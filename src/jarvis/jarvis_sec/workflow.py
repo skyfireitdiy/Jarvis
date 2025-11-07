@@ -48,7 +48,7 @@ def _iter_source_files(
         return
 
     exts = set((languages or ["c", "cpp", "h", "hpp", "rs"]))
-    excludes = set(exclude_dirs or [".git", "build", "out", "target", "third_party", "vendor", "test", "tests", "__tests__", "spec", "testsuite", "testdata", "benchmark", "benchmarks", "perf", "performance", "bench", "profiling", "profiler"])
+    excludes = set(exclude_dirs or [".git", "build", "out", "target", "dist", "bin", "obj", "third_party", "vendor", "deps", "dependencies", "libs", "libraries", "external", "node_modules", "test", "tests", "__tests__", "spec", "testsuite", "testdata", "benchmark", "benchmarks", "perf", "performance", "bench", "benches", "profiling", "profiler", "example", "examples", "tmp", "temp", "cache", ".cache", "docs", "doc", "documentation", "generated", "gen", "mocks", "fixtures", "samples", "sample", "playground", "sandbox"])
 
     for p in entry.rglob("*"):
         if not p.is_file():
@@ -83,9 +83,25 @@ def direct_scan(
     """
     base = Path(entry_path).resolve()
     # 计算实际使用的排除目录列表
-    default_excludes = [".git", "build", "out", "target", "third_party", "vendor", "test", "tests", "__tests__", "spec", "testsuite", "testdata", "benchmark", "benchmarks", "perf", "performance", "bench", "profiling", "profiler"]
+    default_excludes = [".git", "build", "out", "target", "dist", "bin", "obj", "third_party", "vendor", "deps", "dependencies", "libs", "libraries", "external", "node_modules", "test", "tests", "__tests__", "spec", "testsuite", "testdata", "benchmark", "benchmarks", "perf", "performance", "bench", "benches", "profiling", "profiler", "example", "examples", "tmp", "temp", "cache", ".cache", "docs", "doc", "documentation", "generated", "gen", "mocks", "fixtures", "samples", "sample", "playground", "sandbox"]
     actual_excludes = exclude_dirs if exclude_dirs is not None else default_excludes
-    print(f"[Jarvis] 排除目录列表: {', '.join(sorted(actual_excludes))}")
+    
+    # 检查代码库中实际存在的排除目录
+    excludes_set = set(actual_excludes)
+    actual_excluded_dirs = []
+    for item in base.rglob("*"):
+        if item.is_dir() and item.name in excludes_set:
+            rel_path = item.relative_to(base)
+            if str(rel_path) not in actual_excluded_dirs:
+                actual_excluded_dirs.append(str(rel_path))
+    
+    if actual_excluded_dirs:
+        print("[Jarvis] 实际排除的目录:")
+        for dir_path in sorted(actual_excluded_dirs):
+            print(f"  - {dir_path}")
+    else:
+        print(f"[Jarvis] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）")
+    
     files = list(_iter_source_files(entry_path, languages, exclude_dirs))
 
     # 按语言分组
@@ -180,7 +196,7 @@ def run_with_agent(
     - llm_group: 本次分析使用的模型组（仅透传给 Agent，不修改全局配置）
     - report_file: JSONL 报告文件路径（可选，透传）
     - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
-    - exclude_dirs: 要排除的目录列表（可选），默认已包含测试目录（test, tests, __tests__, spec, testsuite, testdata）和性能测试目录（benchmark, benchmarks, perf, performance, bench, profiling, profiler）
+    - exclude_dirs: 要排除的目录列表（可选），默认已包含构建产物（build, out, target, dist, bin, obj）、依赖目录（third_party, vendor, deps, dependencies, libs, libraries, external, node_modules）、测试目录（test, tests, __tests__, spec, testsuite, testdata）、性能测试目录（benchmark, benchmarks, perf, performance, bench, benches, profiling, profiler）、示例目录（example, examples）、临时/缓存（tmp, temp, cache, .cache）、文档（docs, doc, documentation）、生成代码（generated, gen）和其他（mocks, fixtures, samples, sample, playground, sandbox）
     """
     from jarvis.jarvis_sec import run_security_analysis  # 延迟导入，避免循环
     return run_security_analysis(
