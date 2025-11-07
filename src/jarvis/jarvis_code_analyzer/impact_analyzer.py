@@ -8,12 +8,12 @@ import re
 import ast
 import subprocess
 from dataclasses import dataclass, field
-from typing import List, Optional, Set, Dict, Tuple
+from typing import List, Optional, Set, Dict
 from enum import Enum
 
-from .context_manager import ContextManager, Reference
+from .context_manager import ContextManager
 from .symbol_extractor import Symbol
-from .dependency_analyzer import DependencyGraph
+
 
 
 class ImpactType(Enum):
@@ -118,7 +118,7 @@ class ImpactReport:
         
         # 建议
         if self.recommendations:
-            lines.append(f"\n建议:")
+            lines.append("\n建议:")
             for i, rec in enumerate(self.recommendations, 1):
                 lines.append(f"  {i}. {rec}")
         
@@ -167,7 +167,7 @@ class TestDiscoverer:
     
     def find_test_files(self, file_path: str) -> List[str]:
         """查找与文件相关的测试文件"""
-        test_files = []
+        test_files: List[str] = []
         
         # 检测语言
         language = self._detect_language(file_path)
@@ -181,8 +181,6 @@ class TestDiscoverer:
         
         # 获取文件的基础名称（不含扩展名）
         base_name = os.path.splitext(os.path.basename(file_path))[0]
-        dir_path = os.path.dirname(file_path)
-        rel_dir = os.path.relpath(dir_path, self.project_root)
         
         # 在项目根目录搜索测试文件
         for root, dirs, files in os.walk(self.project_root):
@@ -426,7 +424,7 @@ class ImpactAnalyzer:
     
     def _detect_interface_changes(self, file_path: str, edits: List[Edit]) -> List[InterfaceChange]:
         """检测接口变更（函数签名、类定义等）"""
-        changes = []
+        changes: List[InterfaceChange] = []
         
         # 读取文件内容
         content_before = self._get_file_content_before_edit(file_path, edits)
@@ -637,7 +635,7 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
     Returns:
         List[Edit]: 编辑操作列表
     """
-    edits = []
+    edits: List[Edit] = []
     
     try:
         # 获取文件的git diff
@@ -701,9 +699,9 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
             # 解析diff文本
             lines = diff_text.split('\n')
             current_hunk_start = None
-            current_line_num = None
-            before_lines = []
-            after_lines = []
+            current_line_num: Optional[int] = None
+            before_lines: List[str] = []
+            after_lines: List[str] = []
             in_hunk = False
             
             for line in lines:
@@ -725,9 +723,7 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
                     match = re.search(r'@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@', line)
                     if match:
                         old_start = int(match.group(1))
-                        old_count = int(match.group(2)) if match.group(2) else 1
                         new_start = int(match.group(3))
-                        new_count = int(match.group(4)) if match.group(4) else 1
                         
                         current_hunk_start = new_start
                         current_line_num = old_start
@@ -743,7 +739,8 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
                 if line.startswith('-') and not line.startswith('---'):
                     # 删除的行
                     before_lines.append(line[1:])
-                    current_line_num += 1
+                    if current_line_num is not None:
+                        current_line_num += 1
                 elif line.startswith('+') and not line.startswith('+++'):
                     # 新增的行
                     after_lines.append(line[1:])
@@ -751,7 +748,8 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
                     # 未改变的行
                     before_lines.append(line[1:])
                     after_lines.append(line[1:])
-                    current_line_num += 1
+                    if current_line_num is not None:
+                        current_line_num += 1
             
             # 保存最后一个hunk
             if in_hunk and current_hunk_start is not None:

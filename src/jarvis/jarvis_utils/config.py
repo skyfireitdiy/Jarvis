@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import yaml  # type: ignore
+import yaml
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 
@@ -37,7 +37,7 @@ def get_git_commit_prompt() -> str:
     返回:
         str: Git提交信息生成提示模板，如果未配置则返回空字符串
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_GIT_COMMIT_PROMPT", "")
+    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_GIT_COMMIT_PROMPT", ""))
 
 
 # 输出窗口预留大小
@@ -101,7 +101,7 @@ def get_shell_name() -> str:
     4. 如果都未配置，则默认返回bash
     """
     shell_path = GLOBAL_CONFIG_DATA.get("SHELL", os.getenv("SHELL", "/bin/bash"))
-    return os.path.basename(shell_path).lower()
+    return cast(str, os.path.basename(shell_path).lower())
 
 
 def _apply_llm_group_env_override(group_config: Dict[str, Any]) -> None:
@@ -179,7 +179,7 @@ def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
         str: 平台名称，默认为'yuanbao'
     """
     config = _get_resolved_model_config(model_group_override)
-    return config.get("JARVIS_PLATFORM", "yuanbao")
+    return cast(str, config.get("JARVIS_PLATFORM", "yuanbao"))
 
 
 def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
@@ -190,7 +190,7 @@ def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
         str: 模型名称，默认为'deep_seek_v3'
     """
     config = _get_resolved_model_config(model_group_override)
-    return config.get("JARVIS_MODEL", "deep_seek_v3")
+    return cast(str, config.get("JARVIS_MODEL", "deep_seek_v3"))
 
 
 def _deprecated_platform_name_v1(model_group_override: Optional[str] = None) -> str:
@@ -224,7 +224,7 @@ def is_execute_tool_confirm() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_EXECUTE_TOOL_CONFIRM", False)
+    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_EXECUTE_TOOL_CONFIRM", False))
 
 
 def is_confirm_before_apply_patch() -> bool:
@@ -234,7 +234,7 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False)
+    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False))
 
 
 def get_patch_format() -> str:
@@ -250,7 +250,7 @@ def get_patch_format() -> str:
     """
     mode = GLOBAL_CONFIG_DATA.get("JARVIS_PATCH_FORMAT", "all")
     if mode in ["all", "search", "search_range"]:
-        return mode
+        return cast(str, mode)
     return "all"
 
 
@@ -263,7 +263,7 @@ def get_data_dir() -> str:
              如果未设置或为空，则使用~/.jarvis作为默认值
     """
     return os.path.expanduser(
-        GLOBAL_CONFIG_DATA.get("JARVIS_DATA_PATH", "~/.jarvis").strip()
+        cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_DATA_PATH", "~/.jarvis")).strip()
     )
 
 
@@ -291,7 +291,7 @@ def get_pretty_output() -> bool:
     if platform.system() == "Windows":
         return False
 
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", True)
+    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", True))
 
 
 def is_use_methodology() -> bool:
@@ -301,7 +301,7 @@ def is_use_methodology() -> bool:
     返回：
         bool: 如果启用方法论则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_METHODOLOGY", True)
+    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_USE_METHODOLOGY", True))
 
 
 def is_use_analysis() -> bool:
@@ -311,7 +311,7 @@ def is_use_analysis() -> bool:
     返回：
         bool: 如果启用任务分析则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_USE_ANALYSIS", True)
+    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_USE_ANALYSIS", True))
 
 
 def get_tool_load_dirs() -> List[str]:
@@ -405,7 +405,7 @@ def get_central_methodology_repo() -> str:
     返回:
         str: 中心方法论Git仓库地址，如果未配置则返回空字符串
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_METHODOLOGY_REPO", "")
+    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_METHODOLOGY_REPO", ""))
 
 
 def get_central_tool_repo() -> str:
@@ -415,7 +415,7 @@ def get_central_tool_repo() -> str:
     返回:
         str: 中心工具Git仓库地址，如果未配置则返回空字符串
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_TOOL_REPO", "")
+    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_TOOL_REPO", ""))
 
 
 def is_print_prompt() -> bool:
@@ -425,7 +425,7 @@ def is_print_prompt() -> bool:
     返回：
         bool: 如果打印提示则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False)
+    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False))
 
 
 def is_print_error_traceback() -> bool:
@@ -509,7 +509,7 @@ def get_mcp_config() -> List[Dict[str, Any]]:
     返回:
         List[Dict[str, Any]]: MCP配置项列表，如果未配置则返回空列表
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_MCP", [])
+    return cast(List[Dict[str, Any]], GLOBAL_CONFIG_DATA.get("JARVIS_MCP", []))
 
 
 # ==============================================================================
@@ -586,7 +586,7 @@ def get_rag_embedding_model() -> str:
         str: 嵌入模型的名称
     """
     config = _get_resolved_rag_config()
-    return config.get("embedding_model", "BAAI/bge-m3")
+    return cast(str, config.get("embedding_model", "BAAI/bge-m3"))
 
 
 def get_rag_rerank_model() -> str:
@@ -597,7 +597,7 @@ def get_rag_rerank_model() -> str:
         str: rerank模型的名称
     """
     config = _get_resolved_rag_config()
-    return config.get("rerank_model", "BAAI/bge-reranker-v2-m3")
+    return cast(str, config.get("rerank_model", "BAAI/bge-reranker-v2-m3"))
 
 
 def get_rag_embedding_cache_path() -> str:
@@ -707,7 +707,7 @@ def get_tool_use_list() -> List[str]:
         List[str]: 要使用的工具名称列表，空列表表示使用所有工具
     """
     config = _get_resolved_tool_config()
-    return config.get("use", [])
+    return cast(List[str], config.get("use", []))
 
 
 def get_tool_dont_use_list() -> List[str]:
@@ -718,7 +718,7 @@ def get_tool_dont_use_list() -> List[str]:
         List[str]: 不使用的工具名称列表
     """
     config = _get_resolved_tool_config()
-    return config.get("dont_use", [])
+    return cast(List[str], config.get("dont_use", []))
 
 
 def get_tool_filter_threshold() -> int:

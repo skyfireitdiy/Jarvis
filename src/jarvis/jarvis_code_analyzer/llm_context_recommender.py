@@ -66,7 +66,7 @@ class ContextRecommender:
             target_symbols = (target_symbols or []) + extracted_info["target_symbols"]
         
         # 3. 基于目标文件推荐（依赖关系、测试文件等）
-        recommended_files: Set[str] = set()
+        recommended_files: Set[str] = set(target_files or [])
         recommended_symbols: List[Symbol] = []
         related_tests: Set[str] = set()
         reasons: List[str] = []
@@ -209,7 +209,7 @@ description: 修复数据处理函数中的验证逻辑错误
                 yaml_content = response.strip()
             
             extracted = yaml.safe_load(yaml_content)
-            if extracted is None:
+            if not isinstance(extracted, dict):
                 extracted = {}
             return extracted
         except Exception as e:
@@ -594,7 +594,7 @@ symbol3: 6.0
             # 使用chat_until_success方法（BasePlatform的标准接口）
             if hasattr(self.llm_model, 'chat_until_success'):
                 response = self.llm_model.chat_until_success(prompt)
-                return response
+                return str(response)
             else:
                 # 如果不支持chat_until_success，抛出异常
                 raise ValueError("LLM model does not support chat_until_success interface")
