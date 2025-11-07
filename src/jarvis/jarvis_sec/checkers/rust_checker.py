@@ -1053,7 +1053,7 @@ def analyze_rust_text(relpath: str, text: str) -> List[Issue]:
     clean_text = _remove_comments_preserve_strings(text)
     masked_text = _mask_strings_preserve_len(clean_text)
     # 原始行：保留字符串内容，供需要解析字面量的规则使用
-    lines = clean_text.splitlines()
+    clean_text.splitlines()
     # 掩蔽行：字符串内容已被空格替换，适合用于通用 API/关键字匹配，减少误报
     mlines = masked_text.splitlines()
 

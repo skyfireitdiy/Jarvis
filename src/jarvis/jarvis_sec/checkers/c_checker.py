@@ -1855,7 +1855,7 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
                             file=relpath,
                             line=idx,
                             evidence=_strip_line(s),
-                            description=f"使用 delete[] 释放由 new 分配的内存（非数组），存在未定义行为风险。",
+                            description="使用 delete[] 释放由 new 分配的内存（非数组），存在未定义行为风险。",
                             suggestion="new 分配的内存应使用 delete 释放；new[] 分配的内存应使用 delete[] 释放。",
                             confidence=0.85,
                             severity="high",
@@ -1877,7 +1877,7 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
                             file=relpath,
                             line=idx,
                             evidence=_strip_line(s),
-                            description=f"使用 delete 释放由 new[] 分配的数组内存，存在未定义行为风险。",
+                            description="使用 delete 释放由 new[] 分配的数组内存，存在未定义行为风险。",
                             suggestion="new[] 分配的内存应使用 delete[] 释放；new 分配的内存应使用 delete 释放。",
                             confidence=0.85,
                             severity="high",
@@ -2272,7 +2272,7 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
                         break
         
         # 检测 lock_guard/unique_lock（RAII，自动解锁，通常更安全）
-        m_guard = RE_LOCK_GUARD.search(s) or RE_UNIQUE_LOCK.search(s) or RE_SHARED_LOCK.search(s)
+        RE_LOCK_GUARD.search(s) or RE_UNIQUE_LOCK.search(s) or RE_SHARED_LOCK.search(s)
         
         # 检测 std::lock 或 scoped_lock（死锁避免机制）
         has_safe_lock = RE_STD_LOCK.search(s) or RE_SCOPED_LOCK.search(s)
@@ -2298,7 +2298,7 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
                             file=relpath,
                             line=idx,
                             evidence=_strip_line(s),
-                            description=f"检测到手动锁定多个 mutex 但未使用 std::lock 或 std::scoped_lock，存在死锁风险。",
+                            description="检测到手动锁定多个 mutex 但未使用 std::lock 或 std::scoped_lock，存在死锁风险。",
                             suggestion="使用 std::lock 或 std::scoped_lock 同时锁定多个 mutex，可避免死锁；或统一加锁顺序。",
                             confidence=0.65,
                             severity="high",

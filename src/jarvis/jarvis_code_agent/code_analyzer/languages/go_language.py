@@ -83,7 +83,7 @@ class GoDependencyAnalyzer(DependencyAnalyzer):
         # Match import statements
         # Format: import "package" or import ( "package1" "package2" )
         # Also: import alias "package"
-        import_pattern = re.compile(
+        re.compile(
             r'import\s+(?:\(([^)]+)\)|(?:"([^"]+)"|`([^`]+)`)|(\w+)\s+(?:"([^"]+)"|`([^`]+)`)))',
             re.MULTILINE
         )

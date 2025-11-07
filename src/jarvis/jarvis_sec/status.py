@@ -156,7 +156,7 @@ class StatusManager:
             progress=progress,
             current=current_file,
             total=total_files,
-            message=message or f"正在进行聚类分析...",
+            message=message or "正在进行聚类分析...",
             details=details,
         )
     
@@ -190,7 +190,7 @@ class StatusManager:
             progress=progress,
             current=current_batch,
             total=total_batches,
-            message=message or f"正在进行安全验证...",
+            message=message or "正在进行安全验证...",
             details=details,
         )
     

@@ -351,7 +351,7 @@ def get_lint_command(tool_name: str, file_path: str, project_root: Optional[str]
     # 替换占位符
     try:
         command = template.format(**placeholders)
-    except KeyError as e:
+    except KeyError:
         # 如果模板中有未定义的占位符，返回None
         return None
     

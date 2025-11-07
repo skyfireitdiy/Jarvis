@@ -46,7 +46,7 @@ class LanguageRegistry:
             language_name: 语言名称
         """
         if language_name in self._languages:
-            lang_support = self._languages.pop(language_name)
+            self._languages.pop(language_name)
             # 移除扩展名映射
             extensions_to_remove = [
                 ext for ext, lang in self._extension_map.items()

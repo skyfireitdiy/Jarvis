@@ -1473,27 +1473,20 @@ class CodeAgent:
         PrettyOutput.print(f"🔍 正在进行静态检查 ({files_str}, 使用 {tools_str})...", OutputType.INFO)
         
         results = []
+        # 记录每个文件的检查结果
+        file_results = []  # [(file_path, tool_name, status, message), ...]
         
         # 按工具分组，相同工具可以批量执行
         grouped = group_commands_by_tool(commands)
         
-        # 统计总任务数和已完成数
-        total_tasks = sum(len(file_commands) for file_commands in grouped.values())
-        completed_tasks = 0
-        
         for tool_name, file_commands in grouped.items():
             for file_path, command in file_commands:
-                completed_tasks += 1
-                # 打印当前检查状态
                 file_name = os.path.basename(file_path)
-                status_msg = f"  [{completed_tasks}/{total_tasks}] 检查 {file_name} ({tool_name})..."
-                PrettyOutput.print(status_msg, OutputType.INFO)
-                
                 try:
                     # 检查文件是否存在
                     abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
                     if not os.path.exists(abs_file_path):
-                        PrettyOutput.print("    ⚠️  文件不存在，跳过", OutputType.WARNING)
+                        file_results.append((file_name, tool_name, "跳过", "文件不存在"))
                         continue
                     
                     # 执行命令
@@ -1513,31 +1506,63 @@ class CodeAgent:
                         output = result.stdout + result.stderr
                         if output.strip():  # 有输出才记录
                             results.append((tool_name, file_path, command, result.returncode, output))
-                            PrettyOutput.print("    ❌ 发现问题", OutputType.WARNING)
+                            file_results.append((file_name, tool_name, "失败", "发现问题"))
                         else:
-                            PrettyOutput.print("    ✅ 通过", OutputType.SUCCESS)
+                            file_results.append((file_name, tool_name, "通过", ""))
                     else:
-                        PrettyOutput.print("    ✅ 通过", OutputType.SUCCESS)
+                        file_results.append((file_name, tool_name, "通过", ""))
                 
                 except subprocess.TimeoutExpired:
                     results.append((tool_name, file_path, command, -1, "执行超时（30秒）"))
-                    PrettyOutput.print("    ⏱️  执行超时（30秒）", OutputType.WARNING)
+                    file_results.append((file_name, tool_name, "超时", "执行超时（30秒）"))
                 except FileNotFoundError:
                     # 工具未安装，跳过
-                    PrettyOutput.print("    ⚠️  工具未安装，跳过", OutputType.WARNING)
+                    file_results.append((file_name, tool_name, "跳过", "工具未安装"))
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(f"执行lint命令失败: {command}, 错误: {e}")
-                    PrettyOutput.print(f"    ❌ 执行失败: {str(e)[:50]}", OutputType.ERROR)
+                    file_results.append((file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}"))
                     continue
         
-        # 打印总结
-        if results:
-            error_count = len(results)
-            PrettyOutput.print(f"🔍 静态检查完成: 发现 {error_count} 个问题", OutputType.WARNING)
+        # 一次性打印所有检查结果
+        if file_results:
+            total_files = len(file_results)
+            passed_count = sum(1 for _, _, status, _ in file_results if status == "通过")
+            failed_count = sum(1 for _, _, status, _ in file_results if status == "失败")
+            timeout_count = sum(1 for _, _, status, _ in file_results if status == "超时")
+            skipped_count = sum(1 for _, _, status, _ in file_results if status == "跳过")
+            
+            # 构建结果摘要
+            summary_lines = [f"🔍 静态检查完成: 共检查 {total_files} 个文件"]
+            if passed_count > 0:
+                summary_lines.append(f"  ✅ 通过: {passed_count}")
+            if failed_count > 0:
+                summary_lines.append(f"  ❌ 失败: {failed_count}")
+            if timeout_count > 0:
+                summary_lines.append(f"  ⏱️  超时: {timeout_count}")
+            if skipped_count > 0:
+                summary_lines.append(f"  ⚠️  跳过: {skipped_count}")
+            
+            # 添加详细结果（只显示失败和超时的文件）
+            if failed_count > 0 or timeout_count > 0:
+                summary_lines.append("\n详细结果:")
+                for file_name, tool_name, status, message in file_results:
+                    if status not in ("失败", "超时"):
+                        continue  # 只显示失败和超时的文件
+                    status_icon = {
+                        "失败": "❌",
+                        "超时": "⏱️"
+                    }.get(status, "•")
+                    if message:
+                        summary_lines.append(f"  {status_icon} {file_name} ({tool_name}): {message}")
+                    else:
+                        summary_lines.append(f"  {status_icon} {file_name} ({tool_name})")
+            
+            output_type = OutputType.WARNING if (failed_count > 0 or timeout_count > 0) else OutputType.SUCCESS
+            PrettyOutput.print("\n".join(summary_lines), output_type)
         else:
             PrettyOutput.print("🔍 静态检查完成: 全部通过", OutputType.SUCCESS)
         

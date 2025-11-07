@@ -123,7 +123,7 @@ class ContextRecommender:
             reasons.append("LLM语义搜索")
 
         # 6. 使用LLM对推荐结果进行相关性评分和排序
-        scored_files = self._score_files_with_llm(
+        self._score_files_with_llm(
             user_input,
             list(recommended_files),
         )
