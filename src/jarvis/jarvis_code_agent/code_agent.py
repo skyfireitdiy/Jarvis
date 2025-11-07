@@ -961,6 +961,9 @@ class CodeAgent:
 
     def _update_context_for_modified_files(self, modified_files: List[str]) -> None:
         """更新上下文管理器：当文件被修改后，更新符号表和依赖图"""
+        if not modified_files:
+            return
+        PrettyOutput.print("🔄 正在更新代码上下文...", OutputType.INFO)
         for file_path in modified_files:
             if os.path.exists(file_path):
                 try:
@@ -980,6 +983,7 @@ class CodeAgent:
         if not is_enable_impact_analysis():
             return None
         
+        PrettyOutput.print("🔍 正在进行变更影响分析...", OutputType.INFO)
         try:
             impact_analyzer = ImpactAnalyzer(self.context_manager)
             all_edits = []
@@ -1136,7 +1140,7 @@ class CodeAgent:
                     reason="用户选择禁用（项目可能需要在特殊环境中构建）"
                 )
                 config.mark_as_asked()
-                final_ret += f"\n\nℹ️ 已禁用构建验证，后续将仅进行基础静态检查\n"
+                final_ret += "\n\nℹ️ 已禁用构建验证，后续将仅进行基础静态检查\n"
                 
                 # 输出基础静态检查日志
                 file_count = len(modified_files)
@@ -1241,9 +1245,9 @@ class CodeAgent:
 请仔细检查并修复所有问题。
                 """
                 agent.set_addon_prompt(addon_prompt)
-                final_ret += f"\n\n⚠️ 静态扫描发现问题，已提示修复\n"
+                final_ret += "\n\n⚠️ 静态扫描发现问题，已提示修复\n"
             else:
-                final_ret += f"\n\n✅ 静态扫描通过\n"
+                final_ret += "\n\n✅ 静态扫描通过\n"
         
         return final_ret
 
@@ -1391,7 +1395,7 @@ class CodeAgent:
                             results.append((tool_name, file_path, command, result.returncode, output))
                 
                 except subprocess.TimeoutExpired:
-                    results.append((tool_name, file_path, command, -1, f"执行超时（30秒）"))
+                    results.append((tool_name, file_path, command, -1, "执行超时（30秒）"))
                 except FileNotFoundError:
                     # 工具未安装，跳过
                     continue
