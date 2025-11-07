@@ -128,7 +128,7 @@ class TaskAnalyzer:
 
     def _handle_interrupt_with_tool_calls(self, user_input: str) -> str:
         """处理有工具调用时的中断"""
-        if self.agent.user_confirm("检测到有工具调用，是否继续处理工具调用？", True):
+        if self.agent.confirm_callback("检测到有工具调用，是否继续处理工具调用？", True):
             return join_prompts([
                 f"被用户中断，用户补充信息为：{user_input}",
                 "用户同意继续工具调用。"
@@ -144,7 +144,7 @@ class TaskAnalyzer:
         satisfaction_feedback = ""
 
         if not auto_completed and self.agent.use_analysis:
-            if self.agent.user_confirm("您对本次任务的完成是否满意？", True):
+            if self.agent.confirm_callback("您对本次任务的完成是否满意？", True):
                 satisfaction_feedback = "用户对本次任务的完成表示满意。"
             else:
                 feedback = self.agent._multiline_input(
@@ -158,6 +158,9 @@ class TaskAnalyzer:
                     satisfaction_feedback = (
                         "用户对本次任务的完成不满意，未提供具体反馈意见。"
                     )
+        elif auto_completed and self.agent.use_analysis:
+            # 自动完成模式下，仍然执行分析，但不收集用户反馈
+            satisfaction_feedback = "任务已自动完成，无需用户反馈。"
 
         return satisfaction_feedback
 
