@@ -1,6 +1,6 @@
 # 语言支持扩展指南
 
-本文档说明如何为 `jarvis_code_analyzer` 添加新的编程语言支持。
+本文档说明如何为 `code_analyzer` 添加新的编程语言支持。
 
 ## 架构概述
 
@@ -117,7 +117,7 @@ register_language(JavaScriptLanguageSupport())
 添加新语言支持后，可以通过以下方式测试：
 
 ```python
-from jarvis.jarvis_code_analyzer import detect_language, get_symbol_extractor, get_dependency_analyzer
+from jarvis.jarvis_code_agent.code_analyzer import detect_language, get_symbol_extractor, get_dependency_analyzer
 
 # 检测语言
 lang = detect_language('example.js')

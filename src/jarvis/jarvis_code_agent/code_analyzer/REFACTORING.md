@@ -64,7 +64,7 @@ class BaseLanguageSupport(ABC):
 ## 文件结构
 
 ```
-jarvis_code_analyzer/
+code_analyzer/
 ├── base_language.py          # 基础抽象类
 ├── language_registry.py      # 语言注册表
 ├── language_support.py        # 语言支持模块（使用注册表）

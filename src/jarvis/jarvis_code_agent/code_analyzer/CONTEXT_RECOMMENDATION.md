@@ -67,7 +67,7 @@ agent.run("修复 process_data 函数中的bug")
 也可以手动使用上下文推荐器：
 
 ```python
-from jarvis.jarvis_code_analyzer import ContextManager, ContextRecommender
+from jarvis.jarvis_code_agent.code_analyzer import ContextManager, ContextRecommender
 
 # 初始化
 context_manager = ContextManager(project_root)
