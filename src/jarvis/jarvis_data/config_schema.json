@@ -190,8 +190,8 @@
     },
     "JARVIS_PLAN_ENABLED": {
       "type": "boolean",
-      "description": "是否默认启用任务规划。当 Agent 初始化时 plan 参数未指定，将从此配置加载。默认 false。",
-      "default": false
+      "description": "是否默认启用任务规划。当 Agent 初始化时 plan 参数未指定，将从此配置加载。默认 true。",
+      "default": true
     },
     "JARVIS_PLAN_MAX_DEPTH": {
       "type": "number",

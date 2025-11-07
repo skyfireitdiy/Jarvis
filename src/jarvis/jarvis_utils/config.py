@@ -748,9 +748,9 @@ def is_plan_enabled() -> bool:
     获取是否默认启用任务规划。
 
     返回:
-        bool: 如果启用任务规划则返回True，默认为False
+        bool: 如果启用任务规划则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_ENABLED", False) is True
+    return GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_ENABLED", True) is True
 
 
 def get_auto_summary_rounds() -> int:

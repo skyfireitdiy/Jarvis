@@ -1458,7 +1458,7 @@ def _collect_optional_config_interactively(
         _ask_and_set(
             "JARVIS_PLAN_ENABLED",
             "是否默认启用任务规划？当 Agent 初始化时 plan 参数未指定，将从此配置加载",
-            False,
+            True,
             "bool",
         )
         or changed
