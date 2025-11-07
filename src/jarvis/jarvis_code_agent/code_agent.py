@@ -1455,12 +1455,23 @@ class CodeAgent:
         # 按工具分组，相同工具可以批量执行
         grouped = group_commands_by_tool(commands)
         
+        # 统计总任务数和已完成数
+        total_tasks = sum(len(file_commands) for file_commands in grouped.values())
+        completed_tasks = 0
+        
         for tool_name, file_commands in grouped.items():
             for file_path, command in file_commands:
+                completed_tasks += 1
+                # 打印当前检查状态
+                file_name = os.path.basename(file_path)
+                status_msg = f"  [{completed_tasks}/{total_tasks}] 检查 {file_name} ({tool_name})..."
+                PrettyOutput.print(status_msg, OutputType.INFO)
+                
                 try:
                     # 检查文件是否存在
                     abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
                     if not os.path.exists(abs_file_path):
+                        PrettyOutput.print(f"    ⚠️  文件不存在，跳过", OutputType.WARNING)
                         continue
                     
                     # 执行命令
@@ -1480,18 +1491,33 @@ class CodeAgent:
                         output = result.stdout + result.stderr
                         if output.strip():  # 有输出才记录
                             results.append((tool_name, file_path, command, result.returncode, output))
+                            PrettyOutput.print(f"    ❌ 发现问题", OutputType.WARNING)
+                        else:
+                            PrettyOutput.print(f"    ✅ 通过", OutputType.SUCCESS)
+                    else:
+                        PrettyOutput.print(f"    ✅ 通过", OutputType.SUCCESS)
                 
                 except subprocess.TimeoutExpired:
                     results.append((tool_name, file_path, command, -1, "执行超时（30秒）"))
+                    PrettyOutput.print(f"    ⏱️  执行超时（30秒）", OutputType.WARNING)
                 except FileNotFoundError:
                     # 工具未安装，跳过
+                    PrettyOutput.print(f"    ⚠️  工具未安装，跳过", OutputType.WARNING)
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(f"执行lint命令失败: {command}, 错误: {e}")
+                    PrettyOutput.print(f"    ❌ 执行失败: {str(e)[:50]}", OutputType.ERROR)
                     continue
+        
+        # 打印总结
+        if results:
+            error_count = len(results)
+            PrettyOutput.print(f"🔍 静态检查完成: 发现 {error_count} 个问题", OutputType.WARNING)
+        else:
+            PrettyOutput.print(f"🔍 静态检查完成: 全部通过", OutputType.SUCCESS)
         
         return results
     
