@@ -8,17 +8,25 @@ import os
 import subprocess
 import sys
 import hashlib
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any
 
 import typer
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
-from jarvis.jarvis_code_agent.lint import get_lint_tools
+from jarvis.jarvis_code_agent.lint import (
+    get_lint_tools,
+    get_lint_commands_for_files,
+    group_commands_by_tool,
+)
+from jarvis.jarvis_code_agent.build_validator import BuildValidator, BuildResult, FallbackBuildValidator
+from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_static_analysis,
+    is_enable_build_validation,
+    get_build_validation_timeout,
     get_git_check_mode,
     set_config,
     get_data_dir,
@@ -938,6 +946,87 @@ class CodeAgent:
                     final_ret += (
                         f"\n\n代码已修改完成\n补丁内容（按文件）:\n{per_file_preview}\n"
                     )
+                    
+                    # 构建验证
+                    build_validation_result = None
+                    config = BuildValidationConfig(self.root_dir)
+                    
+                    # 检查是否已禁用构建验证
+                    if config.is_build_validation_disabled():
+                        # 已禁用，仅进行基础静态检查
+                        reason = config.get_disable_reason()
+                        reason_text = f"（原因: {reason}）" if reason else ""
+                        final_ret += f"\n\nℹ️ 构建验证已禁用{reason_text}，仅进行基础静态检查\n"
+                        # 使用兜底验证器进行基础静态检查
+                        fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
+                        static_check_result = fallback_validator.validate(modified_files)
+                        if not static_check_result.success:
+                            final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
+                            agent.set_addon_prompt(
+                                f"基础静态检查失败，请根据以下错误信息修复代码:\n{static_check_result.error_message or static_check_result.output}\n"
+                            )
+                        else:
+                            final_ret += f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
+                    elif is_enable_build_validation():
+                        # 未禁用，进行构建验证
+                        build_validation_result = self._validate_build_after_edit(modified_files)
+                        if build_validation_result:
+                            if not build_validation_result.success:
+                                # 构建失败，检查是否需要询问用户
+                                if not config.has_been_asked():
+                                    # 首次失败，询问用户
+                                    error_preview = (build_validation_result.error_message or build_validation_result.output)[:500]
+                                    PrettyOutput.print(
+                                        f"\n⚠️ 构建验证失败:\n{error_preview}\n",
+                                        OutputType.WARNING,
+                                    )
+                                    PrettyOutput.print(
+                                        "提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
+                                        "可以选择禁用构建验证，后续将仅进行基础静态检查。",
+                                        OutputType.INFO,
+                                    )
+                                    
+                                    if user_confirm(
+                                        "是否要禁用构建验证，后续仅进行基础静态检查？",
+                                        default=False,
+                                    ):
+                                        # 用户选择禁用
+                                        config.disable_build_validation(
+                                            reason="用户选择禁用（项目可能需要在特殊环境中构建）"
+                                        )
+                                        config.mark_as_asked()
+                                        final_ret += f"\n\nℹ️ 已禁用构建验证，后续将仅进行基础静态检查\n"
+                                        # 立即进行基础静态检查
+                                        fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
+                                        static_check_result = fallback_validator.validate(modified_files)
+                                        if not static_check_result.success:
+                                            final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
+                                            agent.set_addon_prompt(
+                                                f"基础静态检查失败，请根据以下错误信息修复代码:\n{static_check_result.error_message or static_check_result.output}\n"
+                                            )
+                                        else:
+                                            final_ret += f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
+                                    else:
+                                        # 用户选择继续验证，标记为已询问
+                                        config.mark_as_asked()
+                                        final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                                        # 如果构建失败，添加修复提示
+                                        agent.set_addon_prompt(
+                                            f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                                            "请仔细检查错误信息，修复编译/构建错误后重新提交。"
+                                        )
+                                else:
+                                    # 已经询问过，直接显示错误
+                                    final_ret += f"\n\n⚠️ 构建验证失败:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                                    # 如果构建失败，添加修复提示
+                                    agent.set_addon_prompt(
+                                        f"构建验证失败，请根据以下错误信息修复代码:\n{build_validation_result.error_message or build_validation_result.output}\n"
+                                        "请仔细检查错误信息，修复编译/构建错误后重新提交。"
+                                    )
+                            else:
+                                build_system_info = f" ({build_validation_result.build_system.value})" if build_validation_result.build_system else ""
+                                final_ret += f"\n\n✅ 构建验证通过{build_system_info}（耗时 {build_validation_result.duration:.2f}秒）\n"
+                    
                     # 修改后的提示逻辑
                     lint_tools_info = "\n".join(
                         f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
@@ -951,14 +1040,30 @@ class CodeAgent:
                         else ""
                     )
                     if lint_tools_info and is_enable_static_analysis():
-                        addon_prompt = f"""
-请对以下修改的文件进行静态扫描:
-    {file_list}
-{tool_info}
-如果本次修改引入了警告和错误，请根据警告和错误信息修复代码
-注意：如果要进行静态检查，需要在所有的修改都完成之后进行集中检查，如果文件有多个检查工具，尽量一次全部调用，不要分多次调用
-                    """
-                        agent.set_addon_prompt(addon_prompt)
+                        # 如果构建验证失败且未禁用，不进行静态分析（避免重复错误）
+                        # 如果构建验证已禁用，则进行静态分析（因为只做了基础静态检查）
+                        should_skip_static = (
+                            build_validation_result 
+                            and not build_validation_result.success 
+                            and not config.is_build_validation_disabled()
+                        )
+                        if not should_skip_static:
+                            # 直接执行静态扫描
+                            lint_results = self._run_static_analysis(modified_files)
+                            if lint_results:
+                                # 有错误或警告，让大模型修复
+                                errors_summary = self._format_lint_results(lint_results)
+                                addon_prompt = f"""
+静态扫描发现以下问题，请根据错误信息修复代码:
+
+{errors_summary}
+
+请仔细检查并修复所有问题。
+                                """
+                                agent.set_addon_prompt(addon_prompt)
+                                final_ret += f"\n\n⚠️ 静态扫描发现问题，已提示修复\n"
+                            else:
+                                final_ret += f"\n\n✅ 静态扫描通过\n"
                 else:
                     final_ret += "\n\n修改没有生效\n"
             else:
@@ -982,6 +1087,128 @@ class CodeAgent:
             agent.set_addon_prompt(custom_reply)
         agent.session.prompt += final_ret
         return
+
+    def _run_static_analysis(self, modified_files: List[str]) -> List[Tuple[str, str, str, int, str]]:
+        """执行静态分析
+        
+        Args:
+            modified_files: 修改的文件列表
+        
+        Returns:
+            [(tool_name, file_path, command, returncode, output), ...] 格式的结果列表
+            只返回有错误或警告的结果（returncode != 0）
+        """
+        if not modified_files:
+            return []
+        
+        # 获取所有lint命令
+        commands = get_lint_commands_for_files(modified_files, self.root_dir)
+        if not commands:
+            return []
+        
+        results = []
+        
+        # 按工具分组，相同工具可以批量执行
+        grouped = group_commands_by_tool(commands)
+        
+        for tool_name, file_commands in grouped.items():
+            for file_path, command in file_commands:
+                try:
+                    # 检查文件是否存在
+                    abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
+                    if not os.path.exists(abs_file_path):
+                        continue
+                    
+                    # 执行命令
+                    result = subprocess.run(
+                        command,
+                        shell=True,
+                        cwd=self.root_dir,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=30,  # 30秒超时
+                    )
+                    
+                    # 只记录有错误或警告的结果
+                    if result.returncode != 0:
+                        output = result.stdout + result.stderr
+                        if output.strip():  # 有输出才记录
+                            results.append((tool_name, file_path, command, result.returncode, output))
+                
+                except subprocess.TimeoutExpired:
+                    results.append((tool_name, file_path, command, -1, f"执行超时（30秒）"))
+                except FileNotFoundError:
+                    # 工具未安装，跳过
+                    continue
+                except Exception as e:
+                    # 其他错误，记录但继续
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"执行lint命令失败: {command}, 错误: {e}")
+                    continue
+        
+        return results
+    
+    def _format_lint_results(self, results: List[Tuple[str, str, str, int, str]]) -> str:
+        """格式化lint结果
+        
+        Args:
+            results: [(tool_name, file_path, command, returncode, output), ...]
+        
+        Returns:
+            格式化的错误信息字符串
+        """
+        if not results:
+            return ""
+        
+        lines = []
+        for tool_name, file_path, command, returncode, output in results:
+            lines.append(f"工具: {tool_name}")
+            lines.append(f"文件: {file_path}")
+            lines.append(f"命令: {command}")
+            if returncode == -1:
+                lines.append(f"错误: {output}")
+            else:
+                # 限制输出长度，避免过长
+                output_preview = output[:1000] if len(output) > 1000 else output
+                lines.append(f"输出:\n{output_preview}")
+                if len(output) > 1000:
+                    lines.append(f"... (输出已截断，共 {len(output)} 字符)")
+            lines.append("")  # 空行分隔
+        
+        return "\n".join(lines)
+    
+    def _validate_build_after_edit(self, modified_files: List[str]) -> Optional[BuildResult]:
+        """编辑后验证构建
+        
+        Args:
+            modified_files: 修改的文件列表
+        
+        Returns:
+            BuildResult: 验证结果，如果验证被禁用或出错则返回None
+        """
+        if not is_enable_build_validation():
+            return None
+        
+        # 检查项目配置，看是否已禁用构建验证
+        config = BuildValidationConfig(self.root_dir)
+        if config.is_build_validation_disabled():
+            # 已禁用，返回None，由调用方处理基础静态检查
+            return None
+        
+        try:
+            timeout = get_build_validation_timeout()
+            validator = BuildValidator(self.root_dir, timeout=timeout)
+            result = validator.validate(modified_files)
+            return result
+        except Exception as e:
+            # 构建验证失败不应该影响主流程，仅记录日志
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"构建验证执行失败: {e}", exc_info=True)
+            return None
 
 
 @app.command()

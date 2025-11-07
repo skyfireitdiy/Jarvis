@@ -458,6 +458,26 @@ def is_enable_static_analysis() -> bool:
     return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STATIC_ANALYSIS", True) is True
 
 
+def is_enable_build_validation() -> bool:
+    """
+    获取是否启用构建验证。
+
+    返回：
+        bool: 如果启用构建验证则返回True，默认为True
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_BUILD_VALIDATION", True) is True
+
+
+def get_build_validation_timeout() -> int:
+    """
+    获取构建验证的超时时间（秒）。
+
+    返回：
+        int: 超时时间，默认为30秒
+    """
+    return int(GLOBAL_CONFIG_DATA.get("JARVIS_BUILD_VALIDATION_TIMEOUT", 30))
+
+
 def get_git_check_mode() -> str:
     """
     获取Git校验模式。

@@ -1324,6 +1324,23 @@ def _collect_optional_config_interactively(
     )
     changed = (
         _ask_and_set(
+            "JARVIS_ENABLE_BUILD_VALIDATION",
+            "是否启用构建验证（Build Validation）？在代码编辑后自动验证代码能否成功编译/构建。",
+            True,
+            "bool",
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set_int(
+            "JARVIS_BUILD_VALIDATION_TIMEOUT",
+            "构建验证的超时时间（秒，默认30秒）",
+            30,
+        )
+        or changed
+    )
+    changed = (
+        _ask_and_set(
             "JARVIS_USE_METHODOLOGY",
             "是否启用方法论系统（Methodology）？",
             True,
