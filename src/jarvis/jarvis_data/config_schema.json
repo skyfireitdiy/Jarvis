@@ -312,6 +312,16 @@
       "description": "是否启用静态代码分析",
       "default": true
     },
+    "JARVIS_ENABLE_BUILD_VALIDATION": {
+      "type": "boolean",
+      "description": "是否启用构建验证。在代码编辑后自动验证代码能否成功编译/构建，确保编辑不会破坏项目构建。",
+      "default": true
+    },
+    "JARVIS_BUILD_VALIDATION_TIMEOUT": {
+      "type": "number",
+      "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
+      "default": 30
+    },
     "JARVIS_FORCE_SAVE_MEMORY": {
       "type": "boolean",
       "description": "是否强制保存记忆",
