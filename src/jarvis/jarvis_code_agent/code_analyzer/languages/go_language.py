@@ -32,9 +32,9 @@ GO_SYMBOL_QUERY = """
 # --- Go Language Setup ---
 
 try:
-    # Assumes the compiled grammar is located at 'build/my-languages.so'
-    GO_LANGUAGE: Optional[Language] = Language('build/my-languages.so', 'go')
-except Exception:
+    import tree_sitter_go
+    GO_LANGUAGE: Optional[Language] = tree_sitter_go.language()
+except (ImportError, Exception):
     GO_LANGUAGE = None
 
 

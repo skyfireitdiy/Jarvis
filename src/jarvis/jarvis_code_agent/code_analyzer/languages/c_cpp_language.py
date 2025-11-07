@@ -34,13 +34,15 @@ C_CPP_SYMBOL_QUERY = """
 # --- C/C++ Language Setup ---
 
 try:
-    C_LANGUAGE: Optional[Language] = Language('build/my-languages.so', 'c')
-except Exception:
+    import tree_sitter_c
+    C_LANGUAGE: Optional[Language] = tree_sitter_c.language()
+except (ImportError, Exception):
     C_LANGUAGE = None
 
 try:
-    CPP_LANGUAGE: Optional[Language] = Language('build/my-languages.so', 'cpp')
-except Exception:
+    import tree_sitter_cpp
+    CPP_LANGUAGE: Optional[Language] = tree_sitter_cpp.language()
+except (ImportError, Exception):
     CPP_LANGUAGE = None
 
 
