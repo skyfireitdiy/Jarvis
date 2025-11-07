@@ -78,6 +78,7 @@ from jarvis.jarvis_utils.config import (
     get_after_tool_call_cb_dirs,
     get_plan_max_depth,
     is_plan_enabled,
+    get_addon_prompt_threshold,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -772,8 +773,10 @@ class Agent:
             message = join_prompts([message, addon_text])
             self.session.addon_prompt = ""
         else:
-            addon_text = self.make_default_addon_prompt(need_complete)
-            message = join_prompts([message, addon_text])
+            threshold = get_addon_prompt_threshold()
+            if len(message) > threshold:
+                addon_text = self.make_default_addon_prompt(need_complete)
+                message = join_prompts([message, addon_text])
 
         # 广播添加附加提示后事件（不影响主流程）
         try:
