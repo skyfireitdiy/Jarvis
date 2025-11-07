@@ -4,7 +4,7 @@
 完全基于LLM实现，不依赖硬编码规则。
 """
 
-import json
+
 import os
 import re
 import yaml
@@ -194,8 +194,8 @@ description: 修复数据处理函数中的验证逻辑错误
             # 从<INTENT>标签中提取内容
             response = response.strip()
             # 提取<INTENT>标签内的内容
-            # 支持两种格式：<INTENT>...content...</INTENT> 或 <INTENT>...content...<INTENT>
-            yaml_match = re.search(r'<INTENT>\s*(.*?)\s*(?:</INTENT>|<INTENT>)', response, re.DOTALL)
+            # 支持 <INTENT>...content...</INTENT> 格式
+            yaml_match = re.search(r'<INTENT>\s*(.*?)\s*</INTENT>', response, re.DOTALL)
             if yaml_match:
                 yaml_content = yaml_match.group(1).strip()
             else:
@@ -276,7 +276,7 @@ description: 修复数据处理函数中的验证逻辑错误
             response = self._call_llm(prompt)
             # 从<SYMBOLS>标签中提取内容
             response = response.strip()
-            yaml_match = re.search(r'<SYMBOLS>\s*(.*?)\s*(?:</SYMBOLS>|<SYMBOLS>)', response, re.DOTALL)
+            yaml_match = re.search(r'<SYMBOLS>\s*(.*?)\s*</SYMBOLS>', response, re.DOTALL)
             if yaml_match:
                 yaml_content = yaml_match.group(1).strip()
             else:
@@ -354,7 +354,7 @@ description: 修复数据处理函数中的验证逻辑错误
             response = self._call_llm(prompt)
             # 从<FILES>标签中提取内容
             response = response.strip()
-            yaml_match = re.search(r'<FILES>\s*(.*?)\s*(?:</FILES>|<FILES>)', response, re.DOTALL)
+            yaml_match = re.search(r'<FILES>\s*(.*?)\s*</FILES>', response, re.DOTALL)
             if yaml_match:
                 yaml_content = yaml_match.group(1).strip()
             else:
@@ -428,7 +428,7 @@ path/to/file3.py: 5.5
             response = self._call_llm(prompt)
             # 从<FILE_SCORES>标签中提取内容
             response = response.strip()
-            yaml_match = re.search(r'<FILE_SCORES>\s*(.*?)\s*(?:</FILE_SCORES>|<FILE_SCORES>)', response, re.DOTALL)
+            yaml_match = re.search(r'<FILE_SCORES>\s*(.*?)\s*</FILE_SCORES>', response, re.DOTALL)
             if yaml_match:
                 yaml_content = yaml_match.group(1).strip()
             else:
@@ -510,7 +510,7 @@ symbol3: 6.0
             response = self._call_llm(prompt)
             # 从<SYMBOL_SCORES>标签中提取内容
             response = response.strip()
-            yaml_match = re.search(r'<SYMBOL_SCORES>\s*(.*?)\s*(?:</SYMBOL_SCORES>|<SYMBOL_SCORES>)', response, re.DOTALL)
+            yaml_match = re.search(r'<SYMBOL_SCORES>\s*(.*?)\s*</SYMBOL_SCORES>', response, re.DOTALL)
             if yaml_match:
                 yaml_content = yaml_match.group(1).strip()
             else:
