@@ -1802,7 +1802,30 @@ class Transpiler:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                composed_prompt = self._compose_prompt_with_context(usr_p_init)
+                # 如果是修复后的审查（i > 0），在提示词中明确说明代码已变更，需要重新读取
+                if i > 0:
+                    code_changed_notice = "\n".join([
+                        "",
+                        "【重要提示：代码已变更】",
+                        f"在本次审查之前（第 {i} 次迭代），已根据审查意见对代码进行了修复和优化。",
+                        "目标函数的实现可能已经发生变化，包括但不限于：",
+                        "- 函数实现逻辑的修改",
+                        "- 类型和签名的调整",
+                        "- 依赖关系的更新",
+                        "- 错误处理的改进",
+                        "",
+                        "**请务必重新读取目标模块文件中的函数实现，不要基于之前的审查结果或缓存信息进行判断。**",
+                        "请使用 read_code 工具重新读取以下文件的最新内容：",
+                        f"- 目标模块文件: {module}",
+                        "- 以及相关的依赖模块文件（如有需要）",
+                        "",
+                        "审查时请基于重新读取的最新代码内容进行评估。",
+                        "",
+                    ])
+                    usr_p_with_notice = usr_p_init + code_changed_notice
+                    composed_prompt = self._compose_prompt_with_context(usr_p_with_notice)
+                else:
+                    composed_prompt = self._compose_prompt_with_context(usr_p_init)
                 
                 if use_direct_model_review:
                     # 格式解析失败后，直接调用模型接口
