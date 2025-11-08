@@ -737,11 +737,30 @@ def run_security_analysis(
                     pass
             
             _attempt = 0
+            use_direct_model = False  # 标记是否使用直接模型调用
             
             while True:
                 _attempt += 1
                 _cluster_summary["text"] = ""
-                cluster_agent.run(cluster_task)
+                
+                if use_direct_model:
+                    # 格式校验失败后，直接调用模型接口
+                    # 构造包含摘要提示词的完整提示
+                    full_prompt = f"{cluster_task}\n\n{cluster_summary_prompt}"
+                    try:
+                        response = cluster_agent.model.chat_until_success(full_prompt)  # type: ignore
+                        # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
+                        _cluster_summary["text"] = response
+                    except Exception as e:
+                        try:
+                            print(f"[JARVIS-SEC] 直接模型调用失败: {e}，回退到 run()")
+                        except Exception:
+                            pass
+                        cluster_agent.run(cluster_task)
+                else:
+                    # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                    cluster_agent.run(cluster_task)
+                
                 cluster_items = _parse_clusters_from_text(_cluster_summary.get("text", ""))
                 
                 # 校验结构
@@ -803,7 +822,9 @@ def run_security_analysis(
                         # 有遗漏的gid，需要重试
                         missing_gids_list = sorted(list(missing_gids))
                         missing_count = len(missing_gids)
-                        print(f"[JARVIS-SEC] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {_attempt} 次")
+                        print(f"[JARVIS-SEC] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {_attempt} 次（使用直接模型调用）")
+                        # 格式校验失败，后续重试使用直接模型调用
+                        use_direct_model = True
                         # 更新任务，明确指出遗漏的gid
                         cluster_task = f"""
 # 聚类任务（分析输入）
@@ -823,10 +844,12 @@ def run_security_analysis(
                         valid = False
                 
                 if not valid:
+                    # 格式校验失败，后续重试使用直接模型调用
+                    use_direct_model = True
                     # 如果是格式错误（非遗漏gid），也继续重试
                     if not missing_gids:
                         if error_details:
-                            print(f"[JARVIS-SEC] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {_attempt} 次")
+                            print(f"[JARVIS-SEC] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {_attempt} 次（使用直接模型调用）")
                             # 更新任务，明确指出格式错误
                             cluster_task = f"""
 # 聚类任务（分析输入）
@@ -848,7 +871,7 @@ def run_security_analysis(
 请重新输出正确的聚类结果。
                             """.strip()
                         else:
-                            print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次")
+                            print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次（使用直接模型调用）")
                     cluster_items = None
 
             # 合并聚类结果
@@ -1134,28 +1157,62 @@ def run_security_analysis(
                 except Exception:
                     pass
             
-            # 运行复核Agent
+            # 运行复核Agent（增加重试机制：格式校验失败时，使用直接模型调用）
             review_summary_container["text"] = ""
-            review_agent.run(review_task)
+            review_results: Optional[List[Dict]] = None
+            max_review_retries = 2  # 失败后最多重试2次（共执行最多3次）
+            use_direct_model_review = False  # 标记是否使用直接模型调用
             
-            # 工作区保护
-            try:
-                _changed_review = _git_restore_if_dirty(entry_path)
-                if _changed_review:
+            for review_attempt in range(max_review_retries + 1):
+                review_summary_container["text"] = ""
+                
+                if use_direct_model_review:
+                    # 格式校验失败后，直接调用模型接口
+                    # 构造包含摘要提示词的完整提示
+                    review_summary_prompt_text = _build_verification_summary_prompt()  # 复核使用验证摘要提示词
+                    full_review_prompt = f"{review_task}\n\n{review_summary_prompt_text}"
                     try:
-                        print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
+                        review_response = review_agent.model.chat_until_success(full_review_prompt)  # type: ignore
+                        # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
+                        review_summary_container["text"] = review_response
+                    except Exception as e:
+                        try:
+                            print(f"[JARVIS-SEC] 复核阶段直接模型调用失败: {e}，回退到 run()")
+                        except Exception:
+                            pass
+                        review_agent.run(review_task)
+                else:
+                    # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                    review_agent.run(review_task)
+                
+                # 工作区保护
+                try:
+                    _changed_review = _git_restore_if_dirty(entry_path)
+                    if _changed_review:
+                        try:
+                            print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                
+                # 解析复核结果
+                review_summary_text = review_summary_container.get("text", "")
+                if review_summary_text:
+                    review_parsed = _try_parse_summary_report(review_summary_text)
+                    if isinstance(review_parsed, list):
+                        # 简单校验：检查是否为有效列表，包含必要的字段
+                        if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
+                            review_results = review_parsed
+                            break  # 格式正确，退出重试循环
+                
+                # 格式校验失败，后续重试使用直接模型调用
+                if review_attempt < max_review_retries:
+                    use_direct_model_review = True
+                    try:
+                        print(f"[JARVIS-SEC] 复核结果格式无效 -> 重试 {review_attempt + 1}/{max_review_retries}（使用直接模型调用）")
                     except Exception:
                         pass
-            except Exception:
-                pass
-            
-            # 解析复核结果
-            review_summary_text = review_summary_container.get("text", "")
-            review_results: Optional[List[Dict]] = None
-            if review_summary_text:
-                review_parsed = _try_parse_summary_report(review_summary_text)
-                if isinstance(review_parsed, list):
-                    review_results = review_parsed
             
             # 处理复核结果
             if review_results:
@@ -1406,10 +1463,29 @@ def run_security_analysis(
         summary_items: Optional[List[Dict]] = None
         workspace_restore_info: Optional[Dict] = None
         max_retries = 2  # 失败后最多重试2次（共执行最多3次）
+        use_direct_model_analysis = False  # 标记是否使用直接模型调用
         for attempt in range(max_retries + 1):
             # 清空上一轮摘要容器
             summary_container["text"] = ""
-            agent.run(per_task)
+            
+            if use_direct_model_analysis:
+                # 格式校验失败后，直接调用模型接口
+                # 构造包含摘要提示词的完整提示
+                summary_prompt_text = _build_summary_prompt()
+                full_prompt = f"{per_task}\n\n{summary_prompt_text}"
+                try:
+                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                    # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
+                    summary_container["text"] = response
+                except Exception as e:
+                    try:
+                        print(f"[JARVIS-SEC] 直接模型调用失败: {e}，回退到 run()")
+                    except Exception:
+                        pass
+                    agent.run(per_task)
+            else:
+                # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                agent.run(per_task)
 
             # 工作区保护：调用 Agent 后如检测到文件被修改，则恢复（每次尝试都执行）
             try:
@@ -1480,8 +1556,10 @@ def run_security_analysis(
                 break  # 成功，退出重试循环
             else:
                 # 本次尝试失败：打印并准备重试
+                # 格式校验失败，后续重试使用直接模型调用
+                use_direct_model_analysis = True
                 try:
-                    print(f"[JARVIS-SEC] 批次摘要无效 -> 重试 {attempt + 1}/{max_retries} (批次={bidx})")
+                    print(f"[JARVIS-SEC] 批次摘要无效 -> 重试 {attempt + 1}/{max_retries} (批次={bidx}，使用直接模型调用)")
                 except Exception:
                     pass
 
@@ -1585,28 +1663,62 @@ def run_security_analysis(
                 except Exception:
                     pass
             
-            # 运行验证 Agent
+            # 运行验证 Agent（增加重试机制：格式校验失败时，使用直接模型调用）
             verification_summary_container["text"] = ""
-            verification_agent.run(verification_task)
+            verification_results: Optional[List[Dict]] = None
+            max_verify_retries = 2  # 失败后最多重试2次（共执行最多3次）
+            use_direct_model_verify = False  # 标记是否使用直接模型调用
             
-            # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
-            try:
-                _changed_verify = _git_restore_if_dirty(entry_path)
-                if _changed_verify:
+            for verify_attempt in range(max_verify_retries + 1):
+                verification_summary_container["text"] = ""
+                
+                if use_direct_model_verify:
+                    # 格式校验失败后，直接调用模型接口
+                    # 构造包含摘要提示词的完整提示
+                    verification_summary_prompt_text = _build_verification_summary_prompt()
+                    full_verify_prompt = f"{verification_task}\n\n{verification_summary_prompt_text}"
                     try:
-                        print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
+                        verify_response = verification_agent.model.chat_until_success(full_verify_prompt)  # type: ignore
+                        # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
+                        verification_summary_container["text"] = verify_response
+                    except Exception as e:
+                        try:
+                            print(f"[JARVIS-SEC] 验证阶段直接模型调用失败: {e}，回退到 run()")
+                        except Exception:
+                            pass
+                        verification_agent.run(verification_task)
+                else:
+                    # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                    verification_agent.run(verification_task)
+                
+                # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
+                try:
+                    _changed_verify = _git_restore_if_dirty(entry_path)
+                    if _changed_verify:
+                        try:
+                            print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                
+                # 解析验证结果
+                verification_summary_text = verification_summary_container.get("text", "")
+                if verification_summary_text:
+                    verification_parsed = _try_parse_summary_report(verification_summary_text)
+                    if isinstance(verification_parsed, list):
+                        # 简单校验：检查是否为有效列表
+                        if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
+                            verification_results = verification_parsed
+                            break  # 格式正确，退出重试循环
+                
+                # 格式校验失败，后续重试使用直接模型调用
+                if verify_attempt < max_verify_retries:
+                    use_direct_model_verify = True
+                    try:
+                        print(f"[JARVIS-SEC] 验证结果格式无效 -> 重试 {verify_attempt + 1}/{max_verify_retries} (批次={bidx}，使用直接模型调用)")
                     except Exception:
                         pass
-            except Exception:
-                pass
-            
-            # 解析验证结果
-            verification_summary_text = verification_summary_container.get("text", "")
-            verification_results: Optional[List[Dict]] = None
-            if verification_summary_text:
-                verification_parsed = _try_parse_summary_report(verification_summary_text)
-                if isinstance(verification_parsed, list):
-                    verification_results = verification_parsed
             
             # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
             if verification_results:
