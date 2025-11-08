@@ -39,7 +39,7 @@ def _build_summary_prompt() -> str:
 - gid: 1
   has_risk: true
   preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
-  trigger_path: "函数 foobar 调用 strcpy 时，其输入 src 来自于未经校验的网络数据包，可导致缓冲区溢出"
+  trigger_path: "调用路径推导：main() -> handle_network_request() -> parse_packet() -> foobar() -> strcpy()。数据流：网络数据包通过 handle_network_request() 接收，传递给 parse_packet() 解析，parse_packet() 未对数据长度进行校验，直接将 src 传递给 foobar()，foobar() 调用 strcpy(dst, src) 时未检查 src 长度，可导致缓冲区溢出。关键调用点：parse_packet() 函数未对输入长度进行校验。"
   consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
   suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
 </REPORT>
@@ -56,12 +56,13 @@ def _build_summary_prompt() -> str:
   - gid: 整数（全局唯一编号）
   - has_risk: 布尔值 (true/false)，表示该项是否存在真实安全风险。
   - preconditions: 字符串（触发漏洞的前置条件，仅当 has_risk 为 true 时必需）
-  - trigger_path: 字符串（漏洞的触发路径，即从可控输入到缺陷代码的完整调用链路或关键步骤，仅当 has_risk 为 true 时必需）
+  - trigger_path: 字符串（漏洞的触发路径，必须包含完整的调用路径推导，包括：1) 可控输入的来源；2) 从输入源到缺陷代码的完整调用链（函数调用序列）；3) 每个调用点的数据校验情况；4) 触发条件。格式示例："调用路径推导：函数A() -> 函数B() -> 函数C() -> 缺陷代码。数据流：输入来源 -> 传递路径。关键调用点：函数B()未做校验。"，仅当 has_risk 为 true 时必需）
   - consequences: 字符串（漏洞被触发后可能导致的后果，仅当 has_risk 为 true 时必需）
   - suggestions: 字符串（修复或缓解该漏洞的建议，仅当 has_risk 为 true 时必需）
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
 - **关键**：仅当 `has_risk` 为 `true` 时，才会被记录为确认的问题。对于确认是误报的条目，请确保 `has_risk` 为 `false` 或不输出该条目。
 - **输出格式**：有告警的条目必须包含所有字段（gid, has_risk, preconditions, trigger_path, consequences, suggestions）；无告警的条目只需包含 gid 和 has_risk。
+- **调用路径推导要求**：trigger_path 字段必须包含完整的调用路径推导，不能省略或简化。必须明确说明从可控输入到缺陷代码的完整调用链，以及每个调用点的校验情况。如果无法推导出完整的调用路径，应该判定为误报（has_risk: false）。
 """.strip()
 
 
@@ -375,6 +376,8 @@ def run_security_analysis(
 
     cluster_batches: List[List[Dict]] = []
     cluster_records: List[Dict] = []
+    # 收集所有标记为无效的聚类，用于后续复核
+    invalid_clusters_for_review: List[Dict] = []
 
     # 解析聚类输出（仅 YAML）
     def _parse_clusters_from_text(text: str):
@@ -505,7 +508,14 @@ def run_security_analysis(
 - 验证条件：为了确认是否存在漏洞需要成立/验证的关键前置条件。例如："指针p在解引用前非空""拷贝长度不超过目标缓冲区容量"等。
 - 工具优先：如需核对上下文，可使用 read_code 读取相邻代码；避免过度遍历。
 - 禁止写操作；仅只读分析。
-- **重要**：在聚类过程中，如果能够明确判断某些候选是误报或无效（例如：代码中已有保护措施、调用路径不存在、上下文已确保安全等），可以在聚类结果中标记为无效（is_invalid: true），这些无效的候选将不会进入后续验证阶段。
+- **重要：关于无效判断的保守策略**：
+  - 在判断候选是否无效时，必须充分考虑所有可能的路径、调用链和边界情况。
+  - 必须考虑：所有可能的调用者、所有可能的输入来源、所有可能的执行路径、所有可能的边界条件。
+  - 只要存在任何可能性（即使很小）导致漏洞可被触发，就不应该标记为无效（is_invalid: false）。
+  - 只有在完全确定、没有任何可能性、所有路径都已验证安全的情况下，才能标记为无效（is_invalid: true）。
+  - 保守原则：有疑问时，一律标记为 false（需要进入后续验证阶段），让分析Agent和验证Agent进行更深入的分析。
+  - 不要因为看到局部有保护措施就认为无效，要考虑是否有其他调用路径绕过这些保护。
+  - 不要因为看到某些调用者已做校验就认为无效，要考虑是否有其他调用者未做校验。
 - **记忆使用**：
   - 在聚类过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前文件或函数相关的记忆。
   - 如果有必要，使用 save_memory 工具保存聚类过程中发现的函数或代码片段的要点，使用函数名或文件名作为 tag。
@@ -519,14 +529,28 @@ def run_security_analysis(
   - verification: 字符串（对该聚类的验证条件描述，简洁明确，可直接用于后续Agent验证）
   - gids: 整数数组（候选的全局唯一编号；输入JSON每个元素含 gid，可直接对应填入）
   - is_invalid: 布尔值（必填，true 或 false）。如果为 true，表示该聚类中的所有候选已被确认为无效/误报，将不会进入后续验证阶段；如果为 false，表示该聚类中的候选需要进入后续验证阶段。
+  - invalid_reason: 字符串（当 is_invalid 为 true 时必填，当 is_invalid 为 false 时可省略）。必须详细说明为什么这些候选是无效的，包括：
+    * 已检查的所有调用路径和调用者
+    * 已确认的保护措施和校验逻辑
+    * 为什么这些保护措施在所有路径上都有效
+    * 为什么不存在任何可能的触发路径
+    * 必须足够详细，以便复核Agent能够验证你的判断
 - 要求：
   - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 YAML 数组，其他位置不输出任何文本
   - **必须要求**：输入JSON中的所有gid都必须被分类，不能遗漏任何一个gid。所有gid必须出现在某个聚类的gids数组中。
   - **必须要求**：每个聚类元素必须包含 is_invalid 字段，且值必须为 true 或 false，不能省略。
+  - **必须要求**：当 is_invalid 为 true 时，必须提供 invalid_reason 字段，且理由必须充分详细。
   - 相同验证条件的候选合并为同一项
   - 不需要解释与长文本，仅给出可执行的验证条件短句
   - 若无法聚类，请将每个候选单独成组，verification 为该候选的最小确认条件
-  - 如果能够明确判断某些候选是误报或无效（例如：代码中已有保护措施、调用路径不存在、上下文已确保安全等），请设置 is_invalid: true；否则设置为 false
+  - **关于 is_invalid 的保守判断原则**：
+    - 必须充分考虑所有可能的路径、调用链、输入来源和边界情况。
+    - 只要存在任何可能性（即使很小）导致漏洞可被触发，必须设置 is_invalid: false。
+    - 只有在完全确定、没有任何可能性、所有路径都已验证安全的情况下，才能设置 is_invalid: true。
+    - 保守策略：有疑问时，一律设置为 false，让后续的分析Agent和验证Agent进行更深入的分析。
+    - 不要因为局部有保护措施就设置为 true，要考虑是否有其他路径绕过保护。
+    - 不要因为某些调用者已做校验就设置为 true，要考虑是否有其他调用者未做校验。
+    - 如果设置为 true，必须在 invalid_reason 中详细说明已检查的所有路径和原因。
 <CLUSTERS>
 - verification: ""
   gids: []
@@ -747,6 +771,13 @@ def run_security_analysis(
                             valid = False
                             error_details.append(f"元素{idx}的is_invalid不是布尔值")
                             break
+                        # 如果is_invalid为true，必须提供invalid_reason
+                        if is_invalid_val is True:
+                            invalid_reason = it.get("invalid_reason", "")
+                            if not isinstance(invalid_reason, str) or not invalid_reason.strip():
+                                valid = False
+                                error_details.append(f"元素{idx}的is_invalid为true但缺少invalid_reason字段或理由为空（必填）")
+                                break
                 
                 # 完整性校验：检查所有输入的gid是否都被分类
                 missing_gids = set()
@@ -867,14 +898,25 @@ def run_security_analysis(
                             it["verify"] = verification
                             members.append(it)
                     
-                    # 如果标记为无效，不写入聚类批次和记录，但记录日志
+                    # 如果标记为无效，收集到复核列表，不写入聚类批次和记录，但记录日志
                     if is_invalid:
                         _invalid_count += 1
                         invalid_gids = [m.get("gid") for m in members]
+                        invalid_reason = str(cl.get("invalid_reason", "")).strip()
                         try:
-                            print(f"[JARVIS-SEC] 聚类阶段判定为无效（gids={invalid_gids}），跳过后续验证")
+                            print(f"[JARVIS-SEC] 聚类阶段判定为无效（gids={invalid_gids}），将提交复核Agent验证")
                         except Exception:
                             pass
+                        # 收集到复核列表（包含候选、理由等信息）
+                        invalid_clusters_for_review.append({
+                            "file": _file,
+                            "batch_index": _chunk_idx,
+                            "gids": invalid_gids,
+                            "verification": verification,
+                            "invalid_reason": invalid_reason,
+                            "members": members,  # 保存候选信息，用于复核后可能重新加入验证
+                            "count": len(members),
+                        })
                         # 记录到进度文件，但不写入聚类批次
                         _progress_append(
                             {
@@ -964,7 +1006,261 @@ def run_security_analysis(
     except Exception:
         pass
 
-    # 若聚类失败或空，则回退为“按文件一次处理”
+    # 复核Agent：验证所有标记为无效的聚类
+    if invalid_clusters_for_review:
+        print(f"\n[JARVIS-SEC] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...")
+        status_mgr.update_review(
+            current_review=0,
+            total_reviews=len(invalid_clusters_for_review),
+            message="开始复核无效聚类..."
+        )
+        
+        # 构建复核Agent的系统提示词
+        review_system_prompt = """
+# 复核Agent约束
+- 你的核心任务是复核聚类Agent给出的无效结论是否充分和正确。
+- 你需要仔细检查聚类Agent提供的invalid_reason是否充分，是否真的考虑了所有可能的路径。
+- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
+- 必要时需向上追溯调用者，查看完整的调用路径，以确认聚类Agent的结论是否成立。
+- 禁止修改任何文件或执行写操作命令；仅进行只读分析与读取。
+- 每次仅执行一个操作；等待工具结果后再进行下一步。
+- **记忆使用**：
+  - 在复核过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前文件或函数相关的记忆。
+  - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等。
+- **复核原则**：
+  - 必须验证聚类Agent是否真的检查了所有可能的调用路径和调用者。
+  - 必须验证聚类Agent是否真的确认了所有路径都有保护措施。
+  - 如果发现聚类Agent遗漏了某些路径、调用者或边界情况，必须判定为理由不充分。
+  - 保守策略：有疑问时，一律判定为理由不充分，将候选重新加入验证流程。
+- 完成复核后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+        """.strip()
+        
+        # 构建复核摘要提示词
+        review_summary_prompt = """
+请将本轮"复核结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
+你需要复核聚类Agent给出的无效理由是否充分，是否真的考虑了所有可能的路径。
+
+示例1：理由充分（is_reason_sufficient: true）
+<REPORT>
+- gid: 1
+  is_reason_sufficient: true
+  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+</REPORT>
+
+示例2：理由不充分（is_reason_sufficient: false）
+<REPORT>
+- gid: 1
+  is_reason_sufficient: false
+  review_notes: "聚类Agent遗漏了函数X的调用路径，该路径可能未做校验，理由不充分，需要重新验证"
+</REPORT>
+
+要求：
+- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
+- 数组元素为对象，包含字段：
+  - gid: 整数（全局唯一编号，对应无效聚类的gid）
+  - is_reason_sufficient: 布尔值 (true/false)，表示无效理由是否充分
+  - review_notes: 字符串（复核说明，解释为什么理由充分或不充分）
+- 必须对所有输入的gid进行复核，不能遗漏。
+- 如果理由不充分（is_reason_sufficient: false），该候选将重新加入验证流程；如果理由充分（is_reason_sufficient: true），该候选将被确认为无效。
+        """.strip()
+        
+        # 按批次复核（每批最多10个无效聚类，避免上下文过长）
+        review_batch_size = 10
+        reviewed_clusters: List[Dict] = []
+        reinstated_candidates: List[Dict] = []  # 重新加入验证的候选
+        
+        for review_idx in range(0, len(invalid_clusters_for_review), review_batch_size):
+            review_batch = invalid_clusters_for_review[review_idx:review_idx + review_batch_size]
+            current_review_num = review_idx // review_batch_size + 1
+            total_review_batches = (len(invalid_clusters_for_review) + review_batch_size - 1) // review_batch_size
+            
+            print(f"[JARVIS-SEC] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类")
+            status_mgr.update_review(
+                current_review=current_review_num,
+                total_reviews=total_review_batches,
+                message=f"正在复核批次 {current_review_num}/{total_review_batches}"
+            )
+            
+            # 构建复核任务
+            import json as _json_review
+            review_task = f"""
+# 复核无效聚类任务
+上下文参数：
+- entry_path: {entry_path}
+- languages: {langs}
+
+需要复核的无效聚类（JSON数组）：
+{_json_review.dumps(review_batch, ensure_ascii=False, indent=2)}
+
+请仔细复核每个无效聚类的invalid_reason是否充分，是否真的考虑了所有可能的路径、调用者和边界情况。
+对于每个gid，请判断无效理由是否充分（is_reason_sufficient: true/false），并给出复核说明。
+            """.strip()
+            
+            # 创建复核Agent
+            review_task_id = f"JARVIS-SEC-Review-Batch-{current_review_num}"
+            review_agent_kwargs: Dict = dict(
+                system_prompt=review_system_prompt,
+                name=review_task_id,
+                auto_complete=True,
+                need_summary=True,
+                summary_prompt=review_summary_prompt,
+                non_interactive=True,
+                in_multi_agent=False,
+                use_methodology=False,
+                use_analysis=False,
+                plan=False,
+                output_handler=[ToolRegistry()],
+                disable_file_edit=True,
+                use_tools=["read_code", "execute_script", "retrieve_memory", "save_memory"],
+            )
+            if llm_group:
+                review_agent_kwargs["model_group"] = llm_group
+            review_agent = Agent(**review_agent_kwargs)
+            
+            # 订阅复核Agent的摘要
+            review_summary_container: Dict[str, str] = {"text": ""}
+            try:
+                from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY_REVIEW
+            except Exception:
+                _AFTER_SUMMARY_REVIEW = None
+            if _AFTER_SUMMARY_REVIEW:
+                def _on_after_summary_review(**kwargs):
+                    try:
+                        review_summary_container["text"] = str(kwargs.get("summary", "") or "")
+                    except Exception:
+                        review_summary_container["text"] = ""
+                try:
+                    review_agent.event_bus.subscribe(_AFTER_SUMMARY_REVIEW, _on_after_summary_review)
+                except Exception:
+                    pass
+            
+            # 运行复核Agent
+            review_summary_container["text"] = ""
+            review_agent.run(review_task)
+            
+            # 工作区保护
+            try:
+                _changed_review = _git_restore_if_dirty(entry_path)
+                if _changed_review:
+                    try:
+                        print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            
+            # 解析复核结果
+            review_summary_text = review_summary_container.get("text", "")
+            review_results: Optional[List[Dict]] = None
+            if review_summary_text:
+                review_parsed = _try_parse_summary_report(review_summary_text)
+                if isinstance(review_parsed, list):
+                    review_results = review_parsed
+            
+            # 处理复核结果
+            if review_results:
+                # 构建gid到复核结果的映射
+                gid_to_review: Dict[int, Dict] = {}
+                for rr in review_results:
+                    if isinstance(rr, dict):
+                        try:
+                            r_gid = int(rr.get("gid", 0))
+                            if r_gid >= 1:
+                                gid_to_review[r_gid] = rr
+                        except Exception:
+                            pass
+                
+                # 处理每个无效聚类
+                for invalid_cluster in review_batch:
+                    cluster_gids = invalid_cluster.get("gids", [])
+                    cluster_members = invalid_cluster.get("members", [])
+                    
+                    # 检查该聚类中的所有gid的复核结果
+                    all_sufficient = True
+                    any_reviewed = False
+                    insufficient_review_result = None
+                    for gid in cluster_gids:
+                        review_result = gid_to_review.get(gid)
+                        if review_result:
+                            any_reviewed = True
+                            if review_result.get("is_reason_sufficient") is not True:
+                                all_sufficient = False
+                                if not insufficient_review_result:
+                                    insufficient_review_result = review_result
+                                break
+                    
+                    if any_reviewed and not all_sufficient:
+                        # 理由不充分，重新加入验证流程
+                        print(f"[JARVIS-SEC] 复核结果：无效聚类（gids={cluster_gids}）理由不充分，重新加入验证流程")
+                        for member in cluster_members:
+                            reinstated_candidates.append(member)
+                        reviewed_clusters.append({
+                            **invalid_cluster,
+                            "review_result": "reinstated",
+                            "review_notes": insufficient_review_result.get("review_notes", "") if insufficient_review_result else "",
+                        })
+                    else:
+                        # 理由充分，确认无效
+                        review_notes = ""
+                        if cluster_gids and gid_to_review.get(cluster_gids[0]):
+                            review_notes = gid_to_review[cluster_gids[0]].get("review_notes", "")
+                        print(f"[JARVIS-SEC] 复核结果：无效聚类（gids={cluster_gids}）理由充分，确认为无效")
+                        reviewed_clusters.append({
+                            **invalid_cluster,
+                            "review_result": "confirmed_invalid",
+                            "review_notes": review_notes,
+                        })
+            else:
+                # 复核结果解析失败，保守策略：重新加入验证流程
+                print(f"[JARVIS-SEC] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程")
+                for invalid_cluster in review_batch:
+                    cluster_members = invalid_cluster.get("members", [])
+                    for member in cluster_members:
+                        reinstated_candidates.append(member)
+                    reviewed_clusters.append({
+                        **invalid_cluster,
+                        "review_result": "reinstated",
+                        "review_notes": "复核结果解析失败，保守策略重新加入验证",
+                    })
+        
+        # 将重新加入验证的候选添加到cluster_batches
+        if reinstated_candidates:
+            print(f"[JARVIS-SEC] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程")
+            # 按文件分组重新加入的候选
+            reinstated_by_file: Dict[str, List[Dict]] = _dd2(list)
+            for cand in reinstated_candidates:
+                file_key = str(cand.get("file") or "")
+                reinstated_by_file[file_key].append(cand)
+            
+            # 为每个文件的重新加入候选创建批次
+            for file_key, cands in reinstated_by_file.items():
+                if cands:
+                    cluster_batches.append(cands)
+                    _progress_append({
+                        "event": "review_reinstated",
+                        "file": file_key,
+                        "gids": [c.get("gid") for c in cands],
+                        "count": len(cands),
+                    })
+        else:
+            print(f"[JARVIS-SEC] 复核完成：所有无效聚类理由充分，确认为无效")
+        
+        # 记录复核结果
+        _progress_append({
+            "event": "review_completed",
+            "total_reviewed": len(invalid_clusters_for_review),
+            "reinstated": len(reinstated_candidates),
+            "confirmed_invalid": len(invalid_clusters_for_review) - len(reinstated_candidates),
+        })
+        status_mgr.update_review(
+            current_review=len(invalid_clusters_for_review),
+            total_reviews=len(invalid_clusters_for_review),
+            message=f"复核完成：{len(reinstated_candidates)} 个候选重新加入验证"
+        )
+    else:
+        print(f"[JARVIS-SEC] 无无效聚类需要复核")
+
+    # 若聚类失败或空，则回退为"按文件一次处理"
     if not cluster_batches:
         for _file, _items in _file_groups.items():
             b = [c for c in _items if _sig_of(c) not in done_sigs]
@@ -1018,8 +1314,23 @@ def run_security_analysis(
         system_prompt = """
 # 单Agent安全分析约束
 - 你的核心任务是评估代码的安全问题，目标：针对本候选问题进行证据核实、风险评估与修复建议补充，查找漏洞触发路径，确认在某些条件下会触发；以此来判断是否是漏洞。
+- **必须进行调用路径推导**：
+  - 对于每个候选问题，必须明确推导从可控输入到缺陷代码的完整调用路径。
+  - 调用路径推导必须包括：
+    1. 识别可控输入的来源（例如：用户输入、网络数据、文件读取、命令行参数等）
+    2. 追踪数据流：从输入源开始，逐步追踪数据如何传递到缺陷代码位置
+    3. 识别调用链：明确列出从入口函数到缺陷代码的所有函数调用序列（例如：main() -> parse_input() -> process_data() -> vulnerable_function()）
+    4. 分析每个调用点的数据校验情况：检查每个函数是否对输入进行了校验、边界检查或安全检查
+    5. 确认触发条件：明确说明在什么条件下，未校验或恶意输入能够到达缺陷代码位置
+  - 如果无法推导出完整的调用路径，或者所有调用路径都有充分的保护措施，则应该判定为误报。
+  - 调用路径推导必须在分析过程中明确展示，不能省略或假设。
 - 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
-- 必要时需向上追溯调用者，查看完整的调用路径，以确认风险是否真实存在。例如，一个函数存在空指针解引用风险，但若所有调用者均能确保传入的指针非空，则该风险在当前代码库中可能不会实际触发。
+- **调用路径追溯要求**：
+  - 必须向上追溯所有可能的调用者，查看完整的调用路径，以确认风险是否真实存在。
+  - 使用 read_code 和 execute_script 工具查找函数的调用者（例如：使用 grep 搜索函数名，查找所有调用该函数的位置）。
+  - 对于每个调用者，必须检查其是否对输入进行了校验。
+  - 如果发现任何调用路径未做校验，必须明确记录该路径。
+  - 例如：一个函数存在空指针解引用风险，必须检查所有调用者。如果所有调用者均能确保传入的指针非空，则该风险在当前代码库中可能不会实际触发；但如果存在任何调用者未做校验，则风险真实存在。
 - 若多条告警位于同一文件且行号相距不远，可一次性读取共享上下文，对这些相邻告警进行联合分析与判断；但仍需避免无关扩展与大范围遍历。
 - 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
 - 每次仅执行一个操作；等待工具结果后再进行下一步。
