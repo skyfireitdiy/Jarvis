@@ -68,7 +68,7 @@ def _format_build_error(result: BuildResult, max_len: int = 2000) -> str:
     return full_error
 
 
-class CodeAgent:
+class CodeAgent(Agent):
     """Jarvis系统的代码修改代理。
 
     负责处理代码分析、修改和git操作。
@@ -86,7 +86,6 @@ class CodeAgent:
     ):
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
-        self.non_interactive = non_interactive
 
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
@@ -131,28 +130,34 @@ class CodeAgent:
                 f"{code_system_prompt}\n\n"
                 f"<rules>\n{merged_rules}\n</rules>"
             )
-        self.agent = Agent(
+        
+        # 调用父类 Agent 的初始化
+        # 默认禁用方法论和分析，但允许通过 kwargs 覆盖
+        use_methodology = kwargs.pop("use_methodology", False)
+        use_analysis = kwargs.pop("use_analysis", False)
+        super().__init__(
             system_prompt=code_system_prompt,
             name="CodeAgent",
             auto_complete=False,
             model_group=model_group,
             need_summary=need_summary,
-            use_methodology=False,  # 禁用方法论
-            use_analysis=False,  # 禁用分析
-            non_interactive=self.non_interactive,
+            use_methodology=use_methodology,
+            use_analysis=use_analysis,
+            non_interactive=non_interactive,
             plan=bool(plan) if plan is not None else is_plan_enabled(),
             use_tools=base_tools,  # 仅启用限定工具
+            **kwargs,
         )
 
         # 建立CodeAgent与Agent的关联，便于工具获取上下文管理器
-        self.agent._code_agent = self
+        self._code_agent = self
 
         # 初始化上下文推荐器（自己创建LLM模型，使用父Agent的配置）
         try:
             # 获取当前Agent的model实例
             parent_model = None
-            if hasattr(self.agent, 'model') and self.agent.model:
-                parent_model = self.agent.model
+            if hasattr(self, 'model') and self.model:
+                parent_model = self.model
             
             self.context_recommender = ContextRecommender(
                 self.context_manager,
@@ -164,7 +169,7 @@ class CodeAgent:
             logger = logging.getLogger(__name__)
             logger.warning(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
 
-        self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
+        self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
     def _get_system_prompt(self) -> str:
         """获取代码工程师的系统提示词"""
@@ -478,7 +483,7 @@ class CodeAgent:
         if has_uncommitted_changes():
 
             git_commiter = GitCommitTool()
-            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self.agent, "model_group": getattr(self.agent.model, "model_group", None)})
+            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self, "model_group": getattr(self.model, "model_group", None)})
 
     def _init_env(self, prefix: str, suffix: str) -> None:
         """初始化环境，组合以下功能：
@@ -738,11 +743,11 @@ class CodeAgent:
                 check=True,
             )
             git_commiter = GitCommitTool()
-            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self.agent, "model_group": getattr(self.agent.model, "model_group", None)})
+            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self, "model_group": getattr(self.model, "model_group", None)})
 
             # 在用户接受commit后，根据配置决定是否保存记忆
-            if self.agent.force_save_memory:
-                self.agent.memory_manager.prompt_memory_save()
+            if self.force_save_memory:
+                self.memory_manager.prompt_memory_save()
         elif start_commit:
             if user_confirm("是否要重置到初始提交？", True):
                 os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
@@ -779,9 +784,9 @@ class CodeAgent:
             if self.context_recommender and is_enable_intent_recognition():
                 # 在意图识别和上下文推荐期间抑制模型输出
                 was_suppressed = False
-                if self.agent.model:
-                    was_suppressed = getattr(self.agent.model, '_suppress_output', False)
-                    self.agent.model.set_suppress_output(True)
+                if self.model:
+                    was_suppressed = getattr(self.model, '_suppress_output', False)
+                    self.model.set_suppress_output(True)
                 try:
                     PrettyOutput.print("🔍 正在进行智能上下文推荐....", OutputType.INFO)
                     
@@ -802,8 +807,8 @@ class CodeAgent:
                     logger.debug(f"上下文推荐失败: {e}", exc_info=True)
                 finally:
                     # 恢复模型输出设置
-                    if self.agent.model:
-                        self.agent.model.set_suppress_output(was_suppressed)
+                    if self.model:
+                        self.model.set_suppress_output(was_suppressed)
 
             if project_overview:
                 enhanced_input = (
@@ -818,9 +823,9 @@ class CodeAgent:
                 enhanced_input = first_tip + context_recommendation_text + "\n\n任务描述：\n" + user_input
 
             try:
-                if self.agent.model:
-                    self.agent.model.set_suppress_output(False)
-                self.agent.run(enhanced_input)
+                if self.model:
+                    self.model.set_suppress_output(False)
+                self.run(enhanced_input)
             except RuntimeError as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
                 return str(e)
@@ -1322,14 +1327,14 @@ class CodeAgent:
                     )
                     
                     # 添加影响范围分析报告
-                    final_ret = self._handle_impact_report(impact_report, agent, final_ret)
+                    final_ret = self._handle_impact_report(impact_report, self, final_ret)
                     
                     # 构建验证
                     config = BuildValidationConfig(self.root_dir)
-                    build_validation_result, final_ret = self._handle_build_validation(modified_files, agent, final_ret)
+                    build_validation_result, final_ret = self._handle_build_validation(modified_files, self, final_ret)
                     
                     # 静态分析
-                    final_ret = self._handle_static_analysis(modified_files, build_validation_result, config, agent, final_ret)
+                    final_ret = self._handle_static_analysis(modified_files, build_validation_result, config, self, final_ret)
                 else:
                     final_ret += "\n\n修改没有生效\n"
             else:
@@ -1339,19 +1344,19 @@ class CodeAgent:
             return
         # 用户确认最终结果
         if commited:
-            agent.session.prompt += final_ret
+            self.session.prompt += final_ret
             return
         PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
         if not is_confirm_before_apply_patch() or user_confirm(
             "是否使用此回复？", default=True
         ):
-            agent.session.prompt += final_ret
+            self.session.prompt += final_ret
             return
         # 用户未确认，允许输入自定义回复作为附加提示
         custom_reply = get_multiline_input("请输入自定义回复")
         if custom_reply.strip():  # 如果自定义回复为空，不设置附加提示
-            agent.set_addon_prompt(custom_reply)
-        agent.session.prompt += final_ret
+            self.set_addon_prompt(custom_reply)
+        self.session.prompt += final_ret
         return
 
     def _run_static_analysis(self, modified_files: List[str]) -> List[Tuple[str, str, str, int, str]]:
@@ -1757,7 +1762,7 @@ def cli(
 
         # 尝试恢复会话
         if restore_session:
-            if agent.agent.restore_session():
+            if agent.restore_session():
                 PrettyOutput.print(
                     "已从 .jarvis/saved_session.json 恢复会话。", OutputType.SUCCESS
                 )
