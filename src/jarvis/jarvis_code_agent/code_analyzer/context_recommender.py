@@ -11,8 +11,8 @@ from .symbol_extractor import Symbol
 
 @dataclass
 class ContextRecommendation:
-    """上下文推荐结果"""
-    recommended_files: List[str]  # 推荐的文件列表
-    recommended_symbols: List[Symbol]  # 推荐的符号列表
-    related_tests: List[str]  # 相关的测试文件
-    reason: str  # 推荐原因
+    """上下文推荐结果
+    
+    推荐符号在文件中的位置信息。
+    """
+    recommended_symbols: List[Symbol]  # 推荐的符号列表（包含文件路径和行号）

@@ -10,11 +10,12 @@ import re
 import yaml
 from typing import List, Optional, Dict, Any, Set
 
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_code_agent.utils import get_project_overview
 
 from .context_recommender import ContextRecommendation
 from .context_manager import ContextManager
-from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol
 
 
@@ -25,21 +26,66 @@ class ContextRecommender:
     完全基于LLM实现，提供语义级别的推荐，而非简单的关键词匹配。
     """
 
-    def __init__(self, context_manager: ContextManager, llm_model: Any):
+    def __init__(self, context_manager: ContextManager, parent_model: Optional[Any] = None):
         """初始化上下文推荐器
         
         Args:
             context_manager: 上下文管理器
-            llm_model: LLM模型实例（必需）
+            parent_model: 父Agent的模型实例，用于获取模型配置（平台名称、模型名称、模型组等）
             
         Raises:
-            ValueError: 如果未提供LLM模型
+            ValueError: 如果无法创建LLM模型
         """
         self.context_manager = context_manager
-        self.llm_model = llm_model
         
-        if not llm_model:
-            raise ValueError("LLM model is required for context recommendation")
+        # 自己创建LLM模型实例，使用父Agent的配置
+        try:
+            registry = PlatformRegistry.get_global_platform_registry()
+            
+            # 从父Agent的model获取配置
+            platform_name = None
+            model_name = None
+            model_group = None
+            
+            if parent_model:
+                try:
+                    platform_name = parent_model.platform_name()
+                    model_name = parent_model.name()
+                    model_group = getattr(parent_model, 'model_group', None)
+                except Exception:
+                    # 如果获取失败，使用默认配置
+                    pass
+            
+            # 创建平台实例
+            if platform_name:
+                self.llm_model = registry.create_platform(platform_name)
+                if self.llm_model is None:
+                    # 如果创建失败，使用默认平台
+                    self.llm_model = registry.get_normal_platform()
+            else:
+                self.llm_model = registry.get_normal_platform()
+            
+            # 设置模型名称（如果从父Agent获取到）
+            if model_name and self.llm_model:
+                try:
+                    self.llm_model.set_model_name(model_name)
+                except Exception:
+                    pass
+            
+            # 设置模型组（如果从父Agent获取到）
+            if model_group and self.llm_model:
+                try:
+                    self.llm_model.set_model_group(model_group)
+                except Exception:
+                    pass
+            
+            # 设置抑制输出，因为这是后台任务
+            if self.llm_model:
+                self.llm_model.set_suppress_output(True)
+            else:
+                raise ValueError("无法创建LLM模型实例")
+        except Exception as e:
+            raise ValueError(f"无法创建LLM模型: {e}")
 
     def recommend_context(
         self,
@@ -57,10 +103,7 @@ class ContextRecommender:
         keywords = self._extract_keywords_with_llm(user_input)
         
         # 2. 初始化推荐结果
-        recommended_files: Set[str] = set()
         recommended_symbols: List[Symbol] = []
-        related_tests: Set[str] = set()
-        reasons: List[str] = []
 
         # 3. 基于关键词进行符号查找和文本查找，然后使用LLM挑选关联度高的条目（主要推荐方式）
         if keywords:
@@ -84,50 +127,21 @@ class ContextRecommender:
                     user_input, keywords, candidate_symbols_list
                 )
                 recommended_symbols.extend(selected_symbols)
-                
-                # 从选中的符号中提取文件
-                for symbol in selected_symbols:
-                    recommended_files.add(symbol.file_path)
-                
-                if selected_symbols:
-                    reasons.append(f"基于关键词（{', '.join(keywords[:5])}）的符号查找与LLM筛选")
 
-        # 4. 使用LLM对推荐结果进行相关性评分和排序
-        file_scores = self._score_files_with_llm(
-            user_input,
-            list(recommended_files),
-        )
-        scored_symbols = self._score_symbols_with_llm(
-            user_input,
-            recommended_symbols,
-        )
-        
-        # 5. 过滤和排序
-        # 按评分和修改时间对文件排序，并选择最相关的10个
-        if file_scores:
-            final_files = sorted(
-                list(recommended_files),
-                key=lambda f: (file_scores.get(f, 5.0), os.path.getmtime(f)),
-                reverse=True
-            )[:10]
-        else:
-            final_files = sorted(list(recommended_files), key=os.path.getmtime, reverse=True)[:10]
-        
-        final_symbols = [s for s, _ in sorted(scored_symbols.items(), key=lambda x: x[1], reverse=True)[:10]]
-        
-        # 6. 更新推荐原因
-        reason = "；".join(reasons[:3]) if reasons else "基于LLM关键词语义分析"
-        if len(reasons) > 3:
-            reason += f" 等{len(reasons)}个原因"
-        if keywords:
-            reason = f"基于关键词（{', '.join(keywords[:5])}）的LLM语义分析；{reason}"
+        # 4. 限制符号数量
+        final_symbols = recommended_symbols[:10]
 
         return ContextRecommendation(
-            recommended_files=final_files,
             recommended_symbols=final_symbols,
-            related_tests=list(related_tests),
-            reason=reason,
         )
+
+    def _get_project_overview(self) -> str:
+        """获取项目概况信息
+        
+        Returns:
+            项目概况字符串
+        """
+        return get_project_overview(self.context_manager.project_root)
 
     def _extract_keywords_with_llm(self, user_input: str) -> List[str]:
         """使用LLM提取关键词（仅提取关键词）
@@ -138,7 +152,12 @@ class ContextRecommender:
         Returns:
             关键词列表
         """
+        # 获取项目概况
+        project_overview = self._get_project_overview()
+        
         prompt = f"""分析以下代码编辑任务，提取关键词。关键词应该是与任务相关的核心概念、技术术语、功能模块等。
+
+{project_overview}
 
 任务描述：
 {user_input}
@@ -308,7 +327,12 @@ class ContextRecommender:
             }
             symbol_info_list.append(symbol_info)
         
+        # 获取项目概况
+        project_overview = self._get_project_overview()
+        
         prompt = f"""根据以下任务描述和关键词，从候选符号列表中选择最相关的符号。
+
+{project_overview}
 
 任务描述：{user_input}
 关键词：{', '.join(keywords)}
@@ -363,280 +387,6 @@ class ContextRecommender:
             PrettyOutput.print(f"LLM符号筛选失败: {e}", OutputType.WARNING)
             return []
 
-    def _semantic_search_files(
-        self, user_input: str, keywords: List[str]
-    ) -> List[str]:
-        """使用LLM进行语义搜索，查找相关文件
-        
-        Args:
-            user_input: 用户输入
-            keywords: 关键词列表
-            
-        Returns:
-            相关文件路径列表
-        """
-        # 获取项目中的文件列表（简化版，只获取已分析的文件）
-        known_files = list(self.context_manager.dependency_graph.dependencies.keys())
-        known_files.extend(self.context_manager.dependency_graph.dependents.keys())
-        
-        if not known_files:
-            return []
-        
-        # 限制文件数量
-        files_sample = known_files[:30]  # 最多30个文件
-        
-        file_info = [
-            {
-                "path": os.path.relpath(f, self.context_manager.project_root),
-                "basename": os.path.basename(f),
-            }
-            for f in files_sample
-        ]
-        
-        prompt = f"""根据以下任务描述和关键词，从文件列表中选择最相关的文件。
-
-任务描述：{user_input}
-关键词：{', '.join(keywords)}
-
-文件列表：
-{yaml.dump(file_info, allow_unicode=True, default_flow_style=False)}
-
-请返回最相关的5-10个文件路径（YAML数组格式），按相关性排序，并用<FILES>标签包裹。
-只返回文件路径数组，例如：
-<FILES>
-- path/to/file1.py
-- path/to/file2.py
-</FILES>
-"""
-
-        try:
-            response = self._call_llm(prompt)
-            # 从<FILES>标签中提取内容
-            response = response.strip()
-            yaml_match = re.search(r'<FILES>\s*(.*?)\s*</FILES>', response, re.DOTALL)
-            if yaml_match:
-                yaml_content = yaml_match.group(1).strip()
-            else:
-                # 如果没有找到标签，尝试清理markdown代码块
-                if response.startswith("```yaml"):
-                    response = response[7:]
-                elif response.startswith("```"):
-                    response = response[3:]
-                if response.endswith("```"):
-                    response = response[:-3]
-                yaml_content = response.strip()
-            
-            file_paths = yaml.safe_load(yaml_content)
-            if not isinstance(file_paths, list):
-                return []
-            
-            # 转换为绝对路径
-            result = []
-            for path in file_paths:
-                abs_path = os.path.join(self.context_manager.project_root, path)
-                if os.path.exists(abs_path):
-                    result.append(abs_path)
-            
-            return result
-        except Exception:
-            return []
-
-    def _score_files_with_llm(
-        self, user_input: str, files: List[str]
-    ) -> Dict[str, float]:
-        """使用LLM对文件进行相关性评分
-        
-        Args:
-            user_input: 用户输入
-            files: 文件列表
-            
-        Returns:
-            文件路径到相关性分数的字典
-        """
-        if not files:
-            return {}
-        
-        # 限制文件数量，避免prompt过长
-        files_to_score = files[:20]
-        
-        file_info = [
-            {
-                "path": os.path.relpath(f, self.context_manager.project_root),
-                "basename": os.path.basename(f),
-            }
-            for f in files_to_score
-        ]
-        
-        prompt = f"""根据以下任务描述，对文件列表中的每个文件进行相关性评分（0-10分）。
-
-任务描述：{user_input}
-
-文件列表：
-{yaml.dump(file_info, allow_unicode=True, default_flow_style=False)}
-
-请返回YAML对象，键为文件路径，值为相关性分数（0-10的浮点数），并用<FILE_SCORES>标签包裹。
-只返回YAML对象，例如：
-<FILE_SCORES>
-path/to/file1.py: 8.5
-path/to/file2.py: 7.0
-path/to/file3.py: 5.5
-</FILE_SCORES>
-"""
-
-        try:
-            response = self._call_llm(prompt)
-            # 从<FILE_SCORES>标签中提取内容
-            response = response.strip()
-            yaml_match = re.search(r'<FILE_SCORES>\s*(.*?)\s*</FILE_SCORES>', response, re.DOTALL)
-            if yaml_match:
-                yaml_content = yaml_match.group(1).strip()
-            else:
-                # 如果没有找到标签，尝试清理markdown代码块
-                if response.startswith("```yaml"):
-                    response = response[7:]
-                elif response.startswith("```"):
-                    response = response[3:]
-                if response.endswith("```"):
-                    response = response[:-3]
-                yaml_content = response.strip()
-            
-            scores = yaml.safe_load(yaml_content)
-            if not isinstance(scores, dict):
-                return {}
-            
-            # 转换为绝对路径的键
-            result = {}
-            for rel_path, score in scores.items():
-                abs_path = os.path.join(self.context_manager.project_root, rel_path)
-                if abs_path in files_to_score:
-                    result[abs_path] = float(score)
-            
-            # 为未评分的文件设置默认分数
-            for f in files_to_score:
-                if f not in result:
-                    result[f] = 5.0  # 默认中等相关性
-            
-            return result
-        except Exception:
-            # 评分失败，返回默认分数
-            return {f: 5.0 for f in files_to_score}
-
-    def _score_symbols_with_llm(
-        self, user_input: str, symbols: List[Symbol]
-    ) -> Dict[Symbol, float]:
-        """使用LLM对符号进行相关性评分
-        
-        Args:
-            user_input: 用户输入
-            symbols: 符号列表
-            
-        Returns:
-            符号到相关性分数的字典
-        """
-        if not symbols:
-            return {}
-        
-        # 限制符号数量
-        symbols_to_score = symbols[:20]
-        
-        symbol_info = [
-            {
-                "name": s.name,
-                "kind": s.kind,
-                "file": os.path.basename(s.file_path),
-                "signature": s.signature or "",
-            }
-            for s in symbols_to_score
-        ]
-        
-        prompt = f"""根据以下任务描述，对符号列表中的每个符号进行相关性评分（0-10分）。
-
-任务描述：{user_input}
-
-符号列表：
-{yaml.dump(symbol_info, allow_unicode=True, default_flow_style=False)}
-
-请返回YAML对象，键为符号名称，值为相关性分数（0-10的浮点数），并用<SYMBOL_SCORES>标签包裹。
-只返回YAML对象，例如：
-<SYMBOL_SCORES>
-symbol1: 9.0
-symbol2: 7.5
-symbol3: 6.0
-</SYMBOL_SCORES>
-"""
-
-        try:
-            response = self._call_llm(prompt)
-            # 从<SYMBOL_SCORES>标签中提取内容
-            response = response.strip()
-            yaml_match = re.search(r'<SYMBOL_SCORES>\s*(.*?)\s*</SYMBOL_SCORES>', response, re.DOTALL)
-            if yaml_match:
-                yaml_content = yaml_match.group(1).strip()
-            else:
-                # 如果没有找到标签，尝试清理markdown代码块
-                if response.startswith("```yaml"):
-                    response = response[7:]
-                elif response.startswith("```"):
-                    response = response[3:]
-                if response.endswith("```"):
-                    response = response[:-3]
-                yaml_content = response.strip()
-            
-            scores = yaml.safe_load(yaml_content)
-            if not isinstance(scores, dict):
-                return {}
-            
-            # 创建符号到分数的映射
-            result = {}
-            for s in symbols_to_score:
-                score = scores.get(s.name, 5.0)  # 默认中等相关性
-                result[s] = float(score)
-            
-            return result
-        except Exception:
-            # 评分失败，返回默认分数
-            return {s: 5.0 for s in symbols_to_score}
-
-    def _find_test_files(self, file_path: str) -> List[str]:
-        """查找与文件相关的测试文件
-        
-        Args:
-            file_path: 源文件路径
-            
-        Returns:
-            测试文件路径列表
-        """
-        test_files = []
-        base_name = os.path.splitext(os.path.basename(file_path))[0]
-        project_root = self.context_manager.project_root
-
-        # 常见的测试文件命名模式
-        test_patterns = [
-            f"test_{base_name}.py",
-            f"{base_name}_test.py",
-            f"test_{base_name}.js",
-            f"{base_name}.test.js",
-            f"test_{base_name}.ts",
-            f"{base_name}.test.ts",
-            f"{base_name}_test.rs",
-            f"test_{base_name}.go",
-        ]
-
-        # 在项目根目录搜索测试文件
-        for root, dirs, files in os.walk(project_root):
-            # 跳过隐藏目录和常见忽略目录
-            dirs[:] = filter_walk_dirs(dirs)
-
-            # 检查是否是测试目录
-            if 'test' in root.lower() or 'tests' in root.lower():
-                for pattern in test_patterns:
-                    if pattern in files:
-                        test_file = os.path.join(root, pattern)
-                        if os.path.exists(test_file):
-                            test_files.append(test_file)
-
-        return test_files[:5]  # 限制数量
-
     def _call_llm(self, prompt: str) -> str:
         """调用LLM生成响应
         
@@ -670,43 +420,20 @@ symbol3: 6.0
         Returns:
             格式化的文本
         """
+        if not recommendation.recommended_symbols:
+            return ""
+        
         lines = ["\n💡 智能上下文推荐:"]
         lines.append("─" * 60)
 
-        if recommendation.reason:
-            lines.append(f"📌 推荐原因: {recommendation.reason}")
-
-        if recommendation.recommended_files:
-            files_str = "\n   ".join(
-                f"• {os.path.relpath(f, self.context_manager.project_root)}"
-                for f in recommendation.recommended_files[:5]
-            )
-            more = len(recommendation.recommended_files) - 5
-            if more > 0:
-                files_str += f"\n   ... 还有{more}个文件"
-            lines.append(f"📁 推荐文件 ({len(recommendation.recommended_files)}个):\n   {files_str}")
-
-        if recommendation.recommended_symbols:
-            symbols_str = "\n   ".join(
-                f"• {s.kind} `{s.name}` ({os.path.relpath(s.file_path, self.context_manager.project_root)}:{s.line_start})"
-                for s in recommendation.recommended_symbols[:5]
-            )
-            more = len(recommendation.recommended_symbols) - 5
-            if more > 0:
-                symbols_str += f"\n   ... 还有{more}个符号"
-            lines.append(f"🔗 推荐符号 ({len(recommendation.recommended_symbols)}个):\n   {symbols_str}")
-
-        if recommendation.related_tests:
-            tests_str = "\n   ".join(
-                f"• {os.path.relpath(f, self.context_manager.project_root)}"
-                for f in recommendation.related_tests[:3]
-            )
-            more = len(recommendation.related_tests) - 3
-            if more > 0:
-                tests_str += f"\n   ... 还有{more}个测试文件"
-            lines.append(f"🧪 相关测试 ({len(recommendation.related_tests)}个):\n   {tests_str}")
+        # 输出：符号在文件中的位置
+        symbols_str = "\n   ".join(
+            f"• 符号 `{s.name}` ({s.kind}) 位于文件 {os.path.relpath(s.file_path, self.context_manager.project_root)} 第 {s.line_start} 行"
+            for s in recommendation.recommended_symbols
+        )
+        lines.append(f"🔗 推荐符号位置 ({len(recommendation.recommended_symbols)}个):\n   {symbols_str}")
 
         lines.append("─" * 60)
         lines.append("")  # 空行
 
-        return "\n".join(lines) if len(lines) > 2 else ""  # 如果没有推荐内容，返回空字符串
+        return "\n".join(lines)

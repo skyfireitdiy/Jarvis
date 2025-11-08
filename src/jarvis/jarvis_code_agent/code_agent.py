@@ -37,6 +37,7 @@ from jarvis.jarvis_utils.config import (
     is_enable_intent_recognition,
     is_enable_impact_analysis,
 )
+from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
     find_git_root_and_cd,
@@ -50,7 +51,7 @@ from jarvis.jarvis_utils.git_utils import (
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.utils import get_loc_stats, init_env, _acquire_single_instance_lock
+from jarvis.jarvis_utils.utils import init_env, _acquire_single_instance_lock
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -146,18 +147,22 @@ class CodeAgent:
         # 建立CodeAgent与Agent的关联，便于工具获取上下文管理器
         self.agent._code_agent = self
 
-        # 初始化上下文推荐器（需要LLM模型）
-        if hasattr(self.agent, 'model') and self.agent.model:
-            try:
-                self.context_recommender = ContextRecommender(
-                    self.context_manager,
-                    llm_model=self.agent.model
-                )
-            except Exception as e:
-                # LLM推荐器初始化失败
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
+        # 初始化上下文推荐器（自己创建LLM模型，使用父Agent的配置）
+        try:
+            # 获取当前Agent的model实例
+            parent_model = None
+            if hasattr(self.agent, 'model') and self.agent.model:
+                parent_model = self.agent.model
+            
+            self.context_recommender = ContextRecommender(
+                self.context_manager,
+                parent_model=parent_model
+            )
+        except Exception as e:
+            # LLM推荐器初始化失败
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
 
         self.agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
@@ -322,87 +327,6 @@ class CodeAgent:
         self.root_dir = git_dir
 
         return git_dir
-
-    def _get_git_tracked_files_info(self, max_files: int = 100) -> Optional[str]:
-        """获取git托管的文件列表或目录结构
-        
-        如果文件数量超过max_files，则返回目录结构（不含文件）
-        
-        参数:
-            max_files: 文件数量阈值，超过此值则返回目录结构
-            
-        返回:
-            str: 文件列表或目录结构的字符串表示，失败时返回None
-        """
-        try:
-            # 获取所有git托管的文件
-            result = subprocess.run(
-                ["git", "ls-files"],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=True,
-                cwd=self.root_dir,
-            )
-            
-            if result.returncode != 0 or not result.stdout.strip():
-                return None
-            
-            files = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-            file_count = len(files)
-            
-            if file_count == 0:
-                return None
-            
-            # 如果文件数量超过阈值，返回目录结构
-            if file_count > max_files:
-                # 提取所有目录路径
-                dirs = set()
-                for file_path in files:
-                    # 获取文件所在的所有父目录
-                    parts = file_path.split("/")
-                    for i in range(1, len(parts)):
-                        dir_path = "/".join(parts[:i])
-                        if dir_path:
-                            dirs.add(dir_path)
-                
-                # 构建树形目录结构
-                dir_tree = {}
-                for dir_path in sorted(dirs):
-                    parts = dir_path.split("/")
-                    current = dir_tree
-                    for part in parts:
-                        if part not in current:
-                            current[part] = {}
-                        current = current[part]
-                
-                def format_tree(tree: dict, prefix: str = "", is_last: bool = True) -> List[str]:
-                    """格式化目录树"""
-                    lines = []
-                    items = sorted(tree.items())
-                    for i, (name, subtree) in enumerate(items):
-                        is_last_item = i == len(items) - 1
-                        connector = "└── " if is_last_item else "├── "
-                        lines.append(f"{prefix}{connector}{name}/")
-                        
-                        extension = "    " if is_last_item else "│   "
-                        if subtree:
-                            lines.extend(format_tree(subtree, prefix + extension, is_last_item))
-                    return lines
-                
-                tree_lines = format_tree(dir_tree)
-                return f"Git托管目录结构（共{file_count}个文件）:\n" + "\n".join(tree_lines)
-            else:
-                # 文件数量不多，直接返回文件列表
-                files_str = "\n".join(f"  - {file}" for file in sorted(files))
-                return f"Git托管文件列表（共{file_count}个文件）:\n{files_str}"
-                
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return None
-        except Exception:
-            # 其他异常，静默失败
-            return None
 
     def _update_gitignore(self, git_dir: str) -> None:
         """检查并更新.gitignore文件，确保忽略.jarvis目录，并追加常用语言的忽略规则（若缺失）
@@ -838,24 +762,8 @@ class CodeAgent:
             self._init_env(prefix, suffix)
             start_commit = get_latest_commit_hash()
 
-            # 获取项目统计信息并附加到用户输入
-            loc_stats = get_loc_stats()
-            commits_info = get_recent_commits_with_files()
-            git_files_info = self._get_git_tracked_files_info()
-
-            project_info = []
-            if loc_stats:
-                project_info.append(f"代码统计:\n{loc_stats}")
-            if git_files_info:
-                project_info.append(git_files_info)
-            if commits_info:
-                commits_str = "\n".join(
-                    f"提交 {i+1}: {commit['hash'][:7]} - {commit['message']} ({len(commit['files'])}个文件)\n"
-                    + "\n".join(f"    - {file}" for file in commit["files"][:5])
-                    + ("\n    ..." if len(commit["files"]) > 5 else "")
-                    for i, commit in enumerate(commits_info[:5])
-                )
-                project_info.append(f"最近提交:\n{commits_str}")
+            # 获取项目概况信息
+            project_overview = get_project_overview(self.root_dir)
 
             first_tip = """请严格遵循以下规范进行代码修改任务：
             1. 每次响应仅执行一步操作，先分析再修改，避免一步多改。
@@ -897,10 +805,9 @@ class CodeAgent:
                     if self.agent.model:
                         self.agent.model.set_suppress_output(was_suppressed)
 
-            if project_info:
+            if project_overview:
                 enhanced_input = (
-                    "项目概况:\n"
-                    + "\n\n".join(project_info)
+                    project_overview
                     + "\n\n"
                     + first_tip
                     + context_recommendation_text
