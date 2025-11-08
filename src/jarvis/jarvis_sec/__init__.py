@@ -396,7 +396,7 @@ def run_security_analysis(
                 return None, "YAML 内容为空"
             import yaml as _yaml3  # type: ignore
             try:
-                data = _yaml3.safe_load(content)
+            data = _yaml3.safe_load(content)
             except Exception as yaml_err:
                 error_msg = f"YAML 解析失败: {str(yaml_err)}"
                 return None, error_msg
@@ -515,8 +515,14 @@ def run_security_analysis(
         # 构造聚类Agent（每个文件一个Agent，按批次聚类）
         cluster_system_prompt = """
 # 单Agent聚类约束
-- 你的任务是对同一文件内的启发式候选进行"验证条件一致性"聚类。
+- 你的任务是对同一文件内的启发式候选进行聚类，将可以一起验证的问题归为一类。
+- **聚类原则**：
+  - 可以一起验证的问题归为一类，不一定是验证条件完全一致才能归为一类。
+  - 如果多个候选问题可以通过同一个验证过程来确认，即使它们的验证条件略有不同，也可以归为一类。
+  - 例如：多个指针解引用问题可以归为一类（验证"指针在解引用前非空"），即使它们涉及不同的指针变量。
+  - 例如：多个缓冲区操作问题可以归为一类（验证"拷贝长度不超过目标缓冲区容量"），即使它们涉及不同的缓冲区。
 - 验证条件：为了确认是否存在漏洞需要成立/验证的关键前置条件。例如："指针p在解引用前非空""拷贝长度不超过目标缓冲区容量"等。
+- **完整性要求**：每个gid都必须出现在某个类别中，不能遗漏任何一个gid。所有输入的gid都必须被分类。
 - 工具优先：如需核对上下文，可使用 read_code 读取相邻代码；避免过度遍历。
 - 禁止写操作；仅只读分析。
 - **重要：关于无效判断的保守策略**：
@@ -548,10 +554,10 @@ def run_security_analysis(
     * 必须足够详细，以便复核Agent能够验证你的判断
 - 要求：
   - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 YAML 数组，其他位置不输出任何文本
-  - **必须要求**：输入JSON中的所有gid都必须被分类，不能遗漏任何一个gid。所有gid必须出现在某个聚类的gids数组中。
+  - **完整性要求（最重要）**：输入JSON中的所有gid都必须被分类，不能遗漏任何一个gid。所有gid必须出现在某个聚类的gids数组中。这是强制要求，必须严格遵守。
+  - **聚类原则**：可以一起验证的问题归为一类，不一定是验证条件完全一致才能归为一类。如果多个候选问题可以通过同一个验证过程来确认，即使它们的验证条件略有不同，也可以归为一类。
   - **必须要求**：每个聚类元素必须包含 is_invalid 字段，且值必须为 true 或 false，不能省略。
   - **必须要求**：当 is_invalid 为 true 时，必须提供 invalid_reason 字段，且理由必须充分详细。
-  - 相同验证条件的候选合并为同一项
   - 不需要解释与长文本，仅给出可执行的验证条件短句
   - 若无法聚类，请将每个候选单独成组，verification 为该候选的最小确认条件
   - **关于 is_invalid 的保守判断原则**：
@@ -756,7 +762,7 @@ def run_security_analysis(
                 
                 if use_direct_model:
                     # 格式校验失败后，直接调用模型接口
-                    # 构造包含摘要提示词和具体错误信息的完整提示
+                    # 构造包含摘要提示词和具体错误信息的完整提示（不包含完整上下文）
                     error_guidance = ""
                     if error_details:
                         error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {detail}" for detail in error_details)
@@ -765,7 +771,21 @@ def run_security_analysis(
                         missing_count = len(missing_gids)
                         error_guidance += f"\n\n**完整性错误：遗漏了 {missing_count} 个 gid，这些 gid 必须被分类：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
                     
-                    full_prompt = f"{cluster_task}{error_guidance}\n\n{cluster_summary_prompt}"
+                    # 重试时不带完整上下文，只包含错误信息和遗漏的gid
+                    retry_task = f"""
+# 聚类任务重试
+文件: {_file}
+
+**重要提示**：请重新输出聚类结果。
+""".strip()
+                    if missing_gids:
+                        missing_gids_list = sorted(list(missing_gids))
+                        missing_count = len(missing_gids)
+                        retry_task += f"\n\n**遗漏的gid（共{missing_count}个，必须被分类）：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
+                    if error_details:
+                        retry_task += f"\n\n**格式错误：**\n" + "\n".join(f"- {detail}" for detail in error_details)
+                    
+                    full_prompt = f"{retry_task}{error_guidance}\n\n{cluster_summary_prompt}"
                     try:
                         response = cluster_agent.model.chat_until_success(full_prompt)  # type: ignore
                         # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
@@ -849,22 +869,7 @@ def run_security_analysis(
                         print(f"[JARVIS-SEC] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {_attempt} 次（使用直接模型调用）")
                         # 格式校验失败，后续重试使用直接模型调用
                         use_direct_model = True
-                        # 更新任务，明确指出遗漏的gid
-                        cluster_task = f"""
-# 聚类任务（分析输入）
-上下文：
-- entry_path: {entry_path}
-- file: {_file}
-- languages: {langs}
-
-候选(JSON数组，包含 gid/file/line/pattern/category/evidence)：
-{_json2.dumps(pending_in_file_with_ids, ensure_ascii=False, indent=2)}
-
-**重要提示**：上一次聚类结果中遗漏了以下gid（共{missing_count}个），这些gid必须被分类：
-遗漏的gid: {missing_gids_list}
-
-请确保所有输入的gid都被分类，包括上述遗漏的gid。请仔细检查每个gid，确保它们都出现在某个聚类的gids数组中。
-                        """.strip()
+                        # 不更新cluster_task，重试时使用简化的任务描述
                         valid = False
                 
                 if not valid:
@@ -874,26 +879,6 @@ def run_security_analysis(
                     if not missing_gids:
                         if error_details:
                             print(f"[JARVIS-SEC] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {_attempt} 次（使用直接模型调用）")
-                            # 更新任务，明确指出格式错误
-                            cluster_task = f"""
-# 聚类任务（分析输入）
-上下文：
-- entry_path: {entry_path}
-- file: {_file}
-- languages: {langs}
-
-候选(JSON数组，包含 gid/file/line/pattern/category/evidence)：
-{_json2.dumps(pending_in_file_with_ids, ensure_ascii=False, indent=2)}
-
-**重要提示**：上一次聚类结果格式无效：{'; '.join(error_details)}
-
-请确保每个聚类元素都包含以下必填字段：
-- verification: 字符串（验证条件描述）
-- gids: 整数数组（候选的全局唯一编号）
-- is_invalid: 布尔值（必填，true 或 false，不能省略）
-
-请重新输出正确的聚类结果。
-                            """.strip()
                         else:
                             print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次（使用直接模型调用）")
                     cluster_items = None
@@ -929,26 +914,8 @@ def run_security_analysis(
                     # 重新进入循环进行重试
                     cluster_items = None
                     use_direct_model = True
-                    # 更新任务，明确指出格式错误
-                    cluster_task = f"""
-# 聚类任务（分析输入）
-上下文：
-- entry_path: {entry_path}
-- file: {_file}
-- languages: {langs}
-
-候选(JSON数组，包含 gid/file/line/pattern/category/evidence)：
-{_json2.dumps(pending_in_file_with_ids, ensure_ascii=False, indent=2)}
-
-**重要提示**：上一次聚类结果格式无效：{'; '.join(format_error_details)}
-
-请确保每个聚类元素都包含以下必填字段：
-- verification: 字符串（验证条件描述）
-- gids: 整数数组（候选的全局唯一编号）
-- is_invalid: 布尔值（必填，true 或 false，不能省略）
-
-请重新输出正确的聚类结果。
-                    """.strip()
+                    error_details = format_error_details  # 设置错误详情，以便重试时反馈
+                    # 不更新cluster_task，重试时使用简化的任务描述
                     # 继续while循环重试（通过设置cluster_items为None，下次循环会重新运行Agent）
                     continue
 
@@ -1279,23 +1246,23 @@ def run_security_analysis(
                         review_agent.run(review_task)
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                    review_agent.run(review_task)
-                
-                # 工作区保护
-                try:
-                    _changed_review = _git_restore_if_dirty(entry_path)
-                    if _changed_review:
-                        try:
-                            print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-                
-                # 解析复核结果
-                review_summary_text = review_summary_container.get("text", "")
+            review_agent.run(review_task)
+            
+            # 工作区保护
+            try:
+                _changed_review = _git_restore_if_dirty(entry_path)
+                if _changed_review:
+                    try:
+                        print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            
+            # 解析复核结果
+            review_summary_text = review_summary_container.get("text", "")
                 parse_error_review = None
-                if review_summary_text:
+            if review_summary_text:
                     review_parsed, parse_error_review = _try_parse_summary_report(review_summary_text)
                     if parse_error_review:
                         # YAML解析失败，记录错误信息以便下次重试时反馈给模型
@@ -1306,10 +1273,10 @@ def run_security_analysis(
                             pass
                     else:
                         prev_parse_error_review = None  # 解析成功，清除之前的错误信息
-                        if isinstance(review_parsed, list):
+                if isinstance(review_parsed, list):
                             # 简单校验：检查是否为有效列表，包含必要的字段
                             if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
-                                review_results = review_parsed
+                    review_results = review_parsed
                                 break  # 格式正确，退出重试循环
                 
                 # 格式校验失败，后续重试使用直接模型调用
@@ -1698,7 +1665,7 @@ def run_security_analysis(
                     agent.run(per_task)
             else:
                 # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                agent.run(per_task)
+            agent.run(per_task)
 
             # 工作区保护：调用 Agent 后如检测到文件被修改，则恢复（每次尝试都执行）
             try:
@@ -1730,7 +1697,7 @@ def run_security_analysis(
             parse_error_analysis = None
             if summary_text:
                 rep, parse_error_analysis = _try_parse_summary_report(summary_text)
-                
+
                 if parse_error_analysis:
                     # YAML解析失败，记录错误信息以便下次重试时反馈给模型
                     try:
@@ -1951,23 +1918,23 @@ def run_security_analysis(
                         verification_agent.run(verification_task)
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                    verification_agent.run(verification_task)
-                
-                # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
-                try:
-                    _changed_verify = _git_restore_if_dirty(entry_path)
-                    if _changed_verify:
-                        try:
-                            print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-                
-                # 解析验证结果
-                verification_summary_text = verification_summary_container.get("text", "")
+            verification_agent.run(verification_task)
+            
+            # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
+            try:
+                _changed_verify = _git_restore_if_dirty(entry_path)
+                if _changed_verify:
+                    try:
+                        print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            
+            # 解析验证结果
+            verification_summary_text = verification_summary_container.get("text", "")
                 parse_error_verify = None
-                if verification_summary_text:
+            if verification_summary_text:
                     verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
                     if parse_error_verify:
                         # YAML解析失败，记录错误信息以便下次重试时反馈给模型
@@ -1978,10 +1945,10 @@ def run_security_analysis(
                             pass
                     else:
                         prev_parse_error_verify = None  # 解析成功，清除之前的错误信息
-                        if isinstance(verification_parsed, list):
+                if isinstance(verification_parsed, list):
                             # 简单校验：检查是否为有效列表
                             if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
-                                verification_results = verification_parsed
+                    verification_results = verification_parsed
                                 break  # 格式正确，退出重试循环
                 
                 # 格式校验失败，后续重试使用直接模型调用
@@ -2151,7 +2118,7 @@ def _try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str
     try:
         import yaml as _yaml  # type: ignore
         try:
-            data = _yaml.safe_load(content)
+        data = _yaml.safe_load(content)
         except Exception as yaml_err:
             error_msg = f"YAML 解析失败: {str(yaml_err)}"
             return None, error_msg

@@ -680,19 +680,19 @@ class LLMRustCratePlannerAgent:
 
             # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
             if agent is None or not use_direct_model:
-                agent = Agent(
-                    system_prompt=system_prompt,
-                    name="C2Rust-LLM-Module-Planner",
-                    model_group=self.llm_group,
-                    summary_prompt=summary_prompt,
-                    need_summary=True,
-                    auto_complete=True,
-                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
-                    plan=False,          # 关闭内置任务规划
-                    non_interactive=True, # 非交互
-                    use_methodology=False,
-                    use_analysis=False,
-                )
+            agent = Agent(
+                system_prompt=system_prompt,
+                name="C2Rust-LLM-Module-Planner",
+                model_group=self.llm_group,
+                summary_prompt=summary_prompt,
+                need_summary=True,
+                auto_complete=True,
+                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
+                plan=False,          # 关闭内置任务规划
+                non_interactive=True, # 非交互
+                use_methodology=False,
+                use_analysis=False,
+            )
 
             # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 YAML）
             if use_direct_model:
@@ -711,7 +711,7 @@ class LLMRustCratePlannerAgent:
                     summary_output = response
                 except Exception as e:
                     print(f"[c2rust-llm-planner] 直接模型调用失败: {e}，回退到 run()")
-                    summary_output = agent.run(user_prompt)  # type: ignore
+            summary_output = agent.run(user_prompt)  # type: ignore
             else:
                 # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
                 summary_output = agent.run(user_prompt)  # type: ignore
@@ -894,10 +894,10 @@ def _parse_project_yaml_entries(yaml_text: str) -> Tuple[List[Any], Optional[str
     try:
         import yaml  # type: ignore
         try:
-            data = yaml.safe_load(yaml_text)
-            if isinstance(data, list):
+        data = yaml.safe_load(yaml_text)
+        if isinstance(data, list):
                 return data, None
-            # 如果解析结果不是列表，回退到轻量解析器
+        # 如果解析结果不是列表，回退到轻量解析器
             return [], f"YAML 解析结果不是列表，而是 {type(data).__name__}"
         except (yaml.YAMLError, ValueError) as yaml_err:
             # YAML 解析错误，记录错误信息

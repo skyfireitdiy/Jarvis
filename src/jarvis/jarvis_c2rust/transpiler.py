@@ -440,7 +440,7 @@ def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]
     try:
         import yaml  # type: ignore
         try:
-            obj = yaml.safe_load(raw_yaml)
+        obj = yaml.safe_load(raw_yaml)
         except Exception as yaml_err:
             error_msg = f"YAML 解析失败: {str(yaml_err)}"
             return {}, error_msg
@@ -817,20 +817,20 @@ class Transpiler:
 
             # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
             if agent is None or not use_direct_model:
-                agent = Agent(
-                    system_prompt=sys_p,
-                    name="C2Rust-Function-Planner",
-                    model_group=self.llm_group,
-                    summary_prompt=sum_p,
-                    need_summary=True,
-                    auto_complete=True,
-                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                    plan=False,
+            agent = Agent(
+                system_prompt=sys_p,
+                name="C2Rust-Function-Planner",
+                model_group=self.llm_group,
+                summary_prompt=sum_p,
+                need_summary=True,
+                auto_complete=True,
+                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                plan=False,
                     non_interactive=self.non_interactive,
-                    use_methodology=False,
-                    use_analysis=False,
-                    disable_file_edit=True,
-                )
+                use_methodology=False,
+                use_analysis=False,
+                disable_file_edit=True,
+            )
             
             prev_cwd = os.getcwd()
             try:
@@ -855,7 +855,7 @@ class Transpiler:
                         summary = agent.run(usr_p)
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                    summary = agent.run(usr_p)
+                summary = agent.run(usr_p)
             finally:
                 os.chdir(prev_cwd)
             
@@ -866,15 +866,15 @@ class Transpiler:
                 last_reason = f"YAML解析失败: {parse_error}"
                 use_direct_model = True
             else:
-                ok, reason = _validate(meta)
-                if ok:
-                    module = str(meta.get("module") or "").strip()
-                    rust_sig = str(meta.get("rust_signature") or "").strip()
-                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
-                    return module, rust_sig
-                else:
-                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
-                    last_reason = reason
+            ok, reason = _validate(meta)
+            if ok:
+                module = str(meta.get("module") or "").strip()
+                rust_sig = str(meta.get("rust_signature") or "").strip()
+                typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
+                return module, rust_sig
+            else:
+                typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
+                last_reason = reason
                     # 格式校验失败，后续重试使用直接模型调用
                     use_direct_model = True
         # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 简单占位签名）
