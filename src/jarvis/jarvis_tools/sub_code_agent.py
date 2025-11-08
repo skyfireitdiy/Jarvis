@@ -19,7 +19,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class SubCodeAgentTool:
     """
-    使用 CodeAgent 托管执行子任务，执行完立即清理内部 Agent。
+    使用 CodeAgent 托管执行子任务，执行完立即清理 CodeAgent 实例。
     - 不注册至全局
     - 使用系统默认/全局配置
     - 启用自动完成与总结
@@ -157,21 +157,21 @@ class SubCodeAgentTool:
 
             # 子Agent需要自动完成
             try:
-                code_agent.agent.auto_complete = True
+                code_agent.auto_complete = True
                 # 同步父Agent工具使用集（如可用）
                 if use_tools:
-                    code_agent.agent.set_use_tools(use_tools)
+                    code_agent.set_use_tools(use_tools)
                 # 同步父Agent的模型名称（如可用），以尽量保持平台与模型一致
                 if (
                     parent_agent is not None
                     and getattr(parent_agent, "model", None)
-                    and getattr(code_agent.agent, "model", None)
+                    and getattr(code_agent, "model", None)
                 ):
                     try:
                         parent_model_name = parent_agent.model.name()  # type: ignore[attr-defined]
                         if parent_model_name:
                             from typing import Any
-                            model_obj: Any = getattr(code_agent.agent, "model", None)
+                            model_obj: Any = getattr(code_agent, "model", None)
                             if model_obj is not None:
                                 model_obj.set_model_name(parent_model_name)
                                 # 模型有效性校验与回退，确保父Agent模型在子Agent平台上可用
@@ -197,10 +197,10 @@ class SubCodeAgentTool:
             # 执行子任务（无提交信息前后缀）
             ret = code_agent.run(enhanced_task, prefix="", suffix="")
 
-            # 主动清理内部 Agent，避免污染父Agent的全局状态
+            # 主动清理 CodeAgent 实例，避免污染父Agent的全局状态
             try:
-                inner_agent = code_agent.agent
-                delete_agent(inner_agent.name)
+                # CodeAgent 现在直接继承 Agent，所以直接使用 code_agent
+                delete_agent(code_agent.name)
             except Exception:
                 pass
 

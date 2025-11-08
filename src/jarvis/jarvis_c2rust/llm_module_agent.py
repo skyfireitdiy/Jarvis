@@ -1166,9 +1166,9 @@ def execute_llm_plan(
             try:
                 agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
                 # 验证 agent 内部的模型配置
-                if hasattr(agent, 'agent') and hasattr(agent.agent, 'model'):
-                    actual_model = getattr(agent.agent.model, 'model_name', 'unknown')
-                    actual_platform = type(agent.agent.model).__name__
+                if hasattr(agent, 'model') and agent.model:
+                    actual_model = getattr(agent.model, 'model_name', 'unknown')
+                    actual_platform = type(agent.model).__name__
                     print(f"[c2rust-llm-planner] CodeAgent 内部模型: {actual_platform}.{actual_model}")
                 agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
                 print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
