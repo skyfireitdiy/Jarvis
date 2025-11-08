@@ -875,16 +875,11 @@ class CodeAgent:
                     was_suppressed = getattr(self.agent.model, '_suppress_output', False)
                     self.agent.model.set_suppress_output(True)
                 try:
-                    PrettyOutput.print("🔍 正在进行意图识别与上下文分析...", OutputType.INFO)
-                    # 尝试从用户输入中提取目标文件和符号（简单启发式方法）
-                    target_files = self._extract_file_paths_from_input(user_input)
-                    target_symbols = self._extract_symbols_from_input(user_input)
+                    PrettyOutput.print("🔍 正在进行关键词提取与上下文分析...", OutputType.INFO)
                     
-                    # 生成上下文推荐
+                    # 生成上下文推荐（基于关键词和项目上下文）
                     recommendation = self.context_recommender.recommend_context(
                         user_input=user_input,
-                        target_files=target_files,
-                        target_symbols=target_symbols,
                     )
                     
                     # 格式化推荐结果
