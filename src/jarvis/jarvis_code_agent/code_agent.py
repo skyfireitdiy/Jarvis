@@ -825,7 +825,7 @@ class CodeAgent(Agent):
             try:
                 if self.model:
                     self.model.set_suppress_output(False)
-                self.run(enhanced_input)
+                super().run(enhanced_input)
             except RuntimeError as e:
                 PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
                 return str(e)
