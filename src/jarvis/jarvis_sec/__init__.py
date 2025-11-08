@@ -817,7 +817,7 @@ def run_security_analysis(
 请重新输出正确的聚类结果。
                             """.strip()
                         else:
-                        print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次")
+                            print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次")
                     cluster_items = None
 
             # 合并聚类结果
@@ -1344,11 +1344,11 @@ def run_security_analysis(
                         gid_counts[gid] = gid_counts.get(gid, 0) + 1
                 print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(merged_items)} -> 追加到报告")
                 _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
-            # 更新状态：发现的问题数
-            status_mgr.update_verification(
-                current_batch=bidx,
-                total_batches=total_batches,
-                issues_found=len(all_issues),
+                # 更新状态：发现的问题数
+                status_mgr.update_verification(
+                    current_batch=bidx,
+                    total_batches=total_batches,
+                    issues_found=len(all_issues),
                     message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题（验证通过）"
                 )
             else:
