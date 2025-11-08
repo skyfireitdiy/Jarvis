@@ -456,6 +456,7 @@ class Transpiler:
         review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,  # 审查阶段最大迭代次数（0表示无限重试）
         resume: bool = True,
         only: Optional[List[str]] = None,  # 仅转译指定函数名（简单名或限定名）
+        non_interactive: bool = True,
     ) -> None:
         self.project_root = Path(project_root).resolve()
         self.data_dir = self.project_root / C2RUST_DIRNAME
@@ -477,7 +478,8 @@ class Transpiler:
         self.review_max_iterations = review_max_iterations
         self.resume = resume
         self.only = set(only or [])
-        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []}", fg=typer.colors.BLUE)
+        self.non_interactive = non_interactive
+        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
@@ -811,7 +813,7 @@ class Transpiler:
                 auto_complete=True,
                 use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
                 plan=False,
-                non_interactive=True,
+                non_interactive=self.non_interactive,
                 use_methodology=False,
                 use_analysis=False,
                 disable_file_edit=True,
@@ -932,7 +934,7 @@ class Transpiler:
         # 初始化一次修复Agent（CodeAgent），单个函数生命周期内复用（启用方法论与分析）
         self._current_agents[f"repair::{rec.id}"] = CodeAgent(
             need_summary=False,
-            non_interactive=True,
+            non_interactive=self.non_interactive,
             plan=False,
             model_group=self.llm_group,
             use_methodology=True,
@@ -950,7 +952,7 @@ class Transpiler:
             # 复用的修复Agent启用方法论与分析
             agent = CodeAgent(
                 need_summary=False,
-                non_interactive=True,
+                non_interactive=self.non_interactive,
                 plan=False,
                 model_group=self.llm_group,
                 use_methodology=True,
@@ -1073,7 +1075,7 @@ class Transpiler:
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(self.crate_dir))
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.llm_group)
+            agent = CodeAgent(need_summary=False, non_interactive=self.non_interactive, plan=False, model_group=self.llm_group)
             agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -1743,7 +1745,7 @@ class Transpiler:
                 auto_complete=True,
                 use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
                 plan=False,
-                non_interactive=True,
+                non_interactive=self.non_interactive,
                 use_methodology=False,
                 use_analysis=False,
                 disable_file_edit=True,
@@ -2064,6 +2066,7 @@ def run_transpile(
     review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,
     resume: bool = True,
     only: Optional[List[str]] = None,
+    non_interactive: bool = True,
 ) -> None:
     """
     入口函数：执行转译流程
@@ -2085,5 +2088,6 @@ def run_transpile(
         review_max_iterations=review_max_iterations,
         resume=resume,
         only=only,
+        non_interactive=non_interactive,
     )
     t.transpile()
