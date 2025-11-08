@@ -429,12 +429,38 @@ def run_security_analysis(
 
     # 读取已有聚类报告以支持断点（若存在则按文件+批次复用既有聚类结果）
     _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
+    # 记录已完成的聚类批次（从 progress.jsonl 中读取）
+    _completed_cluster_batches: set = set()
     try:
         from pathlib import Path as _Path2
         import json as _json
         _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
+        
+        # 从 progress.jsonl 中读取已完成的聚类批次（优先检查）
+        if progress_path.exists():
+            try:
+                for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = _json.loads(line)
+                    except Exception:
+                        continue
+                    # 检查 cluster_status 事件，status 为 "done" 表示已完成
+                    if obj.get("event") == "cluster_status" and obj.get("status") == "done":
+                        file_name = obj.get("file")
+                        batch_idx = obj.get("batch_index")
+                        if file_name and batch_idx:
+                            _completed_cluster_batches.add((str(file_name), int(batch_idx)))
+            except Exception:
+                pass
+        
+        # 读取 cluster_report.jsonl（由于使用追加模式，可能有重复，需要去重）
         if _cluster_path.exists():
             try:
+                # 使用字典去重：key 为 (file, batch_index, verification, gids 的字符串表示)
+                seen_records: Dict[tuple, Dict] = {}
                 with _cluster_path.open("r", encoding="utf-8", errors="ignore") as f:
                     for line in f:
                         line = line.strip()
@@ -443,15 +469,27 @@ def run_security_analysis(
                         rec = _json.loads(line)
                         if not isinstance(rec, dict):
                             continue
-                        f = str(rec.get("file") or "")
+                        f_name = str(rec.get("file") or "")
                         bidx = int(rec.get("batch_index", 1) or 1)
-                        _existing_clusters.setdefault((f, bidx), []).append(rec)
+                        # 使用 gids 的排序后元组作为去重键
+                        gids_list = rec.get("gids", [])
+                        gids_key = tuple(sorted(gids_list)) if isinstance(gids_list, list) else ()
+                        key = (f_name, bidx, str(rec.get("verification", "")), gids_key)
+                        # 保留最新的记录（后写入的覆盖先写入的）
+                        seen_records[key] = rec
+                
+                # 按 (file, batch_index) 分组
+                for rec in seen_records.values():
+                    f_name = str(rec.get("file") or "")
+                    bidx = int(rec.get("batch_index", 1) or 1)
+                    _existing_clusters.setdefault((f_name, bidx), []).append(rec)
             except Exception:
                 _existing_clusters = {}
     except Exception:
         _existing_clusters = {}
+        _completed_cluster_batches = set()
 
-    # 快照写入函数：每处理完一个聚类批次后，写入当前聚类结果，支持断点恢复
+    # 快照写入函数：每处理完一个聚类批次后，追加写入该批次的聚类结果，支持断点恢复
     def _write_cluster_report_snapshot():
         try:
             from pathlib import Path as _Path2
@@ -459,7 +497,9 @@ def run_security_analysis(
             _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
             _cluster_path.parent.mkdir(parents=True, exist_ok=True)
             
-            with _cluster_path.open("w", encoding="utf-8") as f:
+            # 使用追加模式，每次只追加当前批次的记录
+            # 注意：这会导致重复记录，需要在读取时去重
+            with _cluster_path.open("a", encoding="utf-8") as f:
                 for record in cluster_records:
                     f.write(_json.dumps(record, ensure_ascii=False) + "\n")
 
@@ -471,6 +511,22 @@ def run_security_analysis(
                     "total_candidates": len(compact_candidates),
                 }
             )
+        except Exception:
+            pass
+    
+    # 写入单个批次的聚类结果（用于增量保存）
+    def _write_cluster_batch_snapshot(batch_records: List[Dict]):
+        """写入单个批次的聚类结果，支持增量保存"""
+        try:
+            from pathlib import Path as _Path2
+            import json as _json
+            _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
+            _cluster_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # 追加模式，每次只追加当前批次的记录
+            with _cluster_path.open("a", encoding="utf-8") as f:
+                for record in batch_records:
+                    f.write(_json.dumps(record, ensure_ascii=False) + "\n")
         except Exception:
             pass
 
@@ -528,8 +584,13 @@ def run_security_analysis(
                     "reason": "single_alert",
                 }
             )
-            # 写入快照
-            _write_cluster_report_snapshot()
+            # 写入当前批次的聚类结果（增量保存）
+            current_batch_records = [
+                rec for rec in cluster_records
+                if rec.get("file") == _file and rec.get("batch_index") == 1
+            ]
+            if current_batch_records:
+                _write_cluster_batch_snapshot(current_batch_records)
             print(f"[JARVIS-SEC] 文件 {_file} 仅有一个告警（gid={single_gid}），跳过聚类直接写入")
             continue
 
@@ -608,88 +669,34 @@ def run_security_analysis(
 
             # 若断点存在：优先使用已有聚类结果复建批次，跳过Agent运行（仅支持 gids）
             _key = (_file, _chunk_idx)
-            if _key in _existing_clusters:
-                # 收集输入的gid
-                input_gids_resume = set()
-                gid_to_item_resume: Dict[int, Dict] = {}
-                for it in pending_in_file_with_ids:
+            # 检查是否已完成聚类（从 cluster_report.jsonl 或 progress.jsonl）
+            if _key in _existing_clusters or _key in _completed_cluster_batches:
+                # 如果 progress.jsonl 标记为已完成，但 cluster_report.jsonl 中没有记录
+                # 说明该批次可能已经完成但结果丢失
+                # 为了不丢失告警，我们创建一个默认的聚类记录，将这些 gid 作为一个批次
+                if _key not in _existing_clusters and _key in _completed_cluster_batches:
                     try:
-                        _gid = int(it.get("gid", 0))
-                        if _gid >= 1:
-                            input_gids_resume.add(_gid)
-                            gid_to_item_resume[_gid] = it
+                        print(f"[JARVIS-SEC] 断点恢复：批次 {_key} 在 progress.jsonl 中标记为已完成，但 cluster_report.jsonl 中无记录，创建默认聚类记录以确保告警不丢失")
                     except Exception:
                         pass
-                
-                # 收集已分类的gid
-                classified_gids_resume = set()
-                for rec in _existing_clusters.get(_key, []):
-                    verification = str(rec.get("verification", "")).strip()
-                    gids_list = rec.get("gids", [])
-                    # 如果 is_invalid 字段缺失，跳过该记录（格式不完整，需要重新聚类）
-                    if "is_invalid" not in rec:
-                        try:
-                            print(f"[JARVIS-SEC] 断点恢复：记录缺少 is_invalid 字段，跳过该记录，将重新聚类")
-                        except Exception:
-                            pass
-                        continue
-                    is_invalid_resume = rec["is_invalid"]
-                    norm_keys: List[int] = []
-                    if isinstance(gids_list, list):
-                        for x in gids_list:
-                            try:
-                                xi = int(x)
-                                if xi >= 1:
-                                    norm_keys.append(xi)
-                                    classified_gids_resume.add(xi)
-                            except Exception:
-                                continue
-                    members: List[Dict] = []
-                    for k in norm_keys:
-                        it = gid_to_item_resume.get(k)
-                        if it:
-                            it["verify"] = verification
-                            members.append(it)
-                    
-                    # 如果断点恢复的记录标记为无效，不恢复该聚类
-                    if is_invalid_resume:
-                        invalid_gids_resume = [m.get("gid") for m in members]
-                        try:
-                            print(f"[JARVIS-SEC] 断点恢复：跳过无效聚类（gids={invalid_gids_resume}）")
-                        except Exception:
-                            pass
-                        # 记录到进度文件
-                        _progress_append(
-                            {
-                                "event": "cluster_invalid_resumed",
-                                "file": _file,
-                                "batch_index": _chunk_idx,
-                                "gids": invalid_gids_resume,
-                                "verification": verification,
-                                "count": len(members),
-                            }
-                        )
-                    elif members:
-                        # 只有非无效的聚类才恢复
-                        cluster_batches.append(members)
-                        cluster_records.append(
-                            {
-                                "file": _file,
-                                "verification": verification,
-                                "gids": [m.get("gid") for m in members],
-                                "count": len(members),
-                                "batch_index": _chunk_idx,
-                                "is_invalid": False,
-                            }
-                        )
-                
-                # 检查断点恢复的完整性
-                missing_gids_resume = input_gids_resume - classified_gids_resume
-                if missing_gids_resume:
-                    print(f"[JARVIS-SEC] 断点恢复：发现遗漏的gid {sorted(list(missing_gids_resume))}，将重新聚类")
-                    # 不跳过，继续执行Agent运行以补充遗漏的gid
-                else:
-                    # 所有gid都已分类，标记进度（断点复用）
+                    # 为所有候选创建默认验证条件
+                    default_verification = f"验证候选的安全风险（断点恢复，聚类结果丢失）"
+                    for it in pending_in_file_with_ids:
+                        it["verify"] = default_verification
+                    # 将整个批次作为一个聚类加入
+                    cluster_batches.append(pending_in_file_with_ids)
+                    cluster_records.append(
+                        {
+                            "file": _file,
+                            "verification": default_verification,
+                            "gids": [it.get("gid") for it in pending_in_file_with_ids],
+                            "count": len(pending_in_file_with_ids),
+                            "batch_index": _chunk_idx,
+                            "is_invalid": False,
+                            "note": "断点恢复：progress.jsonl标记为已完成但cluster_report.jsonl无记录",
+                        }
+                    )
+                    # 标记进度（已恢复）
                     _progress_append(
                         {
                             "event": "cluster_status",
@@ -697,12 +704,114 @@ def run_security_analysis(
                             "file": _file,
                             "batch_index": _chunk_idx,
                             "reused": True,
-                            "clusters_count": len(_existing_clusters.get(_key, [])),
+                            "recovered": True,
+                            "reason": "progress_marked_done_but_no_cluster_record",
                         }
                     )
-                    # 写入快照（断点）
-                    _write_cluster_report_snapshot()
                     continue
+                elif _key in _existing_clusters:
+                    # 收集输入的gid
+                    input_gids_resume = set()
+                    gid_to_item_resume: Dict[int, Dict] = {}
+                    for it in pending_in_file_with_ids:
+                        try:
+                            _gid = int(it.get("gid", 0))
+                            if _gid >= 1:
+                                input_gids_resume.add(_gid)
+                                gid_to_item_resume[_gid] = it
+                        except Exception:
+                            pass
+                    
+                    # 收集已分类的gid
+                    classified_gids_resume = set()
+                    for rec in _existing_clusters.get(_key, []):
+                        verification = str(rec.get("verification", "")).strip()
+                        gids_list = rec.get("gids", [])
+                        # 如果 is_invalid 字段缺失，跳过该记录（格式不完整，需要重新聚类）
+                        if "is_invalid" not in rec:
+                            try:
+                                print(f"[JARVIS-SEC] 断点恢复：记录缺少 is_invalid 字段，跳过该记录，将重新聚类")
+                            except Exception:
+                                pass
+                            continue
+                        is_invalid_resume = rec["is_invalid"]
+                        norm_keys: List[int] = []
+                        if isinstance(gids_list, list):
+                            for x in gids_list:
+                                try:
+                                    xi = int(x)
+                                    if xi >= 1:
+                                        norm_keys.append(xi)
+                                        classified_gids_resume.add(xi)
+                                except Exception:
+                                    continue
+                        members: List[Dict] = []
+                        for k in norm_keys:
+                            it = gid_to_item_resume.get(k)
+                            if it:
+                                it["verify"] = verification
+                                members.append(it)
+                        
+                        # 如果断点恢复的记录标记为无效，不恢复该聚类
+                        if is_invalid_resume:
+                            invalid_gids_resume = [m.get("gid") for m in members]
+                            try:
+                                print(f"[JARVIS-SEC] 断点恢复：跳过无效聚类（gids={invalid_gids_resume}）")
+                            except Exception:
+                                pass
+                            # 记录到进度文件
+                            _progress_append(
+                                {
+                                    "event": "cluster_invalid_resumed",
+                                    "file": _file,
+                                    "batch_index": _chunk_idx,
+                                    "gids": invalid_gids_resume,
+                                    "verification": verification,
+                                    "count": len(members),
+                                }
+                            )
+                        elif members:
+                            # 只有非无效的聚类才恢复
+                            cluster_batches.append(members)
+                            recovered_record = {
+                                "file": _file,
+                                "verification": verification,
+                                "gids": [m.get("gid") for m in members],
+                                "count": len(members),
+                                "batch_index": _chunk_idx,
+                                "is_invalid": False,
+                            }
+                            cluster_records.append(recovered_record)
+                    
+                    # 检查断点恢复的完整性
+                    missing_gids_resume = input_gids_resume - classified_gids_resume
+                    if missing_gids_resume:
+                        print(f"[JARVIS-SEC] 断点恢复：发现遗漏的gid {sorted(list(missing_gids_resume))}，将重新聚类")
+                        # 不跳过，继续执行Agent运行以补充遗漏的gid
+                    else:
+                        # 所有gid都已分类，标记进度（断点复用）
+                        _progress_append(
+                            {
+                                "event": "cluster_status",
+                                "status": "done",
+                                "file": _file,
+                                "batch_index": _chunk_idx,
+                                "reused": True,
+                                "clusters_count": len(_existing_clusters.get(_key, [])),
+                            }
+                        )
+                        # 为了确保状态一致性，即使是从文件恢复的，也再次写入快照（追加模式会自动去重）
+                        recovered_batch_records = [
+                            rec for rec in cluster_records
+                            if rec.get("file") == _file and rec.get("batch_index") == _chunk_idx
+                        ]
+                        if recovered_batch_records:
+                            _write_cluster_batch_snapshot(recovered_batch_records)
+                            try:
+                                print(f"[JARVIS-SEC] 断点恢复：批次 {_key} 已从 cluster_report.jsonl 恢复，共 {len(recovered_batch_records)} 个聚类记录")
+                            except Exception:
+                                pass
+                        continue
 
             # 记录聚类批次开始（进度）
             _progress_append(
@@ -1050,25 +1159,28 @@ def run_security_analysis(
                         print(f"[JARVIS-SEC] 聚类批次完成: 有效聚类={_merged_count}，无效聚类={_invalid_count}（已跳过）")
                     except Exception:
                         pass
-                # 写入快照（断点）
-                _write_cluster_report_snapshot()
-    # 聚类报告（汇总所有文件）
+                # 写入当前批次的聚类结果（增量保存）
+                current_batch_records = [
+                    rec for rec in cluster_records
+                    if rec.get("file") == _file and rec.get("batch_index") == _chunk_idx
+                ]
+                if current_batch_records:
+                    _write_cluster_batch_snapshot(current_batch_records)
+    # 聚类报告（汇总所有文件）- 不再重写，因为每个批次已经增量保存
+    # 如果需要整理文件（去重），可以在需要时单独处理
     try:
         from pathlib import Path as _Path2
         import json as _json
         _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
-        _cluster_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with _cluster_path.open("w", encoding="utf-8") as f:
-            for record in cluster_records:
-                f.write(_json.dumps(record, ensure_ascii=False) + "\n")
-
+        
+        # 记录聚类阶段完成
         _progress_append(
             {
                 "event": "cluster_report_written",
                 "path": str(_cluster_path),
                 "clusters": len(cluster_records),
                 "total_candidates": len(compact_candidates),
+                "note": "每个批次已增量保存，无需重写整个文件",
             }
         )
     except Exception:
