@@ -12,6 +12,7 @@ from typing import List, Optional, Dict, Any, Set
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
 from jarvis.jarvis_code_agent.utils import get_project_overview
 
 from .context_recommender import ContextRecommendation
@@ -49,11 +50,22 @@ class ContextRecommender:
             
             if parent_model:
                 try:
+                    # 优先获取 model_group，因为它包含了完整的配置信息
+                    model_group = getattr(parent_model, 'model_group', None)
                     platform_name = parent_model.platform_name()
                     model_name = parent_model.name()
-                    model_group = getattr(parent_model, 'model_group', None)
                 except Exception:
                     # 如果获取失败，使用默认配置
+                    pass
+            
+            # 优先根据 model_group 获取配置（确保配置一致性）
+            # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
+            if model_group:
+                try:
+                    platform_name = get_normal_platform_name(model_group)
+                    model_name = get_normal_model_name(model_group)
+                except Exception:
+                    # 如果从 model_group 解析失败，回退到从 parent_model 获取的值
                     pass
             
             # 创建平台实例
@@ -65,17 +77,17 @@ class ContextRecommender:
             else:
                 self.llm_model = registry.get_normal_platform()
             
-            # 设置模型名称（如果从父Agent获取到）
-            if model_name and self.llm_model:
-                try:
-                    self.llm_model.set_model_name(model_name)
-                except Exception:
-                    pass
-            
-            # 设置模型组（如果从父Agent获取到）
+            # 先设置模型组（如果从父Agent获取到），因为 model_group 可能会影响模型名称的解析
             if model_group and self.llm_model:
                 try:
                     self.llm_model.set_model_group(model_group)
+                except Exception:
+                    pass
+            
+            # 然后设置模型名称（如果从父Agent或model_group获取到）
+            if model_name and self.llm_model:
+                try:
+                    self.llm_model.set_model_name(model_name)
                 except Exception:
                     pass
             
