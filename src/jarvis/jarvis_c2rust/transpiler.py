@@ -800,30 +800,54 @@ class Transpiler:
         attempt = 0
         last_reason = "未知错误"
         max_attempts = int(getattr(self, "plan_max_retries", 0) or 5)
+        use_direct_model = False  # 标记是否使用直接模型调用
+        agent = None  # 在循环外声明，以便重试时复用
+        
         while attempt < max_attempts:
             attempt += 1
             sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
 
-            agent = Agent(
-                system_prompt=sys_p,
-                name="C2Rust-Function-Planner",
-                model_group=self.llm_group,
-                summary_prompt=sum_p,
-                need_summary=True,
-                auto_complete=True,
-                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                plan=False,
-                non_interactive=self.non_interactive,
-                use_methodology=False,
-                use_analysis=False,
-                disable_file_edit=True,
-            )
+            # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
+            if agent is None or not use_direct_model:
+                agent = Agent(
+                    system_prompt=sys_p,
+                    name="C2Rust-Function-Planner",
+                    model_group=self.llm_group,
+                    summary_prompt=sum_p,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                    plan=False,
+                    non_interactive=self.non_interactive,
+                    use_methodology=False,
+                    use_analysis=False,
+                    disable_file_edit=True,
+                )
+            
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                summary = agent.run(usr_p)
+                
+                if use_direct_model:
+                    # 格式校验失败后，直接调用模型接口
+                    # 构造包含摘要提示词和具体错误信息的完整提示
+                    error_guidance = ""
+                    if last_reason and last_reason != "未知错误":
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内仅包含单个 <yaml> 对象；YAML 对象必须包含字段：module（字符串）、rust_signature（字符串）。"
+                    
+                    full_prompt = f"{usr_p}{error_guidance}\n\n{sum_p}"
+                    try:
+                        response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                        summary = response
+                    except Exception as e:
+                        typer.secho(f"[c2rust-transpiler][plan] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
+                        summary = agent.run(usr_p)
+                else:
+                    # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                    summary = agent.run(usr_p)
             finally:
                 os.chdir(prev_cwd)
+            
             meta = _extract_json_from_summary(str(summary or ""))
             ok, reason = _validate(meta)
             if ok:
@@ -834,6 +858,8 @@ class Transpiler:
             else:
                 typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
                 last_reason = reason
+                # 格式校验失败，后续重试使用直接模型调用
+                use_direct_model = True
         # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 简单占位签名）
         try:
             crate_root = self.crate_dir.resolve()
@@ -1752,18 +1778,41 @@ class Transpiler:
             )
 
         # 0表示无限重试，否则限制迭代次数
+        use_direct_model_review = False  # 标记是否使用直接模型调用
+        parse_failed = False  # 标记上一次解析是否失败
         while max_iterations == 0 or i < max_iterations:
             agent = self._current_agents[review_key]
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(self.crate_dir))
-                summary = str(agent.run(self._compose_prompt_with_context(usr_p_init)) or "")
+                composed_prompt = self._compose_prompt_with_context(usr_p_init)
+                
+                if use_direct_model_review:
+                    # 格式解析失败后，直接调用模型接口
+                    # 构造包含摘要提示词和具体错误信息的完整提示
+                    error_guidance = ""
+                    # 检查上一次的解析结果
+                    if parse_failed:
+                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内为单个 <yaml> 对象，字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。"
+                    
+                    full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
+                    try:
+                        response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                        summary = str(response or "")
+                    except Exception as e:
+                        typer.secho(f"[c2rust-transpiler][review] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
+                        summary = str(agent.run(composed_prompt) or "")
+                else:
+                    # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                    summary = str(agent.run(composed_prompt) or "")
             finally:
                 os.chdir(prev_cwd)
             
             # 解析 YAML 格式的审查结果
             verdict = _extract_json_from_summary(summary)
+            parse_failed = False
             if not isinstance(verdict, dict):
+                parse_failed = True
                 # 兼容旧格式：尝试解析纯文本 OK
                 m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
                 content = (m.group(1).strip() if m else summary.strip()).upper()
@@ -1772,6 +1821,8 @@ class Transpiler:
                 else:
                     # 无法解析，视为有问题
                     verdict = {"ok": False, "function_issues": [content], "critical_issues": []}
+                    # 格式解析失败，后续迭代使用直接模型调用
+                    use_direct_model_review = True
             
             ok = bool(verdict.get("ok") is True)
             function_issues = verdict.get("function_issues") if isinstance(verdict.get("function_issues"), list) else []

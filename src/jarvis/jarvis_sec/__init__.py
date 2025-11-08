@@ -745,8 +745,16 @@ def run_security_analysis(
                 
                 if use_direct_model:
                     # 格式校验失败后，直接调用模型接口
-                    # 构造包含摘要提示词的完整提示
-                    full_prompt = f"{cluster_task}\n\n{cluster_summary_prompt}"
+                    # 构造包含摘要提示词和具体错误信息的完整提示
+                    error_guidance = ""
+                    if error_details:
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {detail}" for detail in error_details)
+                    if missing_gids:
+                        missing_gids_list = sorted(list(missing_gids))
+                        missing_count = len(missing_gids)
+                        error_guidance += f"\n\n**完整性错误：遗漏了 {missing_count} 个 gid，这些 gid 必须被分类：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
+                    
+                    full_prompt = f"{cluster_task}{error_guidance}\n\n{cluster_summary_prompt}"
                     try:
                         response = cluster_agent.model.chat_until_success(full_prompt)  # type: ignore
                         # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
@@ -1168,9 +1176,42 @@ def run_security_analysis(
                 
                 if use_direct_model_review:
                     # 格式校验失败后，直接调用模型接口
-                    # 构造包含摘要提示词的完整提示
+                    # 构造包含摘要提示词和具体错误信息的完整提示
                     review_summary_prompt_text = _build_verification_summary_prompt()  # 复核使用验证摘要提示词
-                    full_review_prompt = f"{review_task}\n\n{review_summary_prompt_text}"
+                    error_guidance = ""
+                    if review_attempt > 0:
+                        # 检查上一次的解析结果
+                        prev_summary = review_summary_container.get("text", "")
+                        if prev_summary:
+                            prev_parsed = _try_parse_summary_report(prev_summary)
+                            if not isinstance(prev_parsed, list):
+                                error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
+                            elif not (prev_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in prev_parsed)):
+                                validation_errors = []
+                                for idx, item in enumerate(prev_parsed):
+                                    if not isinstance(item, dict):
+                                        validation_errors.append(f"元素{idx}不是字典")
+                                        break
+                                    if "gid" not in item:
+                                        validation_errors.append(f"元素{idx}缺少必填字段 gid")
+                                        break
+                                    try:
+                                        if int(item.get("gid", 0)) < 1:
+                                            validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
+                                            break
+                                    except Exception:
+                                        validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
+                                        break
+                                    if "is_reason_sufficient" not in item:
+                                        validation_errors.append(f"元素{idx}缺少必填字段 is_reason_sufficient（必须是布尔值）")
+                                        break
+                                    if not isinstance(item.get("is_reason_sufficient"), bool):
+                                        validation_errors.append(f"元素{idx}的 is_reason_sufficient 不是布尔值")
+                                        break
+                                if validation_errors:
+                                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {err}" for err in validation_errors)
+                    
+                    full_review_prompt = f"{review_task}{error_guidance}\n\n{review_summary_prompt_text}"
                     try:
                         review_response = review_agent.model.chat_until_success(full_review_prompt)  # type: ignore
                         # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
@@ -1464,15 +1505,55 @@ def run_security_analysis(
         workspace_restore_info: Optional[Dict] = None
         max_retries = 2  # 失败后最多重试2次（共执行最多3次）
         use_direct_model_analysis = False  # 标记是否使用直接模型调用
+        prev_parsed_items: Optional[List] = None  # 保存上一次的解析结果，用于错误提示
         for attempt in range(max_retries + 1):
             # 清空上一轮摘要容器
             summary_container["text"] = ""
             
             if use_direct_model_analysis:
                 # 格式校验失败后，直接调用模型接口
-                # 构造包含摘要提示词的完整提示
+                # 构造包含摘要提示词和具体错误信息的完整提示
                 summary_prompt_text = _build_summary_prompt()
-                full_prompt = f"{per_task}\n\n{summary_prompt_text}"
+                error_guidance = ""
+                if prev_parsed_items is None:
+                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
+                elif not _valid_items(prev_parsed_items):
+                    # 收集具体的验证错误
+                    validation_errors = []
+                    if not isinstance(prev_parsed_items, list):
+                        validation_errors.append("结果不是数组")
+                    else:
+                        for idx, it in enumerate(prev_parsed_items):
+                            if not isinstance(it, dict):
+                                validation_errors.append(f"元素{idx}不是字典")
+                                break
+                            if "gid" not in it:
+                                validation_errors.append(f"元素{idx}缺少必填字段 gid")
+                                break
+                            try:
+                                if int(it.get("gid", 0)) < 1:
+                                    validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
+                                    break
+                            except Exception:
+                                validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
+                                break
+                            if "has_risk" not in it or not isinstance(it.get("has_risk"), bool):
+                                validation_errors.append(f"元素{idx}缺少必填字段 has_risk（必须是布尔值）")
+                                break
+                            if it.get("has_risk"):
+                                for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
+                                    if key not in it:
+                                        validation_errors.append(f"元素{idx}的 has_risk 为 true，但缺少必填字段 {key}")
+                                        break
+                                    if not isinstance(it[key], str) or not it[key].strip():
+                                        validation_errors.append(f"元素{idx}的 {key} 字段不能为空")
+                                        break
+                                if validation_errors:
+                                    break
+                    if validation_errors:
+                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {err}" for err in validation_errors)
+                
+                full_prompt = f"{per_task}{error_guidance}\n\n{summary_prompt_text}"
                 try:
                     response = agent.model.chat_until_success(full_prompt)  # type: ignore
                     # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
@@ -1550,6 +1631,9 @@ def run_security_analysis(
                             if not isinstance(it[key], str) or not it[key].strip():
                                 return False
                 return True
+
+            # 保存本次解析结果，用于下次重试时的错误提示
+            prev_parsed_items = parsed_items
 
             if _valid_items(parsed_items):
                 summary_items = parsed_items
@@ -1674,9 +1758,42 @@ def run_security_analysis(
                 
                 if use_direct_model_verify:
                     # 格式校验失败后，直接调用模型接口
-                    # 构造包含摘要提示词的完整提示
+                    # 构造包含摘要提示词和具体错误信息的完整提示
                     verification_summary_prompt_text = _build_verification_summary_prompt()
-                    full_verify_prompt = f"{verification_task}\n\n{verification_summary_prompt_text}"
+                    error_guidance = ""
+                    if verify_attempt > 0:
+                        # 检查上一次的解析结果
+                        prev_summary = verification_summary_container.get("text", "")
+                        if prev_summary:
+                            prev_parsed = _try_parse_summary_report(prev_summary)
+                            if not isinstance(prev_parsed, list):
+                                error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
+                            elif not (prev_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in prev_parsed)):
+                                validation_errors = []
+                                for idx, item in enumerate(prev_parsed):
+                                    if not isinstance(item, dict):
+                                        validation_errors.append(f"元素{idx}不是字典")
+                                        break
+                                    if "gid" not in item:
+                                        validation_errors.append(f"元素{idx}缺少必填字段 gid")
+                                        break
+                                    try:
+                                        if int(item.get("gid", 0)) < 1:
+                                            validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
+                                            break
+                                    except Exception:
+                                        validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
+                                        break
+                                    if "is_valid" not in item:
+                                        validation_errors.append(f"元素{idx}缺少必填字段 is_valid（必须是布尔值）")
+                                        break
+                                    if not isinstance(item.get("is_valid"), bool):
+                                        validation_errors.append(f"元素{idx}的 is_valid 不是布尔值")
+                                        break
+                                if validation_errors:
+                                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {err}" for err in validation_errors)
+                    
+                    full_verify_prompt = f"{verification_task}{error_guidance}\n\n{verification_summary_prompt_text}"
                     try:
                         verify_response = verification_agent.model.chat_until_success(full_verify_prompt)  # type: ignore
                         # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
