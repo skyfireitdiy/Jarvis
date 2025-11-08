@@ -114,6 +114,7 @@ LINT_TOOLS = {
     ".gitignore": ["git-lint"],
     ".editorconfig": ["editorconfig-checker"],
     ".eslintrc": ["eslint"],
+    ".prettierrc": ["prettier"],
 }
 
 
@@ -135,21 +136,28 @@ LINT_TOOLS.update(load_lint_tools_config())
 def get_lint_tools(filename: str) -> List[str]:
     """
     根据文件扩展名或文件名获取对应的lint工具列表
+    优先级：完整文件名匹配 > 扩展名匹配
 
     Args:
-        file_extension_or_name: 文件扩展名(如'.py')或文件名(如'Makefile')
+        filename: 文件路径或文件名(如'test.py'或'Makefile')
 
     Returns:
         对应的lint工具列表，如果找不到则返回空列表
     """
     filename = os.path.basename(filename)
+    filename_lower = filename.lower()
+    
+    # 优先尝试完整文件名匹配（例如 docker-compose.yml, .eslintrc, .prettierrc）
+    lint_tools = LINT_TOOLS.get(filename_lower, [])
+    if lint_tools:
+        return lint_tools
+    
+    # 如果文件名匹配失败，再尝试扩展名匹配
     ext = os.path.splitext(filename)[1]
     if ext:
-        lint_tools = LINT_TOOLS.get(ext.lower(), [])
-        if lint_tools:
-            return lint_tools
-    # 如果扩展名匹配失败或没有扩展名，再尝试用完整文件名匹配
-    return LINT_TOOLS.get(filename.lower(), [])
+        return LINT_TOOLS.get(ext.lower(), [])
+    
+    return []
 
 
 # Lint工具命令模板映射
