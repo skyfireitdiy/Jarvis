@@ -65,6 +65,39 @@ def _build_summary_prompt() -> str:
 """.strip()
 
 
+def _build_verification_summary_prompt() -> str:
+    """
+    构建验证 Agent 的摘要提示词：验证分析 Agent 给出的结论是否正确。
+    """
+    return """
+请将本轮"验证分析结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
+你需要验证分析 Agent 给出的结论是否正确，包括前置条件、触发路径、后果和建议是否合理。
+
+示例1：验证通过（is_valid: true）
+<REPORT>
+- gid: 1
+  is_valid: true
+  verification_notes: "分析结论正确，前置条件合理，触发路径清晰，后果评估准确"
+</REPORT>
+
+示例2：验证不通过（is_valid: false）
+<REPORT>
+- gid: 1
+  is_valid: false
+  verification_notes: "前置条件过于宽泛，实际代码中已有输入校验，触发路径不成立"
+</REPORT>
+
+要求：
+- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
+- 数组元素为对象，包含字段：
+  - gid: 整数（全局唯一编号，对应分析 Agent 给出的 gid）
+  - is_valid: 布尔值 (true/false)，表示分析 Agent 的结论是否正确
+  - verification_notes: 字符串（验证说明，解释为什么结论正确或不正确）
+- 必须对所有输入的 gid 进行验证，不能遗漏。
+- 如果验证通过（is_valid: true），则保留该告警；如果验证不通过（is_valid: false），则视为误报，不记录为问题。
+""".strip()
+
+
 # 注：当前版本不使用 MultiAgent 编排，已移除默认多智能体配置与创建函数。
 # 请使用 run_security_analysis（单Agent逐条验证）或 workflow.direct_scan + format_markdown_report（直扫基线）。 
 
@@ -468,10 +501,11 @@ def run_security_analysis(
         # 构造聚类Agent（每个文件一个Agent，按批次聚类）
         cluster_system_prompt = """
 # 单Agent聚类约束
-- 你的任务是对同一文件内的启发式候选进行“验证条件一致性”聚类。
-- 验证条件：为了确认是否存在漏洞需要成立/验证的关键前置条件。例如：“指针p在解引用前非空”“拷贝长度不超过目标缓冲区容量”等。
+- 你的任务是对同一文件内的启发式候选进行"验证条件一致性"聚类。
+- 验证条件：为了确认是否存在漏洞需要成立/验证的关键前置条件。例如："指针p在解引用前非空""拷贝长度不超过目标缓冲区容量"等。
 - 工具优先：如需核对上下文，可使用 read_code 读取相邻代码；避免过度遍历。
 - 禁止写操作；仅只读分析。
+- **重要**：在聚类过程中，如果能够明确判断某些候选是误报或无效（例如：代码中已有保护措施、调用路径不存在、上下文已确保安全等），可以在聚类结果中标记为无效（is_invalid: true），这些无效的候选将不会进入后续验证阶段。
         """.strip()
         import json as _json2
         cluster_summary_prompt = """
@@ -479,15 +513,18 @@ def run_security_analysis(
 - 每个元素包含：
   - verification: 字符串（对该聚类的验证条件描述，简洁明确，可直接用于后续Agent验证）
   - gids: 整数数组（候选的全局唯一编号；输入JSON每个元素含 gid，可直接对应填入）
+  - is_invalid: 布尔值（可选，默认为 false）。如果为 true，表示该聚类中的所有候选已被确认为无效/误报，将不会进入后续验证阶段。
 - 要求：
   - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 YAML 数组，其他位置不输出任何文本
   - **必须要求**：输入JSON中的所有gid都必须被分类，不能遗漏任何一个gid。所有gid必须出现在某个聚类的gids数组中。
   - 相同验证条件的候选合并为同一项
   - 不需要解释与长文本，仅给出可执行的验证条件短句
   - 若无法聚类，请将每个候选单独成组，verification 为该候选的最小确认条件
+  - 如果能够明确判断某些候选是误报或无效（例如：代码中已有保护措施、调用路径不存在、上下文已确保安全等），请设置 is_invalid: true
 <CLUSTERS>
 - verification: ""
   gids: []
+  is_invalid: false
 </CLUSTERS>
         """.strip()
 
@@ -521,6 +558,7 @@ def run_security_analysis(
                 for rec in _existing_clusters.get(_key, []):
                     verification = str(rec.get("verification", "")).strip()
                     gids_list = rec.get("gids", [])
+                    is_invalid_resume = rec.get("is_invalid", False)  # 默认为 false
                     norm_keys: List[int] = []
                     if isinstance(gids_list, list):
                         for x in gids_list:
@@ -537,7 +575,27 @@ def run_security_analysis(
                         if it:
                             it["verify"] = verification
                             members.append(it)
-                    if members:
+                    
+                    # 如果断点恢复的记录标记为无效，不恢复该聚类
+                    if is_invalid_resume:
+                        invalid_gids_resume = [m.get("gid") for m in members]
+                        try:
+                            print(f"[JARVIS-SEC] 断点恢复：跳过无效聚类（gids={invalid_gids_resume}）")
+                        except Exception:
+                            pass
+                        # 记录到进度文件
+                        _progress_append(
+                            {
+                                "event": "cluster_invalid_resumed",
+                                "file": _file,
+                                "batch_index": _chunk_idx,
+                                "gids": invalid_gids_resume,
+                                "verification": verification,
+                                "count": len(members),
+                            }
+                        )
+                    elif members:
+                        # 只有非无效的聚类才恢复
                         cluster_batches.append(members)
                         cluster_records.append(
                             {
@@ -546,6 +604,7 @@ def run_security_analysis(
                                 "gids": [m.get("gid") for m in members],
                                 "count": len(members),
                                 "batch_index": _chunk_idx,
+                                "is_invalid": False,
                             }
                         )
                 
@@ -726,10 +785,12 @@ def run_security_analysis(
                     gid_to_item = {}
 
                 _merged_count = 0
+                _invalid_count = 0
                 classified_gids_final = set()
                 for cl in cluster_items:
                     verification = str(cl.get("verification", "")).strip()
                     raw_gids = cl.get("gids", [])
+                    is_invalid = cl.get("is_invalid", False)  # 默认为 false
                     norm_keys: List[int] = []
                     if isinstance(raw_gids, list):
                         for x in raw_gids:
@@ -746,7 +807,28 @@ def run_security_analysis(
                         if it:
                             it["verify"] = verification
                             members.append(it)
-                    if members:
+                    
+                    # 如果标记为无效，不写入聚类批次和记录，但记录日志
+                    if is_invalid:
+                        _invalid_count += 1
+                        invalid_gids = [m.get("gid") for m in members]
+                        try:
+                            print(f"[JARVIS-SEC] 聚类阶段判定为无效（gids={invalid_gids}），跳过后续验证")
+                        except Exception:
+                            pass
+                        # 记录到进度文件，但不写入聚类批次
+                        _progress_append(
+                            {
+                                "event": "cluster_invalid",
+                                "file": _file,
+                                "batch_index": _chunk_idx,
+                                "gids": invalid_gids,
+                                "verification": verification,
+                                "count": len(members),
+                            }
+                        )
+                    elif members:
+                        # 只有非无效的聚类才写入批次和记录
                         _merged_count += 1
                         cluster_batches.append(members)
                         cluster_records.append(
@@ -756,6 +838,7 @@ def run_security_analysis(
                                 "gids": [m.get("gid") for m in members],
                                 "count": len(members),
                                 "batch_index": _chunk_idx,
+                                "is_invalid": False,
                             }
                         )
                 
@@ -789,8 +872,15 @@ def run_security_analysis(
                         "file": _file,
                         "batch_index": _chunk_idx,
                         "clusters_count": _merged_count,
+                        "invalid_clusters_count": _invalid_count,
                     }
                 )
+                # 如果有无效聚类，输出日志
+                if _invalid_count > 0:
+                    try:
+                        print(f"[JARVIS-SEC] 聚类批次完成: 有效聚类={_merged_count}，无效聚类={_invalid_count}（已跳过）")
+                    except Exception:
+                        pass
                 # 写入快照（断点）
                 _write_cluster_report_snapshot()
     # 聚类报告（汇总所有文件）
@@ -1041,22 +1131,166 @@ def run_security_analysis(
                         cand["suggestions"] = str(it.get("suggestions", "")).strip()
                         cand["has_risk"] = True
                         merged_items.append(cand)
-                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
+                        # 注意：gid_counts 将在验证通过后更新，这里先不计数
             except Exception:
                 pass  # 异常不影响流程
 
-        # 汇总并报告
+        # 汇总并报告：如果分析 Agent 确认有告警，需要验证 Agent 二次验证
+        verified_items: List[Dict] = []
         if merged_items:
-            all_issues.extend(merged_items)
-            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 发现问题: 数量={len(merged_items)} -> 追加到报告")
-            _append_report(merged_items, "summary", task_id, {"batch": True, "candidates": batch})
-            # 更新状态：发现的问题数
-            status_mgr.update_verification(
-                current_batch=bidx,
-                total_batches=total_batches,
-                issues_found=len(all_issues),
-                message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题"
+            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 分析 Agent 发现问题: 数量={len(merged_items)} -> 启动验证 Agent 进行二次验证")
+            
+            # 创建验证 Agent 来验证分析 Agent 的结论
+            verification_system_prompt = """
+# 验证 Agent 约束
+- 你的核心任务是验证分析 Agent 给出的安全结论是否正确。
+- 你需要仔细检查分析 Agent 给出的前置条件、触发路径、后果和建议是否合理、准确。
+- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
+- 必要时需向上追溯调用者，查看完整的调用路径，以确认分析 Agent 的结论是否成立。
+- 禁止修改任何文件或执行写操作命令；仅进行只读分析与读取。
+- 每次仅执行一个操作；等待工具结果后再进行下一步。
+- 完成验证后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+""".strip()
+            
+            verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"
+            verification_agent_kwargs: Dict = dict(
+                system_prompt=verification_system_prompt,
+                name=verification_task_id,
+                auto_complete=True,
+                need_summary=True,
+                summary_prompt=_build_verification_summary_prompt(),
+                non_interactive=True,
+                in_multi_agent=False,
+                use_methodology=False,
+                use_analysis=False,
+                plan=False,
+                output_handler=[ToolRegistry()],
+                disable_file_edit=True,
+                use_tools=["read_code", "execute_script"],
             )
+            if llm_group:
+                verification_agent_kwargs["model_group"] = llm_group
+            verification_agent = Agent(**verification_agent_kwargs)
+            
+            # 构造验证任务上下文
+            import json as _json3
+            verification_task = f"""
+# 验证分析结论任务
+上下文参数：
+- entry_path: {entry_path}
+- languages: {langs}
+
+分析 Agent 给出的结论（需要验证）：
+{_json3.dumps(merged_items, ensure_ascii=False, indent=2)}
+
+请验证上述分析结论是否正确，包括：
+1. 前置条件（preconditions）是否合理
+2. 触发路径（trigger_path）是否成立
+3. 后果（consequences）评估是否准确
+4. 建议（suggestions）是否合适
+
+对于每个 gid，请判断分析结论是否正确（is_valid: true/false），并给出验证说明。
+""".strip()
+            
+            # 订阅验证 Agent 的摘要
+            verification_summary_container: Dict[str, str] = {"text": ""}
+            if _AFTER_SUMMARY:
+                def _on_after_summary_verify(**kwargs):
+                    try:
+                        verification_summary_container["text"] = str(kwargs.get("summary", "") or "")
+                    except Exception:
+                        verification_summary_container["text"] = ""
+                try:
+                    verification_agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary_verify)
+                except Exception:
+                    pass
+            
+            # 运行验证 Agent
+            verification_summary_container["text"] = ""
+            verification_agent.run(verification_task)
+            
+            # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
+            try:
+                _changed_verify = _git_restore_if_dirty(entry_path)
+                if _changed_verify:
+                    try:
+                        print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            
+            # 解析验证结果
+            verification_summary_text = verification_summary_container.get("text", "")
+            verification_results: Optional[List[Dict]] = None
+            if verification_summary_text:
+                verification_parsed = _try_parse_summary_report(verification_summary_text)
+                if isinstance(verification_parsed, list):
+                    verification_results = verification_parsed
+            
+            # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
+            if verification_results:
+                # 构建 gid 到验证结果的映射
+                gid_to_verification: Dict[int, Dict] = {}
+                for vr in verification_results:
+                    if isinstance(vr, dict):
+                        try:
+                            v_gid = int(vr.get("gid", 0))
+                            if v_gid >= 1:
+                                gid_to_verification[v_gid] = vr
+                        except Exception:
+                            pass
+                
+                # 只保留验证通过的告警
+                for item in merged_items:
+                    item_gid = int(item.get("gid", 0))
+                    verification = gid_to_verification.get(item_gid)
+                    if verification and verification.get("is_valid") is True:
+                        # 添加验证说明
+                        item["verification_notes"] = str(verification.get("verification_notes", "")).strip()
+                        verified_items.append(item)
+                    elif verification and verification.get("is_valid") is False:
+                        # 验证不通过，记录日志但不加入最终结果
+                        try:
+                            print(f"[JARVIS-SEC] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}")
+                        except Exception:
+                            pass
+                    else:
+                        # 验证结果中未找到该 gid，默认不通过（保守策略）
+                        try:
+                            print(f"[JARVIS-SEC] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过")
+                        except Exception:
+                            pass
+            else:
+                # 验证结果解析失败，保守策略：不保留任何告警
+                print(f"[JARVIS-SEC] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）")
+            
+            # 只有验证通过的告警才写入文件
+            if verified_items:
+                all_issues.extend(verified_items)
+                # 更新 gid_counts：只统计验证通过的告警
+                for item in verified_items:
+                    gid = int(item.get("gid", 0))
+                    if gid >= 1:
+                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
+                print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(merged_items)} -> 追加到报告")
+                _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
+                # 更新状态：发现的问题数
+                status_mgr.update_verification(
+                    current_batch=bidx,
+                    total_batches=total_batches,
+                    issues_found=len(all_issues),
+                    message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题（验证通过）"
+                )
+            else:
+                print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(merged_items)} 个，验证后全部不通过")
+                # 更新状态：验证后无有效告警
+                status_mgr.update_verification(
+                    current_batch=bidx,
+                    total_batches=total_batches,
+                    issues_found=len(all_issues),
+                    message=f"已验证 {bidx}/{total_batches} 批次，验证后无有效告警"
+                )
         elif parse_fail:
             print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)")
         else:
@@ -1099,7 +1333,7 @@ def run_security_analysis(
                 "batch_id": task_id,
                 "batch_index": bidx,
                 "total_batches": total_batches,
-                "issues_count": len(merged_items),
+                "issues_count": len(verified_items) if merged_items else 0,  # 只统计验证通过的告警
                 "parse_fail": parse_fail,
             }
         )
