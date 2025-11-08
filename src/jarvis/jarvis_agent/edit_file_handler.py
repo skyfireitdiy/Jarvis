@@ -144,6 +144,7 @@ class EditFileHandler(OutputHandler):
         patch_format = get_patch_format()
 
         search_prompt = f"""{ot("DIFF")}
+{ot("RANGE")}起止行号(如: 10-50)，可选{ct("RANGE")}
 {ot("SEARCH")}原始代码{ct("SEARCH")}
 {ot("REPLACE")}新代码{ct("REPLACE")}
 {ct("DIFF")}"""
@@ -176,7 +177,7 @@ class EditFileHandler(OutputHandler):
 注意：
 - {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
 - {supported_formats}{usage_recommendation}
-- {ot("RANGE")}start-end{ct("RANGE")} 仅用于区间替换模式（SEARCH_START/SEARCH_END），表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
+- {ot("RANGE")}start-end{ct("RANGE")} 可用于单点替换（SEARCH/REPLACE）和区间替换（SEARCH_START/SEARCH_END）模式，表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
 - 单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）
 - 区间替换会从包含 {ot("SEARCH_START")} 的行首开始，到包含 {ot("SEARCH_END")} 的行尾结束，替换整个区域
 否则编辑将失败。"""
@@ -278,7 +279,9 @@ class EditFileHandler(OutputHandler):
                         "SEARCH": single_match.group(1),  # 原始SEARCH内容
                         "REPLACE": single_match.group(2),  # 原始REPLACE内容
                     }
-                    # SEARCH 模式不支持 RANGE，直接忽略
+                    # SEARCH 模式支持 RANGE，如果存在则添加
+                    if range_scope:
+                        diff_item["RANGE"] = range_scope
                     diffs.append(diff_item)
 
             if diffs:
@@ -403,7 +406,15 @@ class EditFileHandler(OutputHandler):
                         base_content = base_content.replace(exact_search, replace_text, 1)
                         found = True
                     elif cnt > 1:
-                        error_msg = "SEARCH 在指定范围内出现多次，要求唯一匹配"
+                        # 提供更详细的错误信息，帮助调试
+                        range_info = f"（RANGE: {patch.get('RANGE', '无')}）" if "RANGE" in patch else ""
+                        base_preview = base_content[:200] + "..." if len(base_content) > 200 else base_content
+                        error_msg = (
+                            f"SEARCH 在指定范围内出现多次，要求唯一匹配{range_info}。"
+                            f"匹配次数: {cnt}。"
+                            f"搜索内容: {repr(exact_search[:50])}。"
+                            f"范围内容预览: {repr(base_preview)}"
+                        )
                         failed_patches.append({"patch": patch, "error": error_msg})
                         # 不继续尝试其它变体
                         continue
