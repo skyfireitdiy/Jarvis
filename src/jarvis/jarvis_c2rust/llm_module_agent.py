@@ -668,6 +668,9 @@ class LLMRustCratePlannerAgent:
 
         last_error = "未知错误"
         attempt = 0
+        use_direct_model = False  # 标记是否使用直接模型调用
+        agent = None  # 在循环外声明，以便重试时复用
+        
         while attempt < max_retries:
             attempt += 1
             # 首次使用基础 summary_prompt；失败后附加反馈
@@ -675,22 +678,41 @@ class LLMRustCratePlannerAgent:
                 base_summary_prompt if attempt == 1 else self._build_retry_summary_prompt(base_summary_prompt, last_error)
             )
 
-            agent = Agent(
-                system_prompt=system_prompt,
-                name="C2Rust-LLM-Module-Planner",
-                model_group=self.llm_group,
-                summary_prompt=summary_prompt,
-                need_summary=True,
-                auto_complete=True,
-                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
-                plan=False,          # 关闭内置任务规划
-                non_interactive=True, # 非交互
-                use_methodology=False,
-                use_analysis=False,
-            )
+            # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
+            if agent is None or not use_direct_model:
+                agent = Agent(
+                    system_prompt=system_prompt,
+                    name="C2Rust-LLM-Module-Planner",
+                    model_group=self.llm_group,
+                    summary_prompt=summary_prompt,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
+                    plan=False,          # 关闭内置任务规划
+                    non_interactive=True, # 非交互
+                    use_methodology=False,
+                    use_analysis=False,
+                )
 
             # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 YAML）
-            summary_output = agent.run(user_prompt)  # type: ignore
+            if use_direct_model:
+                # 格式校验失败后，直接调用模型接口
+                # 构造包含摘要提示词和具体错误信息的完整提示
+                error_guidance = ""
+                if last_error and last_error != "未知错误":
+                    error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 YAML 格式的项目结构定义。"
+                
+                full_prompt = f"{user_prompt}{error_guidance}\n\n{summary_prompt}"
+                try:
+                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                    summary_output = response
+                except Exception as e:
+                    print(f"[c2rust-llm-planner] 直接模型调用失败: {e}，回退到 run()")
+                    summary_output = agent.run(user_prompt)  # type: ignore
+            else:
+                # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                summary_output = agent.run(user_prompt)  # type: ignore
+            
             project_text = str(summary_output) if summary_output is not None else ""
             yaml_text = self._extract_yaml_from_project(project_text)
 
@@ -700,10 +722,12 @@ class LLMRustCratePlannerAgent:
             except (ValueError, TypeError) as e:
                 # 解析失败，记录错误并重试
                 last_error = f"YAML 解析失败: {e}"
+                use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
                 continue
             except Exception as e:
                 # 捕获其他异常（包括可能的 yaml.YAMLError）
                 last_error = f"解析时发生错误: {e}"
+                use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
                 continue
 
             ok, reason = self._validate_project_entries(entries)
@@ -711,6 +735,7 @@ class LLMRustCratePlannerAgent:
                 return yaml_text
             else:
                 last_error = reason
+                use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
         
         # 达到最大重试次数
         raise RuntimeError(
