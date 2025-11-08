@@ -253,25 +253,25 @@ class ReadCodeTool:
                 context_lines.append(scope_info)
 
             if edit_context.used_symbols:
-                symbol_names = [s.name for s in edit_context.used_symbols[:8]]
+                symbol_names = [s.name for s in edit_context.used_symbols[:10]]
                 symbols_str = ", ".join(f"`{name}`" for name in symbol_names)
-                more = len(edit_context.used_symbols) - 8
+                more = len(edit_context.used_symbols) - 10
                 if more > 0:
                     symbols_str += f" (还有{more}个)"
                 context_lines.append(f"🔗 使用的符号: {symbols_str}")
 
             if edit_context.imported_symbols:
-                import_names = [s.name for s in edit_context.imported_symbols[:8]]
+                import_names = [s.name for s in edit_context.imported_symbols[:10]]
                 imports_str = ", ".join(f"`{name}`" for name in import_names)
-                more = len(edit_context.imported_symbols) - 8
+                more = len(edit_context.imported_symbols) - 10
                 if more > 0:
                     imports_str += f" (还有{more}个)"
                 context_lines.append(f"📦 导入的符号: {imports_str}")
 
             if edit_context.relevant_files:
-                rel_files = edit_context.relevant_files[:5]
+                rel_files = edit_context.relevant_files[:10]
                 files_str = "\n   ".join(f"• {os.path.relpath(f, context_manager.project_root)}" for f in rel_files)
-                more = len(edit_context.relevant_files) - 5
+                more = len(edit_context.relevant_files) - 10
                 if more > 0:
                     files_str += f"\n   ... 还有{more}个相关文件"
                 context_lines.append(f"📁 相关文件 ({len(edit_context.relevant_files)}个):\n   {files_str}")
