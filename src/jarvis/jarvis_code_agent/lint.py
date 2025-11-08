@@ -35,8 +35,8 @@ LINT_TOOLS = {
     ".pyx": ["ruff", "mypy"],
     ".pxd": ["ruff", "mypy"],
     # Rust
-    ".rs": ["cargo clippy", "rustfmt"],
-    ".rlib": ["cargo clippy", "rustfmt"],
+    ".rs": ["cargo clippy"],
+    ".rlib": ["cargo clippy"],
     # Java
     ".java": ["pmd"],
     ".class": ["pmd"],
@@ -114,9 +114,6 @@ LINT_TOOLS = {
     ".gitignore": ["git-lint"],
     ".editorconfig": ["editorconfig-checker"],
     ".eslintrc": ["eslint"],
-    ".prettierrc": ["prettier"],
-    "cmakelists.txt": ["cmake-format"],
-    ".cmake": ["cmake-format"],
 }
 
 
@@ -166,13 +163,11 @@ LINT_COMMAND_TEMPLATES: Dict[str, str] = {
     "mypy": "mypy {file_path}",
     "pylint": "pylint {file_path}",
     "flake8": "flake8 {file_path}",
-    "black": "black --check {file_path}",
     # JavaScript/TypeScript
     "eslint": "eslint {file_path}",
     "tsc": "tsc --noEmit {file_path}",
     # Rust
     "cargo clippy": "cargo clippy --message-format=short",
-    "rustfmt": "rustfmt --check {file_path}",
     # Go
     "go vet": "go vet {file_path}",
     "golint": "golint {file_path}",
@@ -210,10 +205,6 @@ LINT_COMMAND_TEMPLATES: Dict[str, str] = {
     "hadolint": "hadolint {file_path}",
     # Makefile
     "checkmake": "checkmake {file_path}",
-    # CMake
-    "cmake-format": "cmake-format --check {file_path}",
-    # Prettier
-    "prettier": "prettier --check {file_path}",
 }
 
 
@@ -268,7 +259,6 @@ def find_config_file(config_names: List[str], project_root: Optional[str] = None
 TOOL_CONFIG_FILES: Dict[str, List[str]] = {
     "checkstyle": ["checkstyle.xml", ".checkstyle.xml", "checkstyle-config.xml"],
     "eslint": [".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", ".eslintrc.yaml", ".eslintrc"],
-    "prettier": [".prettierrc", ".prettierrc.json", ".prettierrc.yml", ".prettierrc.yaml", "prettier.config.js"],
     "stylelint": [".stylelintrc", ".stylelintrc.json", ".stylelintrc.yml", ".stylelintrc.yaml", "stylelint.config.js"],
     "yamllint": [".yamllint", ".yamllint.yml", ".yamllint.yaml"],
     "markdownlint": [".markdownlint.json", ".markdownlintrc"],
@@ -276,14 +266,13 @@ TOOL_CONFIG_FILES: Dict[str, List[str]] = {
     "phpstan": ["phpstan.neon", "phpstan.neon.dist"],
     "sqlfluff": [".sqlfluff", "sqlfluff.ini", ".sqlfluff.ini"],
     "hadolint": [".hadolint.yaml", ".hadolint.yml"],
-    "cmake-format": [".cmake-format.py", "cmake-format.json", ".cmake-format.json"],
 }
 
 # 必须配置文件的工具（未找到配置文件时不能执行）
 REQUIRED_CONFIG_TOOLS = {"checkstyle"}
 
 # 可选配置文件的工具（未找到配置文件时可以使用默认配置）
-OPTIONAL_CONFIG_TOOLS = {"eslint", "prettier", "stylelint", "yamllint", "markdownlint", "rubocop", "phpstan", "sqlfluff", "hadolint", "cmake-format"}
+OPTIONAL_CONFIG_TOOLS = {"eslint", "stylelint", "yamllint", "markdownlint", "rubocop", "phpstan", "sqlfluff", "hadolint"}
 
 
 def get_lint_command(tool_name: str, file_path: str, project_root: Optional[str] = None) -> Optional[str]:
