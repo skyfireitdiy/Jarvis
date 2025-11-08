@@ -160,6 +160,29 @@ class StatusManager:
             details=details,
         )
     
+    def update_review(
+        self,
+        current_review: Optional[int] = None,
+        total_reviews: Optional[int] = None,
+        message: Optional[str] = None,
+    ):
+        """更新复核阶段状态"""
+        details = {}
+        
+        # 计算总体进度
+        progress = None
+        if current_review is not None and total_reviews is not None and total_reviews > 0:
+            progress = (current_review / total_reviews) * 100
+        
+        self.update_stage(
+            stage="review",
+            progress=progress,
+            current=current_review,
+            total=total_reviews,
+            message=message or "正在进行无效聚类复核...",
+            details=details,
+        )
+    
     def update_verification(
         self,
         current_batch: Optional[int] = None,
