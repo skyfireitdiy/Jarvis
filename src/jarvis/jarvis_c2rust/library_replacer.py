@@ -386,9 +386,15 @@ def apply_library_replacement(
             return None
 
     # 解析 YAML/JSON 结果
-    def _parse_agent_yaml_summary(text: str) -> Optional[Dict[str, Any]]:
+    def _parse_agent_yaml_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+        """
+        解析Agent返回的YAML/JSON摘要
+        返回(解析结果, 错误信息)
+        如果解析成功，返回(data, None)
+        如果解析失败，返回(None, 错误信息)
+        """
         if not isinstance(text, str) or not text.strip():
-            return None
+            return None, "摘要文本为空"
         import re as _re
         import json as _json
         try:
@@ -406,9 +412,11 @@ def apply_library_replacement(
                 try:
                     data = yaml.safe_load(raw)
                     if isinstance(data, dict):
-                        return data
-                except Exception:
-                    pass
+                        return data, None
+                except Exception as yaml_err:
+                    return None, f"YAML 解析失败: {str(yaml_err)}"
+            elif raw and not yaml:
+                return None, "PyYAML 未安装，无法解析 YAML"
 
         m_code = _re.search(r"```(?:yaml|yml)\s*([\s\S]*?)```", block, flags=_re.IGNORECASE)
         if m_code:
@@ -417,9 +425,11 @@ def apply_library_replacement(
                 try:
                     data = yaml.safe_load(raw)
                     if isinstance(data, dict):
-                        return data
-                except Exception:
-                    pass
+                        return data, None
+                except Exception as yaml_err:
+                    return None, f"YAML 解析失败: {str(yaml_err)}"
+            elif raw and not yaml:
+                return None, "PyYAML 未安装，无法解析 YAML"
 
         m_json = _re.search(r"\{[\s\S]*\}", block)
         if m_json:
@@ -427,9 +437,9 @@ def apply_library_replacement(
             try:
                 data = _json.loads(raw)
                 if isinstance(data, dict):
-                    return data
-            except Exception:
-                pass
+                    return data, None
+            except Exception as json_err:
+                return None, f"JSON 解析失败: {str(json_err)}"
 
         # 宽松键值
         def _kv(pattern: str) -> Optional[str]:
@@ -454,8 +464,8 @@ def apply_library_replacement(
                     result["confidence"] = float(conf_raw)
                 except Exception:
                     pass
-            return result if result else None
-        return None
+            return (result if result else None, None)
+        return None, "未找到有效的YAML/JSON格式或键值对"
 
     def _llm_evaluate_subtree(fid: int, desc: Set[int]) -> Dict[str, Any]:
         if not _model_available:
@@ -552,7 +562,22 @@ def apply_library_replacement(
 
         try:
             result = model.chat_until_success(prompt)  # type: ignore
-            parsed = _parse_agent_yaml_summary(result or "")
+            parsed, parse_error = _parse_agent_yaml_summary(result or "")
+            if parse_error:
+                # YAML解析失败，将错误信息反馈给模型
+                print(f"[c2rust-lib-replace] YAML解析失败: {parse_error}")
+                # 更新提示词，包含解析错误信息
+                prompt_with_error = (
+                    prompt
+                    + f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {parse_error}\n\n"
+                    + "请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                )
+                result = model.chat_until_success(prompt_with_error)  # type: ignore
+                parsed, parse_error = _parse_agent_yaml_summary(result or "")
+                if parse_error:
+                    # 仍然失败，使用默认值
+                    print(f"[c2rust-lib-replace] 重试后YAML解析仍然失败: {parse_error}，使用默认值")
+                    parsed = None
             if isinstance(parsed, dict):
                 rep = bool(parsed.get("replaceable") is True)
                 lib = str(parsed.get("library") or "").strip()
