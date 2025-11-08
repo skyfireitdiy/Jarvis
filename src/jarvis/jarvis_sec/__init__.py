@@ -396,7 +396,7 @@ def run_security_analysis(
                 return None, "YAML 内容为空"
             import yaml as _yaml3  # type: ignore
             try:
-            data = _yaml3.safe_load(content)
+                data = _yaml3.safe_load(content)
             except Exception as yaml_err:
                 error_msg = f"YAML 解析失败: {str(yaml_err)}"
                 return None, error_msg
