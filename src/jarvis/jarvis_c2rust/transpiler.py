@@ -440,7 +440,7 @@ def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]
     try:
         import yaml  # type: ignore
         try:
-        obj = yaml.safe_load(raw_yaml)
+            obj = yaml.safe_load(raw_yaml)
         except Exception as yaml_err:
             error_msg = f"YAML 解析失败: {str(yaml_err)}"
             return {}, error_msg
@@ -817,7 +817,7 @@ class Transpiler:
 
             # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
             if agent is None or not use_direct_model:
-            agent = Agent(
+                agent = Agent(
                 system_prompt=sys_p,
                 name="C2Rust-Function-Planner",
                 model_group=self.llm_group,
@@ -855,7 +855,7 @@ class Transpiler:
                         summary = agent.run(usr_p)
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                summary = agent.run(usr_p)
+                    summary = agent.run(usr_p)
             finally:
                 os.chdir(prev_cwd)
             
@@ -866,7 +866,7 @@ class Transpiler:
                 last_reason = f"YAML解析失败: {parse_error}"
                 use_direct_model = True
             else:
-            ok, reason = _validate(meta)
+                ok, reason = _validate(meta)
             if ok:
                 module = str(meta.get("module") or "").strip()
                 rust_sig = str(meta.get("rust_signature") or "").strip()
@@ -875,8 +875,8 @@ class Transpiler:
             else:
                 typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
                 last_reason = reason
-                    # 格式校验失败，后续重试使用直接模型调用
-                    use_direct_model = True
+                # 格式校验失败，后续重试使用直接模型调用
+                use_direct_model = True
         # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 简单占位签名）
         try:
             crate_root = self.crate_dir.resolve()

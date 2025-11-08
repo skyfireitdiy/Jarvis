@@ -1246,7 +1246,7 @@ def run_security_analysis(
                         review_agent.run(review_task)
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-            review_agent.run(review_task)
+                    review_agent.run(review_task)
             
             # 工作区保护
             try:
@@ -1261,23 +1261,23 @@ def run_security_analysis(
             
             # 解析复核结果
             review_summary_text = review_summary_container.get("text", "")
-                parse_error_review = None
+            parse_error_review = None
             if review_summary_text:
-                    review_parsed, parse_error_review = _try_parse_summary_report(review_summary_text)
-                    if parse_error_review:
-                        # YAML解析失败，记录错误信息以便下次重试时反馈给模型
-                        prev_parse_error_review = parse_error_review  # 保存解析错误信息
-                        try:
-                            print(f"[JARVIS-SEC] 复核结果YAML解析失败: {parse_error_review}")
-                        except Exception:
-                            pass
-                    else:
-                        prev_parse_error_review = None  # 解析成功，清除之前的错误信息
-                if isinstance(review_parsed, list):
-                            # 简单校验：检查是否为有效列表，包含必要的字段
-                            if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
-                    review_results = review_parsed
-                                break  # 格式正确，退出重试循环
+                review_parsed, parse_error_review = _try_parse_summary_report(review_summary_text)
+                if parse_error_review:
+                    # YAML解析失败，记录错误信息以便下次重试时反馈给模型
+                    prev_parse_error_review = parse_error_review  # 保存解析错误信息
+                    try:
+                        print(f"[JARVIS-SEC] 复核结果YAML解析失败: {parse_error_review}")
+                    except Exception:
+                        pass
+                else:
+                    prev_parse_error_review = None  # 解析成功，清除之前的错误信息
+                    if isinstance(review_parsed, list):
+                        # 简单校验：检查是否为有效列表，包含必要的字段
+                        if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
+                            review_results = review_parsed
+                            break  # 格式正确，退出重试循环
                 
                 # 格式校验失败，后续重试使用直接模型调用
                 if review_attempt < max_review_retries:
@@ -1665,7 +1665,7 @@ def run_security_analysis(
                     agent.run(per_task)
             else:
                 # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-            agent.run(per_task)
+                agent.run(per_task)
 
             # 工作区保护：调用 Agent 后如检测到文件被修改，则恢复（每次尝试都执行）
             try:
@@ -1918,7 +1918,7 @@ def run_security_analysis(
                         verification_agent.run(verification_task)
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-            verification_agent.run(verification_task)
+                    verification_agent.run(verification_task)
             
             # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
             try:
@@ -1933,23 +1933,23 @@ def run_security_analysis(
             
             # 解析验证结果
             verification_summary_text = verification_summary_container.get("text", "")
-                parse_error_verify = None
+            parse_error_verify = None
             if verification_summary_text:
-                    verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
-                    if parse_error_verify:
-                        # YAML解析失败，记录错误信息以便下次重试时反馈给模型
-                        prev_parse_error_verify = parse_error_verify  # 保存解析错误信息
-                        try:
-                            print(f"[JARVIS-SEC] 验证结果YAML解析失败: {parse_error_verify}")
-                        except Exception:
-                            pass
-                    else:
-                        prev_parse_error_verify = None  # 解析成功，清除之前的错误信息
-                if isinstance(verification_parsed, list):
-                            # 简单校验：检查是否为有效列表
-                            if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
-                    verification_results = verification_parsed
-                                break  # 格式正确，退出重试循环
+                verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
+                if parse_error_verify:
+                    # YAML解析失败，记录错误信息以便下次重试时反馈给模型
+                    prev_parse_error_verify = parse_error_verify  # 保存解析错误信息
+                    try:
+                        print(f"[JARVIS-SEC] 验证结果YAML解析失败: {parse_error_verify}")
+                    except Exception:
+                        pass
+                else:
+                    prev_parse_error_verify = None  # 解析成功，清除之前的错误信息
+                    if isinstance(verification_parsed, list):
+                        # 简单校验：检查是否为有效列表
+                        if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
+                            verification_results = verification_parsed
+                            break  # 格式正确，退出重试循环
                 
                 # 格式校验失败，后续重试使用直接模型调用
                 if verify_attempt < max_verify_retries:
@@ -2118,7 +2118,7 @@ def _try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str
     try:
         import yaml as _yaml  # type: ignore
         try:
-        data = _yaml.safe_load(content)
+            data = _yaml.safe_load(content)
         except Exception as yaml_err:
             error_msg = f"YAML 解析失败: {str(yaml_err)}"
             return None, error_msg
