@@ -515,17 +515,18 @@ def run_security_analysis(
         import json as _json2
         cluster_summary_prompt = """
 请仅在 <CLUSTERS> 与 </CLUSTERS> 中输出 YAML 数组：
-- 每个元素包含：
+- 每个元素包含（所有字段均为必填）：
   - verification: 字符串（对该聚类的验证条件描述，简洁明确，可直接用于后续Agent验证）
   - gids: 整数数组（候选的全局唯一编号；输入JSON每个元素含 gid，可直接对应填入）
-  - is_invalid: 布尔值（可选，默认为 false）。如果为 true，表示该聚类中的所有候选已被确认为无效/误报，将不会进入后续验证阶段。
+  - is_invalid: 布尔值（必填，true 或 false）。如果为 true，表示该聚类中的所有候选已被确认为无效/误报，将不会进入后续验证阶段；如果为 false，表示该聚类中的候选需要进入后续验证阶段。
 - 要求：
   - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 YAML 数组，其他位置不输出任何文本
   - **必须要求**：输入JSON中的所有gid都必须被分类，不能遗漏任何一个gid。所有gid必须出现在某个聚类的gids数组中。
+  - **必须要求**：每个聚类元素必须包含 is_invalid 字段，且值必须为 true 或 false，不能省略。
   - 相同验证条件的候选合并为同一项
   - 不需要解释与长文本，仅给出可执行的验证条件短句
   - 若无法聚类，请将每个候选单独成组，verification 为该候选的最小确认条件
-  - 如果能够明确判断某些候选是误报或无效（例如：代码中已有保护措施、调用路径不存在、上下文已确保安全等），请设置 is_invalid: true
+  - 如果能够明确判断某些候选是误报或无效（例如：代码中已有保护措施、调用路径不存在、上下文已确保安全等），请设置 is_invalid: true；否则设置为 false
 <CLUSTERS>
 - verification: ""
   gids: []
@@ -563,7 +564,14 @@ def run_security_analysis(
                 for rec in _existing_clusters.get(_key, []):
                     verification = str(rec.get("verification", "")).strip()
                     gids_list = rec.get("gids", [])
-                    is_invalid_resume = rec.get("is_invalid", False)  # 默认为 false
+                    # 如果 is_invalid 字段缺失，跳过该记录（格式不完整，需要重新聚类）
+                    if "is_invalid" not in rec:
+                        try:
+                            print(f"[JARVIS-SEC] 断点恢复：记录缺少 is_invalid 字段，跳过该记录，将重新聚类")
+                        except Exception:
+                            pass
+                        continue
+                    is_invalid_resume = rec["is_invalid"]
                     norm_keys: List[int] = []
                     if isinstance(gids_list, list):
                         for x in gids_list:
@@ -714,19 +722,34 @@ def run_security_analysis(
                 
                 # 校验结构
                 valid = True
+                error_details = []
                 if not isinstance(cluster_items, list) or not cluster_items:
                     valid = False
+                    error_details.append("结果不是数组或数组为空")
                 else:
-                    for it in cluster_items:
+                    for idx, it in enumerate(cluster_items):
                         if not isinstance(it, dict):
                             valid = False
+                            error_details.append(f"元素{idx}不是字典")
                             break
                         vals = it.get("gids", [])
                         if not isinstance(it.get("verification", ""), str) or not isinstance(vals, list):
                             valid = False
+                            error_details.append(f"元素{idx}的verification或gids格式错误")
+                            break
+                        # 校验 is_invalid 字段（必填）
+                        if "is_invalid" not in it:
+                            valid = False
+                            error_details.append(f"元素{idx}缺少is_invalid字段（必填）")
+                            break
+                        is_invalid_val = it.get("is_invalid")
+                        if not isinstance(is_invalid_val, bool):
+                            valid = False
+                            error_details.append(f"元素{idx}的is_invalid不是布尔值")
                             break
                 
                 # 完整性校验：检查所有输入的gid是否都被分类
+                missing_gids = set()
                 if valid:
                     classified_gids = set()
                     for cl in cluster_items:
@@ -769,10 +792,33 @@ def run_security_analysis(
                         valid = False
                 
                 if not valid:
-                    cluster_items = None
                     # 如果是格式错误（非遗漏gid），也继续重试
                     if not missing_gids:
-                        print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次")
+                        if error_details:
+                            print(f"[JARVIS-SEC] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {_attempt} 次")
+                            # 更新任务，明确指出格式错误
+                            cluster_task = f"""
+# 聚类任务（分析输入）
+上下文：
+- entry_path: {entry_path}
+- file: {_file}
+- languages: {langs}
+
+候选(JSON数组，包含 gid/file/line/pattern/category/evidence)：
+{_json2.dumps(pending_in_file_with_ids, ensure_ascii=False, indent=2)}
+
+**重要提示**：上一次聚类结果格式无效：{'; '.join(error_details)}
+
+请确保每个聚类元素都包含以下必填字段：
+- verification: 字符串（验证条件描述）
+- gids: 整数数组（候选的全局唯一编号）
+- is_invalid: 布尔值（必填，true 或 false，不能省略）
+
+请重新输出正确的聚类结果。
+                            """.strip()
+                        else:
+                            print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次")
+                    cluster_items = None
 
             # 合并聚类结果
             if isinstance(cluster_items, list) and cluster_items:
@@ -795,7 +841,15 @@ def run_security_analysis(
                 for cl in cluster_items:
                     verification = str(cl.get("verification", "")).strip()
                     raw_gids = cl.get("gids", [])
-                    is_invalid = cl.get("is_invalid", False)  # 默认为 false
+                    # 验证逻辑已确保 is_invalid 字段存在，但为了安全仍进行检查
+                    if "is_invalid" not in cl:
+                        # 这种情况不应该发生（验证逻辑已检查），但为了安全仍处理
+                        try:
+                            print(f"[JARVIS-SEC] 警告：聚类结果缺少 is_invalid 字段，跳过该聚类")
+                        except Exception:
+                            pass
+                        continue
+                    is_invalid = cl["is_invalid"]
                     norm_keys: List[int] = []
                     if isinstance(raw_gids, list):
                         for x in raw_gids:
