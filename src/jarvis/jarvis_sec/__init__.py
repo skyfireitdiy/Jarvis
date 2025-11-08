@@ -897,20 +897,52 @@ def run_security_analysis(
                 except Exception:
                     gid_to_item = {}
 
+                # 再次检查格式完整性：如果缺少is_invalid字段，应该触发重试而不是跳过
+                # 这种情况理论上不应该发生（格式校验已检查），但如果发生了，说明格式校验有问题
+                has_format_error = False
+                format_error_details = []
+                for idx, cl in enumerate(cluster_items):
+                    if "is_invalid" not in cl:
+                        has_format_error = True
+                        raw_gids = cl.get("gids", [])
+                        format_error_details.append(f"元素{idx}缺少is_invalid字段（gids={raw_gids}）")
+                
+                if has_format_error:
+                    # 格式错误，应该重试而不是继续处理
+                    print(f"[JARVIS-SEC] 警告：聚类结果缺少 is_invalid 字段（{'; '.join(format_error_details)}），这是格式错误，触发重试")
+                    # 重新进入循环进行重试
+                    cluster_items = None
+                    use_direct_model = True
+                    # 更新任务，明确指出格式错误
+                    cluster_task = f"""
+# 聚类任务（分析输入）
+上下文：
+- entry_path: {entry_path}
+- file: {_file}
+- languages: {langs}
+
+候选(JSON数组，包含 gid/file/line/pattern/category/evidence)：
+{_json2.dumps(pending_in_file_with_ids, ensure_ascii=False, indent=2)}
+
+**重要提示**：上一次聚类结果格式无效：{'; '.join(format_error_details)}
+
+请确保每个聚类元素都包含以下必填字段：
+- verification: 字符串（验证条件描述）
+- gids: 整数数组（候选的全局唯一编号）
+- is_invalid: 布尔值（必填，true 或 false，不能省略）
+
+请重新输出正确的聚类结果。
+                    """.strip()
+                    # 继续while循环重试（通过设置cluster_items为None，下次循环会重新运行Agent）
+                    continue
+
                 _merged_count = 0
                 _invalid_count = 0
                 classified_gids_final = set()
                 for cl in cluster_items:
                     verification = str(cl.get("verification", "")).strip()
                     raw_gids = cl.get("gids", [])
-                    # 验证逻辑已确保 is_invalid 字段存在，但为了安全仍进行检查
-                    if "is_invalid" not in cl:
-                        # 这种情况不应该发生（验证逻辑已检查），但为了安全仍处理
-                        try:
-                            print(f"[JARVIS-SEC] 警告：聚类结果缺少 is_invalid 字段，跳过该聚类")
-                        except Exception:
-                            pass
-                        continue
+                    # 此时is_invalid字段一定存在（已通过上面的检查）
                     is_invalid = cl["is_invalid"]
                     norm_keys: List[int] = []
                     if isinstance(raw_gids, list):
@@ -921,7 +953,8 @@ def run_security_analysis(
                                     norm_keys.append(xi)
                                     classified_gids_final.add(xi)
                             except Exception:
-                                continue
+                                # gid解析失败，跳过该gid（格式错误不应该被计入）
+                                pass
                     members: List[Dict] = []
                     for k in norm_keys:
                         it = gid_to_item.get(k)
@@ -1365,6 +1398,63 @@ def run_security_analysis(
             if b:
                 cluster_batches.append(b)
 
+    # 分析阶段开始前的完整性检查：确保所有候选的gid都已被分类
+    # 如果发现遗漏的gid，应该在分析阶段开始前就补充，而不是在分析阶段开始后再发现
+    all_candidate_gids = set()
+    for _file, _items in _file_groups.items():
+        for it in _items:
+            try:
+                _gid = int(it.get("gid", 0))
+                if _gid >= 1:
+                    all_candidate_gids.add(_gid)
+            except Exception:
+                pass
+    
+    # 收集所有已分类的gid（从cluster_batches中）
+    all_classified_gids = set()
+    for batch in cluster_batches:
+        for item in batch:
+            try:
+                _gid = int(item.get("gid", 0))
+                if _gid >= 1:
+                    all_classified_gids.add(_gid)
+            except Exception:
+                pass
+    
+    # 检查是否有遗漏的gid
+    missing_gids_before_analysis = all_candidate_gids - all_classified_gids
+    if missing_gids_before_analysis:
+        print(f"[JARVIS-SEC] 警告：分析阶段开始前发现遗漏的gid {sorted(list(missing_gids_before_analysis))}，将补充聚类")
+        # 为每个遗漏的gid创建单独的聚类
+        for missing_gid in sorted(missing_gids_before_analysis):
+            # 找到对应的候选
+            missing_item = None
+            for _file, _items in _file_groups.items():
+                for it in _items:
+                    try:
+                        if int(it.get("gid", 0)) == missing_gid:
+                            missing_item = it
+                            break
+                    except Exception:
+                        pass
+                if missing_item:
+                    break
+            
+            if missing_item:
+                # 为遗漏的gid创建默认验证条件
+                default_verification = f"验证候选 {missing_gid} 的安全风险"
+                missing_item["verify"] = default_verification
+                cluster_batches.append([missing_item])
+                _progress_append({
+                    "event": "cluster_missing_gid_supplement",
+                    "gid": missing_gid,
+                    "file": missing_item.get("file"),
+                    "note": "分析阶段开始前补充的遗漏gid",
+                })
+                try:
+                    print(f"[JARVIS-SEC] 已为遗漏的gid {missing_gid} 创建单独聚类")
+                except Exception:
+                    pass
 
     batches: List[List[Dict]] = cluster_batches
     total_batches = len(batches)
