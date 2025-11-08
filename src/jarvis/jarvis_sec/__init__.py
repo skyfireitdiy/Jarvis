@@ -1184,11 +1184,12 @@ def run_security_analysis(
             # 运行复核Agent（增加重试机制：格式校验失败时，使用直接模型调用）
             review_summary_container["text"] = ""
             review_results: Optional[List[Dict]] = None
-            max_review_retries = 2  # 失败后最多重试2次（共执行最多3次）
             use_direct_model_review = False  # 标记是否使用直接模型调用
             prev_parse_error_review: Optional[str] = None  # 保存上一次的YAML解析错误信息
+            review_attempt = 0  # 用于日志记录
             
-            for review_attempt in range(max_review_retries + 1):
+            while True:
+                review_attempt += 1
                 review_summary_container["text"] = ""
                 
                 if use_direct_model_review:
@@ -1199,39 +1200,8 @@ def run_security_analysis(
                     if prev_parse_error_review:
                         # 如果有上一次的YAML解析错误，优先反馈
                         error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_review}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
-                    elif review_attempt > 0:
-                        # 检查上一次的解析结果
-                        prev_summary = review_summary_container.get("text", "")
-                        if prev_summary:
-                            prev_parsed, parse_err = _try_parse_summary_report(prev_summary)
-                            if parse_err:
-                                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_err}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
-                            elif not isinstance(prev_parsed, list):
-                                error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
-                            elif not (prev_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in prev_parsed)):
-                                validation_errors = []
-                                for idx, item in enumerate(prev_parsed):
-                                    if not isinstance(item, dict):
-                                        validation_errors.append(f"元素{idx}不是字典")
-                                        break
-                                    if "gid" not in item:
-                                        validation_errors.append(f"元素{idx}缺少必填字段 gid")
-                                        break
-                                    try:
-                                        if int(item.get("gid", 0)) < 1:
-                                            validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
-                                            break
-                                    except Exception:
-                                        validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
-                                        break
-                                    if "is_reason_sufficient" not in item:
-                                        validation_errors.append(f"元素{idx}缺少必填字段 is_reason_sufficient（必须是布尔值）")
-                                        break
-                                    if not isinstance(item.get("is_reason_sufficient"), bool):
-                                        validation_errors.append(f"元素{idx}的 is_reason_sufficient 不是布尔值")
-                                        break
-                                if validation_errors:
-                                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {err}" for err in validation_errors)
+                    # 注意：由于每次循环开始时都清空了容器，无法从容器中获取上一次的解析结果
+                    # 错误信息已通过 prev_parse_error_review 保存，在上面的 if 分支中处理
                     
                     full_review_prompt = f"{review_task}{error_guidance}\n\n{review_summary_prompt_text}"
                     try:
@@ -1247,52 +1217,51 @@ def run_security_analysis(
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
                     review_agent.run(review_task)
-            
-            # 工作区保护
-            try:
-                _changed_review = _git_restore_if_dirty(entry_path)
-                if _changed_review:
-                    try:
-                        print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            
-            # 解析复核结果
-            review_summary_text = review_summary_container.get("text", "")
-            parse_error_review = None
-            if review_summary_text:
-                review_parsed, parse_error_review = _try_parse_summary_report(review_summary_text)
-                if parse_error_review:
-                    # YAML解析失败，记录错误信息以便下次重试时反馈给模型
-                    prev_parse_error_review = parse_error_review  # 保存解析错误信息
-                    try:
-                        print(f"[JARVIS-SEC] 复核结果YAML解析失败: {parse_error_review}")
-                    except Exception:
-                        pass
-                else:
-                    prev_parse_error_review = None  # 解析成功，清除之前的错误信息
-                    if isinstance(review_parsed, list):
-                        # 简单校验：检查是否为有效列表，包含必要的字段
-                        if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
-                            review_results = review_parsed
-                            break  # 格式正确，退出重试循环
                 
-                # 格式校验失败，后续重试使用直接模型调用
-                if review_attempt < max_review_retries:
-                    use_direct_model_review = True
-                    if parse_error_review:
-                        # 如果有YAML解析错误，在下次重试时反馈给模型
+                # 工作区保护
+                try:
+                    _changed_review = _git_restore_if_dirty(entry_path)
+                    if _changed_review:
                         try:
-                            print(f"[JARVIS-SEC] 复核结果YAML解析失败 -> 重试 {review_attempt + 1}/{max_review_retries}（使用直接模型调用，将反馈解析错误）")
+                            print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                
+                # 解析复核结果（移到循环内部，每次运行后立即解析）
+                review_summary_text = review_summary_container.get("text", "")
+                parse_error_review = None
+                if review_summary_text:
+                    review_parsed, parse_error_review = _try_parse_summary_report(review_summary_text)
+                    if parse_error_review:
+                        # YAML解析失败，记录错误信息以便下次重试时反馈给模型
+                        prev_parse_error_review = parse_error_review  # 保存解析错误信息
+                        try:
+                            print(f"[JARVIS-SEC] 复核结果YAML解析失败: {parse_error_review}")
                         except Exception:
                             pass
                     else:
-                        try:
-                            print(f"[JARVIS-SEC] 复核结果格式无效 -> 重试 {review_attempt + 1}/{max_review_retries}（使用直接模型调用）")
-                        except Exception:
-                            pass
+                        prev_parse_error_review = None  # 解析成功，清除之前的错误信息
+                        if isinstance(review_parsed, list):
+                            # 简单校验：检查是否为有效列表，包含必要的字段
+                            if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
+                                review_results = review_parsed
+                                break  # 格式正确，退出重试循环
+                
+                # 格式校验失败，后续重试使用直接模型调用
+                use_direct_model_review = True
+                if parse_error_review:
+                    # 如果有YAML解析错误，在下次重试时反馈给模型
+                    try:
+                        print(f"[JARVIS-SEC] 复核结果YAML解析失败 -> 重试第 {review_attempt} 次（使用直接模型调用，将反馈解析错误）")
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        print(f"[JARVIS-SEC] 复核结果格式无效 -> 重试第 {review_attempt} 次（使用直接模型调用）")
+                    except Exception:
+                        pass
             
             # 处理复核结果
             if review_results:
@@ -1599,10 +1568,13 @@ def run_security_analysis(
         # 执行Agent（增加重试机制：摘要解析失败或关键字段缺失时，重新运行当前批次）
         summary_items: Optional[List[Dict]] = None
         workspace_restore_info: Optional[Dict] = None
-        max_retries = 2  # 失败后最多重试2次（共执行最多3次）
         use_direct_model_analysis = False  # 标记是否使用直接模型调用
         prev_parsed_items: Optional[List] = None  # 保存上一次的解析结果，用于错误提示
-        for attempt in range(max_retries + 1):
+        parse_error_analysis: Optional[str] = None  # 保存上一次的解析错误信息
+        attempt = 0  # 用于日志记录
+        
+        while True:
+            attempt += 1
             # 清空上一轮摘要容器
             summary_container["text"] = ""
             
@@ -1749,7 +1721,7 @@ def run_security_analysis(
                 # 格式校验失败，后续重试使用直接模型调用
                 use_direct_model_analysis = True
                 try:
-                    print(f"[JARVIS-SEC] 批次摘要无效 -> 重试 {attempt + 1}/{max_retries} (批次={bidx}，使用直接模型调用)")
+                    print(f"[JARVIS-SEC] 批次摘要无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)")
                 except Exception:
                     pass
 
@@ -1856,11 +1828,12 @@ def run_security_analysis(
             # 运行验证 Agent（增加重试机制：格式校验失败时，使用直接模型调用）
             verification_summary_container["text"] = ""
             verification_results: Optional[List[Dict]] = None
-            max_verify_retries = 2  # 失败后最多重试2次（共执行最多3次）
             use_direct_model_verify = False  # 标记是否使用直接模型调用
             prev_parse_error_verify: Optional[str] = None  # 保存上一次的YAML解析错误信息
+            verify_attempt = 0  # 用于日志记录
             
-            for verify_attempt in range(max_verify_retries + 1):
+            while True:
+                verify_attempt += 1
                 verification_summary_container["text"] = ""
                 
                 if use_direct_model_verify:
@@ -1871,39 +1844,8 @@ def run_security_analysis(
                     if prev_parse_error_verify:
                         # 如果有上一次的YAML解析错误，优先反馈
                         error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_verify}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
-                    elif verify_attempt > 0:
-                        # 检查上一次的解析结果
-                        prev_summary = verification_summary_container.get("text", "")
-                        if prev_summary:
-                            prev_parsed, parse_err = _try_parse_summary_report(prev_summary)
-                            if parse_err:
-                                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_err}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
-                            elif not isinstance(prev_parsed, list):
-                                error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
-                            elif not (prev_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in prev_parsed)):
-                                validation_errors = []
-                                for idx, item in enumerate(prev_parsed):
-                                    if not isinstance(item, dict):
-                                        validation_errors.append(f"元素{idx}不是字典")
-                                        break
-                                    if "gid" not in item:
-                                        validation_errors.append(f"元素{idx}缺少必填字段 gid")
-                                        break
-                                    try:
-                                        if int(item.get("gid", 0)) < 1:
-                                            validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
-                                            break
-                                    except Exception:
-                                        validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
-                                        break
-                                    if "is_valid" not in item:
-                                        validation_errors.append(f"元素{idx}缺少必填字段 is_valid（必须是布尔值）")
-                                        break
-                                    if not isinstance(item.get("is_valid"), bool):
-                                        validation_errors.append(f"元素{idx}的 is_valid 不是布尔值")
-                                        break
-                                if validation_errors:
-                                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {err}" for err in validation_errors)
+                    # 注意：由于每次循环开始时都清空了容器，无法从容器中获取上一次的解析结果
+                    # 错误信息已通过 prev_parse_error_verify 保存，在上面的 if 分支中处理
                     
                     full_verify_prompt = f"{verification_task}{error_guidance}\n\n{verification_summary_prompt_text}"
                     try:
@@ -1919,52 +1861,51 @@ def run_security_analysis(
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
                     verification_agent.run(verification_task)
-            
-            # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
-            try:
-                _changed_verify = _git_restore_if_dirty(entry_path)
-                if _changed_verify:
-                    try:
-                        print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            
-            # 解析验证结果
-            verification_summary_text = verification_summary_container.get("text", "")
-            parse_error_verify = None
-            if verification_summary_text:
-                verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
-                if parse_error_verify:
-                    # YAML解析失败，记录错误信息以便下次重试时反馈给模型
-                    prev_parse_error_verify = parse_error_verify  # 保存解析错误信息
-                    try:
-                        print(f"[JARVIS-SEC] 验证结果YAML解析失败: {parse_error_verify}")
-                    except Exception:
-                        pass
-                else:
-                    prev_parse_error_verify = None  # 解析成功，清除之前的错误信息
-                    if isinstance(verification_parsed, list):
-                        # 简单校验：检查是否为有效列表
-                        if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
-                            verification_results = verification_parsed
-                            break  # 格式正确，退出重试循环
                 
-                # 格式校验失败，后续重试使用直接模型调用
-                if verify_attempt < max_verify_retries:
-                    use_direct_model_verify = True
-                    if parse_error_verify:
-                        # 如果有YAML解析错误，在下次重试时反馈给模型
+                # 工作区保护：调用验证 Agent 后如检测到文件被修改，则恢复
+                try:
+                    _changed_verify = _git_restore_if_dirty(entry_path)
+                    if _changed_verify:
                         try:
-                            print(f"[JARVIS-SEC] 验证结果YAML解析失败 -> 重试 {verify_attempt + 1}/{max_verify_retries} (批次={bidx}，使用直接模型调用，将反馈解析错误)")
+                            print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                
+                # 解析验证结果（移到循环内部，每次运行后立即解析）
+                verification_summary_text = verification_summary_container.get("text", "")
+                parse_error_verify = None
+                if verification_summary_text:
+                    verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
+                    if parse_error_verify:
+                        # YAML解析失败，记录错误信息以便下次重试时反馈给模型
+                        prev_parse_error_verify = parse_error_verify  # 保存解析错误信息
+                        try:
+                            print(f"[JARVIS-SEC] 验证结果YAML解析失败: {parse_error_verify}")
                         except Exception:
                             pass
                     else:
-                        try:
-                            print(f"[JARVIS-SEC] 验证结果格式无效 -> 重试 {verify_attempt + 1}/{max_verify_retries} (批次={bidx}，使用直接模型调用)")
-                        except Exception:
-                            pass
+                        prev_parse_error_verify = None  # 解析成功，清除之前的错误信息
+                        if isinstance(verification_parsed, list):
+                            # 简单校验：检查是否为有效列表
+                            if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
+                                verification_results = verification_parsed
+                                break  # 格式正确，退出重试循环
+                
+                # 格式校验失败，后续重试使用直接模型调用
+                use_direct_model_verify = True
+                if parse_error_verify:
+                    # 如果有YAML解析错误，在下次重试时反馈给模型
+                    try:
+                        print(f"[JARVIS-SEC] 验证结果YAML解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)")
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        print(f"[JARVIS-SEC] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)")
+                    except Exception:
+                        pass
             
             # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
             if verification_results:
