@@ -783,7 +783,7 @@ class CodeAgent:
                     was_suppressed = getattr(self.agent.model, '_suppress_output', False)
                     self.agent.model.set_suppress_output(True)
                 try:
-                    PrettyOutput.print("🔍 正在进行关键词提取与上下文分析...", OutputType.INFO)
+                    PrettyOutput.print("🔍 正在进行智能上下文推荐....", OutputType.INFO)
                     
                     # 生成上下文推荐（基于关键词和项目上下文）
                     recommendation = self.context_recommender.recommend_context(
