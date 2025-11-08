@@ -380,20 +380,31 @@ def run_security_analysis(
     invalid_clusters_for_review: List[Dict] = []
 
     # 解析聚类输出（仅 YAML）
-    def _parse_clusters_from_text(text: str):
+    def _parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
+        """
+        解析聚类文本，返回(解析结果, 错误信息)
+        如果解析成功，返回(data, None)
+        如果解析失败，返回(None, 错误信息)
+        """
         try:
             start = text.find("<CLUSTERS>")
             end = text.find("</CLUSTERS>")
             if start == -1 or end == -1 or end <= start:
-                return None
+                return None, "未找到 <CLUSTERS> 或 </CLUSTERS> 标签，或标签顺序错误"
             content = text[start + len("<CLUSTERS>"):end].strip()
+            if not content:
+                return None, "YAML 内容为空"
             import yaml as _yaml3  # type: ignore
-            data = _yaml3.safe_load(content)
+            try:
+                data = _yaml3.safe_load(content)
+            except Exception as yaml_err:
+                error_msg = f"YAML 解析失败: {str(yaml_err)}"
+                return None, error_msg
             if isinstance(data, list):
-                return data
-            return None
-        except Exception:
-            return None
+                return data, None
+            return None, f"YAML 解析结果不是数组，而是 {type(data).__name__}"
+        except Exception as e:
+            return None, f"解析过程发生异常: {str(e)}"
 
     # 读取已有聚类报告以支持断点（若存在则按文件+批次复用既有聚类结果）
     _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
@@ -769,12 +780,17 @@ def run_security_analysis(
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
                     cluster_agent.run(cluster_task)
                 
-                cluster_items = _parse_clusters_from_text(_cluster_summary.get("text", ""))
+                cluster_items, parse_error = _parse_clusters_from_text(_cluster_summary.get("text", ""))
                 
                 # 校验结构
                 valid = True
                 error_details = []
-                if not isinstance(cluster_items, list) or not cluster_items:
+                if parse_error:
+                    # YAML解析失败，将错误信息反馈给模型
+                    valid = False
+                    error_details.append(f"YAML解析失败: {parse_error}")
+                    print(f"[JARVIS-SEC] YAML解析失败: {parse_error}")
+                elif not isinstance(cluster_items, list) or not cluster_items:
                     valid = False
                     error_details.append("结果不是数组或数组为空")
                 else:
@@ -1203,6 +1219,7 @@ def run_security_analysis(
             review_results: Optional[List[Dict]] = None
             max_review_retries = 2  # 失败后最多重试2次（共执行最多3次）
             use_direct_model_review = False  # 标记是否使用直接模型调用
+            prev_parse_error_review: Optional[str] = None  # 保存上一次的YAML解析错误信息
             
             for review_attempt in range(max_review_retries + 1):
                 review_summary_container["text"] = ""
@@ -1212,12 +1229,17 @@ def run_security_analysis(
                     # 构造包含摘要提示词和具体错误信息的完整提示
                     review_summary_prompt_text = _build_verification_summary_prompt()  # 复核使用验证摘要提示词
                     error_guidance = ""
-                    if review_attempt > 0:
+                    if prev_parse_error_review:
+                        # 如果有上一次的YAML解析错误，优先反馈
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_review}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                    elif review_attempt > 0:
                         # 检查上一次的解析结果
                         prev_summary = review_summary_container.get("text", "")
                         if prev_summary:
-                            prev_parsed = _try_parse_summary_report(prev_summary)
-                            if not isinstance(prev_parsed, list):
+                            prev_parsed, parse_err = _try_parse_summary_report(prev_summary)
+                            if parse_err:
+                                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_err}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                            elif not isinstance(prev_parsed, list):
                                 error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
                             elif not (prev_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in prev_parsed)):
                                 validation_errors = []
@@ -1272,21 +1294,38 @@ def run_security_analysis(
                 
                 # 解析复核结果
                 review_summary_text = review_summary_container.get("text", "")
+                parse_error_review = None
                 if review_summary_text:
-                    review_parsed = _try_parse_summary_report(review_summary_text)
-                    if isinstance(review_parsed, list):
-                        # 简单校验：检查是否为有效列表，包含必要的字段
-                        if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
-                            review_results = review_parsed
-                            break  # 格式正确，退出重试循环
+                    review_parsed, parse_error_review = _try_parse_summary_report(review_summary_text)
+                    if parse_error_review:
+                        # YAML解析失败，记录错误信息以便下次重试时反馈给模型
+                        prev_parse_error_review = parse_error_review  # 保存解析错误信息
+                        try:
+                            print(f"[JARVIS-SEC] 复核结果YAML解析失败: {parse_error_review}")
+                        except Exception:
+                            pass
+                    else:
+                        prev_parse_error_review = None  # 解析成功，清除之前的错误信息
+                        if isinstance(review_parsed, list):
+                            # 简单校验：检查是否为有效列表，包含必要的字段
+                            if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
+                                review_results = review_parsed
+                                break  # 格式正确，退出重试循环
                 
                 # 格式校验失败，后续重试使用直接模型调用
                 if review_attempt < max_review_retries:
                     use_direct_model_review = True
-                    try:
-                        print(f"[JARVIS-SEC] 复核结果格式无效 -> 重试 {review_attempt + 1}/{max_review_retries}（使用直接模型调用）")
-                    except Exception:
-                        pass
+                    if parse_error_review:
+                        # 如果有YAML解析错误，在下次重试时反馈给模型
+                        try:
+                            print(f"[JARVIS-SEC] 复核结果YAML解析失败 -> 重试 {review_attempt + 1}/{max_review_retries}（使用直接模型调用，将反馈解析错误）")
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            print(f"[JARVIS-SEC] 复核结果格式无效 -> 重试 {review_attempt + 1}/{max_review_retries}（使用直接模型调用）")
+                        except Exception:
+                            pass
             
             # 处理复核结果
             if review_results:
@@ -1605,7 +1644,10 @@ def run_security_analysis(
                 # 构造包含摘要提示词和具体错误信息的完整提示
                 summary_prompt_text = _build_summary_prompt()
                 error_guidance = ""
-                if prev_parsed_items is None:
+                if parse_error_analysis:
+                    # 如果有YAML解析错误，优先反馈解析错误
+                    error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_error_analysis}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                elif prev_parsed_items is None:
                     error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
                 elif not _valid_items(prev_parsed_items):
                     # 收集具体的验证错误
@@ -1685,10 +1727,17 @@ def run_security_analysis(
             # 解析摘要中的 <REPORT>（YAML）
             summary_text = summary_container.get("text", "")
             parsed_items: Optional[List] = None
+            parse_error_analysis = None
             if summary_text:
-                rep = _try_parse_summary_report(summary_text)
-
-                if isinstance(rep, list):
+                rep, parse_error_analysis = _try_parse_summary_report(summary_text)
+                
+                if parse_error_analysis:
+                    # YAML解析失败，记录错误信息以便下次重试时反馈给模型
+                    try:
+                        print(f"[JARVIS-SEC] 分析结果YAML解析失败: {parse_error_analysis}")
+                    except Exception:
+                        pass
+                elif isinstance(rep, list):
                     parsed_items = rep
                 elif isinstance(rep, dict):
                     items = rep.get("issues")
@@ -1842,6 +1891,7 @@ def run_security_analysis(
             verification_results: Optional[List[Dict]] = None
             max_verify_retries = 2  # 失败后最多重试2次（共执行最多3次）
             use_direct_model_verify = False  # 标记是否使用直接模型调用
+            prev_parse_error_verify: Optional[str] = None  # 保存上一次的YAML解析错误信息
             
             for verify_attempt in range(max_verify_retries + 1):
                 verification_summary_container["text"] = ""
@@ -1851,12 +1901,17 @@ def run_security_analysis(
                     # 构造包含摘要提示词和具体错误信息的完整提示
                     verification_summary_prompt_text = _build_verification_summary_prompt()
                     error_guidance = ""
-                    if verify_attempt > 0:
+                    if prev_parse_error_verify:
+                        # 如果有上一次的YAML解析错误，优先反馈
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_verify}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                    elif verify_attempt > 0:
                         # 检查上一次的解析结果
                         prev_summary = verification_summary_container.get("text", "")
                         if prev_summary:
-                            prev_parsed = _try_parse_summary_report(prev_summary)
-                            if not isinstance(prev_parsed, list):
+                            prev_parsed, parse_err = _try_parse_summary_report(prev_summary)
+                            if parse_err:
+                                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_err}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                            elif not isinstance(prev_parsed, list):
                                 error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
                             elif not (prev_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in prev_parsed)):
                                 validation_errors = []
@@ -1911,21 +1966,38 @@ def run_security_analysis(
                 
                 # 解析验证结果
                 verification_summary_text = verification_summary_container.get("text", "")
+                parse_error_verify = None
                 if verification_summary_text:
-                    verification_parsed = _try_parse_summary_report(verification_summary_text)
-                    if isinstance(verification_parsed, list):
-                        # 简单校验：检查是否为有效列表
-                        if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
-                            verification_results = verification_parsed
-                            break  # 格式正确，退出重试循环
+                    verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
+                    if parse_error_verify:
+                        # YAML解析失败，记录错误信息以便下次重试时反馈给模型
+                        prev_parse_error_verify = parse_error_verify  # 保存解析错误信息
+                        try:
+                            print(f"[JARVIS-SEC] 验证结果YAML解析失败: {parse_error_verify}")
+                        except Exception:
+                            pass
+                    else:
+                        prev_parse_error_verify = None  # 解析成功，清除之前的错误信息
+                        if isinstance(verification_parsed, list):
+                            # 简单校验：检查是否为有效列表
+                            if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
+                                verification_results = verification_parsed
+                                break  # 格式正确，退出重试循环
                 
                 # 格式校验失败，后续重试使用直接模型调用
                 if verify_attempt < max_verify_retries:
                     use_direct_model_verify = True
-                    try:
-                        print(f"[JARVIS-SEC] 验证结果格式无效 -> 重试 {verify_attempt + 1}/{max_verify_retries} (批次={bidx}，使用直接模型调用)")
-                    except Exception:
-                        pass
+                    if parse_error_verify:
+                        # 如果有YAML解析错误，在下次重试时反馈给模型
+                        try:
+                            print(f"[JARVIS-SEC] 验证结果YAML解析失败 -> 重试 {verify_attempt + 1}/{max_verify_retries} (批次={bidx}，使用直接模型调用，将反馈解析错误)")
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            print(f"[JARVIS-SEC] 验证结果格式无效 -> 重试 {verify_attempt + 1}/{max_verify_retries} (批次={bidx}，使用直接模型调用)")
+                        except Exception:
+                            pass
             
             # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
             if verification_results:
@@ -2062,25 +2134,32 @@ def run_security_analysis(
         raise
 
 
-def _try_parse_summary_report(text: str) -> Optional[object]:
+def _try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str]]:
     """
     从摘要文本中提取 <REPORT>...</REPORT> 内容，并解析为对象（dict 或 list，仅支持 YAML）。
-    - 若提取/解析失败返回 None
-    - YAML 解析采用安全模式，若环境无 PyYAML 则忽略
+    返回(解析结果, 错误信息)
+    如果解析成功，返回(data, None)
+    如果解析失败，返回(None, 错误信息)
     """
     start = text.find("<REPORT>")
     end = text.find("</REPORT>")
     if start == -1 or end == -1 or end <= start:
-        return None
+        return None, "未找到 <REPORT> 或 </REPORT> 标签，或标签顺序错误"
     content = text[start + len("<REPORT>"):end].strip()
+    if not content:
+        return None, "YAML 内容为空"
     try:
         import yaml as _yaml  # type: ignore
-        data = _yaml.safe_load(content)
+        try:
+            data = _yaml.safe_load(content)
+        except Exception as yaml_err:
+            error_msg = f"YAML 解析失败: {str(yaml_err)}"
+            return None, error_msg
         if isinstance(data, (dict, list)):
-            return data
-    except Exception:
-        return None
-    return None
+            return data, None
+        return None, f"YAML 解析结果不是字典或数组，而是 {type(data).__name__}"
+    except Exception as e:
+        return None, f"解析过程发生异常: {str(e)}"
 
 
 __all__ = [
