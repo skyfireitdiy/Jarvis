@@ -14,7 +14,7 @@ import os
 import re
 import subprocess
 import sys
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -215,6 +215,126 @@ def revert_change() -> None:
         PrettyOutput.print(f"恢复更改失败: {str(e)}", OutputType.ERROR)
 
 
+def detect_large_code_deletion(threshold: int = 200) -> Optional[Dict[str, int]]:
+    """检测是否有大量代码删除
+    
+    参数:
+        threshold: 净删除行数阈值，默认200行
+        
+    返回:
+        Optional[Dict[str, int]]: 如果检测到大量删除，返回包含统计信息的字典：
+            {
+                'insertions': int,  # 新增行数
+                'deletions': int,   # 删除行数
+                'net_deletions': int  # 净删除行数
+            }
+            如果没有大量删除或发生错误，返回None
+    """
+    try:
+        # 临时暂存所有文件以便获取完整的diff统计
+        subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # 检查是否有HEAD
+        head_check = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+        )
+        
+        if head_check.returncode == 0:
+            # 有HEAD，获取相对于HEAD的diff统计
+            diff_result = subprocess.run(
+                ["git", "diff", "HEAD", "--shortstat"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+        else:
+            # 空仓库，获取工作区diff统计
+            diff_result = subprocess.run(
+                ["git", "diff", "--shortstat"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+        
+        # 重置暂存区
+        subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # 解析插入和删除行数
+        if diff_result.returncode == 0 and diff_result.stdout:
+            insertions = 0
+            deletions = 0
+            insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_result.stdout)
+            deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_result.stdout)
+            if insertions_match:
+                insertions = int(insertions_match.group(1))
+            if deletions_match:
+                deletions = int(deletions_match.group(1))
+            
+            # 检查是否有大量代码删除（净删除超过阈值）
+            net_deletions = deletions - insertions
+            if net_deletions > threshold:
+                return {
+                    'insertions': insertions,
+                    'deletions': deletions,
+                    'net_deletions': net_deletions
+                }
+        return None
+    except Exception:
+        # 如果检查过程中出错，返回None
+        return None
+
+
+def confirm_large_code_deletion(detection_result: Dict[str, int]) -> bool:
+    """询问用户是否确认大量代码删除
+    
+    参数:
+        detection_result: 检测结果字典，包含 'insertions', 'deletions', 'net_deletions'
+        
+    返回:
+        bool: 如果用户确认，返回True；如果用户拒绝，返回False
+    """
+    insertions = detection_result['insertions']
+    deletions = detection_result['deletions']
+    net_deletions = detection_result['net_deletions']
+    
+    PrettyOutput.print(
+        f"⚠️ 检测到大量代码删除：净删除 {net_deletions} 行（删除 {deletions} 行，新增 {insertions} 行）",
+        OutputType.WARNING,
+    )
+    if not user_confirm(
+        "此补丁包含大量代码删除，是否合理？", default=True
+    ):
+        # 用户认为不合理，拒绝提交
+        revert_change()
+        PrettyOutput.print(
+            "已拒绝本次提交（用户认为补丁不合理）", OutputType.INFO
+        )
+        return False
+    return True
+
+
+def check_large_code_deletion(threshold: int = 200) -> bool:
+    """检查是否有大量代码删除并询问用户确认
+    
+    参数:
+        threshold: 净删除行数阈值，默认200行
+        
+    返回:
+        bool: 如果检测到大量删除且用户拒绝提交，返回False；否则返回True
+    """
+    detection_result = detect_large_code_deletion(threshold)
+    if detection_result is None:
+        return True
+    
+    return confirm_large_code_deletion(detection_result)
+
+
 def handle_commit_workflow() -> bool:
     """Handle the git commit workflow and return the commit details.
 
@@ -236,72 +356,8 @@ def handle_commit_workflow() -> bool:
             return False
 
         # 在提交前检查是否有大量代码删除
-        # 获取diff统计信息（相对于HEAD）
-        try:
-            # 临时暂存所有文件以便获取完整的diff统计
-            subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            # 检查是否有HEAD
-            head_check = subprocess.run(
-                ["git", "rev-parse", "--verify", "HEAD"],
-                stderr=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-            )
-            
-            if head_check.returncode == 0:
-                # 有HEAD，获取相对于HEAD的diff统计
-                diff_result = subprocess.run(
-                    ["git", "diff", "HEAD", "--shortstat"],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    check=False,
-                )
-            else:
-                # 空仓库，获取工作区diff统计
-                diff_result = subprocess.run(
-                    ["git", "diff", "--shortstat"],
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    check=False,
-                )
-            
-            # 重置暂存区
-            subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            # 解析插入和删除行数
-            if diff_result.returncode == 0 and diff_result.stdout:
-                insertions = 0
-                deletions = 0
-                insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_result.stdout)
-                deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_result.stdout)
-                if insertions_match:
-                    insertions = int(insertions_match.group(1))
-                if deletions_match:
-                    deletions = int(deletions_match.group(1))
-                
-                # 检查是否有大量代码删除（净删除超过200行）
-                net_deletions = deletions - insertions
-                if net_deletions > 200:
-                    PrettyOutput.print(
-                        f"⚠️ 检测到大量代码删除：净删除 {net_deletions} 行（删除 {deletions} 行，新增 {insertions} 行）",
-                        OutputType.WARNING,
-                    )
-                    if not user_confirm(
-                        "此补丁包含大量代码删除，是否合理？", default=True
-                    ):
-                        # 用户认为不合理，拒绝提交
-                        revert_change()
-                        PrettyOutput.print(
-                            "已拒绝本次提交（用户认为补丁不合理）", OutputType.INFO
-                        )
-                        return False
-        except Exception:
-            # 如果检查过程中出错，不影响正常提交流程
-            pass
+        if not check_large_code_deletion():
+            return False
 
         # 获取当前分支的提交总数
         commit_result = subprocess.run(

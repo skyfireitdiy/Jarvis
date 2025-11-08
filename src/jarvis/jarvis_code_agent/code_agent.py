@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 import hashlib
-from typing import List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import typer
 
@@ -40,6 +40,7 @@ from jarvis.jarvis_utils.config import (
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
+    detect_large_code_deletion,
     find_git_root_and_cd,
     get_commits_between,
     get_diff,
@@ -48,6 +49,7 @@ from jarvis.jarvis_utils.git_utils import (
     get_recent_commits_with_files,
     handle_commit_workflow,
     has_uncommitted_changes,
+    revert_change,
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -1276,6 +1278,73 @@ class CodeAgent(Agent):
         
         return final_ret
 
+    def _ask_llm_about_large_deletion(self, detection_result: Dict[str, int], preview: str) -> bool:
+        """询问大模型大量代码删除是否合理
+        
+        参数:
+            detection_result: 检测结果字典，包含 'insertions', 'deletions', 'net_deletions'
+            preview: 补丁预览内容
+            
+        返回:
+            bool: 如果大模型认为合理返回True，否则返回False
+        """
+        if not self.model:
+            # 如果没有模型，默认认为合理
+            return True
+        
+        insertions = detection_result['insertions']
+        deletions = detection_result['deletions']
+        net_deletions = detection_result['net_deletions']
+        
+        prompt = f"""检测到大量代码删除，请判断是否合理：
+
+统计信息：
+- 新增行数: {insertions}
+- 删除行数: {deletions}
+- 净删除行数: {net_deletions}
+
+补丁预览：
+{preview}
+
+请仔细分析以上代码变更，判断这些大量代码删除是否合理。可能的情况包括：
+1. 重构代码，删除冗余或过时的代码
+2. 简化实现，用更简洁的代码替换复杂的实现
+3. 删除未使用的代码或功能
+4. 错误地删除了重要代码
+
+请使用以下协议回答（必须包含且仅包含以下标记之一）：
+- 如果认为这些删除是合理的，回答: <!!!YES!!!>
+- 如果认为这些删除不合理或存在风险，回答: <!!!NO!!!>
+
+请严格按照协议格式回答，不要添加其他内容。
+"""
+        
+        try:
+            PrettyOutput.print("🤖 正在询问大模型判断大量代码删除是否合理...", OutputType.INFO)
+            response = self.model.chat_until_success(prompt)  # type: ignore
+            
+            # 使用确定的协议标记解析回答
+            if "<!!!YES!!!>" in response:
+                PrettyOutput.print("✅ 大模型确认：代码删除合理", OutputType.SUCCESS)
+                return True
+            elif "<!!!NO!!!>" in response:
+                PrettyOutput.print("❌ 大模型确认：代码删除不合理", OutputType.WARNING)
+                return False
+            else:
+                # 如果无法找到协议标记，默认认为不合理（保守策略）
+                PrettyOutput.print(
+                    f"⚠️ 无法找到协议标记，默认认为不合理。回答内容: {response[:200]}",
+                    OutputType.WARNING
+                )
+                return False
+        except Exception as e:
+            # 如果询问失败，默认认为不合理（保守策略）
+            PrettyOutput.print(
+                f"⚠️ 询问大模型失败: {str(e)}，默认认为不合理",
+                OutputType.WARNING
+            )
+            return False
+
     def _on_after_tool_call(self, agent: Agent, current_response=None, need_return=None, tool_prompt=None, **kwargs) -> None:
         """工具调用后回调函数。"""
         final_ret = ""
@@ -1293,6 +1362,23 @@ class CodeAgent(Agent):
             impact_report = self._analyze_edit_impact(modified_files)
             
             per_file_preview = self._build_per_file_patch_preview(modified_files)
+            
+            # 非交互模式下，在提交前检测大量代码删除
+            if self.non_interactive:
+                detection_result = detect_large_code_deletion()
+                if detection_result is not None:
+                    # 检测到大量代码删除，询问大模型是否合理
+                    is_reasonable = self._ask_llm_about_large_deletion(detection_result, per_file_preview)
+                    if not is_reasonable:
+                        # 大模型认为不合理，撤销修改
+                        PrettyOutput.print("已撤销修改（大模型认为代码删除不合理）", OutputType.INFO)
+                        revert_change()
+                        final_ret += "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
+                        final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
+                        PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
+                        self.session.prompt += final_ret
+                        return
+            
             commited = handle_commit_workflow()
             if commited:
                 # 统计代码行数变化
