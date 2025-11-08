@@ -506,6 +506,11 @@ def run_security_analysis(
 - 工具优先：如需核对上下文，可使用 read_code 读取相邻代码；避免过度遍历。
 - 禁止写操作；仅只读分析。
 - **重要**：在聚类过程中，如果能够明确判断某些候选是误报或无效（例如：代码中已有保护措施、调用路径不存在、上下文已确保安全等），可以在聚类结果中标记为无效（is_invalid: true），这些无效的候选将不会进入后续验证阶段。
+- **记忆使用**：
+  - 在聚类过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前文件或函数相关的记忆。
+  - 如果有必要，使用 save_memory 工具保存聚类过程中发现的函数或代码片段的要点，使用函数名或文件名作为 tag。
+  - 记忆内容示例：某个函数的指针已经判空、某个函数已有输入校验、某个代码片段的上下文信息等。
+  - 这些记忆可以帮助后续的分析Agent和验证Agent更高效地工作。
         """.strip()
         import json as _json2
         cluster_summary_prompt = """
@@ -664,7 +669,7 @@ def run_security_analysis(
                 plan=False,
                 output_handler=[ToolRegistry()],
                 disable_file_edit=True,
-                use_tools=["read_code", "execute_script"],
+                use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],  # 添加保存和召回记忆工具
             )
             if llm_group:
                 agent_kwargs_cluster["model_group"] = llm_group
