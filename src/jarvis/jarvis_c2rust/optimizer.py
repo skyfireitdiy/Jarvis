@@ -67,6 +67,7 @@ class OptimizeOptions:
     git_guard: bool = True
     llm_group: Optional[str] = None
     cargo_test_timeout: int = 300  # cargo test 超时（秒）
+    non_interactive: bool = True
 
 
 @dataclass
@@ -800,7 +801,7 @@ class Optimizer:
         print(f"{self.log_prefix} [CodeAgent] 正在调用 CodeAgent 进行整体优化...")
         try:
             os.chdir(str(crate))
-            agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.options.llm_group)
+            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, plan=False, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -898,7 +899,7 @@ class Optimizer:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(crate))
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=self.options.llm_group)
+                agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, plan=False, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
             finally:
                 os.chdir(prev_cwd)
@@ -922,6 +923,7 @@ def optimize_project(
     git_guard: bool = True,
     llm_group: Optional[str] = None,
     cargo_test_timeout: int = 300,
+    non_interactive: bool = True,
 ) -> Dict:
     """
     对指定 crate 执行优化。返回结果摘要 dict。
@@ -951,6 +953,7 @@ def optimize_project(
         git_guard=git_guard,
         llm_group=llm_group,
         cargo_test_timeout=cargo_test_timeout,
+        non_interactive=non_interactive,
     )
     optimizer = Optimizer(crate, opts)
     stats = optimizer.run()

@@ -1588,6 +1588,7 @@ def run_scan(
     subgraphs_dir: Optional[Path] = None,
     only_subgraphs: bool = False,
     png: bool = False,
+    non_interactive: bool = True,
 ) -> None:
     # Scan for C/C++ functions and persist results to JSONL; optionally generate DOT.
     # Determine data path

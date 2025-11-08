@@ -56,6 +56,7 @@ def apply_library_replacement(
     checkpoint_path: Optional[Path] = None,
     checkpoint_interval: int = 1,
     clear_checkpoint_on_done: bool = True,
+    non_interactive: bool = True,
 ) -> Dict[str, Path]:
     """
     基于依赖图由 LLM 判定，对满足“整子树可由指定库单个 API 替代”的函数根进行替换并剪枝。

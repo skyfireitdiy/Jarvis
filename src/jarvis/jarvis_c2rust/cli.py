@@ -63,6 +63,11 @@ def scan(
         "--only-subgraphs",
         help="不重新扫描。仅生成每个根函数的引用子图 DOT 文件（需要 --subgraphs-dir）",
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
+    ),
 ) -> None:
     """
     进行 C/C++ 函数扫描并生成引用关系 DOT 图；PNG 渲染默认启用（无需参数）。
@@ -73,12 +78,18 @@ def scan(
         subgraphs_dir=subgraphs_dir,
         only_subgraphs=only_subgraphs,
         png=True,
+        non_interactive=not interactive,
     )
 
 @app.command("prepare")
 def prepare(
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="指定用于规划的 LLM 模型组（仅影响本次运行）"
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
     ),
 ) -> None:
     """
@@ -87,7 +98,7 @@ def prepare(
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据
     """
     try:
-        _execute_llm_plan(apply=True, llm_group=llm_group)
+        _execute_llm_plan(apply=True, llm_group=llm_group, non_interactive=not interactive)
     except Exception as e:
         typer.secho(f"[c2rust-llm-planner] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -106,6 +117,11 @@ def transpile(
     ),
     resume: bool = typer.Option(
         True, "--resume/--no-resume", help="是否启用断点续跑（默认启用）"
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
     ),
 ) -> None:
     """
@@ -131,6 +147,7 @@ def transpile(
             max_retries=max_retries,
             resume=resume,
             only=only_list,
+            non_interactive=not interactive,
         )
     except Exception as e:
         typer.secho(f"[c2rust-transpiler] 错误: {e}", fg=typer.colors.RED, err=True)
@@ -150,6 +167,11 @@ def lib_replace(
     ),
     disabled_libs: Optional[str] = typer.Option(
         None, "--disabled-libs", help="禁用库列表：逗号分隔的库名（评估时禁止使用这些库）"
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
     ),
 ) -> None:
     """
@@ -214,6 +236,7 @@ def lib_replace(
             out_mapping_path=None,
             max_funcs=None,
             disabled_libraries=disabled_list,
+            non_interactive=not interactive,
         )
         # 输出简要结果摘要（底层已写出新的符号表与可选转译顺序）
         try:
@@ -238,6 +261,11 @@ def collect(
     out: Path = typer.Option(..., "-o", "--out", help="输出文件路径（写入唯一函数名，每行一个）"),
     cc_root: Optional[Path] = typer.Option(
         None, "--cc-root", help="compile_commands.json 根目录（可选，用于提升解析准确性）"
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
     ),
 ) -> None:
     """
@@ -295,6 +323,11 @@ def run(
     resume: bool = typer.Option(
         True, "--resume/--no-resume", help="transpile 是否启用断点续跑（默认启用）"
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
+    ),
 ) -> None:
     """
     依次执行流水线：collect -> scan -> lib-replace -> prepare -> transpile -> optimize
@@ -339,7 +372,7 @@ def run(
 
         # Step 2: scan（始终执行）
         typer.secho("[c2rust-run] scan: 开始", fg=typer.colors.BLUE)
-        _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False)
+        _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False, non_interactive=not interactive)
         typer.secho("[c2rust-run] scan: 完成", fg=typer.colors.GREEN)
 
         # Step 3: lib-replace（强制执行，依据约束获取根列表）
@@ -399,6 +432,7 @@ def run(
             out_mapping_path=None,
             max_funcs=None,
             disabled_libraries=disabled_list,
+            non_interactive=not interactive,
         )
         try:
             order_msg = f"\n[c2rust-run] lib-replace: 转译顺序: {ret['order']}" if 'order' in ret else ""
@@ -413,7 +447,7 @@ def run(
 
         # Step 4: prepare
         typer.secho("[c2rust-run] prepare: 开始", fg=typer.colors.BLUE)
-        _execute_llm_plan(apply=True, llm_group=llm_group)
+        _execute_llm_plan(apply=True, llm_group=llm_group, non_interactive=not interactive)
         typer.secho("[c2rust-run] prepare: 完成", fg=typer.colors.GREEN)
 
         # Step 5: transpile
@@ -426,6 +460,7 @@ def run(
             max_retries=max_retries,
             resume=resume,
             only=None,
+            non_interactive=not interactive,
         )
         typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
 
@@ -433,7 +468,7 @@ def run(
         try:
             typer.secho("[c2rust-run] optimize: 开始", fg=typer.colors.BLUE)
             from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
-            res = _optimize_project(crate_dir=None, llm_group=llm_group)
+            res = _optimize_project(crate_dir=None, llm_group=llm_group, non_interactive=not interactive)
             summary = (
                 f"[c2rust-run] optimize: 结果摘要:\n"
                 f"  files_scanned: {res.get('files_scanned')}\n"
@@ -520,6 +555,11 @@ def optimize(
         "--git-guard/--no-git-guard",
         help="启用Git保护：每一步优化前记录当前HEAD，修复耗尽时自动git reset --hard回快照（默认启用）",
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
+    ),
 
 ) -> None:
     """
@@ -546,6 +586,7 @@ def optimize(
             build_fix_retries=build_fix_retries,
             git_guard=git_guard,
             llm_group=llm_group,
+            non_interactive=not interactive,
         )
         # 摘要输出
         summary = (

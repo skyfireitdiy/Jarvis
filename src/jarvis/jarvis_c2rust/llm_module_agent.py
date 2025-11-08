@@ -1037,6 +1037,7 @@ def execute_llm_plan(
     apply: bool = False,
     crate_name: Optional[Union[Path, str]] = None,
     llm_group: Optional[str] = None,
+    non_interactive: bool = True,
 ) -> List[Any]:
     """
     返回 LLM 生成的目录结构原始 YAML 文本（来自 <PROJECT> 块）。
@@ -1164,7 +1165,7 @@ def execute_llm_plan(
                 print(f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}")
             
             try:
-                agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
+                agent = CodeAgent(need_summary=False, non_interactive=non_interactive, plan=False, model_group=llm_group)
                 # 验证 agent 内部的模型配置
                 if hasattr(agent, 'model') and agent.model:
                     actual_model = getattr(agent.model, 'model_name', 'unknown')
@@ -1223,7 +1224,7 @@ def execute_llm_plan(
                 if llm_group:
                     print(f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}")
                 try:
-                    repair_agent = CodeAgent(need_summary=False, non_interactive=True, plan=False, model_group=llm_group)
+                    repair_agent = CodeAgent(need_summary=False, non_interactive=non_interactive, plan=False, model_group=llm_group)
                     repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
                 except Exception as e:
                     error_msg = str(e)
