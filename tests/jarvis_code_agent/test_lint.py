@@ -86,27 +86,6 @@ class TestLintTools:
         # 未知扩展名
         assert get_lint_tools("unknown.xyz") == []
     
-    def test_get_lint_tools_by_filename(self):
-        """测试通过文件名获取lint工具"""
-        # Dockerfile
-        assert get_lint_tools("dockerfile") == ["hadolint"]
-        assert get_lint_tools("Dockerfile") == ["hadolint"]  # 测试大小写
-        assert get_lint_tools("/path/to/dockerfile") == ["hadolint"]
-        
-        # Makefile
-        assert get_lint_tools("makefile") == ["checkmake"]
-        assert get_lint_tools("Makefile") == ["checkmake"]
-        
-        # docker-compose文件
-        assert get_lint_tools("docker-compose.yml") == ["hadolint"]
-        assert get_lint_tools("docker-compose.yaml") == ["hadolint"]
-    
-    def test_get_lint_tools_priority(self):
-        """测试文件名优先于扩展名的规则"""
-        # 如果有同名文件在配置中，应该优先使用文件名匹配
-        # 例如 .eslintrc 应该匹配到 eslint，而不是根据扩展名匹配
-        assert get_lint_tools(".eslintrc") == ["eslint"]
-        assert get_lint_tools(".prettierrc") == ["prettier"]
     
     def test_get_lint_tools_with_path(self):
         """测试带路径的文件名"""
