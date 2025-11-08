@@ -34,7 +34,7 @@ def _build_summary_prompt() -> str:
 请将本轮"安全子任务（单点验证）"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
 仅输出全局编号（gid）与详细理由（不含位置信息），gid 为全局唯一的数字编号。
 
-示例1：有告警的情况（has_risk: true）
+示例1：有告警的情况（has_risk: true，单个gid）
 <REPORT>
 - gid: 1
   has_risk: true
@@ -44,7 +44,17 @@ def _build_summary_prompt() -> str:
   suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
 </REPORT>
 
-示例2：误报或无问题（返回空数组）
+示例2：有告警的情况（has_risk: true，多个gid合并，路径和原因一致）
+<REPORT>
+- gids: [1, 2, 3]
+  has_risk: true
+  preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
+  trigger_path: "调用路径推导：main() -> handle_network_request() -> parse_packet() -> foobar() -> strcpy()。数据流：网络数据包通过 handle_network_request() 接收，传递给 parse_packet() 解析，parse_packet() 未对数据长度进行校验，直接将 src 传递给 foobar()，foobar() 调用 strcpy(dst, src) 时未检查 src 长度，可导致缓冲区溢出。关键调用点：parse_packet() 函数未对输入长度进行校验。"
+  consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
+  suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
+</REPORT>
+
+示例3：误报或无问题（返回空数组）
 <REPORT>
 []
 </REPORT>
@@ -53,15 +63,17 @@ def _build_summary_prompt() -> str:
 - 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
 - 若确认本批次全部为误报或无问题，请返回空数组 []。
 - 数组元素为对象，包含字段：
-  - gid: 整数（全局唯一编号）
+  - gid: 整数（全局唯一编号，单个告警时使用）
+  - gids: 整数数组（全局唯一编号数组，多个告警合并时使用）
   - has_risk: 布尔值 (true/false)，表示该项是否存在真实安全风险。
   - preconditions: 字符串（触发漏洞的前置条件，仅当 has_risk 为 true 时必需）
   - trigger_path: 字符串（漏洞的触发路径，必须包含完整的调用路径推导，包括：1) 可控输入的来源；2) 从输入源到缺陷代码的完整调用链（函数调用序列）；3) 每个调用点的数据校验情况；4) 触发条件。格式示例："调用路径推导：函数A() -> 函数B() -> 函数C() -> 缺陷代码。数据流：输入来源 -> 传递路径。关键调用点：函数B()未做校验。"，仅当 has_risk 为 true 时必需）
   - consequences: 字符串（漏洞被触发后可能导致的后果，仅当 has_risk 为 true 时必需）
   - suggestions: 字符串（修复或缓解该漏洞的建议，仅当 has_risk 为 true 时必需）
+- **合并格式优化**：如果多个告警（gid）的路径（trigger_path）、原因（preconditions/consequences/suggestions）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
 - 不要在数组元素中包含 file/line/pattern 等位置信息；写入 jsonl 时系统会结合原始候选信息。
 - **关键**：仅当 `has_risk` 为 `true` 时，才会被记录为确认的问题。对于确认是误报的条目，请确保 `has_risk` 为 `false` 或不输出该条目。
-- **输出格式**：有告警的条目必须包含所有字段（gid, has_risk, preconditions, trigger_path, consequences, suggestions）；无告警的条目只需包含 gid 和 has_risk。
+- **输出格式**：有告警的条目必须包含所有字段（gid 或 gids, has_risk, preconditions, trigger_path, consequences, suggestions）；无告警的条目只需包含 gid 和 has_risk。
 - **调用路径推导要求**：trigger_path 字段必须包含完整的调用路径推导，不能省略或简化。必须明确说明从可控输入到缺陷代码的完整调用链，以及每个调用点的校验情况。如果无法推导出完整的调用路径，应该判定为误报（has_risk: false）。
 """.strip()
 
@@ -74,14 +86,21 @@ def _build_verification_summary_prompt() -> str:
 请将本轮"验证分析结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
 你需要验证分析 Agent 给出的结论是否正确，包括前置条件、触发路径、后果和建议是否合理。
 
-示例1：验证通过（is_valid: true）
+示例1：验证通过（is_valid: true，单个gid）
 <REPORT>
 - gid: 1
   is_valid: true
   verification_notes: "分析结论正确，前置条件合理，触发路径清晰，后果评估准确"
 </REPORT>
 
-示例2：验证不通过（is_valid: false）
+示例2：验证通过（is_valid: true，多个gid合并）
+<REPORT>
+- gids: [1, 2, 3]
+  is_valid: true
+  verification_notes: "分析结论正确，前置条件合理，触发路径清晰，后果评估准确"
+</REPORT>
+
+示例3：验证不通过（is_valid: false）
 <REPORT>
 - gid: 1
   is_valid: false
@@ -91,9 +110,11 @@ def _build_verification_summary_prompt() -> str:
 要求：
 - 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
 - 数组元素为对象，包含字段：
-  - gid: 整数（全局唯一编号，对应分析 Agent 给出的 gid）
+  - gid: 整数（全局唯一编号，对应分析 Agent 给出的 gid，单个告警时使用）
+  - gids: 整数数组（全局唯一编号数组，对应分析 Agent 给出的 gids，多个告警合并时使用）
   - is_valid: 布尔值 (true/false)，表示分析 Agent 的结论是否正确
   - verification_notes: 字符串（验证说明，解释为什么结论正确或不正确）
+- **合并格式优化**：如果多个告警（gid）的验证结果（is_valid）和验证说明（verification_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
 - 必须对所有输入的 gid 进行验证，不能遗漏。
 - 如果验证通过（is_valid: true），则保留该告警；如果验证不通过（is_valid: false），则视为误报，不记录为问题。
 """.strip()
@@ -1087,14 +1108,21 @@ def run_security_analysis(
 请将本轮"复核结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
 你需要复核聚类Agent给出的无效理由是否充分，是否真的考虑了所有可能的路径。
 
-示例1：理由充分（is_reason_sufficient: true）
+示例1：理由充分（is_reason_sufficient: true，单个gid）
 <REPORT>
 - gid: 1
   is_reason_sufficient: true
   review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
 </REPORT>
 
-示例2：理由不充分（is_reason_sufficient: false）
+示例2：理由充分（is_reason_sufficient: true，多个gid合并）
+<REPORT>
+- gids: [1, 2, 3]
+  is_reason_sufficient: true
+  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+</REPORT>
+
+示例3：理由不充分（is_reason_sufficient: false）
 <REPORT>
 - gid: 1
   is_reason_sufficient: false
@@ -1104,9 +1132,11 @@ def run_security_analysis(
 要求：
 - 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
 - 数组元素为对象，包含字段：
-  - gid: 整数（全局唯一编号，对应无效聚类的gid）
+  - gid: 整数（全局唯一编号，对应无效聚类的gid，单个告警时使用）
+  - gids: 整数数组（全局唯一编号数组，对应无效聚类的gids，多个告警合并时使用）
   - is_reason_sufficient: 布尔值 (true/false)，表示无效理由是否充分
   - review_notes: 字符串（复核说明，解释为什么理由充分或不充分）
+- **合并格式优化**：如果多个告警（gid）的复核结果（is_reason_sufficient）和复核说明（review_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
 - 必须对所有输入的gid进行复核，不能遗漏。
 - 如果理由不充分（is_reason_sufficient: false），该候选将重新加入验证流程；如果理由充分（is_reason_sufficient: true），该候选将被确认为无效。
         """.strip()
@@ -1244,8 +1274,31 @@ def run_security_analysis(
                     else:
                         prev_parse_error_review = None  # 解析成功，清除之前的错误信息
                         if isinstance(review_parsed, list):
-                            # 简单校验：检查是否为有效列表，包含必要的字段
-                            if review_parsed and all(isinstance(item, dict) and "gid" in item and "is_reason_sufficient" in item for item in review_parsed):
+                            # 简单校验：检查是否为有效列表，包含必要的字段（支持 gid 或 gids）
+                            def _is_valid_review_item(item):
+                                if not isinstance(item, dict) or "is_reason_sufficient" not in item:
+                                    return False
+                                has_gid = "gid" in item
+                                has_gids = "gids" in item
+                                if not has_gid and not has_gids:
+                                    return False
+                                if has_gid and has_gids:
+                                    return False  # gid 和 gids 不能同时出现
+                                if has_gid:
+                                    try:
+                                        return int(item["gid"]) >= 1
+                                    except Exception:
+                                        return False
+                                elif has_gids:
+                                    if not isinstance(item["gids"], list) or len(item["gids"]) == 0:
+                                        return False
+                                    try:
+                                        return all(int(gid_val) >= 1 for gid_val in item["gids"])
+                                    except Exception:
+                                        return False
+                                return False
+                            
+                            if review_parsed and all(_is_valid_review_item(item) for item in review_parsed):
                                 review_results = review_parsed
                                 break  # 格式正确，退出重试循环
                 
@@ -1265,16 +1318,40 @@ def run_security_analysis(
             
             # 处理复核结果
             if review_results:
-                # 构建gid到复核结果的映射
+                # 构建gid到复核结果的映射（支持 gid 和 gids 两种格式）
                 gid_to_review: Dict[int, Dict] = {}
                 for rr in review_results:
-                    if isinstance(rr, dict):
+                    if not isinstance(rr, dict):
+                        continue
+                    
+                    # 支持 gid 和 gids 两种格式
+                    gids_to_process: List[int] = []
+                    if "gids" in rr and isinstance(rr.get("gids"), list):
+                        # 合并格式：gids 数组
+                        for gid_val in rr.get("gids", []):
+                            try:
+                                gid_int = int(gid_val)
+                                if gid_int >= 1:
+                                    gids_to_process.append(gid_int)
+                            except Exception:
+                                pass
+                    elif "gid" in rr:
+                        # 单个格式：gid
                         try:
-                            r_gid = int(rr.get("gid", 0))
-                            if r_gid >= 1:
-                                gid_to_review[r_gid] = rr
+                            gid_int = int(rr.get("gid", 0))
+                            if gid_int >= 1:
+                                gids_to_process.append(gid_int)
                         except Exception:
                             pass
+                    
+                    # 为每个 gid 创建复核结果映射
+                    is_reason_sufficient = rr.get("is_reason_sufficient")
+                    review_notes = str(rr.get("review_notes", "")).strip()
+                    for gid in gids_to_process:
+                        gid_to_review[gid] = {
+                            "is_reason_sufficient": is_reason_sufficient,
+                            "review_notes": review_notes
+                        }
                 
                 # 处理每个无效聚类
                 for invalid_cluster in review_batch:
@@ -1598,16 +1675,37 @@ def run_security_analysis(
                             if not isinstance(it, dict):
                                 validation_errors.append(f"元素{idx}不是字典")
                                 break
-                            if "gid" not in it:
-                                validation_errors.append(f"元素{idx}缺少必填字段 gid")
+                            # 校验 gid 或 gids
+                            has_gid = "gid" in it
+                            has_gids = "gids" in it
+                            if not has_gid and not has_gids:
+                                validation_errors.append(f"元素{idx}缺少必填字段 gid 或 gids")
                                 break
-                            try:
-                                if int(it.get("gid", 0)) < 1:
-                                    validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
+                            if has_gid and has_gids:
+                                validation_errors.append(f"元素{idx}不能同时包含 gid 和 gids")
+                                break
+                            if has_gid:
+                                try:
+                                    if int(it.get("gid", 0)) < 1:
+                                        validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
+                                        break
+                                except Exception:
+                                    validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
                                     break
-                            except Exception:
-                                validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
-                                break
+                            elif has_gids:
+                                if not isinstance(it.get("gids"), list) or len(it.get("gids", [])) == 0:
+                                    validation_errors.append(f"元素{idx}的 gids 必须是非空数组")
+                                    break
+                                try:
+                                    for gid_idx, gid_val in enumerate(it.get("gids", [])):
+                                        if int(gid_val) < 1:
+                                            validation_errors.append(f"元素{idx}的 gids[{gid_idx}] 必须 >= 1")
+                                            break
+                                    if validation_errors:
+                                        break
+                                except Exception:
+                                    validation_errors.append(f"元素{idx}的 gids 格式错误（必须是整数数组）")
+                                    break
                             if "has_risk" not in it or not isinstance(it.get("has_risk"), bool):
                                 validation_errors.append(f"元素{idx}缺少必填字段 has_risk（必须是布尔值）")
                                 break
@@ -1683,21 +1781,37 @@ def run_security_analysis(
                     if isinstance(items, list):
                         parsed_items = items
 
-            # 关键字段校验：当前要求每个元素为 {gid:int, has_risk:bool, ...}
+            # 关键字段校验：当前要求每个元素为 {gid:int 或 gids:list, has_risk:bool, ...}
             def _valid_items(items: Optional[List]) -> bool:
                 if not isinstance(items, list):
                     return False
                 for it in items:
                     if not isinstance(it, dict):
                         return False
-                    # 校验 gid（全局唯一编号，>=1）
-                    if "gid" not in it:
+                    # 校验 gid 或 gids（全局唯一编号，>=1）
+                    has_gid = "gid" in it
+                    has_gids = "gids" in it
+                    if not has_gid and not has_gids:
                         return False
-                    try:
-                        if int(it["gid"]) < 1:
+                    if has_gid and has_gids:
+                        return False  # gid 和 gids 不能同时出现
+                    
+                    if has_gid:
+                        try:
+                            if int(it["gid"]) < 1:
+                                return False
+                        except Exception:
                             return False
-                    except Exception:
-                        return False
+                    elif has_gids:
+                        if not isinstance(it["gids"], list) or len(it["gids"]) == 0:
+                            return False
+                        for gid_val in it["gids"]:
+                            try:
+                                if int(gid_val) < 1:
+                                    return False
+                            except Exception:
+                                return False
+                    
                     # 校验 has_risk (布尔值)
                     if "has_risk" not in it or not isinstance(it["has_risk"], bool):
                         return False
@@ -1737,17 +1851,44 @@ def run_security_analysis(
                 for it in summary_items:
                     if not isinstance(it, dict) or not it.get("has_risk"):
                         continue
-                    gid = int(it.get("gid", 0))
-                    cand_src = gid_to_item_batch.get(gid)
-                    if cand_src:
-                        cand = dict(cand_src)
-                        cand["preconditions"] = str(it.get("preconditions", "")).strip()
-                        cand["trigger_path"] = str(it.get("trigger_path", "")).strip()
-                        cand["consequences"] = str(it.get("consequences", "")).strip()
-                        cand["suggestions"] = str(it.get("suggestions", "")).strip()
-                        cand["has_risk"] = True
-                        merged_items.append(cand)
-                        # 注意：gid_counts 将在验证通过后更新，这里先不计数
+                    
+                    # 支持 gid 和 gids 两种格式
+                    gids_to_process: List[int] = []
+                    if "gids" in it and isinstance(it.get("gids"), list):
+                        # 合并格式：gids 数组
+                        for gid_val in it.get("gids", []):
+                            try:
+                                gid_int = int(gid_val)
+                                if gid_int >= 1:
+                                    gids_to_process.append(gid_int)
+                            except Exception:
+                                pass
+                    elif "gid" in it:
+                        # 单个格式：gid
+                        try:
+                            gid_int = int(it.get("gid", 0))
+                            if gid_int >= 1:
+                                gids_to_process.append(gid_int)
+                        except Exception:
+                            pass
+                    
+                    # 为每个 gid 创建条目
+                    preconditions = str(it.get("preconditions", "")).strip()
+                    trigger_path = str(it.get("trigger_path", "")).strip()
+                    consequences = str(it.get("consequences", "")).strip()
+                    suggestions = str(it.get("suggestions", "")).strip()
+                    
+                    for gid in gids_to_process:
+                        cand_src = gid_to_item_batch.get(gid)
+                        if cand_src:
+                            cand = dict(cand_src)
+                            cand["preconditions"] = preconditions
+                            cand["trigger_path"] = trigger_path
+                            cand["consequences"] = consequences
+                            cand["suggestions"] = suggestions
+                            cand["has_risk"] = True
+                            merged_items.append(cand)
+                            # 注意：gid_counts 将在验证通过后更新，这里先不计数
             except Exception:
                 pass  # 异常不影响流程
 
@@ -1888,8 +2029,31 @@ def run_security_analysis(
                     else:
                         prev_parse_error_verify = None  # 解析成功，清除之前的错误信息
                         if isinstance(verification_parsed, list):
-                            # 简单校验：检查是否为有效列表
-                            if verification_parsed and all(isinstance(item, dict) and "gid" in item and "is_valid" in item for item in verification_parsed):
+                            # 简单校验：检查是否为有效列表（支持 gid 或 gids）
+                            def _is_valid_verification_item(item):
+                                if not isinstance(item, dict) or "is_valid" not in item:
+                                    return False
+                                has_gid = "gid" in item
+                                has_gids = "gids" in item
+                                if not has_gid and not has_gids:
+                                    return False
+                                if has_gid and has_gids:
+                                    return False  # gid 和 gids 不能同时出现
+                                if has_gid:
+                                    try:
+                                        return int(item["gid"]) >= 1
+                                    except Exception:
+                                        return False
+                                elif has_gids:
+                                    if not isinstance(item["gids"], list) or len(item["gids"]) == 0:
+                                        return False
+                                    try:
+                                        return all(int(gid_val) >= 1 for gid_val in item["gids"])
+                                    except Exception:
+                                        return False
+                                return False
+                            
+                            if verification_parsed and all(_is_valid_verification_item(item) for item in verification_parsed):
                                 verification_results = verification_parsed
                                 break  # 格式正确，退出重试循环
                 
@@ -1909,16 +2073,40 @@ def run_security_analysis(
             
             # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
             if verification_results:
-                # 构建 gid 到验证结果的映射
+                # 构建 gid 到验证结果的映射（支持 gid 和 gids 两种格式）
                 gid_to_verification: Dict[int, Dict] = {}
                 for vr in verification_results:
-                    if isinstance(vr, dict):
+                    if not isinstance(vr, dict):
+                        continue
+                    
+                    # 支持 gid 和 gids 两种格式
+                    gids_to_process: List[int] = []
+                    if "gids" in vr and isinstance(vr.get("gids"), list):
+                        # 合并格式：gids 数组
+                        for gid_val in vr.get("gids", []):
+                            try:
+                                gid_int = int(gid_val)
+                                if gid_int >= 1:
+                                    gids_to_process.append(gid_int)
+                            except Exception:
+                                pass
+                    elif "gid" in vr:
+                        # 单个格式：gid
                         try:
-                            v_gid = int(vr.get("gid", 0))
-                            if v_gid >= 1:
-                                gid_to_verification[v_gid] = vr
+                            gid_int = int(vr.get("gid", 0))
+                            if gid_int >= 1:
+                                gids_to_process.append(gid_int)
                         except Exception:
                             pass
+                    
+                    # 为每个 gid 创建验证结果映射
+                    is_valid = vr.get("is_valid")
+                    verification_notes = str(vr.get("verification_notes", "")).strip()
+                    for gid in gids_to_process:
+                        gid_to_verification[gid] = {
+                            "is_valid": is_valid,
+                            "verification_notes": verification_notes
+                        }
                 
                 # 只保留验证通过的告警
                 for item in merged_items:
