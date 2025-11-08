@@ -679,7 +679,7 @@ def run_security_analysis(
                     missing_gids = input_gids - classified_gids
                     if not missing_gids:
                         # 所有gid都被分类，校验通过
-                        print(f"[JARVIS-SEC] 聚类完整性校验通过，所有gid已分类（共重试 {_attempt} 次）")
+                        print(f"[JARVIS-SEC] 聚类完整性校验通过，所有gid已分类（共尝试 {_attempt} 次）")
                         break
                     else:
                         # 有遗漏的gid，需要重试
