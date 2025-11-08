@@ -47,6 +47,7 @@ LEGACY_SYMBOL_MAP_JSON = "symbol_map.json"
 
 # 配置常量
 ERROR_SUMMARY_MAX_LENGTH = 2000  # 错误信息摘要最大长度
+DEFAULT_PLAN_MAX_RETRIES = 0  # 规划阶段默认最大重试次数（0表示无限重试）
 DEFAULT_REVIEW_MAX_ITERATIONS = 0  # 审查阶段最大迭代次数（0表示无限重试）
 DEFAULT_CHECK_MAX_RETRIES = 0  # cargo check 阶段默认最大重试次数（0表示无限重试）
 DEFAULT_TEST_MAX_RETRIES = 0  # cargo test 阶段默认最大重试次数（0表示无限重试）
@@ -457,7 +458,7 @@ class Transpiler:
         project_root: Union[str, Path] = ".",
         crate_dir: Optional[Union[str, Path]] = None,
         llm_group: Optional[str] = None,
-        plan_max_retries: int = 5,
+        plan_max_retries: int = DEFAULT_PLAN_MAX_RETRIES,  # 规划阶段最大重试次数（0表示无限重试）
         max_retries: int = 0,  # 兼容旧接口，如未设置则使用 check_max_retries 和 test_max_retries
         check_max_retries: Optional[int] = None,  # cargo check 阶段最大重试次数（0表示无限重试）
         test_max_retries: Optional[int] = None,  # cargo test 阶段最大重试次数（0表示无限重试）
@@ -807,11 +808,12 @@ class Transpiler:
 
         attempt = 0
         last_reason = "未知错误"
-        max_attempts = int(getattr(self, "plan_max_retries", 0) or 5)
+        plan_max_retries_val = getattr(self, "plan_max_retries", 0)
+        # 如果 plan_max_retries 为 0，表示无限重试
         use_direct_model = False  # 标记是否使用直接模型调用
         agent = None  # 在循环外声明，以便重试时复用
         
-        while attempt < max_attempts:
+        while plan_max_retries_val == 0 or attempt < plan_max_retries_val:
             attempt += 1
             sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
 
@@ -865,6 +867,8 @@ class Transpiler:
                 typer.secho(f"[c2rust-transpiler][plan] YAML解析失败: {parse_error}", fg=typer.colors.YELLOW)
                 last_reason = f"YAML解析失败: {parse_error}"
                 use_direct_model = True
+                # 解析失败，继续重试
+                continue
             else:
                 ok, reason = _validate(meta)
             if ok:
@@ -878,13 +882,14 @@ class Transpiler:
                 # 格式校验失败，后续重试使用直接模型调用
                 use_direct_model = True
         # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 简单占位签名）
+        # 注意：如果 plan_max_retries_val == 0（无限重试），理论上不应该到达这里
         try:
             crate_root = self.crate_dir.resolve()
             fallback_module = str((crate_root / "src" / "ffi.rs").resolve())
         except Exception:
             fallback_module = "src/ffi.rs"
         fallback_sig = f"pub fn {rec.name or ('fn_' + str(rec.id))}()"
-        typer.secho(f"[c2rust-transpiler][plan] 超出规划重试上限({max_attempts})，回退到兜底: module={fallback_module}, signature={fallback_sig}", fg=typer.colors.YELLOW)
+        typer.secho(f"[c2rust-transpiler][plan] 超出规划重试上限({plan_max_retries_val if plan_max_retries_val > 0 else '无限'})，回退到兜底: module={fallback_module}, signature={fallback_sig}", fg=typer.colors.YELLOW)
         return fallback_module, fallback_sig
 
     def _update_progress_current(self, rec: FnRecord, module: str, rust_sig: str) -> None:
@@ -1797,6 +1802,7 @@ class Transpiler:
         # 0表示无限重试，否则限制迭代次数
         use_direct_model_review = False  # 标记是否使用直接模型调用
         parse_failed = False  # 标记上一次解析是否失败
+        parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
         while max_iterations == 0 or i < max_iterations:
             agent = self._current_agents[review_key]
             prev_cwd = os.getcwd()
