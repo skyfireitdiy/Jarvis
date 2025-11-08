@@ -700,7 +700,10 @@ class LLMRustCratePlannerAgent:
                 # 构造包含摘要提示词和具体错误信息的完整提示
                 error_guidance = ""
                 if last_error and last_error != "未知错误":
-                    error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 YAML 格式的项目结构定义。"
+                    if "YAML解析失败" in last_error:
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。仅输出一个 <PROJECT> 块，块内仅包含 YAML 格式的项目结构定义。"
+                    else:
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 YAML 格式的项目结构定义。"
                 
                 full_prompt = f"{user_prompt}{error_guidance}\n\n{summary_prompt}"
                 try:
@@ -717,17 +720,12 @@ class LLMRustCratePlannerAgent:
             yaml_text = self._extract_yaml_from_project(project_text)
 
             # 尝试解析并校验
-            try:
-                entries = _parse_project_yaml_entries(yaml_text)
-            except (ValueError, TypeError) as e:
-                # 解析失败，记录错误并重试
-                last_error = f"YAML 解析失败: {e}"
+            entries, parse_error_yaml = _parse_project_yaml_entries(yaml_text)
+            if parse_error_yaml:
+                # YAML解析失败，记录错误并重试
+                last_error = parse_error_yaml
                 use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
-                continue
-            except Exception as e:
-                # 捕获其他异常（包括可能的 yaml.YAMLError）
-                last_error = f"解析时发生错误: {e}"
-                use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
+                print(f"[c2rust-llm-planner] YAML解析失败: {parse_error_yaml}")
                 continue
 
             ok, reason = self._validate_project_entries(entries)
@@ -751,7 +749,9 @@ class LLMRustCratePlannerAgent:
           * 字典：目录及其子项，如 {"src": [ ... ]}
         """
         yaml_text = self._get_project_yaml_text()
-        yaml_entries = _parse_project_yaml_entries(yaml_text)
+        yaml_entries, parse_error = _parse_project_yaml_entries(yaml_text)
+        if parse_error:
+            raise RuntimeError(f"YAML解析失败: {parse_error}")
         return yaml_entries
 
     def plan_crate_yaml_text(self) -> str:
@@ -881,30 +881,53 @@ def _parse_project_yaml_entries_fallback(yaml_text: str) -> List[Any]:
     return parse_list(base_indent)
 
 
-def _parse_project_yaml_entries(yaml_text: str) -> List[Any]:
+def _parse_project_yaml_entries(yaml_text: str) -> Tuple[List[Any], Optional[str]]:
     """
     使用 PyYAML 解析 <PROJECT> 块中的目录结构 YAML 为列表结构:
     - 文件项: 字符串，如 "lib.rs"
     - 目录项: 字典，形如 {"src/": [ ... ]} 或 {"src": [ ... ]}
+    返回(解析结果, 错误信息)
+    如果解析成功，返回(data, None)
+    如果解析失败，返回([], 错误信息)
     优先使用 PyYAML；若不可用或解析失败，则回退到轻量解析器以最大化兼容性。
     """
     try:
         import yaml  # type: ignore
-        data = yaml.safe_load(yaml_text)
-        if isinstance(data, list):
-            return data
-        # 如果解析结果不是列表，回退到轻量解析器
+        try:
+            data = yaml.safe_load(yaml_text)
+            if isinstance(data, list):
+                return data, None
+            # 如果解析结果不是列表，回退到轻量解析器
+            return [], f"YAML 解析结果不是列表，而是 {type(data).__name__}"
+        except (yaml.YAMLError, ValueError) as yaml_err:
+            # YAML 解析错误，记录错误信息
+            error_msg = f"YAML 解析失败: {str(yaml_err)}"
+            # 回退到轻量解析器
+            try:
+                fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
+                return fallback_result, None  # 回退解析器成功，不返回错误
+            except Exception:
+                return [], error_msg
     except ImportError:
         # PyYAML 未安装，使用回退解析器
-        pass
-    except (yaml.YAMLError, ValueError):
-        # YAML 解析错误，回退到轻量解析器
-        pass
-    except Exception:
+        try:
+            fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
+            return fallback_result, None
+        except Exception as e:
+            return [], f"PyYAML 未安装且回退解析器失败: {str(e)}"
+    except Exception as e:
         # 其他未知错误，回退到轻量解析器
-        pass
+        try:
+            fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
+            return fallback_result, None
+        except Exception:
+            return [], f"解析过程发生异常: {str(e)}"
     # 回退
-    return _parse_project_yaml_entries_fallback(yaml_text)
+    try:
+        fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
+        return fallback_result, None
+    except Exception as e:
+        return [], f"回退解析器失败: {str(e)}"
 
 
 def _ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> str:
@@ -1032,7 +1055,9 @@ def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, 
     - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名_rs”作为crate根目录
     注意：模块声明（mod/pub mod）补齐将在后续的 CodeAgent 步骤中完成。按新策略不再创建或更新 workspace（构建直接在 crate 目录内进行）。
     """
-    entries = _parse_project_yaml_entries(yaml_text)
+    entries, parse_error = _parse_project_yaml_entries(yaml_text)
+    if parse_error:
+        raise ValueError(f"YAML解析失败: {parse_error}")
     if not entries:
         # 严格模式：解析失败直接报错并退出，由上层 CLI 捕获打印错误
         raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
@@ -1071,7 +1096,9 @@ def execute_llm_plan(
     # execute_llm_plan 是顶层入口，需要执行清理（skip_cleanup=False）
     # plan_crate_yaml_text 内部会根据 skip_cleanup 决定是否执行清理
     yaml_text = plan_crate_yaml_text(llm_group=llm_group, skip_cleanup=False)
-    entries = _parse_project_yaml_entries(yaml_text)
+    entries, parse_error = _parse_project_yaml_entries(yaml_text)
+    if parse_error:
+        raise ValueError(f"YAML解析失败: {parse_error}")
     if not entries:
         raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
 

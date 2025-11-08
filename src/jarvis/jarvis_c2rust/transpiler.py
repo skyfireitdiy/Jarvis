@@ -415,15 +415,17 @@ def _write_json(path: Path, obj: Any) -> None:
             pass
 
 
-def _extract_json_from_summary(text: str) -> Dict[str, Any]:
+def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]]:
     """
     从 Agent summary 中提取结构化数据（仅支持 YAML）：
     - 仅在 <SUMMARY>...</SUMMARY> 块内查找；
     - 只接受 <yaml>...</yaml> 标签包裹的 YAML 对象；
-    - 若未找到或解析失败，返回 {}。
+    返回(解析结果, 错误信息)
+    如果解析成功，返回(data, None)
+    如果解析失败，返回({}, 错误信息)
     """
     if not isinstance(text, str) or not text.strip():
-        return {}
+        return {}, "摘要文本为空"
 
     # 提取 <SUMMARY> 块
     m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=re.IGNORECASE)
@@ -433,14 +435,20 @@ def _extract_json_from_summary(text: str) -> Dict[str, Any]:
     mm = re.search(r"<yaml>([\s\S]*?)</yaml>", block, flags=re.IGNORECASE)
     raw_yaml = mm.group(1).strip() if mm else None
     if not raw_yaml:
-        return {}
+        return {}, "未找到 <yaml> 或 </yaml> 标签，或标签内容为空"
 
     try:
         import yaml  # type: ignore
-        obj = yaml.safe_load(raw_yaml)
-        return obj if isinstance(obj, dict) else {}
-    except Exception:
-        return {}
+        try:
+            obj = yaml.safe_load(raw_yaml)
+        except Exception as yaml_err:
+            error_msg = f"YAML 解析失败: {str(yaml_err)}"
+            return {}, error_msg
+        if isinstance(obj, dict):
+            return obj, None
+        return {}, f"YAML 解析结果不是字典，而是 {type(obj).__name__}"
+    except Exception as e:
+        return {}, f"解析过程发生异常: {str(e)}"
 
 
 class Transpiler:
@@ -833,7 +841,10 @@ class Transpiler:
                     # 构造包含摘要提示词和具体错误信息的完整提示
                     error_guidance = ""
                     if last_reason and last_reason != "未知错误":
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内仅包含单个 <yaml> 对象；YAML 对象必须包含字段：module（字符串）、rust_signature（字符串）。"
+                        if "YAML解析失败" in last_reason:
+                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。YAML 对象必须包含字段：module（字符串）、rust_signature（字符串）。"
+                        else:
+                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内仅包含单个 <yaml> 对象；YAML 对象必须包含字段：module（字符串）、rust_signature（字符串）。"
                     
                     full_prompt = f"{usr_p}{error_guidance}\n\n{sum_p}"
                     try:
@@ -848,18 +859,24 @@ class Transpiler:
             finally:
                 os.chdir(prev_cwd)
             
-            meta = _extract_json_from_summary(str(summary or ""))
-            ok, reason = _validate(meta)
-            if ok:
-                module = str(meta.get("module") or "").strip()
-                rust_sig = str(meta.get("rust_signature") or "").strip()
-                typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
-                return module, rust_sig
-            else:
-                typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
-                last_reason = reason
-                # 格式校验失败，后续重试使用直接模型调用
+            meta, parse_error = _extract_json_from_summary(str(summary or ""))
+            if parse_error:
+                # YAML解析失败，将错误信息反馈给模型
+                typer.secho(f"[c2rust-transpiler][plan] YAML解析失败: {parse_error}", fg=typer.colors.YELLOW)
+                last_reason = f"YAML解析失败: {parse_error}"
                 use_direct_model = True
+            else:
+                ok, reason = _validate(meta)
+                if ok:
+                    module = str(meta.get("module") or "").strip()
+                    rust_sig = str(meta.get("rust_signature") or "").strip()
+                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
+                    return module, rust_sig
+                else:
+                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
+                    last_reason = reason
+                    # 格式校验失败，后续重试使用直接模型调用
+                    use_direct_model = True
         # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 简单占位签名）
         try:
             crate_root = self.crate_dir.resolve()
@@ -1792,7 +1809,10 @@ class Transpiler:
                     # 构造包含摘要提示词和具体错误信息的完整提示
                     error_guidance = ""
                     # 检查上一次的解析结果
-                    if parse_failed:
+                    if parse_error_msg:
+                        # 如果有YAML解析错误，优先反馈
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_error_msg}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。YAML 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。"
+                    elif parse_failed:
                         error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内为单个 <yaml> 对象，字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。"
                     
                     full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
@@ -1809,15 +1829,34 @@ class Transpiler:
                 os.chdir(prev_cwd)
             
             # 解析 YAML 格式的审查结果
-            verdict = _extract_json_from_summary(summary)
+            verdict, parse_error_review = _extract_json_from_summary(summary)
             parse_failed = False
-            if not isinstance(verdict, dict):
+            parse_error_msg = None
+            if parse_error_review:
+                # YAML解析失败
+                parse_failed = True
+                parse_error_msg = parse_error_review
+                typer.secho(f"[c2rust-transpiler][review] YAML解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
+                # 兼容旧格式：尝试解析纯文本 OK
+                m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
+                content = (m.group(1).strip() if m else summary.strip()).upper()
+                if content == "OK":
+                    verdict = {"ok": True, "function_issues": [], "critical_issues": []}
+                    parse_failed = False  # 兼容格式成功，不算解析失败
+                    parse_error_msg = None
+                else:
+                    # 无法解析，视为有问题
+                    verdict = {"ok": False, "function_issues": [content], "critical_issues": []}
+                    # 格式解析失败，后续迭代使用直接模型调用
+                    use_direct_model_review = True
+            elif not isinstance(verdict, dict):
                 parse_failed = True
                 # 兼容旧格式：尝试解析纯文本 OK
                 m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
                 content = (m.group(1).strip() if m else summary.strip()).upper()
                 if content == "OK":
                     verdict = {"ok": True, "function_issues": [], "critical_issues": []}
+                    parse_failed = False  # 兼容格式成功，不算解析失败
                 else:
                     # 无法解析，视为有问题
                     verdict = {"ok": False, "function_issues": [content], "critical_issues": []}
