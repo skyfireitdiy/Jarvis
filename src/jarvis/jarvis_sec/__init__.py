@@ -916,6 +916,35 @@ def _load_processed_gids_from_issues(sec_dir) -> set:
     return processed_gids
 
 
+def _count_issues_from_file(sec_dir) -> int:
+    """从 agent_issues.jsonl 中读取当前问题总数（用于状态显示）"""
+    count = 0
+    try:
+        from pathlib import Path as _Path
+        import json as _json
+        _agent_issues_path = sec_dir / "agent_issues.jsonl"
+        if _agent_issues_path.exists():
+            saved_gids = set()
+            with _agent_issues_path.open("r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        item = _json.loads(line)
+                        gid = item.get("gid", 0)
+                        if gid >= 1 and gid not in saved_gids:
+                            # 只统计验证通过的告警（has_risk: true 且有 verification_notes）
+                            if item.get("has_risk") is True and "verification_notes" in item:
+                                count += 1
+                                saved_gids.add(gid)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return count
+
+
 def _process_verification_batch(
     batch: List[Dict],
     bidx: int,
@@ -927,9 +956,9 @@ def _process_verification_batch(
     _progress_append,
     _append_report,
     _sig_of,
-    all_issues: List[Dict],
     meta_records: List[Dict],
     gid_counts: Dict[int, int],
+    sec_dir,
 ) -> None:
     """
     处理单个验证批次。
@@ -1360,6 +1389,16 @@ def _process_verification_batch(
             
             # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
             if verification_results:
+                # 构建 gid 到原始候选信息的映射
+                gid_to_candidate: Dict[int, Dict] = {}
+                for c in batch:
+                    try:
+                        c_gid = int(c.get("gid", 0))
+                        if c_gid >= 1:
+                            gid_to_candidate[c_gid] = c
+                    except Exception:
+                        pass
+                
                 gid_to_verification: Dict[int, Dict] = {}
                 for vr in verification_results:
                     if not isinstance(vr, dict):
@@ -1418,13 +1457,19 @@ def _process_verification_batch(
                     except Exception:
                         pass
                 
-                # 只保留验证通过的告警（仅验证有风险的项目）
+                # 只保留验证通过的告警（仅验证有风险的项目），并合并原始候选信息
                 for item in items_with_risk:
                     item_gid = int(item.get("gid", 0))
                     verification = gid_to_verification.get(item_gid)
                     if verification and verification.get("is_valid") is True:
-                        item["verification_notes"] = str(verification.get("verification_notes", "")).strip()
-                        verified_items.append(item)
+                        # 合并原始候选信息（file, line, pattern, category, language, evidence, confidence, severity 等）
+                        candidate = gid_to_candidate.get(item_gid, {})
+                        merged_item = {
+                            **candidate,  # 原始候选信息（file, line, pattern, category, language, evidence, confidence, severity 等）
+                            **item,  # 分析结果（gid, has_risk, preconditions, trigger_path, consequences, suggestions）
+                            "verification_notes": str(verification.get("verification_notes", "")).strip(),
+                        }
+                        verified_items.append(merged_item)
                     elif verification and verification.get("is_valid") is False:
                         try:
                             typer.secho(f"[jarvis-sec] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}", fg=typer.colors.BLUE)
@@ -1440,35 +1485,38 @@ def _process_verification_batch(
             
             # 只有验证通过的告警才写入文件
             if verified_items:
-                all_issues.extend(verified_items)
                 for item in verified_items:
                     gid = int(item.get("gid", 0))
                     if gid >= 1:
                         gid_counts[gid] = gid_counts.get(gid, 0) + 1
-                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(items_with_risk)} -> 追加到报告", fg=typer.colors.GREEN)
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(items_with_risk)} -> 写入文件", fg=typer.colors.GREEN)
                 _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
+                # 从文件读取当前总数（用于状态显示）
+                current_count = _count_issues_from_file(sec_dir)
                 status_mgr.update_verification(
                     current_batch=bidx,
                     total_batches=total_batches,
-                    issues_found=len(all_issues),
-                    message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题（验证通过）"
+                    issues_found=current_count,
+                    message=f"已验证 {bidx}/{total_batches} 批次，发现 {current_count} 个问题（验证通过）"
                 )
             else:
                 typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过", fg=typer.colors.BLUE)
+                current_count = _count_issues_from_file(sec_dir)
                 status_mgr.update_verification(
                     current_batch=bidx,
                     total_batches=total_batches,
-                    issues_found=len(all_issues),
+                    issues_found=current_count,
                     message=f"已验证 {bidx}/{total_batches} 批次，验证后无有效告警"
                 )
         elif parse_fail:
             typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)", fg=typer.colors.YELLOW)
         else:
             typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题", fg=typer.colors.BLUE)
+            current_count = _count_issues_from_file(sec_dir)
             status_mgr.update_verification(
                 current_batch=bidx,
                 total_batches=total_batches,
-                issues_found=len(all_issues),
+                issues_found=current_count,
                 message=f"已验证 {bidx}/{total_batches} 批次"
             )
 
@@ -1772,7 +1820,7 @@ def run_security_analysis(
             pass
 
     # 3) 按批次将候选问题提交给单Agent验证（一次提交一个文件的前 n 条，直到该文件全部处理完）
-    all_issues: List[Dict] = []
+    # 注意：不再维护内存中的 all_issues，所有结果直接写入 agent_issues.jsonl，最后统一从文件读取
     meta_records: List[Dict] = []
     gid_counts: Dict[int, int] = {}
 
@@ -3033,19 +3081,18 @@ def run_security_analysis(
             _progress_append,
             _append_report,
             _sig_of,
-            all_issues,
             meta_records,
             gid_counts,
+            sec_dir,
         )
 
-    # 4) 从 agent_issues.jsonl 读取所有已保存的告警，合并到 all_issues 中
-    # 这样可以确保即使分析中断，已保存的告警也会出现在最终报告中
+    # 4) 从 agent_issues.jsonl 读取所有已保存的告警（统一数据源，支持断点续扫）
+    all_issues: List[Dict] = []
     try:
         from pathlib import Path as _Path_final
         import json as _json_final
         _agent_issues_path_final = sec_dir / "agent_issues.jsonl"
         if _agent_issues_path_final.exists():
-            saved_issues_from_file: List[Dict] = []
             saved_gids_from_file = set()
             with _agent_issues_path_final.open("r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
@@ -3058,24 +3105,21 @@ def run_security_analysis(
                         if gid >= 1 and gid not in saved_gids_from_file:
                             # 只保留验证通过的告警（has_risk: true 且有 verification_notes）
                             if item.get("has_risk") is True and "verification_notes" in item:
-                                saved_issues_from_file.append(item)
+                                all_issues.append(item)
                                 saved_gids_from_file.add(gid)
                     except Exception:
                         pass
             
-            # 合并已保存的告警到 all_issues（去重，基于 gid）
-            current_gids = {int(item.get("gid", 0)) for item in all_issues if item.get("gid", 0) >= 1}
-            for saved_item in saved_issues_from_file:
-                saved_gid = int(saved_item.get("gid", 0))
-                if saved_gid >= 1 and saved_gid not in current_gids:
-                    all_issues.append(saved_item)
-                    current_gids.add(saved_gid)
-            
-            if saved_issues_from_file:
+            if all_issues:
                 try:
-                    typer.secho(f"[jarvis-sec] 从 agent_issues.jsonl 加载了 {len(saved_issues_from_file)} 个已保存的告警，合并后共 {len(all_issues)} 个告警", fg=typer.colors.BLUE)
+                    typer.secho(f"[jarvis-sec] 从 agent_issues.jsonl 加载了 {len(all_issues)} 个已保存的告警", fg=typer.colors.BLUE)
                 except Exception:
                     pass
+        else:
+            try:
+                typer.secho(f"[jarvis-sec] agent_issues.jsonl 不存在，当前运行未发现任何问题", fg=typer.colors.BLUE)
+            except Exception:
+                pass
     except Exception as e:
         # 加载失败不影响主流程
         try:
