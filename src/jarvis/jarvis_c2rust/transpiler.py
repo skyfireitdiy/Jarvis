@@ -931,7 +931,7 @@ class Transpiler:
     def _reset_function_context(self, rec: FnRecord, module: str, rust_sig: str, c_code: str) -> None:
         """
         初始化当前函数的上下文与复用Agent缓存。
-        在单个函数实现开始时调用一次，之后复用Repair/Review等Agent。
+        在单个函数实现开始时调用一次，之后复用代码编写与修复Agent/Review等Agent。
         """
         self._current_agents = {}
         self._current_function_id = rec.id
@@ -979,25 +979,28 @@ class Transpiler:
         self._current_context_compact_header = "\n".join(compact_lines)
         self._current_context_full_sent = False
 
-        # 初始化一次修复Agent（CodeAgent），单个函数生命周期内复用（启用方法论与分析）
-        self._current_agents[f"repair::{rec.id}"] = CodeAgent(
+        # 初始化一次代码生成Agent（CodeAgent），单个函数生命周期内复用
+        # 该Agent用于代码生成和修复，启用方法论、分析和强制记忆功能
+        self._current_agents[f"code_agent::{rec.id}"] = CodeAgent(
             need_summary=False,
             non_interactive=self.non_interactive,
             plan=False,
             model_group=self.llm_group,
             use_methodology=True,
             use_analysis=True,
+            force_save_memory=True,  # 强制使用记忆功能
         )
 
     def _get_repair_agent(self) -> CodeAgent:
         """
-        获取复用的修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        获取复用的代码生成Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        该Agent用于代码生成和修复，启用方法论、分析和强制记忆功能。
         """
         fid = self._current_function_id
-        key = f"repair::{fid}" if fid is not None else "repair::default"
+        key = f"code_agent::{fid}" if fid is not None else "code_agent::default"
         agent = self._current_agents.get(key)
         if agent is None:
-            # 复用的修复Agent启用方法论与分析
+            # 复用的代码生成Agent启用方法论、分析和强制记忆功能
             agent = CodeAgent(
                 need_summary=False,
                 non_interactive=self.non_interactive,
@@ -1005,6 +1008,7 @@ class Transpiler:
                 model_group=self.llm_group,
                 use_methodology=True,
                 use_analysis=True,
+                force_save_memory=True,  # 强制使用记忆功能
             )
             self._current_agents[key] = agent
         return agent
@@ -1161,18 +1165,12 @@ class Transpiler:
                     pass
         except Exception:
             pass
-        # 切换到 crate 目录运行 CodeAgent，运行完毕后恢复
+        # 切换到 crate 目录运行复用的代码编写与修复Agent，运行完毕后恢复
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(self.crate_dir))
-            agent = CodeAgent(
-                need_summary=False,
-                non_interactive=self.non_interactive,
-                plan=False,
-                model_group=self.llm_group,
-                force_save_memory=True,  # 强制使用记忆功能
-            )
-            agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
+            agent = self._get_repair_agent()  # 使用复用的Agent，同时支持代码编写和修复
+            agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen]", suffix="")
         finally:
             os.chdir(prev_cwd)
 
@@ -1590,17 +1588,32 @@ class Transpiler:
             base_lines.append(f"- 包名称（用于 cargo -p）: {self.crate_dir.name}")
         else:
             base_lines.append(f"- 包名称（用于 cargo build -p）: {self.crate_dir.name}")
-        base_lines.extend([
-            "",
-            "请阅读以下构建错误并进行必要修复：",
-            "<BUILD_ERROR>",
-            output,
-            "</BUILD_ERROR>",
-        ])
-        if stage == "cargo check":
-            base_lines.append("修复后请再次执行 `cargo check` 验证，后续将自动运行 `cargo test`。")
+        if stage == "cargo test":
+            base_lines.extend([
+                "",
+                "【测试失败信息】",
+                "以下输出来自 `cargo test` 命令，包含测试执行结果和失败详情：",
+                "- 如果看到测试用例名称和断言失败，说明测试逻辑或实现有问题",
+                "- 如果看到编译错误，说明代码存在语法或类型错误",
+                "- 请仔细阅读失败信息，包括：测试用例名称、断言失败位置、期望值与实际值、堆栈跟踪等",
+                "",
+                "请阅读以下测试失败信息并进行必要修复：",
+                "<TEST_FAILURE>",
+                output,
+                "</TEST_FAILURE>",
+                "",
+                "修复后请再次执行 `cargo test` 进行验证。",
+            ])
         else:
-            base_lines.append("修复后请再次执行 `cargo test` 进行验证。")
+            base_lines.extend([
+                "",
+                "请阅读以下构建错误并进行必要修复：",
+                "<BUILD_ERROR>",
+                output,
+                "</BUILD_ERROR>",
+                "",
+                "修复后请再次执行 `cargo check` 验证，后续将自动运行 `cargo test`。",
+            ])
         return "\n".join(base_lines)
 
     def _cargo_build_loop(self) -> bool:
@@ -1686,8 +1699,9 @@ class Transpiler:
 
             # 阶段二：cargo test（check 通过后才执行）
             test_iter += 1
+            # 测试失败时需要详细输出，移除 -q 参数以获取完整的测试失败信息（包括堆栈跟踪、断言详情等）
             res = subprocess.run(
-                ["cargo", "test", "-q"],
+                ["cargo", "test", "--", "--nocapture"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -2201,7 +2215,7 @@ class Transpiler:
             self._update_progress_current(rec, module, rust_sig)
             typer.secho(f"[c2rust-transpiler][progress] 已更新当前进度记录 id={rec.id}", fg=typer.colors.CYAN)
 
-            # 初始化函数上下文与修复Agent复用缓存（只在当前函数开始时执行一次）
+            # 初始化函数上下文与代码编写与修复Agent复用缓存（只在当前函数开始时执行一次）
             self._reset_function_context(rec, module, rust_sig, c_code)
 
             # 1.5) 确保模块声明链（提前到生成实现之前，避免生成的代码无法被正确引用）
@@ -2260,7 +2274,7 @@ class Transpiler:
             self._mark_converted(rec, module, rust_sig)
             typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module}", fg=typer.colors.GREEN)
 
-            # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用修复Agent）
+            # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用代码编写与修复Agent）
             current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
             # 优先使用限定名匹配，其次使用简单名匹配
             for sym in [rec.qname, rec.name]:
