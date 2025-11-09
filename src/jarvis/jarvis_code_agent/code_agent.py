@@ -1839,7 +1839,7 @@ def cli(
         _acquire_single_instance_lock(lock_name="code_agent.lock")
     try:
         # 设置环境变量标识当前是CodeAgent模式
-        os.environ["JARVIS_AGENT_TYPE"] = "code_agent"
+        os.environ["JARVIS_CODE_AGENT"] = "1"
         
         agent = CodeAgent(
             model_group=model_group,
