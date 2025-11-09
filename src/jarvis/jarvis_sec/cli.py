@@ -45,6 +45,9 @@ def agent(
     cluster_limit: int = typer.Option(
         50, "--cluster-limit", "-c", help="聚类每批最多处理的告警数（按文件分批聚类，默认50）"
     ),
+    enable_verification: bool = typer.Option(
+        True, "--enable-verification/--no-verification", help="是否启用二次验证（默认开启）"
+    ),
 ) -> None:
     # 初始化环境，确保平台/模型等全局配置就绪（避免 NoneType 平台）
     try:
@@ -62,6 +65,7 @@ def agent(
             path,
             llm_group=llm_group,
             cluster_limit=cluster_limit,
+            enable_verification=enable_verification,
         )
     except Exception as e:
         try:

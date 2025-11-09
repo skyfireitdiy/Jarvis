@@ -1380,6 +1380,49 @@ def _merge_verified_items(
     return verified_items
 
 
+def _merge_verified_items_without_verification(
+    items_with_risk: List[Dict],
+    batch: List[Dict],
+) -> List[Dict]:
+    """合并分析Agent确认的问题（不进行二次验证）"""
+    gid_to_candidate: Dict[int, Dict] = {}
+    for c in batch:
+        try:
+            c_gid = int(c.get("gid", 0))
+            if c_gid >= 1:
+                gid_to_candidate[c_gid] = c
+        except Exception:
+            pass
+    
+    verified_items: List[Dict] = []
+    for item in items_with_risk:
+        item_gid = int(item.get("gid", 0))
+        # 处理 gids 数组的情况
+        if "gids" in item:
+            gids = item.get("gids", [])
+            for gid in gids:
+                candidate = gid_to_candidate.get(gid, {})
+                merged_item = {
+                    **candidate,  # 原始候选信息
+                    **item,  # 分析结果
+                    "gid": gid,  # 使用单个 gid
+                    "verification_notes": "未进行二次验证（--no-verification）",
+                }
+                # 移除 gids 字段，因为已经展开为单个 gid
+                merged_item.pop("gids", None)
+                verified_items.append(merged_item)
+        else:
+            # 单个 gid 的情况
+            candidate = gid_to_candidate.get(item_gid, {})
+            merged_item = {
+                **candidate,  # 原始候选信息
+                **item,  # 分析结果
+                "verification_notes": "未进行二次验证（--no-verification）",
+            }
+            verified_items.append(merged_item)
+    return verified_items
+
+
 def _process_verification_batch(
     batch: List[Dict],
     bidx: int,
@@ -1393,6 +1436,7 @@ def _process_verification_batch(
     meta_records: List[Dict],
     gid_counts: Dict[int, int],
     sec_dir,
+    enable_verification: bool = True,
 ) -> None:
     """
     处理单个验证批次。
@@ -1462,10 +1506,29 @@ def _process_verification_batch(
             except Exception:
                 pass
         
-        # 运行验证Agent（仅当分析Agent发现有风险的问题时）
+        # 运行验证Agent（仅当分析Agent发现有风险的问题时，且启用二次验证）
         if items_with_risk:
-            # 创建验证 Agent 来验证分析 Agent 的结论
-            verification_system_prompt = """
+            if not enable_verification:
+                # 如果关闭二次验证，直接将分析Agent确认的问题作为已验证的问题
+                verified_items = _merge_verified_items_without_verification(items_with_risk, batch)
+                if verified_items:
+                    for item in verified_items:
+                        gid = int(item.get("gid", 0))
+                        if gid >= 1:
+                            gid_counts[gid] = gid_counts.get(gid, 0) + 1
+                    typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 跳过验证，直接写入: 数量={len(verified_items)}", fg=typer.colors.GREEN)
+                    _append_report(verified_items, "analysis_only", task_id, {"batch": True, "candidates": batch})
+                    current_count = _count_issues_from_file(sec_dir)
+                    status_mgr.update_verification(
+                        current_batch=bidx,
+                        total_batches=total_batches,
+                        issues_found=current_count,
+                        message=f"已处理 {bidx}/{total_batches} 批次，发现 {current_count} 个问题（未验证）"
+                    )
+            else:
+                # 启用二次验证，运行验证Agent
+                # 创建验证 Agent 来验证分析 Agent 的结论
+                verification_system_prompt = """
 # 验证 Agent 约束
 - 你的核心任务是验证分析 Agent 给出的安全结论是否正确。
 - 你需要仔细检查分析 Agent 给出的前置条件、触发路径、后果和建议是否合理、准确。
@@ -1479,30 +1542,30 @@ def _process_verification_batch(
   - 如果发现分析 Agent 的结论与记忆中的信息不一致，需要仔细核实。
 - 完成验证后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
 """.strip()
-            
-            verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"
-            verification_agent_kwargs: Dict = dict(
-                system_prompt=verification_system_prompt,
-                name=verification_task_id,
-                auto_complete=True,
-                need_summary=True,
-                summary_prompt=_build_verification_summary_prompt(),
-                non_interactive=True,
-                in_multi_agent=False,
-                use_methodology=False,
-                use_analysis=False,
-                plan=False,
-                output_handler=[ToolRegistry()],
-                disable_file_edit=True,
-                use_tools=["read_code", "execute_script", "retrieve_memory"],
-            )
-            if llm_group:
-                verification_agent_kwargs["model_group"] = llm_group
-            verification_agent = Agent(**verification_agent_kwargs)
-            
-            # 构造验证任务上下文
-            import json as _json3
-            verification_task = f"""
+                
+                verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"
+                verification_agent_kwargs: Dict = dict(
+                    system_prompt=verification_system_prompt,
+                    name=verification_task_id,
+                    auto_complete=True,
+                    need_summary=True,
+                    summary_prompt=_build_verification_summary_prompt(),
+                    non_interactive=True,
+                    in_multi_agent=False,
+                    use_methodology=False,
+                    use_analysis=False,
+                    plan=False,
+                    output_handler=[ToolRegistry()],
+                    disable_file_edit=True,
+                    use_tools=["read_code", "execute_script", "retrieve_memory"],
+                )
+                if llm_group:
+                    verification_agent_kwargs["model_group"] = llm_group
+                verification_agent = Agent(**verification_agent_kwargs)
+                
+                # 构造验证任务上下文
+                import json as _json3
+                verification_task = f"""
 # 验证分析结论任务
 上下文参数：
 - entry_path: {entry_path}
@@ -1519,87 +1582,87 @@ def _process_verification_batch(
 
 对于每个 gid，请判断分析结论是否正确（is_valid: true/false），并给出验证说明。
 """.strip()
-            
-            # 订阅验证 Agent 的摘要
-            verification_summary_container = _subscribe_summary_event(verification_agent)
-            
-            verification_results, verification_parse_error = _run_verification_agent_with_retry(
-                verification_agent,
-                verification_task,
-                _build_verification_summary_prompt(),
-                entry_path,
-                verification_summary_container,
-                bidx,
-            )
-            
-            # 调试日志：显示验证结果
-            if verification_results is None:
-                try:
-                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败", fg=typer.colors.YELLOW)
-                except Exception:
-                    pass
-            elif not isinstance(verification_results, list):
-                try:
-                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回类型错误，期望 list，实际: {type(verification_results)}", fg=typer.colors.YELLOW)
-                except Exception:
-                    pass
-            elif len(verification_results) == 0:
-                try:
-                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回空列表", fg=typer.colors.YELLOW)
-                except Exception:
-                    pass
-            else:
-                try:
-                    typer.secho(f"[jarvis-sec] 验证 Agent 返回 {len(verification_results)} 个结果项", fg=typer.colors.BLUE)
-                except Exception:
-                    pass
-            
-            # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
-            if verification_results:
-                gid_to_verification = _build_gid_to_verification_mapping(verification_results)
                 
-                # 调试日志：显示提取到的验证结果
-                if gid_to_verification:
+                # 订阅验证 Agent 的摘要
+                verification_summary_container = _subscribe_summary_event(verification_agent)
+                
+                verification_results, verification_parse_error = _run_verification_agent_with_retry(
+                    verification_agent,
+                    verification_task,
+                    _build_verification_summary_prompt(),
+                    entry_path,
+                    verification_summary_container,
+                    bidx,
+                )
+                
+                # 调试日志：显示验证结果
+                if verification_results is None:
                     try:
-                        typer.secho(f"[jarvis-sec] 从验证结果中提取到 {len(gid_to_verification)} 个 gid: {sorted(gid_to_verification.keys())}", fg=typer.colors.BLUE)
+                        typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败", fg=typer.colors.YELLOW)
+                    except Exception:
+                        pass
+                elif not isinstance(verification_results, list):
+                    try:
+                        typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回类型错误，期望 list，实际: {type(verification_results)}", fg=typer.colors.YELLOW)
+                    except Exception:
+                        pass
+                elif len(verification_results) == 0:
+                    try:
+                        typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回空列表", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
                 else:
                     try:
-                        typer.secho(f"[jarvis-sec] 警告：验证结果解析成功，但未提取到任何有效的 gid。验证结果: {verification_results}", fg=typer.colors.YELLOW)
+                        typer.secho(f"[jarvis-sec] 验证 Agent 返回 {len(verification_results)} 个结果项", fg=typer.colors.BLUE)
                     except Exception:
                         pass
                 
-                # 合并验证通过的告警
-                verified_items = _merge_verified_items(items_with_risk, batch, gid_to_verification)
-            else:
-                typer.secho(f"[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）", fg=typer.colors.YELLOW)
-            
-            # 只有验证通过的告警才写入文件
-            if verified_items:
-                for item in verified_items:
-                    gid = int(item.get("gid", 0))
-                    if gid >= 1:
-                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
-                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(items_with_risk)} -> 写入文件", fg=typer.colors.GREEN)
-                _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
-                # 从文件读取当前总数（用于状态显示）
-                current_count = _count_issues_from_file(sec_dir)
-                status_mgr.update_verification(
-                    current_batch=bidx,
-                    total_batches=total_batches,
-                    issues_found=current_count,
-                    message=f"已验证 {bidx}/{total_batches} 批次，发现 {current_count} 个问题（验证通过）"
-                )
-            else:
-                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过", fg=typer.colors.BLUE)
-                current_count = _count_issues_from_file(sec_dir)
-                status_mgr.update_verification(
-                    current_batch=bidx,
-                    total_batches=total_batches,
-                    issues_found=current_count,
-                    message=f"已验证 {bidx}/{total_batches} 批次，验证后无有效告警"
-                )
+                # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
+                if verification_results:
+                    gid_to_verification = _build_gid_to_verification_mapping(verification_results)
+                    
+                    # 调试日志：显示提取到的验证结果
+                    if gid_to_verification:
+                        try:
+                            typer.secho(f"[jarvis-sec] 从验证结果中提取到 {len(gid_to_verification)} 个 gid: {sorted(gid_to_verification.keys())}", fg=typer.colors.BLUE)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            typer.secho(f"[jarvis-sec] 警告：验证结果解析成功，但未提取到任何有效的 gid。验证结果: {verification_results}", fg=typer.colors.YELLOW)
+                        except Exception:
+                            pass
+                    
+                    # 合并验证通过的告警
+                    verified_items = _merge_verified_items(items_with_risk, batch, gid_to_verification)
+                else:
+                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）", fg=typer.colors.YELLOW)
+                
+                # 只有验证通过的告警才写入文件
+                if verified_items:
+                    for item in verified_items:
+                        gid = int(item.get("gid", 0))
+                        if gid >= 1:
+                            gid_counts[gid] = gid_counts.get(gid, 0) + 1
+                    typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(items_with_risk)} -> 写入文件", fg=typer.colors.GREEN)
+                    _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
+                    # 从文件读取当前总数（用于状态显示）
+                    current_count = _count_issues_from_file(sec_dir)
+                    status_mgr.update_verification(
+                        current_batch=bidx,
+                        total_batches=total_batches,
+                        issues_found=current_count,
+                        message=f"已验证 {bidx}/{total_batches} 批次，发现 {current_count} 个问题（验证通过）"
+                    )
+                else:
+                    typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过", fg=typer.colors.BLUE)
+                    current_count = _count_issues_from_file(sec_dir)
+                    status_mgr.update_verification(
+                        current_batch=bidx,
+                        total_batches=total_batches,
+                        issues_found=current_count,
+                        message=f"已验证 {bidx}/{total_batches} 批次，验证后无有效告警"
+                    )
         elif parse_fail:
             typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)", fg=typer.colors.YELLOW)
         else:
@@ -1793,6 +1856,7 @@ def run_security_analysis(
     report_file: Optional[str] = None,
     cluster_limit: int = 50,
     exclude_dirs: Optional[List[str]] = None,
+    enable_verification: bool = True,
 ) -> str:
     """
     运行安全分析工作流（混合模式）。
@@ -1816,6 +1880,7 @@ def run_security_analysis(
       若未指定，则默认写入 entry_path/.jarvis/sec/agent_issues.jsonl
     - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
     - exclude_dirs: 要排除的目录列表（可选），默认已包含测试目录（test, tests, __tests__, spec, testsuite, testdata）
+    - enable_verification: 是否启用二次验证（默认 True），关闭后分析Agent确认的问题将直接写入报告
     - 断点续扫: 默认开启。会基于 .jarvis/sec/progress.jsonl 和 .jarvis/sec/heuristic_issues.jsonl 文件进行状态恢复。
     """
     import json
@@ -1897,6 +1962,7 @@ def run_security_analysis(
         status_mgr,
         _progress_append,
         _append_report,
+        enable_verification=enable_verification,
     )
     
     # 5) 使用统一聚合器生成最终报告（JSON + Markdown）
@@ -3480,6 +3546,7 @@ def _process_verification_phase(
     status_mgr,
     _progress_append,
     _append_report,
+    enable_verification: bool = True,
 ) -> List[Dict]:
     """处理验证阶段，返回所有已保存的告警"""
     batches: List[List[Dict]] = cluster_batches
@@ -3562,6 +3629,7 @@ def _process_verification_phase(
             meta_records,
             gid_counts,
             sec_dir,
+            enable_verification=enable_verification,
         )
     
     # 从 agent_issues.jsonl 读取所有已保存的告警
