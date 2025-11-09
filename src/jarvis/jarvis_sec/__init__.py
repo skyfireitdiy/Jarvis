@@ -20,6 +20,8 @@ Jarvis 安全分析套件
 
 from typing import Dict, List, Optional
 
+import typer
+
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.workflow import direct_scan, run_with_agent
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -193,7 +195,7 @@ def run_security_analysis(
             stage = current_status.get("stage", "unknown")
             progress = current_status.get("progress", 0)
             message = current_status.get("message", "")
-            print(f"[JARVIS-SEC] 从状态文件恢复: 阶段={stage}, 进度={progress}%, {message}")
+            typer.secho(f"[jarvis-sec] 从状态文件恢复: 阶段={stage}, 进度={progress}%, {message}", fg=typer.colors.BLUE)
     except Exception:
         pass
 
@@ -243,7 +245,7 @@ def run_security_analysis(
 
     if _heuristic_path.exists():
         try:
-            print(f"[JARVIS-SEC] 从 {_heuristic_path} 恢复启发式扫描")
+            typer.secho(f"[jarvis-sec] 从 {_heuristic_path} 恢复启发式扫描", fg=typer.colors.BLUE)
             with _heuristic_path.open("r", encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
@@ -254,7 +256,7 @@ def run_security_analysis(
                 "issues_found": len(candidates)
             })
         except Exception as e:
-            print(f"[JARVIS-SEC] 恢复启发式扫描失败，执行完整扫描: {e}")
+            typer.secho(f"[jarvis-sec] 恢复启发式扫描失败，执行完整扫描: {e}", fg=typer.colors.YELLOW)
             candidates = []  # 重置以便执行完整扫描
 
     if not candidates:
@@ -288,7 +290,7 @@ def run_security_analysis(
                 "path": str(_heuristic_path),
                 "issues_count": len(candidates),
             })
-            print(f"[JARVIS-SEC] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}")
+            typer.secho(f"[jarvis-sec] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}", fg=typer.colors.GREEN)
         except Exception:
             pass
     else:
@@ -335,7 +337,7 @@ def run_security_analysis(
             # 为实现“所有告警分批处理”，此处不截断；后续改为按“聚类”逐个提交给验证Agent（不再使用 batch_limit）
             selected_candidates = items
             try:
-                print(f"[JARVIS-SEC] 批次选择: 文件={selected_file} 数量={len(selected_candidates)}/{len(items)}")
+                typer.secho(f"[jarvis-sec] 批次选择: 文件={selected_file} 数量={len(selected_candidates)}/{len(items)}", fg=typer.colors.BLUE)
             except Exception:
                 pass
             # 记录批次选择信息
@@ -373,7 +375,7 @@ def run_security_analysis(
                     line = json.dumps(item, ensure_ascii=False)
                     f.write(line + "\n")
             try:
-                print(f"[JARVIS-SEC] 已将 {len(items)} 个问题写入 {path}")
+                typer.secho(f"[jarvis-sec] 已将 {len(items)} 个问题写入 {path}", fg=typer.colors.GREEN)
             except Exception:
                 pass
         except Exception:
@@ -539,7 +541,7 @@ def run_security_analysis(
             message="开始聚类分析..."
         )
     for _file_idx, (_file, _items) in enumerate(_file_groups.items(), start=1):
-        print(f"\n[JARVIS-SEC] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}")
+        typer.secho(f"\n[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}", fg=typer.colors.CYAN)
         # 更新当前文件进度
         status_mgr.update_clustering(
             current_file=_file_idx,
@@ -591,7 +593,7 @@ def run_security_analysis(
             ]
             if current_batch_records:
                 _write_cluster_batch_snapshot(current_batch_records)
-            print(f"[JARVIS-SEC] 文件 {_file} 仅有一个告警（gid={single_gid}），跳过聚类直接写入")
+            typer.secho(f"[jarvis-sec] 文件 {_file} 仅有一个告警（gid={single_gid}），跳过聚类直接写入", fg=typer.colors.BLUE)
             continue
 
         # 构造聚类Agent（每个文件一个Agent，按批次聚类）
@@ -676,7 +678,7 @@ def run_security_analysis(
                 # 为了不丢失告警，我们创建一个默认的聚类记录，将这些 gid 作为一个批次
                 if _key not in _existing_clusters and _key in _completed_cluster_batches:
                     try:
-                        print(f"[JARVIS-SEC] 断点恢复：批次 {_key} 在 progress.jsonl 中标记为已完成，但 cluster_report.jsonl 中无记录，创建默认聚类记录以确保告警不丢失")
+                        typer.secho(f"[jarvis-sec] 断点恢复：批次 {_key} 在 progress.jsonl 中标记为已完成，但 cluster_report.jsonl 中无记录，创建默认聚类记录以确保告警不丢失", fg=typer.colors.BLUE)
                     except Exception:
                         pass
                     # 为所有候选创建默认验证条件
@@ -730,7 +732,7 @@ def run_security_analysis(
                         # 如果 is_invalid 字段缺失，跳过该记录（格式不完整，需要重新聚类）
                         if "is_invalid" not in rec:
                             try:
-                                print(f"[JARVIS-SEC] 断点恢复：记录缺少 is_invalid 字段，跳过该记录，将重新聚类")
+                                typer.secho(f"[jarvis-sec] 断点恢复：记录缺少 is_invalid 字段，跳过该记录，将重新聚类", fg=typer.colors.YELLOW)
                             except Exception:
                                 pass
                             continue
@@ -756,7 +758,7 @@ def run_security_analysis(
                         if is_invalid_resume:
                             invalid_gids_resume = [m.get("gid") for m in members]
                             try:
-                                print(f"[JARVIS-SEC] 断点恢复：跳过无效聚类（gids={invalid_gids_resume}）")
+                                typer.secho(f"[jarvis-sec] 断点恢复：跳过无效聚类（gids={invalid_gids_resume}）", fg=typer.colors.BLUE)
                             except Exception:
                                 pass
                             # 记录到进度文件
@@ -786,7 +788,7 @@ def run_security_analysis(
                     # 检查断点恢复的完整性
                     missing_gids_resume = input_gids_resume - classified_gids_resume
                     if missing_gids_resume:
-                        print(f"[JARVIS-SEC] 断点恢复：发现遗漏的gid {sorted(list(missing_gids_resume))}，将重新聚类")
+                        typer.secho(f"[jarvis-sec] 断点恢复：发现遗漏的gid {sorted(list(missing_gids_resume))}，将重新聚类", fg=typer.colors.YELLOW)
                         # 不跳过，继续执行Agent运行以补充遗漏的gid
                     else:
                         # 所有gid都已分类，标记进度（断点复用）
@@ -808,7 +810,7 @@ def run_security_analysis(
                         if recovered_batch_records:
                             _write_cluster_batch_snapshot(recovered_batch_records)
                             try:
-                                print(f"[JARVIS-SEC] 断点恢复：批次 {_key} 已从 cluster_report.jsonl 恢复，共 {len(recovered_batch_records)} 个聚类记录")
+                                typer.secho(f"[jarvis-sec] 断点恢复：批次 {_key} 已从 cluster_report.jsonl 恢复，共 {len(recovered_batch_records)} 个聚类记录", fg=typer.colors.GREEN)
                             except Exception:
                                 pass
                         continue
@@ -922,7 +924,7 @@ def run_security_analysis(
                         _cluster_summary["text"] = response
                     except Exception as e:
                         try:
-                            print(f"[JARVIS-SEC] 直接模型调用失败: {e}，回退到 run()")
+                            typer.secho(f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
                         except Exception:
                             pass
                         cluster_agent.run(cluster_task)
@@ -939,7 +941,7 @@ def run_security_analysis(
                     # YAML解析失败，将错误信息反馈给模型
                     valid = False
                     error_details.append(f"YAML解析失败: {parse_error}")
-                    print(f"[JARVIS-SEC] YAML解析失败: {parse_error}")
+                    typer.secho(f"[jarvis-sec] YAML解析失败: {parse_error}", fg=typer.colors.YELLOW)
                 elif not isinstance(cluster_items, list) or not cluster_items:
                     valid = False
                     error_details.append("结果不是数组或数组为空")
@@ -990,13 +992,13 @@ def run_security_analysis(
                     missing_gids = input_gids - classified_gids
                     if not missing_gids:
                         # 所有gid都被分类，校验通过
-                        print(f"[JARVIS-SEC] 聚类完整性校验通过，所有gid已分类（共尝试 {_attempt} 次）")
+                        typer.secho(f"[jarvis-sec] 聚类完整性校验通过，所有gid已分类（共尝试 {_attempt} 次）", fg=typer.colors.GREEN)
                         break
                     else:
                         # 有遗漏的gid，需要重试
                         missing_gids_list = sorted(list(missing_gids))
                         missing_count = len(missing_gids)
-                        print(f"[JARVIS-SEC] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {_attempt} 次（使用直接模型调用）")
+                        typer.secho(f"[jarvis-sec] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {_attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
                         # 格式校验失败，后续重试使用直接模型调用
                         use_direct_model = True
                         # 不更新cluster_task，重试时使用简化的任务描述
@@ -1008,9 +1010,9 @@ def run_security_analysis(
                     # 如果是格式错误（非遗漏gid），也继续重试
                     if not missing_gids:
                         if error_details:
-                            print(f"[JARVIS-SEC] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {_attempt} 次（使用直接模型调用）")
+                            typer.secho(f"[jarvis-sec] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {_attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
                         else:
-                            print(f"[JARVIS-SEC] 聚类结果格式无效，重试第 {_attempt} 次（使用直接模型调用）")
+                            typer.secho(f"[jarvis-sec] 聚类结果格式无效，重试第 {_attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
                     cluster_items = None
 
             # 合并聚类结果
@@ -1040,7 +1042,7 @@ def run_security_analysis(
                 
                 if has_format_error:
                     # 格式错误，应该重试而不是继续处理
-                    print(f"[JARVIS-SEC] 警告：聚类结果缺少 is_invalid 字段（{'; '.join(format_error_details)}），这是格式错误，触发重试")
+                    typer.secho(f"[jarvis-sec] 警告：聚类结果缺少 is_invalid 字段（{'; '.join(format_error_details)}），这是格式错误，触发重试", fg=typer.colors.YELLOW)
                     # 重新进入循环进行重试
                     cluster_items = None
                     use_direct_model = True
@@ -1081,7 +1083,7 @@ def run_security_analysis(
                         invalid_gids = [m.get("gid") for m in members]
                         invalid_reason = str(cl.get("invalid_reason", "")).strip()
                         try:
-                            print(f"[JARVIS-SEC] 聚类阶段判定为无效（gids={invalid_gids}），将提交复核Agent验证")
+                            typer.secho(f"[jarvis-sec] 聚类阶段判定为无效（gids={invalid_gids}），将提交复核Agent验证", fg=typer.colors.BLUE)
                         except Exception:
                             pass
                         # 收集到复核列表（包含候选、理由等信息）
@@ -1123,7 +1125,7 @@ def run_security_analysis(
                 # 最终完整性检查：如果仍有遗漏的gid，为每个遗漏的gid创建单独的聚类
                 missing_gids_final = input_gids - classified_gids_final
                 if missing_gids_final:
-                    print(f"[JARVIS-SEC] 警告：仍有遗漏的gid {sorted(list(missing_gids_final))}，将为每个遗漏的gid创建单独聚类")
+                    typer.secho(f"[jarvis-sec] 警告：仍有遗漏的gid {sorted(list(missing_gids_final))}，将为每个遗漏的gid创建单独聚类", fg=typer.colors.YELLOW)
                     for missing_gid in sorted(missing_gids_final):
                         missing_item = gid_to_item.get(missing_gid)
                         if missing_item:
@@ -1156,7 +1158,7 @@ def run_security_analysis(
                 # 如果有无效聚类，输出日志
                 if _invalid_count > 0:
                     try:
-                        print(f"[JARVIS-SEC] 聚类批次完成: 有效聚类={_merged_count}，无效聚类={_invalid_count}（已跳过）")
+                        typer.secho(f"[jarvis-sec] 聚类批次完成: 有效聚类={_merged_count}，无效聚类={_invalid_count}（已跳过）", fg=typer.colors.GREEN)
                     except Exception:
                         pass
                 # 写入当前批次的聚类结果（增量保存）
@@ -1188,7 +1190,7 @@ def run_security_analysis(
 
     # 复核Agent：验证所有标记为无效的聚类
     if invalid_clusters_for_review:
-        print(f"\n[JARVIS-SEC] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...")
+        typer.secho(f"\n[jarvis-sec] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...", fg=typer.colors.MAGENTA)
         status_mgr.update_review(
             current_review=0,
             total_reviews=len(invalid_clusters_for_review),
@@ -1263,7 +1265,7 @@ def run_security_analysis(
             current_review_num = review_idx // review_batch_size + 1
             total_review_batches = (len(invalid_clusters_for_review) + review_batch_size - 1) // review_batch_size
             
-            print(f"[JARVIS-SEC] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类")
+            typer.secho(f"[jarvis-sec] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类", fg=typer.colors.CYAN)
             status_mgr.update_review(
                 current_review=current_review_num,
                 total_reviews=total_review_batches,
@@ -1352,7 +1354,7 @@ def run_security_analysis(
                         review_summary_container["text"] = review_response
                     except Exception as e:
                         try:
-                            print(f"[JARVIS-SEC] 复核阶段直接模型调用失败: {e}，回退到 run()")
+                            typer.secho(f"[jarvis-sec] 复核阶段直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
                         except Exception:
                             pass
                         review_agent.run(review_task)
@@ -1365,7 +1367,7 @@ def run_security_analysis(
                     _changed_review = _git_restore_if_dirty(entry_path)
                     if _changed_review:
                         try:
-                            print(f"[JARVIS-SEC] 复核Agent工作区已恢复 ({_changed_review} 个文件)")
+                            typer.secho(f"[jarvis-sec] 复核Agent工作区已恢复 ({_changed_review} 个文件）", fg=typer.colors.BLUE)
                         except Exception:
                             pass
                 except Exception:
@@ -1380,7 +1382,7 @@ def run_security_analysis(
                         # YAML解析失败，记录错误信息以便下次重试时反馈给模型
                         prev_parse_error_review = parse_error_review  # 保存解析错误信息
                         try:
-                            print(f"[JARVIS-SEC] 复核结果YAML解析失败: {parse_error_review}")
+                            typer.secho(f"[jarvis-sec] 复核结果YAML解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
                         except Exception:
                             pass
                     else:
@@ -1419,12 +1421,12 @@ def run_security_analysis(
                 if parse_error_review:
                     # 如果有YAML解析错误，在下次重试时反馈给模型
                     try:
-                        print(f"[JARVIS-SEC] 复核结果YAML解析失败 -> 重试第 {review_attempt} 次（使用直接模型调用，将反馈解析错误）")
+                        typer.secho(f"[jarvis-sec] 复核结果YAML解析失败 -> 重试第 {review_attempt} 次（使用直接模型调用，将反馈解析错误）", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
                 else:
                     try:
-                        print(f"[JARVIS-SEC] 复核结果格式无效 -> 重试第 {review_attempt} 次（使用直接模型调用）")
+                        typer.secho(f"[jarvis-sec] 复核结果格式无效 -> 重试第 {review_attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
             
@@ -1486,7 +1488,7 @@ def run_security_analysis(
                     
                     if any_reviewed and not all_sufficient:
                         # 理由不充分，重新加入验证流程
-                        print(f"[JARVIS-SEC] 复核结果：无效聚类（gids={cluster_gids}）理由不充分，重新加入验证流程")
+                        typer.secho(f"[jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由不充分，重新加入验证流程", fg=typer.colors.BLUE)
                         for member in cluster_members:
                             reinstated_candidates.append(member)
                         reviewed_clusters.append({
@@ -1499,7 +1501,7 @@ def run_security_analysis(
                         review_notes = ""
                         if cluster_gids and gid_to_review.get(cluster_gids[0]):
                             review_notes = gid_to_review[cluster_gids[0]].get("review_notes", "")
-                        print(f"[JARVIS-SEC] 复核结果：无效聚类（gids={cluster_gids}）理由充分，确认为无效")
+                        typer.secho(f"[jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由充分，确认为无效", fg=typer.colors.GREEN)
                         reviewed_clusters.append({
                             **invalid_cluster,
                             "review_result": "confirmed_invalid",
@@ -1507,7 +1509,7 @@ def run_security_analysis(
                         })
             else:
                 # 复核结果解析失败，保守策略：重新加入验证流程
-                print(f"[JARVIS-SEC] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程")
+                typer.secho(f"[jarvis-sec] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程", fg=typer.colors.YELLOW)
                 for invalid_cluster in review_batch:
                     cluster_members = invalid_cluster.get("members", [])
                     for member in cluster_members:
@@ -1520,7 +1522,7 @@ def run_security_analysis(
         
         # 将重新加入验证的候选添加到cluster_batches
         if reinstated_candidates:
-            print(f"[JARVIS-SEC] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程")
+            typer.secho(f"[jarvis-sec] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程", fg=typer.colors.GREEN)
             # 按文件分组重新加入的候选
             reinstated_by_file: Dict[str, List[Dict]] = _dd2(list)
             for cand in reinstated_candidates:
@@ -1538,7 +1540,7 @@ def run_security_analysis(
                         "count": len(cands),
                     })
         else:
-            print(f"[JARVIS-SEC] 复核完成：所有无效聚类理由充分，确认为无效")
+            typer.secho(f"[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效", fg=typer.colors.GREEN)
         
         # 记录复核结果
         _progress_append({
@@ -1553,7 +1555,7 @@ def run_security_analysis(
             message=f"复核完成：{len(reinstated_candidates)} 个候选重新加入验证"
         )
     else:
-        print(f"[JARVIS-SEC] 无无效聚类需要复核")
+        typer.secho(f"[jarvis-sec] 无无效聚类需要复核", fg=typer.colors.BLUE)
 
     # 若聚类失败或空，则回退为"按文件一次处理"
     if not cluster_batches:
@@ -1588,7 +1590,7 @@ def run_security_analysis(
     # 检查是否有遗漏的gid
     missing_gids_before_analysis = all_candidate_gids - all_classified_gids
     if missing_gids_before_analysis:
-        print(f"[JARVIS-SEC] 警告：分析阶段开始前发现遗漏的gid {sorted(list(missing_gids_before_analysis))}，将补充聚类")
+        typer.secho(f"[jarvis-sec] 警告：分析阶段开始前发现遗漏的gid {sorted(list(missing_gids_before_analysis))}，将补充聚类", fg=typer.colors.YELLOW)
         # 为每个遗漏的gid创建单独的聚类
         for missing_gid in sorted(missing_gids_before_analysis):
             # 找到对应的候选
@@ -1616,7 +1618,7 @@ def run_security_analysis(
                     "note": "分析阶段开始前补充的遗漏gid",
                 })
                 try:
-                    print(f"[JARVIS-SEC] 已为遗漏的gid {missing_gid} 创建单独聚类")
+                    typer.secho(f"[jarvis-sec] 已为遗漏的gid {missing_gid} 创建单独聚类", fg=typer.colors.BLUE)
                 except Exception:
                     pass
 
@@ -1658,7 +1660,7 @@ def run_security_analysis(
 
         # 显示进度
         try:
-            print(f"\n[JARVIS-SEC] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch[0].get('file') if batch else 'N/A'}'")
+            typer.secho(f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch[0].get('file') if batch else 'N/A'}'", fg=typer.colors.CYAN)
         except Exception:
             pass
 
@@ -1841,7 +1843,7 @@ def run_security_analysis(
                     summary_container["text"] = response
                 except Exception as e:
                     try:
-                        print(f"[JARVIS-SEC] 直接模型调用失败: {e}，回退到 run()")
+                        typer.secho(f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
                     agent.run(per_task)
@@ -1867,7 +1869,7 @@ def run_security_analysis(
                 )
                 if _changed:
                     try:
-                        print(f"[JARVIS-SEC] 工作区已恢复 ({_changed} 个文件)，操作: git checkout -- .")
+                        typer.secho(f"[jarvis-sec] 工作区已恢复 ({_changed} 个文件），操作: git checkout -- .", fg=typer.colors.BLUE)
                     except Exception:
                         pass
             except Exception:
@@ -1883,7 +1885,7 @@ def run_security_analysis(
                 if parse_error_analysis:
                     # YAML解析失败，记录错误信息以便下次重试时反馈给模型
                     try:
-                        print(f"[JARVIS-SEC] 分析结果YAML解析失败: {parse_error_analysis}")
+                        typer.secho(f"[jarvis-sec] 分析结果YAML解析失败: {parse_error_analysis}", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
                 elif isinstance(rep, list):
@@ -1947,7 +1949,7 @@ def run_security_analysis(
                 # 格式校验失败，后续重试使用直接模型调用
                 use_direct_model_analysis = True
                 try:
-                    print(f"[JARVIS-SEC] 批次摘要无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)")
+                    typer.secho(f"[jarvis-sec] 批次摘要无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)", fg=typer.colors.YELLOW)
                 except Exception:
                     pass
 
@@ -2007,7 +2009,7 @@ def run_security_analysis(
         # 汇总并报告：如果分析 Agent 确认有告警，需要验证 Agent 二次验证
         verified_items: List[Dict] = []
         if merged_items:
-            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 分析 Agent 发现问题: 数量={len(merged_items)} -> 启动验证 Agent 进行二次验证")
+            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 发现问题: 数量={len(merged_items)} -> 启动验证 Agent 进行二次验证", fg=typer.colors.MAGENTA)
             
             # 创建验证 Agent 来验证分析 Agent 的结论
             verification_system_prompt = """
@@ -2107,7 +2109,7 @@ def run_security_analysis(
                         verification_summary_container["text"] = verify_response
                     except Exception as e:
                         try:
-                            print(f"[JARVIS-SEC] 验证阶段直接模型调用失败: {e}，回退到 run()")
+                            typer.secho(f"[jarvis-sec] 验证阶段直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
                         except Exception:
                             pass
                         verification_agent.run(verification_task)
@@ -2120,7 +2122,7 @@ def run_security_analysis(
                     _changed_verify = _git_restore_if_dirty(entry_path)
                     if _changed_verify:
                         try:
-                            print(f"[JARVIS-SEC] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件)")
+                            typer.secho(f"[jarvis-sec] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件）", fg=typer.colors.BLUE)
                         except Exception:
                             pass
                 except Exception:
@@ -2135,7 +2137,7 @@ def run_security_analysis(
                         # YAML解析失败，记录错误信息以便下次重试时反馈给模型
                         prev_parse_error_verify = parse_error_verify  # 保存解析错误信息
                         try:
-                            print(f"[JARVIS-SEC] 验证结果YAML解析失败: {parse_error_verify}")
+                            typer.secho(f"[jarvis-sec] 验证结果YAML解析失败: {parse_error_verify}", fg=typer.colors.YELLOW)
                         except Exception:
                             pass
                     else:
@@ -2174,12 +2176,12 @@ def run_security_analysis(
                 if parse_error_verify:
                     # 如果有YAML解析错误，在下次重试时反馈给模型
                     try:
-                        print(f"[JARVIS-SEC] 验证结果YAML解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)")
+                        typer.secho(f"[jarvis-sec] 验证结果YAML解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
                 else:
                     try:
-                        print(f"[JARVIS-SEC] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)")
+                        typer.secho(f"[jarvis-sec] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
             
@@ -2231,18 +2233,18 @@ def run_security_analysis(
                     elif verification and verification.get("is_valid") is False:
                         # 验证不通过，记录日志但不加入最终结果
                         try:
-                            print(f"[JARVIS-SEC] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}")
+                            typer.secho(f"[jarvis-sec] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}", fg=typer.colors.BLUE)
                         except Exception:
                             pass
                     else:
                         # 验证结果中未找到该 gid，默认不通过（保守策略）
                         try:
-                            print(f"[JARVIS-SEC] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过")
+                            typer.secho(f"[jarvis-sec] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过", fg=typer.colors.YELLOW)
                         except Exception:
                             pass
             else:
                 # 验证结果解析失败，保守策略：不保留任何告警
-                print(f"[JARVIS-SEC] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）")
+                typer.secho(f"[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）", fg=typer.colors.YELLOW)
             
             # 只有验证通过的告警才写入文件
             if verified_items:
@@ -2252,7 +2254,7 @@ def run_security_analysis(
                     gid = int(item.get("gid", 0))
                     if gid >= 1:
                         gid_counts[gid] = gid_counts.get(gid, 0) + 1
-                print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(merged_items)} -> 追加到报告")
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(merged_items)} -> 追加到报告", fg=typer.colors.GREEN)
                 _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
                 # 更新状态：发现的问题数
                 status_mgr.update_verification(
@@ -2262,7 +2264,7 @@ def run_security_analysis(
                     message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题（验证通过）"
                 )
             else:
-                print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(merged_items)} 个，验证后全部不通过")
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(merged_items)} 个，验证后全部不通过", fg=typer.colors.BLUE)
                 # 更新状态：验证后无有效告警
                 status_mgr.update_verification(
                     current_batch=bidx,
@@ -2271,9 +2273,9 @@ def run_security_analysis(
                     message=f"已验证 {bidx}/{total_batches} 批次，验证后无有效告警"
             )
         elif parse_fail:
-            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)")
+            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)", fg=typer.colors.YELLOW)
         else:
-            print(f"[JARVIS-SEC] 批次 {bidx}/{total_batches} 未发现问题")
+            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题", fg=typer.colors.BLUE)
             # 更新状态：继续验证
             status_mgr.update_verification(
                 current_batch=bidx,
