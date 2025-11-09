@@ -1,0 +1,71 @@
+{"file": "bzip2.c", "verification": "验证目标缓冲区大小是否足够容纳源字符串", "gids": [1, 2, 3, 4, 5, 17], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2.c", "verification": "验证所有格式化字符串参数是否受控，不存在用户可控的格式字符串", "gids": [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50], "count": 33, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2.c", "verification": "验证malloc返回值是否被检查", "gids": [6], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2.c", "verification": "验证write操作的返回值是否被检查", "gids": [7, 8, 9, 10, 11, 12, 13, 14, 15], "count": 9, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2.c", "verification": "验证fopen返回值是否被检查", "gids": [16], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2.c", "verification": "检查fprintf的格式字符串是否包含用户可控输入", "gids": [51, 52, 53], "count": 3, "batch_index": 2, "is_invalid": false}
+{"file": "bzip2.c", "verification": "检查指针n在使用前是否确保非空", "gids": [54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65], "count": 12, "batch_index": 2, "is_invalid": false}
+{"file": "bzip2.c", "verification": "检查字符串指针在使用前是否确保非空", "gids": [67, 68, 78, 79], "count": 4, "batch_index": 2, "is_invalid": false}
+{"file": "bzip2.c", "verification": "检查链表节点指针和name字段在使用前是否确保非空", "gids": [69, 70, 71, 72, 73, 74, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100], "count": 27, "batch_index": 2, "is_invalid": false}
+{"file": "bzip2.c", "verification": "检查宏ISFLAG中的aa指针是否确保非空", "gids": [77], "count": 1, "batch_index": 2, "is_invalid": false}
+{"file": "bzip2.c", "verification": "检查指针n在拷贝前是否确保非空", "gids": [66], "count": 1, "batch_index": 2, "is_invalid": false}
+{"file": "bzip2.c", "verification": "检查envbase和p指针在使用前是否确保非空", "gids": [75, 76], "count": 2, "batch_index": 2, "is_invalid": false}
+{"file": "bzip2.c", "verification": "验证指针aa是否为空", "gids": [101, 102, 103], "count": 3, "batch_index": 3, "is_invalid": false}
+{"file": "bzip2.c", "verification": "验证aa->name是否为NULL", "gids": [104], "count": 1, "batch_index": 3, "is_invalid": false}
+{"file": "blocksort.c", "verification": "验证budget指针在解引用前非空", "gids": [105, 106, 107, 108], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "blocksort.c", "verification": "验证s指针在访问成员前非空", "gids": [109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120], "count": 12, "batch_index": 1, "is_invalid": false}
+{"file": "unzcrash.c", "verification": "验证候选 121 的安全风险", "gids": [121], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "bzlib_private.h", "verification": "检查fprintf的格式字符串是否来自用户输入或不可信源", "gids": [122, 123, 124, 125, 126, 127, 128], "count": 7, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib_private.h", "verification": "检查结构体指针s在使用前是否经过有效判空", "gids": [129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150], "count": 22, "batch_index": 1, "is_invalid": false}
+{"file": "dlltest.c", "verification": "验证指针在解引用前非空", "gids": [153, 154, 155, 156, 157, 158, 159, 160], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "dlltest.c", "verification": "验证VLA使用是否安全", "gids": [152], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "dlltest.c", "verification": "验证fwrite操作的错误处理", "gids": [151], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证mode2缓冲区是否有足够的空间容纳追加的字符串", "gids": [161, 162], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证malloc返回值是否被检查或确保调用者会检查", "gids": [163, 164, 165], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证fopen和fclose的返回值是否被正确处理", "gids": [166, 167], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证fprintf的格式化字符串是否来自不可信源", "gids": [168, 169], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证items*size是否可能溢出", "gids": [170], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证free后是否还有可能访问bzf", "gids": [171, 172], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证s指针在使用前是否确保非空", "gids": [173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210], "count": 38, "batch_index": 1, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证s->block指针非空且索引在有效范围内", "gids": [212, 213, 214, 215, 216, 217, 219, 220, 221, 222, 223, 224, 229, 231, 258, 259, 260], "count": 17, "batch_index": 2, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证s->inUse指针非空且索引在有效范围内", "gids": [218, 230], "count": 2, "batch_index": 2, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证s指针非空且state_in_ch已正确初始化", "gids": [225, 226, 227, 228, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239], "count": 14, "batch_index": 2, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证s->strm指针非空且相关成员已正确初始化", "gids": [242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 255, 256, 257], "count": 15, "batch_index": 2, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证s指针非空且相关状态变量已正确初始化", "gids": [211, 240, 241, 254], "count": 4, "batch_index": 2, "is_invalid": false}
+{"file": "bzlib.c", "verification": "Verify s->strm pointer is not null before dereference", "gids": [261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 297, 298, 306, 307], "count": 26, "batch_index": 3, "is_invalid": false}
+{"file": "bzlib.c", "verification": "Verify s pointer is not null before dereference", "gids": [283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 299, 300, 301, 302, 303, 304, 305, 308, 309, 310], "count": 24, "batch_index": 3, "is_invalid": false}
+{"file": "bzlib.c", "verification": "Verify strm pointer is not null before dereference", "gids": [283], "count": 1, "batch_index": 3, "is_invalid": false}
+{"file": "bzlib.c", "verification": "s->strm指针在解引用前必须非空", "gids": [311, 312, 337, 338, 340, 341, 344, 345, 346, 347, 348, 349, 350, 351], "count": 14, "batch_index": 4, "is_invalid": false}
+{"file": "bzlib.c", "verification": "s->arr2和s->ftab指针在解引用前必须非空", "gids": [316, 317], "count": 2, "batch_index": 4, "is_invalid": false}
+{"file": "bzlib.c", "verification": "strm->state指针在解引用前必须非空", "gids": [318, 319, 322], "count": 3, "batch_index": 4, "is_invalid": false}
+{"file": "bzlib.c", "verification": "strm->bzalloc和strm->bzfree指针在解引用前必须非空", "gids": [320, 321], "count": 2, "batch_index": 4, "is_invalid": false}
+{"file": "bzlib.c", "verification": "s指针在解引用前必须非空", "gids": [313, 314, 315, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 339, 342, 343, 352, 353, 354, 355, 356, 357, 358, 359, 360], "count": 29, "batch_index": 4, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证结构体指针s在使用前非空", "gids": [361, 362, 363, 364, 365, 366, 367, 368, 369, 370, 371, 372, 373, 374, 375, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410], "count": 50, "batch_index": 5, "is_invalid": false}
+{"file": "bzlib.c", "verification": "s->strm != NULL", "gids": [411, 412, 413, 414, 415, 416, 417, 418, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447, 448, 449, 450, 451, 452], "count": 23, "batch_index": 6, "is_invalid": false}
+{"file": "bzlib.c", "verification": "s != NULL", "gids": [419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434, 435, 436, 437, 453, 454, 455, 456, 457, 458, 459, 460], "count": 27, "batch_index": 6, "is_invalid": false}
+{"file": "bzlib.c", "verification": "s->strm != NULL && s->strm->next_out != NULL", "gids": [441, 442], "count": 2, "batch_index": 6, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证结构体指针s在访问成员前非空", "gids": [461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 489, 490], "count": 30, "batch_index": 7, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证结构体指针bzf在访问成员前非空", "gids": [495, 496, 497, 498, 499, 500, 501, 502, 503, 504, 505, 506, 507, 508, 509, 510], "count": 16, "batch_index": 7, "is_invalid": false}
+{"file": "bzlib.c", "verification": "验证释放前指针非空", "gids": [491, 492, 493, 494], "count": 4, "batch_index": 7, "is_invalid": false}
+{"file": "bzlib.c", "verification": "bzf pointer must be non-null before use", "gids": [511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 537, 538, 539, 540, 541, 542, 543, 544, 545, 546, 547, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557, 558, 559, 560], "count": 50, "batch_index": 8, "is_invalid": false}
+{"file": "bzlib.c", "verification": "确认在解引用前bzf指针及其strm成员是否非空", "gids": [561, 562, 563, 564, 565, 566, 567, 568, 569], "count": 9, "batch_index": 9, "is_invalid": false}
+{"file": "bzlib.c", "verification": "确认在解引用前strm指针及其avail_out成员是否非空", "gids": [570, 571, 572, 573], "count": 4, "batch_index": 9, "is_invalid": false}
+{"file": "bzlib.c", "verification": "确认在解引用前mode指针是否非空", "gids": [574], "count": 1, "batch_index": 9, "is_invalid": false}
+{"file": "bzlib.c", "verification": "确认在解引用前errnum指针是否非空", "gids": [575], "count": 1, "batch_index": 9, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证指针s在解引用前非空", "gids": [576, 577, 578, 579, 580, 581, 582, 583, 584, 585, 586, 587, 588, 589, 590, 591, 592, 593, 594, 595, 596, 597, 598, 599, 600, 601, 602, 603, 604, 605, 606, 607, 608, 609, 610, 611, 612, 613, 614, 615, 616, 617, 618, 619, 620, 621, 622, 623, 624, 625], "count": 50, "batch_index": 1, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证指针s在解引用前非空", "gids": [626, 627, 628, 629, 630, 631, 632, 633, 634, 635, 636, 637, 638, 639, 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675], "count": 50, "batch_index": 2, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证指针s在解引用前非空", "gids": [676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703, 704, 705, 706, 707, 708, 709, 710, 711, 712, 713, 714, 715, 716, 717, 718, 719, 720, 721, 722, 723, 724, 725], "count": 50, "batch_index": 3, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证mtfa和mtfbase数组已正确初始化且索引在有效范围内", "gids": [726, 727, 728, 729, 730, 731, 732], "count": 7, "batch_index": 4, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证unzftab和seqToUnseq数组已正确初始化且索引在有效范围内", "gids": [733, 734, 735, 736], "count": 4, "batch_index": 4, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证origPtr和nblock的值在有效范围内", "gids": [737, 738], "count": 2, "batch_index": 4, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证cftab数组已正确初始化且索引在有效范围内", "gids": [739, 740, 741, 742, 743, 750, 763, 764], "count": 8, "batch_index": 4, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证ll16和tt数组已正确初始化且索引在有效范围内", "gids": [735, 736, 751, 752, 753, 762, 763, 764], "count": 8, "batch_index": 4, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证状态变量已正确初始化", "gids": [744, 745, 746, 747, 748, 749, 754, 755, 756, 757, 758, 759, 760, 761, 765, 766, 767, 768, 769, 770, 771, 772, 773, 774, 775], "count": 25, "batch_index": 4, "is_invalid": false}
+{"file": "decompress.c", "verification": "验证指针s在解引用前是否非空", "gids": [776, 777, 778, 779, 780, 781, 782, 783, 784, 785, 786, 787, 788, 789, 790, 791, 792, 793, 794, 795, 796, 797, 798, 799, 800], "count": 25, "batch_index": 5, "is_invalid": false}
+{"file": "compress.c", "verification": "验证结构体指针s在解引用前非空", "gids": [801, 802, 803, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 820, 821, 822, 823, 824, 825, 826, 827, 828, 829, 830, 831, 832, 833, 834, 835, 836, 837, 838, 839, 840, 841, 842, 843, 844, 845, 846, 847, 848, 849, 850], "count": 50, "batch_index": 1, "is_invalid": false}
+{"file": "compress.c", "verification": "验证结构体指针s在解引用前非空", "gids": [851, 852, 853, 854, 855, 856, 857, 858, 859, 860, 861, 862, 863, 864, 865, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882, 883, 884, 885, 886, 887, 888, 889, 890, 891, 892, 893, 894, 895, 896, 897, 898, 899, 900], "count": 50, "batch_index": 2, "is_invalid": false}
+{"file": "compress.c", "verification": "验证结构体指针s在解引用前是否非空", "gids": [901, 902, 903, 904, 905, 906, 907, 908, 909, 910, 911, 912, 913, 914, 915, 916], "count": 16, "batch_index": 3, "is_invalid": false}
+{"file": "bzip2recover.c", "verification": "验证目标缓冲区大小是否足够容纳源字符串", "gids": [917, 918, 919, 920, 921], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2recover.c", "verification": "验证格式化字符串是否包含用户可控输入", "gids": [926, 927, 928, 929, 930, 931, 932, 933, 934, 935, 936, 937, 938], "count": 13, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2recover.c", "verification": "验证指针在使用前是否经过有效性检查", "gids": [923, 924, 939, 940, 941, 942, 943, 944, 945, 946, 947, 948, 949, 950, 951, 952, 953, 954, 955, 956, 957, 958, 959, 960, 961, 962, 963, 964], "count": 28, "batch_index": 1, "is_invalid": false}
+{"file": "bzip2recover.c", "verification": "验证缓冲区大小和拷贝长度是否匹配", "gids": [922, 925], "count": 2, "batch_index": 1, "is_invalid": false}
