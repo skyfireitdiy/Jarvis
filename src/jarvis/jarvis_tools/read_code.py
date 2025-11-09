@@ -279,7 +279,11 @@ class ReadCodeTool:
             context_lines.append("─" * 60)
             context_lines.append("")  # 空行
 
-            return "\n".join(context_lines)
+            # 打印上下文感知结果到控制台
+            context_output = "\n".join(context_lines)
+            PrettyOutput.print(f"🧠 上下文感知结果:\n{context_output}", OutputType.INFO)
+            
+            return context_output
 
         except Exception:
             # 静默失败，不影响文件读取
