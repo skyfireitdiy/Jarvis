@@ -46,7 +46,6 @@ from jarvis.jarvis_utils.git_utils import (
     get_diff,
     get_diff_file_list,
     get_latest_commit_hash,
-    get_recent_commits_with_files,
     handle_commit_workflow,
     has_uncommitted_changes,
     revert_change,
@@ -105,6 +104,7 @@ class CodeAgent(Agent):
             "retrieve_memory",
             "clear_memory",
             "sub_code_agent",
+            "ctags",
         ]
 
         if append_tools:
@@ -1838,6 +1838,9 @@ def cli(
         # 回退到全局锁，确保至少有互斥保护
         _acquire_single_instance_lock(lock_name="code_agent.lock")
     try:
+        # 设置环境变量标识当前是CodeAgent模式
+        os.environ["JARVIS_AGENT_TYPE"] = "code_agent"
+        
         agent = CodeAgent(
             model_group=model_group,
             need_summary=False,
