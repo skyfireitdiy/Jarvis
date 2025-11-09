@@ -148,6 +148,1427 @@ def _git_restore_if_dirty(repo_root: str) -> int:
     return 0
 
 
+def _get_sec_dir(base_path: str):
+    """获取 .jarvis/sec 目录路径，支持 base_path 是项目根目录或已经是 .jarvis/sec 目录"""
+    from pathlib import Path as _Path
+    base = _Path(base_path)
+    # 检查 base_path 是否已经是 .jarvis/sec 目录
+    if base.name == "sec" and base.parent.name == ".jarvis":
+        return base
+    # 否则，假设 base_path 是项目根目录
+    return base / ".jarvis" / "sec"
+
+
+def _initialize_analysis_context(
+    entry_path: str,
+    status_mgr,
+) -> tuple:
+    """
+    初始化分析上下文，包括状态管理、进度文件、目录等。
+    
+    返回: (sec_dir, progress_path, _progress_append, done_sigs)
+    """
+    from pathlib import Path as _Path
+    from datetime import datetime as _dt
+    import json as _json
+    
+    # 获取 .jarvis/sec 目录
+    sec_dir = _get_sec_dir(entry_path)
+    progress_path = sec_dir / "progress.jsonl"
+    
+    # 进度追加函数
+    def _progress_append(rec: Dict) -> None:
+        try:
+            progress_path.parent.mkdir(parents=True, exist_ok=True)
+            rec = dict(rec)
+            rec.setdefault("timestamp", _dt.utcnow().isoformat() + "Z")
+            line = _json.dumps(rec, ensure_ascii=False)
+            with progress_path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception:
+            # 进度文件失败不影响主流程
+            pass
+    
+    # 已完成集合（按候选签名）
+    done_sigs: set = set()
+    if progress_path.exists():
+        try:
+            for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = _json.loads(line)
+                except Exception:
+                    continue
+                if obj.get("event") == "task_status" and obj.get("status") == "done":
+                    sig = obj.get("candidate_signature")
+                    if sig:
+                        done_sigs.add(sig)
+        except Exception:
+            pass
+    
+    return sec_dir, progress_path, _progress_append, done_sigs
+
+
+def _load_or_run_heuristic_scan(
+    entry_path: str,
+    langs: List[str],
+    exclude_dirs: Optional[List[str]],
+    sec_dir,
+    status_mgr,
+    _progress_append,
+) -> tuple[List[Dict], Dict]:
+    """
+    加载或运行启发式扫描。
+    
+    返回: (candidates, summary)
+    """
+    import json
+    from pathlib import Path as _Path
+    
+    _heuristic_path = sec_dir / "heuristic_issues.jsonl"
+    candidates: List[Dict] = []
+    summary: Dict = {}
+    
+    if _heuristic_path.exists():
+        try:
+            typer.secho(f"[jarvis-sec] 从 {_heuristic_path} 恢复启发式扫描", fg=typer.colors.BLUE)
+            with _heuristic_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        candidates.append(json.loads(line))
+            _progress_append({
+                "event": "pre_scan_resumed",
+                "path": str(_heuristic_path),
+                "issues_found": len(candidates)
+            })
+        except Exception as e:
+            typer.secho(f"[jarvis-sec] 恢复启发式扫描失败，执行完整扫描: {e}", fg=typer.colors.YELLOW)
+            candidates = []  # 重置以便执行完整扫描
+    
+    if not candidates:
+        _progress_append({"event": "pre_scan_start", "entry_path": entry_path, "languages": langs})
+        status_mgr.update_pre_scan(message="开始启发式扫描...")
+        pre_scan = direct_scan(entry_path, languages=langs, exclude_dirs=exclude_dirs)
+        candidates = pre_scan.get("issues", [])
+        summary = pre_scan.get("summary", {})
+        scanned_files = summary.get("scanned_files", 0)
+        status_mgr.update_pre_scan(
+            current_files=scanned_files,
+            total_files=scanned_files,
+            issues_found=len(candidates),
+            message=f"启发式扫描完成，发现 {len(candidates)} 个候选问题"
+        )
+        _progress_append({
+            "event": "pre_scan_done",
+            "entry_path": entry_path,
+            "languages": langs,
+            "scanned_files": scanned_files,
+            "issues_found": len(candidates)
+        })
+        # 持久化
+        try:
+            _heuristic_path.parent.mkdir(parents=True, exist_ok=True)
+            with _heuristic_path.open("w", encoding="utf-8") as f:
+                for item in candidates:
+                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
+            _progress_append({
+                "event": "heuristic_report_written",
+                "path": str(_heuristic_path),
+                "issues_count": len(candidates),
+            })
+            typer.secho(f"[jarvis-sec] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}", fg=typer.colors.GREEN)
+        except Exception:
+            pass
+    else:
+        # 从断点恢复启发式扫描结果
+        status_mgr.update_pre_scan(
+            issues_found=len(candidates),
+            message=f"从断点恢复，已发现 {len(candidates)} 个候选问题"
+        )
+    
+    return candidates, summary
+
+
+def _prepare_candidates(candidates: List[Dict]) -> List[Dict]:
+    """
+    将候选问题精简为子任务清单，控制上下文长度，并分配全局唯一ID。
+    
+    返回: compact_candidates (已分配gid的候选列表)
+    """
+    def _compact(it: Dict) -> Dict:
+        return {
+            "language": it.get("language"),
+            "category": it.get("category"),
+            "pattern": it.get("pattern"),
+            "file": it.get("file"),
+            "line": it.get("line"),
+            "evidence": it.get("evidence"),
+            "confidence": it.get("confidence"),
+            "severity": it.get("severity", "medium"),
+        }
+    
+    compact_candidates = [_compact(it) for it in candidates]
+    # 为所有候选分配全局唯一数字ID（gid: 1..N），用于跨批次/跨文件统一编号与跟踪
+    for i, it in enumerate(compact_candidates, start=1):
+        try:
+            it["gid"] = i
+        except Exception:
+            pass
+    
+    return compact_candidates
+
+
+def _load_existing_clusters(
+    sec_dir,
+    progress_path,
+) -> tuple[Dict[tuple[str, int], List[Dict]], set]:
+    """
+    读取已有聚类报告以支持断点恢复。
+    
+    返回: (_existing_clusters, _completed_cluster_batches)
+    """
+    _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
+    _completed_cluster_batches: set = set()
+    
+    try:
+        from pathlib import Path as _Path2
+        import json as _json
+        _cluster_path = sec_dir / "cluster_report.jsonl"
+        
+        # 从 progress.jsonl 中读取已完成的聚类批次（优先检查）
+        if progress_path.exists():
+            try:
+                for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = _json.loads(line)
+                    except Exception:
+                        continue
+                    # 检查 cluster_status 事件，status 为 "done" 表示已完成
+                    if obj.get("event") == "cluster_status" and obj.get("status") == "done":
+                        file_name = obj.get("file")
+                        batch_idx = obj.get("batch_index")
+                        if file_name and batch_idx:
+                            _completed_cluster_batches.add((str(file_name), int(batch_idx)))
+            except Exception:
+                pass
+        
+        # 读取 cluster_report.jsonl（由于使用追加模式，可能有重复，需要去重）
+        if _cluster_path.exists():
+            try:
+                # 使用字典去重：key 为 (file, batch_index, verification, gids 的字符串表示)
+                seen_records: Dict[tuple, Dict] = {}
+                with _cluster_path.open("r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        rec = _json.loads(line)
+                        if not isinstance(rec, dict):
+                            continue
+                        f_name = str(rec.get("file") or "")
+                        bidx = int(rec.get("batch_index", 1) or 1)
+                        # 使用 gids 的排序后元组作为去重键
+                        gids_list = rec.get("gids", [])
+                        gids_key = tuple(sorted(gids_list)) if isinstance(gids_list, list) else ()
+                        key = (f_name, bidx, str(rec.get("verification", "")), gids_key)
+                        # 保留最新的记录（后写入的覆盖先写入的）
+                        seen_records[key] = rec
+                
+                # 按 (file, batch_index) 分组
+                for rec in seen_records.values():
+                    f_name = str(rec.get("file") or "")
+                    bidx = int(rec.get("batch_index", 1) or 1)
+                    _existing_clusters.setdefault((f_name, bidx), []).append(rec)
+            except Exception:
+                _existing_clusters = {}
+    except Exception:
+        _existing_clusters = {}
+        _completed_cluster_batches = set()
+    
+    return _existing_clusters, _completed_cluster_batches
+
+
+def _restore_clusters_from_checkpoint(
+    _existing_clusters: Dict[tuple[str, int], List[Dict]],
+    _file_groups: Dict[str, List[Dict]],
+) -> tuple[List[List[Dict]], List[Dict], List[Dict], set]:
+    """
+    从断点恢复聚类结果。
+    
+    返回: (cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids)
+    """
+    # 1. 收集所有候选的 gid
+    all_candidate_gids_in_clustering = set()
+    gid_to_candidate: Dict[int, Dict] = {}
+    for _file, _items in _file_groups.items():
+        for it in _items:
+            try:
+                _gid = int(it.get("gid", 0))
+                if _gid >= 1:
+                    all_candidate_gids_in_clustering.add(_gid)
+                    gid_to_candidate[_gid] = it
+            except Exception:
+                pass
+    
+    # 2. 从 cluster_report.jsonl 恢复所有聚类结果
+    clustered_gids = set()  # 已聚类的 gid（包括有效和无效的，因为无效的也需要进入复核阶段）
+    invalid_clusters_for_review: List[Dict] = []  # 无效聚类列表（从断点恢复）
+    cluster_batches: List[List[Dict]] = []
+    cluster_records: List[Dict] = []
+    
+    for (_file_key, _batch_idx), cluster_recs in _existing_clusters.items():
+        for rec in cluster_recs:
+            gids_list = rec.get("gids", [])
+            if not gids_list:
+                continue
+            is_invalid = rec.get("is_invalid", False)
+            verification = str(rec.get("verification", "")).strip()
+            members: List[Dict] = []
+            for _gid in gids_list:
+                try:
+                    _gid_int = int(_gid)
+                    if _gid_int >= 1 and _gid_int in gid_to_candidate:
+                        # 只有当 gid 在当前运行中存在时，才恢复该聚类
+                        candidate = gid_to_candidate[_gid_int]
+                        candidate["verify"] = verification
+                        members.append(candidate)
+                        # 无论有效还是无效，都计入已聚类的 gid（避免被重新聚类）
+                        clustered_gids.add(_gid_int)
+                except Exception:
+                    pass
+            
+            if members:
+                if is_invalid:
+                    # 无效聚类：收集到复核列表，不加入 cluster_batches
+                    invalid_clusters_for_review.append({
+                        "file": _file_key,
+                        "batch_index": _batch_idx,
+                        "gids": [m.get("gid") for m in members],
+                        "verification": verification,
+                        "invalid_reason": str(rec.get("invalid_reason", "")).strip(),
+                        "members": members,  # 保存候选信息，用于复核后可能重新加入验证
+                        "count": len(members),
+                    })
+                else:
+                    # 有效聚类：恢复到 cluster_batches
+                    cluster_batches.append(members)
+                    cluster_records.append({
+                        "file": _file_key,
+                        "verification": verification,
+                        "gids": [m.get("gid") for m in members],
+                        "count": len(members),
+                        "batch_index": _batch_idx,
+                        "is_invalid": False,
+                    })
+    
+    return cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids
+
+
+def _process_review_phase(
+    invalid_clusters_for_review: List[Dict],
+    entry_path: str,
+    langs: List[str],
+    llm_group: Optional[str],
+    status_mgr,
+    _progress_append,
+    cluster_batches: List[List[Dict]],
+) -> List[List[Dict]]:
+    """
+    处理复核阶段：验证所有标记为无效的聚类。
+    
+    返回: 更新后的 cluster_batches（包含重新加入验证的候选）
+    """
+    from collections import defaultdict as _dd2
+    
+    if not invalid_clusters_for_review:
+        typer.secho(f"[jarvis-sec] 无无效聚类需要复核", fg=typer.colors.BLUE)
+        return cluster_batches
+    
+    typer.secho(f"\n[jarvis-sec] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...", fg=typer.colors.MAGENTA)
+    status_mgr.update_review(
+        current_review=0,
+        total_reviews=len(invalid_clusters_for_review),
+        message="开始复核无效聚类..."
+    )
+    
+    # 构建复核Agent的系统提示词
+    review_system_prompt = """
+# 复核Agent约束
+- 你的核心任务是复核聚类Agent给出的无效结论是否充分和正确。
+- 你需要仔细检查聚类Agent提供的invalid_reason是否充分，是否真的考虑了所有可能的路径。
+- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
+- 必要时需向上追溯调用者，查看完整的调用路径，以确认聚类Agent的结论是否成立。
+- 禁止修改任何文件或执行写操作命令；仅进行只读分析与读取。
+- 每次仅执行一个操作；等待工具结果后再进行下一步。
+- **记忆使用**：
+  - 在复核过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前文件或函数相关的记忆。
+  - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等。
+- **复核原则**：
+  - 必须验证聚类Agent是否真的检查了所有可能的调用路径和调用者。
+  - 必须验证聚类Agent是否真的确认了所有路径都有保护措施。
+  - 如果发现聚类Agent遗漏了某些路径、调用者或边界情况，必须判定为理由不充分。
+  - 保守策略：有疑问时，一律判定为理由不充分，将候选重新加入验证流程。
+- 完成复核后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+    """.strip()
+    
+    # 构建复核摘要提示词
+    review_summary_prompt = """
+请将本轮"复核结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
+你需要复核聚类Agent给出的无效理由是否充分，是否真的考虑了所有可能的路径。
+
+示例1：理由充分（is_reason_sufficient: true，单个gid）
+<REPORT>
+- gid: 1
+  is_reason_sufficient: true
+  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+</REPORT>
+
+示例2：理由充分（is_reason_sufficient: true，多个gid合并）
+<REPORT>
+- gids: [1, 2, 3]
+  is_reason_sufficient: true
+  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+</REPORT>
+
+示例3：理由不充分（is_reason_sufficient: false）
+<REPORT>
+- gid: 1
+  is_reason_sufficient: false
+  review_notes: "聚类Agent遗漏了函数X的调用路径，该路径可能未做校验，理由不充分，需要重新验证"
+</REPORT>
+
+要求：
+- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
+- 数组元素为对象，包含字段：
+  - gid: 整数（全局唯一编号，对应无效聚类的gid，单个告警时使用）
+  - gids: 整数数组（全局唯一编号数组，对应无效聚类的gids，多个告警合并时使用）
+  - is_reason_sufficient: 布尔值 (true/false)，表示无效理由是否充分
+  - review_notes: 字符串（复核说明，解释为什么理由充分或不充分）
+- **合并格式优化**：如果多个告警（gid）的复核结果（is_reason_sufficient）和复核说明（review_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
+- 必须对所有输入的gid进行复核，不能遗漏。
+- 如果理由不充分（is_reason_sufficient: false），该候选将重新加入验证流程；如果理由充分（is_reason_sufficient: true），该候选将被确认为无效。
+    """.strip()
+    
+    # 按批次复核（每批最多10个无效聚类，避免上下文过长）
+    review_batch_size = 10
+    reviewed_clusters: List[Dict] = []
+    reinstated_candidates: List[Dict] = []  # 重新加入验证的候选
+    
+    for review_idx in range(0, len(invalid_clusters_for_review), review_batch_size):
+        review_batch = invalid_clusters_for_review[review_idx:review_idx + review_batch_size]
+        current_review_num = review_idx // review_batch_size + 1
+        total_review_batches = (len(invalid_clusters_for_review) + review_batch_size - 1) // review_batch_size
+        
+        typer.secho(f"[jarvis-sec] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类", fg=typer.colors.CYAN)
+        status_mgr.update_review(
+            current_review=current_review_num,
+            total_reviews=total_review_batches,
+            message=f"正在复核批次 {current_review_num}/{total_review_batches}"
+        )
+        
+        # 构建复核任务
+        import json as _json_review
+        review_task = f"""
+# 复核无效聚类任务
+上下文参数：
+- entry_path: {entry_path}
+- languages: {langs}
+
+需要复核的无效聚类（JSON数组）：
+{_json_review.dumps(review_batch, ensure_ascii=False, indent=2)}
+
+请仔细复核每个无效聚类的invalid_reason是否充分，是否真的考虑了所有可能的路径、调用者和边界情况。
+对于每个gid，请判断无效理由是否充分（is_reason_sufficient: true/false），并给出复核说明。
+        """.strip()
+        
+        # 创建复核Agent
+        review_task_id = f"JARVIS-SEC-Review-Batch-{current_review_num}"
+        review_agent_kwargs: Dict = dict(
+            system_prompt=review_system_prompt,
+            name=review_task_id,
+            auto_complete=True,
+            need_summary=True,
+            summary_prompt=review_summary_prompt,
+            non_interactive=True,
+            in_multi_agent=False,
+            use_methodology=False,
+            use_analysis=False,
+            plan=False,
+            output_handler=[ToolRegistry()],
+            disable_file_edit=True,
+            use_tools=["read_code", "execute_script", "retrieve_memory", "save_memory"],
+        )
+        if llm_group:
+            review_agent_kwargs["model_group"] = llm_group
+        review_agent = Agent(**review_agent_kwargs)
+        
+        # 订阅复核Agent的摘要
+        review_summary_container: Dict[str, str] = {"text": ""}
+        try:
+            from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY_REVIEW
+        except Exception:
+            _AFTER_SUMMARY_REVIEW = None
+        if _AFTER_SUMMARY_REVIEW:
+            def _on_after_summary_review(**kwargs):
+                try:
+                    review_summary_container["text"] = str(kwargs.get("summary", "") or "")
+                except Exception:
+                    review_summary_container["text"] = ""
+            try:
+                review_agent.event_bus.subscribe(_AFTER_SUMMARY_REVIEW, _on_after_summary_review)
+            except Exception:
+                pass
+        
+        # 运行复核Agent（永久重试直到格式正确）
+        review_results, parse_error = _run_review_agent_with_retry(
+            review_agent,
+            review_task,
+            review_summary_prompt,
+            entry_path,
+            review_summary_container,
+        )
+        
+        # 处理复核结果
+        _process_review_batch(
+            review_batch,
+            review_results,
+            reviewed_clusters,
+            reinstated_candidates,
+        )
+    
+    # 将重新加入验证的候选添加到cluster_batches
+    if reinstated_candidates:
+        typer.secho(f"[jarvis-sec] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程", fg=typer.colors.GREEN)
+        # 按文件分组重新加入的候选
+        reinstated_by_file: Dict[str, List[Dict]] = _dd2(list)
+        for cand in reinstated_candidates:
+            file_key = str(cand.get("file") or "")
+            reinstated_by_file[file_key].append(cand)
+        
+        # 为每个文件的重新加入候选创建批次
+        for file_key, cands in reinstated_by_file.items():
+            if cands:
+                cluster_batches.append(cands)
+                _progress_append({
+                    "event": "review_reinstated",
+                    "file": file_key,
+                    "gids": [c.get("gid") for c in cands],
+                    "count": len(cands),
+                })
+    else:
+        typer.secho(f"[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效", fg=typer.colors.GREEN)
+    
+    # 记录复核结果
+    _progress_append({
+        "event": "review_completed",
+        "total_reviewed": len(invalid_clusters_for_review),
+        "reinstated": len(reinstated_candidates),
+        "confirmed_invalid": len(invalid_clusters_for_review) - len(reinstated_candidates),
+    })
+    status_mgr.update_review(
+        current_review=len(invalid_clusters_for_review),
+        total_reviews=len(invalid_clusters_for_review),
+        message=f"复核完成：{len(reinstated_candidates)} 个候选重新加入验证"
+    )
+    
+    return cluster_batches
+
+
+def _build_gid_to_review_mapping(review_results: List[Dict]) -> Dict[int, Dict]:
+    """构建gid到复核结果的映射（支持 gid 和 gids 两种格式）"""
+    gid_to_review: Dict[int, Dict] = {}
+    for rr in review_results:
+        if not isinstance(rr, dict):
+            continue
+        
+        # 支持 gid 和 gids 两种格式
+        gids_to_process: List[int] = []
+        if "gids" in rr and isinstance(rr.get("gids"), list):
+            # 合并格式：gids 数组
+            for gid_val in rr.get("gids", []):
+                try:
+                    gid_int = int(gid_val)
+                    if gid_int >= 1:
+                        gids_to_process.append(gid_int)
+                except Exception:
+                    pass
+        elif "gid" in rr:
+            # 单个格式：gid
+            try:
+                gid_int = int(rr.get("gid", 0))
+                if gid_int >= 1:
+                    gids_to_process.append(gid_int)
+            except Exception:
+                pass
+        
+        # 为每个 gid 创建复核结果映射
+        is_reason_sufficient = rr.get("is_reason_sufficient")
+        review_notes = str(rr.get("review_notes", "")).strip()
+        for gid in gids_to_process:
+            gid_to_review[gid] = {
+                "is_reason_sufficient": is_reason_sufficient,
+                "review_notes": review_notes
+            }
+    return gid_to_review
+
+
+def _process_review_batch(
+    review_batch: List[Dict],
+    review_results: Optional[List[Dict]],
+    reviewed_clusters: List[Dict],
+    reinstated_candidates: List[Dict],
+) -> None:
+    """处理单个复核批次的结果"""
+    if review_results:
+        # 构建gid到复核结果的映射
+        gid_to_review = _build_gid_to_review_mapping(review_results)
+        
+        # 处理每个无效聚类
+        for invalid_cluster in review_batch:
+            cluster_gids = invalid_cluster.get("gids", [])
+            cluster_members = invalid_cluster.get("members", [])
+            
+            # 检查该聚类中的所有gid的复核结果
+            all_sufficient = True
+            any_reviewed = False
+            insufficient_review_result = None
+            for gid in cluster_gids:
+                review_result = gid_to_review.get(gid)
+                if review_result:
+                    any_reviewed = True
+                    if review_result.get("is_reason_sufficient") is not True:
+                        all_sufficient = False
+                        if not insufficient_review_result:
+                            insufficient_review_result = review_result
+                        break
+            
+            if any_reviewed and not all_sufficient:
+                # 理由不充分，重新加入验证流程
+                typer.secho(f"[jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由不充分，重新加入验证流程", fg=typer.colors.BLUE)
+                for member in cluster_members:
+                    reinstated_candidates.append(member)
+                reviewed_clusters.append({
+                    **invalid_cluster,
+                    "review_result": "reinstated",
+                    "review_notes": insufficient_review_result.get("review_notes", "") if insufficient_review_result else "",
+                })
+            else:
+                # 理由充分，确认无效
+                review_notes = ""
+                if cluster_gids and gid_to_review.get(cluster_gids[0]):
+                    review_notes = gid_to_review[cluster_gids[0]].get("review_notes", "")
+                typer.secho(f"[jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由充分，确认为无效", fg=typer.colors.GREEN)
+                reviewed_clusters.append({
+                    **invalid_cluster,
+                    "review_result": "confirmed_invalid",
+                    "review_notes": review_notes,
+                })
+    else:
+        # 复核结果解析失败，保守策略：重新加入验证流程
+        typer.secho(f"[jarvis-sec] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程", fg=typer.colors.YELLOW)
+        for invalid_cluster in review_batch:
+            cluster_members = invalid_cluster.get("members", [])
+            for member in cluster_members:
+                reinstated_candidates.append(member)
+            reviewed_clusters.append({
+                **invalid_cluster,
+                "review_result": "reinstated",
+                "review_notes": "复核结果解析失败，保守策略重新加入验证",
+            })
+
+
+def _run_review_agent_with_retry(
+    review_agent,
+    review_task: str,
+    review_summary_prompt: str,
+    entry_path: str,
+    review_summary_container: Dict[str, str],
+) -> tuple[Optional[List[Dict]], Optional[str]]:
+    """运行复核Agent并永久重试直到格式正确，返回(复核结果, 解析错误)"""
+    use_direct_model_review = False
+    prev_parse_error_review: Optional[str] = None
+    review_attempt = 0
+    
+    while True:
+        review_attempt += 1
+        review_summary_container["text"] = ""
+        
+        if use_direct_model_review:
+            # 格式校验失败后，直接调用模型接口
+            review_summary_prompt_text = _build_verification_summary_prompt()
+            error_guidance = ""
+            if prev_parse_error_review:
+                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_review}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+            
+            full_review_prompt = f"{review_task}{error_guidance}\n\n{review_summary_prompt_text}"
+            try:
+                review_response = review_agent.model.chat_until_success(full_review_prompt)  # type: ignore
+                review_summary_container["text"] = review_response
+            except Exception as e:
+                try:
+                    typer.secho(f"[jarvis-sec] 复核阶段直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+                review_agent.run(review_task)
+        else:
+            review_agent.run(review_task)
+        
+        # 工作区保护
+        try:
+            _changed_review = _git_restore_if_dirty(entry_path)
+            if _changed_review:
+                try:
+                    typer.secho(f"[jarvis-sec] 复核 Agent 工作区已恢复 ({_changed_review} 个文件）", fg=typer.colors.BLUE)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
+        # 解析复核结果
+        review_summary_text = review_summary_container.get("text", "")
+        parse_error_review = None
+        if review_summary_text:
+            review_parsed, parse_error_review = _try_parse_summary_report(review_summary_text)
+            if parse_error_review:
+                prev_parse_error_review = parse_error_review
+                try:
+                    typer.secho(f"[jarvis-sec] 复核结果YAML解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+            else:
+                prev_parse_error_review = None
+                if isinstance(review_parsed, list):
+                    # 验证复核结果格式
+                    if review_parsed and all(_is_valid_review_item(item) for item in review_parsed):
+                        return review_parsed, None
+        
+        # 格式校验失败，后续重试使用直接模型调用
+        use_direct_model_review = True
+        if parse_error_review:
+            try:
+                typer.secho(f"[jarvis-sec] 复核结果YAML解析失败 -> 重试第 {review_attempt} 次 (使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
+        else:
+            try:
+                typer.secho(f"[jarvis-sec] 复核结果格式无效 -> 重试第 {review_attempt} 次 (使用直接模型调用)", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
+
+
+def _is_valid_review_item(item: Dict) -> bool:
+    """验证复核结果项的格式"""
+    if not isinstance(item, dict) or "is_reason_sufficient" not in item:
+        return False
+    has_gid = "gid" in item
+    has_gids = "gids" in item
+    if not has_gid and not has_gids:
+        return False
+    if has_gid and has_gids:
+        return False  # gid 和 gids 不能同时出现
+    if has_gid:
+        try:
+            return int(item["gid"]) >= 1
+        except Exception:
+            return False
+    elif has_gids:
+        if not isinstance(item["gids"], list) or len(item["gids"]) == 0:
+            return False
+        try:
+            return all(int(gid_val) >= 1 for gid_val in item["gids"])
+        except Exception:
+            return False
+    return False
+
+
+def _load_processed_gids_from_issues(sec_dir) -> set:
+    """从 agent_issues.jsonl 中读取已处理的 gid"""
+    processed_gids = set()
+    try:
+        from pathlib import Path as _Path
+        _agent_issues_path = sec_dir / "agent_issues.jsonl"
+        if _agent_issues_path.exists():
+            import json as _json
+            with _agent_issues_path.open("r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        issue_obj = _json.loads(line)
+                        _gid = int(issue_obj.get("gid", 0))
+                        if _gid >= 1:
+                            processed_gids.add(_gid)
+                    except Exception:
+                        pass
+            if processed_gids:
+                try:
+                    typer.secho(f"[jarvis-sec] 断点恢复：从 agent_issues.jsonl 读取到 {len(processed_gids)} 个已处理的 gid", fg=typer.colors.BLUE)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    return processed_gids
+
+
+def _process_verification_batch(
+    batch: List[Dict],
+    bidx: int,
+    total_batches: int,
+    entry_path: str,
+    langs: List[str],
+    llm_group: Optional[str],
+    status_mgr,
+    _progress_append,
+    _append_report,
+    _sig_of,
+    all_issues: List[Dict],
+    meta_records: List[Dict],
+    gid_counts: Dict[int, int],
+) -> None:
+    """
+    处理单个验证批次。
+    
+    参数:
+    - batch: 当前批次的候选列表
+    - bidx: 批次索引
+    - total_batches: 总批次数
+    - 其他参数用于状态管理和结果收集
+    """
+    task_id = f"JARVIS-SEC-Batch-{bidx}"
+    batch_file = batch[0].get("file") if batch else None
+    
+    # 进度：批次开始
+    _progress_append(
+        {
+            "event": "batch_status",
+            "status": "running",
+            "batch_id": task_id,
+            "batch_index": bidx,
+            "total_batches": total_batches,
+            "batch_size": len(batch),
+            "file": batch_file,
+        }
+    )
+    # 更新验证阶段进度
+    status_mgr.update_verification(
+        current_batch=bidx,
+        total_batches=total_batches,
+        batch_id=task_id,
+        file_name=batch_file,
+        message=f"正在验证批次 {bidx}/{total_batches}"
+    )
+
+    # 显示进度
+    try:
+        typer.secho(f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}'", fg=typer.colors.CYAN)
+    except Exception:
+        pass
+
+    # 构造 Agent（单次处理一批候选）
+    system_prompt = """
+# 单Agent安全分析约束
+- 你的核心任务是评估代码的安全问题，目标：针对本候选问题进行证据核实、风险评估与修复建议补充，查找漏洞触发路径，确认在某些条件下会触发；以此来判断是否是漏洞。
+- **必须进行调用路径推导**：
+  - 对于每个候选问题，必须明确推导从可控输入到缺陷代码的完整调用路径。
+  - 调用路径推导必须包括：
+    1. 识别可控输入的来源（例如：用户输入、网络数据、文件读取、命令行参数等）
+    2. 追踪数据流：从输入源开始，逐步追踪数据如何传递到缺陷代码位置
+    3. 识别调用链：明确列出从入口函数到缺陷代码的所有函数调用序列（例如：main() -> parse_input() -> process_data() -> vulnerable_function()）
+    4. 分析每个调用点的数据校验情况：检查每个函数是否对输入进行了校验、边界检查或安全检查
+    5. 确认触发条件：明确说明在什么条件下，未校验或恶意输入能够到达缺陷代码位置
+  - 如果无法推导出完整的调用路径，或者所有调用路径都有充分的保护措施，则应该判定为误报。
+  - 调用路径推导必须在分析过程中明确展示，不能省略或假设。
+- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
+- **调用路径追溯要求**：
+  - 必须向上追溯所有可能的调用者，查看完整的调用路径，以确认风险是否真实存在。
+  - 使用 read_code 和 execute_script 工具查找函数的调用者（例如：使用 grep 搜索函数名，查找所有调用该函数的位置）。
+  - 对于每个调用者，必须检查其是否对输入进行了校验。
+  - 如果发现任何调用路径未做校验，必须明确记录该路径。
+  - 例如：一个函数存在空指针解引用风险，必须检查所有调用者。如果所有调用者均能确保传入的指针非空，则该风险在当前代码库中可能不会实际触发；但如果存在任何调用者未做校验，则风险真实存在。
+- 若多条告警位于同一文件且行号相距不远，可一次性读取共享上下文，对这些相邻告警进行联合分析与判断；但仍需避免无关扩展与大范围遍历。
+- 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
+- 每次仅执行一个操作；等待工具结果后再进行下一步。
+- **记忆使用**：
+  - 在分析过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前分析函数相关的记忆。
+  - 如果有必要，使用 save_memory 工具保存每个函数的分析要点，使用函数名作为 tag（例如：函数名、文件名等）。
+  - 记忆内容示例：某个函数的指针已经判空、某个函数已有输入校验、某个函数的调用路径分析结果等。
+  - 这样可以避免重复分析，提高效率，并保持分析的一致性。
+- 完成对本批次候选问题的判断后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+""".strip()
+    
+    agent_kwargs: Dict = dict(
+        system_prompt=system_prompt,
+        name=task_id,
+        auto_complete=True,
+        need_summary=True,
+        summary_prompt=_build_summary_prompt(),
+        non_interactive=True,
+        in_multi_agent=False,
+        use_methodology=False,
+        use_analysis=False,
+        plan=False,
+        output_handler=[ToolRegistry()],
+        disable_file_edit=True,
+        force_save_memory=True,
+        use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
+    )
+    if llm_group:
+        agent_kwargs["model_group"] = llm_group
+    agent = Agent(**agent_kwargs)
+
+    # 任务上下文（批次）
+    import json as _json2
+    batch_ctx: List[Dict] = list(batch)
+    cluster_verify = str(batch_ctx[0].get("verify") if batch_ctx else "")
+    cluster_gids_ctx = [it.get("gid") for it in batch_ctx]
+    per_task = f"""
+# 安全子任务批次
+上下文参数：
+- entry_path: {entry_path}
+- languages: {langs}
+- cluster_verification: {cluster_verify}
+
+- cluster_gids: {cluster_gids_ctx}
+- note: 每个候选含 gid/verify 字段，模型仅需输出 gid 统一给出验证/判断结论（全局编号）；无需使用局部 id
+
+批次候选(JSON数组):
+{_json2.dumps(batch_ctx, ensure_ascii=False, indent=2)}
+""".strip()
+
+    # 订阅 AFTER_SUMMARY，捕获Agent内部生成的摘要
+    try:
+        from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY
+    except Exception:
+        _AFTER_SUMMARY = None
+    summary_container: Dict[str, str] = {"text": ""}
+    if _AFTER_SUMMARY:
+        def _on_after_summary(**kwargs):
+            try:
+                summary_container["text"] = str(kwargs.get("summary", "") or "")
+            except Exception:
+                summary_container["text"] = ""
+        try:
+            agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary)
+        except Exception:
+            pass
+
+    # 执行Agent（增加重试机制：摘要解析失败或关键字段缺失时，重新运行当前批次）
+    summary_items: Optional[List[Dict]] = None
+    workspace_restore_info: Optional[Dict] = None
+    use_direct_model_analysis = False
+    prev_parsed_items: Optional[List] = None
+    parse_error_analysis: Optional[str] = None
+    attempt = 0
+    
+    while True:
+        attempt += 1
+        summary_container["text"] = ""
+        
+        if use_direct_model_analysis:
+            summary_prompt_text = _build_summary_prompt()
+            error_guidance = ""
+            if parse_error_analysis:
+                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_error_analysis}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+            elif prev_parsed_items is None:
+                error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
+            elif not _valid_items(prev_parsed_items):
+                validation_errors = []
+                if not isinstance(prev_parsed_items, list):
+                    validation_errors.append("结果不是数组")
+                else:
+                    for idx, it in enumerate(prev_parsed_items):
+                        if not isinstance(it, dict):
+                            validation_errors.append(f"元素{idx}不是字典")
+                            break
+                        has_gid = "gid" in it
+                        has_gids = "gids" in it
+                        if not has_gid and not has_gids:
+                            validation_errors.append(f"元素{idx}缺少必填字段 gid 或 gids")
+                            break
+                        if has_gid and has_gids:
+                            validation_errors.append(f"元素{idx}不能同时包含 gid 和 gids")
+                            break
+                        if has_gid:
+                            try:
+                                if int(it.get("gid", 0)) < 1:
+                                    validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
+                                    break
+                            except Exception:
+                                validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
+                                break
+                        elif has_gids:
+                            if not isinstance(it.get("gids"), list) or len(it.get("gids", [])) == 0:
+                                validation_errors.append(f"元素{idx}的 gids 必须是非空数组")
+                                break
+                            try:
+                                for gid_idx, gid_val in enumerate(it.get("gids", [])):
+                                    if int(gid_val) < 1:
+                                        validation_errors.append(f"元素{idx}的 gids[{gid_idx}] 必须 >= 1")
+                                        break
+                                if validation_errors:
+                                    break
+                            except Exception:
+                                validation_errors.append(f"元素{idx}的 gids 格式错误（必须是整数数组）")
+                                break
+                        if "has_risk" not in it or not isinstance(it.get("has_risk"), bool):
+                            validation_errors.append(f"元素{idx}缺少必填字段 has_risk（必须是布尔值）")
+                            break
+                        if it.get("has_risk"):
+                            for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
+                                if key not in it:
+                                    validation_errors.append(f"元素{idx}的 has_risk 为 true，但缺少必填字段 {key}")
+                                    break
+                                if not isinstance(it[key], str) or not it[key].strip():
+                                    validation_errors.append(f"元素{idx}的 {key} 字段不能为空")
+                                    break
+                            if validation_errors:
+                                break
+                if validation_errors:
+                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {err}" for err in validation_errors)
+            
+            full_prompt = f"{per_task}{error_guidance}\n\n{summary_prompt_text}"
+            try:
+                response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                summary_container["text"] = response
+            except Exception as e:
+                try:
+                    typer.secho(f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+                agent.run(per_task)
+        else:
+            agent.run(per_task)
+
+        # 工作区保护
+        try:
+            _changed = _git_restore_if_dirty(entry_path)
+            workspace_restore_info = {
+                "performed": bool(_changed),
+                "changed_files_count": int(_changed or 0),
+                "action": "git checkout -- .",
+            }
+            meta_records.append({
+                "task_id": task_id,
+                "batch_index": bidx,
+                "workspace_restore": workspace_restore_info,
+                "attempt": attempt + 1,
+            })
+            if _changed:
+                try:
+                    typer.secho(f"[jarvis-sec] 工作区已恢复 ({_changed} 个文件），操作: git checkout -- .", fg=typer.colors.BLUE)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 解析摘要中的 <REPORT>（YAML）
+        summary_text = summary_container.get("text", "")
+        parsed_items: Optional[List] = None
+        parse_error_analysis = None
+        if summary_text:
+            rep, parse_error_analysis = _try_parse_summary_report(summary_text)
+            if parse_error_analysis:
+                try:
+                    typer.secho(f"[jarvis-sec] 分析结果YAML解析失败: {parse_error_analysis}", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+            elif isinstance(rep, list):
+                parsed_items = rep
+            elif isinstance(rep, dict):
+                items = rep.get("issues")
+                if isinstance(items, list):
+                    parsed_items = items
+
+        # 关键字段校验
+        if parsed_items and _valid_items(parsed_items):
+            summary_items = parsed_items
+            break
+        
+        # 格式校验失败，后续重试使用直接模型调用
+        use_direct_model_analysis = True
+        prev_parsed_items = parsed_items
+        if parse_error_analysis:
+            try:
+                typer.secho(f"[jarvis-sec] 分析结果YAML解析失败 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
+        else:
+            try:
+                typer.secho(f"[jarvis-sec] 分析结果格式无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
+    
+    # 处理分析结果
+    parse_fail = summary_items is None
+    merged_items: List[Dict] = []
+    verified_items: List[Dict] = []
+    
+    if summary_items:
+        # 展开 gids 格式为单个 gid 格式
+        for it in summary_items:
+            if "gids" in it and isinstance(it.get("gids"), list):
+                for gid_val in it.get("gids", []):
+                    try:
+                        gid_int = int(gid_val)
+                        if gid_int >= 1:
+                            merged_items.append({
+                                **{k: v for k, v in it.items() if k != "gids"},
+                                "gid": gid_int,
+                            })
+                    except Exception:
+                        pass
+            elif "gid" in it:
+                merged_items.append(it)
+        
+        # 运行验证Agent（如果分析Agent发现有问题）
+        if merged_items:
+            # 创建验证 Agent 来验证分析 Agent 的结论
+            verification_system_prompt = """
+# 验证 Agent 约束
+- 你的核心任务是验证分析 Agent 给出的安全结论是否正确。
+- 你需要仔细检查分析 Agent 给出的前置条件、触发路径、后果和建议是否合理、准确。
+- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
+- 必要时需向上追溯调用者，查看完整的调用路径，以确认分析 Agent 的结论是否成立。
+- 禁止修改任何文件或执行写操作命令；仅进行只读分析与读取。
+- 每次仅执行一个操作；等待工具结果后再进行下一步。
+- **记忆使用**：
+  - 在验证过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是分析 Agent 保存的与当前验证函数相关的记忆。
+  - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等，可以帮助你更准确地验证分析结论。
+  - 如果发现分析 Agent 的结论与记忆中的信息不一致，需要仔细核实。
+- 完成验证后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+""".strip()
+            
+            verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"
+            verification_agent_kwargs: Dict = dict(
+                system_prompt=verification_system_prompt,
+                name=verification_task_id,
+                auto_complete=True,
+                need_summary=True,
+                summary_prompt=_build_verification_summary_prompt(),
+                non_interactive=True,
+                in_multi_agent=False,
+                use_methodology=False,
+                use_analysis=False,
+                plan=False,
+                output_handler=[ToolRegistry()],
+                disable_file_edit=True,
+                use_tools=["read_code", "execute_script", "retrieve_memory"],
+            )
+            if llm_group:
+                verification_agent_kwargs["model_group"] = llm_group
+            verification_agent = Agent(**verification_agent_kwargs)
+            
+            # 构造验证任务上下文
+            import json as _json3
+            verification_task = f"""
+# 验证分析结论任务
+上下文参数：
+- entry_path: {entry_path}
+- languages: {langs}
+
+分析 Agent 给出的结论（需要验证）：
+{_json3.dumps(merged_items, ensure_ascii=False, indent=2)}
+
+请验证上述分析结论是否正确，包括：
+1. 前置条件（preconditions）是否合理
+2. 触发路径（trigger_path）是否成立
+3. 后果（consequences）评估是否准确
+4. 建议（suggestions）是否合适
+
+对于每个 gid，请判断分析结论是否正确（is_valid: true/false），并给出验证说明。
+""".strip()
+            
+            # 订阅验证 Agent 的摘要
+            try:
+                from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY_VERIFY
+            except Exception:
+                _AFTER_SUMMARY_VERIFY = None
+            verification_summary_container: Dict[str, str] = {"text": ""}
+            if _AFTER_SUMMARY_VERIFY:
+                def _on_after_summary_verify(**kwargs):
+                    try:
+                        verification_summary_container["text"] = str(kwargs.get("summary", "") or "")
+                    except Exception:
+                        verification_summary_container["text"] = ""
+                try:
+                    verification_agent.event_bus.subscribe(_AFTER_SUMMARY_VERIFY, _on_after_summary_verify)
+                except Exception:
+                    pass
+            
+            verification_results = _run_verification_agent_with_retry(
+                verification_agent,
+                verification_task,
+                _build_verification_summary_prompt(),
+                entry_path,
+                verification_summary_container,
+                bidx,
+            )
+            
+            # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
+            if verification_results:
+                gid_to_verification: Dict[int, Dict] = {}
+                for vr in verification_results:
+                    if not isinstance(vr, dict):
+                        continue
+                    gids_to_process: List[int] = []
+                    if "gids" in vr and isinstance(vr.get("gids"), list):
+                        for gid_val in vr.get("gids", []):
+                            try:
+                                gid_int = int(gid_val)
+                                if gid_int >= 1:
+                                    gids_to_process.append(gid_int)
+                            except Exception:
+                                pass
+                    elif "gid" in vr:
+                        try:
+                            gid_int = int(vr.get("gid", 0))
+                            if gid_int >= 1:
+                                gids_to_process.append(gid_int)
+                        except Exception:
+                            pass
+                    
+                    is_valid = vr.get("is_valid")
+                    verification_notes = str(vr.get("verification_notes", "")).strip()
+                    for gid in gids_to_process:
+                        gid_to_verification[gid] = {
+                            "is_valid": is_valid,
+                            "verification_notes": verification_notes
+                        }
+                
+                # 只保留验证通过的告警
+                for item in merged_items:
+                    item_gid = int(item.get("gid", 0))
+                    verification = gid_to_verification.get(item_gid)
+                    if verification and verification.get("is_valid") is True:
+                        item["verification_notes"] = str(verification.get("verification_notes", "")).strip()
+                        verified_items.append(item)
+                    elif verification and verification.get("is_valid") is False:
+                        try:
+                            typer.secho(f"[jarvis-sec] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}", fg=typer.colors.BLUE)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            typer.secho(f"[jarvis-sec] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过", fg=typer.colors.YELLOW)
+                        except Exception:
+                            pass
+            else:
+                typer.secho(f"[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）", fg=typer.colors.YELLOW)
+            
+            # 只有验证通过的告警才写入文件
+            if verified_items:
+                all_issues.extend(verified_items)
+                for item in verified_items:
+                    gid = int(item.get("gid", 0))
+                    if gid >= 1:
+                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(merged_items)} -> 追加到报告", fg=typer.colors.GREEN)
+                _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
+                status_mgr.update_verification(
+                    current_batch=bidx,
+                    total_batches=total_batches,
+                    issues_found=len(all_issues),
+                    message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题（验证通过）"
+                )
+            else:
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(merged_items)} 个，验证后全部不通过", fg=typer.colors.BLUE)
+                status_mgr.update_verification(
+                    current_batch=bidx,
+                    total_batches=total_batches,
+                    issues_found=len(all_issues),
+                    message=f"已验证 {bidx}/{total_batches} 批次，验证后无有效告警"
+                )
+        elif parse_fail:
+            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)", fg=typer.colors.YELLOW)
+        else:
+            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题", fg=typer.colors.BLUE)
+            status_mgr.update_verification(
+                current_batch=bidx,
+                total_batches=total_batches,
+                issues_found=len(all_issues),
+                message=f"已验证 {bidx}/{total_batches} 批次"
+            )
+
+    # 为本批次所有候选写入 done 记录
+    for c in batch:
+        sig = _sig_of(c)
+        try:
+            c_gid = int(c.get("gid", 0))
+        except Exception:
+            c_gid = 0
+        cnt = gid_counts.get(c_gid, 0)
+        _progress_append({
+            "event": "task_status",
+            "status": "done",
+            "task_id": task_id,
+            "candidate_signature": sig,
+            "candidate": c,
+            "issues_count": int(cnt),
+            "parse_fail": parse_fail,
+            "workspace_restore": workspace_restore_info,
+            "batch_index": bidx,
+        })
+
+    # 批次结束记录
+    _progress_append({
+        "event": "batch_status",
+        "status": "done",
+        "batch_id": task_id,
+        "batch_index": bidx,
+        "total_batches": total_batches,
+        "issues_count": len(verified_items) if merged_items else 0,
+        "parse_fail": parse_fail,
+    })
+
+
+def _valid_items(items: Optional[List]) -> bool:
+    """验证分析结果项的格式"""
+    if not isinstance(items, list):
+        return False
+    for it in items:
+        if not isinstance(it, dict):
+            return False
+        has_gid = "gid" in it
+        has_gids = "gids" in it
+        if not has_gid and not has_gids:
+            return False
+        if has_gid and has_gids:
+            return False
+        if has_gid:
+            try:
+                if int(it["gid"]) < 1:
+                    return False
+            except Exception:
+                return False
+        elif has_gids:
+            if not isinstance(it["gids"], list) or len(it["gids"]) == 0:
+                return False
+            for gid_val in it["gids"]:
+                try:
+                    if int(gid_val) < 1:
+                        return False
+                except Exception:
+                    return False
+        if "has_risk" not in it or not isinstance(it["has_risk"], bool):
+            return False
+        if it.get("has_risk"):
+            for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
+                if key not in it:
+                    return False
+                if not isinstance(it[key], str) or not it[key].strip():
+                    return False
+    return True
+
+
+def _is_valid_verification_item(item: Dict) -> bool:
+    """验证验证结果项的格式"""
+    if not isinstance(item, dict) or "is_valid" not in item:
+        return False
+    has_gid = "gid" in item
+    has_gids = "gids" in item
+    if not has_gid and not has_gids:
+        return False
+    if has_gid and has_gids:
+        return False  # gid 和 gids 不能同时出现
+    if has_gid:
+        try:
+            return int(item["gid"]) >= 1
+        except Exception:
+            return False
+    elif has_gids:
+        if not isinstance(item["gids"], list) or len(item["gids"]) == 0:
+            return False
+        try:
+            return all(int(gid_val) >= 1 for gid_val in item["gids"])
+        except Exception:
+            return False
+    return False
+
+
+def _run_verification_agent_with_retry(
+    verification_agent,
+    verification_task: str,
+    verification_summary_prompt: str,
+    entry_path: str,
+    verification_summary_container: Dict[str, str],
+    bidx: int,
+) -> tuple[Optional[List[Dict]], Optional[str]]:
+    """运行验证Agent并永久重试直到格式正确，返回(验证结果, 解析错误)"""
+    use_direct_model_verify = False
+    prev_parse_error_verify: Optional[str] = None
+    verify_attempt = 0
+    
+    while True:
+        verify_attempt += 1
+        verification_summary_container["text"] = ""
+        
+        if use_direct_model_verify:
+            verification_summary_prompt_text = _build_verification_summary_prompt()
+            error_guidance = ""
+            if prev_parse_error_verify:
+                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_verify}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+            
+            full_verify_prompt = f"{verification_task}{error_guidance}\n\n{verification_summary_prompt_text}"
+            try:
+                verify_response = verification_agent.model.chat_until_success(full_verify_prompt)  # type: ignore
+                verification_summary_container["text"] = verify_response
+            except Exception as e:
+                try:
+                    typer.secho(f"[jarvis-sec] 验证阶段直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+                verification_agent.run(verification_task)
+        else:
+            verification_agent.run(verification_task)
+        
+        # 工作区保护
+        try:
+            _changed_verify = _git_restore_if_dirty(entry_path)
+            if _changed_verify:
+                try:
+                    typer.secho(f"[jarvis-sec] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件）", fg=typer.colors.BLUE)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        
+        # 解析验证结果
+        verification_summary_text = verification_summary_container.get("text", "")
+        parse_error_verify = None
+        if verification_summary_text:
+            verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
+            if parse_error_verify:
+                prev_parse_error_verify = parse_error_verify
+                try:
+                    typer.secho(f"[jarvis-sec] 验证结果YAML解析失败: {parse_error_verify}", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+            else:
+                prev_parse_error_verify = None
+                if isinstance(verification_parsed, list):
+                    if verification_parsed and all(_is_valid_verification_item(item) for item in verification_parsed):
+                        return verification_parsed, None
+        
+        # 格式校验失败，后续重试使用直接模型调用
+        use_direct_model_verify = True
+        if parse_error_verify:
+            try:
+                typer.secho(f"[jarvis-sec] 验证结果YAML解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
+        else:
+            try:
+                typer.secho(f"[jarvis-sec] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
+
+
 def run_security_analysis(
     entry_path: str,
     languages: Optional[List[str]] = None,
@@ -199,139 +1620,18 @@ def run_security_analysis(
     except Exception:
         pass
 
-    # 辅助函数：正确解析 .jarvis/sec 目录路径
-    # 如果 entry_path 已经是 .jarvis/sec 目录，直接使用；否则添加 .jarvis/sec
-    from pathlib import Path as _Path
-    def _get_sec_dir(base_path: str):
-        """获取 .jarvis/sec 目录路径，支持 base_path 是项目根目录或已经是 .jarvis/sec 目录"""
-        base = _Path(base_path)
-        # 检查 base_path 是否已经是 .jarvis/sec 目录
-        if base.name == "sec" and base.parent.name == ".jarvis":
-            return base
-        # 否则，假设 base_path 是项目根目录
-        return base / ".jarvis" / "sec"
-    
-    # 进度文件（JSONL，断点续扫）
-    from datetime import datetime as _dt
-    sec_dir = _get_sec_dir(entry_path)
-    progress_path = sec_dir / "progress.jsonl"
-
-    def _progress_append(rec: Dict) -> None:
-        try:
-            progress_path.parent.mkdir(parents=True, exist_ok=True)
-            rec = dict(rec)
-            rec.setdefault("timestamp", _dt.utcnow().isoformat() + "Z")
-            import json as _json
-            line = _json.dumps(rec, ensure_ascii=False)
-            with progress_path.open("a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            # 进度文件失败不影响主流程
-            pass
-
-    # 已完成集合（按候选签名）
-    done_sigs: set = set()
-    if progress_path.exists():
-        try:
-            import json as _json
-            for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = _json.loads(line)
-                except Exception:
-                    continue
-                if obj.get("event") == "task_status" and obj.get("status") == "done":
-                    sig = obj.get("candidate_signature")
-                    if sig:
-                        done_sigs.add(sig)
-        except Exception:
-            pass
+    # 初始化分析上下文
+    sec_dir, progress_path, _progress_append, done_sigs = _initialize_analysis_context(
+        entry_path, status_mgr
+    )
 
     # 1) 启发式扫描（支持断点续扫）
-    from pathlib import Path as _Path
-    _heuristic_path = sec_dir / "heuristic_issues.jsonl"
-    candidates: List[Dict] = []
-    summary: Dict = {}
-
-    if _heuristic_path.exists():
-        try:
-            typer.secho(f"[jarvis-sec] 从 {_heuristic_path} 恢复启发式扫描", fg=typer.colors.BLUE)
-            with _heuristic_path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        candidates.append(json.loads(line))
-            _progress_append({
-                "event": "pre_scan_resumed",
-                "path": str(_heuristic_path),
-                "issues_found": len(candidates)
-            })
-        except Exception as e:
-            typer.secho(f"[jarvis-sec] 恢复启发式扫描失败，执行完整扫描: {e}", fg=typer.colors.YELLOW)
-            candidates = []  # 重置以便执行完整扫描
-
-    if not candidates:
-        _progress_append({"event": "pre_scan_start", "entry_path": entry_path, "languages": langs})
-        status_mgr.update_pre_scan(message="开始启发式扫描...")
-        pre_scan = direct_scan(entry_path, languages=langs, exclude_dirs=exclude_dirs)
-        candidates = pre_scan.get("issues", [])
-        summary = pre_scan.get("summary", {})
-        scanned_files = summary.get("scanned_files", 0)
-        status_mgr.update_pre_scan(
-            current_files=scanned_files,
-            total_files=scanned_files,
-            issues_found=len(candidates),
-            message=f"启发式扫描完成，发现 {len(candidates)} 个候选问题"
-        )
-        _progress_append({
-            "event": "pre_scan_done",
-            "entry_path": entry_path,
-            "languages": langs,
-            "scanned_files": scanned_files,
-            "issues_found": len(candidates)
-        })
-        # 持久化
-        try:
-            _heuristic_path.parent.mkdir(parents=True, exist_ok=True)
-            with _heuristic_path.open("w", encoding="utf-8") as f:
-                for item in candidates:
-                    f.write(json.dumps(item, ensure_ascii=False) + "\n")
-            _progress_append({
-                "event": "heuristic_report_written",
-                "path": str(_heuristic_path),
-                "issues_count": len(candidates),
-            })
-            typer.secho(f"[jarvis-sec] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}", fg=typer.colors.GREEN)
-        except Exception:
-            pass
-    else:
-        # 从断点恢复启发式扫描结果
-        status_mgr.update_pre_scan(
-            issues_found=len(candidates),
-            message=f"从断点恢复，已发现 {len(candidates)} 个候选问题"
-        )
+    candidates, summary = _load_or_run_heuristic_scan(
+        entry_path, langs, exclude_dirs, sec_dir, status_mgr, _progress_append
+    )
 
     # 2) 将候选问题精简为子任务清单，控制上下文长度
-    def _compact(it: Dict) -> Dict:
-        return {
-            "language": it.get("language"),
-            "category": it.get("category"),
-            "pattern": it.get("pattern"),
-            "file": it.get("file"),
-            "line": it.get("line"),
-            "evidence": it.get("evidence"),
-            "confidence": it.get("confidence"),
-            "severity": it.get("severity", "medium"),
-        }
-
-    compact_candidates = [_compact(it) for it in candidates]
-    # 为所有候选分配全局唯一数字ID（gid: 1..N），用于跨批次/跨文件统一编号与跟踪
-    for i, it in enumerate(compact_candidates, start=1):
-        try:
-            it["gid"] = i
-        except Exception:
-            pass
+    compact_candidates = _prepare_candidates(candidates)
     # 为所有启发式候选分配稳定ID（HID），聚类改由 Agent 执行
 
     # candidates already compacted; no additional enrichment required
@@ -397,6 +1697,7 @@ def run_security_analysis(
     # 3) 按批次将候选问题提交给单Agent验证（一次提交一个文件的前 n 条，直到该文件全部处理完）
     all_issues: List[Dict] = []
     meta_records: List[Dict] = []
+    gid_counts: Dict[int, int] = {}
 
     # 仅处理当前批次选择的文件的候选（compact_candidates 前面已替换为该文件的全部候选）
     # 基于进度文件跳过已完成的候选
@@ -442,66 +1743,9 @@ def run_security_analysis(
             return None, f"解析过程发生异常: {str(e)}"
 
     # 读取已有聚类报告以支持断点（若存在则按文件+批次复用既有聚类结果）
-    _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
-    # 记录已完成的聚类批次（从 progress.jsonl 中读取）
-    _completed_cluster_batches: set = set()
-    try:
-        from pathlib import Path as _Path2
-        import json as _json
-        _cluster_path = sec_dir / "cluster_report.jsonl"
-        
-        # 从 progress.jsonl 中读取已完成的聚类批次（优先检查）
-        if progress_path.exists():
-            try:
-                for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = _json.loads(line)
-                    except Exception:
-                        continue
-                    # 检查 cluster_status 事件，status 为 "done" 表示已完成
-                    if obj.get("event") == "cluster_status" and obj.get("status") == "done":
-                        file_name = obj.get("file")
-                        batch_idx = obj.get("batch_index")
-                        if file_name and batch_idx:
-                            _completed_cluster_batches.add((str(file_name), int(batch_idx)))
-            except Exception:
-                pass
-        
-        # 读取 cluster_report.jsonl（由于使用追加模式，可能有重复，需要去重）
-        if _cluster_path.exists():
-            try:
-                # 使用字典去重：key 为 (file, batch_index, verification, gids 的字符串表示)
-                seen_records: Dict[tuple, Dict] = {}
-                with _cluster_path.open("r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        rec = _json.loads(line)
-                        if not isinstance(rec, dict):
-                            continue
-                        f_name = str(rec.get("file") or "")
-                        bidx = int(rec.get("batch_index", 1) or 1)
-                        # 使用 gids 的排序后元组作为去重键
-                        gids_list = rec.get("gids", [])
-                        gids_key = tuple(sorted(gids_list)) if isinstance(gids_list, list) else ()
-                        key = (f_name, bidx, str(rec.get("verification", "")), gids_key)
-                        # 保留最新的记录（后写入的覆盖先写入的）
-                        seen_records[key] = rec
-                
-                # 按 (file, batch_index) 分组
-                for rec in seen_records.values():
-                    f_name = str(rec.get("file") or "")
-                    bidx = int(rec.get("batch_index", 1) or 1)
-                    _existing_clusters.setdefault((f_name, bidx), []).append(rec)
-            except Exception:
-                _existing_clusters = {}
-    except Exception:
-        _existing_clusters = {}
-        _completed_cluster_batches = set()
+    _existing_clusters, _completed_cluster_batches = _load_existing_clusters(
+        sec_dir, progress_path
+    )
 
     # 快照写入函数：每处理完一个聚类批次后，追加写入该批次的聚类结果，支持断点恢复
     def _write_cluster_report_snapshot():
@@ -1349,171 +2593,25 @@ def run_security_analysis(
                     typer.secho(f"[jarvis-sec] 复核结果格式无效 -> 重试第 {review_attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
                 except Exception:
                     pass
-    
-    def _is_valid_verification_item(item: Dict) -> bool:
-        """验证验证结果项的格式"""
-        if not isinstance(item, dict) or "is_valid" not in item:
-            return False
-        has_gid = "gid" in item
-        has_gids = "gids" in item
-        if not has_gid and not has_gids:
-            return False
-        if has_gid and has_gids:
-            return False  # gid 和 gids 不能同时出现
-        if has_gid:
-            try:
-                return int(item["gid"]) >= 1
-            except Exception:
-                return False
-        elif has_gids:
-            if not isinstance(item["gids"], list) or len(item["gids"]) == 0:
-                return False
-            try:
-                return all(int(gid_val) >= 1 for gid_val in item["gids"])
-            except Exception:
-                return False
-        return False
-    
-    def _run_verification_agent_with_retry(
-        verification_agent,
-        verification_task: str,
-        verification_summary_prompt: str,
-        entry_path: str,
-        verification_summary_container: Dict[str, str],
-        bidx: int,
-    ) -> tuple[Optional[List[Dict]], Optional[str]]:
-        """运行验证Agent并永久重试直到格式正确，返回(验证结果, 解析错误)"""
-        use_direct_model_verify = False
-        prev_parse_error_verify: Optional[str] = None
-        verify_attempt = 0
-        
-        while True:
-            verify_attempt += 1
-            verification_summary_container["text"] = ""
-            
-            if use_direct_model_verify:
-                verification_summary_prompt_text = _build_verification_summary_prompt()
-                error_guidance = ""
-                if prev_parse_error_verify:
-                    error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_verify}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
-                
-                full_verify_prompt = f"{verification_task}{error_guidance}\n\n{verification_summary_prompt_text}"
-                try:
-                    verify_response = verification_agent.model.chat_until_success(full_verify_prompt)  # type: ignore
-                    verification_summary_container["text"] = verify_response
-                except Exception as e:
-                    try:
-                        typer.secho(f"[jarvis-sec] 验证阶段直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
-                    except Exception:
-                        pass
-                    verification_agent.run(verification_task)
-            else:
-                verification_agent.run(verification_task)
-            
-            # 工作区保护
-            try:
-                _changed_verify = _git_restore_if_dirty(entry_path)
-                if _changed_verify:
-                    try:
-                        typer.secho(f"[jarvis-sec] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件）", fg=typer.colors.BLUE)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            
-            # 解析验证结果
-            verification_summary_text = verification_summary_container.get("text", "")
-            parse_error_verify = None
-            if verification_summary_text:
-                verification_parsed, parse_error_verify = _try_parse_summary_report(verification_summary_text)
-                if parse_error_verify:
-                    prev_parse_error_verify = parse_error_verify
-                    try:
-                        typer.secho(f"[jarvis-sec] 验证结果YAML解析失败: {parse_error_verify}", fg=typer.colors.YELLOW)
-                    except Exception:
-                        pass
-                else:
-                    prev_parse_error_verify = None
-                    if isinstance(verification_parsed, list):
-                        if verification_parsed and all(_is_valid_verification_item(item) for item in verification_parsed):
-                            return verification_parsed, None
-            
-            # 格式校验失败，后续重试使用直接模型调用
-            use_direct_model_verify = True
-            if parse_error_verify:
-                try:
-                    typer.secho(f"[jarvis-sec] 验证结果YAML解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
-                except Exception:
-                    pass
-            else:
-                try:
-                    typer.secho(f"[jarvis-sec] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)", fg=typer.colors.YELLOW)
-                except Exception:
-                    pass
 
     # ========== 聚类阶段：基于 gid 的断点恢复 ==========
     # 核心原则：从 cluster_report.jsonl 恢复所有聚类结果，基于 gid 匹配，不依赖批次索引
     
-    # 1. 收集所有候选的 gid
+    # 从断点恢复聚类结果
+    cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids = _restore_clusters_from_checkpoint(
+        _existing_clusters, _file_groups
+    )
+    
+    # 收集所有候选的 gid（用于检查未聚类的 gid）
     all_candidate_gids_in_clustering = set()
-    gid_to_candidate: Dict[int, Dict] = {}
     for _file, _items in _file_groups.items():
         for it in _items:
             try:
                 _gid = int(it.get("gid", 0))
                 if _gid >= 1:
                     all_candidate_gids_in_clustering.add(_gid)
-                    gid_to_candidate[_gid] = it
             except Exception:
                 pass
-    
-    # 2. 从 cluster_report.jsonl 恢复所有聚类结果
-    clustered_gids = set()  # 已聚类的 gid（包括有效和无效的，因为无效的也需要进入复核阶段）
-    invalid_clusters_for_review: List[Dict] = []  # 无效聚类列表（从断点恢复）
-    for (_file_key, _batch_idx), cluster_recs in _existing_clusters.items():
-        for rec in cluster_recs:
-            gids_list = rec.get("gids", [])
-            if not gids_list:
-                continue
-            is_invalid = rec.get("is_invalid", False)
-            verification = str(rec.get("verification", "")).strip()
-            members: List[Dict] = []
-            for _gid in gids_list:
-                try:
-                    _gid_int = int(_gid)
-                    if _gid_int >= 1 and _gid_int in gid_to_candidate:
-                        # 只有当 gid 在当前运行中存在时，才恢复该聚类
-                        candidate = gid_to_candidate[_gid_int]
-                        candidate["verify"] = verification
-                        members.append(candidate)
-                        # 无论有效还是无效，都计入已聚类的 gid（避免被重新聚类）
-                        clustered_gids.add(_gid_int)
-                except Exception:
-                    pass
-            
-            if members:
-                if is_invalid:
-                    # 无效聚类：收集到复核列表，不加入 cluster_batches
-                    invalid_clusters_for_review.append({
-                        "file": _file_key,
-                        "batch_index": _batch_idx,
-                        "gids": [m.get("gid") for m in members],
-                        "verification": verification,
-                        "invalid_reason": str(rec.get("invalid_reason", "")).strip(),
-                        "members": members,  # 保存候选信息，用于复核后可能重新加入验证
-                        "count": len(members),
-                    })
-                else:
-                    # 有效聚类：恢复到 cluster_batches
-                    cluster_batches.append(members)
-                    cluster_records.append({
-                        "file": _file_key,
-                        "verification": verification,
-                        "gids": [m.get("gid") for m in members],
-                        "count": len(members),
-                        "batch_index": _batch_idx,
-                        "is_invalid": False,
-                    })
     
     # 3. 检查是否有未聚类的 gid
     unclustered_gids = all_candidate_gids_in_clustering - clustered_gids
@@ -1583,195 +2681,15 @@ def run_security_analysis(
         pass
 
     # 复核Agent：验证所有标记为无效的聚类
-    if invalid_clusters_for_review:
-        typer.secho(f"\n[jarvis-sec] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...", fg=typer.colors.MAGENTA)
-        status_mgr.update_review(
-                current_review=0,
-                total_reviews=len(invalid_clusters_for_review),
-                message="开始复核无效聚类..."
-        )
-        
-        # 构建复核Agent的系统提示词
-        review_system_prompt = """
-# 复核Agent约束
-- 你的核心任务是复核聚类Agent给出的无效结论是否充分和正确。
-- 你需要仔细检查聚类Agent提供的invalid_reason是否充分，是否真的考虑了所有可能的路径。
-- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
-- 必要时需向上追溯调用者，查看完整的调用路径，以确认聚类Agent的结论是否成立。
-- 禁止修改任何文件或执行写操作命令；仅进行只读分析与读取。
-- 每次仅执行一个操作；等待工具结果后再进行下一步。
-- **记忆使用**：
-  - 在复核过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前文件或函数相关的记忆。
-  - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等。
-- **复核原则**：
-  - 必须验证聚类Agent是否真的检查了所有可能的调用路径和调用者。
-  - 必须验证聚类Agent是否真的确认了所有路径都有保护措施。
-  - 如果发现聚类Agent遗漏了某些路径、调用者或边界情况，必须判定为理由不充分。
-  - 保守策略：有疑问时，一律判定为理由不充分，将候选重新加入验证流程。
-- 完成复核后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
-        """.strip()
-        
-        # 构建复核摘要提示词
-        review_summary_prompt = """
-请将本轮"复核结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
-你需要复核聚类Agent给出的无效理由是否充分，是否真的考虑了所有可能的路径。
-
-示例1：理由充分（is_reason_sufficient: true，单个gid）
-<REPORT>
-- gid: 1
-  is_reason_sufficient: true
-  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
-</REPORT>
-
-示例2：理由充分（is_reason_sufficient: true，多个gid合并）
-<REPORT>
-- gids: [1, 2, 3]
-  is_reason_sufficient: true
-  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
-</REPORT>
-
-示例3：理由不充分（is_reason_sufficient: false）
-<REPORT>
-- gid: 1
-  is_reason_sufficient: false
-  review_notes: "聚类Agent遗漏了函数X的调用路径，该路径可能未做校验，理由不充分，需要重新验证"
-</REPORT>
-
-要求：
-- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
-- 数组元素为对象，包含字段：
-  - gid: 整数（全局唯一编号，对应无效聚类的gid，单个告警时使用）
-  - gids: 整数数组（全局唯一编号数组，对应无效聚类的gids，多个告警合并时使用）
-  - is_reason_sufficient: 布尔值 (true/false)，表示无效理由是否充分
-  - review_notes: 字符串（复核说明，解释为什么理由充分或不充分）
-- **合并格式优化**：如果多个告警（gid）的复核结果（is_reason_sufficient）和复核说明（review_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
-- 必须对所有输入的gid进行复核，不能遗漏。
-- 如果理由不充分（is_reason_sufficient: false），该候选将重新加入验证流程；如果理由充分（is_reason_sufficient: true），该候选将被确认为无效。
-        """.strip()
-        
-        # 按批次复核（每批最多10个无效聚类，避免上下文过长）
-        review_batch_size = 10
-        reviewed_clusters: List[Dict] = []
-        reinstated_candidates: List[Dict] = []  # 重新加入验证的候选
-        
-        for review_idx in range(0, len(invalid_clusters_for_review), review_batch_size):
-            review_batch = invalid_clusters_for_review[review_idx:review_idx + review_batch_size]
-            current_review_num = review_idx // review_batch_size + 1
-            total_review_batches = (len(invalid_clusters_for_review) + review_batch_size - 1) // review_batch_size
-            
-            typer.secho(f"[jarvis-sec] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类", fg=typer.colors.CYAN)
-            status_mgr.update_review(
-                current_review=current_review_num,
-                total_reviews=total_review_batches,
-                message=f"正在复核批次 {current_review_num}/{total_review_batches}"
-            )
-            
-            # 构建复核任务
-            import json as _json_review
-            review_task = f"""
-# 复核无效聚类任务
-上下文参数：
-- entry_path: {entry_path}
-- languages: {langs}
-
-需要复核的无效聚类（JSON数组）：
-{_json_review.dumps(review_batch, ensure_ascii=False, indent=2)}
-
-请仔细复核每个无效聚类的invalid_reason是否充分，是否真的考虑了所有可能的路径、调用者和边界情况。
-对于每个gid，请判断无效理由是否充分（is_reason_sufficient: true/false），并给出复核说明。
-            """.strip()
-            
-            # 创建复核Agent
-            review_task_id = f"JARVIS-SEC-Review-Batch-{current_review_num}"
-            review_agent_kwargs: Dict = dict(
-                system_prompt=review_system_prompt,
-                name=review_task_id,
-                auto_complete=True,
-                need_summary=True,
-                summary_prompt=review_summary_prompt,
-                non_interactive=True,
-                in_multi_agent=False,
-                use_methodology=False,
-                use_analysis=False,
-                plan=False,
-                output_handler=[ToolRegistry()],
-                disable_file_edit=True,
-                use_tools=["read_code", "execute_script", "retrieve_memory", "save_memory"],
-            )
-            if llm_group:
-                review_agent_kwargs["model_group"] = llm_group
-            review_agent = Agent(**review_agent_kwargs)
-            
-            # 订阅复核Agent的摘要
-            review_summary_container: Dict[str, str] = {"text": ""}
-            try:
-                from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY_REVIEW
-            except Exception:
-                _AFTER_SUMMARY_REVIEW = None
-            if _AFTER_SUMMARY_REVIEW:
-                def _on_after_summary_review(**kwargs):
-                    try:
-                        review_summary_container["text"] = str(kwargs.get("summary", "") or "")
-                    except Exception:
-                        review_summary_container["text"] = ""
-                try:
-                    review_agent.event_bus.subscribe(_AFTER_SUMMARY_REVIEW, _on_after_summary_review)
-                except Exception:
-                    pass
-            
-            # 运行复核Agent（永久重试直到格式正确）
-            review_results, parse_error = _run_review_agent_with_retry(
-                review_agent,
-                review_task,
-                review_summary_prompt,
-                entry_path,
-                review_summary_container,
-            )
-            
-            # 处理复核结果
-            _process_review_batch(
-                review_batch,
-                review_results,
-                reviewed_clusters,
-                reinstated_candidates,
-            )
-        
-        # 将重新加入验证的候选添加到cluster_batches
-        if reinstated_candidates:
-            typer.secho(f"[jarvis-sec] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程", fg=typer.colors.GREEN)
-            # 按文件分组重新加入的候选
-            reinstated_by_file: Dict[str, List[Dict]] = _dd2(list)
-            for cand in reinstated_candidates:
-                file_key = str(cand.get("file") or "")
-                reinstated_by_file[file_key].append(cand)
-            
-            # 为每个文件的重新加入候选创建批次
-            for file_key, cands in reinstated_by_file.items():
-                if cands:
-                    cluster_batches.append(cands)
-                    _progress_append({
-                        "event": "review_reinstated",
-                        "file": file_key,
-                        "gids": [c.get("gid") for c in cands],
-                        "count": len(cands),
-                    })
-        else:
-            typer.secho(f"[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效", fg=typer.colors.GREEN)
-        
-        # 记录复核结果
-        _progress_append({
-            "event": "review_completed",
-            "total_reviewed": len(invalid_clusters_for_review),
-            "reinstated": len(reinstated_candidates),
-            "confirmed_invalid": len(invalid_clusters_for_review) - len(reinstated_candidates),
-        })
-        status_mgr.update_review(
-            current_review=len(invalid_clusters_for_review),
-            total_reviews=len(invalid_clusters_for_review),
-            message=f"复核完成：{len(reinstated_candidates)} 个候选重新加入验证"
-        )
-    else:
-        typer.secho(f"[jarvis-sec] 无无效聚类需要复核", fg=typer.colors.BLUE)
+    cluster_batches = _process_review_phase(
+        invalid_clusters_for_review,
+        entry_path,
+        langs,
+        llm_group,
+        status_mgr,
+        _progress_append,
+        cluster_batches,
+    )
 
     # 若聚类失败或空，则回退为"按文件一次处理"
     # 注意：这种情况应该很少发生，因为完整性检查会补充遗漏的 gid
@@ -1941,37 +2859,41 @@ def run_security_analysis(
                 pass
 
     # ========== 验证阶段：基于 gid 的断点恢复 ==========
-    # 核心原则：从 agent_issues.jsonl 读取已处理的 gid，基于 gid 列表判断批次是否完成
+    # 核心原则：从 agent_issues.jsonl 读取已处理的 gid，从 progress.jsonl 读取已完成的批次，基于 gid 列表和批次状态判断批次是否完成
     
     batches: List[List[Dict]] = cluster_batches
     total_batches = len(batches)
     
     # 从 agent_issues.jsonl 中读取已处理的 gid
-    processed_gids_from_issues = set()
+    processed_gids_from_issues = _load_processed_gids_from_issues(sec_dir)
+    
+    # 从 progress.jsonl 中读取已完成的批次（基于 batch_status 事件）
+    completed_batch_ids = set()
     try:
-        from pathlib import Path as _Path6
-        _agent_issues_path = sec_dir / "agent_issues.jsonl"
-        if _agent_issues_path.exists():
-            import json as _json6
-            with _agent_issues_path.open("r", encoding="utf-8", errors="ignore") as f:
+        import json as _json_progress
+        if progress_path.exists():
+            with progress_path.open("r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
                     try:
-                        issue_obj = _json6.loads(line)
-                        _gid = int(issue_obj.get("gid", 0))
-                        if _gid >= 1:
-                            processed_gids_from_issues.add(_gid)
+                        obj = _json_progress.loads(line)
+                        # 检查 batch_status 事件，status 为 "done" 表示批次已完成
+                        if obj.get("event") == "batch_status" and obj.get("status") == "done":
+                            batch_id = obj.get("batch_id")
+                            if batch_id:
+                                completed_batch_ids.add(batch_id)
                     except Exception:
                         pass
-            if processed_gids_from_issues:
-                try:
-                    typer.secho(f"[jarvis-sec] 断点恢复：从 agent_issues.jsonl 读取到 {len(processed_gids_from_issues)} 个已处理的 gid", fg=typer.colors.BLUE)
-                except Exception:
-                    pass
     except Exception:
         pass
+    
+    if completed_batch_ids:
+        try:
+            typer.secho(f"[jarvis-sec] 断点恢复：从 progress.jsonl 读取到 {len(completed_batch_ids)} 个已完成的批次", fg=typer.colors.BLUE)
+        except Exception:
+            pass
 
     # 更新验证阶段状态
     if total_batches > 0:
@@ -1982,620 +2904,61 @@ def run_security_analysis(
         )
 
     for bidx, batch in enumerate(batches, start=1):
-        # 检查批次是否已完成，如果已完成则跳过
-        # 根据批次内容（gid 列表）来判断，而不是只根据 batch_index
-        batch_gids = set()
+        task_id = f"JARVIS-SEC-Batch-{bidx}"
         batch_file = batch[0].get("file") if batch else None
-        for item in batch:
-            try:
-                _gid = int(item.get("gid", 0))
-                if _gid >= 1:
-                    batch_gids.add(_gid)
-            except Exception:
-                pass
         
-        # 如果批次中的所有 gid 都已处理，则认为该批次已完成
-        if batch_gids and processed_gids_from_issues and batch_gids.issubset(processed_gids_from_issues):
+        # 检查批次是否已完成：优先检查 progress.jsonl 中的批次状态
+        is_batch_completed = False
+        
+        # 方法1：检查 progress.jsonl 中是否有该批次的完成记录
+        if task_id in completed_batch_ids:
+            is_batch_completed = True
+        else:
+            # 方法2：检查批次中的所有 gid 是否都在 agent_issues.jsonl 中
+            # 根据批次内容（gid 列表）来判断，而不是只根据 batch_index
+            batch_gids = set()
+            for item in batch:
+                try:
+                    _gid = int(item.get("gid", 0))
+                    if _gid >= 1:
+                        batch_gids.add(_gid)
+                except Exception:
+                    pass
+            
+            # 如果批次中的所有 gid 都已处理，则认为该批次已完成
+            if batch_gids and processed_gids_from_issues and batch_gids.issubset(processed_gids_from_issues):
+                is_batch_completed = True
+        
+        if is_batch_completed:
             try:
                 typer.secho(f"[jarvis-sec] 跳过批次 {bidx}/{total_batches}：已在之前的运行中完成", fg=typer.colors.GREEN)
             except Exception:
                 pass
             # 更新进度但不实际处理
-            batch_file = batch[0].get("file") if batch else None
             status_mgr.update_verification(
                 current_batch=bidx,
                 total_batches=total_batches,
-                batch_id=f"JARVIS-SEC-Batch-{bidx}",
+                batch_id=task_id,
                 file_name=batch_file,
                 message=f"跳过已完成的批次 {bidx}/{total_batches}"
             )
             continue
-        # 进度：批次开始
-        _progress_append(
-            {
-                "event": "batch_status",
-                "status": "running",
-                "batch_id": f"JARVIS-SEC-Batch-{bidx}",
-                "batch_index": bidx,
-                "total_batches": total_batches,
-                "batch_size": len(batch),
-                "file": batch[0].get("file") if batch else None,
-            }
-        )
-        # 更新验证阶段进度
-        batch_file = batch[0].get("file") if batch else None
-        status_mgr.update_verification(
-            current_batch=bidx,
-            total_batches=total_batches,
-            batch_id=f"JARVIS-SEC-Batch-{bidx}",
-            file_name=batch_file,
-            message=f"正在验证批次 {bidx}/{total_batches}"
-        )
-
-        # 显示进度
-        try:
-            typer.secho(f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch[0].get('file') if batch else 'N/A'}'", fg=typer.colors.CYAN)
-        except Exception:
-            pass
-
-        # 构造 Agent（单次处理一批候选）
-        system_prompt = """
-# 单Agent安全分析约束
-- 你的核心任务是评估代码的安全问题，目标：针对本候选问题进行证据核实、风险评估与修复建议补充，查找漏洞触发路径，确认在某些条件下会触发；以此来判断是否是漏洞。
-- **必须进行调用路径推导**：
-  - 对于每个候选问题，必须明确推导从可控输入到缺陷代码的完整调用路径。
-  - 调用路径推导必须包括：
-    1. 识别可控输入的来源（例如：用户输入、网络数据、文件读取、命令行参数等）
-    2. 追踪数据流：从输入源开始，逐步追踪数据如何传递到缺陷代码位置
-    3. 识别调用链：明确列出从入口函数到缺陷代码的所有函数调用序列（例如：main() -> parse_input() -> process_data() -> vulnerable_function()）
-    4. 分析每个调用点的数据校验情况：检查每个函数是否对输入进行了校验、边界检查或安全检查
-    5. 确认触发条件：明确说明在什么条件下，未校验或恶意输入能够到达缺陷代码位置
-  - 如果无法推导出完整的调用路径，或者所有调用路径都有充分的保护措施，则应该判定为误报。
-  - 调用路径推导必须在分析过程中明确展示，不能省略或假设。
-- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
-- **调用路径追溯要求**：
-  - 必须向上追溯所有可能的调用者，查看完整的调用路径，以确认风险是否真实存在。
-  - 使用 read_code 和 execute_script 工具查找函数的调用者（例如：使用 grep 搜索函数名，查找所有调用该函数的位置）。
-  - 对于每个调用者，必须检查其是否对输入进行了校验。
-  - 如果发现任何调用路径未做校验，必须明确记录该路径。
-  - 例如：一个函数存在空指针解引用风险，必须检查所有调用者。如果所有调用者均能确保传入的指针非空，则该风险在当前代码库中可能不会实际触发；但如果存在任何调用者未做校验，则风险真实存在。
-- 若多条告警位于同一文件且行号相距不远，可一次性读取共享上下文，对这些相邻告警进行联合分析与判断；但仍需避免无关扩展与大范围遍历。
-- 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
-- 每次仅执行一个操作；等待工具结果后再进行下一步。
-- **记忆使用**：
-  - 在分析过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前分析函数相关的记忆。
-  - 如果有必要，使用 save_memory 工具保存每个函数的分析要点，使用函数名作为 tag（例如：函数名、文件名等）。
-  - 记忆内容示例：某个函数的指针已经判空、某个函数已有输入校验、某个函数的调用路径分析结果等。
-  - 这样可以避免重复分析，提高效率，并保持分析的一致性。
-- 完成对本批次候选问题的判断后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
-""".strip()
-        task_id = f"JARVIS-SEC-Batch-{bidx}"
-        agent_kwargs: Dict = dict(
-            system_prompt=system_prompt,
-            name=task_id,
-            auto_complete=True,
-            need_summary=True,
-            # 复用现有摘要提示词构建器，candidate 传入批次列表包一层
-            summary_prompt=_build_summary_prompt(),
-            non_interactive=True,
-            in_multi_agent=False,
-            use_methodology=False,
-            use_analysis=False,
-            plan=False,
-            output_handler=[ToolRegistry()],
-            disable_file_edit=True,
-            force_save_memory=True,  # 打开强制保存记忆开关
-            use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],  # 添加保存和召回记忆工具
-        )
-        if llm_group:
-            agent_kwargs["model_group"] = llm_group
-        agent = Agent(**agent_kwargs)
-
-        # 任务上下文（批次）
-        import json as _json2
-        # 使用全局 gid 进行验证（不再构造局部 id），并保留 verify
-        batch_ctx: List[Dict] = list(batch)
-        # 聚类上下文：本批次所有候选共享同一“验证条件”，传入验证条件与当前批次的连续 id 列表
-        cluster_verify = str(batch_ctx[0].get("verify") if batch_ctx else "")
-        # cluster_ids_ctx removed (using global gid only)
-        cluster_gids_ctx = [it.get("gid") for it in batch_ctx]
-        per_task = f"""
-# 安全子任务批次
-上下文参数：
-- entry_path: {entry_path}
-- languages: {langs}
-- cluster_verification: {cluster_verify}
-
-- cluster_gids: {cluster_gids_ctx}
-- note: 每个候选含 gid/verify 字段，模型仅需输出 gid 统一给出验证/判断结论（全局编号）；无需使用局部 id
-
-批次候选(JSON数组):
-{_json2.dumps(batch_ctx, ensure_ascii=False, indent=2)}
-""".strip()
-
-        # 订阅 AFTER_SUMMARY，捕获Agent内部生成的摘要
-        try:
-            from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY  # type: ignore
-        except Exception:
-            _AFTER_SUMMARY = None  # type: ignore
-        summary_container: Dict[str, str] = {"text": ""}
-        if _AFTER_SUMMARY:
-            def _on_after_summary(**kwargs):
-                try:
-                    summary_container["text"] = str(kwargs.get("summary", "") or "")
-                except Exception:
-                    summary_container["text"] = ""
-            try:
-                agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary)
-            except Exception:
-                pass
-
-        # 执行Agent（增加重试机制：摘要解析失败或关键字段缺失时，重新运行当前批次）
-        summary_items: Optional[List[Dict]] = None
-        workspace_restore_info: Optional[Dict] = None
-        use_direct_model_analysis = False  # 标记是否使用直接模型调用
-        prev_parsed_items: Optional[List] = None  # 保存上一次的解析结果，用于错误提示
-        parse_error_analysis: Optional[str] = None  # 保存上一次的解析错误信息
-        attempt = 0  # 用于日志记录
         
-        while True:
-            attempt += 1
-            # 清空上一轮摘要容器
-            summary_container["text"] = ""
-            
-            if use_direct_model_analysis:
-                # 格式校验失败后，直接调用模型接口
-                # 构造包含摘要提示词和具体错误信息的完整提示
-                summary_prompt_text = _build_summary_prompt()
-                error_guidance = ""
-                if parse_error_analysis:
-                    # 如果有YAML解析错误，优先反馈解析错误
-                    error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_error_analysis}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
-                elif prev_parsed_items is None:
-                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
-                elif not _valid_items(prev_parsed_items):
-                    # 收集具体的验证错误
-                    validation_errors = []
-                    if not isinstance(prev_parsed_items, list):
-                        validation_errors.append("结果不是数组")
-                    else:
-                        for idx, it in enumerate(prev_parsed_items):
-                            if not isinstance(it, dict):
-                                validation_errors.append(f"元素{idx}不是字典")
-                                break
-                            # 校验 gid 或 gids
-                            has_gid = "gid" in it
-                            has_gids = "gids" in it
-                            if not has_gid and not has_gids:
-                                validation_errors.append(f"元素{idx}缺少必填字段 gid 或 gids")
-                                break
-                            if has_gid and has_gids:
-                                validation_errors.append(f"元素{idx}不能同时包含 gid 和 gids")
-                                break
-                            if has_gid:
-                                try:
-                                    if int(it.get("gid", 0)) < 1:
-                                        validation_errors.append(f"元素{idx}的 gid 必须 >= 1")
-                                        break
-                                except Exception:
-                                    validation_errors.append(f"元素{idx}的 gid 格式错误（必须是整数）")
-                                    break
-                            elif has_gids:
-                                if not isinstance(it.get("gids"), list) or len(it.get("gids", [])) == 0:
-                                    validation_errors.append(f"元素{idx}的 gids 必须是非空数组")
-                                    break
-                                try:
-                                    for gid_idx, gid_val in enumerate(it.get("gids", [])):
-                                        if int(gid_val) < 1:
-                                            validation_errors.append(f"元素{idx}的 gids[{gid_idx}] 必须 >= 1")
-                                            break
-                                    if validation_errors:
-                                        break
-                                except Exception:
-                                    validation_errors.append(f"元素{idx}的 gids 格式错误（必须是整数数组）")
-                                    break
-                            if "has_risk" not in it or not isinstance(it.get("has_risk"), bool):
-                                validation_errors.append(f"元素{idx}缺少必填字段 has_risk（必须是布尔值）")
-                                break
-                            if it.get("has_risk"):
-                                for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
-                                    if key not in it:
-                                        validation_errors.append(f"元素{idx}的 has_risk 为 true，但缺少必填字段 {key}")
-                                        break
-                                    if not isinstance(it[key], str) or not it[key].strip():
-                                        validation_errors.append(f"元素{idx}的 {key} 字段不能为空")
-                                        break
-                                if validation_errors:
-                                    break
-                    if validation_errors:
-                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {err}" for err in validation_errors)
-                
-                full_prompt = f"{per_task}{error_guidance}\n\n{summary_prompt_text}"
-                try:
-                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
-                    # 从响应中提取摘要（假设摘要提示词会引导模型输出 <REPORT> 块）
-                    summary_container["text"] = response
-                except Exception as e:
-                    try:
-                        typer.secho(f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
-                    except Exception:
-                        pass
-                    agent.run(per_task)
-            else:
-                # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                agent.run(per_task)
-
-            # 工作区保护：调用 Agent 后如检测到文件被修改，则恢复（每次尝试都执行）
-            try:
-                _changed = _git_restore_if_dirty(entry_path)
-                workspace_restore_info = {
-                    "performed": bool(_changed),
-                    "changed_files_count": int(_changed or 0),
-                    "action": "git checkout -- .",
-                }
-                meta_records.append(
-                    {
-                        "task_id": task_id,
-                        "batch_index": bidx,
-                        "workspace_restore": workspace_restore_info,
-                        "attempt": attempt + 1,
-                    }
-                )
-                if _changed:
-                    try:
-                        typer.secho(f"[jarvis-sec] 工作区已恢复 ({_changed} 个文件），操作: git checkout -- .", fg=typer.colors.BLUE)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-            # 解析摘要中的 <REPORT>（YAML）
-            summary_text = summary_container.get("text", "")
-            parsed_items: Optional[List] = None
-            parse_error_analysis = None
-            if summary_text:
-                rep, parse_error_analysis = _try_parse_summary_report(summary_text)
-
-                if parse_error_analysis:
-                    # YAML解析失败，记录错误信息以便下次重试时反馈给模型
-                    try:
-                        typer.secho(f"[jarvis-sec] 分析结果YAML解析失败: {parse_error_analysis}", fg=typer.colors.YELLOW)
-                    except Exception:
-                        pass
-                elif isinstance(rep, list):
-                    parsed_items = rep
-                elif isinstance(rep, dict):
-                    items = rep.get("issues")
-                    if isinstance(items, list):
-                        parsed_items = items
-
-            # 关键字段校验：当前要求每个元素为 {gid:int 或 gids:list, has_risk:bool, ...}
-            def _valid_items(items: Optional[List]) -> bool:
-                if not isinstance(items, list):
-                    return False
-                for it in items:
-                    if not isinstance(it, dict):
-                        return False
-                    # 校验 gid 或 gids（全局唯一编号，>=1）
-                    has_gid = "gid" in it
-                    has_gids = "gids" in it
-                    if not has_gid and not has_gids:
-                        return False
-                    if has_gid and has_gids:
-                        return False  # gid 和 gids 不能同时出现
-                    
-                    if has_gid:
-                        try:
-                            if int(it["gid"]) < 1:
-                                return False
-                        except Exception:
-                            return False
-                    elif has_gids:
-                        if not isinstance(it["gids"], list) or len(it["gids"]) == 0:
-                            return False
-                        for gid_val in it["gids"]:
-                            try:
-                                if int(gid_val) < 1:
-                                    return False
-                            except Exception:
-                                return False
-                    
-                    # 校验 has_risk (布尔值)
-                    if "has_risk" not in it or not isinstance(it["has_risk"], bool):
-                        return False
-                    # 如果有风险，则校验 reason 四元组（非空字符串）
-                    if it.get("has_risk"):
-                        for key in ["preconditions", "trigger_path", "consequences", "suggestions"]:
-                            if key not in it:
-                                return False
-                            if not isinstance(it[key], str) or not it[key].strip():
-                                return False
-                return True
-
-            # 保存本次解析结果，用于下次重试时的错误提示
-            prev_parsed_items = parsed_items
-
-            if _valid_items(parsed_items):
-                summary_items = parsed_items
-                break  # 成功，退出重试循环
-            else:
-                # 本次尝试失败：打印并准备重试
-                # 格式校验失败，后续重试使用直接模型调用
-                use_direct_model_analysis = True
-                try:
-                    typer.secho(f"[jarvis-sec] 批次摘要无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)", fg=typer.colors.YELLOW)
-                except Exception:
-                    pass
-
-        # 重试结束：处理摘要结果
-        merged_items: List[Dict] = []
-        gid_counts: Dict[int, int] = {}
-        parse_fail = not isinstance(summary_items, list)
-
-        if not parse_fail:
-            # 摘要解析成功：处理有风险的条目
-            try:
-                gid_to_item_batch: Dict[int, Dict] = {int(it.get("gid", 0)): it for it in batch if int(it.get("gid", 0)) >= 1}
-                for it in summary_items:
-                    if not isinstance(it, dict) or not it.get("has_risk"):
-                        continue
-                    
-                    # 支持 gid 和 gids 两种格式
-                    gids_to_process: List[int] = []
-                    if "gids" in it and isinstance(it.get("gids"), list):
-                        # 合并格式：gids 数组
-                        for gid_val in it.get("gids", []):
-                            try:
-                                gid_int = int(gid_val)
-                                if gid_int >= 1:
-                                    gids_to_process.append(gid_int)
-                            except Exception:
-                                pass
-                    elif "gid" in it:
-                        # 单个格式：gid
-                        try:
-                            gid_int = int(it.get("gid", 0))
-                            if gid_int >= 1:
-                                gids_to_process.append(gid_int)
-                        except Exception:
-                            pass
-                    
-                    # 为每个 gid 创建条目
-                    preconditions = str(it.get("preconditions", "")).strip()
-                    trigger_path = str(it.get("trigger_path", "")).strip()
-                    consequences = str(it.get("consequences", "")).strip()
-                    suggestions = str(it.get("suggestions", "")).strip()
-                    
-                    for gid in gids_to_process:
-                        cand_src = gid_to_item_batch.get(gid)
-                        if cand_src:
-                            cand = dict(cand_src)
-                            cand["preconditions"] = preconditions
-                            cand["trigger_path"] = trigger_path
-                            cand["consequences"] = consequences
-                            cand["suggestions"] = suggestions
-                            cand["has_risk"] = True
-                            merged_items.append(cand)
-                            # 注意：gid_counts 将在验证通过后更新，这里先不计数
-            except Exception:
-                pass  # 异常不影响流程
-
-        # 汇总并报告：如果分析 Agent 确认有告警，需要验证 Agent 二次验证
-        verified_items: List[Dict] = []
-        if merged_items:
-            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 发现问题: 数量={len(merged_items)} -> 启动验证 Agent 进行二次验证", fg=typer.colors.MAGENTA)
-            
-            # 创建验证 Agent 来验证分析 Agent 的结论
-            verification_system_prompt = """
-# 验证 Agent 约束
-- 你的核心任务是验证分析 Agent 给出的安全结论是否正确。
-- 你需要仔细检查分析 Agent 给出的前置条件、触发路径、后果和建议是否合理、准确。
-- 工具优先：使用 read_code 读取目标文件附近源码（行号前后各 ~50 行），必要时用 execute_script 辅助检索。
-- 必要时需向上追溯调用者，查看完整的调用路径，以确认分析 Agent 的结论是否成立。
-- 禁止修改任何文件或执行写操作命令；仅进行只读分析与读取。
-- 每次仅执行一个操作；等待工具结果后再进行下一步。
-- **记忆使用**：
-  - 在验证过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是分析 Agent 保存的与当前验证函数相关的记忆。
-  - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等，可以帮助你更准确地验证分析结论。
-  - 如果发现分析 Agent 的结论与记忆中的信息不一致，需要仔细核实。
-- 完成验证后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
-""".strip()
-            
-            verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"
-            verification_agent_kwargs: Dict = dict(
-                system_prompt=verification_system_prompt,
-                name=verification_task_id,
-                auto_complete=True,
-                need_summary=True,
-                summary_prompt=_build_verification_summary_prompt(),
-                non_interactive=True,
-                in_multi_agent=False,
-                use_methodology=False,
-                use_analysis=False,
-                plan=False,
-                output_handler=[ToolRegistry()],
-                disable_file_edit=True,
-                use_tools=["read_code", "execute_script", "retrieve_memory"],  # 添加召回记忆工具
-            )
-            if llm_group:
-                verification_agent_kwargs["model_group"] = llm_group
-            verification_agent = Agent(**verification_agent_kwargs)
-            
-            # 构造验证任务上下文
-            import json as _json3
-            verification_task = f"""
-# 验证分析结论任务
-上下文参数：
-- entry_path: {entry_path}
-- languages: {langs}
-
-分析 Agent 给出的结论（需要验证）：
-{_json3.dumps(merged_items, ensure_ascii=False, indent=2)}
-
-请验证上述分析结论是否正确，包括：
-1. 前置条件（preconditions）是否合理
-2. 触发路径（trigger_path）是否成立
-3. 后果（consequences）评估是否准确
-4. 建议（suggestions）是否合适
-
-对于每个 gid，请判断分析结论是否正确（is_valid: true/false），并给出验证说明。
-""".strip()
-            
-            # 订阅验证 Agent 的摘要
-            verification_summary_container: Dict[str, str] = {"text": ""}
-            if _AFTER_SUMMARY:
-                def _on_after_summary_verify(**kwargs):
-                    try:
-                        verification_summary_container["text"] = str(kwargs.get("summary", "") or "")
-                    except Exception:
-                        verification_summary_container["text"] = ""
-                try:
-                    verification_agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary_verify)
-                except Exception:
-                    pass
-            
-            # 运行验证 Agent（永久重试直到格式正确）
-            verification_results, parse_error = _run_verification_agent_with_retry(
-                verification_agent,
-                verification_task,
-                _build_verification_summary_prompt(),
-                entry_path,
-                verification_summary_container,
-                bidx,
-            )
-            
-            # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
-            if verification_results:
-                # 构建 gid 到验证结果的映射（支持 gid 和 gids 两种格式）
-                gid_to_verification: Dict[int, Dict] = {}
-                for vr in verification_results:
-                    if not isinstance(vr, dict):
-                        continue
-                    
-                    # 支持 gid 和 gids 两种格式
-                    gids_to_process: List[int] = []
-                    if "gids" in vr and isinstance(vr.get("gids"), list):
-                        # 合并格式：gids 数组
-                        for gid_val in vr.get("gids", []):
-                            try:
-                                gid_int = int(gid_val)
-                                if gid_int >= 1:
-                                    gids_to_process.append(gid_int)
-                            except Exception:
-                                pass
-                    elif "gid" in vr:
-                        # 单个格式：gid
-                        try:
-                            gid_int = int(vr.get("gid", 0))
-                            if gid_int >= 1:
-                                gids_to_process.append(gid_int)
-                        except Exception:
-                            pass
-                    
-                    # 为每个 gid 创建验证结果映射
-                    is_valid = vr.get("is_valid")
-                    verification_notes = str(vr.get("verification_notes", "")).strip()
-                    for gid in gids_to_process:
-                        gid_to_verification[gid] = {
-                            "is_valid": is_valid,
-                            "verification_notes": verification_notes
-                        }
-                
-                # 只保留验证通过的告警
-                for item in merged_items:
-                    item_gid = int(item.get("gid", 0))
-                    verification = gid_to_verification.get(item_gid)
-                    if verification and verification.get("is_valid") is True:
-                        # 添加验证说明
-                        item["verification_notes"] = str(verification.get("verification_notes", "")).strip()
-                        verified_items.append(item)
-                    elif verification and verification.get("is_valid") is False:
-                        # 验证不通过，记录日志但不加入最终结果
-                        try:
-                            typer.secho(f"[jarvis-sec] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}", fg=typer.colors.BLUE)
-                        except Exception:
-                            pass
-                    else:
-                        # 验证结果中未找到该 gid，默认不通过（保守策略）
-                        try:
-                            typer.secho(f"[jarvis-sec] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过", fg=typer.colors.YELLOW)
-                        except Exception:
-                            pass
-            else:
-                # 验证结果解析失败，保守策略：不保留任何告警
-                typer.secho(f"[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）", fg=typer.colors.YELLOW)
-            
-            # 只有验证通过的告警才写入文件
-            if verified_items:
-                all_issues.extend(verified_items)
-                # 更新 gid_counts：只统计验证通过的告警
-                for item in verified_items:
-                    gid = int(item.get("gid", 0))
-                    if gid >= 1:
-                        gid_counts[gid] = gid_counts.get(gid, 0) + 1
-                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(merged_items)} -> 追加到报告", fg=typer.colors.GREEN)
-                _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
-                # 更新状态：发现的问题数
-                status_mgr.update_verification(
-                    current_batch=bidx,
-                    total_batches=total_batches,
-                    issues_found=len(all_issues),
-                    message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题（验证通过）"
-                )
-            else:
-                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(merged_items)} 个，验证后全部不通过", fg=typer.colors.BLUE)
-                # 更新状态：验证后无有效告警
-                status_mgr.update_verification(
-                    current_batch=bidx,
-                    total_batches=total_batches,
-                    issues_found=len(all_issues),
-                    message=f"已验证 {bidx}/{total_batches} 批次，验证后无有效告警"
-            )
-        elif parse_fail:
-            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)", fg=typer.colors.YELLOW)
-        else:
-            typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题", fg=typer.colors.BLUE)
-            # 更新状态：继续验证
-            status_mgr.update_verification(
-                current_batch=bidx,
-                total_batches=total_batches,
-                issues_found=len(all_issues),
-                message=f"已验证 {bidx}/{total_batches} 批次"
-            )
-
-        # 为本批次所有候选写入 done 记录（无论成功失败，都标记为已处理）
-        for c in batch:
-            sig = _sig_of(c)
-            try:
-                c_gid = int(c.get("gid", 0))
-            except Exception:
-                c_gid = 0
-            cnt = gid_counts.get(c_gid, 0)
-            _progress_append(
-                {
-                    "event": "task_status",
-                    "status": "done",
-                    "task_id": f"{task_id}",
-                    "candidate_signature": sig,
-                    "candidate": c,
-                    "issues_count": int(cnt),
-                    "parse_fail": parse_fail,
-                    "workspace_restore": workspace_restore_info,
-                    "batch_index": bidx,
-                }
-            )
-
-        # 批次结束记录
-        _progress_append(
-            {
-                "event": "batch_status",
-                "status": "done",
-                "batch_id": task_id,
-                "batch_index": bidx,
-                "total_batches": total_batches,
-                "issues_count": len(verified_items) if merged_items else 0,  # 只统计验证通过的告警
-                "parse_fail": parse_fail,
-            }
+        # 处理验证批次
+        _process_verification_batch(
+            batch,
+            bidx,
+            total_batches,
+            entry_path,
+            langs,
+            llm_group,
+            status_mgr,
+            _progress_append,
+            _append_report,
+            _sig_of,
+            all_issues,
+            meta_records,
+            gid_counts,
         )
 
     # 4) 使用统一聚合器生成最终报告（JSON + Markdown）
