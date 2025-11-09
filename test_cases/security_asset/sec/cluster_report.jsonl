@@ -1,0 +1,102 @@
+{"file": "frameworks/c/system_api/src/asset_system_api.c", "verification": "检查result指针及其成员attrs是否非空，count是否大于0", "gids": [1, 2, 3, 4], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/c/system_api/src/asset_system_api.c", "verification": "检查blob指针及其成员data是否非空，size是否大于0", "gids": [5, 6, 7, 8, 9], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/c/system_api/src/asset_system_api.c", "verification": "检查resultSet指针及其成员results是否非空，count是否大于0", "gids": [10, 11, 12, 13, 14, 15, 16, 17, 18, 19], "count": 10, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/os_dependency/memory/src/asset_mem.c", "verification": "验证候选 20 的安全风险", "gids": [20], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "frameworks/js/napi/src/asset_napi_post_query.cpp", "verification": "验证context指针及其成员(attrs, parse, execute, result, resolve)在使用前非空", "gids": [21, 22, 23, 24, 25, 26, 27, 28, 29], "count": 9, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_post_query.cpp", "verification": "验证context.get()返回的指针在使用前非空", "gids": [30], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_query_sync_result.cpp", "verification": "验证context指针及其成员在解引用前是否非空", "gids": [31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42], "count": 12, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_query_sync_result.cpp", "verification": "验证baseContext到QuerySyncResultContext的类型转换是否安全", "gids": [43], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_query.cpp", "verification": "context指针及其成员(attrs, resultSet等)在访问前非空", "gids": [44, 45, 46, 47, 48, 49, 50, 51, 52, 53], "count": 10, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_query.cpp", "verification": "context.get()返回的裸指针使用安全", "gids": [54], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_remove.cpp", "verification": "验证context指针及其成员在解引用前非空", "gids": [55, 56, 57, 58, 59, 60, 61, 62, 63], "count": 9, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_remove.cpp", "verification": "验证智能指针context的生命周期和有效性", "gids": [64], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_pre_query.cpp", "verification": "Verify context pointer is properly initialized and non-null before accessing its members", "gids": [65, 66, 67, 68, 69, 70, 71, 72, 73, 74], "count": 10, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_pre_query.cpp", "verification": "Verify smart pointer get() usage is safe and the raw pointer is properly managed", "gids": [75], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_update.cpp", "verification": "验证context指针及其成员(attrs, updateAttrs等)在解引用前非空", "gids": [76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87], "count": 12, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_update.cpp", "verification": "验证reinterpret_cast转换是否安全，基类指针是否确实指向UpdateContext对象", "gids": [88, 89], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_update.cpp", "verification": "验证context.get()返回的裸指针使用是否安全，生命周期是否得到保证", "gids": [90], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_common.cpp", "verification": "验证context指针在解引用前非空", "gids": [91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111], "count": 21, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_add.cpp", "verification": "context->attrs 在解引用前非空", "gids": [112, 113, 114, 115, 116, 119], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_add.cpp", "verification": "context 指针在解引用前非空", "gids": [117, 118, 120], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/js/napi/src/asset_napi_add.cpp", "verification": "context.get() 返回的指针在后续使用中有效", "gids": [121], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/huks_wrapper.c", "verification": "验证指针在解引用前非空", "gids": [122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155], "count": 34, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/huks_wrapper.c", "verification": "验证缓冲区操作长度不超过目标容量", "gids": [138, 139, 140, 148, 149, 152], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/huks_wrapper.h", "verification": "验证所有HksBlob指针参数在解引用前非空", "gids": [156, 157], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/os_dependency/inc/system_event_wrapper.h", "verification": "验证指针在解引用前非空", "gids": [158, 159], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/os_dependency/src/system_ability_wrapper.cpp", "verification": "验证指针分配和使用是否安全：1) 检查new(std::nothrow)分配是否成功 2) 检查abilityHandler在Subscribe/UnSubscribe前是否非空", "gids": [160, 161, 162], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/os_dependency/src/os_account_wrapper.cpp", "verification": "验证指针在解引用前是否非空", "gids": [163, 164, 165, 166, 167], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "services/os_dependency/src/system_event_wrapper.cpp", "verification": "确认reinterpret_cast转换是否安全，包括指针使用是否符合预期且不会导致未定义行为", "gids": [168, 169, 170, 171, 172, 173], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/os_dependency/src/file_operator_wrapper.cpp", "verification": "验证候选 174 的安全风险", "gids": [174], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/os_dependency/src/bms_wrapper.cpp", "verification": "验证指针在解引用前非空", "gids": [175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214], "count": 40, "batch_index": 1, "is_invalid": false}
+{"file": "services/os_dependency/src/bms_wrapper.cpp", "verification": "验证reinterpret_cast转换的指针有效性", "gids": [215, 216, 217], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/utils/src/hasher.rs", "verification": "验证不安全操作(unsafe块和原始指针)是否有足够的边界检查和安全性保证", "gids": [218, 219], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/utils/src/hasher.rs", "verification": "确认unwrap()的使用是否安全或是否有更好的错误处理方式", "gids": [220], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/os_dependency/file/src/de_operator.rs", "verification": "验证fs::set_permissions的返回值是否被正确处理", "gids": [221, 222], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/os_dependency/file/src/ce_operator.rs", "verification": "检查是否应该处理文件权限设置失败的情况", "gids": [223, 224], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/os_dependency/log/src/lib.rs", "verification": "验证候选 225 的安全风险", "gids": [225], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "frameworks/definition/src/extension.rs", "verification": "验证候选 226 的安全风险", "gids": [226], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/db_operator/src/database_file_upgrade.rs", "verification": "确认unwrap/expect调用是否在安全上下文中使用，即是否已经确保Option/Result不会为None/Err", "gids": [227, 228, 229, 230, 231, 232, 233, 234], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/database_file_upgrade.rs", "verification": "确认fs::set_permissions操作失败是否会影响程序正确性或安全性", "gids": [237, 238, 239], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/database_file_upgrade.rs", "verification": "确认get_db操作忽略结果是否会影响程序正确性或安全性", "gids": [235], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/database_file_upgrade.rs", "verification": "确认create_upgrade_file操作忽略结果是否会影响程序正确性或安全性", "gids": [236], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/table.rs", "verification": "验证 SqliteChanges 函数调用中 self.db.handle 的有效性和安全性", "gids": [240, 241, 242, 243, 244, 245], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/table.rs", "verification": "验证 SqliteChanges 函数声明中原始指针 *mut c_void 的使用安全性", "gids": [246], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/table.rs", "verification": "验证 rows.first() 是否可能返回空值", "gids": [247], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/database.rs", "verification": "验证所有原始指针在使用前是否经过有效校验", "gids": [248, 249, 250, 251, 252, 253], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/database.rs", "verification": "验证unwrap/expect调用是否在安全上下文中使用", "gids": [254, 255, 256], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/database.rs", "verification": "验证FFI相关导入的使用是否安全", "gids": [257], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/statement.rs", "verification": "验证所有SQLite FFI函数调用中handle指针的有效性和参数范围正确性", "gids": [258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 289], "count": 28, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/statement.rs", "verification": "验证原始指针类型定义和转换的安全性", "gids": [273, 286, 287], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/db_operator/src/statement.rs", "verification": "确认FFI字符串处理中CStr使用的安全性", "gids": [288], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/db_key_operator.rs", "verification": "验证unsafe操作是否有足够的边界检查和错误处理", "gids": [290, 291], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/db_key_operator.rs", "verification": "确认unwrap是否有替代的错误处理方式或保证不会panic", "gids": [292, 293], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/secret_key.rs", "verification": "验证所有不安全块中的原始指针使用是否安全，包括指针有效性、生命周期和是否有更安全的替代方案", "gids": [294, 295, 296, 297, 302, 303, 304, 305], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/secret_key.rs", "verification": "验证原始指针函数声明是否必要，是否有更安全的替代方案", "gids": [298, 299, 300, 301], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/crypto.rs", "verification": "验证unsafe代码块中的操作是否安全，特别是内存操作是否正确", "gids": [306, 307, 308, 309, 310], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/crypto.rs", "verification": "验证原始指针使用是否安全，包括指针有效性、生命周期和解引用安全", "gids": [311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336], "count": 26, "batch_index": 1, "is_invalid": false}
+{"file": "services/crypto_manager/src/crypto_manager.rs", "verification": "验证候选 337 的安全风险", "gids": [337], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/crypto_manager/src/lib.rs", "verification": "验证原始指针(*const u8/*mut u8)在使用前是否有效且进行了适当的安全检查", "gids": [338, 339], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/common/src/calling_info.rs", "verification": "验证候选 340 的安全风险", "gids": [340], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/common/src/process_info.rs", "verification": "验证所有不安全操作(包括原始指针和unsafe块)是否有适当的边界检查和安全性保证", "gids": [341, 342], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/common/src/counter.rs", "verification": "验证counter.lock()是否可能失败导致unwrap() panic", "gids": [343, 344], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/common/src/lib.rs", "verification": "检查unsafe代码块中的操作是否有必要的安全保证", "gids": [345, 346], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/common/src/lib.rs", "verification": "检查原始指针在使用前是否有正确的初始化/校验", "gids": [347, 348, 349, 350, 351], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/data_size_mod.rs", "verification": "验证所有FFI调用的指针参数是否有效，包括指针非空、内存有效、字符串以null结尾、指针生命周期合理", "gids": [352, 353, 354, 355, 356, 357], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/data_size_mod.rs", "verification": "检查unwrap/expect调用的前置条件是否总是成立，是否有适当的错误处理替代方案", "gids": [358, 359, 360], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/data_size_mod.rs", "verification": "检查被忽略的操作结果是否真的可以安全忽略，是否有适当的错误处理替代方案", "gids": [361, 362], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/data_size_mod.rs", "verification": "检查FFI相关定义是否正确，是否有潜在的类型安全问题", "gids": [363], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/stub.rs", "verification": "验证候选 364 的安全风险", "gids": [364], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/core_service/src/upgrade_operator.rs", "verification": "验证所有FFI调用中的原始指针使用是否安全，包括参数验证和错误处理", "gids": [365, 366, 367, 368], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/upgrade_operator.rs", "verification": "检查unwrap/expect使用是否有更好的错误处理方式或确保panic是可接受的", "gids": [369, 370, 371, 372], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/upgrade_operator.rs", "verification": "确认忽略函数返回值是否安全，是否有必要处理潜在错误", "gids": [373, 374, 375], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/upgrade_operator.rs", "verification": "确保所有FFI字符串转换都正确处理了可能的错误", "gids": [376], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/lib.rs", "verification": "验证Mutex锁获取是否可能失败导致panic", "gids": [377, 378, 379, 380, 381, 382, 383, 384], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/lib.rs", "verification": "验证被忽略的返回值是否可能包含重要错误信息", "gids": [385], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/common_event/listener.rs", "verification": "验证指针在解引用前非空且长度参数有效", "gids": [386, 387, 388, 389, 390, 391, 392, 393, 394, 395, 396, 397, 398, 399, 400, 424, 425, 426, 427, 428, 429], "count": 21, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/common_event/listener.rs", "verification": "验证指针参数的有效性和安全性", "gids": [401, 402, 403, 404, 405, 406], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/common_event/listener.rs", "verification": "验证unwrap/expect调用前是否有错误处理", "gids": [407, 408, 409, 410, 411, 412, 413], "count": 7, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/common_event/listener.rs", "verification": "验证忽略的结果是否可能导致问题", "gids": [414, 415, 416, 417, 418, 419, 420, 421, 422], "count": 9, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/common_event/listener.rs", "verification": "验证C字符串转换的安全性", "gids": [423], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/operation_pre_query.rs", "verification": "验证crypto_manager.lock()的结果是否安全", "gids": [430, 431], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/operation_post_query.rs", "verification": "验证候选 432 的安全风险", "gids": [432], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/core_service/src/operations/operation_query.rs", "verification": "验证unwrap/expect调用是否安全，即是否有可能在这些情况下触发panic", "gids": [433, 434], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/operation_add.rs", "verification": "验证所有unsafe块和FFI调用的安全性，包括指针有效性检查", "gids": [435, 436, 437], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/operation_add.rs", "verification": "检查unwrap/expect和忽略结果的使用是否合理，是否有适当的错误处理", "gids": [438, 439], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/operation_add.rs", "verification": "检查FFI相关导入的使用情况，确认是否有必要且安全", "gids": [440], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/operation_update.rs", "verification": "验证候选 441 的安全风险", "gids": [441], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/core_service/src/operations/common/permission_check.rs", "verification": "验证unsafe块中的外部函数调用是否安全", "gids": [442, 443], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/common/permission_check.rs", "verification": "验证FFI接口中的原始指针使用是否安全", "gids": [444, 446], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/core_service/src/operations/common/permission_check.rs", "verification": "检查unwrap()的使用是否可能导致panic", "gids": [445], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/plugin/src/asset_plugin.rs", "verification": "验证unsafe代码块中的操作是否安全，包括内存安全和线程安全", "gids": [447, 448], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/plugin/src/asset_plugin.rs", "verification": "验证原始指针的有效性和生命周期管理", "gids": [449, 455], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/plugin/src/asset_plugin.rs", "verification": "验证unwrap/expect前的Option/Result是否确实不会为None/Err", "gids": [450, 451, 452, 453], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "services/plugin/src/asset_plugin.rs", "verification": "验证Sync trait的实现是否确实线程安全", "gids": [454], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/c/src/lib.rs", "verification": "验证unsafe代码块中的操作是否满足Rust的安全要求", "gids": [456, 457, 458, 459, 460, 461, 462, 463, 464, 465], "count": 10, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/c/src/lib.rs", "verification": "验证原始指针是否有效且不会导致越界访问", "gids": [466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482], "count": 17, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/c/src/lib.rs", "verification": "验证指针算术运算是否会导致越界", "gids": [490, 491, 492, 493], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/c/src/lib.rs", "verification": "验证不安全内存操作的范围和有效性", "gids": [494, 495], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/c/src/lib.rs", "verification": "验证是否有比unwrap/expect更安全的错误处理方式", "gids": [483, 484, 485, 486, 487, 488, 489], "count": 7, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/rs/src/plugin_interface.rs", "verification": "验证候选 496 的安全风险", "gids": [496], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "interfaces/inner_kits/rs/src/lib.rs", "verification": "验证unsafe代码块是否有足够的边界检查和安全性保证", "gids": [497, 498], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/rs/src/lib.rs", "verification": "验证原始指针是否有效且使用安全", "gids": [499, 500], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/inner_kits/rs/src/lib.rs", "verification": "验证unwrap的使用是否合理，是否有更好的错误处理方式", "gids": [501], "count": 1, "batch_index": 1, "is_invalid": false}
