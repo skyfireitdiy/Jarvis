@@ -1,0 +1,12 @@
+{
+  "stage": "completed",
+  "message": "安全分析完成，共发现 679 个问题",
+  "stage_history": [],
+  "last_updated": "2025-11-09T17:55:58.957107Z",
+  "progress": 100.0,
+  "current": 613,
+  "total": 613,
+  "details": {
+    "total_issues": 679
+  }
+}
