@@ -1186,9 +1186,16 @@ def _process_verification_batch(
                     parsed_items = items
 
         # 关键字段校验
-        if parsed_items and _valid_items(parsed_items):
-            summary_items = parsed_items
-            break
+        # 空数组 [] 是有效的（表示没有发现问题），需要单独处理
+        if parsed_items is not None:
+            if len(parsed_items) == 0:
+                # 空数组表示没有发现问题，这是有效的格式
+                summary_items = parsed_items
+                break
+            elif _valid_items(parsed_items):
+                # 非空数组需要验证格式
+                summary_items = parsed_items
+                break
         
         # 格式校验失败，后续重试使用直接模型调用
         use_direct_model_analysis = True
@@ -1320,7 +1327,7 @@ def _process_verification_batch(
                 except Exception:
                     pass
             
-            verification_results = _run_verification_agent_with_retry(
+            verification_results, verification_parse_error = _run_verification_agent_with_retry(
                 verification_agent,
                 verification_task,
                 _build_verification_summary_prompt(),
@@ -1328,6 +1335,28 @@ def _process_verification_batch(
                 verification_summary_container,
                 bidx,
             )
+            
+            # 调试日志：显示验证结果
+            if verification_results is None:
+                try:
+                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+            elif not isinstance(verification_results, list):
+                try:
+                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回类型错误，期望 list，实际: {type(verification_results)}", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+            elif len(verification_results) == 0:
+                try:
+                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回空列表", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+            else:
+                try:
+                    typer.secho(f"[jarvis-sec] 验证 Agent 返回 {len(verification_results)} 个结果项", fg=typer.colors.BLUE)
+                except Exception:
+                    pass
             
             # 根据验证结果筛选：只保留验证通过（is_valid: true）的告警
             if verification_results:
@@ -1342,13 +1371,30 @@ def _process_verification_batch(
                                 gid_int = int(gid_val)
                                 if gid_int >= 1:
                                     gids_to_process.append(gid_int)
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                try:
+                                    typer.secho(f"[jarvis-sec] 警告：验证结果中 gids 数组元素格式错误: {gid_val}, 错误: {e}", fg=typer.colors.YELLOW)
+                                except Exception:
+                                    pass
                     elif "gid" in vr:
                         try:
-                            gid_int = int(vr.get("gid", 0))
+                            gid_val = vr.get("gid", 0)
+                            gid_int = int(gid_val)
                             if gid_int >= 1:
                                 gids_to_process.append(gid_int)
+                            else:
+                                try:
+                                    typer.secho(f"[jarvis-sec] 警告：验证结果中 gid 值无效: {gid_val} (必须 >= 1)", fg=typer.colors.YELLOW)
+                                except Exception:
+                                    pass
+                        except Exception as e:
+                            try:
+                                typer.secho(f"[jarvis-sec] 警告：验证结果中 gid 格式错误: {vr.get('gid')}, 错误: {e}", fg=typer.colors.YELLOW)
+                            except Exception:
+                                pass
+                    else:
+                        try:
+                            typer.secho(f"[jarvis-sec] 警告：验证结果项缺少 gid 或 gids 字段: {vr}", fg=typer.colors.YELLOW)
                         except Exception:
                             pass
                     
@@ -1359,6 +1405,18 @@ def _process_verification_batch(
                             "is_valid": is_valid,
                             "verification_notes": verification_notes
                         }
+                
+                # 调试日志：显示提取到的验证结果
+                if gid_to_verification:
+                    try:
+                        typer.secho(f"[jarvis-sec] 从验证结果中提取到 {len(gid_to_verification)} 个 gid: {sorted(gid_to_verification.keys())}", fg=typer.colors.BLUE)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        typer.secho(f"[jarvis-sec] 警告：验证结果解析成功，但未提取到任何有效的 gid。验证结果: {verification_results}", fg=typer.colors.YELLOW)
+                    except Exception:
+                        pass
                 
                 # 只保留验证通过的告警（仅验证有风险的项目）
                 for item in items_with_risk:
@@ -2980,7 +3038,52 @@ def run_security_analysis(
             gid_counts,
         )
 
-    # 4) 使用统一聚合器生成最终报告（JSON + Markdown）
+    # 4) 从 agent_issues.jsonl 读取所有已保存的告警，合并到 all_issues 中
+    # 这样可以确保即使分析中断，已保存的告警也会出现在最终报告中
+    try:
+        from pathlib import Path as _Path_final
+        import json as _json_final
+        _agent_issues_path_final = sec_dir / "agent_issues.jsonl"
+        if _agent_issues_path_final.exists():
+            saved_issues_from_file: List[Dict] = []
+            saved_gids_from_file = set()
+            with _agent_issues_path_final.open("r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        item = _json_final.loads(line)
+                        gid = item.get("gid", 0)
+                        if gid >= 1 and gid not in saved_gids_from_file:
+                            # 只保留验证通过的告警（has_risk: true 且有 verification_notes）
+                            if item.get("has_risk") is True and "verification_notes" in item:
+                                saved_issues_from_file.append(item)
+                                saved_gids_from_file.add(gid)
+                    except Exception:
+                        pass
+            
+            # 合并已保存的告警到 all_issues（去重，基于 gid）
+            current_gids = {int(item.get("gid", 0)) for item in all_issues if item.get("gid", 0) >= 1}
+            for saved_item in saved_issues_from_file:
+                saved_gid = int(saved_item.get("gid", 0))
+                if saved_gid >= 1 and saved_gid not in current_gids:
+                    all_issues.append(saved_item)
+                    current_gids.add(saved_gid)
+            
+            if saved_issues_from_file:
+                try:
+                    typer.secho(f"[jarvis-sec] 从 agent_issues.jsonl 加载了 {len(saved_issues_from_file)} 个已保存的告警，合并后共 {len(all_issues)} 个告警", fg=typer.colors.BLUE)
+                except Exception:
+                    pass
+    except Exception as e:
+        # 加载失败不影响主流程
+        try:
+            typer.secho(f"[jarvis-sec] 警告：从 agent_issues.jsonl 加载告警失败: {e}", fg=typer.colors.YELLOW)
+        except Exception:
+            pass
+    
+    # 5) 使用统一聚合器生成最终报告（JSON + Markdown）
     try:
         from jarvis.jarvis_sec.report import build_json_and_markdown
         result = build_json_and_markdown(
