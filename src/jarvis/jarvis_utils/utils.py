@@ -1154,515 +1154,465 @@ def _process_env_variables(config_data: dict) -> None:
         )
 
 
-def _collect_optional_config_interactively(
-    config_data: dict, ask_all: bool = False
-) -> bool:
-    """
-    复用的交互式配置收集逻辑：
-    - ask_all=False（默认）：仅对缺省的新功能开关/可选项逐项询问，已存在项跳过
-    - ask_all=True：对所有项进行询问，默认值取自当前配置文件，可覆盖现有设置
-    - 修改传入的 config_data
-    - 包含更多来自 config.py 的可选项
-    返回:
-        bool: 是否有变更
-    """
-    from jarvis.jarvis_utils.input import user_confirm as get_yes_no
-    from jarvis.jarvis_utils.input import get_single_line_input
-
-    def _ask_and_set(_key, _tip, _default, _type="bool"):
-        try:
-            if not ask_all and _key in config_data:
-                return False
-            if _type == "bool":
-                cur = bool(config_data.get(_key, _default))
-                val = get_yes_no(_tip, default=cur)
-                # 与当前值相同则不写入，避免冗余
-                if bool(val) == cur:
-                    return False
-                config_data[_key] = bool(val)
-            else:
-                cur = str(config_data.get(_key, _default or ""))
-                val = get_single_line_input(f"{_tip}", default=cur)
-                v = ("" if val is None else str(val)).strip()
-                # 输入与当前值相同则不写入
-                if v == cur:
-                    return False
-                config_data[_key] = v
-            return True
-        except Exception:
-            # 异常时不写入，保持精简
+def _ask_config_bool(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: bool) -> bool:
+    """询问并设置布尔类型配置项"""
+    try:
+        if not ask_all and _key in config_data:
             return False
-
-    def _ask_and_set_optional_str(_key, _tip, _default: str = "") -> bool:
-        try:
-            if not ask_all and _key in config_data:
-                return False
-            cur = str(config_data.get(_key, _default or ""))
-            val = get_single_line_input(f"{_tip}", default=cur)
-            if val is None:
-                return False
-            s = str(val).strip()
-            # 空输入表示不改变
-            if s == "":
-                return False
-            if s == cur:
-                return False
-            config_data[_key] = s
-            return True
-        except Exception:
+        from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+        cur = bool(config_data.get(_key, _default))
+        val = get_yes_no(_tip, default=cur)
+        if bool(val) == cur:
             return False
+        config_data[_key] = bool(val)
+        return True
+    except Exception:
+        return False
 
-    def _ask_and_set_int(_key, _tip, _default: int) -> bool:
+
+def _ask_config_str(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = "") -> bool:
+    """询问并设置字符串类型配置项"""
+    try:
+        if not ask_all and _key in config_data:
+            return False
+        from jarvis.jarvis_utils.input import get_single_line_input
+        cur = str(config_data.get(_key, _default or ""))
+        val = get_single_line_input(f"{_tip}", default=cur)
+        v = ("" if val is None else str(val)).strip()
+        if v == cur:
+            return False
+        config_data[_key] = v
+        return True
+    except Exception:
+        return False
+
+
+def _ask_config_optional_str(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = "") -> bool:
+    """询问并设置可选字符串类型配置项（空输入表示不改变）"""
+    try:
+        if not ask_all and _key in config_data:
+            return False
+        from jarvis.jarvis_utils.input import get_single_line_input
+        cur = str(config_data.get(_key, _default or ""))
+        val = get_single_line_input(f"{_tip}", default=cur)
+        if val is None:
+            return False
+        s = str(val).strip()
+        if s == "" or s == cur:
+            return False
+        config_data[_key] = s
+        return True
+    except Exception:
+        return False
+
+
+def _ask_config_int(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: int) -> bool:
+    """询问并设置整数类型配置项"""
+    try:
+        if not ask_all and _key in config_data:
+            return False
+        from jarvis.jarvis_utils.input import get_single_line_input
+        cur = str(config_data.get(_key, _default))
+        val_str = get_single_line_input(f"{_tip}", default=cur)
+        s = "" if val_str is None else str(val_str).strip()
+        if s == "" or s == cur:
+            return False
         try:
-            if not ask_all and _key in config_data:
-                return False
-            cur = str(config_data.get(_key, _default))
-            val_str = get_single_line_input(f"{_tip}", default=cur)
-            s = "" if val_str is None else str(val_str).strip()
-            if s == "" or s == cur:
-                return False
-            try:
-                v = int(s)
-            except Exception:
-                return False
-            if str(v) == cur:
-                return False
-            config_data[_key] = v
-            return True
+            v = int(s)
         except Exception:
             return False
-
-    def _ask_and_set_list(_key, _tip) -> bool:
-        try:
-            if not ask_all and _key in config_data:
-                return False
-            cur_val = config_data.get(_key, [])
-            if isinstance(cur_val, list):
-                cur_display = ", ".join([str(x) for x in cur_val])
-            else:
-                cur_display = str(cur_val or "")
-            val = get_single_line_input(f"{_tip}", default=cur_display)
-            if val is None:
-                return False
-            s = str(val).strip()
-            if s == cur_display.strip():
-                return False
-            if not s:
-                # 输入为空表示不改变
-                return False
-            items = [x.strip() for x in s.split(",") if x.strip()]
-            if isinstance(cur_val, list) and items == cur_val:
-                return False
-            config_data[_key] = items
-            return True
-        except Exception:
+        if str(v) == cur:
             return False
+        config_data[_key] = v
+        return True
+    except Exception:
+        return False
 
+
+def _ask_config_list(config_data: dict, ask_all: bool, _key: str, _tip: str) -> bool:
+    """询问并设置列表类型配置项（逗号分隔）"""
+    try:
+        if not ask_all and _key in config_data:
+            return False
+        from jarvis.jarvis_utils.input import get_single_line_input
+        cur_val = config_data.get(_key, [])
+        if isinstance(cur_val, list):
+            cur_display = ", ".join([str(x) for x in cur_val])
+        else:
+            cur_display = str(cur_val or "")
+        val = get_single_line_input(f"{_tip}", default=cur_display)
+        if val is None:
+            return False
+        s = str(val).strip()
+        if s == cur_display.strip():
+            return False
+        if not s:
+            return False
+        items = [x.strip() for x in s.split(",") if x.strip()]
+        if isinstance(cur_val, list) and items == cur_val:
+            return False
+        config_data[_key] = items
+        return True
+    except Exception:
+        return False
+
+
+def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
+    """收集基础开关配置"""
     changed = False
-    # 现有两个开关
-    changed = (
-        _ask_and_set(
-            "JARVIS_ENABLE_GIT_JCA_SWITCH",
-            "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
-            "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
-            False,
-            "bool",
-        )
-        or changed
-    )
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_ENABLE_GIT_JCA_SWITCH",
+        "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
+        False,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
+        "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
+        False,
+    ) or changed
+    return changed
 
-    # 新增的配置项交互（通用体验相关）
-    # 根据平台统一默认值：Windows下为False，其它平台为True（与config.get_pretty_output一致）
+
+def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
+    """收集UI体验相关配置"""
+    changed = False
     try:
         import platform as _platform_mod
         _default_pretty = False if _platform_mod.system() == "Windows" else True
     except Exception:
         _default_pretty = True
-    changed = (
-        _ask_and_set(
-            "JARVIS_PRETTY_OUTPUT",
-            "是否启用更美观的终端输出（Pretty Output）？",
-            _default_pretty,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_PRINT_PROMPT",
-            "是否打印发送给模型的提示词（Prompt）？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_IMMEDIATE_ABORT",
-            "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
-            False,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_ENABLE_STATIC_ANALYSIS",
-            "是否启用静态代码分析（Static Analysis）？",
-            True,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_ENABLE_BUILD_VALIDATION",
-            "是否启用构建验证（Build Validation）？在代码编辑后自动验证代码能否成功编译/构建。",
-            True,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_int(
-            "JARVIS_BUILD_VALIDATION_TIMEOUT",
-            "构建验证的超时时间（秒，默认30秒）",
-            30,
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_ENABLE_IMPACT_ANALYSIS",
-            "是否启用编辑影响范围分析（Impact Analysis）？分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等。",
-            True,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_USE_METHODOLOGY",
-            "是否启用方法论系统（Methodology）？",
-            True,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_USE_ANALYSIS",
-            "是否启用分析流程（Analysis）？",
-            True,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_FORCE_SAVE_MEMORY",
-            "是否强制保存会话记忆？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-
-    # 新增：会话与调试相关配置
-    changed = (
-        _ask_and_set(
-            "JARVIS_SAVE_SESSION_HISTORY",
-            "是否保存会话记录？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_PRINT_ERROR_TRACEBACK",
-            "是否在错误输出时打印回溯调用链？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-
-    # 其它可选开关
-    changed = (
-        _ask_and_set(
-            "JARVIS_SKIP_PREDEFINED_TASKS",
-            "是否跳过预定义任务加载（不读取 pre-command 列表）？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-
-    # 代码与工具操作安全提示
-    changed = (
-        _ask_and_set(
-            "JARVIS_EXECUTE_TOOL_CONFIRM",
-            "执行工具前是否需要确认？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_CONFIRM_BEFORE_APPLY_PATCH",
-            "应用补丁前是否需要确认？",
-            False,
-            "bool",
-        )
-        or changed
-    )
-
-    # 数据目录与最大输入Token
-    from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir  # lazy import
-
-    changed = (
-        _ask_and_set_optional_str(
-            "JARVIS_DATA_PATH",
-            f"是否自定义数据目录路径(JARVIS_DATA_PATH)？留空使用默认: {_get_data_dir()}",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_int(
-            "JARVIS_MAX_INPUT_TOKEN_COUNT",
-            "自定义最大输入Token数量（留空使用默认: 32000）",
-            32000,
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_int(
-            "JARVIS_TOOL_FILTER_THRESHOLD",
-            "设置AI工具筛选阈值 (当可用工具数超过此值时触发AI筛选, 默认30)",
-            30,
-        )
-        or changed
-    )
-    # 规划相关配置
-    changed = (
-        _ask_and_set(
-            "JARVIS_PLAN_ENABLED",
-            "是否默认启用任务规划？当 Agent 初始化时 plan 参数未指定，将从此配置加载",
-            True,
-            "bool",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_int(
-            "JARVIS_PLAN_MAX_DEPTH",
-            "任务规划的最大层数（限制递归拆分深度，默认2；仅在启用规划时生效）",
-            2,
-        )
-        or changed
-    )
-    # 新增：自动总结轮次与脚本超时
-    changed = (
-        _ask_and_set_int(
-            "JARVIS_AUTO_SUMMARY_ROUNDS",
-            "基于对话轮次的自动总结阈值（达到该轮次后自动总结并清理历史，默认50）",
-            50,
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_int(
-            "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
-            "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
-            300,
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_int(
-            "JARVIS_ADDON_PROMPT_THRESHOLD",
-            "附加提示的触发阈值（字符数，默认1024）。当消息长度超过此值时，会自动添加默认的附加提示",
-            1024,
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_ENABLE_INTENT_RECOGNITION",
-            "是否启用意图识别功能？用于智能上下文推荐中的LLM意图提取和语义分析",
-            True,
-            "bool",
-        )
-        or changed
-    )
-
-    # 目录类配置（逗号分隔）
-    changed = (
-        _ask_and_set_list(
-            "JARVIS_TOOL_LOAD_DIRS",
-            "指定工具加载目录（逗号分隔，留空跳过）：",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_list(
-            "JARVIS_METHODOLOGY_DIRS",
-            "指定方法论加载目录（逗号分隔，留空跳过）：",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_list(
-            "JARVIS_AGENT_DEFINITION_DIRS",
-            "指定 agent 定义加载目录（逗号分隔，留空跳过）：",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_list(
-            "JARVIS_MULTI_AGENT_DIRS",
-            "指定 multi_agent 加载目录（逗号分隔，留空跳过）：",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_list(
-            "JARVIS_ROLES_DIRS",
-            "指定 roles 加载目录（逗号分隔，留空跳过）：",
-        )
-        or changed
-    )
-    # 新增：工具调用后回调实现目录
-    changed = (
-        _ask_and_set_list(
-            "JARVIS_AFTER_TOOL_CALL_CB_DIRS",
-            "指定工具调用后回调实现目录（逗号分隔，留空跳过）：",
-        )
-        or changed
-    )
-
-    # Web 搜索配置（可选）
-    changed = (
-        _ask_and_set_optional_str(
-            "JARVIS_WEB_SEARCH_PLATFORM",
-            "配置 Web 搜索平台名称（留空跳过）：",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set_optional_str(
-            "JARVIS_WEB_SEARCH_MODEL",
-            "配置 Web 搜索模型名称（留空跳过）：",
-        )
-        or changed
-    )
-
-    # Git 校验模式
-    def _ask_git_check_mode() -> bool:
-        try:
-            _key = "JARVIS_GIT_CHECK_MODE"
-            if not ask_all and _key in config_data:
-                return False
-
-            from jarvis.jarvis_utils.input import get_choice
-            from jarvis.jarvis_utils.config import get_git_check_mode
-
-            current_mode = config_data.get(_key, get_git_check_mode())
-            choices = ["strict", "warn"]
-            tip = (
-                "请选择 Git 仓库检查模式 (JARVIS_GIT_CHECK_MODE):\n"
-                "此设置决定了当在 Git 仓库中检测到未提交的更改时，Jarvis应如何处理。\n"
-                "这对于确保代码修改和提交操作在干净的工作区上进行至关重要。\n"
-                "  - strict: (推荐) 如果存在未提交的更改，则中断相关操作（如代码修改、自动提交）。\n"
-                "            这可以防止意外覆盖或丢失本地工作。\n"
-                "  - warn:   如果存在未提交的更改，仅显示警告信息，然后继续执行操作。\n"
-                "            适用于您希望绕过检查并自行管理仓库状态的场景。"
-            )
+    
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_PRETTY_OUTPUT",
+        "是否启用更美观的终端输出（Pretty Output）？",
+        _default_pretty,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_PRINT_PROMPT",
+        "是否打印发送给模型的提示词（Prompt）？",
+        False,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_IMMEDIATE_ABORT",
+        "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
+        False,
+    ) or changed
+    return changed
 
 
+def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
+    """收集代码分析相关配置"""
+    changed = False
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_ENABLE_STATIC_ANALYSIS",
+        "是否启用静态代码分析（Static Analysis）？",
+        True,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_ENABLE_BUILD_VALIDATION",
+        "是否启用构建验证（Build Validation）？在代码编辑后自动验证代码能否成功编译/构建。",
+        True,
+    ) or changed
+    changed = _ask_config_int(
+        config_data, ask_all,
+        "JARVIS_BUILD_VALIDATION_TIMEOUT",
+        "构建验证的超时时间（秒，默认30秒）",
+        30,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_ENABLE_IMPACT_ANALYSIS",
+        "是否启用编辑影响范围分析（Impact Analysis）？分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等。",
+        True,
+    ) or changed
+    return changed
 
-            new_mode = get_choice(
-                tip,
-                choices,
-            )
 
-            if new_mode == current_mode:
-                return False
+def _collect_agent_features_config(config_data: dict, ask_all: bool) -> bool:
+    """收集Agent功能相关配置"""
+    changed = False
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_USE_METHODOLOGY",
+        "是否启用方法论系统（Methodology）？",
+        True,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_USE_ANALYSIS",
+        "是否启用分析流程（Analysis）？",
+        True,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_FORCE_SAVE_MEMORY",
+        "是否强制保存会话记忆？",
+        False,
+    ) or changed
+    return changed
 
-            config_data[_key] = new_mode
-            return True
-        except Exception:
+
+def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
+    """收集会话与调试相关配置"""
+    changed = False
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_SAVE_SESSION_HISTORY",
+        "是否保存会话记录？",
+        False,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_PRINT_ERROR_TRACEBACK",
+        "是否在错误输出时打印回溯调用链？",
+        False,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_SKIP_PREDEFINED_TASKS",
+        "是否跳过预定义任务加载（不读取 pre-command 列表）？",
+        False,
+    ) or changed
+    return changed
+
+
+def _collect_safety_config(config_data: dict, ask_all: bool) -> bool:
+    """收集代码与工具操作安全提示配置"""
+    changed = False
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_EXECUTE_TOOL_CONFIRM",
+        "执行工具前是否需要确认？",
+        False,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_CONFIRM_BEFORE_APPLY_PATCH",
+        "应用补丁前是否需要确认？",
+        False,
+    ) or changed
+    return changed
+
+
+def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
+    """收集数据目录与最大输入Token配置"""
+    changed = False
+    from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir
+    changed = _ask_config_optional_str(
+        config_data, ask_all,
+        "JARVIS_DATA_PATH",
+        f"是否自定义数据目录路径(JARVIS_DATA_PATH)？留空使用默认: {_get_data_dir()}",
+    ) or changed
+    changed = _ask_config_int(
+        config_data, ask_all,
+        "JARVIS_MAX_INPUT_TOKEN_COUNT",
+        "自定义最大输入Token数量（留空使用默认: 32000）",
+        32000,
+    ) or changed
+    changed = _ask_config_int(
+        config_data, ask_all,
+        "JARVIS_TOOL_FILTER_THRESHOLD",
+        "设置AI工具筛选阈值 (当可用工具数超过此值时触发AI筛选, 默认30)",
+        30,
+    ) or changed
+    return changed
+
+
+def _collect_planning_config(config_data: dict, ask_all: bool) -> bool:
+    """收集规划相关配置"""
+    changed = False
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_PLAN_ENABLED",
+        "是否默认启用任务规划？当 Agent 初始化时 plan 参数未指定，将从此配置加载",
+        True,
+    ) or changed
+    changed = _ask_config_int(
+        config_data, ask_all,
+        "JARVIS_PLAN_MAX_DEPTH",
+        "任务规划的最大层数（限制递归拆分深度，默认2；仅在启用规划时生效）",
+        2,
+    ) or changed
+    return changed
+
+
+def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
+    """收集高级配置（自动总结、脚本超时等）"""
+    changed = False
+    changed = _ask_config_int(
+        config_data, ask_all,
+        "JARVIS_AUTO_SUMMARY_ROUNDS",
+        "基于对话轮次的自动总结阈值（达到该轮次后自动总结并清理历史，默认50）",
+        50,
+    ) or changed
+    changed = _ask_config_int(
+        config_data, ask_all,
+        "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
+        "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
+        300,
+    ) or changed
+    changed = _ask_config_int(
+        config_data, ask_all,
+        "JARVIS_ADDON_PROMPT_THRESHOLD",
+        "附加提示的触发阈值（字符数，默认1024）。当消息长度超过此值时，会自动添加默认的附加提示",
+        1024,
+    ) or changed
+    changed = _ask_config_bool(
+        config_data, ask_all,
+        "JARVIS_ENABLE_INTENT_RECOGNITION",
+        "是否启用意图识别功能？用于智能上下文推荐中的LLM意图提取和语义分析",
+        True,
+    ) or changed
+    return changed
+
+
+def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
+    """收集目录类配置（逗号分隔）"""
+    changed = False
+    changed = _ask_config_list(
+        config_data, ask_all,
+        "JARVIS_TOOL_LOAD_DIRS",
+        "指定工具加载目录（逗号分隔，留空跳过）：",
+    ) or changed
+    changed = _ask_config_list(
+        config_data, ask_all,
+        "JARVIS_METHODOLOGY_DIRS",
+        "指定方法论加载目录（逗号分隔，留空跳过）：",
+    ) or changed
+    changed = _ask_config_list(
+        config_data, ask_all,
+        "JARVIS_AGENT_DEFINITION_DIRS",
+        "指定 agent 定义加载目录（逗号分隔，留空跳过）：",
+    ) or changed
+    changed = _ask_config_list(
+        config_data, ask_all,
+        "JARVIS_MULTI_AGENT_DIRS",
+        "指定 multi_agent 加载目录（逗号分隔，留空跳过）：",
+    ) or changed
+    changed = _ask_config_list(
+        config_data, ask_all,
+        "JARVIS_ROLES_DIRS",
+        "指定 roles 加载目录（逗号分隔，留空跳过）：",
+    ) or changed
+    changed = _ask_config_list(
+        config_data, ask_all,
+        "JARVIS_AFTER_TOOL_CALL_CB_DIRS",
+        "指定工具调用后回调实现目录（逗号分隔，留空跳过）：",
+    ) or changed
+    return changed
+
+
+def _collect_web_search_config(config_data: dict, ask_all: bool) -> bool:
+    """收集Web搜索配置"""
+    changed = False
+    changed = _ask_config_optional_str(
+        config_data, ask_all,
+        "JARVIS_WEB_SEARCH_PLATFORM",
+        "配置 Web 搜索平台名称（留空跳过）：",
+    ) or changed
+    changed = _ask_config_optional_str(
+        config_data, ask_all,
+        "JARVIS_WEB_SEARCH_MODEL",
+        "配置 Web 搜索模型名称（留空跳过）：",
+    ) or changed
+    return changed
+
+
+def _ask_git_check_mode(config_data: dict, ask_all: bool) -> bool:
+    """询问Git校验模式"""
+    try:
+        _key = "JARVIS_GIT_CHECK_MODE"
+        if not ask_all and _key in config_data:
             return False
-
-    def _ask_patch_format_mode() -> bool:
-        try:
-            _key = "JARVIS_PATCH_FORMAT"
-            if not ask_all and _key in config_data:
-                return False
-
-            from jarvis.jarvis_utils.input import get_choice
-            from jarvis.jarvis_utils.config import get_patch_format
-
-            current_mode = config_data.get(_key, get_patch_format())
-            choices = ["all", "search", "search_range"]
-            tip = (
-                "请选择补丁格式处理模式 (JARVIS_PATCH_FORMAT):\n"
-                "该设置影响 edit_file_handler 在处理补丁时允许的匹配方式。\n"
-                "  - all: 同时支持 SEARCH 与 SEARCH_START/SEARCH_END 两种模式（默认）。\n"
-                "  - search: 仅允许精确片段匹配（SEARCH）。更稳定，适合较弱模型或严格控制改动。\n"
-                "  - search_range: 仅允许范围匹配（SEARCH_START/SEARCH_END）。更灵活，适合较强模型和块内细粒度修改。"
-            )
-
-            new_mode = get_choice(
-                tip,
-                choices,
-            )
-
-            if new_mode == current_mode:
-                return False
-
-            config_data[_key] = new_mode
-            return True
-        except Exception:
-            return False
-
-    changed = _ask_git_check_mode() or changed
-    changed = _ask_patch_format_mode() or changed
-
-    # Git 提交提示词（可选）
-    changed = (
-        _ask_and_set_optional_str(
-            "JARVIS_GIT_COMMIT_PROMPT",
-            "自定义 Git 提交提示模板（留空跳过）：",
+        from jarvis.jarvis_utils.input import get_choice
+        from jarvis.jarvis_utils.config import get_git_check_mode
+        current_mode = config_data.get(_key, get_git_check_mode())
+        choices = ["strict", "warn"]
+        tip = (
+            "请选择 Git 仓库检查模式 (JARVIS_GIT_CHECK_MODE):\n"
+            "此设置决定了当在 Git 仓库中检测到未提交的更改时，Jarvis应如何处理。\n"
+            "这对于确保代码修改和提交操作在干净的工作区上进行至关重要。\n"
+            "  - strict: (推荐) 如果存在未提交的更改，则中断相关操作（如代码修改、自动提交）。\n"
+            "            这可以防止意外覆盖或丢失本地工作。\n"
+            "  - warn:   如果存在未提交的更改，仅显示警告信息，然后继续执行操作。\n"
+            "            适用于您希望绕过检查并自行管理仓库状态的场景。"
         )
-        or changed
-    )
+        new_mode = get_choice(tip, choices)
+        if new_mode == current_mode:
+            return False
+        config_data[_key] = new_mode
+        return True
+    except Exception:
+        return False
 
-    # RAG 配置（可选）
+
+def _ask_patch_format_mode(config_data: dict, ask_all: bool) -> bool:
+    """询问补丁格式模式"""
+    try:
+        _key = "JARVIS_PATCH_FORMAT"
+        if not ask_all and _key in config_data:
+            return False
+        from jarvis.jarvis_utils.input import get_choice
+        from jarvis.jarvis_utils.config import get_patch_format
+        current_mode = config_data.get(_key, get_patch_format())
+        choices = ["all", "search", "search_range"]
+        tip = (
+            "请选择补丁格式处理模式 (JARVIS_PATCH_FORMAT):\n"
+            "该设置影响 edit_file_handler 在处理补丁时允许的匹配方式。\n"
+            "  - all: 同时支持 SEARCH 与 SEARCH_START/SEARCH_END 两种模式（默认）。\n"
+            "  - search: 仅允许精确片段匹配（SEARCH）。更稳定，适合较弱模型或严格控制改动。\n"
+            "  - search_range: 仅允许范围匹配（SEARCH_START/SEARCH_END）。更灵活，适合较强模型和块内细粒度修改。"
+        )
+        new_mode = get_choice(tip, choices)
+        if new_mode == current_mode:
+            return False
+        config_data[_key] = new_mode
+        return True
+    except Exception:
+        return False
+
+
+def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
+    """收集Git相关配置"""
+    changed = False
+    changed = _ask_git_check_mode(config_data, ask_all) or changed
+    changed = _ask_patch_format_mode(config_data, ask_all) or changed
+    changed = _ask_config_optional_str(
+        config_data, ask_all,
+        "JARVIS_GIT_COMMIT_PROMPT",
+        "自定义 Git 提交提示模板（留空跳过）：",
+    ) or changed
+    return changed
+
+
+def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
+    """收集RAG配置"""
+    changed = False
     try:
         from jarvis.jarvis_utils.config import (
             get_rag_embedding_model as _get_rag_embedding_model,
             get_rag_rerank_model as _get_rag_rerank_model,
         )
-
+        from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+        from jarvis.jarvis_utils.input import get_single_line_input
+        
         rag_default_embed = _get_rag_embedding_model()
         rag_default_rerank = _get_rag_rerank_model()
     except Exception:
         rag_default_embed = "BAAI/bge-m3"
         rag_default_rerank = "BAAI/bge-reranker-v2-m3"
-
+        get_yes_no = None
+        get_single_line_input = None
+    
     try:
-        if "JARVIS_RAG" not in config_data:
+        if "JARVIS_RAG" not in config_data and get_yes_no:
             if get_yes_no("是否配置 RAG 检索增强参数？", default=False):
                 rag_conf: Dict[str, Any] = {}
                 emb = get_single_line_input(
@@ -1689,49 +1639,75 @@ def _collect_optional_config_interactively(
                 changed = True
     except Exception:
         pass
+    return changed
 
-    # 中心仓库配置
-    changed = (
-        _ask_and_set(
-            "JARVIS_CENTRAL_METHODOLOGY_REPO",
-            "请输入中心方法论仓库路径或Git地址（可留空跳过）：",
-            "",
-            "str",
-        )
-        or changed
-    )
-    changed = (
-        _ask_and_set(
-            "JARVIS_CENTRAL_TOOL_REPO",
-            "请输入中心工具仓库路径或Git地址（可留空跳过）：",
-            "",
-            "str",
-        )
-        or changed
-    )
 
-    # 已移除 LLM 组配置交互
+def _collect_central_repo_config(config_data: dict, ask_all: bool) -> bool:
+    """收集中心仓库配置"""
+    changed = False
+    changed = _ask_config_str(
+        config_data, ask_all,
+        "JARVIS_CENTRAL_METHODOLOGY_REPO",
+        "请输入中心方法论仓库路径或Git地址（可留空跳过）：",
+        "",
+    ) or changed
+    changed = _ask_config_str(
+        config_data, ask_all,
+        "JARVIS_CENTRAL_TOOL_REPO",
+        "请输入中心工具仓库路径或Git地址（可留空跳过）：",
+        "",
+    ) or changed
+    return changed
 
-    # 已移除 RAG 组配置交互
 
-    # 已移除 工具组配置交互
-
-    # 已移除：替换映射（JARVIS_REPLACE_MAP）的交互式配置，保持最简交互
-    # SHELL 覆盖（可选）
+def _collect_shell_config(config_data: dict, ask_all: bool) -> bool:
+    """收集SHELL覆盖配置"""
+    changed = False
     try:
+        import os
         default_shell = os.getenv("SHELL", "/bin/bash")
-        changed = (
-            _ask_and_set_optional_str(
-                "SHELL",
-                f"覆盖 SHELL 路径（留空使用系统默认: {default_shell}）：",
-                default_shell,
-            )
-            or changed
-        )
+        changed = _ask_config_optional_str(
+            config_data, ask_all,
+            "SHELL",
+            f"覆盖 SHELL 路径（留空使用系统默认: {default_shell}）：",
+            default_shell,
+        ) or changed
     except Exception:
         pass
+    return changed
 
-    # 已移除：MCP（JARVIS_MCP）的交互式配置，保持最简交互
+
+def _collect_optional_config_interactively(
+    config_data: dict, ask_all: bool = False
+) -> bool:
+    """
+    复用的交互式配置收集逻辑：
+    - ask_all=False（默认）：仅对缺省的新功能开关/可选项逐项询问，已存在项跳过
+    - ask_all=True：对所有项进行询问，默认值取自当前配置文件，可覆盖现有设置
+    - 修改传入的 config_data
+    - 包含更多来自 config.py 的可选项
+    返回:
+        bool: 是否有变更
+    """
+    changed = False
+    
+    # 收集各类配置
+    changed = _collect_basic_switches(config_data, ask_all) or changed
+    changed = _collect_ui_experience_config(config_data, ask_all) or changed
+    changed = _collect_analysis_config(config_data, ask_all) or changed
+    changed = _collect_agent_features_config(config_data, ask_all) or changed
+    changed = _collect_session_config(config_data, ask_all) or changed
+    changed = _collect_safety_config(config_data, ask_all) or changed
+    changed = _collect_data_and_token_config(config_data, ask_all) or changed
+    changed = _collect_planning_config(config_data, ask_all) or changed
+    changed = _collect_advanced_config(config_data, ask_all) or changed
+    changed = _collect_directory_config(config_data, ask_all) or changed
+    changed = _collect_web_search_config(config_data, ask_all) or changed
+    changed = _collect_git_config(config_data, ask_all) or changed
+    changed = _collect_rag_config(config_data, ask_all) or changed
+    changed = _collect_central_repo_config(config_data, ask_all) or changed
+    changed = _collect_shell_config(config_data, ask_all) or changed
+    
     return changed
 
 
