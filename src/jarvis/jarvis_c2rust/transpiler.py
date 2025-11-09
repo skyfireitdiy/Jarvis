@@ -988,7 +988,6 @@ class Transpiler:
             model_group=self.llm_group,
             use_methodology=True,
             use_analysis=True,
-            force_save_memory=True,  # 强制使用记忆功能
         )
 
     def _get_repair_agent(self) -> CodeAgent:
@@ -1008,7 +1007,6 @@ class Transpiler:
                 model_group=self.llm_group,
                 use_methodology=True,
                 use_analysis=True,
-                force_save_memory=True,  # 强制使用记忆功能
             )
             self._current_agents[key] = agent
         return agent
