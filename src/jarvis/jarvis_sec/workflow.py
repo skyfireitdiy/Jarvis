@@ -17,8 +17,10 @@ Jarvis 安全分析套件 —— Workflow（含可复现直扫基线）
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, cast
-from jarvis.jarvis_sec.checkers import analyze_c_files, analyze_rust_files
 
+import typer
+
+from jarvis.jarvis_sec.checkers import analyze_c_files, analyze_rust_files
 from jarvis.jarvis_sec.types import Issue
 
 
@@ -96,11 +98,11 @@ def direct_scan(
                 actual_excluded_dirs.append(str(rel_path))
     
     if actual_excluded_dirs:
-        print("[Jarvis] 实际排除的目录:")
+        typer.secho("[jarvis-sec] 实际排除的目录:", fg=typer.colors.BLUE)
         for dir_path in sorted(actual_excluded_dirs):
-            print(f"  - {dir_path}")
+            typer.secho(f"  - {dir_path}", fg=typer.colors.BLUE)
     else:
-        print(f"[Jarvis] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）")
+        typer.secho(f"[jarvis-sec] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）", fg=typer.colors.BLUE)
     
     files = list(_iter_source_files(entry_path, languages, exclude_dirs))
 
