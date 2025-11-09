@@ -1033,7 +1033,7 @@ def _create_analysis_agent(task_id: str, llm_group: Optional[str]) -> Agent:
         plan=False,
         output_handler=[ToolRegistry()],
         disable_file_edit=True,
-        force_save_memory=True,
+        force_save_memory=False,
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
     if llm_group:
