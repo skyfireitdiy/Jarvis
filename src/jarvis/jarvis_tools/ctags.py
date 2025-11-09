@@ -28,7 +28,7 @@ class CtagsTool:
     @classmethod
     def check(cls) -> bool:
         """检查工具是否可用，仅在CodeAgent模式下启用"""
-        return os.environ.get("JARVIS_CODE_AGENT") == "1"
+        return os.environ.get("JARVIS_CODE_AGENT", "") == "1"
     
     def _find_symbol_with_ctags(self, symbol: str, file_pattern: str = "") -> Dict[str, Any]:
         """使用ctags查找符号定义位置"""
