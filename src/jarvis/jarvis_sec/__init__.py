@@ -199,10 +199,22 @@ def run_security_analysis(
     except Exception:
         pass
 
-    # 进度文件（JSONL，断点续扫）
+    # 辅助函数：正确解析 .jarvis/sec 目录路径
+    # 如果 entry_path 已经是 .jarvis/sec 目录，直接使用；否则添加 .jarvis/sec
     from pathlib import Path as _Path
+    def _get_sec_dir(base_path: str):
+        """获取 .jarvis/sec 目录路径，支持 base_path 是项目根目录或已经是 .jarvis/sec 目录"""
+        base = _Path(base_path)
+        # 检查 base_path 是否已经是 .jarvis/sec 目录
+        if base.name == "sec" and base.parent.name == ".jarvis":
+            return base
+        # 否则，假设 base_path 是项目根目录
+        return base / ".jarvis" / "sec"
+    
+    # 进度文件（JSONL，断点续扫）
     from datetime import datetime as _dt
-    progress_path = _Path(entry_path) / ".jarvis/sec" / "progress.jsonl"
+    sec_dir = _get_sec_dir(entry_path)
+    progress_path = sec_dir / "progress.jsonl"
 
     def _progress_append(rec: Dict) -> None:
         try:
@@ -239,7 +251,7 @@ def run_security_analysis(
 
     # 1) 启发式扫描（支持断点续扫）
     from pathlib import Path as _Path
-    _heuristic_path = _Path(entry_path) / ".jarvis/sec" / "heuristic_issues.jsonl"
+    _heuristic_path = sec_dir / "heuristic_issues.jsonl"
     candidates: List[Dict] = []
     summary: Dict = {}
 
@@ -368,7 +380,7 @@ def run_security_analysis(
         try:
             from pathlib import Path as _Path
 
-            path = _Path(report_file) if report_file else _Path(entry_path) / ".jarvis/sec" / "agent_issues.jsonl"
+            path = _Path(report_file) if report_file else sec_dir / "agent_issues.jsonl"
             path.parent.mkdir(parents=True, exist_ok=True)
             with path.open("a", encoding="utf-8") as f:
                 for item in items:
@@ -400,7 +412,7 @@ def run_security_analysis(
     cluster_batches: List[List[Dict]] = []
     cluster_records: List[Dict] = []
     # 收集所有标记为无效的聚类，用于后续复核
-    invalid_clusters_for_review: List[Dict] = []
+    # 注意：invalid_clusters_for_review 会在全局恢复阶段初始化，这里不需要重复定义
 
     # 解析聚类输出（仅 YAML）
     def _parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
@@ -436,7 +448,7 @@ def run_security_analysis(
     try:
         from pathlib import Path as _Path2
         import json as _json
-        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
+        _cluster_path = sec_dir / "cluster_report.jsonl"
         
         # 从 progress.jsonl 中读取已完成的聚类批次（优先检查）
         if progress_path.exists():
@@ -496,7 +508,7 @@ def run_security_analysis(
         try:
             from pathlib import Path as _Path2
             import json as _json
-            _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
+            _cluster_path = sec_dir / "cluster_report.jsonl"
             _cluster_path.parent.mkdir(parents=True, exist_ok=True)
             
             # 使用追加模式，每次只追加当前批次的记录
@@ -522,7 +534,7 @@ def run_security_analysis(
         try:
             from pathlib import Path as _Path2
             import json as _json
-            _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
+            _cluster_path = sec_dir / "cluster_report.jsonl"
             _cluster_path.parent.mkdir(parents=True, exist_ok=True)
             
             # 追加模式，每次只追加当前批次的记录
@@ -532,69 +544,154 @@ def run_security_analysis(
         except Exception:
             pass
 
-    total_files_to_cluster = len(_file_groups)
-    # 更新聚类阶段状态
-    if total_files_to_cluster > 0:
-        status_mgr.update_clustering(
-            current_file=0,
-            total_files=total_files_to_cluster,
-            message="开始聚类分析..."
-        )
-    for _file_idx, (_file, _items) in enumerate(_file_groups.items(), start=1):
-        typer.secho(f"\n[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}", fg=typer.colors.CYAN)
-        # 更新当前文件进度
-        status_mgr.update_clustering(
-            current_file=_file_idx,
-            total_files=total_files_to_cluster,
-            file_name=_file,
-            message=f"正在聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}"
-        )
-        # 过滤掉已完成
-        pending_in_file: List[Dict] = []
-        for c in _items:
-            if _sig_of(c) not in done_sigs:
-                pending_in_file.append(c)
-        if not pending_in_file:
-            continue
+    # ========== 聚类阶段：基于 gid 的断点恢复 ==========
+    # 核心原则：从 cluster_report.jsonl 恢复所有聚类结果，基于 gid 匹配，不依赖批次索引
+    
+    # 1. 收集所有候选的 gid
+    all_candidate_gids_in_clustering = set()
+    gid_to_candidate: Dict[int, Dict] = {}
+    for _file, _items in _file_groups.items():
+        for it in _items:
+            try:
+                _gid = int(it.get("gid", 0))
+                if _gid >= 1:
+                    all_candidate_gids_in_clustering.add(_gid)
+                    gid_to_candidate[_gid] = it
+            except Exception:
+                pass
+    
+    # 2. 从 cluster_report.jsonl 恢复所有聚类结果
+    clustered_gids = set()  # 已聚类的 gid（包括有效和无效的，因为无效的也需要进入复核阶段）
+    invalid_clusters_for_review: List[Dict] = []  # 无效聚类列表（从断点恢复）
+    for (_file_key, _batch_idx), cluster_recs in _existing_clusters.items():
+        for rec in cluster_recs:
+            gids_list = rec.get("gids", [])
+            if not gids_list:
+                continue
+            is_invalid = rec.get("is_invalid", False)
+            verification = str(rec.get("verification", "")).strip()
+            members: List[Dict] = []
+            for _gid in gids_list:
+                try:
+                    _gid_int = int(_gid)
+                    if _gid_int >= 1 and _gid_int in gid_to_candidate:
+                        # 只有当 gid 在当前运行中存在时，才恢复该聚类
+                        candidate = gid_to_candidate[_gid_int]
+                        candidate["verify"] = verification
+                        members.append(candidate)
+                        # 无论有效还是无效，都计入已聚类的 gid（避免被重新聚类）
+                        clustered_gids.add(_gid_int)
+                except Exception:
+                    pass
+            
+            if members:
+                if is_invalid:
+                    # 无效聚类：收集到复核列表，不加入 cluster_batches
+                    invalid_clusters_for_review.append({
+                        "file": _file_key,
+                        "batch_index": _batch_idx,
+                        "gids": [m.get("gid") for m in members],
+                        "verification": verification,
+                        "invalid_reason": str(rec.get("invalid_reason", "")).strip(),
+                        "members": members,  # 保存候选信息，用于复核后可能重新加入验证
+                        "count": len(members),
+                    })
+                else:
+                    # 有效聚类：恢复到 cluster_batches
+                    cluster_batches.append(members)
+                    cluster_records.append({
+                        "file": _file_key,
+                        "verification": verification,
+                        "gids": [m.get("gid") for m in members],
+                        "count": len(members),
+                        "batch_index": _batch_idx,
+                        "is_invalid": False,
+                    })
+    
+    # 3. 检查是否有未聚类的 gid
+    unclustered_gids = all_candidate_gids_in_clustering - clustered_gids
+    if unclustered_gids:
+        try:
+            typer.secho(f"[jarvis-sec] 发现 {len(unclustered_gids)} 个未聚类的 gid，将进行聚类", fg=typer.colors.YELLOW)
+        except Exception:
+            pass
+    else:
+        try:
+            typer.secho(f"[jarvis-sec] 所有 {len(all_candidate_gids_in_clustering)} 个候选已聚类，跳过聚类阶段", fg=typer.colors.GREEN)
+        except Exception:
+            pass
+    
+    # 4. 如果有未聚类的 gid，继续执行聚类
+    if unclustered_gids:
+        total_files_to_cluster = len(_file_groups)
+        # 更新聚类阶段状态
+        if total_files_to_cluster > 0:
+            status_mgr.update_clustering(
+                current_file=0,
+                total_files=total_files_to_cluster,
+                message="开始聚类分析..."
+            )
+        for _file_idx, (_file, _items) in enumerate(_file_groups.items(), start=1):
+            typer.secho(f"\n[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}", fg=typer.colors.CYAN)
+            # 更新当前文件进度
+            status_mgr.update_clustering(
+                current_file=_file_idx,
+                total_files=total_files_to_cluster,
+                file_name=_file,
+                message=f"正在聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}"
+            )
+            # 过滤掉已聚类的 gid（基于 gid 而非 done_sigs）
+            pending_in_file: List[Dict] = []
+            for c in _items:
+                try:
+                    _gid = int(c.get("gid", 0))
+                    if _gid >= 1 and _gid not in clustered_gids:
+                        pending_in_file.append(c)
+                except Exception:
+                    pass
+            if not pending_in_file:
+                continue
 
-        # 优化：如果文件只有一个告警，跳过聚类，直接写入
-        if len(pending_in_file) == 1:
-            single_item = pending_in_file[0]
-            single_gid = single_item.get("gid", 0)
-            # 为单个告警创建默认验证条件
-            default_verification = f"验证候选 {single_gid} 的安全风险"
-            single_item["verify"] = default_verification
-            cluster_batches.append([single_item])
-            cluster_records.append(
-                {
-                    "file": _file,
-                    "verification": default_verification,
-                    "gids": [single_gid],
-                    "count": 1,
-                    "batch_index": 1,
-                    "note": "单告警跳过聚类",
-                }
-            )
-            # 标记进度
-            _progress_append(
-                {
-                    "event": "cluster_status",
-                    "status": "done",
-                    "file": _file,
-                    "batch_index": 1,
-                    "skipped": True,
-                    "reason": "single_alert",
-                }
-            )
-            # 写入当前批次的聚类结果（增量保存）
-            current_batch_records = [
-                rec for rec in cluster_records
-                if rec.get("file") == _file and rec.get("batch_index") == 1
-            ]
-            if current_batch_records:
-                _write_cluster_batch_snapshot(current_batch_records)
-            typer.secho(f"[jarvis-sec] 文件 {_file} 仅有一个告警（gid={single_gid}），跳过聚类直接写入", fg=typer.colors.BLUE)
-            continue
+            # 优化：如果文件只有一个告警，跳过聚类，直接写入
+            # 注意：pending_in_file 已经过滤掉了已聚类的 gid，所以这里只需要处理未聚类的单告警
+            if len(pending_in_file) == 1:
+                single_item = pending_in_file[0]
+                single_gid = single_item.get("gid", 0)
+                
+                # 为单个告警创建默认验证条件
+                default_verification = f"验证候选 {single_gid} 的安全风险"
+                single_item["verify"] = default_verification
+                cluster_batches.append([single_item])
+                cluster_records.append(
+                    {
+                        "file": _file,
+                        "verification": default_verification,
+                        "gids": [single_gid],
+                        "count": 1,
+                        "batch_index": 1,
+                        "note": "单告警跳过聚类",
+                    }
+                )
+                # 标记进度
+                _progress_append(
+                    {
+                        "event": "cluster_status",
+                        "status": "done",
+                        "file": _file,
+                        "batch_index": 1,
+                        "skipped": True,
+                        "reason": "single_alert",
+                    }
+                )
+                # 写入当前批次的聚类结果（增量保存）
+                current_batch_records = [
+                    rec for rec in cluster_records
+                    if rec.get("file") == _file and rec.get("batch_index") == 1
+                ]
+                if current_batch_records:
+                    _write_cluster_batch_snapshot(current_batch_records)
+                typer.secho(f"[jarvis-sec] 文件 {_file} 仅有一个告警（gid={single_gid}），跳过聚类直接写入", fg=typer.colors.BLUE)
+                continue
 
         # 构造聚类Agent（每个文件一个Agent，按批次聚类）
         cluster_system_prompt = """
@@ -667,153 +764,9 @@ def run_security_analysis(
             if not _chunk:
                 continue
             # 构造本批次候选列表（元素已包含全局 gid）
+            # 注意：pending_in_file 已经过滤掉了已聚类的 gid（基于 clustered_gids）
+            # 所以这里不需要再检查批次是否已完成，直接进行聚类即可
             pending_in_file_with_ids = list(_chunk)
-
-            # 若断点存在：优先使用已有聚类结果复建批次，跳过Agent运行（仅支持 gids）
-            _key = (_file, _chunk_idx)
-            # 检查是否已完成聚类（从 cluster_report.jsonl 或 progress.jsonl）
-            if _key in _existing_clusters or _key in _completed_cluster_batches:
-                # 如果 progress.jsonl 标记为已完成，但 cluster_report.jsonl 中没有记录
-                # 说明该批次可能已经完成但结果丢失
-                # 为了不丢失告警，我们创建一个默认的聚类记录，将这些 gid 作为一个批次
-                if _key not in _existing_clusters and _key in _completed_cluster_batches:
-                    try:
-                        typer.secho(f"[jarvis-sec] 断点恢复：批次 {_key} 在 progress.jsonl 中标记为已完成，但 cluster_report.jsonl 中无记录，创建默认聚类记录以确保告警不丢失", fg=typer.colors.BLUE)
-                    except Exception:
-                        pass
-                    # 为所有候选创建默认验证条件
-                    default_verification = f"验证候选的安全风险（断点恢复，聚类结果丢失）"
-                    for it in pending_in_file_with_ids:
-                        it["verify"] = default_verification
-                    # 将整个批次作为一个聚类加入
-                    cluster_batches.append(pending_in_file_with_ids)
-                    cluster_records.append(
-                        {
-                            "file": _file,
-                            "verification": default_verification,
-                            "gids": [it.get("gid") for it in pending_in_file_with_ids],
-                            "count": len(pending_in_file_with_ids),
-                            "batch_index": _chunk_idx,
-                            "is_invalid": False,
-                            "note": "断点恢复：progress.jsonl标记为已完成但cluster_report.jsonl无记录",
-                        }
-                    )
-                    # 标记进度（已恢复）
-                    _progress_append(
-                        {
-                            "event": "cluster_status",
-                            "status": "done",
-                            "file": _file,
-                            "batch_index": _chunk_idx,
-                            "reused": True,
-                            "recovered": True,
-                            "reason": "progress_marked_done_but_no_cluster_record",
-                        }
-                    )
-                    continue
-                elif _key in _existing_clusters:
-                    # 收集输入的gid
-                    input_gids_resume = set()
-                    gid_to_item_resume: Dict[int, Dict] = {}
-                    for it in pending_in_file_with_ids:
-                        try:
-                            _gid = int(it.get("gid", 0))
-                            if _gid >= 1:
-                                input_gids_resume.add(_gid)
-                                gid_to_item_resume[_gid] = it
-                        except Exception:
-                            pass
-                    
-                    # 收集已分类的gid
-                    classified_gids_resume = set()
-                    for rec in _existing_clusters.get(_key, []):
-                        verification = str(rec.get("verification", "")).strip()
-                        gids_list = rec.get("gids", [])
-                        # 如果 is_invalid 字段缺失，跳过该记录（格式不完整，需要重新聚类）
-                        if "is_invalid" not in rec:
-                            try:
-                                typer.secho(f"[jarvis-sec] 断点恢复：记录缺少 is_invalid 字段，跳过该记录，将重新聚类", fg=typer.colors.YELLOW)
-                            except Exception:
-                                pass
-                            continue
-                        is_invalid_resume = rec["is_invalid"]
-                        norm_keys: List[int] = []
-                        if isinstance(gids_list, list):
-                            for x in gids_list:
-                                try:
-                                    xi = int(x)
-                                    if xi >= 1:
-                                        norm_keys.append(xi)
-                                        classified_gids_resume.add(xi)
-                                except Exception:
-                                    continue
-                        members: List[Dict] = []
-                        for k in norm_keys:
-                            it = gid_to_item_resume.get(k)
-                            if it:
-                                it["verify"] = verification
-                                members.append(it)
-                        
-                        # 如果断点恢复的记录标记为无效，不恢复该聚类
-                        if is_invalid_resume:
-                            invalid_gids_resume = [m.get("gid") for m in members]
-                            try:
-                                typer.secho(f"[jarvis-sec] 断点恢复：跳过无效聚类（gids={invalid_gids_resume}）", fg=typer.colors.BLUE)
-                            except Exception:
-                                pass
-                            # 记录到进度文件
-                            _progress_append(
-                                {
-                                    "event": "cluster_invalid_resumed",
-                                    "file": _file,
-                                    "batch_index": _chunk_idx,
-                                    "gids": invalid_gids_resume,
-                                    "verification": verification,
-                                    "count": len(members),
-                                }
-                            )
-                        elif members:
-                            # 只有非无效的聚类才恢复
-                            cluster_batches.append(members)
-                            recovered_record = {
-                                "file": _file,
-                                "verification": verification,
-                                "gids": [m.get("gid") for m in members],
-                                "count": len(members),
-                                "batch_index": _chunk_idx,
-                                "is_invalid": False,
-                            }
-                            cluster_records.append(recovered_record)
-                    
-                    # 检查断点恢复的完整性
-                    missing_gids_resume = input_gids_resume - classified_gids_resume
-                    if missing_gids_resume:
-                        typer.secho(f"[jarvis-sec] 断点恢复：发现遗漏的gid {sorted(list(missing_gids_resume))}，将重新聚类", fg=typer.colors.YELLOW)
-                        # 不跳过，继续执行Agent运行以补充遗漏的gid
-                    else:
-                        # 所有gid都已分类，标记进度（断点复用）
-                        _progress_append(
-                            {
-                                "event": "cluster_status",
-                                "status": "done",
-                                "file": _file,
-                                "batch_index": _chunk_idx,
-                                "reused": True,
-                                "clusters_count": len(_existing_clusters.get(_key, [])),
-                            }
-                        )
-                        # 为了确保状态一致性，即使是从文件恢复的，也再次写入快照（追加模式会自动去重）
-                        recovered_batch_records = [
-                            rec for rec in cluster_records
-                            if rec.get("file") == _file and rec.get("batch_index") == _chunk_idx
-                        ]
-                        if recovered_batch_records:
-                            _write_cluster_batch_snapshot(recovered_batch_records)
-                            try:
-                                typer.secho(f"[jarvis-sec] 断点恢复：批次 {_key} 已从 cluster_report.jsonl 恢复，共 {len(recovered_batch_records)} 个聚类记录", fg=typer.colors.GREEN)
-                            except Exception:
-                                pass
-                        continue
 
             # 记录聚类批次开始（进度）
             _progress_append(
@@ -1077,7 +1030,7 @@ def run_security_analysis(
                             it["verify"] = verification
                             members.append(it)
                     
-                    # 如果标记为无效，收集到复核列表，不写入聚类批次和记录，但记录日志
+                    # 如果标记为无效，收集到复核列表，不加入 cluster_batches，但要写入 cluster_records 以便断点恢复
                     if is_invalid:
                         _invalid_count += 1
                         invalid_gids = [m.get("gid") for m in members]
@@ -1096,7 +1049,7 @@ def run_security_analysis(
                             "members": members,  # 保存候选信息，用于复核后可能重新加入验证
                             "count": len(members),
                         })
-                        # 记录到进度文件，但不写入聚类批次
+                        # 记录到进度文件
                         _progress_append(
                             {
                                 "event": "cluster_invalid",
@@ -1107,6 +1060,16 @@ def run_security_analysis(
                                 "count": len(members),
                             }
                         )
+                        # 重要：也要写入 cluster_records，以便断点恢复时能够恢复无效聚类
+                        cluster_records.append({
+                            "file": _file,
+                            "verification": verification,
+                            "gids": invalid_gids,
+                            "count": len(members),
+                            "batch_index": _chunk_idx,
+                            "is_invalid": True,
+                            "invalid_reason": invalid_reason,
+                        })
                     elif members:
                         # 只有非无效的聚类才写入批次和记录
                         _merged_count += 1
@@ -1173,7 +1136,7 @@ def run_security_analysis(
     try:
         from pathlib import Path as _Path2
         import json as _json
-        _cluster_path = _Path2(entry_path) / ".jarvis/sec" / "cluster_report.jsonl"
+        _cluster_path = sec_dir / "cluster_report.jsonl"
         
         # 记录聚类阶段完成
         _progress_append(
@@ -1558,74 +1521,204 @@ def run_security_analysis(
         typer.secho(f"[jarvis-sec] 无无效聚类需要复核", fg=typer.colors.BLUE)
 
     # 若聚类失败或空，则回退为"按文件一次处理"
+    # 注意：这种情况应该很少发生，因为完整性检查会补充遗漏的 gid
     if not cluster_batches:
+        # 收集所有未聚类的 gid（从所有候选 gid 中排除已聚类的）
+        all_gids_in_file_groups = set()
+        gid_to_item_fallback: Dict[int, Dict] = {}
         for _file, _items in _file_groups.items():
-            b = [c for c in _items if _sig_of(c) not in done_sigs]
-            if b:
-                cluster_batches.append(b)
+            for c in _items:
+                try:
+                    _gid = int(c.get("gid", 0))
+                    if _gid >= 1:
+                        all_gids_in_file_groups.add(_gid)
+                        gid_to_item_fallback[_gid] = c
+                except Exception:
+                    pass
+        
+        # 如果还有未聚类的 gid，按文件分组创建批次
+        if all_gids_in_file_groups:
+            # 收集已聚类的 gid（从 cluster_report.jsonl）
+            clustered_gids_fallback = set()
+            for (_file_key, _batch_idx), cluster_recs in _existing_clusters.items():
+                for rec in cluster_recs:
+                    if rec.get("is_invalid", False):
+                        continue
+                    gids_list = rec.get("gids", [])
+                    for _gid in gids_list:
+                        try:
+                            _gid_int = int(_gid)
+                            if _gid_int >= 1:
+                                clustered_gids_fallback.add(_gid_int)
+                        except Exception:
+                            pass
+            
+            unclustered_gids_fallback = all_gids_in_file_groups - clustered_gids_fallback
+            if unclustered_gids_fallback:
+                # 按文件分组未聚类的 gid
+                from collections import defaultdict as _dd_fallback
+                unclustered_by_file: Dict[str, List[Dict]] = _dd_fallback(list)
+                for _gid in unclustered_gids_fallback:
+                    item = gid_to_item_fallback.get(_gid)
+                    if item:
+                        file_key = str(item.get("file") or "")
+                        unclustered_by_file[file_key].append(item)
+                
+                # 为每个文件创建批次
+                for _file, _items in unclustered_by_file.items():
+                    if _items:
+                        cluster_batches.append(_items)
 
-    # 分析阶段开始前的完整性检查：确保所有候选的gid都已被分类
-    # 如果发现遗漏的gid，应该在分析阶段开始前就补充，而不是在分析阶段开始后再发现
+    # ========== 完整性检查：确保所有候选的 gid 都已被聚类 ==========
+    # 核心原则：基于 gid 列表检查，不依赖 done_sigs
+    
+    # 1. 收集所有候选的 gid
     all_candidate_gids = set()
+    gid_to_candidate_for_check: Dict[int, Dict] = {}
     for _file, _items in _file_groups.items():
         for it in _items:
             try:
                 _gid = int(it.get("gid", 0))
                 if _gid >= 1:
                     all_candidate_gids.add(_gid)
+                    gid_to_candidate_for_check[_gid] = it
             except Exception:
                 pass
     
-    # 收集所有已分类的gid（从cluster_batches中）
-    all_classified_gids = set()
+    # 2. 收集所有已聚类的 gid（从 cluster_batches 和 invalid_clusters_for_review 中）
+    # 注意：无效聚类的 gid 也应该被计入，因为它们已经进入复核流程，不应该被认为是"遗漏"的
+    all_clustered_gids = set()
     for batch in cluster_batches:
         for item in batch:
             try:
                 _gid = int(item.get("gid", 0))
                 if _gid >= 1:
-                    all_classified_gids.add(_gid)
+                    all_clustered_gids.add(_gid)
+            except Exception:
+                pass
+    # 也收集无效聚类中的 gid（它们已经进入复核流程）
+    for invalid_cluster in invalid_clusters_for_review:
+        gids_list = invalid_cluster.get("gids", [])
+        for _gid in gids_list:
+            try:
+                _gid_int = int(_gid)
+                if _gid_int >= 1:
+                    all_clustered_gids.add(_gid_int)
             except Exception:
                 pass
     
-    # 检查是否有遗漏的gid
-    missing_gids_before_analysis = all_candidate_gids - all_classified_gids
-    if missing_gids_before_analysis:
-        typer.secho(f"[jarvis-sec] 警告：分析阶段开始前发现遗漏的gid {sorted(list(missing_gids_before_analysis))}，将补充聚类", fg=typer.colors.YELLOW)
-        # 为每个遗漏的gid创建单独的聚类
-        for missing_gid in sorted(missing_gids_before_analysis):
-            # 找到对应的候选
-            missing_item = None
-            for _file, _items in _file_groups.items():
-                for it in _items:
+    # 3. 读取已处理的 gid（从 agent_issues.jsonl），用于判断是否需要重新聚类
+    processed_gids_from_issues_for_check = set()
+    try:
+        from pathlib import Path as _Path_check
+        _agent_issues_path_check = sec_dir / "agent_issues.jsonl"
+        if _agent_issues_path_check.exists():
+            import json as _json_check
+            with _agent_issues_path_check.open("r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
                     try:
-                        if int(it.get("gid", 0)) == missing_gid:
-                            missing_item = it
-                            break
+                        issue_obj = _json_check.loads(line)
+                        _gid = int(issue_obj.get("gid", 0))
+                        if _gid >= 1:
+                            processed_gids_from_issues_for_check.add(_gid)
                     except Exception:
                         pass
-                if missing_item:
-                    break
+    except Exception:
+        pass
+    
+    # 4. 检查是否有遗漏的 gid（未聚类）
+    missing_gids_before_analysis = all_candidate_gids - all_clustered_gids
+    if missing_gids_before_analysis:
+        missing_count = len(missing_gids_before_analysis)
+        missing_list = sorted(list(missing_gids_before_analysis))
+        if missing_count > 50:
+            # 如果遗漏的gid太多，只显示前10个和后10个
+            display_list = missing_list[:10] + ["..."] + missing_list[-10:]
+            typer.secho(f"[jarvis-sec] 警告：分析阶段开始前发现遗漏的gid（共{missing_count}个）：{display_list}，将检查是否需要补充聚类", fg=typer.colors.YELLOW)
+        else:
+            typer.secho(f"[jarvis-sec] 警告：分析阶段开始前发现遗漏的gid {missing_list}，将检查是否需要补充聚类", fg=typer.colors.YELLOW)
+        
+        # 为每个遗漏的 gid 创建单独的聚类
+        # 注意：如果 gid 已经在 agent_issues.jsonl 中有结果，说明已经验证过了，不需要重新聚类
+        # 但为了完整性，我们仍然需要确保它有聚类记录（即使不加入 cluster_batches）
+        supplemented_count = 0
+        skipped_count = 0
+        
+        for missing_gid in sorted(missing_gids_before_analysis):
+            # 如果该 gid 已经在 agent_issues.jsonl 中有结果，说明已经验证过了
+            # 不需要重新聚类，但记录一下
+            if missing_gid in processed_gids_from_issues_for_check:
+                skipped_count += 1
+                _progress_append({
+                    "event": "cluster_missing_gid_skipped",
+                    "gid": missing_gid,
+                    "note": "已在agent_issues.jsonl中有验证结果，跳过重新处理",
+                    "reason": "already_processed",
+                })
+                continue
             
+            # 找到对应的候选
+            missing_item = gid_to_candidate_for_check.get(missing_gid)
             if missing_item:
-                # 为遗漏的gid创建默认验证条件
+                # 为遗漏的 gid 创建默认验证条件
                 default_verification = f"验证候选 {missing_gid} 的安全风险"
                 missing_item["verify"] = default_verification
                 cluster_batches.append([missing_item])
+                supplemented_count += 1
                 _progress_append({
                     "event": "cluster_missing_gid_supplement",
                     "gid": missing_gid,
                     "file": missing_item.get("file"),
                     "note": "分析阶段开始前补充的遗漏gid",
                 })
-                try:
-                    typer.secho(f"[jarvis-sec] 已为遗漏的gid {missing_gid} 创建单独聚类", fg=typer.colors.BLUE)
-                except Exception:
-                    pass
+        
+        # 输出统计信息
+        if skipped_count > 0:
+            try:
+                typer.secho(f"[jarvis-sec] 已跳过 {skipped_count} 个已在agent_issues.jsonl中处理的gid", fg=typer.colors.GREEN)
+            except Exception:
+                pass
+        if supplemented_count > 0:
+            try:
+                typer.secho(f"[jarvis-sec] 已为 {supplemented_count} 个遗漏的gid创建单独聚类", fg=typer.colors.GREEN)
+            except Exception:
+                pass
 
+    # ========== 验证阶段：基于 gid 的断点恢复 ==========
+    # 核心原则：从 agent_issues.jsonl 读取已处理的 gid，基于 gid 列表判断批次是否完成
+    
     batches: List[List[Dict]] = cluster_batches
     total_batches = len(batches)
-    # 占位 batch_size 以兼容后续日志
-    len(batches[0]) if batches else 0
+    
+    # 从 agent_issues.jsonl 中读取已处理的 gid
+    processed_gids_from_issues = set()
+    try:
+        from pathlib import Path as _Path6
+        _agent_issues_path = sec_dir / "agent_issues.jsonl"
+        if _agent_issues_path.exists():
+            import json as _json6
+            with _agent_issues_path.open("r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        issue_obj = _json6.loads(line)
+                        _gid = int(issue_obj.get("gid", 0))
+                        if _gid >= 1:
+                            processed_gids_from_issues.add(_gid)
+                    except Exception:
+                        pass
+            if processed_gids_from_issues:
+                try:
+                    typer.secho(f"[jarvis-sec] 断点恢复：从 agent_issues.jsonl 读取到 {len(processed_gids_from_issues)} 个已处理的 gid", fg=typer.colors.BLUE)
+                except Exception:
+                    pass
+    except Exception:
+        pass
 
     # 更新验证阶段状态
     if total_batches > 0:
@@ -1636,6 +1729,34 @@ def run_security_analysis(
         )
 
     for bidx, batch in enumerate(batches, start=1):
+        # 检查批次是否已完成，如果已完成则跳过
+        # 根据批次内容（gid 列表）来判断，而不是只根据 batch_index
+        batch_gids = set()
+        batch_file = batch[0].get("file") if batch else None
+        for item in batch:
+            try:
+                _gid = int(item.get("gid", 0))
+                if _gid >= 1:
+                    batch_gids.add(_gid)
+            except Exception:
+                pass
+        
+        # 如果批次中的所有 gid 都已处理，则认为该批次已完成
+        if batch_gids and processed_gids_from_issues and batch_gids.issubset(processed_gids_from_issues):
+            try:
+                typer.secho(f"[jarvis-sec] 跳过批次 {bidx}/{total_batches}：已在之前的运行中完成", fg=typer.colors.GREEN)
+            except Exception:
+                pass
+            # 更新进度但不实际处理
+            batch_file = batch[0].get("file") if batch else None
+            status_mgr.update_verification(
+                current_batch=bidx,
+                total_batches=total_batches,
+                batch_id=f"JARVIS-SEC-Batch-{bidx}",
+                file_name=batch_file,
+                message=f"跳过已完成的批次 {bidx}/{total_batches}"
+            )
+            continue
         # 进度：批次开始
         _progress_append(
             {

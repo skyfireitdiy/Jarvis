@@ -20,10 +20,15 @@ class StatusManager:
         初始化状态管理器
         
         Args:
-            entry_path: 待分析的根目录路径
+            entry_path: 待分析的根目录路径（可以是项目根目录或 .jarvis/sec 目录）
         """
         self.entry_path = Path(entry_path)
-        self.status_path = self.entry_path / ".jarvis/sec" / "status.json"
+        # 检查 entry_path 是否已经是 .jarvis/sec 目录
+        if self.entry_path.name == "sec" and self.entry_path.parent.name == ".jarvis":
+            sec_dir = self.entry_path
+        else:
+            sec_dir = self.entry_path / ".jarvis" / "sec"
+        self.status_path = sec_dir / "status.json"
         self._ensure_dir()
     
     def _ensure_dir(self):
