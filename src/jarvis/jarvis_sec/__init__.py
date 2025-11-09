@@ -1210,24 +1210,43 @@ def _process_verification_batch(
     verified_items: List[Dict] = []
     
     if summary_items:
-        # 展开 gids 格式为单个 gid 格式
+        # 展开 gids 格式为单个 gid 格式，并过滤出有风险的项目
+        items_with_risk: List[Dict] = []
+        items_without_risk: List[Dict] = []
         for it in summary_items:
+            has_risk = it.get("has_risk") is True
             if "gids" in it and isinstance(it.get("gids"), list):
                 for gid_val in it.get("gids", []):
                     try:
                         gid_int = int(gid_val)
                         if gid_int >= 1:
-                            merged_items.append({
+                            item = {
                                 **{k: v for k, v in it.items() if k != "gids"},
                                 "gid": gid_int,
-                            })
+                            }
+                            if has_risk:
+                                merged_items.append(item)
+                                items_with_risk.append(item)
+                            else:
+                                items_without_risk.append(item)
                     except Exception:
                         pass
             elif "gid" in it:
-                merged_items.append(it)
+                if has_risk:
+                    merged_items.append(it)
+                    items_with_risk.append(it)
+                else:
+                    items_without_risk.append(it)
         
-        # 运行验证Agent（如果分析Agent发现有问题）
-        if merged_items:
+        # 记录无风险项目的日志
+        if items_without_risk:
+            try:
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 判定 {len(items_without_risk)} 个候选为无风险（has_risk: false），跳过验证", fg=typer.colors.BLUE)
+            except Exception:
+                pass
+        
+        # 运行验证Agent（仅当分析Agent发现有风险的问题时）
+        if items_with_risk:
             # 创建验证 Agent 来验证分析 Agent 的结论
             verification_system_prompt = """
 # 验证 Agent 约束
@@ -1272,8 +1291,8 @@ def _process_verification_batch(
 - entry_path: {entry_path}
 - languages: {langs}
 
-分析 Agent 给出的结论（需要验证）：
-{_json3.dumps(merged_items, ensure_ascii=False, indent=2)}
+分析 Agent 给出的结论（需要验证，仅包含 has_risk: true 的项目）：
+{_json3.dumps(items_with_risk, ensure_ascii=False, indent=2)}
 
 请验证上述分析结论是否正确，包括：
 1. 前置条件（preconditions）是否合理
@@ -1341,8 +1360,8 @@ def _process_verification_batch(
                             "verification_notes": verification_notes
                         }
                 
-                # 只保留验证通过的告警
-                for item in merged_items:
+                # 只保留验证通过的告警（仅验证有风险的项目）
+                for item in items_with_risk:
                     item_gid = int(item.get("gid", 0))
                     verification = gid_to_verification.get(item_gid)
                     if verification and verification.get("is_valid") is True:
@@ -1368,7 +1387,7 @@ def _process_verification_batch(
                     gid = int(item.get("gid", 0))
                     if gid >= 1:
                         gid_counts[gid] = gid_counts.get(gid, 0) + 1
-                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(merged_items)} -> 追加到报告", fg=typer.colors.GREEN)
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(items_with_risk)} -> 追加到报告", fg=typer.colors.GREEN)
                 _append_report(verified_items, "verified", task_id, {"batch": True, "candidates": batch})
                 status_mgr.update_verification(
                     current_batch=bidx,
@@ -1377,7 +1396,7 @@ def _process_verification_batch(
                     message=f"已验证 {bidx}/{total_batches} 批次，发现 {len(all_issues)} 个问题（验证通过）"
                 )
             else:
-                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(merged_items)} 个，验证后全部不通过", fg=typer.colors.BLUE)
+                typer.secho(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过", fg=typer.colors.BLUE)
                 status_mgr.update_verification(
                     current_batch=bidx,
                     total_batches=total_batches,
