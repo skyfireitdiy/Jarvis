@@ -2327,6 +2327,101 @@ def _extract_classified_gids(cluster_items: List[Dict]) -> set:
     return classified_gids
 
 
+def _build_cluster_retry_task(
+    file: str,
+    missing_gids: set,
+    error_details: List[str],
+) -> str:
+    """构建聚类重试任务"""
+    retry_task = f"""
+# 聚类任务重试
+文件: {file}
+
+**重要提示**：请重新输出聚类结果。
+""".strip()
+    if missing_gids:
+        missing_gids_list = sorted(list(missing_gids))
+        missing_count = len(missing_gids)
+        retry_task += f"\n\n**遗漏的gid（共{missing_count}个，必须被分类）：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
+    if error_details:
+        retry_task += f"\n\n**格式错误：**\n" + "\n".join(f"- {detail}" for detail in error_details)
+    return retry_task
+
+
+def _build_cluster_error_guidance(
+    error_details: List[str],
+    missing_gids: set,
+) -> str:
+    """构建聚类错误指导信息"""
+    error_guidance = ""
+    if error_details:
+        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {detail}" for detail in error_details)
+    if missing_gids:
+        missing_gids_list = sorted(list(missing_gids))
+        missing_count = len(missing_gids)
+        error_guidance += f"\n\n**完整性错误：遗漏了 {missing_count} 个 gid，这些 gid 必须被分类：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
+    return error_guidance
+
+
+def _run_cluster_agent_direct_model(
+    cluster_agent,
+    cluster_task: str,
+    cluster_summary_prompt: str,
+    file: str,
+    missing_gids: set,
+    error_details: List[str],
+    _cluster_summary: Dict[str, str],
+) -> None:
+    """使用直接模型调用运行聚类Agent"""
+    retry_task = _build_cluster_retry_task(file, missing_gids, error_details)
+    error_guidance = _build_cluster_error_guidance(error_details, missing_gids)
+    full_prompt = f"{retry_task}{error_guidance}\n\n{cluster_summary_prompt}"
+    try:
+        response = cluster_agent.model.chat_until_success(full_prompt)  # type: ignore
+        _cluster_summary["text"] = response
+    except Exception as e:
+        try:
+            typer.secho(f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
+        except Exception:
+            pass
+        cluster_agent.run(cluster_task)
+
+
+def _validate_cluster_result(
+    cluster_items: Optional[List[Dict]],
+    parse_error: Optional[str],
+    attempt: int,
+) -> tuple[bool, List[str]]:
+    """验证聚类结果格式"""
+    if parse_error:
+        error_details = [f"YAML解析失败: {parse_error}"]
+        typer.secho(f"[jarvis-sec] YAML解析失败: {parse_error}", fg=typer.colors.YELLOW)
+        return False, error_details
+    else:
+        valid, error_details = _validate_cluster_format(cluster_items)
+        if not valid:
+            typer.secho(f"[jarvis-sec] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
+        return valid, error_details
+
+
+def _check_cluster_completeness(
+    cluster_items: List[Dict],
+    input_gids: set,
+    attempt: int,
+) -> tuple[bool, set]:
+    """检查聚类完整性，返回(是否完整, 遗漏的gid)"""
+    classified_gids = _extract_classified_gids(cluster_items)
+    missing_gids = input_gids - classified_gids
+    if not missing_gids:
+        typer.secho(f"[jarvis-sec] 聚类完整性校验通过，所有gid已分类（共尝试 {attempt} 次）", fg=typer.colors.GREEN)
+        return True, set()
+    else:
+        missing_gids_list = sorted(list(missing_gids))
+        missing_count = len(missing_gids)
+        typer.secho(f"[jarvis-sec] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
+        return False, missing_gids
+
+
 def _run_cluster_agent_with_retry(
     cluster_agent,
     cluster_task: str,
@@ -2338,7 +2433,7 @@ def _run_cluster_agent_with_retry(
     """运行聚类Agent并永久重试直到所有gid都被分类，返回(聚类结果, 解析错误)"""
     _attempt = 0
     use_direct_model = False
-    error_details = []
+    error_details: List[str] = []
     missing_gids = set()
     
     while True:
@@ -2346,38 +2441,15 @@ def _run_cluster_agent_with_retry(
         _cluster_summary["text"] = ""
         
         if use_direct_model:
-            # 格式校验失败后，直接调用模型接口
-            error_guidance = ""
-            if error_details:
-                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {detail}" for detail in error_details)
-            if missing_gids:
-                missing_gids_list = sorted(list(missing_gids))
-                missing_count = len(missing_gids)
-                error_guidance += f"\n\n**完整性错误：遗漏了 {missing_count} 个 gid，这些 gid 必须被分类：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
-            
-            retry_task = f"""
-# 聚类任务重试
-文件: {file}
-
-**重要提示**：请重新输出聚类结果。
-""".strip()
-            if missing_gids:
-                missing_gids_list = sorted(list(missing_gids))
-                missing_count = len(missing_gids)
-                retry_task += f"\n\n**遗漏的gid（共{missing_count}个，必须被分类）：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
-            if error_details:
-                retry_task += f"\n\n**格式错误：**\n" + "\n".join(f"- {detail}" for detail in error_details)
-            
-            full_prompt = f"{retry_task}{error_guidance}\n\n{cluster_summary_prompt}"
-            try:
-                response = cluster_agent.model.chat_until_success(full_prompt)  # type: ignore
-                _cluster_summary["text"] = response
-            except Exception as e:
-                try:
-                    typer.secho(f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
-                except Exception:
-                    pass
-                cluster_agent.run(cluster_task)
+            _run_cluster_agent_direct_model(
+                cluster_agent,
+                cluster_task,
+                cluster_summary_prompt,
+                file,
+                missing_gids,
+                error_details,
+                _cluster_summary,
+            )
         else:
             # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
             cluster_agent.run(cluster_task)
@@ -2385,29 +2457,15 @@ def _run_cluster_agent_with_retry(
         cluster_items, parse_error = _parse_clusters_from_text(_cluster_summary.get("text", ""))
         
         # 校验结构
-        if parse_error:
-            valid = False
-            error_details = [f"YAML解析失败: {parse_error}"]
-            typer.secho(f"[jarvis-sec] YAML解析失败: {parse_error}", fg=typer.colors.YELLOW)
-        else:
-            valid, error_details = _validate_cluster_format(cluster_items)
-            if not valid:
-                typer.secho(f"[jarvis-sec] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {_attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
+        valid, error_details = _validate_cluster_result(cluster_items, parse_error, _attempt)
         
         # 完整性校验：检查所有输入的gid是否都被分类
         missing_gids = set()
-        if valid:
-            classified_gids = _extract_classified_gids(cluster_items)
-            missing_gids = input_gids - classified_gids
-            if not missing_gids:
-                # 所有gid都被分类，校验通过
-                typer.secho(f"[jarvis-sec] 聚类完整性校验通过，所有gid已分类（共尝试 {_attempt} 次）", fg=typer.colors.GREEN)
+        if valid and cluster_items:
+            is_complete, missing_gids = _check_cluster_completeness(cluster_items, input_gids, _attempt)
+            if is_complete:
                 return cluster_items, None
             else:
-                # 有遗漏的gid，需要重试
-                missing_gids_list = sorted(list(missing_gids))
-                missing_count = len(missing_gids)
-                typer.secho(f"[jarvis-sec] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {_attempt} 次（使用直接模型调用）", fg=typer.colors.YELLOW)
                 use_direct_model = True
                 valid = False
         
@@ -3150,18 +3208,13 @@ def _check_and_supplement_missing_gids(
                 pass
 
 
-def _process_clustering_phase(
+def _initialize_clustering_context(
     compact_candidates: List[Dict],
-    entry_path: str,
-    langs: List[str],
-    cluster_limit: int,
-    llm_group: Optional[str],
     sec_dir,
     progress_path,
-    status_mgr,
     _progress_append,
-) -> tuple[List[List[Dict]], List[Dict]]:
-    """处理聚类阶段，返回(cluster_batches, invalid_clusters_for_review)"""
+) -> tuple[Dict[str, List[Dict]], Dict, tuple, List[List[Dict]], List[Dict], List[Dict], set]:
+    """初始化聚类上下文，返回(文件分组, 已有聚类, 快照写入函数, 聚类批次, 聚类记录, 无效聚类, 已聚类gid)"""
     # 按文件分组构建待聚类集合
     _file_groups = _group_candidates_by_file(compact_candidates)
     
@@ -3184,11 +3237,23 @@ def _process_clustering_phase(
         _existing_clusters, _file_groups
     )
     
-    # 收集所有候选的 gid（用于检查未聚类的 gid）
-    all_candidate_gids_in_clustering = _collect_candidate_gids(_file_groups)
-    
-    # 检查是否有未聚类的 gid
-    unclustered_gids = all_candidate_gids_in_clustering - clustered_gids
+    return (
+        _file_groups,
+        _existing_clusters,
+        (_write_cluster_batch_snapshot, _write_cluster_report_snapshot),
+        cluster_batches,
+        cluster_records,
+        invalid_clusters_for_review,
+        clustered_gids,
+    )
+
+
+def _check_unclustered_gids(
+    all_candidate_gids: set,
+    clustered_gids: set,
+) -> set:
+    """检查未聚类的gid"""
+    unclustered_gids = all_candidate_gids - clustered_gids
     if unclustered_gids:
         try:
             typer.secho(f"[jarvis-sec] 发现 {len(unclustered_gids)} 个未聚类的 gid，将进行聚类", fg=typer.colors.YELLOW)
@@ -3196,46 +3261,68 @@ def _process_clustering_phase(
             pass
     else:
         try:
-            typer.secho(f"[jarvis-sec] 所有 {len(all_candidate_gids_in_clustering)} 个候选已聚类，跳过聚类阶段", fg=typer.colors.GREEN)
+            typer.secho(f"[jarvis-sec] 所有 {len(all_candidate_gids)} 个候选已聚类，跳过聚类阶段", fg=typer.colors.GREEN)
         except Exception:
             pass
-    
-    # 如果有未聚类的 gid，继续执行聚类
-    if unclustered_gids:
-        total_files_to_cluster = len(_file_groups)
-        # 更新聚类阶段状态
-        if total_files_to_cluster > 0:
-            status_mgr.update_clustering(
-                current_file=0,
-                total_files=total_files_to_cluster,
-                message="开始聚类分析..."
-            )
-        for _file_idx, (_file, _items) in enumerate(_file_groups.items(), start=1):
-            typer.secho(f"\n[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}", fg=typer.colors.CYAN)
-            # 更新当前文件进度
-            status_mgr.update_clustering(
-                current_file=_file_idx,
-                total_files=total_files_to_cluster,
-                file_name=_file,
-                message=f"正在聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}"
-            )
-            # 使用子函数处理文件聚类
-            _process_file_clustering(
-                _file,
-                _items,
-                clustered_gids,
-                cluster_batches,
-                cluster_records,
-                invalid_clusters_for_review,
-                entry_path,
-                langs,
-                cluster_limit,
-                llm_group,
-                _progress_append,
-                _write_cluster_batch_snapshot,
-            )
-    
-    # 记录聚类阶段完成
+    return unclustered_gids
+
+
+def _execute_clustering_for_files(
+    file_groups: Dict[str, List[Dict]],
+    clustered_gids: set,
+    cluster_batches: List[List[Dict]],
+    cluster_records: List[Dict],
+    invalid_clusters_for_review: List[Dict],
+    entry_path: str,
+    langs: List[str],
+    cluster_limit: int,
+    llm_group: Optional[str],
+    status_mgr,
+    _progress_append,
+    _write_cluster_batch_snapshot,
+) -> None:
+    """执行文件聚类"""
+    total_files_to_cluster = len(file_groups)
+    # 更新聚类阶段状态
+    if total_files_to_cluster > 0:
+        status_mgr.update_clustering(
+            current_file=0,
+            total_files=total_files_to_cluster,
+            message="开始聚类分析..."
+        )
+    for _file_idx, (_file, _items) in enumerate(file_groups.items(), start=1):
+        typer.secho(f"\n[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}", fg=typer.colors.CYAN)
+        # 更新当前文件进度
+        status_mgr.update_clustering(
+            current_file=_file_idx,
+            total_files=total_files_to_cluster,
+            file_name=_file,
+            message=f"正在聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}"
+        )
+        # 使用子函数处理文件聚类
+        _process_file_clustering(
+            _file,
+            _items,
+            clustered_gids,
+            cluster_batches,
+            cluster_records,
+            invalid_clusters_for_review,
+            entry_path,
+            langs,
+            cluster_limit,
+            llm_group,
+            _progress_append,
+            _write_cluster_batch_snapshot,
+        )
+
+
+def _record_clustering_completion(
+    sec_dir,
+    cluster_records: List[Dict],
+    compact_candidates: List[Dict],
+    _progress_append,
+) -> None:
+    """记录聚类阶段完成"""
     try:
         from pathlib import Path
         import json
@@ -3249,6 +3336,111 @@ def _process_clustering_phase(
         })
     except Exception:
         pass
+
+
+def _fallback_to_file_based_batches(
+    file_groups: Dict[str, List[Dict]],
+    existing_clusters: Dict,
+) -> List[List[Dict]]:
+    """若聚类失败或空，则回退为按文件一次处理"""
+    fallback_batches: List[List[Dict]] = []
+    
+    # 收集所有未聚类的 gid（从所有候选 gid 中排除已聚类的）
+    all_gids_in_file_groups = _collect_candidate_gids(file_groups)
+    gid_to_item_fallback: Dict[int, Dict] = {}
+    for _file, _items in file_groups.items():
+        for c in _items:
+            try:
+                _gid = int(c.get("gid", 0))
+                if _gid >= 1:
+                    gid_to_item_fallback[_gid] = c
+            except Exception:
+                pass
+    
+    # 如果还有未聚类的 gid，按文件分组创建批次
+    if all_gids_in_file_groups:
+        # 收集已聚类的 gid（从 cluster_report.jsonl）
+        clustered_gids_fallback = set()
+        for (_file_key, _batch_idx), cluster_recs in existing_clusters.items():
+            for rec in cluster_recs:
+                if rec.get("is_invalid", False):
+                    continue
+                gids_list = rec.get("gids", [])
+                for _gid in gids_list:
+                    try:
+                        _gid_int = int(_gid)
+                        if _gid_int >= 1:
+                            clustered_gids_fallback.add(_gid_int)
+                    except Exception:
+                        pass
+        
+        unclustered_gids_fallback = all_gids_in_file_groups - clustered_gids_fallback
+        if unclustered_gids_fallback:
+            # 按文件分组未聚类的 gid
+            from collections import defaultdict
+            unclustered_by_file: Dict[str, List[Dict]] = defaultdict(list)
+            for _gid in unclustered_gids_fallback:
+                item = gid_to_item_fallback.get(_gid)
+                if item:
+                    file_key = str(item.get("file") or "")
+                    unclustered_by_file[file_key].append(item)
+            
+            # 为每个文件创建批次
+            for _file, _items in unclustered_by_file.items():
+                if _items:
+                    fallback_batches.append(_items)
+    
+    return fallback_batches
+
+
+def _process_clustering_phase(
+    compact_candidates: List[Dict],
+    entry_path: str,
+    langs: List[str],
+    cluster_limit: int,
+    llm_group: Optional[str],
+    sec_dir,
+    progress_path,
+    status_mgr,
+    _progress_append,
+) -> tuple[List[List[Dict]], List[Dict]]:
+    """处理聚类阶段，返回(cluster_batches, invalid_clusters_for_review)"""
+    # 初始化聚类上下文
+    (
+        _file_groups,
+        _existing_clusters,
+        (_write_cluster_batch_snapshot, _write_cluster_report_snapshot),
+        cluster_batches,
+        cluster_records,
+        invalid_clusters_for_review,
+        clustered_gids,
+    ) = _initialize_clustering_context(compact_candidates, sec_dir, progress_path, _progress_append)
+    
+    # 收集所有候选的 gid（用于检查未聚类的 gid）
+    all_candidate_gids_in_clustering = _collect_candidate_gids(_file_groups)
+    
+    # 检查是否有未聚类的 gid
+    unclustered_gids = _check_unclustered_gids(all_candidate_gids_in_clustering, clustered_gids)
+    
+    # 如果有未聚类的 gid，继续执行聚类
+    if unclustered_gids:
+        _execute_clustering_for_files(
+            _file_groups,
+            clustered_gids,
+            cluster_batches,
+            cluster_records,
+            invalid_clusters_for_review,
+            entry_path,
+            langs,
+            cluster_limit,
+            llm_group,
+            status_mgr,
+            _progress_append,
+            _write_cluster_batch_snapshot,
+        )
+    
+    # 记录聚类阶段完成
+    _record_clustering_completion(sec_dir, cluster_records, compact_candidates, _progress_append)
     
     # 复核Agent：验证所有标记为无效的聚类
     cluster_batches = _process_review_phase(
@@ -3263,50 +3455,8 @@ def _process_clustering_phase(
     
     # 若聚类失败或空，则回退为"按文件一次处理"
     if not cluster_batches:
-        # 收集所有未聚类的 gid（从所有候选 gid 中排除已聚类的）
-        all_gids_in_file_groups = _collect_candidate_gids(_file_groups)
-        gid_to_item_fallback: Dict[int, Dict] = {}
-        for _file, _items in _file_groups.items():
-            for c in _items:
-                try:
-                    _gid = int(c.get("gid", 0))
-                    if _gid >= 1:
-                        gid_to_item_fallback[_gid] = c
-                except Exception:
-                    pass
-        
-        # 如果还有未聚类的 gid，按文件分组创建批次
-        if all_gids_in_file_groups:
-            # 收集已聚类的 gid（从 cluster_report.jsonl）
-            clustered_gids_fallback = set()
-            for (_file_key, _batch_idx), cluster_recs in _existing_clusters.items():
-                for rec in cluster_recs:
-                    if rec.get("is_invalid", False):
-                        continue
-                    gids_list = rec.get("gids", [])
-                    for _gid in gids_list:
-                        try:
-                            _gid_int = int(_gid)
-                            if _gid_int >= 1:
-                                clustered_gids_fallback.add(_gid_int)
-                        except Exception:
-                            pass
-            
-            unclustered_gids_fallback = all_gids_in_file_groups - clustered_gids_fallback
-            if unclustered_gids_fallback:
-                # 按文件分组未聚类的 gid
-                from collections import defaultdict
-                unclustered_by_file: Dict[str, List[Dict]] = defaultdict(list)
-                for _gid in unclustered_gids_fallback:
-                    item = gid_to_item_fallback.get(_gid)
-                    if item:
-                        file_key = str(item.get("file") or "")
-                        unclustered_by_file[file_key].append(item)
-                
-                # 为每个文件创建批次
-                for _file, _items in unclustered_by_file.items():
-                    if _items:
-                        cluster_batches.append(_items)
+        fallback_batches = _fallback_to_file_based_batches(_file_groups, _existing_clusters)
+        cluster_batches.extend(fallback_batches)
     
     # 完整性检查：确保所有候选的 gid 都已被聚类
     _check_and_supplement_missing_gids(
