@@ -820,19 +820,19 @@ class Transpiler:
             # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
             if agent is None or not use_direct_model:
                 agent = Agent(
-                system_prompt=sys_p,
-                name="C2Rust-Function-Planner",
-                model_group=self.llm_group,
-                summary_prompt=sum_p,
-                need_summary=True,
-                auto_complete=True,
-                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                plan=False,
+                    system_prompt=sys_p,
+                    name="C2Rust-Function-Planner",
+                    model_group=self.llm_group,
+                    summary_prompt=sum_p,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                    plan=False,
                     non_interactive=self.non_interactive,
-                use_methodology=False,
-                use_analysis=False,
-                disable_file_edit=True,
-            )
+                    use_methodology=False,
+                    use_analysis=False,
+                    disable_file_edit=True,
+                )
             
             prev_cwd = os.getcwd()
             try:
