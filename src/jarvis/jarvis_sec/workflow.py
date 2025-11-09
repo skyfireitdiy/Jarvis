@@ -187,6 +187,7 @@ def run_with_agent(
     report_file: Optional[str] = None,
     cluster_limit: int = 50,
     exclude_dirs: Optional[List[str]] = None,
+    enable_verification: bool = True,
 ) -> str:
     """
     使用单Agent逐条子任务分析模式运行（与 jarvis.jarvis_sec.__init__ 中保持一致）。
@@ -199,6 +200,7 @@ def run_with_agent(
     - report_file: JSONL 报告文件路径（可选，透传）
     - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
     - exclude_dirs: 要排除的目录列表（可选），默认已包含构建产物（build, out, target, dist, bin, obj）、依赖目录（third_party, vendor, deps, dependencies, libs, libraries, external, node_modules）、测试目录（test, tests, __tests__, spec, testsuite, testdata）、性能测试目录（benchmark, benchmarks, perf, performance, bench, benches, profiling, profiler）、示例目录（example, examples）、临时/缓存（tmp, temp, cache, .cache）、文档（docs, doc, documentation）、生成代码（generated, gen）和其他（mocks, fixtures, samples, sample, playground, sandbox）
+    - enable_verification: 是否启用二次验证（默认 True），关闭后分析Agent确认的问题将直接写入报告
     """
     from jarvis.jarvis_sec import run_security_analysis  # 延迟导入，避免循环
     return run_security_analysis(
@@ -208,6 +210,7 @@ def run_with_agent(
         report_file=report_file,
         cluster_limit=cluster_limit,
         exclude_dirs=exclude_dirs,
+        enable_verification=enable_verification,
     )
 
 
