@@ -5,6 +5,11 @@ import pytest
 import tempfile
 from pathlib import Path
 
+# 检查 RAG 依赖是否安装，如果没有则跳过所有测试
+# 必须在导入 jarvis_rag 模块之前检查，因为 __init__.py 会导入依赖 langchain 的模块
+langchain = pytest.importorskip("langchain", reason="RAG dependencies not installed")
+
+# 现在可以安全地导入，因为我们已经确认 langchain 可用
 from jarvis.jarvis_rag.cli import is_likely_text_file
 
 
