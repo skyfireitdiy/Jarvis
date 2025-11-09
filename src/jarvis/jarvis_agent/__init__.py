@@ -261,6 +261,8 @@ class Agent:
 
         # 清理会话历史并重置模型状态
         self.session.clear_history()
+        # 重置 addon_prompt 跳过轮数计数器
+        self._addon_prompt_skip_rounds = 0
 
         # 重置后重新设置系统提示词，确保系统约束仍然生效
         try:
@@ -391,6 +393,8 @@ class Agent:
         self.first = True
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
+        # 记录连续未添加 addon_prompt 的轮数
+        self._addon_prompt_skip_rounds: int = 0
 
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
@@ -754,7 +758,13 @@ class Agent:
         return message
 
     def _add_addon_prompt(self, message: str, need_complete: bool) -> str:
-        """添加附加提示到消息"""
+        """添加附加提示到消息
+        
+        规则：
+        1. 如果 session.addon_prompt 存在，优先使用它
+        2. 如果消息长度超过阈值，添加默认 addon_prompt
+        3. 如果连续10轮都没有添加过 addon_prompt，强制添加一次
+        """
         # 广播添加附加提示前事件（不影响主流程）
         try:
             self.event_bus.emit(
@@ -768,15 +778,32 @@ class Agent:
             pass
 
         addon_text = ""
+        should_add = False
+        
         if self.session.addon_prompt:
+            # 优先使用 session 中设置的 addon_prompt
             addon_text = self.session.addon_prompt
             message = join_prompts([message, addon_text])
             self.session.addon_prompt = ""
+            should_add = True
         else:
             threshold = get_addon_prompt_threshold()
+            # 条件1：消息长度超过阈值
             if len(message) > threshold:
                 addon_text = self.make_default_addon_prompt(need_complete)
                 message = join_prompts([message, addon_text])
+                should_add = True
+            # 条件2：连续10轮都没有添加过 addon_prompt，强制添加一次
+            elif self._addon_prompt_skip_rounds >= 10:
+                addon_text = self.make_default_addon_prompt(need_complete)
+                message = join_prompts([message, addon_text])
+                should_add = True
+        
+        # 更新计数器：如果添加了 addon_prompt，重置计数器；否则递增
+        if should_add:
+            self._addon_prompt_skip_rounds = 0
+        else:
+            self._addon_prompt_skip_rounds += 1
 
         # 广播添加附加提示后事件（不影响主流程）
         try:
@@ -923,6 +950,8 @@ class Agent:
             self._setup_system_prompt()
         # 重置会话
         self.session.clear_history()
+        # 重置 addon_prompt 跳过轮数计数器
+        self._addon_prompt_skip_rounds = 0
         # 广播清理历史后的事件
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
@@ -939,6 +968,8 @@ class Agent:
         except Exception:
             pass
         result = self.file_methodology_manager.handle_history_with_file_upload()
+        # 重置 addon_prompt 跳过轮数计数器
+        self._addon_prompt_skip_rounds = 0
         # 广播清理历史后的事件
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
