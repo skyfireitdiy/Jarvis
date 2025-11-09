@@ -1,0 +1,91 @@
+{"file": "platform/hilog.cpp", "verification": "验证候选 1 的安全风险", "gids": [1], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "frameworks/hilog_ndk/hilog_ndk.c", "verification": "验证VLA数组长度(copyTagLen和copyMsgLen)是否受到合理限制", "gids": [2, 3], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/hilog_printf.cpp", "verification": "检查write系统调用的返回值是否被正确处理", "gids": [4, 5], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/include/hilog_inner.h", "verification": "验证函数调用时传入的const char *fmt指针是否非空", "gids": [6, 7], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/vsnprintf/vsnprintf_s_p.c", "verification": "验证指针在解引用前非空（包括*str和*pnumwritten）", "gids": [8, 9, 10, 11, 12], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/base/hilog_base.c", "verification": "验证在调用close(socketFd)前是否检查了socketFd的有效性", "gids": [13, 14, 15], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/base/hilog_base.c", "verification": "验证header指针在使用前是否进行了非空验证", "gids": [16, 17, 18, 19, 20], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/ioctl/log_ioctl.cpp", "verification": "检查是否在使用前对new(std::nothrow)返回的指针进行了nullptr检查", "gids": [21, 22, 23, 24, 25, 26], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/ioctl/log_ioctl.cpp", "verification": "检查rsp指针在解引用前是否非空", "gids": [27], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/ioctl/log_ioctl.cpp", "verification": "检查reinterpret_cast转换是否安全，源指针和目标类型是否兼容", "gids": [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38], "count": 11, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/utils/log_print.cpp", "verification": "指针pScan在解引用前非空", "gids": [39, 40, 41], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/utils/log_utils.cpp", "verification": "检查fclose操作的返回值是否被正确处理", "gids": [42], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/utils/log_utils.cpp", "verification": "检查数组访问是否越界", "gids": [43], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/socket/dgram_socket_client.cpp", "verification": "验证候选 44 的安全风险", "gids": [44], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "frameworks/libhilog/socket/seq_packet_socket_server.cpp", "verification": "handler指针在SetHandler和SetCredential调用前非空", "gids": [45, 46], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/socket/hilog_input_socket_client.cpp", "verification": "验证header指针在使用前是否非空", "gids": [47, 48], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/socket/hilog_input_socket_client.cpp", "verification": "验证reinterpret_cast和const_cast的使用是否安全", "gids": [49, 50, 51, 52], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/socket/socket_client.cpp", "verification": "验证候选 53 的安全风险", "gids": [53], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "frameworks/libhilog/socket/socket.cpp", "verification": "验证IO系统调用(close/read/write)的错误处理是否正确，包括文件描述符有效性检查及返回值处理", "gids": [54, 55, 56, 57, 58, 59], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/socket/socket_server.cpp", "verification": "验证候选 60 的安全风险", "gids": [60], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "frameworks/libhilog/socket/dgram_socket_server.cpp", "verification": "receivedUcred指针在解引用前必须非空", "gids": [61, 62], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/param/properties.cpp", "verification": "验证new操作是否可能失败(抛出bad_alloc异常)以及是否有相应的异常处理机制", "gids": [63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77], "count": 15, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/param/properties.cpp", "verification": "验证switchCache指针在解引用前是否保证非空", "gids": [78, 79, 80, 107, 108], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/param/properties.cpp", "verification": "验证logLevelCache指针在解引用前是否保证非空", "gids": [81, 82, 88, 94, 100, 106], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/param/properties.cpp", "verification": "验证levelMtx和map指针在解引用前是否保证非空", "gids": [83, 84, 85, 86, 87, 89, 90, 91, 92, 93, 95, 96, 97, 98, 99, 101, 102, 103, 104, 105], "count": 20, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/ioctl/include/log_ioctl.h", "verification": "验证reinterpret_cast的类型转换是否安全", "gids": [109, 110], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "frameworks/libhilog/utils/include/log_utils.h", "verification": "验证候选 111 的安全风险", "gids": [111], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "frameworks/libhilog/socket/include/socket.h", "verification": "检查IO操作函数的返回值是否被正确处理，以及指针参数是否有效", "gids": [112, 113], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "检查内存分配操作后是否有对返回指针的非空检查", "gids": [114, 115, 116, 117, 118], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "检查m_communicationSocket在使用前是否确保非空", "gids": [120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 138, 140, 147, 149, 150, 151, 152, 153, 154, 155, 156], "count": 27, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "检查persister在使用前是否确保非空", "gids": [136, 137], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "检查iterator在使用前是否确保非空", "gids": [139, 141, 142, 143, 144, 145, 146, 148], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "检查dirent在使用前是否确保非空", "gids": [157, 158], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "检查reinterpret_cast类型转换是否安全", "gids": [159, 160, 161, 162, 163], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "检查fread操作的返回值是否被正确处理", "gids": [119], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "确认reinterpret_cast转换前后的类型是否兼容，以及源指针的有效性", "gids": [164, 165, 166, 167, 168, 180], "count": 6, "batch_index": 2, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "确认网络写入操作中数据大小和缓冲区边界是否匹配", "gids": [169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179], "count": 11, "batch_index": 2, "is_invalid": false}
+{"file": "services/hilogd/service_controller.cpp", "verification": "确认IsValidFileName函数是否能有效防止路径遍历等攻击", "gids": [181], "count": 1, "batch_index": 2, "is_invalid": false}
+{"file": "services/hilogd/log_buffer.cpp", "verification": "验证指针在解引用前非空", "gids": [182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216], "count": 35, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_buffer.cpp", "verification": "验证reinterpret_cast类型转换的安全性", "gids": [217, 218, 219], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_buffer.cpp", "verification": "验证字符串索引访问不越界", "gids": [220, 221], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_compress.cpp", "verification": "确认源指针(buffIn/buffOut)有效且reinterpret_cast转换到Bytef*类型安全", "gids": [222, 223, 224], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister_rotator.cpp", "verification": "检查IO操作(open/close/write)是否失败并正确处理错误", "gids": [225, 226, 227, 228, 229, 230], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister_rotator.cpp", "verification": "检查是否使用了线程安全的替代方案替代localtime()", "gids": [231], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister_rotator.cpp", "verification": "验证ent->d_name是否可能为NULL", "gids": [232, 233], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister_rotator.cpp", "verification": "验证reinterpret_cast的使用是否安全", "gids": [234, 235, 236], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_kmsg.cpp", "verification": "验证close(kmsgCtl)的返回值是否被检查", "gids": [237], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_kmsg.cpp", "verification": "验证msgWrap指针在调用GetHilogMsg()前是否非空", "gids": [238, 239], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/main.cpp", "verification": "验证文件描述符关闭操作(close)是否正确处理错误情况", "gids": [240, 241, 242], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/cmd_executor.cpp", "verification": "Verify client/newVal/ct/clientInfoIt pointers are not null before dereferencing", "gids": [243, 244, 245, 246, 247, 248, 249, 250, 251], "count": 9, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_stats.cpp", "verification": "验证迭代器是否有效（非空）以及解引用的成员是否存在", "gids": [252, 253, 254, 255, 256, 257], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "m_fileRotator 指针在解引用前非空", "gids": [258, 271, 272, 274, 280], "count": 5, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "m_mappedPlainLogFile 指针在解引用前非空", "gids": [259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 273, 276, 286, 287, 288, 289], "count": 18, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "m_compressBuffer 指针在解引用前非空", "gids": [260, 261, 262, 267, 268, 269, 271, 272, 275, 286, 287, 288, 289], "count": 13, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "logPersisterPtr 指针在解引用前非空", "gids": [283, 284, 285, 286, 287, 288, 289], "count": 7, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "ent 指针非空且 ent->d_name 非空", "gids": [290, 291], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "logPersister 指针非空且 m_startMsg 有效", "gids": [281, 282, 292, 293, 294, 295], "count": 6, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "reinterpret_cast 转换的安全性验证", "gids": [296], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "shared 指针在解引用前非空", "gids": [277], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_persister.cpp", "verification": "m_compressor 指针在解引用前非空", "gids": [278, 279], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/flow_control.cpp", "verification": "验证迭代器it在解引用前是否有效（非空）", "gids": [297, 298, 299, 300, 301, 302, 303, 304], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_collector.cpp", "verification": "确认 dropMsg 指针在解引用前非空", "gids": [305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318], "count": 14, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/log_collector.cpp", "verification": "确认 reinterpret_cast 类型转换后的指针使用安全", "gids": [319, 320], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogtool/log_display.cpp", "verification": "验证向量访问是否在有效范围内", "gids": [321, 322, 323, 324], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogtool/main.cpp", "verification": "验证handler指针在解引用前是否非空", "gids": [325, 326], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogtool/main.cpp", "verification": "验证entry指针在解引用前是否非空", "gids": [327, 328, 329, 330], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogtool/main.cpp", "verification": "验证cmdEntry指针在解引用前是否非空", "gids": [331], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogtool/main.cpp", "verification": "验证数组/vector访问是否在合法范围内", "gids": [332, 333, 334, 336, 337, 339, 340, 341, 342, 343, 344, 345, 347, 349, 351, 354, 356, 358], "count": 18, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogtool/main.cpp", "verification": "验证字符串操作是否在合法范围内", "gids": [335, 338, 346, 348, 350, 352, 353, 355, 357, 359], "count": 10, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/include/log_msg_wrapper.h", "verification": "验证候选 360 的安全风险", "gids": [360], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "services/hilogd/include/log_data.h", "verification": "验证使用std::nothrow分配的指针在使用前是否被检查为空", "gids": [361, 362], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/include/log_persister.h", "verification": "验证静态方法是否在多线程环境下被调用且没有适当的同步机制", "gids": [363, 364, 365, 366], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/include/log_persister.h", "verification": "验证volatile变量在多线程环境下的访问是否没有适当的同步机制", "gids": [367, 368], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/include/service_controller.h", "verification": "验证 rqst 指针在解引用前是否非空", "gids": [369], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "services/hilogd/include/service_controller.h", "verification": "验证 reinterpret_cast<T*> 转换的安全性", "gids": [370], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/ets/ani/hilog/src/ani_util.cpp", "verification": "env指针在方法调用前非空", "gids": [371, 372, 373, 374, 375, 376, 377, 378], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/ets/ani/hilog/src/hilog_ani_base.cpp", "verification": "env指针在调用Array_GetLength和Array_Get_Ref前必须非空", "gids": [379, 380], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/ets/ani/hilog/src/hilog_ani_base.cpp", "verification": "contentPos.count必须小于params数组的长度", "gids": [381, 382, 383, 384, 385, 386, 387, 388, 389, 390, 391], "count": 11, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/ets/ani/hilog/src/hilog_ani.cpp", "verification": "验证指针(vm/env/ns/result)在使用前是否非空", "gids": [392, 393, 394, 395], "count": 4, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/ets/ani/hilog/src/hilog_ani.cpp", "verification": "验证reinterpret_cast转换是否安全", "gids": [396, 397, 398, 399, 400, 401, 402, 403], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/js/kits/napi/src/hilog/module.cpp", "verification": "验证候选 404 的安全风险", "gids": [404], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "interfaces/js/kits/napi/src/common/napi/n_val.cpp", "verification": "验证 reinterpret_cast 的使用是否安全，特别是指针转换是否正确且不会导致未定义行为", "gids": [405, 406], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/js/kits/napi/src/common/napi/n_val.cpp", "verification": "验证智能指针的 get() 方法使用是否安全，特别是在传递给外部函数时是否保证指针有效性", "gids": [407, 408, 409], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/js/kits/napi/src/common/napi/n_class.cpp", "verification": "验证候选 410 的安全风险", "gids": [410], "count": 1, "batch_index": 1, "note": "单告警跳过聚类"}
+{"file": "interfaces/js/kits/napi/src/hilog/src/hilog_napi.cpp", "verification": "descriptors != NULL", "gids": [411, 412], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/js/kits/napi/src/hilog/src/hilog_napi_base.cpp", "verification": "验证count变量是否始终小于params数组的长度", "gids": [413, 414, 415, 416, 417, 418, 419, 420], "count": 8, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/js/kits/napi/src/hilog/src/hilog_napi_base.cpp", "verification": "验证智能指针在使用.get()方法前是否始终非空", "gids": [421, 422, 423], "count": 3, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/js/kits/napi/src/hilog/src/hilog_napi_base.cpp", "verification": "验证tag.get()返回的字符串和logContent是否安全用于日志格式化", "gids": [424], "count": 1, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/rust/src/macros.rs", "verification": "验证unsafe代码块中的操作是否满足Rust安全要求", "gids": [425, 426], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/rust/src/macros.rs", "verification": "验证原始指针转换和使用是否安全", "gids": [427, 428], "count": 2, "batch_index": 1, "is_invalid": false}
+{"file": "interfaces/rust/src/macros.rs", "verification": "验证忽略Result/Option是否合理", "gids": [429], "count": 1, "batch_index": 1, "is_invalid": false}
