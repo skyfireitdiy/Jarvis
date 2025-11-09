@@ -8,7 +8,7 @@
 import os
 import re
 import yaml
-from typing import List, Optional, Dict, Any, Set
+from typing import List, Optional, Any
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -116,10 +116,6 @@ class ContextRecommender:
         
         # 1. 使用LLM提取关键词（仅提取关键词）
         keywords = self._extract_keywords_with_llm(user_input)
-        if keywords:
-            PrettyOutput.print(f"🔑 提取的关键词: {', '.join(keywords)}", OutputType.INFO)
-        else:
-            PrettyOutput.print("⚠️  未能提取到关键词", OutputType.WARNING)
         
         # 2. 初始化推荐结果
         recommended_symbols: List[Symbol] = []
@@ -129,7 +125,6 @@ class ContextRecommender:
             # 3.1 使用关键词进行符号查找和文本查找，找到所有候选符号及其位置
             candidate_symbols = self._search_symbols_by_keywords(keywords)
             candidate_symbols_from_text = self._search_text_by_keywords(keywords)
-            PrettyOutput.print(f"🔍 找到 {len(candidate_symbols)} 个符号匹配，{len(candidate_symbols_from_text)} 个文本匹配", OutputType.INFO)
             
             # 合并候选符号（去重）
             all_candidates = {}
@@ -143,22 +138,15 @@ class ContextRecommender:
             
             # 3.2 使用LLM从候选符号中挑选关联度高的条目
             if candidate_symbols_list:
-                PrettyOutput.print(f"🤖 使用LLM从 {len(candidate_symbols_list)} 个候选符号中筛选...", OutputType.INFO)
                 selected_symbols = self._select_relevant_symbols_with_llm(
                     user_input, keywords, candidate_symbols_list
                 )
                 recommended_symbols.extend(selected_symbols)
-                PrettyOutput.print(f"✅ LLM筛选出 {len(selected_symbols)} 个相关符号", OutputType.INFO)
             else:
                 PrettyOutput.print("⚠️  没有找到候选符号", OutputType.WARNING)
 
         # 4. 限制符号数量
         final_symbols = recommended_symbols[:10]
-        
-        if final_symbols:
-            PrettyOutput.print(f"📌 最终推荐 {len(final_symbols)} 个符号", OutputType.INFO)
-        else:
-            PrettyOutput.print("⚠️  未能推荐任何符号", OutputType.WARNING)
 
         return ContextRecommendation(
             recommended_symbols=final_symbols,
@@ -180,15 +168,7 @@ class ContextRecommender:
         """
         # 检查符号表是否为空
         if not self.context_manager.symbol_table.symbols_by_name:
-            PrettyOutput.print("📚 符号表为空，正在扫描项目文件...", OutputType.INFO)
             self._build_symbol_table()
-            
-            # 再次检查
-            symbol_count = len(self.context_manager.symbol_table.symbols_by_name)
-            if symbol_count > 0:
-                PrettyOutput.print(f"✅ 已加载 {symbol_count} 个符号", OutputType.INFO)
-            else:
-                PrettyOutput.print("⚠️  符号表仍然为空，可能没有找到可解析的代码文件", OutputType.WARNING)
 
     def _build_symbol_table(self) -> None:
         """扫描项目文件并构建符号表
@@ -239,8 +219,7 @@ class ContextRecommender:
                     # 跳过无法读取的文件
                     continue
         
-        if files_scanned > 0:
-            PrettyOutput.print(f"📖 已扫描 {files_scanned} 个文件，提取了 {symbols_added} 个符号", OutputType.INFO)
+        # 静默构建符号表，不输出扫描信息
 
     def _extract_keywords_with_llm(self, user_input: str) -> List[str]:
         """使用LLM提取关键词（仅提取关键词）
