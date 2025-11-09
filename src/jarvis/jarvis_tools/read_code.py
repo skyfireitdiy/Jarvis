@@ -260,13 +260,7 @@ class ReadCodeTool:
                     symbols_str += f" (还有{more}个)"
                 context_lines.append(f"🔗 使用的符号: {symbols_str}")
 
-            if edit_context.imported_symbols:
-                import_names = [s.name for s in edit_context.imported_symbols[:10]]
-                imports_str = ", ".join(f"`{name}`" for name in import_names)
-                more = len(edit_context.imported_symbols) - 10
-                if more > 0:
-                    imports_str += f" (还有{more}个)"
-                context_lines.append(f"📦 导入的符号: {imports_str}")
+            # 不再感知导入符号
 
             if edit_context.relevant_files:
                 rel_files = edit_context.relevant_files[:10]
