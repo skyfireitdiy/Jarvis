@@ -800,8 +800,9 @@ class CodeAgent(Agent):
                     # 格式化推荐结果
                     context_recommendation_text = self.context_recommender.format_recommendation(recommendation)
                     
+                    # 打印推荐的上下文
                     if context_recommendation_text:
-                        PrettyOutput.print("💡 正在生成智能上下文推荐...", OutputType.INFO)
+                        PrettyOutput.print(context_recommendation_text, OutputType.INFO)
                 except Exception as e:
                     # 上下文推荐失败不应该影响主流程
                     import logging
