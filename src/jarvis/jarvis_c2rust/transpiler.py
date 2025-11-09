@@ -1090,6 +1090,31 @@ class Transpiler:
             "",
             "尚未转换的被调符号如下（请阅读这些符号的 C 源码并生成等价的 Rust 实现；必要时新增模块或签名）：",
             *[f"- {s}" for s in (unresolved or [])],
+            "",
+            "【重要：依赖检查与实现要求】",
+            "在实现函数之前，请务必检查以下内容：",
+            "1. 检查当前函数是否已实现：",
+            f"   - 在目标模块 {module} 中查找函数 {rec.qname or rec.name} 的实现",
+            "   - 如果已存在实现，检查其是否完整且正确",
+            "2. 检查所有依赖函数是否已实现：",
+            "   - 遍历当前函数调用的所有被调函数（包括直接调用和间接调用）",
+            "   - 对于每个被调函数，检查其在 Rust crate 中是否已有完整实现",
+            "   - 可以使用 read_code 工具读取相关模块文件进行检查",
+            "   - 可以使用 retrieve_memory 工具检索已保存的函数实现记忆",
+            "3. 对于未实现的依赖函数：",
+            "   - 使用 read_symbols 工具获取其 C 源码和符号信息",
+            "   - 使用 read_code 工具读取其 C 源码实现",
+            "   - 在本次实现中一并补齐这些依赖函数的 Rust 实现",
+            "   - 根据依赖关系选择合适的模块位置（可在同一模块或合理的新模块中）",
+            "   - 确保所有依赖函数都有完整实现，禁止使用 todo!/unimplemented! 占位",
+            "4. 实现顺序：",
+            "   - 优先实现最底层的依赖函数（不依赖其他未实现函数的函数）",
+            "   - 然后实现依赖这些底层函数的函数",
+            "   - 最后实现当前目标函数",
+            "5. 验证：",
+            "   - 确保当前函数及其所有依赖函数都已完整实现",
+            "   - 确保没有遗留的 todo!/unimplemented! 占位",
+            "   - 确保所有函数调用都能正确解析",
         ]
         # 若存在库替代上下文，则附加到实现提示中，便于生成器参考（多库组合、参考API、备注等）
         librep_ctx = None
@@ -1104,6 +1129,23 @@ class Transpiler:
                 json.dumps(librep_ctx, ensure_ascii=False, indent=2),
                 "",
             ])
+        requirement_lines.extend([
+            "",
+            "【重要：记忆保存要求】",
+            "在完成函数实现之后，请务必使用 save_memory 工具记录以下关键信息，以便后续检索和复用：",
+            f"- 函数名称：{rec.qname or rec.name} (id={rec.id})",
+            f"- 源文件位置：{rec.file}:{rec.start_line}-{rec.end_line}",
+            f"- 目标模块：{module}",
+            f"- Rust 函数签名：{rust_sig}",
+            "- C 函数的核心功能与语义",
+            "- 关键实现细节与设计决策",
+            "- 依赖关系与调用链",
+            "- 类型转换与边界处理要点",
+            "- 错误处理策略",
+            "- 实际实现的 Rust 代码要点与关键逻辑",
+            "记忆标签建议：使用 'c2rust', 'function_impl', 函数名等作为标签，便于后续检索。",
+            "请在完成代码实现之后保存记忆，记录本次实现的完整信息。",
+        ])
         prompt = "\n".join(requirement_lines)
         # 确保目标模块文件存在（提高补丁应用与实现落盘的确定性）
         try:
@@ -1123,7 +1165,13 @@ class Transpiler:
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(self.crate_dir))
-            agent = CodeAgent(need_summary=False, non_interactive=self.non_interactive, plan=False, model_group=self.llm_group)
+            agent = CodeAgent(
+                need_summary=False,
+                non_interactive=self.non_interactive,
+                plan=False,
+                model_group=self.llm_group,
+                force_save_memory=True,  # 强制使用记忆功能
+            )
             agent.run(prompt, prefix="[c2rust-transpiler][gen]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -1486,6 +1534,32 @@ class Transpiler:
             "- 禁止使用 todo!/unimplemented! 作为占位；",
             "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
             f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == 'cargo test' else '')}；",
+            "",
+            "【重要：依赖检查与实现要求】",
+            "在修复问题之前，请务必检查以下内容：",
+            "1. 检查当前函数是否已完整实现：",
+            f"   - 在目标模块中查找函数 {sym_name} 的实现",
+            "   - 如果已存在实现，检查其是否完整且正确",
+            "2. 检查所有依赖函数是否已实现：",
+            "   - 分析构建错误，识别所有缺失或未实现的被调函数",
+            "   - 遍历当前函数调用的所有被调函数（包括直接调用和间接调用）",
+            "   - 对于每个被调函数，检查其在 Rust crate 中是否已有完整实现",
+            "   - 可以使用 read_code 工具读取相关模块文件进行检查",
+            "   - 可以使用 retrieve_memory 工具检索已保存的函数实现记忆",
+            "3. 对于未实现的依赖函数：",
+            "   - 使用 read_symbols 工具获取其 C 源码和符号信息",
+            "   - 使用 read_code 工具读取其 C 源码实现",
+            "   - 在本次修复中一并补齐这些依赖函数的 Rust 实现",
+            "   - 根据依赖关系选择合适的模块位置（可在同一模块或合理的新模块中）",
+            "   - 确保所有依赖函数都有完整实现，禁止使用 todo!/unimplemented! 占位",
+            "4. 实现顺序：",
+            "   - 优先实现最底层的依赖函数（不依赖其他未实现函数的函数）",
+            "   - 然后实现依赖这些底层函数的函数",
+            "   - 最后修复当前目标函数",
+            "5. 验证：",
+            "   - 确保当前函数及其所有依赖函数都已完整实现",
+            "   - 确保没有遗留的 todo!/unimplemented! 占位",
+            "   - 确保所有函数调用都能正确解析",
         ]
         if include_output_patch_hint:
             base_lines.append("- 请仅输出补丁，不要输出解释或多余文本。")
@@ -1951,6 +2025,31 @@ class Transpiler:
                 "- 如审查问题涉及缺失/未实现的被调函数或依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时在合理模块新增函数或引入精确 use；",
                 "- 禁止使用 todo!/unimplemented! 作为占位；",
                 "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号（禁止通配）；",
+                "",
+                "【重要：依赖检查与实现要求】",
+                "在优化函数之前，请务必检查以下内容：",
+                "1. 检查当前函数是否已完整实现：",
+                f"   - 在目标模块 {module} 中查找函数 {rec.qname or rec.name} 的实现",
+                "   - 如果已存在实现，检查其是否完整且正确",
+                "2. 检查所有依赖函数是否已实现：",
+                "   - 遍历当前函数调用的所有被调函数（包括直接调用和间接调用）",
+                "   - 对于每个被调函数，检查其在 Rust crate 中是否已有完整实现",
+                "   - 可以使用 read_code 工具读取相关模块文件进行检查",
+                "   - 可以使用 retrieve_memory 工具检索已保存的函数实现记忆",
+                "3. 对于未实现的依赖函数：",
+                "   - 使用 read_symbols 工具获取其 C 源码和符号信息",
+                "   - 使用 read_code 工具读取其 C 源码实现",
+                "   - 在本次优化中一并补齐这些依赖函数的 Rust 实现",
+                "   - 根据依赖关系选择合适的模块位置（可在同一模块或合理的新模块中）",
+                "   - 确保所有依赖函数都有完整实现，禁止使用 todo!/unimplemented! 占位",
+                "4. 实现顺序：",
+                "   - 优先实现最底层的依赖函数（不依赖其他未实现函数的函数）",
+                "   - 然后实现依赖这些底层函数的函数",
+                "   - 最后优化当前目标函数",
+                "5. 验证：",
+                "   - 确保当前函数及其所有依赖函数都已完整实现",
+                "   - 确保没有遗留的 todo!/unimplemented! 占位",
+                "   - 确保所有函数调用都能正确解析",
                 "",
                 "请仅以补丁形式输出修改，避免冗余解释。",
             ])
