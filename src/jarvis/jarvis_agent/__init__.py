@@ -475,6 +475,14 @@ class Agent:
         # 任务规划器：封装规划与子任务调度逻辑
         self.task_planner = TaskPlanner(self, plan_depth=self.plan_depth, plan_max_depth=self.plan_max_depth)
 
+        # 如果配置了强制保存记忆，确保 save_memory 工具可用
+        if self.force_save_memory:
+            self._ensure_save_memory_tool()
+
+        # 如果启用了分析，确保 methodology 工具可用
+        if self.use_analysis:
+            self._ensure_methodology_tool()
+
         # 设置系统提示词
         self._setup_system_prompt()
 
@@ -706,6 +714,58 @@ class Agent:
             if isinstance(handler, ToolRegistry):
                 return handler
         return None
+
+    def _ensure_save_memory_tool(self) -> None:
+        """如果配置了强制保存记忆，确保 save_memory 工具在 use_tools 列表中"""
+        try:
+            tool_registry = self.get_tool_registry()
+            if not tool_registry:
+                return
+
+            # 检查 save_memory 工具是否已注册（工具默认都会注册）
+            if not tool_registry.get_tool("save_memory"):
+                # 如果工具本身不存在，则无法使用，直接返回
+                return
+
+            # 检查 save_memory 是否在 use_tools 列表中
+            # 如果 use_tools 为 None，表示使用所有工具，无需添加
+            if self.use_tools is None:
+                return
+
+            # 如果 save_memory 不在 use_tools 列表中，则添加
+            if "save_memory" not in self.use_tools:
+                self.use_tools.append("save_memory")
+                # 更新工具注册表的工具列表
+                self.set_use_tools(self.use_tools)
+        except Exception:
+            # 忽略所有错误，不影响主流程
+            pass
+
+    def _ensure_methodology_tool(self) -> None:
+        """如果启用了分析，确保 methodology 工具在 use_tools 列表中"""
+        try:
+            tool_registry = self.get_tool_registry()
+            if not tool_registry:
+                return
+
+            # 检查 methodology 工具是否已注册（工具默认都会注册）
+            if not tool_registry.get_tool("methodology"):
+                # 如果工具本身不存在，则无法使用，直接返回
+                return
+
+            # 检查 methodology 是否在 use_tools 列表中
+            # 如果 use_tools 为 None，表示使用所有工具，无需添加
+            if self.use_tools is None:
+                return
+
+            # 如果 methodology 不在 use_tools 列表中，则添加
+            if "methodology" not in self.use_tools:
+                self.use_tools.append("methodology")
+                # 更新工具注册表的工具列表
+                self.set_use_tools(self.use_tools)
+        except Exception:
+            # 忽略所有错误，不影响主流程
+            pass
 
     def get_event_bus(self) -> EventBus:
         """获取事件总线实例"""
