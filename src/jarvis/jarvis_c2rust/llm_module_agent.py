@@ -688,7 +688,6 @@ class LLMRustCratePlannerAgent:
                 need_summary=True,
                 auto_complete=True,
                 use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
-                plan=False,          # 关闭内置任务规划
                 non_interactive=True, # 非交互
                 use_methodology=False,
                 use_analysis=False,
@@ -1217,7 +1216,7 @@ def execute_llm_plan(
                 print(f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}")
             
             try:
-                agent = CodeAgent(need_summary=False, non_interactive=non_interactive, plan=False, model_group=llm_group)
+                agent = CodeAgent(need_summary=False, non_interactive=non_interactive, model_group=llm_group)
                 # 验证 agent 内部的模型配置
                 if hasattr(agent, 'model') and agent.model:
                     actual_model = getattr(agent.model, 'model_name', 'unknown')
@@ -1276,7 +1275,7 @@ def execute_llm_plan(
                 if llm_group:
                     print(f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}")
                 try:
-                    repair_agent = CodeAgent(need_summary=False, non_interactive=non_interactive, plan=False, model_group=llm_group)
+                    repair_agent = CodeAgent(need_summary=False, non_interactive=non_interactive, model_group=llm_group)
                     repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
                 except Exception as e:
                     error_msg = str(e)

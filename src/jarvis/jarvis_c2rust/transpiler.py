@@ -824,7 +824,6 @@ class Transpiler:
                     need_summary=True,
                     auto_complete=True,
                     use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                    plan=False,
                     non_interactive=self.non_interactive,
                     use_methodology=False,
                     use_analysis=False,
@@ -981,7 +980,6 @@ class Transpiler:
         self._current_agents[f"code_agent::{rec.id}"] = CodeAgent(
             need_summary=False,
             non_interactive=self.non_interactive,
-            plan=False,
             model_group=self.llm_group,
             use_methodology=True,
             use_analysis=True,
@@ -1001,7 +999,6 @@ class Transpiler:
             agent = CodeAgent(
                 need_summary=False,
                 non_interactive=self.non_interactive,
-                plan=False,
                 model_group=self.llm_group,
                 use_methodology=True,
                 use_analysis=True,
@@ -1877,7 +1874,6 @@ class Transpiler:
                 need_summary=True,
                 auto_complete=True,
                 use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                plan=False,
                 non_interactive=self.non_interactive,
                 use_methodology=False,
                 use_analysis=False,

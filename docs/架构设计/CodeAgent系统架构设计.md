@@ -111,7 +111,6 @@ CLI --> CodeAgent : 入口与参数传递
 - 行为开关：
   - 默认禁用：方法论引导与完成后分析（聚焦代码改造）
   - auto_complete 关闭（由 CodeAgent 控制交互流程）
-  - 规划开关 plan：默认从配置读取，可由 CLI 覆盖
 
 
 ### 3.2 环境与仓库初始化
@@ -190,7 +189,7 @@ end
 title CLI 入口与运行约束（非交互/会话恢复/单实例锁）
 
 start
-:解析 CLI 参数（模型组/工具组/需求/非交互/恢复会话/plan/提交前后缀等）;
+:解析 CLI 参数（模型组/工具组/需求/非交互/恢复会话/提交前后缀等）;
 :校验 git 仓库；必要时支持初始化（交互或非交互自动）;
 :切换到仓库根目录并加仓库维度单实例锁;
 :同步 CLI 选项到配置（model_group/tool_group/restore_session/non_interactive）;
@@ -300,7 +299,6 @@ end
   - auto_complete：默认关闭
   - need_summary：是否在完成阶段生成总结（代码场景通常关闭或由 CLI 控制）
   - non_interactive：非交互模式（最高优先级）
-  - plan：任务规划与子任务拆分开关
 - CLI 入口（typer）
   - -g/--llm-group：覆盖模型组
   - -G/--tool-group：覆盖工具组
@@ -310,9 +308,8 @@ end
   - --restore-session：恢复会话状态
   - --prefix/--suffix：提交信息前后缀
   - -n/--non-interactive：非交互模式
-  - --plan/--no-plan：规划开关
 - 配置项与行为
-  - 非交互、模型组、工具组、规划、静态分析、补丁确认等通过配置读取，可被 CLI 覆盖
+  - 非交互、模型组、工具组、静态分析、补丁确认等通过配置读取，可被 CLI 覆盖
   - git 校验模式（strict/warn）控制未配置用户名/邮箱时的处理方式
 
 
