@@ -987,7 +987,7 @@ def _count_issues_from_file(sec_dir) -> int:
     return count
 
 
-def _create_analysis_agent(task_id: str, llm_group: Optional[str]) -> Agent:
+def _create_analysis_agent(task_id: str, llm_group: Optional[str], force_save_memory: bool = False) -> Agent:
     """创建分析Agent"""
     system_prompt = """
 # 单Agent安全分析约束
@@ -1033,7 +1033,7 @@ def _create_analysis_agent(task_id: str, llm_group: Optional[str]) -> Agent:
         plan=False,
         output_handler=[ToolRegistry()],
         disable_file_edit=True,
-        force_save_memory=False,
+        force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
     if llm_group:
@@ -1437,6 +1437,7 @@ def _process_verification_batch(
     gid_counts: Dict[int, int],
     sec_dir,
     enable_verification: bool = True,
+    force_save_memory: bool = False,
 ) -> None:
     """
     处理单个验证批次。
@@ -1478,7 +1479,7 @@ def _process_verification_batch(
         pass
 
     # 创建分析Agent
-    agent = _create_analysis_agent(task_id, llm_group)
+    agent = _create_analysis_agent(task_id, llm_group, force_save_memory=force_save_memory)
     
     # 构建任务上下文
     per_task = _build_analysis_task_context(batch, entry_path, langs)
@@ -1857,6 +1858,7 @@ def run_security_analysis(
     cluster_limit: int = 50,
     exclude_dirs: Optional[List[str]] = None,
     enable_verification: bool = True,
+    force_save_memory: bool = False,
 ) -> str:
     """
     运行安全分析工作流（混合模式）。
@@ -1947,6 +1949,7 @@ def run_security_analysis(
         progress_path,
         status_mgr,
         _progress_append,
+        force_save_memory=force_save_memory,
     )
 
     # 4) 处理验证阶段
@@ -1963,6 +1966,7 @@ def run_security_analysis(
         _progress_append,
         _append_report,
         enable_verification=enable_verification,
+        force_save_memory=force_save_memory,
     )
     
     # 5) 使用统一聚合器生成最终报告（JSON + Markdown）
@@ -2739,6 +2743,7 @@ def _create_cluster_agent(
     file: str,
     chunk_idx: int,
     llm_group: Optional[str],
+    force_save_memory: bool = False,
 ) -> Agent:
     """创建聚类Agent"""
     cluster_system_prompt = _get_cluster_system_prompt()
@@ -2757,6 +2762,7 @@ def _create_cluster_agent(
         plan=False,
         output_handler=[ToolRegistry()],
         disable_file_edit=True,
+        force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
     if llm_group:
@@ -2825,6 +2831,7 @@ def _process_cluster_chunk(
     invalid_clusters_for_review: List[Dict],
     _progress_append,
     _write_cluster_batch_snapshot,
+    force_save_memory: bool = False,
 ) -> None:
     """处理单个聚类批次"""
     if not chunk:
@@ -2842,7 +2849,7 @@ def _process_cluster_chunk(
     })
     
     # 创建聚类Agent
-    cluster_agent = _create_cluster_agent(file, chunk_idx, llm_group)
+    cluster_agent = _create_cluster_agent(file, chunk_idx, llm_group, force_save_memory=force_save_memory)
     
     # 构建任务上下文
     cluster_task = _build_cluster_task(pending_in_file_with_ids, entry_path, file, langs)
@@ -2964,6 +2971,7 @@ def _process_file_clustering(
     llm_group: Optional[str],
     _progress_append,
     _write_cluster_batch_snapshot,
+    force_save_memory: bool = False,
 ) -> None:
     """处理单个文件的聚类任务"""
     # 过滤掉已聚类的 gid
@@ -3004,6 +3012,7 @@ def _process_file_clustering(
             invalid_clusters_for_review,
             _progress_append,
             _write_cluster_batch_snapshot,
+            force_save_memory=force_save_memory,
         )
 
 
@@ -3346,6 +3355,7 @@ def _execute_clustering_for_files(
     status_mgr,
     _progress_append,
     _write_cluster_batch_snapshot,
+    force_save_memory: bool = False,
 ) -> None:
     """执行文件聚类"""
     total_files_to_cluster = len(file_groups)
@@ -3379,6 +3389,7 @@ def _execute_clustering_for_files(
             llm_group,
             _progress_append,
             _write_cluster_batch_snapshot,
+            force_save_memory=force_save_memory,
         )
 
 
@@ -3469,6 +3480,7 @@ def _process_clustering_phase(
     progress_path,
     status_mgr,
     _progress_append,
+    force_save_memory: bool = False,
 ) -> tuple[List[List[Dict]], List[Dict]]:
     """处理聚类阶段，返回(cluster_batches, invalid_clusters_for_review)"""
     # 初始化聚类上下文
@@ -3503,6 +3515,7 @@ def _process_clustering_phase(
             status_mgr,
             _progress_append,
             _write_cluster_batch_snapshot,
+            force_save_memory=force_save_memory,
         )
     
     # 记录聚类阶段完成
@@ -3547,6 +3560,7 @@ def _process_verification_phase(
     _progress_append,
     _append_report,
     enable_verification: bool = True,
+    force_save_memory: bool = False,
 ) -> List[Dict]:
     """处理验证阶段，返回所有已保存的告警"""
     batches: List[List[Dict]] = cluster_batches
@@ -3630,6 +3644,7 @@ def _process_verification_phase(
             gid_counts,
             sec_dir,
             enable_verification=enable_verification,
+            force_save_memory=force_save_memory,
         )
     
     # 从 agent_issues.jsonl 读取所有已保存的告警
