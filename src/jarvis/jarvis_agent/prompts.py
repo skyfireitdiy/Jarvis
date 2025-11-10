@@ -41,23 +41,142 @@ SUMMARY_REQUEST_PROMPT = """<summary_request>
 """
 
 
-TASK_ANALYSIS_PROMPT = f"""<task_analysis>
+def get_task_analysis_prompt(
+    has_save_memory: bool = False,
+    has_generate_new_tool: bool = False
+) -> str:
+    """根据配置返回任务分析提示词
+    
+    参数:
+        has_save_memory: 是否有 save_memory 工具（工具可用性）
+        has_generate_new_tool: 是否有 generate_new_tool 工具
+    """
+    # 第一步：记忆保存部分
+    if not has_save_memory:
+        # 如果没有 save_memory 工具，说明无法保存记忆
+        memory_step = """第一步：记忆值得保存的信息
+1. 识别任务中的关键信息和知识点
+2. 评估是否有值得保存的项目长期记忆或全局长期记忆
+3. 注意：当前环境不支持 save_memory 工具，无法保存记忆。请直接说明识别到的关键信息即可。"""
+    else:
+        # 有 save_memory 工具
+        memory_step = """第一步：记忆值得保存的信息
+1. 识别任务中的关键信息和知识点
+2. 评估是否有值得保存的项目长期记忆或全局长期记忆
+3. 如果有价值，使用 save_memory 工具保存有价值的信息：
+   - project_long_term: 保存与当前项目相关的长期信息（如项目配置、架构决策、开发规范等）
+   - global_long_term: 保存通用的信息、用户偏好、知识或方法（如技术知识、最佳实践、用户习惯等）"""
+    
+    # 第二步：工具/方法论分析部分
+    if has_generate_new_tool:
+        solution_step = """第二步：分析任务解决方案
+1. 检查现有工具或方法论是否已经可以完成该任务，如果可以，直接说明即可，无需生成新内容
+2. 如果现有工具/方法论不足，评估当前任务是否可以通过编写新工具来自动化解决
+3. 如果可以通过工具解决，请使用 generate_new_tool 工具创建新工具：
+   - 使用 generate_new_tool 工具，传入 tool_name 和 tool_code 参数
+   - tool_code 应包含完整的工具类定义，遵循工具代码要求
+4. 如果无法通过编写通用工具完成，评估当前的执行流程是否可以总结为通用方法论
+5. 如果以上都不可行，给出详细理由"""
+    else:
+        solution_step = """第二步：分析任务解决方案
+1. 检查现有工具或方法论是否已经可以完成该任务，如果可以，直接说明即可，无需生成新内容
+2. 如果现有工具/方法论不足，评估当前任务是否可以通过编写新工具来自动化解决
+3. 如果可以通过工具解决，请设计并提供工具代码（注意：当前环境不支持 generate_new_tool 工具，需要手动创建工具文件）
+4. 如果无法通过编写通用工具完成，评估当前的执行流程是否可以总结为通用方法论
+5. 如果以上都不可行，给出详细理由"""
+    
+    # 输出要求部分
+    if has_generate_new_tool:
+        output_requirements = f"""<output_requirements>
+根据分析结果，输出以下三种情况之一：
+1. 如果现有工具/方法论可以解决，直接输出说明：
+已有工具/方法论可以解决该问题，无需创建新内容。
+可用的工具/方法论：[列出工具名称或方法论名称]
+使用方法：[简要说明如何使用]
+2. 工具创建（如果需要创建新工具）:
+{ot("TOOL_CALL")}
+want: 创建新工具来解决XXX问题
+name: generate_new_tool
+arguments:
+  tool_name: 工具名称
+  tool_code: |2
+    # -*- coding: utf-8 -*-
+    from typing import Dict, Any
+    from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+    class 工具名称:
+        name = "工具名称"
+        description = "Tool description"
+        parameters = {{
+            "type": "object",
+            "properties": {{
+                # 参数定义
+            }},
+            "required": []
+        }}
+        @staticmethod
+        def check() -> bool:
+            return True
+        def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+            try:
+                # 使用PrettyOutput显示执行过程
+                PrettyOutput.print("开始执行操作...", OutputType.INFO)
+                # 实现逻辑
+                # ...
+        PrettyOutput.print("操作已完成", OutputType.SUCCESS)
+        return {{
+            "success": True,
+            "stdout": "结果输出",
+            "stderr": ""
+        }}
+    except Exception as e:
+        PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
+        return {{
+            "success": False,
+            "stdout": "",
+            "stderr": f"操作失败: {{str(e)}}"
+        }}
+{ct("TOOL_CALL")}
+3. 方法论创建（如果需要创建新方法论）:
+{ot("TOOL_CALL")}
+want: 添加/更新xxxx的方法论
+name: methodology
+arguments:
+  operation: add/update
+  problem_type: 方法论类型，不要过于细节，也不要过于泛化
+  content: |2
+    方法论内容
+{ct("TOOL_CALL")}
+如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
+</output_requirements>"""
+    else:
+        output_requirements = f"""<output_requirements>
+根据分析结果，输出以下三种情况之一：
+1. 如果现有工具/方法论可以解决，直接输出说明：
+已有工具/方法论可以解决该问题，无需创建新内容。
+可用的工具/方法论：[列出工具名称或方法论名称]
+使用方法：[简要说明如何使用]
+2. 工具创建（如果需要创建新工具）:
+注意：当前环境不支持 generate_new_tool 工具。如果需要创建新工具，请提供完整的工具代码和说明，用户需要手动创建工具文件。
+3. 方法论创建（如果需要创建新方法论）:
+{ot("TOOL_CALL")}
+want: 添加/更新xxxx的方法论
+name: methodology
+arguments:
+  operation: add/update
+  problem_type: 方法论类型，不要过于细节，也不要过于泛化
+  content: |2
+    方法论内容
+{ct("TOOL_CALL")}
+如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
+</output_requirements>"""
+    
+    return f"""<task_analysis>
 <request>
 当前任务已结束，请按以下步骤分析该任务：
 
-第一步：记忆值得保存的信息
-1. 识别任务中的关键信息和知识点
-2. 评估是否有值得保存的项目长期记忆或全局长期记忆
-3. 使用 save_memory 工具保存有价值的信息：
-   - project_long_term: 保存与当前项目相关的长期信息（如项目配置、架构决策、开发规范等）
-   - global_long_term: 保存通用的信息、用户偏好、知识或方法（如技术知识、最佳实践、用户习惯等）
+{memory_step}
 
-第二步：分析任务解决方案
-1. 检查现有工具或方法论是否已经可以完成该任务，如果可以，直接说明即可，无需生成新内容
-2. 如果现有工具/方法论不足，评估当前任务是否可以通过编写新工具来自动化解决
-3. 如果可以通过工具解决，请设计并提供工具代码
-4. 如果无法通过编写通用工具完成，评估当前的执行流程是否可以总结为通用方法论
-5. 如果以上都不可行，给出详细理由
+{solution_step}
 
 请根据分析结果采取相应行动。
 
@@ -81,7 +200,7 @@ TASK_ANALYSIS_PROMPT = f"""<task_analysis>
 2. 方法论应该具备足够的通用性，可应用于同类问题
 3. 特别注意用户在执行过程中提供的修正、反馈和改进建议
 4. 如果用户明确指出了某个解决步骤的优化方向，这应该被纳入方法论
-5. 方法论应面向未来复用，总结“下次遇到同类问题应该如何处理”的通用流程与检查清单，避免局限于本次执行细节
+5. 方法论应面向未来复用，总结"下次遇到同类问题应该如何处理"的通用流程与检查清单，避免局限于本次执行细节
 </evaluation_criteria>
 <tool_requirements>
 工具代码要求:
@@ -157,69 +276,15 @@ TASK_ANALYSIS_PROMPT = f"""<task_analysis>
 <methodology_requirements>
 方法论格式要求:
 1. 问题重述: 简明扼要的问题归纳，不含特定细节
-2. 可复用解决流程: 面向“下次遇到同类问题”的步骤化方案（列出每步可用的工具），避免与本次特定上下文绑定
+2. 可复用解决流程: 面向"下次遇到同类问题"的步骤化方案（列出每步可用的工具），避免与本次特定上下文绑定
 3. 注意事项: 执行中可能遇到的常见问题和注意点，尤其是用户指出的问题
 4. 可选步骤: 对于有多种解决路径的问题，标注出可选步骤和适用场景
 </methodology_requirements>
-<output_requirements>
-根据分析结果，输出以下三种情况之一：
-1. 如果现有工具/方法论可以解决，直接输出说明：
-已有工具/方法论可以解决该问题，无需创建新内容。
-可用的工具/方法论：[列出工具名称或方法论名称]
-使用方法：[简要说明如何使用]
-2. 工具创建（如果需要创建新工具）:
-{ot("TOOL_CALL")}
-want: 创建新工具来解决XXX问题
-name: generate_new_tool
-arguments:
-  tool_name: 工具名称
-  tool_code: |2
-    # -*- coding: utf-8 -*-
-    from typing import Dict, Any
-    from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-    class 工具名称:
-        name = "工具名称"
-        description = "Tool description"
-        parameters = {{
-            "type": "object",
-            "properties": {{
-                # 参数定义
-            }},
-            "required": []
-        }}
-        @staticmethod
-        def check() -> bool:
-            return True
-        def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-            try:
-                # 使用PrettyOutput显示执行过程
-                PrettyOutput.print("开始执行操作...", OutputType.INFO)
-                # 实现逻辑
-                # ...
-        PrettyOutput.print("操作已完成", OutputType.SUCCESS)
-        return {{
-            "success": True,
-            "stdout": "结果输出",
-            "stderr": ""
-        }}
-    except Exception as e:
-        PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
-        return {{
-            "success": False,
-            "stdout": "",
-            "stderr": f"操作失败: {{str(e)}}"
-        }}
-{ct("TOOL_CALL")}
-3. 方法论创建（如果需要创建新方法论）:
-{ot("TOOL_CALL")}
-want: 添加/更新xxxx的方法论
-name: methodology
-arguments:
-  operation: add/update
-  problem_type: 方法论类型，不要过于细节，也不要过于泛化
-  content: |2
-    方法论内容
-{ct("TOOL_CALL")}
-如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
-</output_requirements>
+{output_requirements}
 </task_analysis>"""
+    
+    return prompt
+
+
+# 为了向后兼容，保留原来的常量（使用默认参数，假设有 save_memory 工具）
+TASK_ANALYSIS_PROMPT = get_task_analysis_prompt(has_save_memory=True)

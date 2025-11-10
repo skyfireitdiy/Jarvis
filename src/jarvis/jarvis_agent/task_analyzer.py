@@ -6,7 +6,7 @@
 
 from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 
-from jarvis.jarvis_agent.prompts import TASK_ANALYSIS_PROMPT
+from jarvis.jarvis_agent.prompts import get_task_analysis_prompt
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL, BEFORE_SUMMARY, TASK_COMPLETED
@@ -57,7 +57,30 @@ class TaskAnalyzer:
 
     def _prepare_analysis_prompt(self, satisfaction_feedback: str) -> str:
         """准备分析提示"""
-        return join_prompts([TASK_ANALYSIS_PROMPT, satisfaction_feedback])
+        # 检查是否有 save_memory 工具（工具可用性）
+        has_save_memory = False
+        # 检查是否有 generate_new_tool 工具
+        has_generate_new_tool = False
+        try:
+            tool_registry = self.agent.get_tool_registry()
+            if tool_registry:
+                # 检查 save_memory 工具
+                save_memory_tool = tool_registry.get_tool("save_memory")
+                has_save_memory = save_memory_tool is not None
+                
+                # 检查 generate_new_tool 工具
+                generate_tool = tool_registry.get_tool("generate_new_tool")
+                has_generate_new_tool = generate_tool is not None
+        except Exception:
+            pass
+        
+        # 根据配置获取相应的提示词
+        analysis_prompt = get_task_analysis_prompt(
+            has_save_memory=has_save_memory,
+            has_generate_new_tool=has_generate_new_tool
+        )
+        
+        return join_prompts([analysis_prompt, satisfaction_feedback])
 
     def _process_analysis_loop(self):
         """处理分析循环"""
