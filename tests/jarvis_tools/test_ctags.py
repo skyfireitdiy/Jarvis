@@ -12,8 +12,11 @@ from jarvis.jarvis_tools.ctags import CtagsTool
 class TestCtagsTool:
     """测试 CtagsTool 类"""
 
-    def test_check_enabled(self):
+    @patch("jarvis.jarvis_tools.ctags.subprocess.run")
+    def test_check_enabled(self, mock_run):
         """测试检查工具可用性（启用状态）"""
+        # 模拟 ctags 命令成功执行
+        mock_run.return_value = MagicMock(returncode=0)
         with patch.dict(os.environ, {"JARVIS_CODE_AGENT": "1"}):
             assert CtagsTool.check() is True
 
