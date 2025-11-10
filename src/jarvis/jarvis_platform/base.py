@@ -198,16 +198,45 @@ class BasePlatform(ABC):
                         if first_chunk:
                             _update_panel_content(first_chunk)
 
+                        # 缓存机制：降低更新频率，减少界面闪烁
+                        buffer = ""  # 内容缓存
+                        last_update_time = time.time()  # 上次更新时间
+                        update_interval = 0.15  # 最小更新间隔（秒）
+                        min_buffer_size = 50  # 最小缓存大小（字符数）
+
+                        def _flush_buffer():
+                            """刷新缓存内容到面板"""
+                            nonlocal buffer, last_update_time
+                            if buffer:
+                                _update_panel_content(buffer)
+                                buffer = ""
+                                last_update_time = time.time()
+
                         # Process rest of the chunks
                         for s in chat_iterator:
                             if not s:
                                 continue
                             response += s  # Accumulate the full response string
-                            _update_panel_content(s)
+                            buffer += s  # 累积到缓存
+
+                            # 检查是否需要更新：缓存达到阈值或超过时间间隔
+                            current_time = time.time()
+                            should_update = (
+                                len(buffer) >= min_buffer_size
+                                or (current_time - last_update_time) >= update_interval
+                            )
+
+                            if should_update:
+                                _flush_buffer()
 
                             if is_immediate_abort() and get_interrupt():
+                                # 中断时也要刷新剩余缓存
+                                _flush_buffer()
                                 self._append_session_history(message, response)
                                 return response  # Return the partial response immediately
+
+                        # 循环结束时，刷新所有剩余缓存内容
+                        _flush_buffer()
 
                         # At the end, display the entire response
                         text_content.plain = response
