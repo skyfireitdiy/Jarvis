@@ -116,50 +116,40 @@ class ContextRecommender:
         # 0. 检查并填充符号表（如果为空）
         self._ensure_symbol_table_loaded()
         
-        # 1. 使用LLM提取关键词（仅提取关键词）
-        PrettyOutput.print("📝 正在使用LLM提取任务关键词...", OutputType.INFO)
-        keywords = self._extract_keywords_with_llm(user_input)
-        if keywords:
-            PrettyOutput.print(f"✅ 提取到 {len(keywords)} 个关键词: {', '.join(keywords[:5])}{'...' if len(keywords) > 5 else ''}", OutputType.SUCCESS)
+        # 1. 使用LLM生成相关符号名
+        PrettyOutput.print("📝 正在使用LLM生成相关符号名...", OutputType.INFO)
+        symbol_names = self._extract_symbol_names_with_llm(user_input)
+        if symbol_names:
+            PrettyOutput.print(f"✅ 生成 {len(symbol_names)} 个符号名: {', '.join(symbol_names[:5])}{'...' if len(symbol_names) > 5 else ''}", OutputType.SUCCESS)
         else:
-            PrettyOutput.print("⚠️  未能提取到关键词，将使用基础搜索策略", OutputType.WARNING)
+            PrettyOutput.print("⚠️  未能生成符号名，将使用基础搜索策略", OutputType.WARNING)
         
         # 2. 初始化推荐结果
         recommended_symbols: List[Symbol] = []
 
-        # 3. 基于关键词进行符号查找和文本查找，然后使用LLM挑选关联度高的条目（主要推荐方式）
-        if keywords:
-            # 3.1 使用关键词进行符号查找和文本查找，找到所有候选符号及其位置
-            PrettyOutput.print("🔎 正在基于关键词搜索相关符号...", OutputType.INFO)
-            candidate_symbols = self._search_symbols_by_keywords(keywords)
-            candidate_symbols_from_text = self._search_text_by_keywords(keywords)
+        # 3. 基于符号名进行符号查找，然后使用LLM挑选关联度高的条目（主要推荐方式）
+        if symbol_names:
+            # 3.1 使用符号名进行精确查找，找到所有候选符号及其位置
+            PrettyOutput.print("🔎 正在基于符号名搜索相关符号...", OutputType.INFO)
+            candidate_symbols = self._search_symbols_by_names(symbol_names)
             
-            PrettyOutput.print(f"📊 符号名称匹配: {len(candidate_symbols)} 个候选", OutputType.INFO)
-            PrettyOutput.print(f"📄 文本内容匹配: {len(candidate_symbols_from_text)} 个候选", OutputType.INFO)
+            PrettyOutput.print(f"📊 符号名匹配: {len(candidate_symbols)} 个候选", OutputType.INFO)
             
-            # 合并候选符号（去重）
-            all_candidates = {}
-            for symbol in candidate_symbols + candidate_symbols_from_text:
-                # 使用 (file_path, name, line_start) 作为唯一键
-                key = (symbol.file_path, symbol.name, symbol.line_start)
-                if key not in all_candidates:
-                    all_candidates[key] = symbol
-            
-            candidate_symbols_list = list(all_candidates.values())
-            PrettyOutput.print(f"📦 合并去重后共 {len(candidate_symbols_list)} 个候选符号", OutputType.INFO)
+            candidate_symbols_list = candidate_symbols
+            PrettyOutput.print(f"📦 共 {len(candidate_symbols_list)} 个候选符号", OutputType.INFO)
             
             # 3.2 使用LLM从候选符号中挑选关联度高的条目
             if candidate_symbols_list:
                 PrettyOutput.print(f"🤖 正在使用LLM从 {len(candidate_symbols_list)} 个候选符号中筛选最相关的条目...", OutputType.INFO)
                 selected_symbols = self._select_relevant_symbols_with_llm(
-                    user_input, keywords, candidate_symbols_list
+                    user_input, symbol_names, candidate_symbols_list
                 )
                 recommended_symbols.extend(selected_symbols)
                 PrettyOutput.print(f"✅ LLM筛选完成，选中 {len(selected_symbols)} 个相关符号", OutputType.SUCCESS)
             else:
                 PrettyOutput.print("⚠️  没有找到候选符号", OutputType.WARNING)
         else:
-            PrettyOutput.print("⚠️  无关键词可用，跳过符号推荐", OutputType.WARNING)
+            PrettyOutput.print("⚠️  无符号名可用，跳过符号推荐", OutputType.WARNING)
 
         # 4. 限制符号数量
         final_symbols = recommended_symbols[:10]
@@ -248,43 +238,55 @@ class ContextRecommender:
         
         PrettyOutput.print(f"✅ 符号表构建完成: 扫描 {files_scanned} 个文件，提取 {symbols_added} 个符号（来自 {files_with_symbols} 个文件）", OutputType.SUCCESS)
 
-    def _extract_keywords_with_llm(self, user_input: str) -> List[str]:
-        """使用LLM提取关键词（仅提取关键词）
+    def _extract_symbol_names_with_llm(self, user_input: str) -> List[str]:
+        """使用LLM生成相关符号名
         
         Args:
             user_input: 用户输入
             
         Returns:
-            关键词列表
+            符号名列表
         """
-        # 获取项目概况
+        # 获取项目概况和符号表信息
         project_overview = self._get_project_overview()
         
-        prompt = f"""分析以下代码编辑任务，提取关键词。关键词应该是与任务相关的核心概念、技术术语、功能模块等。
+        # 获取所有可用的符号名（用于参考）
+        all_symbol_names = list(self.context_manager.symbol_table.symbols_by_name.keys())
+        symbol_names_sample = sorted(all_symbol_names)[:50]  # 取前50个作为示例
+        
+        prompt = f"""分析以下代码编辑任务，生成可能相关的符号名（函数名、类名、变量名等）。
 
 {project_overview}
 
 任务描述：
 {user_input}
 
-请提取5-10个关键词，以YAML数组格式返回，并用<KEYWORDS>标签包裹。
-只返回关键词数组，不要包含其他文字。
+项目中的部分符号名示例（仅供参考）：
+{', '.join(symbol_names_sample[:30])}{'...' if len(symbol_names_sample) > 30 else ''}
+
+请根据任务描述，生成5-15个可能相关的符号名。符号名应该是：
+1. 与任务直接相关的函数、类、变量等的名称
+2. 符合常见命名规范（如驼峰命名、下划线命名等）
+3. 尽量具体，避免过于通用的名称
+
+以YAML数组格式返回，并用<SYMBOL_NAMES>标签包裹。
+只返回符号名数组，不要包含其他文字。
 
 示例格式：
-<KEYWORDS>
-- data processing
-- validation
-- error handling
-- API endpoint
-- authentication
-</KEYWORDS>
+<SYMBOL_NAMES>
+- processData
+- validateInput
+- handleError
+- createApiEndpoint
+- authenticateUser
+</SYMBOL_NAMES>
 """
 
         try:
             response = self._call_llm(prompt)
-            # 从<KEYWORDS>标签中提取内容
+            # 从<SYMBOL_NAMES>标签中提取内容
             response = response.strip()
-            yaml_match = re.search(r'<KEYWORDS>\s*(.*?)\s*</KEYWORDS>', response, re.DOTALL)
+            yaml_match = re.search(r'<SYMBOL_NAMES>\s*(.*?)\s*</SYMBOL_NAMES>', response, re.DOTALL)
             if yaml_match:
                 yaml_content = yaml_match.group(1).strip()
             else:
@@ -297,121 +299,63 @@ class ContextRecommender:
                     response = response[:-3]
                 yaml_content = response.strip()
             
-            keywords = yaml.safe_load(yaml_content)
-            if not isinstance(keywords, list):
-                PrettyOutput.print("⚠️  LLM返回的关键词格式不正确，期望YAML数组", OutputType.WARNING)
+            symbol_names = yaml.safe_load(yaml_content)
+            if not isinstance(symbol_names, list):
+                PrettyOutput.print("⚠️  LLM返回的符号名格式不正确，期望YAML数组", OutputType.WARNING)
                 return []
             
-            # 过滤空字符串和过短的关键词
-            original_count = len(keywords)
-            keywords = [k.strip() for k in keywords if k and isinstance(k, str) and len(k.strip()) > 1]
-            if original_count != len(keywords):
-                PrettyOutput.print(f"📋 过滤后保留 {len(keywords)} 个有效关键词（原始 {original_count} 个）", OutputType.INFO)
-            return keywords
+            # 过滤空字符串和过短的符号名
+            original_count = len(symbol_names)
+            symbol_names = [name.strip() for name in symbol_names if name and isinstance(name, str) and len(name.strip()) > 0]
+            if original_count != len(symbol_names):
+                PrettyOutput.print(f"📋 过滤后保留 {len(symbol_names)} 个有效符号名（原始 {original_count} 个）", OutputType.INFO)
+            return symbol_names
         except Exception as e:
             # 解析失败，返回空列表
-            PrettyOutput.print(f"❌ LLM关键词提取失败: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"❌ LLM符号名生成失败: {e}", OutputType.WARNING)
             return []
 
-    def _search_symbols_by_keywords(self, keywords: List[str]) -> List[Symbol]:
-        """基于关键词在符号表中查找相关符号
+    def _search_symbols_by_names(self, symbol_names: List[str]) -> List[Symbol]:
+        """基于符号名在符号表中精确查找相关符号
         
         Args:
-            keywords: 关键词列表
+            symbol_names: 符号名列表
             
         Returns:
             候选符号列表
         """
-        if not keywords:
+        if not symbol_names:
             return []
         
         found_symbols: List[Symbol] = []
-        keywords_lower = [k.lower() for k in keywords]
         found_symbol_keys = set()  # 用于去重，使用 (file_path, name, line_start) 作为键
         
-        # 遍历所有符号，查找名称或签名中包含关键词的符号
+        # 创建符号名映射（支持大小写不敏感匹配）
+        symbol_names_lower = {name.lower(): name for name in symbol_names}
+        
+        # 遍历所有符号，精确匹配符号名
         for symbol_name, symbols in self.context_manager.symbol_table.symbols_by_name.items():
             symbol_name_lower = symbol_name.lower()
             
-            # 检查符号名称是否包含任何关键词
-            name_matched = False
-            for keyword in keywords_lower:
-                if keyword in symbol_name_lower:
-                    # 找到匹配的符号，添加所有同名符号（可能有重载）
-                    for symbol in symbols:
-                        key = (symbol.file_path, symbol.name, symbol.line_start)
-                        if key not in found_symbol_keys:
-                            found_symbols.append(symbol)
-                            found_symbol_keys.add(key)
-                    name_matched = True
-                    break
-            
-            # 如果名称不匹配，检查符号签名是否包含关键词
-            if not name_matched:
+            # 精确匹配：检查符号名是否在目标列表中（大小写不敏感）
+            if symbol_name_lower in symbol_names_lower:
+                # 找到匹配的符号，添加所有同名符号（可能有重载）
                 for symbol in symbols:
-                    if symbol.signature:
-                        signature_lower = symbol.signature.lower()
-                        for keyword in keywords_lower:
-                            if keyword in signature_lower:
-                                key = (symbol.file_path, symbol.name, symbol.line_start)
-                                if key not in found_symbol_keys:
-                                    found_symbols.append(symbol)
-                                    found_symbol_keys.add(key)
-                                break
-        
-        return found_symbols
-
-    def _search_text_by_keywords(self, keywords: List[str]) -> List[Symbol]:
-        """基于关键词在文件内容中进行文本查找，找到相关符号
-        
-        Args:
-            keywords: 关键词列表
-            
-        Returns:
-            候选符号列表（在包含关键词的文件中找到的符号）
-        """
-        if not keywords:
-            return []
-        
-        found_symbols: List[Symbol] = []
-        keywords_lower = [k.lower() for k in keywords]
-        
-        # 获取所有已分析的文件
-        all_files = set()
-        for symbol_name, symbols in self.context_manager.symbol_table.symbols_by_name.items():
-            for symbol in symbols:
-                all_files.add(symbol.file_path)
-        
-        # 在文件内容中搜索关键词
-        for file_path in all_files:
-            content = self.context_manager._get_file_content(file_path)
-            if not content:
-                continue
-            
-            content_lower = content.lower()
-            
-            # 检查文件内容是否包含任何关键词
-            file_matches = False
-            for keyword in keywords_lower:
-                if keyword in content_lower:
-                    file_matches = True
-                    break
-            
-            if file_matches:
-                # 获取该文件中的所有符号
-                file_symbols = self.context_manager.symbol_table.get_file_symbols(file_path)
-                found_symbols.extend(file_symbols)
+                    key = (symbol.file_path, symbol.name, symbol.line_start)
+                    if key not in found_symbol_keys:
+                        found_symbols.append(symbol)
+                        found_symbol_keys.add(key)
         
         return found_symbols
 
     def _select_relevant_symbols_with_llm(
-        self, user_input: str, keywords: List[str], candidate_symbols: List[Symbol]
+        self, user_input: str, symbol_names: List[str], candidate_symbols: List[Symbol]
     ) -> List[Symbol]:
         """使用LLM从候选符号中挑选关联度高的条目
         
         Args:
             user_input: 用户输入/任务描述
-            keywords: 关键词列表
+            symbol_names: 符号名列表
             candidate_symbols: 候选符号列表（包含位置信息）
             
         Returns:
@@ -441,12 +385,12 @@ class ContextRecommender:
         # 获取项目概况
         project_overview = self._get_project_overview()
         
-        prompt = f"""根据以下任务描述和关键词，从候选符号列表中选择最相关的符号。
+        prompt = f"""根据以下任务描述和生成的符号名，从候选符号列表中选择最相关的符号。
 
 {project_overview}
 
 任务描述：{user_input}
-关键词：{', '.join(keywords)}
+生成的符号名：{', '.join(symbol_names)}
 
 候选符号列表（已编号，包含位置信息）：
 {yaml.dump(symbol_info_list, allow_unicode=True, default_flow_style=False)}
