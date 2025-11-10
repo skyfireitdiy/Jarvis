@@ -111,11 +111,18 @@ class ContextRecommender:
         Returns:
             ContextRecommendation: 推荐的上下文信息
         """
+        PrettyOutput.print("🔍 开始智能上下文推荐分析...", OutputType.INFO)
+        
         # 0. 检查并填充符号表（如果为空）
         self._ensure_symbol_table_loaded()
         
         # 1. 使用LLM提取关键词（仅提取关键词）
+        PrettyOutput.print("📝 正在使用LLM提取任务关键词...", OutputType.INFO)
         keywords = self._extract_keywords_with_llm(user_input)
+        if keywords:
+            PrettyOutput.print(f"✅ 提取到 {len(keywords)} 个关键词: {', '.join(keywords[:5])}{'...' if len(keywords) > 5 else ''}", OutputType.SUCCESS)
+        else:
+            PrettyOutput.print("⚠️  未能提取到关键词，将使用基础搜索策略", OutputType.WARNING)
         
         # 2. 初始化推荐结果
         recommended_symbols: List[Symbol] = []
@@ -123,8 +130,12 @@ class ContextRecommender:
         # 3. 基于关键词进行符号查找和文本查找，然后使用LLM挑选关联度高的条目（主要推荐方式）
         if keywords:
             # 3.1 使用关键词进行符号查找和文本查找，找到所有候选符号及其位置
+            PrettyOutput.print("🔎 正在基于关键词搜索相关符号...", OutputType.INFO)
             candidate_symbols = self._search_symbols_by_keywords(keywords)
             candidate_symbols_from_text = self._search_text_by_keywords(keywords)
+            
+            PrettyOutput.print(f"📊 符号名称匹配: {len(candidate_symbols)} 个候选", OutputType.INFO)
+            PrettyOutput.print(f"📄 文本内容匹配: {len(candidate_symbols_from_text)} 个候选", OutputType.INFO)
             
             # 合并候选符号（去重）
             all_candidates = {}
@@ -135,18 +146,27 @@ class ContextRecommender:
                     all_candidates[key] = symbol
             
             candidate_symbols_list = list(all_candidates.values())
+            PrettyOutput.print(f"📦 合并去重后共 {len(candidate_symbols_list)} 个候选符号", OutputType.INFO)
             
             # 3.2 使用LLM从候选符号中挑选关联度高的条目
             if candidate_symbols_list:
+                PrettyOutput.print(f"🤖 正在使用LLM从 {len(candidate_symbols_list)} 个候选符号中筛选最相关的条目...", OutputType.INFO)
                 selected_symbols = self._select_relevant_symbols_with_llm(
                     user_input, keywords, candidate_symbols_list
                 )
                 recommended_symbols.extend(selected_symbols)
+                PrettyOutput.print(f"✅ LLM筛选完成，选中 {len(selected_symbols)} 个相关符号", OutputType.SUCCESS)
             else:
                 PrettyOutput.print("⚠️  没有找到候选符号", OutputType.WARNING)
+        else:
+            PrettyOutput.print("⚠️  无关键词可用，跳过符号推荐", OutputType.WARNING)
 
         # 4. 限制符号数量
         final_symbols = recommended_symbols[:10]
+        if len(recommended_symbols) > 10:
+            PrettyOutput.print(f"📌 推荐结果已限制为前 10 个符号（共 {len(recommended_symbols)} 个）", OutputType.INFO)
+
+        PrettyOutput.print(f"✨ 上下文推荐完成，共推荐 {len(final_symbols)} 个符号", OutputType.SUCCESS)
 
         return ContextRecommendation(
             recommended_symbols=final_symbols,
@@ -168,7 +188,11 @@ class ContextRecommender:
         """
         # 检查符号表是否为空
         if not self.context_manager.symbol_table.symbols_by_name:
+            PrettyOutput.print("📚 符号表为空，开始扫描项目文件构建符号表...", OutputType.INFO)
             self._build_symbol_table()
+        else:
+            symbol_count = sum(len(symbols) for symbols in self.context_manager.symbol_table.symbols_by_name.values())
+            PrettyOutput.print(f"📚 符号表已就绪，包含 {symbol_count} 个符号", OutputType.INFO)
 
     def _build_symbol_table(self) -> None:
         """扫描项目文件并构建符号表
@@ -182,6 +206,7 @@ class ContextRecommender:
         project_root = self.context_manager.project_root
         files_scanned = 0
         symbols_added = 0
+        files_with_symbols = 0
         
         # 遍历项目目录
         for root, dirs, files in os.walk(project_root):
@@ -210,6 +235,8 @@ class ContextRecommender:
                     
                     # 提取符号
                     symbols = extractor.extract_symbols(file_path, content)
+                    if symbols:
+                        files_with_symbols += 1
                     for symbol in symbols:
                         self.context_manager.symbol_table.add_symbol(symbol)
                         symbols_added += 1
@@ -219,7 +246,7 @@ class ContextRecommender:
                     # 跳过无法读取的文件
                     continue
         
-        # 静默构建符号表，不输出扫描信息
+        PrettyOutput.print(f"✅ 符号表构建完成: 扫描 {files_scanned} 个文件，提取 {symbols_added} 个符号（来自 {files_with_symbols} 个文件）", OutputType.SUCCESS)
 
     def _extract_keywords_with_llm(self, user_input: str) -> List[str]:
         """使用LLM提取关键词（仅提取关键词）
@@ -272,14 +299,18 @@ class ContextRecommender:
             
             keywords = yaml.safe_load(yaml_content)
             if not isinstance(keywords, list):
+                PrettyOutput.print("⚠️  LLM返回的关键词格式不正确，期望YAML数组", OutputType.WARNING)
                 return []
             
             # 过滤空字符串和过短的关键词
+            original_count = len(keywords)
             keywords = [k.strip() for k in keywords if k and isinstance(k, str) and len(k.strip()) > 1]
+            if original_count != len(keywords):
+                PrettyOutput.print(f"📋 过滤后保留 {len(keywords)} 个有效关键词（原始 {original_count} 个）", OutputType.INFO)
             return keywords
         except Exception as e:
             # 解析失败，返回空列表
-            PrettyOutput.print(f"LLM关键词提取失败: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"❌ LLM关键词提取失败: {e}", OutputType.WARNING)
             return []
 
     def _search_symbols_by_keywords(self, keywords: List[str]) -> List[Symbol]:
@@ -391,6 +422,8 @@ class ContextRecommender:
         
         # 限制候选符号数量，避免prompt过长
         candidates_to_consider = candidate_symbols[:100]  # 最多100个候选
+        if len(candidate_symbols) > 100:
+            PrettyOutput.print(f"📌 候选符号数量较多（{len(candidate_symbols)} 个），限制为前 100 个进行LLM筛选", OutputType.INFO)
         
         # 构建带编号的符号信息列表（包含位置信息）
         symbol_info_list = []
@@ -449,20 +482,37 @@ class ContextRecommender:
             
             selected_indices = yaml.safe_load(yaml_content)
             if not isinstance(selected_indices, list):
+                PrettyOutput.print("⚠️  LLM返回的符号序号格式不正确，期望YAML数组", OutputType.WARNING)
                 return []
+            
+            PrettyOutput.print(f"📋 LLM返回了 {len(selected_indices)} 个符号序号", OutputType.INFO)
             
             # 根据序号查找对应的符号对象
             selected_symbols = []
+            invalid_indices = []
             for idx in selected_indices:
                 # 序号从1开始，转换为列表索引（从0开始）
                 if isinstance(idx, int) and 1 <= idx <= len(candidates_to_consider):
                     symbol = candidates_to_consider[idx - 1]
                     selected_symbols.append(symbol)
+                else:
+                    invalid_indices.append(idx)
+            
+            if invalid_indices:
+                PrettyOutput.print(f"⚠️  发现 {len(invalid_indices)} 个无效序号: {invalid_indices[:5]}{'...' if len(invalid_indices) > 5 else ''}", OutputType.WARNING)
+            
+            if selected_symbols:
+                # 统计选中的符号类型分布
+                kind_count = {}
+                for symbol in selected_symbols:
+                    kind_count[symbol.kind] = kind_count.get(symbol.kind, 0) + 1
+                kind_summary = ", ".join([f"{kind}: {count}" for kind, count in sorted(kind_count.items())])
+                PrettyOutput.print(f"📊 选中符号类型分布: {kind_summary}", OutputType.INFO)
             
             return selected_symbols
         except Exception as e:
             # 解析失败，返回空列表
-            PrettyOutput.print(f"LLM符号筛选失败: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"❌ LLM符号筛选失败: {e}", OutputType.WARNING)
             return []
 
     def _call_llm(self, prompt: str) -> str:
@@ -481,12 +531,16 @@ class ContextRecommender:
             # 使用chat_until_success方法（BasePlatform的标准接口）
             if hasattr(self.llm_model, 'chat_until_success'):
                 response = self.llm_model.chat_until_success(prompt)
-                return str(response)
+                response_str = str(response)
+                if response_str:
+                    response_length = len(response_str)
+                    PrettyOutput.print(f"💬 LLM响应长度: {response_length} 字符", OutputType.INFO)
+                return response_str
             else:
                 # 如果不支持chat_until_success，抛出异常
                 raise ValueError("LLM model does not support chat_until_success interface")
         except Exception as e:
-            PrettyOutput.print(f"LLM调用失败: {e}", OutputType.WARNING)
+            PrettyOutput.print(f"❌ LLM调用失败: {e}", OutputType.WARNING)
             raise
 
     def format_recommendation(self, recommendation: ContextRecommendation) -> str:
