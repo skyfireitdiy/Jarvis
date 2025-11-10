@@ -193,7 +193,7 @@ class CtagsTool:
             PrettyOutput.print(f"❌ 生成 ctags 索引时出错: {str(e)}", OutputType.ERROR)
             return False
     
-    def _find_symbol_with_ctags(self, symbol: str) -> Dict[str, Any]:
+    def _find_symbol_with_ctags(self, symbol: str, file_pattern: Optional[str] = None) -> Dict[str, Any]:
         """使用ctags查找符号定义位置"""
         try:
             tags_file = self._get_tags_file_path()
@@ -218,6 +218,12 @@ class CtagsTool:
             # 使用 -x 生成交叉引用列表，支持所有语言
             # ctags -x 会在当前目录查找 tags 文件，所以需要在 tags 文件所在目录执行
             cmd = ["ctags", "-x", "--sort=no", symbol]
+            
+            # 如果指定了文件模式，添加过滤选项
+            if file_pattern:
+                # ctags -x 不支持直接的文件模式过滤，但可以通过 grep 过滤输出
+                # 或者使用 -L 选项配合文件列表，但这里简化处理，在输出后过滤
+                pass  # 文件模式过滤在解析输出时处理
             
             PrettyOutput.print(f"⚙️  执行命令: {' '.join(cmd)}", OutputType.INFO)
             
@@ -253,6 +259,10 @@ class CtagsTool:
             
             PrettyOutput.print(f"📊 解析 ctags 输出，共 {len(lines)} 行结果", OutputType.INFO)
             
+            # 如果指定了文件模式，需要导入 fnmatch 进行模式匹配
+            if file_pattern:
+                import fnmatch
+            
             for line in lines:
                 parts = line.split()
                 if len(parts) >= 3:
@@ -260,6 +270,11 @@ class CtagsTool:
                     symbol_type = parts[1]
                     file_path = parts[2]
                     line_number = parts[3] if len(parts) > 3 else "未知"
+                    
+                    # 如果指定了文件模式，进行过滤
+                    if file_pattern:
+                        if not fnmatch.fnmatch(file_path, file_pattern):
+                            continue
                     
                     locations.append({
                         "symbol": symbol_name,
