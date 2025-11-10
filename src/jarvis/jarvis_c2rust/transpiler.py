@@ -514,9 +514,6 @@ class Transpiler:
         """保存进度，使用原子性写入"""
         _write_json(self.progress_path, self.progress)
 
-    # JSONL 模式下不再整体写回 symbol_map；此方法保留占位（兼容旧调用），无操作
-    def _save_symbol_map(self) -> None:
-        return
 
     def _read_source_span(self, rec: FnRecord) -> str:
         """按起止行读取源码片段（忽略列边界，尽量完整）"""
@@ -988,6 +985,7 @@ class Transpiler:
             model_group=self.llm_group,
             use_methodology=True,
             use_analysis=True,
+            force_save_memory=True,
         )
 
     def _get_repair_agent(self) -> CodeAgent:
@@ -1007,6 +1005,7 @@ class Transpiler:
                 model_group=self.llm_group,
                 use_methodology=True,
                 use_analysis=True,
+                force_save_memory=True,
             )
             self._current_agents[key] = agent
         return agent
