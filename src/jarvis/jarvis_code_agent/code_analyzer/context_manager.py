@@ -36,7 +36,9 @@ class ContextManager:
 
     def __init__(self, project_root: str):
         self.project_root = project_root
-        self.symbol_table = SymbolTable()
+        # Create cache directory path relative to project root
+        cache_dir = os.path.join(project_root, ".jarvis", "symbol_cache")
+        self.symbol_table = SymbolTable(cache_dir)
         self.dependency_graph = DependencyGraph()
         self._file_cache: dict[str, str] = {}  # Cache file contents
 
