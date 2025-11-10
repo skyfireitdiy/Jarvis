@@ -801,7 +801,7 @@ class Optimizer:
         print(f"{self.log_prefix} [CodeAgent] 正在调用 CodeAgent 进行整体优化...")
         try:
             os.chdir(str(crate))
-            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, plan=False, model_group=self.options.llm_group)
+            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -899,7 +899,7 @@ class Optimizer:
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(crate))
-                agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, plan=False, model_group=self.options.llm_group)
+                agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
             finally:
                 os.chdir(prev_cwd)

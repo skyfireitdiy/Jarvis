@@ -28,7 +28,6 @@ class AgentManager:
         multiline_inputer: Optional[Callable[[str], str]] = None,
         confirm_callback: Optional[Callable[[str, bool], bool]] = None,
         non_interactive: Optional[bool] = None,
-        plan: Optional[bool] = None,
     ):
         self.model_group = model_group
         self.tool_group = tool_group
@@ -40,7 +39,6 @@ class AgentManager:
         self.multiline_inputer = multiline_inputer
         self.confirm_callback = confirm_callback
         self.non_interactive = non_interactive
-        self.plan = plan
 
     def initialize(self) -> Agent:
         """初始化Agent"""
@@ -59,7 +57,6 @@ class AgentManager:
             multiline_inputer=self.multiline_inputer,
             confirm_callback=self.confirm_callback,
             non_interactive=self.non_interactive,
-            plan=self.plan,
         )
 
         # 尝试恢复会话

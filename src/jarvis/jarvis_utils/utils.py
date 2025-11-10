@@ -1425,24 +1425,6 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_planning_config(config_data: dict, ask_all: bool) -> bool:
-    """收集规划相关配置"""
-    changed = False
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_PLAN_ENABLED",
-        "是否默认启用任务规划？当 Agent 初始化时 plan 参数未指定，将从此配置加载",
-        True,
-    ) or changed
-    changed = _ask_config_int(
-        config_data, ask_all,
-        "JARVIS_PLAN_MAX_DEPTH",
-        "任务规划的最大层数（限制递归拆分深度，默认2；仅在启用规划时生效）",
-        2,
-    ) or changed
-    return changed
-
-
 def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
     """收集高级配置（自动总结、脚本超时等）"""
     changed = False
@@ -1699,7 +1681,6 @@ def _collect_optional_config_interactively(
     changed = _collect_session_config(config_data, ask_all) or changed
     changed = _collect_safety_config(config_data, ask_all) or changed
     changed = _collect_data_and_token_config(config_data, ask_all) or changed
-    changed = _collect_planning_config(config_data, ask_all) or changed
     changed = _collect_advanced_config(config_data, ask_all) or changed
     changed = _collect_directory_config(config_data, ask_all) or changed
     changed = _collect_web_search_config(config_data, ask_all) or changed

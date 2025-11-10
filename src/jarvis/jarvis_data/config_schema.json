@@ -188,16 +188,6 @@
       "description": "AI工具筛选阈值：当可用工具数量超过此值时触发AI筛选",
       "default": 30
     },
-    "JARVIS_PLAN_ENABLED": {
-      "type": "boolean",
-      "description": "是否默认启用任务规划。当 Agent 初始化时 plan 参数未指定，将从此配置加载。默认 true。",
-      "default": true
-    },
-    "JARVIS_PLAN_MAX_DEPTH": {
-      "type": "number",
-      "description": "任务规划的最大层数。用于限制 plan 模式的递归拆分深度。仅在启用规划时生效（通过 CLI --plan/--no-plan 控制），默认 2。",
-      "default": 2
-    },
     "JARVIS_SCRIPT_EXECUTION_TIMEOUT": {
       "type": "number",
       "description": "脚本执行的超时时间（秒），仅在非交互模式下生效。",

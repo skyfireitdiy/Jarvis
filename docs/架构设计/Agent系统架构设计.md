@@ -5,7 +5,7 @@
 - 代码参考：
   - src/jarvis/jarvis_agent/__init__.py（Agent 主实现）
   - docs/jarvis_book/3.核心概念与架构.md（整体架构与工作流）
-- 相关核心组件：EventBus、MemoryManager、TaskAnalyzer、FileMethodologyManager、PromptManager、SessionManager、ToolRegistry、AgentRunLoop、TaskPlanner、PlatformRegistry/BasePlatform、工具执行器 execute_tool_call、输入处理器链 builtin_input_handler/shell_input_handler/file_context_handler、EditFileHandler/RewriteFileHandler 等
+- 相关核心组件：EventBus、MemoryManager、TaskAnalyzer、FileMethodologyManager、PromptManager、SessionManager、ToolRegistry、AgentRunLoop、PlatformRegistry/BasePlatform、工具执行器 execute_tool_call、输入处理器链 builtin_input_handler/shell_input_handler/file_context_handler、EditFileHandler/RewriteFileHandler 等
 
 
 ## 1. 设计目标与总体思路
@@ -14,7 +14,7 @@
 - 高解耦、可插拔：通过 Registry（ToolRegistry/PlatformRegistry）与事件总线（EventBus）实现能力可插拔与旁路扩展。
 - 稳健运行：针对模型空响应、上下文超长、工具输出过大、异常回调等场景提供防御性处理。
 - 易扩展与可观测：关键节点统一事件广播，支持 after_tool_call 回调动态注入；启动时输出资源统计，便于观测。
-- 多场景友好：支持非交互模式、子 Agent 递归规划执行、文件上传/本地两种方法论与历史处理模式、工具筛选降噪等。
+- 多场景友好：支持非交互模式、文件上传/本地两种方法论与历史处理模式、工具筛选降噪等。
 
 
 ## 2. 模块组成（PlantUML）
@@ -37,7 +37,6 @@ package "Agent Core" #LightGreen {
 package "Managers" #LightYellow {
   component "MemoryManager" as MemoryManager
   component "TaskAnalyzer" as TaskAnalyzer
-  component "TaskPlanner" as TaskPlanner
   component "FileMethodologyManager" as FileMethodologyManager
 }
 
@@ -73,7 +72,6 @@ Agent --> RewriteFileHandler : 可选
 
 Agent --> MemoryManager
 Agent --> TaskAnalyzer
-Agent --> TaskPlanner
 Agent --> FileMethodologyManager
 
 Agent --> PlatformRegistry : 创建平台实例
@@ -122,9 +120,6 @@ Agent --> file_context_handler
 - MemoryManager（记忆）
   - 图型：活动图（TASK_STARTED/BEFORE_HISTORY_CLEAR/TASK_COMPLETED→是否 force_save_memory→prompt_memory_save）
   - 聚焦：强制保存门控；标签提示注入位置；工具存在性检查
-- TaskPlanner（规划）
-  - 图型：活动图（需拆分?/深度限制→子 Agent 执行→结果汇总写回）
-  - 聚焦：不拆分条件；深度与步数上限；写回块 <PLAN>/<SUB_TASK_RESULTS>/<RESULT_SUMMARY>
 - FileMethodologyManager（文件/方法论）
   - 图型：决策活动图（upload 模式 vs 本地模式；历史转移流程）
   - 聚焦：提示写回 session 的语义；上传失败回退到本地策略
@@ -163,8 +158,6 @@ Agent --> file_context_handler
   - 记忆标签提示注入；关键事件驱动下进行记忆整理/保存；与 save/retrieve/clear_memory 工具协作
 - TaskAnalyzer（任务分析）
   - 任务完成阶段旁路分析与满意度收集；必要时沉淀方法论
-- TaskPlanner（任务规划）
-  - 递归任务拆分与子任务调度；将 <PLAN>/<SUB_TASK_RESULTS>/<RESULT_SUMMARY> 写回父 Agent 上下文
 - FileMethodologyManager（文件与方法论）
   - 基于平台能力选择“文件上传模式”或“本地模式”；加载/上传方法论；上下文溢出时以文件方式转移历史
 - PlatformRegistry/BasePlatform（平台/模型）
@@ -183,13 +176,13 @@ title Agent 内部逻辑流程（初始化与委派）
 start
 :解析入参与配置;
 :初始化 Platform/Session/Handlers;
-:创建 EventBus/MemoryManager/TaskAnalyzer\nFileMethodologyManager/PromptManager/TaskPlanner;
+:创建 EventBus/MemoryManager/TaskAnalyzer\nFileMethodologyManager/PromptManager;
 :设置系统提示词;
 :输出启动统计(方法论/工具/记忆等);
 if (存在 after_tool_call 回调目录?) then (是)
   :扫描目录并注册回调;\n(优先: 直接回调 > get_*/register_* 工厂);
 endif
-:解析非交互/多Agent/自动完成/规划参数;
+:解析非交互/多Agent/自动完成参数;
 :进入运行阶段;
 :委派主循环给 AgentRunLoop.run();
 stop
@@ -207,7 +200,7 @@ stop
   - _complete_task: 处理总结与任务完成事件，触发记忆/分析旁路
   - _filter_tools_if_needed: 工具超过阈值时使用临时模型筛选并重设系统提示
   - _summarize_and_clear_history: 上下文过长的摘要/文件上传分流与历史清理
-- 关键参数影响行为：auto_complete、need_summary、use_methodology、use_analysis、execute_tool_confirm、force_save_memory、non_interactive、in_multi_agent、plan/plan_max_depth/plan_depth、disable_file_edit、use_tools/files 等
+- 关键参数影响行为：auto_complete、need_summary、use_methodology、use_analysis、execute_tool_confirm、force_save_memory、non_interactive、in_multi_agent、disable_file_edit、use_tools/files 等
 - 小型结构图：
 ```plantuml
 @startuml
@@ -220,7 +213,6 @@ title Agent 与核心组件关系
 [Agent] --> [ToolRegistry]
 [Agent] --> [MemoryManager]
 [Agent] --> [TaskAnalyzer]
-[Agent] --> [TaskPlanner]
 [Agent] --> [FileMethodologyManager]
 [Agent] --> [PlatformRegistry]
 [PlatformRegistry] --> [BasePlatform]
@@ -733,50 +725,7 @@ Bus -> Analyzer: 响应：完成后进行兜底分析（同上条件）
 - 约束：仅在 use_analysis 启用时执行；触发一次后设置去重标记
 - 容错：模型/工具异常不影响主流程；中断时优先采集用户补充信息再继续分析
 
-### 3.10 TaskPlanner 设计
-- 职责：复杂任务拆分与子任务调度，控制递归深度（plan_max_depth/plan_depth）
-- 产出：<PLAN>（YAML 列表）、<SUB_TASK_RESULTS>、<RESULT_SUMMARY> 合并回父 Agent 上下文
-- 子 Agent 构造：通过 _build_child_agent_params 继承父 Agent 能力与配置，默认非交互自动完成
-
-#### 内部逻辑流程（PlantUML）
-```plantuml
-@startuml
-!theme plain
-title 任务规划与子任务调度（拆分判定 / 深度限制 / 子Agent执行 / 结果写回）
-
-start
-:读取 plan / plan_max_depth / plan_depth 配置;
-if (是否需要拆分? plan=True 且任务可分) then (是)
-  if (已达深度上限? plan_depth >= plan_max_depth) then (是)
-    :不进行拆分，返回常规执行路径;
-  else (否)
-    :生成 <PLAN>（子任务列表）;
-    :将 <PLAN> 写入父会话上下文;
-    :初始化结果收集器;
-    while (存在未完成子任务?) is (是)
-      :选择下一个子任务;
-      :构造子Agent参数\n(in_multi_agent=True,\nnon_interactive=True,\nplan_depth+1);
-      :调度子Agent执行并等待结果;
-      :将结果追加到 <SUB_TASK_RESULTS>;
-    endwhile
-    :汇总所有子任务结果，生成 <RESULT_SUMMARY>;
-    :将 <SUB_TASK_RESULTS>/<RESULT_SUMMARY> 写回父会话;
-  endif
-else (否)
-  :跳过规划，常规执行;
-endif
-stop
-@enduml
-```
-
-图示说明
-- 触发条件：仅在 plan=True 且任务可拆分时进入规划路径
-- 深度限制：plan_depth >= plan_max_depth 时不再递归拆分
-- 子 Agent：默认非交互自动完成，继承父 Agent 能力与配置
-- 写回约定：将 <PLAN>/<SUB_TASK_RESULTS>/<RESULT_SUMMARY> 写回父会话，便于后续模型使用
-- 容错：单个子任务失败不阻断整体流程，按需记录并继续其他子任务
-
-### 3.11 FileMethodologyManager 设计
+### 3.10 FileMethodologyManager 设计
 - 模式选择：
   - 文件上传模式：平台支持 upload_files 时，方法论与历史以文件上传
   - 本地模式：不支持上传时，加载本地方法论库并管理上下文
@@ -1053,12 +1002,10 @@ participant "循环" as Loop
 participant "平台" as Platform
 participant "工具" as Tools
 participant "记忆" as Mem
-participant "规划" as Planner
 participant "方法论" as Fm
 
 User -> Agent : 启动任务
 Agent -> Agent : 初始化与准备（平台/工具/方法论/记忆）
-Agent -> Planner : 规划任务 [可选]
 Agent -> Fm : 处理文件与方法论 [可选]
 Agent -> Loop : 进入循环
 
@@ -1111,9 +1058,6 @@ end
 - confirm_callback: 确认回调，签名 (tip: str, default: bool) -> bool；默认 CLI user_confirm
 - non_interactive: 非交互模式（最高优先级）；若显式提供会同步到环境变量 JARVIS_NON_INTERACTIVE
 - in_multi_agent: 多智能体运行标志；用于控制自动完成（子 Agent 默认非交互自动完成）
-- plan: 是否启用任务规划与子任务拆分（默认从配置 is_plan_enabled）
-- plan_max_depth: 规划最大深度（默认 get_plan_max_depth，异常回退 2）
-- plan_depth: 当前规划深度（父 +1 传递至子；默认 0）
 - agent_type: "normal" 或 "code"；"code" 时构造 CodeAgent（转发构造参数）
 
 行为与默认策略补充
@@ -1209,7 +1153,6 @@ end
 - 事件回调异常隔离，避免影响主流程
 - 工具调用格式容错：ToolRegistry 对缺失结束标签的 TOOL_CALL 尝试自动补全并提示规范
 - 长输出安全处理：优先文件上传，其次智能截断，抑制上下文溢出
-- 规划失败或无需拆分不影响主流程，主循环按常规路径继续
 - 历史清理后自动重置系统提示，保持约束环境持续生效
 
 
@@ -1219,5 +1162,5 @@ end
 - 平台扩展：在 jarvis_platform 下新增 BasePlatform 子类，通过 PlatformRegistry 自动发现
 - 旁路增强：通过 JARVIS_AFTER_TOOL_CALL_CB_DIRS 注入 AFTER_TOOL_CALL 回调，实现统计/审计等旁路能力
 - 方法论共享：建立中心方法论库（Git），团队同步沉淀最佳实践，提升协作效率
-- 子 Agent：利用 TaskPlanner 与 _build_child_agent_params 继承父 Agent 能力，构建递归执行的子任务体系
+- 子 Agent：利用 _build_child_agent_params 继承父 Agent 能力，构建递归执行的子任务体系
 - UI 替换：UserInteractionHandler 与 OutputHandlerProtocol 的抽象便于替换为 TUI/GUI/WebUI

@@ -730,29 +730,6 @@ def get_tool_filter_threshold() -> int:
     """
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_FILTER_THRESHOLD", 30))
 
-def get_plan_max_depth() -> int:
-    """
-    获取任务规划的最大层数。
-    
-    返回:
-        int: 最大规划层数，默认为2（可通过 GLOBAL_CONFIG_DATA['JARVIS_PLAN_MAX_DEPTH'] 配置）
-    """
-    try:
-        return int(GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_MAX_DEPTH", 2))
-    except Exception:
-        return 2
-
-
-def is_plan_enabled() -> bool:
-    """
-    获取是否默认启用任务规划。
-
-    返回:
-        bool: 如果启用任务规划则返回True，默认为True
-    """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PLAN_ENABLED", True) is True
-
-
 def get_auto_summary_rounds() -> int:
     """
     获取基于对话轮次的自动总结阈值。
