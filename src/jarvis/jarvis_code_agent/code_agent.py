@@ -137,17 +137,31 @@ class CodeAgent(Agent):
         # 默认禁用方法论和分析，但允许通过 kwargs 覆盖
         use_methodology = kwargs.pop("use_methodology", False)
         use_analysis = kwargs.pop("use_analysis", False)
+        # name 使用传入的值，如果没有传入则使用默认值 "CodeAgent"
+        name = kwargs.pop("name", "CodeAgent")
+        
+        # 准备显式传递给 super().__init__ 的参数
+        # 注意：这些参数如果也在 kwargs 中，需要先移除，避免重复传递错误
+        explicit_params = {
+            "system_prompt": code_system_prompt,
+            "name": name,
+            "auto_complete": False,
+            "model_group": model_group,
+            "need_summary": need_summary,
+            "use_methodology": use_methodology,
+            "use_analysis": use_analysis,
+            "non_interactive": non_interactive,
+            "plan": bool(plan) if plan is not None else is_plan_enabled(),
+            "use_tools": base_tools,
+        }
+        
+        # 自动移除所有显式传递的参数，避免重复传递错误
+        # 这样以后添加新参数时，只要在 explicit_params 中声明，就会自动处理
+        for key in explicit_params:
+            kwargs.pop(key, None)
+        
         super().__init__(
-            system_prompt=code_system_prompt,
-            name="CodeAgent",
-            auto_complete=False,
-            model_group=model_group,
-            need_summary=need_summary,
-            use_methodology=use_methodology,
-            use_analysis=use_analysis,
-            non_interactive=non_interactive,
-            plan=bool(plan) if plan is not None else is_plan_enabled(),
-            use_tools=base_tools,  # 仅启用限定工具
+            **explicit_params,
             **kwargs,
         )
 
