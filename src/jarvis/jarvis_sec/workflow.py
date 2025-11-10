@@ -188,6 +188,7 @@ def run_with_agent(
     cluster_limit: int = 50,
     exclude_dirs: Optional[List[str]] = None,
     enable_verification: bool = True,
+    force_save_memory: bool = False,
 ) -> str:
     """
     使用单Agent逐条子任务分析模式运行（与 jarvis.jarvis_sec.__init__ 中保持一致）。
@@ -211,6 +212,7 @@ def run_with_agent(
         cluster_limit=cluster_limit,
         exclude_dirs=exclude_dirs,
         enable_verification=enable_verification,
+        force_save_memory=force_save_memory,
     )
 
 

@@ -48,6 +48,9 @@ def agent(
     enable_verification: bool = typer.Option(
         True, "--enable-verification/--no-verification", help="是否启用二次验证（默认开启）"
     ),
+    force_save_memory: bool = typer.Option(
+        False, "--force-save-memory/--no-force-save-memory", help="强制使用记忆（默认关闭）"
+    ),
 ) -> None:
     # 初始化环境，确保平台/模型等全局配置就绪（避免 NoneType 平台）
     try:
@@ -66,6 +69,7 @@ def agent(
             llm_group=llm_group,
             cluster_limit=cluster_limit,
             enable_verification=enable_verification,
+            force_save_memory=force_save_memory,
         )
     except Exception as e:
         try:
