@@ -436,25 +436,25 @@ def _parse_agent_json_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Opti
     # 提取 <SUMMARY> 块
     m_sum = _re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=_re.IGNORECASE)
     block = (m_sum.group(1) if m_sum else text).strip()
-    
+
     if not block:
         return None, "未找到 <SUMMARY> 或 </SUMMARY> 标签，或标签内容为空"
 
     # 直接解析 <SUMMARY> 块内的内容为 JSON
     try:
         data = _json.loads(block)
-        if isinstance(data, dict):
-            return data, None
+                if isinstance(data, dict):
+                    return data, None
         return None, f"JSON 解析结果不是字典，而是 {type(data).__name__}"
     except Exception as json_err:
         # JSON 解析失败，尝试查找 JSON 对象
-        m_json = _re.search(r"\{[\s\S]*\}", block)
-        if m_json:
-            raw = m_json.group(0).strip()
-            try:
-                data = _json.loads(raw)
-                if isinstance(data, dict):
-                    return data, None
+    m_json = _re.search(r"\{[\s\S]*\}", block)
+    if m_json:
+        raw = m_json.group(0).strip()
+        try:
+            data = _json.loads(raw)
+            if isinstance(data, dict):
+                return data, None
             except Exception:
                 pass
         return None, f"JSON 解析失败: {str(json_err)}"
