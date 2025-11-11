@@ -409,7 +409,7 @@ def _create_llm_model(
             "你是资深 C→Rust 迁移专家。任务：给定一个函数及其调用子树（依赖图摘要、函数签名、源码片段），"
             "判断是否可以使用一个或多个成熟的 Rust 库整体替代该子树的功能（允许库内多个 API 协同，允许多个库组合；不允许使用不成熟/不常见库）。"
             "如可替代，请给出 libraries 列表（库名），可选给出代表性 API/模块与实现备注 notes（如何用这些库协作实现）。"
-            "输出格式：仅输出一个 <yaml> 块，字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，可选 library(str,首选主库), api(str) 或 apis(list)，notes(str)。"
+            "输出格式：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，可选 library(str,首选主库), api(str) 或 apis(list)，notes(str)。支持json5语法（如尾随逗号、注释等）。"
         )
         return model
     except Exception as e:
@@ -421,9 +421,9 @@ def _create_llm_model(
         return None
 
 
-def _parse_agent_yaml_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+def _parse_agent_json_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """
-    解析Agent返回的YAML/JSON摘要
+    解析Agent返回的JSON摘要
     返回(解析结果, 错误信息)
     如果解析成功，返回(data, None)
     如果解析失败，返回(None, 错误信息)
@@ -432,75 +432,32 @@ def _parse_agent_yaml_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Opti
         return None, "摘要文本为空"
     import re as _re
     import json5 as _json
-    try:
-        import yaml  # type: ignore
-    except Exception:
-        yaml = None  # type: ignore
 
+    # 提取 <SUMMARY> 块
     m_sum = _re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=_re.IGNORECASE)
     block = (m_sum.group(1) if m_sum else text).strip()
+    
+    if not block:
+        return None, "未找到 <SUMMARY> 或 </SUMMARY> 标签，或标签内容为空"
 
-    m_yaml = _re.search(r"<yaml>([\s\S]*?)</yaml>", block, flags=_re.IGNORECASE)
-    if m_yaml:
-        raw = m_yaml.group(1).strip()
-        if raw and yaml:
+    # 直接解析 <SUMMARY> 块内的内容为 JSON
+    try:
+        data = _json.loads(block)
+        if isinstance(data, dict):
+            return data, None
+        return None, f"JSON 解析结果不是字典，而是 {type(data).__name__}"
+    except Exception as json_err:
+        # JSON 解析失败，尝试查找 JSON 对象
+        m_json = _re.search(r"\{[\s\S]*\}", block)
+        if m_json:
+            raw = m_json.group(0).strip()
             try:
-                data = yaml.safe_load(raw)
+                data = _json.loads(raw)
                 if isinstance(data, dict):
                     return data, None
-            except Exception as yaml_err:
-                return None, f"YAML 解析失败: {str(yaml_err)}"
-        elif raw and not yaml:
-            return None, "PyYAML 未安装，无法解析 YAML"
-
-    m_code = _re.search(r"```(?:yaml|yml)\s*([\s\S]*?)```", block, flags=_re.IGNORECASE)
-    if m_code:
-        raw = m_code.group(1).strip()
-        if raw and yaml:
-            try:
-                data = yaml.safe_load(raw)
-                if isinstance(data, dict):
-                    return data, None
-            except Exception as yaml_err:
-                return None, f"YAML 解析失败: {str(yaml_err)}"
-        elif raw and not yaml:
-            return None, "PyYAML 未安装，无法解析 YAML"
-
-    m_json = _re.search(r"\{[\s\S]*\}", block)
-    if m_json:
-        raw = m_json.group(0).strip()
-        try:
-            data = _json.loads(raw)
-            if isinstance(data, dict):
-                return data, None
-        except Exception as json_err:
-            return None, f"JSON 解析失败: {str(json_err)}"
-
-    # 宽松键值
-    def _kv(pattern: str) -> Optional[str]:
-        m = _re.search(pattern, block, flags=_re.IGNORECASE)
-        return m.group(1).strip() if m else None
-
-    rep_raw = _kv(r"replaceable\s*:\s*(.+)")
-    lib_raw = _kv(r"library\s*:\s*(.+)")
-    api_raw = _kv(r"(?:api|function)\s*:\s*(.+)")
-    conf_raw = _kv(r"confidence\s*:\s*([0-9\.\-eE]+)")
-    if any([rep_raw, lib_raw, api_raw, conf_raw]):
-        result: Dict[str, Any] = {}
-        if rep_raw is not None:
-            rep_s = rep_raw.strip().strip("\"'")
-            result["replaceable"] = rep_s.lower() in ("true", "yes", "y", "1")
-        if lib_raw is not None:
-            result["library"] = lib_raw.strip().strip("\"'")
-        if api_raw is not None:
-            result["api"] = api_raw.strip().strip("\"'")
-        if conf_raw is not None:
-            try:
-                result["confidence"] = float(conf_raw)
             except Exception:
                 pass
-        return (result if result else None, None)
-    return None, "未找到有效的YAML/JSON格式或键值对"
+        return None, f"JSON 解析失败: {str(json_err)}"
 
 
 def _build_subtree_prompt(
@@ -578,8 +535,8 @@ def _build_subtree_prompt(
         "请评估以下 C/C++ 函数子树是否可以由一个或多个成熟的 Rust 库整体替代（语义等价或更强）。"
         "允许库内多个 API 协同，允许多个库组合；如果必须依赖尚不成熟/冷门库或非 Rust 库，则判定为不可替代。\n"
         f"{disabled_hint}"
-        "输出格式：仅输出一个 <yaml> 块，字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，"
-        "可选字段: library(str,首选主库), api(str) 或 apis(list), notes(str: 简述如何由这些库协作实现的思路)。\n\n"
+        "输出格式：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，"
+        "可选字段: library(str,首选主库), api(str) 或 apis(list), notes(str: 简述如何由这些库协作实现的思路)。支持json5语法（如尾随逗号、注释等）。\n\n"
         f"根函数(被评估子树的根): {root_name}\n"
         f"签名: {root_sig}\n"
         f"语言: {root_lang}\n"
@@ -619,21 +576,21 @@ def _llm_evaluate_subtree(
     
     try:
         result = model.chat_until_success(prompt)  # type: ignore
-        parsed, parse_error = _parse_agent_yaml_summary(result or "")
+        parsed, parse_error = _parse_agent_json_summary(result or "")
         if parse_error:
-            # YAML解析失败，将错误信息反馈给模型
-            print(f"[c2rust-lib-replace] YAML解析失败: {parse_error}")
+            # JSON解析失败，将错误信息反馈给模型
+            print(f"[c2rust-lib-replace] JSON解析失败: {parse_error}")
             # 更新提示词，包含解析错误信息
             prompt_with_error = (
                 prompt
                 + f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {parse_error}\n\n"
-                + "请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                + "请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
             )
             result = model.chat_until_success(prompt_with_error)  # type: ignore
-            parsed, parse_error = _parse_agent_yaml_summary(result or "")
+            parsed, parse_error = _parse_agent_json_summary(result or "")
             if parse_error:
                 # 仍然失败，使用默认值
-                print(f"[c2rust-lib-replace] 重试后YAML解析仍然失败: {parse_error}，使用默认值")
+                print(f"[c2rust-lib-replace] 重试后JSON解析仍然失败: {parse_error}，使用默认值")
                 parsed = None
         if isinstance(parsed, dict):
             rep = bool(parsed.get("replaceable") is True)
