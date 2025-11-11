@@ -5,7 +5,7 @@
 """
 
 
-import json
+import json5 as json
 import os
 import re
 from typing import List, Optional, Any
@@ -269,8 +269,13 @@ class ContextRecommender:
 2. 符合常见命名规范（如驼峰命名、下划线命名等）
 3. 尽量具体，避免过于通用的名称
 
-以JSON数组格式返回，并用<SYMBOL_NAMES>标签包裹。
+以 JSON5 数组格式返回，并用<SYMBOL_NAMES>标签包裹。
 只返回符号名数组，不要包含其他文字。
+
+JSON5 格式说明：
+- 可以使用双引号 "..." 或单引号 '...' 包裹字符串
+- 支持尾随逗号
+- 数组格式示例：["item1", "item2", "item3"] 或 ['item1', 'item2', 'item3',]
 
 示例格式：
 <SYMBOL_NAMES>
@@ -297,7 +302,7 @@ class ContextRecommender:
             
             symbol_names = json.loads(json_content)
             if not isinstance(symbol_names, list):
-                PrettyOutput.print("⚠️  LLM返回的符号名格式不正确，期望JSON数组", OutputType.WARNING)
+                PrettyOutput.print("⚠️  LLM返回的符号名格式不正确，期望 JSON5 数组格式", OutputType.WARNING)
                 return []
             
             # 过滤空字符串和过短的符号名
@@ -391,7 +396,11 @@ class ContextRecommender:
 候选符号列表（已编号，包含位置信息）：
 {json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
 
-请返回最相关的10-20个符号的序号（JSON数组格式），按相关性排序，并用<SELECTED_INDICES>标签包裹。
+请返回最相关的10-20个符号的序号（JSON5 数组格式），按相关性排序，并用<SELECTED_INDICES>标签包裹。
+
+JSON5 格式说明：
+- 数组格式示例：[1, 2, 3] 或 [1, 2, 3,]
+- 支持尾随逗号
 
 只返回序号数组，例如：
 <SELECTED_INDICES>
@@ -418,7 +427,7 @@ class ContextRecommender:
             
             selected_indices = json.loads(json_content)
             if not isinstance(selected_indices, list):
-                PrettyOutput.print("⚠️  LLM返回的符号序号格式不正确，期望JSON数组", OutputType.WARNING)
+                PrettyOutput.print("⚠️  LLM返回的符号序号格式不正确，期望 JSON5 数组格式", OutputType.WARNING)
                 return []
             
             PrettyOutput.print(f"📋 LLM返回了 {len(selected_indices)} 个符号序号", OutputType.INFO)

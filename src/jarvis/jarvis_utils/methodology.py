@@ -7,7 +7,7 @@
 - 生成方法论临时文件
 - 上传方法论文件到大模型
 """
-import json
+import json5 as json
 import os
 import tempfile
 from typing import Any, Dict, List, Optional

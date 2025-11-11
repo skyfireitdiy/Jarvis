@@ -6,7 +6,7 @@
 状态文件格式：JSON，包含当前阶段、进度百分比、已完成/总数等信息。
 """
 
-import json
+import json5 as json
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Any

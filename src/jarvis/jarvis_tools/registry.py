@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json
+import json5 as json
 import os
 import re
 import sys
@@ -27,18 +27,63 @@ tool_call_help = f"""
 </introduction>
 
 <format>
-# 📋 工具调用格式
+# 📋 工具调用格式（JSON5）
 {ot("TOOL_CALL")}
 {{
   "want": "想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息",
   "name": "工具名称",
   "arguments": {{
     "param1": "值1",
-    "param2": "值2"
+    "param2": "值2",
   }}
 }}
 {ct("TOOL_CALL")}
 </format>
+
+<json5_format>
+# 📝 JSON5 格式说明
+工具调用使用 JSON5 格式，支持以下特性：
+
+1. **字符串引号**：
+   - 可以使用双引号 "..." 或单引号 '...'
+   - 示例：`"name": "工具名"` 或 `'name': '工具名'`
+
+2. **多行字符串**：
+   - 使用反引号 `...` 可以包含多行内容，自动处理换行
+   - 示例：
+     {{
+       "tool_code": `# -*- coding: utf-8 -*-
+from typing import Dict, Any
+
+class MyTool:
+    name = "my_tool"
+    def execute(self, args):
+        return {{"success": True}}`
+     }}
+   - 多行字符串中不需要转义换行符，直接换行即可
+   - 如果字符串中包含反引号，可以使用双引号或单引号包裹，并在字符串内使用 \\n 表示换行
+
+3. **尾随逗号**：
+   - 对象和数组的最后一个元素后可以添加逗号
+   - 示例：`{{"param1": "值1", "param2": "值2",}}`
+
+4. **注释**（可选）：
+   - 可以使用 // 单行注释或 /* */ 多行注释
+   - 示例：`{{"param": "值", // 这是注释}}`
+
+5. **长字符串参数**：
+   - 对于包含代码、多行文本等长字符串参数，推荐使用反引号多行字符串
+   - 示例：
+     {{
+       "content": `这是第一行
+这是第二行
+这是第三行`
+     }}
+   - 或者使用转义的换行符（适用于单行字符串）：
+     {{
+       "content": "第一行\\n第二行\\n第三行"
+     }}
+</json5_format>
 
 <rules>
 # ❗ 关键规则
@@ -51,9 +96,10 @@ tool_call_help = f"""
 <rule>
 ### 2. 严格遵守格式
 - 完全按照上述格式
-- 使用正确的JSON格式
+- 使用正确的 JSON5 格式
 - 包含所有必需参数
 - {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
+- 对于多行字符串参数，优先使用反引号 `...` 格式以提高可读性
 </rule>
 
 <rule>
@@ -74,17 +120,31 @@ tool_call_help = f"""
 </rules>
 
 <string_format>
-# 📝 字符串参数格式
-使用 |2 语法表示字符串参数，防止多行字符串行首空格引起歧义。
+# 📝 字符串参数格式（JSON5）
+对于多行字符串参数，推荐使用 JSON5 的反引号语法：
 
 {ot("TOOL_CALL")}
-want: 当前的git状态，期望获取xxx的提交记录
-name: execute_script
+{{
+  "want": "当前的git状态，期望获取xxx的提交记录",
+  "name": "execute_script",
+  "arguments": {{
+    "interpreter": "bash",
+    "script_content": `git status --porcelain
+git log --oneline -5`
+  }}
+}}
+{ct("TOOL_CALL")}
 
-arguments:
-  interpreter: bash
-  script_content: |
-    git status --porcelain
+或者使用转义的换行符（适用于较短的字符串）：
+{ot("TOOL_CALL")}
+{{
+  "want": "执行脚本",
+  "name": "execute_script",
+  "arguments": {{
+    "interpreter": "bash",
+    "script_content": "git status --porcelain\\ngit log --oneline -5"
+  }}
+}}
 {ct("TOOL_CALL")}
 </string_format>
 
@@ -103,7 +163,7 @@ arguments:
 - 假设工具结果
 - 创建虚构对话
 - 在没有所需信息的情况下继续
-- JSON 格式错误
+- JSON5 格式错误
 - {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 没有出现在行首
 </common_errors>
 </tool_system_guide>
@@ -699,8 +759,14 @@ class ToolRegistry(OutputHandlerProtocol):
             except Exception as e:
                 return (
                     {},
-                    f"""JSON 解析失败，请检查工具调用格式。
+                    f"""JSON5 解析失败，请检查工具调用格式。
                     {e}
+
+                提示：JSON5 支持以下特性：
+                - 可以使用双引号 "..." 或单引号 '...' 包裹字符串
+                - 可以使用反引号 `...` 包裹多行字符串（推荐用于长文本）
+                - 支持尾随逗号
+                - 多行字符串中直接换行，无需转义 \\n
 
                 {tool_call_help}""",
                     False,
@@ -857,7 +923,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         usage_prompt = agent_instance.get_tool_usage_prompt()
                     except Exception:
                         usage_prompt = tool_call_help
-                    return f"工具参数格式无效: {name}。arguments 应为可解析的 JSON 或对象，请按工具调用格式提供。\n\n{usage_prompt}"
+                    return f"工具参数格式无效: {name}。arguments 应为可解析的 JSON5 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，推荐使用反引号 `...` 包裹以提高可读性。\n\n{usage_prompt}"
 
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)

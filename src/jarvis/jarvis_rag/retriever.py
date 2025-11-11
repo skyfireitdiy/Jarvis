@@ -1,6 +1,6 @@
 import os
 import pickle
-import json
+import json5 as json
 import hashlib
 from typing import Any, Dict, List, Optional, cast
 

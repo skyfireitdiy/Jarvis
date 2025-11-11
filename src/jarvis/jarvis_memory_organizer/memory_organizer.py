@@ -6,7 +6,7 @@
 该工具会查找具有高度重叠标签的记忆，并使用大模型将它们合并成一个新的记忆。
 """
 
-import json
+import json5 as json
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Set, Any, Optional

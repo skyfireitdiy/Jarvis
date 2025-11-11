@@ -21,7 +21,7 @@ CLI 集成建议:
 
 from __future__ import annotations
 
-import json
+import json5 as json
 # removed sqlite3 (migrated to JSONL/JSON)
 from dataclasses import dataclass
 from pathlib import Path
@@ -366,7 +366,7 @@ class LLMRustCratePlannerAgent:
         - 跳过无 roots 标签的 residual 步骤（仅保留明确 root 的上下文）
         - 若最终未收集到任何 root 组，则回退为单组 'project'，包含所有 items 的函数名集合
         """
-        import json
+        import json5 as json
         order_path = self._order_path()
         if not order_path.exists():
             raise FileNotFoundError(f"未找到 translation_order.jsonl: {order_path}")
