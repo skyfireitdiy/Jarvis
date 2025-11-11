@@ -1547,7 +1547,7 @@ def _ask_patch_format_mode(config_data: dict, ask_all: bool) -> bool:
         choices = ["all", "search", "search_range"]
         tip = (
             "请选择补丁格式处理模式 (JARVIS_PATCH_FORMAT):\n"
-            "该设置影响 edit_file_handler 在处理补丁时允许的匹配方式。\n"
+            "该设置影响 edit_file 工具在处理补丁时允许的匹配方式。\n"
             "  - all: 同时支持 SEARCH 与 SEARCH_START/SEARCH_END 两种模式（默认）。\n"
             "  - search: 仅允许精确片段匹配（SEARCH）。更稳定，适合较弱模型或严格控制改动。\n"
             "  - search_range: 仅允许范围匹配（SEARCH_START/SEARCH_END）。更灵活，适合较强模型和块内细粒度修改。"

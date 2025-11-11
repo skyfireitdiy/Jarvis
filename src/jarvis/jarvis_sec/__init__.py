@@ -570,7 +570,6 @@ def _create_review_agent(
         use_methodology=False,
         use_analysis=False,
         output_handler=[ToolRegistry()],
-        disable_file_edit=True,
         use_tools=["read_code", "execute_script", "retrieve_memory", "save_memory"],
     )
     if llm_group:
@@ -1030,7 +1029,6 @@ def _create_analysis_agent(task_id: str, llm_group: Optional[str], force_save_me
         use_methodology=False,
         use_analysis=False,
         output_handler=[ToolRegistry()],
-        disable_file_edit=True,
         force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
@@ -1554,7 +1552,6 @@ def _process_verification_batch(
                     use_methodology=False,
                     use_analysis=False,
                     output_handler=[ToolRegistry()],
-                    disable_file_edit=True,
                     use_tools=["read_code", "execute_script", "retrieve_memory"],
                 )
                 if llm_group:
@@ -2757,7 +2754,6 @@ def _create_cluster_agent(
         use_methodology=False,
         use_analysis=False,
         output_handler=[ToolRegistry()],
-        disable_file_edit=True,
         force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
