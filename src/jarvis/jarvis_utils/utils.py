@@ -503,6 +503,7 @@ def _show_usage_stats(welcome_str: str) -> None:
         console = Console()
 
         from jarvis.jarvis_stats.stats import StatsManager
+        from jarvis.jarvis_stats.storage import StatsStorage
 
         # 获取所有可用的指标
         all_metrics = StatsManager.list_metrics()
@@ -518,27 +519,44 @@ def _show_usage_stats(welcome_str: str) -> None:
             "other": {"title": "📦 其他指标", "metrics": {}, "suffix": ""},
         }
 
-        # 遍历所有指标，使用快速总量读取以避免全量扫描
-        for metric in all_metrics:
-            try:
-                # 直接从总量缓存文件读取，避免扫描历史文件
-                from jarvis.jarvis_stats.storage import StatsStorage
-                storage = StatsStorage()
-                total_file = storage._get_total_file(metric)
-                if total_file.exists():
-                    with open(total_file, "r", encoding="utf-8") as f:
-                        total = float((f.read() or "0").strip() or "0")
-                else:
-                    total = 0.0
-            except Exception:
-                total = 0.0
+        # 复用存储实例，避免重复创建
+        storage = StatsStorage()
+        
+        # 一次性读取元数据，避免重复读取
+        try:
+            meta = storage._load_json(storage.meta_file)
+            metrics_info = meta.get("metrics", {})
+        except Exception:
+            metrics_info = {}
 
+        # 批量读取所有总量文件，避免逐个文件操作
+        metric_totals: Dict[str, float] = {}
+        totals_dir = storage.totals_dir
+        if totals_dir.exists():
+            try:
+                for total_file in totals_dir.glob("*"):
+                    if total_file.is_file():
+                        try:
+                            with open(total_file, "r", encoding="utf-8") as f:
+                                total = float((f.read() or "0").strip() or "0")
+                                if total > 0:
+                                    metric_totals[total_file.name] = total
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+        # 遍历所有指标，使用批量读取的数据
+        for metric in all_metrics:
+            # 从批量读取的数据中获取总量
+            total = metric_totals.get(metric, 0.0)
+            
             if not total or total <= 0:
                 continue
 
-            # 优先使用元信息中的分组（在写入指标时已记录）
+            # 从已加载的元数据中获取分组信息，避免重复读取
             try:
-                info = StatsManager.get_metric_info(metric) or {}
+                info = metrics_info.get(metric, {})
                 group = info.get("group", "other")
             except Exception:
                 group = "other"
@@ -951,17 +969,30 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
         pass
 
     # 4. 显示历史统计数据（仅在显示欢迎信息时显示）
+    # 使用延迟加载，避免阻塞初始化
     if welcome_str:
         try:
-            _show_usage_stats(welcome_str)
+            # 在后台线程中显示统计，避免阻塞主流程
+            import threading
+            def show_stats_async():
+                try:
+                    _show_usage_stats(welcome_str)
+                except Exception:
+                    pass
+            stats_thread = threading.Thread(target=show_stats_async, daemon=True)
+            stats_thread.start()
         except Exception:
             # 静默失败，不影响正常使用
             pass
 
-    # 5. 检查Jarvis更新
-    if _check_jarvis_updates():
-        os.execv(sys.executable, [sys.executable] + sys.argv)
-        sys.exit(0)
+    # 5. 检查Jarvis更新（异步执行，避免阻塞）
+    try:
+        if _check_jarvis_updates():
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+            sys.exit(0)
+    except Exception:
+        # 静默失败，不影响正常使用
+        pass
 
 
 def _interactive_config_setup(config_file_path: Path):
