@@ -21,6 +21,7 @@ Jarvis 安全分析套件
 from typing import Dict, List, Optional
 
 import typer
+import json5 as json
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.workflow import direct_scan, run_with_agent
@@ -29,31 +30,39 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 
 def _build_summary_prompt() -> str:
     """
-    构建摘要提示词：要求以 <REPORT>...</REPORT> 包裹的 YAML 输出（仅YAML）。
+    构建摘要提示词：要求以 <REPORT>...</REPORT> 包裹的 JSON 输出（仅JSON）。
     系统提示词不强制规定主对话输出格式，仅在摘要中给出结构化结果。
     """
     return """
-请将本轮"安全子任务（单点验证）"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
+请将本轮"安全子任务（单点验证）"的结构化结果仅放入以下标记中，并使用 JSON 数组对象形式输出。
 仅输出全局编号（gid）与详细理由（不含位置信息），gid 为全局唯一的数字编号。
 
 示例1：有告警的情况（has_risk: true，单个gid）
 <REPORT>
-- gid: 1
-  has_risk: true
-  preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
-  trigger_path: "调用路径推导：main() -> handle_network_request() -> parse_packet() -> foobar() -> strcpy()。数据流：网络数据包通过 handle_network_request() 接收，传递给 parse_packet() 解析，parse_packet() 未对数据长度进行校验，直接将 src 传递给 foobar()，foobar() 调用 strcpy(dst, src) 时未检查 src 长度，可导致缓冲区溢出。关键调用点：parse_packet() 函数未对输入长度进行校验。"
-  consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
-  suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
+[
+  {
+    "gid": 1,
+    "has_risk": true,
+    "preconditions": "输入字符串 src 的长度大于等于 dst 的缓冲区大小",
+    "trigger_path": "调用路径推导：main() -> handle_network_request() -> parse_packet() -> foobar() -> strcpy()。数据流：网络数据包通过 handle_network_request() 接收，传递给 parse_packet() 解析，parse_packet() 未对数据长度进行校验，直接将 src 传递给 foobar()，foobar() 调用 strcpy(dst, src) 时未检查 src 长度，可导致缓冲区溢出。关键调用点：parse_packet() 函数未对输入长度进行校验。",
+    "consequences": "缓冲区溢出，可能引发程序崩溃或任意代码执行",
+    "suggestions": "使用 strncpy_s 或其他安全的字符串复制函数"
+  }
+]
 </REPORT>
 
 示例2：有告警的情况（has_risk: true，多个gid合并，路径和原因一致）
 <REPORT>
-- gids: [1, 2, 3]
-  has_risk: true
-  preconditions: "输入字符串 src 的长度大于等于 dst 的缓冲区大小"
-  trigger_path: "调用路径推导：main() -> handle_network_request() -> parse_packet() -> foobar() -> strcpy()。数据流：网络数据包通过 handle_network_request() 接收，传递给 parse_packet() 解析，parse_packet() 未对数据长度进行校验，直接将 src 传递给 foobar()，foobar() 调用 strcpy(dst, src) 时未检查 src 长度，可导致缓冲区溢出。关键调用点：parse_packet() 函数未对输入长度进行校验。"
-  consequences: "缓冲区溢出，可能引发程序崩溃或任意代码执行"
-  suggestions: "使用 strncpy_s 或其他安全的字符串复制函数"
+[
+  {
+    "gids": [1, 2, 3],
+    "has_risk": true,
+    "preconditions": "输入字符串 src 的长度大于等于 dst 的缓冲区大小",
+    "trigger_path": "调用路径推导：main() -> handle_network_request() -> parse_packet() -> foobar() -> strcpy()。数据流：网络数据包通过 handle_network_request() 接收，传递给 parse_packet() 解析，parse_packet() 未对数据长度进行校验，直接将 src 传递给 foobar()，foobar() 调用 strcpy(dst, src) 时未检查 src 长度，可导致缓冲区溢出。关键调用点：parse_packet() 函数未对输入长度进行校验。",
+    "consequences": "缓冲区溢出，可能引发程序崩溃或任意代码执行",
+    "suggestions": "使用 strncpy_s 或其他安全的字符串复制函数"
+  }
+]
 </REPORT>
 
 示例3：误报或无问题（返回空数组）
@@ -62,7 +71,7 @@ def _build_summary_prompt() -> str:
 </REPORT>
 
 要求：
-- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
+- 只能在 <REPORT> 与 </REPORT> 中输出 JSON 数组，且不得出现其他文本。
 - 若确认本批次全部为误报或无问题，请返回空数组 []。
 - 数组元素为对象，包含字段：
   - gid: 整数（全局唯一编号，单个告警时使用）
@@ -77,6 +86,7 @@ def _build_summary_prompt() -> str:
 - **关键**：仅当 `has_risk` 为 `true` 时，才会被记录为确认的问题。对于确认是误报的条目，请确保 `has_risk` 为 `false` 或不输出该条目。
 - **输出格式**：有告警的条目必须包含所有字段（gid 或 gids, has_risk, preconditions, trigger_path, consequences, suggestions）；无告警的条目只需包含 gid 和 has_risk。
 - **调用路径推导要求**：trigger_path 字段必须包含完整的调用路径推导，不能省略或简化。必须明确说明从可控输入到缺陷代码的完整调用链，以及每个调用点的校验情况。如果无法推导出完整的调用路径，应该判定为误报（has_risk: false）。
+- 支持json5语法（如尾随逗号、注释等）。
 """.strip()
 
 
@@ -85,32 +95,44 @@ def _build_verification_summary_prompt() -> str:
     构建验证 Agent 的摘要提示词：验证分析 Agent 给出的结论是否正确。
     """
     return """
-请将本轮"验证分析结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
+请将本轮"验证分析结论"的结构化结果仅放入以下标记中，并使用 JSON 数组对象形式输出。
 你需要验证分析 Agent 给出的结论是否正确，包括前置条件、触发路径、后果和建议是否合理。
 
 示例1：验证通过（is_valid: true，单个gid）
 <REPORT>
-- gid: 1
-  is_valid: true
-  verification_notes: "分析结论正确，前置条件合理，触发路径清晰，后果评估准确"
+[
+  {
+    "gid": 1,
+    "is_valid": true,
+    "verification_notes": "分析结论正确，前置条件合理，触发路径清晰，后果评估准确"
+  }
+]
 </REPORT>
 
 示例2：验证通过（is_valid: true，多个gid合并）
 <REPORT>
-- gids: [1, 2, 3]
-  is_valid: true
-  verification_notes: "分析结论正确，前置条件合理，触发路径清晰，后果评估准确"
+[
+  {
+    "gids": [1, 2, 3],
+    "is_valid": true,
+    "verification_notes": "分析结论正确，前置条件合理，触发路径清晰，后果评估准确"
+  }
+]
 </REPORT>
 
 示例3：验证不通过（is_valid: false）
 <REPORT>
-- gid: 1
-  is_valid: false
-  verification_notes: "前置条件过于宽泛，实际代码中已有输入校验，触发路径不成立"
+[
+  {
+    "gid": 1,
+    "is_valid": false,
+    "verification_notes": "前置条件过于宽泛，实际代码中已有输入校验，触发路径不成立"
+  }
+]
 </REPORT>
 
 要求：
-- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
+- 只能在 <REPORT> 与 </REPORT> 中输出 JSON 数组，且不得出现其他文本。
 - 数组元素为对象，包含字段：
   - gid: 整数（全局唯一编号，对应分析 Agent 给出的 gid，单个告警时使用）
   - gids: 整数数组（全局唯一编号数组，对应分析 Agent 给出的 gids，多个告警合并时使用）
@@ -119,6 +141,7 @@ def _build_verification_summary_prompt() -> str:
 - **合并格式优化**：如果多个告警（gid）的验证结果（is_valid）和验证说明（verification_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
 - 必须对所有输入的 gid 进行验证，不能遗漏。
 - 如果验证通过（is_valid: true），则保留该告警；如果验证不通过（is_valid: false），则视为误报，不记录为问题。
+- 支持json5语法（如尾随逗号、注释等）。
 """.strip()
 
 
@@ -496,32 +519,44 @@ def _get_review_system_prompt() -> str:
 def _get_review_summary_prompt() -> str:
     """获取复核Agent的摘要提示词"""
     return """
-请将本轮"复核结论"的结构化结果仅放入以下标记中，并使用 YAML 数组对象形式输出。
+请将本轮"复核结论"的结构化结果仅放入以下标记中，并使用 JSON 数组对象形式输出。
 你需要复核聚类Agent给出的无效理由是否充分，是否真的考虑了所有可能的路径。
 
 示例1：理由充分（is_reason_sufficient: true，单个gid）
 <REPORT>
-- gid: 1
-  is_reason_sufficient: true
-  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+[
+  {
+    "gid": 1,
+    "is_reason_sufficient": true,
+    "review_notes": "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+  }
+]
 </REPORT>
 
 示例2：理由充分（is_reason_sufficient: true，多个gid合并）
 <REPORT>
-- gids: [1, 2, 3]
-  is_reason_sufficient: true
-  review_notes: "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+[
+  {
+    "gids": [1, 2, 3],
+    "is_reason_sufficient": true,
+    "review_notes": "聚类Agent已检查所有调用路径，确认所有调用者都有输入校验，理由充分"
+  }
+]
 </REPORT>
 
 示例3：理由不充分（is_reason_sufficient: false）
 <REPORT>
-- gid: 1
-  is_reason_sufficient: false
-  review_notes: "聚类Agent遗漏了函数X的调用路径，该路径可能未做校验，理由不充分，需要重新验证"
+[
+  {
+    "gid": 1,
+    "is_reason_sufficient": false,
+    "review_notes": "聚类Agent遗漏了函数X的调用路径，该路径可能未做校验，理由不充分，需要重新验证"
+  }
+]
 </REPORT>
 
 要求：
-- 只能在 <REPORT> 与 </REPORT> 中输出 YAML 数组，且不得出现其他文本。
+- 只能在 <REPORT> 与 </REPORT> 中输出 JSON 数组，且不得出现其他文本。
 - 数组元素为对象，包含字段：
   - gid: 整数（全局唯一编号，对应无效聚类的gid，单个告警时使用）
   - gids: 整数数组（全局唯一编号数组，对应无效聚类的gids，多个告警合并时使用）
@@ -530,6 +565,7 @@ def _get_review_summary_prompt() -> str:
 - **合并格式优化**：如果多个告警（gid）的复核结果（is_reason_sufficient）和复核说明（review_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
 - 必须对所有输入的gid进行复核，不能遗漏。
 - 如果理由不充分（is_reason_sufficient: false），该候选将重新加入验证流程；如果理由充分（is_reason_sufficient: true），该候选将被确认为无效。
+- 支持json5语法（如尾随逗号、注释等）。
     """.strip()
 
 
@@ -843,7 +879,7 @@ def _run_review_agent_with_retry(
             review_summary_prompt_text = _build_verification_summary_prompt()
             error_guidance = ""
             if prev_parse_error_review:
-                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_review}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {prev_parse_error_review}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
             
             full_review_prompt = f"{review_task}{error_guidance}\n\n{review_summary_prompt_text}"
             try:
@@ -877,7 +913,7 @@ def _run_review_agent_with_retry(
             if parse_error_review:
                 prev_parse_error_review = parse_error_review
                 try:
-                    typer.secho(f"[jarvis-sec] 复核结果YAML解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
+                    typer.secho(f"[jarvis-sec] 复核结果JSON解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
                 except Exception:
                     pass
             else:
@@ -891,7 +927,7 @@ def _run_review_agent_with_retry(
         use_direct_model_review = True
         if parse_error_review:
             try:
-                typer.secho(f"[jarvis-sec] 复核结果YAML解析失败 -> 重试第 {review_attempt} 次 (使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
+                typer.secho(f"[jarvis-sec] 复核结果JSON解析失败 -> 重试第 {review_attempt} 次 (使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
             except Exception:
                 pass
         else:
@@ -1085,9 +1121,9 @@ def _build_validation_error_guidance(
 ) -> str:
     """构建验证错误指导信息"""
     if parse_error_analysis:
-        return f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_error_analysis}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+        return f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_analysis}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
     elif prev_parsed_items is None:
-        return "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 数组"
+        return "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 数组"
     elif not _valid_items(prev_parsed_items):
         validation_errors = []
         if not isinstance(prev_parsed_items, list):
@@ -1204,7 +1240,7 @@ def _run_analysis_agent_with_retry(
         except Exception:
             pass
 
-        # 解析摘要中的 <REPORT>（YAML）
+        # 解析摘要中的 <REPORT>（JSON）
         summary_text = summary_container.get("text", "")
         parsed_items: Optional[List] = None
         parse_error_analysis = None
@@ -1212,7 +1248,7 @@ def _run_analysis_agent_with_retry(
             rep, parse_error_analysis = _try_parse_summary_report(summary_text)
             if parse_error_analysis:
                 try:
-                    typer.secho(f"[jarvis-sec] 分析结果YAML解析失败: {parse_error_analysis}", fg=typer.colors.YELLOW)
+                    typer.secho(f"[jarvis-sec] 分析结果JSON解析失败: {parse_error_analysis}", fg=typer.colors.YELLOW)
                 except Exception:
                     pass
             elif isinstance(rep, list):
@@ -1239,7 +1275,7 @@ def _run_analysis_agent_with_retry(
         prev_parsed_items = parsed_items
         if parse_error_analysis:
             try:
-                typer.secho(f"[jarvis-sec] 分析结果YAML解析失败 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
+                typer.secho(f"[jarvis-sec] 分析结果JSON解析失败 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
             except Exception:
                 pass
         else:
@@ -1787,7 +1823,7 @@ def _run_verification_agent_with_retry(
             verification_summary_prompt_text = _build_verification_summary_prompt()
             error_guidance = ""
             if prev_parse_error_verify:
-                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_verify}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {prev_parse_error_verify}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
             
             full_verify_prompt = f"{verification_task}{error_guidance}\n\n{verification_summary_prompt_text}"
             try:
@@ -1821,7 +1857,7 @@ def _run_verification_agent_with_retry(
             if parse_error_verify:
                 prev_parse_error_verify = parse_error_verify
                 try:
-                    typer.secho(f"[jarvis-sec] 验证结果YAML解析失败: {parse_error_verify}", fg=typer.colors.YELLOW)
+                    typer.secho(f"[jarvis-sec] 验证结果JSON解析失败: {parse_error_verify}", fg=typer.colors.YELLOW)
                 except Exception:
                     pass
             else:
@@ -1834,7 +1870,7 @@ def _run_verification_agent_with_retry(
         use_direct_model_verify = True
         if parse_error_verify:
             try:
-                typer.secho(f"[jarvis-sec] 验证结果YAML解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
+                typer.secho(f"[jarvis-sec] 验证结果JSON解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)", fg=typer.colors.YELLOW)
             except Exception:
                 pass
         else:
@@ -2043,16 +2079,15 @@ def _parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]
             return None, "未找到 <CLUSTERS> 或 </CLUSTERS> 标签，或标签顺序错误"
         content = text[start + len("<CLUSTERS>"):end].strip()
         if not content:
-            return None, "YAML 内容为空"
-        import yaml as _yaml3  # type: ignore
+            return None, "JSON 内容为空"
         try:
-            data = _yaml3.safe_load(content)
-        except Exception as yaml_err:
-            error_msg = f"YAML 解析失败: {str(yaml_err)}"
+            data = json.loads(content)
+        except Exception as json_err:
+            error_msg = f"JSON 解析失败: {str(json_err)}"
             return None, error_msg
         if isinstance(data, list):
             return data, None
-        return None, f"YAML 解析结果不是数组，而是 {type(data).__name__}"
+        return None, f"JSON 解析结果不是数组，而是 {type(data).__name__}"
     except Exception as e:
         return None, f"解析过程发生异常: {str(e)}"
 
@@ -2458,8 +2493,8 @@ def _validate_cluster_result(
 ) -> tuple[bool, List[str]]:
     """验证聚类结果格式"""
     if parse_error:
-        error_details = [f"YAML解析失败: {parse_error}"]
-        typer.secho(f"[jarvis-sec] YAML解析失败: {parse_error}", fg=typer.colors.YELLOW)
+        error_details = [f"JSON解析失败: {parse_error}"]
+        typer.secho(f"[jarvis-sec] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
         return False, error_details
     else:
         valid, error_details = _validate_cluster_format(cluster_items)
@@ -2698,7 +2733,7 @@ def _get_cluster_system_prompt() -> str:
 def _get_cluster_summary_prompt() -> str:
     """获取聚类Agent的摘要提示词"""
     return """
-请仅在 <CLUSTERS> 与 </CLUSTERS> 中输出 YAML 数组：
+请仅在 <CLUSTERS> 与 </CLUSTERS> 中输出 JSON 数组：
 - 每个元素包含（所有字段均为必填）：
   - verification: 字符串（对该聚类的验证条件描述，简洁明确，可直接用于后续Agent验证）
   - gids: 整数数组（候选的全局唯一编号；输入JSON每个元素含 gid，可直接对应填入）
@@ -2710,7 +2745,7 @@ def _get_cluster_summary_prompt() -> str:
     * 为什么不存在任何可能的触发路径
     * 必须足够详细，以便复核Agent能够验证你的判断
 - 要求：
-  - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 YAML 数组，其他位置不输出任何文本
+  - 严格要求：仅输出位于 <CLUSTERS> 与 </CLUSTERS> 间的 JSON 数组，其他位置不输出任何文本
   - **完整性要求（最重要）**：输入JSON中的所有gid都必须被分类，不能遗漏任何一个gid。所有gid必须出现在某个聚类的gids数组中。这是强制要求，必须严格遵守。
   - **聚类原则**：可以一起验证的问题归为一类，不一定是验证条件完全一致才能归为一类。如果多个候选问题可以通过同一个验证过程来确认，即使它们的验证条件略有不同，也可以归为一类。
   - **必须要求**：每个聚类元素必须包含 is_invalid 字段，且值必须为 true 或 false，不能省略。
@@ -2725,10 +2760,15 @@ def _get_cluster_summary_prompt() -> str:
     - 不要因为局部有保护措施就设置为 true，要考虑是否有其他路径绕过保护。
     - 不要因为某些调用者已做校验就设置为 true，要考虑是否有其他调用者未做校验。
     - 如果设置为 true，必须在 invalid_reason 中详细说明已检查的所有路径和原因。
+  - 支持json5语法（如尾随逗号、注释等）。
 <CLUSTERS>
-- verification: ""
-  gids: []
-  is_invalid: false
+[
+  {
+    "verification": "",
+    "gids": [],
+    "is_invalid": false
+  }
+]
 </CLUSTERS>
     """.strip()
 
@@ -3157,7 +3197,7 @@ def _run_review_agent_with_retry(
             review_summary_prompt_text = _build_verification_summary_prompt()
             error_guidance = ""
             if prev_parse_error_review:
-                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {prev_parse_error_review}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。"
+                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {prev_parse_error_review}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
             
             full_review_prompt = f"{review_task}{error_guidance}\n\n{review_summary_prompt_text}"
             try:
@@ -3192,7 +3232,7 @@ def _run_review_agent_with_retry(
             if parse_error_review:
                 prev_parse_error_review = parse_error_review
                 try:
-                    typer.secho(f"[jarvis-sec] 复核结果YAML解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
+                    typer.secho(f"[jarvis-sec] 复核结果JSON解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
                 except Exception:
                     pass
             else:
@@ -3205,7 +3245,7 @@ def _run_review_agent_with_retry(
         use_direct_model_review = True
         if parse_error_review:
             try:
-                typer.secho(f"[jarvis-sec] 复核结果YAML解析失败 -> 重试第 {review_attempt} 次（使用直接模型调用，将反馈解析错误）", fg=typer.colors.YELLOW)
+                typer.secho(f"[jarvis-sec] 复核结果JSON解析失败 -> 重试第 {review_attempt} 次（使用直接模型调用，将反馈解析错误）", fg=typer.colors.YELLOW)
             except Exception:
                 pass
         else:
@@ -3645,7 +3685,7 @@ def _process_verification_phase(
 
 def _try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str]]:
     """
-    从摘要文本中提取 <REPORT>...</REPORT> 内容，并解析为对象（dict 或 list，仅支持 YAML）。
+    从摘要文本中提取 <REPORT>...</REPORT> 内容，并解析为对象（dict 或 list，使用 JSON）。
     返回(解析结果, 错误信息)
     如果解析成功，返回(data, None)
     如果解析失败，返回(None, 错误信息)
@@ -3656,17 +3696,16 @@ def _try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str
         return None, "未找到 <REPORT> 或 </REPORT> 标签，或标签顺序错误"
     content = text[start + len("<REPORT>"):end].strip()
     if not content:
-        return None, "YAML 内容为空"
+        return None, "JSON 内容为空"
     try:
-        import yaml as _yaml  # type: ignore
         try:
-            data = _yaml.safe_load(content)
-        except Exception as yaml_err:
-            error_msg = f"YAML 解析失败: {str(yaml_err)}"
+            data = json.loads(content)
+        except Exception as json_err:
+            error_msg = f"JSON 解析失败: {str(json_err)}"
             return None, error_msg
         if isinstance(data, (dict, list)):
             return data, None
-        return None, f"YAML 解析结果不是字典或数组，而是 {type(data).__name__}"
+        return None, f"JSON 解析结果不是字典或数组，而是 {type(data).__name__}"
     except Exception as e:
         return None, f"解析过程发生异常: {str(e)}"
 
