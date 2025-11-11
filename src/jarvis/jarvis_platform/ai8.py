@@ -160,7 +160,7 @@ class AI8Model(BasePlatform):
                             chunk_data = data.get("data", "")
                             if chunk_data:
                                 yield chunk_data
-                    except json.JSONDecodeError:
+                    except Exception:
                         continue
 
             return None

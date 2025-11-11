@@ -182,7 +182,7 @@ class StreamableMcpClient(McpClient):
                                         handler(params)
                                     except Exception as e:
                                         error_lines.append(f"处理通知时出错 ({notify_method}): {e}")
-                    except json.JSONDecodeError:
+                    except Exception:
                         warning_lines.append(f"无法解析响应: {line}")
                         continue
 

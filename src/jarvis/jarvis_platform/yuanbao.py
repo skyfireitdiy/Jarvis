@@ -515,14 +515,14 @@ class YuanbaoPlatform(BasePlatform):
                             if think_content:
                                 yield think_content
 
-                    except json.JSONDecodeError:
+                    except Exception:
                         pass
                 else:
                     try:
                         data = json.loads(line)
                         if "msg" in data:
                             yield data["msg"]
-                    except json.JSONDecodeError:
+                    except Exception:
                         pass
 
             self.first_chat = False

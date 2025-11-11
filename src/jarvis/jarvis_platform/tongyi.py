@@ -224,7 +224,7 @@ class TongyiPlatform(BasePlatform):
                                             yield tmp_content[len(text_content) :]
                                             text_content = tmp_content
 
-                    except json.JSONDecodeError:
+                    except Exception:
                         continue
 
             self.msg_id = msg_id

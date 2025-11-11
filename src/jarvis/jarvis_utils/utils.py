@@ -364,7 +364,7 @@ def _check_pip_updates() -> bool:
             with urllib.request.urlopen(url, timeout=5) as response:
                 data = json.loads(response.read().decode())
                 latest_version = data["info"]["version"]
-        except (urllib.error.URLError, KeyError, json.JSONDecodeError):
+        except (urllib.error.URLError, KeyError, ValueError):
             return False
 
         # 比较版本
@@ -521,7 +521,15 @@ def _show_usage_stats(welcome_str: str) -> None:
         # 遍历所有指标，使用快速总量读取以避免全量扫描
         for metric in all_metrics:
             try:
-                total = StatsManager.get_metric_total(metric)
+                # 直接从总量缓存文件读取，避免扫描历史文件
+                from jarvis.jarvis_stats.storage import StatsStorage
+                storage = StatsStorage()
+                total_file = storage._get_total_file(metric)
+                if total_file.exists():
+                    with open(total_file, "r", encoding="utf-8") as f:
+                        total = float((f.read() or "0").strip() or "0")
+                else:
+                    total = 0.0
             except Exception:
                 total = 0.0
 
@@ -529,8 +537,11 @@ def _show_usage_stats(welcome_str: str) -> None:
                 continue
 
             # 优先使用元信息中的分组（在写入指标时已记录）
-            info = StatsManager.get_metric_info(metric) or {}
-            group = info.get("group", "other")
+            try:
+                info = StatsManager.get_metric_info(metric) or {}
+                group = info.get("group", "other")
+            except Exception:
+                group = "other"
 
             if group == "tool":
                 categorized_stats["tool"]["metrics"][metric] = int(total)
@@ -918,19 +929,34 @@ def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
         pass
 
     # 1. 设置信号处理
-    _setup_signal_handler()
+    try:
+        _setup_signal_handler()
+    except Exception:
+        pass
 
-    # 2. 统计命令使用
-    count_cmd_usage()
+    # 2. 统计命令使用（异步执行，避免阻塞初始化）
+    try:
+        count_cmd_usage()
+    except Exception:
+        # 静默失败，不影响正常使用
+        pass
 
     # 3. 设置配置文件
     global g_config_file
     g_config_file = config_file
-    load_config()
+    try:
+        load_config()
+    except Exception:
+        # 静默失败，不影响正常使用
+        pass
 
     # 4. 显示历史统计数据（仅在显示欢迎信息时显示）
     if welcome_str:
-        _show_usage_stats(welcome_str)
+        try:
+            _show_usage_stats(welcome_str)
+        except Exception:
+            # 静默失败，不影响正常使用
+            pass
 
     # 5. 检查Jarvis更新
     if _check_jarvis_updates():

@@ -112,7 +112,7 @@ class _GraphLoader:
                         continue
                     try:
                         obj = json.loads(line)
-                    except (json.JSONDecodeError, ValueError):
+                    except Exception:
                         # 跳过无效的 JSON 行，但记录以便调试
                         continue
                     # 不区分函数与类型，统一处理 symbols.jsonl 中的所有记录
@@ -399,7 +399,7 @@ class LLMRustCratePlannerAgent:
                         continue
                     try:
                         obj = json.loads(line)
-                    except (json.JSONDecodeError, ValueError):
+                    except Exception:
                         continue
                     
                     roots = obj.get("roots") or []

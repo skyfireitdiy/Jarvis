@@ -219,7 +219,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     tools_prompt += "      </parameters>\n"
                     tools_prompt += "    </tool>\n"
 
-                except (json.JSONDecodeError, TypeError) as e:
+                except Exception as e:
                     PrettyOutput.print(
                         f"工具 {tool['name']} 参数序列化失败: {str(e)}",
                         OutputType.ERROR,
@@ -741,7 +741,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
                         data = temp_data
                         auto_completed = True
-                    except (json.JSONDecodeError, EOFError, KeyboardInterrupt):
+                    except (Exception, EOFError, KeyboardInterrupt):
                         # Even after fixing, it's not valid JSON, or user cancelled.
                         # Fall through to the original error.
                         pass
@@ -917,7 +917,7 @@ class ToolRegistry(OutputHandlerProtocol):
             if isinstance(args, str):
                 try:
                     args = json.loads(args)
-                except json.JSONDecodeError:
+                except Exception:
                     # 返回错误并附带完整的工具使用提示，指导下一次正确调用
                     try:
                         usage_prompt = agent_instance.get_tool_usage_prompt()
