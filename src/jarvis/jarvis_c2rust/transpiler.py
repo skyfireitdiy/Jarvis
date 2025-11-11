@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union, Set
 
+import json5  # type: ignore
 import typer
 
 from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
@@ -418,9 +419,10 @@ def _write_json(path: Path, obj: Any) -> None:
 
 def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]]:
     """
-    从 Agent summary 中提取结构化数据（仅支持 YAML）：
+    从 Agent summary 中提取结构化数据（使用 JSON 格式）：
     - 仅在 <SUMMARY>...</SUMMARY> 块内查找；
-    - 只接受 <yaml>...</yaml> 标签包裹的 YAML 对象；
+    - 直接解析 <SUMMARY> 块内的内容为 JSON 对象（不需要额外的 <json> 标签）；
+    - 使用 json5 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）；
     返回(解析结果, 错误信息)
     如果解析成功，返回(data, None)
     如果解析失败，返回({}, 错误信息)
@@ -431,23 +433,19 @@ def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]
     # 提取 <SUMMARY> 块
     m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=re.IGNORECASE)
     block = (m.group(1) if m else text).strip()
-
-    # 仅解析 <yaml>...</yaml>
-    mm = re.search(r"<yaml>([\s\S]*?)</yaml>", block, flags=re.IGNORECASE)
-    raw_yaml = mm.group(1).strip() if mm else None
-    if not raw_yaml:
-        return {}, "未找到 <yaml> 或 </yaml> 标签，或标签内容为空"
+    
+    if not block:
+        return {}, "未找到 <SUMMARY> 或 </SUMMARY> 标签，或标签内容为空"
 
     try:
-        import yaml  # type: ignore
         try:
-            obj = yaml.safe_load(raw_yaml)
-        except Exception as yaml_err:
-            error_msg = f"YAML 解析失败: {str(yaml_err)}"
+            obj = json5.loads(block)
+        except Exception as json_err:
+            error_msg = f"JSON 解析失败: {str(json_err)}"
             return {}, error_msg
         if isinstance(obj, dict):
             return obj, None
-        return {}, f"YAML 解析结果不是字典，而是 {type(obj).__name__}"
+        return {}, f"JSON 解析结果不是字典，而是 {type(obj).__name__}"
     except Exception as e:
         return {}, f"解析过程发生异常: {str(e)}"
 
@@ -682,7 +680,7 @@ class Transpiler:
     ) -> Tuple[str, str, str]:
         """
         返回 (system_prompt, user_prompt, summary_prompt)
-        要求 summary 输出 YAML：
+        要求 summary 输出 JSON：
         {
           "module": "src/<path>.rs or module path (e.g., src/foo/mod.rs or src/foo/bar.rs)",
           "rust_signature": "pub fn ...",
@@ -727,19 +725,17 @@ class Transpiler:
             "",
             "为避免完整读取体积较大的符号表，你也可以使用工具 read_symbols 按需获取指定符号记录：",
             "- 工具: read_symbols",
-            "- 参数示例(YAML):",
-            f"  symbols_file: \"{(self.data_dir / 'symbols.jsonl').resolve()}\"",
-            "  symbols:",
-            "    - 要读取的符号列表",
+            "- 参数示例(JSON):",
+            f"  {{\"symbols_file\": \"{(self.data_dir / 'symbols.jsonl').resolve()}\", \"symbols\": [\"符号1\", \"符号2\"]}}",
             "",
             "如果理解完毕，请进入总结阶段。",
         ])
         summary_prompt = (
-            "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 <yaml>...</yaml>，不得包含其它内容。\n"
-            "允许字段（YAML 对象）：\n"
-            '- module: "<绝对路径>/src/xxx.rs 或 <绝对路径>/src/xxx/mod.rs；或相对路径 src/xxx.rs / src/xxx/mod.rs"\n'
-            '- rust_signature: "pub fn xxx(...)->..."\n'
-            '- notes: "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
+            "请仅输出一个 <SUMMARY> 块，块内必须且只包含一个 JSON 对象，不得包含其它内容。\n"
+            "允许字段（JSON 对象）：\n"
+            '- "module": "<绝对路径>/src/xxx.rs 或 <绝对路径>/src/xxx/mod.rs；或相对路径 src/xxx.rs / src/xxx/mod.rs"\n'
+            '- "rust_signature": "pub fn xxx(...)->..."\n'
+            '- "notes": "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
             "注意：\n"
             "- module 必须位于 crate 的 src/ 目录下，接受绝对路径或以 src/ 开头的相对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型和惯用法，而不是 C 风格类型。\n"
@@ -751,8 +747,8 @@ class Transpiler:
             "  * 参数个数与顺序可以保持与 C 一致，但类型应优先考虑 Rust 的惯用法、安全性和可读性；\n"
             "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n"
-            "请严格按以下格式输出：\n"
-            "<SUMMARY><yaml>\nmodule: \"...\"\nrust_signature: \"...\"\nnotes: \"...\"\n</yaml></SUMMARY>"
+            "请严格按以下格式输出（JSON格式，支持json5语法如尾随逗号、注释等）：\n"
+            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"notes\": \"...\"\n}\n</SUMMARY>"
         )
         return system_prompt, user_prompt, summary_prompt
 
@@ -765,7 +761,7 @@ class Transpiler:
         def _validate(meta: Any) -> Tuple[bool, str]:
             """基本格式检查，仅验证字段存在性，不做硬编码规则校验"""
             if not isinstance(meta, dict) or not meta:
-                return False, "未解析到有效的 <SUMMARY><yaml> 对象"
+                return False, "未解析到有效的 <SUMMARY> 中的 JSON 对象"
             module = meta.get("module")
             rust_sig = meta.get("rust_signature")
             if not isinstance(module, str) or not module.strip():
@@ -799,8 +795,8 @@ class Transpiler:
                 base_sum_p
                 + "\n\n[格式检查失败，必须重试]\n"
                 + f"- 失败原因：{reason}\n"
-                + "- 仅输出一个 <SUMMARY> 块；块内仅包含单个 <yaml> 对象；\n"
-                + '- YAML 对象必须包含字段：module、rust_signature。\n'
+                + "- 仅输出一个 <SUMMARY> 块；块内直接包含 JSON 对象（不需要额外的标签）；\n"
+                + '- JSON 对象必须包含字段：module、rust_signature。\n'
             )
 
         attempt = 0
@@ -838,10 +834,10 @@ class Transpiler:
                     # 构造包含摘要提示词和具体错误信息的完整提示
                     error_guidance = ""
                     if last_reason and last_reason != "未知错误":
-                        if "YAML解析失败" in last_reason:
-                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。YAML 对象必须包含字段：module（字符串）、rust_signature（字符串）。"
+                        if "JSON解析失败" in last_reason:
+                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持json5语法（如尾随逗号、注释等）。"
                         else:
-                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内仅包含单个 <yaml> 对象；YAML 对象必须包含字段：module（字符串）、rust_signature（字符串）。"
+                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）；JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持json5语法（如尾随逗号、注释等）。"
                     
                     full_prompt = f"{usr_p}{error_guidance}\n\n{sum_p}"
                     try:
@@ -858,9 +854,9 @@ class Transpiler:
             
             meta, parse_error = _extract_json_from_summary(str(summary or ""))
             if parse_error:
-                # YAML解析失败，将错误信息反馈给模型
-                typer.secho(f"[c2rust-transpiler][plan] YAML解析失败: {parse_error}", fg=typer.colors.YELLOW)
-                last_reason = f"YAML解析失败: {parse_error}"
+                # JSON解析失败，将错误信息反馈给模型
+                typer.secho(f"[c2rust-transpiler][plan] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
+                last_reason = f"JSON解析失败: {parse_error}"
                 use_direct_model = True
                 # 解析失败，继续重试
                 continue
@@ -1120,10 +1116,8 @@ class Transpiler:
             "2. 符号表检索：",
             "   - 工具: read_symbols",
             "   - 用途: 按需获取指定符号记录",
-            "   - 参数示例(YAML):",
-            f"     symbols_file: \"{symbols_path}\"",
-            "     symbols:",
-            "       - 要读取的符号列表",
+            "   - 参数示例(JSON):",
+            f"     {{\"symbols_file\": \"{symbols_path}\", \"symbols\": [\"符号1\", \"符号2\"]}}",
             "",
             "3. 代码读取：",
             "   - 工具: read_code",
@@ -1622,10 +1616,8 @@ class Transpiler:
             "2. 符号表检索：",
             "   - 工具: read_symbols",
             "   - 用途: 定位或交叉验证 C 符号位置",
-            "   - 参数示例(YAML):",
-            f"     symbols_file: \"{symbols_path}\"",
-            "     symbols:",
-            f"       - \"{sym_name}\"",
+            "   - 参数示例(JSON):",
+            f"     {{\"symbols_file\": \"{symbols_path}\", \"symbols\": [\"{sym_name}\"]}}",
             "",
             "3. 代码读取：",
             "   - 工具: read_code",
@@ -1930,23 +1922,22 @@ class Transpiler:
                 "",
                 "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
                 "- 工具: read_symbols",
-                "- 参数示例(YAML):",
-                f"  symbols_file: \"{(self.data_dir / 'symbols.jsonl').resolve()}\"",
-                "  symbols:",
-                f"    - \"{rec.qname or rec.name}\"",
+                "- 参数示例(JSON):",
+                f"  {{\"symbols_file\": \"{(self.data_dir / 'symbols.jsonl').resolve()}\", \"symbols\": [\"{rec.qname or rec.name}\"]}}",
                 "",
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
             sum_p = (
-                "请仅输出一个 <SUMMARY> 块，块内为单个 <yaml> 对象，字段：\n"
-                "ok: bool  # 若满足功能一致且无严重问题，则为 true\n"
-                "function_issues: [string, ...]  # 功能一致性问题，每项以 [function] 开头，示例：[function] missing return value handling\n"
-                "critical_issues: [string, ...]  # 严重问题（可能导致功能错误），每项以 [critical] 开头，示例：[critical] obvious null pointer dereference\n"
+                "请仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：\n"
+                '"ok": bool  // 若满足功能一致且无严重问题，则为 true\n'
+                '"function_issues": [string, ...]  // 功能一致性问题，每项以 [function] 开头，示例：[function] missing return value handling\n'
+                '"critical_issues": [string, ...]  // 严重问题（可能导致功能错误），每项以 [critical] 开头，示例：[critical] obvious null pointer dereference\n'
                 "注意：\n"
                 "- 前置条件：必须在crate中找到该函数的实现（匹配函数名或签名）。若未找到，ok 必须为 false，function_issues 应包含 [function] function not found\n"
                 "- 若Rust实现修复了C代码中的安全漏洞或使用了不同的实现方式但保持了功能一致，且无严重问题，ok 应为 true\n"
                 "- 仅报告功能不一致和严重问题，不报告类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）\n"
-                "<SUMMARY><yaml>\nok: true\nfunction_issues: []\ncritical_issues: []\n</yaml></SUMMARY>"
+                "请严格按以下格式输出（JSON格式，支持json5语法如尾随逗号、注释等）：\n"
+                "<SUMMARY>\n{\n  \"ok\": true,\n  \"function_issues\": [],\n  \"critical_issues\": []\n}\n</SUMMARY>"
             )
             return sys_p, usr_p, sum_p
 
@@ -2009,10 +2000,10 @@ class Transpiler:
                     error_guidance = ""
                     # 检查上一次的解析结果
                     if parse_error_msg:
-                        # 如果有YAML解析错误，优先反馈
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- YAML解析失败: {parse_error_msg}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。YAML 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。"
+                        # 如果有JSON解析错误，优先反馈
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_msg}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持json5语法（如尾随逗号、注释等）。"
                     elif parse_failed:
-                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 YAML 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内为单个 <yaml> 对象，字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。"
+                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持json5语法（如尾随逗号、注释等）。"
                     
                     full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
                     try:
@@ -2027,15 +2018,15 @@ class Transpiler:
             finally:
                 os.chdir(prev_cwd)
             
-            # 解析 YAML 格式的审查结果
+            # 解析 JSON 格式的审查结果
             verdict, parse_error_review = _extract_json_from_summary(summary)
             parse_failed = False
             parse_error_msg = None
             if parse_error_review:
-                # YAML解析失败
+                # JSON解析失败
                 parse_failed = True
                 parse_error_msg = parse_error_review
-                typer.secho(f"[c2rust-transpiler][review] YAML解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
+                typer.secho(f"[c2rust-transpiler][review] JSON解析失败: {parse_error_review}", fg=typer.colors.YELLOW)
                 # 兼容旧格式：尝试解析纯文本 OK
                 m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
                 content = (m.group(1).strip() if m else summary.strip()).upper()
