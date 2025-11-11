@@ -2073,11 +2073,20 @@ def _create_signature_function():
 def _parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
     """解析聚类文本，返回(解析结果, 错误信息)"""
     try:
-        start = text.find("<CLUSTERS>")
-        end = text.find("</CLUSTERS>")
-        if start == -1 or end == -1 or end <= start:
-            return None, "未找到 <CLUSTERS> 或 </CLUSTERS> 标签，或标签顺序错误"
-        content = text[start + len("<CLUSTERS>"):end].strip()
+        import re as _re
+        # 使用正则表达式进行大小写不敏感的匹配
+        pattern = r"<CLUSTERS>([\s\S]*?)</CLUSTERS>"
+        match = _re.search(pattern, text, flags=_re.IGNORECASE)
+        if not match:
+            # 如果正则匹配失败，尝试直接查找（大小写敏感）
+            start = text.find("<CLUSTERS>")
+            end = text.find("</CLUSTERS>")
+            if start == -1 or end == -1 or end <= start:
+                return None, "未找到 <CLUSTERS> 或 </CLUSTERS> 标签，或标签顺序错误"
+            content = text[start + len("<CLUSTERS>"):end].strip()
+        else:
+            content = match.group(1).strip()
+        
         if not content:
             return None, "JSON 内容为空"
         try:
@@ -2528,12 +2537,17 @@ def _run_cluster_agent_with_retry(
     input_gids: set,
     file: str,
     _cluster_summary: Dict[str, str],
-) -> tuple[Optional[List[Dict]], Optional[str]]:
-    """运行聚类Agent并永久重试直到所有gid都被分类，返回(聚类结果, 解析错误)"""
+    create_agent_func=None,
+) -> tuple[Optional[List[Dict]], Optional[str], bool]:
+    """
+    运行聚类Agent并永久重试直到所有gid都被分类，返回(聚类结果, 解析错误, 是否需要重新创建agent)
+    如果需要重新创建agent，返回的第三个值为True
+    """
     _attempt = 0
     use_direct_model = False
     error_details: List[str] = []
     missing_gids = set()
+    consecutive_failures = 0  # 连续失败次数
     
     while True:
         _attempt += 1
@@ -2553,7 +2567,17 @@ def _run_cluster_agent_with_retry(
             # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
             cluster_agent.run(cluster_task)
         
-        cluster_items, parse_error = _parse_clusters_from_text(_cluster_summary.get("text", ""))
+        cluster_summary_text = _cluster_summary.get("text", "")
+        # 调试：如果解析失败，输出摘要文本的前500个字符用于调试
+        cluster_items, parse_error = _parse_clusters_from_text(cluster_summary_text)
+        
+        # 如果解析失败且是第一次尝试，输出调试信息
+        if parse_error and _attempt == 1:
+            preview = cluster_summary_text[:500] if cluster_summary_text else "(空)"
+            try:
+                typer.secho(f"[jarvis-sec] 调试：摘要文本预览（前500字符）: {preview}", fg=typer.colors.CYAN, err=True)
+            except Exception:
+                pass
         
         # 校验结构
         valid, error_details = _validate_cluster_result(cluster_items, parse_error, _attempt)
@@ -2563,10 +2587,21 @@ def _run_cluster_agent_with_retry(
         if valid and cluster_items:
             is_complete, missing_gids = _check_cluster_completeness(cluster_items, input_gids, _attempt)
             if is_complete:
-                return cluster_items, None
+                return cluster_items, None, False
             else:
                 use_direct_model = True
                 valid = False
+                consecutive_failures += 1
+        else:
+            consecutive_failures += 1
+        
+        # 如果连续失败5次，且提供了创建agent的函数，则返回需要重新创建agent的标志
+        if not valid and consecutive_failures >= 5 and create_agent_func is not None:
+            try:
+                typer.secho(f"[jarvis-sec] 连续失败 {consecutive_failures} 次，需要重新创建agent", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
+            return None, parse_error or "连续失败5次", True
         
         if not valid:
             use_direct_model = True
@@ -2886,22 +2921,38 @@ def _process_cluster_chunk(
     # 构建任务上下文
     cluster_task = _build_cluster_task(pending_in_file_with_ids, entry_path, file, langs)
     
-    # 订阅摘要事件
-    cluster_summary = _subscribe_summary_event(cluster_agent)
-    
     # 提取输入gid
     input_gids = _extract_input_gids(pending_in_file_with_ids)
     
-    # 运行聚类Agent
+    # 运行聚类Agent（支持重新创建agent，不限次数）
     cluster_summary_prompt = _get_cluster_summary_prompt()
-    cluster_items, parse_error = _run_cluster_agent_with_retry(
-        cluster_agent,
-        cluster_task,
-        cluster_summary_prompt,
-        input_gids,
-        file,
-        cluster_summary,
-    )
+    recreate_count = 0
+    
+    while True:
+        # 订阅摘要事件（每次重新创建agent后需要重新订阅）
+        cluster_summary = _subscribe_summary_event(cluster_agent)
+        
+        cluster_items, parse_error, need_recreate = _run_cluster_agent_with_retry(
+            cluster_agent,
+            cluster_task,
+            cluster_summary_prompt,
+            input_gids,
+            file,
+            cluster_summary,
+            create_agent_func=lambda: _create_cluster_agent(file, chunk_idx, llm_group, force_save_memory=force_save_memory),
+        )
+        
+        # 如果不需要重新创建agent，退出循环
+        if not need_recreate:
+            break
+        
+        # 需要重新创建agent（不限次数）
+        recreate_count += 1
+        try:
+            typer.secho(f"[jarvis-sec] 重新创建聚类Agent（第 {recreate_count} 次）", fg=typer.colors.MAGENTA)
+        except Exception:
+            pass
+        cluster_agent = _create_cluster_agent(file, chunk_idx, llm_group, force_save_memory=force_save_memory)
     
     # 处理聚类结果
     _merged_count = 0
@@ -3690,14 +3741,23 @@ def _try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str
     如果解析成功，返回(data, None)
     如果解析失败，返回(None, 错误信息)
     """
-    start = text.find("<REPORT>")
-    end = text.find("</REPORT>")
-    if start == -1 or end == -1 or end <= start:
-        return None, "未找到 <REPORT> 或 </REPORT> 标签，或标签顺序错误"
-    content = text[start + len("<REPORT>"):end].strip()
-    if not content:
-        return None, "JSON 内容为空"
     try:
+        import re as _re
+        # 使用正则表达式进行大小写不敏感的匹配
+        pattern = r"<REPORT>([\s\S]*?)</REPORT>"
+        match = _re.search(pattern, text, flags=_re.IGNORECASE)
+        if not match:
+            # 如果正则匹配失败，尝试直接查找（大小写敏感）
+            start = text.find("<REPORT>")
+            end = text.find("</REPORT>")
+            if start == -1 or end == -1 or end <= start:
+                return None, "未找到 <REPORT> 或 </REPORT> 标签，或标签顺序错误"
+            content = text[start + len("<REPORT>"):end].strip()
+        else:
+            content = match.group(1).strip()
+        
+        if not content:
+            return None, "JSON 内容为空"
         try:
             data = json.loads(content)
         except Exception as json_err:
