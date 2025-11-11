@@ -433,7 +433,7 @@ def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]
     # 提取 <SUMMARY> 块
     m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=re.IGNORECASE)
     block = (m.group(1) if m else text).strip()
-    
+
     if not block:
         return {}, "未找到 <SUMMARY> 或 </SUMMARY> 标签，或标签内容为空"
 
