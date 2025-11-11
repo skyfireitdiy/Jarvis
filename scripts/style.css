@@ -1,17 +1,11 @@
-/* style.css for Pandoc PDF Conversion */
+/* style.css for Pandoc PDF Conversion - Continuous (No Page Breaks) */
 
-/* --- Page Layout --- */
+/* --- Page Layout: Continuous Flow --- */
+/* Use a very tall page to allow continuous content flow without page breaks */
 @page {
-    size: A4 landscape;
+    size: 29.7cm 10000cm;  /* A4 landscape width (29.7cm), very tall height for continuous flow */
     margin: 2.5cm;
-    @bottom-center {
-        content: "Page " counter(page);
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", "PingFang SC", "WenQuanYi Micro Hei", sans-serif;
-        font-size: 9pt;
-        color: #555;
-        vertical-align: top;
-        padding-top: 1cm;
-    }
+    /* No page numbers for continuous PDF */
 }
 
 /* --- General Body and Typography --- */
@@ -33,7 +27,7 @@ h1, h2, h3, h4, h5, h6 {
     line-height: 1.2;
     margin-top: 1.5em;
     margin-bottom: 0.5em;
-    page-break-after: avoid;
+    /* No page-break-after for continuous flow */
 }
 
 h1 {
@@ -81,7 +75,7 @@ pre {
     font-size: 9pt;
     line-height: 1.4;
     border-radius: 4px;
-    page-break-inside: avoid;
+    /* No page-break-inside for continuous flow */
     /* --- Crucial for preventing overflow in PDF --- */
     white-space: pre-wrap; /* Tells the browser to wrap text, pandoc translates this for LaTeX */
     word-wrap: break-word; /* Forces long, unbreakable words to break */
@@ -110,7 +104,7 @@ blockquote {
     padding-left: 1em;
     color: #7f8c8d;
     margin-left: 0;
-    page-break-inside: avoid;
+    /* No page-break-inside for continuous flow */
 }
 
 
@@ -125,7 +119,7 @@ table {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 1em;
-    page-break-inside: avoid;
+    /* No page-break-inside for continuous flow */
     font-size: 9pt;
 }
 
@@ -147,7 +141,7 @@ img {
     display: block;
     margin-left: auto;
     margin-right: auto;
-    page-break-inside: avoid;
+    /* No page-break-inside for continuous flow */
 }
 
 /* --- PlantUML Diagrams --- */
@@ -155,5 +149,5 @@ img {
     display: block;
     margin: 2em auto;
     text-align: center;
-    page-break-inside: avoid;
+    /* No page-break-inside for continuous flow */
 }
