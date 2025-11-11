@@ -17,6 +17,8 @@
 #
 # Usage:
 #   ./build_pdf.sh [<input.md>] [<output.pdf>]
+#   
+# Note: Generates a continuous PDF without page breaks
 
 set -e # Exit immediately if a command exits with a non-zero status.
 set -u # Treat unset variables as an error.
@@ -139,6 +141,8 @@ echo "--- Starting PDF Generation via PrinceXML ---"
 echo "Input Markdown: $INPUT_FILE_ABS"
 echo "Temp HTML:      $TEMP_HTML_FILE"
 echo "Output PDF:     $OUTPUT_FILE_ABS"
+echo "Mode:           Continuous (no page breaks)"
+echo "Style CSS:      $STYLE_CSS"
 echo "---------------------------------------------"
 
 # Set PLANTUML_JAR and _JAVA_OPTIONS for pandoc-plantuml
