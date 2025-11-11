@@ -3,20 +3,20 @@
 LLM 驱动的 Rust Crate 模块规划 Agent
 
 目标:
-- 复用 scanner 中的 find_root_function_ids 与调用图信息，构造“以根函数为起点”的上下文
-- 通过 jarvis_agent.Agent 调用 LLM，基于上下文生成 Rust crate 的目录规划（YAML）
+- 复用 scanner 中的 find_root_function_ids 与调用图信息，构造"以根函数为起点"的上下文
+- 通过 jarvis_agent.Agent 调用 LLM，基于上下文生成 Rust crate 的目录规划（JSON）
 
 设计要点:
 - 与现有 scanner/cli 解耦，最小侵入新增模块
 - 使用 jarvis_agent.Agent 的平台与系统提示管理能力，但不走完整工具循环，直接进行一次性对话生成
-- 对输出格式进行强约束：仅输出 YAML，无解释文本
+- 对输出格式进行强约束：仅输出 JSON，无解释文本
 
 用法:
-  from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_yaml_llm
-  print(plan_crate_yaml_llm(project_root="."))
+  from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_json_llm
+  print(plan_crate_json_llm(project_root="."))
 
 CLI 集成建议:
-  可在 jarvis_c2rust/cli.py 中新增 llm-plan 子命令调用本模块的 plan_crate_yaml_llm（已独立封装，便于后续补充）
+  可在 jarvis_c2rust/cli.py 中新增 llm-plan 子命令调用本模块的 plan_crate_json_llm（已独立封装，便于后续补充）
 """
 
 from __future__ import annotations
@@ -301,7 +301,7 @@ def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
 
 class LLMRustCratePlannerAgent:
     """
-    使用 jarvis_agent.Agent 调用 LLM 来生成 Rust crate 规划（YAML）。
+    使用 jarvis_agent.Agent 调用 LLM 来生成 Rust crate 规划（JSON）。
     """
 
     def __init__(
@@ -454,7 +454,7 @@ class LLMRustCratePlannerAgent:
             indent=2,
         )
         return f"""
-下面提供了项目的调用图上下文（JSON），请先通读理解，不要输出任何规划或YAML内容：
+下面提供了项目的调用图上下文（JSON），请先通读理解，不要输出任何规划或JSON内容：
 <context>
 {context_json}
 </context>
@@ -490,11 +490,11 @@ class LLMRustCratePlannerAgent:
 
     def _build_summary_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
         """
-        总结阶段：只输出目录结构的 YAML。
+        总结阶段：只输出目录结构的 JSON。
         要求：
         - 仅输出一个 <PROJECT> 块
-        - <PROJECT> 与 </PROJECT> 之间必须是可解析的 YAML 列表，使用两空格缩进
-        - 目录以 '目录名/' 表示，子项为列表；文件为纯字符串
+        - <PROJECT> 与 </PROJECT> 之间必须是可解析的 JSON 数组
+        - 目录以对象表示，键为 '目录名/'，值为子项数组；文件为字符串
         - 块外不得有任何字符（包括空行、注释、Markdown、解释文字、schema等）
         - 不要输出 crate 名称或其他多余字段
         """
@@ -504,10 +504,11 @@ class LLMRustCratePlannerAgent:
 输出规范：
 - 只输出一个 <PROJECT> 块
 - 块外不得有任何字符（包括空行、注释、Markdown 等）
-- 块内必须是 YAML 列表：
-  - 目录项使用 '<name>/' 作为键，并在后面加冒号 ':'，其值为子项列表
-  - 文件为字符串项（例如 'lib.rs'）
+- 块内必须是 JSON 数组：
+  - 目录项使用对象表示，键为 '<name>/'，值为子项数组
+  - 文件为字符串项（例如 "lib.rs"）
 - 不要创建与入口无关的占位文件
+- 支持json5语法（如尾随逗号、注释等）
 """.strip()
         if has_main:
             entry_rule = f"""
@@ -516,13 +517,21 @@ class LLMRustCratePlannerAgent:
 - 不要包含 src/main.rs；
 - 必须包含 src/bin/{crate_name}.rs，作为唯一可执行入口（仅做入口，调用库逻辑）；
 - 如无明确多个入口，不要创建额外 bin 文件。
-正确示例（标准 YAML，带冒号）：
+正确示例（JSON格式）：
 <PROJECT>
-- Cargo.toml
-- src/:
-  - lib.rs
-  - bin/:
-    - {crate_name}.rs
+[
+  "Cargo.toml",
+  {{
+    "src/": [
+      "lib.rs",
+      {{
+        "bin/": [
+          "{crate_name}.rs"
+        ]
+      }}
+    ]
+  }}
+]
 </PROJECT>
 """.strip()
         else:
@@ -531,28 +540,33 @@ class LLMRustCratePlannerAgent:
 - 必须包含 src/lib.rs；
 - 不要包含 src/main.rs；
 - 不要包含 src/bin/ 目录。
-正确示例（标准 YAML，带冒号）：
+正确示例（JSON格式）：
 <PROJECT>
-- Cargo.toml
-- src/:
-  - lib.rs
+[
+  "Cargo.toml",
+  {
+    "src/": [
+      "lib.rs"
+    ]
+  }
+]
 </PROJECT>
 """.strip()
         guidance = f"{guidance_common}\n{entry_rule}"
         return f"""
-请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 YAML）。严格遵循以下要求：
+请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 JSON）。严格遵循以下要求：
 
 {guidance}
 
 你的输出必须仅包含以下单个块（用项目的真实目录结构替换块内内容）：
 <PROJECT>
-- ...
+[...]
 </PROJECT>
 """.strip()
 
-    def _extract_yaml_from_project(self, text: str) -> str:
+    def _extract_json_from_project(self, text: str) -> str:
         """
-        从 <PROJECT> 块中提取内容作为最终 YAML；若未匹配，返回原文本（兜底）。
+        从 <PROJECT> 块中提取内容作为最终 JSON；若未匹配，返回原文本（兜底）。
         """
         if not isinstance(text, str) or not text:
             return ""
@@ -574,7 +588,7 @@ class LLMRustCratePlannerAgent:
         返回 (是否通过, 错误原因)
         """
         if not isinstance(entries, list) or not entries:
-            return False, "YAML 不可解析或为空列表"
+            return False, "JSON 不可解析或为空数组"
 
         # 提取 src 目录子项
         src_children: Optional[List[Any]] = None
@@ -644,13 +658,13 @@ class LLMRustCratePlannerAgent:
             "\n\n[格式校验失败，必须重试]\n"
             f"- 失败原因：{error_reason}\n"
             "- 请严格遵循上述“输出规范”与“入口约定”，重新输出；\n"
-            "- 仅输出一个 <PROJECT> 块，块内为可解析的 YAML 列表；块外不得有任何字符。\n"
+            "- 仅输出一个 <PROJECT> 块，块内为可解析的 JSON 数组；块外不得有任何字符。\n"
         )
         return base_summary_prompt + feedback
 
-    def _get_project_yaml_text(self, max_retries: int = 10) -> str:
+    def _get_project_json_text(self, max_retries: int = 10) -> str:
         """
-        执行主流程并返回原始 <PROJECT> YAML 文本，不进行解析。
+        执行主流程并返回原始 <PROJECT> JSON 文本，不进行解析。
         若格式校验失败，将自动重试，直到满足为止或达到最大重试次数。
         
         Args:
@@ -693,16 +707,16 @@ class LLMRustCratePlannerAgent:
                 use_analysis=False,
             )
 
-            # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 YAML）
+            # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 JSON）
             if use_direct_model:
                 # 格式校验失败后，直接调用模型接口
                 # 构造包含摘要提示词和具体错误信息的完整提示
                 error_guidance = ""
                 if last_error and last_error != "未知错误":
-                    if "YAML解析失败" in last_error:
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出的YAML格式正确，包括正确的缩进、引号、冒号等。仅输出一个 <PROJECT> 块，块内仅包含 YAML 格式的项目结构定义。"
+                    if "JSON解析失败" in last_error:
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持json5语法（如尾随逗号、注释等）。"
                     else:
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 YAML 格式的项目结构定义。"
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持json5语法（如尾随逗号、注释等）。"
                 
                 full_prompt = f"{user_prompt}{error_guidance}\n\n{summary_prompt}"
                 try:
@@ -716,20 +730,20 @@ class LLMRustCratePlannerAgent:
                 summary_output = agent.run(user_prompt)  # type: ignore
             
             project_text = str(summary_output) if summary_output is not None else ""
-            yaml_text = self._extract_yaml_from_project(project_text)
+            json_text = self._extract_json_from_project(project_text)
 
             # 尝试解析并校验
-            entries, parse_error_yaml = _parse_project_yaml_entries(yaml_text)
-            if parse_error_yaml:
-                # YAML解析失败，记录错误并重试
-                last_error = parse_error_yaml
+            entries, parse_error_json = _parse_project_json_entries(json_text)
+            if parse_error_json:
+                # JSON解析失败，记录错误并重试
+                last_error = parse_error_json
                 use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
-                print(f"[c2rust-llm-planner] YAML解析失败: {parse_error_yaml}")
+                print(f"[c2rust-llm-planner] JSON解析失败: {parse_error_json}")
                 continue
 
             ok, reason = self._validate_project_entries(entries)
             if ok:
-                return yaml_text
+                return json_text
             else:
                 last_error = reason
                 use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
@@ -740,35 +754,35 @@ class LLMRustCratePlannerAgent:
             f"最后一次错误: {last_error}"
         )
 
-    def plan_crate_yaml_with_project(self) -> List[Any]:
+    def plan_crate_json_with_project(self) -> List[Any]:
         """
-        执行主流程并返回解析后的 YAML 对象（列表）：
+        执行主流程并返回解析后的 JSON 对象（列表）：
         - 列表项：
           * 字符串：文件，如 "lib.rs"
-          * 字典：目录及其子项，如 {"src": [ ... ]}
+          * 字典：目录及其子项，如 {"src/": [ ... ]}
         """
-        yaml_text = self._get_project_yaml_text()
-        yaml_entries, parse_error = _parse_project_yaml_entries(yaml_text)
+        json_text = self._get_project_json_text()
+        json_entries, parse_error = _parse_project_json_entries(json_text)
         if parse_error:
-            raise RuntimeError(f"YAML解析失败: {parse_error}")
-        return yaml_entries
+            raise RuntimeError(f"JSON解析失败: {parse_error}")
+        return json_entries
 
-    def plan_crate_yaml_text(self) -> str:
+    def plan_crate_json_text(self) -> str:
         """
-        执行主流程但返回原始 <PROJECT> YAML 文本，不进行解析。
+        执行主流程但返回原始 <PROJECT> JSON 文本，不进行解析。
         便于后续按原样应用目录结构，避免早期解析失败导致信息丢失。
         """
-        return self._get_project_yaml_text()
+        return self._get_project_json_text()
 
 
-def plan_crate_yaml_text(
+def plan_crate_json_text(
     project_root: Union[Path, str] = ".",
     db_path: Optional[Union[Path, str]] = None,
     llm_group: Optional[str] = None,
     skip_cleanup: bool = False,
 ) -> str:
     """
-    返回 LLM 生成的目录结构原始 YAML 文本（来自 <PROJECT> 块）。
+    返回 LLM 生成的目录结构原始 JSON 文本（来自 <PROJECT> 块）。
     在规划前执行预清理并征询用户确认：删除将要生成的 crate 目录、当前目录的 Cargo.toml 工作区文件，以及 .jarvis/c2rust 下的 progress.json 与 symbol_map.jsonl。
     用户不同意则退出程序。
     当 skip_cleanup=True 时，跳过清理与确认（用于外层已处理的场景）。
@@ -776,15 +790,15 @@ def plan_crate_yaml_text(
     # 若外层已处理清理确认，则跳过本函数的清理与确认（避免重复询问）
     if skip_cleanup:
         agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
-        return agent.plan_crate_yaml_text()
+        return agent.plan_crate_json_text()
 
     _perform_pre_cleanup_for_planner(project_root)
 
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
-    return agent.plan_crate_yaml_text()
+    return agent.plan_crate_json_text()
 
 
-def plan_crate_yaml_llm(
+def plan_crate_json_llm(
     project_root: Union[Path, str] = ".",
     db_path: Optional[Union[Path, str]] = None,
     skip_cleanup: bool = False,
@@ -798,135 +812,60 @@ def plan_crate_yaml_llm(
     # 若外层已处理清理确认，则跳过本函数的清理与确认（避免重复询问）
     if skip_cleanup:
         agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
-        return agent.plan_crate_yaml_with_project()
+        return agent.plan_crate_json_with_project()
 
     _perform_pre_cleanup_for_planner(project_root)
 
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
-    return agent.plan_crate_yaml_with_project()
+    return agent.plan_crate_json_with_project()
 
 
-def entries_to_yaml(entries: List[Any]) -> str:
+def entries_to_json(entries: List[Any]) -> str:
     """
-    将解析后的 entries 列表序列化为 YAML 文本（目录使用 'name/:' 形式，文件为字符串）
+    将解析后的 entries 列表序列化为 JSON 文本（目录使用对象表示，文件为字符串）
     """
-    def _entries_to_yaml(items, indent=0):
-        lines: List[str] = []
-        for it in (items or []):
-            if isinstance(it, str):
-                lines.append("  " * indent + f"- {it}")
-            elif isinstance(it, dict) and len(it) == 1:
-                name, children = next(iter(it.items()))
-                name = str(name).rstrip("/")
-                lines.append("  " * indent + f"- {name}/:")
-                lines.extend(_entries_to_yaml(children or [], indent + 1))
-        return lines
-
-    return "\n".join(_entries_to_yaml(entries))
+    return json.dumps(entries, ensure_ascii=False, indent=2)
 
 
-def _parse_project_yaml_entries_fallback(yaml_text: str) -> List[Any]:
+def _parse_project_json_entries_fallback(json_text: str) -> List[Any]:
     """
-    Fallback 解析器：当 PyYAML 不可用或解析失败时，按约定的缩进/列表语法解析 <PROJECT> 块。
-    支持的子集：
-    - 列表项以 "- " 开头
-    - 目录项以 "- <name>/:", 其子项为下一层缩进（+2 空格）的列表
-    - 文件项为 "- <filename>"
+    Fallback 解析器：当 json5 解析失败时，尝试使用标准 json 解析。
+    注意：此函数主要用于兼容性，正常情况下应使用 json5 解析。
     """
-    def leading_spaces(s: str) -> int:
-        return len(s) - len(s.lstrip(" "))
-
-    lines = [ln.rstrip() for ln in str(yaml_text or "").splitlines()]
-    idx = 0
-    n = len(lines)
-
-    # 跳过非列表起始行
-    while idx < n and not lines[idx].lstrip().startswith("- "):
-        idx += 1
-
-    def parse_list(expected_indent: int) -> List[Any]:
-        nonlocal idx
-        items: List[Any] = []
-        while idx < n:
-            line = lines[idx]
-            if not line.strip():
-                idx += 1
-                continue
-            indent = leading_spaces(line)
-            if indent < expected_indent:
-                break
-            if not line.lstrip().startswith("- "):
-                break
-
-            # 去掉 "- "
-            content = line[indent + 2 :].strip()
-
-            # 目录项：以 ":" 结尾（形如 "src/:")
-            if content.endswith(":"):
-                key = content[:-1].strip()
-                idx += 1  # 消费当前目录行
-                children = parse_list(expected_indent + 2)
-                # 规范化目录键为以 "/" 结尾（apply 时会 rstrip("/")，二者均可）
-                if not str(key).endswith("/"):
-                    key = f"{str(key).rstrip('/')}/"
-                items.append({key: children})
-            else:
-                # 文件项
-                items.append(content)
-                idx += 1
-        return items
-
-    base_indent = leading_spaces(lines[idx]) if idx < n else 0
-    return parse_list(base_indent)
+    try:
+        import json as std_json
+        data = std_json.loads(json_text)
+        if isinstance(data, list):
+            return data
+        return []
+    except Exception:
+        return []
 
 
-def _parse_project_yaml_entries(yaml_text: str) -> Tuple[List[Any], Optional[str]]:
+def _parse_project_json_entries(json_text: str) -> Tuple[List[Any], Optional[str]]:
     """
-    使用 PyYAML 解析 <PROJECT> 块中的目录结构 YAML 为列表结构:
+    使用 json5 解析 <PROJECT> 块中的目录结构 JSON 为列表结构:
     - 文件项: 字符串，如 "lib.rs"
     - 目录项: 字典，形如 {"src/": [ ... ]} 或 {"src": [ ... ]}
     返回(解析结果, 错误信息)
     如果解析成功，返回(data, None)
     如果解析失败，返回([], 错误信息)
-    优先使用 PyYAML；若不可用或解析失败，则回退到轻量解析器以最大化兼容性。
+    使用 json5 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）。
     """
     try:
-        import yaml  # type: ignore
         try:
-            data = yaml.safe_load(yaml_text)
+            data = json.loads(json_text)
             if isinstance(data, list):
                 return data, None
-            # 如果解析结果不是列表，回退到轻量解析器
-            return [], f"YAML 解析结果不是列表，而是 {type(data).__name__}"
-        except (yaml.YAMLError, ValueError) as yaml_err:
-            # YAML 解析错误，记录错误信息
-            error_msg = f"YAML 解析失败: {str(yaml_err)}"
-            # 回退到轻量解析器
-            try:
-                fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
-                return fallback_result, None  # 回退解析器成功，不返回错误
-            except Exception:
-                return [], error_msg
-    except ImportError:
-        # PyYAML 未安装，使用回退解析器
-        try:
-            fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
-            return fallback_result, None
-        except Exception as e:
-            return [], f"PyYAML 未安装且回退解析器失败: {str(e)}"
+            # 如果解析结果不是列表
+            return [], f"JSON 解析结果不是数组，而是 {type(data).__name__}"
+        except Exception as json_err:
+            # JSON 解析错误
+            error_msg = f"JSON 解析失败: {str(json_err)}"
+            return [], error_msg
     except Exception as e:
-        # 其他未知错误，回退到轻量解析器
-        try:
-            fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
-            return fallback_result, None
-        except Exception:
-            return [], f"解析过程发生异常: {str(e)}"
-    # 回退
-    try:
-        fallback_result = _parse_project_yaml_entries_fallback(yaml_text)
-        return fallback_result, None
-    except Exception as e:
-        return [], f"回退解析器失败: {str(e)}"
+        # 其他未知错误
+        return [], f"解析过程发生异常: {str(e)}"
 
 
 def _ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> str:
@@ -1023,7 +962,7 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
 
             # 非 src 目录：
             # 为避免覆盖现有实现，当前阶段不创建或更新 mod.rs 内容。
-            # 如需创建 mod.rs，应在 YAML 中显式指定为文件项；
+            # 如需创建 mod.rs，应在 JSON 中显式指定为文件项；
             # 如需补齐模块声明，将由后续的 CodeAgent 阶段根据目录结构自动补齐。
             return
 
@@ -1048,15 +987,15 @@ def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
         pass
 
 
-def apply_project_structure_from_yaml(yaml_text: str, project_root: Union[Path, str] = ".") -> None:
+def apply_project_structure_from_json(json_text: str, project_root: Union[Path, str] = ".") -> None:
     """
-    基于 Agent 返回的 <PROJECT> 中的目录结构 YAML，创建实际目录与文件（不在此阶段写入或更新任何 Rust 源文件内容）。
-    - project_root: 目标应用路径；当为 "."（默认）时，将使用“父目录/当前目录名_rs”作为crate根目录
+    基于 Agent 返回的 <PROJECT> 中的目录结构 JSON，创建实际目录与文件（不在此阶段写入或更新任何 Rust 源文件内容）。
+    - project_root: 目标应用路径；当为 "."（默认）时，将使用"父目录/当前目录名_rs"作为crate根目录
     注意：模块声明（mod/pub mod）补齐将在后续的 CodeAgent 步骤中完成。按新策略不再创建或更新 workspace（构建直接在 crate 目录内进行）。
     """
-    entries, parse_error = _parse_project_yaml_entries(yaml_text)
+    entries, parse_error = _parse_project_json_entries(json_text)
     if parse_error:
-        raise ValueError(f"YAML解析失败: {parse_error}")
+        raise ValueError(f"JSON解析失败: {parse_error}")
     if not entries:
         # 严格模式：解析失败直接报错并退出，由上层 CLI 捕获打印错误
         raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
@@ -1089,15 +1028,15 @@ def execute_llm_plan(
     non_interactive: bool = True,
 ) -> List[Any]:
     """
-    返回 LLM 生成的目录结构原始 YAML 文本（来自 <PROJECT> 块）。
+    返回 LLM 生成的目录结构原始 JSON 文本（来自 <PROJECT> 块）。
     不进行解析，便于后续按原样应用并在需要时使用更健壮的解析器处理。
     """
     # execute_llm_plan 是顶层入口，需要执行清理（skip_cleanup=False）
-    # plan_crate_yaml_text 内部会根据 skip_cleanup 决定是否执行清理
-    yaml_text = plan_crate_yaml_text(llm_group=llm_group, skip_cleanup=False)
-    entries, parse_error = _parse_project_yaml_entries(yaml_text)
+    # plan_crate_json_text 内部会根据 skip_cleanup 决定是否执行清理
+    json_text = plan_crate_json_text(llm_group=llm_group, skip_cleanup=False)
+    entries, parse_error = _parse_project_json_entries(json_text)
     if parse_error:
-        raise ValueError(f"YAML解析失败: {parse_error}")
+        raise ValueError(f"JSON解析失败: {parse_error}")
     if not entries:
         raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
 
@@ -1105,7 +1044,7 @@ def execute_llm_plan(
     if apply:
         target_root = crate_name if crate_name else "."
         try:
-            apply_project_structure_from_yaml(yaml_text, project_root=target_root)
+            apply_project_structure_from_json(json_text, project_root=target_root)
             print("[c2rust-llm-planner] 项目结构已应用。")
         except Exception as e:
             print(f"[c2rust-llm-planner] 应用项目结构失败: {e}")
@@ -1288,12 +1227,12 @@ def execute_llm_plan(
             # 恢复之前的工作目录
             os.chdir(prev_cwd)
 
-    # 3) 输出 YAML 到文件（如指定），并返回解析后的 entries
+    # 3) 输出 JSON 到文件（如指定），并返回解析后的 entries
     if out is not None:
         out_path = Path(out)
         out_path.parent.mkdir(parents=True, exist_ok=True)
         # 使用原始文本写出，便于可读
-        out_path.write_text(yaml_text, encoding="utf-8")
-        print(f"[c2rust-llm-planner] YAML 已写入: {out_path}")
+        out_path.write_text(json_text, encoding="utf-8")
+        print(f"[c2rust-llm-planner] JSON 已写入: {out_path}")
 
     return entries
