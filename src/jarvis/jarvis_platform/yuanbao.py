@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import hashlib
 import hmac
-import json5 as json
+import json
 import os
 import time
 import urllib.parse

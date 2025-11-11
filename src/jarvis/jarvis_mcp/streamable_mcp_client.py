@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json5 as json
+import json
 import threading
 from typing import Any, Callable, Dict, List
 from urllib.parse import urljoin

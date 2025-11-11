@@ -7,7 +7,7 @@ Node.js构建验证器模块
 提供Node.js项目的构建验证功能。
 """
 
-import json5 as json
+import json
 import os
 import time
 from typing import List, Optional

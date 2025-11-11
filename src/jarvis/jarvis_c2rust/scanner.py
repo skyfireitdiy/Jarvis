@@ -48,7 +48,7 @@ JSONL 文件
 from __future__ import annotations
 
 
-import json5 as json
+import json
 import os
 
 import sys

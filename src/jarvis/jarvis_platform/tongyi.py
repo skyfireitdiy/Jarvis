@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json5 as json
+import json
 import os
 import time
 import uuid

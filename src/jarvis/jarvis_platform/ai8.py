@@ -2,7 +2,7 @@ import os
 from typing import Any, Dict, Generator, List, Tuple
 
 from jarvis.jarvis_platform.base import BasePlatform
-import json5 as json
+import json
 
 from jarvis.jarvis_utils import http
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput

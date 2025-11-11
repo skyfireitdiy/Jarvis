@@ -15,7 +15,7 @@
 - stdout (str): JSON文本，包含查询结果
 - stderr (str)
 """
-import json5 as json
+import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List
