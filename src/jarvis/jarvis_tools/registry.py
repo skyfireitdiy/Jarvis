@@ -185,8 +185,8 @@ class ToolRegistry(OutputHandlerProtocol):
         return "TOOL_CALL"
 
     def can_handle(self, response: str) -> bool:
-        # 仅当 {ot("TOOL_CALL")} 出现在行首时才认为可以处理
-        return re.search(rf'(?m){re.escape(ot("TOOL_CALL"))}', response) is not None
+        # 仅当 {ot("TOOL_CALL")} 出现在行首时才认为可以处理（忽略大小写）
+        return re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', response) is not None
 
     def prompt(self) -> str:
         """加载工具"""
@@ -686,8 +686,8 @@ class ToolRegistry(OutputHandlerProtocol):
 
     @staticmethod
     def _has_tool_calls_block(content: str) -> bool:
-        """从内容中提取工具调用块（仅匹配行首标签）"""
-        pattern = rf'(?ms){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
+        """从内容中提取工具调用块（仅匹配行首标签，忽略大小写）"""
+        pattern = rf'(?msi){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
         return re.search(pattern, content) is not None
 
     @staticmethod
@@ -708,21 +708,25 @@ class ToolRegistry(OutputHandlerProtocol):
         异常:
             Exception: 如果工具调用缺少必要字段
         """
-        # 如果</TOOL_CALL>出现在响应的末尾，但是前面没有换行符，自动插入一个换行符进行修复
-        if content.rstrip().endswith(ct("TOOL_CALL")):
-            pos = content.rfind(ct("TOOL_CALL"))
+        # 如果</TOOL_CALL>出现在响应的末尾，但是前面没有换行符，自动插入一个换行符进行修复（忽略大小写）
+        close_tag = ct("TOOL_CALL")
+        # 使用正则表达式查找结束标签（忽略大小写），以获取实际位置和原始大小写
+        close_tag_pattern = re.escape(close_tag)
+        match = re.search(rf'{close_tag_pattern}$', content.rstrip(), re.IGNORECASE)
+        if match:
+            pos = match.start()
             if pos > 0 and content[pos - 1] not in ("\n", "\r"):
                 content = content[:pos] + "\n" + content[pos:]
 
-        # 将内容拆分为行
-        pattern = rf'(?ms){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
+        # 将内容拆分为行（忽略大小写）
+        pattern = rf'(?msi){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
         data = re.findall(pattern, content)
         auto_completed = False
         if not data:
             # can_handle 确保 ot("TOOL_CALL") 在内容中（行首）。
             # 如果数据为空，则表示行首的 ct("TOOL_CALL") 可能丢失。
-            has_open_at_bol = re.search(rf'(?m){re.escape(ot("TOOL_CALL"))}', content) is not None
-            has_close_at_bol = re.search(rf'(?m)^{re.escape(ct("TOOL_CALL"))}', content) is not None
+            has_open_at_bol = re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', content) is not None
+            has_close_at_bol = re.search(rf'(?mi)^{re.escape(ct("TOOL_CALL"))}', content) is not None
             if has_open_at_bol and not has_close_at_bol:
                 # 尝试通过附加结束标签来修复它（确保结束标签位于行首）
                 fixed_content = content.strip() + f"\n{ct('TOOL_CALL')}"
