@@ -174,16 +174,13 @@ class MemoryOrganizer:
 4. 确保合并后的记忆保留了所有重要信息
 5. **重要**：越近期的记忆权重越高，优先保留最新记忆中的信息
 
-请将合并结果放在 <merged_memory> 标签内，使用YAML格式：
+请将合并结果放在 <merged_memory> 标签内，使用JSON格式：
 
 <merged_memory>
-content: |
-  合并后的记忆内容
-  可以是多行文本
-tags:
-  - 标签1
-  - 标签2
-  - 标签3
+{{
+  "content": "合并后的记忆内容，可以是多行文本",
+  "tags": ["标签1", "标签2", "标签3"]
+}}
 </merged_memory>
 
 注意：
@@ -192,6 +189,7 @@ tags:
 - 保持专业和客观的语气
 - 最近的记忆信息优先级更高
 - 只输出 <merged_memory> 标签内的内容，不要有其他说明
+- JSON格式必须有效，字符串中的换行符使用 \\n 表示
 """
 
         try:
@@ -203,27 +201,27 @@ tags:
 
             # 解析响应
             import re
-            import yaml  # type: ignore[import-untyped]
+            import json5  # type: ignore[import-untyped]
 
             # 提取 <merged_memory> 标签内的内容
-            yaml_match = re.search(
+            json_match = re.search(
                 r"<merged_memory>(.*?)</merged_memory>",
                 response,
                 re.DOTALL | re.IGNORECASE,
             )
 
-            if yaml_match:
-                yaml_content = yaml_match.group(1).strip()
+            if json_match:
+                json_content = json_match.group(1).strip()
                 try:
-                    result = yaml.safe_load(yaml_content)
+                    result = json5.loads(json_content)
                     return {
                         "content": result.get("content", ""),
                         "tags": result.get("tags", []),
                         "type": memories[0].get("type", "unknown"),
                         "merged_from": [m.get("id", "") for m in memories],
                     }
-                except yaml.YAMLError as e:
-                    raise ValueError(f"无法解析YAML内容: {str(e)}")
+                except json5.JSON5DecodeError as e:
+                    raise ValueError(f"无法解析JSON内容: {str(e)}")
             else:
                 raise ValueError("无法从模型响应中提取 <merged_memory> 标签内容")
 
