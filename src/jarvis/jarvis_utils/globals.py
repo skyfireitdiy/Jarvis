@@ -274,7 +274,7 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
         Dict[str, List[str]]: 按记忆类型分组的标签列表
     """
     from pathlib import Path
-    import json5 as json
+    import json
     import random
     from jarvis.jarvis_utils.config import get_data_dir
 

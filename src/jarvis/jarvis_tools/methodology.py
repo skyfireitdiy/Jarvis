@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import hashlib
-import json5 as json
+import json
 import os
 from typing import Any, Dict
 

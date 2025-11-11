@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json5 as json
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 

@@ -256,7 +256,7 @@ def export(
     ),
 ):
     """导出统计数据"""
-    import json5 as json
+    import json
     import csv
     import sys
 

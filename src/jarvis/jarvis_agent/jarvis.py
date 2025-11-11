@@ -1084,7 +1084,7 @@ def run_cli(
                 try:
                     import sys as _sys
                     import os as _os
-                    import json5 as _json
+                    import json as _json
                     _argv = list(_sys.argv)
                     # 去掉程序名（argv[0]），并过滤 --web 相关参数
                     filtered = []

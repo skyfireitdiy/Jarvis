@@ -1,4 +1,4 @@
-import json5 as json
+import json
 import os
 from dataclasses import dataclass
 from typing import Dict, List, Optional

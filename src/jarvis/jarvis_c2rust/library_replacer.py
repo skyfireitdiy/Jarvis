@@ -28,7 +28,7 @@ Library-based dependency replacer for C→Rust migration (LLM-only subtree evalu
 
 from __future__ import annotations
 
-import json5 as json
+import json
 import shutil
 import time
 from pathlib import Path

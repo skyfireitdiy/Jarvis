@@ -9,7 +9,7 @@
 """
 
 import hashlib
-import json5 as json
+import json
 import os
 
 import typer

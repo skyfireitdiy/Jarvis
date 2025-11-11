@@ -2,7 +2,7 @@
 """方法论分享管理模块"""
 import os
 import glob
-import json5 as json
+import json
 import shutil
 from typing import List, Dict, Any
 
