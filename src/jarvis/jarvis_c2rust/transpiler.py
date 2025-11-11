@@ -1635,12 +1635,45 @@ class Transpiler:
             ])
         return "\n".join(base_lines)
 
+    def _detect_crate_kind(self) -> str:
+        """
+        检测 crate 类型：lib、bin 或 mixed。
+        判定规则（尽量保守，避免误判）：
+        - 若存在 src/lib.rs 或 Cargo.toml 中包含 [lib]，视为包含 lib
+        - 若存在 src/main.rs 或 Cargo.toml 中包含 [[bin]]（或 [bin] 兼容），视为包含 bin
+        - 同时存在则返回 mixed
+        - 两者都不明确时，默认返回 lib（与默认模版一致）
+        """
+        try:
+            cargo_path = (self.crate_dir / "Cargo.toml").resolve()
+            txt = ""
+            if cargo_path.exists():
+                try:
+                    txt = cargo_path.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    txt = ""
+            txt_lower = txt.lower()
+            has_lib = (self.crate_dir / "src" / "lib.rs").exists() or bool(re.search(r"(?m)^\s*\[lib\]\s*$", txt_lower))
+            # 兼容：[[bin]] 为数组表，极少数项目也会写成 [bin]
+            has_bin = (self.crate_dir / "src" / "main.rs").exists() or bool(re.search(r"(?m)^\s*\[\[bin\]\]\s*$", txt_lower) or re.search(r"(?m)^\s*\[bin\]\s*$", txt_lower))
+            if has_lib and has_bin:
+                return "mixed"
+            if has_bin:
+                return "bin"
+            if has_lib:
+                return "lib"
+        except Exception:
+            pass
+        # 默认假设为 lib
+        return "lib"
+
     def _cargo_build_loop(self) -> bool:
         """在 crate 目录执行构建与测试：先 cargo check，再 cargo test。失败则最小化修复直到通过或达到上限。"""
         workspace_root = str(self.crate_dir)
+        crate_kind = self._detect_crate_kind()
         check_limit = f"最大重试: {self.check_max_retries if self.check_max_retries > 0 else '无限'}"
         test_limit = f"最大重试: {self.test_max_retries if self.test_max_retries > 0 else '无限'}"
-        typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（check -> test，{check_limit} / {test_limit}）", fg=typer.colors.MAGENTA)
+        typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，crate类型={crate_kind}，开始构建循环（check -> {'build' if crate_kind=='bin' else 'test'}，{check_limit} / {test_limit}）", fg=typer.colors.MAGENTA)
         check_iter = 0
         test_iter = 0
         while True:
@@ -1716,32 +1749,124 @@ class Transpiler:
                 # 下一轮循环
                 continue
 
-            # 阶段二：cargo test（check 通过后才执行）
+            # 阶段二：根据 crate 类型决定验证方式
+            # - lib/mixed: 优先运行 cargo test
+            # - bin-only: 运行 cargo build（二进制项目常无测试，构建通过即可）
             test_iter += 1
-            # 测试失败时需要详细输出，移除 -q 参数以获取完整的测试失败信息（包括堆栈跟踪、断言详情等）
-            res = subprocess.run(
-                ["cargo", "test", "--", "--nocapture"],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=workspace_root,
-            )
-            if res.returncode == 0:
-                typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
+            if crate_kind == "bin":
+                # 构建二进制（包含所有 bins）
+                res = subprocess.run(
+                    ["cargo", "build", "-q", "--bins"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    cwd=workspace_root,
+                )
+                if res.returncode == 0:
+                    typer.secho("[c2rust-transpiler][build] Cargo 构建通过（二进制 crate）。", fg=typer.colors.GREEN)
+                    try:
+                        cur = self.progress.get("current") or {}
+                        metrics = cur.get("metrics") or {}
+                        metrics["check_attempts"] = int(check_iter)
+                        # 对于 bin-only，使用 build_attempts 记录第二阶段次数
+                        metrics["build_attempts"] = int(test_iter)
+                        cur["metrics"] = metrics
+                        cur["impl_verified"] = True
+                        cur["failed_stage"] = None
+                        self.progress["current"] = cur
+                        self._save_progress()
+                    except Exception:
+                        pass
+                    return True
+                # 构建失败路径（bin-only）
+                output = (res.stdout or "") + "\n" + (res.stderr or "")
+                limit_info = f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})" if test_iter % 10 == 0 or test_iter == 1 else ""
+                typer.secho(f"[c2rust-transpiler][build] Cargo 构建失败 (第 {test_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
+                typer.secho(output, fg=typer.colors.RED)
+                maxr = self.test_max_retries
+                if maxr > 0 and test_iter >= maxr:
+                    typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
+                    try:
+                        cur = self.progress.get("current") or {}
+                        metrics = cur.get("metrics") or {}
+                        metrics["check_attempts"] = int(check_iter)
+                        metrics["build_attempts"] = int(test_iter)
+                        cur["metrics"] = metrics
+                        cur["impl_verified"] = False
+                        cur["failed_stage"] = "build"
+                        err_summary = (output or "").strip()
+                        if len(err_summary) > ERROR_SUMMARY_MAX_LENGTH:
+                            err_summary = err_summary[:ERROR_SUMMARY_MAX_LENGTH] + "...(truncated)"
+                        cur["last_build_error"] = err_summary
+                        self.progress["current"] = cur
+                        self._save_progress()
+                    except Exception:
+                        pass
+                    return False
+                # 构建失败修复流程（bin-only）
+                tags = self._classify_rust_error(output)
+                symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
+                curr, sym_name, src_loc, c_code = self._get_current_function_context()
+                # 复用 repair 提示，但阶段命名使用 "cargo build"
+                repair_prompt = self._build_repair_prompt(
+                    stage="cargo build",
+                    output=output,
+                    tags=tags,
+                    sym_name=sym_name,
+                    src_loc=src_loc,
+                    c_code=c_code,
+                    curr=curr,
+                    symbols_path=symbols_path,
+                    include_output_patch_hint=False,
+                )
+                prev_cwd = os.getcwd()
                 try:
-                    cur = self.progress.get("current") or {}
-                    metrics = cur.get("metrics") or {}
-                    metrics["check_attempts"] = int(check_iter)
-                    metrics["test_attempts"] = int(test_iter)
-                    cur["metrics"] = metrics
-                    cur["impl_verified"] = True
-                    cur["failed_stage"] = None
-                    self.progress["current"] = cur
-                    self._save_progress()
-                except Exception:
-                    pass
-                return True
+                    os.chdir(str(self.crate_dir))
+                    agent = self._get_repair_agent()
+                    agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][build]", suffix="")
+                    # 修复后进行轻量验证
+                    res_verify = subprocess.run(
+                        ["cargo", "build", "-q", "--bins"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        cwd=workspace_root,
+                    )
+                    if res_verify.returncode == 0:
+                        typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                    else:
+                        typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                finally:
+                    os.chdir(prev_cwd)
+                # 下一轮循环
+                continue
+            else:
+                # lib 或 mixed：执行测试
+                # 测试失败时需要详细输出，移除 -q 参数以获取完整的测试失败信息（包括堆栈跟踪、断言详情等）
+                res = subprocess.run(
+                    ["cargo", "test", "--", "--nocapture"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    cwd=workspace_root,
+                )
+                if res.returncode == 0:
+                    typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
+                    try:
+                        cur = self.progress.get("current") or {}
+                        metrics = cur.get("metrics") or {}
+                        metrics["check_attempts"] = int(check_iter)
+                        metrics["test_attempts"] = int(test_iter)
+                        cur["metrics"] = metrics
+                        cur["impl_verified"] = True
+                        cur["failed_stage"] = None
+                        self.progress["current"] = cur
+                        self._save_progress()
+                    except Exception:
+                        pass
+                    return True
 
+            # 走到这里表示 lib/mixed 的测试失败
             output = (res.stdout or "") + "\n" + (res.stderr or "")
             limit_info = f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})" if test_iter % 10 == 0 or test_iter == 1 else ""
             typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
