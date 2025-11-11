@@ -974,9 +974,19 @@ class Transpiler:
         self._current_context_compact_header = "\n".join(compact_lines)
         self._current_context_full_sent = False
 
-        # 初始化一次代码生成Agent（CodeAgent），单个函数生命周期内复用
-        # 该Agent用于代码生成和修复，启用方法论、分析和强制记忆功能
-        self._current_agents[f"code_agent::{rec.id}"] = CodeAgent(
+        # 初始化代码生成Agent（CodeAgent），单个函数生命周期内复用
+        # 代码生成阶段：禁用方法论和分析，仅启用强制记忆功能
+        self._current_agents[f"code_agent_gen::{rec.id}"] = CodeAgent(
+            need_summary=False,
+            non_interactive=self.non_interactive,
+            model_group=self.llm_group,
+            use_methodology=False,
+            use_analysis=False,
+            force_save_memory=True,
+        )
+        # 初始化修复Agent（CodeAgent），单个函数生命周期内复用
+        # 修复阶段：启用方法论、分析和强制记忆功能
+        self._current_agents[f"code_agent_repair::{rec.id}"] = CodeAgent(
             need_summary=False,
             non_interactive=self.non_interactive,
             model_group=self.llm_group,
@@ -985,16 +995,37 @@ class Transpiler:
             force_save_memory=True,
         )
 
-    def _get_repair_agent(self) -> CodeAgent:
+    def _get_generate_agent(self) -> CodeAgent:
         """
-        获取复用的代码生成Agent（CodeAgent）。若未初始化，则按当前函数id创建。
-        该Agent用于代码生成和修复，启用方法论、分析和强制记忆功能。
+        获取代码生成Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        代码生成阶段：禁用方法论和分析，仅启用强制记忆功能。
         """
         fid = self._current_function_id
-        key = f"code_agent::{fid}" if fid is not None else "code_agent::default"
+        key = f"code_agent_gen::{fid}" if fid is not None else "code_agent_gen::default"
         agent = self._current_agents.get(key)
         if agent is None:
-            # 复用的代码生成Agent启用方法论、分析和强制记忆功能
+            # 代码生成Agent禁用方法论和分析，仅启用强制记忆功能
+            agent = CodeAgent(
+                need_summary=False,
+                non_interactive=self.non_interactive,
+                model_group=self.llm_group,
+                use_methodology=False,
+                use_analysis=False,
+                force_save_memory=True,
+            )
+            self._current_agents[key] = agent
+        return agent
+
+    def _get_repair_agent(self) -> CodeAgent:
+        """
+        获取修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        修复阶段：启用方法论、分析和强制记忆功能。
+        """
+        fid = self._current_function_id
+        key = f"code_agent_repair::{fid}" if fid is not None else "code_agent_repair::default"
+        agent = self._current_agents.get(key)
+        if agent is None:
+            # 修复Agent启用方法论、分析和强制记忆功能
             agent = CodeAgent(
                 need_summary=False,
                 non_interactive=self.non_interactive,
@@ -1171,11 +1202,11 @@ class Transpiler:
                     pass
         except Exception:
             pass
-        # 切换到 crate 目录运行复用的代码编写与修复Agent，运行完毕后恢复
+        # 切换到 crate 目录运行代码生成Agent，运行完毕后恢复
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(self.crate_dir))
-            agent = self._get_repair_agent()  # 使用复用的Agent，同时支持代码编写和修复
+            agent = self._get_generate_agent()  # 使用代码生成Agent（禁用分析和方法论）
             agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen]", suffix="")
         finally:
             os.chdir(prev_cwd)
