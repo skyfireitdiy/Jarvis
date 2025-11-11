@@ -160,6 +160,9 @@ class StatsStorage:
 
         # 更新元数据
         meta = self._load_json(self.meta_file)
+        # 确保 meta 字典中有 "metrics" 键
+        if "metrics" not in meta:
+            meta["metrics"] = {}
         if metric_name not in meta["metrics"]:
             meta["metrics"][metric_name] = {
                 "unit": unit,
@@ -549,7 +552,9 @@ class StatsStorage:
         """
         # 检查指标是否存在
         meta = self._load_json(self.meta_file)
-        if metric_name not in meta.get("metrics", {}):
+        if "metrics" not in meta:
+            meta["metrics"] = {}
+        if metric_name not in meta["metrics"]:
             return False
 
         # 从元数据中删除指标
