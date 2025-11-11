@@ -5,9 +5,9 @@
 """
 
 
+import json
 import os
 import re
-import yaml
 from typing import List, Optional, Any
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -269,16 +269,12 @@ class ContextRecommender:
 2. 符合常见命名规范（如驼峰命名、下划线命名等）
 3. 尽量具体，避免过于通用的名称
 
-以YAML数组格式返回，并用<SYMBOL_NAMES>标签包裹。
+以JSON数组格式返回，并用<SYMBOL_NAMES>标签包裹。
 只返回符号名数组，不要包含其他文字。
 
 示例格式：
 <SYMBOL_NAMES>
-- processData
-- validateInput
-- handleError
-- createApiEndpoint
-- authenticateUser
+["processData", "validateInput", "handleError", "createApiEndpoint", "authenticateUser"]
 </SYMBOL_NAMES>
 """
 
@@ -286,22 +282,22 @@ class ContextRecommender:
             response = self._call_llm(prompt)
             # 从<SYMBOL_NAMES>标签中提取内容
             response = response.strip()
-            yaml_match = re.search(r'<SYMBOL_NAMES>\s*(.*?)\s*</SYMBOL_NAMES>', response, re.DOTALL)
-            if yaml_match:
-                yaml_content = yaml_match.group(1).strip()
+            json_match = re.search(r'<SYMBOL_NAMES>\s*(.*?)\s*</SYMBOL_NAMES>', response, re.DOTALL)
+            if json_match:
+                json_content = json_match.group(1).strip()
             else:
                 # 如果没有找到标签，尝试清理markdown代码块
-                if response.startswith("```yaml"):
+                if response.startswith("```json"):
                     response = response[7:]
                 elif response.startswith("```"):
                     response = response[3:]
                 if response.endswith("```"):
                     response = response[:-3]
-                yaml_content = response.strip()
+                json_content = response.strip()
             
-            symbol_names = yaml.safe_load(yaml_content)
+            symbol_names = json.loads(json_content)
             if not isinstance(symbol_names, list):
-                PrettyOutput.print("⚠️  LLM返回的符号名格式不正确，期望YAML数组", OutputType.WARNING)
+                PrettyOutput.print("⚠️  LLM返回的符号名格式不正确，期望JSON数组", OutputType.WARNING)
                 return []
             
             # 过滤空字符串和过短的符号名
@@ -393,17 +389,13 @@ class ContextRecommender:
 生成的符号名：{', '.join(symbol_names)}
 
 候选符号列表（已编号，包含位置信息）：
-{yaml.dump(symbol_info_list, allow_unicode=True, default_flow_style=False)}
+{json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
 
-请返回最相关的10-20个符号的序号（YAML数组格式），按相关性排序，并用<SELECTED_INDICES>标签包裹。
+请返回最相关的10-20个符号的序号（JSON数组格式），按相关性排序，并用<SELECTED_INDICES>标签包裹。
 
 只返回序号数组，例如：
 <SELECTED_INDICES>
-- 3
-- 7
-- 12
-- 15
-- 23
+[3, 7, 12, 15, 23]
 </SELECTED_INDICES>
 """
 
@@ -411,22 +403,22 @@ class ContextRecommender:
             response = self._call_llm(prompt)
             # 从<SELECTED_INDICES>标签中提取内容
             response = response.strip()
-            yaml_match = re.search(r'<SELECTED_INDICES>\s*(.*?)\s*</SELECTED_INDICES>', response, re.DOTALL)
-            if yaml_match:
-                yaml_content = yaml_match.group(1).strip()
+            json_match = re.search(r'<SELECTED_INDICES>\s*(.*?)\s*</SELECTED_INDICES>', response, re.DOTALL)
+            if json_match:
+                json_content = json_match.group(1).strip()
             else:
                 # 如果没有找到标签，尝试清理markdown代码块
-                if response.startswith("```yaml"):
+                if response.startswith("```json"):
                     response = response[7:]
                 elif response.startswith("```"):
                     response = response[3:]
                 if response.endswith("```"):
                     response = response[:-3]
-                yaml_content = response.strip()
+                json_content = response.strip()
             
-            selected_indices = yaml.safe_load(yaml_content)
+            selected_indices = json.loads(json_content)
             if not isinstance(selected_indices, list):
-                PrettyOutput.print("⚠️  LLM返回的符号序号格式不正确，期望YAML数组", OutputType.WARNING)
+                PrettyOutput.print("⚠️  LLM返回的符号序号格式不正确，期望JSON数组", OutputType.WARNING)
                 return []
             
             PrettyOutput.print(f"📋 LLM返回了 {len(selected_indices)} 个符号序号", OutputType.INFO)

@@ -29,12 +29,14 @@ tool_call_help = f"""
 <format>
 # 📋 工具调用格式
 {ot("TOOL_CALL")}
-want: 想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息
-name: 工具名称
-
-arguments:
-  param1: 值1
-  param2: 值2
+{{
+  "want": "想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息",
+  "name": "工具名称",
+  "arguments": {{
+    "param1": "值1",
+    "param2": "值2"
+  }}
+}}
 {ct("TOOL_CALL")}
 </format>
 
@@ -49,7 +51,7 @@ arguments:
 <rule>
 ### 2. 严格遵守格式
 - 完全按照上述格式
-- 使用正确的YAML格式，2个空格作为缩进
+- 使用正确的JSON格式
 - 包含所有必需参数
 - {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
 </rule>
@@ -101,7 +103,7 @@ arguments:
 - 假设工具结果
 - 创建虚构对话
 - 在没有所需信息的情况下继续
-- yaml 格式错误
+- JSON 格式错误
 - {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 没有出现在行首
 </common_errors>
 </tool_system_guide>
@@ -139,26 +141,25 @@ class ToolRegistry(OutputHandlerProtocol):
                     tools_prompt += f"      <name>名称: {tool['name']}</name>\n"
                     tools_prompt += f"      <description>描述: {tool['description']}</description>\n"
                     tools_prompt += "      <parameters>\n"
-                    tools_prompt += "        <yaml>|\n"
+                    tools_prompt += "        <json>|\n"
 
-                    # 生成格式化的YAML参数
-                    yaml_params = yaml.dump(
+                    # 生成格式化的JSON参数
+                    json_params = json.dumps(
                         tool["parameters"],
-                        allow_unicode=True,
-                        indent=4,
+                        ensure_ascii=False,
+                        indent=2,
                         sort_keys=False,
-                        width=120,  # 增加行宽限制
                     )
 
                     # 添加缩进并移除尾部空格
-                    for line in yaml_params.split("\n"):
+                    for line in json_params.split("\n"):
                         tools_prompt += f"          {line.rstrip()}\n"
 
-                    tools_prompt += "        </yaml>\n"
+                    tools_prompt += "        </json>\n"
                     tools_prompt += "      </parameters>\n"
                     tools_prompt += "    </tool>\n"
 
-                except yaml.YAMLError as e:
+                except (json.JSONDecodeError, TypeError) as e:
                     PrettyOutput.print(
                         f"工具 {tool['name']} 参数序列化失败: {str(e)}",
                         OutputType.ERROR,
@@ -430,7 +431,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
                     return {
                         "success": True,
-                        "stdout": yaml.safe_dump(ret, allow_unicode=True),
+                        "stdout": json.dumps(ret, ensure_ascii=False, indent=2),
                         "stderr": "",
                     }
 
@@ -666,7 +667,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 # 尝试通过附加结束标签来修复它（确保结束标签位于行首）
                 fixed_content = content.strip() + f"\n{ct('TOOL_CALL')}"
 
-                # 再次提取，并检查YAML是否有效
+                # 再次提取，并检查JSON是否有效
                 temp_data = re.findall(
                     pattern,
                     fixed_content,
@@ -674,14 +675,14 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 if temp_data:
                     try:
-                        yaml.safe_load(temp_data[0])  # Check if valid YAML
+                        json.loads(temp_data[0])  # Check if valid JSON
 
                         # Ask user for confirmation
 
                         data = temp_data
                         auto_completed = True
-                    except (yaml.YAMLError, EOFError, KeyboardInterrupt):
-                        # Even after fixing, it's not valid YAML, or user cancelled.
+                    except (json.JSONDecodeError, EOFError, KeyboardInterrupt):
+                        # Even after fixing, it's not valid JSON, or user cancelled.
                         # Fall through to the original error.
                         pass
 
@@ -694,11 +695,11 @@ class ToolRegistry(OutputHandlerProtocol):
         ret = []
         for item in data:
             try:
-                msg = yaml.safe_load(item)
+                msg = json.loads(item)
             except Exception as e:
                 return (
                     {},
-                    f"""yaml 解析失败，请检查工具调用格式。
+                    f"""JSON 解析失败，请检查工具调用格式。
                     {e}
 
                 {tool_call_help}""",
@@ -927,7 +928,7 @@ class ToolRegistry(OutputHandlerProtocol):
 </content>
 
 上传的文件是以下工具执行结果：
-{yaml.safe_dump({"name":name, "arguments":args, "want":want})}
+{json.dumps({"name":name, "arguments":args, "want":want}, ensure_ascii=False, indent=2)}
 
 请根据以上信息，继续完成任务。
 """
