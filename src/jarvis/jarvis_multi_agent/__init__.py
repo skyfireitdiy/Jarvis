@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
+import json
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
-
-import yaml
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.output_handler import OutputHandler
@@ -36,19 +35,10 @@ class MultiAgent(OutputHandler):
 ### 消息格式标准
 ```
 {ot("SEND_MESSAGE")}
-to: 智能体名称    # 目标智能体名称
-content: |2
-  # 消息主题
-  ## 背景信息
-  [提供必要的上下文和背景]
-  ## 具体需求
-  [明确表达期望完成的任务]
-  ## 相关资源
-  [列出相关文档、数据或工具]
-  ## 期望结果
-  [描述期望的输出格式和内容]
-  ## 下一步计划
-  [描述下一步的计划和行动]
+{{
+  "to": "智能体名称",
+  "content": "# 消息主题\\n## 背景信息\\n[提供必要的上下文和背景]\\n## 具体需求\\n[明确表达期望完成的任务]\\n## 相关资源\\n[列出相关文档、数据或工具]\\n## 期望结果\\n[描述期望的输出格式和内容]\\n## 下一步计划\\n[描述下一步的计划和行动]"
+}}
 {ct("SEND_MESSAGE")}
 ```
 
@@ -56,11 +46,10 @@ content: |2
 
 ```
 {ot("SEND_MESSAGE")}
-to: 智能体名称    # 目标智能体名称
-content: |2
-  # 消息主题
-  ## 任务结果
-  [任务完成结果，用于反馈]
+{{
+  "to": "智能体名称",
+  "content": "# 消息主题\\n## 任务结果\\n[任务完成结果，用于反馈]"
+}}
 {ct("SEND_MESSAGE")}
 ```
 
@@ -97,12 +86,10 @@ content: |2
                     + "\n修复建议：\n"
                     "- 必须包含 to 和 content 字段\n"
                     "- to: 目标智能体名称（字符串）\n"
-                    "- content: 发送内容，建议使用多行块 |2 保持格式\n"
+                    "- content: 发送内容（字符串）\n"
                     "示例：\n"
                     f"{ot('SEND_MESSAGE')}\n"
-                    "to: 目标Agent名称\n"
-                    "content: |2\n"
-                    "  这里填写要发送的消息内容\n"
+                    '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
                     f"{ct('SEND_MESSAGE')}"
                 )
                 return False, guidance
@@ -110,7 +97,7 @@ content: |2
             if not isinstance(to_val, str):
                 return False, "SEND_MESSAGE 字段类型错误：to 必须为字符串。修复建议：将 to 改为字符串，如 to: ChapterPolisher"
             if not isinstance(content_val, str):
-                return False, "SEND_MESSAGE 字段类型错误：content 必须为字符串。修复建议：将 content 改为字符串或使用多行块 content: |2"
+                return False, "SEND_MESSAGE 字段类型错误：content 必须为字符串。修复建议：将 content 改为字符串"
             # 目标校验
             if to_val not in self.agents_config_map:
                 available = ", ".join(self.agents_config_map.keys())
@@ -150,7 +137,7 @@ content: |2
                 "  这里填写要发送的消息内容\n"
                 f"{ct_tag}"
             )
-        # 尝试提取原始块并指出 YAML 问题
+        # 尝试提取原始块并指出 JSON 问题
         import re as _re
         pattern = _re.compile(
             rf"{_re.escape(ot_tag)}[ \t]*\n(.*?)(?:\n)?[ \t]*{_re.escape(ct_tag)}",
@@ -167,21 +154,19 @@ content: |2
             return (
                 False,
                 "SEND_MESSAGE 格式错误：未能识别完整的消息块。\n"
-                "修复建议：确保起止标签在单独行上，且中间内容为合法的 YAML，包含 to 与 content 字段。"
+                "修复建议：确保起止标签在单独行上，且中间内容为合法的 JSON，包含 to 与 content 字段。"
             )
         raw = blocks[0]
         try:
-            msg_obj = yaml.safe_load(raw)
+            msg_obj = json.loads(raw)
             if not isinstance(msg_obj, dict):
                 return (
                     False,
-                    "SEND_MESSAGE 内容必须为 YAML 对象（键值对）。\n"
+                    "SEND_MESSAGE 内容必须为 JSON 对象（键值对）。\n"
                     "修复建议：使用 to 与 content 字段构成的对象。\n"
                     "示例：\n"
                     f"{ot('SEND_MESSAGE')}\n"
-                    "to: 目标Agent名称\n"
-                    "content: |2\n"
-                    "  这里填写要发送的消息内容\n"
+                    '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
                     f"{ct('SEND_MESSAGE')}"
                 )
             missing_keys = [k for k in ("to", "content") if k not in msg_obj]
@@ -192,16 +177,14 @@ content: |2
                     "修复建议：补充缺失字段。\n"
                     "示例：\n"
                     f"{ot('SEND_MESSAGE')}\n"
-                    "to: 目标Agent名称\n"
-                    "content: |2\n"
-                    "  这里填写要发送的消息内容\n"
+                    '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
                     f"{ct('SEND_MESSAGE')}"
                 )
             # 针对值类型的提示（更细）
             if not isinstance(msg_obj.get("to"), str):
                 return False, "SEND_MESSAGE 字段类型错误：to 必须为字符串。"
             if not isinstance(msg_obj.get("content"), str):
-                return False, "SEND_MESSAGE 字段类型错误：content 必须为字符串，建议使用多行块 |2。"
+                return False, "SEND_MESSAGE 字段类型错误：content 必须为字符串。"
             # 若到此仍未返回，说明结构基本正确，但 _extract_send_msg 未命中，给出泛化建议
             return (
                 False,
@@ -209,26 +192,22 @@ content: |2
                 "修复建议：\n"
                 "- 确保起止标签各占一行\n"
                 "- 标签与内容之间保留换行\n"
-                "- 使用 content: |2 并保证 YAML 缩进一致\n"
+                "- 使用正确的 JSON 格式\n"
                 "示例：\n"
                 f"{ot('SEND_MESSAGE')}\n"
-                "to: 目标Agent名称\n"
-                "content: |2\n"
-                "  这里填写要发送的消息内容\n"
+                '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
                 f"{ct('SEND_MESSAGE')}"
             )
         except Exception as e:
             return (
                 False,
-                f"SEND_MESSAGE YAML 解析失败：{str(e)}\n"
+                f"SEND_MESSAGE JSON 解析失败：{str(e)}\n"
                 "修复建议：\n"
-                "- 检查冒号、缩进与引号是否正确\n"
-                "- 使用 content: |2 多行块以避免缩进歧义\n"
+                "- 检查JSON格式是否正确（引号、逗号、大括号）\n"
+                "- 确保字符串值使用双引号\n"
                 "示例：\n"
                 f"{ot('SEND_MESSAGE')}\n"
-                "to: 目标Agent名称\n"
-                "content: |2\n"
-                "  这里填写要发送的消息内容\n"
+                '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
                 f"{ct('SEND_MESSAGE')}"
             )
 
@@ -272,7 +251,7 @@ content: |2
         ret = []
         for item in data:
             try:
-                msg = yaml.safe_load(item)
+                msg = json.loads(item)
                 if isinstance(msg, dict) and "to" in msg and "content" in msg:
                     ret.append(msg)
             except Exception:
