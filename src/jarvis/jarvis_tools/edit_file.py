@@ -1,298 +1,186 @@
+# -*- coding: utf-8 -*-
+import json
 import os
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
-from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.config import get_patch_format
 
 
-class EditFileHandler(OutputHandler):
+class EditFileTool:
+    """文件编辑工具，用于对文件进行局部修改"""
+
+    name = "edit_file"
+    description = """对文件进行局部修改。
+
+支持两种修改模式：
+1. 单点替换（SEARCH/REPLACE）：精确匹配并替换代码片段
+2. 区间替换（SEARCH_START/SEARCH_END/REPLACE）：替换两个标记之间的内容
+
+可选的行号范围限制（RANGE）：
+- 可以指定行号范围来限制搜索和替换的范围
+- 格式：start-end（1-based，闭区间）
+- 省略则在整个文件范围内处理
+
+单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）。
+区间替换会从包含 SEARCH_START 的行首开始，到包含 SEARCH_END 的行尾结束，替换整个区域。
+"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "file_path": {
+                "type": "string",
+                "description": "要修改的文件路径（支持绝对路径和相对路径）",
+            },
+            "diffs": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["search"],
+                                    "description": "单点替换模式",
+                                },
+                                "range": {
+                                    "type": "string",
+                                    "description": "可选的行号范围，格式：start-end（1-based，闭区间）",
+                                },
+                                "search": {
+                                    "type": "string",
+                                    "description": "要搜索的原始代码",
+                                },
+                                "replace": {
+                                    "type": "string",
+                                    "description": "替换后的新代码",
+                                },
+                            },
+                            "required": ["type", "search", "replace"],
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["search_range"],
+                                    "description": "区间替换模式",
+                                },
+                                "range": {
+                                    "type": "string",
+                                    "description": "可选的行号范围，格式：start-end（1-based，闭区间）",
+                                },
+                                "search_start": {
+                                    "type": "string",
+                                    "description": "起始标记",
+                                },
+                                "search_end": {
+                                    "type": "string",
+                                    "description": "结束标记",
+                                },
+                                "replace": {
+                                    "type": "string",
+                                    "description": "替换内容",
+                                },
+                            },
+                            "required": ["type", "search_start", "search_end", "replace"],
+                        },
+                    ],
+                },
+                "description": "修改操作列表，每个操作包含一个DIFF块",
+            },
+        },
+        "required": ["file_path", "diffs"],
+    }
+
     def __init__(self):
-        self.patch_pattern = re.compile(
-            ot("PATCH file=(?:'([^']+)'|\"([^\"]+)\"|([^>]+))") + r"\s*"
-            r"(?:"
-            + ot("DIFF")
-            + r"\s*(?:"
-            # 可选的RANGE标签，限制替换行号范围
-            + r"(?:" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*)?"
-            + r"(?:"
-            # 单点替换（SEARCH/REPLACE）
-            + ot("SEARCH")
-            + r"(.*?)"
-            + ct("SEARCH")
-            + r"\s*"
-            + ot("REPLACE")
-            + r"(.*?)"
-            + ct("REPLACE")
-            + r"|"
-            # 区间替换（SEARCH_START/SEARCH_END/REPLACE）
-            + ot("SEARCH_START")
-            + r"(.*?)"
-            + ct("SEARCH_START")
-            + r"\s*"
-            + ot("SEARCH_END")
-            + r"(.*?)"
-            + ct("SEARCH_END")
-            + r"\s*"
-            + ot("REPLACE")
-            + r"(.*?)"
-            + ct("REPLACE")
-            + r")"
-            + r")\s*"
-            + ct("DIFF")
-            + r"\s*)+"
-            + r"^" + ct("PATCH"),
-            re.DOTALL | re.MULTILINE,
-        )
-        self.diff_pattern = re.compile(
-            ot("DIFF")
-            + r"\s*(?:" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*)?"
-            + ot("SEARCH")
-            + r"(.*?)"
-            + ct("SEARCH")
-            + r"\s*"
-            + ot("REPLACE")
-            + r"(.*?)"
-            + ct("REPLACE")
-            + r"\s*"
-            + ct("DIFF"),
-            re.DOTALL,
-        )
-        self.diff_range_pattern = re.compile(
-            ot("DIFF")
-            + r"\s*(?:" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*)?"
-            + ot("SEARCH_START")
-            + r"(.*?)"
-            + ct("SEARCH_START")
-            + r"\s*"
-            + ot("SEARCH_END")
-            + r"(.*?)"
-            + ct("SEARCH_END")
-            + r"\s*"
-            + ot("REPLACE")
-            + r"(.*?)"
-            + ct("REPLACE")
-            + r"\s*"
-            + ct("DIFF"),
-            re.DOTALL,
-        )
+        """初始化文件编辑工具"""
+        pass
 
-    def handle(self, response: str, agent: Any) -> Tuple[bool, str]:
-        """处理文件编辑响应
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """执行文件编辑操作"""
+        try:
+            file_path = args.get("file_path")
+            diffs = args.get("diffs", [])
 
-        Args:
-            response: 包含文件编辑指令的响应字符串
-            agent: 执行处理的agent实例
+            if not file_path:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "缺少必需参数：file_path",
+                }
 
-        Returns:
-            Tuple[bool, str]: 返回处理结果元组，第一个元素表示是否处理成功，第二个元素为处理结果汇总字符串
-        """
-        patches = self._parse_patches(response)
-        if not patches:
-            # 当响应中存在 PATCH 标签但未能解析出合法的补丁内容时，提示格式错误并给出合法格式
-            has_patch_open = bool(re.search("<PATCH", response))
-            has_patch_close = bool(re.search(ct("PATCH"), response))
-            if has_patch_open and has_patch_close:
-                return False, f"PATCH格式错误。合法的格式如下：\n{self.prompt()}"
-            return False, "未找到有效的文件编辑指令"
+            if not diffs:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "缺少必需参数：diffs",
+                }
 
-        # 记录 PATCH 操作调用统计
-        from jarvis.jarvis_stats.stats import StatsManager
+            # 转换为内部格式
+            patches = []
+            for diff in diffs:
+                diff_type = diff.get("type")
+                if diff_type == "search":
+                    patch = {
+                        "SEARCH": diff.get("search", ""),
+                        "REPLACE": diff.get("replace", ""),
+                    }
+                    if "range" in diff:
+                        patch["RANGE"] = diff["range"]
+                    patches.append(patch)
+                elif diff_type == "search_range":
+                    patch = {
+                        "SEARCH_START": diff.get("search_start", ""),
+                        "SEARCH_END": diff.get("search_end", ""),
+                        "REPLACE": diff.get("replace", ""),
+                    }
+                    if "range" in diff:
+                        patch["RANGE"] = diff["range"]
+                    patches.append(patch)
+                else:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"不支持的diff类型: {diff_type}",
+                    }
 
-        StatsManager.increment("patch", group="tool")
+            # 记录 PATCH 操作调用统计
+            try:
+                from jarvis.jarvis_stats.stats import StatsManager
 
-        results = []
+                StatsManager.increment("patch", group="tool")
+            except Exception:
+                pass
 
-        for file_path, diffs in patches.items():
-            file_path = os.path.abspath(file_path)
-            file_patches = diffs
-
-            success, result = self._fast_edit(file_path, file_patches)
+            # 执行编辑
+            success, result = self._fast_edit(file_path, patches)
 
             if success:
-                results.append(f"✅ 文件 {file_path} 修改成功")
-            else:
-                results.append(f"❌ 文件 {file_path} 修改失败: {result}")
-
-        summary = "\n".join(results)
-        return False, summary
-
-    def can_handle(self, response: str) -> bool:
-        """判断是否能处理给定的响应
-
-        Args:
-            response: 需要判断的响应字符串
-
-        Returns:
-            bool: 返回是否能处理该响应
-        """
-        # 只要检测到 PATCH 标签（包含起止标签），即认为可处理，
-        # 具体合法性由 handle() 内的解析与错误提示负责
-        has_patch_open = bool(re.search("<PATCH", response))
-        has_patch_close = bool(re.search(ct("PATCH"), response))
-        return has_patch_open and has_patch_close
-
-    def prompt(self) -> str:
-        """获取处理器的提示信息
-
-        Returns:
-            str: 返回处理器的提示字符串
-        """
-        from jarvis.jarvis_utils.config import get_patch_format
-
-        patch_format = get_patch_format()
-
-        search_prompt = f"""{ot("DIFF")}
-{ot("RANGE")}起止行号(如: 10-50)，可选{ct("RANGE")}
-{ot("SEARCH")}原始代码{ct("SEARCH")}
-{ot("REPLACE")}新代码{ct("REPLACE")}
-{ct("DIFF")}"""
-
-        search_range_prompt = f"""{ot("DIFF")}
-{ot("RANGE")}起止行号(如: 10-50)，可选{ct("RANGE")}
-{ot("SEARCH_START")}起始标记{ct("SEARCH_START")}
-{ot("SEARCH_END")}结束标记{ct("SEARCH_END")}
-{ot("REPLACE")}替换内容{ct("REPLACE")}
-{ct("DIFF")}"""
-
-        if patch_format == "search":
-            formats = search_prompt
-            supported_formats = "仅支持单点替换（SEARCH/REPLACE）"
-            usage_recommendation = ""
-        elif patch_format == "search_range":
-            formats = search_range_prompt
-            supported_formats = "仅支持区间替换（SEARCH_START/SEARCH_END/REPLACE），可选RANGE限定行号范围"
-            usage_recommendation = ""
-        else:  # all
-            formats = f"{search_prompt}\n或\n{search_range_prompt}"
-            supported_formats = "支持两种DIFF块：单点替换（SEARCH/REPLACE）与区间替换（SEARCH_START/SEARCH_END/REPLACE）"
-            usage_recommendation = "\n推荐：优先使用单点替换（SEARCH/REPLACE）模式，除非需要大段修改，否则不要使用区间替换（SEARCH_START/SEARCH_END/REPLACE）模式"
-
-        return f"""文件编辑指令格式：
-{ot("PATCH file=文件路径")}
-{formats}
-{ct("PATCH")}
-
-注意：
-- {ot("PATCH")} 和 {ct("PATCH")} 必须出现在行首，否则不生效（会被忽略）
-- {supported_formats}{usage_recommendation}
-- {ot("RANGE")}start-end{ct("RANGE")} 可用于单点替换（SEARCH/REPLACE）和区间替换（SEARCH_START/SEARCH_END）模式，表示只在指定行号范围内进行匹配与替换（1-based，闭区间）；省略则在整个文件范围内处理
-- 单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）
-- 区间替换会从包含 {ot("SEARCH_START")} 的行首开始，到包含 {ot("SEARCH_END")} 的行尾结束，替换整个区域
-否则编辑将失败。"""
-
-    def name(self) -> str:
-        """获取处理器的名称
-
-        Returns:
-            str: 返回处理器的名称字符串
-        """
-        return "PATCH"
-
-    def _parse_patches(self, response: str) -> Dict[str, List[Dict[str, str]]]:
-        """解析响应中的补丁信息
-
-        该方法使用正则表达式从响应文本中提取文件编辑指令(PATCH块)，
-        每个PATCH块可以包含多个DIFF块，每个DIFF块包含一组搜索和替换内容。
-        解析后会返回一个字典，键是文件路径，值是该文件对应的补丁列表。
-        如果同一个文件路径出现多次，会将所有DIFF块合并到一起。
-
-        Args:
-            response: 包含补丁信息的响应字符串，格式应符合PATCH指令规范
-
-        Returns:
-            Dict[str, List[Dict[str, str]]]:
-                返回解析后的补丁信息字典，结构为:
-                {
-                    "文件路径1": [
-                        {"SEARCH": "搜索文本1", "REPLACE": "替换文本1"},
-                        {"SEARCH": "搜索文本2", "REPLACE": "替换文本2"}
-                    ],
-                    "文件路径2": [...]
+                return {
+                    "success": True,
+                    "stdout": f"文件 {file_path} 修改成功",
+                    "stderr": "",
                 }
-        """
-        patches: Dict[str, List[Dict[str, str]]] = {}
+            else:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": result,
+                }
 
-        for match in self.patch_pattern.finditer(response):
-            # Get the file path from the appropriate capture group
-            file_path = match.group(1) or match.group(2) or match.group(3)
-            diffs: List[Dict[str, str]] = []
-
-            # 逐块解析，保持 DIFF 顺序
-            diff_block_pattern = re.compile(ot("DIFF") + r"(.*?)" + ct("DIFF"), re.DOTALL)
-            for block_match in diff_block_pattern.finditer(match.group(0)):
-                block_text = block_match.group(1)
-
-                # 提取可选的行号范围
-                range_scope = None
-                range_scope_match = re.match(
-                    r"^\s*" + ot("RANGE") + r"(.*?)" + ct("RANGE") + r"\s*",
-                    block_text,
-                    re.DOTALL,
-                )
-                if range_scope_match:
-                    range_scope = range_scope_match.group(1).strip()
-                    # 仅移除块首部的RANGE标签，避免误删内容中的同名标记
-                    block_text = block_text[range_scope_match.end():]
-                # 统一按 all 解析：无视配置，始终尝试区间替换
-                range_match = re.search(
-                    ot("SEARCH_START")
-                    + r"(.*?)"
-                    + ct("SEARCH_START")
-                    + r"\s*"
-                    + ot("SEARCH_END")
-                    + r"(.*?)"
-                    + ct("SEARCH_END")
-                    + r"\s*"
-                    + ot("REPLACE")
-                    + r"(.*?)"
-                    + ct("REPLACE"),
-                    block_text,
-                    re.DOTALL,
-                )
-                if range_match:
-                    diff_item: Dict[str, str] = {
-                        "SEARCH_START": range_match.group(1),  # 原始SEARCH_START内容
-                        "SEARCH_END": range_match.group(2),  # 原始SEARCH_END内容
-                        "REPLACE": range_match.group(3),  # 原始REPLACE内容
-                    }
-                    if range_scope:
-                        diff_item["RANGE"] = range_scope
-                    diffs.append(diff_item)
-                    continue
-
-                # 解析单点替换（统一按 all 解析：无视配置，始终尝试单点替换）
-                single_match = re.search(
-                    ot("SEARCH")
-                    + r"(.*?)"
-                    + ct("SEARCH")
-                    + r"\s*"
-                    + ot("REPLACE")
-                    + r"(.*?)"
-                    + ct("REPLACE"),
-                    block_text,
-                    re.DOTALL,
-                )
-                if single_match:
-                    diff_item = {
-                        "SEARCH": single_match.group(1),  # 原始SEARCH内容
-                        "REPLACE": single_match.group(2),  # 原始REPLACE内容
-                    }
-                    # SEARCH 模式支持 RANGE，如果存在则添加
-                    if range_scope:
-                        diff_item["RANGE"] = range_scope
-                    diffs.append(diff_item)
-
-            if diffs:
-                if file_path in patches:
-                    patches[file_path].extend(diffs)
-                else:
-                    patches[file_path] = diffs
-        return patches
+        except Exception as e:
+            error_msg = f"文件编辑失败: {str(e)}"
+            PrettyOutput.print(error_msg, OutputType.ERROR)
+            return {"success": False, "stdout": "", "stderr": error_msg}
 
     @staticmethod
-    def _fast_edit(file_path: str, patches: List[Dict[str, str]]) -> Tuple[bool, str]:
+    def _fast_edit(file_path: str, patches: List[Dict[str, str]]) -> tuple[bool, str]:
         """快速应用补丁到文件
 
         该方法直接尝试将补丁应用到目标文件，适用于简单、明确的修改场景。
@@ -329,8 +217,8 @@ class EditFileHandler(OutputHandler):
 
             # 当存在RANGE时，确保按行号从后往前应用补丁，避免前面补丁影响后续RANGE的行号
             ordered_patches: List[Dict[str, str]] = []
-            range_items: List[Tuple[int, int, int, Dict[str, str]]] = []
-            non_range_items: List[Tuple[int, Dict[str, str]]] = []
+            range_items: List[tuple[int, int, int, Dict[str, str]]] = []
+            non_range_items: List[tuple[int, Dict[str, str]]] = []
             for idx, p in enumerate(patches):
                 r = p.get("RANGE")
                 if r and str(r).strip():
@@ -582,3 +470,4 @@ class EditFileHandler(OutputHandler):
         except Exception as e:
             PrettyOutput.print(f"文件修改失败: {str(e)}", OutputType.ERROR)
             return False, f"文件修改失败: {str(e)}"
+

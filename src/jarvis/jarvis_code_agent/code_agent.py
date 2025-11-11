@@ -103,6 +103,8 @@ class CodeAgent(Agent):
             "clear_memory",
             "sub_code_agent",
             "ctags",
+            "edit_file",
+            "rewrite_file",
         ]
 
         if append_tools:

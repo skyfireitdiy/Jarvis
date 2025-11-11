@@ -827,7 +827,6 @@ class Transpiler:
                     non_interactive=self.non_interactive,
                     use_methodology=False,
                     use_analysis=False,
-                    disable_file_edit=True,
                 )
             
             prev_cwd = os.getcwd()
@@ -1877,7 +1876,6 @@ class Transpiler:
                 non_interactive=self.non_interactive,
                 use_methodology=False,
                 use_analysis=False,
-                disable_file_edit=True,
             )
 
         # 0表示无限重试，否则限制迭代次数
