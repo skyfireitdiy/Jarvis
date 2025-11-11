@@ -191,14 +191,14 @@ def call_tool(
     if args:
         try:
             tool_args = json.loads(args)
-        except json.JSONDecodeError:
+        except Exception:
             PrettyOutput.print("错误: 参数必须是有效的JSON格式", OutputType.ERROR)
             raise typer.Exit(code=1)
     elif args_file:
         try:
             with open(args_file, "r", encoding="utf-8") as f:
                 tool_args = json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError) as e:
+        except (Exception, FileNotFoundError) as e:
             PrettyOutput.print(f"错误: 无法从文件加载参数: {str(e)}", OutputType.ERROR)
             raise typer.Exit(code=1)
 

@@ -171,7 +171,7 @@ class KimiModel(BasePlatform):
                                 return True
                             elif status == "failed":
                                 return False
-                    except json.JSONDecodeError:
+                    except Exception:
                         continue
 
             retry_count += 1
@@ -306,7 +306,7 @@ class KimiModel(BasePlatform):
                             text = data.get("text", "")
                             if text:
                                 yield text
-                    except json.JSONDecodeError:
+                    except Exception:
                         continue
 
             return None

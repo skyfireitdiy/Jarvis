@@ -71,7 +71,7 @@ class StatsStorage:
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     return data
-            except (json.JSONDecodeError, IOError):
+            except Exception:
                 if attempt < max_retries - 1:
                     time.sleep(0.1 * (attempt + 1))  # 递增延迟
                     continue
@@ -218,9 +218,9 @@ class StatsStorage:
                 new_total = current_total + float(value)
                 self._save_text_atomic(total_file, str(new_total))
             else:
-                # 首次生成：扫描历史数据（包含刚写入的这条记录）并写入
-                # 注意：get_metric_total 内部会完成扫描并写入 totals 文件，这里无需再额外写入或累加
-                _ = self.get_metric_total(metric_name)
+                # 首次生成：直接写入当前值，避免扫描所有历史文件
+                # 如果后续需要精确总量，可以通过 get_metric_total 重新计算
+                self._save_text_atomic(total_file, str(float(value)))
         except Exception:
             # 静默失败，不影响主流程
             pass
@@ -452,21 +452,11 @@ class StatsStorage:
 
     def list_metrics(self) -> List[str]:
         """列出所有指标"""
-        # 从元数据文件获取指标
+        # 从元数据文件获取指标（主要来源，避免扫描所有历史文件）
         meta = self._load_json(self.meta_file)
         metrics_from_meta = set(meta.get("metrics", {}).keys())
 
-        # 扫描所有数据文件获取实际存在的指标
-        metrics_from_data: Set[str] = set()
-        for data_file in self.data_dir.glob("stats_*.json"):
-            try:
-                data = self._load_json(data_file)
-                metrics_from_data.update(data.keys())
-            except (json.JSONDecodeError, OSError):
-                # 忽略无法读取的文件
-                continue
-
-        # 扫描总量缓存目录中已有的指标文件
+        # 扫描总量缓存目录中已有的指标文件（快速）
         metrics_from_totals: Set[str] = set()
         try:
             for f in self.totals_dir.glob("*"):
@@ -475,10 +465,9 @@ class StatsStorage:
         except Exception:
             pass
 
-        # 合并三个来源的指标并返回排序后的列表
-        all_metrics = metrics_from_meta.union(metrics_from_data).union(
-            metrics_from_totals
-        )
+        # 合并两个来源的指标并返回排序后的列表
+        # 注意：不再扫描所有历史数据文件，避免性能问题
+        all_metrics = metrics_from_meta.union(metrics_from_totals)
         return sorted(list(all_metrics))
 
     def aggregate_metrics(

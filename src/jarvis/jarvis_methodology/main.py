@@ -59,7 +59,7 @@ def import_methodology(
             f"成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）",
             OutputType.SUCCESS,
         )
-    except (json.JSONDecodeError, OSError) as e:
+    except (ValueError, OSError) as e:
         PrettyOutput.print(f"导入失败: {str(e)}", OutputType.ERROR)
         raise typer.Exit(code=1)
 
@@ -97,7 +97,7 @@ def list_methodologies():
         for i, (problem_type, _) in enumerate(methodologies.items(), 1):
             lines.append(f"{i}. {problem_type}")
         PrettyOutput.print("\n".join(lines), OutputType.INFO)
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, ValueError) as e:
         PrettyOutput.print(f"列出方法论失败: {str(e)}", OutputType.ERROR)
         raise typer.Exit(code=1)
 

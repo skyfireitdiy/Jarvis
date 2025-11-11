@@ -218,10 +218,8 @@ class SSEMcpClient(McpClient):
                             error_lines.append(f"处理通知时出错 ({method}): {e}")
                     if error_lines:
                         PrettyOutput.print("\n".join(error_lines), OutputType.ERROR)
-        except json.JSONDecodeError:
-            PrettyOutput.print(f"无法解析SSE事件: {data}", OutputType.WARNING)
         except Exception as e:
-            PrettyOutput.print(f"处理SSE事件时出错: {e}", OutputType.ERROR)
+            PrettyOutput.print(f"无法解析SSE事件: {data}", OutputType.WARNING)
 
     def register_notification_handler(self, method: str, handler: Callable) -> None:
         """注册通知处理器
