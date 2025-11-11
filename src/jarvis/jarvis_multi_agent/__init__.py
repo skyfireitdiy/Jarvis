@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json
+import json5 as json
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -30,12 +30,22 @@ class MultiAgent(OutputHandler):
 - **明确性原则**：清晰表达意图、需求和期望结果
 - **上下文保留**：在消息中包含足够的背景信息
 
-### 消息格式标准
+### 消息格式标准（JSON5）
 ```
 {ot("SEND_MESSAGE")}
 {{
   "to": "智能体名称",
-  "content": "# 消息主题\\n## 背景信息\\n[提供必要的上下文和背景]\\n## 具体需求\\n[明确表达期望完成的任务]\\n## 相关资源\\n[列出相关文档、数据或工具]\\n## 期望结果\\n[描述期望的输出格式和内容]\\n## 下一步计划\\n[描述下一步的计划和行动]"
+  "content": `# 消息主题
+## 背景信息
+[提供必要的上下文和背景]
+## 具体需求
+[明确表达期望完成的任务]
+## 相关资源
+[列出相关文档、数据或工具]
+## 期望结果
+[描述期望的输出格式和内容]
+## 下一步计划
+[描述下一步的计划和行动]`
 }}
 {ct("SEND_MESSAGE")}
 ```
@@ -46,10 +56,17 @@ class MultiAgent(OutputHandler):
 {ot("SEND_MESSAGE")}
 {{
   "to": "智能体名称",
-  "content": "# 消息主题\\n## 任务结果\\n[任务完成结果，用于反馈]"
+  "content": `# 消息主题
+## 任务结果
+[任务完成结果，用于反馈]`
 }}
 {ct("SEND_MESSAGE")}
 ```
+
+**JSON5 格式说明**：
+- 可以使用双引号 "..." 或单引号 '...' 包裹字符串
+- **推荐使用反引号 `...` 包裹多行字符串**，这样更清晰易读，无需转义换行符
+- 支持尾随逗号
 
 ## 可用智能体资源
 {chr(10).join([f"- **{c['name']}**: {c.get('description', '')}" for c in self.agents_config])}
@@ -190,7 +207,7 @@ class MultiAgent(OutputHandler):
                 "修复建议：\n"
                 "- 确保起止标签各占一行\n"
                 "- 标签与内容之间保留换行\n"
-                "- 使用正确的 JSON 格式\n"
+                "- 使用正确的 JSON5 格式\n"
                 "示例：\n"
                 f"{ot('SEND_MESSAGE')}\n"
                 '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
@@ -199,13 +216,18 @@ class MultiAgent(OutputHandler):
         except Exception as e:
             return (
                 False,
-                f"SEND_MESSAGE JSON 解析失败：{str(e)}\n"
+                f"SEND_MESSAGE JSON5 解析失败：{str(e)}\n"
                 "修复建议：\n"
-                "- 检查JSON格式是否正确（引号、逗号、大括号）\n"
-                "- 确保字符串值使用双引号\n"
+                "- 检查 JSON5 格式是否正确（引号、逗号、大括号）\n"
+                "- 可以使用双引号 \"...\" 或单引号 '...' 包裹字符串\n"
+                "- 对于多行内容，推荐使用反引号 `...` 包裹\n"
                 "示例：\n"
                 f"{ot('SEND_MESSAGE')}\n"
                 '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
+                f"{ct('SEND_MESSAGE')}\n"
+                "或使用多行字符串：\n"
+                f"{ot('SEND_MESSAGE')}\n"
+                '{{\n  "to": "目标Agent名称",\n  "content": `多行消息内容\n可以包含换行\n更清晰易读`\n}}\n'
                 f"{ct('SEND_MESSAGE')}"
             )
 

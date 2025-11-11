@@ -95,57 +95,68 @@ def get_task_analysis_prompt(
 使用方法：[简要说明如何使用]
 2. 工具创建（如果需要创建新工具）:
 {ot("TOOL_CALL")}
-want: 创建新工具来解决XXX问题
-name: generate_new_tool
-arguments:
-  tool_name: 工具名称
-  tool_code: |2
-    # -*- coding: utf-8 -*-
-    from typing import Dict, Any
-    from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-    class 工具名称:
-        name = "工具名称"
-        description = "Tool description"
-        parameters = {{
-            "type": "object",
-            "properties": {{
-                # 参数定义
-            }},
-            "required": []
-        }}
-        @staticmethod
-        def check() -> bool:
-            return True
-        def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-            try:
-                # 使用PrettyOutput显示执行过程
-                PrettyOutput.print("开始执行操作...", OutputType.INFO)
-                # 实现逻辑
-                # ...
-        PrettyOutput.print("操作已完成", OutputType.SUCCESS)
-        return {{
-            "success": True,
-            "stdout": "结果输出",
-            "stderr": ""
-        }}
-    except Exception as e:
-        PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
-        return {{
-            "success": False,
-            "stdout": "",
-            "stderr": f"操作失败: {{str(e)}}"
-        }}
+{{
+  "want": "创建新工具来解决XXX问题",
+  "name": "generate_new_tool",
+  "arguments": {{
+    "tool_name": "工具名称",
+    "tool_code": `# -*- coding: utf-8 -*-
+from typing import Dict, Any
+from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+
+class 工具名称:
+    name = "工具名称"
+    description = "Tool description"
+    parameters = {{
+        "type": "object",
+        "properties": {{
+            # 参数定义
+        }},
+        "required": []
+    }}
+    @staticmethod
+    def check() -> bool:
+        return True
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            # 使用PrettyOutput显示执行过程
+            PrettyOutput.print("开始执行操作...", OutputType.INFO)
+            # 实现逻辑
+            # ...
+            PrettyOutput.print("操作已完成", OutputType.SUCCESS)
+            return {{
+                "success": True,
+                "stdout": "结果输出",
+                "stderr": ""
+            }}
+        except Exception as e:
+            PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
+            return {{
+                "success": False,
+                "stdout": "",
+                "stderr": f"操作失败: {{str(e)}}"
+            }}`
+  }}
+}}
 {ct("TOOL_CALL")}
+
+注意：tool_code 参数使用反引号 `...` 包裹多行代码，这样更清晰易读，无需转义换行符。
 3. 方法论创建（如果需要创建新方法论）:
 {ot("TOOL_CALL")}
-want: 添加/更新xxxx的方法论
-name: methodology
-arguments:
-  operation: add/update
-  problem_type: 方法论类型，不要过于细节，也不要过于泛化
-  content: |2
-    方法论内容
+{{
+  "want": "添加/更新xxxx的方法论",
+  "name": "methodology",
+  "arguments": {{
+    "operation": "add/update",
+    "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
+    "content": `方法论内容
+可以包含多行内容
+使用反引号包裹多行字符串更清晰`
+  }}
+}}
 {ct("TOOL_CALL")}
+
+注意：如果 content 参数包含多行内容，推荐使用反引号 `...` 包裹，这样更清晰易读。
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
     else:
@@ -159,14 +170,20 @@ arguments:
 注意：当前环境不支持 generate_new_tool 工具。如果需要创建新工具，请提供完整的工具代码和说明，用户需要手动创建工具文件。
 3. 方法论创建（如果需要创建新方法论）:
 {ot("TOOL_CALL")}
-want: 添加/更新xxxx的方法论
-name: methodology
-arguments:
-  operation: add/update
-  problem_type: 方法论类型，不要过于细节，也不要过于泛化
-  content: |2
-    方法论内容
+{{
+  "want": "添加/更新xxxx的方法论",
+  "name": "methodology",
+  "arguments": {{
+    "operation": "add/update",
+    "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
+    "content": `方法论内容
+可以包含多行内容
+使用反引号包裹多行字符串更清晰`
+  }}
+}}
 {ct("TOOL_CALL")}
+
+注意：如果 content 参数包含多行内容，推荐使用反引号 `...` 包裹，这样更清晰易读。
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
     
@@ -209,8 +226,17 @@ arguments:
 3. 必须实现execute方法处理输入参数
 4. 可选实现check方法验证环境
 5. 工具描述应详细说明用途、适用场景和使用示例
-6. 参数定义应遵循JSON Schema格式
+6. 参数定义应遵循 JSON Schema 格式（工具调用使用 JSON5 格式）
 7. 不要包含特定任务的细节，保持通用性
+
+JSON5 工具调用格式说明:
+工具调用使用 JSON5 格式，支持以下特性：
+1. **字符串引号**：可以使用双引号 "..." 或单引号 '...'
+2. **多行字符串**：使用反引号 `...` 可以包含多行内容，自动处理换行
+   - 推荐用于包含代码、长文本等参数
+   - 示例：{{"tool_code": `代码内容\\n多行代码`}}
+3. **尾随逗号**：对象和数组的最后一个元素后可以添加逗号
+4. **注释**（可选）：可以使用 // 单行注释或 /* */ 多行注释
 工具设计关键点:
 1. **使用PrettyOutput打印执行过程**：强烈建议在工具中使用PrettyOutput显示执行过程，
    这样用户可以了解工具在做什么，提升用户体验。示例：

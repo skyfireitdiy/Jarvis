@@ -170,7 +170,7 @@ def _initialize_analysis_context(
     """
     from pathlib import Path as _Path
     from datetime import datetime as _dt
-    import json as _json
+    import json5 as _json
     
     # 获取 .jarvis/sec 目录
     sec_dir = _get_sec_dir(entry_path)
@@ -224,7 +224,7 @@ def _load_or_run_heuristic_scan(
     
     返回: (candidates, summary)
     """
-    import json
+    import json5 as json
     from pathlib import Path as _Path
     
     _heuristic_path = sec_dir / "heuristic_issues.jsonl"
@@ -336,7 +336,7 @@ def _load_existing_clusters(
     
     try:
         from pathlib import Path as _Path2
-        import json as _json
+        import json5 as _json
         _cluster_path = sec_dir / "cluster_report.jsonl"
         
         # 从 progress.jsonl 中读取已完成的聚类批次（优先检查）
@@ -535,7 +535,7 @@ def _get_review_summary_prompt() -> str:
 
 def _build_review_task(review_batch: List[Dict], entry_path: str, langs: List[str]) -> str:
     """构建复核任务上下文"""
-    import json as _json_review
+    import json5 as _json_review
     return f"""
 # 复核无效聚类任务
 上下文参数：
@@ -933,7 +933,7 @@ def _load_processed_gids_from_issues(sec_dir) -> set:
         from pathlib import Path as _Path
         _agent_issues_path = sec_dir / "agent_issues.jsonl"
         if _agent_issues_path.exists():
-            import json as _json
+            import json5 as _json
             with _agent_issues_path.open("r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()
@@ -961,7 +961,7 @@ def _count_issues_from_file(sec_dir) -> int:
     count = 0
     try:
         from pathlib import Path as _Path
-        import json as _json
+        import json5 as _json
         _agent_issues_path = sec_dir / "agent_issues.jsonl"
         if _agent_issues_path.exists():
             saved_gids = set()
@@ -1039,7 +1039,7 @@ def _create_analysis_agent(task_id: str, llm_group: Optional[str], force_save_me
 
 def _build_analysis_task_context(batch: List[Dict], entry_path: str, langs: List[str]) -> str:
     """构建分析任务上下文"""
-    import json as _json2
+    import json5 as _json2
     batch_ctx: List[Dict] = list(batch)
     cluster_verify = str(batch_ctx[0].get("verify") if batch_ctx else "")
     cluster_gids_ctx = [it.get("gid") for it in batch_ctx]
@@ -1559,7 +1559,7 @@ def _process_verification_batch(
                 verification_agent = Agent(**verification_agent_kwargs)
                 
                 # 构造验证任务上下文
-                import json as _json3
+                import json5 as _json3
                 verification_task = f"""
 # 验证分析结论任务
 上下文参数：
@@ -1879,7 +1879,7 @@ def run_security_analysis(
     - enable_verification: 是否启用二次验证（默认 True），关闭后分析Agent确认的问题将直接写入报告
     - 断点续扫: 默认开启。会基于 .jarvis/sec/progress.jsonl 和 .jarvis/sec/heuristic_issues.jsonl 文件进行状态恢复。
     """
-    import json
+    import json5 as json
 
     langs = languages or ["c", "cpp", "h", "hpp", "rs"]
 
@@ -1999,7 +1999,7 @@ def _group_candidates_by_file(candidates: List[Dict]) -> Dict[str, List[Dict]]:
 
 def _create_report_writer(sec_dir, report_file):
     """创建报告写入函数"""
-    import json
+    import json5 as json
     from pathlib import Path
     
     def _append_report(items, source: str, task_id: str, cand: Dict):
@@ -2063,7 +2063,7 @@ def _create_cluster_snapshot_writer(sec_dir, cluster_records, compact_candidates
         """写入单个批次的聚类结果，支持增量保存"""
         try:
             from pathlib import Path as _Path2
-            import json as _json
+            import json5 as _json
             _cluster_path = sec_dir / "cluster_report.jsonl"
             _cluster_path.parent.mkdir(parents=True, exist_ok=True)
             
@@ -2078,7 +2078,7 @@ def _create_cluster_snapshot_writer(sec_dir, cluster_records, compact_candidates
         """写入聚类报告快照"""
         try:
             from pathlib import Path as _Path2
-            import json as _json
+            import json5 as _json
             _cluster_path = sec_dir / "cluster_report.jsonl"
             _cluster_path.parent.mkdir(parents=True, exist_ok=True)
             
@@ -2145,7 +2145,7 @@ def _load_processed_gids_from_agent_issues(sec_dir) -> set:
     processed_gids = set()
     try:
         from pathlib import Path
-        import json
+        import json5 as json
         _agent_issues_path = sec_dir / "agent_issues.jsonl"
         if _agent_issues_path.exists():
             with _agent_issues_path.open("r", encoding="utf-8", errors="ignore") as f:
@@ -2169,7 +2169,7 @@ def _load_completed_batch_ids(progress_path) -> set:
     """从 progress.jsonl 读取已完成的批次ID"""
     completed_batch_ids = set()
     try:
-        import json
+        import json5 as json
         if progress_path.exists():
             with progress_path.open("r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
@@ -2195,7 +2195,7 @@ def _load_all_issues_from_file(sec_dir) -> List[Dict]:
     all_issues: List[Dict] = []
     try:
         from pathlib import Path
-        import json
+        import json5 as json
         _agent_issues_path = sec_dir / "agent_issues.jsonl"
         if _agent_issues_path.exists():
             saved_gids_from_file = set()
@@ -2769,7 +2769,7 @@ def _build_cluster_task(
     langs: List[str],
 ) -> str:
     """构建聚类任务上下文"""
-    import json as _json2
+    import json5 as _json2
     return f"""
 # 聚类任务（分析输入）
 上下文：
@@ -3394,7 +3394,7 @@ def _record_clustering_completion(
     """记录聚类阶段完成"""
     try:
         from pathlib import Path
-        import json
+        import json5 as json
         _cluster_path = sec_dir / "cluster_report.jsonl"
         _progress_append({
             "event": "cluster_report_written",

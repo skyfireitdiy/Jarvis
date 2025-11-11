@@ -1,4 +1,4 @@
-import json
+import json5 as json
 from typing import Optional
 
 import typer
@@ -41,7 +41,7 @@ def list_tools(
         PrettyOutput.section("可用工具列表", OutputType.SYSTEM)
         # 为避免 PrettyOutput 对每行加框造成信息稀疏，先拼接字符串再统一打印
         lines = []
-        import json as _json  # local import to ensure available
+        import json5 as _json  # local import to ensure available
         for tool in tools:
             lines.append(f"\n{tool['name']}")
             lines.append(f"   描述: {tool['description']}")

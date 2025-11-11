@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import json5 as json
 import os
 import signal
 import atexit
@@ -460,7 +460,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
                 if pid == 0:
                     # 子进程：执行 jvs 启动命令（移除 web 相关参数），失败时回退到系统 shell
                     try:
-                        import json as _json
+                        import json5 as _json
                         _cmd_json = _os.environ.get("JARVIS_WEB_LAUNCH_JSON", "")
                         if _cmd_json:
                             try:

@@ -4,7 +4,7 @@
 
 # 提供与真实人类交互的模拟接口
 
-import json
+import json5 as json
 import random
 import string
 from typing import Generator, List, Tuple

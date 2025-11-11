@@ -4,7 +4,7 @@
 负责统计数据的持久化存储和读取
 """
 
-import json
+import json5 as json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path

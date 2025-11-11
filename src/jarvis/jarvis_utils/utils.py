@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import hashlib
-import json
+import json5 as json
 import os
 import signal
 import subprocess

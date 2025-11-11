@@ -19,7 +19,7 @@ C2Rust 转译器模块
 """
 from __future__ import annotations
 
-import json
+import json5 as json
 import os
 import re
 import subprocess

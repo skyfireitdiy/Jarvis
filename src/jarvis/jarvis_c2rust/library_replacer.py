@@ -28,7 +28,7 @@ Library-based dependency replacer for C→Rust migration (LLM-only subtree evalu
 
 from __future__ import annotations
 
-import json
+import json5 as json
 import shutil
 import time
 from pathlib import Path
@@ -431,7 +431,7 @@ def _parse_agent_yaml_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Opti
     if not isinstance(text, str) or not text.strip():
         return None, "摘要文本为空"
     import re as _re
-    import json as _json
+    import json5 as _json
     try:
         import yaml  # type: ignore
     except Exception:

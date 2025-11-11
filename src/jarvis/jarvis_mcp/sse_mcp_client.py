@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json
+import json5 as json
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional

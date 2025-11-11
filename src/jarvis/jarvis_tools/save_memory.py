@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import json
+import json5 as json
 import time
 from datetime import datetime
 from pathlib import Path

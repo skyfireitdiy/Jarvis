@@ -34,7 +34,7 @@ Rust 代码优化器：对转译或生成后的 Rust 项目执行若干保守优
 
 from __future__ import annotations
 
-import json
+import json5 as json
 import os
 import re
 import shutil

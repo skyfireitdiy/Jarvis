@@ -11,7 +11,7 @@ sub_agent 工具
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 from typing import Any, Dict
-import json
+import json5 as json
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.globals import delete_agent

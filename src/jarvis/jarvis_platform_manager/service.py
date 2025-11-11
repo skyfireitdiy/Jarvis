@@ -4,7 +4,7 @@
 This module provides an OpenAI-compatible API service for the Jarvis platform.
 """
 import asyncio
-import json
+import json5 as json
 import os
 import time
 import threading

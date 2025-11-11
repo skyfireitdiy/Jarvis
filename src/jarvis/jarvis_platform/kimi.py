@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Kimi 平台实现模块
 # 提供与 Moonshot AI 的 Kimi 大模型交互功能
-import json
+import json5 as json
 import mimetypes
 import os
 import time
