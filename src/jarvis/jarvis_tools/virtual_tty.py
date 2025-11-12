@@ -19,12 +19,7 @@ else:
 
 class VirtualTTYTool:
     name = "virtual_tty"
-    description = (
-        "控制虚拟终端执行各种操作，如启动终端、输入命令、获取输出等。"
-        + "与execute_script不同，此工具会创建一个持久的虚拟终端会话，可以连续执行多个命令，并保持终端状态。"
-        + "适用于需要交互式操作的场景，如运行需要用户输入的交互式程序（如：ssh连接、sftp传输、gdb/dlv调试等）。"
-        + "注意：Windows平台功能有限，某些Unix特有功能可能不可用。"
-    )
+    description = "控制虚拟终端执行交互式操作（如ssh、sftp、gdb等）。与execute_script不同，此工具创建持久会话，保持终端状态。Windows平台功能有限。"
     parameters = {
         "type": "object",
         "properties": {
@@ -42,19 +37,19 @@ class VirtualTTYTool:
             },
             "keys": {
                 "type": "string",
-                "description": "要发送的按键序列（仅支持单行输入，当action为send_keys时有效）",
+                "description": "要发送的按键序列（仅当action为send_keys时有效）",
             },
             "add_enter": {
                 "type": "boolean",
-                "description": "是否在单行命令末尾自动添加回车符（仅当action为send_keys时有效，默认为true）",
+                "description": "是否在命令末尾自动添加回车符（仅当action为send_keys时有效，默认true）",
             },
             "timeout": {
                 "type": "number",
-                "description": "等待输出的超时时间（秒，仅当action为send_keys或output时有效，默认为5.0）",
+                "description": "等待输出的超时时间（秒，仅当action为send_keys或output时有效，默认5.0）",
             },
             "tty_id": {
                 "type": "string",
-                "description": "虚拟终端的唯一标识符（默认为'default'）",
+                "description": "虚拟终端的唯一标识符（默认'default'）",
             },
         },
         "required": ["action"],
