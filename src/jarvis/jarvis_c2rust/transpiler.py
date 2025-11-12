@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 from dataclasses import dataclass
@@ -507,6 +508,216 @@ class Transpiler:
         # 兼容旧字段（不再使用）
         self._current_context_header: str = ""
         self._current_function_id: Optional[int] = None
+        # 缓存 compile_commands.json 的解析结果
+        self._compile_commands_cache: Optional[List[Dict[str, Any]]] = None
+        self._compile_commands_path: Optional[Path] = None
+
+    def _find_compile_commands(self) -> Optional[Path]:
+        """
+        查找 compile_commands.json 文件。
+        搜索顺序：
+        1. project_root / compile_commands.json
+        2. project_root / build / compile_commands.json
+        3. project_root 的父目录及向上查找（最多向上3层）
+        """
+        # 首先在 project_root 下查找
+        candidates = [
+            self.project_root / "compile_commands.json",
+            self.project_root / "build" / "compile_commands.json",
+        ]
+        # 向上查找（最多3层）
+        current = self.project_root.parent
+        for _ in range(3):
+            if current and current.exists():
+                candidates.append(current / "compile_commands.json")
+                current = current.parent
+            else:
+                break
+        
+        for path in candidates:
+            if path.exists() and path.is_file():
+                return path.resolve()
+        return None
+
+    def _load_compile_commands(self) -> Optional[List[Dict[str, Any]]]:
+        """
+        加载 compile_commands.json 文件。
+        如果已缓存，直接返回缓存结果。
+        """
+        if self._compile_commands_cache is not None:
+            return self._compile_commands_cache
+        
+        compile_commands_path = self._find_compile_commands()
+        if compile_commands_path is None:
+            self._compile_commands_cache = []
+            self._compile_commands_path = None
+            return None
+        
+        try:
+            with compile_commands_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    self._compile_commands_cache = data
+                    self._compile_commands_path = compile_commands_path
+                    typer.secho(f"[c2rust-transpiler][compile_commands] 已加载: {compile_commands_path} ({len(data)} 条记录)", fg=typer.colors.BLUE)
+                    return data
+        except Exception as e:
+            typer.secho(f"[c2rust-transpiler][compile_commands] 加载失败: {compile_commands_path}: {e}", fg=typer.colors.YELLOW)
+            self._compile_commands_cache = []
+            self._compile_commands_path = None
+            return None
+        
+        self._compile_commands_cache = []
+        self._compile_commands_path = None
+        return None
+
+    def _extract_compile_flags(self, c_file_path: Union[str, Path]) -> Optional[Dict[str, Any]]:
+        """
+        从 compile_commands.json 中提取指定 C 文件的编译参数。
+        
+        返回格式：
+        {
+            "command": "完整的编译命令",
+            "directory": "编译目录",
+            "arguments": ["编译参数列表"],  # 如果存在
+            "flags": ["提取的编译标志"],  # 提取的 -I, -D, -U, -std= 等标志
+            "include_dirs": ["包含目录列表"],
+            "defines": ["宏定义列表"],
+            "undefines": ["取消定义列表"],
+            "std": "C标准版本（如 c99, c11）",
+        }
+        
+        如果未找到或解析失败，返回 None。
+        """
+        compile_commands = self._load_compile_commands()
+        if not compile_commands:
+            return None
+        
+        # 规范化目标文件路径
+        try:
+            target_path = Path(c_file_path)
+            if not target_path.is_absolute():
+                target_path = (self.project_root / target_path).resolve()
+            target_path = target_path.resolve()
+        except Exception:
+            return None
+        
+        # 查找匹配的编译命令
+        for entry in compile_commands:
+            if not isinstance(entry, dict):
+                continue
+            
+            entry_file = entry.get("file")
+            if not entry_file:
+                continue
+            
+            try:
+                entry_path = Path(entry_file)
+                if not entry_path.is_absolute() and entry.get("directory"):
+                    entry_path = (Path(entry.get("directory")) / entry_path).resolve()
+                entry_path = entry_path.resolve()
+                
+                # 路径匹配（支持相对路径和绝对路径）
+                if entry_path == target_path:
+                    result: Dict[str, Any] = {
+                        "command": entry.get("command", ""),
+                        "directory": entry.get("directory", ""),
+                        "flags": [],
+                        "include_dirs": [],
+                        "defines": [],
+                        "undefines": [],
+                        "std": None,
+                    }
+                    
+                    # 解析 arguments（如果存在）
+                    arguments = entry.get("arguments")
+                    if isinstance(arguments, list):
+                        # 从 arguments 中提取标志
+                        for arg in arguments:
+                            if not isinstance(arg, str):
+                                continue
+                            arg = arg.strip()
+                            if not arg:
+                                continue
+                            
+                            # 跳过编译器名称和源文件
+                            if arg.endswith(".c") or arg.endswith(".cpp") or arg.endswith(".cc") or arg.endswith(".cxx"):
+                                continue
+                            if arg in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
+                                continue
+                            
+                            result["flags"].append(arg)
+                            
+                            # 提取包含目录
+                            if arg.startswith("-I"):
+                                include_dir = arg[2:] if len(arg) > 2 else None
+                                if include_dir:
+                                    result["include_dirs"].append(include_dir)
+                            
+                            # 提取宏定义
+                            if arg.startswith("-D"):
+                                define = arg[2:] if len(arg) > 2 else None
+                                if define:
+                                    result["defines"].append(define)
+                            
+                            # 提取取消定义
+                            if arg.startswith("-U"):
+                                undef = arg[2:] if len(arg) > 2 else None
+                                if undef:
+                                    result["undefines"].append(undef)
+                            
+                            # 提取 C 标准
+                            if arg.startswith("-std="):
+                                result["std"] = arg[5:]
+                    
+                    # 解析 command（如果存在且 arguments 不存在）
+                    elif entry.get("command"):
+                        command = entry.get("command", "")
+                        # 简单的命令解析（按空格分割，但保留引号内的内容）
+                        try:
+                            parts = shlex.split(command)
+                            for i, part in enumerate(parts):
+                                if not part:
+                                    continue
+                                
+                                # 跳过编译器名称和源文件
+                                if part.endswith((".c", ".cpp", ".cc", ".cxx")):
+                                    continue
+                                if part in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
+                                    continue
+                                
+                                result["flags"].append(part)
+                                
+                                # 提取包含目录
+                                if part.startswith("-I"):
+                                    include_dir = part[2:] if len(part) > 2 else None
+                                    if include_dir:
+                                        result["include_dirs"].append(include_dir)
+                                
+                                # 提取宏定义
+                                if part.startswith("-D"):
+                                    define = part[2:] if len(part) > 2 else None
+                                    if define:
+                                        result["defines"].append(define)
+                                
+                                # 提取取消定义
+                                if part.startswith("-U"):
+                                    undef = part[2:] if len(part) > 2 else None
+                                    if undef:
+                                        result["undefines"].append(undef)
+                                
+                                # 提取 C 标准
+                                if part.startswith("-std="):
+                                    result["std"] = part[5:]
+                        except Exception:
+                            # shlex 解析失败，跳过
+                            pass
+                    
+                    return result
+            except Exception:
+                continue
+        
+        return None
 
     def _save_progress(self) -> None:
         """保存进度，使用原子性写入"""
@@ -698,6 +909,16 @@ class Transpiler:
             "- 参数个数与顺序可以保持与 C 一致，但类型设计应优先考虑 Rust 的惯用法和安全性；\n"
             "- 仅输出必要信息，避免冗余解释。"
         )
+        # 提取编译参数
+        compile_flags = self._extract_compile_flags(rec.file)
+        compile_flags_section = ""
+        if compile_flags:
+            compile_flags_section = "\n".join([
+                "",
+                "C文件编译参数（来自 compile_commands.json）：",
+                json.dumps(compile_flags, ensure_ascii=False, indent=2),
+            ])
+        
         user_prompt = "\n".join([
             "请阅读以下上下文并准备总结：",
             f"- 函数标识: id={rec.id}, name={rec.name}, qualified={rec.qname}",
@@ -717,6 +938,7 @@ class Transpiler:
             "",
             "库替代上下文（若存在）：",
             json.dumps(getattr(rec, "lib_replacement", None), ensure_ascii=False, indent=2),
+            compile_flags_section,
             "",
             "当前crate目录结构（部分）：",
             "<CRATE_TREE>",
@@ -931,6 +1153,8 @@ class Transpiler:
         callees_ctx = self._collect_callees_context(rec)
         crate_tree = _dir_tree(self.crate_dir)
         librep_ctx = rec.lib_replacement if isinstance(rec.lib_replacement, dict) else None
+        # 提取编译参数
+        compile_flags = self._extract_compile_flags(rec.file)
 
         header_lines = [
             "【当前函数上下文（复用Agent专用）】",
@@ -951,12 +1175,21 @@ class Transpiler:
             "",
             "库替代上下文（若有）：",
             json.dumps(librep_ctx, ensure_ascii=False, indent=2),
+        ]
+        # 添加编译参数（如果存在）
+        if compile_flags:
+            header_lines.extend([
+                "",
+                "C文件编译参数（来自 compile_commands.json）：",
+                json.dumps(compile_flags, ensure_ascii=False, indent=2),
+            ])
+        header_lines.extend([
             "",
             "crate 目录结构（部分）：",
             "<CRATE_TREE>",
             crate_tree,
             "</CRATE_TREE>",
-        ]
+        ])
         # 精简头部（后续复用）
         compact_lines = [
             "【函数上下文简要（复用）】",
@@ -1162,6 +1395,15 @@ class Transpiler:
                 "",
                 "库替代上下文（若存在）：",
                 json.dumps(librep_ctx, ensure_ascii=False, indent=2),
+                "",
+            ])
+        # 添加编译参数（如果存在）
+        compile_flags = self._extract_compile_flags(rec.file)
+        if compile_flags:
+            requirement_lines.extend([
+                "",
+                "C文件编译参数（来自 compile_commands.json）：",
+                json.dumps(compile_flags, ensure_ascii=False, indent=2),
                 "",
             ])
         requirement_lines.extend([
@@ -1605,6 +1847,18 @@ class Transpiler:
             "<C_SOURCE>",
             c_code,
             "</C_SOURCE>",
+        ])
+        # 添加编译参数（如果存在）
+        c_file_path = curr.get("file") or ""
+        if c_file_path:
+            compile_flags = self._extract_compile_flags(c_file_path)
+            if compile_flags:
+                base_lines.extend([
+                    "",
+                    "C文件编译参数（来自 compile_commands.json）：",
+                    json.dumps(compile_flags, ensure_ascii=False, indent=2),
+                ])
+        base_lines.extend([
             "",
             "【工具使用建议】",
             "1. 召回记忆（推荐优先使用）：",
@@ -1887,7 +2141,10 @@ class Transpiler:
             callees_ctx = self._collect_callees_context(rec)
             librep_ctx = rec.lib_replacement if isinstance(rec.lib_replacement, dict) else None
             crate_tree = _dir_tree(self.crate_dir)
-            usr_p = "\n".join([
+            # 提取编译参数
+            compile_flags = self._extract_compile_flags(rec.file)
+            
+            usr_p_lines = [
                 f"待审查函数：{rec.qname or rec.name}",
                 f"建议签名：{rust_sig}",
                 f"目标模块：{module}",
@@ -1914,6 +2171,15 @@ class Transpiler:
                 "",
                 "库替代上下文（若存在）：",
                 json.dumps(librep_ctx, ensure_ascii=False, indent=2),
+            ]
+            # 添加编译参数（如果存在）
+            if compile_flags:
+                usr_p_lines.extend([
+                    "",
+                    "C文件编译参数（来自 compile_commands.json）：",
+                    json.dumps(compile_flags, ensure_ascii=False, indent=2),
+                ])
+            usr_p_lines.extend([
                 "",
                 "当前crate目录结构（部分）：",
                 "<CRATE_TREE>",
@@ -1927,6 +2193,7 @@ class Transpiler:
                 "",
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
+            usr_p = "\n".join(usr_p_lines)
             sum_p = (
                 "请仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：\n"
                 '"ok": bool  // 若满足功能一致且无严重问题，则为 true\n'
