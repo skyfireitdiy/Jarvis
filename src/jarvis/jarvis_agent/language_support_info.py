@@ -62,20 +62,22 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
         
         for ext, factory in _LANGUAGE_EXTRACTORS.items():
             try:
+                # 尝试创建提取器，只有成功创建才标记为支持
                 extractor = factory()
-                if extractor:
+                if extractor is not None:
                     lang_name = lang_name_map.get(ext, ext[1:] if ext.startswith('.') else ext)
                     
                     if lang_name not in info:
                         info[lang_name] = {}
                     
-                    # 文件上下文符号提取支持
+                    # 文件上下文符号提取支持（只有成功创建才支持）
                     info[lang_name]['文件上下文符号提取'] = True
                     
-                    # 如果 code_analyzer 中的符号提取不支持，但 file_context_handler 中有提取器，也标记为支持
+                    # 如果 code_analyzer 中的符号提取不支持，但 file_context_handler 中能成功创建提取器，也标记为支持
                     if '符号提取' not in info[lang_name] or not info[lang_name]['符号提取']:
                         info[lang_name]['符号提取'] = True
-            except Exception:
+            except Exception as e:
+                # 静默失败，不记录错误（避免输出过多调试信息）
                 pass
     except Exception:
         pass
@@ -179,10 +181,52 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                             'typescript': ['.ts', '.tsx'],
                         }
                         exts = ext_map.get(lang_name, [])
-                        has_extractor = any(ext in _LANGUAGE_EXTRACTORS for ext in exts)
+                        # 尝试创建提取器，只有成功创建才认为支持（需要 tree-sitter 已安装）
+                        has_extractor = False
+                        for ext in exts:
+                            if ext in _LANGUAGE_EXTRACTORS:
+                                try:
+                                    factory = _LANGUAGE_EXTRACTORS[ext]
+                                    extractor = factory()
+                                    if extractor:
+                                        has_extractor = True
+                                        break
+                                except Exception:
+                                    continue
                         info[lang_name][feature] = has_extractor
                     except Exception:
                         info[lang_name][feature] = False
+                elif feature == '符号提取':
+                    # 如果之前没有设置或为 False，再次检查 file_context_handler 中的提取器
+                    # 只有能成功创建提取器才标记为支持（需要 tree-sitter 已安装）
+                    if '符号提取' not in info[lang_name] or not info[lang_name]['符号提取']:
+                        try:
+                            from jarvis.jarvis_agent.file_context_handler import _LANGUAGE_EXTRACTORS
+                            ext_map = {
+                                'python': ['.py', '.pyw'],
+                                'rust': ['.rs'],
+                                'go': ['.go'],
+                                'c': ['.c', '.h'],
+                                'cpp': ['.cpp', '.cc', '.cxx', '.hpp', '.hxx'],
+                                'javascript': ['.js', '.jsx'],
+                                'typescript': ['.ts', '.tsx'],
+                            }
+                            exts = ext_map.get(lang_name, [])
+                            # 尝试创建提取器，只有成功创建才认为支持
+                            has_extractor = False
+                            for ext in exts:
+                                if ext in _LANGUAGE_EXTRACTORS:
+                                    try:
+                                        factory = _LANGUAGE_EXTRACTORS[ext]
+                                        extractor = factory()
+                                        if extractor:
+                                            has_extractor = True
+                                            break
+                                    except Exception:
+                                        continue
+                            info[lang_name][feature] = has_extractor
+                        except Exception:
+                            info[lang_name][feature] = False
                 elif feature == '构建验证':
                     # 默认 False，已在上面检查过（可能是字符串或False）
                     if feature not in info[lang_name]:
