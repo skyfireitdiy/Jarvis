@@ -139,10 +139,31 @@ def _get_resolved_model_config(
     model_groups = GLOBAL_CONFIG_DATA.get("JARVIS_LLM_GROUPS", [])
 
     if model_group_name and isinstance(model_groups, list):
+        found = False
         for group_item in model_groups:
             if isinstance(group_item, dict) and model_group_name in group_item:
                 group_config = group_item[model_group_name]
+                found = True
                 break
+        
+        # 当显式指定了模型组但未找到时，报错并退出
+        if model_group_override and not found:
+            from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+            PrettyOutput.print(
+                f"错误：指定的模型组 '{model_group_name}' 不存在于配置中。",
+                output_type=OutputType.ERROR,
+            )
+            PrettyOutput.print(
+                "可用的模型组: " + 
+                ", ".join(
+                    list(group.keys())[0] 
+                    for group in model_groups 
+                    if isinstance(group, dict)
+                ) if model_groups else "无可用模型组",
+                output_type=OutputType.INFO,
+            )
+            import sys
+            sys.exit(1)
     
     _apply_llm_group_env_override(group_config)
 
