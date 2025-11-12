@@ -258,6 +258,8 @@ class Agent:
         self.session.clear_history()
         # 重置 addon_prompt 跳过轮数计数器
         self._addon_prompt_skip_rounds = 0
+        # 重置没有工具调用的计数器
+        self._no_tool_call_count = 0
 
         # 重置后重新设置系统提示词，确保系统约束仍然生效
         try:
@@ -369,6 +371,8 @@ class Agent:
         self.user_data: Dict[str, Any] = {}
         # 记录连续未添加 addon_prompt 的轮数
         self._addon_prompt_skip_rounds: int = 0
+        # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
+        self._no_tool_call_count: int = 0
 
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
@@ -980,6 +984,8 @@ class Agent:
         self.session.clear_history()
         # 重置 addon_prompt 跳过轮数计数器
         self._addon_prompt_skip_rounds = 0
+        # 重置没有工具调用的计数器
+        self._no_tool_call_count = 0
         # 广播清理历史后的事件
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
@@ -998,6 +1004,8 @@ class Agent:
         result = self.file_methodology_manager.handle_history_with_file_upload()
         # 重置 addon_prompt 跳过轮数计数器
         self._addon_prompt_skip_rounds = 0
+        # 重置没有工具调用的计数器
+        self._no_tool_call_count = 0
         # 广播清理历史后的事件
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
