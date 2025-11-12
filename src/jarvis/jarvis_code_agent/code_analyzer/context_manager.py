@@ -96,6 +96,10 @@ class ContextManager:
         """
         references: List[Reference] = []
         
+        # Check if file is stale and update if needed
+        if file_path and self.symbol_table.is_file_stale(file_path):
+            self._refresh_file_symbols(file_path)
+        
         # Find symbol definitions
         symbols = self.symbol_table.find_symbol(symbol_name, file_path)
         if not symbols:
@@ -116,6 +120,10 @@ class ContextManager:
         
         # Search for references in each file
         for file_path_to_search in search_files:
+            # Check if file is stale and update if needed
+            if self.symbol_table.is_file_stale(file_path_to_search):
+                self._refresh_file_symbols(file_path_to_search)
+            
             content = self._get_file_content(file_path_to_search)
             if not content:
                 continue
@@ -160,6 +168,10 @@ class ContextManager:
         Returns:
             Symbol object if found, None otherwise
         """
+        # Check if file is stale and update if needed
+        if file_path and self.symbol_table.is_file_stale(file_path):
+            self._refresh_file_symbols(file_path)
+        
         symbols = self.symbol_table.find_symbol(symbol_name, file_path)
         if symbols:
             # Return the first definition (could be enhanced to find the most relevant one)
@@ -188,6 +200,13 @@ class ContextManager:
             symbols = extractor.extract_symbols(file_path, content)
             for symbol in symbols:
                 self.symbol_table.add_symbol(symbol)
+            
+            # Update file modification time after extracting symbols
+            if os.path.exists(file_path):
+                try:
+                    self.symbol_table._file_mtimes[file_path] = os.path.getmtime(file_path)
+                except Exception:
+                    pass
 
         # 5. Analyze dependencies
         analyzer = get_dependency_analyzer(language)
@@ -201,6 +220,23 @@ class ContextManager:
         
         # 6. Save updated symbols to cache
         self.symbol_table.save_cache()
+    
+    def _refresh_file_symbols(self, file_path: str):
+        """Refresh symbols for a file that has been modified externally.
+        
+        This method is called when a file is detected to be stale (modified
+        outside of Jarvis's control).
+        """
+        if not os.path.exists(file_path):
+            return
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+            self.update_context_for_file(file_path, content)
+        except Exception:
+            # If we can't read the file, skip refresh
+            pass
 
     def _get_file_content(self, file_path: str) -> Optional[str]:
         """Get file content, using cache if available."""
@@ -220,6 +256,9 @@ class ContextManager:
 
     def _find_current_scope(self, file_path: str, line_num: int) -> Optional[Symbol]:
         """Find the function or class that contains the given line."""
+        # Check if file is stale and update if needed
+        if self.symbol_table.is_file_stale(file_path):
+            self._refresh_file_symbols(file_path)
         symbols = self.symbol_table.get_file_symbols(file_path)
         
         # Find the innermost scope containing the line
@@ -238,6 +277,10 @@ class ContextManager:
 
     def _find_used_symbols(self, file_path: str, content: str, line_start: int, line_end: int) -> List[Symbol]:
         """Find symbols used in the specified line range."""
+        # Check if file is stale and update if needed
+        if self.symbol_table.is_file_stale(file_path):
+            self._refresh_file_symbols(file_path)
+        
         # Extract the code in the range
         lines = content.split('\n')
         region_content = '\n'.join(lines[line_start-1:line_end])
@@ -258,6 +301,10 @@ class ContextManager:
 
     def _find_imported_symbols(self, file_path: str) -> List[Symbol]:
         """Find all imported symbols in a file."""
+        # Check if file is stale and update if needed
+        if self.symbol_table.is_file_stale(file_path):
+            self._refresh_file_symbols(file_path)
+        
         symbols = self.symbol_table.get_file_symbols(file_path)
         return [s for s in symbols if s.kind == 'import']
 
