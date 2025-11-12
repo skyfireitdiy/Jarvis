@@ -109,8 +109,14 @@ class SymbolTable:
             parent=data.get('parent')
         )
 
-    def add_symbol(self, symbol: Symbol):
-        """Adds a symbol to the table."""
+    def add_symbol(self, symbol: Symbol, save_to_cache: bool = False):
+        """Adds a symbol to the table.
+        
+        Args:
+            symbol: The symbol to add
+            save_to_cache: If True, save to cache immediately. Default False for performance.
+                          Use save_cache() to save all symbols at once after batch operations.
+        """
         if symbol.name not in self.symbols_by_name:
             self.symbols_by_name[symbol.name] = []
         self.symbols_by_name[symbol.name].append(symbol)
@@ -119,7 +125,12 @@ class SymbolTable:
             self.symbols_by_file[symbol.file_path] = []
         self.symbols_by_file[symbol.file_path].append(symbol)
         
-        # Save to cache after adding
+        # Only save to cache if explicitly requested (for performance)
+        if save_to_cache:
+            self._save_to_cache()
+    
+    def save_cache(self):
+        """Save the entire symbol table to cache. Call this after batch operations."""
         self._save_to_cache()
 
     def find_symbol(self, name: str, file_path: Optional[str] = None) -> List[Symbol]:
