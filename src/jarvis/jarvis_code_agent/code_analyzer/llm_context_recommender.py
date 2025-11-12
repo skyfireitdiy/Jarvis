@@ -295,6 +295,12 @@ class ContextRecommender:
                         self.context_manager.symbol_table.add_symbol(symbol, save_to_cache=False)
                         symbols_added += 1
                     
+                    # 更新文件修改时间
+                    try:
+                        self.context_manager.symbol_table._file_mtimes[file_path] = os.path.getmtime(file_path)
+                    except Exception:
+                        pass
+                    
                     files_scanned += 1
                     
                     # 实时更新进度（不换行，文件名在最后）

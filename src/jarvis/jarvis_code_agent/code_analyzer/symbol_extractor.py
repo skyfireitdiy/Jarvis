@@ -27,6 +27,8 @@ class SymbolTable:
         self.symbols_by_name: Dict[str, List[Symbol]] = {}
         # A dictionary to store symbols on a per-file basis.
         self.symbols_by_file: Dict[str, List[Symbol]] = {}
+        # Track file modification times for cache invalidation
+        self._file_mtimes: Dict[str, float] = {}
         # Cache directory for persistent storage
         self.cache_dir = cache_dir or ".jarvis/symbol_cache"
         # Load cached data if available
@@ -46,6 +48,8 @@ class SymbolTable:
                 # Convert JSON data back to Symbol objects
                 self.symbols_by_name = self._deserialize_symbols(data.get('symbols_by_name', {}))
                 self.symbols_by_file = self._deserialize_symbols(data.get('symbols_by_file', {}))
+                # Load file modification times
+                self._file_mtimes = data.get('file_mtimes', {})
             except Exception:
                 # If cache loading fails, start with empty tables
                 pass
@@ -57,10 +61,14 @@ class SymbolTable:
             os.makedirs(self.cache_dir, exist_ok=True)
             cache_file = self._get_cache_file()
             
+            # Update file modification times before saving
+            self._update_file_mtimes()
+            
             # Serialize symbols for JSON storage
             data = {
                 'symbols_by_name': self._serialize_symbols(self.symbols_by_name),
-                'symbols_by_file': self._serialize_symbols(self.symbols_by_file)
+                'symbols_by_file': self._serialize_symbols(self.symbols_by_file),
+                'file_mtimes': self._file_mtimes
             }
             
             with open(cache_file, 'w', encoding='utf-8') as f:
@@ -161,8 +169,51 @@ class SymbolTable:
                     if not self.symbols_by_name[symbol.name]:
                         del self.symbols_by_name[symbol.name]
             
+            # Remove file mtime tracking
+            if file_path in self._file_mtimes:
+                del self._file_mtimes[file_path]
+            
             # Save to cache after clearing
             self._save_to_cache()
+    
+    def _update_file_mtimes(self):
+        """Update modification times for all tracked files."""
+        for file_path in list(self.symbols_by_file.keys()):
+            if os.path.exists(file_path):
+                try:
+                    self._file_mtimes[file_path] = os.path.getmtime(file_path)
+                except Exception:
+                    # If we can't get mtime, remove from tracking
+                    self._file_mtimes.pop(file_path, None)
+    
+    def is_file_stale(self, file_path: str) -> bool:
+        """Check if a file has been modified since it was cached.
+        
+        Args:
+            file_path: Path to the file to check
+            
+        Returns:
+            True if file is newer than cache, False otherwise
+        """
+        if file_path not in self.symbols_by_file:
+            # File not in cache, consider it stale (needs to be loaded)
+            return True
+        
+        if file_path not in self._file_mtimes:
+            # No mtime recorded, consider it stale
+            return True
+        
+        if not os.path.exists(file_path):
+            # File doesn't exist, not stale (will be handled by clear_file_symbols)
+            return False
+        
+        try:
+            current_mtime = os.path.getmtime(file_path)
+            cached_mtime = self._file_mtimes.get(file_path, 0)
+            return current_mtime > cached_mtime
+        except Exception:
+            # If we can't get mtime, assume not stale
+            return False
 
 
 class SymbolExtractor:
