@@ -13,7 +13,8 @@ def create_typescript_extractor() -> Optional[Any]:
         import tree_sitter_typescript
         from jarvis.jarvis_code_agent.code_analyzer.symbol_extractor import Symbol
         
-        TS_LANGUAGE = tree_sitter_typescript.language()
+        # tree-sitter-typescript 使用 language_typescript() 和 language_tsx()
+        TS_LANGUAGE = tree_sitter_typescript.language_typescript()
         TS_SYMBOL_QUERY = """
         (function_declaration
           name: (identifier) @function.name)
@@ -34,9 +35,15 @@ def create_typescript_extractor() -> Optional[Any]:
         
         class TSSymbolExtractor:
             def __init__(self):
-                self.language = TS_LANGUAGE
+                # 如果传入的是 PyCapsule，需要转换为 Language 对象
+                from tree_sitter import Language
+                if not isinstance(TS_LANGUAGE, Language):
+                    self.language = Language(TS_LANGUAGE)
+                else:
+                    self.language = TS_LANGUAGE
                 self.parser = Parser()
-                self.parser.set_language(self.language)
+                # 使用 language 属性而不是 set_language 方法
+                self.parser.language = self.language
                 self.symbol_query = TS_SYMBOL_QUERY
             
             def extract_symbols(self, file_path: str, content: str) -> List[Any]:

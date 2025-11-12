@@ -52,6 +52,27 @@ try:
 except (ImportError, RuntimeError):
     pass  # 静默失败，tree-sitter可能不可用
 
+# JavaScript语言支持（可选，需要tree-sitter）
+try:
+    from .languages import JavaScriptLanguageSupport
+    register_language(JavaScriptLanguageSupport())
+except (ImportError, RuntimeError):
+    pass  # 静默失败，tree-sitter可能不可用
+
+# TypeScript语言支持（可选，需要tree-sitter）
+try:
+    from .languages import TypeScriptLanguageSupport
+    register_language(TypeScriptLanguageSupport())
+except (ImportError, RuntimeError):
+    pass  # 静默失败，tree-sitter可能不可用
+
+# Java语言支持（可选，需要tree-sitter）
+try:
+    from .languages import JavaLanguageSupport
+    register_language(JavaLanguageSupport())
+except (ImportError, RuntimeError):
+    pass  # 静默失败，tree-sitter可能不可用
+
 
 def detect_language(file_path: str) -> Optional[str]:
     """检测文件的编程语言。
