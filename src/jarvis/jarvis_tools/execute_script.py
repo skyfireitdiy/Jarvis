@@ -20,7 +20,7 @@ class ScriptTool:
         "properties": {
             "interpreter": {
                 "type": "string",
-                "description": "脚本解释器: 如bash, python3, expect, perl, ruby等任意解释器。如需直接执行shell命令, 可使用bash作为解释器",
+                "description": "脚本解释器（如bash、python3、perl等）。执行shell命令可使用bash。",
             },
             "script_content": {"type": "string", "description": "要执行的脚本内容"},
         },

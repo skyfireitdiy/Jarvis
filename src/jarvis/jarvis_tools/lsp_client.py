@@ -805,7 +805,7 @@ class LSPClientTool:
             },
             "symbol_name": {
                 "type": "string",
-                "description": "符号名称（函数名、类名、变量名等）。对于 get_symbol_info、definition、references 操作必需；对于 search_symbol 可选（用于搜索）；对于 document_symbols 不需要。支持模糊匹配。"
+                "description": "符号名称（函数名、类名、变量名等）。get_symbol_info/definition/references必需；search_symbol可选；document_symbols不需要。支持模糊匹配。"
             }
         },
         "required": ["action", "file_path"]

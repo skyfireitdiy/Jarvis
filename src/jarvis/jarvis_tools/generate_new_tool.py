@@ -8,14 +8,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 class generate_new_tool:
     name = "generate_new_tool"
-    description = """
-    生成并注册新的Jarvis工具。该工具会在用户数据目录下创建新的工具文件，
-    并自动注册到当前的工具注册表中。适用场景：1. 需要创建新的自定义工具；
-    2. 扩展Jarvis功能；3. 自动化重复性操作；4. 封装特定领域的功能。
-    重要提示：
-    1. `tool_name` 参数必须与 `tool_code` 中定义的 `name` 属性完全一致。
-    2. 在编写工具代码时，应尽量将工具执行的过程和结果打印出来，方便追踪工具的执行状态。
-    """
+    description = "生成并注册新的Jarvis工具。在用户数据目录下创建工具文件并自动注册。注意：tool_name必须与tool_code中的name属性完全一致。"
 
     parameters = {
         "type": "object",
