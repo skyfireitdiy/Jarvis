@@ -180,9 +180,7 @@ class CodeAgent(Agent):
             )
         except Exception as e:
             # LLM推荐器初始化失败
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
+            PrettyOutput.print(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能", OutputType.WARNING)
 
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
         
@@ -1096,7 +1094,6 @@ class CodeAgent(Agent):
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
         if file_count > 3:
             files_str += f" 等{file_count}个文件"
-        PrettyOutput.print("🔍 静态检查中...", OutputType.INFO)
         
         # 使用兜底验证器进行基础静态检查
         fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
@@ -1146,7 +1143,6 @@ class CodeAgent(Agent):
                 files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
                 if file_count > 3:
                     files_str += f" 等{file_count}个文件"
-                PrettyOutput.print("🔍 静态检查中...", OutputType.INFO)
                 
                 # 立即进行基础静态检查
                 fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
@@ -1510,7 +1506,7 @@ class CodeAgent(Agent):
                     file_results.append((file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}"))
                     continue
         
-# 一次性打印所有检查结果
+        # 一次性打印所有检查结果
         if file_results:
             total_files = len(file_results)
             passed_count = sum(1 for _, _, status, _ in file_results if status == "通过")
