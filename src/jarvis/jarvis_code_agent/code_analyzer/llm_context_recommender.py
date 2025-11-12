@@ -201,6 +201,9 @@ class ContextRecommender:
         files_with_symbols = 0
         files_skipped = 0
         
+        # 用于清除行的最大宽度（终端通常80-120字符，使用100作为安全值）
+        max_line_width = 100
+        
         # 快速统计总文件数（用于进度显示）
         console.print("📊 正在统计项目文件...", end="")
         total_files = 0
@@ -221,6 +224,20 @@ class ContextRecommender:
         else:
             console.print("⚠️  未发现可扫描的代码文件", style="yellow")
             return
+        
+        # 辅助函数：生成固定宽度的进度字符串（避免残留字符）
+        def format_progress_msg(current_file: str, scanned: int, total: int, symbols: int, skipped: int) -> str:
+            progress_pct = (scanned * 100) // total if total > 0 else 0
+            base_msg = f"⏳ 扫描进度: {scanned}/{total} ({progress_pct}%)"
+            if symbols > 0:
+                base_msg += f"，已提取 {symbols} 个符号"
+            if skipped > 0:
+                base_msg += f"，跳过 {skipped}"
+            base_msg += f" | {current_file}"
+            # 填充空格到固定宽度，清除旧内容
+            if len(base_msg) < max_line_width:
+                base_msg += " " * (max_line_width - len(base_msg))
+            return base_msg
         
         # 遍历项目目录
         for root, dirs, files in os.walk(project_root):
@@ -244,8 +261,8 @@ class ContextRecommender:
                 try:
                     rel_path = os.path.relpath(file_path, project_root)
                     # 如果路径太长，只显示文件名
-                    if len(rel_path) > 50:
-                        rel_path = "..." + rel_path[-47:]
+                    if len(rel_path) > 40:
+                        rel_path = "..." + rel_path[-37:]
                 except Exception:
                     rel_path = file
                 
@@ -255,21 +272,14 @@ class ContextRecommender:
                     file_size = os.path.getsize(file_path)
                     if file_size > 1024 * 1024:  # 1MB
                         files_skipped += 1
-                        # 实时更新进度（不换行，显示当前文件）
-                        progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
-                        skip_info = f"，跳过 {files_skipped}" if files_skipped > 0 else ""
-                        console.print(
-                            f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%){skip_info}",
-                            end="\r"
-                        )
+                        # 实时更新进度（不换行，文件名在最后）
+                        msg = format_progress_msg(rel_path, files_scanned, total_files, symbols_added, files_skipped)
+                        console.print(msg, end="\r")
                         continue
                     
                     # 显示当前正在扫描的文件
-                    progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
-                    console.print(
-                        f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%)",
-                        end="\r"
-                    )
+                    msg = format_progress_msg(rel_path, files_scanned, total_files, symbols_added, files_skipped)
+                    console.print(msg, end="\r")
                     
                     with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                         content = f.read()
@@ -286,30 +296,21 @@ class ContextRecommender:
                     
                     files_scanned += 1
                     
-                    # 实时更新进度（不换行，显示当前文件）
-                    progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
-                    skip_info = f"，跳过 {files_skipped}" if files_skipped > 0 else ""
-                    console.print(
-                        f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%)，已提取 {symbols_added} 个符号{skip_info}",
-                        end="\r"
-                    )
+                    # 实时更新进度（不换行，文件名在最后）
+                    msg = format_progress_msg(rel_path, files_scanned, total_files, symbols_added, files_skipped)
+                    console.print(msg, end="\r")
                 except Exception as e:
                     # 跳过无法读取的文件
                     files_skipped += 1
-                    # 实时更新进度（不换行，显示当前文件）
-                    progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
-                    console.print(
-                        f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%)，跳过 {files_skipped} 个文件",
-                        end="\r"
-                    )
+                    # 实时更新进度（不换行，文件名在最后）
+                    msg = format_progress_msg(rel_path, files_scanned, total_files, symbols_added, files_skipped)
+                    console.print(msg, end="\r")
                     continue
         
         # 完成时显示100%进度，然后换行并显示最终结果
         if total_files > 0:
-            console.print(
-                f"⏳ 扫描完成 ({files_scanned}/{total_files}, 100%)，已提取 {symbols_added} 个符号...",
-                end="\r"
-            )
+            # 清除进度行
+            console.print(" " * max_line_width, end="\r")
         console.print()  # 换行
         skip_msg = f"，跳过 {files_skipped} 个文件" if files_skipped > 0 else ""
         console.print(
