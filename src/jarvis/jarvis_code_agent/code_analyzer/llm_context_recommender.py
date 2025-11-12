@@ -291,7 +291,8 @@ class ContextRecommender:
                     if symbols:
                         files_with_symbols += 1
                     for symbol in symbols:
-                        self.context_manager.symbol_table.add_symbol(symbol)
+                        # 不立即保存缓存，批量添加以提高性能
+                        self.context_manager.symbol_table.add_symbol(symbol, save_to_cache=False)
                         symbols_added += 1
                     
                     files_scanned += 1
@@ -312,6 +313,15 @@ class ContextRecommender:
             # 清除进度行
             console.print(" " * max_line_width, end="\r")
         console.print()  # 换行
+        
+        # 批量保存缓存（扫描完成后一次性保存，提高性能）
+        try:
+            console.print("💾 正在保存符号表缓存...", end="\r")
+            self.context_manager.symbol_table.save_cache()
+            console.print("💾 符号表缓存已保存")
+        except Exception as e:
+            console.print(f"⚠️  保存符号表缓存失败: {e}", style="yellow")
+        
         skip_msg = f"，跳过 {files_skipped} 个文件" if files_skipped > 0 else ""
         console.print(
             f"✅ 符号表构建完成: 扫描 {files_scanned} 个文件{skip_msg}，提取 {symbols_added} 个符号（来自 {files_with_symbols} 个文件）",
