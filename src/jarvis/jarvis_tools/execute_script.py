@@ -14,13 +14,7 @@ class ScriptTool:
     """
 
     name = "execute_script"
-    description = (
-        "执行脚本并返回结果，支持任意解释器。"
-        + "注意：由于模型上下文长度限制，请避免在脚本中输出大量信息，应该使用rg过滤输出。"
-        + "与virtual_tty不同，此工具会创建一个临时的脚本文件，并使用脚本命令执行脚本，不具备交互式操作的能力，"
-        + "适用于需要执行脚本并获取结果的场景。不适合需要交互式操作的场景（如：ssh连接、sftp传输、gdb/dlv调试等）。"
-        + "在非交互模式（JARVIS_NON_INTERACTIVE=true）下：脚本执行时间限制为5分钟，超时将被终止并返回超时信息；用户无法与命令交互，请不要执行需要交互的命令。"
-    )
+    description = "执行脚本并返回结果，支持任意解释器。建议使用rg过滤大量输出。"
     parameters = {
         "type": "object",
         "properties": {

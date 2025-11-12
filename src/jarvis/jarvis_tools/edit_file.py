@@ -13,20 +13,7 @@ class EditFileTool:
     """文件编辑工具，用于对文件进行局部修改"""
 
     name = "edit_file"
-    description = """对文件进行局部修改。
-
-支持两种修改模式：
-1. 单点替换（SEARCH/REPLACE）：精确匹配并替换代码片段
-2. 区间替换（SEARCH_START/SEARCH_END/REPLACE）：替换两个标记之间的内容
-
-可选的行号范围限制（RANGE）：
-- 可以指定行号范围来限制搜索和替换的范围
-- 格式：start-end（1-based，闭区间）
-- 省略则在整个文件范围内处理
-
-单点替换要求 SEARCH 在有效范围内唯一匹配（仅替换第一个匹配）。
-区间替换会从包含 SEARCH_START 的行首开始，到包含 SEARCH_END 的行尾结束，替换整个区域。
-"""
+    description = "对文件进行局部修改。支持单点替换（精确匹配）和区间替换（标记之间），可指定行号范围限制。"
 
     parameters = {
         "type": "object",

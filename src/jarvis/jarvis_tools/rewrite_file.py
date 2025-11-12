@@ -10,12 +10,7 @@ class RewriteFileTool:
     """文件重写工具，用于完全重写文件内容"""
 
     name = "rewrite_file"
-    description = """完全重写文件内容。
-
-该工具用于完全替换文件内容，适用于新增文件或大范围改写。
-整文件重写会完全替换文件内容，如需局部修改请使用 edit_file 操作。
-该操作具备失败回滚能力。
-"""
+    description = "完全重写文件内容，适用于新增文件或大范围改写。具备失败回滚能力。局部修改请使用 edit_file。"
 
     parameters = {
         "type": "object",

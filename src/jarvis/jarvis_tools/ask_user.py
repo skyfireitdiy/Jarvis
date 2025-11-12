@@ -9,7 +9,7 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 # 定义AskUserTool类，用于向用户提问
 class AskUserTool:
     name = "ask_user"
-    description = """当完成任务所需的信息缺失或关键决策信息不足时，向用户提问。用户可以输入多行文本，以空行结束。使用场景：1. 需要用户提供更多信息以完成任务；2. 需要用户做出关键决策；3. 需要用户确认重要操作；4. 需要用户提供额外信息"""
+    description = "向用户提问获取信息或确认决策。用户可输入多行文本，以空行结束。"
     # 定义参数结构，指定必须包含的问题字段
     parameters = {
         "type": "object",

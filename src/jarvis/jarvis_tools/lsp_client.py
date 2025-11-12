@@ -783,19 +783,7 @@ class LSPClientTool:
     """LSP客户端工具，供CodeAgent使用。"""
     
     name = "lsp_client"
-    description = """LSP客户端工具，连接到Language Server Protocol服务器获取代码信息，仅在CodeAgent模式下可用。
-    
-本工具专为大模型设计，完全基于符号名称操作，无需提供行列号。
-
-推荐使用方式：
-1. document_symbols: 先获取文件中的所有符号列表（函数、类等）
-2. get_symbol_info: 通过符号名称获取完整信息（定义、引用等）
-3. search_symbol: 在文件中搜索符号（支持模糊匹配）
-4. definition: 查找符号的定义位置（通过符号名）
-5. references: 查找符号的所有引用（通过符号名）
-
-所有操作都只需要提供 file_path 和 symbol_name，无需行列号。
-"""
+    description = "LSP客户端工具，基于符号名称获取代码信息（定义、引用等），无需行列号。仅在CodeAgent模式下可用。"
     
     parameters = {
         "type": "object",
