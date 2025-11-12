@@ -1136,7 +1136,7 @@ class CodeAgent(Agent):
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
         if file_count > 3:
             files_str += f" 等{file_count}个文件"
-        PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
+        PrettyOutput.print("🔍 静态检查中...", OutputType.INFO)
         
         # 使用兜底验证器进行基础静态检查
         fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
@@ -1186,7 +1186,7 @@ class CodeAgent(Agent):
                 files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
                 if file_count > 3:
                     files_str += f" 等{file_count}个文件"
-                PrettyOutput.print(f"🔍 正在进行基础静态检查 ({files_str})...", OutputType.INFO)
+                PrettyOutput.print("🔍 静态检查中...", OutputType.INFO)
                 
                 # 立即进行基础静态检查
                 fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
@@ -1385,21 +1385,20 @@ class CodeAgent(Agent):
             
             per_file_preview = self._build_per_file_patch_preview(modified_files)
             
-            # 非交互模式下，在提交前检测大量代码删除
-            if self.non_interactive:
-                detection_result = detect_large_code_deletion()
-                if detection_result is not None:
-                    # 检测到大量代码删除，询问大模型是否合理
-                    is_reasonable = self._ask_llm_about_large_deletion(detection_result, per_file_preview)
-                    if not is_reasonable:
-                        # 大模型认为不合理，撤销修改
-                        PrettyOutput.print("已撤销修改（大模型认为代码删除不合理）", OutputType.INFO)
-                        revert_change()
-                        final_ret += "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
-                        final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
-                        PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
-                        self.session.prompt += final_ret
-                        return
+            # 所有模式下，在提交前检测大量代码删除并询问大模型
+            detection_result = detect_large_code_deletion()
+            if detection_result is not None:
+                # 检测到大量代码删除，询问大模型是否合理
+                is_reasonable = self._ask_llm_about_large_deletion(detection_result, per_file_preview)
+                if not is_reasonable:
+                    # 大模型认为不合理，撤销修改
+                    PrettyOutput.print("已撤销修改（大模型认为代码删除不合理）", OutputType.INFO)
+                    revert_change()
+                    final_ret += "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
+                    final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
+                    PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
+                    self.session.prompt += final_ret
+                    return
             
             commited = handle_commit_workflow()
             if commited:
@@ -1494,7 +1493,7 @@ class CodeAgent(Agent):
         tools_str = ", ".join(tool_names[:3])
         if len(tool_names) > 3:
             tools_str += f" 等{len(tool_names)}个工具"
-        PrettyOutput.print(f"🔍 正在进行静态检查 ({files_str}, 使用 {tools_str})...", OutputType.INFO)
+        PrettyOutput.print("🔍 静态检查中...", OutputType.INFO)
         
         results = []
         # 记录每个文件的检查结果
@@ -1551,7 +1550,7 @@ class CodeAgent(Agent):
                     file_results.append((file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}"))
                     continue
         
-        # 一次性打印所有检查结果
+# 一次性打印所有检查结果
         if file_results:
             total_files = len(file_results)
             passed_count = sum(1 for _, _, status, _ in file_results if status == "通过")
@@ -1559,38 +1558,19 @@ class CodeAgent(Agent):
             timeout_count = sum(1 for _, _, status, _ in file_results if status == "超时")
             skipped_count = sum(1 for _, _, status, _ in file_results if status == "跳过")
             
-            # 构建结果摘要
-            summary_lines = [f"🔍 静态检查完成: 共检查 {total_files} 个文件"]
-            if passed_count > 0:
-                summary_lines.append(f"  ✅ 通过: {passed_count}")
+            # 收缩为一行的结果摘要
+            summary = f"🔍 静态检查: {total_files}个文件"
             if failed_count > 0:
-                summary_lines.append(f"  ❌ 失败: {failed_count}")
+                summary += f", {failed_count}失败"
             if timeout_count > 0:
-                summary_lines.append(f"  ⏱️  超时: {timeout_count}")
-            if skipped_count > 0:
-                summary_lines.append(f"  ⚠️  跳过: {skipped_count}")
-            
-            # 添加详细结果（只显示失败和超时的文件）
-            if failed_count > 0 or timeout_count > 0:
-                summary_lines.append("\n详细结果:")
-                for file_name, tool_name, status, message in file_results:
-                    if status not in ("失败", "超时"):
-                        continue  # 只显示失败和超时的文件
-                    status_icon = {
-                        "失败": "❌",
-                        "超时": "⏱️"
-                    }.get(status, "•")
-                    if message:
-                        summary_lines.append(f"  {status_icon} {file_name} ({tool_name}): {message}")
-                    else:
-                        summary_lines.append(f"  {status_icon} {file_name} ({tool_name})")
+                summary += f", {timeout_count}超时"
+            if passed_count == total_files:
+                summary += " ✅全部通过"
             
             output_type = OutputType.WARNING if (failed_count > 0 or timeout_count > 0) else OutputType.SUCCESS
-            PrettyOutput.print("\n".join(summary_lines), output_type)
+            PrettyOutput.print(summary, output_type)
         else:
-            PrettyOutput.print("🔍 静态检查完成: 全部通过", OutputType.SUCCESS)
-        
-        return results
+            PrettyOutput.print("✅ 静态检查完成", OutputType.SUCCESS)
     
     def _format_lint_results(self, results: List[Tuple[str, str, str, int, str]]) -> str:
         """格式化lint结果
