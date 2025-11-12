@@ -198,6 +198,9 @@ class ContextManager:
                 dep_path = self._resolve_dependency_path(file_path, dep.from_module)
                 if dep_path:
                     self.dependency_graph.add_dependency(file_path, dep_path)
+        
+        # 6. Save updated symbols to cache
+        self.symbol_table.save_cache()
 
     def _get_file_content(self, file_path: str) -> Optional[str]:
         """Get file content, using cache if available."""
