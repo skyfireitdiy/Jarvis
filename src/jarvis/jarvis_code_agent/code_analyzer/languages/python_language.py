@@ -16,10 +16,21 @@ class PythonSymbolExtractor(SymbolExtractor):
     def extract_symbols(self, file_path: str, content: str) -> List[Symbol]:
         symbols: List[Symbol] = []
         try:
+            # 对于超大文件，限制解析内容长度（避免内存和性能问题）
+            # 只解析前 50000 行，通常足够提取主要符号
+            max_lines = 50000
+            lines = content.split('\n')
+            if len(lines) > max_lines:
+                content = '\n'.join(lines[:max_lines])
+            
             tree = ast.parse(content, filename=file_path)
             self._traverse_node(tree, file_path, symbols, parent_name=None)
-        except SyntaxError as e:
-            print(f"Error parsing Python file {file_path}: {e}")
+        except SyntaxError:
+            # 静默跳过语法错误文件（可能是部分代码片段或测试文件）
+            pass
+        except Exception:
+            # 静默跳过其他解析错误（如内存不足等）
+            pass
         return symbols
 
     def _traverse_node(self, node: ast.AST, file_path: str, symbols: List[Symbol], parent_name: Optional[str]):
