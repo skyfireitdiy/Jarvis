@@ -349,6 +349,17 @@ def process_review_phase(
             reviewed_clusters,
             reinstated_candidates,
         )
+        
+        # 记录每个已复核的无效聚类的 gids（包括确认无效的和重新加入验证的）
+        for invalid_cluster in review_batch:
+            cluster_gids = invalid_cluster.get("gids", [])
+            if cluster_gids:
+                _progress_append({
+                    "event": "review_invalid_cluster",
+                    "gids": cluster_gids,
+                    "file": invalid_cluster.get("file"),
+                    "batch_index": invalid_cluster.get("batch_index"),
+                })
     
     # 将重新加入验证的候选添加到cluster_batches
     reinstated_candidates_to_cluster_batches(
@@ -360,13 +371,32 @@ def process_review_phase(
     if not reinstated_candidates:
         typer.secho(f"[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效", fg=typer.colors.GREEN)
     
-    # 记录复核结果
+    # 记录复核结果（汇总）
     _progress_append({
         "event": "review_completed",
         "total_reviewed": len(invalid_clusters_for_review),
         "reinstated": len(reinstated_candidates),
         "confirmed_invalid": len(invalid_clusters_for_review) - len(reinstated_candidates),
     })
+    
+    # 记录所有已复核的无效聚类的 gids（用于断点恢复时跳过已复核的聚类）
+    all_reviewed_gids = set()
+    for invalid_cluster in invalid_clusters_for_review:
+        cluster_gids = invalid_cluster.get("gids", [])
+        for gid_val in cluster_gids:
+            try:
+                gid_int = int(gid_val)
+                if gid_int >= 1:
+                    all_reviewed_gids.add(gid_int)
+            except Exception:
+                pass
+    
+    if all_reviewed_gids:
+        _progress_append({
+            "event": "review_all_gids",
+            "gids": sorted(list(all_reviewed_gids)),
+            "total": len(all_reviewed_gids),
+        })
     status_mgr.update_review(
         current_review=len(invalid_clusters_for_review),
         total_reviews=len(invalid_clusters_for_review),
