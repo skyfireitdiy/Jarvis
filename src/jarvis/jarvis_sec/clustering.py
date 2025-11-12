@@ -18,19 +18,21 @@ from jarvis.jarvis_sec.utils import (
 def load_existing_clusters(
     sec_dir: Path,
     progress_path: Path,
-) -> tuple[Dict[tuple[str, int], List[Dict]], set]:
+) -> tuple[Dict[tuple[str, int], List[Dict]], set, set]:
     """
     读取已有聚类报告以支持断点恢复。
     
-    返回: (_existing_clusters, _completed_cluster_batches)
+    返回: (_existing_clusters, _completed_cluster_batches, _reviewed_invalid_gids)
     """
     _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
     _completed_cluster_batches: set = set()
+    _reviewed_invalid_gids: set = set()  # 已复核的无效聚类的 gids
+    has_review_completed = False  # 是否找到 review_completed 事件
     
     try:
         _cluster_path = sec_dir / "cluster_report.jsonl"
         
-        # 从 progress.jsonl 中读取已完成的聚类批次（优先检查）
+        # 从 progress.jsonl 中读取已完成的聚类批次和已复核的无效聚类（优先检查）
         if progress_path.exists():
             try:
                 for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
@@ -47,6 +49,42 @@ def load_existing_clusters(
                         batch_idx = obj.get("batch_index")
                         if file_name and batch_idx:
                             _completed_cluster_batches.add((str(file_name), int(batch_idx)))
+                    # 检查 review_invalid_cluster 事件，记录每个已复核的无效聚类的 gids
+                    elif obj.get("event") == "review_invalid_cluster":
+                        gids_list = obj.get("gids", [])
+                        if isinstance(gids_list, list):
+                            for gid_val in gids_list:
+                                try:
+                                    gid_int = int(gid_val)
+                                    if gid_int >= 1:
+                                        _reviewed_invalid_gids.add(gid_int)
+                                except Exception:
+                                    pass
+                    # 检查 review_all_gids 事件，记录所有已复核的无效聚类的 gids（汇总）
+                    elif obj.get("event") == "review_all_gids":
+                        gids_list = obj.get("gids", [])
+                        if isinstance(gids_list, list):
+                            for gid_val in gids_list:
+                                try:
+                                    gid_int = int(gid_val)
+                                    if gid_int >= 1:
+                                        _reviewed_invalid_gids.add(gid_int)
+                                except Exception:
+                                    pass
+                    # 检查 review_reinstated 事件，记录重新加入验证的 gids（这些已经被复核过了）
+                    elif obj.get("event") == "review_reinstated":
+                        gids_list = obj.get("gids", [])
+                        if isinstance(gids_list, list):
+                            for gid_val in gids_list:
+                                try:
+                                    gid_int = int(gid_val)
+                                    if gid_int >= 1:
+                                        _reviewed_invalid_gids.add(gid_int)
+                                except Exception:
+                                    pass
+                    # 检查 review_completed 事件，标记复核已完成
+                    elif obj.get("event") == "review_completed":
+                        has_review_completed = True
             except Exception:
                 pass
         
@@ -77,18 +115,34 @@ def load_existing_clusters(
                     f_name = str(rec.get("file") or "")
                     bidx = int(rec.get("batch_index", 1) or 1)
                     _existing_clusters.setdefault((f_name, bidx), []).append(rec)
+                    
+                    # 兼容旧版本：如果 review_completed 存在但没有 review_all_gids，
+                    # 则将所有 is_invalid=True 的聚类的 gids 标记为已复核
+                    if has_review_completed and not _reviewed_invalid_gids:
+                        if rec.get("is_invalid", False):
+                            gids_list = rec.get("gids", [])
+                            if isinstance(gids_list, list):
+                                for gid_val in gids_list:
+                                    try:
+                                        gid_int = int(gid_val)
+                                        if gid_int >= 1:
+                                            _reviewed_invalid_gids.add(gid_int)
+                                    except Exception:
+                                        pass
             except Exception:
                 _existing_clusters = {}
     except Exception:
         _existing_clusters = {}
         _completed_cluster_batches = set()
+        _reviewed_invalid_gids = set()
     
-    return _existing_clusters, _completed_cluster_batches
+    return _existing_clusters, _completed_cluster_batches, _reviewed_invalid_gids
 
 
 def restore_clusters_from_checkpoint(
     _existing_clusters: Dict[tuple[str, int], List[Dict]],
     _file_groups: Dict[str, List[Dict]],
+    _reviewed_invalid_gids: set,
 ) -> tuple[List[List[Dict]], List[Dict], List[Dict], set]:
     """
     从断点恢复聚类结果。
@@ -113,6 +167,7 @@ def restore_clusters_from_checkpoint(
     invalid_clusters_for_review: List[Dict] = []  # 无效聚类列表（从断点恢复）
     cluster_batches: List[List[Dict]] = []
     cluster_records: List[Dict] = []
+    skipped_reviewed_count = 0  # 已复核的无效聚类数量（跳过）
     
     for (_file_key, _batch_idx), cluster_recs in _existing_clusters.items():
         for rec in cluster_recs:
@@ -137,16 +192,34 @@ def restore_clusters_from_checkpoint(
             
             if members:
                 if is_invalid:
-                    # 无效聚类：收集到复核列表，不加入 cluster_batches
-                    invalid_clusters_for_review.append({
-                        "file": _file_key,
-                        "batch_index": _batch_idx,
-                        "gids": [m.get("gid") for m in members],
-                        "verification": verification,
-                        "invalid_reason": str(rec.get("invalid_reason", "")).strip(),
-                        "members": members,  # 保存候选信息，用于复核后可能重新加入验证
-                        "count": len(members),
-                    })
+                    # 检查该无效聚类的所有 gids 是否都已被复核过
+                    cluster_gids = [m.get("gid") for m in members]
+                    # 将 cluster_gids 转换为 int 类型进行比较
+                    cluster_gids_int = set()
+                    for gid_val in cluster_gids:
+                        try:
+                            gid_int = int(gid_val)
+                            if gid_int >= 1:
+                                cluster_gids_int.add(gid_int)
+                        except Exception:
+                            pass
+                    # 检查所有 gid 是否都已被复核过
+                    all_reviewed = cluster_gids_int and cluster_gids_int.issubset(_reviewed_invalid_gids)
+                    
+                    if not all_reviewed:
+                        # 如果还有未复核的 gid，收集到复核列表
+                        invalid_clusters_for_review.append({
+                            "file": _file_key,
+                            "batch_index": _batch_idx,
+                            "gids": cluster_gids,
+                            "verification": verification,
+                            "invalid_reason": str(rec.get("invalid_reason", "")).strip(),
+                            "members": members,  # 保存候选信息，用于复核后可能重新加入验证
+                            "count": len(members),
+                        })
+                    else:
+                        # 如果所有 gid 都已被复核过，则跳过（不加入复核列表）
+                        skipped_reviewed_count += 1
                 else:
                     # 有效聚类：恢复到 cluster_batches
                     cluster_batches.append(members)
@@ -158,6 +231,18 @@ def restore_clusters_from_checkpoint(
                         "batch_index": _batch_idx,
                         "is_invalid": False,
                     })
+    
+    # 输出统计信息
+    if _reviewed_invalid_gids:
+        try:
+            typer.secho(f"[jarvis-sec] 断点恢复：发现 {len(_reviewed_invalid_gids)} 个已复核的无效聚类 gids", fg=typer.colors.BLUE)
+        except Exception:
+            pass
+    if skipped_reviewed_count > 0:
+        try:
+            typer.secho(f"[jarvis-sec] 断点恢复：跳过 {skipped_reviewed_count} 个已复核的无效聚类", fg=typer.colors.BLUE)
+        except Exception:
+            pass
     
     return cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids
 
@@ -1034,7 +1119,7 @@ def initialize_clustering_context(
     invalid_clusters_for_review: List[Dict] = []
     
     # 读取已有聚类报告以支持断点
-    _existing_clusters, _completed_cluster_batches = load_existing_clusters(
+    _existing_clusters, _completed_cluster_batches, _reviewed_invalid_gids = load_existing_clusters(
         sec_dir, progress_path
     )
     
@@ -1045,7 +1130,7 @@ def initialize_clustering_context(
     
     # 从断点恢复聚类结果
     cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids = restore_clusters_from_checkpoint(
-        _existing_clusters, _file_groups
+        _existing_clusters, _file_groups, _reviewed_invalid_gids
     )
     
     return (
