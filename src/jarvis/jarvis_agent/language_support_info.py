@@ -290,7 +290,7 @@ def print_language_support_table() -> None:
         
         # 创建表格
         table = Table(
-            title="[bold cyan]语言功能支持情况[/bold cyan]",
+            title="[bold cyan]编程语言功能支持情况[/bold cyan]",
             show_header=True,
             header_style="bold magenta",
             border_style="blue",

@@ -185,6 +185,13 @@ class CodeAgent(Agent):
             logger.warning(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
 
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
+        
+        # 打印语言功能支持表格
+        try:
+            from jarvis.jarvis_agent.language_support_info import print_language_support_table
+            print_language_support_table()
+        except Exception:
+            pass
 
     def _get_system_prompt(self) -> str:
         """获取代码工程师的系统提示词"""
