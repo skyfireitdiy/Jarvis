@@ -79,6 +79,7 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
     delete_agent,
     get_interrupt,
+    get_short_term_memories,
     make_agent_name,
     set_agent,
     set_interrupt,
@@ -133,6 +134,10 @@ def show_agent_startup_stats(
         if project_memory_dir.exists():
             project_memory_count = len(list(project_memory_dir.glob("*.json")))
 
+        # 检查短期记忆
+        short_term_memories = get_short_term_memories()
+        short_term_memory_count = len(short_term_memories) if short_term_memories else 0
+
         # 获取当前工作目录
         current_dir = os.getcwd()
 
@@ -150,6 +155,12 @@ def show_agent_startup_stats(
         if project_memory_count > 0:
             stats_parts.append(
                 f"📝  项目记忆: [bold magenta]{project_memory_count}[/bold magenta]"
+            )
+
+        # 如果有短期记忆，添加到统计信息中
+        if short_term_memory_count > 0:
+            stats_parts.append(
+                f"💭  短期记忆: [bold blue]{short_term_memory_count}[/bold blue]"
             )
 
         stats_text = Text.from_markup(" | ".join(stats_parts), justify="center")
