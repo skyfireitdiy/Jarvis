@@ -33,6 +33,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     extractor = lang_support.create_symbol_extractor()
                     info[lang_name]['符号提取'] = extractor is not None
                 except Exception:
+                    # 如果创建失败，先标记为 False，后续会检查 file_context_handler 中的提取器
                     info[lang_name]['符号提取'] = False
                 
                 # 检查依赖分析支持
@@ -44,7 +45,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
     except Exception:
         pass
     
-    # 从 file_context_handler 获取文件上下文符号提取支持
+    # 从 file_context_handler 获取文件上下文符号提取支持，同时也用于补充符号提取支持
     try:
         from jarvis.jarvis_agent.file_context_handler import _LANGUAGE_EXTRACTORS
         
@@ -67,7 +68,13 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     
                     if lang_name not in info:
                         info[lang_name] = {}
+                    
+                    # 文件上下文符号提取支持
                     info[lang_name]['文件上下文符号提取'] = True
+                    
+                    # 如果 code_analyzer 中的符号提取不支持，但 file_context_handler 中有提取器，也标记为支持
+                    if '符号提取' not in info[lang_name] or not info[lang_name]['符号提取']:
+                        info[lang_name]['符号提取'] = True
             except Exception:
                 pass
     except Exception:
