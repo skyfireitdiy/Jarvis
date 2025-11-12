@@ -49,5 +49,11 @@ try:
 except (ImportError, Exception):
     pass
 
+try:
+    from .java_extractor import register_java_extractor
+    register_java_extractor()
+except (ImportError, Exception):
+    pass
+
 __all__ = []
 

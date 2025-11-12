@@ -29,3 +29,21 @@ try:
 except (ImportError, RuntimeError):
     pass
 
+try:
+    from .javascript_language import JavaScriptLanguageSupport
+    __all__.append('JavaScriptLanguageSupport')
+except (ImportError, RuntimeError):
+    pass
+
+try:
+    from .typescript_language import TypeScriptLanguageSupport
+    __all__.append('TypeScriptLanguageSupport')
+except (ImportError, RuntimeError):
+    pass
+
+try:
+    from .java_language import JavaLanguageSupport
+    __all__.append('JavaLanguageSupport')
+except (ImportError, RuntimeError):
+    pass
+

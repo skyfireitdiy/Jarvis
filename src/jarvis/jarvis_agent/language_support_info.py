@@ -45,7 +45,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
     except Exception:
         pass
     
-    # 从 file_context_handler 获取文件上下文符号提取支持，同时也用于补充符号提取支持
+    # 从 file_context_handler 获取上下文提取支持，同时也用于补充符号提取支持
     try:
         from jarvis.jarvis_agent.file_context_handler import _LANGUAGE_EXTRACTORS
         
@@ -58,6 +58,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
             '.cpp': 'cpp', '.cc': 'cpp', '.cxx': 'cpp', '.hpp': 'cpp', '.hxx': 'cpp',
             '.js': 'javascript', '.jsx': 'javascript',
             '.ts': 'typescript', '.tsx': 'typescript',
+            '.java': 'java',
         }
         
         for ext, factory in _LANGUAGE_EXTRACTORS.items():
@@ -70,8 +71,8 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     if lang_name not in info:
                         info[lang_name] = {}
                     
-                    # 文件上下文符号提取支持（只有成功创建才支持）
-                    info[lang_name]['文件上下文符号提取'] = True
+                    # 上下文提取支持（只有成功创建才支持）
+                    info[lang_name]['上下文提取'] = True
                     
                     # 如果 code_analyzer 中的符号提取不支持，但 file_context_handler 中能成功创建提取器，也标记为支持
                     if '符号提取' not in info[lang_name] or not info[lang_name]['符号提取']:
@@ -165,10 +166,10 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
         if lang_name not in info:
             info[lang_name] = {}
         # 确保所有功能字段都存在
-        for feature in ['符号提取', '依赖分析', '文件上下文符号提取', '构建验证', '静态检查']:
+        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查']:
             if feature not in info[lang_name]:
-                # 对于文件上下文符号提取，检查是否有对应的提取器
-                if feature == '文件上下文符号提取':
+                # 对于上下文提取，检查是否有对应的提取器
+                if feature == '上下文提取':
                     try:
                         from jarvis.jarvis_agent.file_context_handler import _LANGUAGE_EXTRACTORS
                         ext_map = {
@@ -179,6 +180,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                             'cpp': ['.cpp', '.cc', '.cxx', '.hpp', '.hxx'],
                             'javascript': ['.js', '.jsx'],
                             'typescript': ['.ts', '.tsx'],
+                            'java': ['.java'],
                         }
                         exts = ext_map.get(lang_name, [])
                         # 尝试创建提取器，只有成功创建才认为支持（需要 tree-sitter 已安装）
@@ -252,7 +254,7 @@ def print_language_support_table() -> None:
             return
         
         # 定义功能列表
-        features = ['符号提取', '依赖分析', '文件上下文符号提取', '构建验证', '静态检查']
+        features = ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查']
         
         # 定义语言显示名称映射
         lang_display_names = {
@@ -335,7 +337,7 @@ def print_language_support_table() -> None:
             if not info:
                 return
             
-            features = ['符号提取', '依赖分析', '文件上下文符号提取', '构建验证', '静态检查']
+            features = ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查']
             lang_display_names = {
                 'python': 'Python',
                 'rust': 'Rust',

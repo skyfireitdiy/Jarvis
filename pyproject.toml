@@ -44,7 +44,25 @@ dependencies = [
     "typer",
     "pathspec",
     "plotext==5.2.8",
-    "packaging>=24.2"
+    "packaging>=24.2",
+    "tree-sitter",
+    "tree-sitter-python",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
+    "tree-sitter-rust",
+    "tree-sitter-go",
+    "tree-sitter-java",
+    "tree-sitter-cpp",
+    "tree-sitter-c",
+    "tree-sitter-json",
+    "tree-sitter-yaml",
+    "tree-sitter-markdown",
+    "tree-sitter-html",
+    "tree-sitter-css",
+    "tree-sitter-bash",
+    "tree-sitter-ruby",
+    "tree-sitter-php",
+    "tree-sitter-sql",
 ]
 requires-python = ">=3.9,<3.13"
 
