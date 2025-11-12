@@ -18,6 +18,9 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 class CMakeBuildValidator(BuildValidatorBase):
     """CMake构建验证器"""
     
+    BUILD_SYSTEM_NAME = "CMake"
+    SUPPORTED_LANGUAGES = ["c", "cpp"]
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
         

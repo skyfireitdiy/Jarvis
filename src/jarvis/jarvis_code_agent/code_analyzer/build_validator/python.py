@@ -17,6 +17,9 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 class PythonBuildValidator(BuildValidatorBase):
     """Python构建验证器"""
     
+    BUILD_SYSTEM_NAME = "Python"
+    SUPPORTED_LANGUAGES = ["python"]
+    
     def _extract_python_errors(self, output: str) -> str:
         """提取Python错误信息"""
         if not output:

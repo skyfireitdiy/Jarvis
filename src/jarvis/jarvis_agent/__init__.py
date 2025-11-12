@@ -480,6 +480,13 @@ class Agent:
             self.get_tool_registry(),  # type: ignore
             platform_name=self.model.platform_name(),  # type: ignore
         )
+        
+        # 打印语言功能支持表格
+        try:
+            from jarvis.jarvis_agent.language_support_info import print_language_support_table
+            print_language_support_table()
+        except Exception:
+            pass
         # 动态加载工具调用后回调
         self._load_after_tool_callbacks()
 

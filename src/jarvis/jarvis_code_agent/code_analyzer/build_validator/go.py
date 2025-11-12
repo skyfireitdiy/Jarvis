@@ -16,6 +16,9 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 class GoBuildValidator(BuildValidatorBase):
     """Go构建验证器"""
     
+    BUILD_SYSTEM_NAME = "Go Build"
+    SUPPORTED_LANGUAGES = ["go"]
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
         
