@@ -4,6 +4,7 @@
 提供语言功能支持情况的收集和展示功能。
 """
 
+import subprocess
 from typing import Dict, Any, Optional, List
 
 
@@ -159,6 +160,32 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
     except Exception:
         pass
     
+    # 检查LSP支持（从 lsp_client.py 获取，并验证实际可用性）
+    from jarvis.jarvis_tools.lsp_client import LSP_SERVERS
+    
+    # LSP服务器配置中的语言名称到标准语言名称的映射
+    lsp_lang_map = {
+        'python': 'python',
+        'typescript': 'typescript',
+        'javascript': 'javascript',
+        'c': 'c',
+        'cpp': 'cpp',
+        'rust': 'rust',
+        'go': 'go',
+        'java': 'java',
+    }
+    
+    # 检查每种语言是否有对应的 LSP 服务器配置，并验证实际可用性
+    for lsp_lang, lang_name in lsp_lang_map.items():
+        if lang_name not in info:
+            info[lang_name] = {}
+        
+        if lsp_lang in LSP_SERVERS:
+            config = LSP_SERVERS[lsp_lang]
+            # 检查服务器是否实际可用
+            is_available = _check_lsp_server_available(config)
+            info[lang_name]['LSP支持'] = is_available
+    
     # 确保所有已知语言都在 info 中（即使某些功能不支持）
     # 这样表格会显示所有语言，即使某些功能不支持
     known_languages = ['python', 'c', 'cpp', 'rust', 'go', 'javascript', 'typescript', 'java']
@@ -166,7 +193,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
         if lang_name not in info:
             info[lang_name] = {}
         # 确保所有功能字段都存在
-        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查']:
+        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持']:
             if feature not in info[lang_name]:
                 # 对于上下文提取，检查是否有对应的提取器
                 if feature == '上下文提取':
@@ -236,6 +263,128 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                 elif feature == '静态检查':
                     # 默认 False，已在上面检查过
                     info[lang_name][feature] = info[lang_name].get(feature, False)
+                elif feature == 'LSP支持':
+                    # 默认 False，已在上面检查过
+                    info[lang_name][feature] = info[lang_name].get(feature, False)
+                else:
+                    info[lang_name][feature] = False
+    
+    return info
+
+
+def _check_lsp_server_available(config) -> bool:
+    """检查LSP服务器是否实际可用。
+    
+    Args:
+        config: LSPServerConfig 配置对象
+        
+    Returns:
+        bool: 如果服务器可用返回True，否则返回False
+    """
+    # 使用检测命令或主命令来验证
+    check_cmd = config.check_command or config.command
+    
+    try:
+        # 尝试运行检测命令
+        result = subprocess.run(
+            check_cmd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False
+        )
+        
+        # 只要命令能执行（不是FileNotFoundError），就认为可用
+        # 某些LSP服务器即使返回非零退出码也可能可用
+        return True
+        
+    except FileNotFoundError:
+        return False
+    except subprocess.TimeoutExpired:
+        return False
+    except Exception:
+        return False
+    
+    # 确保所有已知语言都在 info 中（即使某些功能不支持）
+    # 这样表格会显示所有语言，即使某些功能不支持
+    known_languages = ['python', 'c', 'cpp', 'rust', 'go', 'javascript', 'typescript', 'java']
+    for lang_name in known_languages:
+        if lang_name not in info:
+            info[lang_name] = {}
+        # 确保所有功能字段都存在
+        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持']:
+            if feature not in info[lang_name]:
+                # 对于上下文提取，检查是否有对应的提取器
+                if feature == '上下文提取':
+                    try:
+                        from jarvis.jarvis_agent.file_context_handler import _LANGUAGE_EXTRACTORS
+                        ext_map = {
+                            'python': ['.py', '.pyw'],
+                            'rust': ['.rs'],
+                            'go': ['.go'],
+                            'c': ['.c', '.h'],
+                            'cpp': ['.cpp', '.cc', '.cxx', '.hpp', '.hxx'],
+                            'javascript': ['.js', '.jsx'],
+                            'typescript': ['.ts', '.tsx'],
+                            'java': ['.java'],
+                        }
+                        exts = ext_map.get(lang_name, [])
+                        # 尝试创建提取器，只有成功创建才认为支持（需要 tree-sitter 已安装）
+                        has_extractor = False
+                        for ext in exts:
+                            if ext in _LANGUAGE_EXTRACTORS:
+                                try:
+                                    factory = _LANGUAGE_EXTRACTORS[ext]
+                                    extractor = factory()
+                                    if extractor:
+                                        has_extractor = True
+                                        break
+                                except Exception:
+                                    continue
+                        info[lang_name][feature] = has_extractor
+                    except Exception:
+                        info[lang_name][feature] = False
+                elif feature == '符号提取':
+                    # 如果之前没有设置或为 False，再次检查 file_context_handler 中的提取器
+                    # 只有能成功创建提取器才标记为支持（需要 tree-sitter 已安装）
+                    if '符号提取' not in info[lang_name] or not info[lang_name]['符号提取']:
+                        try:
+                            from jarvis.jarvis_agent.file_context_handler import _LANGUAGE_EXTRACTORS
+                            ext_map = {
+                                'python': ['.py', '.pyw'],
+                                'rust': ['.rs'],
+                                'go': ['.go'],
+                                'c': ['.c', '.h'],
+                                'cpp': ['.cpp', '.cc', '.cxx', '.hpp', '.hxx'],
+                                'javascript': ['.js', '.jsx'],
+                                'typescript': ['.ts', '.tsx'],
+                            }
+                            exts = ext_map.get(lang_name, [])
+                            # 尝试创建提取器，只有成功创建才认为支持
+                            has_extractor = False
+                            for ext in exts:
+                                if ext in _LANGUAGE_EXTRACTORS:
+                                    try:
+                                        factory = _LANGUAGE_EXTRACTORS[ext]
+                                        extractor = factory()
+                                        if extractor:
+                                            has_extractor = True
+                                            break
+                                    except Exception:
+                                        continue
+                            info[lang_name][feature] = has_extractor
+                        except Exception:
+                            info[lang_name][feature] = False
+                elif feature == '构建验证':
+                    # 默认 False，已在上面检查过（可能是字符串或False）
+                    if feature not in info[lang_name]:
+                        info[lang_name][feature] = False
+                elif feature == '静态检查':
+                    # 默认 False，已在上面检查过
+                    info[lang_name][feature] = info[lang_name].get(feature, False)
+                elif feature == 'LSP支持':
+                    # 默认 False，已在上面检查过
+                    info[lang_name][feature] = info[lang_name].get(feature, False)
                 else:
                     info[lang_name][feature] = False
     
@@ -244,152 +393,88 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
 
 def print_language_support_table() -> None:
     """打印语言功能支持表格"""
-    try:
-        from rich.console import Console
-        from rich.table import Table
-        
-        info = _collect_language_support_info()
-        
-        if not info:
-            return
-        
-        # 定义功能列表
-        features = ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查']
-        
-        # 定义语言显示名称映射
-        lang_display_names = {
-            'python': 'Python',
-            'rust': 'Rust',
-            'go': 'Go',
-            'c': 'C',
-            'cpp': 'C++',
-            'javascript': 'JavaScript',
-            'typescript': 'TypeScript',
-            'java': 'Java',
-        }
-        
-        # 获取所有语言（按固定顺序，优先显示 C, C++, Rust, Go）
-        priority_languages = ['c', 'cpp', 'rust', 'go']
-        other_languages = ['python', 'javascript', 'typescript', 'java']
-        all_languages = priority_languages + [lang for lang in other_languages if lang not in priority_languages]
-        # 显示所有已知语言，即使某些功能不支持（只要在 info 中有记录）
-        languages = [lang for lang in all_languages if lang in info]
-        
-        # 如果没有任何语言，尝试显示 info 中的所有语言
-        if not languages:
-            languages = list(info.keys())
-            # 按优先级排序
-            languages = sorted(languages, key=lambda x: (
-                0 if x in priority_languages else 1,
-                priority_languages.index(x) if x in priority_languages else 999,
-                x
-            ))
-        
-        if not languages:
-            return
-        
-        # 创建表格
-        table = Table(
-            title="[bold cyan]编程语言功能支持情况[/bold cyan]",
-            show_header=True,
-            header_style="bold magenta",
-            border_style="blue",
-            title_style="bold cyan",
-            show_lines=False,
-            padding=(0, 1),
-        )
-        
-        # 添加功能列
-        table.add_column("功能", style="cyan", no_wrap=True, justify="left")
-        
-        # 添加语言列
-        for lang in languages:
-            display_name = lang_display_names.get(lang, lang.capitalize())
-            table.add_column(display_name, justify="center", style="green", no_wrap=True)
-        
-        # 添加功能行
+    from rich.console import Console
+    from rich.table import Table
+    from rich.align import Align
+    
+    info = _collect_language_support_info()
+    
+    if not info:
+        return
+    
+    # 定义功能列表
+    features = ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持']
+    
+    # 定义语言显示名称映射
+    lang_display_names = {
+        'python': 'Python',
+        'rust': 'Rust',
+        'go': 'Go',
+        'c': 'C',
+        'cpp': 'C++',
+        'javascript': 'JavaScript',
+        'typescript': 'TypeScript',
+        'java': 'Java',
+    }
+    
+    # 获取所有语言（按固定顺序，优先显示 C, C++, Rust, Go）
+    priority_languages = ['c', 'cpp', 'rust', 'go']
+    other_languages = ['python', 'javascript', 'typescript', 'java']
+    all_languages = priority_languages + [lang for lang in other_languages if lang not in priority_languages]
+    # 显示所有已知语言，即使某些功能不支持（只要在 info 中有记录）
+    languages = [lang for lang in all_languages if lang in info]
+    
+    # 如果没有任何语言，尝试显示 info 中的所有语言
+    if not languages:
+        languages = list(info.keys())
+        # 按优先级排序
+        languages = sorted(languages, key=lambda x: (
+            0 if x in priority_languages else 1,
+            priority_languages.index(x) if x in priority_languages else 999,
+            x
+        ))
+    
+    if not languages:
+        return
+    
+    # 创建表格
+    table = Table(
+        title="[bold cyan]编程语言功能支持情况[/bold cyan]",
+        show_header=True,
+        header_style="bold magenta",
+        border_style="blue",
+        title_style="bold cyan",
+        show_lines=False,
+        padding=(0, 1),
+    )
+    
+    # 添加语言列（第一列）
+    table.add_column("语言", style="cyan", no_wrap=True, justify="left")
+    
+    # 添加功能列
+    for feature in features:
+        table.add_column(feature, justify="center", style="green", no_wrap=True)
+    
+    # 添加语言行
+    for lang in languages:
+        display_name = lang_display_names.get(lang, lang.capitalize())
+        row = [display_name]
         for feature in features:
-            row = [feature]
-            for lang in languages:
-                supported = info.get(lang, {}).get(feature, False)
-                if supported:
-                    # 如果是构建验证，显示构建系统名称
-                    if feature == '构建验证' and isinstance(supported, str):
-                        row.append(f"[bold green]{supported}[/bold green]")
-                    else:
-                        row.append("[bold green]✓[/bold green]")
+            supported = info.get(lang, {}).get(feature, False)
+            if supported:
+                # 如果是构建验证，显示构建系统名称
+                if feature == '构建验证' and isinstance(supported, str):
+                    row.append(f"[bold green]{supported}[/bold green]")
                 else:
-                    row.append("[bold red]✗[/bold red]")
-            table.add_row(*row)
-        
-        console = Console()
-        console.print()
-        # 居中显示表格
-        from rich.align import Align
-        aligned_table = Align.center(table)
-        console.print(aligned_table)
-        console.print()
-        
-    except ImportError:
-        # 如果 rich 不可用，使用简单的文本表格
-        try:
-            info = _collect_language_support_info()
-            if not info:
-                return
-            
-            features = ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查']
-            lang_display_names = {
-                'python': 'Python',
-                'rust': 'Rust',
-                'go': 'Go',
-                'c': 'C',
-                'cpp': 'C++',
-                'javascript': 'JavaScript',
-                'typescript': 'TypeScript',
-                'java': 'Java',
-            }
-            
-            priority_languages = ['c', 'cpp', 'rust', 'go']
-            other_languages = ['python', 'javascript', 'typescript', 'java']
-            all_languages = priority_languages + [lang for lang in other_languages if lang not in priority_languages]
-            languages = [lang for lang in all_languages if lang in info]
-            
-            if not languages:
-                return
-            
-            # 计算列宽
-            feature_width = max(len(f) for f in features) + 2
-            lang_widths = {}
-            for lang in languages:
-                display_name = lang_display_names.get(lang, lang.capitalize())
-                lang_widths[lang] = max(len(display_name), 8)
-            
-            # 打印表头
-            header = "功能".ljust(feature_width)
-            for lang in languages:
-                display_name = lang_display_names.get(lang, lang.capitalize())
-                header += display_name.center(lang_widths[lang] + 2)
-            print("\n" + header)
-            print("─" * len(header))
-            
-            # 打印功能行
-            for feature in features:
-                row = feature.ljust(feature_width)
-                for lang in languages:
-                    supported = info.get(lang, {}).get(feature, False)
-                    if supported:
-                        # 如果是构建验证，显示构建系统名称
-                        if feature == '构建验证' and isinstance(supported, str):
-                            status = supported
-                        else:
-                            status = "✓"
-                    else:
-                        status = "✗"
-                    row += status.center(lang_widths[lang] + 2)
-                print(row)
-            print()
-        except Exception:
-            pass
-    except Exception:
-        pass
+                    row.append("[bold green]✓[/bold green]")
+            else:
+                row.append("[bold red]✗[/bold red]")
+        table.add_row(*row)
+    
+    console = Console()
+    console.print()
+    # 居中显示表格
+    aligned_table = Align.center(table)
+    console.print(aligned_table)
+    console.print()
 
