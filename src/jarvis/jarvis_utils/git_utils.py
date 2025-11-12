@@ -215,7 +215,7 @@ def revert_change() -> None:
         PrettyOutput.print(f"恢复更改失败: {str(e)}", OutputType.ERROR)
 
 
-def detect_large_code_deletion(threshold: int = 200) -> Optional[Dict[str, int]]:
+def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
     """检测是否有大量代码删除
     
     参数:
@@ -319,7 +319,7 @@ def confirm_large_code_deletion(detection_result: Dict[str, int]) -> bool:
     return True
 
 
-def check_large_code_deletion(threshold: int = 200) -> bool:
+def check_large_code_deletion(threshold: int = 30) -> bool:
     """检查是否有大量代码删除并询问用户确认
     
     参数:

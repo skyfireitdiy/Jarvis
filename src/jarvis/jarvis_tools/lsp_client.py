@@ -7,15 +7,12 @@
 
 import os
 import subprocess
-import logging
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -139,7 +136,7 @@ class LSPClient:
         
         try:
             # 尝试运行检测命令
-            result = subprocess.run(
+            subprocess.run(
                 check_cmd,
                 capture_output=True,
                 text=True,
@@ -152,20 +149,23 @@ class LSPClient:
             return True
             
         except FileNotFoundError:
-            logger.warning(
+            PrettyOutput.print(
                 f"LSP服务器 {self.server_config.name} 未找到。"
-                f"命令: {' '.join(check_cmd)}"
+                f"命令: {' '.join(check_cmd)}",
+                OutputType.WARNING
             )
             return False
         except subprocess.TimeoutExpired:
-            logger.warning(
+            PrettyOutput.print(
                 f"LSP服务器 {self.server_config.name} 检测超时。"
-                f"命令: {' '.join(check_cmd)}"
+                f"命令: {' '.join(check_cmd)}",
+                OutputType.WARNING
             )
             return False
         except Exception as e:
-            logger.warning(
-                f"检测LSP服务器 {self.server_config.name} 时出错: {e}"
+            PrettyOutput.print(
+                f"检测LSP服务器 {self.server_config.name} 时出错: {e}",
+                OutputType.WARNING
             )
             return False
     
@@ -204,9 +204,9 @@ class LSPClient:
             # 发送initialized通知
             self._send_notification("initialized", {})
             
-            logger.info(f"LSP client initialized for {self.server_config.name}")
+            PrettyOutput.print(f"LSP client initialized for {self.server_config.name}", OutputType.INFO)
         except Exception as e:
-            logger.error(f"Failed to initialize LSP client: {e}", exc_info=True)
+            PrettyOutput.print(f"Failed to initialize LSP client: {e}", OutputType.ERROR)
             raise
     
     def _send_request(self, method: str, params: Dict) -> Optional[Dict]:
@@ -238,8 +238,6 @@ class LSPClient:
             
             # 读取响应（简化实现，实际应该使用异步或线程）
             # 这里使用超时读取
-            import select
-            import sys
             import threading
             import queue
             
@@ -253,7 +251,7 @@ class LSPClient:
                         response = json.loads(response_line)
                         response_queue.put(response)
                 except Exception as e:
-                    logger.error(f"Error reading LSP response: {e}")
+                    PrettyOutput.print(f"Error reading LSP response: {e}", OutputType.ERROR)
                     response_queue.put(None)
             
             # 启动读取线程
@@ -270,7 +268,7 @@ class LSPClient:
             
             return None
         except Exception as e:
-            logger.error(f"Error sending LSP request: {e}", exc_info=True)
+            PrettyOutput.print(f"Error sending LSP request: {e}", OutputType.ERROR)
             return None
     
     def _send_notification(self, method: str, params: Dict):
@@ -294,7 +292,7 @@ class LSPClient:
             self.process.stdin.write(notification_str)
             self.process.stdin.flush()
         except Exception as e:
-            logger.error(f"Error sending LSP notification: {e}", exc_info=True)
+            PrettyOutput.print(f"Error sending LSP notification: {e}", OutputType.ERROR)
     
     def get_completion(self, file_path: str, line: int, character: int) -> List[Dict]:
         """获取代码补全。
@@ -437,7 +435,7 @@ class LSPClient:
                 self.process.terminate()
                 self.process.wait(timeout=5)
             except Exception as e:
-                logger.warning(f"Error closing LSP client: {e}")
+                PrettyOutput.print(f"Error closing LSP client: {e}", OutputType.WARNING)
                 if self.process:
                     self.process.kill()
 
@@ -525,14 +523,14 @@ class LSPClientTool:
             config = LSP_SERVERS[language]
             client = LSPClient(project_root, config)
             LSPClientTool._clients[cache_key] = client
-            logger.info(f"LSP客户端创建成功: {config.name} for {language}")
+            PrettyOutput.print(f"LSP客户端创建成功: {config.name} for {language}", OutputType.INFO)
             return client
         except RuntimeError as e:
             # LSP服务器不可用（已在_check_server_available中记录日志）
-            logger.error(f"LSP服务器不可用: {e}")
+            PrettyOutput.print(f"LSP服务器不可用: {e}", OutputType.ERROR)
             return None
         except Exception as e:
-            logger.error(f"Failed to create LSP client: {e}", exc_info=True)
+            PrettyOutput.print(f"Failed to create LSP client: {e}", OutputType.ERROR)
             return None
     
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -650,7 +648,7 @@ class LSPClientTool:
             }
             
         except Exception as e:
-            logger.error(f"LSP client tool error: {e}", exc_info=True)
+            PrettyOutput.print(f"LSP client tool error: {e}", OutputType.ERROR)
             return {
                 "success": False,
                 "stdout": "",
@@ -744,4 +742,3 @@ class LSPClientTool:
             return "\n".join(lines)
         
         return str(result)
-
