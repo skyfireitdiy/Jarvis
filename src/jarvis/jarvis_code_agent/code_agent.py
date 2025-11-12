@@ -105,6 +105,7 @@ class CodeAgent(Agent):
             "ctags",
             "edit_file",
             "rewrite_file",
+            "lsp_client",  # LSP客户端工具，用于获取代码补全、悬停等信息
         ]
 
         if append_tools:
