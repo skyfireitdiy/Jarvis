@@ -101,10 +101,12 @@ class AgentRunLoop:
 
                 # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
                 if need_return:
+                    ag._no_tool_call_count = 0
                     return tool_prompt
 
                 # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
                 safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
+                
                 ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
                 # 广播工具调用后的事件（不影响主流程）
@@ -121,16 +123,39 @@ class AgentRunLoop:
 
                 # 检查是否需要继续
                 if ag.session.prompt or ag.session.addon_prompt:
+                    ag._no_tool_call_count = 0
                     continue
 
                 # 检查自动完成
                 if ag.auto_complete and is_auto_complete(current_response):
+                    ag._no_tool_call_count = 0
                     # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
                     result = ag._complete_task(auto_completed=True)
                     # 若不需要summary，则将最后一条LLM输出作为返回值
                     if not getattr(ag, "need_summary", True):
                         return current_response
                     return result
+
+                
+                # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
+                has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
+                
+                # 在非交互模式下，跟踪连续没有工具调用的次数
+                if ag.non_interactive:
+                    if has_tool_call:
+                        # 有工具调用，重置计数器
+                        ag._no_tool_call_count = 0
+                    else:
+                        # 没有工具调用，增加计数器
+                        ag._no_tool_call_count += 1
+                        # 如果连续5次没有工具调用，添加工具使用提示
+                        if ag._no_tool_call_count >= 5:
+                            tool_usage_prompt = ag.get_tool_usage_prompt()
+                            ag.session.addon_prompt = join_prompts(
+                                [ag.session.addon_prompt, tool_usage_prompt]
+                            )
+                            # 重置计数器，避免重复添加
+                            ag._no_tool_call_count = 0
 
                 # 获取下一步用户输入
                 next_action = ag._get_next_user_action()
