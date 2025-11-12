@@ -82,16 +82,10 @@ class MemoryManager:
             return
 
         # 构建提示词，让大模型自己判断并保存记忆
-        prompt = """请回顾本次任务的整个过程，判断是否有值得长期记忆或项目记忆的信息。
-
-如果有以下类型的信息，请使用 save_memory 工具保存：
-1. 解决问题的新方法或技巧（适合保存为 global_long_term）
-2. 项目相关的重要发现或配置（适合保存为 project_long_term）
-3. 用户的偏好或习惯（适合保存为 global_long_term）
-4. 重要的技术知识或经验（适合保存为 global_long_term）
-5. 项目特定的实现细节或约定（适合保存为 project_long_term）
-
-请分析并保存有价值的信息，选择合适的记忆类型和标签。如果没有值得记忆的信息，请直接说明。"""
+        prompt = """回顾本次任务，判断是否有值得记忆的信息。使用 save_memory 保存：
+- global_long_term: 新方法/技巧、用户偏好、技术知识
+- project_long_term: 项目发现/配置、实现细节/约定
+如无值得记忆的信息，直接说明。"""
 
         # 处理记忆保存
         try:
