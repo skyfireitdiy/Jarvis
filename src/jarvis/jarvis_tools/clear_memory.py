@@ -15,21 +15,7 @@ class ClearMemoryTool:
     """清除记忆工具，用于批量清除指定的记忆"""
 
     name = "clear_memory"
-    description = """批量清除指定的记忆。
-    
-    支持的清除方式：
-    1. 按记忆类型清除所有记忆
-    2. 按标签清除特定记忆
-    3. 按记忆ID清除单个记忆
-    
-    支持的记忆类型：
-    - project_long_term: 项目长期记忆
-    - global_long_term: 全局长期记忆
-    - short_term: 短期记忆
-    - all: 所有类型的记忆
-    
-    注意：清除操作不可恢复，请谨慎使用
-    """
+    description = "批量清除指定的记忆。支持按类型、标签或ID清除。记忆类型：project_long_term/global_long_term/short_term/all。注意：清除操作不可恢复。"
 
     parameters = {
         "type": "object",

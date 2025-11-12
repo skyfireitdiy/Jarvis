@@ -28,7 +28,7 @@ class SubAgentTool:
 
     # 必须与文件名一致，供 ToolRegistry 自动注册
     name = "sub_agent"
-    description = "将子任务交给通用 Agent 执行，并返回执行结果（继承父Agent部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer、non_interactive、use_methodology、use_analysis；其他参数需显式提供，自动完成并生成总结）。"
+    description = "将子任务交给通用 Agent 执行并返回结果（继承父Agent部分配置，自动完成并生成总结）。"
     parameters = {
         "type": "object",
         "properties": {

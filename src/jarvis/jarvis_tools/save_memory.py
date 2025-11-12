@@ -14,18 +14,7 @@ class SaveMemoryTool:
     """保存记忆工具，用于将信息保存到长短期记忆系统"""
 
     name = "save_memory"
-    description = """保存信息到长短期记忆系统。
-    
-    支持批量保存多条记忆，可以同时保存不同类型的记忆。
-    
-    支持的记忆类型：
-    - project_long_term: 项目长期记忆（与当前项目相关的信息）
-    - global_long_term: 全局长期记忆（通用的信息、用户喜好、知识、方法等）
-    - short_term: 短期记忆（当前任务相关的信息）
-    
-    项目长期记忆存储在当前目录的 .jarvis/memory 下
-    全局长期记忆和短期记忆存储在数据目录的 memory 子目录下
-    """
+    description = "保存信息到长短期记忆系统。支持批量保存，记忆类型：project_long_term（项目长期）、global_long_term（全局长期）、short_term（短期）。"
 
     parameters = {
         "type": "object",

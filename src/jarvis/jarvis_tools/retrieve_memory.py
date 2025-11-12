@@ -13,17 +13,7 @@ class RetrieveMemoryTool:
     """检索记忆工具，用于从长短期记忆系统中检索信息"""
 
     name = "retrieve_memory"
-    description = """从长短期记忆系统中检索信息。
-    
-    支持的记忆类型：
-    - project_long_term: 项目长期记忆（与当前项目相关的信息）
-    - global_long_term: 全局长期记忆（通用的信息、用户喜好、知识、方法等）
-    - short_term: 短期记忆（当前任务相关的信息）
-    - all: 从所有类型中检索
-    
-    可以通过标签过滤检索结果，支持多个标签（满足任一标签即可）
-    注意：标签数量建议不要超过10个，以保证检索效率
-    """
+    description = "从长短期记忆系统中检索信息。支持按类型（project_long_term/global_long_term/short_term/all）和标签过滤，标签建议不超过10个。"
 
     parameters = {
         "type": "object",
