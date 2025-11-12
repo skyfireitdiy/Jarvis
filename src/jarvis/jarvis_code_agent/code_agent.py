@@ -1383,8 +1383,16 @@ class CodeAgent(Agent):
 
                 # 添加提交信息到final_ret（按文件展示diff；删除文件仅提示）
                 if commits:
+                    # 获取最新的提交信息（commits列表按时间倒序，第一个是最新的）
+                    latest_commit_hash, latest_commit_message = commits[0]
+                    commit_short_hash = latest_commit_hash[:7] if len(latest_commit_hash) >= 7 else latest_commit_hash
+                    
                     final_ret += (
-                        f"\n\n代码已修改完成\n补丁内容（按文件）:\n{per_file_preview}\n"
+                        f"\n\n代码已修改完成\n"
+                        f"✅ 已自动提交\n"
+                        f"   Commit ID: {commit_short_hash} ({latest_commit_hash})\n"
+                        f"   提交信息: {latest_commit_message}\n"
+                        f"\n补丁内容（按文件）:\n{per_file_preview}\n"
                     )
                     
                     # 添加影响范围分析报告
@@ -1397,7 +1405,33 @@ class CodeAgent(Agent):
                     # 静态分析
                     final_ret = self._handle_static_analysis(modified_files, build_validation_result, config, self, final_ret)
                 else:
-                    final_ret += "\n\n修改没有生效\n"
+                    # 如果没有获取到commits，尝试直接从end_hash获取commit信息
+                    commit_info = ""
+                    if end_hash:
+                        try:
+                            result = subprocess.run(
+                                ["git", "log", "-1", "--pretty=format:%H|%s", end_hash],
+                                capture_output=True,
+                                text=True,
+                                encoding="utf-8",
+                                errors="replace",
+                                check=False,
+                            )
+                            if result.returncode == 0 and result.stdout and "|" in result.stdout:
+                                commit_hash, commit_message = result.stdout.strip().split("|", 1)
+                                commit_short_hash = commit_hash[:7] if len(commit_hash) >= 7 else commit_hash
+                                commit_info = (
+                                    f"\n✅ 已自动提交\n"
+                                    f"   Commit ID: {commit_short_hash} ({commit_hash})\n"
+                                    f"   提交信息: {commit_message}\n"
+                                )
+                        except Exception:
+                            pass
+                    
+                    if commit_info:
+                        final_ret += f"\n\n代码已修改完成{commit_info}\n"
+                    else:
+                        final_ret += "\n\n修改没有生效\n"
             else:
                 final_ret += "\n修改被拒绝\n"
                 final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
