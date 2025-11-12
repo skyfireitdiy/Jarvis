@@ -290,49 +290,23 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
         return None
 
 
-def confirm_large_code_deletion(detection_result: Dict[str, int]) -> bool:
-    """询问用户是否确认大量代码删除
-    
-    参数:
-        detection_result: 检测结果字典，包含 'insertions', 'deletions', 'net_deletions'
-        
-    返回:
-        bool: 如果用户确认，返回True；如果用户拒绝，返回False
-    """
-    insertions = detection_result['insertions']
-    deletions = detection_result['deletions']
-    net_deletions = detection_result['net_deletions']
-    
-    PrettyOutput.print(
-        f"⚠️ 检测到大量代码删除：净删除 {net_deletions} 行（删除 {deletions} 行，新增 {insertions} 行）",
-        OutputType.WARNING,
-    )
-    if not user_confirm(
-        "此补丁包含大量代码删除，是否合理？", default=True
-    ):
-        # 用户认为不合理，拒绝提交
-        revert_change()
-        PrettyOutput.print(
-            "已拒绝本次提交（用户认为补丁不合理）", OutputType.INFO
-        )
-        return False
-    return True
+# confirm_large_code_deletion函数已废弃，统一使用大模型询问
 
 
 def check_large_code_deletion(threshold: int = 30) -> bool:
-    """检查是否有大量代码删除并询问用户确认
+    """检查是否有大量代码删除
     
     参数:
         threshold: 净删除行数阈值，默认200行
         
     返回:
-        bool: 如果检测到大量删除且用户拒绝提交，返回False；否则返回True
+        bool: 始终返回True，由调用方统一处理大模型询问
     """
-    detection_result = detect_large_code_deletion(threshold)
-    if detection_result is None:
-        return True
+    # 检测功能现在由调用方统一处理
+    return True
     
-    return confirm_large_code_deletion(detection_result)
+    # 直接返回True，让调用方统一处理大模型询问
+    return True
 
 
 def handle_commit_workflow() -> bool:
