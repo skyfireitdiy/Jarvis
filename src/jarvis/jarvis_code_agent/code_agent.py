@@ -784,9 +784,7 @@ class CodeAgent(Agent):
                         PrettyOutput.print(context_recommendation_text, OutputType.INFO)
                 except Exception as e:
                     # 上下文推荐失败不应该影响主流程
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.debug(f"上下文推荐失败: {e}", exc_info=True)
+                    PrettyOutput.print(f"上下文推荐失败: {e}", OutputType.WARNING)
                 finally:
                     # 恢复模型输出设置
                     if self.model:
@@ -1043,9 +1041,7 @@ class CodeAgent(Agent):
             return impact_report
         except Exception as e:
             # 影响分析失败不应该影响主流程，仅记录日志
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"影响范围分析失败: {e}", exc_info=True)
+            PrettyOutput.print(f"影响范围分析失败: {e}", OutputType.WARNING)
             return None
 
     def _handle_impact_report(self, impact_report: Optional[Any], agent: Agent, final_ret: str) -> str:
@@ -1242,6 +1238,8 @@ class CodeAgent(Agent):
         if lint_results:
             # 有错误或警告，让大模型修复
             errors_summary = self._format_lint_results(lint_results)
+            # 打印完整的检查结果
+            PrettyOutput.print(f"\n静态扫描发现问题:\n{errors_summary}", OutputType.WARNING)
             addon_prompt = f"""
 静态扫描发现以下问题，请根据错误信息修复代码:
 
@@ -1468,6 +1466,9 @@ class CodeAgent(Agent):
                         file_results.append((file_name, tool_name, "跳过", "文件不存在"))
                         continue
                     
+                    # 打印执行的命令
+                    PrettyOutput.print(f"执行: {command}", OutputType.INFO)
+                    
                     # 执行命令
                     result = subprocess.run(
                         command,
@@ -1486,6 +1487,11 @@ class CodeAgent(Agent):
                         if output.strip():  # 有输出才记录
                             results.append((tool_name, file_path, command, result.returncode, output))
                             file_results.append((file_name, tool_name, "失败", "发现问题"))
+                            # 失败时打印检查结果
+                            output_preview = output[:2000] if len(output) > 2000 else output
+                            PrettyOutput.print(f"检查失败 ({file_name}):\n{output_preview}", OutputType.WARNING)
+                            if len(output) > 2000:
+                                PrettyOutput.print(f"... (输出已截断，共 {len(output)} 字符)", OutputType.WARNING)
                         else:
                             file_results.append((file_name, tool_name, "通过", ""))
                     else:
@@ -1494,15 +1500,14 @@ class CodeAgent(Agent):
                 except subprocess.TimeoutExpired:
                     results.append((tool_name, file_path, command, -1, "执行超时（30秒）"))
                     file_results.append((file_name, tool_name, "超时", "执行超时（30秒）"))
+                    PrettyOutput.print(f"检查超时 ({file_name}): 执行超时（30秒）", OutputType.WARNING)
                 except FileNotFoundError:
                     # 工具未安装，跳过
                     file_results.append((file_name, tool_name, "跳过", "工具未安装"))
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f"执行lint命令失败: {command}, 错误: {e}")
+                    PrettyOutput.print(f"执行lint命令失败: {command}, 错误: {e}", OutputType.WARNING)
                     file_results.append((file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}"))
                     continue
         
@@ -1556,87 +1561,6 @@ class CodeAgent(Agent):
             lines.append("")  # 空行分隔
         
         return "\n".join(lines)
-    
-    def _extract_file_paths_from_input(self, user_input: str) -> List[str]:
-        """从用户输入中提取文件路径
-        
-        Args:
-            user_input: 用户输入文本
-            
-        Returns:
-            文件路径列表
-        """
-        import re
-        file_paths = []
-        
-        # 匹配常见的文件路径模式
-        # 1. 引号中的路径: "path/to/file.py" 或 'path/to/file.py'
-        quoted_paths = re.findall(r'["\']([^"\']+\.(?:py|js|ts|rs|go|java|cpp|c|h|hpp))["\']', user_input)
-        file_paths.extend(quoted_paths)
-        
-        # 2. 相对路径: ./path/to/file.py 或 path/to/file.py
-        relative_paths = re.findall(r'(?:\./)?[\w/]+\.(?:py|js|ts|rs|go|java|cpp|c|h|hpp)', user_input)
-        file_paths.extend(relative_paths)
-        
-        # 3. 绝对路径（简化匹配）
-        absolute_paths = re.findall(r'/(?:[\w\-\.]+/)+[\w\-\.]+\.(?:py|js|ts|rs|go|java|cpp|c|h|hpp)', user_input)
-        file_paths.extend(absolute_paths)
-        
-        # 转换为绝对路径并去重
-        unique_paths = []
-        seen = set()
-        for path in file_paths:
-            abs_path = os.path.abspath(path) if not os.path.isabs(path) else path
-            if abs_path not in seen and os.path.exists(abs_path):
-                seen.add(abs_path)
-                unique_paths.append(abs_path)
-        
-        return unique_paths
-
-    def _extract_symbols_from_input(self, user_input: str) -> List[str]:
-        """从用户输入中提取符号名称（函数名、类名等）
-        
-        Args:
-            user_input: 用户输入文本
-            
-        Returns:
-            符号名称列表
-        """
-        import re
-        symbols = []
-        
-        # 匹配常见的符号命名模式
-        # 1. 驼峰命名（类名）: MyClass, ProcessData
-        camel_case = re.findall(r'\b[A-Z][a-zA-Z0-9]+\b', user_input)
-        symbols.extend(camel_case)
-        
-        # 2. 下划线命名（函数名、变量名）: process_data, get_user_info
-        snake_case = re.findall(r'\b[a-z][a-z0-9_]+[a-z0-9]\b', user_input)
-        symbols.extend(snake_case)
-        
-        # 3. 在引号中的符号名: "function_name" 或 'ClassName'
-        quoted_symbols = re.findall(r'["\']([A-Za-z][A-Za-z0-9_]*?)["\']', user_input)
-        symbols.extend(quoted_symbols)
-        
-        # 过滤常见停用词和过短的符号
-        stop_words = {
-            'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her', 'was', 'one',
-            'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now',
-            'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she',
-            'too', 'use', '添加', '修改', '实现', '修复', '更新', '删除', '创建', '文件', '代码',
-        }
-        
-        unique_symbols = []
-        seen = set()
-        for symbol in symbols:
-            symbol_lower = symbol.lower()
-            if (symbol_lower not in stop_words and 
-                len(symbol) > 2 and 
-                symbol_lower not in seen):
-                seen.add(symbol_lower)
-                unique_symbols.append(symbol)
-        
-        return unique_symbols[:10]  # 限制数量
 
     def _validate_build_after_edit(self, modified_files: List[str]) -> Optional[BuildResult]:
         """编辑后验证构建
@@ -1670,9 +1594,7 @@ class CodeAgent(Agent):
             return result
         except Exception as e:
             # 构建验证失败不应该影响主流程，仅记录日志
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"构建验证执行失败: {e}", exc_info=True)
+            PrettyOutput.print(f"构建验证执行失败: {e}", OutputType.WARNING)
             return None
 
 
