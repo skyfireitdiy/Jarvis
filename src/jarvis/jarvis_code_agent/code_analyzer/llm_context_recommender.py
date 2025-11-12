@@ -10,6 +10,7 @@ import os
 import re
 from typing import List, Optional, Any
 
+from rich.console import Console
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
@@ -193,6 +194,7 @@ class ContextRecommender:
         from .language_support import detect_language, get_symbol_extractor
         from .file_ignore import filter_walk_dirs
         
+        console = Console()
         project_root = self.context_manager.project_root
         files_scanned = 0
         symbols_added = 0
@@ -200,7 +202,7 @@ class ContextRecommender:
         files_skipped = 0
         
         # 快速统计总文件数（用于进度显示）
-        PrettyOutput.print("📊 正在统计项目文件...", OutputType.INFO)
+        console.print("📊 正在统计项目文件...", end="")
         total_files = 0
         for root, dirs, files in os.walk(project_root):
             dirs[:] = filter_walk_dirs(dirs)
@@ -209,14 +211,16 @@ class ContextRecommender:
                 language = detect_language(file_path)
                 if language and get_symbol_extractor(language):
                     total_files += 1
+        console.print(" 完成")  # 统计完成，换行
         
         # 进度反馈间隔（每处理这么多文件输出一次，最多每10个文件输出一次）
         progress_interval = max(1, min(total_files // 20, 10)) if total_files > 0 else 10
         
         if total_files > 0:
-            PrettyOutput.print(f"📁 发现 {total_files} 个代码文件，开始扫描...", OutputType.INFO)
+            console.print(f"📁 发现 {total_files} 个代码文件，开始扫描...")
         else:
-            PrettyOutput.print("⚠️  未发现可扫描的代码文件", OutputType.WARNING)
+            console.print("⚠️  未发现可扫描的代码文件", style="yellow")
+            return
         
         # 遍历项目目录
         for root, dirs, files in os.walk(project_root):
@@ -236,18 +240,36 @@ class ContextRecommender:
                 if not extractor:
                     continue
                 
+                # 获取相对路径用于显示（限制长度）
+                try:
+                    rel_path = os.path.relpath(file_path, project_root)
+                    # 如果路径太长，只显示文件名
+                    if len(rel_path) > 50:
+                        rel_path = "..." + rel_path[-47:]
+                except Exception:
+                    rel_path = file
+                
                 # 读取文件内容（跳过超大文件，避免内存问题）
                 try:
                     # 检查文件大小（超过 1MB 的文件跳过）
                     file_size = os.path.getsize(file_path)
                     if file_size > 1024 * 1024:  # 1MB
                         files_skipped += 1
-                        if files_scanned % progress_interval == 0:
-                            PrettyOutput.print(
-                                f"⏳ 扫描进度: {files_scanned}/{total_files} 文件，已提取 {symbols_added} 个符号（跳过 {files_skipped} 个大文件）...",
-                                OutputType.INFO
-                            )
+                        # 实时更新进度（不换行，显示当前文件）
+                        progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
+                        skip_info = f"，跳过 {files_skipped}" if files_skipped > 0 else ""
+                        console.print(
+                            f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%){skip_info}",
+                            end="\r"
+                        )
                         continue
+                    
+                    # 显示当前正在扫描的文件
+                    progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
+                    console.print(
+                        f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%)",
+                        end="\r"
+                    )
                     
                     with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
                         content = f.read()
@@ -264,27 +286,35 @@ class ContextRecommender:
                     
                     files_scanned += 1
                     
-                    # 定期输出进度
-                    if files_scanned % progress_interval == 0:
-                        progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
-                        PrettyOutput.print(
-                            f"⏳ 扫描进度: {files_scanned}/{total_files} 文件 ({progress_pct}%)，已提取 {symbols_added} 个符号...",
-                            OutputType.INFO
-                        )
+                    # 实时更新进度（不换行，显示当前文件）
+                    progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
+                    skip_info = f"，跳过 {files_skipped}" if files_skipped > 0 else ""
+                    console.print(
+                        f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%)，已提取 {symbols_added} 个符号{skip_info}",
+                        end="\r"
+                    )
                 except Exception as e:
                     # 跳过无法读取的文件
                     files_skipped += 1
-                    if files_scanned % progress_interval == 0:
-                        PrettyOutput.print(
-                            f"⏳ 扫描进度: {files_scanned}/{total_files} 文件，已提取 {symbols_added} 个符号（跳过 {files_skipped} 个文件）...",
-                            OutputType.INFO
-                        )
+                    # 实时更新进度（不换行，显示当前文件）
+                    progress_pct = (files_scanned * 100) // total_files if total_files > 0 else 0
+                    console.print(
+                        f"⏳ 正在扫描 {rel_path}... ({files_scanned}/{total_files}, {progress_pct}%)，跳过 {files_skipped} 个文件",
+                        end="\r"
+                    )
                     continue
         
+        # 完成时显示100%进度，然后换行并显示最终结果
+        if total_files > 0:
+            console.print(
+                f"⏳ 扫描完成 ({files_scanned}/{total_files}, 100%)，已提取 {symbols_added} 个符号...",
+                end="\r"
+            )
+        console.print()  # 换行
         skip_msg = f"，跳过 {files_skipped} 个文件" if files_skipped > 0 else ""
-        PrettyOutput.print(
+        console.print(
             f"✅ 符号表构建完成: 扫描 {files_scanned} 个文件{skip_msg}，提取 {symbols_added} 个符号（来自 {files_with_symbols} 个文件）",
-            OutputType.SUCCESS
+            style="green"
         )
 
     def _extract_symbol_names_with_llm(self, user_input: str) -> List[str]:
