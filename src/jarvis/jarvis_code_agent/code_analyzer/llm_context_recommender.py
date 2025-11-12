@@ -344,32 +344,19 @@ class ContextRecommender:
         all_symbol_names = list(self.context_manager.symbol_table.symbols_by_name.keys())
         symbol_names_sample = sorted(all_symbol_names)[:50]  # 取前50个作为示例
         
-        prompt = f"""分析以下代码编辑任务，生成可能相关的符号名（函数名、类名、变量名等）。
+        prompt = f"""分析代码编辑任务，生成5-15个可能相关的符号名（函数名、类名、变量名等）。
 
 {project_overview}
 
-任务描述：
-{user_input}
+任务描述：{user_input}
 
-项目中的部分符号名示例（仅供参考）：
-{', '.join(symbol_names_sample[:30])}{'...' if len(symbol_names_sample) > 30 else ''}
+符号名示例：{', '.join(symbol_names_sample[:30])}{'...' if len(symbol_names_sample) > 30 else ''}
 
-请根据任务描述，生成5-15个可能相关的符号名。符号名应该是：
-1. 与任务直接相关的函数、类、变量等的名称
-2. 符合常见命名规范（如驼峰命名、下划线命名等）
-3. 尽量具体，避免过于通用的名称
+要求：与任务直接相关，符合命名规范，尽量具体。
 
-以 JSON5 数组格式返回，并用<SYMBOL_NAMES>标签包裹。
-只返回符号名数组，不要包含其他文字。
-
-JSON5 格式说明：
-- 可以使用双引号 "..." 或单引号 '...' 包裹字符串
-- 支持尾随逗号
-- 数组格式示例：["item1", "item2", "item3"] 或 ['item1', 'item2', 'item3',]
-
-示例格式：
+以JSON5数组格式返回，用<SYMBOL_NAMES>标签包裹。示例：
 <SYMBOL_NAMES>
-["processData", "validateInput", "handleError", "createApiEndpoint", "authenticateUser"]
+["processData", "validateInput", "handleError"]
 </SYMBOL_NAMES>
 """
 
@@ -476,23 +463,15 @@ JSON5 格式说明：
         # 获取项目概况
         project_overview = self._get_project_overview()
         
-        prompt = f"""根据以下任务描述和生成的符号名，从候选符号列表中选择最相关的符号。
+        prompt = f"""根据任务描述和生成的符号名，从候选符号列表中选择最相关的10-20个符号。
 
 {project_overview}
 
 任务描述：{user_input}
 生成的符号名：{', '.join(symbol_names)}
+候选符号列表（已编号）：{json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
 
-候选符号列表（已编号，包含位置信息）：
-{json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
-
-请返回最相关的10-20个符号的序号（JSON5 数组格式），按相关性排序，并用<SELECTED_INDICES>标签包裹。
-
-JSON5 格式说明：
-- 数组格式示例：[1, 2, 3] 或 [1, 2, 3,]
-- 支持尾随逗号
-
-只返回序号数组，例如：
+返回最相关符号的序号（JSON5数组），按相关性排序，用<SELECTED_INDICES>标签包裹。示例：
 <SELECTED_INDICES>
 [3, 7, 12, 15, 23]
 </SELECTED_INDICES>

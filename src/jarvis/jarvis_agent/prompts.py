@@ -203,108 +203,19 @@ class 工具名称:
 - 不要在一次响应中同时调用多个工具（如同时保存记忆和创建工具/方法论）
 </request>
 <evaluation_criteria>
-现有资源评估:
-1. 现有工具 - 检查系统中是否已有可以完成该任务的工具
-2. 现有方法论 - 检查是否已有适用于该任务的方法论
-3. 组合使用 - 评估现有工具和方法论组合使用是否可以解决问题
-工具评估标准:
-1. 通用性 - 该工具是否可以解决一类问题，而不仅仅是当前特定问题
-2. 自动化 - 该工具是否可以减少人工干预，提高效率
-3. 可靠性 - 该工具是否可以在不同场景下稳定工作
-4. 简单性 - 该工具是否易于使用，参数设计是否合理
-方法论评估标准:
-1. 方法论应聚焦于通用且可重复的解决方案流程
-2. 方法论应该具备足够的通用性，可应用于同类问题
-3. 特别注意用户在执行过程中提供的修正、反馈和改进建议
-4. 如果用户明确指出了某个解决步骤的优化方向，这应该被纳入方法论
-5. 方法论应面向未来复用，总结"下次遇到同类问题应该如何处理"的通用流程与检查清单，避免局限于本次执行细节
+现有资源评估: 检查现有工具/方法论/组合使用是否可解决问题
+工具评估: 通用性、自动化、可靠性、简单性
+方法论评估: 聚焦通用可重复流程，纳入用户反馈，面向未来复用
 </evaluation_criteria>
 <tool_requirements>
 工具代码要求:
-1. 工具类名应与工具名称保持一致
-2. 必须包含name、description、parameters属性
-3. 必须实现execute方法处理输入参数
-4. 可选实现check方法验证环境
-5. 工具描述应详细说明用途、适用场景和使用示例
-6. 参数定义应遵循 JSON Schema 格式（工具调用使用 JSON5 格式）
-7. 不要包含特定任务的细节，保持通用性
-
-JSON5 工具调用格式说明:
-工具调用使用 JSON5 格式，支持以下特性：
-1. **字符串引号**：可以使用双引号 "..." 或单引号 '...'
-2. **多行字符串**：使用反引号 `...` 可以包含多行内容，自动处理换行
-   - 推荐用于包含代码、长文本等参数
-   - 示例：{{"tool_code": `代码内容\\n多行代码`}}
-3. **尾随逗号**：对象和数组的最后一个元素后可以添加逗号
-4. **注释**（可选）：可以使用 // 单行注释或 /* */ 多行注释
-工具设计关键点:
-1. **使用PrettyOutput打印执行过程**：强烈建议在工具中使用PrettyOutput显示执行过程，
-   这样用户可以了解工具在做什么，提升用户体验。示例：
-   ```python
-   from jarvis.jarvis_utils.output import PrettyOutput, OutputType
-   # 执行中打印信息
-   PrettyOutput.print("正在处理数据...", OutputType.INFO)
-   # 成功信息
-   PrettyOutput.print("操作成功完成", OutputType.SUCCESS)
-   # 警告信息
-   PrettyOutput.print("发现潜在问题", OutputType.WARNING)
-   # 错误信息
-   PrettyOutput.print("操作失败", OutputType.ERROR)
-   ```
-2. **结构化返回结果**：工具应该始终返回结构化的结果字典，包含以下字段：
-   - success: 布尔值，表示操作是否成功
-   - stdout: 字符串，包含工具的主要输出内容
-   - stderr: 字符串，包含错误信息（如果有）
-3. **异常处理**：工具应该妥善处理可能发生的异常，并在失败时清理已创建的资源
-   ```python
-   try:
-       # 执行逻辑
-       return {{
-           "success": True,
-           "stdout": "成功结果",
-           "stderr": ""
-       }}
-   except Exception as e:
-       PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
-       # 清理资源（如果有创建）
-       return {{
-           "success": False,
-           "stdout": "",
-           "stderr": f"操作失败: {{str(e)}}"
-       }}
-   ```
-4. **在工具中调用大模型**：如果工具需要调用大模型来完成子任务（例如，生成代码、分析文本等），为了避免干扰主对话流程，建议创建一个独立的大模型实例。
-   ```python
-    # 通过 agent 实例获取模型配置
-    agent = args.get("agent")
-    if not agent:
-        return {{"success": False, "stderr": "Agent not found."}}
-    
-    current_model = agent.model
-    platform_name = current_model.platform_name()
-    model_name = current_model.name()
-
-    # 创建独立的模型实例
-    from jarvis.jarvis_platform.registry import PlatformRegistry
-    llm = PlatformRegistry().create_platform(platform_name)
-    if not llm:
-        return {{"success": False, "stderr": f"Platform {{platform_name}} not found."}}
-    
-    llm.set_model_name(model_name)
-    llm.set_suppress_output(True) # 工具内的调用通常不需要流式输出
-
-    # 使用新实例调用大模型
-    PrettyOutput.print("正在执行子任务...", OutputType.INFO)
-    response = llm.chat_until_success("你的提示词")
-    PrettyOutput.print("子任务完成", OutputType.SUCCESS)
-   ```
+1. 工具类名与工具名称一致，包含name、description、parameters属性，实现execute方法
+2. 参数定义遵循JSON Schema，工具调用使用JSON5格式（支持反引号多行字符串、尾随逗号）
+3. 使用PrettyOutput显示执行过程，返回{{success, stdout, stderr}}结构化结果
+4. 妥善处理异常，失败时清理资源。如需调用大模型，创建独立实例避免干扰主流程
 </tool_requirements>
 <methodology_requirements>
-方法论格式要求:
-1. 问题重述: 简明扼要的问题归纳，不含特定细节
-2. 可复用解决流程: 面向"下次遇到同类问题"的步骤化方案（列出每步可用的工具），避免与本次特定上下文绑定
-3. 注意事项: 执行中可能遇到的常见问题和注意点，尤其是用户指出的问题
-4. 可选步骤: 对于有多种解决路径的问题，标注出可选步骤和适用场景
+方法论格式: 问题重述、可复用解决流程（步骤化+工具）、注意事项、可选步骤
 </methodology_requirements>
 {output_requirements}
 </task_analysis>"""

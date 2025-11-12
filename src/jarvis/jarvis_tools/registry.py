@@ -21,151 +21,32 @@ from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updat
 
 tool_call_help = f"""
 <tool_system_guide>
-<introduction>
-# 🛠️ 工具使用系统
-您正在使用一个需要精确格式和严格规则的工具执行系统。
-</introduction>
-
-<format>
-# 📋 工具调用格式（JSON5）
+工具调用格式（JSON5）：
 {ot("TOOL_CALL")}
 {{
-  "want": "想要从执行结果中获取到的信息，如果工具输出内容过长，会根据此字段尝试提取有效信息",
+  "want": "想要从执行结果中获取到的信息",
   "name": "工具名称",
   "arguments": {{
     "param1": "值1",
-    "param2": "值2",
-  }}
-}}
-{ct("TOOL_CALL")}
-</format>
-
-<json5_format>
-# 📝 JSON5 格式说明
-工具调用使用 JSON5 格式，支持以下特性：
-
-1. **字符串引号**：
-   - 可以使用双引号 "..." 或单引号 '...'
-   - 示例：`"name": "工具名"` 或 `'name': '工具名'`
-
-2. **多行字符串**：
-   - 使用反引号 `...` 可以包含多行内容，自动处理换行
-   - 示例：
-     {{
-       "tool_code": `# -*- coding: utf-8 -*-
-from typing import Dict, Any
-
-class MyTool:
-    name = "my_tool"
-    def execute(self, args):
-        return {{"success": True}}`
-     }}
-   - 多行字符串中不需要转义换行符，直接换行即可
-   - 如果字符串中包含反引号，可以使用双引号或单引号包裹，并在字符串内使用 \\n 表示换行
-
-3. **尾随逗号**：
-   - 对象和数组的最后一个元素后可以添加逗号
-   - 示例：`{{"param1": "值1", "param2": "值2",}}`
-
-4. **注释**（可选）：
-   - 可以使用 // 单行注释或 /* */ 多行注释
-   - 示例：`{{"param": "值", // 这是注释}}`
-
-5. **长字符串参数**：
-   - 对于包含代码、多行文本等长字符串参数，推荐使用反引号多行字符串
-   - 示例：
-     {{
-       "content": `这是第一行
-这是第二行
-这是第三行`
-     }}
-   - 或者使用转义的换行符（适用于单行字符串）：
-     {{
-       "content": "第一行\\n第二行\\n第三行"
-     }}
-</json5_format>
-
-<rules>
-# ❗ 关键规则
-<rule>
-### 1. 每次只使用一个工具
-- 一次只执行一个工具
-- 等待结果后再进行下一步
-</rule>
-
-<rule>
-### 2. 严格遵守格式
-- 完全按照上述格式
-- 使用正确的 JSON5 格式
-- 包含所有必需参数
-- {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
-- 对于多行字符串参数，优先使用反引号 `...` 格式以提高可读性
-</rule>
-
-<rule>
-### 3. 结果处理
-- 等待执行结果
-- 不要假设结果
-- 不要创建虚假响应
-- 不要想象对话
-</rule>
-
-<rule>
-### 4. 信息管理
-- 如果信息不足，询问用户
-- 跳过不必要的步骤
-- 如果卡住，请求指导
-- 不要在没有完整信息的情况下继续
-</rule>
-</rules>
-
-<string_format>
-# 📝 字符串参数格式（JSON5）
-对于多行字符串参数，推荐使用 JSON5 的反引号语法：
-
-{ot("TOOL_CALL")}
-{{
-  "want": "当前的git状态，期望获取xxx的提交记录",
-  "name": "execute_script",
-  "arguments": {{
-    "interpreter": "bash",
-    "script_content": `git status --porcelain
-git log --oneline -5`
+    "param2": "值2"
   }}
 }}
 {ct("TOOL_CALL")}
 
-或者使用转义的换行符（适用于较短的字符串）：
-{ot("TOOL_CALL")}
-{{
-  "want": "执行脚本",
-  "name": "execute_script",
-  "arguments": {{
-    "interpreter": "bash",
-    "script_content": "git status --porcelain\\ngit log --oneline -5"
-  }}
-}}
-{ct("TOOL_CALL")}
-</string_format>
+JSON5格式特性：
+- 字符串引号：可使用双引号或单引号
+- 多行字符串：使用反引号 `...` 包裹（推荐），自动处理换行，无需转义
+- 尾随逗号：对象/数组最后一个元素后可添加逗号
+- 注释：支持 // 单行或 /* */ 多行注释
 
-<best_practices>
-# 💡 最佳实践
-- 准备好后立即开始执行
-- 无需请求许可即可开始
-- 使用正确的字符串格式
-- 监控进度并调整
-- 遇到困难时请求帮助
-</best_practices>
+关键规则：
+1. 每次只使用一个工具，等待结果后再进行下一步
+2. {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
+3. 多行字符串参数优先使用反引号格式
+4. 等待执行结果，不要假设或创建虚假响应
+5. 信息不足时询问用户，不要在没有完整信息的情况下继续
 
-<common_errors>
-# ⚠️ 常见错误
-- 同时调用多个工具
-- 假设工具结果
-- 创建虚构对话
-- 在没有所需信息的情况下继续
-- JSON5 格式错误
-- {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 没有出现在行首
-</common_errors>
+常见错误：同时调用多个工具、假设工具结果、JSON5格式错误、标签未出现在行首
 </tool_system_guide>
 """
 
@@ -763,16 +644,11 @@ class ToolRegistry(OutputHandlerProtocol):
             except Exception as e:
                 return (
                     {},
-                    f"""JSON5 解析失败，请检查工具调用格式。
-                    {e}
+                    f"""JSON5 解析失败：{e}
 
-                提示：JSON5 支持以下特性：
-                - 可以使用双引号 "..." 或单引号 '...' 包裹字符串
-                - 可以使用反引号 `...` 包裹多行字符串（推荐用于长文本）
-                - 支持尾随逗号
-                - 多行字符串中直接换行，无需转义 \\n
+提示：JSON5支持双引号/单引号、反引号多行字符串（推荐）、尾随逗号。多行字符串中直接换行，无需转义\\n。
 
-                {tool_call_help}""",
+{tool_call_help}""",
                     False,
                 )
 
