@@ -19,6 +19,9 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 class NodeJSBuildValidator(BuildValidatorBase):
     """Node.js构建验证器"""
     
+    BUILD_SYSTEM_NAME = "npm/Node.js"
+    SUPPORTED_LANGUAGES = ["javascript", "typescript"]
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
         

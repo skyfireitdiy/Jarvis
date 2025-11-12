@@ -17,6 +17,9 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 class MakefileBuildValidator(BuildValidatorBase):
     """Makefile构建验证器"""
     
+    BUILD_SYSTEM_NAME = "Makefile"
+    SUPPORTED_LANGUAGES = ["c", "cpp"]
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
         

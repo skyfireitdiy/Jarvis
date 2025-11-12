@@ -16,6 +16,9 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 class RustBuildValidator(BuildValidatorBase):
     """Rust构建验证器（使用cargo check）"""
     
+    BUILD_SYSTEM_NAME = "Cargo"
+    SUPPORTED_LANGUAGES = ["rust"]
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
         

@@ -16,6 +16,9 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 class JavaMavenBuildValidator(BuildValidatorBase):
     """Java Maven构建验证器"""
     
+    BUILD_SYSTEM_NAME = "Maven"
+    SUPPORTED_LANGUAGES = ["java"]
+    
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
         

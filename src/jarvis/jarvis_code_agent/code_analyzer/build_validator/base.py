@@ -41,6 +41,10 @@ class BuildResult:
 class BuildValidatorBase(ABC):
     """构建验证器基类"""
     
+    # 子类需要定义的类变量
+    BUILD_SYSTEM_NAME: str = ""  # 构建系统名称，如 "CMake", "Makefile", "Cargo"
+    SUPPORTED_LANGUAGES: List[str] = []  # 支持的语言列表，如 ["c", "cpp"]
+    
     def __init__(self, project_root: str, timeout: int = 30):
         self.project_root = project_root
         self.timeout = timeout
