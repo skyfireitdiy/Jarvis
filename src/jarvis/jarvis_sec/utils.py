@@ -48,47 +48,17 @@ def initialize_analysis_context(
     """
     初始化分析上下文，包括状态管理、进度文件、目录等。
     
-    返回: (sec_dir, progress_path, _progress_append, done_sigs)
+    返回: (sec_dir, progress_path, _progress_append)
     """
-    from datetime import datetime as _dt
-    
     # 获取 .jarvis/sec 目录
     sec_dir = get_sec_dir(entry_path)
-    progress_path = sec_dir / "progress.jsonl"
+    progress_path = None  # 不再使用 progress.jsonl
     
-    # 进度追加函数
+    # 进度追加函数（空函数，不再记录）
     def _progress_append(rec: Dict) -> None:
-        try:
-            progress_path.parent.mkdir(parents=True, exist_ok=True)
-            rec = dict(rec)
-            rec.setdefault("timestamp", _dt.utcnow().isoformat() + "Z")
-            line = json.dumps(rec, ensure_ascii=False)
-            with progress_path.open("a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            # 进度文件失败不影响主流程
-            pass
+        pass  # 不再记录进度日志
     
-    # 已完成集合（按候选签名）
-    done_sigs: set = set()
-    if progress_path.exists():
-        try:
-            for line in progress_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    obj = json.loads(line)
-                except Exception:
-                    continue
-                if obj.get("event") == "task_status" and obj.get("status") == "done":
-                    sig = obj.get("candidate_signature")
-                    if sig:
-                        done_sigs.add(sig)
-        except Exception:
-            pass
-    
-    return sec_dir, progress_path, _progress_append, done_sigs
+    return sec_dir, progress_path, _progress_append
 
 
 def load_or_run_heuristic_scan(
@@ -102,27 +72,45 @@ def load_or_run_heuristic_scan(
     """
     加载或运行启发式扫描。
     
+    优先从新的 candidates.jsonl 文件加载，如果不存在则回退到旧的 heuristic_issues.jsonl。
+    
     返回: (candidates, summary)
     """
-    _heuristic_path = sec_dir / "heuristic_issues.jsonl"
     candidates: List[Dict] = []
     summary: Dict = {}
     
-    if _heuristic_path.exists():
+    # 优先使用新的 candidates.jsonl 文件
+    from jarvis.jarvis_sec.file_manager import load_candidates, get_candidates_file
+    candidates = load_candidates(sec_dir)
+    
+    if candidates:
         try:
-            typer.secho(f"[jarvis-sec] 从 {_heuristic_path} 恢复启发式扫描", fg=typer.colors.BLUE)
-            with _heuristic_path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        candidates.append(json.loads(line))
+            typer.secho(f"[jarvis-sec] 从 {get_candidates_file(sec_dir)} 恢复启发式扫描", fg=typer.colors.BLUE)
             _progress_append({
                 "event": "pre_scan_resumed",
-                "path": str(_heuristic_path),
+                "path": str(get_candidates_file(sec_dir)),
                 "issues_found": len(candidates)
             })
-        except Exception as e:
-            typer.secho(f"[jarvis-sec] 恢复启发式扫描失败，执行完整扫描: {e}", fg=typer.colors.YELLOW)
-            candidates = []  # 重置以便执行完整扫描
+        except Exception:
+            pass
+    else:
+        # 回退到旧的 heuristic_issues.jsonl 文件（向后兼容）
+        _heuristic_path = sec_dir / "heuristic_issues.jsonl"
+        if _heuristic_path.exists():
+            try:
+                typer.secho(f"[jarvis-sec] 从 {_heuristic_path} 恢复启发式扫描（旧格式）", fg=typer.colors.BLUE)
+                with _heuristic_path.open("r", encoding="utf-8") as f:
+                    for line in f:
+                        if line.strip():
+                            candidates.append(json.loads(line))
+                _progress_append({
+                    "event": "pre_scan_resumed",
+                    "path": str(_heuristic_path),
+                    "issues_found": len(candidates)
+                })
+            except Exception as e:
+                typer.secho(f"[jarvis-sec] 恢复启发式扫描失败，执行完整扫描: {e}", fg=typer.colors.YELLOW)
+                candidates = []  # 重置以便执行完整扫描
     
     if not candidates:
         _progress_append({"event": "pre_scan_start", "entry_path": entry_path, "languages": langs})
@@ -170,7 +158,7 @@ def load_or_run_heuristic_scan(
 
 def compact_candidate(it: Dict) -> Dict:
     """精简候选问题，只保留必要字段"""
-    return {
+    result = {
         "language": it.get("language"),
         "category": it.get("category"),
         "pattern": it.get("pattern"),
@@ -180,6 +168,15 @@ def compact_candidate(it: Dict) -> Dict:
         "confidence": it.get("confidence"),
         "severity": it.get("severity", "medium"),
     }
+    # 如果候选已经有gid，保留它（用于断点恢复）
+    if "gid" in it:
+        try:
+            gid_val = int(it.get("gid", 0))
+            if gid_val >= 1:
+                result["gid"] = gid_val
+        except Exception:
+            pass
+    return result
 
 
 def prepare_candidates(candidates: List[Dict]) -> List[Dict]:
@@ -189,12 +186,35 @@ def prepare_candidates(candidates: List[Dict]) -> List[Dict]:
     返回: compact_candidates (已分配gid的候选列表)
     """
     compact_candidates = [compact_candidate(it) for it in candidates]
-    # 为所有候选分配全局唯一数字ID（gid: 1..N），用于跨批次/跨文件统一编号与跟踪
-    for i, it in enumerate(compact_candidates, start=1):
-        try:
-            it["gid"] = i
-        except Exception:
-            pass
+    
+    # 检查是否所有候选都已经有gid（从heuristic_issues.jsonl恢复时）
+    all_have_gid = all("gid" in it and isinstance(it.get("gid"), int) and it.get("gid", 0) >= 1 for it in compact_candidates)
+    
+    if not all_have_gid:
+        # 如果有候选没有gid，需要分配
+        # 优先保留已有的gid，为没有gid的候选分配新的gid
+        existing_gids = set()
+        for it in compact_candidates:
+            try:
+                gid_val = int(it.get("gid", 0))
+                if gid_val >= 1:
+                    existing_gids.add(gid_val)
+            except Exception:
+                pass
+        
+        # 为没有gid的候选分配新的gid
+        next_gid = 1
+        for it in compact_candidates:
+            if "gid" not in it or not isinstance(it.get("gid"), int) or it.get("gid", 0) < 1:
+                # 找到一个未使用的gid
+                while next_gid in existing_gids:
+                    next_gid += 1
+                try:
+                    it["gid"] = next_gid
+                    existing_gids.add(next_gid)
+                    next_gid += 1
+                except Exception:
+                    pass
     
     return compact_candidates
 
@@ -210,24 +230,138 @@ def group_candidates_by_file(candidates: List[Dict]) -> Dict[str, List[Dict]]:
 
 def create_report_writer(sec_dir: Path, report_file: Optional[str]):
     """创建报告写入函数"""
+    from jarvis.jarvis_sec.file_manager import save_analysis_result, load_clusters
+    
     def _append_report(items, source: str, task_id: str, cand: Dict):
-        """将当前子任务的检测结果追加写入 JSONL 报告文件（每行一个 issue）。仅当 items 非空时写入。"""
+        """
+        将当前子任务的检测结果追加写入 analysis.jsonl 文件。
+        
+        参数:
+        - items: 验证通过的问题列表（has_risk: true）
+        - source: 来源（"analysis_only" 或 "verified"）
+        - task_id: 任务ID（如 "JARVIS-SEC-Batch-1"）
+        - cand: 候选信息，包含 batch 和 candidates
+        """
         if not items:
             return
+        
         try:
-            path = Path(report_file) if report_file else sec_dir / "agent_issues.jsonl"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as f:
-                for item in items:
-                    line = json.dumps(item, ensure_ascii=False)
-                    f.write(line + "\n")
+            # 从批次中提取信息
+            batch = cand.get("batch", False)
+            candidates = cand.get("candidates", [])
+            
+            if not batch or not candidates:
+                # 如果没有批次信息，回退到旧格式（向后兼容）
+                path = Path(report_file) if report_file else sec_dir / "agent_issues.jsonl"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with path.open("a", encoding="utf-8") as f:
+                    for item in items:
+                        line = json.dumps(item, ensure_ascii=False)
+                        f.write(line + "\n")
+                try:
+                    typer.secho(f"[jarvis-sec] 已将 {len(items)} 个问题写入 {path}（旧格式）", fg=typer.colors.GREEN)
+                except Exception:
+                    pass
+                return
+            
+            # 从批次中提取 file 和 gids
+            batch_file = candidates[0].get("file") if candidates else ""
+            batch_gids = []
+            for c in candidates:
+                try:
+                    gid = int(c.get("gid", 0))
+                    if gid >= 1:
+                        batch_gids.append(gid)
+                except Exception:
+                    pass
+            
+            # 从 clusters.jsonl 中查找对应的 cluster_id
+            clusters = load_clusters(sec_dir)
+            cluster_id = None
+            batch_index = None
+            cluster_index = None
+            
+            # 尝试从 task_id 中提取 batch_index（格式：JARVIS-SEC-Batch-1）
             try:
-                typer.secho(f"[jarvis-sec] 已将 {len(items)} 个问题写入 {path}", fg=typer.colors.GREEN)
+                if "Batch-" in task_id:
+                    batch_index = int(task_id.split("Batch-")[1])
             except Exception:
                 pass
-        except Exception:
+            
+            # 查找匹配的聚类（通过 file 和 gids）
+            for cluster in clusters:
+                cluster_file = str(cluster.get("file", ""))
+                cluster_gids = cluster.get("gids", [])
+                
+                if cluster_file == batch_file and set(cluster_gids) == set(batch_gids):
+                    cluster_id = cluster.get("cluster_id", "")
+                    if not cluster_id:
+                        # 如果没有 cluster_id，生成一个
+                        cluster_id = f"{cluster_file}|{cluster.get('batch_index', batch_index or 0)}|{cluster.get('cluster_index', 0)}"
+                    batch_index = cluster.get("batch_index", batch_index or 0)
+                    cluster_index = cluster.get("cluster_index", 0)
+                    break
+            
+            # 如果找不到匹配的聚类，生成一个临时的 cluster_id
+            if not cluster_id:
+                cluster_id = f"{batch_file}|{batch_index or 0}|0"
+                batch_index = batch_index or 0
+                cluster_index = 0
+            
+            # 分离验证为问题的gid和误报的gid
+            verified_gids = []
+            false_positive_gids = []
+            issues = []
+            
+            # 从 items 中提取已验证的问题
+            for item in items:
+                try:
+                    gid = int(item.get("gid", 0))
+                    if gid >= 1:
+                        has_risk = item.get("has_risk", False)
+                        if has_risk:
+                            verified_gids.append(gid)
+                            issues.append(item)
+                        else:
+                            false_positive_gids.append(gid)
+                except Exception:
+                    pass
+            
+            # 从 candidates 中提取所有未在 items 中的 gid（这些可能是误报）
+            for c in candidates:
+                try:
+                    gid = int(c.get("gid", 0))
+                    if gid >= 1 and gid not in verified_gids and gid not in false_positive_gids:
+                        # 如果这个 gid 不在已验证的问题中，可能是误报
+                        false_positive_gids.append(gid)
+                except Exception:
+                    pass
+            
+            # 构建分析结果记录
+            analysis_result = {
+                "cluster_id": cluster_id,
+                "file": batch_file,
+                "batch_index": batch_index,
+                "cluster_index": cluster_index,
+                "gids": batch_gids,
+                "verified_gids": verified_gids,
+                "false_positive_gids": false_positive_gids,
+                "issues": issues,
+            }
+            
+            # 保存到 analysis.jsonl
+            save_analysis_result(sec_dir, analysis_result)
+            
+            try:
+                typer.secho(f"[jarvis-sec] 已将批次 {batch_index} 的分析结果写入 analysis.jsonl（问题: {len(verified_gids)}, 误报: {len(false_positive_gids)}）", fg=typer.colors.GREEN)
+            except Exception:
+                pass
+        except Exception as e:
             # 报告写入失败不影响主流程
-            pass
+            try:
+                typer.secho(f"[jarvis-sec] 警告：保存分析结果失败: {e}", fg=typer.colors.YELLOW)
+            except Exception:
+                pass
     
     return _append_report
 
@@ -266,6 +400,13 @@ def load_processed_gids_from_issues(sec_dir: Path) -> set:
 
 
 def count_issues_from_file(sec_dir: Path) -> int:
+    """从 analysis.jsonl 读取问题数量"""
+    from jarvis.jarvis_sec.file_manager import get_verified_issue_gids
+    verified_gids = get_verified_issue_gids(sec_dir)
+    return len(verified_gids)
+
+
+def count_issues_from_file_old(sec_dir: Path) -> int:
     """从 agent_issues.jsonl 中读取当前问题总数（用于状态显示）"""
     count = 0
     try:
@@ -290,30 +431,6 @@ def count_issues_from_file(sec_dir: Path) -> int:
     except Exception:
         pass
     return count
-
-
-def load_completed_batch_ids(progress_path: Path) -> set:
-    """从 progress.jsonl 读取已完成的批次ID"""
-    completed_batch_ids = set()
-    try:
-        if progress_path.exists():
-            with progress_path.open("r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                        # 检查 batch_status 事件，status 为 "done" 表示批次已完成
-                        if obj.get("event") == "batch_status" and obj.get("status") == "done":
-                            batch_id = obj.get("batch_id")
-                            if batch_id:
-                                completed_batch_ids.add(batch_id)
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-    return completed_batch_ids
 
 
 def load_all_issues_from_file(sec_dir: Path) -> List[Dict]:

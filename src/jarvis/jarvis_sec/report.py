@@ -147,7 +147,25 @@ def aggregate_issues(
     """
     聚合问题列表并生成 JSON 报告。
     """
-    items = [_normalize_issue(_as_dict(it)) for it in issues]
+    # 归一化所有 issues
+    normalized_items = [_normalize_issue(_as_dict(it)) for it in issues]
+    
+    # 去重：通过 gid 去重（如果存在），否则通过 file:line:category:pattern 去重
+    # 保留第一个出现的 issue（因为 load_analysis_results 已经保留了最新的）
+    seen_items: Dict[str, Dict] = {}
+    for item in normalized_items:
+        # 优先使用 gid 作为唯一标识
+        gid = item.get("gid")
+        if gid:
+            key = f"gid:{gid}"
+        else:
+            # 如果没有 gid，使用 file:line:category:pattern 作为唯一标识
+            key = f"{item.get('file')}:{item.get('line')}:{item.get('category')}:{item.get('pattern')}"
+        
+        if key not in seen_items:
+            seen_items[key] = item
+    
+    items = list(seen_items.values())
 
     summary: Dict = {
         "total": len(items),

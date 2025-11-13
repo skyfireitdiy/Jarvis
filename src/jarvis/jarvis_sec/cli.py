@@ -5,10 +5,12 @@ Jarvis 安全演进套件 —— 命令行入口（Typer 版本）
 用法示例：
 - Agent模式（单Agent，逐条子任务分析）
   python -m jarvis.jarvis_sec.cli agent --path ./target_project
+  python -m jarvis.jarvis_sec.cli agent  # 默认分析当前目录
 
 可选参数：
 
-- --output: 最终Markdown报告输出路径（默认 ./report.md）
+- --path, -p: 待分析的根目录（默认当前目录）
+- --output, -o: 最终Markdown报告输出路径（默认 ./report.md）
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ app = typer.Typer(
 
 @app.command("agent", help="Agent模式（单Agent逐条子任务分析）")
 def agent(
-    path: str = typer.Option(..., "--path", "-p", help="待分析的根目录"),
+    path: str = typer.Option(".", "--path", "-p", help="待分析的根目录（默认当前目录）"),
 
     llm_group: Optional[str] = typer.Option(
         None, "--llm-group", "-g", help="使用的模型组（仅对本次运行生效，不修改全局配置）"

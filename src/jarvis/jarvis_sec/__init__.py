@@ -20,6 +20,7 @@ Jarvis 安全分析套件
 """
 
 from typing import Dict, List, Optional
+import json
 
 import typer
 
@@ -51,7 +52,6 @@ from jarvis.jarvis_sec.utils import (
     sig_of as _sig_of,
     load_processed_gids_from_issues as _load_processed_gids_from_issues,
     count_issues_from_file as _count_issues_from_file,
-    load_completed_batch_ids as _load_completed_batch_ids,
     load_all_issues_from_file as _load_all_issues_from_file,
     load_processed_gids_from_agent_issues as _load_processed_gids_from_agent_issues,
 )
@@ -67,7 +67,7 @@ from jarvis.jarvis_sec.clustering import (
     create_cluster_snapshot_writer as _create_cluster_snapshot_writer,
     collect_candidate_gids as _collect_candidate_gids,
     collect_clustered_gids as _collect_clustered_gids,
-    supplement_missing_gids_for_clustering as _supplement_missing_gids_for_clustering,
+    # supplement_missing_gids_for_clustering已移除，不再需要
     handle_single_alert_file as _handle_single_alert_file,
     validate_cluster_format as _validate_cluster_format,
     extract_classified_gids as _extract_classified_gids,
@@ -85,7 +85,7 @@ from jarvis.jarvis_sec.clustering import (
     process_cluster_chunk as _process_cluster_chunk,
     filter_pending_items as _filter_pending_items,
     process_file_clustering as _process_file_clustering,
-    check_and_supplement_missing_gids as _check_and_supplement_missing_gids,
+    # check_and_supplement_missing_gids已移除，完整性检查已移至process_clustering_phase中
     initialize_clustering_context as _initialize_clustering_context,
     check_unclustered_gids as _check_unclustered_gids,
     execute_clustering_for_files as _execute_clustering_for_files,
@@ -167,29 +167,25 @@ def run_security_analysis(
     - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
     - exclude_dirs: 要排除的目录列表（可选），默认已包含测试目录（test, tests, __tests__, spec, testsuite, testdata）
     - enable_verification: 是否启用二次验证（默认 True），关闭后分析Agent确认的问题将直接写入报告
-    - 断点续扫: 默认开启。会基于 .jarvis/sec/progress.jsonl 和 .jarvis/sec/heuristic_issues.jsonl 文件进行状态恢复。
+    - 断点续扫: 默认开启。会基于 .jarvis/sec/candidates.jsonl、clusters.jsonl 和 analysis.jsonl 文件进行状态恢复。
     """
     import json
 
     langs = languages or ["c", "cpp", "h", "hpp", "rs"]
 
-    # 状态管理器（结构化进度状态文件）
-    from jarvis.jarvis_sec.status import StatusManager
-    status_mgr = StatusManager(entry_path)
+    # 状态管理器（不再使用 status.json，使用空对象）
+    class DummyStatusManager:
+        def update_pre_scan(self, **kwargs): pass
+        def update_clustering(self, **kwargs): pass
+        def update_review(self, **kwargs): pass
+        def update_verification(self, **kwargs): pass
+        def mark_completed(self, **kwargs): pass
+        def mark_error(self, **kwargs): pass
     
-    # 尝试从状态文件恢复并显示当前状态
-    try:
-        current_status = status_mgr.get_status()
-        if current_status:
-            stage = current_status.get("stage", "unknown")
-            progress = current_status.get("progress", 0)
-            message = current_status.get("message", "")
-            typer.secho(f"[jarvis-sec] 从状态文件恢复: 阶段={stage}, 进度={progress}%, {message}", fg=typer.colors.BLUE)
-    except Exception:
-        pass
+    status_mgr = DummyStatusManager()
 
     # 初始化分析上下文
-    sec_dir, progress_path, _progress_append, done_sigs = _initialize_analysis_context(
+    sec_dir, progress_path, _progress_append = _initialize_analysis_context(
         entry_path, status_mgr
     )
 
@@ -200,6 +196,18 @@ def run_security_analysis(
 
     # 2) 将候选问题精简为子任务清单，控制上下文长度
     compact_candidates = _prepare_candidates(candidates)
+    
+    # 3) 保存候选到新的 candidates.jsonl 文件（包含gid）
+    from jarvis.jarvis_sec.file_manager import save_candidates, get_candidates_file
+    try:
+        save_candidates(sec_dir, compact_candidates)
+        _progress_append({
+            "event": "candidates_saved",
+            "path": str(get_candidates_file(sec_dir)),
+            "issues_count": len(compact_candidates),
+        })
+    except Exception:
+        pass
     
     # 记录批次选择信息（可选，用于日志）
     try:
@@ -230,7 +238,6 @@ def run_security_analysis(
         cluster_limit,
         llm_group,
         sec_dir,
-        progress_path,
         status_mgr,
         _progress_append,
         force_save_memory=force_save_memory,
@@ -245,7 +252,6 @@ def run_security_analysis(
         langs,
         llm_group,
         sec_dir,
-        progress_path,
         status_mgr,
         _progress_append,
         _append_report,
