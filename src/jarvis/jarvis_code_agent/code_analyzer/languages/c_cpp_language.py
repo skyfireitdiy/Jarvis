@@ -15,7 +15,23 @@ from ..tree_sitter_extractor import TreeSitterExtractor
 
 # --- C/C++ Symbol Query ---
 
-C_CPP_SYMBOL_QUERY = """
+# C语言查询（不包含class_specifier，因为C不支持class）
+C_SYMBOL_QUERY = """
+(function_declarator
+  declarator: (identifier) @function.name)
+
+(struct_specifier
+  name: (type_identifier) @struct.name)
+  
+(union_specifier
+  name: (type_identifier) @union.name)
+  
+(enum_specifier
+  name: (type_identifier) @enum.name)
+"""
+
+# C++语言查询（包含class_specifier）
+CPP_SYMBOL_QUERY = """
 (function_declarator
   declarator: (identifier) @function.name)
 
@@ -55,7 +71,7 @@ class CSymbolExtractor(TreeSitterExtractor):
     def __init__(self):
         if not C_LANGUAGE:
             raise RuntimeError("C tree-sitter grammar not available.")
-        super().__init__(C_LANGUAGE, C_CPP_SYMBOL_QUERY)
+        super().__init__(C_LANGUAGE, C_SYMBOL_QUERY)
 
     def _create_symbol_from_capture(self, node: Node, name: str, file_path: str) -> Optional[Symbol]:
         kind_map = {
@@ -83,7 +99,7 @@ class CppSymbolExtractor(TreeSitterExtractor):
     def __init__(self):
         if not CPP_LANGUAGE:
             raise RuntimeError("C++ tree-sitter grammar not available.")
-        super().__init__(CPP_LANGUAGE, C_CPP_SYMBOL_QUERY)
+        super().__init__(CPP_LANGUAGE, CPP_SYMBOL_QUERY)
 
     def _create_symbol_from_capture(self, node: Node, name: str, file_path: str) -> Optional[Symbol]:
         kind_map = {
