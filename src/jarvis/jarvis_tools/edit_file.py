@@ -15,7 +15,7 @@ class EditFileTool:
     """文件编辑工具，用于对文件进行局部修改"""
 
     name = "edit_file"
-    description = "对文件进行局部修改。支持行号替换（推荐，最准确）、单点替换（精确匹配）、区间替换（标记之间）和sed命令模式（正则表达式），可指定行号范围限制。"
+    description = "对文件进行局部修改。支持单点替换（精确匹配）、区间替换（标记之间）和sed命令模式（正则表达式），可指定行号范围限制。"
 
     parameters = {
         "type": "object",
@@ -29,29 +29,6 @@ class EditFileTool:
                 "items": {
                     "type": "object",
                     "oneOf": [
-                        {
-                            "type": "object",
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["line_replace"],
-                                    "description": "行号替换模式（推荐）：直接指定行号范围进行替换，最准确且不受格式影响",
-                                },
-                                "line_start": {
-                                    "type": "integer",
-                                    "description": "起始行号（1-based，包含）",
-                                },
-                                "line_end": {
-                                    "type": "integer",
-                                    "description": "结束行号（1-based，包含）",
-                                },
-                                "new_content": {
-                                    "type": "string",
-                                    "description": "替换后的新内容",
-                                },
-                            },
-                            "required": ["type", "line_start", "line_end", "new_content"],
-                        },
                         {
                             "type": "object",
                             "properties": {
@@ -355,67 +332,6 @@ class EditFileTool:
         return None
 
     @staticmethod
-    def _validate_line_replace(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
-        """验证并转换line_replace类型的diff
-        
-        Returns:
-            (错误响应或None, patch字典或None)
-        """
-        line_start = diff.get("line_start")
-        line_end = diff.get("line_end")
-        new_content = diff.get("new_content")
-        
-        if line_start is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少line_start参数",
-            }, None)
-        if line_end is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少line_end参数",
-            }, None)
-        if not isinstance(line_start, int) or not isinstance(line_end, int):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的line_start和line_end必须是整数",
-            }, None)
-        if line_start < 1 or line_end < 1:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的行号必须大于0（行号从1开始）",
-            }, None)
-        if line_start > line_end:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的line_start({line_start})不能大于line_end({line_end})",
-            }, None)
-        if new_content is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少new_content参数",
-            }, None)
-        if not isinstance(new_content, str):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的new_content必须是字符串",
-            }, None)
-        
-        patch = {
-            "LINE_START": line_start,
-            "LINE_END": line_end,
-            "NEW_CONTENT": new_content,
-        }
-        return (None, patch)
-
-    @staticmethod
     def _validate_search(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
         """验证并转换search类型的diff
         
@@ -598,9 +514,7 @@ class EditFileTool:
             error_response = None
             patch = None
             
-            if diff_type == "line_replace":
-                error_response, patch = EditFileTool._validate_line_replace(diff, idx + 1)
-            elif diff_type == "search":
+            if diff_type == "search":
                 error_response, patch = EditFileTool._validate_search(diff, idx + 1)
             elif diff_type == "search_range":
                 error_response, patch = EditFileTool._validate_search_range(diff, idx + 1)
@@ -612,7 +526,7 @@ class EditFileTool:
                     "stdout": "",
                     "stderr": (
                         f"第 {idx+1} 个diff的类型不支持: {diff_type}。"
-                        f"支持的类型: line_replace（推荐）、search、search_range、sed"
+                        f"支持的类型: search、search_range、sed"
                     ),
                 }, [])
             
@@ -715,19 +629,13 @@ class EditFileTool:
             failed_patches: List[Dict[str, Any]] = []
             successful_patches = 0
 
-            # 当存在RANGE或LINE时，确保按行号从后往前应用补丁，避免前面补丁影响后续行号
+            # 当存在RANGE时，确保按行号从后往前应用补丁，避免前面补丁影响后续行号
             ordered_patches: List[Dict[str, str]] = []
-            line_items: List[Tuple[int, int, int, Dict[str, str]]] = []  # 行号编辑补丁
             sed_items: List[Tuple[int, int, int, Dict[str, str]]] = []  # sed命令补丁（如果有行号范围）
             range_items: List[Tuple[int, int, int, Dict[str, str]]] = []  # RANGE补丁
             non_range_items: List[Tuple[int, Dict[str, str]]] = []  # 无行号限制的补丁
             for idx, p in enumerate(patches):
-                # 优先处理行号编辑（LINE_START/LINE_END）
-                if "LINE_START" in p and "LINE_END" in p:
-                    start_line = p["LINE_START"]
-                    end_line = p["LINE_END"]
-                    line_items.append((start_line, end_line, idx, p))
-                elif "SED_COMMAND" in p:
+                if "SED_COMMAND" in p:
                     # sed命令补丁：尝试从命令中提取行号范围（简单匹配）
                     # 格式如：10,20s/old/new/g 或 10d
                     sed_cmd = p.get("SED_COMMAND", "")
@@ -750,15 +658,12 @@ class EditFileTool:
                     else:
                         # RANGE格式无效或没有RANGE的补丁保持原有顺序
                         non_range_items.append((idx, p))
-            # 先应用行号编辑补丁：按start_line、end_line、原始索引逆序
-            line_items.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-            # 再应用sed命令补丁（如果有行号范围）：按start_line、end_line、原始索引逆序
+            # 先应用sed命令补丁（如果有行号范围）：按start_line、end_line、原始索引逆序
             sed_items.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
             # 再应用RANGE补丁：按start_line、end_line、原始索引逆序
             range_items.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
             # 最后应用无行号限制的补丁
             ordered_patches = (
-                [item[3] for item in line_items] +
                 [item[3] for item in sed_items] +
                 [item[3] for item in range_items] +
                 [item[1] for item in non_range_items]
@@ -768,51 +673,8 @@ class EditFileTool:
             for patch in ordered_patches:
                 found = False
 
-                # 行号替换模式（最准确，推荐使用）
-                if "LINE_START" in patch and "LINE_END" in patch:
-                    line_start = patch["LINE_START"]
-                    line_end = patch["LINE_END"]
-                    new_content = patch["NEW_CONTENT"]
-                    
-                    # 获取当前文件的行列表
-                    lines = modified_content.splitlines(keepends=True)
-                    total_lines = len(lines)
-                    
-                    # 验证行号有效性
-                    if (
-                        line_start < 1
-                        or line_end < 1
-                        or line_start > total_lines
-                        or line_start > line_end
-                    ):
-                        error_msg = (
-                            f"行号范围无效（文件共有{total_lines}行，请求范围: {line_start}-{line_end}）。\n"
-                            f"注意：如果这是多个补丁中的后续补丁，前面的补丁可能已经改变了文件行数。\n"
-                            f"建议：使用read_code工具重新读取文件获取最新行号，或使用search/search_range模式。"
-                        )
-                        failed_patches.append({"patch": patch, "error": error_msg})
-                        continue
-                    
-                    # 截断end_line不超过总行数
-                    line_end = min(line_end, total_lines)
-                    
-                    # 执行行号替换
-                    prefix = "".join(lines[: line_start - 1])
-                    suffix = "".join(lines[line_end:])
-                    
-                    # 处理换行符：如果原文件最后一行有换行符，保持格式
-                    if new_content and not new_content.endswith("\n"):
-                        # 检查原范围最后一行是否有换行符
-                        if line_end <= len(lines) and lines[line_end - 1].endswith("\n"):
-                            new_content = new_content + "\n"
-                    
-                    modified_content = prefix + new_content + suffix
-                    found = True
-                    successful_patches += 1
-                    continue
-
                 # sed命令模式：直接使用系统sed命令
-                elif "SED_COMMAND" in patch:
+                if "SED_COMMAND" in patch:
                     sed_cmd = patch.get("SED_COMMAND", "")
                     try:
                         modified_content = EditFileTool._execute_sed_command(modified_content, sed_cmd)
@@ -853,7 +715,7 @@ class EditFileTool:
                         error_msg = (
                             f"RANGE行号无效（文件共有{total_lines}行，请求范围: {start_line}-{end_line}）。\n"
                             f"注意：如果这是多个补丁中的后续补丁，前面的补丁可能已经改变了文件行数。\n"
-                            f"建议：使用read_code工具重新读取文件获取最新行号，或使用line_replace模式（推荐）。"
+                            f"建议：使用read_code工具重新读取文件获取最新行号，或使用search/search_range模式。"
                         )
                         failed_patches.append({"patch": patch, "error": error_msg})
                         continue
@@ -916,7 +778,6 @@ class EditFileTool:
                         else:
                             suggestions.append("2. 使用RANGE参数限制搜索范围到目标位置")
                         suggestions.append("3. 使用search_range模式，通过SEARCH_START和SEARCH_END精确定位")
-                        suggestions.append("4. 如果已知行号，使用line_replace模式（推荐，最准确）")
                         
                         error_details.append(f"\n建议的修正方法：\n" + "\n".join(suggestions))
                         error_msg = "\n".join(error_details)
@@ -991,7 +852,6 @@ class EditFileTool:
                                     )
                                     found = True
                                     # 记录使用了缩进适配（可以在日志中提示，但不影响成功）
-                                    # 注意：缩进适配成功，但建议LLM使用line_replace模式以获得更高准确性
                                     break
                                 elif cnt3 > 1:
                                     positions = EditFileTool._find_all_positions(base_content, indented_search)
@@ -1000,7 +860,7 @@ class EditFileTool:
                                         f"SEARCH 在指定范围内出现多次（缩进适配后，缩进: {space_count}空格），"
                                         f"要求唯一匹配。匹配次数: {cnt3}，行号: {', '.join(map(str, line_numbers[:10]))}\n"
                                         f"注意：缩进适配可能匹配到错误的实例。\n"
-                                        f"建议：使用line_replace模式（推荐）或提供包含正确缩进的SEARCH文本。"
+                                        f"建议：提供包含正确缩进的SEARCH文本，或使用search_range模式。"
                                     )
                                     failed_patches.append({"patch": patch, "error": error_msg})
                                     # 多匹配直接失败，不再继续尝试其它缩进
@@ -1017,9 +877,8 @@ class EditFileTool:
                                 "建议的修正方法：",
                                 "1. 检查SEARCH文本是否完全匹配文件中的内容（包括缩进、换行符、空格）",
                                 "2. 使用read_code工具读取文件，确认要修改的内容",
-                                "3. 如果已知行号，使用line_replace模式（推荐，最准确）",
-                                "4. 使用search_range模式，通过SEARCH_START和SEARCH_END精确定位",
-                                "5. 使用RANGE参数限制搜索范围",
+                                "3. 使用search_range模式，通过SEARCH_START和SEARCH_END精确定位",
+                                "4. 使用RANGE参数限制搜索范围",
                             ]
                             error_msg = "\n".join(error_msg_parts)
                             failed_patches.append({"patch": patch, "error": error_msg})
@@ -1112,12 +971,7 @@ class EditFileTool:
                 error_details = []
                 for p in failed_patches:
                     patch = p["patch"]
-                    if "LINE_START" in patch and "LINE_END" in patch:
-                        patch_desc = (
-                            f"行号替换 (line_replace): "
-                            f"行 {patch.get('LINE_START')}-{patch.get('LINE_END')}"
-                        )
-                    elif "SED_COMMAND" in patch:
+                    if "SED_COMMAND" in patch:
                         patch_desc = f"sed命令: {patch.get('SED_COMMAND', '')[:100]}..."
                     elif "SEARCH" in patch:
                         patch_desc = patch["SEARCH"][:200] + "..." if len(patch["SEARCH"]) > 200 else patch["SEARCH"]
@@ -1162,12 +1016,7 @@ class EditFileTool:
                 error_details = []
                 for p in failed_patches:
                     patch = p["patch"]
-                    if "LINE_START" in patch and "LINE_END" in patch:
-                        patch_desc = (
-                            f"行号替换 (line_replace): "
-                            f"行 {patch.get('LINE_START')}-{patch.get('LINE_END')}"
-                        )
-                    elif "SED_COMMAND" in patch:
+                    if "SED_COMMAND" in patch:
                         patch_desc = f"sed命令: {patch.get('SED_COMMAND', '')[:100]}..."
                     elif "SEARCH" in patch:
                         patch_desc = patch["SEARCH"][:200] + "..." if len(patch["SEARCH"]) > 200 else patch["SEARCH"]
