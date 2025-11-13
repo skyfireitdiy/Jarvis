@@ -3,7 +3,7 @@
 /* --- Page Layout: Continuous Flow --- */
 /* Use a very tall page to allow continuous content flow without page breaks */
 @page {
-    size: 29.7cm 10000cm;  /* A4 landscape width (29.7cm), very tall height for continuous flow */
+    size: 29.7cm 5000cm;  /* A4 landscape width (29.7cm), very tall height for continuous flow */
     margin: 2.5cm;
     /* No page numbers for continuous PDF */
 }
