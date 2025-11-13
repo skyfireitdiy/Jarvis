@@ -9,7 +9,7 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_sec.prompts import build_verification_summary_prompt
 from jarvis.jarvis_sec.parsers import try_parse_summary_report
 from jarvis.jarvis_sec.agents import create_analysis_agent, subscribe_summary_event
-from jarvis.jarvis_sec.utils import git_restore_if_dirty, sig_of, count_issues_from_file, load_processed_gids_from_issues, load_completed_batch_ids, load_all_issues_from_file
+from jarvis.jarvis_sec.utils import git_restore_if_dirty, sig_of, count_issues_from_file
 from jarvis.jarvis_sec.analysis import (
     build_analysis_task_context,
     run_analysis_agent_with_retry,
@@ -543,7 +543,6 @@ def process_verification_phase(
     langs: List[str],
     llm_group: Optional[str],
     sec_dir,
-    progress_path,
     status_mgr,
     _progress_append,
     _append_report,
@@ -551,18 +550,25 @@ def process_verification_phase(
     force_save_memory: bool = False,
 ) -> List[Dict]:
     """处理验证阶段，返回所有已保存的告警"""
+    from jarvis.jarvis_sec.file_manager import load_analysis_results, get_all_analyzed_gids
+    
     batches: List[List[Dict]] = cluster_batches
     total_batches = len(batches)
     
-    # 从 agent_issues.jsonl 中读取已处理的 gid
-    processed_gids_from_issues = load_processed_gids_from_issues(sec_dir)
+    # 从 analysis.jsonl 中读取已分析的结果
+    analysis_results = load_analysis_results(sec_dir)
+    analyzed_gids = get_all_analyzed_gids(sec_dir)
     
-    # 从 progress.jsonl 中读取已完成的批次
-    completed_batch_ids = load_completed_batch_ids(progress_path)
+    # 构建已完成的批次集合（通过 cluster_id 匹配）
+    completed_cluster_ids = set()
+    for result in analysis_results:
+        cluster_id = result.get("cluster_id", "")
+        if cluster_id:
+            completed_cluster_ids.add(cluster_id)
     
-    if completed_batch_ids:
+    if completed_cluster_ids:
         try:
-            typer.secho(f"[jarvis-sec] 断点恢复：从 progress.jsonl 读取到 {len(completed_batch_ids)} 个已完成的批次", fg=typer.colors.BLUE)
+            typer.secho(f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(completed_cluster_ids)} 个已完成的聚类", fg=typer.colors.BLUE)
         except Exception:
             pass
     
@@ -577,29 +583,42 @@ def process_verification_phase(
     meta_records: List[Dict] = []
     gid_counts: Dict[int, int] = {}
     
+    # 加载 clusters.jsonl 以匹配批次和聚类
+    from jarvis.jarvis_sec.file_manager import load_clusters
+    clusters = load_clusters(sec_dir)
+    
     for bidx, batch in enumerate(batches, start=1):
         task_id = f"JARVIS-SEC-Batch-{bidx}"
         batch_file = batch[0].get("file") if batch else None
         
-        # 检查批次是否已完成：优先检查 progress.jsonl 中的批次状态
+        # 检查批次是否已完成
         is_batch_completed = False
         
-        # 方法1：检查 progress.jsonl 中是否有该批次的完成记录
-        if task_id in completed_batch_ids:
-            is_batch_completed = True
-        else:
-            # 方法2：检查批次中的所有 gid 是否都在 agent_issues.jsonl 中
-            batch_gids = set()
-            for item in batch:
-                try:
-                    _gid = int(item.get("gid", 0))
-                    if _gid >= 1:
-                        batch_gids.add(_gid)
-                except Exception:
-                    pass
+        # 从批次中提取 gids
+        batch_gids = set()
+        for item in batch:
+            try:
+                _gid = int(item.get("gid", 0))
+                if _gid >= 1:
+                    batch_gids.add(_gid)
+            except Exception:
+                pass
+        
+        # 方法1：通过 cluster_id 检查是否已完成
+        # 查找匹配的聚类
+        for cluster in clusters:
+            cluster_file = str(cluster.get("file", ""))
+            cluster_gids = set(cluster.get("gids", []))
             
-            # 如果批次中的所有 gid 都已处理，则认为该批次已完成
-            if batch_gids and processed_gids_from_issues and batch_gids.issubset(processed_gids_from_issues):
+            if cluster_file == batch_file and cluster_gids == batch_gids:
+                cluster_id = cluster.get("cluster_id", "")
+                if cluster_id and cluster_id in completed_cluster_ids:
+                    is_batch_completed = True
+                    break
+        
+        # 方法2：如果所有 gid 都已分析，则认为该批次已完成
+        if not is_batch_completed and batch_gids and analyzed_gids:
+            if batch_gids.issubset(analyzed_gids):
                 is_batch_completed = True
         
         if is_batch_completed:
@@ -635,5 +654,16 @@ def process_verification_phase(
             force_save_memory=force_save_memory,
         )
     
-    # 从 agent_issues.jsonl 读取所有已保存的告警
-    return load_all_issues_from_file(sec_dir)
+    # 从 analysis.jsonl 读取所有已验证的问题
+    from jarvis.jarvis_sec.file_manager import get_verified_issue_gids, load_candidates
+    verified_gids = get_verified_issue_gids(sec_dir)
+    candidates = load_candidates(sec_dir)
+    
+    # 构建问题列表（从 analysis.jsonl 的 issues 字段）
+    all_issues = []
+    for result in analysis_results:
+        issues = result.get("issues", [])
+        if isinstance(issues, list):
+            all_issues.extend(issues)
+    
+    return all_issues
