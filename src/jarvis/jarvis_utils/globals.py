@@ -19,6 +19,10 @@ MAX_HISTORY_SIZE = 50
 short_term_memories: List[Dict[str, Any]] = []
 MAX_SHORT_TERM_MEMORIES = 100
 
+# 文件结构化信息存储
+# 键：文件绝对路径，值：包含结构化单元、读取时间等信息的字典
+file_structured_info: Dict[str, Dict[str, Any]] = {}
+
 import colorama  # noqa: E402
 from rich.console import Console  # noqa: E402
 from rich.theme import Theme  # noqa: E402
@@ -337,3 +341,57 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
             tags_by_type["global_long_term"] = global_tags_list
 
     return tags_by_type
+
+
+def get_file_structured_info(file_path: str) -> Optional[Dict[str, Any]]:
+    """
+    获取指定文件的结构化信息。
+
+    参数:
+        file_path: 文件的绝对路径
+
+    返回:
+        Dict[str, Any]: 文件的结构化信息，如果不存在则返回None
+    """
+    import os
+    abs_path = os.path.abspath(file_path)
+    return file_structured_info.get(abs_path)
+
+
+def set_file_structured_info(file_path: str, info: Dict[str, Any]) -> None:
+    """
+    设置指定文件的结构化信息。
+
+    参数:
+        file_path: 文件的绝对路径
+        info: 包含结构化信息的字典
+    """
+    import os
+    abs_path = os.path.abspath(file_path)
+    file_structured_info[abs_path] = info
+
+
+def clear_file_structured_info(file_path: Optional[str] = None) -> None:
+    """
+    清除文件的结构化信息。
+
+    参数:
+        file_path: 文件的绝对路径，如果为None则清除所有文件的信息
+    """
+    if file_path is None:
+        file_structured_info.clear()
+    else:
+        import os
+        abs_path = os.path.abspath(file_path)
+        if abs_path in file_structured_info:
+            del file_structured_info[abs_path]
+
+
+def get_all_file_structured_info() -> Dict[str, Dict[str, Any]]:
+    """
+    获取所有文件的结构化信息。
+
+    返回:
+        Dict[str, Dict[str, Any]]: 所有文件的结构化信息字典
+    """
+    return file_structured_info.copy()

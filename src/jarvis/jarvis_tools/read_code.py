@@ -1,15 +1,35 @@
 # -*- coding: utf-8 -*-
 import os
-from typing import Any, Dict
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.globals import file_structured_info
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+
+# 尝试导入语言支持模块
+try:
+    from jarvis.jarvis_code_agent.code_analyzer.language_support import (
+        detect_language,
+        get_symbol_extractor,
+    )
+    from jarvis.jarvis_code_agent.code_analyzer.symbol_extractor import Symbol
+    LANGUAGE_SUPPORT_AVAILABLE = True
+except ImportError:
+    LANGUAGE_SUPPORT_AVAILABLE = False
 
 
 class ReadCodeTool:
     name = "read_code"
-    description = "读取源代码文件并添加行号，适用于代码分析和审查。"
+    description = (
+        "结构化读取源代码文件，支持按语法单元或行号分组读取。"
+        "对于支持 tree-sitter 的语言（Python、C/C++、Rust、Go、JavaScript、TypeScript、Java等），"
+        "会按语法单元（函数、类、方法等）结构化读取，每个单元包含 id（体现作用域）、start_line、end_line 和完整内容。"
+        "对于不支持的语言，会按 20 行一组进行分组读取。"
+        "会自动返回与请求范围有重叠的所有语法单元（包括边界上的），并返回完整的语法单元内容。"
+        "适用于代码分析、审查和编辑定位。"
+    )
     # 工具标签
     parameters = {
         "type": "object",
@@ -25,11 +45,266 @@ class ReadCodeTool:
                     },
                     "required": ["path"],
                 },
-                "description": "要读取的文件列表",
+                "description": "要读取的文件列表，每个文件可指定行号范围（start_line 到 end_line，-1 表示文件末尾）",
             }
         },
         "required": ["files"],
     }
+    
+    def _get_full_definition_range(
+        self, symbol: Symbol, content: str, language: Optional[str]
+    ) -> Tuple[int, int]:
+        """获取完整的定义范围（包括函数体等）
+        
+        对于 tree-sitter 提取的符号，可能需要向上查找父节点以获取完整定义。
+        对于 Python AST，已经包含完整范围。
+        
+        Args:
+            symbol: 符号对象
+            content: 文件内容
+            language: 语言名称
+            
+        Returns:
+            (start_line, end_line) 元组
+        """
+        # Python AST 已经包含完整范围（使用 end_lineno）
+        if language == 'python':
+            return symbol.line_start, symbol.line_end
+        
+        # 对于 tree-sitter，尝试查找包含函数体的完整定义
+        # 由于 tree-sitter 查询可能只捕获声明节点，我们需要查找包含函数体的节点
+        # 这里使用一个简单的启发式方法：查找下一个同级别的定义或文件结束
+        
+        lines = content.split('\n')
+        start_line = symbol.line_start
+        end_line = symbol.line_end
+        
+        # 如果结束行号看起来不完整（比如只有1-2行），尝试查找函数体结束
+        if end_line - start_line < 2:
+            # 从结束行开始向下查找，寻找匹配的大括号或缩进变化
+            # 这是一个简化的实现，实际可能需要解析语法树
+            brace_count = 0
+            found_start = False
+            for i in range(start_line - 1, min(len(lines), start_line + 100)):  # 最多查找100行
+                line = lines[i]
+                if '{' in line:
+                    brace_count += line.count('{')
+                    found_start = True
+                if found_start and '}' in line:
+                    brace_count -= line.count('}')
+                    if brace_count == 0:
+                        end_line = i + 1
+                        break
+        
+        # 确保不超过文件末尾和请求的范围
+        end_line = min(end_line, len(lines))
+        
+        return start_line, end_line
+    
+    def _extract_syntax_units(
+        self, filepath: str, content: str, start_line: int, end_line: int
+    ) -> List[Dict[str, Any]]:
+        """提取语法单元（函数、类等）
+        
+        Args:
+            filepath: 文件路径
+            content: 文件内容
+            start_line: 起始行号
+            end_line: 结束行号
+            
+        Returns:
+            语法单元列表，每个单元包含 id, start_line, end_line, content
+        """
+        if not LANGUAGE_SUPPORT_AVAILABLE:
+            return []
+        
+        try:
+            # 检测语言
+            language = detect_language(filepath)
+            if not language:
+                return []
+            
+            # 获取符号提取器
+            extractor = get_symbol_extractor(language)
+            if not extractor:
+                return []
+            
+            # 提取符号
+            symbols = extractor.extract_symbols(filepath, content)
+            if not symbols:
+                return []
+            
+            # 过滤符号：返回与请求范围有重叠的所有语法单元（包括边界上的）
+            # 重叠条件：symbol.line_start <= end_line AND symbol.line_end >= start_line
+            syntax_kinds = {'function', 'method', 'class', 'struct', 'enum', 'union', 'interface', 'trait', 'impl', 'module'}
+            filtered_symbols = [
+                s for s in symbols
+                if s.kind in syntax_kinds
+                and s.line_start <= end_line  # 开始行在范围结束之前或等于
+                and s.line_end >= start_line   # 结束行在范围开始之后或等于
+            ]
+            
+            # 按行号排序
+            filtered_symbols.sort(key=lambda s: s.line_start)
+            
+            # 构建语法单元列表
+            units = []
+            lines = content.split('\n')
+            
+            for symbol in filtered_symbols:
+                # 获取完整的定义范围（不截断，返回完整语法单元）
+                unit_start, unit_end = self._get_full_definition_range(symbol, content, language)
+                
+                # 提取该符号的完整内容（不截断到请求范围）
+                symbol_start_idx = max(0, unit_start - 1)  # 转为0-based索引
+                symbol_end_idx = min(len(lines), unit_end)
+                
+                symbol_content = '\n'.join(lines[symbol_start_idx:symbol_end_idx])
+                
+                # 生成id：体现作用域（如果有parent，使用 parent.name 格式）
+                if symbol.parent:
+                    unit_id = f"{symbol.parent}.{symbol.name}"
+                else:
+                    unit_id = symbol.name
+                
+                # 如果id重复，加上行号
+                if any(u['id'] == unit_id for u in units):
+                    if symbol.parent:
+                        unit_id = f"{symbol.parent}.{symbol.name}_{unit_start}"
+                    else:
+                        unit_id = f"{symbol.name}_{unit_start}"
+                
+                units.append({
+                    'id': unit_id,
+                    'start_line': unit_start,
+                    'end_line': unit_end,
+                    'content': symbol_content,
+                })
+            
+            return units
+        except Exception:
+            # 如果提取失败，返回空列表，将使用行号分组
+            return []
+    
+    def _extract_line_groups(
+        self, content: str, start_line: int, end_line: int, group_size: int = 20
+    ) -> List[Dict[str, Any]]:
+        """按行号分组提取内容
+        
+        Args:
+            content: 文件内容
+            start_line: 起始行号
+            end_line: 结束行号
+            group_size: 每组行数，默认20行
+            
+        Returns:
+            分组列表，每个分组包含 id, start_line, end_line, content
+        """
+        lines = content.split('\n')
+        groups = []
+        
+        current_start = start_line
+        while current_start <= end_line:
+            current_end = min(current_start + group_size - 1, end_line)
+            
+            # 提取该组的内容（0-based索引）
+            group_start_idx = current_start - 1
+            group_end_idx = current_end
+            group_content = '\n'.join(lines[group_start_idx:group_end_idx])
+            
+            # 生成id：行号范围
+            group_id = f"{current_start}-{current_end}"
+            
+            groups.append({
+                'id': group_id,
+                'start_line': current_start,
+                'end_line': current_end,
+                'content': group_content,
+            })
+            
+            current_start = current_end + 1
+        
+        return groups
+    
+    def _format_structured_output(
+        self, filepath: str, units: List[Dict[str, Any]], total_lines: int
+    ) -> str:
+        """格式化结构化输出
+        
+        Args:
+            filepath: 文件路径
+            units: 语法单元或行号分组列表
+            total_lines: 文件总行数
+            
+        Returns:
+            格式化后的输出字符串
+        """
+        output_lines = [
+            f"\n🔍 文件: {filepath}",
+            f"📄 总行数: {total_lines}",
+            f"📦 结构化单元数: {len(units)}\n",
+        ]
+        
+        for unit in units:
+            # 将 id、start_line、end_line 放在一行，用 [] 包起来
+            output_lines.append(f"[id:{unit['id']} start_line:{unit['start_line']} end_line:{unit['end_line']}]")
+            # 添加内容，保持原有缩进
+            content_lines = unit['content'].split('\n')
+            for line in content_lines:
+                output_lines.append(line)
+            output_lines.append("")  # 单元之间空行分隔
+        
+        return '\n'.join(output_lines)
+    
+    def _estimate_structured_tokens(
+        self, filepath: str, content: str, start_line: int, end_line: int, total_lines: int
+    ) -> int:
+        """估算结构化输出的token数
+        
+        Args:
+            filepath: 文件路径
+            content: 文件内容
+            start_line: 起始行号
+            end_line: 结束行号
+            total_lines: 文件总行数
+            
+        Returns:
+            估算的token数
+        """
+        try:
+            # 尝试提取语法单元
+            syntax_units = self._extract_syntax_units(filepath, content, start_line, end_line)
+            
+            if syntax_units:
+                # 使用语法单元结构化输出格式计算token
+                sample_output = self._format_structured_output(filepath, syntax_units[:1], total_lines)
+                if len(syntax_units) > 1:
+                    unit_tokens = get_context_token_count(sample_output)
+                    return unit_tokens * len(syntax_units)
+                else:
+                    return get_context_token_count(sample_output)
+            else:
+                # 使用行号分组格式计算token
+                line_groups = self._extract_line_groups(content, start_line, end_line, group_size=20)
+                if line_groups:
+                    sample_output = self._format_structured_output(filepath, line_groups[:1], total_lines)
+                    if len(line_groups) > 1:
+                        group_tokens = get_context_token_count(sample_output)
+                        return group_tokens * len(line_groups)
+                    else:
+                        return get_context_token_count(sample_output)
+                else:
+                    # 回退到原始格式计算
+                    lines = content.split('\n')
+                    selected_lines = lines[start_line - 1:end_line]
+                    numbered_content = "".join(f"{i:4d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
+                    return get_context_token_count(numbered_content)
+        except Exception:
+            # 如果估算失败，使用简单的行号格式估算
+            lines = content.split('\n')
+            selected_lines = lines[start_line - 1:end_line]
+            numbered_content = "".join(f"{i:4d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
+            return get_context_token_count(numbered_content)
     
     def _get_max_token_limit(self, agent: Any = None) -> int:
         """获取基于最大窗口数量的token限制
@@ -124,21 +399,19 @@ class ReadCodeTool:
                     "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})",
                 }
 
-            # 读取要读取的行范围内容，计算实际token数
-            selected_content_lines = []
+            # 读取完整文件内容用于语法分析和token计算
             with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                for i, line in enumerate(f, start=1):
-                    if i < start_line:
-                        continue
-                    if i > end_line:
-                        break
-                    selected_content_lines.append(line)
+                full_content = f.read()
             
-            # 构建带行号的内容用于token计算（与实际输出格式一致）
-            numbered_content = "".join(f"{i:4d}:{line}" for i, line in enumerate(selected_content_lines, start=start_line))
+            # 读取要读取的行范围内容
+            selected_content_lines = []
+            lines = full_content.split('\n')
+            for i in range(start_line - 1, min(end_line, len(lines))):
+                selected_content_lines.append(lines[i])
             
-            # 计算实际token数
-            content_tokens = get_context_token_count(numbered_content)
+            # 估算结构化输出的token数
+            content_tokens = self._estimate_structured_tokens(abs_path, full_content, start_line, end_line, total_lines)
+            
             max_token_limit = self._get_max_token_limit(agent)
             
             # 检查单文件读取token数是否超过2/3限制
@@ -157,15 +430,41 @@ class ReadCodeTool:
                     ),
                 }
 
-            # 使用已读取的内容构建输出（避免重复读取）
-            numbered_content = "".join(f"{i:4d}:{line}" for i, line in enumerate(selected_content_lines, start=start_line))
-
-            # 构建输出格式
-            output = (
-                f"\n🔍 文件: {abs_path}\n"
-                f"📄 原始行号: {start_line}-{end_line} (共{total_lines}行) \n\n"
-                f"{numbered_content}\n\n"
-            )
+            # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
+            syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
+            
+            # 检测语言类型
+            language = None
+            if LANGUAGE_SUPPORT_AVAILABLE:
+                try:
+                    language = detect_language(abs_path)
+                except Exception:
+                    pass
+            
+            # 确定使用的结构化单元（语法单元或行号分组）
+            structured_units = None
+            unit_type = None
+            if syntax_units:
+                # 使用语法单元结构化输出
+                structured_units = syntax_units
+                unit_type = "syntax_units"
+                output = self._format_structured_output(abs_path, syntax_units, total_lines)
+            else:
+                # 使用行号分组结构化输出（使用完整内容以保持正确的行号）
+                line_groups = self._extract_line_groups(full_content, start_line, end_line, group_size=20)
+                structured_units = line_groups
+                unit_type = "line_groups"
+                output = self._format_structured_output(abs_path, line_groups, total_lines)
+            
+            # 保存结构化信息到全局变量
+            if structured_units:
+                file_structured_info[abs_path] = {
+                    "units": structured_units,
+                    "unit_type": unit_type,
+                    "total_lines": total_lines,
+                    "language": language,
+                    "read_time": datetime.now().isoformat(),
+                }
 
             # 尝试获取并附加上下文信息
             context_info = self._get_file_context(abs_path, start_line, end_line, agent)
@@ -347,24 +646,14 @@ class ReadCodeTool:
                     )
                     
                     if actual_start_line <= actual_end_line:
-                        # 读取要读取的行范围内容
-                        selected_content_lines = []
+                        # 读取完整文件内容用于token估算
                         with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                            for i, line in enumerate(f, start=1):
-                                if i < actual_start_line:
-                                    continue
-                                if i > actual_end_line:
-                                    break
-                                selected_content_lines.append(line)
+                            file_content = f.read()
                         
-                        # 构建带行号的内容用于token计算（与实际输出格式一致）
-                        numbered_content = "".join(
-                            f"{i:4d}:{line}" 
-                            for i, line in enumerate(selected_content_lines, start=actual_start_line)
+                        # 估算结构化输出的token数
+                        content_tokens = self._estimate_structured_tokens(
+                            abs_path, file_content, actual_start_line, actual_end_line, total_lines
                         )
-                        
-                        # 计算实际token数
-                        content_tokens = get_context_token_count(numbered_content)
                         
                         file_read_info.append({
                             "filepath": filepath,
@@ -437,3 +726,278 @@ class ReadCodeTool:
         except Exception as e:
             PrettyOutput.print(str(e), OutputType.ERROR)
             return {"success": False, "stdout": "", "stderr": f"代码读取失败: {str(e)}"}
+
+
+def main():
+    """测试结构化读取功能"""
+    import tempfile
+    import os
+    
+    tool = ReadCodeTool()
+    
+    print("=" * 80)
+    print("测试结构化读取功能")
+    print("=" * 80)
+    
+    # 测试1: C语言文件（tree-sitter支持）
+    print("\n【测试1】C语言文件 - 语法单元提取")
+    print("-" * 80)
+    
+    c_code = """#include <stdio.h>
+
+void main() {
+    printf("Hello, World!\\n");
+}
+
+int add(int a, int b) {
+    return a + b;
+}
+
+int sub(int a, int b) {
+    return a - b;
+}
+
+struct Point {
+    int x;
+    int y;
+};
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.c', delete=False) as f:
+        c_file = f.name
+        f.write(c_code)
+    
+    try:
+        result = tool.execute({
+            "files": [{"path": c_file, "start_line": 1, "end_line": -1}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ C语言文件读取成功")
+            print("\n输出内容:")
+            print(result["stdout"])
+        else:
+            print(f"❌ C语言文件读取失败: {result['stderr']}")
+    finally:
+        os.unlink(c_file)
+    
+    # 测试2: Python文件（AST支持）
+    print("\n【测试2】Python文件 - 语法单元提取")
+    print("-" * 80)
+    
+    python_code = """def main():
+    print("Hello, World!")
+
+def add(a, b):
+    return a + b
+
+def sub(a, b):
+    return a - b
+
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        py_file = f.name
+        f.write(python_code)
+    
+    try:
+        result = tool.execute({
+            "files": [{"path": py_file, "start_line": 1, "end_line": -1}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ Python文件读取成功")
+            print("\n输出内容:")
+            print(result["stdout"])
+        else:
+            print(f"❌ Python文件读取失败: {result['stderr']}")
+    finally:
+        os.unlink(py_file)
+    
+    # 测试3: 不支持的语言 - 行号分组
+    print("\n【测试3】不支持的语言 - 行号分组（20行一组）")
+    print("-" * 80)
+    
+    text_content = "\n".join([f"这是第 {i} 行内容" for i in range(1, 51)])
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        txt_file = f.name
+        f.write(text_content)
+    
+    try:
+        result = tool.execute({
+            "files": [{"path": txt_file, "start_line": 1, "end_line": -1}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ 文本文件读取成功（使用行号分组）")
+            print("\n输出内容（前500字符）:")
+            print(result["stdout"][:500] + "..." if len(result["stdout"]) > 500 else result["stdout"])
+        else:
+            print(f"❌ 文本文件读取失败: {result['stderr']}")
+    finally:
+        os.unlink(txt_file)
+    
+    # 测试4: 指定行号范围
+    print("\n【测试4】指定行号范围读取")
+    print("-" * 80)
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.c', delete=False) as f:
+        c_file2 = f.name
+        f.write(c_code)
+    
+    try:
+        result = tool.execute({
+            "files": [{"path": c_file2, "start_line": 1, "end_line": 10}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ 指定范围读取成功")
+            print("\n输出内容:")
+            print(result["stdout"])
+        else:
+            print(f"❌ 指定范围读取失败: {result['stderr']}")
+    finally:
+        os.unlink(c_file2)
+    
+    # 测试5: 边界情况 - 返回边界上的语法单元
+    print("\n【测试5】边界情况 - 返回边界上的语法单元")
+    print("-" * 80)
+    
+    boundary_test_code = """def func1():
+    line1 = 1
+    line2 = 2
+    line3 = 3
+
+def func2():
+    line1 = 1
+    line2 = 2
+
+def func3():
+    line1 = 1
+    line2 = 2
+    line3 = 3
+    line4 = 4
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        boundary_file = f.name
+        f.write(boundary_test_code)
+    
+    try:
+        # 请求第3-8行
+        # func1: 1-4行（结束行4在范围内，应该返回完整func1）
+        # func2: 6-8行（开始行6在范围内，应该返回完整func2）
+        # func3: 10-14行（完全不在范围内，不应该返回）
+        result = tool.execute({
+            "files": [{"path": boundary_file, "start_line": 3, "end_line": 8}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ 边界情况测试成功")
+            print("请求范围: 3-8行")
+            print("预期结果:")
+            print("  - func1 (1-4行): 结束行4在范围内，应返回完整func1")
+            print("  - func2 (6-8行): 开始行6在范围内，应返回完整func2")
+            print("  - func3 (10-14行): 完全不在范围内，不应返回")
+            print("\n实际输出:")
+            print(result["stdout"])
+        else:
+            print(f"❌ 边界情况测试失败: {result['stderr']}")
+    finally:
+        os.unlink(boundary_file)
+    
+    # 测试6: 多个文件
+    print("\n【测试6】多个文件读取")
+    print("-" * 80)
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.c', delete=False) as f1, \
+         tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f2:
+        c_file3 = f1.name
+        py_file2 = f2.name
+        f1.write(c_code)
+        f2.write(python_code)
+    
+    try:
+        result = tool.execute({
+            "files": [
+                {"path": c_file3, "start_line": 1, "end_line": -1},
+                {"path": py_file2, "start_line": 1, "end_line": -1}
+            ],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ 多文件读取成功")
+            print("\n输出内容（前800字符）:")
+            print(result["stdout"][:800] + "..." if len(result["stdout"]) > 800 else result["stdout"])
+        else:
+            print(f"❌ 多文件读取失败: {result['stderr']}")
+    finally:
+        os.unlink(c_file3)
+        os.unlink(py_file2)
+    
+    # 测试7: 嵌套作用域的边界情况
+    print("\n【测试7】嵌套作用域的边界情况")
+    print("-" * 80)
+    
+    nested_code = """class Outer:
+    def method1(self):
+        line1 = 1
+        line2 = 2
+    
+    def method2(self):
+        line1 = 1
+        line2 = 2
+        line3 = 3
+
+def standalone_func():
+    line1 = 1
+    line2 = 2
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        nested_file = f.name
+        f.write(nested_code)
+    
+    try:
+        # 请求第4-7行
+        # Outer.method1: 2-4行（结束行4在范围内，应该返回完整method1）
+        # Outer.method2: 6-9行（开始行6在范围内，应该返回完整method2）
+        # Outer类: 1-9行（包含method1和method2，应该返回）
+        # standalone_func: 11-13行（完全不在范围内，不应返回）
+        result = tool.execute({
+            "files": [{"path": nested_file, "start_line": 4, "end_line": 7}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ 嵌套作用域边界测试成功")
+            print("请求范围: 4-7行")
+            print("预期结果:")
+            print("  - Outer类 (1-9行): 包含method1和method2，应返回")
+            print("  - Outer.method1 (2-4行): 结束行4在范围内，应返回完整method1")
+            print("  - Outer.method2 (6-9行): 开始行6在范围内，应返回完整method2")
+            print("\n实际输出:")
+            print(result["stdout"])
+        else:
+            print(f"❌ 嵌套作用域边界测试失败: {result['stderr']}")
+    finally:
+        os.unlink(nested_file)
+    
+    print("\n" + "=" * 80)
+    print("测试完成")
+    print("=" * 80)
+
+
+if __name__ == "__main__":
+    main()
