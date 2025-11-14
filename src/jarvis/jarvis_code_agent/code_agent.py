@@ -1566,6 +1566,8 @@ class CodeAgent(Agent):
             PrettyOutput.print(summary, output_type)
         else:
             PrettyOutput.print("✅ 静态检查完成", OutputType.SUCCESS)
+        
+        return results
     
     def _format_lint_results(self, results: List[Tuple[str, str, str, int, str]]) -> str:
         """格式化lint结果
