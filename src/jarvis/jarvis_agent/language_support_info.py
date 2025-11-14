@@ -43,6 +43,14 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     info[lang_name]['依赖分析'] = analyzer is not None
                 except Exception:
                     info[lang_name]['依赖分析'] = False
+                
+                # 检查结构化编辑支持（基于符号提取器）
+                try:
+                    # 结构化编辑需要符号提取器支持
+                    extractor = lang_support.create_symbol_extractor()
+                    info[lang_name]['结构化编辑'] = extractor is not None
+                except Exception:
+                    info[lang_name]['结构化编辑'] = False
     except Exception:
         pass
     
@@ -193,7 +201,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
         if lang_name not in info:
             info[lang_name] = {}
         # 确保所有功能字段都存在
-        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持']:
+        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持', '结构化编辑']:
             if feature not in info[lang_name]:
                 # 对于上下文提取，检查是否有对应的提取器
                 if feature == '上下文提取':
@@ -312,7 +320,7 @@ def _check_lsp_server_available(config) -> bool:
         if lang_name not in info:
             info[lang_name] = {}
         # 确保所有功能字段都存在
-        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持']:
+        for feature in ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持', '结构化编辑']:
             if feature not in info[lang_name]:
                 # 对于上下文提取，检查是否有对应的提取器
                 if feature == '上下文提取':
@@ -403,7 +411,7 @@ def print_language_support_table() -> None:
         return
     
     # 定义功能列表
-    features = ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持']
+    features = ['符号提取', '依赖分析', '上下文提取', '构建验证', '静态检查', 'LSP支持', '结构化编辑']
     
     # 定义语言显示名称映射
     lang_display_names = {
