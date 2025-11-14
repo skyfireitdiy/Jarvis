@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.methodology 模块单元测试"""
 
-import pytest
-import tempfile
-import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from jarvis.jarvis_utils.methodology import _get_methodology_directory
 

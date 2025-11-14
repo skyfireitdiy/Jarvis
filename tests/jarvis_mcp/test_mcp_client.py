@@ -2,7 +2,6 @@
 """jarvis_mcp 模块单元测试"""
 
 import pytest
-from abc import ABC
 
 from jarvis.jarvis_mcp import McpClient
 

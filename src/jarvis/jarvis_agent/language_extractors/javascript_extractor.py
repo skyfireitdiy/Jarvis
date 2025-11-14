@@ -32,7 +32,6 @@ def create_javascript_extractor() -> Optional[Any]:
         class JSSymbolExtractor:
             def __init__(self):
                 # 如果传入的是 PyCapsule，需要转换为 Language 对象
-                from tree_sitter import Language
                 if not isinstance(JS_LANGUAGE, Language):
                     self.language = Language(JS_LANGUAGE)
                 else:

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_tools.base 模块单元测试"""
 
-import pytest
-from unittest.mock import MagicMock
 
 from jarvis.jarvis_tools.base import Tool
 

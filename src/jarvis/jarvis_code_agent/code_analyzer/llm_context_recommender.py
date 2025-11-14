@@ -217,7 +217,7 @@ class ContextRecommender:
         console.print(" 完成")  # 统计完成，换行
         
         # 进度反馈间隔（每处理这么多文件输出一次，最多每10个文件输出一次）
-        progress_interval = max(1, min(total_files // 20, 10)) if total_files > 0 else 10
+        # progress_interval = max(1, min(total_files // 20, 10)) if total_files > 0 else 10
         
         if total_files > 0:
             console.print(f"📁 发现 {total_files} 个代码文件，开始扫描...")
@@ -306,7 +306,7 @@ class ContextRecommender:
                     # 实时更新进度（不换行，文件名在最后）
                     msg = format_progress_msg(rel_path, files_scanned, total_files, symbols_added, files_skipped)
                     console.print(msg, end="\r")
-                except Exception as e:
+                except Exception:
                     # 跳过无法读取的文件
                     files_skipped += 1
                     # 实时更新进度（不换行，文件名在最后）

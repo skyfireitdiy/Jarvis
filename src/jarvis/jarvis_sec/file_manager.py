@@ -8,7 +8,7 @@
 3. analysis.jsonl - 分析结果文件：包括所有聚类，聚类中哪些问题是问题，哪些问题是误报
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 from pathlib import Path
 import json
 import typer

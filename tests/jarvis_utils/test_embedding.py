@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.embedding 模块单元测试"""
 
-import pytest
 
 from jarvis.jarvis_utils.embedding import get_context_token_count, split_text_into_chunks
 

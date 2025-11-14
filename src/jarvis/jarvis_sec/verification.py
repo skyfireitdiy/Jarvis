@@ -428,7 +428,7 @@ def process_verification_batch(
                 # 调试日志：显示验证结果
                 if verification_results is None:
                     try:
-                        typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败", fg=typer.colors.YELLOW)
+                        typer.secho("[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
                 elif not isinstance(verification_results, list):
@@ -438,7 +438,7 @@ def process_verification_batch(
                         pass
                 elif len(verification_results) == 0:
                     try:
-                        typer.secho(f"[jarvis-sec] 警告：验证 Agent 返回空列表", fg=typer.colors.YELLOW)
+                        typer.secho("[jarvis-sec] 警告：验证 Agent 返回空列表", fg=typer.colors.YELLOW)
                     except Exception:
                         pass
                 else:
@@ -466,7 +466,7 @@ def process_verification_batch(
                     # 合并验证通过的告警
                     verified_items = merge_verified_items(items_with_risk, batch, gid_to_verification)
                 else:
-                    typer.secho(f"[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）", fg=typer.colors.YELLOW)
+                    typer.secho("[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）", fg=typer.colors.YELLOW)
                 
                 # 只有验证通过的告警才写入文件
                 if verified_items:

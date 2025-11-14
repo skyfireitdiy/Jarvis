@@ -5,7 +5,7 @@
 """
 
 import subprocess
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 
 def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
@@ -86,7 +86,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     # 如果 code_analyzer 中的符号提取不支持，但 file_context_handler 中能成功创建提取器，也标记为支持
                     if '符号提取' not in info[lang_name] or not info[lang_name]['符号提取']:
                         info[lang_name]['符号提取'] = True
-            except Exception as e:
+            except Exception:
                 # 静默失败，不记录错误（避免输出过多调试信息）
                 pass
     except Exception:
@@ -277,42 +277,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                 else:
                     info[lang_name][feature] = False
     
-    return info
-
-
-def _check_lsp_server_available(config) -> bool:
-    """检查LSP服务器是否实际可用。
-    
-    Args:
-        config: LSPServerConfig 配置对象
-        
-    Returns:
-        bool: 如果服务器可用返回True，否则返回False
-    """
-    # 使用检测命令或主命令来验证
-    check_cmd = config.check_command or config.command
-    
-    try:
-        # 尝试运行检测命令
-        result = subprocess.run(
-            check_cmd,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False
-        )
-        
-        # 只要命令能执行（不是FileNotFoundError），就认为可用
-        # 某些LSP服务器即使返回非零退出码也可能可用
-        return True
-        
-    except FileNotFoundError:
-        return False
-    except subprocess.TimeoutExpired:
-        return False
-    except Exception:
-        return False
-    
     # 确保所有已知语言都在 info 中（即使某些功能不支持）
     # 这样表格会显示所有语言，即使某些功能不支持
     known_languages = ['python', 'c', 'cpp', 'rust', 'go', 'javascript', 'typescript', 'java']
@@ -397,6 +361,40 @@ def _check_lsp_server_available(config) -> bool:
                     info[lang_name][feature] = False
     
     return info
+
+
+def _check_lsp_server_available(config) -> bool:
+    """检查LSP服务器是否实际可用。
+    
+    Args:
+        config: LSPServerConfig 配置对象
+        
+    Returns:
+        bool: 如果服务器可用返回True，否则返回False
+    """
+    # 使用检测命令或主命令来验证
+    check_cmd = config.check_command or config.command
+    
+    try:
+        # 尝试运行检测命令
+        subprocess.run(
+            check_cmd,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False
+        )
+        
+        # 只要命令能执行（不是FileNotFoundError），就认为可用
+        # 某些LSP服务器即使返回非零退出码也可能可用
+        return True
+        
+    except FileNotFoundError:
+        return False
+    except subprocess.TimeoutExpired:
+        return False
+    except Exception:
+        return False
 
 
 def print_language_support_table() -> None:

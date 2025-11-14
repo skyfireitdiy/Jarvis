@@ -36,7 +36,6 @@ def create_typescript_extractor() -> Optional[Any]:
         class TSSymbolExtractor:
             def __init__(self):
                 # 如果传入的是 PyCapsule，需要转换为 Language 对象
-                from tree_sitter import Language
                 if not isinstance(TS_LANGUAGE, Language):
                     self.language = Language(TS_LANGUAGE)
                 else:

@@ -3,7 +3,6 @@ import re
 import os
 from typing import Any, Tuple, List, Dict, Optional, Callable
 
-from jarvis.jarvis_tools.read_code import ReadCodeTool
 
 # 语言提取器注册表（导出供其他模块使用）
 _LANGUAGE_EXTRACTORS: Dict[str, Callable[[], Optional[Any]]] = {}

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_code_analysis.code_review 模块单元测试"""
 
-import pytest
 
 from jarvis.jarvis_code_analysis.code_review import _detect_languages_from_files
 

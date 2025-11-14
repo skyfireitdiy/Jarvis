@@ -6,12 +6,11 @@ from pathlib import Path
 import json
 import typer
 
-from jarvis.jarvis_sec.prompts import get_cluster_system_prompt, get_cluster_summary_prompt
+from jarvis.jarvis_sec.prompts import get_cluster_summary_prompt
 from jarvis.jarvis_sec.parsers import parse_clusters_from_text
 from jarvis.jarvis_sec.agents import create_cluster_agent, subscribe_summary_event
 from jarvis.jarvis_sec.utils import (
     group_candidates_by_file,
-    load_processed_gids_from_agent_issues,
 )
 from jarvis.jarvis_sec.file_manager import (
     load_clusters,
@@ -584,7 +583,7 @@ def extract_classified_gids(cluster_items: List[Dict]) -> set:
                     xi = int(x)
                     if xi >= 1:
                         classified_gids.add(xi)
-                except (ValueError, TypeError) as e:
+                except (ValueError, TypeError):
                     # 理论上不应该到达这里（格式验证应该已经捕获），但如果到达了，记录警告
                     try:
                         typer.secho(f"[jarvis-sec] 警告：在提取gid时遇到格式错误（值={x}，类型={type(x).__name__}），这不应该发生（格式验证应该已捕获）", fg=typer.colors.YELLOW)
@@ -611,7 +610,7 @@ def build_cluster_retry_task(
         missing_count = len(missing_gids)
         retry_task += f"\n\n**遗漏的gid（共{missing_count}个，必须被分类）：**\n" + ", ".join(str(gid) for gid in missing_gids_list)
     if error_details:
-        retry_task += f"\n\n**格式错误：**\n" + "\n".join(f"- {detail}" for detail in error_details)
+        retry_task += "\n\n**格式错误：**\n" + "\n".join(f"- {detail}" for detail in error_details)
     return retry_task
 
 
@@ -622,7 +621,7 @@ def build_cluster_error_guidance(
     """构建聚类错误指导信息"""
     error_guidance = ""
     if error_details:
-        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {detail}" for detail in error_details)
+        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n" + "\n".join(f"- {detail}" for detail in error_details)
     if missing_gids:
         missing_gids_list = sorted(list(missing_gids))
         missing_count = len(missing_gids)

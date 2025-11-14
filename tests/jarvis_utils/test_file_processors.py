@@ -2,8 +2,6 @@
 """jarvis_utils.file_processors 模块单元测试"""
 
 import pytest
-import tempfile
-import os
 
 from jarvis.jarvis_utils.file_processors import FileProcessor, TextFileProcessor
 

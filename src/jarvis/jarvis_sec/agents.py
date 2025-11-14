@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Agent创建和订阅模块"""
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_sec.prompts import (

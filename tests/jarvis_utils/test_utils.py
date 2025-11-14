@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.utils 模块单元测试"""
 
-import pytest
 from unittest.mock import patch, MagicMock
-from importlib.util import find_spec
 
 from jarvis.jarvis_utils.utils import (
     get_missing_rag_modules,

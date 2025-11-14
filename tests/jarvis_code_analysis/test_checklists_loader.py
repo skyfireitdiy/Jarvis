@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_code_analysis.checklists.loader 模块单元测试"""
 
-import pytest
 
 from jarvis.jarvis_code_analysis.checklists.loader import (
     get_language_checklist,

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_c2rust.llm_module_agent 模块单元测试"""
 
-import pytest
 
 from jarvis.jarvis_c2rust.llm_module_agent import _sanitize_mod_name
 

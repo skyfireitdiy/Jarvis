@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 """jarvis_platform_manager.main 模块单元测试"""
 
-import pytest
-import tempfile
 import yaml
-from pathlib import Path
 from unittest.mock import patch
 
 from jarvis.jarvis_platform_manager.main import validate_platform_model, load_role_config

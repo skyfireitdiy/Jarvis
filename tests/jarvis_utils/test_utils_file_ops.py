@@ -3,7 +3,6 @@
 
 import pytest
 import hashlib
-from pathlib import Path
 
 from jarvis.jarvis_utils.utils import get_file_md5, get_file_line_count
 

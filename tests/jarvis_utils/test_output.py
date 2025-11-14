@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.output 模块单元测试"""
 
-import pytest
 
 from jarvis.jarvis_utils.output import OutputType, OutputEvent
 

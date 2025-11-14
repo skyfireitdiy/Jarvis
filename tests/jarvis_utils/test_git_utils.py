@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.git_utils 模块单元测试"""
 
-import pytest
-import tempfile
-import os
-import subprocess
 from unittest.mock import patch, MagicMock
 
 from jarvis.jarvis_utils.git_utils import (
     detect_large_code_deletion,
-    check_large_code_deletion,
     get_modified_line_ranges,
     is_file_in_git_repo,
 )

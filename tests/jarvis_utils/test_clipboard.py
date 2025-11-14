@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.clipboard 模块单元测试"""
 
-import pytest
 import subprocess
 from unittest.mock import patch, MagicMock
 
@@ -52,7 +51,6 @@ class TestCopyToClipboard:
     @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
     def test_linux_xsel_clipboard(self, mock_pretty, mock_popen, mock_platform):
         """测试 Linux xsel 剪贴板"""
-        import subprocess
         mock_platform.return_value = "Linux"
         mock_process = MagicMock()
         mock_process.stdin = MagicMock()
@@ -70,7 +68,6 @@ class TestCopyToClipboard:
     @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
     def test_linux_xsel_not_found_fallback_xclip(self, mock_pretty, mock_popen, mock_platform):
         """测试 Linux xsel 未找到时回退到 xclip"""
-        import subprocess
         mock_platform.return_value = "Linux"
         # 第一次调用（xsel）抛出 FileNotFoundError，第二次（xclip）成功
         mock_popen.side_effect = [
@@ -104,7 +101,6 @@ class TestCopyToClipboard:
     @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
     def test_linux_no_clipboard_tools(self, mock_pretty, mock_popen, mock_platform):
         """测试 Linux 没有剪贴板工具"""
-        import subprocess
         mock_platform.return_value = "Linux"
         mock_popen.side_effect = FileNotFoundError()
 
