@@ -15,7 +15,7 @@ class EditFileTool:
     """文件编辑工具，用于对文件进行局部修改"""
 
     name = "edit_file"
-    description = "对文件进行局部修改。支持单点替换（精确匹配）、区间替换（标记之间）和sed命令模式（正则表达式），可指定行号范围限制。"
+    description = "对文件进行局部修改。支持单点替换（精确匹配）、区间替换（标记之间）、sed命令模式（正则表达式）和结构化编辑（通过块id），可指定行号范围限制。"
 
     parameters = {
         "type": "object",
