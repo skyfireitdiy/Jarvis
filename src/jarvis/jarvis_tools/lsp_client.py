@@ -816,14 +816,6 @@ class LSPClientTool:
     # Tree-sitter 后备客户端缓存
     _treesitter_clients: Dict[Tuple[str, str], TreeSitterFallback] = {}
     
-    @classmethod
-    def check(cls) -> bool:
-        """检查工具是否可用，仅在CodeAgent模式下启用"""
-        # 检查是否在CodeAgent模式下
-        if os.environ.get("JARVIS_CODE_AGENT", "") != "1":
-            return False
-        return True
-    
     def _get_or_create_client(self, project_root: str, file_path: str) -> Optional[Any]:
         """获取或创建LSP客户端，如果LSP不可用则使用Tree-sitter后备。
         
