@@ -42,6 +42,41 @@ from jarvis.jarvis_c2rust.scanner import (
     find_root_function_ids,
 )
 
+# ============================================================================
+# 常量定义
+# ============================================================================
+
+# LLM评估重试配置
+MAX_LLM_RETRIES = 3  # LLM评估最大重试次数
+
+# 源码片段读取配置
+DEFAULT_SOURCE_SNIPPET_MAX_LINES = 200  # 默认源码片段最大行数
+SUBTREE_SOURCE_SNIPPET_MAX_LINES = 120  # 子树提示词中源码片段最大行数
+
+# 子树提示词构建配置
+MAX_SUBTREE_NODES_META = 200  # 子树节点元数据列表最大长度
+MAX_SUBTREE_EDGES = 400  # 子树边列表最大长度
+MAX_DOT_EDGES = 200  # DOT图边数阈值（超过此值不生成DOT）
+MAX_CHILD_SAMPLES = 2  # 子节点采样数量
+MAX_SOURCE_SAMPLES = 3  # 代表性源码样本最大数量（注释说明）
+
+# 显示配置
+MAX_NOTES_DISPLAY_LENGTH = 200  # 备注显示最大长度
+
+# 输出文件路径配置
+DEFAULT_SYMBOLS_OUTPUT = "symbols_library_pruned.jsonl"  # 默认符号表输出文件名
+DEFAULT_MAPPING_OUTPUT = "library_replacements.jsonl"  # 默认替代映射输出文件名
+SYMBOLS_PRUNE_OUTPUT = "symbols_prune.jsonl"  # 兼容符号表输出文件名
+ORDER_PRUNE_OUTPUT = "translation_order_prune.jsonl"  # 剪枝阶段转译顺序输出文件名
+ORDER_ALIAS_OUTPUT = "translation_order.jsonl"  # 通用转译顺序输出文件名
+DEFAULT_CHECKPOINT_FILE = "library_replacer_checkpoint.json"  # 默认检查点文件名
+
+# Checkpoint配置
+DEFAULT_CHECKPOINT_INTERVAL = 1  # 默认检查点保存间隔（每评估N个节点保存一次）
+
+# JSON格式化配置
+JSON_INDENT = 2  # JSON格式化缩进空格数
+
 
 def _resolve_symbols_jsonl_path(hint: Path) -> Path:
     """解析symbols.jsonl路径"""
@@ -60,18 +95,18 @@ def _setup_output_paths(
 ) -> tuple[Path, Path, Path, Path, Path]:
     """设置输出路径，返回(符号表路径, 映射路径, 兼容符号表路径, 顺序路径, 别名顺序路径)"""
     if out_symbols_path is None:
-        out_symbols_path = data_dir / "symbols_library_pruned.jsonl"
+        out_symbols_path = data_dir / DEFAULT_SYMBOLS_OUTPUT
     else:
         out_symbols_path = Path(out_symbols_path)
     if out_mapping_path is None:
-        out_mapping_path = data_dir / "library_replacements.jsonl"
+        out_mapping_path = data_dir / DEFAULT_MAPPING_OUTPUT
     else:
         out_mapping_path = Path(out_mapping_path)
     
     # 兼容输出
-    out_symbols_prune_path = data_dir / "symbols_prune.jsonl"
-    order_prune_path = data_dir / "translation_order_prune.jsonl"
-    alias_order_path = data_dir / "translation_order.jsonl"
+    out_symbols_prune_path = data_dir / SYMBOLS_PRUNE_OUTPUT
+    order_prune_path = data_dir / ORDER_PRUNE_OUTPUT
+    alias_order_path = data_dir / ORDER_ALIAS_OUTPUT
     
     return out_symbols_path, out_mapping_path, out_symbols_prune_path, order_prune_path, alias_order_path
 
@@ -245,7 +280,7 @@ def _process_candidate_scope(
     return filtered_roots, scope_unreachable_funcs
 
 
-def _read_source_snippet(rec: Dict[str, Any], max_lines: int = 200) -> str:
+def _read_source_snippet(rec: Dict[str, Any], max_lines: int = DEFAULT_SOURCE_SNIPPET_MAX_LINES) -> str:
     """读取源码片段"""
     path = rec.get("file") or ""
     try:
@@ -474,19 +509,19 @@ def _build_subtree_prompt(
             nodes_meta.append(f"- {nm} | {sg}")
         else:
             nodes_meta.append(f"- {nm}")
-    if len(nodes_meta) > 200:
-        nodes_meta = nodes_meta[:200] + [f"...({len(desc)-200} more)"]
+    if len(nodes_meta) > MAX_SUBTREE_NODES_META:
+        nodes_meta = nodes_meta[:MAX_SUBTREE_NODES_META] + [f"...({len(desc)-MAX_SUBTREE_NODES_META} more)"]
     
-    # 选取部分代表性叶子/内部节点源码（最多 3 个）
+    # 选取部分代表性叶子/内部节点源码（最多 MAX_SOURCE_SAMPLES 个）
     samples: List[str] = []
     sample_ids: List[int] = [fid]
-    for ch in adj_func.get(fid, [])[:2]:
+    for ch in adj_func.get(fid, [])[:MAX_CHILD_SAMPLES]:
         sample_ids.append(ch)
     for sid in sample_ids:
         rec = by_id.get(sid, {})
         nm = rec.get("qualified_name") or rec.get("name") or f"sym_{sid}"
         sg = rec.get("signature") or ""
-        src = _read_source_snippet(rec, max_lines=120)
+        src = _read_source_snippet(rec, max_lines=SUBTREE_SOURCE_SNIPPET_MAX_LINES)
         samples.append(f"--- BEGIN {nm} ---\n{sg}\n{src}\n--- END {nm} ---")
     
     # 构建依赖图（子树内的调用有向边）
@@ -500,14 +535,14 @@ def _build_subtree_prompt(
             if v in desc:
                 edges_list.append(f"{_label(u)} -> {_label(v)}")
     edges_text: str
-    if len(edges_list) > 400:
-        edges_text = "\n".join(edges_list[:400] + [f"...({len(edges_list) - 400} more edges)"])
+    if len(edges_list) > MAX_SUBTREE_EDGES:
+        edges_text = "\n".join(edges_list[:MAX_SUBTREE_EDGES] + [f"...({len(edges_list) - MAX_SUBTREE_EDGES} more edges)"])
     else:
         edges_text = "\n".join(edges_list)
     
     # 适度提供 DOT（边数不大时），便于大模型直观看图
     dot_text = ""
-    if len(edges_list) <= 200:
+    if len(edges_list) <= MAX_DOT_EDGES:
         dot_lines: List[str] = ["digraph subtree {", "  rankdir=LR;"]
         for u in sorted(desc):
             for v in adj_func.get(u, []):
@@ -555,34 +590,73 @@ def _llm_evaluate_subtree(
     _model_available: bool,
     _new_model_func: Callable,
 ) -> Dict[str, Any]:
-    """使用LLM评估子树是否可替代"""
+    """使用LLM评估子树是否可替代，支持最多3次重试"""
     if not _model_available:
         return {"replaceable": False}
     model = _new_model_func()
     if not model:
         return {"replaceable": False}
     
-    prompt = _build_subtree_prompt(fid, desc, by_id, adj_func, disabled_display)
+    base_prompt = _build_subtree_prompt(fid, desc, by_id, adj_func, disabled_display)
+    last_parse_error = None
     
-    try:
-        result = model.chat_until_success(prompt)  # type: ignore
-        parsed, parse_error = _parse_agent_json_summary(result or "")
-        if parse_error:
-            # JSON解析失败，将错误信息反馈给模型
-            print(f"[c2rust-lib-replace] JSON解析失败: {parse_error}")
-            # 更新提示词，包含解析错误信息
-            prompt_with_error = (
-                prompt
-                + f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {parse_error}\n\n"
-                + "请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
-            )
-            result = model.chat_until_success(prompt_with_error)  # type: ignore
+    for attempt in range(1, MAX_LLM_RETRIES + 1):
+        try:
+            # 构建当前尝试的提示词
+            if attempt == 1:
+                prompt = base_prompt
+            else:
+                # 重试时包含之前的错误信息
+                error_hint = ""
+                if last_parse_error:
+                    error_hint = (
+                        f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_parse_error}\n\n"
+                        + "请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
+                    )
+                prompt = base_prompt + error_hint
+            
+            # 调用LLM
+            result = model.chat_until_success(prompt)  # type: ignore
             parsed, parse_error = _parse_agent_json_summary(result or "")
+            
             if parse_error:
-                # 仍然失败，使用默认值
-                print(f"[c2rust-lib-replace] 重试后JSON解析仍然失败: {parse_error}，使用默认值")
-                parsed = None
-        if isinstance(parsed, dict):
+                # JSON解析失败，记录错误并准备重试
+                last_parse_error = parse_error
+                typer.secho(
+                    f"[c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：JSON解析失败: {parse_error}",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
+                if attempt < MAX_LLM_RETRIES:
+                    continue  # 继续重试
+                else:
+                    # 最后一次尝试也失败，使用默认值
+                    typer.secho(
+                        f"[c2rust-library] 重试 {MAX_LLM_RETRIES} 次后JSON解析仍然失败: {parse_error}，使用默认值",
+                        fg=typer.colors.YELLOW,
+                        err=True,
+                    )
+                    return {"replaceable": False}
+            
+            # 解析成功，检查是否为字典
+            if not isinstance(parsed, dict):
+                last_parse_error = f"解析结果不是字典，而是 {type(parsed).__name__}"
+                typer.secho(
+                    f"[c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：{last_parse_error}",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
+                if attempt < MAX_LLM_RETRIES:
+                    continue  # 继续重试
+                else:
+                    typer.secho(
+                        f"[c2rust-library] 重试 {MAX_LLM_RETRIES} 次后结果格式仍然不正确，视为不可替代。",
+                        fg=typer.colors.YELLOW,
+                        err=True,
+                    )
+                    return {"replaceable": False}
+            
+            # 成功解析为字典，处理结果
             rep = bool(parsed.get("replaceable") is True)
             lib = str(parsed.get("library") or "").strip()
             api = str(parsed.get("api") or parsed.get("function") or "").strip()
@@ -635,12 +709,37 @@ def _llm_evaluate_subtree(
                 result_obj["apis"] = apis
             if notes:
                 result_obj["notes"] = notes
+            
+            # 成功获取结果，返回
+            if attempt > 1:
+                typer.secho(
+                    f"[c2rust-library] 第 {attempt} 次尝试成功获取评估结果",
+                    fg=typer.colors.GREEN,
+                    err=True,
+                )
             return result_obj
-        typer.secho("[c2rust-library] LLM 结果解析失败，视为不可替代。", fg=typer.colors.YELLOW, err=True)
-        return {"replaceable": False}
-    except Exception as e:
-        typer.secho(f"[c2rust-library] LLM 评估失败，视为不可替代: {e}", fg=typer.colors.YELLOW, err=True)
-        return {"replaceable": False}
+            
+        except Exception as e:
+            # LLM调用异常，记录并准备重试
+            last_parse_error = f"LLM调用异常: {str(e)}"
+            typer.secho(
+                f"[c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：LLM评估失败: {e}",
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
+            if attempt < MAX_LLM_RETRIES:
+                continue  # 继续重试
+            else:
+                # 最后一次尝试也失败，返回默认值
+                typer.secho(
+                    f"[c2rust-library] 重试 {MAX_LLM_RETRIES} 次后LLM评估仍然失败: {e}，视为不可替代",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
+                return {"replaceable": False}
+    
+    # 理论上不会到达这里，但作为保险
+    return {"replaceable": False}
 
 
 def _is_entry_function(
@@ -790,7 +889,7 @@ def apply_library_replacement(
     disabled_libraries: Optional[List[str]] = None,
     resume: bool = True,
     checkpoint_path: Optional[Path] = None,
-    checkpoint_interval: int = 1,
+    checkpoint_interval: int = DEFAULT_CHECKPOINT_INTERVAL,
     clear_checkpoint_on_done: bool = True,
     non_interactive: bool = True,
 ) -> Dict[str, Path]:
@@ -819,7 +918,7 @@ def apply_library_replacement(
 
     # Checkpoint 默认路径
     if checkpoint_path is None:
-        checkpoint_path = data_dir / "library_replacer_checkpoint.json"
+        checkpoint_path = data_dir / DEFAULT_CHECKPOINT_FILE
 
     # 读取符号
     all_records, by_id, name_to_id, func_ids, id_refs_names = _load_symbols(sjsonl)
@@ -846,7 +945,7 @@ def apply_library_replacement(
     disabled_norm, disabled_display = _normalize_disabled_libraries(disabled_libraries)
 
     # 断点恢复支持：工具函数与关键键构造
-    ckpt_path: Path = Path(checkpoint_path) if checkpoint_path is not None else (data_dir / "library_replacer_checkpoint.json")
+    ckpt_path: Path = Path(checkpoint_path) if checkpoint_path is not None else (data_dir / DEFAULT_CHECKPOINT_FILE)
     checkpoint_key = _make_checkpoint_key(sjsonl, library_name, llm_group, candidates, disabled_libraries, max_funcs)
 
     def _new_model() -> Optional[Any]:
@@ -909,12 +1008,12 @@ def apply_library_replacement(
         try:
             interval = int(checkpoint_interval)
         except Exception:
-            interval = 1
+            interval = DEFAULT_CHECKPOINT_INTERVAL
         need_save = force or (interval <= 0) or ((eval_counter - last_ckpt_saved) >= interval)
         if not need_save:
             return
         try:
-            _atomic_write(ckpt_path, json.dumps(_current_checkpoint_state(), ensure_ascii=False, indent=2))
+            _atomic_write(ckpt_path, json.dumps(_current_checkpoint_state(), ensure_ascii=False, indent=JSON_INDENT))
             last_ckpt_saved = eval_counter
         except Exception:
             pass
@@ -968,7 +1067,7 @@ def apply_library_replacement(
                     msg += f"; 参考API: {apis_str}"
                 msg += f"; 置信度: {conf:.2f}"
                 if notes:
-                    msg += f"; 备注: {notes[:200]}"
+                    msg += f"; 备注: {notes[:MAX_NOTES_DISPLAY_LENGTH]}"
                 typer.secho(msg, fg=typer.colors.GREEN, err=True)
 
                 # 入口函数保护：不替代 main（保留进行转译），改为深入评估其子节点
@@ -1065,5 +1164,4 @@ def apply_library_replacement(
     return result
 
 
-__all__ = ["apply_library_replacement"]
 __all__ = ["apply_library_replacement"]
