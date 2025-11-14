@@ -11,11 +11,14 @@ try:
     from jarvis.jarvis_code_agent.code_analyzer.language_support import (
         detect_language,
         get_symbol_extractor,
+        get_dependency_analyzer,
     )
     from jarvis.jarvis_code_agent.code_analyzer.symbol_extractor import Symbol
     LANGUAGE_SUPPORT_AVAILABLE = True
 except ImportError:
     LANGUAGE_SUPPORT_AVAILABLE = False
+    def get_dependency_analyzer(language: str):
+        return None
 
 
 class ReadCodeTool:
@@ -142,7 +145,7 @@ class ReadCodeTool:
                 and s.line_end >= start_line   # 结束行在范围开始之后或等于
             ]
             
-            # 按行号排序
+            # 按行号排序（导入语句通常在文件开头，所以会排在最前面）
             filtered_symbols.sort(key=lambda s: s.line_start)
             
             # 构建语法单元列表（先收集所有单元信息）
@@ -253,6 +256,90 @@ class ReadCodeTool:
             # 如果提取失败，返回空列表，将使用行号分组
             return []
     
+    def _extract_blank_line_groups(
+        self, content: str, start_line: int, end_line: int
+    ) -> List[Dict[str, Any]]:
+        """按空白行分组提取内容
+        
+        遇到空白行（除了空格、制表符等，没有任何其他字符的行）时，作为分隔符将代码分成不同的组。
+        
+        Args:
+            content: 文件内容
+            start_line: 起始行号
+            end_line: 结束行号
+            
+        Returns:
+            分组列表，每个分组包含 id, start_line, end_line, content
+        """
+        lines = content.split('\n')
+        groups = []
+        
+        # 获取实际要处理的行范围
+        actual_lines = lines[start_line - 1:end_line]
+        
+        if not actual_lines:
+            return groups
+        
+        current_start = start_line
+        group_start_idx = 0
+        i = 0
+        
+        while i < len(actual_lines):
+            line = actual_lines[i]
+            # 空白行定义：除了空格、制表符等，没有任何其他字符的行
+            is_blank = not line.strip()
+            
+            if is_blank:
+                # 空白行作为分隔符，结束当前分组（不包含空白行）
+                if group_start_idx < i:
+                    group_end_idx = i - 1
+                    group_content = '\n'.join(actual_lines[group_start_idx:group_end_idx + 1])
+                    if group_content.strip():  # 只添加非空分组
+                        group_id = f"{current_start}-{current_start + (group_end_idx - group_start_idx)}"
+                        groups.append({
+                            'id': group_id,
+                            'start_line': current_start,
+                            'end_line': current_start + (group_end_idx - group_start_idx),
+                            'content': group_content,
+                        })
+                # 跳过空白行，开始新分组
+                i += 1
+                # 跳过连续的多个空白行
+                while i < len(actual_lines) and not actual_lines[i].strip():
+                    i += 1
+                if i < len(actual_lines):
+                    current_start = start_line + i
+                    group_start_idx = i
+            else:
+                # 非空白行，继续当前分组
+                i += 1
+        
+        # 处理最后一组
+        if group_start_idx < len(actual_lines):
+            group_end_idx = len(actual_lines) - 1
+            group_content = '\n'.join(actual_lines[group_start_idx:group_end_idx + 1])
+            if group_content.strip():  # 只添加非空分组
+                group_id = f"{current_start}-{current_start + (group_end_idx - group_start_idx)}"
+                groups.append({
+                    'id': group_id,
+                    'start_line': current_start,
+                    'end_line': current_start + (group_end_idx - group_start_idx),
+                    'content': group_content,
+                })
+        
+        # 如果没有找到任何分组（全部是空白行），返回整个范围作为一个分组
+        if not groups:
+            group_content = '\n'.join(actual_lines)
+            group_id = f"{start_line}-{end_line}"
+            groups.append({
+                'id': group_id,
+                'start_line': start_line,
+                'end_line': end_line,
+                'content': group_content,
+            })
+        
+        return groups
+    
     def _extract_line_groups(
         self, content: str, start_line: int, end_line: int, group_size: int = 20
     ) -> List[Dict[str, Any]]:
@@ -293,6 +380,125 @@ class ReadCodeTool:
         
         return groups
     
+    def _ensure_unique_ids(self, units: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """确保单元列表中所有id唯一
+        
+        Args:
+            units: 单元列表
+            
+        Returns:
+            确保id唯一后的单元列表
+        """
+        seen_ids = set()
+        result = []
+        
+        for unit in units:
+            original_id = unit['id']
+            unit_id = original_id
+            counter = 1
+            
+            # 如果id已存在，添加后缀使其唯一
+            while unit_id in seen_ids:
+                unit_id = f"{original_id}_{counter}"
+                counter += 1
+            
+            seen_ids.add(unit_id)
+            # 创建新单元，使用唯一的id
+            new_unit = unit.copy()
+            new_unit['id'] = unit_id
+            result.append(new_unit)
+        
+        return result
+    
+    def _extract_imports(self, filepath: str, content: str, start_line: int, end_line: int) -> List[Dict[str, Any]]:
+        """提取文件的导入/包含语句作为结构化单元
+        
+        Args:
+            filepath: 文件路径
+            content: 文件内容
+            start_line: 起始行号
+            end_line: 结束行号
+            
+        Returns:
+            导入语句单元列表，每个单元包含 id, start_line, end_line, content
+        """
+        if not LANGUAGE_SUPPORT_AVAILABLE:
+            return []
+        
+        try:
+            language = detect_language(filepath)
+            if not language:
+                return []
+            
+            analyzer = get_dependency_analyzer(language)
+            if not analyzer:
+                return []
+            
+            dependencies = analyzer.analyze_imports(filepath, content)
+            if not dependencies:
+                return []
+            
+            # 过滤在请求范围内的导入语句
+            lines = content.split('\n')
+            import_units = []
+            
+            # 按行号分组导入语句（连续的导入语句作为一个单元）
+            current_group = []
+            for dep in sorted(dependencies, key=lambda d: d.line):
+                line_num = dep.line
+                # 只包含在请求范围内的导入语句
+                if start_line <= line_num <= end_line and 1 <= line_num <= len(lines):
+                    if not current_group or line_num == current_group[-1]['line'] + 1:
+                        # 连续的导入语句，添加到当前组
+                        current_group.append({
+                            'line': line_num,
+                            'content': lines[line_num - 1]
+                        })
+                    else:
+                        # 不连续，先处理当前组
+                        if current_group:
+                            import_units.append(self._create_import_unit(current_group))
+                        # 开始新组
+                        current_group = [{
+                            'line': line_num,
+                            'content': lines[line_num - 1]
+                        }]
+            
+            # 处理最后一组
+            if current_group:
+                import_units.append(self._create_import_unit(current_group))
+            
+            return import_units
+        except Exception:
+            return []
+    
+    def _create_import_unit(self, import_group: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """创建导入语句单元
+        
+        Args:
+            import_group: 导入语句组（连续的导入语句）
+            
+        Returns:
+            导入单元字典
+        """
+        start_line = import_group[0]['line']
+        end_line = import_group[-1]['line']
+        content = '\n'.join(item['content'] for item in import_group)
+        
+        # 生成id：根据导入语句内容生成唯一标识
+        first_line = import_group[0]['content'].strip()
+        if len(import_group) == 1:
+            unit_id = f"import_{start_line}"
+        else:
+            unit_id = f"imports_{start_line}_{end_line}"
+        
+        return {
+            'id': unit_id,
+            'start_line': start_line,
+            'end_line': end_line,
+            'content': content,
+        }
+    
     def _format_structured_output(
         self, filepath: str, units: List[Dict[str, Any]], total_lines: int
     ) -> str:
@@ -300,7 +506,7 @@ class ReadCodeTool:
         
         Args:
             filepath: 文件路径
-            units: 语法单元或行号分组列表
+            units: 语法单元或行号分组列表（已包含导入语句单元）
             total_lines: 文件总行数
             
         Returns:
@@ -313,8 +519,8 @@ class ReadCodeTool:
         ]
         
         for unit in units:
-            # 将 id、start_line、end_line 放在一行，用 [] 包起来
-            output_lines.append(f"[id:{unit['id']} start_line:{unit['start_line']} end_line:{unit['end_line']}]")
+            # 显示id
+            output_lines.append(f"[id:{unit['id']}]")
             # 添加内容，保持原有缩进，并添加行号
             content_lines = unit['content'].split('\n')
             current_line_num = unit['start_line']
@@ -347,17 +553,29 @@ class ReadCodeTool:
             
             if syntax_units:
                 # 使用语法单元结构化输出格式计算token
-                sample_output = self._format_structured_output(filepath, syntax_units[:1], total_lines)
+                import_units = self._extract_imports(filepath, content, start_line, end_line)
+                all_units = import_units + syntax_units[:1]
+                # 确保id唯一
+                all_units = self._ensure_unique_ids(all_units)
+                # 按行号排序
+                all_units.sort(key=lambda u: u['start_line'])
+                sample_output = self._format_structured_output(filepath, all_units, total_lines)
                 if len(syntax_units) > 1:
                     unit_tokens = get_context_token_count(sample_output)
                     return unit_tokens * len(syntax_units)
                 else:
                     return get_context_token_count(sample_output)
             else:
-                # 使用行号分组格式计算token
-                line_groups = self._extract_line_groups(content, start_line, end_line, group_size=20)
+                # 使用空白行分组格式计算token（不支持语言时）
+                line_groups = self._extract_blank_line_groups(content, start_line, end_line)
                 if line_groups:
-                    sample_output = self._format_structured_output(filepath, line_groups[:1], total_lines)
+                    import_units = self._extract_imports(filepath, content, start_line, end_line)
+                    all_units = import_units + line_groups[:1]
+                    # 确保id唯一
+                    all_units = self._ensure_unique_ids(all_units)
+                    # 按行号排序
+                    all_units.sort(key=lambda u: u['start_line'])
+                    sample_output = self._format_structured_output(filepath, all_units, total_lines)
                     if len(line_groups) > 1:
                         group_tokens = get_context_token_count(sample_output)
                         return group_tokens * len(line_groups)
@@ -511,20 +729,34 @@ class ReadCodeTool:
                 except Exception:
                     pass
             
+            # 提取导入/包含语句作为结构化单元
+            import_units = self._extract_imports(abs_path, full_content, start_line, end_line)
+            
             # 确定使用的结构化单元（语法单元或行号分组）
             structured_units = None
             unit_type = None
             if syntax_units:
-                # 使用语法单元结构化输出
-                structured_units = syntax_units
+                # 合并导入单元和语法单元
+                all_units = import_units + syntax_units
+                # 确保id唯一
+                all_units = self._ensure_unique_ids(all_units)
+                # 按行号排序，所有单元按在文件中的实际位置排序
+                all_units.sort(key=lambda u: u['start_line'])
+                structured_units = all_units
                 unit_type = "syntax_units"
-                output = self._format_structured_output(abs_path, syntax_units, total_lines)
+                output = self._format_structured_output(abs_path, structured_units, total_lines)
             else:
-                # 使用行号分组结构化输出（使用完整内容以保持正确的行号）
-                line_groups = self._extract_line_groups(full_content, start_line, end_line, group_size=20)
-                structured_units = line_groups
+                # 使用空白行分组结构化输出（不支持语言时，按连续空白行分隔）
+                line_groups = self._extract_blank_line_groups(full_content, start_line, end_line)
+                # 合并导入单元和行号分组
+                all_units = import_units + line_groups
+                # 确保id唯一
+                all_units = self._ensure_unique_ids(all_units)
+                # 按行号排序，所有单元按在文件中的实际位置排序
+                all_units.sort(key=lambda u: u['start_line'])
+                structured_units = all_units
                 unit_type = "line_groups"
-                output = self._format_structured_output(abs_path, line_groups, total_lines)
+                output = self._format_structured_output(abs_path, structured_units, total_lines)
 
             # 尝试获取并附加上下文信息
             context_info = self._get_file_context(abs_path, start_line, end_line, agent)

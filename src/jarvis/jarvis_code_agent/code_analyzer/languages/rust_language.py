@@ -30,6 +30,15 @@ RUST_SYMBOL_QUERY = """
 
 (mod_item
   name: (identifier) @module.name)
+
+(enum_item
+  name: (type_identifier) @enum.name)
+
+(union_item
+  name: (type_identifier) @union.name)
+
+(macro_definition
+  name: (identifier) @macro.name)
 """
 
 # --- Rust Language Setup ---
@@ -59,6 +68,9 @@ class RustSymbolExtractor(TreeSitterExtractor):
             "trait.name": "trait",
             "impl.name": "impl",
             "module.name": "module",
+            "enum.name": "enum",
+            "union.name": "union",
+            "macro.name": "macro",
         }
         
         symbol_kind = kind_map.get(name)
