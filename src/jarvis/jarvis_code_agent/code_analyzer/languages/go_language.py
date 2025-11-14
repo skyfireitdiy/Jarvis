@@ -26,8 +26,10 @@ GO_SYMBOL_QUERY = """
   (type_spec
     name: (type_identifier) @type.name))
 
-(interface_declaration
-  name: (type_identifier) @interface.name)
+(type_declaration
+  (type_spec
+    name: (type_identifier) @interface.name
+    type: (interface_type)))
 """
 
 # --- Go Language Setup ---
