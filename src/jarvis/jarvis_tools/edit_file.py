@@ -112,6 +112,11 @@ class EditFileTool:
                                     "type": "string",
                                     "description": "新内容（对于insert_before、insert_after、replace操作必需，delete操作不需要）",
                                 },
+                                "raw_mode": {
+                                    "type": "boolean",
+                                    "description": "原始模式：false（默认，使用语法单元模式或空白行分组模式）、true（使用行号分组模式，每20行一组）。必须与read_code工具读取时使用的raw_mode参数一致，否则无法找到对应的块id",
+                                    "default": False,
+                                },
                             },
                             "required": ["type", "block_id", "action"],
                         },
@@ -480,19 +485,20 @@ class EditFileTool:
         return (None, patch)
 
     @staticmethod
-    def _find_block_by_id(filepath: str, block_id: str) -> Optional[Dict[str, Any]]:
+    def _find_block_by_id(filepath: str, block_id: str, raw_mode: bool = False) -> Optional[Dict[str, Any]]:
         """根据块id定位代码块
         
         Args:
             filepath: 文件路径
             block_id: 块id
+            raw_mode: 原始模式，False（语法单元或空白行分组）、True（行号分组）
             
         Returns:
             如果找到，返回包含 start_line, end_line, content 的字典；否则返回 None
         """
         try:
             from jarvis.jarvis_code_agent.code_analyzer.structured_code import StructuredCodeExtractor
-            return StructuredCodeExtractor.find_block_by_id(filepath, block_id)
+            return StructuredCodeExtractor.find_block_by_id(filepath, block_id, raw_mode)
         except Exception:
             return None
 
@@ -560,9 +566,19 @@ class EditFileTool:
                     "stderr": f"第 {idx+1} 个diff的content参数必须是字符串",
                 }, None)
         
+        # 验证raw_mode参数
+        raw_mode = diff.get("raw_mode", False)  # 默认为False
+        if not isinstance(raw_mode, bool):
+            return ({
+                "success": False,
+                "stdout": "",
+                "stderr": f"第 {idx+1} 个diff的raw_mode参数必须是布尔值",
+            }, None)
+        
         patch = {
             "STRUCTURED_BLOCK_ID": block_id,
             "STRUCTURED_ACTION": action,
+            "STRUCTURED_RAW_MODE": raw_mode,
         }
         if content is not None:
             patch["STRUCTURED_CONTENT"] = content
@@ -1033,7 +1049,8 @@ class EditFileTool:
         content: str,
         block_id: str,
         action: str,
-        new_content: Optional[str]
+        new_content: Optional[str],
+        raw_mode: bool = False
     ) -> Tuple[bool, str, Optional[str]]:
         """应用结构化编辑
         
@@ -1043,14 +1060,16 @@ class EditFileTool:
             block_id: 块id
             action: 操作类型（delete, insert_before, insert_after, replace）
             new_content: 新内容（对于非delete操作）
+            raw_mode: 原始模式，False（语法单元或空白行分组）、True（行号分组）
             
         Returns:
             (是否成功, 修改后的内容, 错误信息)
         """
         # 定位块
-        block_info = EditFileTool._find_block_by_id(filepath, block_id)
+        block_info = EditFileTool._find_block_by_id(filepath, block_id, raw_mode)
         if not block_info:
-            return (False, content, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
+            mode_desc = "行号分组模式" if raw_mode else "语法单元/空白行分组模式"
+            return (False, content, f"未找到块id: {block_id}（{mode_desc}）。请使用read_code工具查看文件的结构化块id，并确保raw_mode参数与读取时使用的模式一致。")
         
         start_line = block_info['start_line']
         end_line = block_info['end_line']
@@ -1285,9 +1304,10 @@ class EditFileTool:
                     block_id = patch.get("STRUCTURED_BLOCK_ID", "")
                     action = patch.get("STRUCTURED_ACTION", "")
                     new_content = patch.get("STRUCTURED_CONTENT")
+                    raw_mode = patch.get("STRUCTURED_RAW_MODE", False)  # 默认为False
                     try:
                         success, new_modified_content, error_msg = EditFileTool._apply_structured_edit(
-                            abs_path, modified_content, block_id, action, new_content
+                            abs_path, modified_content, block_id, action, new_content, raw_mode
                         )
                         if success:
                             modified_content = new_modified_content

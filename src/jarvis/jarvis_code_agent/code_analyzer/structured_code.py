@@ -487,12 +487,13 @@ class StructuredCodeExtractor:
         }
     
     @staticmethod
-    def find_block_by_id(filepath: str, block_id: str) -> Optional[Dict[str, Any]]:
+    def find_block_by_id(filepath: str, block_id: str, raw_mode: bool = False) -> Optional[Dict[str, Any]]:
         """根据块id定位代码块
         
         Args:
             filepath: 文件路径
             block_id: 块id
+            raw_mode: 原始模式，False（默认，先尝试语法单元，找不到则尝试空白行分组）、True（行号分组模式，每20行一组）
             
         Returns:
             如果找到，返回包含 start_line, end_line, content 的字典；否则返回 None
@@ -508,36 +509,46 @@ class StructuredCodeExtractor:
             
             total_lines = len(content.split('\n'))
             
-            # 提取所有结构化单元
-            # 先尝试提取语法单元
-            syntax_units = StructuredCodeExtractor.extract_syntax_units(abs_path, content, 1, total_lines)
+            if raw_mode:
+                # 行号分组模式（raw_mode=true）
+                line_groups = StructuredCodeExtractor.extract_line_groups(content, 1, total_lines, group_size=20)
+                for group in line_groups:
+                    if group['id'] == block_id:
+                        return {
+                            'start_line': group['start_line'],
+                            'end_line': group['end_line'],
+                            'content': group['content']
+                        }
+            else:
+                # raw_mode=False: 先尝试语法单元和导入单元，如果找不到再尝试空白行分组
+                # 语法单元模式：先尝试提取语法单元和导入单元
+                syntax_units = StructuredCodeExtractor.extract_syntax_units(abs_path, content, 1, total_lines)
+                import_units = StructuredCodeExtractor.extract_imports(abs_path, content, 1, total_lines)
+                
+                # 合并并确保id唯一
+                all_units = import_units + syntax_units
+                all_units = StructuredCodeExtractor.ensure_unique_ids(all_units)
+                
+                # 查找匹配的块
+                for unit in all_units:
+                    if unit['id'] == block_id:
+                        return {
+                            'start_line': unit['start_line'],
+                            'end_line': unit['end_line'],
+                            'content': unit['content']
+                        }
+                
+                # 如果语法单元模式没找到，尝试空白行分组模式
+                blank_line_groups = StructuredCodeExtractor.extract_blank_line_groups(content, 1, total_lines)
+                for group in blank_line_groups:
+                    if group['id'] == block_id:
+                        return {
+                            'start_line': group['start_line'],
+                            'end_line': group['end_line'],
+                            'content': group['content']
+                        }
             
-            # 提取导入单元
-            import_units = StructuredCodeExtractor.extract_imports(abs_path, content, 1, total_lines)
-            
-            # 合并并确保id唯一
-            all_units = import_units + syntax_units
-            all_units = StructuredCodeExtractor.ensure_unique_ids(all_units)
-            
-            # 查找匹配的块
-            for unit in all_units:
-                if unit['id'] == block_id:
-                    return {
-                        'start_line': unit['start_line'],
-                        'end_line': unit['end_line'],
-                        'content': unit['content']
-                    }
-            
-            # 如果没找到，尝试空白行分组
-            blank_line_groups = StructuredCodeExtractor.extract_blank_line_groups(content, 1, total_lines)
-            for group in blank_line_groups:
-                if group['id'] == block_id:
-                    return {
-                        'start_line': group['start_line'],
-                        'end_line': group['end_line'],
-                        'content': group['content']
-                    }
-            
+            # 如果没找到，返回None
             return None
                 
         except Exception:
