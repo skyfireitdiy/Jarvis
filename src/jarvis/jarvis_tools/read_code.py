@@ -145,8 +145,8 @@ class ReadCodeTool:
             # 按行号排序
             filtered_symbols.sort(key=lambda s: s.line_start)
             
-            # 构建语法单元列表
-            units = []
+            # 构建语法单元列表（先收集所有单元信息）
+            units_info = []
             lines = content.split('\n')
             
             for symbol in filtered_symbols:
@@ -166,18 +166,87 @@ class ReadCodeTool:
                     unit_id = symbol.name
                 
                 # 如果id重复，加上行号
-                if any(u['id'] == unit_id for u in units):
+                if any(u['id'] == unit_id for u in units_info):
                     if symbol.parent:
                         unit_id = f"{symbol.parent}.{symbol.name}_{unit_start}"
                     else:
                         unit_id = f"{symbol.name}_{unit_start}"
                 
-                units.append({
+                units_info.append({
                     'id': unit_id,
                     'start_line': unit_start,
                     'end_line': unit_end,
                     'content': symbol_content,
+                    'has_parent': symbol.parent is not None,
                 })
+            
+            # 处理重叠：如果一个单元完全包含另一个单元，父符号排除被子符号覆盖的行
+            # 策略：保留所有符号，但父符号只显示未被子符号覆盖的部分
+            units = []
+            for unit in units_info:
+                # 找出所有被unit包含的子符号
+                child_ranges = []
+                for other in units_info:
+                    if unit == other:
+                        continue
+                    # 检查other是否完全被unit包含（other是unit的子符号）
+                    if (unit['start_line'] <= other['start_line'] and 
+                        unit['end_line'] >= other['end_line']):
+                        # 排除范围完全相同的情况（范围相同时不认为是父子关系）
+                        if not (unit['start_line'] == other['start_line'] and 
+                                unit['end_line'] == other['end_line']):
+                            child_ranges.append((other['start_line'], other['end_line']))
+                
+                # 如果有子符号，需要排除被子符号覆盖的行
+                if child_ranges:
+                    # 合并重叠的子符号范围
+                    child_ranges.sort()
+                    merged_ranges = []
+                    for start, end in child_ranges:
+                        if merged_ranges and start <= merged_ranges[-1][1] + 1:
+                            # 合并重叠或相邻的范围
+                            merged_ranges[-1] = (merged_ranges[-1][0], max(merged_ranges[-1][1], end))
+                        else:
+                            merged_ranges.append((start, end))
+                    
+                    # 提取未被覆盖的行
+                    unit_lines = unit['content'].split('\n')
+                    filtered_lines = []
+                    current_line = unit['start_line']
+                    
+                    for line in unit_lines:
+                        # 检查当前行是否在任何子符号范围内
+                        is_covered = any(start <= current_line <= end for start, end in merged_ranges)
+                        if not is_covered:
+                            filtered_lines.append(line)
+                        current_line += 1
+                    
+                    # 如果还有未被覆盖的行，创建新的单元
+                    if filtered_lines:
+                        filtered_content = '\n'.join(filtered_lines)
+                        # 计算新的结束行号（最后一个未被覆盖的行）
+                        last_line = unit['start_line'] + len(filtered_lines) - 1
+                        # 需要调整，因为跳过了被覆盖的行
+                        # 重新计算：找到最后一个未被覆盖的实际行号
+                        actual_last_line = unit['start_line']
+                        for i, line in enumerate(unit_lines):
+                            line_num = unit['start_line'] + i
+                            is_covered = any(start <= line_num <= end for start, end in merged_ranges)
+                            if not is_covered:
+                                actual_last_line = line_num
+                        
+                        new_unit = {
+                            'id': unit['id'],
+                            'start_line': unit['start_line'],
+                            'end_line': actual_last_line,
+                            'content': filtered_content,
+                        }
+                        units.append(new_unit)
+                    # 如果所有行都被覆盖，跳过父符号
+                else:
+                    # 没有子符号，直接添加
+                    unit.pop('has_parent', None)
+                    units.append(unit)
             
             return units
         except Exception:
@@ -246,10 +315,13 @@ class ReadCodeTool:
         for unit in units:
             # 将 id、start_line、end_line 放在一行，用 [] 包起来
             output_lines.append(f"[id:{unit['id']} start_line:{unit['start_line']} end_line:{unit['end_line']}]")
-            # 添加内容，保持原有缩进
+            # 添加内容，保持原有缩进，并添加行号
             content_lines = unit['content'].split('\n')
+            current_line_num = unit['start_line']
             for line in content_lines:
-                output_lines.append(line)
+                # 行号格式：5位右对齐，后面加冒号
+                output_lines.append(f"{current_line_num:5d}:{line}")
+                current_line_num += 1
             output_lines.append("")  # 单元之间空行分隔
         
         return '\n'.join(output_lines)
@@ -295,13 +367,13 @@ class ReadCodeTool:
                     # 回退到原始格式计算
                     lines = content.split('\n')
                     selected_lines = lines[start_line - 1:end_line]
-                    numbered_content = "".join(f"{i:4d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
+                    numbered_content = "".join(f"{i:5d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
                     return get_context_token_count(numbered_content)
         except Exception:
             # 如果估算失败，使用简单的行号格式估算
             lines = content.split('\n')
             selected_lines = lines[start_line - 1:end_line]
-            numbered_content = "".join(f"{i:4d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
+            numbered_content = "".join(f"{i:5d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
             return get_context_token_count(numbered_content)
     
     def _get_max_token_limit(self, agent: Any = None) -> int:
@@ -981,6 +1053,174 @@ def standalone_func():
             print(f"❌ 嵌套作用域边界测试失败: {result['stderr']}")
     finally:
         os.unlink(nested_file)
+    
+    # 测试8: Java文件（tree-sitter支持）
+    print("\n【测试8】Java文件 - 语法单元提取")
+    print("-" * 80)
+    
+    java_code = """public class Main {
+    public static void main(String[] args) {
+        System.out.println("Hello, World!");
+    }
+    
+    public int add(int a, int b) {
+        return a + b;
+    }
+    
+    private int subtract(int a, int b) {
+        return a - b;
+    }
+}
+
+class Point {
+    private int x;
+    private int y;
+    
+    public Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.java', delete=False) as f:
+        java_file = f.name
+        f.write(java_code)
+    
+    try:
+        result = tool.execute({
+            "files": [{"path": java_file, "start_line": 1, "end_line": -1}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ Java文件读取成功")
+            print("\n输出内容:")
+            print(result["stdout"])
+        else:
+            print(f"❌ Java文件读取失败: {result['stderr']}")
+    finally:
+        os.unlink(java_file)
+    
+    # 测试9: Rust文件（tree-sitter支持）
+    print("\n【测试9】Rust文件 - 语法单元提取")
+    print("-" * 80)
+    
+    rust_code = """fn main() {
+    println!("Hello, World!");
+}
+
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn subtract(a: i32, b: i32) -> i32 {
+    a - b
+}
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn new(x: i32, y: i32) -> Point {
+        Point { x, y }
+    }
+}
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.rs', delete=False) as f:
+        rust_file = f.name
+        f.write(rust_code)
+    
+    try:
+        result = tool.execute({
+            "files": [{"path": rust_file, "start_line": 1, "end_line": -1}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ Rust文件读取成功")
+            print("\n输出内容:")
+            print(result["stdout"])
+        else:
+            print(f"❌ Rust文件读取失败: {result['stderr']}")
+    finally:
+        os.unlink(rust_file)
+    
+    # 测试10: Go文件（tree-sitter支持）
+    print("\n【测试10】Go文件 - 语法单元提取")
+    print("-" * 80)
+    
+    go_code = """package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, World!")
+}
+
+func add(a int, b int) int {
+    return a + b
+}
+
+func subtract(a int, b int) int {
+    return a - b
+}
+
+type Point struct {
+    x int
+    y int
+}
+
+func (p *Point) New(x int, y int) {
+    p.x = x
+    p.y = y
+}
+
+type Color int
+
+const (
+    Red Color = iota
+    Green
+    Blue
+)
+
+type Shape interface {
+    Area() float64
+    Perimeter() float64
+}
+
+type Drawable interface {
+    Draw()
+}
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.go', delete=False) as f:
+        go_file = f.name
+        f.write(go_code)
+    
+    try:
+        result = tool.execute({
+            "files": [{"path": go_file, "start_line": 1, "end_line": -1}],
+            "agent": None
+        })
+        
+        if result["success"]:
+            print("✅ Go文件读取成功")
+            print("\n输出内容:")
+            print(result["stdout"])
+        else:
+            print(f"❌ Go文件读取失败: {result['stderr']}")
+    finally:
+        os.unlink(go_file)
     
     print("\n" + "=" * 80)
     print("测试完成")
