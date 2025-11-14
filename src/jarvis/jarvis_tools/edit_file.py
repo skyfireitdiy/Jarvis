@@ -94,6 +94,30 @@ class EditFileTool:
                             },
                             "required": ["type", "command"],
                         },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["structured"],
+                                    "description": "结构化编辑模式：通过块id进行编辑，支持删除块、在块前插入、在块后插入、替换块",
+                                },
+                                "block_id": {
+                                    "type": "string",
+                                    "description": "要操作的块id（从read_code工具获取的结构化块id）",
+                                },
+                                "action": {
+                                    "type": "string",
+                                    "enum": ["delete", "insert_before", "insert_after", "replace"],
+                                    "description": "操作类型：delete（删除块）、insert_before（在块前插入）、insert_after（在块后插入）、replace（替换块）",
+                                },
+                                "content": {
+                                    "type": "string",
+                                    "description": "新内容（对于insert_before、insert_after、replace操作必需，delete操作不需要）",
+                                },
+                            },
+                            "required": ["type", "block_id", "action"],
+                        },
                     ],
                 },
                 "description": "修改操作列表，每个操作包含一个DIFF块",
@@ -459,6 +483,95 @@ class EditFileTool:
         return (None, patch)
 
     @staticmethod
+    def _find_block_by_id(filepath: str, block_id: str) -> Optional[Dict[str, Any]]:
+        """根据块id定位代码块
+        
+        Args:
+            filepath: 文件路径
+            block_id: 块id
+            
+        Returns:
+            如果找到，返回包含 start_line, end_line, content 的字典；否则返回 None
+        """
+        try:
+            from jarvis.jarvis_code_agent.code_analyzer.structured_code import StructuredCodeExtractor
+            return StructuredCodeExtractor.find_block_by_id(filepath, block_id)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _validate_structured(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
+        """验证并转换structured类型的diff
+        
+        Returns:
+            (错误响应或None, patch字典或None)
+        """
+        block_id = diff.get("block_id")
+        action = diff.get("action")
+        content = diff.get("content")
+        
+        if block_id is None:
+            return ({
+                "success": False,
+                "stdout": "",
+                "stderr": f"第 {idx+1} 个diff缺少block_id参数",
+            }, None)
+        if not isinstance(block_id, str):
+            return ({
+                "success": False,
+                "stdout": "",
+                "stderr": f"第 {idx+1} 个diff的block_id参数必须是字符串",
+            }, None)
+        if not block_id.strip():
+            return ({
+                "success": False,
+                "stdout": "",
+                "stderr": f"第 {idx+1} 个diff的block_id参数不能为空",
+            }, None)
+        
+        if action is None:
+            return ({
+                "success": False,
+                "stdout": "",
+                "stderr": f"第 {idx+1} 个diff缺少action参数",
+            }, None)
+        if not isinstance(action, str):
+            return ({
+                "success": False,
+                "stdout": "",
+                "stderr": f"第 {idx+1} 个diff的action参数必须是字符串",
+            }, None)
+        if action not in ["delete", "insert_before", "insert_after", "replace"]:
+            return ({
+                "success": False,
+                "stdout": "",
+                "stderr": f"第 {idx+1} 个diff的action参数必须是 delete、insert_before、insert_after 或 replace 之一",
+            }, None)
+        
+        # 对于非delete操作，content是必需的
+        if action != "delete":
+            if content is None:
+                return ({
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"第 {idx+1} 个diff的action为 {action}，需要提供content参数",
+                }, None)
+            if not isinstance(content, str):
+                return ({
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"第 {idx+1} 个diff的content参数必须是字符串",
+                }, None)
+        
+        patch = {
+            "STRUCTURED_BLOCK_ID": block_id,
+            "STRUCTURED_ACTION": action,
+        }
+        if content is not None:
+            patch["STRUCTURED_CONTENT"] = content
+        return (None, patch)
+
+    @staticmethod
     def _validate_sed(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
         """验证并转换sed类型的diff
         
@@ -520,13 +633,15 @@ class EditFileTool:
                 error_response, patch = EditFileTool._validate_search_range(diff, idx + 1)
             elif diff_type == "sed":
                 error_response, patch = EditFileTool._validate_sed(diff, idx + 1)
+            elif diff_type == "structured":
+                error_response, patch = EditFileTool._validate_structured(diff, idx + 1)
             else:
                 return ({
                     "success": False,
                     "stdout": "",
                     "stderr": (
                         f"第 {idx+1} 个diff的类型不支持: {diff_type}。"
-                        f"支持的类型: search、search_range、sed"
+                        f"支持的类型: search、search_range、sed、structured"
                     ),
                 }, [])
             
@@ -916,6 +1031,97 @@ class EditFileTool:
         return (True, new_content, None)
 
     @staticmethod
+    def _apply_structured_edit(
+        filepath: str,
+        content: str,
+        block_id: str,
+        action: str,
+        new_content: Optional[str]
+    ) -> Tuple[bool, str, Optional[str]]:
+        """应用结构化编辑
+        
+        Args:
+            filepath: 文件路径
+            content: 文件内容
+            block_id: 块id
+            action: 操作类型（delete, insert_before, insert_after, replace）
+            new_content: 新内容（对于非delete操作）
+            
+        Returns:
+            (是否成功, 修改后的内容, 错误信息)
+        """
+        # 定位块
+        block_info = EditFileTool._find_block_by_id(filepath, block_id)
+        if not block_info:
+            return (False, content, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
+        
+        start_line = block_info['start_line']
+        end_line = block_info['end_line']
+        block_content = block_info['content']
+        
+        lines = content.splitlines(keepends=True)
+        total_lines = len(lines)
+        
+        # 验证行号范围
+        if start_line < 1 or end_line < 1 or start_line > total_lines or end_line > total_lines or start_line > end_line:
+            return (False, content, f"块的行号范围无效: {start_line}-{end_line}（文件总行数: {total_lines}）")
+        
+        # 计算行索引（0-based）
+        # end_line是包含的，所以end_idx应该是end_line（0-based，不包含，即end_line行之后）
+        start_idx = start_line - 1
+        end_idx = end_line  # end_line是包含的，所以end_idx应该是end_line（0-based，不包含）
+        
+        # 根据操作类型执行编辑
+        if action == "delete":
+            # 删除块：移除从start_line到end_line的所有行（包含）
+            new_lines = lines[:start_idx] + lines[end_idx:]
+            result_content = ''.join(new_lines)
+            return (True, result_content, None)
+        
+        elif action == "insert_before":
+            # 在块前插入
+            if new_content is None:
+                return (False, content, "insert_before操作需要提供content参数")
+            # 确保新内容以换行符结尾
+            insert_content = new_content
+            if not insert_content.endswith('\n'):
+                insert_content += '\n'
+            new_lines = lines[:start_idx] + [insert_content] + lines[start_idx:]
+            result_content = ''.join(new_lines)
+            return (True, result_content, None)
+        
+        elif action == "insert_after":
+            # 在块后插入
+            if new_content is None:
+                return (False, content, "insert_after操作需要提供content参数")
+            # 确保新内容以换行符结尾
+            insert_content = new_content
+            if not insert_content.endswith('\n'):
+                insert_content += '\n'
+            new_lines = lines[:end_idx] + [insert_content] + lines[end_idx:]
+            result_content = ''.join(new_lines)
+            return (True, result_content, None)
+        
+        elif action == "replace":
+            # 替换块
+            if new_content is None:
+                return (False, content, "replace操作需要提供content参数")
+            # 保持原有的换行符风格
+            replace_content = new_content
+            # 检查原块最后一行是否有换行符
+            if end_idx > 0 and end_idx <= len(lines):
+                # 原块的最后一行是 lines[end_idx - 1]
+                if lines[end_idx - 1].endswith('\n'):
+                    if not replace_content.endswith('\n'):
+                        replace_content += '\n'
+            new_lines = lines[:start_idx] + [replace_content] + lines[end_idx:]
+            result_content = ''.join(new_lines)
+            return (True, result_content, None)
+        
+        else:
+            return (False, content, f"不支持的操作类型: {action}")
+
+    @staticmethod
     def _format_patch_description(patch: Dict[str, str]) -> str:
         """格式化补丁描述用于错误信息
         
@@ -927,6 +1133,15 @@ class EditFileTool:
         """
         if "SED_COMMAND" in patch:
             return f"sed命令: {patch.get('SED_COMMAND', '')[:100]}..."
+        elif "STRUCTURED_BLOCK_ID" in patch:
+            block_id = patch.get('STRUCTURED_BLOCK_ID', '')
+            action = patch.get('STRUCTURED_ACTION', '')
+            content = patch.get('STRUCTURED_CONTENT', '')
+            if content:
+                content_preview = content[:100] + "..." if len(content) > 100 else content
+                return f"结构化编辑: block_id={block_id}, action={action}, content={content_preview}"
+            else:
+                return f"结构化编辑: block_id={block_id}, action={action}"
         elif "SEARCH" in patch:
             search_text = patch["SEARCH"]
             return search_text[:200] + "..." if len(search_text) > 200 else search_text
@@ -1064,6 +1279,29 @@ class EditFileTool:
                         error_msg = (
                             f"sed命令执行出错: {str(e)}\n"
                             f"命令: {sed_cmd}"
+                        )
+                        failed_patches.append({"patch": patch, "error": error_msg})
+                    continue
+                
+                # 结构化编辑模式
+                if "STRUCTURED_BLOCK_ID" in patch:
+                    block_id = patch.get("STRUCTURED_BLOCK_ID", "")
+                    action = patch.get("STRUCTURED_ACTION", "")
+                    new_content = patch.get("STRUCTURED_CONTENT")
+                    try:
+                        success, new_modified_content, error_msg = EditFileTool._apply_structured_edit(
+                            abs_path, modified_content, block_id, action, new_content
+                        )
+                        if success:
+                            modified_content = new_modified_content
+                            found = True
+                            successful_patches += 1
+                        else:
+                            failed_patches.append({"patch": patch, "error": error_msg})
+                    except Exception as e:
+                        error_msg = (
+                            f"结构化编辑执行出错: {str(e)}\n"
+                            f"block_id: {block_id}, action: {action}"
                         )
                         failed_patches.append({"patch": patch, "error": error_msg})
                     continue
