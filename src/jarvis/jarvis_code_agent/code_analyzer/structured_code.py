@@ -210,7 +210,7 @@ class StructuredCodeExtractor:
                     if filtered_lines:
                         filtered_content = '\n'.join(filtered_lines)
                         # 计算新的结束行号（最后一个未被覆盖的行）
-                        last_line = unit['start_line'] + len(filtered_lines) - 1
+                        unit['start_line'] + len(filtered_lines) - 1
                         # 需要调整，因为跳过了被覆盖的行
                         # 重新计算：找到最后一个未被覆盖的实际行号
                         actual_last_line = unit['start_line']
@@ -473,7 +473,7 @@ class StructuredCodeExtractor:
         content = '\n'.join(item['content'] for item in import_group)
         
         # 生成id：根据导入语句内容生成唯一标识
-        first_line = import_group[0]['content'].strip()
+        import_group[0]['content'].strip()
         if len(import_group) == 1:
             unit_id = f"import_{start_line}"
         else:

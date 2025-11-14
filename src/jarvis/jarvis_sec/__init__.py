@@ -244,7 +244,6 @@ def run_security_analysis(
 
     # 4) 处理验证阶段
     meta_records: List[Dict] = []
-    gid_counts: Dict[int, int] = {}
     all_issues = _process_verification_phase(
         cluster_batches,
         entry_path,

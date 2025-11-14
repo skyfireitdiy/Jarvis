@@ -309,7 +309,7 @@ def process_review_phase(
     reviewed_clusters: List[Dict] = []
     reinstated_candidates: List[Dict] = []  # 重新加入验证的候选
     
-    review_system_prompt = get_review_system_prompt()
+    get_review_system_prompt()
     review_summary_prompt = get_review_summary_prompt()
     
     for review_idx in range(0, len(invalid_clusters_for_review), review_batch_size):
