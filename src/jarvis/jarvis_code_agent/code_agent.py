@@ -101,7 +101,6 @@ class CodeAgent(Agent):
             "save_memory",
             "retrieve_memory",
             "clear_memory",
-            "sub_code_agent",
             "edit_file",
             "rewrite_file",
             "lsp_client",  # LSP客户端工具，用于获取代码补全、悬停等信息
@@ -211,7 +210,6 @@ class CodeAgent(Agent):
 工具使用：
 - 符号分析：lsp_client（基于符号名，无需行列号）
 - 文件编辑：edit_file（部分修改）或 rewrite_file（全文件重写）
-- 大范围变更：使用 sub_code_agent 托管子任务
 
 要点：工具优先验证结论，拒绝臆测；影响最小且可回退；保持项目风格一致。
 </code_engineer_guide>
