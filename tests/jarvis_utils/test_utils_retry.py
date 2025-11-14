@@ -2,8 +2,7 @@
 """jarvis_utils.utils 重试函数单元测试"""
 
 import pytest
-from unittest.mock import patch, MagicMock
-import time
+from unittest.mock import patch
 
 from jarvis.jarvis_utils.utils import while_success, while_true
 

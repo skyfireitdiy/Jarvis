@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
@@ -10,7 +10,6 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 try:
     from jarvis.jarvis_code_agent.code_analyzer.language_support import (
         detect_language,
-        get_symbol_extractor,
         get_dependency_analyzer,
     )
     from jarvis.jarvis_code_agent.code_analyzer.structured_code import StructuredCodeExtractor
@@ -344,7 +343,7 @@ class ReadCodeTool:
             
             # 确定使用的结构化单元（语法单元或行号分组）
             structured_units = None
-            unit_type = None
+            # unit_type = None
             
             if raw_mode:
                 # 原始读取模式：按每20行分组
@@ -356,17 +355,17 @@ class ReadCodeTool:
                 # 按行号排序，所有单元按在文件中的实际位置排序
                 all_units.sort(key=lambda u: u['start_line'])
                 structured_units = all_units
-                unit_type = "line_groups"
+                # unit_type = "line_groups"
                 output = self._format_structured_output(abs_path, structured_units, total_lines)
             else:
                 # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
                 syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
                 
                 # 检测语言类型
-                language = None
+                # language = None
                 if LANGUAGE_SUPPORT_AVAILABLE:
                     try:
-                        language = detect_language(abs_path)
+                        detect_language(abs_path)
                     except Exception:
                         pass
                 
@@ -378,7 +377,7 @@ class ReadCodeTool:
                     # 按行号排序，所有单元按在文件中的实际位置排序
                     all_units.sort(key=lambda u: u['start_line'])
                     structured_units = all_units
-                    unit_type = "syntax_units"
+                    # unit_type = "syntax_units"
                     output = self._format_structured_output(abs_path, structured_units, total_lines)
                 else:
                     # 使用空白行分组结构化输出（不支持语言时，按连续空白行分隔）
@@ -390,7 +389,7 @@ class ReadCodeTool:
                     # 按行号排序，所有单元按在文件中的实际位置排序
                     all_units.sort(key=lambda u: u['start_line'])
                     structured_units = all_units
-                    unit_type = "line_groups"
+                    # unit_type = "line_groups"
                     output = self._format_structured_output(abs_path, structured_units, total_lines)
 
             # 尝试获取并附加上下文信息

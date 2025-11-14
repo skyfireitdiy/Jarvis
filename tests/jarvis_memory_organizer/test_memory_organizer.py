@@ -2,10 +2,8 @@
 """jarvis_memory_organizer.memory_organizer 模块单元测试"""
 
 import pytest
-import tempfile
 import json
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from jarvis.jarvis_memory_organizer.memory_organizer import MemoryOrganizer
 

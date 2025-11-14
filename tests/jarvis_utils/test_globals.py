@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.globals 模块单元测试"""
 
-import pytest
 
 from jarvis.jarvis_utils.globals import make_agent_name, global_agents
 

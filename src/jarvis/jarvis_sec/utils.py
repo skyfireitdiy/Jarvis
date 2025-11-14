@@ -463,7 +463,7 @@ def load_all_issues_from_file(sec_dir: Path) -> List[Dict]:
                     pass
         else:
             try:
-                typer.secho(f"[jarvis-sec] agent_issues.jsonl 不存在，当前运行未发现任何问题", fg=typer.colors.BLUE)
+                typer.secho("[jarvis-sec] agent_issues.jsonl 不存在，当前运行未发现任何问题", fg=typer.colors.BLUE)
             except Exception:
                 pass
     except Exception as e:

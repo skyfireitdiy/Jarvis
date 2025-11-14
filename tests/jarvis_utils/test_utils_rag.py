@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.utils RAG 相关函数单元测试"""
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 from jarvis.jarvis_utils.utils import (

@@ -2,7 +2,6 @@
 """jarvis_rag.cli 模块单元测试"""
 
 import pytest
-import tempfile
 from pathlib import Path
 
 # 检查 RAG 依赖是否安装，如果没有则跳过所有测试

@@ -218,7 +218,7 @@ class SSEMcpClient(McpClient):
                             error_lines.append(f"处理通知时出错 ({method}): {e}")
                     if error_lines:
                         PrettyOutput.print("\n".join(error_lines), OutputType.ERROR)
-        except Exception as e:
+        except Exception:
             PrettyOutput.print(f"无法解析SSE事件: {data}", OutputType.WARNING)
 
     def register_notification_handler(self, method: str, handler: Callable) -> None:

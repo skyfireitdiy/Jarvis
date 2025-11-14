@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.http 模块单元测试"""
 
-import pytest
 from unittest.mock import patch, MagicMock
 import requests
 

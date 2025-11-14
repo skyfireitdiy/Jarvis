@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 """jarvis_platform.registry 模块单元测试"""
 
-import pytest
 from unittest.mock import patch, MagicMock
-from abc import ABC
 
-from jarvis.jarvis_platform.registry import PlatformRegistry, REQUIRED_METHODS
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
 
 

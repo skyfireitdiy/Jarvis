@@ -169,7 +169,6 @@ def run_security_analysis(
     - enable_verification: 是否启用二次验证（默认 True），关闭后分析Agent确认的问题将直接写入报告
     - 断点续扫: 默认开启。会基于 .jarvis/sec/candidates.jsonl、clusters.jsonl 和 analysis.jsonl 文件进行状态恢复。
     """
-    import json
 
     langs = languages or ["c", "cpp", "h", "hpp", "rs"]
 

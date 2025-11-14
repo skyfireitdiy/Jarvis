@@ -4,7 +4,6 @@
 提供项目概况等工具函数。
 """
 
-import os
 import subprocess
 from typing import List, Optional
 

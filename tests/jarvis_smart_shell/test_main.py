@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_smart_shell.main 模块单元测试"""
 
-import pytest
 from unittest.mock import patch
 
 from jarvis.jarvis_smart_shell.main import (

@@ -89,7 +89,7 @@ class TypeScriptSymbolExtractor(TreeSitterExtractor):
 
         # For arrow functions without names, use a generated name
         if name == "arrow.function":
-            symbol_name = f"<anonymous_arrow_function>"
+            symbol_name = "<anonymous_arrow_function>"
         else:
             symbol_name = node.text.decode('utf8')
         

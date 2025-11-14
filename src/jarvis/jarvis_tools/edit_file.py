@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import json
 import os
 import re
 import shutil
@@ -7,15 +6,13 @@ import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.config import get_patch_format
 
 
 class EditFileTool:
     """文件编辑工具，用于对文件进行局部修改"""
 
     name = "edit_file"
-    description = "对文件进行局部修改。支持单点替换（精确匹配）、区间替换（标记之间）、sed命令模式（正则表达式）和结构化编辑（通过块id），可指定行号范围限制。"
+    description = "对文件进行局部修改。支持单点替换（精确匹配）、区间替换（标记之间）、sed命令模式（正则表达式）和结构化编辑（通过块id），可指定行号范围限制。\n\n    💡 推荐使用结构化编辑（structured模式）：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换）\n    3. 避免手动计算行号，减少错误风险"
 
     parameters = {
         "type": "object",
@@ -861,7 +858,7 @@ class EditFileTool:
             ]
             
             if match_details:
-                error_details.append(f"\n匹配位置的上下文:\n" + "\n---\n".join(match_details))
+                error_details.append("\n匹配位置的上下文:\n" + "\n---\n".join(match_details))
                 if cnt > context_count:
                     error_details.append(f"\n... 还有 {cnt - context_count} 个匹配")
             
@@ -874,7 +871,7 @@ class EditFileTool:
                 suggestions.append("2. 使用RANGE参数限制搜索范围到目标位置")
             suggestions.append("3. 使用search_range模式，通过SEARCH_START和SEARCH_END精确定位")
             
-            error_details.append(f"\n建议的修正方法：\n" + "\n".join(suggestions))
+            error_details.append("\n建议的修正方法：\n" + "\n".join(suggestions))
             error_msg = "\n".join(error_details)
             return (False, base_content, error_msg)
         
@@ -947,7 +944,7 @@ class EditFileTool:
         
         # 未找到匹配
         error_msg_parts = [
-            f"未找到唯一匹配的SEARCH。",
+            "未找到唯一匹配的SEARCH。",
             f"搜索内容预览: {repr(search_text[:100])}..."
             if len(search_text) > 100 else f"搜索内容: {repr(search_text)}",
             "",
@@ -1057,7 +1054,7 @@ class EditFileTool:
         
         start_line = block_info['start_line']
         end_line = block_info['end_line']
-        block_content = block_info['content']
+        # block_content = block_info['content']
         
         lines = content.splitlines(keepends=True)
         total_lines = len(lines)

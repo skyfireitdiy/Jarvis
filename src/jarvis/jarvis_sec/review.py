@@ -143,7 +143,7 @@ def process_review_batch(
                 })
     else:
         # 复核结果解析失败，保守策略：重新加入验证流程
-        typer.secho(f"[jarvis-sec] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程", fg=typer.colors.YELLOW)
+        typer.secho("[jarvis-sec] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程", fg=typer.colors.YELLOW)
         for invalid_cluster in review_batch:
             cluster_members = invalid_cluster.get("members", [])
             for member in cluster_members:
@@ -294,7 +294,7 @@ def process_review_phase(
     返回: 更新后的 cluster_batches（包含重新加入验证的候选）
     """
     if not invalid_clusters_for_review:
-        typer.secho(f"[jarvis-sec] 无无效聚类需要复核", fg=typer.colors.BLUE)
+        typer.secho("[jarvis-sec] 无无效聚类需要复核", fg=typer.colors.BLUE)
         return cluster_batches
     
     typer.secho(f"\n[jarvis-sec] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...", fg=typer.colors.MAGENTA)
@@ -369,7 +369,7 @@ def process_review_phase(
     )
     
     if not reinstated_candidates:
-        typer.secho(f"[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效", fg=typer.colors.GREEN)
+        typer.secho("[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效", fg=typer.colors.GREEN)
     
     # 记录复核结果（汇总）
     _progress_append({

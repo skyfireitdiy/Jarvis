@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_git_utils.git_commiter 模块单元测试"""
 
-import pytest
 from unittest.mock import patch, MagicMock
 
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool

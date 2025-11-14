@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """解析模块 - 用于解析Agent返回的JSON格式摘要"""
 
-from typing import Dict, List, Optional
+from typing import List, Optional
 import json5 as json
 
 
