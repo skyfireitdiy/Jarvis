@@ -35,6 +35,7 @@ import typer
 from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 
 
 # 数据文件常量
@@ -44,8 +45,6 @@ SYMBOLS_JSONL = "symbols.jsonl"
 ORDER_JSONL = "translation_order.jsonl"
 PROGRESS_JSON = "progress.json"
 SYMBOL_MAP_JSONL = "symbol_map.jsonl"
-# 兼容旧版：若存在 symbol_map.json 也尝试加载（只读）
-LEGACY_SYMBOL_MAP_JSON = "symbol_map.json"
 
 # 配置常量
 ERROR_SUMMARY_MAX_LENGTH = 2000  # 错误信息摘要最大长度
@@ -191,9 +190,8 @@ class _SymbolMapJsonl:
     - 提供按名称（c_name/c_qname）查询、按源位置判断是否已记录等能力
     """
 
-    def __init__(self, jsonl_path: Path, legacy_json_path: Optional[Path] = None) -> None:
+    def __init__(self, jsonl_path: Path) -> None:
         self.jsonl_path = jsonl_path
-        self.legacy_json_path = legacy_json_path
         self.records: List[Dict[str, Any]] = []
         # 索引：名称 -> 记录列表索引
         self.by_key: Dict[str, List[int]] = {}
@@ -218,25 +216,6 @@ class _SymbolMapJsonl:
                         except Exception:
                             continue
                         self._add_record_in_memory(obj)
-            except Exception:
-                pass
-        # 兼容旧版 symbol_map.json（若存在则读入为“最后一条”）
-        elif self.legacy_json_path and self.legacy_json_path.exists():
-            try:
-                legacy = json.loads(self.legacy_json_path.read_text(encoding="utf-8"))
-                if isinstance(legacy, dict):
-                    for k, v in legacy.items():
-                        rec = {
-                            "c_name": k,
-                            "c_qname": k,
-                            "c_file": "",
-                            "start_line": 0,
-                            "end_line": 0,
-                            "module": v.get("module"),
-                            "rust_symbol": v.get("rust_symbol"),
-                            "updated_at": v.get("updated_at"),
-                        }
-                        self._add_record_in_memory(rec)
             except Exception:
                 pass
 
@@ -471,8 +450,6 @@ class Transpiler:
         self.progress_path = self.data_dir / PROGRESS_JSON
         # JSONL 路径
         self.symbol_map_path = self.data_dir / SYMBOL_MAP_JSONL
-        # 兼容旧版 JSON 字典格式
-        self.legacy_symbol_map_path = self.data_dir / LEGACY_SYMBOL_MAP_JSON
         self.llm_group = llm_group
         self.plan_max_retries = plan_max_retries
         # 兼容旧接口：如果只设置了 max_retries，则同时用于 check 和 test
@@ -496,7 +473,7 @@ class Transpiler:
 
         self.progress: Dict[str, Any] = _read_json(self.progress_path, {"current": None, "converted": []})
         # 使用 JSONL 存储的符号映射
-        self.symbol_map = _SymbolMapJsonl(self.symbol_map_path, legacy_json_path=self.legacy_symbol_map_path)
+        self.symbol_map = _SymbolMapJsonl(self.symbol_map_path)
 
         # 当前函数上下文与Agent复用缓存（按单个函数生命周期）
         self._current_agents: Dict[str, Any] = {}
@@ -511,6 +488,10 @@ class Transpiler:
         # 缓存 compile_commands.json 的解析结果
         self._compile_commands_cache: Optional[List[Dict[str, Any]]] = None
         self._compile_commands_path: Optional[Path] = None
+        # 当前函数开始时的 commit id（用于失败回退）
+        self._current_function_start_commit: Optional[str] = None
+        # 连续修复失败的次数（用于判断是否需要回退）
+        self._consecutive_fix_failures: int = 0
 
     def _find_compile_commands(self) -> Optional[Path]:
         """
@@ -1944,7 +1925,59 @@ class Transpiler:
         # 默认假设为 lib
         return "lib"
 
-    def _cargo_build_loop(self) -> bool:
+    def _get_crate_commit_hash(self) -> Optional[str]:
+        """获取 crate 目录的当前 commit id"""
+        try:
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                commit_hash = get_latest_commit_hash()
+                return commit_hash if commit_hash else None
+            finally:
+                os.chdir(prev_cwd)
+        except Exception:
+            return None
+
+    def _reset_to_commit(self, commit_hash: str) -> bool:
+        """回退 crate 目录到指定的 commit"""
+        try:
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                # 检查是否是 git 仓库
+                result = subprocess.run(
+                    ["git", "rev-parse", "--git-dir"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    # 不是 git 仓库，无法回退
+                    return False
+                
+                # 执行硬重置
+                result = subprocess.run(
+                    ["git", "reset", "--hard", commit_hash],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode == 0:
+                    # 清理未跟踪的文件
+                    subprocess.run(
+                        ["git", "clean", "-fd"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    return True
+                return False
+            finally:
+                os.chdir(prev_cwd)
+        except Exception:
+            return False
+
+    def _cargo_build_loop(self) -> Optional[bool]:
         """在 crate 目录执行构建与测试：先 cargo check，再 cargo test（运行所有测试，不区分项目结构）。失败则最小化修复直到通过或达到上限。"""
         workspace_root = str(self.crate_dir)
         check_limit = f"最大重试: {self.check_max_retries if self.check_max_retries > 0 else '无限'}"
@@ -2018,8 +2051,21 @@ class Transpiler:
                     )
                     if res_verify.returncode == 0:
                         typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                        # 修复成功，重置连续失败计数
+                        self._consecutive_fix_failures = 0
                     else:
                         typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                        # 修复失败，增加连续失败计数
+                        self._consecutive_fix_failures += 1
+                        # 检查是否需要回退
+                        if self._consecutive_fix_failures >= 10 and self._current_function_start_commit:
+                            typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
+                            if self._reset_to_commit(self._current_function_start_commit):
+                                typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
+                                # 返回特殊值，表示需要重新开始
+                                return None  # type: ignore
+                            else:
+                                typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
                 finally:
                     os.chdir(prev_cwd)
                 # 下一轮循环
@@ -2038,6 +2084,8 @@ class Transpiler:
             )
             if res_test.returncode == 0:
                 typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
+                # 测试通过，重置连续失败计数
+                self._consecutive_fix_failures = 0
                 try:
                     cur = self.progress.get("current") or {}
                     metrics = cur.get("metrics") or {}
@@ -2108,8 +2156,21 @@ class Transpiler:
                 )
                 if res_verify.returncode == 0:
                     typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                    # 修复成功，重置连续失败计数
+                    self._consecutive_fix_failures = 0
                 else:
                     typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                    # 修复失败，增加连续失败计数
+                    self._consecutive_fix_failures += 1
+                    # 检查是否需要回退
+                    if self._consecutive_fix_failures >= 10 and self._current_function_start_commit:
+                        typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
+                        if self._reset_to_commit(self._current_function_start_commit):
+                            typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
+                            # 返回特殊值，表示需要重新开始
+                            return None  # type: ignore
+                        else:
+                            typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
             finally:
                 os.chdir(prev_cwd)
             # 重置 check 迭代计数，因为修复后需要重新 check
@@ -2585,26 +2646,66 @@ class Transpiler:
             except Exception:
                 pass
 
-            # 2) 生成实现
-            unresolved = self._untranslated_callee_symbols(rec)
-            typer.secho(f"[c2rust-transpiler][deps] 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
-            typer.secho(f"[c2rust-transpiler][gen] 正在为 {rec.qname or rec.name} 生成 Rust 实现", fg=typer.colors.GREEN)
-            self._codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
-            typer.secho(f"[c2rust-transpiler][gen] 已在 {module} 生成或更新实现", fg=typer.colors.GREEN)
-            # 刷新精简上下文（防止签名/模块调整后提示不同步）
-            try:
-                self._refresh_compact_context(rec, module, rust_sig)
-            except Exception:
-                pass
+            # 在处理函数前，记录当前的 commit id（用于失败回退）
+            self._current_function_start_commit = self._get_crate_commit_hash()
+            if self._current_function_start_commit:
+                typer.secho(f"[c2rust-transpiler][commit] 记录函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.BLUE)
+            else:
+                typer.secho("[c2rust-transpiler][commit] 警告：无法获取 commit id，将无法在失败时回退", fg=typer.colors.YELLOW)
+            
+            # 重置连续失败计数（每个新函数开始时重置）
+            self._consecutive_fix_failures = 0
 
-            # 3) 构建与修复
-            typer.secho("[c2rust-transpiler][build] 开始 cargo 测试循环", fg=typer.colors.MAGENTA)
-            ok = self._cargo_build_loop()
-            typer.secho(f"[c2rust-transpiler][build] 构建结果: {'通过' if ok else '失败'}", fg=typer.colors.MAGENTA)
-            if not ok:
-                typer.secho("[c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。", fg=typer.colors.RED)
-                # 保留当前状态，便于下次 resume
-                return
+            # 使用循环来处理函数，支持失败回退后重新开始
+            function_retry_count = 0
+            max_function_retries = 10  # 最多重新开始10次
+            while function_retry_count <= max_function_retries:
+                if function_retry_count > 0:
+                    typer.secho(f"[c2rust-transpiler][retry] 重新开始处理函数 (第 {function_retry_count} 次重试)", fg=typer.colors.YELLOW)
+                    # 重新记录 commit id（回退后的新 commit）
+                    self._current_function_start_commit = self._get_crate_commit_hash()
+                    if self._current_function_start_commit:
+                        typer.secho(f"[c2rust-transpiler][commit] 重新记录函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.BLUE)
+                    # 重置连续失败计数（重新开始时重置）
+                    self._consecutive_fix_failures = 0
+
+                # 2) 生成实现
+                unresolved = self._untranslated_callee_symbols(rec)
+                typer.secho(f"[c2rust-transpiler][deps] 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
+                typer.secho(f"[c2rust-transpiler][gen] 正在为 {rec.qname or rec.name} 生成 Rust 实现", fg=typer.colors.GREEN)
+                self._codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
+                typer.secho(f"[c2rust-transpiler][gen] 已在 {module} 生成或更新实现", fg=typer.colors.GREEN)
+                # 刷新精简上下文（防止签名/模块调整后提示不同步）
+                try:
+                    self._refresh_compact_context(rec, module, rust_sig)
+                except Exception:
+                    pass
+
+                # 3) 构建与修复
+                typer.secho("[c2rust-transpiler][build] 开始 cargo 测试循环", fg=typer.colors.MAGENTA)
+                ok = self._cargo_build_loop()
+                
+                # 检查是否需要重新开始（回退后）
+                if ok is None:
+                    # 需要重新开始
+                    function_retry_count += 1
+                    if function_retry_count > max_function_retries:
+                        typer.secho(f"[c2rust-transpiler] 函数重新开始次数已达上限({max_function_retries})，停止处理该函数", fg=typer.colors.RED)
+                        # 保留当前状态，便于下次 resume
+                        return
+                    # 重置连续失败计数
+                    self._consecutive_fix_failures = 0
+                    # 继续循环，重新开始处理
+                    continue
+                
+                typer.secho(f"[c2rust-transpiler][build] 构建结果: {'通过' if ok else '失败'}", fg=typer.colors.MAGENTA)
+                if not ok:
+                    typer.secho("[c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。", fg=typer.colors.RED)
+                    # 保留当前状态，便于下次 resume
+                    return
+                
+                # 构建成功，跳出循环继续后续流程
+                break
 
             # 4) 审查与优化（复用 Review Agent）
             typer.secho(f"[c2rust-transpiler][review] 开始代码审查: {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
