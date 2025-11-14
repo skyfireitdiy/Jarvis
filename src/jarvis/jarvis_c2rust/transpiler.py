@@ -1883,6 +1883,7 @@ class Transpiler:
             ])
             if command:
                 base_lines.append(f"执行的命令：{command}")
+                base_lines.append("提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。")
             base_lines.extend([
                 "",
                 "请阅读以下测试失败信息并进行必要修复：",
@@ -1899,6 +1900,7 @@ class Transpiler:
             ])
             if command:
                 base_lines.append(f"执行的命令：{command}")
+                base_lines.append("提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。")
             base_lines.extend([
                 "",
                 "<BUILD_ERROR>",
