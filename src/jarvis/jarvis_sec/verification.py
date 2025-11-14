@@ -656,8 +656,8 @@ def process_verification_phase(
     
     # 从 analysis.jsonl 读取所有已验证的问题
     from jarvis.jarvis_sec.file_manager import get_verified_issue_gids, load_candidates
-    verified_gids = get_verified_issue_gids(sec_dir)
-    candidates = load_candidates(sec_dir)
+    get_verified_issue_gids(sec_dir)
+    load_candidates(sec_dir)
     
     # 构建问题列表（从 analysis.jsonl 的 issues 字段）
     all_issues = []

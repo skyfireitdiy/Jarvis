@@ -1551,7 +1551,7 @@ class CodeAgent(Agent):
             passed_count = sum(1 for _, _, status, _ in file_results if status == "通过")
             failed_count = sum(1 for _, _, status, _ in file_results if status == "失败")
             timeout_count = sum(1 for _, _, status, _ in file_results if status == "超时")
-            skipped_count = sum(1 for _, _, status, _ in file_results if status == "跳过")
+            sum(1 for _, _, status, _ in file_results if status == "跳过")
             
             # 收缩为一行的结果摘要
             summary = f"🔍 静态检查: {total_files}个文件"

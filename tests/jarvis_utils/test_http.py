@@ -59,7 +59,7 @@ class TestPost:
         mock_session.post.return_value = mock_response
         mock_get_session.return_value = mock_session
 
-        result = post("http://example.com", data="test data")
+        post("http://example.com", data="test data")
 
         call_kwargs = mock_session.post.call_args[1]
         assert call_kwargs.get("data") == "test data"
@@ -100,7 +100,7 @@ class TestPut:
         mock_session.put.return_value = mock_response
         mock_get_session.return_value = mock_session
 
-        result = put("http://example.com", data="test data")
+        put("http://example.com", data="test data")
 
         call_kwargs = mock_session.put.call_args[1]
         assert call_kwargs.get("data") == "test data"

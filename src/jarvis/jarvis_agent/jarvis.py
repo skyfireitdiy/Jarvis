@@ -1050,7 +1050,7 @@ def run_cli(
             non_interactive=non_interactive,
             **extra_kwargs,
         )
-        agent = agent_manager.initialize()
+        agent_manager.initialize()
 
         if web:
             try:

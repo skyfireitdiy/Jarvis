@@ -768,7 +768,7 @@ class TreeSitterFallback:
         for symbol in symbols:
             range_info = symbol.get("range", {})
             start = range_info.get("start", {})
-            end = range_info.get("end", {})
+            range_info.get("end", {})
             sym_line = start.get("line", 0)
             if sym_line == line:
                 return {
