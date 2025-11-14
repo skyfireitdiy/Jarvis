@@ -24,10 +24,18 @@ JS_SYMBOL_QUERY = """
 (function_declaration
   name: (identifier) @function.name)
 
+(function_expression
+  name: (identifier) @function.name)
+
+(arrow_function) @arrow.function
+
 (method_definition
   name: (property_identifier) @method.name)
 
 (class_declaration
+  name: (identifier) @class.name)
+
+(class_expression
   name: (identifier) @class.name)
 
 (variable_declaration
@@ -53,6 +61,7 @@ class JavaScriptSymbolExtractor(TreeSitterExtractor):
         """Maps a tree-sitter capture to a Symbol object."""
         kind_map = {
             "function.name": "function",
+            "arrow.function": "function",
             "method.name": "method",
             "class.name": "class",
             "variable.name": "variable",
@@ -62,8 +71,17 @@ class JavaScriptSymbolExtractor(TreeSitterExtractor):
         if not symbol_kind:
             return None
 
+        # For arrow functions without names, use a generated name
+        if name == "arrow.function":
+            symbol_name = f"<anonymous_arrow_function>"
+        else:
+            symbol_name = node.text.decode('utf8')
+        
+        if not symbol_name:
+            return None
+
         return Symbol(
-            name=node.text.decode('utf8'),
+            name=symbol_name,
             kind=symbol_kind,
             file_path=file_path,
             line_start=node.start_point[0] + 1,

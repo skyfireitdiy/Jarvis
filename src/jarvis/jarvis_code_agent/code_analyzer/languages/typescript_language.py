@@ -24,14 +24,31 @@ TS_SYMBOL_QUERY = """
 (function_declaration
   name: (identifier) @function.name)
 
+(function_expression
+  name: (identifier) @function.name)
+
+(arrow_function) @arrow.function
+
 (method_definition
   name: (property_identifier) @method.name)
 
 (class_declaration
   name: (type_identifier) @class.name)
 
+(class_expression
+  name: (type_identifier) @class.name)
+
 (interface_declaration
   name: (type_identifier) @interface.name)
+
+(enum_declaration
+  name: (identifier) @enum.name)
+
+(type_alias_declaration
+  name: (type_identifier) @type.name)
+
+(namespace_declaration
+  name: (identifier) @namespace.name)
 
 (variable_declaration
   (variable_declarator
@@ -56,9 +73,13 @@ class TypeScriptSymbolExtractor(TreeSitterExtractor):
         """Maps a tree-sitter capture to a Symbol object."""
         kind_map = {
             "function.name": "function",
+            "arrow.function": "function",
             "method.name": "method",
             "class.name": "class",
             "interface.name": "interface",
+            "enum.name": "enum",
+            "type.name": "type",
+            "namespace.name": "namespace",
             "variable.name": "variable",
         }
         
@@ -66,8 +87,17 @@ class TypeScriptSymbolExtractor(TreeSitterExtractor):
         if not symbol_kind:
             return None
 
+        # For arrow functions without names, use a generated name
+        if name == "arrow.function":
+            symbol_name = f"<anonymous_arrow_function>"
+        else:
+            symbol_name = node.text.decode('utf8')
+        
+        if not symbol_name:
+            return None
+
         return Symbol(
-            name=node.text.decode('utf8'),
+            name=symbol_name,
             kind=symbol_kind,
             file_path=file_path,
             line_start=node.start_point[0] + 1,

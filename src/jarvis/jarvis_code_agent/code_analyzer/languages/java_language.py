@@ -30,6 +30,12 @@ JAVA_SYMBOL_QUERY = """
 (interface_declaration
   name: (identifier) @interface.name)
 
+(enum_declaration
+  name: (identifier) @enum.name)
+
+(annotation_type_declaration
+  name: (identifier) @annotation.name)
+
 (field_declaration
   (variable_declarator
     name: (identifier) @field.name))
@@ -55,6 +61,8 @@ class JavaSymbolExtractor(TreeSitterExtractor):
             "method.name": "method",
             "class.name": "class",
             "interface.name": "interface",
+            "enum.name": "enum",
+            "annotation.name": "annotation",
             "field.name": "field",
         }
         

@@ -46,6 +46,9 @@ CPP_SYMBOL_QUERY = """
   
 (enum_specifier
   name: (type_identifier) @enum.name)
+
+(namespace_definition
+  name: (identifier)? @namespace.name)
 """
 
 # --- C/C++ Language Setup ---
@@ -108,13 +111,23 @@ class CppSymbolExtractor(TreeSitterExtractor):
             "class.name": "class",
             "union.name": "union",
             "enum.name": "enum",
+            "namespace.name": "namespace",
         }
         symbol_kind = kind_map.get(name)
         if not symbol_kind:
             return None
 
+        # For anonymous namespaces, use a generated name
+        if name == "namespace.name":
+            symbol_name = node.text.decode('utf8') if node.text else "<anonymous_namespace>"
+        else:
+            symbol_name = node.text.decode('utf8')
+        
+        if not symbol_name:
+            return None
+
         return Symbol(
-            name=node.text.decode('utf8'),
+            name=symbol_name,
             kind=symbol_kind,
             file_path=file_path,
             line_start=node.start_point[0] + 1,
