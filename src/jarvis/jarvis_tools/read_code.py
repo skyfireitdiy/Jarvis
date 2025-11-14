@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import file_structured_info
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 尝试导入语言支持模块
@@ -455,16 +453,6 @@ class ReadCodeTool:
                 structured_units = line_groups
                 unit_type = "line_groups"
                 output = self._format_structured_output(abs_path, line_groups, total_lines)
-            
-            # 保存结构化信息到全局变量
-            if structured_units:
-                file_structured_info[abs_path] = {
-                    "units": structured_units,
-                    "unit_type": unit_type,
-                    "total_lines": total_lines,
-                    "language": language,
-                    "read_time": datetime.now().isoformat(),
-                }
 
             # 尝试获取并附加上下文信息
             context_info = self._get_file_context(abs_path, start_line, end_line, agent)
