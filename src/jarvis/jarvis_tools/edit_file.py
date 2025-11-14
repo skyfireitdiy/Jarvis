@@ -12,7 +12,7 @@ class EditFileTool:
     """文件编辑工具，用于对文件进行局部修改"""
 
     name = "edit_file"
-    description = "对文件进行局部修改。支持单点替换（精确匹配）、区间替换（标记之间）、sed命令模式（正则表达式）和结构化编辑（通过块id），可指定行号范围限制。\n\n    💡 推荐使用结构化编辑（structured模式）：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换）\n    3. 避免手动计算行号，减少错误风险"
+    description = "对文件进行局部修改。支持sed命令模式（正则表达式）和结构化编辑（通过块id），可指定行号范围限制。\n\n    💡 推荐使用结构化编辑（structured模式）：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换）\n    3. 避免手动计算行号，减少错误风险"
 
     parameters = {
         "type": "object",
@@ -26,56 +26,6 @@ class EditFileTool:
                 "items": {
                     "type": "object",
                     "oneOf": [
-                        {
-                            "type": "object",
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["search"],
-                                    "description": "单点替换模式：通过搜索文本进行替换",
-                                },
-                                "range": {
-                                    "type": "string",
-                                    "description": "可选的行号范围，格式：start-end（1-based，闭区间）",
-                                },
-                                "search": {
-                                    "type": "string",
-                                    "description": "要搜索的原始代码",
-                                },
-                                "replace": {
-                                    "type": "string",
-                                    "description": "替换后的新代码",
-                                },
-                            },
-                            "required": ["type", "search", "replace"],
-                        },
-                        {
-                            "type": "object",
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["search_range"],
-                                    "description": "区间替换模式：通过起始和结束标记进行替换",
-                                },
-                                "range": {
-                                    "type": "string",
-                                    "description": "可选的行号范围，格式：start-end（1-based，闭区间）",
-                                },
-                                "search_start": {
-                                    "type": "string",
-                                    "description": "起始标记",
-                                },
-                                "search_end": {
-                                    "type": "string",
-                                    "description": "结束标记",
-                                },
-                                "replace": {
-                                    "type": "string",
-                                    "description": "替换内容",
-                                },
-                            },
-                            "required": ["type", "search_start", "search_end", "replace"],
-                        },
                         {
                             "type": "object",
                             "properties": {
@@ -358,133 +308,6 @@ class EditFileTool:
         return None
 
     @staticmethod
-    def _validate_search(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
-        """验证并转换search类型的diff
-        
-        Returns:
-            (错误响应或None, patch字典或None)
-        """
-        search = diff.get("search")
-        replace = diff.get("replace")
-        
-        if search is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少search参数",
-            }, None)
-        if not isinstance(search, str):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的search参数必须是字符串",
-            }, None)
-        if not search.strip():
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": (
-                    f"第 {idx+1} 个diff的search参数为空或只包含空白字符。"
-                    f"search参数不能为空，请提供要搜索的文本。"
-                ),
-            }, None)
-        if replace is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少replace参数",
-            }, None)
-        if not isinstance(replace, str):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的replace参数必须是字符串",
-            }, None)
-        
-        patch = {
-            "SEARCH": search,
-            "REPLACE": replace,
-        }
-        if "range" in diff:
-            patch["RANGE"] = diff["range"]
-        return (None, patch)
-
-    @staticmethod
-    def _validate_search_range(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
-        """验证并转换search_range类型的diff
-        
-        Returns:
-            (错误响应或None, patch字典或None)
-        """
-        search_start = diff.get("search_start")
-        search_end = diff.get("search_end")
-        replace = diff.get("replace")
-        
-        if search_start is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少search_start参数",
-            }, None)
-        if not isinstance(search_start, str):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的search_start参数必须是字符串",
-            }, None)
-        if not search_start.strip():
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": (
-                    f"第 {idx+1} 个diff的search_start参数为空或只包含空白字符。"
-                    f"search_start参数不能为空。"
-                ),
-            }, None)
-        if search_end is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少search_end参数",
-            }, None)
-        if not isinstance(search_end, str):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的search_end参数必须是字符串",
-            }, None)
-        if not search_end.strip():
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": (
-                    f"第 {idx+1} 个diff的search_end参数为空或只包含空白字符。"
-                    f"search_end参数不能为空。"
-                ),
-            }, None)
-        if replace is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少replace参数",
-            }, None)
-        if not isinstance(replace, str):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的replace参数必须是字符串",
-            }, None)
-        
-        patch = {
-            "SEARCH_START": search_start,
-            "SEARCH_END": search_end,
-            "REPLACE": replace,
-        }
-        if "range" in diff:
-            patch["RANGE"] = diff["range"]
-        return (None, patch)
-
-    @staticmethod
     def _find_block_by_id(filepath: str, block_id: str, raw_mode: bool = False) -> Optional[Dict[str, Any]]:
         """根据块id定位代码块
         
@@ -640,11 +463,7 @@ class EditFileTool:
             error_response = None
             patch = None
             
-            if diff_type == "search":
-                error_response, patch = EditFileTool._validate_search(diff, idx + 1)
-            elif diff_type == "search_range":
-                error_response, patch = EditFileTool._validate_search_range(diff, idx + 1)
-            elif diff_type == "sed":
+            if diff_type == "sed":
                 error_response, patch = EditFileTool._validate_sed(diff, idx + 1)
             elif diff_type == "structured":
                 error_response, patch = EditFileTool._validate_structured(diff, idx + 1)
@@ -654,7 +473,7 @@ class EditFileTool:
                     "stdout": "",
                     "stderr": (
                         f"第 {idx+1} 个diff的类型不支持: {diff_type}。"
-                        f"支持的类型: search、search_range、sed、structured"
+                        f"支持的类型: sed、structured"
                     ),
                 }, [])
             
@@ -814,7 +633,7 @@ class EditFileTool:
             error_msg = (
                 f"RANGE行号无效（文件共有{total_lines}行，请求范围: {start_line}-{end_line}）。\n"
                 f"注意：如果这是多个补丁中的后续补丁，前面的补丁可能已经改变了文件行数。\n"
-                f"建议：使用read_code工具重新读取文件获取最新行号，或使用search/search_range模式。"
+                f"建议：使用read_code工具重新读取文件获取最新行号，或使用structured模式。"
             )
             return (False, "", "", "", error_msg)
         
@@ -885,7 +704,7 @@ class EditFileTool:
                 suggestions.append(f"2. 检查RANGE是否正确（当前RANGE: {range_tuple[0]}-{range_tuple[1]}）")
             else:
                 suggestions.append("2. 使用RANGE参数限制搜索范围到目标位置")
-            suggestions.append("3. 使用search_range模式，通过SEARCH_START和SEARCH_END精确定位")
+            suggestions.append("3. 使用structured模式，通过块id进行精确编辑")
             
             error_details.append("\n建议的修正方法：\n" + "\n".join(suggestions))
             error_msg = "\n".join(error_details)
@@ -954,7 +773,7 @@ class EditFileTool:
                     f"SEARCH 在指定范围内出现多次（缩进适配后，缩进: {space_count}空格），"
                     f"要求唯一匹配。匹配次数: {cnt3}，行号: {', '.join(map(str, line_numbers[:10]))}\n"
                     f"注意：缩进适配可能匹配到错误的实例。\n"
-                    f"建议：提供包含正确缩进的SEARCH文本，或使用search_range模式。"
+                    f"建议：提供包含正确缩进的SEARCH文本，或使用structured模式。"
                 )
                 return (False, base_content, error_msg)
         
@@ -967,81 +786,11 @@ class EditFileTool:
             "建议的修正方法：",
             "1. 检查SEARCH文本是否完全匹配文件中的内容（包括缩进、换行符、空格）",
             "2. 使用read_code工具读取文件，确认要修改的内容",
-            "3. 使用search_range模式，通过SEARCH_START和SEARCH_END精确定位",
+            "3. 使用structured模式，通过块id进行精确编辑",
             "4. 使用RANGE参数限制搜索范围",
         ]
         error_msg = "\n".join(error_msg_parts)
         return (False, base_content, error_msg)
-
-    @staticmethod
-    def _apply_search_range_replace(
-        base_content: str,
-        search_start: str,
-        search_end: str,
-        replace_text: str,
-        modified_content: str
-    ) -> Tuple[bool, str, Optional[str]]:
-        """应用search_range替换
-        
-        Args:
-            base_content: 要搜索的内容
-            search_start: 起始标记
-            search_end: 结束标记
-            replace_text: 替换文本
-            modified_content: 完整文件内容（用于获取上下文）
-            
-        Returns:
-            (是否成功, 替换后的base_content, 错误信息)
-        """
-        start_idx = base_content.find(search_start)
-        if start_idx == -1:
-            error_msg = (
-                f"未找到SEARCH_START。"
-                f"搜索内容: {repr(search_start[:50])}..."
-                if len(search_start) > 50 else f"搜索内容: {repr(search_start)}"
-            )
-            return (False, base_content, error_msg)
-        
-        end_idx = base_content.find(search_end, start_idx + len(search_start))
-        if end_idx == -1:
-            start_line = EditFileTool._get_line_number(base_content, start_idx)
-            context = EditFileTool._get_line_context(modified_content, start_line, 2)
-            error_msg = (
-                f"在SEARCH_START之后未找到SEARCH_END。"
-                f"SEARCH_START位置: 第{start_line}行。"
-                f"SEARCH_END内容: {repr(search_end[:50])}..."
-                if len(search_end) > 50 else f"SEARCH_END内容: {repr(search_end)}"
-            )
-            if context:
-                error_msg += f"\nSEARCH_START上下文:\n{context}"
-            return (False, base_content, error_msg)
-        
-        # 将替换范围扩展到整行
-        line_start_idx = base_content.rfind("\n", 0, start_idx) + 1
-        match_end_pos = end_idx + len(search_end)
-        line_end_idx = base_content.find("\n", match_end_pos)
-        
-        if line_end_idx == -1:
-            end_of_range = len(base_content)
-        else:
-            end_of_range = line_end_idx + 1
-        
-        final_replace_text = replace_text
-        original_slice = base_content[line_start_idx:end_of_range]
-        
-        if (
-            final_replace_text
-            and original_slice.endswith("\n")
-            and not final_replace_text.endswith("\n")
-        ):
-            final_replace_text += "\n"
-        
-        new_content = (
-            base_content[:line_start_idx]
-            + final_replace_text
-            + base_content[end_of_range:]
-        )
-        return (True, new_content, None)
 
     @staticmethod
     def _apply_structured_edit(
@@ -1158,14 +907,8 @@ class EditFileTool:
                 return f"结构化编辑: block_id={block_id}, action={action}, content={content_preview}"
             else:
                 return f"结构化编辑: block_id={block_id}, action={action}"
-        elif "SEARCH" in patch:
-            search_text = patch["SEARCH"]
-            return search_text[:200] + "..." if len(search_text) > 200 else search_text
         else:
-            return (
-                f"SEARCH_START: {patch.get('SEARCH_START', '')[:100]}...\n"
-                f"SEARCH_END: {patch.get('SEARCH_END', '')[:100]}..."
-            )
+            return "未知的补丁格式"
 
     @staticmethod
     def _generate_error_summary(
@@ -1244,15 +987,13 @@ class EditFileTool:
 
         该方法直接尝试将补丁应用到目标文件，适用于简单、明确的修改场景。
         特点：
-        1. 直接进行字符串替换，效率高
-        2. 会自动处理缩进问题，尝试匹配不同缩进级别的代码
-        3. 确保搜索文本在文件中唯一匹配
-        4. 如果部分补丁失败，会继续应用剩余补丁，并报告失败信息
-        5. 支持备份和回滚机制
+        1. 支持sed命令模式和结构化编辑模式
+        2. 如果部分补丁失败，会继续应用剩余补丁，并报告失败信息
+        3. 支持备份和回滚机制
 
         Args:
             file_path: 要修改的文件路径，支持绝对路径和相对路径
-            patches: 补丁列表，每个补丁包含search(搜索文本)和replace(替换文本)
+            patches: 补丁列表，每个补丁包含 SED_COMMAND 或 STRUCTURED_BLOCK_ID
 
         Returns:
             Tuple[bool, str]:
@@ -1323,55 +1064,9 @@ class EditFileTool:
                         failed_patches.append({"patch": patch, "error": error_msg})
                     continue
                 
-                # 提取RANGE范围（如果有）
-                range_tuple = EditFileTool._parse_range(str(patch.get("RANGE", "")))
-                success, prefix, base_content, suffix, error_msg = EditFileTool._extract_range_content(
-                    modified_content, range_tuple
-                )
-                if not success:
-                    failed_patches.append({"patch": patch, "error": error_msg})
-                    continue
-                
-                scoped = range_tuple is not None
-                
-                # 单点替换
-                if "SEARCH" in patch:
-                    search_text = patch["SEARCH"]
-                    replace_text = patch["REPLACE"]
-                    success, new_base_content, error_msg = EditFileTool._apply_search_replace(
-                        base_content, search_text, replace_text, range_tuple, modified_content, patch
-                    )
-                    if success:
-                        base_content = new_base_content
-                        found = True
-                    else:
-                        failed_patches.append({"patch": patch, "error": error_msg})
-                
-                # 区间替换
-                elif "SEARCH_START" in patch and "SEARCH_END" in patch:
-                    search_start = patch["SEARCH_START"]
-                    search_end = patch["SEARCH_END"]
-                    replace_text = patch["REPLACE"]
-                    success, new_base_content, error_msg = EditFileTool._apply_search_range_replace(
-                        base_content, search_start, search_end, replace_text, modified_content
-                    )
-                    if success:
-                        base_content = new_base_content
-                        found = True
-                    else:
-                        failed_patches.append({"patch": patch, "error": error_msg})
-                
-                else:
-                    error_msg = "不支持的补丁格式"
-                    failed_patches.append({"patch": patch, "error": error_msg})
-                
-                # 若使用了RANGE，则将局部修改写回整体内容
-                if found:
-                    if scoped:
-                        modified_content = prefix + base_content + suffix
-                    else:
-                        modified_content = base_content
-                    successful_patches += 1
+                # 如果不支持的模式，记录错误
+                error_msg = f"不支持的补丁格式。支持的格式: SED_COMMAND、STRUCTURED_BLOCK_ID"
+                failed_patches.append({"patch": patch, "error": error_msg})
             
             # 如果有失败的补丁，且没有成功的补丁，则不写入文件
             if failed_patches and successful_patches == 0:
