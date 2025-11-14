@@ -53,6 +53,11 @@ DEFAULT_REVIEW_MAX_ITERATIONS = 0  # 审查阶段最大迭代次数（0表示无
 DEFAULT_CHECK_MAX_RETRIES = 0  # cargo check 阶段默认最大重试次数（0表示无限重试）
 DEFAULT_TEST_MAX_RETRIES = 0  # cargo test 阶段默认最大重试次数（0表示无限重试）
 
+# 回退与重试常量
+CONSECUTIVE_FIX_FAILURE_THRESHOLD = 10  # 连续修复失败次数阈值，达到此值将触发回退
+MAX_FUNCTION_RETRIES = 10  # 函数重新开始处理的最大次数
+DEFAULT_PLAN_MAX_RETRIES_ENTRY = 5  # run_transpile 入口函数的 plan_max_retries 默认值
+
 
 @dataclass
 class FnRecord:
@@ -2058,7 +2063,7 @@ class Transpiler:
                         # 修复失败，增加连续失败计数
                         self._consecutive_fix_failures += 1
                         # 检查是否需要回退
-                        if self._consecutive_fix_failures >= 10 and self._current_function_start_commit:
+                        if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
                             typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
                             if self._reset_to_commit(self._current_function_start_commit):
                                 typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
@@ -2163,7 +2168,7 @@ class Transpiler:
                     # 修复失败，增加连续失败计数
                     self._consecutive_fix_failures += 1
                     # 检查是否需要回退
-                    if self._consecutive_fix_failures >= 10 and self._current_function_start_commit:
+                    if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
                         typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
                         if self._reset_to_commit(self._current_function_start_commit):
                             typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
@@ -2658,7 +2663,7 @@ class Transpiler:
 
             # 使用循环来处理函数，支持失败回退后重新开始
             function_retry_count = 0
-            max_function_retries = 10  # 最多重新开始10次
+            max_function_retries = MAX_FUNCTION_RETRIES
             while function_retry_count <= max_function_retries:
                 if function_retry_count > 0:
                     typer.secho(f"[c2rust-transpiler][retry] 重新开始处理函数 (第 {function_retry_count} 次重试)", fg=typer.colors.YELLOW)
@@ -2733,7 +2738,7 @@ def run_transpile(
     project_root: Union[str, Path] = ".",
     crate_dir: Optional[Union[str, Path]] = None,
     llm_group: Optional[str] = None,
-    plan_max_retries: int = 5,
+    plan_max_retries: int = DEFAULT_PLAN_MAX_RETRIES_ENTRY,
     max_retries: int = 0,  # 兼容旧接口
     check_max_retries: Optional[int] = None,
     test_max_retries: Optional[int] = None,
