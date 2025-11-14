@@ -20,15 +20,14 @@ Jarvis 安全分析套件
 """
 
 from typing import Dict, List, Optional
-import json
 
 import typer
 
-from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_agent import Agent  # noqa: F401
 from jarvis.jarvis_sec.workflow import direct_scan, run_with_agent
 
-# 导入模块化后的函数
-from jarvis.jarvis_sec.prompts import (
+# 导入模块化后的函数（用于触发模块加载）
+from jarvis.jarvis_sec.prompts import (  # noqa: F401
     build_summary_prompt as _build_summary_prompt,
     build_verification_summary_prompt as _build_verification_summary_prompt,
     get_review_system_prompt as _get_review_system_prompt,
@@ -36,11 +35,11 @@ from jarvis.jarvis_sec.prompts import (
     get_cluster_system_prompt as _get_cluster_system_prompt,
     get_cluster_summary_prompt as _get_cluster_summary_prompt,
 )
-from jarvis.jarvis_sec.parsers import (
+from jarvis.jarvis_sec.parsers import (  # noqa: F401
     parse_clusters_from_text as _parse_clusters_from_text,
     try_parse_summary_report as _try_parse_summary_report,
 )
-from jarvis.jarvis_sec.utils import (
+from jarvis.jarvis_sec.utils import (  # noqa: F401
     git_restore_if_dirty as _git_restore_if_dirty,
     get_sec_dir as _get_sec_dir,
     initialize_analysis_context as _initialize_analysis_context,
@@ -55,13 +54,13 @@ from jarvis.jarvis_sec.utils import (
     load_all_issues_from_file as _load_all_issues_from_file,
     load_processed_gids_from_agent_issues as _load_processed_gids_from_agent_issues,
 )
-from jarvis.jarvis_sec.agents import (
+from jarvis.jarvis_sec.agents import (  # noqa: F401
     subscribe_summary_event as _subscribe_summary_event,
     create_analysis_agent as _create_analysis_agent,
     create_review_agent as _create_review_agent,
     create_cluster_agent as _create_cluster_agent,
 )
-from jarvis.jarvis_sec.clustering import (
+from jarvis.jarvis_sec.clustering import (  # noqa: F401
     load_existing_clusters as _load_existing_clusters,
     restore_clusters_from_checkpoint as _restore_clusters_from_checkpoint,
     create_cluster_snapshot_writer as _create_cluster_snapshot_writer,
@@ -93,7 +92,7 @@ from jarvis.jarvis_sec.clustering import (
     fallback_to_file_based_batches as _fallback_to_file_based_batches,
     process_clustering_phase as _process_clustering_phase,
 )
-from jarvis.jarvis_sec.review import (
+from jarvis.jarvis_sec.review import (  # noqa: F401
     build_review_task as _build_review_task,
     process_review_batch_items as _process_review_batch_items,
     reinstated_candidates_to_cluster_batches as _reinstated_candidates_to_cluster_batches,
@@ -103,14 +102,14 @@ from jarvis.jarvis_sec.review import (
     run_review_agent_with_retry as _run_review_agent_with_retry,
     is_valid_review_item as _is_valid_review_item,
 )
-from jarvis.jarvis_sec.analysis import (
+from jarvis.jarvis_sec.analysis import (  # noqa: F401
     build_analysis_task_context as _build_analysis_task_context,
     build_validation_error_guidance as _build_validation_error_guidance,
     run_analysis_agent_with_retry as _run_analysis_agent_with_retry,
     expand_and_filter_analysis_results as _expand_and_filter_analysis_results,
     valid_items as _valid_items,
 )
-from jarvis.jarvis_sec.verification import (
+from jarvis.jarvis_sec.verification import (  # noqa: F401
     build_gid_to_verification_mapping as _build_gid_to_verification_mapping,
     merge_verified_items as _merge_verified_items,
     merge_verified_items_without_verification as _merge_verified_items_without_verification,
