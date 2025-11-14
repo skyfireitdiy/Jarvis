@@ -219,8 +219,6 @@ class 工具名称:
 </methodology_requirements>
 {output_requirements}
 </task_analysis>"""
-    
-    return prompt
 
 
 # 为了向后兼容，保留原来的常量（使用默认参数，假设有 save_memory 工具）

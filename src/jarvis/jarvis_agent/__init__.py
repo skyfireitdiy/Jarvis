@@ -29,7 +29,7 @@ from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
 from jarvis.jarvis_agent.prompts import (
     DEFAULT_SUMMARY_PROMPT,
     SUMMARY_REQUEST_PROMPT,
-    TASK_ANALYSIS_PROMPT,
+    TASK_ANALYSIS_PROMPT,  # noqa: F401
 )
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent.prompt_manager import PromptManager

@@ -12,37 +12,37 @@ __all__ = ['PythonLanguageSupport']
 
 # 尝试导入tree-sitter相关的语言支持
 try:
-    from .rust_language import RustLanguageSupport
+    from .rust_language import RustLanguageSupport  # noqa: F401
     __all__.append('RustLanguageSupport')
 except (ImportError, RuntimeError):
     pass
 
 try:
-    from .go_language import GoLanguageSupport
+    from .go_language import GoLanguageSupport  # noqa: F401
     __all__.append('GoLanguageSupport')
 except (ImportError, RuntimeError):
     pass
 
 try:
-    from .c_cpp_language import CLanguageSupport, CppLanguageSupport
+    from .c_cpp_language import CLanguageSupport, CppLanguageSupport  # noqa: F401
     __all__.extend(['CLanguageSupport', 'CppLanguageSupport'])
 except (ImportError, RuntimeError):
     pass
 
 try:
-    from .javascript_language import JavaScriptLanguageSupport
+    from .javascript_language import JavaScriptLanguageSupport  # noqa: F401
     __all__.append('JavaScriptLanguageSupport')
 except (ImportError, RuntimeError):
     pass
 
 try:
-    from .typescript_language import TypeScriptLanguageSupport
+    from .typescript_language import TypeScriptLanguageSupport  # noqa: F401
     __all__.append('TypeScriptLanguageSupport')
 except (ImportError, RuntimeError):
     pass
 
 try:
-    from .java_language import JavaLanguageSupport
+    from .java_language import JavaLanguageSupport  # noqa: F401
     __all__.append('JavaLanguageSupport')
 except (ImportError, RuntimeError):
     pass

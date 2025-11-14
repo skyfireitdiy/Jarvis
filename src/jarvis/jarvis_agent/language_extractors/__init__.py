@@ -4,8 +4,6 @@
 This module automatically registers all language extractors.
 """
 
-from typing import Optional, Any
-
 # Import all language extractors to trigger registration
 try:
     from .python_extractor import register_python_extractor
