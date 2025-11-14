@@ -1766,7 +1766,7 @@ class Transpiler:
             c_code = ""
         return curr, sym_name, src_loc, c_code
 
-    def _build_repair_prompt(self, stage: str, output: str, tags: List[str], sym_name: str, src_loc: str, c_code: str, curr: Dict[str, Any], symbols_path: str, include_output_patch_hint: bool = False) -> str:
+    def _build_repair_prompt(self, stage: str, output: str, tags: List[str], sym_name: str, src_loc: str, c_code: str, curr: Dict[str, Any], symbols_path: str, include_output_patch_hint: bool = False, command: Optional[str] = None) -> str:
         """
         构建修复提示词。
         
@@ -1780,6 +1780,7 @@ class Transpiler:
             curr: 当前进度信息
             symbols_path: 符号表文件路径
             include_output_patch_hint: 是否包含"仅输出补丁"提示（test阶段需要）
+            command: 执行的命令（可选）
         """
         base_lines = [
             f"目标：以最小的改动修复问题，使 `{stage}` 命令可以通过。",
@@ -1879,6 +1880,11 @@ class Transpiler:
                 "- 如果看到编译错误，说明代码存在语法或类型错误",
                 "- 请仔细阅读失败信息，包括：测试用例名称、断言失败位置、期望值与实际值、堆栈跟踪等",
                 "",
+            ])
+            if command:
+                base_lines.append(f"执行的命令：{command}")
+            base_lines.extend([
+                "",
                 "请阅读以下测试失败信息并进行必要修复：",
                 "<TEST_FAILURE>",
                 output,
@@ -1890,6 +1896,11 @@ class Transpiler:
             base_lines.extend([
                 "",
                 "请阅读以下构建错误并进行必要修复：",
+            ])
+            if command:
+                base_lines.append(f"执行的命令：{command}")
+            base_lines.extend([
+                "",
                 "<BUILD_ERROR>",
                 output,
                 "</BUILD_ERROR>",
@@ -2040,6 +2051,7 @@ class Transpiler:
                     curr=curr,
                     symbols_path=symbols_path,
                     include_output_patch_hint=False,
+                    command="cargo check -q",
                 )
                 prev_cwd = os.getcwd()
                 try:
@@ -2145,6 +2157,7 @@ class Transpiler:
                 curr=curr,
                 symbols_path=symbols_path,
                 include_output_patch_hint=True,
+                command="cargo test -- --nocapture",
             )
             prev_cwd = os.getcwd()
             try:
