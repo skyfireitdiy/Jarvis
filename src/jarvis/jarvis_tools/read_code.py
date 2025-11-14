@@ -24,12 +24,9 @@ except ImportError:
 class ReadCodeTool:
     name = "read_code"
     description = (
-        "结构化读取源代码文件，支持按语法单元或行号分组读取。"
-        "对于支持 tree-sitter 的语言（Python、C/C++、Rust、Go、JavaScript、TypeScript、Java等），"
-        "会按语法单元（函数、类、方法等）结构化读取，每个单元包含 id（体现作用域）、start_line、end_line 和完整内容。"
-        "对于不支持的语言，会按 20 行一组进行分组读取。"
-        "会自动返回与请求范围有重叠的所有语法单元（包括边界上的），并返回完整的语法单元内容。"
-        "适用于代码分析、审查和编辑定位。"
+        "结构化读取源代码文件。"
+        "支持的语言按语法单元（函数、类等）读取；不支持的语言按空白行分组；"
+        "raw_mode=true 时按每20行分组读取。"
     )
     # 工具标签
     parameters = {
@@ -43,10 +40,11 @@ class ReadCodeTool:
                         "path": {"type": "string"},
                         "start_line": {"type": "number", "default": 1},
                         "end_line": {"type": "number", "default": -1},
+                        "raw_mode": {"type": "boolean", "default": False},
                     },
                     "required": ["path"],
                 },
-                "description": "要读取的文件列表，每个文件可指定行号范围（start_line 到 end_line，-1 表示文件末尾）",
+                "description": "要读取的文件列表，每个文件可指定行号范围（start_line 到 end_line，-1 表示文件末尾）。raw_mode为true时按每20行分组读取（原始模式）。",
             }
         },
         "required": ["files"],
@@ -533,7 +531,7 @@ class ReadCodeTool:
         return '\n'.join(output_lines)
     
     def _estimate_structured_tokens(
-        self, filepath: str, content: str, start_line: int, end_line: int, total_lines: int
+        self, filepath: str, content: str, start_line: int, end_line: int, total_lines: int, raw_mode: bool = False
     ) -> int:
         """估算结构化输出的token数
         
@@ -548,26 +546,9 @@ class ReadCodeTool:
             估算的token数
         """
         try:
-            # 尝试提取语法单元
-            syntax_units = self._extract_syntax_units(filepath, content, start_line, end_line)
-            
-            if syntax_units:
-                # 使用语法单元结构化输出格式计算token
-                import_units = self._extract_imports(filepath, content, start_line, end_line)
-                all_units = import_units + syntax_units[:1]
-                # 确保id唯一
-                all_units = self._ensure_unique_ids(all_units)
-                # 按行号排序
-                all_units.sort(key=lambda u: u['start_line'])
-                sample_output = self._format_structured_output(filepath, all_units, total_lines)
-                if len(syntax_units) > 1:
-                    unit_tokens = get_context_token_count(sample_output)
-                    return unit_tokens * len(syntax_units)
-                else:
-                    return get_context_token_count(sample_output)
-            else:
-                # 使用空白行分组格式计算token（不支持语言时）
-                line_groups = self._extract_blank_line_groups(content, start_line, end_line)
+            if raw_mode:
+                # 原始模式：按每20行分组计算token
+                line_groups = self._extract_line_groups(content, start_line, end_line, group_size=20)
                 if line_groups:
                     import_units = self._extract_imports(filepath, content, start_line, end_line)
                     all_units = import_units + line_groups[:1]
@@ -581,12 +562,46 @@ class ReadCodeTool:
                         return group_tokens * len(line_groups)
                     else:
                         return get_context_token_count(sample_output)
+            else:
+                # 尝试提取语法单元
+                syntax_units = self._extract_syntax_units(filepath, content, start_line, end_line)
+                
+                if syntax_units:
+                    # 使用语法单元结构化输出格式计算token
+                    import_units = self._extract_imports(filepath, content, start_line, end_line)
+                    all_units = import_units + syntax_units[:1]
+                    # 确保id唯一
+                    all_units = self._ensure_unique_ids(all_units)
+                    # 按行号排序
+                    all_units.sort(key=lambda u: u['start_line'])
+                    sample_output = self._format_structured_output(filepath, all_units, total_lines)
+                    if len(syntax_units) > 1:
+                        unit_tokens = get_context_token_count(sample_output)
+                        return unit_tokens * len(syntax_units)
+                    else:
+                        return get_context_token_count(sample_output)
                 else:
-                    # 回退到原始格式计算
-                    lines = content.split('\n')
-                    selected_lines = lines[start_line - 1:end_line]
-                    numbered_content = "".join(f"{i:5d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
-                    return get_context_token_count(numbered_content)
+                    # 使用空白行分组格式计算token（不支持语言时）
+                    line_groups = self._extract_blank_line_groups(content, start_line, end_line)
+                    if line_groups:
+                        import_units = self._extract_imports(filepath, content, start_line, end_line)
+                        all_units = import_units + line_groups[:1]
+                        # 确保id唯一
+                        all_units = self._ensure_unique_ids(all_units)
+                        # 按行号排序
+                        all_units.sort(key=lambda u: u['start_line'])
+                        sample_output = self._format_structured_output(filepath, all_units, total_lines)
+                        if len(line_groups) > 1:
+                            group_tokens = get_context_token_count(sample_output)
+                            return group_tokens * len(line_groups)
+                        else:
+                            return get_context_token_count(sample_output)
+                    else:
+                        # 回退到原始格式计算
+                        lines = content.split('\n')
+                        selected_lines = lines[start_line - 1:end_line]
+                        numbered_content = "".join(f"{i:5d}:{line}\n" for i, line in enumerate(selected_lines, start=start_line))
+                        return get_context_token_count(numbered_content)
         except Exception:
             # 如果估算失败，使用简单的行号格式估算
             lines = content.split('\n')
@@ -618,7 +633,7 @@ class ReadCodeTool:
             return 21333
 
     def _handle_single_file(
-        self, filepath: str, start_line: int = 1, end_line: int = -1, agent: Any = None
+        self, filepath: str, start_line: int = 1, end_line: int = -1, agent: Any = None, raw_mode: bool = False
     ) -> Dict[str, Any]:
         """处理单个文件的读取操作
 
@@ -698,7 +713,7 @@ class ReadCodeTool:
                 selected_content_lines.append(lines[i])
             
             # 估算结构化输出的token数
-            content_tokens = self._estimate_structured_tokens(abs_path, full_content, start_line, end_line, total_lines)
+            content_tokens = self._estimate_structured_tokens(abs_path, full_content, start_line, end_line, total_lines, raw_mode)
             
             max_token_limit = self._get_max_token_limit(agent)
             
@@ -718,36 +733,16 @@ class ReadCodeTool:
                     ),
                 }
 
-            # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
-            syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
-            
-            # 检测语言类型
-            language = None
-            if LANGUAGE_SUPPORT_AVAILABLE:
-                try:
-                    language = detect_language(abs_path)
-                except Exception:
-                    pass
-            
             # 提取导入/包含语句作为结构化单元
             import_units = self._extract_imports(abs_path, full_content, start_line, end_line)
             
             # 确定使用的结构化单元（语法单元或行号分组）
             structured_units = None
             unit_type = None
-            if syntax_units:
-                # 合并导入单元和语法单元
-                all_units = import_units + syntax_units
-                # 确保id唯一
-                all_units = self._ensure_unique_ids(all_units)
-                # 按行号排序，所有单元按在文件中的实际位置排序
-                all_units.sort(key=lambda u: u['start_line'])
-                structured_units = all_units
-                unit_type = "syntax_units"
-                output = self._format_structured_output(abs_path, structured_units, total_lines)
-            else:
-                # 使用空白行分组结构化输出（不支持语言时，按连续空白行分隔）
-                line_groups = self._extract_blank_line_groups(full_content, start_line, end_line)
+            
+            if raw_mode:
+                # 原始读取模式：按每20行分组
+                line_groups = self._extract_line_groups(full_content, start_line, end_line, group_size=20)
                 # 合并导入单元和行号分组
                 all_units = import_units + line_groups
                 # 确保id唯一
@@ -757,6 +752,40 @@ class ReadCodeTool:
                 structured_units = all_units
                 unit_type = "line_groups"
                 output = self._format_structured_output(abs_path, structured_units, total_lines)
+            else:
+                # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
+                syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
+                
+                # 检测语言类型
+                language = None
+                if LANGUAGE_SUPPORT_AVAILABLE:
+                    try:
+                        language = detect_language(abs_path)
+                    except Exception:
+                        pass
+                
+                if syntax_units:
+                    # 合并导入单元和语法单元
+                    all_units = import_units + syntax_units
+                    # 确保id唯一
+                    all_units = self._ensure_unique_ids(all_units)
+                    # 按行号排序，所有单元按在文件中的实际位置排序
+                    all_units.sort(key=lambda u: u['start_line'])
+                    structured_units = all_units
+                    unit_type = "syntax_units"
+                    output = self._format_structured_output(abs_path, structured_units, total_lines)
+                else:
+                    # 使用空白行分组结构化输出（不支持语言时，按连续空白行分隔）
+                    line_groups = self._extract_blank_line_groups(full_content, start_line, end_line)
+                    # 合并导入单元和行号分组
+                    all_units = import_units + line_groups
+                    # 确保id唯一
+                    all_units = self._ensure_unique_ids(all_units)
+                    # 按行号排序，所有单元按在文件中的实际位置排序
+                    all_units.sort(key=lambda u: u['start_line'])
+                    structured_units = all_units
+                    unit_type = "line_groups"
+                    output = self._format_structured_output(abs_path, structured_units, total_lines)
 
             # 尝试获取并附加上下文信息
             context_info = self._get_file_context(abs_path, start_line, end_line, agent)
@@ -943,8 +972,9 @@ class ReadCodeTool:
                             file_content = f.read()
                         
                         # 估算结构化输出的token数
+                        raw_mode = file_info.get("raw_mode", False)
                         content_tokens = self._estimate_structured_tokens(
-                            abs_path, file_content, actual_start_line, actual_end_line, total_lines
+                            abs_path, file_content, actual_start_line, actual_end_line, total_lines, raw_mode
                         )
                         
                         file_read_info.append({
@@ -992,6 +1022,7 @@ class ReadCodeTool:
                     file_info.get("start_line", 1),
                     file_info.get("end_line", -1),
                     agent,
+                    file_info.get("raw_mode", False),
                 )
 
                 if result["success"]:
