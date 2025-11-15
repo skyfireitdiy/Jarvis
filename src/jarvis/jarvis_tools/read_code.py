@@ -138,7 +138,7 @@ class ReadCodeTool:
         return {}
     
     def _format_structured_output(
-        self, filepath: str, units: List[Dict[str, Any]], total_lines: int
+        self, filepath: str, units: List[Dict[str, Any]], total_lines: int, agent: Any = None
     ) -> str:
         """格式化结构化输出
         
@@ -146,6 +146,7 @@ class ReadCodeTool:
             filepath: 文件路径
             units: 语法单元或行号分组列表（已包含导入语句单元）
             total_lines: 文件总行数
+            agent: Agent实例，用于从缓存中获取block_id
             
         Returns:
             格式化后的输出字符串
@@ -160,9 +161,43 @@ class ReadCodeTool:
             "",
         ]
         
-        # 为每个单元分配block-id
+        # 从缓存中获取block_id映射（如果可用）
+        block_id_map = {}
+        if agent:
+            cache_info = self._get_file_cache(agent, filepath)
+            if cache_info and "id_list" in cache_info and "blocks" in cache_info:
+                # 根据content匹配，找到对应的block_id
+                blocks = cache_info.get("blocks", {})
+                for unit in units:
+                    unit_content = unit.get('content', '').strip()
+                    if not unit_content:
+                        continue
+                    # 为每个unit查找匹配的block（精确匹配或包含匹配）
+                    for block_id, block_data in blocks.items():
+                        block_content = block_data.get("content", "").strip()
+                        if not block_content:
+                            continue
+                        # 精确匹配或unit的content是block的content的子串
+                        if unit_content == block_content:
+                            block_id_map[id(unit)] = block_id
+                            break
+                        elif unit_content in block_content:
+                            # unit的content是block的content的子串，也匹配
+                            block_id_map[id(unit)] = block_id
+                            break
+                        elif block_content in unit_content:
+                            # block的content是unit的content的子串，也匹配
+                            block_id_map[id(unit)] = block_id
+                            break
+        
+        # 为每个单元分配block-id（优先使用缓存中的id）
         for idx, unit in enumerate(units, start=1):
-            block_id = f"block-{idx}"
+            # 优先使用缓存中的block_id，否则使用临时生成的id
+            unit_id = id(unit)
+            if unit_id in block_id_map:
+                block_id = block_id_map[unit_id]
+            else:
+                block_id = f"block-{idx}"
             # 显示id
             output_lines.append(f"[id:{block_id}]")
             # 添加内容，保持原有缩进
@@ -329,7 +364,12 @@ class ReadCodeTool:
         
         # 转换为 id_list 和 blocks 格式
         id_list = [unit["id"] for unit in result_units]
-        blocks = {unit["id"]: {"content": unit["content"]} for unit in result_units}
+        blocks = {
+            unit["id"]: {
+                "content": unit["content"],
+            }
+            for unit in result_units
+        }
         return {
             "id_list": id_list,
             "blocks": blocks,
@@ -718,7 +758,7 @@ class ReadCodeTool:
                 # 按行号排序，所有单元按在文件中的实际位置排序
                 all_units.sort(key=lambda u: u['start_line'])
                 structured_units = all_units
-                output = self._format_structured_output(abs_path, structured_units, total_lines)
+                output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
             else:
                 # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
                 syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
@@ -731,7 +771,7 @@ class ReadCodeTool:
                     # 按行号排序，所有单元按在文件中的实际位置排序
                     all_units.sort(key=lambda u: u['start_line'])
                     structured_units = all_units
-                    output = self._format_structured_output(abs_path, structured_units, total_lines)
+                    output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
                 else:
                     # 使用空白行分组结构化输出（不支持语言时）
                     # 先按空行分割，然后对超过20行的块再按每20行分割
@@ -743,7 +783,7 @@ class ReadCodeTool:
                     # 按行号排序，所有单元按在文件中的实际位置排序
                     all_units.sort(key=lambda u: u['start_line'])
                     structured_units = all_units
-                    output = self._format_structured_output(abs_path, structured_units, total_lines)
+                    output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
 
             # 尝试获取并附加上下文信息
             context_info = self._get_file_context(abs_path, start_line, end_line, agent)
