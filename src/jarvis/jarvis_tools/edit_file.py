@@ -137,8 +137,12 @@ class EditFileTool:
             if cached_mtime is None or abs(current_mtime - cached_mtime) > 0.1:  # 允许0.1秒的误差
                 return False
             
-            # 检查缓存数据结构是否完整
-            if "units" not in cache_info or "total_lines" not in cache_info:
+            # 检查缓存数据结构是否完整（支持新旧两种格式）
+            # 新格式：id_list 和 blocks
+            # 旧格式：units（向后兼容）
+            has_new_format = "id_list" in cache_info and "blocks" in cache_info
+            has_old_format = "units" in cache_info
+            if not (has_new_format or has_old_format) or "total_lines" not in cache_info:
                 return False
             
             return True
@@ -154,19 +158,31 @@ class EditFileTool:
             block_id: 块id
             
         Returns:
-            如果找到，返回包含 start_line, end_line, content 的字典；否则返回 None
+            如果找到，返回包含 content 的字典；否则返回 None
         """
-        if not cache_info or "units" not in cache_info:
+        if not cache_info:
             return None
         
-        units = cache_info["units"]
-        for unit in units:
-            if unit.get("id") == block_id:
+        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
+        if "id_list" in cache_info and "blocks" in cache_info:
+            # 新格式：直接从 blocks 字典中查找
+            blocks = cache_info.get("blocks", {})
+            block = blocks.get(block_id)
+            if block:
                 return {
-                    "start_line": unit.get("start_line"),
-                    "end_line": unit.get("end_line"),
-                    "content": unit.get("content", ""),
+                    "content": block.get("content", ""),
                 }
+        elif "units" in cache_info:
+            # 旧格式：向后兼容
+            units = cache_info["units"]
+            for unit in units:
+                if unit.get("id") == block_id:
+                    return {
+                        "start_line": unit.get("start_line"),
+                        "end_line": unit.get("end_line"),
+                        "content": unit.get("content", ""),
+                    }
+        
         return None
 
     @staticmethod
@@ -412,29 +428,42 @@ class EditFileTool:
         Returns:
             恢复的文件内容字符串（与原始文件内容完全一致）
         """
-        if not cache_info or "units" not in cache_info:
+        if not cache_info:
             return ""
         
-        units = cache_info["units"]
+        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
+        if "id_list" in cache_info and "blocks" in cache_info:
+            # 新格式：按照 id_list 的顺序恢复
+            id_list = cache_info.get("id_list", [])
+            blocks = cache_info.get("blocks", {})
             
-        if not units:
-            return ""
+            result = []
+            for block_id in id_list:
+                block = blocks.get(block_id)
+                if block:
+                    content = block.get('content', '')
+                    if content:
+                        result.append(content)
+            
+            return ''.join(result) if result else ""
+        elif "units" in cache_info:
+            # 旧格式：向后兼容
+            units = cache_info["units"]
+            if not units:
+                return ""
+            
+            # 按id排序单元（id是任意字符串，直接按字符串排序）
+            sorted_units = sorted(units, key=lambda u: str(u.get('id', '')))
+            
+            result = []
+            for unit in sorted_units:
+                content = unit.get('content', '')
+                if content:
+                    result.append(content)
+            
+            return ''.join(result) if result else ""
         
-        # 按id排序单元（id是序号字符串，需要转换为整数排序）
-        sorted_units = sorted(units, key=lambda u: int(u.get('id', 0)) if str(u.get('id', '0')).isdigit() else 0)
-        
-        # 直接拼接所有块的内容，不做额外处理
-        # 每个块的content应该已经包含了完整的原始内容（包括换行符）
-        # 这样直接拼接就能恢复原始文件内容
-        result = []
-        for unit in sorted_units:
-            content = unit.get('content', '')
-            if content:
-                result.append(content)
-        
-        # 直接拼接，不添加额外的换行符
-        # 如果块的content已经包含了所有必要的换行符，直接拼接即可
-        return ''.join(result) if result else ""
+        return ""
 
     @staticmethod
     def _apply_structured_edit_to_cache(
@@ -447,65 +476,104 @@ class EditFileTool:
         
         Args:
             cache_info: 缓存信息字典（会被修改）
-            block_id: 块id（序号格式，如 "1", "2", "3"）
+            block_id: 块id（字符串，从read_code工具获取）
             action: 操作类型（delete, insert_before, insert_after, replace）
             new_content: 新内容（对于非delete操作）
             
         Returns:
             (是否成功, 错误信息)
         """
-        if not cache_info or "units" not in cache_info:
+        if not cache_info:
             return (False, "缓存信息不完整")
         
-        units = cache_info["units"]
-        
-        # 查找块（通过序号id）
-        block = None
-        for unit in units:
-            if str(unit.get("id")) == str(block_id):
-                block = unit
-                break
-        
-        if block is None:
-            return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
-        
-        # 根据操作类型执行编辑
-        if action == "delete":
-            # 删除块：将当前块的内容清空
-            block['content'] = ""
-            return (True, None)
-        
-        elif action == "insert_before":
-            # 在块前插入：在当前块的内容前面插入文本
-            if new_content is None:
-                return (False, "insert_before操作需要提供content参数")
+        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
+        if "id_list" in cache_info and "blocks" in cache_info:
+            # 新格式：从 blocks 字典中查找
+            blocks = cache_info.get("blocks", {})
+            block = blocks.get(block_id)
             
-            # 在当前块的内容前面插入新内容
-            current_content = block.get('content', '')
-            block['content'] = new_content + current_content
-            return (True, None)
-        
-        elif action == "insert_after":
-            # 在块后插入：在当前块的内容后面插入文本
-            if new_content is None:
-                return (False, "insert_after操作需要提供content参数")
+            if block is None:
+                return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
             
-            # 在当前块的内容后面插入新内容
-            current_content = block.get('content', '')
-            block['content'] = current_content + new_content
-            return (True, None)
-        
-        elif action == "replace":
-            # 替换块
-            if new_content is None:
-                return (False, "replace操作需要提供content参数")
+            # 根据操作类型执行编辑
+            if action == "delete":
+                # 删除块：将当前块的内容清空
+                block['content'] = ""
+                return (True, None)
             
-            # 更新块内容
-            block['content'] = new_content
-            return (True, None)
+            elif action == "insert_before":
+                # 在块前插入：在当前块的内容前面插入文本
+                if new_content is None:
+                    return (False, "insert_before操作需要提供content参数")
+                
+                current_content = block.get('content', '')
+                block['content'] = new_content + current_content
+                return (True, None)
+            
+            elif action == "insert_after":
+                # 在块后插入：在当前块的内容后面插入文本
+                if new_content is None:
+                    return (False, "insert_after操作需要提供content参数")
+                
+                current_content = block.get('content', '')
+                block['content'] = current_content + new_content
+                return (True, None)
+            
+            elif action == "replace":
+                # 替换块
+                if new_content is None:
+                    return (False, "replace操作需要提供content参数")
+                
+                block['content'] = new_content
+                return (True, None)
+            
+            else:
+                return (False, f"不支持的操作类型: {action}")
         
-        else:
-            return (False, f"不支持的操作类型: {action}")
+        elif "units" in cache_info:
+            # 旧格式：向后兼容
+            units = cache_info["units"]
+            
+            # 查找块（直接字符串匹配id）
+            block = None
+            for unit in units:
+                unit_id = str(unit.get("id", ""))
+                if unit_id == str(block_id):
+                    block = unit
+                    break
+            
+            if block is None:
+                return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
+            
+            # 根据操作类型执行编辑
+            if action == "delete":
+                block['content'] = ""
+                return (True, None)
+            
+            elif action == "insert_before":
+                if new_content is None:
+                    return (False, "insert_before操作需要提供content参数")
+                current_content = block.get('content', '')
+                block['content'] = new_content + current_content
+                return (True, None)
+            
+            elif action == "insert_after":
+                if new_content is None:
+                    return (False, "insert_after操作需要提供content参数")
+                current_content = block.get('content', '')
+                block['content'] = current_content + new_content
+                return (True, None)
+            
+            elif action == "replace":
+                if new_content is None:
+                    return (False, "replace操作需要提供content参数")
+                block['content'] = new_content
+                return (True, None)
+            
+            else:
+                return (False, f"不支持的操作类型: {action}")
+        
+        return (False, "缓存格式不支持")
 
     @staticmethod
     def _format_patch_description(patch: Dict[str, str]) -> str:
@@ -634,13 +702,27 @@ class EditFileTool:
                 )
                 return False, error_msg
             
-            # 创建缓存副本，避免直接修改原缓存
-            cache_copy = {
-                "units": [unit.copy() for unit in cache_info["units"]],
-                "total_lines": cache_info["total_lines"],
-                "read_time": cache_info.get("read_time", time.time()),
-                "file_mtime": cache_info.get("file_mtime", 0),
-            }
+            # 创建缓存副本，避免直接修改原缓存（支持新旧两种格式）
+            if "id_list" in cache_info and "blocks" in cache_info:
+                # 新格式：深拷贝 id_list 和 blocks
+                cache_copy = {
+                    "id_list": list(cache_info["id_list"]),  # 浅拷贝列表
+                    "blocks": {k: v.copy() for k, v in cache_info["blocks"].items()},  # 深拷贝字典
+                    "total_lines": cache_info["total_lines"],
+                    "read_time": cache_info.get("read_time", time.time()),
+                    "file_mtime": cache_info.get("file_mtime", 0),
+                }
+            elif "units" in cache_info:
+                # 旧格式：向后兼容
+                cache_copy = {
+                    "units": [unit.copy() for unit in cache_info["units"]],
+                    "total_lines": cache_info["total_lines"],
+                    "read_time": cache_info.get("read_time", time.time()),
+                    "file_mtime": cache_info.get("file_mtime", 0),
+                }
+            else:
+                error_msg = "缓存格式不支持"
+                return False, error_msg
             
             # 创建备份
             if os.path.exists(abs_path):
