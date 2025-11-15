@@ -305,12 +305,12 @@ def run(
     root_list_file: Optional[Path] = typer.Option(
         None,
         "--root-list-file",
-        help="兼容占位：run 会使用 collect 的 --out 作为 lib-replace 的输入；当提供 --files 时本参数将被忽略；未提供 --files 时，本命令要求使用 --root-list-syms",
+        help="lib-replace 的根列表文件（按行列出，忽略空行与以#开头的注释）。可与 --root-list-syms 同时使用，会合并去重",
     ),
     root_list_syms: Optional[str] = typer.Option(
         None,
         "--root-list-syms",
-        help="lib-replace 的根列表内联（逗号分隔）。未提供 --files 时该参数为必填",
+        help="lib-replace 的根列表内联（逗号分隔）。可与 --root-list-file 同时使用，会合并去重",
     ),
     disabled_libs: Optional[str] = typer.Option(
         None,
@@ -334,10 +334,10 @@ def run(
 
     约束:
     
-    - collect 的输出文件就是 lib-replace 的输入文件；
-      当提供 --files 时，lib-replace 将固定读取 --out（或默认值）作为根列表文件，忽略 --root-list-file
+    - collect 的输出文件作为 lib-replace 的基础根列表来源；
+      当提供 --files 时，lib-replace 会读取 --out（或默认值）作为基础，并可同时合并 --root-list-file 和 --root-list-syms
 
-    - 未提供 --files 时，必须通过 --root-list-syms 提供根列表
+    - 未提供 --files 时，必须通过 --root-list-file 或 --root-list-syms 提供根列表（至少一种，可同时使用，会合并去重）
 
     - scan 始终执行以确保数据完整
 
@@ -379,7 +379,7 @@ def run(
         root_names: List[str] = []
 
         if files:
-            # 约束：collect 的输出文件作为唯一文件来源
+            # 约束：collect 的输出文件作为基础来源
             if not roots_path or not roots_path.exists():
                 typer.secho("[c2rust-run] lib-replace: 未找到 collect 输出文件，无法继续", fg=typer.colors.RED, err=True)
                 raise typer.Exit(code=2)
@@ -390,16 +390,38 @@ def run(
             except Exception as _e:
                 typer.secho(f"[c2rust-run] lib-replace: 读取根列表失败: {roots_path}: {_e}", fg=typer.colors.RED, err=True)
                 raise
-            # 兼容参数提示
+            # 如果提供了 --root-list-file，也合并进来
             if root_list_file is not None:
-                typer.secho("[c2rust-run] 提示: --root-list-file 已被忽略（run 会固定使用 collect 的 --out 作为输入）", fg=typer.colors.YELLOW)
+                try:
+                    txt = root_list_file.read_text(encoding="utf-8")
+                    root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
+                    typer.secho(f"[c2rust-run] lib-replace: 合并根列表文件: {root_list_file}", fg=typer.colors.BLUE)
+                except Exception as _e:
+                    typer.secho(f"[c2rust-run] lib-replace: 读取根列表文件失败: {root_list_file}: {_e}", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(code=1)
+            # 如果提供了 --root-list-syms，也合并进来
+            if isinstance(root_list_syms, str) and root_list_syms.strip():
+                parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
+                root_names.extend(parts)
+                typer.secho(f"[c2rust-run] lib-replace: 合并内联根列表: {len(parts)} 个符号", fg=typer.colors.BLUE)
         else:
-            # 约束：未传递 files 必须提供 --root-list-syms
-            if not (isinstance(root_list_syms, str) and root_list_syms.strip()):
-                typer.secho("[c2rust-run] 错误：未提供 --files 时，必须通过 --root-list-syms 指定根列表（逗号分隔）", fg=typer.colors.RED, err=True)
+            # 未传递 files 时，从 --root-list-file 和/或 --root-list-syms 获取
+            # 文件来源
+            if root_list_file is not None:
+                try:
+                    txt = root_list_file.read_text(encoding="utf-8")
+                    root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
+                except Exception as _e:
+                    typer.secho(f"[c2rust-run] lib-replace: 读取根列表失败: {root_list_file}: {_e}", fg=typer.colors.RED, err=True)
+                    raise typer.Exit(code=1)
+            # 内联来源
+            if isinstance(root_list_syms, str) and root_list_syms.strip():
+                parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
+                root_names.extend(parts)
+            # 至少需要提供一种来源
+            if not root_names:
+                typer.secho("[c2rust-run] 错误：未提供 --files 时，必须通过 --root-list-file 或 --root-list-syms 指定根列表", fg=typer.colors.RED, err=True)
                 raise typer.Exit(code=2)
-            parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
-            root_names.extend(parts)
 
         # 去重并校验（允许为空时回退为自动根集）
         try:
