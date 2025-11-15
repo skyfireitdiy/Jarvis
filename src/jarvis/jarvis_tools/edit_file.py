@@ -1,18 +1,17 @@
 # -*- coding: utf-8 -*-
 import os
-import re
 import shutil
-import subprocess
+import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class EditFileTool:
-    """文件编辑工具，用于对文件进行局部修改"""
+    """文件编辑工具，用于对文件进行结构化编辑"""
 
     name = "edit_file"
-    description = "对文件进行局部修改。支持sed命令模式（正则表达式）和结构化编辑（通过块id），可指定行号范围限制。\n\n    💡 推荐使用结构化编辑（structured模式）：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换）\n    3. 避免手动计算行号，减少错误风险"
+    description = "对文件进行结构化编辑（通过块id）。\n\n    💡 使用步骤：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换）\n    3. 避免手动计算行号，减少错误风险"
 
     parameters = {
         "type": "object",
@@ -24,24 +23,6 @@ class EditFileTool:
             "diffs": {
                 "type": "array",
                 "items": {
-                    "type": "object",
-                    "oneOf": [
-                        {
-                            "type": "object",
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["sed"],
-                                    "description": "sed命令模式：使用类sed命令进行编辑，支持正则表达式替换、删除、追加、插入等",
-                                },
-                                "command": {
-                                    "type": "string",
-                                    "description": "sed命令，支持：s/pattern/replacement/flags（替换）、d（删除）、a\\text（追加）、i\\text（插入）、c\\text（替换整行）。可指定行号范围，如：10,20s/old/new/g 或 /pattern/s/old/new/",
-                                },
-                            },
-                            "required": ["type", "command"],
-                        },
-                        {
                             "type": "object",
                             "properties": {
                                 "type": {
@@ -62,17 +43,10 @@ class EditFileTool:
                                     "type": "string",
                                     "description": "新内容（对于insert_before、insert_after、replace操作必需，delete操作不需要）",
                                 },
-                                "raw_mode": {
-                                    "type": "boolean",
-                                    "description": "原始模式：false（默认，使用语法单元模式或空白行分组模式）、true（使用行号分组模式，每20行一组）。必须与read_code工具读取时使用的raw_mode参数一致，否则无法找到对应的块id",
-                                    "default": False,
-                                },
                             },
                             "required": ["type", "block_id", "action"],
                         },
-                    ],
-                },
-                "description": "修改操作列表，每个操作包含一个DIFF块",
+                "description": "修改操作列表，每个操作包含一个结构化编辑块",
             },
         },
         "required": ["file_path", "diffs"],
@@ -82,202 +56,11 @@ class EditFileTool:
         """初始化文件编辑工具"""
         pass
 
-    @staticmethod
-    def _parse_range(range_str: str) -> Optional[Tuple[int, int]]:
-        """解析RANGE字符串为行号范围
-        
-        Args:
-            range_str: 格式为 "start-end" 的字符串（1-based, 闭区间）
-            
-        Returns:
-            如果格式有效，返回 (start_line, end_line) 元组；否则返回 None
-        """
-        if not range_str or not str(range_str).strip():
-            return None
-        m = re.match(r"\s*(\d+)\s*-\s*(\d+)\s*$", str(range_str))
-        if m:
-            return int(m.group(1)), int(m.group(2))
-        return None
-
-    @staticmethod
-    def _count_occurrences(haystack: str, needle: str) -> int:
-        """统计字符串出现次数"""
-        if not needle:
-            return 0
-        return haystack.count(needle)
-
-    @staticmethod
-    def _find_all_with_count(haystack: str, needle: str) -> Tuple[int, List[int]]:
-        """一次遍历同时返回匹配次数和所有位置
-        
-        Args:
-            haystack: 目标字符串
-            needle: 搜索字符串
-            
-        Returns:
-            (匹配次数, 所有匹配位置的索引列表)
-        """
-        if not needle:
-            return 0, []
-        count = 0
-        positions = []
-        start = 0
-        while True:
-            pos = haystack.find(needle, start)
-            if pos == -1:
-                break
-            count += 1
-            positions.append(pos)
-            start = pos + 1
-        return count, positions
-
-    @staticmethod
-    def _find_all_positions(haystack: str, needle: str) -> List[int]:
-        """查找所有匹配位置
-        
-        Args:
-            haystack: 目标字符串
-            needle: 搜索字符串
-            
-        Returns:
-            所有匹配位置的索引列表
-        """
-        if not needle:
-            return []
-        positions = []
-        start = 0
-        while True:
-            pos = haystack.find(needle, start)
-            if pos == -1:
-                break
-            positions.append(pos)
-            start = pos + 1
-        return positions
-
-    @staticmethod
-    def _get_line_number(content: str, position: int) -> int:
-        """获取字符位置对应的行号（1-based）"""
-        return content[:position].count("\n") + 1
-
-    @staticmethod
-    def _get_line_context(content: str, line_num: int, context_lines: int = 2) -> str:
-        """获取指定行号周围的上下文
-        
-        Args:
-            content: 文件内容
-            line_num: 行号（1-based）
-            context_lines: 上下各显示的行数
-            
-        Returns:
-            包含上下文的多行字符串
-        """
-        lines = content.splitlines()
-        if line_num < 1 or line_num > len(lines):
-            return ""
-        start = max(0, line_num - context_lines - 1)
-        end = min(len(lines), line_num + context_lines)
-        context = []
-        for i in range(start, end):
-            prefix = ">>> " if i == line_num - 1 else "    "
-            context.append(f"{prefix}{i+1:4d}: {lines[i]}")
-        return "\n".join(context)
-
-    @staticmethod
-    def _detect_indent_style(content: str, search_text: str) -> Optional[int]:
-        """检测文件中的缩进风格
-        
-        Args:
-            content: 文件内容
-            search_text: 要匹配的搜索文本（用于定位上下文）
-            
-        Returns:
-            检测到的缩进空格数，如果无法检测则返回 None
-        """
-        # 尝试在文件中找到搜索文本的上下文
-        pos = content.find(search_text)
-        if pos == -1:
-            return None
-        
-        # 获取匹配位置所在行的缩进
-        line_start = content.rfind("\n", 0, pos) + 1
-        line_content = content[line_start:pos]
-        
-        # 计算前导空格数
-        indent = 0
-        for char in line_content:
-            if char == " ":
-                indent += 1
-            elif char == "\t":
-                # 制表符通常等于4个空格
-                indent += 4
-            else:
-                break
-        
-        return indent if indent > 0 else None
-
-    @staticmethod
-    def _apply_indent(text: str, indent_spaces: int) -> str:
-        """为文本应用缩进
-        
-        Args:
-            text: 原始文本
-            indent_spaces: 缩进空格数
-            
-        Returns:
-            应用缩进后的文本
-        """
-        lines = text.split("\n")
-        indented_lines = []
-        for line in lines:
-            if line.strip():  # 非空行添加缩进
-                indented_lines.append(" " * indent_spaces + line)
-            else:  # 空行保持原样
-                indented_lines.append(line)
-        return "\n".join(indented_lines)
-
-    @staticmethod
-    def _execute_sed_command(content: str, sed_cmd: str) -> str:
-        """使用系统sed命令执行编辑
-        
-        Args:
-            content: 文件内容
-            sed_cmd: sed命令字符串（如 "s/old/new/g" 或 "10,20d"）
-            
-        Returns:
-            执行sed命令后的内容
-            
-        Raises:
-            ValueError: 如果sed命令执行失败
-        """
-        try:
-            # 直接使用subprocess执行sed命令，通过stdin传递内容
-            result = subprocess.run(
-                ['sed', '-e', sed_cmd],
-                input=content,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                check=False,
-                timeout=30  # 30秒超时
-            )
-            
-            if result.returncode != 0:
-                error_msg = result.stderr.strip() if result.stderr else "sed命令执行失败"
-                raise ValueError(f"sed命令执行失败: {error_msg}")
-            
-            return result.stdout
-            
-        except FileNotFoundError:
-            raise ValueError("系统中未找到sed命令，请确保已安装sed")
-        except subprocess.TimeoutExpired:
-            raise ValueError("sed命令执行超时（超过30秒）")
-        except Exception as e:
-            raise ValueError(f"sed命令执行出错: {str(e)}")
 
     @staticmethod
     def _validate_basic_args(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """验证基本参数
-        
+            
         Returns:
             如果验证失败，返回错误响应；否则返回None
         """
@@ -308,22 +91,109 @@ class EditFileTool:
         return None
 
     @staticmethod
-    def _find_block_by_id(filepath: str, block_id: str, raw_mode: bool = False) -> Optional[Dict[str, Any]]:
-        """根据块id定位代码块
+    def _get_file_cache(agent: Any, filepath: str) -> Optional[Dict[str, Any]]:
+        """获取文件的缓存信息
         
         Args:
+            agent: Agent实例
             filepath: 文件路径
+            
+        Returns:
+            缓存信息字典，如果不存在则返回None
+        """
+        if not agent:
+            return None
+        
+        cache = agent.get_user_data("read_code_cache")
+        if not cache:
+            return None
+        
+        abs_path = os.path.abspath(filepath)
+        return cache.get(abs_path)
+
+    @staticmethod
+    def _is_cache_valid(cache_info: Optional[Dict[str, Any]], filepath: str) -> bool:
+        """检查缓存是否有效
+        
+        Args:
+            cache_info: 缓存信息字典
+            filepath: 文件路径
+            
+        Returns:
+            True表示缓存有效，False表示缓存无效
+        """
+        if not cache_info:
+            return False
+        
+        try:
+            # 检查文件是否存在
+            if not os.path.exists(filepath):
+                return False
+            
+            # 检查文件修改时间是否变化
+            current_mtime = os.path.getmtime(filepath)
+            cached_mtime = cache_info.get("file_mtime")
+            
+            if cached_mtime is None or abs(current_mtime - cached_mtime) > 0.1:  # 允许0.1秒的误差
+                return False
+            
+            # 检查缓存数据结构是否完整
+            if "units" not in cache_info or "total_lines" not in cache_info:
+                return False
+            
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
+    def _find_block_by_id_in_cache(cache_info: Dict[str, Any], block_id: str) -> Optional[Dict[str, Any]]:
+        """从缓存中根据块id定位代码块
+        
+        Args:
+            cache_info: 缓存信息字典
             block_id: 块id
-            raw_mode: 原始模式，False（语法单元或空白行分组）、True（行号分组）
             
         Returns:
             如果找到，返回包含 start_line, end_line, content 的字典；否则返回 None
         """
-        try:
-            from jarvis.jarvis_code_agent.code_analyzer.structured_code import StructuredCodeExtractor
-            return StructuredCodeExtractor.find_block_by_id(filepath, block_id, raw_mode)
-        except Exception:
+        if not cache_info or "units" not in cache_info:
             return None
+        
+        units = cache_info["units"]
+        for unit in units:
+            if unit.get("id") == block_id:
+                return {
+                    "start_line": unit.get("start_line"),
+                    "end_line": unit.get("end_line"),
+                    "content": unit.get("content", ""),
+                }
+        return None
+
+    @staticmethod
+    def _update_cache_timestamp(agent: Any, filepath: str) -> None:
+        """更新缓存的时间戳
+        
+        Args:
+            agent: Agent实例
+            filepath: 文件路径
+        """
+        if not agent:
+            return
+        
+        cache = agent.get_user_data("read_code_cache")
+        if not cache:
+            return
+        
+        abs_path = os.path.abspath(filepath)
+        if abs_path in cache:
+            cache[abs_path]["read_time"] = time.time()
+            # 更新文件修改时间
+            try:
+                if os.path.exists(abs_path):
+                    cache[abs_path]["file_mtime"] = os.path.getmtime(abs_path)
+            except Exception:
+                pass
+            agent.set_user_data("read_code_cache", cache)
 
     @staticmethod
     def _validate_structured(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
@@ -387,61 +257,16 @@ class EditFileTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"第 {idx+1} 个diff的content参数必须是字符串",
-                }, None)
-        
-        # 验证raw_mode参数
-        raw_mode = diff.get("raw_mode", False)  # 默认为False
-        if not isinstance(raw_mode, bool):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的raw_mode参数必须是布尔值",
             }, None)
         
         patch = {
             "STRUCTURED_BLOCK_ID": block_id,
             "STRUCTURED_ACTION": action,
-            "STRUCTURED_RAW_MODE": raw_mode,
         }
         if content is not None:
             patch["STRUCTURED_CONTENT"] = content
         return (None, patch)
 
-    @staticmethod
-    def _validate_sed(diff: Dict[str, Any], idx: int) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, str]]]:
-        """验证并转换sed类型的diff
-        
-        Returns:
-            (错误响应或None, patch字典或None)
-        """
-        command = diff.get("command")
-        
-        if command is None:
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff缺少command参数",
-            }, None)
-        if not isinstance(command, str):
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的command参数必须是字符串",
-            }, None)
-        if not command.strip():
-            return ({
-                "success": False,
-                "stdout": "",
-                "stderr": (
-                    f"第 {idx+1} 个diff的command参数为空或只包含空白字符。"
-                    f"command参数不能为空。"
-                ),
-            }, None)
-        
-        patch = {
-            "SED_COMMAND": command,
-        }
-        return (None, patch)
 
     @staticmethod
     def _convert_diffs_to_patches(diffs: List[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, str]]]:
@@ -463,9 +288,7 @@ class EditFileTool:
             error_response = None
             patch = None
             
-            if diff_type == "sed":
-                error_response, patch = EditFileTool._validate_sed(diff, idx + 1)
-            elif diff_type == "structured":
+            if diff_type == "structured":
                 error_response, patch = EditFileTool._validate_structured(diff, idx + 1)
             else:
                 return ({
@@ -473,7 +296,7 @@ class EditFileTool:
                     "stdout": "",
                     "stderr": (
                         f"第 {idx+1} 个diff的类型不支持: {diff_type}。"
-                        f"支持的类型: sed、structured"
+                        f"支持的类型: structured"
                     ),
                 }, [])
             
@@ -509,8 +332,11 @@ class EditFileTool:
             except Exception:
                 pass
 
+            # 获取 agent
+            agent = args.get("agent", None)
+
             # 执行编辑
-            success, result = self._fast_edit(file_path, patches)
+            success, result = self._fast_edit(file_path, patches, agent)
 
             if success:
                 return {
@@ -560,331 +386,126 @@ class EditFileTool:
 
     @staticmethod
     def _order_patches_by_range(patches: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """按行号范围对补丁进行排序（从后往前，避免行号变化影响）
+        """按顺序返回补丁列表
+        
+        注意：对于结构化编辑，由于需要在实际应用时才能获取块的行号范围，
+        这里暂时按原始顺序返回。如果需要优化，可以在应用时动态排序。
         
         Args:
             patches: 补丁列表
             
         Returns:
-            排序后的补丁列表
+            补丁列表（当前按原始顺序返回）
         """
-        sed_items: List[Tuple[int, int, int, Dict[str, str]]] = []
-        range_items: List[Tuple[int, int, int, Dict[str, str]]] = []
-        non_range_items: List[Tuple[int, Dict[str, str]]] = []
-        
-        for idx, p in enumerate(patches):
-            if "SED_COMMAND" in p:
-                # sed命令补丁：尝试从命令中提取行号范围（简单匹配）
-                sed_cmd = p.get("SED_COMMAND", "")
-                range_match = re.match(r'^(\d+)(?:,(\d+))?', sed_cmd)
-                if range_match:
-                    start_line = int(range_match.group(1))
-                    end_line = int(range_match.group(2)) if range_match.group(2) else start_line
-                    sed_items.append((start_line, end_line, idx, p))
-                else:
-                    non_range_items.append((idx, p))
-            else:
-                # 处理RANGE补丁
-                r = p.get("RANGE")
-                range_tuple = EditFileTool._parse_range(str(r)) if r else None
-                if range_tuple:
-                    start_line, end_line = range_tuple
-                    range_items.append((start_line, end_line, idx, p))
-                else:
-                    non_range_items.append((idx, p))
-        
-        # 按行号从后往前排序
-        sed_items.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-        range_items.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-        
-        return (
-            [item[3] for item in sed_items] +
-            [item[3] for item in range_items] +
-            [item[1] for item in non_range_items]
-        )
+        # 对于结构化编辑，暂时按原始顺序处理
+        # 如果需要按行号排序，需要在应用时动态获取块的行号范围
+        return patches
+
 
     @staticmethod
-    def _extract_range_content(
-        content: str, 
-        range_tuple: Optional[Tuple[int, int]]
-    ) -> Tuple[bool, str, str, str, Optional[str]]:
-        """提取RANGE范围内的内容
+    def _restore_file_from_cache(cache_info: Dict[str, Any]) -> str:
+        """从缓存恢复文件内容
         
         Args:
-            content: 文件内容
-            range_tuple: 行号范围 (start_line, end_line) 或 None
+            cache_info: 缓存信息字典
             
         Returns:
-            (是否成功, prefix, base_content, suffix, 错误信息)
+            恢复的文件内容字符串（与原始文件内容完全一致）
         """
-        if not range_tuple:
-            return (True, "", content, "", None)
+        if not cache_info or "units" not in cache_info:
+            return ""
         
-        start_line, end_line = range_tuple
-        lines = content.splitlines(keepends=True)
-        total_lines = len(lines)
+        units = cache_info["units"]
+            
+        if not units:
+            return ""
         
-        if (
-            start_line < 1
-            or end_line < 1
-            or start_line > end_line
-            or start_line > total_lines
-        ):
-            error_msg = (
-                f"RANGE行号无效（文件共有{total_lines}行，请求范围: {start_line}-{end_line}）。\n"
-                f"注意：如果这是多个补丁中的后续补丁，前面的补丁可能已经改变了文件行数。\n"
-                f"建议：使用read_code工具重新读取文件获取最新行号，或使用structured模式。"
-            )
-            return (False, "", "", "", error_msg)
+        # 按id排序单元（id是序号字符串，需要转换为整数排序）
+        sorted_units = sorted(units, key=lambda u: int(u.get('id', 0)) if str(u.get('id', '0')).isdigit() else 0)
         
-        end_line = min(end_line, total_lines)
-        prefix = "".join(lines[: start_line - 1])
-        base_content = "".join(lines[start_line - 1 : end_line])
-        suffix = "".join(lines[end_line:])
+        # 直接拼接所有块的内容，不做额外处理
+        # 每个块的content应该已经包含了完整的原始内容（包括换行符）
+        # 这样直接拼接就能恢复原始文件内容
+        result = []
+        for unit in sorted_units:
+            content = unit.get('content', '')
+            if content:
+                result.append(content)
         
-        return (True, prefix, base_content, suffix, None)
+        # 直接拼接，不添加额外的换行符
+        # 如果块的content已经包含了所有必要的换行符，直接拼接即可
+        return ''.join(result) if result else ""
 
     @staticmethod
-    def _apply_search_replace(
-        base_content: str,
-        search_text: str,
-        replace_text: str,
-        range_tuple: Optional[Tuple[int, int]],
-        modified_content: str,
-        patch: Dict[str, str]
-    ) -> Tuple[bool, str, Optional[str]]:
-        """应用search替换
-        
-        Args:
-            base_content: 要搜索的内容（可能是RANGE范围内的内容）
-            search_text: 搜索文本
-            replace_text: 替换文本
-            range_tuple: RANGE范围或None
-            modified_content: 完整文件内容（用于获取上下文）
-            patch: 补丁字典（用于错误信息）
-            
-        Returns:
-            (是否成功, 替换后的base_content, 错误信息)
-        """
-        # 1) 精确匹配，要求唯一
-        exact_search = search_text
-        cnt = EditFileTool._count_occurrences(base_content, exact_search)
-        
-        if cnt == 1:
-            return (True, base_content.replace(exact_search, replace_text, 1), None)
-        elif cnt > 1:
-            # 多匹配错误
-            positions = EditFileTool._find_all_positions(base_content, exact_search)
-            line_numbers = [EditFileTool._get_line_number(base_content, pos) for pos in positions]
-            range_info = f"（RANGE: {patch.get('RANGE', '无')}）" if range_tuple else ""
-            
-            context_count = min(3, cnt)
-            match_details = []
-            for i in range(context_count):
-                line_num = line_numbers[i]
-                context = EditFileTool._get_line_context(modified_content, line_num, 2)
-                if context:
-                    match_details.append(f"匹配 {i+1} (第{line_num}行):\n{context}")
-            
-            error_details = [
-                f"SEARCH 在指定范围内出现 {cnt} 次，要求唯一匹配{range_info}。",
-                f"匹配位置行号: {', '.join(map(str, line_numbers[:10]))}" + 
-                (f" 等共{cnt}处" if cnt > 10 else ""),
-            ]
-            
-            if match_details:
-                error_details.append("\n匹配位置的上下文:\n" + "\n---\n".join(match_details))
-                if cnt > context_count:
-                    error_details.append(f"\n... 还有 {cnt - context_count} 个匹配")
-            
-            suggestions = [
-                "1. 使用更具体的SEARCH文本，包含更多上下文（如前后的代码行）",
-            ]
-            if range_tuple:
-                suggestions.append(f"2. 检查RANGE是否正确（当前RANGE: {range_tuple[0]}-{range_tuple[1]}）")
-            else:
-                suggestions.append("2. 使用RANGE参数限制搜索范围到目标位置")
-            suggestions.append("3. 使用structured模式，通过块id进行精确编辑")
-            
-            error_details.append("\n建议的修正方法：\n" + "\n".join(suggestions))
-            error_msg = "\n".join(error_details)
-            return (False, base_content, error_msg)
-        
-        # 2) 若首尾均为换行，尝试去掉首尾换行后匹配
-        if (
-            search_text.startswith("\n")
-            and search_text.endswith("\n")
-            and replace_text.startswith("\n")
-            and replace_text.endswith("\n")
-        ):
-            stripped_search = search_text[1:-1]
-            stripped_replace = replace_text[1:-1]
-            cnt2 = EditFileTool._count_occurrences(base_content, stripped_search)
-            if cnt2 == 1:
-                return (True, base_content.replace(stripped_search, stripped_replace, 1), None)
-            elif cnt2 > 1:
-                positions = EditFileTool._find_all_positions(base_content, stripped_search)
-                line_numbers = [EditFileTool._get_line_number(base_content, pos) for pos in positions]
-                error_msg = (
-                    f"SEARCH 在指定范围内出现多次（去掉首尾换行后），要求唯一匹配。"
-                    f"匹配次数: {cnt2}，行号: {', '.join(map(str, line_numbers[:10]))}"
-                )
-                return (False, base_content, error_msg)
-        
-        # 3) 尝试缩进适配
-        current_search = search_text
-        current_replace = replace_text
-        if (
-            current_search.startswith("\n")
-            and current_search.endswith("\n")
-            and current_replace.startswith("\n")
-            and current_replace.endswith("\n")
-        ):
-            current_search = current_search[1:-1]
-            current_replace = current_replace[1:-1]
-        
-        detected_indent = EditFileTool._detect_indent_style(modified_content, search_text)
-        indent_candidates = []
-        if detected_indent and 1 <= detected_indent <= 16:
-            indent_candidates.append(detected_indent)
-        for space_count in range(1, 17):
-            if space_count not in indent_candidates:
-                indent_candidates.append(space_count)
-        
-        for space_count in indent_candidates:
-            indented_search = EditFileTool._apply_indent(current_search, space_count)
-            indented_replace = EditFileTool._apply_indent(current_replace, space_count)
-            cnt3, positions3 = EditFileTool._find_all_with_count(base_content, indented_search)
-            
-            if cnt3 == 1:
-                # 验证匹配位置是否在RANGE范围内
-                pos = positions3[0]
-                if range_tuple:
-                    start_line, end_line = range_tuple
-                    match_line = EditFileTool._get_line_number(base_content, pos)
-                    if not (start_line <= match_line <= end_line):
-                        continue
-                
-                return (True, base_content.replace(indented_search, indented_replace, 1), None)
-            elif cnt3 > 1:
-                positions = EditFileTool._find_all_positions(base_content, indented_search)
-                line_numbers = [EditFileTool._get_line_number(base_content, pos) for pos in positions]
-                error_msg = (
-                    f"SEARCH 在指定范围内出现多次（缩进适配后，缩进: {space_count}空格），"
-                    f"要求唯一匹配。匹配次数: {cnt3}，行号: {', '.join(map(str, line_numbers[:10]))}\n"
-                    f"注意：缩进适配可能匹配到错误的实例。\n"
-                    f"建议：提供包含正确缩进的SEARCH文本，或使用structured模式。"
-                )
-                return (False, base_content, error_msg)
-        
-        # 未找到匹配
-        error_msg_parts = [
-            "未找到唯一匹配的SEARCH。",
-            f"搜索内容预览: {repr(search_text[:100])}..."
-            if len(search_text) > 100 else f"搜索内容: {repr(search_text)}",
-            "",
-            "建议的修正方法：",
-            "1. 检查SEARCH文本是否完全匹配文件中的内容（包括缩进、换行符、空格）",
-            "2. 使用read_code工具读取文件，确认要修改的内容",
-            "3. 使用structured模式，通过块id进行精确编辑",
-            "4. 使用RANGE参数限制搜索范围",
-        ]
-        error_msg = "\n".join(error_msg_parts)
-        return (False, base_content, error_msg)
-
-    @staticmethod
-    def _apply_structured_edit(
-        filepath: str,
-        content: str,
+    def _apply_structured_edit_to_cache(
+        cache_info: Dict[str, Any],
         block_id: str,
         action: str,
-        new_content: Optional[str],
-        raw_mode: bool = False
-    ) -> Tuple[bool, str, Optional[str]]:
-        """应用结构化编辑
+        new_content: Optional[str]
+    ) -> Tuple[bool, Optional[str]]:
+        """在缓存中应用结构化编辑
         
         Args:
-            filepath: 文件路径
-            content: 文件内容
-            block_id: 块id
+            cache_info: 缓存信息字典（会被修改）
+            block_id: 块id（序号格式，如 "1", "2", "3"）
             action: 操作类型（delete, insert_before, insert_after, replace）
             new_content: 新内容（对于非delete操作）
-            raw_mode: 原始模式，False（语法单元或空白行分组）、True（行号分组）
             
         Returns:
-            (是否成功, 修改后的内容, 错误信息)
+            (是否成功, 错误信息)
         """
-        # 定位块
-        block_info = EditFileTool._find_block_by_id(filepath, block_id, raw_mode)
-        if not block_info:
-            mode_desc = "行号分组模式" if raw_mode else "语法单元/空白行分组模式"
-            return (False, content, f"未找到块id: {block_id}（{mode_desc}）。请使用read_code工具查看文件的结构化块id，并确保raw_mode参数与读取时使用的模式一致。")
+        if not cache_info or "units" not in cache_info:
+            return (False, "缓存信息不完整")
         
-        start_line = block_info['start_line']
-        end_line = block_info['end_line']
-        # block_content = block_info['content']
+        units = cache_info["units"]
         
-        lines = content.splitlines(keepends=True)
-        total_lines = len(lines)
+        # 查找块（通过序号id）
+        block = None
+        for unit in units:
+            if str(unit.get("id")) == str(block_id):
+                block = unit
+                break
         
-        # 验证行号范围
-        if start_line < 1 or end_line < 1 or start_line > total_lines or end_line > total_lines or start_line > end_line:
-            return (False, content, f"块的行号范围无效: {start_line}-{end_line}（文件总行数: {total_lines}）")
-        
-        # 计算行索引（0-based）
-        # end_line是包含的，所以end_idx应该是end_line（0-based，不包含，即end_line行之后）
-        start_idx = start_line - 1
-        end_idx = end_line  # end_line是包含的，所以end_idx应该是end_line（0-based，不包含）
+        if block is None:
+            return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
         
         # 根据操作类型执行编辑
         if action == "delete":
-            # 删除块：移除从start_line到end_line的所有行（包含）
-            new_lines = lines[:start_idx] + lines[end_idx:]
-            result_content = ''.join(new_lines)
-            return (True, result_content, None)
+            # 删除块：将当前块的内容清空
+            block['content'] = ""
+            return (True, None)
         
         elif action == "insert_before":
-            # 在块前插入
+            # 在块前插入：在当前块的内容前面插入文本
             if new_content is None:
-                return (False, content, "insert_before操作需要提供content参数")
-            # 确保新内容以换行符结尾
-            insert_content = new_content
-            if not insert_content.endswith('\n'):
-                insert_content += '\n'
-            new_lines = lines[:start_idx] + [insert_content] + lines[start_idx:]
-            result_content = ''.join(new_lines)
-            return (True, result_content, None)
+                return (False, "insert_before操作需要提供content参数")
+            
+            # 在当前块的内容前面插入新内容
+            current_content = block.get('content', '')
+            block['content'] = new_content + current_content
+            return (True, None)
         
         elif action == "insert_after":
-            # 在块后插入
+            # 在块后插入：在当前块的内容后面插入文本
             if new_content is None:
-                return (False, content, "insert_after操作需要提供content参数")
-            # 确保新内容以换行符结尾
-            insert_content = new_content
-            if not insert_content.endswith('\n'):
-                insert_content += '\n'
-            new_lines = lines[:end_idx] + [insert_content] + lines[end_idx:]
-            result_content = ''.join(new_lines)
-            return (True, result_content, None)
+                return (False, "insert_after操作需要提供content参数")
+            
+            # 在当前块的内容后面插入新内容
+            current_content = block.get('content', '')
+            block['content'] = current_content + new_content
+            return (True, None)
         
         elif action == "replace":
             # 替换块
             if new_content is None:
-                return (False, content, "replace操作需要提供content参数")
-            # 保持原有的换行符风格
-            replace_content = new_content
-            # 检查原块最后一行是否有换行符
-            if end_idx > 0 and end_idx <= len(lines):
-                # 原块的最后一行是 lines[end_idx - 1]
-                if lines[end_idx - 1].endswith('\n'):
-                    if not replace_content.endswith('\n'):
-                        replace_content += '\n'
-            new_lines = lines[:start_idx] + [replace_content] + lines[end_idx:]
-            result_content = ''.join(new_lines)
-            return (True, result_content, None)
+                return (False, "replace操作需要提供content参数")
+            
+            # 更新块内容
+            block['content'] = new_content
+            return (True, None)
         
         else:
-            return (False, content, f"不支持的操作类型: {action}")
+            return (False, f"不支持的操作类型: {action}")
 
     @staticmethod
     def _format_patch_description(patch: Dict[str, str]) -> str:
@@ -896,9 +517,7 @@ class EditFileTool:
         Returns:
             补丁描述字符串
         """
-        if "SED_COMMAND" in patch:
-            return f"sed命令: {patch.get('SED_COMMAND', '')[:100]}..."
-        elif "STRUCTURED_BLOCK_ID" in patch:
+        if "STRUCTURED_BLOCK_ID" in patch:
             block_id = patch.get('STRUCTURED_BLOCK_ID', '')
             action = patch.get('STRUCTURED_ACTION', '')
             content = patch.get('STRUCTURED_CONTENT', '')
@@ -982,18 +601,19 @@ class EditFileTool:
             return (False, error_msg)
 
     @staticmethod
-    def _fast_edit(file_path: str, patches: List[Dict[str, str]]) -> Tuple[bool, str]:
+    def _fast_edit(file_path: str, patches: List[Dict[str, str]], agent: Any = None) -> Tuple[bool, str]:
         """快速应用补丁到文件
 
-        该方法直接尝试将补丁应用到目标文件，适用于简单、明确的修改场景。
-        特点：
-        1. 支持sed命令模式和结构化编辑模式
-        2. 如果部分补丁失败，会继续应用剩余补丁，并报告失败信息
-        3. 支持备份和回滚机制
+        该方法基于缓存进行编辑：
+        1. 先检查缓存有效性，无效则提示重新读取
+        2. 在缓存中应用所有补丁
+        3. 从缓存恢复文件内容并写入
+        4. 更新缓存的时间戳
 
         Args:
             file_path: 要修改的文件路径，支持绝对路径和相对路径
-            patches: 补丁列表，每个补丁包含 SED_COMMAND 或 STRUCTURED_BLOCK_ID
+            patches: 补丁列表，每个补丁包含 STRUCTURED_BLOCK_ID
+            agent: Agent实例，用于访问缓存
 
         Returns:
             Tuple[bool, str]:
@@ -1004,9 +624,31 @@ class EditFileTool:
         backup_path = None
         
         try:
-            # 读取文件并创建备份
-            file_content, backup_path = EditFileTool._read_file_with_backup(file_path)
-            modified_content = file_content
+            # 检查缓存有效性
+            cache_info = EditFileTool._get_file_cache(agent, abs_path)
+            if not EditFileTool._is_cache_valid(cache_info, abs_path):
+                error_msg = (
+                    f"⚠️ 缓存无效或文件已被外部修改。\n"
+                    f"📋 文件: {abs_path}\n"
+                    f"💡 请先使用 read_code 工具重新读取文件，然后再进行编辑。"
+                )
+                return False, error_msg
+            
+            # 创建缓存副本，避免直接修改原缓存
+            cache_copy = {
+                "units": [unit.copy() for unit in cache_info["units"]],
+                "total_lines": cache_info["total_lines"],
+                "read_time": cache_info.get("read_time", time.time()),
+                "file_mtime": cache_info.get("file_mtime", 0),
+            }
+            
+            # 创建备份
+            if os.path.exists(abs_path):
+                backup_path = abs_path + ".bak"
+                try:
+                    shutil.copy2(abs_path, backup_path)
+                except Exception:
+                    backup_path = None
             
             # 对补丁进行排序
             ordered_patches = EditFileTool._order_patches_by_range(patches)
@@ -1014,45 +656,18 @@ class EditFileTool:
             failed_patches: List[Dict[str, Any]] = []
             successful_patches = 0
             
-            # 应用所有补丁
+            # 在缓存中应用所有补丁
             for patch in ordered_patches:
-                found = False
-                
-                # sed命令模式
-                if "SED_COMMAND" in patch:
-                    sed_cmd = patch.get("SED_COMMAND", "")
-                    try:
-                        modified_content = EditFileTool._execute_sed_command(modified_content, sed_cmd)
-                        found = True
-                        successful_patches += 1
-                    except ValueError as e:
-                        error_msg = (
-                            f"sed命令执行失败: {str(e)}\n"
-                            f"命令: {sed_cmd}\n"
-                            f"建议：检查命令格式是否正确，参考sed命令文档"
-                        )
-                        failed_patches.append({"patch": patch, "error": error_msg})
-                    except Exception as e:
-                        error_msg = (
-                            f"sed命令执行出错: {str(e)}\n"
-                            f"命令: {sed_cmd}"
-                        )
-                        failed_patches.append({"patch": patch, "error": error_msg})
-                    continue
-                
                 # 结构化编辑模式
                 if "STRUCTURED_BLOCK_ID" in patch:
                     block_id = patch.get("STRUCTURED_BLOCK_ID", "")
                     action = patch.get("STRUCTURED_ACTION", "")
                     new_content = patch.get("STRUCTURED_CONTENT")
-                    raw_mode = patch.get("STRUCTURED_RAW_MODE", False)  # 默认为False
                     try:
-                        success, new_modified_content, error_msg = EditFileTool._apply_structured_edit(
-                            abs_path, modified_content, block_id, action, new_content, raw_mode
+                        success, error_msg = EditFileTool._apply_structured_edit_to_cache(
+                            cache_copy, block_id, action, new_content
                         )
                         if success:
-                            modified_content = new_modified_content
-                            found = True
                             successful_patches += 1
                         else:
                             failed_patches.append({"patch": patch, "error": error_msg})
@@ -1062,11 +677,10 @@ class EditFileTool:
                             f"block_id: {block_id}, action: {action}"
                         )
                         failed_patches.append({"patch": patch, "error": error_msg})
-                    continue
-                
-                # 如果不支持的模式，记录错误
-                error_msg = f"不支持的补丁格式。支持的格式: SED_COMMAND、STRUCTURED_BLOCK_ID"
-                failed_patches.append({"patch": patch, "error": error_msg})
+                else:
+                    # 如果不支持的模式，记录错误
+                    error_msg = f"不支持的补丁格式。支持的格式: STRUCTURED_BLOCK_ID"
+                    failed_patches.append({"patch": patch, "error": error_msg})
             
             # 如果有失败的补丁，且没有成功的补丁，则不写入文件
             if failed_patches and successful_patches == 0:
@@ -1081,10 +695,31 @@ class EditFileTool:
                 PrettyOutput.print(summary, OutputType.ERROR)
                 return False, summary
             
+            # 从缓存恢复文件内容
+            modified_content = EditFileTool._restore_file_from_cache(cache_copy)
+            if not modified_content:
+                error_msg = "从缓存恢复文件内容失败"
+                if backup_path and os.path.exists(backup_path):
+                    try:
+                        os.remove(backup_path)
+                    except Exception:
+                        pass
+                return False, error_msg
+            
             # 写入文件
             success, error_msg = EditFileTool._write_file_with_rollback(abs_path, modified_content, backup_path)
             if not success:
                 return False, error_msg
+            
+            # 写入成功，更新缓存
+            if agent:
+                cache = agent.get_user_data("read_code_cache")
+                if cache and abs_path in cache:
+                    # 更新缓存内容
+                    cache[abs_path] = cache_copy
+                    # 更新缓存时间戳
+                    EditFileTool._update_cache_timestamp(agent, abs_path)
+                    agent.set_user_data("read_code_cache", cache)
             
             # 写入成功，删除备份文件
             if backup_path and os.path.exists(backup_path):
