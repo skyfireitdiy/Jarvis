@@ -300,7 +300,7 @@ class ReadCodeTool:
                                 full_unit_content_parts.append(line + '\n')
                             else:
                                 # 文件不以换行符结尾
-                                full_unit_content_parts.append(line)
+                            full_unit_content_parts.append(line)
                 
                 full_unit_content = ''.join(full_unit_content_parts)
                 
@@ -602,8 +602,8 @@ class ReadCodeTool:
                         full_content = f.read()
             else:
                 # 读取文件内容
-                with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                    full_content = f.read()
+            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                full_content = f.read()
             
             # 读取要读取的行范围内容
             selected_content_lines = []

@@ -1,33 +1,29 @@
-# -*- coding: utf-8 -*-
 from typing import Any, Protocol, Tuple, runtime_checkable
 
 
 @runtime_checkable
 class OutputHandlerProtocol(Protocol):
     """
-    Defines the interface for an output handler, which is responsible for
-    processing the model's response, typically to execute a tool.
+    定义输出处理器的接口，该处理器负责处理模型的响应，通常用于执行工具。
     """
 
     def name(self) -> str:
-        """Returns the name of the handler."""
+        """返回处理器的名称。"""
         ...
 
     def can_handle(self, response: str) -> bool:
-        """Determines if this handler can process the given response."""
+        """判断此处理器能否处理给定的响应。"""
         ...
 
     def prompt(self) -> str:
-        """Returns the prompt snippet that describes the handler's functionality."""
+        """返回描述处理器功能的提示片段。"""
         ...
 
     def handle(self, response: str, agent: Any) -> Tuple[bool, Any]:
         """
-        Handles the response, executing the associated logic.
+        处理响应，执行相关逻辑。
 
-        Returns:
-            A tuple containing a boolean (whether to return) and the result.
+        返回：
+            一个元组，包含一个布尔值（是否返回）和结果。
         """
         ...
-        
-__all__ = ["OutputHandlerProtocol"]
