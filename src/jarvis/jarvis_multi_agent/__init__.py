@@ -21,6 +21,14 @@ class MultiAgent(OutputHandler):
         self.common_system_prompt: str = common_system_prompt
 
     def prompt(self) -> str:
+        _multiline_example_msg = """  {
+    "content": |||
+      第一行：直接换行，无需 \\n
+      第二行：包含"双引号"，无需转义
+      第三行：包含'单引号'，直接写
+      第四行：支持缩进保留
+    |||
+  }"""
         return f"""
 # 多智能体消息发送
 
@@ -72,14 +80,7 @@ class MultiAgent(OutputHandler):
 - 可以使用双引号 "..." 或单引号 '...' 包裹字符串
 - **多行字符串推荐使用 ||| 分隔符包裹**，直接换行无需转义，支持保留缩进
   示例：
-  {
-    "content": |||
-      第一行：直接换行，无需 \\n
-      第二行：包含"双引号"，无需转义
-      第三行：包含'单引号'，直接写
-      第四行：支持缩进保留
-    |||
-  }
+{_multiline_example_msg}
 - 支持尾随逗号
 
 ## 可用智能体资源
