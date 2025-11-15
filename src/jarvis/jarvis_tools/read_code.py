@@ -175,6 +175,8 @@ class ReadCodeTool:
             content = unit.get('content', '')
             if content:
                 output_lines.append(content)
+            # 块结束分界符
+            output_lines.append("-" * 80)
             output_lines.append("")  # 单元之间空行分隔
         
         # 文件结束分界符
