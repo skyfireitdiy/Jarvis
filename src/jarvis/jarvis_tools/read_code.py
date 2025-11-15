@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import time
 from typing import Any, Dict, List
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
@@ -168,6 +169,138 @@ class ReadCodeTool:
             output_lines.append("")  # 单元之间空行分隔
         
         return '\n'.join(output_lines)
+    
+    def _get_file_cache(self, agent: Any, filepath: str) -> Dict[str, Any]:
+        """获取文件的缓存信息
+        
+        Args:
+            agent: Agent实例
+            filepath: 文件路径
+            
+        Returns:
+            缓存信息字典，如果不存在则返回None
+        """
+        if not agent:
+            return None
+        
+        cache = agent.get_user_data("read_code_cache")
+        if not cache:
+            return None
+        
+        abs_path = os.path.abspath(filepath)
+        return cache.get(abs_path)
+    
+    def _save_file_cache(
+        self, agent: Any, filepath: str, units: List[Dict[str, Any]], 
+        total_lines: int, file_mtime: float
+    ) -> None:
+        """保存文件的结构化信息到缓存
+        
+        Args:
+            agent: Agent实例
+            filepath: 文件路径
+            units: 结构化单元列表
+            total_lines: 文件总行数
+            file_mtime: 文件修改时间
+        """
+        if not agent:
+            return
+        
+        cache = agent.get_user_data("read_code_cache")
+        if not cache:
+            cache = {}
+            agent.set_user_data("read_code_cache", cache)
+        
+        abs_path = os.path.abspath(filepath)
+        cache[abs_path] = {
+            "units": units,
+            "total_lines": total_lines,
+            "read_time": time.time(),
+            "file_mtime": file_mtime,
+        }
+        agent.set_user_data("read_code_cache", cache)
+    
+    def _is_cache_valid(self, cache_info: Dict[str, Any], filepath: str) -> bool:
+        """检查缓存是否有效
+        
+        Args:
+            cache_info: 缓存信息字典
+            filepath: 文件路径
+            
+        Returns:
+            True表示缓存有效，False表示缓存无效
+        """
+        if not cache_info:
+            return False
+        
+        try:
+            # 检查文件是否存在
+            if not os.path.exists(filepath):
+                return False
+            
+            # 检查文件修改时间是否变化
+            current_mtime = os.path.getmtime(filepath)
+            cached_mtime = cache_info.get("file_mtime")
+            
+            if cached_mtime is None or abs(current_mtime - cached_mtime) > 0.1:  # 允许0.1秒的误差
+                return False
+            
+            # 检查缓存数据结构是否完整
+            if "units" not in cache_info or "total_lines" not in cache_info:
+                return False
+            
+            return True
+        except Exception:
+            return False
+    
+    def _restore_file_from_cache(self, cache_info: Dict[str, Any]) -> str:
+        """从缓存恢复文件内容
+        
+        Args:
+            cache_info: 缓存信息字典
+            
+        Returns:
+            恢复的文件内容字符串
+        """
+        if not cache_info or "units" not in cache_info:
+            return ""
+        
+        units = cache_info["units"]
+        total_lines = cache_info.get("total_lines", 0)
+        
+        if not units or total_lines == 0:
+            return ""
+        
+        # 按行号排序单元
+        sorted_units = sorted(units, key=lambda u: u.get('start_line', 0))
+        
+        # 构建文件内容
+        # 使用None标记未填充的行，最后用空字符串填充
+        lines = [None] * total_lines
+        
+        for unit in sorted_units:
+            start_line = unit.get('start_line', 1)
+            end_line = unit.get('end_line', start_line)
+            content = unit.get('content', '')
+            
+            if content:
+                content_lines = content.split('\n')
+                # 计算实际应该填充的行数
+                expected_lines = end_line - start_line + 1
+                
+                # 如果内容行数与预期行数不一致，使用实际内容行数
+                actual_lines = len(content_lines)
+                fill_lines = min(actual_lines, expected_lines)
+                
+                # 将内容填充到对应的行位置
+                for i in range(fill_lines):
+                    line_num = start_line + i - 1  # 转换为0-based索引
+                    if 0 <= line_num < total_lines:
+                        lines[line_num] = content_lines[i]
+        
+        # 将None替换为空字符串，合并为文件内容
+        result_lines = [line if line is not None else "" for line in lines]
+        return '\n'.join(result_lines)
     
     def _estimate_structured_tokens(
         self, filepath: str, content: str, start_line: int, end_line: int, total_lines: int, raw_mode: bool = False
@@ -342,9 +475,25 @@ class ReadCodeTool:
                     "stderr": f"无效的行范围 [{start_line}-{end_line}] (总行数: {total_lines})",
                 }
 
+            # 获取文件修改时间
+            file_mtime = os.path.getmtime(abs_path)
+            
+            # 检查缓存是否有效
+            cache_info = self._get_file_cache(agent, abs_path)
+            use_cache = self._is_cache_valid(cache_info, abs_path)
+            
             # 读取完整文件内容用于语法分析和token计算
-            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                full_content = f.read()
+            if use_cache:
+                # 从缓存恢复文件内容
+                full_content = self._restore_file_from_cache(cache_info)
+                # 如果恢复失败，重新读取文件
+                if not full_content:
+                    with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                        full_content = f.read()
+            else:
+                # 读取文件内容
+                with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                    full_content = f.read()
             
             # 读取要读取的行范围内容
             selected_content_lines = []
@@ -373,12 +522,63 @@ class ReadCodeTool:
                     ),
                 }
 
-            # 提取导入/包含语句作为结构化单元
+            # 生成整个文件的结构化信息（用于缓存）
+            # 提取整个文件的导入/包含语句
+            full_import_units = self._extract_imports(abs_path, full_content, 1, total_lines)
+            
+            # 生成整个文件的结构化单元
+            full_structured_units = None
+            
+            if raw_mode:
+                # 原始读取模式：按每20行分组（整个文件）
+                full_line_groups = self._extract_line_groups(full_content, 1, total_lines, group_size=20)
+                # 合并导入单元和行号分组
+                full_all_units = full_import_units + full_line_groups
+                # 确保id唯一
+                full_all_units = self._ensure_unique_ids(full_all_units)
+                # 按行号排序
+                full_all_units.sort(key=lambda u: u['start_line'])
+                full_structured_units = full_all_units
+            else:
+                # 尝试提取整个文件的语法单元
+                full_syntax_units = self._extract_syntax_units(abs_path, full_content, 1, total_lines)
+                
+                # 检测语言类型
+                if LANGUAGE_SUPPORT_AVAILABLE:
+                    try:
+                        detect_language(abs_path)
+                    except Exception:
+                        pass
+                
+                if full_syntax_units:
+                    # 合并导入单元和语法单元
+                    full_all_units = full_import_units + full_syntax_units
+                    # 确保id唯一
+                    full_all_units = self._ensure_unique_ids(full_all_units)
+                    # 按行号排序
+                    full_all_units.sort(key=lambda u: u['start_line'])
+                    full_structured_units = full_all_units
+                else:
+                    # 使用空白行分组结构化输出（不支持语言时）
+                    # 先按空行分割，然后对超过20行的块再按每20行分割（整个文件）
+                    full_line_groups = self._extract_blank_line_groups_with_split(full_content, 1, total_lines)
+                    # 合并导入单元和行号分组
+                    full_all_units = full_import_units + full_line_groups
+                    # 确保id唯一
+                    full_all_units = self._ensure_unique_ids(full_all_units)
+                    # 按行号排序
+                    full_all_units.sort(key=lambda u: u['start_line'])
+                    full_structured_units = full_all_units
+            
+            # 保存整个文件的结构化信息到缓存
+            if full_structured_units is not None:
+                self._save_file_cache(agent, abs_path, full_structured_units, total_lines, file_mtime)
+            
+            # 提取请求范围的结构化单元（用于输出）
             import_units = self._extract_imports(abs_path, full_content, start_line, end_line)
             
             # 确定使用的结构化单元（语法单元或行号分组）
             structured_units = None
-            # unit_type = None
             
             if raw_mode:
                 # 原始读取模式：按每20行分组
@@ -390,19 +590,10 @@ class ReadCodeTool:
                 # 按行号排序，所有单元按在文件中的实际位置排序
                 all_units.sort(key=lambda u: u['start_line'])
                 structured_units = all_units
-                # unit_type = "line_groups"
                 output = self._format_structured_output(abs_path, structured_units, total_lines)
             else:
                 # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
                 syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
-                
-                # 检测语言类型
-                # language = None
-                if LANGUAGE_SUPPORT_AVAILABLE:
-                    try:
-                        detect_language(abs_path)
-                    except Exception:
-                        pass
                 
                 if syntax_units:
                     # 合并导入单元和语法单元
@@ -412,7 +603,6 @@ class ReadCodeTool:
                     # 按行号排序，所有单元按在文件中的实际位置排序
                     all_units.sort(key=lambda u: u['start_line'])
                     structured_units = all_units
-                    # unit_type = "syntax_units"
                     output = self._format_structured_output(abs_path, structured_units, total_lines)
                 else:
                     # 使用空白行分组结构化输出（不支持语言时）
@@ -425,7 +615,6 @@ class ReadCodeTool:
                     # 按行号排序，所有单元按在文件中的实际位置排序
                     all_units.sort(key=lambda u: u['start_line'])
                     structured_units = all_units
-                    # unit_type = "line_groups"
                     output = self._format_structured_output(abs_path, structured_units, total_lines)
 
             # 尝试获取并附加上下文信息
