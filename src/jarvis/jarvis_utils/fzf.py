@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""FZF selector utility."""
+"""FZF选择器工具。"""
 import shutil
 import subprocess
 from typing import List, Optional, Union, Dict, Any, cast
@@ -10,15 +10,15 @@ def fzf_select(
     key: Optional[str] = None,
 ) -> Optional[str]:
     """
-    Uses fzf to select an item from a list.
+    使用fzf从列表中选择一个项目。
 
-    Args:
-        options: A list of strings or dicts to choose from.
-        prompt: The prompt to display in fzf.
-        key: If options is a list of dicts, this is the key to display.
+    参数:
+        options: 可供选择的字符串或字典列表。
+        prompt: 在fzf中显示的提示信息。
+        key: 如果options是字典列表，则此参数指定要显示的键名。
 
-    Returns:
-        The selected item, or None if fzf is not available or the selection is cancelled.
+    返回:
+        选中的项目，如果fzf不可用或选择被取消则返回None。
     """
     if shutil.which("fzf") is None:
         return None
