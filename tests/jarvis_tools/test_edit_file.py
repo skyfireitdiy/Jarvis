@@ -907,11 +907,11 @@ type Point struct {
                     }
                 }
                 def get_user_data_side_effect(key):
-                if key == "read_code_cache":
-                    return cache
-                return None
-            
-            mock_agent.get_user_data.side_effect = get_user_data_side_effect
+                    if key == "read_code_cache":
+                        return cache
+                    return None
+                
+                mock_agent.get_user_data.side_effect = get_user_data_side_effect
                 
                 # 编辑文件
                 result = tool.execute({
