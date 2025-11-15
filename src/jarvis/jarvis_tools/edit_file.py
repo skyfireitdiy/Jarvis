@@ -162,11 +162,11 @@ class EditFileTool:
         units = cache_info["units"]
         for unit in units:
             if unit.get("id") == block_id:
-            return {
+                return {
                     "start_line": unit.get("start_line"),
                     "end_line": unit.get("end_line"),
                     "content": unit.get("content", ""),
-            }
+                }
         return None
 
     @staticmethod
@@ -191,7 +191,7 @@ class EditFileTool:
             try:
                 if os.path.exists(abs_path):
                     cache[abs_path]["file_mtime"] = os.path.getmtime(abs_path)
-        except Exception:
+            except Exception:
                 pass
             agent.set_user_data("read_code_cache", cache)
 
@@ -678,9 +678,9 @@ class EditFileTool:
                         )
                         failed_patches.append({"patch": patch, "error": error_msg})
                 else:
-                # 如果不支持的模式，记录错误
+                    # 如果不支持的模式，记录错误
                     error_msg = f"不支持的补丁格式。支持的格式: STRUCTURED_BLOCK_ID"
-                failed_patches.append({"patch": patch, "error": error_msg})
+                    failed_patches.append({"patch": patch, "error": error_msg})
             
             # 如果有失败的补丁，且没有成功的补丁，则不写入文件
             if failed_patches and successful_patches == 0:
