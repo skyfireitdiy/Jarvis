@@ -632,10 +632,9 @@ def process_verification_phase(
         
         # 方法2：如果所有 gid 都已分析，则认为该批次已完成
         if not is_batch_completed and batch_gids and analyzed_gids:
-            # 确保类型一致：都转换为整数集合
-            batch_gids_int = {int(gid) for gid in batch_gids if isinstance(gid, (int, str))}
-            analyzed_gids_int = {int(gid) for gid in analyzed_gids if isinstance(gid, (int, str))}
-            if batch_gids_int and batch_gids_int.issubset(analyzed_gids_int):
+            # batch_gids已经是整数集合，analyzed_gids也应该是整数集合
+            # 直接使用issubset检查
+            if batch_gids.issubset(analyzed_gids):
                 is_batch_completed = True
         
         if is_batch_completed:
