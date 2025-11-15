@@ -396,12 +396,8 @@ class ReadCodeTool:
             if cached_mtime is None or abs(current_mtime - cached_mtime) > 0.1:  # 允许0.1秒的误差
                 return False
             
-            # 检查缓存数据结构是否完整（支持新旧两种格式）
-            # 新格式：id_list 和 blocks
-            # 旧格式：units（向后兼容）
-            has_new_format = "id_list" in cache_info and "blocks" in cache_info
-            has_old_format = "units" in cache_info
-            if not (has_new_format or has_old_format) or "total_lines" not in cache_info:
+            # 检查缓存数据结构是否完整
+            if "id_list" not in cache_info or "blocks" not in cache_info or "total_lines" not in cache_info:
                 return False
             
             return True
@@ -420,52 +416,19 @@ class ReadCodeTool:
         if not cache_info:
             return ""
         
-        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
-        if "id_list" in cache_info and "blocks" in cache_info:
-            # 新格式：按照 id_list 的顺序恢复
-            id_list = cache_info.get("id_list", [])
-            blocks = cache_info.get("blocks", {})
-            
-            result = []
-            for block_id in id_list:
-                block = blocks.get(block_id)
-                if block:
-                    content = block.get('content', '')
-                    if content:
-                        result.append(content)
-            
-            return ''.join(result) if result else ""
-        elif "units" in cache_info:
-            # 旧格式：向后兼容
-            units = cache_info["units"]
-            if not units:
-                return ""
-            
-            # 按id排序单元（id是block-1, block-2格式，提取数字部分排序）
-            def extract_block_number(unit):
-                id_str = str(unit.get('id', 'block-0'))
-                if id_str.startswith('block-'):
-                    try:
-                        return int(id_str.split('-', 1)[1])
-                    except (ValueError, IndexError):
-                        return 0
-                # 兼容旧的数字格式
-                try:
-                    return int(id_str)
-                except ValueError:
-                    return 0
-            
-            sorted_units = sorted(units, key=extract_block_number)
-            
-            result = []
-            for unit in sorted_units:
-                content = unit.get('content', '')
+        # 按照 id_list 的顺序恢复
+        id_list = cache_info.get("id_list", [])
+        blocks = cache_info.get("blocks", {})
+        
+        result = []
+        for block_id in id_list:
+            block = blocks.get(block_id)
+            if block:
+                content = block.get('content', '')
                 if content:
                     result.append(content)
-            
-            return ''.join(result) if result else ""
         
-        return ""
+        return ''.join(result) if result else ""
     
     def _estimate_structured_tokens(
         self, filepath: str, content: str, start_line: int, end_line: int, total_lines: int, raw_mode: bool = False
