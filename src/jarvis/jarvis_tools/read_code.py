@@ -161,42 +161,13 @@ class ReadCodeTool:
             "",
         ]
         
-        # 从缓存中获取block_id映射（如果可用）
-        block_id_map = {}
-        if agent:
-            cache_info = self._get_file_cache(agent, filepath)
-            if cache_info and "id_list" in cache_info and "blocks" in cache_info:
-                # 根据content匹配，找到对应的block_id
-                blocks = cache_info.get("blocks", {})
-                for unit in units:
-                    unit_content = unit.get('content', '').strip()
-                    if not unit_content:
-                        continue
-                    # 为每个unit查找匹配的block（精确匹配或包含匹配）
-                    for block_id, block_data in blocks.items():
-                        block_content = block_data.get("content", "").strip()
-                        if not block_content:
-                            continue
-                        # 精确匹配或unit的content是block的content的子串
-                        if unit_content == block_content:
-                            block_id_map[id(unit)] = block_id
-                            break
-                        elif unit_content in block_content:
-                            # unit的content是block的content的子串，也匹配
-                            block_id_map[id(unit)] = block_id
-                            break
-                        elif block_content in unit_content:
-                            # block的content是unit的content的子串，也匹配
-                            block_id_map[id(unit)] = block_id
-                            break
-        
-        # 为每个单元分配block-id（优先使用缓存中的id）
+        # 为每个单元分配block-id
+        # 如果unit已经有block_id（从缓存中获取），直接使用；否则按顺序生成
         for idx, unit in enumerate(units, start=1):
-            # 优先使用缓存中的block_id，否则使用临时生成的id
-            unit_id = id(unit)
-            if unit_id in block_id_map:
-                block_id = block_id_map[unit_id]
-            else:
+            # 如果unit已经有block_id，直接使用（在生成structured_units时已分配）
+            block_id = unit.get('block_id')
+            if not block_id:
+                # 否则按顺序生成临时id
                 block_id = f"block-{idx}"
             # 显示id
             output_lines.append(f"[id:{block_id}]")
@@ -231,6 +202,76 @@ class ReadCodeTool:
         
         abs_path = os.path.abspath(filepath)
         return cache.get(abs_path)
+    
+    def _get_blocks_from_cache(self, cache_info: Dict[str, Any], start_line: int, end_line: int) -> List[Dict[str, Any]]:
+        """从缓存中获取对应范围的blocks
+        
+        Args:
+            cache_info: 缓存信息
+            start_line: 起始行号（1-based）
+            end_line: 结束行号（1-based，-1表示文件末尾）
+            
+        Returns:
+            blocks列表，每个block包含block_id和content
+        """
+        if not cache_info or "id_list" not in cache_info or "blocks" not in cache_info:
+            return []
+        
+        id_list = cache_info.get("id_list", [])
+        blocks = cache_info.get("blocks", {})
+        result = []
+        
+        # 如果end_line是-1，表示文件末尾，需要先计算文件总行数
+        if end_line == -1:
+            # 先遍历所有blocks计算总行数
+            total_lines = 0
+            for block_id in id_list:
+                block_data = blocks.get(block_id)
+                if block_data:
+                    block_content = block_data.get("content", "")
+                    if block_content:
+                        block_line_count = block_content.count('\n')
+                        if not block_content.endswith('\n'):
+                            block_line_count += 1
+                        total_lines += block_line_count
+            end_line = total_lines
+        
+        # 通过前面blocks的内容推算每个block的行号范围
+        current_line = 1  # 从第1行开始
+        
+        for block_id in id_list:
+            block_data = blocks.get(block_id)
+            if not block_data:
+                continue
+            block_content = block_data.get("content", "")
+            if not block_content:
+                continue
+            
+            # 计算这个block的行数（通过换行符数量）
+            # content中的换行符数量 = 行数（因为每行都以换行符结尾，除了最后一行）
+            block_line_count = block_content.count('\n')
+            # 如果content不以换行符结尾，说明最后一行没有换行符，需要+1
+            if not block_content.endswith('\n'):
+                block_line_count += 1
+            
+            block_start_line = current_line
+            block_end_line = current_line + block_line_count - 1
+            
+            # block与请求范围有重叠就包含
+            if block_end_line >= start_line and block_start_line <= end_line:
+                result.append({
+                    "block_id": block_id,
+                    "content": block_content,
+                })
+            
+            # 更新当前行号
+            current_line = block_end_line + 1
+            
+            # 如果已经超过请求的结束行，可以提前退出
+            if block_start_line > end_line:
+                break
+        
+        return result
     
     def _convert_units_to_sequential_ids(self, units: List[Dict[str, Any]], full_content: str = None) -> Dict[str, Any]:
         """将单元列表转换为缓存格式（id_list和blocks字典）
@@ -742,48 +783,97 @@ class ReadCodeTool:
             if full_structured_units is not None:
                 self._save_file_cache(agent, abs_path, full_structured_units, total_lines, file_mtime, full_content)
             
-            # 提取请求范围的结构化单元（用于输出）
-            import_units = self._extract_imports(abs_path, full_content, start_line, end_line)
-            
-            # 确定使用的结构化单元（语法单元或行号分组）
-            structured_units = None
-            
-            if raw_mode:
-                # 原始读取模式：按每20行分组
-                line_groups = self._extract_line_groups(full_content, start_line, end_line, group_size=20)
-                # 合并导入单元和行号分组
-                all_units = import_units + line_groups
-                # 确保id唯一
-                all_units = self._ensure_unique_ids(all_units)
-                # 按行号排序，所有单元按在文件中的实际位置排序
-                all_units.sort(key=lambda u: u['start_line'])
-                structured_units = all_units
-                output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
+            # 如果缓存有效，直接使用缓存中的blocks输出
+            if agent:
+                cache_info = self._get_file_cache(agent, abs_path)
+                if cache_info and self._is_cache_valid(cache_info, abs_path):
+                    # 直接从缓存中获取对应范围的blocks
+                    cached_blocks = self._get_blocks_from_cache(cache_info, start_line, end_line)
+                    if cached_blocks:
+                        # 转换为units格式（用于输出）
+                        structured_units = []
+                        for block in cached_blocks:
+                            structured_units.append({
+                                "block_id": block["block_id"],
+                                "content": block["content"],
+                            })
+                        output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
+                    else:
+                        output = ""
+                else:
+                    # 缓存无效，重新提取units
+                    # 提取请求范围的结构化单元（用于输出）
+                    import_units = self._extract_imports(abs_path, full_content, start_line, end_line)
+                    
+                    # 确定使用的结构化单元（语法单元或行号分组）
+                    structured_units = None
+                    
+                    if raw_mode:
+                        # 原始读取模式：按每20行分组
+                        line_groups = self._extract_line_groups(full_content, start_line, end_line, group_size=20)
+                        # 合并导入单元和行号分组
+                        all_units = import_units + line_groups
+                        # 确保id唯一
+                        all_units = self._ensure_unique_ids(all_units)
+                        # 按行号排序，所有单元按在文件中的实际位置排序
+                        all_units.sort(key=lambda u: u['start_line'])
+                        structured_units = all_units
+                    else:
+                        # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
+                        syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
+                        
+                        if syntax_units:
+                            # 合并导入单元和语法单元
+                            all_units = import_units + syntax_units
+                            # 确保id唯一
+                            all_units = self._ensure_unique_ids(all_units)
+                            # 按行号排序，所有单元按在文件中的实际位置排序
+                            all_units.sort(key=lambda u: u['start_line'])
+                            structured_units = all_units
+                        else:
+                            # 使用空白行分组结构化输出（不支持语言时）
+                            # 先按空行分割，然后对超过20行的块再按每20行分割
+                            line_groups = self._extract_blank_line_groups_with_split(full_content, start_line, end_line)
+                            # 合并导入单元和行号分组
+                            all_units = import_units + line_groups
+                            # 确保id唯一
+                            all_units = self._ensure_unique_ids(all_units)
+                            # 按行号排序，所有单元按在文件中的实际位置排序
+                            all_units.sort(key=lambda u: u['start_line'])
+                            structured_units = all_units
+                    
+                    if structured_units:
+                        output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
+                    else:
+                        output = ""
             else:
-                # 尝试提取语法单元（结构化读取，full_content 已在上面读取）
-                syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
+                # 没有agent，无法使用缓存，重新提取units
+                import_units = self._extract_imports(abs_path, full_content, start_line, end_line)
                 
-                if syntax_units:
-                    # 合并导入单元和语法单元
-                    all_units = import_units + syntax_units
-                    # 确保id唯一
+                if raw_mode:
+                    line_groups = self._extract_line_groups(full_content, start_line, end_line, group_size=20)
+                    all_units = import_units + line_groups
                     all_units = self._ensure_unique_ids(all_units)
-                    # 按行号排序，所有单元按在文件中的实际位置排序
                     all_units.sort(key=lambda u: u['start_line'])
                     structured_units = all_units
+                else:
+                    syntax_units = self._extract_syntax_units(abs_path, full_content, start_line, end_line)
+                    if syntax_units:
+                        all_units = import_units + syntax_units
+                        all_units = self._ensure_unique_ids(all_units)
+                        all_units.sort(key=lambda u: u['start_line'])
+                        structured_units = all_units
+                    else:
+                        line_groups = self._extract_blank_line_groups_with_split(full_content, start_line, end_line)
+                        all_units = import_units + line_groups
+                        all_units = self._ensure_unique_ids(all_units)
+                        all_units.sort(key=lambda u: u['start_line'])
+                        structured_units = all_units
+                
+                if structured_units:
                     output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
                 else:
-                    # 使用空白行分组结构化输出（不支持语言时）
-                    # 先按空行分割，然后对超过20行的块再按每20行分割
-                    line_groups = self._extract_blank_line_groups_with_split(full_content, start_line, end_line)
-                    # 合并导入单元和行号分组
-                    all_units = import_units + line_groups
-                    # 确保id唯一
-                    all_units = self._ensure_unique_ids(all_units)
-                    # 按行号排序，所有单元按在文件中的实际位置排序
-                    all_units.sort(key=lambda u: u['start_line'])
-                    structured_units = all_units
-                    output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
+                    output = ""
 
             # 尝试获取并附加上下文信息
             context_info = self._get_file_context(abs_path, start_line, end_line, agent)
