@@ -29,7 +29,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union, Set
 
-import json5  # type: ignore
+from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
+# json5 已替换为 jsonnet，通过 jsonnet_compat 模块提供兼容接口
 import typer
 
 from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
@@ -407,7 +408,7 @@ def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]
     从 Agent summary 中提取结构化数据（使用 JSON 格式）：
     - 仅在 <SUMMARY>...</SUMMARY> 块内查找；
     - 直接解析 <SUMMARY> 块内的内容为 JSON 对象（不需要额外的 <json> 标签）；
-    - 使用 json5 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）；
+    - 使用 jsonnet 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）；
     返回(解析结果, 错误信息)
     如果解析成功，返回(data, None)
     如果解析失败，返回({}, 错误信息)
@@ -424,7 +425,7 @@ def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]
 
     try:
         try:
-            obj = json5.loads(block)
+            obj = json5_loads(block)
         except Exception as json_err:
             error_msg = f"JSON 解析失败: {str(json_err)}"
             return {}, error_msg
@@ -955,7 +956,7 @@ class Transpiler:
             "  * 参数个数与顺序可以保持与 C 一致，但类型应优先考虑 Rust 的惯用法、安全性和可读性；\n"
             "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n"
-            "请严格按以下格式输出（JSON格式，支持json5语法如尾随逗号、注释等）：\n"
+            "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
             "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"notes\": \"...\"\n}\n</SUMMARY>"
         )
         return system_prompt, user_prompt, summary_prompt
@@ -1043,9 +1044,9 @@ class Transpiler:
                     error_guidance = ""
                     if last_reason and last_reason != "未知错误":
                         if "JSON解析失败" in last_reason:
-                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持json5语法（如尾随逗号、注释等）。"
+                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                         else:
-                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）；JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持json5语法（如尾随逗号、注释等）。"
+                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）；JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                     
                     full_prompt = f"{usr_p}{error_guidance}\n\n{sum_p}"
                     try:
@@ -2284,7 +2285,7 @@ class Transpiler:
                 "- 前置条件：必须在crate中找到该函数的实现（匹配函数名或签名）。若未找到，ok 必须为 false，function_issues 应包含 [function] function not found\n"
                 "- 若Rust实现修复了C代码中的安全漏洞或使用了不同的实现方式但保持了功能一致，且无严重问题，ok 应为 true\n"
                 "- 仅报告功能不一致和严重问题，不报告类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）\n"
-                "请严格按以下格式输出（JSON格式，支持json5语法如尾随逗号、注释等）：\n"
+                "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
                 "<SUMMARY>\n{\n  \"ok\": true,\n  \"function_issues\": [],\n  \"critical_issues\": []\n}\n</SUMMARY>"
             )
             return sys_p, usr_p, sum_p
@@ -2349,9 +2350,9 @@ class Transpiler:
                     # 检查上一次的解析结果
                     if parse_error_msg:
                         # 如果有JSON解析错误，优先反馈
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_msg}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持json5语法（如尾随逗号、注释等）。"
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_msg}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                     elif parse_failed:
-                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持json5语法（如尾随逗号、注释等）。"
+                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                     
                     full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
                     try:

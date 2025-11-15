@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import json5 as json
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+import json
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -30,12 +31,13 @@ class MultiAgent(OutputHandler):
 - **明确性原则**：清晰表达意图、需求和期望结果
 - **上下文保留**：在消息中包含足够的背景信息
 
-### 消息格式标准（JSON5）
+### 消息格式标准（Jsonnet）
 ```
 {ot("SEND_MESSAGE")}
 {{
   "to": "智能体名称",
-  "content": "# 消息主题
+  "content": |||
+# 消息主题
 ## 背景信息
 [提供必要的上下文和背景]
 ## 具体需求
@@ -45,7 +47,8 @@ class MultiAgent(OutputHandler):
 ## 期望结果
 [描述期望的输出格式和内容]
 ## 下一步计划
-[描述下一步的计划和行动]"
+[描述下一步的计划和行动]
+  |||
 }}
 {ct("SEND_MESSAGE")}
 ```
@@ -56,16 +59,27 @@ class MultiAgent(OutputHandler):
 {ot("SEND_MESSAGE")}
 {{
   "to": "智能体名称",
-  "content": "# 消息主题
+  "content": |||
+# 消息主题
 ## 任务结果
-[任务完成结果，用于反馈]"
+[任务完成结果，用于反馈]
+  |||
 }}
 {ct("SEND_MESSAGE")}
 ```
 
-**JSON5 格式说明**：
+**Jsonnet 格式说明**：
 - 可以使用双引号 "..." 或单引号 '...' 包裹字符串
-- **多行字符串使用单引号或双引号包裹，可以直接换行**，无需转义换行符
+- **多行字符串推荐使用 ||| 分隔符包裹**，直接换行无需转义，支持保留缩进
+  示例：
+  {
+    "content": |||
+      第一行：直接换行，无需 \\n
+      第二行：包含"双引号"，无需转义
+      第三行：包含'单引号'，直接写
+      第四行：支持缩进保留
+    |||
+  }
 - 支持尾随逗号
 
 ## 可用智能体资源
@@ -173,7 +187,7 @@ class MultiAgent(OutputHandler):
             )
         raw = blocks[0]
         try:
-            msg_obj = json.loads(raw)
+            msg_obj = json_loads(raw)
             if not isinstance(msg_obj, dict):
                 return (
                     False,
@@ -207,7 +221,7 @@ class MultiAgent(OutputHandler):
                 "修复建议：\n"
                 "- 确保起止标签各占一行\n"
                 "- 标签与内容之间保留换行\n"
-                "- 使用正确的 JSON5 格式\n"
+                "- 使用正确的 Jsonnet 格式\n"
                 "示例：\n"
                 f"{ot('SEND_MESSAGE')}\n"
                 '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
@@ -216,18 +230,18 @@ class MultiAgent(OutputHandler):
         except Exception as e:
             return (
                 False,
-                f"SEND_MESSAGE JSON5 解析失败：{str(e)}\n"
+                f"SEND_MESSAGE Jsonnet 解析失败：{str(e)}\n"
                 "修复建议：\n"
-                "- 检查 JSON5 格式是否正确（引号、逗号、大括号）\n"
+                "- 检查 Jsonnet 格式是否正确（引号、逗号、大括号）\n"
                 "- 可以使用双引号 \"...\" 或单引号 '...' 包裹字符串\n"
-                "- 对于多行内容，使用单引号或双引号包裹，可以直接换行\n"
+                "- 对于多行内容，推荐使用 ||| 分隔符包裹，直接换行无需转义，支持保留缩进\n"
                 "示例：\n"
                 f"{ot('SEND_MESSAGE')}\n"
                 '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
                 f"{ct('SEND_MESSAGE')}\n"
-                "或使用多行字符串：\n"
+                "或使用多行字符串（推荐使用 ||| 分隔符）：\n"
                 f"{ot('SEND_MESSAGE')}\n"
-                '{{\n  "to": "目标Agent名称",\n  "content": `多行消息内容\n可以包含换行\n更清晰易读`\n}}\n'
+                '{{\n  "to": "目标Agent名称",\n  "content": |||\n多行消息内容\n可以包含换行\n包含"双引号"和\'单引号\'都无需转义\n更清晰易读\n  |||\n}}\n'
                 f"{ct('SEND_MESSAGE')}"
             )
 
@@ -271,7 +285,7 @@ class MultiAgent(OutputHandler):
         ret = []
         for item in data:
             try:
-                msg = json.loads(item)
+                msg = json_loads(item)
                 if isinstance(msg, dict) and "to" in msg and "content" in msg:
                     ret.append(msg)
             except Exception:

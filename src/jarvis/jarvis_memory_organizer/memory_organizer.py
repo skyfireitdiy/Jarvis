@@ -201,7 +201,7 @@ class MemoryOrganizer:
 
             # 解析响应
             import re
-            import json5  # type: ignore[import-untyped]
+            from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
 
             # 提取 <merged_memory> 标签内的内容
             json_match = re.search(
@@ -213,14 +213,14 @@ class MemoryOrganizer:
             if json_match:
                 json_content = json_match.group(1).strip()
                 try:
-                    result = json5.loads(json_content)
+                    result = json5_loads(json_content)
                     return {
                         "content": result.get("content", ""),
                         "tags": result.get("tags", []),
                         "type": memories[0].get("type", "unknown"),
                         "merged_from": [m.get("id", "") for m in memories],
                     }
-                except json5.JSON5DecodeError as e:
+                except (ValueError, Exception) as e:
                     raise ValueError(f"无法解析JSON内容: {str(e)}")
             else:
                 raise ValueError("无法从模型响应中提取 <merged_memory> 标签内容")
