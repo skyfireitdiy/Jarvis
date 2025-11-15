@@ -35,14 +35,14 @@ tool_call_help = f"""
 
 JSON5格式特性：
 - 字符串引号：可使用双引号或单引号
-- 多行字符串：使用反引号 `...` 包裹（推荐），自动处理换行，无需转义
+- 多行字符串：使用单引号或双引号包裹，可以直接换行（无需转义\\n）
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
 - 注释：支持 // 单行或 /* */ 多行注释
 
 关键规则：
 1. 每次只使用一个工具，等待结果后再进行下一步
 2. {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
-3. 多行字符串参数优先使用反引号格式
+3. 多行字符串参数使用单引号或双引号，可以直接换行
 4. 等待执行结果，不要假设或创建虚假响应
 5. 信息不足时询问用户，不要在没有完整信息的情况下继续
 
@@ -646,7 +646,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     {},
                     f"""JSON5 解析失败：{e}
 
-提示：JSON5支持双引号/单引号、反引号多行字符串（推荐）、尾随逗号。多行字符串中直接换行，无需转义\\n。
+提示：JSON5支持双引号/单引号、尾随逗号、注释。多行字符串使用单引号或双引号，可以直接换行。
 
 {tool_call_help}""",
                     False,
@@ -803,7 +803,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         usage_prompt = agent_instance.get_tool_usage_prompt()
                     except Exception:
                         usage_prompt = tool_call_help
-                    return f"工具参数格式无效: {name}。arguments 应为可解析的 JSON5 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，推荐使用反引号 `...` 包裹以提高可读性。\n\n{usage_prompt}"
+                    return f"工具参数格式无效: {name}。arguments 应为可解析的 JSON5 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，使用单引号或双引号包裹，可以直接换行。\n\n{usage_prompt}"
 
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)
