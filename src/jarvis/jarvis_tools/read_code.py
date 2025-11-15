@@ -159,13 +159,10 @@ class ReadCodeTool:
         for unit in units:
             # 显示id
             output_lines.append(f"[id:{unit['id']}]")
-            # 添加内容，保持原有缩进，并添加行号
-            content_lines = unit['content'].split('\n')
-            current_line_num = unit['start_line']
-            for line in content_lines:
-                # 行号格式：5位右对齐，后面加冒号
-                output_lines.append(f"{current_line_num:5d}:{line}")
-                current_line_num += 1
+            # 添加内容，保持原有缩进
+            content = unit.get('content', '')
+            if content:
+                output_lines.append(content)
             output_lines.append("")  # 单元之间空行分隔
         
         return '\n'.join(output_lines)
@@ -190,9 +187,133 @@ class ReadCodeTool:
         abs_path = os.path.abspath(filepath)
         return cache.get(abs_path)
     
+    def _convert_units_to_sequential_ids(self, units: List[Dict[str, Any]], full_content: str = None) -> List[Dict[str, Any]]:
+        """将单元列表转换为缓存格式（只保留id和content，id为序号格式）
+        
+        按照行号范围分割文件，不区分语法单元，确保完美恢复。
+        
+        Args:
+            units: 结构化单元列表，每个单元包含 id, start_line, end_line, content
+            full_content: 完整的文件内容（可选），用于确保块之间的空白行也被包含
+            
+        Returns:
+            转换后的单元列表，只包含 id 和 content，id为序号格式（如 "1", "2", "3"）
+        """
+        if not full_content or not units:
+            # 没有完整内容，直接使用原始的content
+            sorted_original = sorted(units, key=lambda u: u.get('start_line', 0))
+            result_units = []
+            for unit in sorted_original:
+                result_units.append({
+                    "id": str(len(result_units) + 1),  # 从1开始的序号
+                    "content": unit.get('content', ''),
+                })
+            return result_units
+        
+        # 收集所有单元的行号范围，用于确定分割点
+        # 关键：只使用行号范围来分割文件，不区分语法单元类型，确保每行只被提取一次
+        ranges = []
+        for unit in units:
+            start_line = unit.get('start_line', 1)
+            end_line = unit.get('end_line', start_line)
+            if start_line > 0 and end_line >= start_line:
+                ranges.append((start_line, end_line))
+        
+        if not ranges:
+            # 没有有效的行号范围，返回空列表
+            return []
+        
+        # 合并重叠的范围，得到连续的行号范围
+        ranges.sort(key=lambda x: (x[0], x[1]))
+        merged_ranges = []
+        for start, end in ranges:
+            if not merged_ranges:
+                merged_ranges.append((start, end))
+            else:
+                last_start, last_end = merged_ranges[-1]
+                # 如果当前范围与上一个范围重叠或相邻，合并它们
+                if start <= last_end + 1:
+                    merged_ranges[-1] = (last_start, max(last_end, end))
+                else:
+                    merged_ranges.append((start, end))
+        
+        # 按照合并后的行号范围，连续分割文件内容
+        # 每个块包含从当前范围的开始到下一个范围的开始之前的所有内容（包括空白行）
+        # 关键：直接按行号范围从原始内容中提取，确保完美恢复（包括文件末尾的换行符和所有空白行）
+        # 使用 split('\n') 分割，然后手动为每行添加换行符（除了最后一行，根据原始文件决定）
+        lines = full_content.split('\n')
+        result_units = []
+        
+        # 确定所有分割点（每个范围的开始行）
+        split_points = [1]  # 从第1行开始
+        for start_line, end_line in merged_ranges:
+            if start_line not in split_points:
+                split_points.append(start_line)
+        split_points.sort()
+        split_points.append(len(lines) + 1)  # 文件末尾
+        
+        # 按照分割点连续分割文件
+        # 注意：如果文件以换行符结尾，split('\n')会在末尾产生一个空字符串
+        # 我们需要正确处理这种情况
+        file_ends_with_newline = full_content.endswith('\n')
+        
+        for idx in range(len(split_points) - 1):
+            start_line = split_points[idx]  # 1-based
+            next_start_line = split_points[idx + 1]  # 1-based
+            
+            # 提取从当前分割点到下一个分割点之前的所有内容
+            unit_start_idx = max(0, start_line - 1)  # 0-based索引
+            unit_end_idx = min(len(lines) - 1, next_start_line - 2)  # 0-based索引，下一个分割点之前
+            
+            # 确保索引有效
+            if unit_start_idx <= unit_end_idx:
+                # 提取行并重新组合，确保保留所有换行符
+                extracted_lines = lines[unit_start_idx:unit_end_idx + 1]
+                
+                # 重新组合：每行后面添加换行符
+                # 对于非最后一个块，最后一行也需要换行符，因为下一个块从下一行开始
+                # 对于最后一个块，根据原始文件是否以换行符结尾来决定
+                full_unit_content_parts = []
+                is_last_block = (idx == len(split_points) - 2)
+                
+                for i, line in enumerate(extracted_lines):
+                    if i < len(extracted_lines) - 1:
+                        # 不是最后一行，添加换行符
+                        full_unit_content_parts.append(line + '\n')
+                    else:
+                        # 最后一行
+                        if not is_last_block:
+                            # 非最后一个块：最后一行必须添加换行符，因为下一个块从下一行开始
+                            # 这样可以保留块之间的空白行
+                            full_unit_content_parts.append(line + '\n')
+                        else:
+                            # 最后一个块：需要特殊处理
+                            # 如果文件以换行符结尾，且最后一行是空字符串（来自split('\n')的副作用），
+                            # 且不是唯一的一行，那么前面的行已经输出了换行符，这里不需要再输出
+                            if file_ends_with_newline and line == '' and len(extracted_lines) > 1:
+                                # 最后一行是空字符串且来自trailing newline，且不是唯一的一行
+                                # 前面的行已经输出了换行符，所以这里不需要再输出任何内容
+                                # 空字符串表示不输出任何内容
+                                full_unit_content_parts.append('')
+                            elif file_ends_with_newline:
+                                # 文件以换行符结尾，最后一行需要换行符
+                                full_unit_content_parts.append(line + '\n')
+                            else:
+                                # 文件不以换行符结尾
+                                full_unit_content_parts.append(line)
+                
+                full_unit_content = ''.join(full_unit_content_parts)
+                
+                result_units.append({
+                    "id": str(len(result_units) + 1),  # 从1开始的序号
+                    "content": full_unit_content,
+                })
+        
+        return result_units
+    
     def _save_file_cache(
         self, agent: Any, filepath: str, units: List[Dict[str, Any]], 
-        total_lines: int, file_mtime: float
+        total_lines: int, file_mtime: float, full_content: str = None
     ) -> None:
         """保存文件的结构化信息到缓存
         
@@ -202,6 +323,7 @@ class ReadCodeTool:
             units: 结构化单元列表
             total_lines: 文件总行数
             file_mtime: 文件修改时间
+            full_content: 完整的文件内容（可选），用于确保块之间的空白行也被包含
         """
         if not agent:
             return
@@ -212,8 +334,12 @@ class ReadCodeTool:
             agent.set_user_data("read_code_cache", cache)
         
         abs_path = os.path.abspath(filepath)
+        
+        # 将id转换为序号格式（从1开始），并确保包含完整内容
+        units_with_sequential_ids = self._convert_units_to_sequential_ids(units, full_content)
+        
         cache[abs_path] = {
-            "units": units,
+            "units": units_with_sequential_ids,
             "total_lines": total_lines,
             "read_time": time.time(),
             "file_mtime": file_mtime,
@@ -260,47 +386,31 @@ class ReadCodeTool:
             cache_info: 缓存信息字典
             
         Returns:
-            恢复的文件内容字符串
+            恢复的文件内容字符串（与原始文件内容完全一致）
         """
         if not cache_info or "units" not in cache_info:
             return ""
         
         units = cache_info["units"]
-        total_lines = cache_info.get("total_lines", 0)
         
-        if not units or total_lines == 0:
+        if not units:
             return ""
         
-        # 按行号排序单元
-        sorted_units = sorted(units, key=lambda u: u.get('start_line', 0))
+        # 按id排序单元（id是序号字符串，需要转换为整数排序）
+        sorted_units = sorted(units, key=lambda u: int(u.get('id', 0)) if str(u.get('id', '0')).isdigit() else 0)
         
-        # 构建文件内容
-        # 使用None标记未填充的行，最后用空字符串填充
-        lines = [None] * total_lines
-        
+        # 直接拼接所有块的内容，不做额外处理
+        # 每个块的content应该已经包含了完整的原始内容（包括换行符）
+        # 这样直接拼接就能恢复原始文件内容
+        result = []
         for unit in sorted_units:
-            start_line = unit.get('start_line', 1)
-            end_line = unit.get('end_line', start_line)
             content = unit.get('content', '')
-            
             if content:
-                content_lines = content.split('\n')
-                # 计算实际应该填充的行数
-                expected_lines = end_line - start_line + 1
-                
-                # 如果内容行数与预期行数不一致，使用实际内容行数
-                actual_lines = len(content_lines)
-                fill_lines = min(actual_lines, expected_lines)
-                
-                # 将内容填充到对应的行位置
-                for i in range(fill_lines):
-                    line_num = start_line + i - 1  # 转换为0-based索引
-                    if 0 <= line_num < total_lines:
-                        lines[line_num] = content_lines[i]
+                result.append(content)
         
-        # 将None替换为空字符串，合并为文件内容
-        result_lines = [line if line is not None else "" for line in lines]
-        return '\n'.join(result_lines)
+        # 直接拼接，不添加额外的换行符
+        # 如果块的content已经包含了所有必要的换行符，直接拼接即可
+        return ''.join(result) if result else ""
     
     def _estimate_structured_tokens(
         self, filepath: str, content: str, start_line: int, end_line: int, total_lines: int, raw_mode: bool = False
@@ -481,7 +591,7 @@ class ReadCodeTool:
             # 检查缓存是否有效
             cache_info = self._get_file_cache(agent, abs_path)
             use_cache = self._is_cache_valid(cache_info, abs_path)
-            
+
             # 读取完整文件内容用于语法分析和token计算
             if use_cache:
                 # 从缓存恢复文件内容
@@ -572,7 +682,7 @@ class ReadCodeTool:
             
             # 保存整个文件的结构化信息到缓存
             if full_structured_units is not None:
-                self._save_file_cache(agent, abs_path, full_structured_units, total_lines, file_mtime)
+                self._save_file_cache(agent, abs_path, full_structured_units, total_lines, file_mtime, full_content)
             
             # 提取请求范围的结构化单元（用于输出）
             import_units = self._extract_imports(abs_path, full_content, start_line, end_line)
@@ -749,6 +859,13 @@ class ReadCodeTool:
                     "success": False,
                     "stdout": "",
                     "stderr": "参数中必须包含文件列表",
+                }
+            
+            if len(args["files"]) == 0:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "文件列表不能为空",
                 }
 
             all_outputs = []
