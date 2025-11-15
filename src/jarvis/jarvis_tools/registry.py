@@ -20,6 +20,15 @@ from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
 
+_multiline_example = """  {
+    "multiline_str": |||
+      第一行：直接换行，无需 \\n
+      第二行：包含"双引号"，无需转义
+      第三行：包含'单引号'，直接写
+      第四行：支持缩进保留
+    |||
+  }"""
+
 tool_call_help = f"""
 <tool_system_guide>
 工具调用格式（Jsonnet）：
@@ -38,14 +47,7 @@ Jsonnet格式特性：
 - 字符串引号：可使用双引号或单引号
 - 多行字符串：推荐使用 ||| 分隔符包裹多行字符串，直接换行无需转义，支持保留缩进
   示例：
-  {
-    "multiline_str": |||
-      第一行：直接换行，无需 \\n
-      第二行：包含"双引号"，无需转义
-      第三行：包含'单引号'，直接写
-      第四行：支持缩进保留
-    |||
-  }
+{_multiline_example}
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
 - 注释：支持 // 单行或 /* */ 多行注释
 
