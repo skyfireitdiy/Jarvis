@@ -137,12 +137,8 @@ class EditFileTool:
             if cached_mtime is None or abs(current_mtime - cached_mtime) > 0.1:  # 允许0.1秒的误差
                 return False
             
-            # 检查缓存数据结构是否完整（支持新旧两种格式）
-            # 新格式：id_list 和 blocks
-            # 旧格式：units（向后兼容）
-            has_new_format = "id_list" in cache_info and "blocks" in cache_info
-            has_old_format = "units" in cache_info
-            if not (has_new_format or has_old_format) or "total_lines" not in cache_info:
+            # 检查缓存数据结构是否完整
+            if "id_list" not in cache_info or "blocks" not in cache_info or "total_lines" not in cache_info:
                 return False
             
             return True
@@ -163,25 +159,13 @@ class EditFileTool:
         if not cache_info:
             return None
         
-        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
-        if "id_list" in cache_info and "blocks" in cache_info:
-            # 新格式：直接从 blocks 字典中查找
-            blocks = cache_info.get("blocks", {})
-            block = blocks.get(block_id)
-            if block:
-                return {
-                    "content": block.get("content", ""),
-                }
-        elif "units" in cache_info:
-            # 旧格式：向后兼容
-            units = cache_info["units"]
-            for unit in units:
-                if unit.get("id") == block_id:
-                    return {
-                        "start_line": unit.get("start_line"),
-                        "end_line": unit.get("end_line"),
-                        "content": unit.get("content", ""),
-                    }
+        # 直接从 blocks 字典中查找
+        blocks = cache_info.get("blocks", {})
+        block = blocks.get(block_id)
+        if block:
+            return {
+                "content": block.get("content", ""),
+            }
         
         return None
 
@@ -431,39 +415,19 @@ class EditFileTool:
         if not cache_info:
             return ""
         
-        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
-        if "id_list" in cache_info and "blocks" in cache_info:
-            # 新格式：按照 id_list 的顺序恢复
-            id_list = cache_info.get("id_list", [])
-            blocks = cache_info.get("blocks", {})
-            
-            result = []
-            for block_id in id_list:
-                block = blocks.get(block_id)
-                if block:
-                    content = block.get('content', '')
-                    if content:
-                        result.append(content)
-            
-            return ''.join(result) if result else ""
-        elif "units" in cache_info:
-            # 旧格式：向后兼容
-            units = cache_info["units"]
-            if not units:
-                return ""
-            
-            # 按id排序单元（id是任意字符串，直接按字符串排序）
-            sorted_units = sorted(units, key=lambda u: str(u.get('id', '')))
-            
-            result = []
-            for unit in sorted_units:
-                content = unit.get('content', '')
+        # 按照 id_list 的顺序恢复
+        id_list = cache_info.get("id_list", [])
+        blocks = cache_info.get("blocks", {})
+        
+        result = []
+        for block_id in id_list:
+            block = blocks.get(block_id)
+            if block:
+                content = block.get('content', '')
                 if content:
                     result.append(content)
-            
-            return ''.join(result) if result else ""
         
-        return ""
+        return ''.join(result) if result else ""
 
     @staticmethod
     def _apply_structured_edit_to_cache(
@@ -486,94 +450,47 @@ class EditFileTool:
         if not cache_info:
             return (False, "缓存信息不完整")
         
-        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
-        if "id_list" in cache_info and "blocks" in cache_info:
-            # 新格式：从 blocks 字典中查找
-            blocks = cache_info.get("blocks", {})
-            block = blocks.get(block_id)
-            
-            if block is None:
-                return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
-            
-            # 根据操作类型执行编辑
-            if action == "delete":
-                # 删除块：将当前块的内容清空
-                block['content'] = ""
-                return (True, None)
-            
-            elif action == "insert_before":
-                # 在块前插入：在当前块的内容前面插入文本
-                if new_content is None:
-                    return (False, "insert_before操作需要提供content参数")
-                
-                current_content = block.get('content', '')
-                block['content'] = new_content + current_content
-                return (True, None)
-            
-            elif action == "insert_after":
-                # 在块后插入：在当前块的内容后面插入文本
-                if new_content is None:
-                    return (False, "insert_after操作需要提供content参数")
-                
-                current_content = block.get('content', '')
-                block['content'] = current_content + new_content
-                return (True, None)
-            
-            elif action == "replace":
-                # 替换块
-                if new_content is None:
-                    return (False, "replace操作需要提供content参数")
-                
-                block['content'] = new_content
-                return (True, None)
-            
-            else:
-                return (False, f"不支持的操作类型: {action}")
+        # 从 blocks 字典中查找
+        blocks = cache_info.get("blocks", {})
+        block = blocks.get(block_id)
         
-        elif "units" in cache_info:
-            # 旧格式：向后兼容
-            units = cache_info["units"]
-            
-            # 查找块（直接字符串匹配id）
-            block = None
-            for unit in units:
-                unit_id = str(unit.get("id", ""))
-                if unit_id == str(block_id):
-                    block = unit
-                    break
-            
-            if block is None:
-                return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
-            
-            # 根据操作类型执行编辑
-            if action == "delete":
-                block['content'] = ""
-                return (True, None)
-            
-            elif action == "insert_before":
-                if new_content is None:
-                    return (False, "insert_before操作需要提供content参数")
-                current_content = block.get('content', '')
-                block['content'] = new_content + current_content
-                return (True, None)
-            
-            elif action == "insert_after":
-                if new_content is None:
-                    return (False, "insert_after操作需要提供content参数")
-                current_content = block.get('content', '')
-                block['content'] = current_content + new_content
-                return (True, None)
-            
-            elif action == "replace":
-                if new_content is None:
-                    return (False, "replace操作需要提供content参数")
-                block['content'] = new_content
-                return (True, None)
-            
-            else:
-                return (False, f"不支持的操作类型: {action}")
+        if block is None:
+            return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
         
-        return (False, "缓存格式不支持")
+        # 根据操作类型执行编辑
+        if action == "delete":
+            # 删除块：将当前块的内容清空
+            block['content'] = ""
+            return (True, None)
+        
+        elif action == "insert_before":
+            # 在块前插入：在当前块的内容前面插入文本
+            if new_content is None:
+                return (False, "insert_before操作需要提供content参数")
+            
+            current_content = block.get('content', '')
+            block['content'] = new_content + current_content
+            return (True, None)
+        
+        elif action == "insert_after":
+            # 在块后插入：在当前块的内容后面插入文本
+            if new_content is None:
+                return (False, "insert_after操作需要提供content参数")
+            
+            current_content = block.get('content', '')
+            block['content'] = current_content + new_content
+            return (True, None)
+        
+        elif action == "replace":
+            # 替换块
+            if new_content is None:
+                return (False, "replace操作需要提供content参数")
+            
+            block['content'] = new_content
+            return (True, None)
+        
+        else:
+            return (False, f"不支持的操作类型: {action}")
 
     @staticmethod
     def _format_patch_description(patch: Dict[str, str]) -> str:
@@ -702,27 +619,14 @@ class EditFileTool:
                 )
                 return False, error_msg
             
-            # 创建缓存副本，避免直接修改原缓存（支持新旧两种格式）
-            if "id_list" in cache_info and "blocks" in cache_info:
-                # 新格式：深拷贝 id_list 和 blocks
-                cache_copy = {
-                    "id_list": list(cache_info["id_list"]),  # 浅拷贝列表
-                    "blocks": {k: v.copy() for k, v in cache_info["blocks"].items()},  # 深拷贝字典
-                    "total_lines": cache_info["total_lines"],
-                    "read_time": cache_info.get("read_time", time.time()),
-                    "file_mtime": cache_info.get("file_mtime", 0),
-                }
-            elif "units" in cache_info:
-                # 旧格式：向后兼容
-                cache_copy = {
-                    "units": [unit.copy() for unit in cache_info["units"]],
-                    "total_lines": cache_info["total_lines"],
-                    "read_time": cache_info.get("read_time", time.time()),
-                    "file_mtime": cache_info.get("file_mtime", 0),
-                }
-            else:
-                error_msg = "缓存格式不支持"
-                return False, error_msg
+            # 创建缓存副本，避免直接修改原缓存
+            cache_copy = {
+                "id_list": list(cache_info["id_list"]),  # 浅拷贝列表
+                "blocks": {k: v.copy() for k, v in cache_info["blocks"].items()},  # 深拷贝字典
+                "total_lines": cache_info["total_lines"],
+                "read_time": cache_info.get("read_time", time.time()),
+                "file_mtime": cache_info.get("file_mtime", 0),
+            }
             
             # 创建备份
             if os.path.exists(abs_path):

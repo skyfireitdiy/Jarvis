@@ -138,12 +138,13 @@ class Calculator:
         abs_path = os.path.abspath(sample_file)
         file_mtime = os.path.getmtime(abs_path)
         
-        # 创建有效缓存
+        # 创建有效缓存（新格式：id_list 和 blocks）
         cache = {
             abs_path: {
-                "units": [
-                    {"id": "1", "content": "def hello():\n    print('Hello')"}
-                ],
+                "id_list": ["block-1"],
+                "blocks": {
+                    "block-1": {"content": "def hello():\n    print('Hello')"}
+                },
                 "total_lines": 10,
                 "read_time": time.time(),
                 "file_mtime": file_mtime,
@@ -218,11 +219,12 @@ class Calculator:
     def test_restore_file_from_cache(self, tool):
         """测试从缓存恢复文件内容"""
         cache_info = {
-            "units": [
-                {"id": "2", "content": "line2\nline3"},
-                {"id": "1", "content": "line1"},
-                {"id": "3", "content": "line4"},
-            ],
+            "id_list": ["block-1", "block-2", "block-3"],
+            "blocks": {
+                "block-1": {"content": "line1"},
+                "block-2": {"content": "line2\nline3"},
+                "block-3": {"content": "line4"},
+            },
             "total_lines": 4,
         }
         
@@ -374,8 +376,8 @@ def goodbye():
             assert abs_path in cache
             
             cache_info = cache[abs_path]
-            # 检查新格式（id_list 和 blocks）或旧格式（units，向后兼容）
-            assert ("id_list" in cache_info and "blocks" in cache_info) or "units" in cache_info
+            # 检查新格式（id_list 和 blocks）
+            assert "id_list" in cache_info and "blocks" in cache_info
             
             # 从缓存恢复文件内容
             restored_content = tool._restore_file_from_cache(cache_info)
@@ -383,25 +385,15 @@ def goodbye():
             # 验证恢复的内容与原始内容完全一致
             assert restored_content == python_content, f"恢复的内容与原始内容不一致\n原始:\n{python_content}\n恢复:\n{restored_content}"
             
-            # 验证缓存中的单元只有id和content（新格式：id_list 和 blocks，或旧格式：units）
-            if "id_list" in cache_info and "blocks" in cache_info:
-                # 新格式
-                id_list = cache_info["id_list"]
-                blocks = cache_info["blocks"]
-                for block_id in id_list:
-                    assert block_id in blocks
-                    block = blocks[block_id]
-                    assert "content" in block
-                    assert "start_line" not in block
-                    assert "end_line" not in block
-            elif "units" in cache_info:
-                # 旧格式：向后兼容
-                units = cache_info["units"]
-                for unit in units:
-                    assert "id" in unit
-                    assert "content" in unit
-                    assert "start_line" not in unit
-                    assert "end_line" not in unit
+            # 验证缓存中的单元只有id和content
+            id_list = cache_info["id_list"]
+            blocks = cache_info["blocks"]
+            for block_id in id_list:
+                assert block_id in blocks
+                block = blocks[block_id]
+                assert "content" in block
+                assert "start_line" not in block
+                assert "end_line" not in block
         finally:
             if os.path.exists(filepath):
                 os.unlink(filepath)
@@ -824,49 +816,34 @@ def func3():
             if cache and abs_path in cache:
                 cache_info = cache[abs_path]
                 
-                # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
-                if "id_list" in cache_info and "blocks" in cache_info:
-                    # 新格式
-                    id_list = cache_info["id_list"]
-                    blocks = cache_info["blocks"]
-                    
-                    # 验证 id_list 不为空
-                    assert len(id_list) > 0
-                    
-                    # 验证所有 id 都在 blocks 中
-                    for block_id in id_list:
-                        assert block_id in blocks
-                    
-                    # 验证 id 格式（block-N 格式）
-                    for block_id in id_list:
-                        assert isinstance(block_id, str)
-                        assert block_id.startswith("block-")
-                    
-                    # 验证 id 是连续的（提取数字部分）
-                    numeric_ids = []
-                    for block_id in id_list:
-                        if block_id.startswith("block-"):
-                            try:
-                                num = int(block_id.split("-", 1)[1])
-                                numeric_ids.append(num)
-                            except (ValueError, IndexError):
-                                pass
-                    
-                    if len(numeric_ids) > 1:
-                        assert numeric_ids == list(range(1, len(numeric_ids) + 1))
-                elif "units" in cache_info:
-                    # 旧格式：向后兼容
-                    units = cache_info["units"]
-                    
-                    # 验证id是序号格式（字符串"1", "2", "3"等）
-                    ids = [unit["id"] for unit in units]
-                    assert all(str(id).isdigit() for id in ids)
-                    
-                    # 验证id是连续的
-                    numeric_ids = [int(id) for id in ids if str(id).isdigit()]
-                    if len(numeric_ids) > 1:
-                        assert numeric_ids == sorted(numeric_ids)
-                        assert numeric_ids[0] == 1  # 从1开始
+                # 验证新格式（id_list + blocks）
+                id_list = cache_info["id_list"]
+                blocks = cache_info["blocks"]
+                
+                # 验证 id_list 不为空
+                assert len(id_list) > 0
+                
+                # 验证所有 id 都在 blocks 中
+                for block_id in id_list:
+                    assert block_id in blocks
+                
+                # 验证 id 格式（block-N 格式）
+                for block_id in id_list:
+                    assert isinstance(block_id, str)
+                    assert block_id.startswith("block-")
+                
+                # 验证 id 是连续的（提取数字部分）
+                numeric_ids = []
+                for block_id in id_list:
+                    if block_id.startswith("block-"):
+                        try:
+                            num = int(block_id.split("-", 1)[1])
+                            numeric_ids.append(num)
+                        except (ValueError, IndexError):
+                            pass
+                
+                if len(numeric_ids) > 1:
+                    assert numeric_ids == list(range(1, len(numeric_ids) + 1))
                 
                 # 验证恢复的内容与原始内容完全一致
                 restored_content = tool._restore_file_from_cache(cache_info)
@@ -916,25 +893,15 @@ class Math:
             # 步骤4：验证恢复的内容与原始内容完全一致
             assert restored_content == original_content, f"恢复的内容与原始内容不一致\n原始:\n{original_content}\n恢复:\n{restored_content}"
             
-            # 步骤5：验证缓存结构正确（新格式：id_list 和 blocks，或旧格式：units）
-            if "id_list" in cache_info and "blocks" in cache_info:
-                # 新格式
-                id_list = cache_info["id_list"]
-                blocks = cache_info["blocks"]
-                for block_id in id_list:
-                    assert block_id in blocks
-                    block = blocks[block_id]
-                    assert "content" in block
-                    assert "start_line" not in block
-                    assert "end_line" not in block
-            elif "units" in cache_info:
-                # 旧格式：向后兼容
-                units = cache_info["units"]
-                for unit in units:
-                    assert "id" in unit
-                    assert "content" in unit
-                    assert "start_line" not in unit
-                    assert "end_line" not in unit
+            # 步骤5：验证缓存结构正确
+            id_list = cache_info["id_list"]
+            blocks = cache_info["blocks"]
+            for block_id in id_list:
+                assert block_id in blocks
+                block = blocks[block_id]
+                assert "content" in block
+                assert "start_line" not in block
+                assert "end_line" not in block
         finally:
             if os.path.exists(filepath):
                 os.unlink(filepath)
@@ -1066,30 +1033,18 @@ class Test:
                 # 验证恢复的内容与原始内容完全一致
                 assert restored_content == python_content, f"恢复的内容与原始内容不一致\n原始:\n{python_content}\n恢复:\n{restored_content}"
                 
-                # 验证缓存单元结构（新格式：id_list 和 blocks，或旧格式：units）
-                if "id_list" in cache_info and "blocks" in cache_info:
-                    # 新格式
-                    id_list = cache_info["id_list"]
-                    blocks = cache_info["blocks"]
-                    assert len(id_list) > 0
-                    assert len(blocks) > 0
-                    for block_id in id_list:
-                        assert isinstance(block_id, str)
-                        assert block_id.startswith("block-")  # id应该是block-N格式
-                        assert block_id in blocks
-                        block = blocks[block_id]
-                        assert "content" in block
-                        assert isinstance(block["content"], str)
-                elif "units" in cache_info:
-                    # 旧格式：向后兼容
-                    units = cache_info["units"]
-                    assert len(units) > 0
-                    for unit in units:
-                        assert "id" in unit
-                        assert isinstance(unit["id"], str)
-                        assert unit["id"].isdigit()  # id应该是数字字符串
-                        assert "content" in unit
-                        assert isinstance(unit["content"], str)
+                # 验证缓存单元结构
+                id_list = cache_info["id_list"]
+                blocks = cache_info["blocks"]
+                assert len(id_list) > 0
+                assert len(blocks) > 0
+                for block_id in id_list:
+                    assert isinstance(block_id, str)
+                    assert block_id.startswith("block-")  # id应该是block-N格式
+                    assert block_id in blocks
+                    block = blocks[block_id]
+                    assert "content" in block
+                    assert isinstance(block["content"], str)
         finally:
             if os.path.exists(filepath):
                 os.unlink(filepath)
@@ -1124,17 +1079,9 @@ def func3():
             if cache and abs_path in cache:
                 cache_info = cache[abs_path]
                 
-                # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
-                if "id_list" in cache_info and "blocks" in cache_info:
-                    # 新格式
-                    blocks = cache_info["blocks"]
-                    unit_contents = [block["content"] for block in blocks.values()]
-                elif "units" in cache_info:
-                    # 旧格式：向后兼容
-                    units = cache_info["units"]
-                    unit_contents = [unit["content"] for unit in units]
-                else:
-                    unit_contents = []
+                # 从新格式（id_list + blocks）中提取内容
+                blocks = cache_info["blocks"]
+                unit_contents = [block["content"] for block in blocks.values()]
                 
                 # 验证所有函数都在缓存中
                 assert any("def func1()" in content for content in unit_contents)

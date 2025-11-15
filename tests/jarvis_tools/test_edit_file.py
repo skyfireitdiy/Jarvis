@@ -70,14 +70,15 @@ class Calculator:
         abs_path = os.path.abspath(sample_file)
         file_mtime = os.path.getmtime(abs_path)
         
-        # 创建有效缓存
+        # 创建有效缓存（新格式：id_list 和 blocks）
         cache = {
             abs_path: {
-                "units": [
-                    {"id": "1", "content": "def hello():\n    print(\"Hello, World!\")\n"},
-                    {"id": "2", "content": "\ndef add(a, b):\n    return a + b\n"},
-                    {"id": "3", "content": "\nclass Calculator:\n    def __init__(self):\n        self.value = 0\n"},
-                ],
+                "id_list": ["block-1", "block-2", "block-3"],
+                "blocks": {
+                    "block-1": {"content": "def hello():\n    print(\"Hello, World!\")\n"},
+                    "block-2": {"content": "\ndef add(a, b):\n    return a + b\n"},
+                    "block-3": {"content": "\nclass Calculator:\n    def __init__(self):\n        self.value = 0\n"},
+                },
                 "total_lines": 10,
                 "read_time": time.time(),
                 "file_mtime": file_mtime,
@@ -102,7 +103,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "replace",
                 "content": "def hello():\n    print('Hi!')\n"
             }],
@@ -124,7 +125,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "delete"
             }],
             "agent": mock_agent
@@ -137,8 +138,8 @@ class Calculator:
         if cache:
             abs_path = os.path.abspath(sample_file)
             if abs_path in cache:
-                units = cache[abs_path]["units"]
-                block = next((u for u in units if u["id"] == "1"), None)
+                blocks = cache[abs_path]["blocks"]
+                block = blocks.get("block-1")
                 if block:
                     assert block["content"] == ""
 
@@ -150,7 +151,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "2",
+                "block_id": "block-2",
                 "action": "insert_before",
                 "content": "# New comment\n"
             }],
@@ -172,7 +173,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "2",
+                "block_id": "block-2",
                 "action": "insert_after",
                 "content": "# After comment\n"
             }],
@@ -192,7 +193,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "replace",
                 "content": "new content"
             }],
@@ -211,7 +212,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "999",
+                "block_id": "block-999",
                 "action": "replace",
                 "content": "new content"
             }],
@@ -230,13 +231,13 @@ class Calculator:
             "diffs": [
                 {
                     "type": "structured",
-                    "block_id": "1",
+                    "block_id": "block-1",
                     "action": "replace",
                     "content": "def hello():\n    print('Modified')\n"
                 },
                 {
                     "type": "structured",
-                    "block_id": "2",
+                    "block_id": "block-2",
                     "action": "insert_before",
                     "content": "# Before add\n"
                 }
@@ -260,7 +261,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "replace"
             }],
             "agent": mock_agent
@@ -277,7 +278,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "invalid_action",
                 "content": "content"
             }],
@@ -289,10 +290,11 @@ class Calculator:
 
     def test_edit_nonexistent_file(self, tool, mock_agent):
         """测试编辑不存在的文件"""
-        # 创建无效缓存
+        # 创建无效缓存（新格式）
         cache = {
             "/nonexistent/file.py": {
-                "units": [{"id": "1", "content": "content"}],
+                "id_list": ["block-1"],
+                "blocks": {"block-1": {"content": "content"}},
                 "total_lines": 1,
                 "read_time": time.time(),
                 "file_mtime": time.time(),
@@ -304,7 +306,7 @@ class Calculator:
             "file_path": "/nonexistent/file.py",
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "replace",
                 "content": "new content"
             }],
@@ -318,13 +320,14 @@ class Calculator:
         """测试编辑后缓存更新"""
         abs_path = os.path.abspath(sample_file)
         
-        # 设置缓存，使其可以被修改
+        # 设置缓存，使其可以被修改（新格式）
         cache = {
             abs_path: {
-                "units": [
-                    {"id": "1", "content": "original content"},
-                    {"id": "2", "content": "other content"},
-                ],
+                "id_list": ["block-1", "block-2"],
+                "blocks": {
+                    "block-1": {"content": "original content"},
+                    "block-2": {"content": "other content"},
+                },
                 "total_lines": 2,
                 "read_time": time.time(),
                 "file_mtime": os.path.getmtime(abs_path),
@@ -343,7 +346,7 @@ class Calculator:
             "file_path": sample_file,
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "replace",
                 "content": "new content\n"
             }],
@@ -356,62 +359,64 @@ class Calculator:
         assert mock_agent.set_user_data.called
         # 检查缓存中的内容是否已更新
         final_cache = cache[abs_path]
-        units = final_cache["units"]
-        block = next((u for u in units if u["id"] == "1"), None)
+        blocks = final_cache["blocks"]
+        block = blocks.get("block-1")
         assert block is not None
         assert "new content" in block["content"]
 
     def test_apply_structured_edit_to_cache(self, tool):
         """测试直接在缓存中应用编辑"""
         cache_info = {
-            "units": [
-                {"id": "1", "content": "original content"},
-                {"id": "2", "content": "other content"},
-            ],
+            "id_list": ["block-1", "block-2"],
+            "blocks": {
+                "block-1": {"content": "original content"},
+                "block-2": {"content": "other content"},
+            },
             "total_lines": 2,
         }
         
         # 测试替换
         success, error = EditFileTool._apply_structured_edit_to_cache(
-            cache_info, "1", "replace", "new content"
+            cache_info, "block-1", "replace", "new content"
         )
         assert success is True
-        assert cache_info["units"][0]["content"] == "new content"
+        assert cache_info["blocks"]["block-1"]["content"] == "new content"
         
         # 测试删除（清空）
         success, error = EditFileTool._apply_structured_edit_to_cache(
-            cache_info, "2", "delete", None
+            cache_info, "block-2", "delete", None
         )
         assert success is True
-        assert cache_info["units"][1]["content"] == ""
+        assert cache_info["blocks"]["block-2"]["content"] == ""
         
         # 测试插入前
         success, error = EditFileTool._apply_structured_edit_to_cache(
-            cache_info, "1", "insert_before", "prefix "
+            cache_info, "block-1", "insert_before", "prefix "
         )
         assert success is True
-        assert cache_info["units"][0]["content"].startswith("prefix ")
+        assert cache_info["blocks"]["block-1"]["content"].startswith("prefix ")
         
         # 测试插入后
         success, error = EditFileTool._apply_structured_edit_to_cache(
-            cache_info, "1", "insert_after", " suffix"
+            cache_info, "block-1", "insert_after", " suffix"
         )
         assert success is True
-        assert cache_info["units"][0]["content"].endswith(" suffix")
+        assert cache_info["blocks"]["block-1"]["content"].endswith(" suffix")
 
     def test_restore_file_from_cache(self, tool):
         """测试从缓存恢复文件"""
         cache_info = {
-            "units": [
-                {"id": "2", "content": "second"},
-                {"id": "1", "content": "first"},
-                {"id": "3", "content": "third"},
-            ],
+            "id_list": ["block-1", "block-2", "block-3"],
+            "blocks": {
+                "block-1": {"content": "first"},
+                "block-2": {"content": "second"},
+                "block-3": {"content": "third"},
+            },
         }
         
         result = EditFileTool._restore_file_from_cache(cache_info)
         
-        # 应该按id顺序拼接
+        # 应该按id_list顺序拼接
         assert "first" in result
         assert "second" in result
         assert "third" in result
@@ -423,14 +428,14 @@ class Calculator:
         """测试验证结构化diff"""
         # 有效的diff
         error, patch = EditFileTool._validate_structured({
-            "block_id": "1",
+            "block_id": "block-1",
             "action": "replace",
             "content": "new content"
         }, 0)
         
         assert error is None
         assert patch is not None
-        assert patch["STRUCTURED_BLOCK_ID"] == "1"
+        assert patch["STRUCTURED_BLOCK_ID"] == "block-1"
         assert patch["STRUCTURED_ACTION"] == "replace"
         
         # 缺少block_id
@@ -444,7 +449,7 @@ class Calculator:
         
         # 无效的action
         error, patch = EditFileTool._validate_structured({
-            "block_id": "1",
+            "block_id": "block-1",
             "action": "invalid",
             "content": "content"
         }, 0)
@@ -471,7 +476,7 @@ class Calculator:
         result = tool.execute({
             "diffs": [{
                 "type": "structured",
-                "block_id": "1",
+                "block_id": "block-1",
                 "action": "replace",
                 "content": "content"
             }]
@@ -481,7 +486,7 @@ class Calculator:
 
     def test_restore_empty_cache(self, tool):
         """测试恢复空缓存"""
-        cache_info = {"units": []}
+        cache_info = {"id_list": [], "blocks": {}}
         result = EditFileTool._restore_file_from_cache(cache_info)
         assert result == ""
         
@@ -489,7 +494,7 @@ class Calculator:
         result = EditFileTool._restore_file_from_cache(None)
         assert result == ""
         
-        # 测试缺少 units 的缓存
+        # 测试缺少 id_list 和 blocks 的缓存
         result = EditFileTool._restore_file_from_cache({})
         assert result == ""
 
@@ -509,13 +514,14 @@ def func2():
             abs_path = os.path.abspath(filepath)
             file_mtime = os.path.getmtime(abs_path)
             
-            # 创建缓存
+            # 创建缓存（新格式）
             cache = {
                 abs_path: {
-                    "units": [
-                        {"id": "1", "content": "def func1():\n    return 1\n"},
-                        {"id": "2", "content": "\ndef func2():\n    return 2\n"},
-                    ],
+                    "id_list": ["block-1", "block-2"],
+                    "blocks": {
+                        "block-1": {"content": "def func1():\n    return 1\n"},
+                        "block-2": {"content": "\ndef func2():\n    return 2\n"},
+                    },
                     "total_lines": 6,
                     "read_time": time.time(),
                     "file_mtime": file_mtime,
@@ -533,7 +539,7 @@ def func2():
                 "file_path": filepath,
                 "diffs": [{
                     "type": "structured",
-                    "block_id": "1",
+                    "block_id": "block-1",
                     "action": "replace",
                     "content": "def func1():\n    return 100\n"
                 }],
@@ -572,14 +578,15 @@ void func2() {
             abs_path = os.path.abspath(filepath)
             file_mtime = os.path.getmtime(abs_path)
             
-            # 创建缓存
+            # 创建缓存（新格式）
             cache = {
                 abs_path: {
-                    "units": [
-                        {"id": "1", "content": "#include <stdio.h>\n\n"},
-                        {"id": "2", "content": "void func1() {\n    printf(\"1\");\n}\n\n"},
-                        {"id": "3", "content": "void func2() {\n    printf(\"2\");\n}\n"},
-                    ],
+                    "id_list": ["block-1", "block-2", "block-3"],
+                    "blocks": {
+                        "block-1": {"content": "#include <stdio.h>\n\n"},
+                        "block-2": {"content": "void func1() {\n    printf(\"1\");\n}\n\n"},
+                        "block-3": {"content": "void func2() {\n    printf(\"2\");\n}\n"},
+                    },
                     "total_lines": 10,
                     "read_time": time.time(),
                     "file_mtime": file_mtime,
@@ -597,7 +604,7 @@ void func2() {
                 "file_path": filepath,
                 "diffs": [{
                     "type": "structured",
-                    "block_id": "2",
+                    "block_id": "block-2",
                     "action": "replace",
                     "content": "void func1() {\n    printf(\"modified\");\n}\n\n"
                 }],
@@ -634,15 +641,16 @@ void func2() {
             abs_path = os.path.abspath(filepath)
             file_mtime = os.path.getmtime(abs_path)
             
-            # 创建缓存
+            # 创建缓存（新格式）
             cache = {
                 abs_path: {
-                    "units": [
-                        {"id": "1", "content": "public class Main {\n"},
-                        {"id": "2", "content": "    public void method1() {\n    }\n"},
-                        {"id": "3", "content": "    \n    public void method2() {\n    }\n"},
-                        {"id": "4", "content": "}\n"},
-                    ],
+                    "id_list": ["block-1", "block-2", "block-3", "block-4"],
+                    "blocks": {
+                        "block-1": {"content": "public class Main {\n"},
+                        "block-2": {"content": "    public void method1() {\n    }\n"},
+                        "block-3": {"content": "    \n    public void method2() {\n    }\n"},
+                        "block-4": {"content": "}\n"},
+                    },
                     "total_lines": 7,
                     "read_time": time.time(),
                     "file_mtime": file_mtime,
@@ -660,7 +668,7 @@ void func2() {
                 "file_path": filepath,
                 "diffs": [{
                     "type": "structured",
-                    "block_id": "2",
+                    "block_id": "block-2",
                     "action": "insert_before",
                     "content": "    // New comment\n"
                 }],
@@ -698,13 +706,14 @@ struct Point {
             abs_path = os.path.abspath(filepath)
             file_mtime = os.path.getmtime(abs_path)
             
-            # 创建缓存
+            # 创建缓存（新格式）
             cache = {
                 abs_path: {
-                    "units": [
-                        {"id": "1", "content": "fn main() {\n    println!(\"Hello\");\n}\n\n"},
-                        {"id": "2", "content": "struct Point {\n    x: i32,\n    y: i32,\n}\n"},
-                    ],
+                    "id_list": ["block-1", "block-2"],
+                    "blocks": {
+                        "block-1": {"content": "fn main() {\n    println!(\"Hello\");\n}\n\n"},
+                        "block-2": {"content": "struct Point {\n    x: i32,\n    y: i32,\n}\n"},
+                    },
                     "total_lines": 8,
                     "read_time": time.time(),
                     "file_mtime": file_mtime,
@@ -722,7 +731,7 @@ struct Point {
                 "file_path": filepath,
                 "diffs": [{
                     "type": "structured",
-                    "block_id": "1",
+                    "block_id": "block-1",
                     "action": "delete"
                 }],
                 "agent": mock_agent
@@ -732,8 +741,8 @@ struct Point {
             
             # 验证缓存中的块内容已清空
             final_cache = cache[abs_path]
-            units = final_cache["units"]
-            block = next((u for u in units if u["id"] == "1"), None)
+            blocks = final_cache["blocks"]
+            block = blocks.get("block-1")
             assert block is not None
             assert block["content"] == ""
         finally:
@@ -763,14 +772,15 @@ type Point struct {
             abs_path = os.path.abspath(filepath)
             file_mtime = os.path.getmtime(abs_path)
             
-            # 创建缓存
+            # 创建缓存（新格式）
             cache = {
                 abs_path: {
-                    "units": [
-                        {"id": "1", "content": "package main\n\n"},
-                        {"id": "2", "content": "func main() {\n    fmt.Println(\"Hello\")\n}\n\n"},
-                        {"id": "3", "content": "type Point struct {\n    x int\n    y int\n}\n"},
-                    ],
+                    "id_list": ["block-1", "block-2", "block-3"],
+                    "blocks": {
+                        "block-1": {"content": "package main\n\n"},
+                        "block-2": {"content": "func main() {\n    fmt.Println(\"Hello\")\n}\n\n"},
+                        "block-3": {"content": "type Point struct {\n    x int\n    y int\n}\n"},
+                    },
                     "total_lines": 9,
                     "read_time": time.time(),
                     "file_mtime": file_mtime,
@@ -788,7 +798,7 @@ type Point struct {
                 "file_path": filepath,
                 "diffs": [{
                     "type": "structured",
-                    "block_id": "2",
+                    "block_id": "block-2",
                     "action": "insert_after",
                     "content": "    fmt.Println(\"World\")\n"
                 }],
@@ -820,12 +830,13 @@ type Point struct {
             abs_path = os.path.abspath(filepath)
             file_mtime = os.path.getmtime(abs_path)
             
-            # 创建初始缓存
+            # 创建初始缓存（新格式）
             cache = {
                 abs_path: {
-                    "units": [
-                        {"id": "1", "content": "def test():\n    return 1\n"},
-                    ],
+                    "id_list": ["block-1"],
+                    "blocks": {
+                        "block-1": {"content": "def test():\n    return 1\n"},
+                    },
                     "total_lines": 2,
                     "read_time": time.time(),
                     "file_mtime": file_mtime,
@@ -843,7 +854,7 @@ type Point struct {
                 "file_path": filepath,
                 "diffs": [{
                     "type": "structured",
-                    "block_id": "1",
+                    "block_id": "block-1",
                     "action": "replace",
                     "content": "def test():\n    return 999\n"
                 }],
@@ -895,12 +906,13 @@ type Point struct {
                 abs_path = os.path.abspath(filepath)
                 file_mtime = os.path.getmtime(abs_path)
                 
-                # 创建缓存
+                # 创建缓存（新格式）
                 cache = {
                     abs_path: {
-                        "units": [
-                            {"id": "1", "content": content},
-                        ],
+                        "id_list": ["block-1"],
+                        "blocks": {
+                            "block-1": {"content": content},
+                        },
                         "total_lines": len(content.split('\n')),
                         "read_time": time.time(),
                         "file_mtime": file_mtime,
@@ -918,7 +930,7 @@ type Point struct {
                     "file_path": filepath,
                     "diffs": [{
                         "type": "structured",
-                        "block_id": "1",
+                        "block_id": "block-1",
                         "action": "replace",
                         "content": content.replace("func", "modified_func")
                     }],
