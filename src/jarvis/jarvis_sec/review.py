@@ -95,6 +95,7 @@ def process_review_batch(
     review_results: Optional[List[Dict]],
     reviewed_clusters: List[Dict],
     reinstated_candidates: List[Dict],
+    sec_dir=None,
 ) -> None:
     """处理单个复核批次的结果"""
     if review_results:
@@ -141,6 +142,48 @@ def process_review_batch(
                     "review_result": "confirmed_invalid",
                     "review_notes": review_notes,
                 })
+                
+                # 将确认无效的gids保存到analysis.jsonl的false_positive_gids中，以便断点恢复时能正确识别已复核的无效聚类
+                if sec_dir:
+                    try:
+                        from pathlib import Path
+                        from jarvis.jarvis_sec.file_manager import save_analysis_result
+                        from datetime import datetime
+                        
+                        # 构建cluster_id
+                        file_name = invalid_cluster.get("file", "")
+                        batch_index = invalid_cluster.get("batch_index", 1)
+                        cluster_id = f"{file_name}|{batch_index}|review"
+                        
+                        # 将gids转换为整数列表
+                        false_positive_gids = []
+                        for gid_val in cluster_gids:
+                            try:
+                                gid_int = int(gid_val)
+                                if gid_int >= 1:
+                                    false_positive_gids.append(gid_int)
+                            except Exception:
+                                pass
+                        
+                        # 保存分析结果
+                        if false_positive_gids:
+                            analysis_result = {
+                                "cluster_id": cluster_id,
+                                "file": file_name,
+                                "batch_index": batch_index,
+                                "gids": false_positive_gids,
+                                "verified_gids": [],
+                                "false_positive_gids": false_positive_gids,
+                                "issues": [],
+                                "analyzed_at": datetime.now().isoformat(),
+                            }
+                            save_analysis_result(Path(sec_dir), analysis_result)
+                    except Exception as e:
+                        # 保存失败不影响主流程，只记录警告
+                        try:
+                            typer.secho(f"[jarvis-sec] 警告：保存复核结果到analysis.jsonl失败: {str(e)}", fg=typer.colors.YELLOW)
+                        except Exception:
+                            pass
     else:
         # 复核结果解析失败，保守策略：重新加入验证流程
         typer.secho("[jarvis-sec] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程", fg=typer.colors.YELLOW)
@@ -160,6 +203,7 @@ def process_review_batch_items(
     review_results: Optional[List[Dict]],
     reviewed_clusters: List[Dict],
     reinstated_candidates: List[Dict],
+    sec_dir=None,
 ) -> None:
     """处理单个复核批次的结果"""
     process_review_batch(
@@ -167,6 +211,7 @@ def process_review_batch_items(
         review_results,
         reviewed_clusters,
         reinstated_candidates,
+        sec_dir,
     )
 
 
@@ -287,6 +332,7 @@ def process_review_phase(
     status_mgr,
     _progress_append,
     cluster_batches: List[List[Dict]],
+    sec_dir=None,
 ) -> List[List[Dict]]:
     """
     处理复核阶段：验证所有标记为无效的聚类。
@@ -348,6 +394,7 @@ def process_review_phase(
             review_results,
             reviewed_clusters,
             reinstated_candidates,
+            sec_dir,
         )
         
         # 记录每个已复核的无效聚类的 gids（包括确认无效的和重新加入验证的）
