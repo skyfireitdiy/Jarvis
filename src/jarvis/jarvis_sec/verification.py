@@ -572,6 +572,12 @@ def process_verification_phase(
         except Exception:
             pass
     
+    if analyzed_gids:
+        try:
+            typer.secho(f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(analyzed_gids)} 个已分析的 gids", fg=typer.colors.BLUE)
+        except Exception:
+            pass
+    
     # 更新验证阶段状态
     if total_batches > 0:
         status_mgr.update_verification(
@@ -594,11 +600,12 @@ def process_verification_phase(
         # 检查批次是否已完成
         is_batch_completed = False
         
-        # 从批次中提取 gids
+        # 从批次中提取 gids（确保类型为整数）
         batch_gids = set()
         for item in batch:
             try:
-                _gid = int(item.get("gid", 0))
+                _gid_val = item.get("gid", 0)
+                _gid = int(_gid_val) if _gid_val else 0
                 if _gid >= 1:
                     batch_gids.add(_gid)
             except Exception:
@@ -608,7 +615,14 @@ def process_verification_phase(
         # 查找匹配的聚类
         for cluster in clusters:
             cluster_file = str(cluster.get("file", ""))
-            cluster_gids = set(cluster.get("gids", []))
+            cluster_gids_list = cluster.get("gids", [])
+            # 转换为整数集合进行比较
+            cluster_gids = set()
+            for gid_val in cluster_gids_list:
+                try:
+                    cluster_gids.add(int(gid_val))
+                except Exception:
+                    pass
             
             if cluster_file == batch_file and cluster_gids == batch_gids:
                 cluster_id = cluster.get("cluster_id", "")
@@ -618,7 +632,10 @@ def process_verification_phase(
         
         # 方法2：如果所有 gid 都已分析，则认为该批次已完成
         if not is_batch_completed and batch_gids and analyzed_gids:
-            if batch_gids.issubset(analyzed_gids):
+            # 确保类型一致：都转换为整数集合
+            batch_gids_int = {int(gid) for gid in batch_gids if isinstance(gid, (int, str))}
+            analyzed_gids_int = {int(gid) for gid in analyzed_gids if isinstance(gid, (int, str))}
+            if batch_gids_int and batch_gids_int.issubset(analyzed_gids_int):
                 is_batch_completed = True
         
         if is_batch_completed:
