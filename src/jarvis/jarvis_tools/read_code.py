@@ -197,8 +197,8 @@ class ReadCodeTool:
         abs_path = os.path.abspath(filepath)
         return cache.get(abs_path)
     
-    def _convert_units_to_sequential_ids(self, units: List[Dict[str, Any]], full_content: str = None) -> List[Dict[str, Any]]:
-        """将单元列表转换为缓存格式（只保留id和content，id为block格式）
+    def _convert_units_to_sequential_ids(self, units: List[Dict[str, Any]], full_content: str = None) -> Dict[str, Any]:
+        """将单元列表转换为缓存格式（id_list和blocks字典）
         
         按照行号范围分割文件，不区分语法单元，确保完美恢复。
         
@@ -207,18 +207,25 @@ class ReadCodeTool:
             full_content: 完整的文件内容（可选），用于确保块之间的空白行也被包含
             
         Returns:
-            转换后的单元列表，只包含 id 和 content，id为block格式（如 "block-1", "block-2", "block-3"）
+            包含 id_list 和 blocks 的字典：
+            - id_list: 有序的id列表，如 ["block-1", "block-2", "block-3"]
+            - blocks: id到块信息的字典，如 {"block-1": {"content": "..."}, ...}
         """
         if not full_content or not units:
             # 没有完整内容，直接使用原始的content
             sorted_original = sorted(units, key=lambda u: u.get('start_line', 0))
-            result_units = []
+            id_list = []
+            blocks = {}
             for unit in sorted_original:
-                result_units.append({
-                    "id": f"block-{len(result_units) + 1}",  # block-1, block-2, ...
+                block_id = f"block-{len(id_list) + 1}"  # block-1, block-2, ...
+                id_list.append(block_id)
+                blocks[block_id] = {
                     "content": unit.get('content', ''),
-                })
-            return result_units
+                }
+            return {
+                "id_list": id_list,
+                "blocks": blocks,
+            }
         
         # 收集所有单元的行号范围，用于确定分割点
         # 关键：只使用行号范围来分割文件，不区分语法单元类型，确保每行只被提取一次
@@ -314,12 +321,19 @@ class ReadCodeTool:
                 
                 full_unit_content = ''.join(full_unit_content_parts)
                 
+                block_id = f"block-{len(result_units) + 1}"  # block-1, block-2, ...
                 result_units.append({
-                    "id": f"block-{len(result_units) + 1}",  # block-1, block-2, ...
+                    "id": block_id,
                     "content": full_unit_content,
                 })
         
-        return result_units
+        # 转换为 id_list 和 blocks 格式
+        id_list = [unit["id"] for unit in result_units]
+        blocks = {unit["id"]: {"content": unit["content"]} for unit in result_units}
+        return {
+            "id_list": id_list,
+            "blocks": blocks,
+        }
     
     def _save_file_cache(
         self, agent: Any, filepath: str, units: List[Dict[str, Any]], 
@@ -345,11 +359,12 @@ class ReadCodeTool:
         
         abs_path = os.path.abspath(filepath)
         
-        # 将id转换为序号格式（从1开始），并确保包含完整内容
-        units_with_sequential_ids = self._convert_units_to_sequential_ids(units, full_content)
+        # 转换为 id_list 和 blocks 格式
+        cache_data = self._convert_units_to_sequential_ids(units, full_content)
         
         cache[abs_path] = {
-            "units": units_with_sequential_ids,
+            "id_list": cache_data["id_list"],
+            "blocks": cache_data["blocks"],
             "total_lines": total_lines,
             "read_time": time.time(),
             "file_mtime": file_mtime,
@@ -381,8 +396,12 @@ class ReadCodeTool:
             if cached_mtime is None or abs(current_mtime - cached_mtime) > 0.1:  # 允许0.1秒的误差
                 return False
             
-            # 检查缓存数据结构是否完整
-            if "units" not in cache_info or "total_lines" not in cache_info:
+            # 检查缓存数据结构是否完整（支持新旧两种格式）
+            # 新格式：id_list 和 blocks
+            # 旧格式：units（向后兼容）
+            has_new_format = "id_list" in cache_info and "blocks" in cache_info
+            has_old_format = "units" in cache_info
+            if not (has_new_format or has_old_format) or "total_lines" not in cache_info:
                 return False
             
             return True
@@ -398,42 +417,55 @@ class ReadCodeTool:
         Returns:
             恢复的文件内容字符串（与原始文件内容完全一致）
         """
-        if not cache_info or "units" not in cache_info:
+        if not cache_info:
             return ""
         
-        units = cache_info["units"]
-        
-        if not units:
-            return ""
-        
-        # 按id排序单元（id是block-1, block-2格式，提取数字部分排序）
-        def extract_block_number(unit):
-            id_str = str(unit.get('id', 'block-0'))
-            if id_str.startswith('block-'):
+        # 支持新格式（id_list + blocks）和旧格式（units，向后兼容）
+        if "id_list" in cache_info and "blocks" in cache_info:
+            # 新格式：按照 id_list 的顺序恢复
+            id_list = cache_info.get("id_list", [])
+            blocks = cache_info.get("blocks", {})
+            
+            result = []
+            for block_id in id_list:
+                block = blocks.get(block_id)
+                if block:
+                    content = block.get('content', '')
+                    if content:
+                        result.append(content)
+            
+            return ''.join(result) if result else ""
+        elif "units" in cache_info:
+            # 旧格式：向后兼容
+            units = cache_info["units"]
+            if not units:
+                return ""
+            
+            # 按id排序单元（id是block-1, block-2格式，提取数字部分排序）
+            def extract_block_number(unit):
+                id_str = str(unit.get('id', 'block-0'))
+                if id_str.startswith('block-'):
+                    try:
+                        return int(id_str.split('-', 1)[1])
+                    except (ValueError, IndexError):
+                        return 0
+                # 兼容旧的数字格式
                 try:
-                    return int(id_str.split('-', 1)[1])
-                except (ValueError, IndexError):
+                    return int(id_str)
+                except ValueError:
                     return 0
-            # 兼容旧的数字格式
-            try:
-                return int(id_str)
-            except ValueError:
-                return 0
+            
+            sorted_units = sorted(units, key=extract_block_number)
+            
+            result = []
+            for unit in sorted_units:
+                content = unit.get('content', '')
+                if content:
+                    result.append(content)
+            
+            return ''.join(result) if result else ""
         
-        sorted_units = sorted(units, key=extract_block_number)
-        
-        # 直接拼接所有块的内容，不做额外处理
-        # 每个块的content应该已经包含了完整的原始内容（包括换行符）
-        # 这样直接拼接就能恢复原始文件内容
-        result = []
-        for unit in sorted_units:
-            content = unit.get('content', '')
-            if content:
-                result.append(content)
-        
-        # 直接拼接，不添加额外的换行符
-        # 如果块的content已经包含了所有必要的换行符，直接拼接即可
-        return ''.join(result) if result else ""
+        return ""
     
     def _estimate_structured_tokens(
         self, filepath: str, content: str, start_line: int, end_line: int, total_lines: int, raw_mode: bool = False
