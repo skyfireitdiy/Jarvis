@@ -11,7 +11,7 @@ class EditFileTool:
     """文件编辑工具，用于对文件进行结构化编辑"""
 
     name = "edit_file"
-    description = "对文件进行结构化编辑（通过块id）。\n\n    💡 使用步骤：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换）\n    3. 避免手动计算行号，减少错误风险"
+    description = "对文件进行结构化编辑（通过块id）。\n\n    💡 使用步骤：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换、编辑）\n    3. 避免手动计算行号，减少错误风险\n\n    📝 支持的操作类型：\n    - delete: 删除块\n    - insert_before: 在块前插入内容\n    - insert_after: 在块后插入内容\n    - replace: 替换整个块\n    - edit: 在块内进行search/replace（需要提供search和replace参数）"
 
     parameters = {
         "type": "object",
@@ -31,12 +31,20 @@ class EditFileTool:
                                 },
                                 "action": {
                                     "type": "string",
-                                    "enum": ["delete", "insert_before", "insert_after", "replace"],
-                                    "description": "操作类型：delete（删除块）、insert_before（在块前插入）、insert_after（在块后插入）、replace（替换块）",
+                                    "enum": ["delete", "insert_before", "insert_after", "replace", "edit"],
+                                    "description": "操作类型：delete（删除块）、insert_before（在块前插入）、insert_after（在块后插入）、replace（替换块）、edit（在块内进行search/replace）",
                                 },
                                 "content": {
                                     "type": "string",
-                                    "description": "新内容（对于insert_before、insert_after、replace操作必需，delete操作不需要）",
+                                    "description": "新内容（对于insert_before、insert_after、replace操作必需，delete和edit操作不需要）",
+                                },
+                                "search": {
+                                    "type": "string",
+                                    "description": "要搜索的文本（对于edit操作必需）",
+                                },
+                                "replace": {
+                                    "type": "string",
+                                    "description": "替换后的文本（对于edit操作必需）",
                                 },
                             },
                             "required": ["block_id", "action"],
@@ -232,15 +240,43 @@ class EditFileTool:
                 "stdout": "",
                 "stderr": f"第 {idx+1} 个diff的action参数必须是字符串",
             }, None)
-        if action not in ["delete", "insert_before", "insert_after", "replace"]:
+        if action not in ["delete", "insert_before", "insert_after", "replace", "edit"]:
             return ({
                 "success": False,
                 "stdout": "",
-                "stderr": f"第 {idx+1} 个diff的action参数必须是 delete、insert_before、insert_after 或 replace 之一",
+                "stderr": f"第 {idx+1} 个diff的action参数必须是 delete、insert_before、insert_after、replace 或 edit 之一",
             }, None)
         
-        # 对于非delete操作，content是必需的
-        if action != "delete":
+        # 对于edit操作，需要search和replace参数
+        if action == "edit":
+            search = diff.get("search")
+            replace = diff.get("replace")
+            if search is None:
+                return ({
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"第 {idx+1} 个diff的action为 edit，需要提供search参数",
+                }, None)
+            if not isinstance(search, str):
+                return ({
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"第 {idx+1} 个diff的search参数必须是字符串",
+                }, None)
+            if replace is None:
+                return ({
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"第 {idx+1} 个diff的action为 edit，需要提供replace参数",
+                }, None)
+            if not isinstance(replace, str):
+                return ({
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"第 {idx+1} 个diff的replace参数必须是字符串",
+                }, None)
+        # 对于非delete和非edit操作，content是必需的
+        elif action != "delete":
             if content is None:
                 return ({
                     "success": False,
@@ -260,6 +296,9 @@ class EditFileTool:
         }
         if content is not None:
             patch["STRUCTURED_CONTENT"] = content
+        if action == "edit":
+            patch["STRUCTURED_SEARCH"] = diff.get("search")
+            patch["STRUCTURED_REPLACE"] = diff.get("replace")
         return (None, patch)
 
 
@@ -416,15 +455,19 @@ class EditFileTool:
         cache_info: Dict[str, Any],
         block_id: str,
         action: str,
-        new_content: Optional[str]
+        new_content: Optional[str] = None,
+        search: Optional[str] = None,
+        replace: Optional[str] = None
     ) -> Tuple[bool, Optional[str]]:
         """在缓存中应用结构化编辑
         
         Args:
             cache_info: 缓存信息字典（会被修改）
             block_id: 块id（字符串，从read_code工具获取）
-            action: 操作类型（delete, insert_before, insert_after, replace）
-            new_content: 新内容（对于非delete操作）
+            action: 操作类型（delete, insert_before, insert_after, replace, edit）
+            new_content: 新内容（对于非delete和非edit操作）
+            search: 要搜索的文本（对于edit操作）
+            replace: 替换后的文本（对于edit操作）
             
         Returns:
             (是否成功, 错误信息)
@@ -471,6 +514,21 @@ class EditFileTool:
             block['content'] = new_content
             return (True, None)
         
+        elif action == "edit":
+            # 在块内进行search/replace
+            if search is None:
+                return (False, "edit操作需要提供search参数")
+            if replace is None:
+                return (False, "edit操作需要提供replace参数")
+            
+            current_content = block.get('content', '')
+            if search not in current_content:
+                return (False, f"在块 {block_id} 中未找到要搜索的文本: {search[:100]}...")
+            
+            # 在块内进行替换（只替换第一次出现）
+            block['content'] = current_content.replace(search, replace, 1)
+            return (True, None)
+        
         else:
             return (False, f"不支持的操作类型: {action}")
 
@@ -487,12 +545,19 @@ class EditFileTool:
         if "STRUCTURED_BLOCK_ID" in patch:
             block_id = patch.get('STRUCTURED_BLOCK_ID', '')
             action = patch.get('STRUCTURED_ACTION', '')
-            content = patch.get('STRUCTURED_CONTENT', '')
-            if content:
-                content_preview = content[:100] + "..." if len(content) > 100 else content
-                return f"结构化编辑: block_id={block_id}, action={action}, content={content_preview}"
+            if action == "edit":
+                search = patch.get('STRUCTURED_SEARCH', '')
+                replace = patch.get('STRUCTURED_REPLACE', '')
+                search_preview = search[:50] + "..." if len(search) > 50 else search
+                replace_preview = replace[:50] + "..." if len(replace) > 50 else replace
+                return f"结构化编辑: block_id={block_id}, action={action}, search={search_preview}, replace={replace_preview}"
             else:
-                return f"结构化编辑: block_id={block_id}, action={action}"
+                content = patch.get('STRUCTURED_CONTENT', '')
+                if content:
+                    content_preview = content[:100] + "..." if len(content) > 100 else content
+                    return f"结构化编辑: block_id={block_id}, action={action}, content={content_preview}"
+                else:
+                    return f"结构化编辑: block_id={block_id}, action={action}"
         else:
             return "未知的补丁格式"
 
@@ -631,9 +696,11 @@ class EditFileTool:
                     block_id = patch.get("STRUCTURED_BLOCK_ID", "")
                     action = patch.get("STRUCTURED_ACTION", "")
                     new_content = patch.get("STRUCTURED_CONTENT")
+                    search = patch.get("STRUCTURED_SEARCH")
+                    replace = patch.get("STRUCTURED_REPLACE")
                     try:
                         success, error_msg = EditFileTool._apply_structured_edit_to_cache(
-                            cache_copy, block_id, action, new_content
+                            cache_copy, block_id, action, new_content, search, replace
                         )
                         if success:
                             successful_patches += 1
