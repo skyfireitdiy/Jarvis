@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-import json5 as json
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+import json
 import os
 import re
 import sys
@@ -21,7 +22,7 @@ from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updat
 
 tool_call_help = f"""
 <tool_system_guide>
-工具调用格式（JSON5）：
+工具调用格式（Jsonnet）：
 {ot("TOOL_CALL")}
 {{
   "want": "想要从执行结果中获取到的信息",
@@ -33,20 +34,29 @@ tool_call_help = f"""
 }}
 {ct("TOOL_CALL")}
 
-JSON5格式特性：
+Jsonnet格式特性：
 - 字符串引号：可使用双引号或单引号
-- 多行字符串：使用单引号或双引号包裹，可以直接换行（无需转义\\n）
+- 多行字符串：推荐使用 ||| 分隔符包裹多行字符串，直接换行无需转义，支持保留缩进
+  示例：
+  {
+    "multiline_str": |||
+      第一行：直接换行，无需 \\n
+      第二行：包含"双引号"，无需转义
+      第三行：包含'单引号'，直接写
+      第四行：支持缩进保留
+    |||
+  }
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
 - 注释：支持 // 单行或 /* */ 多行注释
 
 关键规则：
 1. 每次只使用一个工具，等待结果后再进行下一步
 2. {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
-3. 多行字符串参数使用单引号或双引号，可以直接换行
+3. 多行字符串参数推荐使用 ||| 分隔符包裹，直接换行无需转义，支持保留缩进
 4. 等待执行结果，不要假设或创建虚假响应
 5. 信息不足时询问用户，不要在没有完整信息的情况下继续
 
-常见错误：同时调用多个工具、假设工具结果、JSON5格式错误、标签未出现在行首
+常见错误：同时调用多个工具、假设工具结果、Jsonnet格式错误、标签未出现在行首
 </tool_system_guide>
 """
 
@@ -620,7 +630,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 if temp_data:
                     try:
-                        json.loads(temp_data[0])  # Check if valid JSON
+                        json_loads(temp_data[0])  # Check if valid JSON
 
                         # Ask user for confirmation
 
@@ -640,13 +650,13 @@ class ToolRegistry(OutputHandlerProtocol):
         ret = []
         for item in data:
             try:
-                msg = json.loads(item)
+                msg = json_loads(item)
             except Exception as e:
                 return (
                     {},
-                    f"""JSON5 解析失败：{e}
+                    f"""Jsonnet 解析失败：{e}
 
-提示：JSON5支持双引号/单引号、尾随逗号、注释。多行字符串使用单引号或双引号，可以直接换行。
+提示：Jsonnet支持双引号/单引号、尾随逗号、注释。多行字符串推荐使用 ||| 分隔符包裹，直接换行无需转义，支持保留缩进。
 
 {tool_call_help}""",
                     False,
@@ -796,14 +806,14 @@ class ToolRegistry(OutputHandlerProtocol):
             # 如果args是字符串，尝试解析为JSON
             if isinstance(args, str):
                 try:
-                    args = json.loads(args)
+                    args = json_loads(args)
                 except Exception:
                     # 返回错误并附带完整的工具使用提示，指导下一次正确调用
                     try:
                         usage_prompt = agent_instance.get_tool_usage_prompt()
                     except Exception:
                         usage_prompt = tool_call_help
-                    return f"工具参数格式无效: {name}。arguments 应为可解析的 JSON5 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，使用单引号或双引号包裹，可以直接换行。\n\n{usage_prompt}"
+                    return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，推荐使用 ||| 分隔符包裹，直接换行无需转义，支持保留缩进。\n\n{usage_prompt}"
 
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)

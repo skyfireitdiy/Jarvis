@@ -466,7 +466,7 @@ def _parse_agent_json_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Opti
     if not isinstance(text, str) or not text.strip():
         return None, "摘要文本为空"
     import re as _re
-    import json5 as _json
+    from jarvis.jarvis_utils.jsonnet_compat import loads as _json_loads
 
     # 提取 <SUMMARY> 块
     m_sum = _re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=_re.IGNORECASE)
@@ -477,7 +477,7 @@ def _parse_agent_json_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Opti
 
     # 直接解析 <SUMMARY> 块内的内容为 JSON
     try:
-        data = _json.loads(block)
+        data = _json_loads(block)
         if isinstance(data, dict):
             return data, None
         return None, f"JSON 解析结果不是字典，而是 {type(data).__name__}"

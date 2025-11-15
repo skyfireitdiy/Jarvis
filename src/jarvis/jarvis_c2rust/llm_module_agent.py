@@ -21,7 +21,8 @@ CLI 集成建议:
 
 from __future__ import annotations
 
-import json5 as json
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+import json
 # removed sqlite3 (migrated to JSONL/JSON)
 from dataclasses import dataclass
 from pathlib import Path
@@ -111,7 +112,7 @@ class _GraphLoader:
                     if not line:
                         continue
                     try:
-                        obj = json.loads(line)
+                        obj = json_loads(line)
                     except Exception:
                         # 跳过无效的 JSON 行，但记录以便调试
                         continue
@@ -366,7 +367,8 @@ class LLMRustCratePlannerAgent:
         - 跳过无 roots 标签的 residual 步骤（仅保留明确 root 的上下文）
         - 若最终未收集到任何 root 组，则回退为单组 'project'，包含所有 items 的函数名集合
         """
-        import json5 as json
+        from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+        import json
         order_path = self._order_path()
         if not order_path.exists():
             raise FileNotFoundError(f"未找到 translation_order.jsonl: {order_path}")
@@ -398,7 +400,7 @@ class LLMRustCratePlannerAgent:
                     if not line:
                         continue
                     try:
-                        obj = json.loads(line)
+                        obj = json_loads(line)
                     except Exception:
                         continue
                     
@@ -508,7 +510,7 @@ class LLMRustCratePlannerAgent:
   - 目录项使用对象表示，键为 '<name>/'，值为子项数组
   - 文件为字符串项（例如 "lib.rs"）
 - 不要创建与入口无关的占位文件
-- 支持json5语法（如尾随逗号、注释等）
+- 支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）
 """.strip()
         if has_main:
             entry_rule = f"""
@@ -714,9 +716,9 @@ class LLMRustCratePlannerAgent:
                 error_guidance = ""
                 if last_error and last_error != "未知错误":
                     if "JSON解析失败" in last_error:
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持json5语法（如尾随逗号、注释等）。"
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                     else:
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持json5语法（如尾随逗号、注释等）。"
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                 
                 full_prompt = f"{user_prompt}{error_guidance}\n\n{summary_prompt}"
                 try:
@@ -829,8 +831,8 @@ def entries_to_json(entries: List[Any]) -> str:
 
 def _parse_project_json_entries_fallback(json_text: str) -> List[Any]:
     """
-    Fallback 解析器：当 json5 解析失败时，尝试使用标准 json 解析。
-    注意：此函数主要用于兼容性，正常情况下应使用 json5 解析。
+    Fallback 解析器：当 jsonnet 解析失败时，尝试使用标准 json 解析。
+    注意：此函数主要用于兼容性，正常情况下应使用 jsonnet 解析。
     """
     try:
         import json as std_json
@@ -844,17 +846,17 @@ def _parse_project_json_entries_fallback(json_text: str) -> List[Any]:
 
 def _parse_project_json_entries(json_text: str) -> Tuple[List[Any], Optional[str]]:
     """
-    使用 json5 解析 <PROJECT> 块中的目录结构 JSON 为列表结构:
+    使用 jsonnet 解析 <PROJECT> 块中的目录结构 JSON 为列表结构:
     - 文件项: 字符串，如 "lib.rs"
     - 目录项: 字典，形如 {"src/": [ ... ]} 或 {"src": [ ... ]}
     返回(解析结果, 错误信息)
     如果解析成功，返回(data, None)
     如果解析失败，返回([], 错误信息)
-    使用 json5 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）。
+    使用 jsonnet 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）。
     """
     try:
         try:
-            data = json.loads(json_text)
+            data = json_loads(json_text)
             if isinstance(data, list):
                 return data, None
             # 如果解析结果不是列表

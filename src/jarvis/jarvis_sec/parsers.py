@@ -2,7 +2,8 @@
 """解析模块 - 用于解析Agent返回的JSON格式摘要"""
 
 from typing import List, Optional
-import json5 as json
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+import json
 
 
 def parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
@@ -25,7 +26,7 @@ def parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
         if not content:
             return None, "JSON 内容为空"
         try:
-            data = json.loads(content)
+            data = json_loads(content)
         except Exception as json_err:
             error_msg = f"JSON 解析失败: {str(json_err)}"
             return None, error_msg
@@ -61,7 +62,7 @@ def try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str]
         if not content:
             return None, "JSON 内容为空"
         try:
-            data = json.loads(content)
+            data = json_loads(content)
         except Exception as json_err:
             error_msg = f"JSON 解析失败: {str(json_err)}"
             return None, error_msg

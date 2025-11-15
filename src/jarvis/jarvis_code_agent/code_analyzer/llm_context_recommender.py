@@ -5,7 +5,8 @@
 """
 
 
-import json5 as json
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+import json
 import os
 import re
 from typing import List, Optional, Any
@@ -360,7 +361,7 @@ class ContextRecommender:
 
 要求：与任务直接相关，符合命名规范，尽量具体。
 
-以JSON5数组格式返回，用<SYMBOL_NAMES>标签包裹。示例：
+以Jsonnet数组格式返回，用<SYMBOL_NAMES>标签包裹。示例：
 <SYMBOL_NAMES>
 ["processData", "validateInput", "handleError"]
 </SYMBOL_NAMES>
@@ -383,9 +384,9 @@ class ContextRecommender:
                     response = response[:-3]
                 json_content = response.strip()
             
-            symbol_names = json.loads(json_content)
+            symbol_names = json_loads(json_content)
             if not isinstance(symbol_names, list):
-                PrettyOutput.print("⚠️  LLM返回的符号名格式不正确，期望 JSON5 数组格式", OutputType.WARNING)
+                PrettyOutput.print("⚠️  LLM返回的符号名格式不正确，期望 Jsonnet 数组格式", OutputType.WARNING)
                 return []
             
             # 过滤空字符串和过短的符号名
@@ -477,7 +478,7 @@ class ContextRecommender:
 生成的符号名：{', '.join(symbol_names)}
 候选符号列表（已编号）：{json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
 
-返回最相关符号的序号（JSON5数组），按相关性排序，用<SELECTED_INDICES>标签包裹。示例：
+返回最相关符号的序号（Jsonnet数组），按相关性排序，用<SELECTED_INDICES>标签包裹。示例：
 <SELECTED_INDICES>
 [3, 7, 12, 15, 23]
 </SELECTED_INDICES>
@@ -500,9 +501,9 @@ class ContextRecommender:
                     response = response[:-3]
                 json_content = response.strip()
             
-            selected_indices = json.loads(json_content)
+            selected_indices = json_loads(json_content)
             if not isinstance(selected_indices, list):
-                PrettyOutput.print("⚠️  LLM返回的符号序号格式不正确，期望 JSON5 数组格式", OutputType.WARNING)
+                PrettyOutput.print("⚠️  LLM返回的符号序号格式不正确，期望 Jsonnet 数组格式", OutputType.WARNING)
                 return []
             
             PrettyOutput.print(f"📋 LLM返回了 {len(selected_indices)} 个符号序号", OutputType.INFO)
