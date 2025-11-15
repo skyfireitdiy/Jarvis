@@ -226,22 +226,25 @@ class ReadCodeTool:
         # 如果end_line是-1，表示文件末尾，需要先计算文件总行数
         if end_line == -1:
             # 先遍历所有blocks计算总行数
+            # 注意：块内容不包含末尾换行符，块之间需要添加换行符
             total_lines = 0
-            for block_id in id_list:
+            for idx, block_id in enumerate(id_list):
                 block_data = blocks.get(block_id)
                 if block_data:
                     block_content = block_data.get("content", "")
                     if block_content:
-                        block_line_count = block_content.count('\n')
-                        if not block_content.endswith('\n'):
-                            block_line_count += 1
+                        # 块内容中的换行符数量 + 1 = 行数
+                        block_line_count = block_content.count('\n') + 1
                         total_lines += block_line_count
+                        # 如果不是最后一个块，块之间有一个换行符分隔（已计入下一个块的第一行）
+                        # 所以不需要额外添加
             end_line = total_lines
         
         # 通过前面blocks的内容推算每个block的行号范围
+        # 注意：块内容不包含末尾换行符，块之间需要添加换行符
         current_line = 1  # 从第1行开始
         
-        for block_id in id_list:
+        for idx, block_id in enumerate(id_list):
             block_data = blocks.get(block_id)
             if not block_data:
                 continue
@@ -249,12 +252,9 @@ class ReadCodeTool:
             if not block_content:
                 continue
             
-            # 计算这个block的行数（通过换行符数量）
-            # content中的换行符数量 = 行数（因为每行都以换行符结尾，除了最后一行）
-            block_line_count = block_content.count('\n')
-            # 如果content不以换行符结尾，说明最后一行没有换行符，需要+1
-            if not block_content.endswith('\n'):
-                block_line_count += 1
+            # 计算这个block的行数
+            # 块内容中的换行符数量 + 1 = 行数（因为块内容不包含末尾换行符）
+            block_line_count = block_content.count('\n') + 1
             
             block_start_line = current_line
             block_end_line = current_line + block_line_count - 1
@@ -267,6 +267,7 @@ class ReadCodeTool:
                 })
             
             # 更新当前行号
+            # 块之间有一个换行符分隔，所以下一个块从 block_end_line + 1 开始
             current_line = block_end_line + 1
             
             # 如果已经超过请求的结束行，可以提前退出
@@ -297,12 +298,17 @@ class ReadCodeTool:
             for unit in sorted_original:
                 block_id = f"block-{len(id_list) + 1}"  # block-1, block-2, ...
                 id_list.append(block_id)
+                content = unit.get('content', '')
+                # 去掉块末尾的换行符
+                if content.endswith('\n'):
+                    content = content[:-1]
                 blocks[block_id] = {
-                    "content": unit.get('content', ''),
+                    "content": content,
                 }
             return {
                 "id_list": id_list,
                 "blocks": blocks,
+                "file_ends_with_newline": False,  # 无法确定，默认False
             }
         
         # 收集所有单元的行号范围，用于确定分割点
@@ -399,6 +405,10 @@ class ReadCodeTool:
                 
                 full_unit_content = ''.join(full_unit_content_parts)
                 
+                # 去掉块末尾的换行符（存储时去掉，恢复时再添加）
+                if full_unit_content.endswith('\n'):
+                    full_unit_content = full_unit_content[:-1]
+                
                 block_id = f"block-{len(result_units) + 1}"  # block-1, block-2, ...
                 result_units.append({
                     "id": block_id,
@@ -413,9 +423,14 @@ class ReadCodeTool:
             }
             for unit in result_units
         }
+        
+        # 保存文件是否以换行符结尾的信息（用于恢复时正确处理）
+        file_ends_with_newline = full_content.endswith('\n')
+        
         return {
             "id_list": id_list,
             "blocks": blocks,
+            "file_ends_with_newline": file_ends_with_newline,
         }
     
     def _save_file_cache(
@@ -451,6 +466,7 @@ class ReadCodeTool:
             "total_lines": total_lines,
             "read_time": time.time(),
             "file_mtime": file_mtime,
+            "file_ends_with_newline": cache_data.get("file_ends_with_newline", False),
         }
         agent.set_user_data("read_code_cache", cache)
     
@@ -502,14 +518,24 @@ class ReadCodeTool:
         # 按照 id_list 的顺序恢复
         id_list = cache_info.get("id_list", [])
         blocks = cache_info.get("blocks", {})
+        file_ends_with_newline = cache_info.get("file_ends_with_newline", False)
         
         result = []
-        for block_id in id_list:
+        for idx, block_id in enumerate(id_list):
             block = blocks.get(block_id)
             if block:
                 content = block.get('content', '')
                 if content:
                     result.append(content)
+                    # 在块之间添加换行符（最后一个块后面根据文件是否以换行符结尾决定）
+                    is_last_block = (idx == len(id_list) - 1)
+                    if is_last_block:
+                        # 最后一个块：如果文件以换行符结尾，添加换行符
+                        if file_ends_with_newline:
+                            result.append('\n')
+                    else:
+                        # 非最后一个块：在块之间添加换行符
+                        result.append('\n')
         
         return ''.join(result) if result else ""
     
