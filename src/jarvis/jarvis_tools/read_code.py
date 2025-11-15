@@ -76,6 +76,40 @@ class ReadCodeTool:
             return StructuredCodeExtractor.extract_blank_line_groups(content, start_line, end_line)
         return []
     
+    def _extract_blank_line_groups_with_split(
+        self, content: str, start_line: int, end_line: int
+    ) -> List[Dict[str, Any]]:
+        """先按空白行分组，然后对超过20行的块再按每20行分割
+        
+        Args:
+            content: 文件内容
+            start_line: 起始行号
+            end_line: 结束行号
+            
+        Returns:
+            分组列表，每个分组包含 id, start_line, end_line, content
+        """
+        # 先获取空白行分组
+        blank_line_groups = self._extract_blank_line_groups(content, start_line, end_line)
+        
+        if not blank_line_groups:
+            return []
+        
+        result = []
+        for group in blank_line_groups:
+            group_line_count = group['end_line'] - group['start_line'] + 1
+            if group_line_count > 20:
+                # 如果块超过20行，按每20行分割
+                sub_groups = self._extract_line_groups(
+                    content, group['start_line'], group['end_line'], group_size=20
+                )
+                result.extend(sub_groups)
+            else:
+                # 如果块不超过20行，直接添加
+                result.append(group)
+        
+        return result
+    
     def _extract_line_groups(
         self, content: str, start_line: int, end_line: int, group_size: int = 20
     ) -> List[Dict[str, Any]]:
@@ -187,7 +221,8 @@ class ReadCodeTool:
                         return get_context_token_count(sample_output)
                 else:
                     # 使用空白行分组格式计算token（不支持语言时）
-                    line_groups = self._extract_blank_line_groups(content, start_line, end_line)
+                    # 先按空行分割，然后对超过20行的块再按每20行分割
+                    line_groups = self._extract_blank_line_groups_with_split(content, start_line, end_line)
                     if line_groups:
                         import_units = self._extract_imports(filepath, content, start_line, end_line)
                         all_units = import_units + line_groups[:1]
@@ -380,8 +415,9 @@ class ReadCodeTool:
                     # unit_type = "syntax_units"
                     output = self._format_structured_output(abs_path, structured_units, total_lines)
                 else:
-                    # 使用空白行分组结构化输出（不支持语言时，按连续空白行分隔）
-                    line_groups = self._extract_blank_line_groups(full_content, start_line, end_line)
+                    # 使用空白行分组结构化输出（不支持语言时）
+                    # 先按空行分割，然后对超过20行的块再按每20行分割
+                    line_groups = self._extract_blank_line_groups_with_split(full_content, start_line, end_line)
                     # 合并导入单元和行号分组
                     all_units = import_units + line_groups
                     # 确保id唯一
