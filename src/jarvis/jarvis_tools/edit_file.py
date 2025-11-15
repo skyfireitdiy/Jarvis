@@ -25,11 +25,6 @@ class EditFileTool:
                 "items": {
                             "type": "object",
                             "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["structured"],
-                                    "description": "结构化编辑模式：通过块id进行编辑，支持删除块、在块前插入、在块后插入、替换块",
-                                },
                                 "block_id": {
                                     "type": "string",
                                     "description": "要操作的块id（从read_code工具获取的结构化块id）",
@@ -44,7 +39,7 @@ class EditFileTool:
                                     "description": "新内容（对于insert_before、insert_after、replace操作必需，delete操作不需要）",
                                 },
                             },
-                            "required": ["type", "block_id", "action"],
+                            "required": ["block_id", "action"],
                         },
                 "description": "修改操作列表，每个操作包含一个结构化编辑块",
             },
@@ -284,21 +279,8 @@ class EditFileTool:
                     "stderr": f"第 {idx+1} 个diff必须是字典类型",
                 }, [])
             
-            diff_type = diff.get("type")
-            error_response = None
-            patch = None
-            
-            if diff_type == "structured":
-                error_response, patch = EditFileTool._validate_structured(diff, idx + 1)
-            else:
-                return ({
-                    "success": False,
-                    "stdout": "",
-                    "stderr": (
-                        f"第 {idx+1} 个diff的类型不支持: {diff_type}。"
-                        f"支持的类型: structured"
-                    ),
-                }, [])
+            # 所有diff都是structured类型
+            error_response, patch = EditFileTool._validate_structured(diff, idx + 1)
             
             if error_response:
                 return (error_response, [])
