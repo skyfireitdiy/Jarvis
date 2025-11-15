@@ -140,7 +140,7 @@ class 工具名称:
 }}
 {ct("TOOL_CALL")}
 
-注意：tool_code 参数使用反引号 `...` 包裹多行代码，这样更清晰易读，无需转义换行符。
+注意：tool_code 参数使用单引号或双引号包裹多行代码，可以直接换行，无需转义换行符。
 3. 方法论创建（如果需要创建新方法论）:
 {ot("TOOL_CALL")}
 {{
@@ -149,14 +149,14 @@ class 工具名称:
   "arguments": {{
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
-    "content": `方法论内容
+    "content": "方法论内容
 可以包含多行内容
-使用反引号包裹多行字符串更清晰`
+使用单引号或双引号包裹多行字符串，可以直接换行"
   }}
 }}
 {ct("TOOL_CALL")}
 
-注意：如果 content 参数包含多行内容，推荐使用反引号 `...` 包裹，这样更清晰易读。
+注意：如果 content 参数包含多行内容，使用单引号或双引号包裹，可以直接换行。
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
     else:
@@ -176,14 +176,14 @@ class 工具名称:
   "arguments": {{
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
-    "content": `方法论内容
+    "content": "方法论内容
 可以包含多行内容
-使用反引号包裹多行字符串更清晰`
+使用单引号或双引号包裹多行字符串，可以直接换行"
   }}
 }}
 {ct("TOOL_CALL")}
 
-注意：如果 content 参数包含多行内容，推荐使用反引号 `...` 包裹，这样更清晰易读。
+注意：如果 content 参数包含多行内容，使用单引号或双引号包裹，可以直接换行。
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
     
@@ -210,7 +210,7 @@ class 工具名称:
 <tool_requirements>
 工具代码要求:
 1. 工具类名与工具名称一致，包含name、description、parameters属性，实现execute方法
-2. 参数定义遵循JSON Schema，工具调用使用JSON5格式（支持反引号多行字符串、尾随逗号）
+2. 参数定义遵循JSON Schema，工具调用使用JSON5格式（支持多行字符串直接换行、尾随逗号）
 3. 使用PrettyOutput显示执行过程，返回{{success, stdout, stderr}}结构化结果
 4. 妥善处理异常，失败时清理资源。如需调用大模型，创建独立实例避免干扰主流程
 </tool_requirements>
