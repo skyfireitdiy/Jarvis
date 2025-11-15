@@ -1403,6 +1403,7 @@ def process_clustering_phase(
         status_mgr,
         _progress_append,
         cluster_batches,
+        sec_dir,
     )
     
     # 若聚类失败或空，则回退为"按文件一次处理"
