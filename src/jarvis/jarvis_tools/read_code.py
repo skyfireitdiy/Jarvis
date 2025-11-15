@@ -150,20 +150,30 @@ class ReadCodeTool:
         Returns:
             格式化后的输出字符串
         """
+        # 文件开始分界符
         output_lines = [
-            f"\n🔍 文件: {filepath}",
+            "=" * 80,
+            f"🔍 文件: {filepath}",
             f"📄 总行数: {total_lines}",
-            f"📦 结构化单元数: {len(units)}\n",
+            f"📦 结构化单元数: {len(units)}",
+            "=" * 80,
+            "",
         ]
         
-        for unit in units:
+        # 为每个单元分配block-id
+        for idx, unit in enumerate(units, start=1):
+            block_id = f"block-{idx}"
             # 显示id
-            output_lines.append(f"[id:{unit['id']}]")
+            output_lines.append(f"[id:{block_id}]")
             # 添加内容，保持原有缩进
             content = unit.get('content', '')
             if content:
                 output_lines.append(content)
             output_lines.append("")  # 单元之间空行分隔
+        
+        # 文件结束分界符
+        output_lines.append("=" * 80)
+        output_lines.append("")
         
         return '\n'.join(output_lines)
     
@@ -188,7 +198,7 @@ class ReadCodeTool:
         return cache.get(abs_path)
     
     def _convert_units_to_sequential_ids(self, units: List[Dict[str, Any]], full_content: str = None) -> List[Dict[str, Any]]:
-        """将单元列表转换为缓存格式（只保留id和content，id为序号格式）
+        """将单元列表转换为缓存格式（只保留id和content，id为block格式）
         
         按照行号范围分割文件，不区分语法单元，确保完美恢复。
         
@@ -197,7 +207,7 @@ class ReadCodeTool:
             full_content: 完整的文件内容（可选），用于确保块之间的空白行也被包含
             
         Returns:
-            转换后的单元列表，只包含 id 和 content，id为序号格式（如 "1", "2", "3"）
+            转换后的单元列表，只包含 id 和 content，id为block格式（如 "block-1", "block-2", "block-3"）
         """
         if not full_content or not units:
             # 没有完整内容，直接使用原始的content
@@ -205,7 +215,7 @@ class ReadCodeTool:
             result_units = []
             for unit in sorted_original:
                 result_units.append({
-                    "id": str(len(result_units) + 1),  # 从1开始的序号
+                    "id": f"block-{len(result_units) + 1}",  # block-1, block-2, ...
                     "content": unit.get('content', ''),
                 })
             return result_units
@@ -305,7 +315,7 @@ class ReadCodeTool:
                 full_unit_content = ''.join(full_unit_content_parts)
                 
                 result_units.append({
-                    "id": str(len(result_units) + 1),  # 从1开始的序号
+                    "id": f"block-{len(result_units) + 1}",  # block-1, block-2, ...
                     "content": full_unit_content,
                 })
         
@@ -396,8 +406,21 @@ class ReadCodeTool:
         if not units:
             return ""
         
-        # 按id排序单元（id是序号字符串，需要转换为整数排序）
-        sorted_units = sorted(units, key=lambda u: int(u.get('id', 0)) if str(u.get('id', '0')).isdigit() else 0)
+        # 按id排序单元（id是block-1, block-2格式，提取数字部分排序）
+        def extract_block_number(unit):
+            id_str = str(unit.get('id', 'block-0'))
+            if id_str.startswith('block-'):
+                try:
+                    return int(id_str.split('-', 1)[1])
+                except (ValueError, IndexError):
+                    return 0
+            # 兼容旧的数字格式
+            try:
+                return int(id_str)
+            except ValueError:
+                return 0
+        
+        sorted_units = sorted(units, key=extract_block_number)
         
         # 直接拼接所有块的内容，不做额外处理
         # 每个块的content应该已经包含了完整的原始内容（包括换行符）
