@@ -70,6 +70,165 @@ def _load_config() -> dict:
         return default_config
 
 
+RUN_STATE_JSON = "run_state.json"
+
+
+def _get_run_state_path() -> Path:
+    """获取 run 状态文件路径"""
+    from jarvis.jarvis_c2rust.transpiler import C2RUST_DIRNAME
+    data_dir = Path(".") / C2RUST_DIRNAME
+    return data_dir / RUN_STATE_JSON
+
+
+def _load_run_state() -> dict:
+    """加载 run 状态文件"""
+    import json
+    
+    state_path = _get_run_state_path()
+    default_state = {
+        "scan": {"completed": False, "timestamp": None},
+        "lib_replace": {"completed": False, "timestamp": None},
+        "prepare": {"completed": False, "timestamp": None},
+        "transpile": {"completed": False, "timestamp": None},
+        "optimize": {"completed": False, "timestamp": None},
+    }
+    
+    if not state_path.exists():
+        return default_state
+    
+    try:
+        with state_path.open("r", encoding="utf-8") as f:
+            state = json.load(f)
+            if not isinstance(state, dict):
+                return default_state
+            # 确保包含所有必需的阶段
+            for stage in ["scan", "lib_replace", "prepare", "transpile", "optimize"]:
+                if stage not in state:
+                    state[stage] = {"completed": False, "timestamp": None}
+            return state
+    except Exception:
+        return default_state
+
+
+def _save_run_state(stage: str, completed: bool = True) -> None:
+    """保存 run 状态文件"""
+    import json
+    import time
+    
+    state_path = _get_run_state_path()
+    state = _load_run_state()
+    
+    state[stage] = {
+        "completed": completed,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()) if completed else None,
+    }
+    
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        with state_path.open("w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        typer.secho(f"[c2rust-run] 保存状态文件失败: {e}", fg=typer.colors.YELLOW, err=True)
+
+
+def _get_next_stage(current_state: dict) -> Optional[str]:
+    """根据状态文件确定下一个需要执行的阶段"""
+    stages = ["scan", "lib_replace", "prepare", "transpile", "optimize"]
+    for stage in stages:
+        if not current_state.get(stage, {}).get("completed", False):
+            return stage
+    return None  # 所有阶段都已完成
+
+
+# 定义各阶段的前置依赖关系
+STAGE_DEPENDENCIES = {
+    "scan": [],  # scan 没有前置依赖
+    "lib_replace": ["scan"],  # lib-replace 需要 scan 完成
+    "prepare": ["scan"],  # prepare 需要 scan 完成（可选：lib_replace）
+    "transpile": ["scan", "prepare"],  # transpile 需要 scan 和 prepare 完成
+    "optimize": ["transpile"],  # optimize 需要 transpile 完成
+}
+
+
+def _check_prerequisites(stage: str, interactive: bool = False) -> bool:
+    """
+    检查指定阶段的前置依赖是否已完成。
+    
+    Args:
+        stage: 要检查的阶段名称
+        interactive: 是否在交互模式下询问用户是否继续
+    
+    Returns:
+        True 如果前置依赖已满足，False 如果未满足且用户选择不继续
+    """
+    if stage not in STAGE_DEPENDENCIES:
+        return True  # 未知阶段，不检查
+    
+    dependencies = STAGE_DEPENDENCIES[stage]
+    if not dependencies:
+        return True  # 没有前置依赖
+    
+    state = _load_run_state()
+    missing = []
+    
+    for dep in dependencies:
+        if not state.get(dep, {}).get("completed", False):
+            missing.append(dep)
+    
+    if not missing:
+        return True  # 所有前置依赖都已完成
+    
+    # 前置依赖未完成
+    dep_names = {
+        "scan": "扫描",
+        "lib_replace": "库替代评估",
+        "prepare": "模块规划",
+        "transpile": "代码转译",
+        "optimize": "代码优化",
+    }
+    missing_names = [dep_names.get(d, d) for d in missing]
+    stage_name = dep_names.get(stage, stage)
+    
+    typer.secho(
+        f"[c2rust-{stage}] 警告：前置阶段未完成: {', '.join(missing_names)}",
+        fg=typer.colors.YELLOW,
+        err=True,
+    )
+    typer.secho(
+        f"[c2rust-{stage}] 执行 {stage_name} 前需要先完成这些阶段",
+        fg=typer.colors.YELLOW,
+        err=True,
+    )
+    
+    if interactive:
+        # 交互模式下询问用户是否继续
+        try:
+            response = typer.prompt(
+                "是否仍要继续执行？(y/N)",
+                default="N",
+                type=str,
+            )
+            if response.lower() in ["y", "yes"]:
+                typer.secho(
+                    f"[c2rust-{stage}] 用户选择继续执行，但可能遇到错误",
+                    fg=typer.colors.YELLOW,
+                )
+                return True
+            else:
+                typer.secho(f"[c2rust-{stage}] 已取消执行", fg=typer.colors.RED)
+                return False
+        except Exception:
+            return False
+    else:
+        # 非交互模式下直接提示并退出
+        typer.secho(
+            f"[c2rust-{stage}] 请先完成前置阶段，或使用 --interactive 参数在交互模式下继续",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        return False
+
+
 @app.command("scan")
 def scan(
     dot: Optional[Path] = typer.Option(
@@ -96,14 +255,21 @@ def scan(
     """
     进行 C/C++ 函数扫描并生成引用关系 DOT 图；PNG 渲染默认启用（无需参数）。
     """
-    _run_scan(
-        dot=dot,
-        only_dot=only_dot,
-        subgraphs_dir=subgraphs_dir,
-        only_subgraphs=only_subgraphs,
-        png=True,
-        non_interactive=True,
-    )
+    try:
+        _run_scan(
+            dot=dot,
+            only_dot=only_dot,
+            subgraphs_dir=subgraphs_dir,
+            only_subgraphs=only_subgraphs,
+            png=True,
+            non_interactive=True,
+        )
+        # 只有在真正执行扫描（而非仅生成 DOT）时才记录状态
+        if not only_dot and not only_subgraphs:
+            _save_run_state("scan", completed=True)
+    except Exception as e:
+        typer.secho(f"[c2rust-scan] 错误: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 @app.command("prepare")
 def prepare(
@@ -121,8 +287,13 @@ def prepare(
     需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据
     """
+    # 检查前置依赖
+    if not _check_prerequisites("prepare", interactive=interactive):
+        raise typer.Exit(code=1)
+    
     try:
         _execute_llm_plan(apply=True, llm_group=llm_group, non_interactive=not interactive)
+        _save_run_state("prepare", completed=True)
     except Exception as e:
         typer.secho(f"[c2rust-llm-planner] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -157,6 +328,10 @@ def transpile(
     - --max-retries/-m: 构建/修复与审查的最大重试次数（0 表示不限制）
     - --llm-group/-g: 指定用于翻译的 LLM 模型组
     """
+    # 检查前置依赖
+    if not _check_prerequisites("transpile", interactive=interactive):
+        raise typer.Exit(code=1)
+    
     try:
         # Lazy import to avoid hard dependency if not used
         from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
@@ -171,6 +346,7 @@ def transpile(
             root_symbols=None,  # 从配置文件恢复
             non_interactive=not interactive,
         )
+        _save_run_state("transpile", completed=True)
     except Exception as e:
         typer.secho(f"[c2rust-transpiler] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -196,6 +372,10 @@ def lib_replace(
     - 默认库: std（仅用于对后续流程保持一致的默认上下文）
     - 使用 jarvis-c2rust config 命令设置根符号列表和禁用库列表
     """
+    # 检查前置依赖
+    if not _check_prerequisites("lib_replace", interactive=interactive):
+        raise typer.Exit(code=1)
+    
     try:
         data_dir = Path(".") / ".jarvis" / "c2rust"
         curated_symbols = data_dir / "symbols.jsonl"
@@ -260,6 +440,7 @@ def lib_replace(
             )
         except Exception as _e:
             typer.secho(f"[c2rust-lib-replace] 结果输出时发生非致命错误: {_e}", fg=typer.colors.YELLOW, err=True)
+        _save_run_state("lib_replace", completed=True)
     except Exception as e:
         typer.secho(f"[c2rust-lib-replace] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -437,34 +618,6 @@ def config(
         raise typer.Exit(code=1)
 
 
-@app.command("collect")
-def collect(
-    files: List[Path] = typer.Argument(..., help="一个或多个 C/C++ 头文件路径（.h/.hh/.hpp/.hxx）"),
-    out: Path = typer.Option(..., "-o", "--out", help="输出文件路径（写入唯一函数名，每行一个）"),
-    cc_root: Optional[Path] = typer.Option(
-        None, "--cc-root", help="compile_commands.json 根目录（可选，用于提升解析准确性）"
-    ),
-    interactive: bool = typer.Option(
-        False,
-        "--interactive",
-        help="启用交互模式（默认非交互模式）",
-    ),
-) -> None:
-    """
-    收集指定头文件中的函数名（使用 libclang 解析），并写入指定输出文件（每行一个）。
-    示例:
-      jarvis-c2rust collect a.h b.hpp -o funcs.txt
-    说明:
-      非头文件会被跳过（仅支持 .h/.hh/.hpp/.hxx）。
-    """
-    try:
-        from jarvis.jarvis_c2rust.collector import collect_function_names as _collect_fn_names
-        _collect_fn_names(files=files, out_path=out, compile_commands_root=cc_root)
-        typer.secho(f"[c2rust-collect] 函数名已写入: {out}", fg=typer.colors.GREEN)
-    except Exception as e:
-        typer.secho(f"[c2rust-collect] 错误: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1)
-
 @app.command("run")
 def run(
     llm_group: Optional[str] = typer.Option(
@@ -481,16 +634,23 @@ def run(
         "--interactive",
         help="启用交互模式（默认非交互模式）",
     ),
+    reset: bool = typer.Option(
+        False,
+        "--reset",
+        help="重置状态，从头开始执行所有阶段",
+    ),
 ) -> None:
     """
     依次执行流水线：scan -> lib-replace -> prepare -> transpile -> optimize
+
+    支持断点续跑：根据状态文件（.jarvis/c2rust/run_state.json）自动跳过已完成的阶段。
 
     约束:
     
     - 根符号列表和禁用库列表从配置文件（.jarvis/c2rust/config.json）读取
       使用 jarvis-c2rust config 命令设置这些配置（例如：jarvis-c2rust config --files bzlib.h）
 
-    - scan 始终执行以确保数据完整
+    - 使用 --reset 可以重置状态，从头开始执行所有阶段
 
     - prepare/transpile 会使用 --llm-group 指定的模型组
 
@@ -498,102 +658,141 @@ def run(
 
     补充:
 
-    - 如需精细化控制，可独立调用子命令：collect、scan、lib-replace、prepare、transpile、optimize
+    - 如需精细化控制，可独立调用子命令：scan、lib-replace、prepare、transpile、optimize
     """
+    
     try:
-        # Step 1: scan（始终执行）
-        typer.secho("[c2rust-run] scan: 开始", fg=typer.colors.BLUE)
-        _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False, non_interactive=True)
-        typer.secho("[c2rust-run] scan: 完成", fg=typer.colors.GREEN)
+        # 加载状态文件
+        if reset:
+            # 重置状态
+            state_path = _get_run_state_path()
+            if state_path.exists():
+                state_path.unlink()
+                typer.secho("[c2rust-run] 已重置状态，将从头开始执行", fg=typer.colors.YELLOW)
+            state = _load_run_state()
+        else:
+            state = _load_run_state()
+            # 显示当前状态
+            completed_stages = [s for s, info in state.items() if info.get("completed", False)]
+            if completed_stages:
+                typer.secho(f"[c2rust-run] 检测到已完成阶段: {', '.join(completed_stages)}，将从断点继续", fg=typer.colors.CYAN)
+        
+        # Step 1: scan
+        if not state.get("scan", {}).get("completed", False):
+            typer.secho("[c2rust-run] scan: 开始", fg=typer.colors.BLUE)
+            _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False, non_interactive=True)
+            typer.secho("[c2rust-run] scan: 完成", fg=typer.colors.GREEN)
+            # 状态由 scan 命令自己记录
+        else:
+            typer.secho("[c2rust-run] scan: 已完成，跳过", fg=typer.colors.CYAN)
 
         # Step 2: lib-replace（从配置文件读取根列表和禁用库列表）
-        # 从配置文件读取基础配置
-        config = _load_config()
-        root_names: List[str] = list(config.get("root_symbols", []))
-        disabled_list: Optional[List[str]] = config.get("disabled_libraries", []) or None
-        
-        # 去重并校验（允许为空时回退为自动根集）
-        if root_names:
-            try:
-                root_names = list(dict.fromkeys(root_names))
-            except Exception:
-                root_names = sorted(list(set(root_names)))
-            # 排除 main
-            root_names = [s for s in root_names if s.lower() != "main"]
-        
-        candidates_list: Optional[List[str]] = root_names if root_names else None
-        if not candidates_list:
-            typer.secho("[c2rust-run] lib-replace: 根列表为空，将回退为自动检测的根集合（基于扫描结果）", fg=typer.colors.YELLOW)
-        
-        if disabled_list:
-            typer.secho(f"[c2rust-run] lib-replace: 从配置文件读取禁用库: {', '.join(disabled_list)}", fg=typer.colors.BLUE)
+        if not state.get("lib_replace", {}).get("completed", False):
+            # 从配置文件读取基础配置
+            config = _load_config()
+            root_names: List[str] = list(config.get("root_symbols", []))
+            disabled_list: Optional[List[str]] = config.get("disabled_libraries", []) or None
+            
+            # 去重并校验（允许为空时回退为自动根集）
+            if root_names:
+                try:
+                    root_names = list(dict.fromkeys(root_names))
+                except Exception:
+                    root_names = sorted(list(set(root_names)))
+                # 排除 main
+                root_names = [s for s in root_names if s.lower() != "main"]
+            
+            candidates_list: Optional[List[str]] = root_names if root_names else None
+            if not candidates_list:
+                typer.secho("[c2rust-run] lib-replace: 根列表为空，将回退为自动检测的根集合（基于扫描结果）", fg=typer.colors.YELLOW)
+            
+            if disabled_list:
+                typer.secho(f"[c2rust-run] lib-replace: 从配置文件读取禁用库: {', '.join(disabled_list)}", fg=typer.colors.BLUE)
 
-        # 执行 lib-replace（默认库 std）
-        library = "std"
-        root_count_str = str(len(candidates_list)) if candidates_list is not None else "auto"
-        typer.secho(f"[c2rust-run] lib-replace: 开始（库: {library}，根数: {root_count_str}）", fg=typer.colors.BLUE)
-        ret = _apply_library_replacement(
-            db_path=Path("."),
-            library_name=library,
-            llm_group=llm_group,
-            candidates=candidates_list,   # None 表示自动检测全部根
-            out_symbols_path=None,
-            out_mapping_path=None,
-            max_funcs=None,
-            disabled_libraries=disabled_list,
-            non_interactive=not interactive,
-        )
-        try:
-            order_msg = f"\n[c2rust-run] lib-replace: 转译顺序: {ret['order']}" if 'order' in ret else ""
-            typer.secho(
-                f"[c2rust-run] lib-replace: 替代映射: {ret['mapping']}\n"
-                f"[c2rust-run] lib-replace: 新符号表: {ret['symbols']}"
-                + order_msg,
-                fg=typer.colors.GREEN,
+            # 执行 lib-replace（默认库 std）
+            library = "std"
+            root_count_str = str(len(candidates_list)) if candidates_list is not None else "auto"
+            typer.secho(f"[c2rust-run] lib-replace: 开始（库: {library}，根数: {root_count_str}）", fg=typer.colors.BLUE)
+            ret = _apply_library_replacement(
+                db_path=Path("."),
+                library_name=library,
+                llm_group=llm_group,
+                candidates=candidates_list,   # None 表示自动检测全部根
+                out_symbols_path=None,
+                out_mapping_path=None,
+                max_funcs=None,
+                disabled_libraries=disabled_list,
+                non_interactive=not interactive,
             )
-        except Exception as _e:
-            typer.secho(f"[c2rust-run] lib-replace: 结果输出时发生非致命错误: {_e}", fg=typer.colors.YELLOW, err=True)
+            try:
+                order_msg = f"\n[c2rust-run] lib-replace: 转译顺序: {ret['order']}" if 'order' in ret else ""
+                typer.secho(
+                    f"[c2rust-run] lib-replace: 替代映射: {ret['mapping']}\n"
+                    f"[c2rust-run] lib-replace: 新符号表: {ret['symbols']}"
+                    + order_msg,
+                    fg=typer.colors.GREEN,
+                )
+            except Exception as _e:
+                typer.secho(f"[c2rust-run] lib-replace: 结果输出时发生非致命错误: {_e}", fg=typer.colors.YELLOW, err=True)
+            # 状态由 lib-replace 命令自己记录
+        else:
+            typer.secho("[c2rust-run] lib-replace: 已完成，跳过", fg=typer.colors.CYAN)
 
         # Step 3: prepare
-        typer.secho("[c2rust-run] prepare: 开始", fg=typer.colors.BLUE)
-        _execute_llm_plan(apply=True, llm_group=llm_group, non_interactive=not interactive)
-        typer.secho("[c2rust-run] prepare: 完成", fg=typer.colors.GREEN)
+        if not state.get("prepare", {}).get("completed", False):
+            typer.secho("[c2rust-run] prepare: 开始", fg=typer.colors.BLUE)
+            _execute_llm_plan(apply=True, llm_group=llm_group, non_interactive=not interactive)
+            typer.secho("[c2rust-run] prepare: 完成", fg=typer.colors.GREEN)
+            # 状态由 prepare 命令自己记录
+        else:
+            typer.secho("[c2rust-run] prepare: 已完成，跳过", fg=typer.colors.CYAN)
 
         # Step 4: transpile
-        typer.secho("[c2rust-run] transpile: 开始", fg=typer.colors.BLUE)
-        from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
-        # 从配置文件读取配置（transpile 内部会自动读取）
-        _run_transpile(
-            project_root=Path("."),
-            crate_dir=None,
-            llm_group=llm_group,
-            max_retries=max_retries,
-            disabled_libraries=None,  # 从配置文件恢复
-            root_symbols=None,  # 从配置文件恢复
-            non_interactive=not interactive,
-        )
-        typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
+        if not state.get("transpile", {}).get("completed", False):
+            typer.secho("[c2rust-run] transpile: 开始", fg=typer.colors.BLUE)
+            from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
+            # 从配置文件读取配置（transpile 内部会自动读取）
+            _run_transpile(
+                project_root=Path("."),
+                crate_dir=None,
+                llm_group=llm_group,
+                max_retries=max_retries,
+                disabled_libraries=None,  # 从配置文件恢复
+                root_symbols=None,  # 从配置文件恢复
+                non_interactive=not interactive,
+            )
+            typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
+            # 状态由 transpile 命令自己记录
+        else:
+            typer.secho("[c2rust-run] transpile: 已完成，跳过", fg=typer.colors.CYAN)
 
         # Step 5: optimize
-        try:
-            typer.secho("[c2rust-run] optimize: 开始", fg=typer.colors.BLUE)
-            from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
-            res = _optimize_project(crate_dir=None, llm_group=llm_group, non_interactive=not interactive)
-            summary = (
-                f"[c2rust-run] optimize: 结果摘要:\n"
-                f"  files_scanned: {res.get('files_scanned')}\n"
-                f"  unsafe_removed: {res.get('unsafe_removed')}\n"
-                f"  unsafe_annotated: {res.get('unsafe_annotated')}\n"
-                f"  duplicates_tagged: {res.get('duplicates_tagged')}\n"
-                f"  visibility_downgraded: {res.get('visibility_downgraded')}\n"
-                f"  docs_added: {res.get('docs_added')}\n"
-                f"  cargo_checks: {res.get('cargo_checks')}\n"
-            )
-            typer.secho(summary, fg=typer.colors.GREEN)
-            typer.secho("[c2rust-run] optimize: 完成", fg=typer.colors.GREEN)
-        except Exception as _e:
-            typer.secho(f"[c2rust-run] optimize: 错误: {_e}", fg=typer.colors.RED, err=True)
-            raise
+        if not state.get("optimize", {}).get("completed", False):
+            try:
+                typer.secho("[c2rust-run] optimize: 开始", fg=typer.colors.BLUE)
+                from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
+                res = _optimize_project(crate_dir=None, llm_group=llm_group, non_interactive=not interactive)
+                summary = (
+                    f"[c2rust-run] optimize: 结果摘要:\n"
+                    f"  files_scanned: {res.get('files_scanned')}\n"
+                    f"  unsafe_removed: {res.get('unsafe_removed')}\n"
+                    f"  unsafe_annotated: {res.get('unsafe_annotated')}\n"
+                    f"  duplicates_tagged: {res.get('duplicates_tagged')}\n"
+                    f"  visibility_downgraded: {res.get('visibility_downgraded')}\n"
+                    f"  docs_added: {res.get('docs_added')}\n"
+                    f"  cargo_checks: {res.get('cargo_checks')}\n"
+                )
+                typer.secho(summary, fg=typer.colors.GREEN)
+                typer.secho("[c2rust-run] optimize: 完成", fg=typer.colors.GREEN)
+                # 状态由 optimize 命令自己记录
+            except Exception as _e:
+                typer.secho(f"[c2rust-run] optimize: 错误: {_e}", fg=typer.colors.RED, err=True)
+                raise
+        else:
+            typer.secho("[c2rust-run] optimize: 已完成，跳过", fg=typer.colors.CYAN)
+        
+        # 所有阶段完成
+        typer.secho("[c2rust-run] 所有阶段已完成！", fg=typer.colors.GREEN)
     except Exception as e:
         typer.secho(f"[c2rust-run] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -676,6 +875,10 @@ def optimize(
     对生成的 Rust 代码执行保守优化（unsafe 清理、结构优化、可见性优化、文档补充）。
     建议在转译完成后执行：jarvis-c2rust optimize
     """
+    # 检查前置依赖
+    if not _check_prerequisites("optimize", interactive=interactive):
+        raise typer.Exit(code=1)
+    
     try:
         from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
 
@@ -710,6 +913,7 @@ def optimize(
             f"  cargo_checks: {res.get('cargo_checks')}\n"
         )
         typer.secho(summary, fg=typer.colors.GREEN)
+        _save_run_state("optimize", completed=True)
     except Exception as e:
         typer.secho(f"[c2rust-optimize] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
