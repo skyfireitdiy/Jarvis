@@ -276,6 +276,24 @@ class TestFixJsonnetMultilineStrings:
         assert "第三行没有" in lines[2]  # 没有缩进
         assert "    第四行有4个空格" in lines[3]  # 4个空格
 
+    def test_multiline_string_with_indented_end_marker(self):
+        """测试 ||| 多行字符串的结束标记有缩进的情况（应该自动修复）"""
+        input_str = """{
+  "text": |||
+    第一行
+    第二行
+     |||
+}"""
+        result, _ = _fix_jsonnet_multiline_strings(input_str)
+        # 结束标记应该被修复为没有缩进
+        assert "\n|||" in result or result.endswith("|||")
+        assert "     |||" not in result  # 不应该有缩进的结束标记
+        # 验证可以解析
+        parsed = loads(input_str)
+        assert "text" in parsed
+        assert "第一行" in parsed["text"]
+        assert "第二行" in parsed["text"]
+
     def test_first_line_empty_then_indented(self):
         """测试第一行是空行，后续行有缩进的情况"""
         input_str = """{
