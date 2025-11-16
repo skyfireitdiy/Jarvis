@@ -40,6 +40,15 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
         content = match.group(3)  # 多行内容
         end_marker = match.group(4)  # 换行、空白和 |||
         
+        # jsonnet 要求结束标记 ||| 必须单独一行且没有缩进（从行首开始）
+        # 如果结束标记前面有空白，需要去除
+        if end_marker.startswith('\n'):
+            # 提取结束标记前的空白
+            end_whitespace = end_marker[1:]  # 去除第一个换行
+            if end_whitespace.startswith(' '):
+                # 去除所有前导空白，只保留换行和 |||
+                end_marker = '\n|||'
+        
         # 如果内容为空，直接返回
         if not content.strip():
             return match.group(0), {}
