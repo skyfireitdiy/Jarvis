@@ -44,6 +44,7 @@ C2RUST_DIRNAME = ".jarvis/c2rust"
 SYMBOLS_JSONL = "symbols.jsonl"
 ORDER_JSONL = "translation_order.jsonl"
 PROGRESS_JSON = "progress.json"
+CONFIG_JSON = "config.json"
 SYMBOL_MAP_JSONL = "symbol_map.jsonl"
 
 # 配置常量
@@ -453,6 +454,7 @@ class Transpiler:
         self.project_root = Path(project_root).resolve()
         self.data_dir = self.project_root / C2RUST_DIRNAME
         self.progress_path = self.data_dir / PROGRESS_JSON
+        self.config_path = self.data_dir / CONFIG_JSON
         # JSONL 路径
         self.symbol_map_path = self.data_dir / SYMBOL_MAP_JSONL
         self.llm_group = llm_group
@@ -476,48 +478,36 @@ class Transpiler:
         # 断点续跑功能默认始终启用
         self.resume = True
         
-        # 读取进度文件，如果存在则从中恢复配置（根符号、禁用库）
+        # 读取进度文件（仅用于进度信息，不包含配置）
         default_progress = {"current": None, "converted": []}
         self.progress: Dict[str, Any] = _read_json(self.progress_path, default_progress)
         
-        # 如果提供了新的根符号或禁用库，更新配置；否则从进度文件中恢复
-        # 优先使用传入的参数，如果为 None 则从进度文件恢复
-        config = self.progress.get("config", {})
+        # 从独立的配置文件加载配置（支持从 progress.json 向后兼容迁移）
+        config = self._load_config()
         
+        # 如果提供了新的根符号或禁用库，更新配置；否则从配置文件中恢复
+        # 优先使用传入的参数，如果为 None 则从配置文件恢复
         if root_symbols is not None:
             # 传入的参数不为 None，使用传入的值并保存
             self.root_symbols = root_symbols
-            self.progress["config"] = self.progress.get("config", {})
-            self.progress["config"]["root_symbols"] = root_symbols
         else:
-            # 传入的参数为 None，从进度文件恢复
-            # 如果进度文件中有配置则使用，否则使用空列表
+            # 传入的参数为 None，从配置文件恢复
+            # 如果配置文件中有配置则使用，否则使用空列表
             self.root_symbols = config.get("root_symbols", [])
-            # 确保进度文件中有 config 结构（即使值为空列表也要保存，以便后续恢复）
-            if "root_symbols" not in config:
-                self.progress["config"] = self.progress.get("config", {})
-                self.progress["config"]["root_symbols"] = self.root_symbols
         
         if disabled_libraries is not None:
             # 传入的参数不为 None，使用传入的值并保存
             self.disabled_libraries = disabled_libraries
-            self.progress["config"] = self.progress.get("config", {})
-            self.progress["config"]["disabled_libraries"] = disabled_libraries
         else:
-            # 传入的参数为 None，从进度文件恢复
-            # 如果进度文件中有配置则使用，否则使用空列表
+            # 传入的参数为 None，从配置文件恢复
+            # 如果配置文件中有配置则使用，否则使用空列表
             self.disabled_libraries = config.get("disabled_libraries", [])
-            # 确保进度文件中有 config 结构（即使值为空列表也要保存，以便后续恢复）
-            if "disabled_libraries" not in config:
-                self.progress["config"] = self.progress.get("config", {})
-                self.progress["config"]["disabled_libraries"] = self.disabled_libraries
+        
+        # 保存配置到独立的配置文件
+        self._save_config()
         
         # 在初始化完成后打印日志
         typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
-        
-        # 保存配置到进度文件
-        if "config" in self.progress:
-            self._save_progress()
         # 使用 JSONL 存储的符号映射
         self.symbol_map = _SymbolMapJsonl(self.symbol_map_path)
 
@@ -659,6 +649,47 @@ class Transpiler:
     def _save_progress(self) -> None:
         """保存进度，使用原子性写入"""
         _write_json(self.progress_path, self.progress)
+
+    def _load_config(self) -> Dict[str, Any]:
+        """
+        从独立的配置文件加载配置。
+        如果配置文件不存在，尝试从 progress.json 迁移配置（向后兼容）。
+        """
+        config_path = self.data_dir / CONFIG_JSON
+        default_config = {"root_symbols": [], "disabled_libraries": []}
+        
+        # 尝试从配置文件读取
+        if config_path.exists():
+            config = _read_json(config_path, default_config)
+            if isinstance(config, dict):
+                return config
+        
+        # 向后兼容：如果配置文件不存在，尝试从 progress.json 迁移
+        progress_config = self.progress.get("config", {})
+        if progress_config:
+            # 迁移配置到独立文件
+            migrated_config = {
+                "root_symbols": progress_config.get("root_symbols", []),
+                "disabled_libraries": progress_config.get("disabled_libraries", []),
+            }
+            _write_json(config_path, migrated_config)
+            typer.secho(f"[c2rust-transpiler][config] 已从 progress.json 迁移配置到 {config_path}", fg=typer.colors.YELLOW)
+            # 从 progress.json 中移除 config（可选，保持兼容性）
+            # if "config" in self.progress:
+            #     del self.progress["config"]
+            #     self._save_progress()
+            return migrated_config
+        
+        return default_config
+
+    def _save_config(self) -> None:
+        """保存配置到独立的配置文件"""
+        config_path = self.data_dir / CONFIG_JSON
+        config = {
+            "root_symbols": self.root_symbols,
+            "disabled_libraries": self.disabled_libraries,
+        }
+        _write_json(config_path, config)
 
 
     def _read_source_span(self, rec: FnRecord) -> str:
@@ -2888,8 +2919,8 @@ def run_transpile(
     check_max_retries: Optional[int] = None,
     test_max_retries: Optional[int] = None,
     review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,
-    disabled_libraries: Optional[List[str]] = None,  # None 表示从进度文件恢复
-    root_symbols: Optional[List[str]] = None,  # None 表示从进度文件恢复
+    disabled_libraries: Optional[List[str]] = None,  # None 表示从配置文件恢复
+    root_symbols: Optional[List[str]] = None,  # None 表示从配置文件恢复
     non_interactive: bool = True,
 ) -> None:
     """

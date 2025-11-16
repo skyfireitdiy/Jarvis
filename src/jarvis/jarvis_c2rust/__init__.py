@@ -5,7 +5,7 @@ Jarvis C2Rust 工具集。
 核心数据:
 - 统一符号表（JSONL）：<project_root>/.jarvis/c2rust/symbols.jsonl（后续流程的主输入）
 - 原始符号表（JSONL）：<project_root>/.jarvis/c2rust/symbols_raw.jsonl
-- 其他产物：translation_order.jsonl、library_replacements.jsonl、progress.json、symbol_map.jsonl 等
+- 其他产物：translation_order.jsonl、library_replacements.jsonl、progress.json、config.json、symbol_map.jsonl 等
 
 推荐用法（CLI）:
   - 扫描:           jarvis-c2rust scan

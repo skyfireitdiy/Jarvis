@@ -41,6 +41,35 @@ def _root():
     pass
 
 
+def _load_config() -> dict:
+    """
+    从配置文件加载配置。
+    返回包含 root_symbols 和 disabled_libraries 的字典。
+    """
+    import json
+    from jarvis.jarvis_c2rust.transpiler import CONFIG_JSON, C2RUST_DIRNAME
+    
+    data_dir = Path(".") / C2RUST_DIRNAME
+    config_path = data_dir / CONFIG_JSON
+    default_config = {"root_symbols": [], "disabled_libraries": []}
+    
+    if not config_path.exists():
+        return default_config
+    
+    try:
+        with config_path.open("r", encoding="utf-8") as f:
+            config = json.load(f)
+            if not isinstance(config, dict):
+                return default_config
+            # 确保包含所有必需的键
+            return {
+                "root_symbols": config.get("root_symbols", []),
+                "disabled_libraries": config.get("disabled_libraries", []),
+            }
+    except Exception:
+        return default_config
+
+
 @app.command("scan")
 def scan(
     dot: Optional[Path] = typer.Option(
@@ -63,11 +92,6 @@ def scan(
         "--only-subgraphs",
         help="不重新扫描。仅生成每个根函数的引用子图 DOT 文件（需要 --subgraphs-dir）",
     ),
-    interactive: bool = typer.Option(
-        False,
-        "--interactive",
-        help="启用交互模式（默认非交互模式）",
-    ),
 ) -> None:
     """
     进行 C/C++ 函数扫描并生成引用关系 DOT 图；PNG 渲染默认启用（无需参数）。
@@ -78,7 +102,7 @@ def scan(
         subgraphs_dir=subgraphs_dir,
         only_subgraphs=only_subgraphs,
         png=True,
-        non_interactive=not interactive,
+        non_interactive=True,
     )
 
 @app.command("prepare")
@@ -124,8 +148,9 @@ def transpile(
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据。
     未指定目标 crate 时，使用默认 <cwd>/<cwd.name>_rs。
 
-    注意: disabled_libraries、root_symbols 等配置参数会从进度文件（.jarvis/c2rust/progress.json）中自动恢复，
+    注意: disabled_libraries、root_symbols 等配置参数会从配置文件（.jarvis/c2rust/config.json）中自动恢复，
     这些参数应该在前面的流程（如 run 或 lib-replace）中设置。
+    如果配置文件不存在，系统会自动从 progress.json 迁移配置（向后兼容）。
     断点续跑功能默认始终启用。
 
     选项:
@@ -135,15 +160,15 @@ def transpile(
     try:
         # Lazy import to avoid hard dependency if not used
         from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
-        # disabled_libraries、root_symbols 从进度文件恢复，不通过命令行参数传入
+        # disabled_libraries、root_symbols 从配置文件恢复，不通过命令行参数传入
         # 断点续跑功能默认始终启用
         _run_transpile(
             project_root=Path("."),
             crate_dir=None,
             llm_group=llm_group,
             max_retries=max_retries,
-            disabled_libraries=None,  # 从进度文件恢复
-            root_symbols=None,  # 从进度文件恢复
+            disabled_libraries=None,  # 从配置文件恢复
+            root_symbols=None,  # 从配置文件恢复
             non_interactive=not interactive,
         )
     except Exception as e:
@@ -156,15 +181,6 @@ def lib_replace(
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="用于评估的 LLM 模型组"
     ),
-    root_list_file: Optional[Path] = typer.Option(
-        None, "--root-list-file", help="根列表文件：按行列出要参与评估的根符号名称或限定名（忽略空行与以#开头的注释）"
-    ),
-    root_list_syms: Optional[str] = typer.Option(
-        None, "--root-list-syms", help="根列表内联：以逗号分隔的符号名称或限定名（仅评估这些根）"
-    ),
-    disabled_libs: Optional[str] = typer.Option(
-        None, "--disabled-libs", help="禁用库列表：逗号分隔的库名（评估时禁止使用这些库）"
-    ),
     interactive: bool = typer.Option(
         False,
         "--interactive",
@@ -173,12 +189,12 @@ def lib_replace(
 ) -> None:
     """
     Root-list 评估模式（必须走 LLM 评估）：
-    - 必须提供根列表（--root-list-file 或 --root-list-syms，至少一种）
-    - 仅对根列表中的符号作为评估根执行 LLM 子树评估
+    - 从配置文件（.jarvis/c2rust/config.json）读取根符号列表和禁用库列表
+    - 仅对配置中的根符号作为评估根执行 LLM 子树评估
     - 若可替代：替换该根的 ref 为库占位，并剪除其所有子孙函数（根本身保留）
     - 需先执行: jarvis-c2rust scan 以生成数据文件（symbols.jsonl）
     - 默认库: std（仅用于对后续流程保持一致的默认上下文）
-    - 可选：--disabled-libs 指定评估时禁止使用的库列表（逗号分隔）
+    - 使用 jarvis-c2rust config 命令设置根符号列表和禁用库列表
     """
     try:
         data_dir = Path(".") / ".jarvis" / "c2rust"
@@ -193,46 +209,44 @@ def lib_replace(
         # 使用默认库: std
         library = "std"
 
-        # 读取根列表（必填，至少提供一种来源）
-        root_names: List[str] = []
-        # 文件来源
-        if root_list_file is not None:
+        # 从配置文件读取根列表和禁用库列表
+        config = _load_config()
+        root_names = config.get("root_symbols", [])
+        disabled_list = config.get("disabled_libraries", [])
+        
+        if root_names:
+            typer.secho(f"[c2rust-lib-replace] 从配置文件读取根符号: {len(root_names)} 个", fg=typer.colors.BLUE)
+        else:
+            typer.secho("[c2rust-lib-replace] 警告：配置文件中未设置根符号列表，将使用自动检测的根集合", fg=typer.colors.YELLOW)
+        
+        if disabled_list:
+            typer.secho(f"[c2rust-lib-replace] 从配置文件读取禁用库: {', '.join(disabled_list)}", fg=typer.colors.BLUE)
+        
+        # 去重根符号列表
+        if root_names:
             try:
-                txt = root_list_file.read_text(encoding="utf-8")
-                root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
-            except Exception as _e:
-                typer.secho(f"[c2rust-lib-replace] 读取根列表失败: {root_list_file}: {_e}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(code=1)
-        # 内联来源
-        if isinstance(root_list_syms, str) and root_list_syms.strip():
-            parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
-            root_names.extend(parts)
-        # 去重
-        try:
-            root_names = list(dict.fromkeys(root_names))
-        except Exception:
-            root_names = sorted(list(set(root_names)))
-        if not root_names:
-            typer.secho("[c2rust-lib-replace] 错误：必须提供根列表（--root-list-file 或 --root-list-syms）。", fg=typer.colors.RED, err=True)
-            raise typer.Exit(code=2)
-
-        # 解析禁用库列表（可选）
-        disabled_list: Optional[List[str]] = None
-        if isinstance(disabled_libs, str) and disabled_libs.strip():
-            disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
-            if disabled_list:
-                typer.secho(f"[c2rust-lib-replace] 禁用库: {', '.join(disabled_list)}", fg=typer.colors.YELLOW)
+                root_names = list(dict.fromkeys(root_names))
+            except Exception:
+                root_names = sorted(list(set(root_names)))
+            # 排除 main
+            root_names = [s for s in root_names if s.lower() != "main"]
+        
+        # 如果根列表为空，使用 None 表示自动检测
+        candidates_list: Optional[List[str]] = root_names if root_names else None
+        
+        # 禁用库列表
+        disabled_libraries_list: Optional[List[str]] = disabled_list if disabled_list else None
 
         # 必须走 LLM 评估：仅评估提供的根（candidates），不启用强制剪枝模式
         ret = _apply_library_replacement(
             db_path=Path("."),
             library_name=library,
             llm_group=llm_group,
-            candidates=root_names,          # 仅评估这些根
+            candidates=candidates_list,  # None 表示自动检测全部根
             out_symbols_path=None,
             out_mapping_path=None,
             max_funcs=None,
-            disabled_libraries=disabled_list,
+            disabled_libraries=disabled_libraries_list,
             non_interactive=not interactive,
         )
         # 输出简要结果摘要（底层已写出新的符号表与可选转译顺序）
@@ -250,6 +264,177 @@ def lib_replace(
         typer.secho(f"[c2rust-lib-replace] 错误: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+
+
+@app.command("config")
+def config(
+    files: Optional[List[Path]] = typer.Option(
+        None, "--files", help="头文件（.h/.hh/.hpp/.hxx）或函数名列表文件（每行一个函数名，忽略空行与以#开头的注释）"
+    ),
+    root_list_syms: Optional[str] = typer.Option(
+        None, "--root-list-syms", help="根符号列表内联（逗号分隔）"
+    ),
+    disabled_libs: Optional[str] = typer.Option(
+        None, "--disabled-libs", help="禁用库列表（逗号分隔）"
+    ),
+    show: bool = typer.Option(
+        False, "--show", help="显示当前配置内容"
+    ),
+    clear: bool = typer.Option(
+        False, "--clear", help="清空配置（重置为默认值）"
+    ),
+) -> None:
+    """
+    管理转译配置文件（.jarvis/c2rust/config.json）。
+    
+    可以设置根符号列表（root_symbols）和禁用库列表（disabled_libraries）。
+    这些配置会被 transpile 命令自动读取和使用。
+    
+    示例:
+      # 从头文件自动提取函数名并设置根符号列表
+      jarvis-c2rust config --files bzlib.h
+      
+      # 从多个头文件提取函数名
+      jarvis-c2rust config --files a.h b.hpp c.hxx
+      
+      # 从函数名列表文件设置根符号列表
+      jarvis-c2rust config --files roots.txt
+      
+      # 从命令行设置根符号列表
+      jarvis-c2rust config --root-list-syms "func1,func2,func3"
+      
+      # 设置禁用库列表
+      jarvis-c2rust config --disabled-libs "libc,libm"
+      
+      # 同时设置多个参数
+      jarvis-c2rust config --files bzlib.h --disabled-libs "libc"
+      
+      # 查看当前配置
+      jarvis-c2rust config --show
+      
+      # 清空配置
+      jarvis-c2rust config --clear
+    """
+    import json
+    from jarvis.jarvis_c2rust.transpiler import CONFIG_JSON, C2RUST_DIRNAME
+    
+    data_dir = Path(".") / C2RUST_DIRNAME
+    config_path = data_dir / CONFIG_JSON
+    data_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 读取现有配置
+    default_config = {"root_symbols": [], "disabled_libraries": []}
+    current_config = default_config.copy()
+    
+    if config_path.exists():
+        try:
+            with config_path.open("r", encoding="utf-8") as f:
+                current_config = json.load(f)
+                if not isinstance(current_config, dict):
+                    current_config = default_config.copy()
+        except Exception as e:
+            typer.secho(f"[c2rust-config] 读取现有配置失败: {e}，将使用默认值", fg=typer.colors.YELLOW)
+            current_config = default_config.copy()
+    
+    # 如果只是查看配置
+    if show:
+        typer.secho(f"[c2rust-config] 当前配置文件: {config_path}", fg=typer.colors.BLUE)
+        typer.secho(json.dumps(current_config, ensure_ascii=False, indent=2), fg=typer.colors.CYAN)
+        return
+    
+    # 如果清空配置
+    if clear:
+        current_config = default_config.copy()
+        with config_path.open("w", encoding="utf-8") as f:
+            json.dump(current_config, f, ensure_ascii=False, indent=2)
+        typer.secho(f"[c2rust-config] 配置已清空: {config_path}", fg=typer.colors.GREEN)
+        return
+    
+    # 读取根符号列表
+    root_symbols: List[str] = []
+    header_exts = {".h", ".hh", ".hpp", ".hxx"}
+    
+    if files:
+        for file_path in files:
+            try:
+                file_path = Path(file_path).resolve()
+                if not file_path.exists():
+                    typer.secho(f"[c2rust-config] 警告: 文件不存在，跳过: {file_path}", fg=typer.colors.YELLOW)
+                    continue
+                
+                # 检查是否是头文件
+                if file_path.suffix.lower() in header_exts:
+                    # 从头文件提取函数名
+                    typer.secho(f"[c2rust-config] 从头文件提取函数名: {file_path}", fg=typer.colors.BLUE)
+                    try:
+                        from jarvis.jarvis_c2rust.collector import collect_function_names as _collect_fn_names
+                        # 使用临时文件存储提取的函数名
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as tmp:
+                            tmp_path = Path(tmp.name)
+                        _collect_fn_names(files=[file_path], out_path=tmp_path, compile_commands_root=None)
+                        # 读取提取的函数名
+                        txt = tmp_path.read_text(encoding="utf-8")
+                        collected = [ln.strip() for ln in txt.splitlines() if ln.strip()]
+                        root_symbols.extend(collected)
+                        typer.secho(f"[c2rust-config] 从头文件 {file_path.name} 提取了 {len(collected)} 个函数名", fg=typer.colors.GREEN)
+                        # 清理临时文件
+                        try:
+                            tmp_path.unlink()
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        typer.secho(f"[c2rust-config] 从头文件提取函数名失败: {file_path}: {e}", fg=typer.colors.RED, err=True)
+                        raise typer.Exit(code=1)
+                else:
+                    # 读取函数名列表文件（每行一个函数名）
+                    txt = file_path.read_text(encoding="utf-8")
+                    collected = [ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+                    root_symbols.extend(collected)
+                    typer.secho(f"[c2rust-config] 从文件 {file_path.name} 读取了 {len(collected)} 个根符号", fg=typer.colors.BLUE)
+            except typer.Exit:
+                raise
+            except Exception as e:
+                typer.secho(f"[c2rust-config] 处理文件失败: {file_path}: {e}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(code=1)
+    
+    if isinstance(root_list_syms, str) and root_list_syms.strip():
+        parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
+        root_symbols.extend(parts)
+        typer.secho(f"[c2rust-config] 从命令行读取根符号: {len(parts)} 个", fg=typer.colors.BLUE)
+    
+    # 去重根符号列表
+    if root_symbols:
+        try:
+            root_symbols = list(dict.fromkeys(root_symbols))
+        except Exception:
+            root_symbols = sorted(list(set(root_symbols)))
+        # 排除 main
+        root_symbols = [s for s in root_symbols if s.lower() != "main"]
+        current_config["root_symbols"] = root_symbols
+        typer.secho(f"[c2rust-config] 已设置根符号列表: {len(root_symbols)} 个", fg=typer.colors.GREEN)
+    
+    # 读取禁用库列表
+    if isinstance(disabled_libs, str) and disabled_libs.strip():
+        disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
+        if disabled_list:
+            current_config["disabled_libraries"] = disabled_list
+            typer.secho(f"[c2rust-config] 已设置禁用库列表: {', '.join(disabled_list)}", fg=typer.colors.GREEN)
+    
+    # 如果没有提供任何参数，提示用户
+    if not files and not root_list_syms and not disabled_libs:
+        typer.secho("[c2rust-config] 未提供任何参数，使用 --show 查看当前配置，或使用 --help 查看帮助", fg=typer.colors.YELLOW)
+        return
+    
+    # 保存配置
+    try:
+        with config_path.open("w", encoding="utf-8") as f:
+            json.dump(current_config, f, ensure_ascii=False, indent=2)
+        typer.secho(f"[c2rust-config] 配置已保存: {config_path}", fg=typer.colors.GREEN)
+        typer.secho(json.dumps(current_config, ensure_ascii=False, indent=2), fg=typer.colors.CYAN)
+    except Exception as e:
+        typer.secho(f"[c2rust-config] 保存配置失败: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command("collect")
@@ -282,37 +467,11 @@ def collect(
 
 @app.command("run")
 def run(
-    files: Optional[List[Path]] = typer.Option(
-        None,
-        "--files",
-        help="用于 collect 阶段的头文件列表（.h/.hh/.hpp/.hxx）；提供则先执行 collect",
-    ),
-    out: Optional[Path] = typer.Option(
-        None,
-        "-o",
-        "--out",
-        help="collect 输出函数名文件；若未提供且指定 --files 则默认为 <root>/.jarvis/c2rust/roots.txt",
-    ),
     llm_group: Optional[str] = typer.Option(
         None,
         "-g",
         "--llm-group",
         help="用于 LLM 相关阶段（lib-replace/prepare/transpile/optimize）的模型组",
-    ),
-    root_list_file: Optional[Path] = typer.Option(
-        None,
-        "--root-list-file",
-        help="lib-replace 的根列表文件（按行列出，忽略空行与以#开头的注释）。可与 --root-list-syms 同时使用，会合并去重",
-    ),
-    root_list_syms: Optional[str] = typer.Option(
-        None,
-        "--root-list-syms",
-        help="lib-replace 的根列表内联（逗号分隔）。可与 --root-list-file 同时使用，会合并去重",
-    ),
-    disabled_libs: Optional[str] = typer.Option(
-        None,
-        "--disabled-libs",
-        help="lib-replace 禁用库列表（逗号分隔）",
     ),
     max_retries: int = typer.Option(
         0, "-m", "--max-retries", help="transpile 构建/修复与审查的最大重试次数（0 表示不限制）"
@@ -324,14 +483,12 @@ def run(
     ),
 ) -> None:
     """
-    依次执行流水线：collect -> scan -> lib-replace -> prepare -> transpile -> optimize
+    依次执行流水线：scan -> lib-replace -> prepare -> transpile -> optimize
 
     约束:
     
-    - collect 的输出文件作为 lib-replace 的基础根列表来源；
-      当提供 --files 时，lib-replace 会读取 --out（或默认值）作为基础，并可同时合并 --root-list-file 和 --root-list-syms
-
-    - 未提供 --files 时，必须通过 --root-list-file 或 --root-list-syms 提供根列表（至少一种，可同时使用，会合并去重）
+    - 根符号列表和禁用库列表从配置文件（.jarvis/c2rust/config.json）读取
+      使用 jarvis-c2rust config 命令设置这些配置（例如：jarvis-c2rust config --files bzlib.h）
 
     - scan 始终执行以确保数据完整
 
@@ -344,96 +501,32 @@ def run(
     - 如需精细化控制，可独立调用子命令：collect、scan、lib-replace、prepare、transpile、optimize
     """
     try:
-        data_dir = Path(".") / ".jarvis" / "c2rust"
-        default_roots = data_dir / "roots.txt"
-
-        # Step 1: collect（可选）
-        roots_path: Optional[Path] = None
-        if files:
-            try:
-                if out is None:
-                    out = default_roots
-                out.parent.mkdir(parents=True, exist_ok=True)
-                from jarvis.jarvis_c2rust.collector import (
-                    collect_function_names as _collect_fn_names,
-                )
-                _collect_fn_names(files=files, out_path=out)
-                typer.secho(f"[c2rust-run] collect: 函数名已写入: {out}", fg=typer.colors.GREEN)
-                roots_path = out
-            except Exception as _e:
-                typer.secho(f"[c2rust-run] collect: 错误: {_e}", fg=typer.colors.RED, err=True)
-                raise
-
-        # Step 2: scan（始终执行）
+        # Step 1: scan（始终执行）
         typer.secho("[c2rust-run] scan: 开始", fg=typer.colors.BLUE)
-        _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False, non_interactive=not interactive)
+        _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False, non_interactive=True)
         typer.secho("[c2rust-run] scan: 完成", fg=typer.colors.GREEN)
 
-        # Step 3: lib-replace（强制执行，依据约束获取根列表）
-        root_names: List[str] = []
-
-        if files:
-            # 约束：collect 的输出文件作为基础来源
-            if not roots_path or not roots_path.exists():
-                typer.secho("[c2rust-run] lib-replace: 未找到 collect 输出文件，无法继续", fg=typer.colors.RED, err=True)
-                raise typer.Exit(code=2)
-            try:
-                txt = roots_path.read_text(encoding="utf-8")
-                root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
-                typer.secho(f"[c2rust-run] lib-replace: 使用根列表文件: {roots_path}", fg=typer.colors.BLUE)
-            except Exception as _e:
-                typer.secho(f"[c2rust-run] lib-replace: 读取根列表失败: {roots_path}: {_e}", fg=typer.colors.RED, err=True)
-                raise
-            # 如果提供了 --root-list-file，也合并进来
-            if root_list_file is not None:
-                try:
-                    txt = root_list_file.read_text(encoding="utf-8")
-                    root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
-                    typer.secho(f"[c2rust-run] lib-replace: 合并根列表文件: {root_list_file}", fg=typer.colors.BLUE)
-                except Exception as _e:
-                    typer.secho(f"[c2rust-run] lib-replace: 读取根列表文件失败: {root_list_file}: {_e}", fg=typer.colors.RED, err=True)
-                    raise typer.Exit(code=1)
-            # 如果提供了 --root-list-syms，也合并进来
-            if isinstance(root_list_syms, str) and root_list_syms.strip():
-                parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
-                root_names.extend(parts)
-                typer.secho(f"[c2rust-run] lib-replace: 合并内联根列表: {len(parts)} 个符号", fg=typer.colors.BLUE)
-        else:
-            # 未传递 files 时，从 --root-list-file 和/或 --root-list-syms 获取
-            # 文件来源
-            if root_list_file is not None:
-                try:
-                    txt = root_list_file.read_text(encoding="utf-8")
-                    root_names.extend([ln.strip() for ln in txt.splitlines() if ln.strip() and not ln.strip().startswith("#")])
-                except Exception as _e:
-                    typer.secho(f"[c2rust-run] lib-replace: 读取根列表失败: {root_list_file}: {_e}", fg=typer.colors.RED, err=True)
-                    raise typer.Exit(code=1)
-            # 内联来源
-            if isinstance(root_list_syms, str) and root_list_syms.strip():
-                parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
-                root_names.extend(parts)
-            # 至少需要提供一种来源
-            if not root_names:
-                typer.secho("[c2rust-run] 错误：未提供 --files 时，必须通过 --root-list-file 或 --root-list-syms 指定根列表", fg=typer.colors.RED, err=True)
-                raise typer.Exit(code=2)
-
+        # Step 2: lib-replace（从配置文件读取根列表和禁用库列表）
+        # 从配置文件读取基础配置
+        config = _load_config()
+        root_names: List[str] = list(config.get("root_symbols", []))
+        disabled_list: Optional[List[str]] = config.get("disabled_libraries", []) or None
+        
         # 去重并校验（允许为空时回退为自动根集）
-        try:
-            root_names = list(dict.fromkeys(root_names))
-        except Exception:
-            root_names = sorted(list(set(root_names)))
-        candidates_list: Optional[List[str]] = None
         if root_names:
-            candidates_list = root_names
-        else:
+            try:
+                root_names = list(dict.fromkeys(root_names))
+            except Exception:
+                root_names = sorted(list(set(root_names)))
+            # 排除 main
+            root_names = [s for s in root_names if s.lower() != "main"]
+        
+        candidates_list: Optional[List[str]] = root_names if root_names else None
+        if not candidates_list:
             typer.secho("[c2rust-run] lib-replace: 根列表为空，将回退为自动检测的根集合（基于扫描结果）", fg=typer.colors.YELLOW)
-
-        # 可选禁用库列表
-        disabled_list: Optional[List[str]] = None
-        if isinstance(disabled_libs, str) and disabled_libs.strip():
-            disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
-            if disabled_list:
-                typer.secho(f"[c2rust-run] lib-replace: 禁用库: {', '.join(disabled_list)}", fg=typer.colors.YELLOW)
+        
+        if disabled_list:
+            typer.secho(f"[c2rust-run] lib-replace: 从配置文件读取禁用库: {', '.join(disabled_list)}", fg=typer.colors.BLUE)
 
         # 执行 lib-replace（默认库 std）
         library = "std"
@@ -461,28 +554,27 @@ def run(
         except Exception as _e:
             typer.secho(f"[c2rust-run] lib-replace: 结果输出时发生非致命错误: {_e}", fg=typer.colors.YELLOW, err=True)
 
-        # Step 4: prepare
+        # Step 3: prepare
         typer.secho("[c2rust-run] prepare: 开始", fg=typer.colors.BLUE)
         _execute_llm_plan(apply=True, llm_group=llm_group, non_interactive=not interactive)
         typer.secho("[c2rust-run] prepare: 完成", fg=typer.colors.GREEN)
 
-        # Step 5: transpile
+        # Step 4: transpile
         typer.secho("[c2rust-run] transpile: 开始", fg=typer.colors.BLUE)
         from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
-        # 使用收集到的根符号列表（排除 main）
-        root_symbols_list = [s for s in root_names if s.lower() != "main"] if root_names else None
+        # 从配置文件读取配置（transpile 内部会自动读取）
         _run_transpile(
             project_root=Path("."),
             crate_dir=None,
             llm_group=llm_group,
             max_retries=max_retries,
-            disabled_libraries=disabled_list,
-            root_symbols=root_symbols_list,
+            disabled_libraries=None,  # 从配置文件恢复
+            root_symbols=None,  # 从配置文件恢复
             non_interactive=not interactive,
         )
         typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
 
-        # Step 6: optimize
+        # Step 5: optimize
         try:
             typer.secho("[c2rust-run] optimize: 开始", fg=typer.colors.BLUE)
             from jarvis.jarvis_c2rust.optimizer import optimize_project as _optimize_project
