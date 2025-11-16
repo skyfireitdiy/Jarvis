@@ -109,20 +109,8 @@ def transpile(
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="指定用于翻译的 LLM 模型组"
     ),
-    only: Optional[str] = typer.Option(
-        None, "--only", help="仅翻译指定的函数（名称或限定名称），以逗号分隔"
-    ),
     max_retries: int = typer.Option(
         0, "-m", "--max-retries", help="构建/修复与审查的最大重试次数（0 表示不限制）"
-    ),
-    resume: bool = typer.Option(
-        True, "--resume/--no-resume", help="是否启用断点续跑（默认启用）"
-    ),
-    disabled_libs: Optional[str] = typer.Option(
-        None, "--disabled-libs", help="禁用库列表（逗号分隔，在实现时禁止使用这些库）"
-    ),
-    root_symbols: Optional[str] = typer.Option(
-        None, "--root-symbols", help="根符号列表（逗号分隔，这些符号对应的接口实现时要求对外暴露，main除外）"
     ),
     interactive: bool = typer.Option(
         False,
@@ -136,31 +124,26 @@ def transpile(
     默认使用当前目录作为项目根，并从 <root>/.jarvis/c2rust/symbols.jsonl 读取数据。
     未指定目标 crate 时，使用默认 <cwd>/<cwd.name>_rs。
 
+    注意: disabled_libraries、root_symbols 等配置参数会从进度文件（.jarvis/c2rust/progress.json）中自动恢复，
+    这些参数应该在前面的流程（如 run 或 lib-replace）中设置。
+    断点续跑功能默认始终启用。
+
     选项:
-    - --only: 仅翻译指定的函数（名称或限定名称），以逗号分隔
     - --max-retries/-m: 构建/修复与审查的最大重试次数（0 表示不限制）
-    - --resume/--no-resume: 是否启用断点续跑（默认启用）
     - --llm-group/-g: 指定用于翻译的 LLM 模型组
     """
     try:
         # Lazy import to avoid hard dependency if not used
         from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
-        only_list = [s.strip() for s in str(only).split(",") if s.strip()] if only else None
-        disabled_list: Optional[List[str]] = None
-        if isinstance(disabled_libs, str) and disabled_libs.strip():
-            disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
-        root_symbols_list: Optional[List[str]] = None
-        if isinstance(root_symbols, str) and root_symbols.strip():
-            root_symbols_list = [s.strip() for s in root_symbols.replace("\n", ",").split(",") if s.strip()]
+        # disabled_libraries、root_symbols 从进度文件恢复，不通过命令行参数传入
+        # 断点续跑功能默认始终启用
         _run_transpile(
             project_root=Path("."),
             crate_dir=None,
             llm_group=llm_group,
             max_retries=max_retries,
-            resume=resume,
-            only=only_list,
-            disabled_libraries=disabled_list,
-            root_symbols=root_symbols_list,
+            disabled_libraries=None,  # 从进度文件恢复
+            root_symbols=None,  # 从进度文件恢复
             non_interactive=not interactive,
         )
     except Exception as e:
@@ -334,9 +317,6 @@ def run(
     max_retries: int = typer.Option(
         0, "-m", "--max-retries", help="transpile 构建/修复与审查的最大重试次数（0 表示不限制）"
     ),
-    resume: bool = typer.Option(
-        True, "--resume/--no-resume", help="transpile 是否启用断点续跑（默认启用）"
-    ),
     interactive: bool = typer.Option(
         False,
         "--interactive",
@@ -496,8 +476,6 @@ def run(
             crate_dir=None,
             llm_group=llm_group,
             max_retries=max_retries,
-            resume=resume,
-            only=None,
             disabled_libraries=disabled_list,
             root_symbols=root_symbols_list,
             non_interactive=not interactive,

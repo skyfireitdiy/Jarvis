@@ -22,7 +22,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
 import time
 from dataclasses import dataclass
@@ -447,8 +446,6 @@ class Transpiler:
         check_max_retries: Optional[int] = None,  # cargo check 阶段最大重试次数（0表示无限重试）
         test_max_retries: Optional[int] = None,  # cargo test 阶段最大重试次数（0表示无限重试）
         review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,  # 审查阶段最大迭代次数（0表示无限重试）
-        resume: bool = True,
-        only: Optional[List[str]] = None,  # 仅转译指定函数名（简单名或限定名）
         disabled_libraries: Optional[List[str]] = None,  # 禁用库列表（在实现时禁止使用这些库）
         root_symbols: Optional[List[str]] = None,  # 根符号列表（这些符号对应的接口实现时要求对外暴露，main除外）
         non_interactive: bool = True,
@@ -469,38 +466,54 @@ class Transpiler:
             self.test_max_retries = test_max_retries if test_max_retries is not None else DEFAULT_TEST_MAX_RETRIES
         self.max_retries = max(self.check_max_retries, self.test_max_retries)  # 保持兼容性
         self.review_max_iterations = review_max_iterations
-        self.resume = resume
-        self.only = set(only or [])
         self.non_interactive = non_interactive
-        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
         self.fn_index_by_id: Dict[int, FnRecord] = {}
         self.fn_name_to_id: Dict[str, int] = {}
 
-        # 读取进度文件，如果存在则从中恢复配置（根符号和禁用库）
+        # 断点续跑功能默认始终启用
+        self.resume = True
+        
+        # 读取进度文件，如果存在则从中恢复配置（根符号、禁用库）
         default_progress = {"current": None, "converted": []}
         self.progress: Dict[str, Any] = _read_json(self.progress_path, default_progress)
         
         # 如果提供了新的根符号或禁用库，更新配置；否则从进度文件中恢复
+        # 优先使用传入的参数，如果为 None 则从进度文件恢复
+        config = self.progress.get("config", {})
+        
         if root_symbols is not None:
+            # 传入的参数不为 None，使用传入的值并保存
             self.root_symbols = root_symbols
             self.progress["config"] = self.progress.get("config", {})
             self.progress["config"]["root_symbols"] = root_symbols
         else:
-            # 从进度文件恢复
-            config = self.progress.get("config", {})
+            # 传入的参数为 None，从进度文件恢复
+            # 如果进度文件中有配置则使用，否则使用空列表
             self.root_symbols = config.get("root_symbols", [])
+            # 确保进度文件中有 config 结构（即使值为空列表也要保存，以便后续恢复）
+            if "root_symbols" not in config:
+                self.progress["config"] = self.progress.get("config", {})
+                self.progress["config"]["root_symbols"] = self.root_symbols
         
         if disabled_libraries is not None:
+            # 传入的参数不为 None，使用传入的值并保存
             self.disabled_libraries = disabled_libraries
             self.progress["config"] = self.progress.get("config", {})
             self.progress["config"]["disabled_libraries"] = disabled_libraries
         else:
-            # 从进度文件恢复
-            config = self.progress.get("config", {})
+            # 传入的参数为 None，从进度文件恢复
+            # 如果进度文件中有配置则使用，否则使用空列表
             self.disabled_libraries = config.get("disabled_libraries", [])
+            # 确保进度文件中有 config 结构（即使值为空列表也要保存，以便后续恢复）
+            if "disabled_libraries" not in config:
+                self.progress["config"] = self.progress.get("config", {})
+                self.progress["config"]["disabled_libraries"] = self.disabled_libraries
+        
+        # 在初始化完成后打印日志
+        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
         
         # 保存配置到进度文件
         if "config" in self.progress:
@@ -740,12 +753,6 @@ class Transpiler:
         typer.secho(f"[c2rust-transpiler][index] 索引构建完成: ids={len(self.fn_index_by_id)} names={len(self.fn_name_to_id)}", fg=typer.colors.BLUE)
 
     def _should_skip(self, rec: FnRecord) -> bool:
-        # 如果 only 列表非空，则仅处理匹配者
-        if self.only:
-            if rec.name in self.only or rec.qname in self.only:
-                pass
-            else:
-                return True
         # 已转译的跳过（按源位置与名称唯一性判断，避免同名不同位置的误判）
         if self.symbol_map.has_rec(rec):
             return True
@@ -1813,7 +1820,7 @@ class Transpiler:
             "- 禁止使用 todo!/unimplemented! 作为占位；",
             "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
             "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在修复之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高修复效率和准确性；",
-            f"- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
+            "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == 'cargo test' else '')}；",
             *([f"- **禁用库约束**：禁止在修复中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果修复需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
             *([f"- **根符号要求**：此函数是根符号（{sym_name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。"] if is_root else []),
@@ -2881,10 +2888,8 @@ def run_transpile(
     check_max_retries: Optional[int] = None,
     test_max_retries: Optional[int] = None,
     review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,
-    resume: bool = True,
-    only: Optional[List[str]] = None,
-    disabled_libraries: Optional[List[str]] = None,
-    root_symbols: Optional[List[str]] = None,
+    disabled_libraries: Optional[List[str]] = None,  # None 表示从进度文件恢复
+    root_symbols: Optional[List[str]] = None,  # None 表示从进度文件恢复
     non_interactive: bool = True,
 ) -> None:
     """
@@ -2893,8 +2898,7 @@ def run_transpile(
     - crate_dir: Rust crate 根目录；默认遵循 "<parent>/<cwd_name>_rs"（与当前目录同级，若 project_root 为 ".")
     - llm_group: 指定 LLM 模型组
     - max_retries: 构建与审查迭代的最大次数
-    - resume: 是否启用断点续跑
-    - only: 仅转译给定列表中的函数（函数名或限定名）
+    注意: 断点续跑功能默认始终启用
     """
     t = Transpiler(
         project_root=project_root,
@@ -2905,8 +2909,6 @@ def run_transpile(
         check_max_retries=check_max_retries,
         test_max_retries=test_max_retries,
         review_max_iterations=review_max_iterations,
-        resume=resume,
-        only=only,
         disabled_libraries=disabled_libraries,
         root_symbols=root_symbols,
         non_interactive=non_interactive,

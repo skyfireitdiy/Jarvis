@@ -3,9 +3,8 @@
 
 import os
 import subprocess
-import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -33,7 +32,7 @@ def check_lsp_server_available(language: str) -> bool:
     check_cmd = config.check_command or config.command
     
     try:
-        result = subprocess.run(
+        subprocess.run(
             check_cmd,
             capture_output=True,
             text=True,

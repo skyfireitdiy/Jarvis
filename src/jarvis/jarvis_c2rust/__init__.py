@@ -11,7 +11,7 @@ Jarvis C2Rust 工具集。
   - 扫描:           jarvis-c2rust scan
   - 库替代评估:     jarvis-c2rust lib-replace --root-list-file roots.txt [--disabled-libs ...]
   - 规划/落盘:      jarvis-c2rust prepare [-g <llm-group>]
-  - 转译:           jarvis-c2rust transpile [-g <llm-group>] [--only ...] [--max-retries N] [--resume/--no-resume]
+  - 转译:           jarvis-c2rust transpile [-g <llm-group>] [-m <max-retries>]（断点续跑默认始终启用）
   - 代码优化:       jarvis-c2rust optimize [--crate-dir ...] [--unsafe/--no-unsafe] [--structure/--no-structure] [--visibility/--no-visibility] [--doc/--no-doc] [-m N] [--dry-run]
   - 头文件收集:     jarvis-c2rust collect <hdrs...> -o roots.txt
   - 一键流水线:     jarvis-c2rust run [--files <hdrs...> -o roots.txt | --root-list-syms ...] [-g <llm-group>] [--disabled-libs ...]

@@ -361,7 +361,7 @@ def goodbye():
         
         try:
             abs_path = os.path.abspath(filepath)
-            file_mtime = os.path.getmtime(abs_path)
+            os.path.getmtime(abs_path)
             
             # 先读取文件，生成缓存
             result = tool.execute({
@@ -426,7 +426,7 @@ int main() {
         
         try:
             abs_path = os.path.abspath(filepath)
-            file_mtime = os.path.getmtime(abs_path)
+            os.path.getmtime(abs_path)
             
             # 读取文件生成缓存
             result = tool.execute({
