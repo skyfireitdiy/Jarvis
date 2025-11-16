@@ -832,7 +832,7 @@ class Transpiler:
             "- 函数接口设计应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型（如 i32/u32/usize、&[T]/&mut [T]、String、Result<T, E> 等），而不是 C 风格类型（如 core::ffi::c_*、libc::c_*）；\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI；\n"
             "- 参数个数与顺序可以保持与 C 一致，但类型设计应优先考虑 Rust 的惯用法和安全性；\n"
-            f"{'- **根符号要求**：此函数是根符号，必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。\n' if is_root else ''}"
+            f"{'- **根符号要求**：此函数是根符号，必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n' if is_root else ''}"
             "- **特殊处理：对于资源释放类函数（如文件关闭、内存释放、句柄释放等），在 Rust 中通常通过 RAII 自动管理，可以跳过实现或提供空实现；请在 notes 字段中标注此类情况；\n"
             "- 仅输出必要信息，避免冗余解释。"
         )
@@ -898,7 +898,7 @@ class Transpiler:
             "  * 字符串：优先使用 String、&str 而非 *const c_char/*mut c_char；\n"
             "  * 错误处理：考虑使用 Result<T, E> 而非 C 风格的错误码；\n"
             "  * 参数个数与顺序可以保持与 C 一致，但类型应优先考虑 Rust 的惯用法、安全性和可读性；\n"
-            f"{'- **根符号要求**：此函数是根符号，rust_signature 必须包含 `pub` 关键字，确保可以从 crate 外部访问。\n' if is_root else ''}"
+            f"{'- **根符号要求**：此函数是根符号，rust_signature 必须包含 `pub` 关键字，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n' if is_root else ''}"
             "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n"
             "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
@@ -1254,7 +1254,7 @@ class Transpiler:
             f"目标：在 crate 目录 {self.crate_dir.resolve()} 的 {module} 中，为 C 函数 {rec.qname or rec.name} 生成对应的 Rust 实现，并同时生成测试用例。",
             "要求：",
             f"- 函数签名（建议）：{rust_sig}",
-            *([f"- **根符号要求**：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if is_root else []),
+            *([f"- **根符号要求**：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`），确保可以从 crate 外部访问。"] if is_root else []),
             f"- 原 C 工程目录位置：{self.project_root.resolve()}",
             "- 若 module 文件不存在则新建；为所在模块添加必要的 mod 声明（若需要）；",
             "- 若已有函数占位/实现，尽量最小修改，不要破坏现有代码；",
@@ -1444,6 +1444,25 @@ class Transpiler:
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         agent = self._get_generate_agent()  # 使用代码生成Agent（禁用分析和方法论）
         agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen]", suffix="")
+        
+        # 如果是根符号，确保其模块在 lib.rs 中被暴露
+        if self._is_root_symbol(rec):
+            try:
+                mp = Path(module)
+                crate_root = self.crate_dir.resolve()
+                rel = mp.resolve().relative_to(crate_root) if mp.is_absolute() else Path(module)
+                rel_s = str(rel).replace("\\", "/")
+                if rel_s.startswith("./"):
+                    rel_s = rel_s[2:]
+                if rel_s.startswith("src/"):
+                    parts = rel_s[len("src/"):].strip("/").split("/")
+                    if parts and parts[0]:
+                        top_mod = parts[0]
+                        if not top_mod.endswith(".rs"):
+                            self._ensure_top_level_pub_mod(top_mod)
+                            typer.secho(f"[c2rust-transpiler][gen] 根符号 {rec.qname or rec.name} 的模块 {top_mod} 已在 lib.rs 中暴露", fg=typer.colors.GREEN)
+            except Exception:
+                pass
 
     def _extract_rust_fn_name_from_sig(self, rust_sig: str) -> str:
         """
@@ -1797,7 +1816,7 @@ class Transpiler:
             f"- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == 'cargo test' else '')}；",
             *([f"- **禁用库约束**：禁止在修复中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果修复需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
-            *([f"- **根符号要求**：此函数是根符号（{sym_name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if is_root else []),
+            *([f"- **根符号要求**：此函数是根符号（{sym_name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。"] if is_root else []),
             "",
             "【重要：依赖检查与实现要求】",
             "在修复问题之前，请务必检查以下内容：",
@@ -2318,7 +2337,7 @@ class Transpiler:
                 json.dumps(librep_ctx, ensure_ascii=False, indent=2),
                 "",
                 *([f"禁用库列表（禁止在实现中使用这些库）：{', '.join(self.disabled_libraries)}"] if self.disabled_libraries else []),
-                *([f"根符号要求：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if self._is_root_symbol(rec) else []),
+                *([f"根符号要求：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。"] if self._is_root_symbol(rec) else []),
             ]
             # 添加编译参数（如果存在）
             if compile_flags:
@@ -2546,7 +2565,7 @@ class Transpiler:
                 "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在优化之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高优化效率和准确性；",
                 "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
                 *([f"- **禁用库约束**：禁止在优化中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果优化需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
-                *([f"- **根符号要求**：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if self._is_root_symbol(rec) else []),
+                *([f"- **根符号要求**：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。"] if self._is_root_symbol(rec) else []),
                 "",
                 "【重要：依赖检查与实现要求】",
                 "在优化函数之前，请务必检查以下内容：",
