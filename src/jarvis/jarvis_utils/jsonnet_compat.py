@@ -7,7 +7,7 @@ from typing import Any
 import _jsonnet
 
 
-def _fix_jsonnet_multiline_strings(s: str) -> str:
+def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
     """
     修复 jsonnet ||| 多行字符串的缩进问题。
     
@@ -20,7 +20,9 @@ def _fix_jsonnet_multiline_strings(s: str) -> str:
         s: 输入字符串
         
     返回:
-        修复后的字符串
+        (修复后的字符串, 第一行原始缩进信息字典)
+        缩进信息字典的键是修复后字符串中 ||| 多行字符串的标记，
+        值是第一行的原始缩进级别（如果第一行原本有缩进但后续行没有）
     """
     if not isinstance(s, str):
         return s
@@ -40,44 +42,178 @@ def _fix_jsonnet_multiline_strings(s: str) -> str:
         
         # 如果内容为空，直接返回
         if not content.strip():
-            return match.group(0)
+            return match.group(0), {}
         
         # 按行分割内容
         lines = content.split('\n')
         
         # 确定缩进级别：
         # 1. 如果第一行有缩进，使用第一行的缩进级别
-        # 2. 如果第一行没有缩进，使用默认的一个空格
-        # 3. 如果所有行都为空，使用默认的一个空格
+        # 2. 如果第一行是空行，查找第一个非空行的缩进级别
+        # 3. 如果第一行没有缩进，使用默认的一个空格
+        # 4. 如果所有行都为空，使用默认的一个空格
         indent_level = 1  # 默认缩进级别
+        first_line_has_indent = False
+        first_line_indent = 0
+        
         if lines:
             first_line = lines[0]
             if first_line.strip() and first_line.startswith((' ', '\t')):
-                # 第一行已有缩进，使用其缩进级别
-                indent_level = len(first_line) - len(first_line.lstrip())
+                # 第一行已有缩进，记录其缩进级别
+                first_line_indent = len(first_line) - len(first_line.lstrip())
+                first_line_has_indent = True
+                indent_level = first_line_indent
                 # 确保至少有一个空格
                 if indent_level == 0:
                     indent_level = 1
+            elif not first_line.strip():
+                # 第一行是空行，查找第一个非空行的缩进级别
+                for line in lines[1:]:
+                    if line.strip():
+                        if line.startswith((' ', '\t')):
+                            # 找到第一个非空行，使用其缩进级别
+                            indent_level = len(line) - len(line.lstrip())
+                            # 确保至少有一个空格
+                            if indent_level == 0:
+                                indent_level = 1
+                        else:
+                            # 第一个非空行没有缩进，使用默认的一个空格
+                            indent_level = 1
+                        break
         
-        # 对每一行都统一缩进级别：使用第一行的缩进级别
-        # jsonnet 要求所有行都有相同的缩进级别
+        # 对每一行都统一缩进级别
+        # jsonnet 的 ||| 要求所有行都有相同的缩进级别，并会去除所有行的最小共同缩进前缀
+        # 为了保留第一行的缩进，我们需要：
+        # 1. 让所有行都有相同的缩进（满足 jsonnet 的要求）
+        # 2. 记录第一行的原始缩进级别，以便在解析后恢复
+        # 3. 在解析后，为第一行添加原始缩进
+        
+        # 检查是否有后续行没有缩进（需要修复）
+        has_unindented_lines = False
+        if first_line_has_indent:
+            for line in lines[1:]:
+                if line.strip() and not line.startswith((' ', '\t')):
+                    has_unindented_lines = True
+                    break
+        
+        # 记录所有行的原始缩进信息（用于恢复）
+        # 如果存在不同缩进级别的行，我们需要记录每行的原始缩进
+        original_indents = {}  # 键：行内容（去除缩进后），值：原始缩进级别
+        has_mixed_indents = False
+        
+        # 检查是否有混合缩进（不同行有不同的缩进级别）
+        if lines:
+            seen_indents = set()
+            for line in lines:
+                if line.strip():
+                    line_indent = len(line) - len(line.lstrip())
+                    if line_indent > 0:
+                        seen_indents.add(line_indent)
+                    line_content = line.lstrip()
+                    # 记录原始缩进（如果有）
+                    if line_indent > 0:
+                        original_indents[line_content] = line_indent
+            
+            # 如果有多个不同的缩进级别，说明是混合缩进
+            if len(seen_indents) > 1:
+                has_mixed_indents = True
+        
+        # 如果第一行有缩进，但后续行没有，我们也需要记录
+        if first_line_has_indent and has_unindented_lines:
+            has_mixed_indents = True
+            # 记录第一行的原始缩进
+            first_line_content = lines[0].lstrip()
+            original_indents[first_line_content] = first_line_indent
+        
+        # 统一所有行的缩进级别（以满足 jsonnet 的要求）
+        # 但我们会记录原始缩进信息，以便在解析后恢复
         for i in range(len(lines)):
             line = lines[i]
             if line.strip():  # 只处理非空行
-                # 统一使用第一行的缩进级别
-                # 去除原有的前导空白，然后添加统一的缩进
                 line_content = line.lstrip()
+                # 统一使用第一行的缩进级别（如果第一行有缩进）
+                # 或者使用默认的缩进级别
                 lines[i] = ' ' * indent_level + line_content
         
         # 重新组合内容
         fixed_content = '\n'.join(lines)
         
-        return start_marker + whitespace_after + fixed_content + end_marker
+        # 返回修复后的内容和原始缩进信息
+        indent_info = {}
+        if has_mixed_indents and original_indents:
+            indent_info = original_indents
+        
+        return start_marker + whitespace_after + fixed_content + end_marker, indent_info
     
     # 使用 DOTALL 标志，使 . 匹配换行符
-    fixed = re.sub(pattern, fix_match, s, flags=re.DOTALL)
+    # 收集所有修复后的内容和缩进信息
+    all_indent_info = {}
+    fixed_parts = []
+    last_end = 0
     
-    return fixed
+    for match in re.finditer(pattern, s, flags=re.DOTALL):
+        # 添加匹配前的部分
+        fixed_parts.append(s[last_end:match.start()])
+        
+        # 修复匹配的部分
+        fixed_content, indent_info = fix_match(match)
+        fixed_parts.append(fixed_content)
+        
+        # 合并缩进信息
+        all_indent_info.update(indent_info)
+        
+        last_end = match.end()
+    
+    # 添加剩余部分
+    fixed_parts.append(s[last_end:])
+    fixed = ''.join(fixed_parts)
+    
+    return fixed, all_indent_info
+
+
+def _restore_first_line_indent(obj: Any, indent_info: dict) -> Any:
+    """
+    恢复第一行的原始缩进。
+    
+    参数:
+        obj: 解析后的对象
+        indent_info: 缩进信息字典
+        
+    返回:
+        恢复缩进后的对象
+    """
+    if not indent_info:
+        return obj
+    
+    if isinstance(obj, dict):
+        return {k: _restore_first_line_indent(v, indent_info) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_restore_first_line_indent(item, indent_info) for item in obj]
+    elif isinstance(obj, str):
+        # 检查字符串的每一行是否原本有缩进
+        # 如果存在原始缩进信息，恢复每行的原始缩进
+        if indent_info:
+            lines = obj.split('\n')
+            restored_lines = []
+            for line in lines:
+                if line.strip():
+                    # 去除当前行的缩进，获取内容
+                    line_content = line.lstrip()
+                    # 检查是否有对应的原始缩进信息
+                    if line_content in indent_info:
+                        # 恢复原始缩进
+                        original_indent = indent_info[line_content]
+                        restored_lines.append(' ' * original_indent + line_content)
+                    else:
+                        # 没有原始缩进信息，保持原样
+                        restored_lines.append(line)
+                else:
+                    # 空行保持原样
+                    restored_lines.append(line)
+            return '\n'.join(restored_lines)
+        return obj
+    else:
+        return obj
 
 
 def _strip_markdown_code_blocks(s: str) -> str:
@@ -154,12 +290,18 @@ def loads(s: str) -> Any:
     cleaned = _strip_markdown_code_blocks(s)
     
     # 自动修复 ||| 多行字符串的缩进问题
-    cleaned = _fix_jsonnet_multiline_strings(cleaned)
+    cleaned, indent_info = _fix_jsonnet_multiline_strings(cleaned)
     
     # 使用 jsonnet 解析，支持 JSON5 和 Jsonnet 语法
     result_json = _jsonnet.evaluate_snippet("<input>", cleaned)
     # jsonnet 返回的是 JSON 字符串，需要再次解析
-    return json.loads(result_json)
+    result = json.loads(result_json)
+    
+    # 如果第一行原本有缩进，恢复第一行的缩进
+    if indent_info:
+        result = _restore_first_line_indent(result, indent_info)
+    
+    return result
 
 
 def dumps(obj: Any, **kwargs) -> str:
