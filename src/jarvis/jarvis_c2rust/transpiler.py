@@ -2375,11 +2375,20 @@ class Transpiler:
                 # 检查上一次的解析结果
                 if parse_error_msg:
                     # 如果有JSON解析错误，优先反馈
-                    error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_msg}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
+                    error_guidance = (
+                        f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n"
+                        f"- JSON解析失败: {parse_error_msg}\n\n"
+                        f"请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
+                    )
                 elif parse_failed:
-                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
+                    error_guidance = (
+                        "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n"
+                        "- 无法从摘要中解析出有效的 JSON 对象\n\n"
+                        "请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
+                    )
                 
                 full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
+                typer.secho(f"[c2rust-transpiler][review] 直接调用模型接口修复格式错误（第 {i+1} 次重试）", fg=typer.colors.YELLOW)
                 try:
                     response = agent.model.chat_until_success(full_prompt)  # type: ignore
                     summary = str(response or "")
@@ -2407,10 +2416,10 @@ class Transpiler:
                     parse_failed = False  # 兼容格式成功，不算解析失败
                     parse_error_msg = None
                 else:
-                    # 无法解析，视为有问题
-                    verdict = {"ok": False, "function_issues": [content], "critical_issues": []}
-                    # 格式解析失败，后续迭代使用直接模型调用
+                    # 无法解析，立即重试：设置标志并继续循环
                     use_direct_model_review = True
+                    # 继续循环，立即重试
+                    continue
             elif not isinstance(verdict, dict):
                 parse_failed = True
                 # 兼容旧格式：尝试解析纯文本 OK
@@ -2420,10 +2429,11 @@ class Transpiler:
                     verdict = {"ok": True, "function_issues": [], "critical_issues": []}
                     parse_failed = False  # 兼容格式成功，不算解析失败
                 else:
-                    # 无法解析，视为有问题
-                    verdict = {"ok": False, "function_issues": [content], "critical_issues": []}
-                    # 格式解析失败，后续迭代使用直接模型调用
+                    # 无法解析，立即重试：设置标志并继续循环
                     use_direct_model_review = True
+                    parse_error_msg = f"无法从摘要中解析出有效的 JSON 对象，得到的内容类型为: {type(verdict).__name__}"
+                    # 继续循环，立即重试
+                    continue
             
             ok = bool(verdict.get("ok") is True)
             function_issues = verdict.get("function_issues") if isinstance(verdict.get("function_issues"), list) else []
