@@ -894,6 +894,7 @@ class Transpiler:
             "- 函数接口设计应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型（如 i32/u32/usize、&[T]/&mut [T]、String、Result<T, E> 等），而不是 C 风格类型（如 core::ffi::c_*、libc::c_*）；\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI；\n"
             "- 参数个数与顺序可以保持与 C 一致，但类型设计应优先考虑 Rust 的惯用法和安全性；\n"
+            "- **特殊处理：对于资源释放类函数（如文件关闭、内存释放、句柄释放等），在 Rust 中通常通过 RAII 自动管理，可以跳过实现或提供空实现；请在 notes 字段中标注此类情况；\n"
             "- 仅输出必要信息，避免冗余解释。"
         )
         # 提取编译参数
@@ -944,10 +945,12 @@ class Transpiler:
             "允许字段（JSON 对象）：\n"
             '- "module": "<绝对路径>/src/xxx.rs 或 <绝对路径>/src/xxx/mod.rs；或相对路径 src/xxx.rs / src/xxx/mod.rs"\n'
             '- "rust_signature": "pub fn xxx(...)->..."\n'
+            '- "skip_implementation": bool  // 可选，如果为 true，表示此函数可通过 RAII 自动管理，可以跳过实现阶段\n'
             '- "notes": "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
             "注意：\n"
             "- module 必须位于 crate 的 src/ 目录下，接受绝对路径或以 src/ 开头的相对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型和惯用法，而不是 C 风格类型。\n"
+            "- **资源释放类函数处理**：如果函数是资源释放类（如文件关闭 fclose、内存释放 free、句柄释放、锁释放等），在 Rust 中通常通过 RAII（Drop trait）自动管理，可以跳过实现阶段；请设置 skip_implementation 为 true，并在 notes 字段中说明原因（如 \"通过 RAII 自动管理，无需显式实现\"）。\n"
             "- 类型设计原则：\n"
             "  * 基本类型：优先使用 i32/u32/i64/u64/isize/usize/f32/f64 等原生 Rust 类型，而不是 core::ffi::c_* 或 libc::c_*；\n"
             "  * 指针/引用：优先使用引用 &T/&mut T 或切片 &[T]/&mut [T]，而非原始指针 *const T/*mut T；仅在必要时使用原始指针；\n"
@@ -957,12 +960,15 @@ class Transpiler:
             "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n"
             "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
-            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"notes\": \"...\"\n}\n</SUMMARY>"
+            "示例1（正常函数）：\n"
+            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"notes\": \"...\"\n}\n</SUMMARY>\n"
+            "示例2（资源释放类函数，可跳过实现）：\n"
+            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"skip_implementation\": true,\n  \"notes\": \"通过 RAII 自动管理，无需显式实现\"\n}\n</SUMMARY>"
         )
         return system_prompt, user_prompt, summary_prompt
 
-    def _plan_module_and_signature(self, rec: FnRecord, c_code: str) -> Tuple[str, str]:
-        """调用 Agent 选择模块与签名，返回 (module_path, rust_signature)，若格式不满足将自动重试直到满足"""
+    def _plan_module_and_signature(self, rec: FnRecord, c_code: str) -> Tuple[str, str, bool]:
+        """调用 Agent 选择模块与签名，返回 (module_path, rust_signature, skip_implementation)，若格式不满足将自动重试直到满足"""
         crate_tree = _dir_tree(self.crate_dir)
         callees_ctx = self._collect_callees_context(rec)
         sys_p, usr_p, base_sum_p = self._build_module_selection_prompts(rec, c_code, callees_ctx, crate_tree)
@@ -1074,8 +1080,15 @@ class Transpiler:
             if ok:
                 module = str(meta.get("module") or "").strip()
                 rust_sig = str(meta.get("rust_signature") or "").strip()
-                typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
-                return module, rust_sig
+                skip_impl = bool(meta.get("skip_implementation") is True)
+                if skip_impl:
+                    notes = str(meta.get("notes") or "")
+                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}, 跳过实现={skip_impl}", fg=typer.colors.GREEN)
+                    if notes:
+                        typer.secho(f"[c2rust-transpiler][plan] 跳过实现原因: {notes}", fg=typer.colors.CYAN)
+                else:
+                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
+                return module, rust_sig, skip_impl
             else:
                 typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
                 last_reason = reason
@@ -1090,7 +1103,7 @@ class Transpiler:
             fallback_module = "src/ffi.rs"
         fallback_sig = f"pub fn {rec.name or ('fn_' + str(rec.id))}()"
         typer.secho(f"[c2rust-transpiler][plan] 超出规划重试上限({plan_max_retries_val if plan_max_retries_val > 0 else '无限'})，回退到兜底: module={fallback_module}, signature={fallback_sig}", fg=typer.colors.YELLOW)
-        return fallback_module, fallback_sig
+        return fallback_module, fallback_sig, False
 
     def _update_progress_current(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         self.progress["current"] = {
@@ -1290,6 +1303,10 @@ class Transpiler:
             "- 禁止在函数实现中使用 todo!/unimplemented! 作为占位；对于尚未实现的被调符号，请阅读其原 C 实现并在本次一并补齐等价的 Rust 实现，避免遗留占位；",
             "- 为保证行为等价，禁止使用占位返回或随意默认值；必须实现与 C 语义等价的返回逻辑，不得使用 panic!/todo!/unimplemented!；",
             "- **必须同时生成测试用例**：在生成函数实现的同时，必须在同一文件中添加测试模块（#[cfg(test)] mod tests），并编写至少一个可编译通过的单元测试；",
+            "- **资源释放类函数特殊处理**：如果函数是资源释放类（如文件关闭 fclose、内存释放 free、句柄释放、资源清理等），在 Rust 中通常通过 RAII（Drop trait）自动管理，可以：",
+            "  * 提供空实现（函数体为空或仅返回成功状态），并在文档注释中说明资源通过 RAII 自动管理；",
+            "  * 或者完全跳过实现，仅保留函数签名（如果调用方不需要显式调用）；",
+            "  * 在函数文档注释中明确说明：\"此函数在 Rust 中通过 RAII 自动管理资源，无需显式调用\"；",
             "- 不要删除或移动其他无关文件。",
             "",
             "编码原则与规范：",
@@ -1311,6 +1328,20 @@ class Transpiler:
             "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             "- 导入：禁止使用 use ...::* 通配；仅允许精确导入所需符号",
             "- 依赖管理：如引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值；",
+            "",
+            "【重要：资源释放类函数处理】",
+            "- 识别标准：如果函数名或功能属于以下类别，通常可以通过 RAII 自动管理：",
+            "  * 文件关闭：fclose、close、file_close 等；",
+            "  * 内存释放：free、dealloc、memory_free 等；",
+            "  * 句柄/资源释放：handle_close、resource_free、cleanup 等；",
+            "  * 锁释放：mutex_unlock、lock_release 等（Rust 中通过作用域自动释放）；",
+            "  * 其他资源清理函数；",
+            "- 实现策略：",
+            "  * 如果函数签名需要保留（用于兼容性），提供空实现或仅返回成功状态；",
+            "  * 在函数文档注释中明确说明：\"此函数在 Rust 中通过 RAII（Drop trait）自动管理资源，无需显式调用。保留此函数仅用于 API 兼容性。\"；",
+            "  * 如果函数签名不需要保留，可以完全跳过实现；",
+            "  * 对于需要返回值的函数（如错误码），可以返回成功状态（如 Ok(()) 或 0）；",
+            "- 测试处理：对于资源释放类函数，测试可以非常简单（如仅验证函数可以调用而不崩溃），或可以跳过测试（在文档注释中说明原因）；",
             "",
             "【重要：测试用例生成要求】",
             "- **必须同时生成测试用例**：在生成函数实现的同时，必须在同一文件中添加测试模块（#[cfg(test)] mod tests），并编写至少一个可编译通过的单元测试；",
@@ -2647,12 +2678,20 @@ class Transpiler:
                 continue
             # 1) 规划：模块路径与Rust签名
             typer.secho(f"[c2rust-transpiler][plan] 正在规划模块与签名: {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.CYAN)
-            module, rust_sig = self._plan_module_and_signature(rec, c_code)
+            module, rust_sig, skip_implementation = self._plan_module_and_signature(rec, c_code)
             typer.secho(f"[c2rust-transpiler][plan] 已选择 模块={module}, 签名={rust_sig}", fg=typer.colors.CYAN)
 
             # 记录当前进度
             self._update_progress_current(rec, module, rust_sig)
             typer.secho(f"[c2rust-transpiler][progress] 已更新当前进度记录 id={rec.id}", fg=typer.colors.CYAN)
+
+            # 如果标记为跳过实现（通过 RAII 自动管理），则直接标记为已转换
+            if skip_implementation:
+                typer.secho(f"[c2rust-transpiler][skip-impl] 函数 {rec.qname or rec.name} 通过 RAII 自动管理，跳过实现阶段", fg=typer.colors.CYAN)
+                # 直接标记为已转换，跳过代码生成、构建和审查阶段
+                self._mark_converted(rec, module, rust_sig)
+                typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module} (跳过实现)", fg=typer.colors.GREEN)
+                continue
 
             # 初始化函数上下文与代码编写与修复Agent复用缓存（只在当前函数开始时执行一次）
             self._reset_function_context(rec, module, rust_sig, c_code)
