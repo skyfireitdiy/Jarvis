@@ -444,7 +444,7 @@ def _create_llm_model(
             "你是资深 C→Rust 迁移专家。任务：给定一个函数及其调用子树（依赖图摘要、函数签名、源码片段），"
             "判断是否可以使用一个或多个成熟的 Rust 库整体替代该子树的功能（允许库内多个 API 协同，允许多个库组合；不允许使用不成熟/不常见库）。"
             "如可替代，请给出 libraries 列表（库名），可选给出代表性 API/模块与实现备注 notes（如何用这些库协作实现）。"
-            "输出格式：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，可选 library(str,首选主库), api(str) 或 apis(list)，notes(str)。支持json5语法（如尾随逗号、注释等）。"
+            "输出格式：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，可选 library(str,首选主库), api(str) 或 apis(list)，notes(str)。"
         )
         return model
     except Exception as e:
@@ -476,6 +476,7 @@ def _parse_agent_json_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Opti
         return None, "未找到 <SUMMARY> 或 </SUMMARY> 标签，或标签内容为空"
 
     # 直接解析 <SUMMARY> 块内的内容为 JSON
+    # jsonnet_compat.loads 会自动处理 markdown 代码块标记（如 ```json5、```json、``` 等）
     try:
         data = _json_loads(block)
         if isinstance(data, dict):
@@ -561,7 +562,7 @@ def _build_subtree_prompt(
         "允许库内多个 API 协同，允许多个库组合；如果必须依赖尚不成熟/冷门库或非 Rust 库，则判定为不可替代。\n"
         f"{disabled_hint}"
         "输出格式：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，"
-        "可选字段: library(str,首选主库), api(str) 或 apis(list), notes(str: 简述如何由这些库协作实现的思路)。支持json5语法（如尾随逗号、注释等）。\n\n"
+        "可选字段: library(str,首选主库), api(str) 或 apis(list), notes(str: 简述如何由这些库协作实现的思路)。\n\n"
         f"根函数(被评估子树的根): {root_name}\n"
         f"签名: {root_sig}\n"
         f"语言: {root_lang}\n"
@@ -611,7 +612,7 @@ def _llm_evaluate_subtree(
                 if last_parse_error:
                     error_hint = (
                         f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_parse_error}\n\n"
-                        + "请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）。支持json5语法（如尾随逗号、注释等）。"
+                        + "请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）。"
                     )
                 prompt = base_prompt + error_hint
             
@@ -627,6 +628,20 @@ def _llm_evaluate_subtree(
                     fg=typer.colors.YELLOW,
                     err=True,
                 )
+                # 打印原始内容以便调试
+                result_text = str(result or "").strip()
+                if result_text:
+                    typer.secho(
+                        f"[c2rust-library] 原始LLM响应内容（前1000字符）:\n{result_text[:1000]}",
+                        fg=typer.colors.RED,
+                        err=True,
+                    )
+                    if len(result_text) > 1000:
+                        typer.secho(
+                            f"[c2rust-library] ... (还有 {len(result_text) - 1000} 个字符未显示)",
+                            fg=typer.colors.RED,
+                            err=True,
+                        )
                 if attempt < MAX_LLM_RETRIES:
                     continue  # 继续重试
                 else:
@@ -646,6 +661,19 @@ def _llm_evaluate_subtree(
                     fg=typer.colors.YELLOW,
                     err=True,
                 )
+                # 打印解析结果和原始内容以便调试
+                typer.secho(
+                    f"[c2rust-library] 解析结果类型: {type(parsed).__name__}, 值: {repr(parsed)[:500]}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                result_text = str(result or "").strip()
+                if result_text:
+                    typer.secho(
+                        f"[c2rust-library] 原始LLM响应内容（前1000字符）:\n{result_text[:1000]}",
+                        fg=typer.colors.RED,
+                        err=True,
+                    )
                 if attempt < MAX_LLM_RETRIES:
                     continue  # 继续重试
                 else:
