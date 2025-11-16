@@ -558,6 +558,98 @@ class Transpiler:
         self._compile_commands_path = None
         return None
 
+    def _parse_compile_arguments(self, arguments: List[str], result: Dict[str, Any]) -> None:
+        """
+        从 arguments 列表中解析编译标志并更新 result。
+        
+        Args:
+            arguments: 编译参数列表
+            result: 结果字典（会被修改）
+        """
+        for arg in arguments:
+            if not isinstance(arg, str):
+                continue
+            arg = arg.strip()
+            if not arg:
+                continue
+            
+            # 跳过编译器名称和源文件
+            if arg.endswith((".c", ".cpp", ".cc", ".cxx")):
+                continue
+            if arg in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
+                continue
+            
+            result["flags"].append(arg)
+            
+            # 提取包含目录
+            if arg.startswith("-I"):
+                include_dir = arg[2:] if len(arg) > 2 else None
+                if include_dir:
+                    result["include_dirs"].append(include_dir)
+            
+            # 提取宏定义
+            if arg.startswith("-D"):
+                define = arg[2:] if len(arg) > 2 else None
+                if define:
+                    result["defines"].append(define)
+            
+            # 提取取消定义
+            if arg.startswith("-U"):
+                undef = arg[2:] if len(arg) > 2 else None
+                if undef:
+                    result["undefines"].append(undef)
+            
+            # 提取 C 标准
+            if arg.startswith("-std="):
+                result["std"] = arg[5:]
+
+    def _parse_compile_command(self, command: str, result: Dict[str, Any]) -> None:
+        """
+        从 command 字符串中解析编译标志并更新 result。
+        
+        Args:
+            command: 编译命令字符串
+            result: 结果字典（会被修改）
+        """
+        try:
+            parts = shlex.split(command)
+            for part in parts:
+                if not part:
+                    continue
+                
+                # 跳过编译器名称和源文件
+                if part.endswith((".c", ".cpp", ".cc", ".cxx")):
+                    continue
+                if part in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
+                    continue
+                
+                result["flags"].append(part)
+                
+                # 提取包含目录
+                if part.startswith("-I"):
+                    include_dir = part[2:] if len(part) > 2 else None
+                    if include_dir:
+                        result["include_dirs"].append(include_dir)
+                
+                # 提取宏定义
+                if part.startswith("-D"):
+                    define = part[2:] if len(part) > 2 else None
+                    if define:
+                        result["defines"].append(define)
+                
+                # 提取取消定义
+                if part.startswith("-U"):
+                    undef = part[2:] if len(part) > 2 else None
+                    if undef:
+                        result["undefines"].append(undef)
+                
+                # 提取 C 标准
+                if part.startswith("-std="):
+                    result["std"] = part[5:]
+        except Exception:
+            # shlex 解析失败，跳过
+            pass
+
     def _extract_compile_flags(self, c_file_path: Union[str, Path]) -> Optional[Dict[str, Any]]:
         """
         从 compile_commands.json 中提取指定 C 文件的编译参数。
@@ -619,86 +711,11 @@ class Transpiler:
                     # 解析 arguments（如果存在）
                     arguments = entry.get("arguments")
                     if isinstance(arguments, list):
-                        # 从 arguments 中提取标志
-                        for arg in arguments:
-                            if not isinstance(arg, str):
-                                continue
-                            arg = arg.strip()
-                            if not arg:
-                                continue
-                            
-                            # 跳过编译器名称和源文件
-                            if arg.endswith(".c") or arg.endswith(".cpp") or arg.endswith(".cc") or arg.endswith(".cxx"):
-                                continue
-                            if arg in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
-                                continue
-                            
-                            result["flags"].append(arg)
-                            
-                            # 提取包含目录
-                            if arg.startswith("-I"):
-                                include_dir = arg[2:] if len(arg) > 2 else None
-                                if include_dir:
-                                    result["include_dirs"].append(include_dir)
-                            
-                            # 提取宏定义
-                            if arg.startswith("-D"):
-                                define = arg[2:] if len(arg) > 2 else None
-                                if define:
-                                    result["defines"].append(define)
-                            
-                            # 提取取消定义
-                            if arg.startswith("-U"):
-                                undef = arg[2:] if len(arg) > 2 else None
-                                if undef:
-                                    result["undefines"].append(undef)
-                            
-                            # 提取 C 标准
-                            if arg.startswith("-std="):
-                                result["std"] = arg[5:]
-                    
+                        self._parse_compile_arguments(arguments, result)
                     # 解析 command（如果存在且 arguments 不存在）
                     elif entry.get("command"):
                         command = entry.get("command", "")
-                        # 简单的命令解析（按空格分割，但保留引号内的内容）
-                        try:
-                            parts = shlex.split(command)
-                            for i, part in enumerate(parts):
-                                if not part:
-                                    continue
-                                
-                                # 跳过编译器名称和源文件
-                                if part.endswith((".c", ".cpp", ".cc", ".cxx")):
-                                    continue
-                                if part in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
-                                    continue
-                                
-                                result["flags"].append(part)
-                                
-                                # 提取包含目录
-                                if part.startswith("-I"):
-                                    include_dir = part[2:] if len(part) > 2 else None
-                                    if include_dir:
-                                        result["include_dirs"].append(include_dir)
-                                
-                                # 提取宏定义
-                                if part.startswith("-D"):
-                                    define = part[2:] if len(part) > 2 else None
-                                    if define:
-                                        result["defines"].append(define)
-                                
-                                # 提取取消定义
-                                if part.startswith("-U"):
-                                    undef = part[2:] if len(part) > 2 else None
-                                    if undef:
-                                        result["undefines"].append(undef)
-                                
-                                # 提取 C 标准
-                                if part.startswith("-std="):
-                                    result["std"] = part[5:]
-                        except Exception:
-                            # shlex 解析失败，跳过
-                            pass
+                        self._parse_compile_command(command, result)
                     
                     return result
             except Exception:
@@ -1285,10 +1302,13 @@ class Transpiler:
 
     # ========= 代码生成与修复 =========
 
-    def _codeagent_generate_impl(self, rec: FnRecord, c_code: str, module: str, rust_sig: str, unresolved: List[str]) -> None:
+    def _build_generate_impl_prompt(
+        self, rec: FnRecord, c_code: str, module: str, rust_sig: str, unresolved: List[str]
+    ) -> str:
         """
-        使用 CodeAgent 生成/更新目标模块中的函数实现。
-        约束：最小变更，生成可编译的占位实现，尽可能保留后续细化空间。
+        构建代码生成提示词。
+        
+        返回完整的提示词字符串。
         """
         symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
         requirement_lines = [
@@ -1455,7 +1475,16 @@ class Transpiler:
             "记忆标签建议：使用 'c2rust', 'function_impl', 函数名等作为标签，便于后续检索。",
             "请在完成代码实现之后保存记忆，记录本次实现的完整信息。",
         ])
-        prompt = "\n".join(requirement_lines)
+        return "\n".join(requirement_lines)
+
+    def _codeagent_generate_impl(self, rec: FnRecord, c_code: str, module: str, rust_sig: str, unresolved: List[str]) -> None:
+        """
+        使用 CodeAgent 生成/更新目标模块中的函数实现。
+        约束：最小变更，生成可编译的占位实现，尽可能保留后续细化空间。
+        """
+        # 构建提示词
+        prompt = self._build_generate_impl_prompt(rec, c_code, module, rust_sig, unresolved)
+        
         # 确保目标模块文件存在（提高补丁应用与实现落盘的确定性）
         try:
             mp = Path(module)
@@ -1470,6 +1499,7 @@ class Transpiler:
                     pass
         except Exception:
             pass
+        
         # 切换到 crate 目录运行代码生成Agent，运行完毕后恢复
         prev_cwd = os.getcwd()
         try:
@@ -1812,21 +1842,14 @@ class Transpiler:
             c_code = ""
         return curr, sym_name, src_loc, c_code
 
-    def _build_repair_prompt(self, stage: str, output: str, tags: List[str], sym_name: str, src_loc: str, c_code: str, curr: Dict[str, Any], symbols_path: str, include_output_patch_hint: bool = False, command: Optional[str] = None) -> str:
+    def _build_repair_prompt_base(
+        self, stage: str, tags: List[str], sym_name: str, src_loc: str, c_code: str,
+        curr: Dict[str, Any], symbols_path: str, include_output_patch_hint: bool = False
+    ) -> List[str]:
         """
-        构建修复提示词。
+        构建修复提示词的基础部分。
         
-        Args:
-            stage: 阶段名称（"cargo check" 或 "cargo test"）
-            output: 构建错误输出
-            tags: 错误分类标签
-            sym_name: 符号名称
-            src_loc: 源文件位置
-            c_code: C 源码片段
-            curr: 当前进度信息
-            symbols_path: 符号表文件路径
-            include_output_patch_hint: 是否包含"仅输出补丁"提示（test阶段需要）
-            command: 执行的命令（可选）
+        返回基础行列表。
         """
         base_lines = [
             f"目标：以最小的改动修复问题，使 `{stage}` 命令可以通过。",
@@ -1918,8 +1941,19 @@ class Transpiler:
             base_lines.append(f"- 包名称（用于 cargo -p）: {self.crate_dir.name}")
         else:
             base_lines.append(f"- 包名称（用于 cargo build -p）: {self.crate_dir.name}")
+        return base_lines
+
+    def _build_repair_prompt_stage_section(
+        self, stage: str, output: str, command: Optional[str] = None
+    ) -> List[str]:
+        """
+        构建修复提示词的阶段特定部分（测试或检查）。
+        
+        返回阶段特定的行列表。
+        """
+        section_lines: List[str] = []
         if stage == "cargo test":
-            base_lines.extend([
+            section_lines.extend([
                 "",
                 "【测试失败信息】",
                 "以下输出来自 `cargo test` 命令，包含测试执行结果和失败详情：",
@@ -1929,9 +1963,9 @@ class Transpiler:
                 "",
             ])
             if command:
-                base_lines.append(f"执行的命令：{command}")
-                base_lines.append("提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。")
-            base_lines.extend([
+                section_lines.append(f"执行的命令：{command}")
+                section_lines.append("提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。")
+            section_lines.extend([
                 "",
                 "请阅读以下测试失败信息并进行必要修复：",
                 "<TEST_FAILURE>",
@@ -1941,14 +1975,14 @@ class Transpiler:
                 "修复后请再次执行 `cargo test` 进行验证。",
             ])
         else:
-            base_lines.extend([
+            section_lines.extend([
                 "",
                 "请阅读以下构建错误并进行必要修复：",
             ])
             if command:
-                base_lines.append(f"执行的命令：{command}")
-                base_lines.append("提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。")
-            base_lines.extend([
+                section_lines.append(f"执行的命令：{command}")
+                section_lines.append("提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。")
+            section_lines.extend([
                 "",
                 "<BUILD_ERROR>",
                 output,
@@ -1956,7 +1990,29 @@ class Transpiler:
                 "",
                 "修复后请再次执行 `cargo check` 验证，后续将自动运行 `cargo test`。",
             ])
-        return "\n".join(base_lines)
+        return section_lines
+
+    def _build_repair_prompt(self, stage: str, output: str, tags: List[str], sym_name: str, src_loc: str, c_code: str, curr: Dict[str, Any], symbols_path: str, include_output_patch_hint: bool = False, command: Optional[str] = None) -> str:
+        """
+        构建修复提示词。
+        
+        Args:
+            stage: 阶段名称（"cargo check" 或 "cargo test"）
+            output: 构建错误输出
+            tags: 错误分类标签
+            sym_name: 符号名称
+            src_loc: 源文件位置
+            c_code: C 源码片段
+            curr: 当前进度信息
+            symbols_path: 符号表文件路径
+            include_output_patch_hint: 是否包含"仅输出补丁"提示（test阶段需要）
+            command: 执行的命令（可选）
+        """
+        base_lines = self._build_repair_prompt_base(
+            stage, tags, sym_name, src_loc, c_code, curr, symbols_path, include_output_patch_hint
+        )
+        stage_lines = self._build_repair_prompt_stage_section(stage, output, command)
+        return "\n".join(base_lines + stage_lines)
 
     def _detect_crate_kind(self) -> str:
         """
@@ -2042,6 +2098,208 @@ class Transpiler:
         except Exception:
             return False
 
+    def _run_cargo_check_and_fix(self, workspace_root: str, check_iter: int, test_iter: int) -> Tuple[bool, Optional[bool]]:
+        """
+        运行 cargo check 并在失败时修复。
+        
+        Returns:
+            (是否成功, 是否需要回退重新开始，None表示需要回退)
+        """
+        res_check = subprocess.run(
+            ["cargo", "check", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=workspace_root,
+        )
+        if res_check.returncode != 0:
+            output = (res_check.stdout or "") + "\n" + (res_check.stderr or "")
+            limit_info = f" (上限: {self.check_max_retries if self.check_max_retries > 0 else '无限'})" if check_iter % 10 == 0 or check_iter == 1 else ""
+            typer.secho(f"[c2rust-transpiler][build] cargo check 失败 (第 {check_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
+            typer.secho(output, fg=typer.colors.RED)
+            # 达到上限则记录并退出（0表示无限重试）
+            maxr = self.check_max_retries
+            if maxr > 0 and check_iter >= maxr:
+                typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
+                try:
+                    cur = self.progress.get("current") or {}
+                    metrics = cur.get("metrics") or {}
+                    metrics["check_attempts"] = int(check_iter)
+                    metrics["test_attempts"] = int(test_iter)
+                    cur["metrics"] = metrics
+                    cur["impl_verified"] = False
+                    cur["failed_stage"] = "check"
+                    err_summary = (output or "").strip()
+                    if len(err_summary) > ERROR_SUMMARY_MAX_LENGTH:
+                        err_summary = err_summary[:ERROR_SUMMARY_MAX_LENGTH] + "...(truncated)"
+                    cur["last_build_error"] = err_summary
+                    self.progress["current"] = cur
+                    self._save_progress()
+                except Exception:
+                    pass
+                return (False, False)
+            # 提示修复（分类标签）
+            tags = self._classify_rust_error(output)
+            symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
+            curr, sym_name, src_loc, c_code = self._get_current_function_context()
+            repair_prompt = self._build_repair_prompt(
+                stage="cargo check",
+                output=output,
+                tags=tags,
+                sym_name=sym_name,
+                src_loc=src_loc,
+                c_code=c_code,
+                curr=curr,
+                symbols_path=symbols_path,
+                include_output_patch_hint=False,
+                command="cargo check -q",
+            )
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                agent = self._get_repair_agent()
+                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={check_iter}][check]", suffix="")
+                # 修复后进行轻量验证：检查语法是否正确
+                res_verify = subprocess.run(
+                    ["cargo", "check", "--message-format=short", "-q"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    cwd=workspace_root,
+                )
+                if res_verify.returncode == 0:
+                    typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                    # 修复成功，重置连续失败计数
+                    self._consecutive_fix_failures = 0
+                    return (False, False)  # 需要继续循环
+                else:
+                    typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                    # 修复失败，增加连续失败计数
+                    self._consecutive_fix_failures += 1
+                    # 检查是否需要回退
+                    if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
+                        typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
+                        if self._reset_to_commit(self._current_function_start_commit):
+                            typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
+                            # 返回特殊值，表示需要重新开始
+                            return (False, None)  # type: ignore
+                        else:
+                            typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
+                    return (False, False)  # 需要继续循环
+            finally:
+                os.chdir(prev_cwd)
+        return (True, False)  # check 成功
+
+    def _run_cargo_test_and_fix(self, workspace_root: str, check_iter: int, test_iter: int) -> Tuple[bool, Optional[bool]]:
+        """
+        运行 cargo test 并在失败时修复。
+        
+        Returns:
+            (是否成功, 是否需要回退重新开始，None表示需要回退)
+        """
+        # 测试失败时需要详细输出，移除 -q 参数以获取完整的测试失败信息（包括堆栈跟踪、断言详情等）
+        res_test = subprocess.run(
+            ["cargo", "test", "--", "--nocapture"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=workspace_root,
+        )
+        if res_test.returncode == 0:
+            typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
+            # 测试通过，重置连续失败计数
+            self._consecutive_fix_failures = 0
+            try:
+                cur = self.progress.get("current") or {}
+                metrics = cur.get("metrics") or {}
+                metrics["check_attempts"] = int(check_iter)
+                metrics["test_attempts"] = int(test_iter)
+                cur["metrics"] = metrics
+                cur["impl_verified"] = True
+                cur["failed_stage"] = None
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
+            return (True, False)
+
+        # 测试失败
+        output = (res_test.stdout or "") + "\n" + (res_test.stderr or "")
+        limit_info = f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})" if test_iter % 10 == 0 or test_iter == 1 else ""
+        typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
+        typer.secho(output, fg=typer.colors.RED)
+        maxr = self.test_max_retries
+        if maxr > 0 and test_iter >= maxr:
+            typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
+            try:
+                cur = self.progress.get("current") or {}
+                metrics = cur.get("metrics") or {}
+                metrics["check_attempts"] = int(check_iter)
+                metrics["test_attempts"] = int(test_iter)
+                cur["metrics"] = metrics
+                cur["impl_verified"] = False
+                cur["failed_stage"] = "test"
+                err_summary = (output or "").strip()
+                if len(err_summary) > ERROR_SUMMARY_MAX_LENGTH:
+                    err_summary = err_summary[:ERROR_SUMMARY_MAX_LENGTH] + "...(truncated)"
+                cur["last_build_error"] = err_summary
+                self.progress["current"] = cur
+                self._save_progress()
+            except Exception:
+                pass
+            return (False, False)
+
+        # 构建失败（测试阶段）修复
+        tags = self._classify_rust_error(output)
+        symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
+        curr, sym_name, src_loc, c_code = self._get_current_function_context()
+        repair_prompt = self._build_repair_prompt(
+            stage="cargo test",
+            output=output,
+            tags=tags,
+            sym_name=sym_name,
+            src_loc=src_loc,
+            c_code=c_code,
+            curr=curr,
+            symbols_path=symbols_path,
+            include_output_patch_hint=True,
+            command="cargo test -- --nocapture",
+        )
+        prev_cwd = os.getcwd()
+        try:
+            os.chdir(str(self.crate_dir))
+            agent = self._get_repair_agent()
+            agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
+            # 修复后进行轻量验证：检查语法是否正确
+            res_verify = subprocess.run(
+                ["cargo", "test", "--message-format=short", "-q", "--no-run"],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=workspace_root,
+            )
+            if res_verify.returncode == 0:
+                typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                # 修复成功，重置连续失败计数
+                self._consecutive_fix_failures = 0
+                return (False, False)  # 需要继续循环
+            else:
+                typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                # 修复失败，增加连续失败计数
+                self._consecutive_fix_failures += 1
+                # 检查是否需要回退
+                if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
+                    typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
+                    if self._reset_to_commit(self._current_function_start_commit):
+                        typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
+                        # 返回特殊值，表示需要重新开始
+                        return (False, None)  # type: ignore
+                    else:
+                        typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
+                return (False, False)  # 需要继续循环
+        finally:
+            os.chdir(prev_cwd)
+
     def _cargo_build_loop(self) -> Optional[bool]:
         """在 crate 目录执行构建与测试：先 cargo check，再 cargo test（运行所有测试，不区分项目结构）。失败则最小化修复直到通过或达到上限。"""
         workspace_root = str(self.crate_dir)
@@ -2053,194 +2311,21 @@ class Transpiler:
         while True:
             # 阶段一：cargo check（更快）
             check_iter += 1
-            res_check = subprocess.run(
-                ["cargo", "check", "-q"],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=workspace_root,
-            )
-            if res_check.returncode != 0:
-                output = (res_check.stdout or "") + "\n" + (res_check.stderr or "")
-                limit_info = f" (上限: {self.check_max_retries if self.check_max_retries > 0 else '无限'})" if check_iter % 10 == 0 or check_iter == 1 else ""
-                typer.secho(f"[c2rust-transpiler][build] cargo check 失败 (第 {check_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
-                typer.secho(output, fg=typer.colors.RED)
-                # 达到上限则记录并退出（0表示无限重试）
-                maxr = self.check_max_retries
-                if maxr > 0 and check_iter >= maxr:
-                    typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
-                    try:
-                        cur = self.progress.get("current") or {}
-                        metrics = cur.get("metrics") or {}
-                        metrics["check_attempts"] = int(check_iter)
-                        metrics["test_attempts"] = int(test_iter)
-                        cur["metrics"] = metrics
-                        cur["impl_verified"] = False
-                        cur["failed_stage"] = "check"
-                        err_summary = (output or "").strip()
-                        if len(err_summary) > ERROR_SUMMARY_MAX_LENGTH:
-                            err_summary = err_summary[:ERROR_SUMMARY_MAX_LENGTH] + "...(truncated)"
-                        cur["last_build_error"] = err_summary
-                        self.progress["current"] = cur
-                        self._save_progress()
-                    except Exception:
-                        pass
-                    return False
-                # 提示修复（分类标签）
-                tags = self._classify_rust_error(output)
-                symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
-                curr, sym_name, src_loc, c_code = self._get_current_function_context()
-                repair_prompt = self._build_repair_prompt(
-                    stage="cargo check",
-                    output=output,
-                    tags=tags,
-                    sym_name=sym_name,
-                    src_loc=src_loc,
-                    c_code=c_code,
-                    curr=curr,
-                    symbols_path=symbols_path,
-                    include_output_patch_hint=False,
-                    command="cargo check -q",
-                )
-                prev_cwd = os.getcwd()
-                try:
-                    os.chdir(str(self.crate_dir))
-                    agent = self._get_repair_agent()
-                    agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={check_iter}][check]", suffix="")
-                    # 修复后进行轻量验证：检查语法是否正确
-                    res_verify = subprocess.run(
-                        ["cargo", "check", "--message-format=short", "-q"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                        cwd=workspace_root,
-                    )
-                    if res_verify.returncode == 0:
-                        typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
-                        # 修复成功，重置连续失败计数
-                        self._consecutive_fix_failures = 0
-                    else:
-                        typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
-                        # 修复失败，增加连续失败计数
-                        self._consecutive_fix_failures += 1
-                        # 检查是否需要回退
-                        if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
-                            typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
-                            if self._reset_to_commit(self._current_function_start_commit):
-                                typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
-                                # 返回特殊值，表示需要重新开始
-                                return None  # type: ignore
-                            else:
-                                typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
-                finally:
-                    os.chdir(prev_cwd)
-                # 下一轮循环
-                continue
-
+            check_success, need_restart = self._run_cargo_check_and_fix(workspace_root, check_iter, test_iter)
+            if need_restart is None:
+                return None  # 需要回退重新开始
+            if not check_success:
+                continue  # 继续循环
+            
             # 阶段二：运行所有测试（不区分项目结构）
             # cargo test 会自动运行所有类型的测试：lib tests、bin tests、integration tests、doc tests 等
             test_iter += 1
-            # 测试失败时需要详细输出，移除 -q 参数以获取完整的测试失败信息（包括堆栈跟踪、断言详情等）
-            res_test = subprocess.run(
-                ["cargo", "test", "--", "--nocapture"],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=workspace_root,
-            )
-            if res_test.returncode == 0:
-                typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
-                # 测试通过，重置连续失败计数
-                self._consecutive_fix_failures = 0
-                try:
-                    cur = self.progress.get("current") or {}
-                    metrics = cur.get("metrics") or {}
-                    metrics["check_attempts"] = int(check_iter)
-                    metrics["test_attempts"] = int(test_iter)
-                    cur["metrics"] = metrics
-                    cur["impl_verified"] = True
-                    cur["failed_stage"] = None
-                    self.progress["current"] = cur
-                    self._save_progress()
-                except Exception:
-                    pass
-                return True
-
-            # 测试失败
-            output = (res_test.stdout or "") + "\n" + (res_test.stderr or "")
-            limit_info = f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})" if test_iter % 10 == 0 or test_iter == 1 else ""
-            typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
-            typer.secho(output, fg=typer.colors.RED)
-            maxr = self.test_max_retries
-            if maxr > 0 and test_iter >= maxr:
-                typer.secho(f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。", fg=typer.colors.RED)
-                try:
-                    cur = self.progress.get("current") or {}
-                    metrics = cur.get("metrics") or {}
-                    metrics["check_attempts"] = int(check_iter)
-                    metrics["test_attempts"] = int(test_iter)
-                    cur["metrics"] = metrics
-                    cur["impl_verified"] = False
-                    cur["failed_stage"] = "test"
-                    err_summary = (output or "").strip()
-                    if len(err_summary) > ERROR_SUMMARY_MAX_LENGTH:
-                        err_summary = err_summary[:ERROR_SUMMARY_MAX_LENGTH] + "...(truncated)"
-                    cur["last_build_error"] = err_summary
-                    self.progress["current"] = cur
-                    self._save_progress()
-                except Exception:
-                    pass
-                return False
-
-            # 构建失败（测试阶段）修复
-            tags = self._classify_rust_error(output)
-            symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
-            curr, sym_name, src_loc, c_code = self._get_current_function_context()
-            repair_prompt = self._build_repair_prompt(
-                stage="cargo test",
-                output=output,
-                tags=tags,
-                sym_name=sym_name,
-                src_loc=src_loc,
-                c_code=c_code,
-                curr=curr,
-                symbols_path=symbols_path,
-                include_output_patch_hint=True,
-                command="cargo test -- --nocapture",
-            )
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                agent = self._get_repair_agent()
-                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
-                # 修复后进行轻量验证：检查语法是否正确
-                res_verify = subprocess.run(
-                    ["cargo", "test", "--message-format=short", "-q", "--no-run"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    cwd=workspace_root,
-                )
-                if res_verify.returncode == 0:
-                    typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
-                    # 修复成功，重置连续失败计数
-                    self._consecutive_fix_failures = 0
-                else:
-                    typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
-                    # 修复失败，增加连续失败计数
-                    self._consecutive_fix_failures += 1
-                    # 检查是否需要回退
-                    if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
-                        typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
-                        if self._reset_to_commit(self._current_function_start_commit):
-                            typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
-                            # 返回特殊值，表示需要重新开始
-                            return None  # type: ignore
-                        else:
-                            typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
-            finally:
-                os.chdir(prev_cwd)
-            # 重置 check 迭代计数，因为修复后需要重新 check
+            test_success, need_restart = self._run_cargo_test_and_fix(workspace_root, check_iter, test_iter)
+            if need_restart is None:
+                return None  # 需要回退重新开始
+            if test_success:
+                return True  # 测试通过
+            # 测试失败，重置 check 迭代计数，因为修复后需要重新 check
             check_iter = 0
 
     def _review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
