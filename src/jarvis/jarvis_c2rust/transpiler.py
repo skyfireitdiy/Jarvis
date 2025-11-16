@@ -558,113 +558,16 @@ class Transpiler:
         self._compile_commands_path = None
         return None
 
-    def _parse_compile_arguments(self, arguments: List[str], result: Dict[str, Any]) -> None:
-        """
-        从 arguments 列表中解析编译标志并更新 result。
-        
-        Args:
-            arguments: 编译参数列表
-            result: 结果字典（会被修改）
-        """
-        for arg in arguments:
-            if not isinstance(arg, str):
-                continue
-            arg = arg.strip()
-            if not arg:
-                continue
-            
-            # 跳过编译器名称和源文件
-            if arg.endswith((".c", ".cpp", ".cc", ".cxx")):
-                continue
-            if arg in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
-                continue
-            
-            result["flags"].append(arg)
-            
-            # 提取包含目录
-            if arg.startswith("-I"):
-                include_dir = arg[2:] if len(arg) > 2 else None
-                if include_dir:
-                    result["include_dirs"].append(include_dir)
-            
-            # 提取宏定义
-            if arg.startswith("-D"):
-                define = arg[2:] if len(arg) > 2 else None
-                if define:
-                    result["defines"].append(define)
-            
-            # 提取取消定义
-            if arg.startswith("-U"):
-                undef = arg[2:] if len(arg) > 2 else None
-                if undef:
-                    result["undefines"].append(undef)
-            
-            # 提取 C 标准
-            if arg.startswith("-std="):
-                result["std"] = arg[5:]
-
-    def _parse_compile_command(self, command: str, result: Dict[str, Any]) -> None:
-        """
-        从 command 字符串中解析编译标志并更新 result。
-        
-        Args:
-            command: 编译命令字符串
-            result: 结果字典（会被修改）
-        """
-        try:
-            parts = shlex.split(command)
-            for part in parts:
-                if not part:
-                    continue
-                
-                # 跳过编译器名称和源文件
-                if part.endswith((".c", ".cpp", ".cc", ".cxx")):
-                    continue
-                if part in ("gcc", "clang", "cc", "c++", "g++", "clang++"):
-                    continue
-                
-                result["flags"].append(part)
-                
-                # 提取包含目录
-                if part.startswith("-I"):
-                    include_dir = part[2:] if len(part) > 2 else None
-                    if include_dir:
-                        result["include_dirs"].append(include_dir)
-                
-                # 提取宏定义
-                if part.startswith("-D"):
-                    define = part[2:] if len(part) > 2 else None
-                    if define:
-                        result["defines"].append(define)
-                
-                # 提取取消定义
-                if part.startswith("-U"):
-                    undef = part[2:] if len(part) > 2 else None
-                    if undef:
-                        result["undefines"].append(undef)
-                
-                # 提取 C 标准
-                if part.startswith("-std="):
-                    result["std"] = part[5:]
-        except Exception:
-            # shlex 解析失败，跳过
-            pass
-
-    def _extract_compile_flags(self, c_file_path: Union[str, Path]) -> Optional[Dict[str, Any]]:
+    def _extract_compile_flags(self, c_file_path: Union[str, Path]) -> Optional[str]:
         """
         从 compile_commands.json 中提取指定 C 文件的编译参数。
         
+        如果 compile_commands.json 中存在 arguments 字段，则用空格连接该数组并返回。
+        如果只有 command 字段，则直接返回 command 字符串。
+        
         返回格式：
-        {
-            "command": "完整的编译命令",
-            "directory": "编译目录",
-            "arguments": ["编译参数列表"],  # 如果存在
-            "flags": ["提取的编译标志"],  # 提取的 -I, -D, -U, -std= 等标志
-            "include_dirs": ["包含目录列表"],
-            "defines": ["宏定义列表"],
-            "undefines": ["取消定义列表"],
-            "std": "C标准版本（如 c99, c11）",
-        }
+        - 如果存在 arguments：用空格连接的参数字符串，例如 "-I/usr/include -DDEBUG"
+        - 如果只有 command：完整的编译命令字符串，例如 "gcc -I/usr/include -DDEBUG file.c"
         
         如果未找到或解析失败，返回 None。
         """
@@ -698,26 +601,16 @@ class Transpiler:
                 
                 # 路径匹配（支持相对路径和绝对路径）
                 if entry_path == target_path:
-                    result: Dict[str, Any] = {
-                        "command": entry.get("command", ""),
-                        "directory": entry.get("directory", ""),
-                        "flags": [],
-                        "include_dirs": [],
-                        "defines": [],
-                        "undefines": [],
-                        "std": None,
-                    }
-                    
-                    # 解析 arguments（如果存在）
+                    # 如果存在 arguments，用空格连接并返回
                     arguments = entry.get("arguments")
                     if isinstance(arguments, list):
-                        self._parse_compile_arguments(arguments, result)
-                    # 解析 command（如果存在且 arguments 不存在）
+                        # 过滤掉空字符串，然后用空格连接
+                        args = [str(arg) for arg in arguments if arg]
+                        return " ".join(args) if args else None
+                    # 如果只有 command，直接返回 command 字符串
                     elif entry.get("command"):
                         command = entry.get("command", "")
-                        self._parse_compile_command(command, result)
-                    
-                    return result
+                        return command if command else None
             except Exception:
                 continue
         
@@ -921,7 +814,7 @@ class Transpiler:
             compile_flags_section = "\n".join([
                 "",
                 "C文件编译参数（来自 compile_commands.json）：",
-                json.dumps(compile_flags, ensure_ascii=False, indent=2),
+                compile_flags,
             ])
         
         user_prompt = "\n".join([
@@ -1198,7 +1091,7 @@ class Transpiler:
             header_lines.extend([
                 "",
                 "C文件编译参数（来自 compile_commands.json）：",
-                json.dumps(compile_flags, ensure_ascii=False, indent=2),
+                compile_flags,
             ])
         header_lines.extend([
             "",
@@ -1455,7 +1348,7 @@ class Transpiler:
             requirement_lines.extend([
                 "",
                 "C文件编译参数（来自 compile_commands.json）：",
-                json.dumps(compile_flags, ensure_ascii=False, indent=2),
+                compile_flags,
                 "",
             ])
         requirement_lines.extend([
@@ -1913,7 +1806,7 @@ class Transpiler:
                 base_lines.extend([
                     "",
                     "C文件编译参数（来自 compile_commands.json）：",
-                    json.dumps(compile_flags, ensure_ascii=False, indent=2),
+                    compile_flags,
                 ])
         base_lines.extend([
             "",
@@ -2390,7 +2283,7 @@ class Transpiler:
                 usr_p_lines.extend([
                     "",
                     "C文件编译参数（来自 compile_commands.json）：",
-                    json.dumps(compile_flags, ensure_ascii=False, indent=2),
+                    compile_flags,
                 ])
             usr_p_lines.extend([
                 "",
