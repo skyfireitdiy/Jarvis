@@ -357,6 +357,11 @@
       "description": "是否启用意图识别功能。用于智能上下文推荐中的LLM意图提取和语义分析",
       "default": true
     },
+    "JARVIS_ENABLE_MEMORY_ORGANIZER": {
+      "type": "boolean",
+      "description": "是否启用自动记忆整理功能。在任务完成后自动检测记忆库状态，当记忆数量超过200条且存在重叠时提示用户整理",
+      "default": false
+    },
     "JARVIS_GIT_CHECK_MODE": {
       "type": "string",
       "enum": ["strict", "warn"],
