@@ -2803,13 +2803,20 @@ class Transpiler:
 
             # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用代码编写与修复Agent）
             current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
-            # 优先使用限定名匹配，其次使用简单名匹配
-            for sym in [rec.qname, rec.name]:
-                if sym:
-                    typer.secho(f"[c2rust-transpiler][todo] 清理 todo!(\'{sym}\') 的出现位置", fg=typer.colors.BLUE)
-                    self._resolve_pending_todos_for_symbol(sym, module, current_rust_fn, rust_sig)
-                    typer.secho("[c2rust-transpiler][build] 处理 todo 后重新运行 cargo test", fg=typer.colors.MAGENTA)
-                    self._cargo_build_loop()
+            # 收集需要处理的符号（去重，避免 qname 和 name 相同时重复处理）
+            symbols_to_resolve = []
+            if rec.qname:
+                symbols_to_resolve.append(rec.qname)
+            if rec.name and rec.name != rec.qname:  # 如果 name 与 qname 不同，才添加
+                symbols_to_resolve.append(rec.name)
+            # 处理每个符号（去重后）
+            for sym in symbols_to_resolve:
+                typer.secho(f"[c2rust-transpiler][todo] 清理 todo!(\'{sym}\') 的出现位置", fg=typer.colors.BLUE)
+                self._resolve_pending_todos_for_symbol(sym, module, current_rust_fn, rust_sig)
+            # 如果有处理任何符号，统一运行一次 cargo test（避免重复运行）
+            if symbols_to_resolve:
+                typer.secho("[c2rust-transpiler][build] 处理 todo 后重新运行 cargo test", fg=typer.colors.MAGENTA)
+                self._cargo_build_loop()
 
         typer.secho("[c2rust-transpiler] 所有符合条件的函数均已处理完毕。", fg=typer.colors.GREEN)
 
