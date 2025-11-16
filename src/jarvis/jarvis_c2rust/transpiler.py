@@ -931,81 +931,76 @@ class Transpiler:
         use_direct_model = False  # 标记是否使用直接模型调用
         agent = None  # 在循环外声明，以便重试时复用
         
-        # 切换到 crate 根目录，确保 Agent 创建时在正确的目录
-        prev_cwd = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            
-            while plan_max_retries_val == 0 or attempt < plan_max_retries_val:
-                attempt += 1
-                sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
+        # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        while plan_max_retries_val == 0 or attempt < plan_max_retries_val:
+            attempt += 1
+            sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
 
-                # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
-                # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
-                if agent is None or not use_direct_model:
-                    agent = Agent(
-                        system_prompt=sys_p,
-                        name="C2Rust-Function-Planner",
-                        model_group=self.llm_group,
-                        summary_prompt=sum_p,
-                        need_summary=True,
-                        auto_complete=True,
-                        use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                        non_interactive=self.non_interactive,
-                        use_methodology=False,
-                        use_analysis=False,
-                    )
-                
-                if use_direct_model:
-                    # 格式校验失败后，直接调用模型接口
-                    # 构造包含摘要提示词和具体错误信息的完整提示
-                    error_guidance = ""
-                    if last_reason and last_reason != "未知错误":
-                        if "JSON解析失败" in last_reason:
-                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
-                        else:
-                            error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）；JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
-                    
-                    full_prompt = f"{usr_p}{error_guidance}\n\n{sum_p}"
-                    try:
-                        response = agent.model.chat_until_success(full_prompt)  # type: ignore
-                        summary = response
-                    except Exception as e:
-                        typer.secho(f"[c2rust-transpiler][plan] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
-                        summary = agent.run(usr_p)
-                else:
-                    # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                    summary = agent.run(usr_p)
-                
-                meta, parse_error = _extract_json_from_summary(str(summary or ""))
-                if parse_error:
-                    # JSON解析失败，将错误信息反馈给模型
-                    typer.secho(f"[c2rust-transpiler][plan] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
-                    last_reason = f"JSON解析失败: {parse_error}"
-                    use_direct_model = True
-                    # 解析失败，继续重试
-                    continue
-                else:
-                    ok, reason = _validate(meta)
-                if ok:
-                    module = str(meta.get("module") or "").strip()
-                    rust_sig = str(meta.get("rust_signature") or "").strip()
-                    skip_impl = bool(meta.get("skip_implementation") is True)
-                    if skip_impl:
-                        notes = str(meta.get("notes") or "")
-                        typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}, 跳过实现={skip_impl}", fg=typer.colors.GREEN)
-                        if notes:
-                            typer.secho(f"[c2rust-transpiler][plan] 跳过实现原因: {notes}", fg=typer.colors.CYAN)
+            # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
+            # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+            if agent is None or not use_direct_model:
+                agent = Agent(
+                    system_prompt=sys_p,
+                    name="C2Rust-Function-Planner",
+                    model_group=self.llm_group,
+                    summary_prompt=sum_p,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                    non_interactive=self.non_interactive,
+                    use_methodology=False,
+                    use_analysis=False,
+                )
+            
+            if use_direct_model:
+                # 格式校验失败后，直接调用模型接口
+                # 构造包含摘要提示词和具体错误信息的完整提示
+                error_guidance = ""
+                if last_reason and last_reason != "未知错误":
+                    if "JSON解析失败" in last_reason:
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                     else:
-                        typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
-                    return module, rust_sig, skip_impl
+                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_reason}\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）；JSON 对象必须包含字段：module（字符串）、rust_signature（字符串）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
+                
+                full_prompt = f"{usr_p}{error_guidance}\n\n{sum_p}"
+                try:
+                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                    summary = response
+                except Exception as e:
+                    typer.secho(f"[c2rust-transpiler][plan] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
+                    summary = agent.run(usr_p)
+            else:
+                # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                summary = agent.run(usr_p)
+            
+            meta, parse_error = _extract_json_from_summary(str(summary or ""))
+            if parse_error:
+                # JSON解析失败，将错误信息反馈给模型
+                typer.secho(f"[c2rust-transpiler][plan] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
+                last_reason = f"JSON解析失败: {parse_error}"
+                use_direct_model = True
+                # 解析失败，继续重试
+                continue
+            else:
+                ok, reason = _validate(meta)
+            if ok:
+                module = str(meta.get("module") or "").strip()
+                rust_sig = str(meta.get("rust_signature") or "").strip()
+                skip_impl = bool(meta.get("skip_implementation") is True)
+                if skip_impl:
+                    notes = str(meta.get("notes") or "")
+                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}, 跳过实现={skip_impl}", fg=typer.colors.GREEN)
+                    if notes:
+                        typer.secho(f"[c2rust-transpiler][plan] 跳过实现原因: {notes}", fg=typer.colors.CYAN)
                 else:
-                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
-                    last_reason = reason
-                    # 格式校验失败，后续重试使用直接模型调用
-                    use_direct_model = True
-        finally:
-            os.chdir(prev_cwd)
+                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
+                return module, rust_sig, skip_impl
+            else:
+                typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
+                last_reason = reason
+                # 格式校验失败，后续重试使用直接模型调用
+                use_direct_model = True
         
         # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 简单占位签名）
         # 注意：如果 plan_max_retries_val == 0（无限重试），理论上不应该到达这里
@@ -1118,30 +1113,26 @@ class Transpiler:
 
         # 初始化代码生成Agent（CodeAgent），单个函数生命周期内复用
         # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
-        prev_cwd = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            # 代码生成阶段：禁用方法论和分析，仅启用强制记忆功能
-            self._current_agents[f"code_agent_gen::{rec.id}"] = CodeAgent(
-                need_summary=False,
-                non_interactive=self.non_interactive,
-                model_group=self.llm_group,
-                use_methodology=False,
-                use_analysis=False,
-                force_save_memory=True,
-            )
-            # 初始化修复Agent（CodeAgent），单个函数生命周期内复用
-            # 修复阶段：启用方法论、分析和强制记忆功能
-            self._current_agents[f"code_agent_repair::{rec.id}"] = CodeAgent(
-                need_summary=False,
-                non_interactive=self.non_interactive,
-                model_group=self.llm_group,
-                use_methodology=True,
-                use_analysis=True,
-                force_save_memory=True,
-            )
-        finally:
-            os.chdir(prev_cwd)
+        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        # 代码生成阶段：禁用方法论和分析，仅启用强制记忆功能
+        self._current_agents[f"code_agent_gen::{rec.id}"] = CodeAgent(
+            need_summary=False,
+            non_interactive=self.non_interactive,
+            model_group=self.llm_group,
+            use_methodology=False,
+            use_analysis=False,
+            force_save_memory=True,
+        )
+        # 初始化修复Agent（CodeAgent），单个函数生命周期内复用
+        # 修复阶段：启用方法论、分析和强制记忆功能
+        self._current_agents[f"code_agent_repair::{rec.id}"] = CodeAgent(
+            need_summary=False,
+            non_interactive=self.non_interactive,
+            model_group=self.llm_group,
+            use_methodology=True,
+            use_analysis=True,
+            force_save_memory=True,
+        )
 
     def _get_generate_agent(self) -> CodeAgent:
         """
@@ -1153,22 +1144,18 @@ class Transpiler:
         key = f"code_agent_gen::{fid}" if fid is not None else "code_agent_gen::default"
         agent = self._current_agents.get(key)
         if agent is None:
-            # 确保在 crate 根目录下创建 Agent
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                # 代码生成Agent禁用方法论和分析，仅启用强制记忆功能
-                agent = CodeAgent(
-                    need_summary=False,
-                    non_interactive=self.non_interactive,
-                    model_group=self.llm_group,
-                    use_methodology=False,
-                    use_analysis=False,
-                    force_save_memory=True,
-                )
-                self._current_agents[key] = agent
-            finally:
-                os.chdir(prev_cwd)
+            # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            # 代码生成Agent禁用方法论和分析，仅启用强制记忆功能
+            agent = CodeAgent(
+                need_summary=False,
+                non_interactive=self.non_interactive,
+                model_group=self.llm_group,
+                use_methodology=False,
+                use_analysis=False,
+                force_save_memory=True,
+            )
+            self._current_agents[key] = agent
         return agent
 
     def _get_repair_agent(self) -> CodeAgent:
@@ -1181,22 +1168,18 @@ class Transpiler:
         key = f"code_agent_repair::{fid}" if fid is not None else "code_agent_repair::default"
         agent = self._current_agents.get(key)
         if agent is None:
-            # 确保在 crate 根目录下创建 Agent
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                # 修复Agent启用方法论、分析和强制记忆功能
-                agent = CodeAgent(
-                    need_summary=False,
-                    non_interactive=self.non_interactive,
-                    model_group=self.llm_group,
-                    use_methodology=True,
-                    use_analysis=True,
-                    force_save_memory=True,
-                )
-                self._current_agents[key] = agent
-            finally:
-                os.chdir(prev_cwd)
+            # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            # 修复Agent启用方法论、分析和强制记忆功能
+            agent = CodeAgent(
+                need_summary=False,
+                non_interactive=self.non_interactive,
+                model_group=self.llm_group,
+                use_methodology=True,
+                use_analysis=True,
+                force_save_memory=True,
+            )
+            self._current_agents[key] = agent
         return agent
 
     def _refresh_compact_context(self, rec: FnRecord, module: str, rust_sig: str) -> None:
@@ -1416,14 +1399,9 @@ class Transpiler:
         except Exception:
             pass
         
-        # 切换到 crate 目录运行代码生成Agent，运行完毕后恢复
-        prev_cwd = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            agent = self._get_generate_agent()  # 使用代码生成Agent（禁用分析和方法论）
-            agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen]", suffix="")
-        finally:
-            os.chdir(prev_cwd)
+        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        agent = self._get_generate_agent()  # 使用代码生成Agent（禁用分析和方法论）
+        agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen]", suffix="")
 
     def _extract_rust_fn_name_from_sig(self, rust_sig: str) -> str:
         """
@@ -1669,7 +1647,7 @@ class Transpiler:
             typer.secho(f"[c2rust-transpiler][todo] 未在 src/ 中找到 todo!(\"{symbol}\") 或 unimplemented!(\"{symbol}\") 的出现", fg=typer.colors.BLUE)
             return
 
-        # 在当前工作目录运行 CodeAgent，不进入 crate 目录
+        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         typer.secho(f"[c2rust-transpiler][todo] 发现 {len(matches)} 个包含 todo!(\"{symbol}\") 或 unimplemented!(\"{symbol}\") 的文件", fg=typer.colors.YELLOW)
         for target_file in matches:
             prompt = "\n".join([
@@ -1688,13 +1666,8 @@ class Transpiler:
                 f"仅修改 {target_file} 中与上述占位相关的代码，其他位置不要改动。",
                 "请仅输出补丁，不要输出解释或多余文本。",
             ])
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                agent = self._get_repair_agent()
-                agent.run(self._compose_prompt_with_context(prompt), prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
-            finally:
-                os.chdir(prev_cwd)
+            agent = self._get_repair_agent()
+            agent.run(self._compose_prompt_with_context(prompt), prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
 
     def _classify_rust_error(self, text: str) -> List[str]:
         """
@@ -1965,52 +1938,44 @@ class Transpiler:
     def _get_crate_commit_hash(self) -> Optional[str]:
         """获取 crate 目录的当前 commit id"""
         try:
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                commit_hash = get_latest_commit_hash()
-                return commit_hash if commit_hash else None
-            finally:
-                os.chdir(prev_cwd)
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            commit_hash = get_latest_commit_hash()
+            return commit_hash if commit_hash else None
         except Exception:
             return None
 
     def _reset_to_commit(self, commit_hash: str) -> bool:
         """回退 crate 目录到指定的 commit"""
         try:
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                # 检查是否是 git 仓库
-                result = subprocess.run(
-                    ["git", "rev-parse", "--git-dir"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if result.returncode != 0:
-                    # 不是 git 仓库，无法回退
-                    return False
-                
-                # 执行硬重置
-                result = subprocess.run(
-                    ["git", "reset", "--hard", commit_hash],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                if result.returncode == 0:
-                    # 清理未跟踪的文件
-                    subprocess.run(
-                        ["git", "clean", "-fd"],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
-                    return True
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            # 检查是否是 git 仓库
+            result = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode != 0:
+                # 不是 git 仓库，无法回退
                 return False
-            finally:
-                os.chdir(prev_cwd)
+            
+            # 执行硬重置
+            result = subprocess.run(
+                ["git", "reset", "--hard", commit_hash],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                # 清理未跟踪的文件
+                subprocess.run(
+                    ["git", "clean", "-fd"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                return True
+            return False
         except Exception:
             return False
 
@@ -2070,40 +2035,36 @@ class Transpiler:
                 include_output_patch_hint=False,
                 command="cargo check -q",
             )
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                agent = self._get_repair_agent()
-                agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={check_iter}][check]", suffix="")
-                # 修复后进行轻量验证：检查语法是否正确
-                res_verify = subprocess.run(
-                    ["cargo", "check", "--message-format=short", "-q"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    cwd=workspace_root,
-                )
-                if res_verify.returncode == 0:
-                    typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
-                    # 修复成功，重置连续失败计数
-                    self._consecutive_fix_failures = 0
-                    return (False, False)  # 需要继续循环
-                else:
-                    typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
-                    # 修复失败，增加连续失败计数
-                    self._consecutive_fix_failures += 1
-                    # 检查是否需要回退
-                    if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
-                        typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
-                        if self._reset_to_commit(self._current_function_start_commit):
-                            typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
-                            # 返回特殊值，表示需要重新开始
-                            return (False, None)  # type: ignore
-                        else:
-                            typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
-                    return (False, False)  # 需要继续循环
-            finally:
-                os.chdir(prev_cwd)
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            agent = self._get_repair_agent()
+            agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={check_iter}][check]", suffix="")
+            # 修复后进行轻量验证：检查语法是否正确
+            res_verify = subprocess.run(
+                ["cargo", "check", "--message-format=short", "-q"],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=workspace_root,
+            )
+            if res_verify.returncode == 0:
+                typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+                # 修复成功，重置连续失败计数
+                self._consecutive_fix_failures = 0
+                return (False, False)  # 需要继续循环
+            else:
+                typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+                # 修复失败，增加连续失败计数
+                self._consecutive_fix_failures += 1
+                # 检查是否需要回退
+                if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
+                    typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
+                    if self._reset_to_commit(self._current_function_start_commit):
+                        typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
+                        # 返回特殊值，表示需要重新开始
+                        return (False, None)  # type: ignore
+                    else:
+                        typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
+                return (False, False)  # 需要继续循环
         return (True, False)  # check 成功
 
     def _run_cargo_test_and_fix(self, workspace_root: str, check_iter: int, test_iter: int) -> Tuple[bool, Optional[bool]]:
@@ -2181,40 +2142,36 @@ class Transpiler:
             include_output_patch_hint=True,
             command="cargo test -- --nocapture",
         )
-        prev_cwd = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            agent = self._get_repair_agent()
-            agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
-            # 修复后进行轻量验证：检查语法是否正确
-            res_verify = subprocess.run(
-                ["cargo", "test", "--message-format=short", "-q", "--no-run"],
-                capture_output=True,
-                text=True,
-                check=False,
-                cwd=workspace_root,
-            )
-            if res_verify.returncode == 0:
-                typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
-                # 修复成功，重置连续失败计数
-                self._consecutive_fix_failures = 0
-                return (False, False)  # 需要继续循环
-            else:
-                typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
-                # 修复失败，增加连续失败计数
-                self._consecutive_fix_failures += 1
-                # 检查是否需要回退
-                if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
-                    typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
-                    if self._reset_to_commit(self._current_function_start_commit):
-                        typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
-                        # 返回特殊值，表示需要重新开始
-                        return (False, None)  # type: ignore
-                    else:
-                        typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
-                return (False, False)  # 需要继续循环
-        finally:
-            os.chdir(prev_cwd)
+        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        agent = self._get_repair_agent()
+        agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
+        # 修复后进行轻量验证：检查语法是否正确
+        res_verify = subprocess.run(
+            ["cargo", "test", "--message-format=short", "-q", "--no-run"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=workspace_root,
+        )
+        if res_verify.returncode == 0:
+            typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
+            # 修复成功，重置连续失败计数
+            self._consecutive_fix_failures = 0
+            return (False, False)  # 需要继续循环
+        else:
+            typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+            # 修复失败，增加连续失败计数
+            self._consecutive_fix_failures += 1
+            # 检查是否需要回退
+            if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
+                typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
+                if self._reset_to_commit(self._current_function_start_commit):
+                    typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
+                    # 返回特殊值，表示需要重新开始
+                    return (False, None)  # type: ignore
+                else:
+                    typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
+            return (False, False)  # 需要继续循环
 
     def _cargo_build_loop(self) -> Optional[bool]:
         """在 crate 目录执行构建与测试：先 cargo check，再 cargo test（运行所有测试，不区分项目结构）。失败则最小化修复直到通过或达到上限。"""
@@ -2341,28 +2298,23 @@ class Transpiler:
         max_iterations = self.review_max_iterations
         # 复用 Review Agent（仅在本函数生命周期内构建一次）
         # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         review_key = f"review::{rec.id}"
         sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
         
-        # 切换到 crate 根目录，确保 Agent 创建时在正确的目录
-        prev_cwd_init = os.getcwd()
-        try:
-            os.chdir(str(self.crate_dir))
-            if self._current_agents.get(review_key) is None:
-                self._current_agents[review_key] = Agent(
-                    system_prompt=sys_p_init,
-                    name="C2Rust-Review-Agent",
-                    model_group=self.llm_group,
-                    summary_prompt=sum_p_init,
-                    need_summary=True,
-                    auto_complete=True,
-                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                    non_interactive=self.non_interactive,
-                    use_methodology=False,
-                    use_analysis=False,
-                )
-        finally:
-            os.chdir(prev_cwd_init)
+        if self._current_agents.get(review_key) is None:
+            self._current_agents[review_key] = Agent(
+                system_prompt=sys_p_init,
+                name="C2Rust-Review-Agent",
+                model_group=self.llm_group,
+                summary_prompt=sum_p_init,
+                need_summary=True,
+                auto_complete=True,
+                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                non_interactive=self.non_interactive,
+                use_methodology=False,
+                use_analysis=False,
+            )
 
         # 0表示无限重试，否则限制迭代次数
         use_direct_model_review = False  # 标记是否使用直接模型调用
@@ -2370,57 +2322,53 @@ class Transpiler:
         parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
         while max_iterations == 0 or i < max_iterations:
             agent = self._current_agents[review_key]
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                # 如果是修复后的审查（i > 0），在提示词中明确说明代码已变更，需要重新读取
-                if i > 0:
-                    code_changed_notice = "\n".join([
-                        "",
-                        "【重要提示：代码已变更】",
-                        f"在本次审查之前（第 {i} 次迭代），已根据审查意见对代码进行了修复和优化。",
-                        "目标函数的实现可能已经发生变化，包括但不限于：",
-                        "- 函数实现逻辑的修改",
-                        "- 类型和签名的调整",
-                        "- 依赖关系的更新",
-                        "- 错误处理的改进",
-                        "",
-                        "**请务必重新读取目标模块文件中的函数实现，不要基于之前的审查结果或缓存信息进行判断。**",
-                        "请使用 read_code 工具重新读取以下文件的最新内容：",
-                        f"- 目标模块文件: {module}",
-                        "- 以及相关的依赖模块文件（如有需要）",
-                        "",
-                        "审查时请基于重新读取的最新代码内容进行评估。",
-                        "",
-                    ])
-                    usr_p_with_notice = usr_p_init + code_changed_notice
-                    composed_prompt = self._compose_prompt_with_context(usr_p_with_notice)
-                else:
-                    composed_prompt = self._compose_prompt_with_context(usr_p_init)
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            # 如果是修复后的审查（i > 0），在提示词中明确说明代码已变更，需要重新读取
+            if i > 0:
+                code_changed_notice = "\n".join([
+                    "",
+                    "【重要提示：代码已变更】",
+                    f"在本次审查之前（第 {i} 次迭代），已根据审查意见对代码进行了修复和优化。",
+                    "目标函数的实现可能已经发生变化，包括但不限于：",
+                    "- 函数实现逻辑的修改",
+                    "- 类型和签名的调整",
+                    "- 依赖关系的更新",
+                    "- 错误处理的改进",
+                    "",
+                    "**请务必重新读取目标模块文件中的函数实现，不要基于之前的审查结果或缓存信息进行判断。**",
+                    "请使用 read_code 工具重新读取以下文件的最新内容：",
+                    f"- 目标模块文件: {module}",
+                    "- 以及相关的依赖模块文件（如有需要）",
+                    "",
+                    "审查时请基于重新读取的最新代码内容进行评估。",
+                    "",
+                ])
+                usr_p_with_notice = usr_p_init + code_changed_notice
+                composed_prompt = self._compose_prompt_with_context(usr_p_with_notice)
+            else:
+                composed_prompt = self._compose_prompt_with_context(usr_p_init)
+            
+            if use_direct_model_review:
+                # 格式解析失败后，直接调用模型接口
+                # 构造包含摘要提示词和具体错误信息的完整提示
+                error_guidance = ""
+                # 检查上一次的解析结果
+                if parse_error_msg:
+                    # 如果有JSON解析错误，优先反馈
+                    error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_msg}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
+                elif parse_failed:
+                    error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
                 
-                if use_direct_model_review:
-                    # 格式解析失败后，直接调用模型接口
-                    # 构造包含摘要提示词和具体错误信息的完整提示
-                    error_guidance = ""
-                    # 检查上一次的解析结果
-                    if parse_error_msg:
-                        # 如果有JSON解析错误，优先反馈
-                        error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_msg}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
-                    elif parse_failed:
-                        error_guidance = "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 对象\n\n请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
-                    
-                    full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
-                    try:
-                        response = agent.model.chat_until_success(full_prompt)  # type: ignore
-                        summary = str(response or "")
-                    except Exception as e:
-                        typer.secho(f"[c2rust-transpiler][review] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
-                        summary = str(agent.run(composed_prompt) or "")
-                else:
-                    # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
+                try:
+                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                    summary = str(response or "")
+                except Exception as e:
+                    typer.secho(f"[c2rust-transpiler][review] 直接模型调用失败: {e}，回退到 run()", fg=typer.colors.YELLOW)
                     summary = str(agent.run(composed_prompt) or "")
-            finally:
-                os.chdir(prev_cwd)
+            else:
+                # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
+                summary = str(agent.run(composed_prompt) or "")
             
             # 解析 JSON 格式的审查结果
             verdict, parse_error_review = _extract_json_from_summary(summary)
@@ -2546,17 +2494,12 @@ class Transpiler:
                 "",
                 "请仅以补丁形式输出修改，避免冗余解释。",
             ])
-            # 在当前工作目录运行复用的修复 CodeAgent
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             ca = self._get_repair_agent()
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
-                limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
-                ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}]", suffix="")
-                # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
-                self._cargo_build_loop()
-            finally:
-                os.chdir(prev_cwd)
+            limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
+            ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}]", suffix="")
+            # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
+            self._cargo_build_loop()
             
             # 记录本次审查结果
             try:
@@ -2612,213 +2555,221 @@ class Transpiler:
     def transpile(self) -> None:
         """主流程"""
         typer.secho("[c2rust-transpiler][start] 开始转译", fg=typer.colors.BLUE)
-        # 准确性兜底：在未执行 prepare 的情况下，确保 crate 目录与最小 Cargo 配置存在
+        # 切换到 crate 根目录，整个转译过程都在此目录下执行
+        prev_cwd = os.getcwd()
         try:
-            cd = self.crate_dir.resolve()
-            cd.mkdir(parents=True, exist_ok=True)
-            cargo = cd / "Cargo.toml"
-            src_dir = cd / "src"
-            lib_rs = src_dir / "lib.rs"
-            # 最小 Cargo.toml（不覆盖已有），edition 使用 2021 以兼容更广环境
-            if not cargo.exists():
-                pkg_name = cd.name
-                content = (
-                    f'[package]\nname = "{pkg_name}"\nversion = "0.1.0"\nedition = "2021"\n\n'
-                    '[lib]\npath = "src/lib.rs"\n'
-                )
-                try:
-                    cargo.write_text(content, encoding="utf-8")
-                    typer.secho(f"[c2rust-transpiler][init] created Cargo.toml at {cargo}", fg=typer.colors.GREEN)
-                except Exception:
-                    pass
-            # 确保 src/lib.rs 存在
-            src_dir.mkdir(parents=True, exist_ok=True)
-            if not lib_rs.exists():
-                try:
-                    lib_rs.write_text("// Auto-created by c2rust transpiler\n", encoding="utf-8")
-                    typer.secho(f"[c2rust-transpiler][init] created src/lib.rs at {lib_rs}", fg=typer.colors.GREEN)
-                except Exception:
-                    pass
-        except Exception:
-            # 保持稳健，失败不阻塞主流程
-            pass
-
-        order_path = _ensure_order_file(self.project_root)
-        steps = _iter_order_steps(order_path)
-        if not steps:
-            typer.secho("[c2rust-transpiler] 未找到翻译步骤。", fg=typer.colors.YELLOW)
-            return
-
-        # 构建自包含 order 索引（id -> FnRecord，name/qname -> id）
-        self._load_order_index(order_path)
-
-        # 扁平化顺序，按单个函数处理（保持原有顺序）
-        seq: List[int] = []
-        for grp in steps:
-            seq.extend(grp)
-
-        # 若支持 resume，则跳过 progress['converted'] 中已完成的
-        done: Set[int] = set(self.progress.get("converted") or [])
-        typer.secho(f"[c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)}", fg=typer.colors.BLUE)
-
-        for fid in seq:
-            if fid in done:
-                continue
-            rec = self.fn_index_by_id.get(fid)
-            if not rec:
-                continue
-            if self._should_skip(rec):
-                typer.secho(f"[c2rust-transpiler][skip] 跳过 {rec.qname or rec.name} (id={rec.id}) 位于 {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.YELLOW)
-                continue
-
-            # 读取C函数源码
-            typer.secho(f"[c2rust-transpiler][read] 读取 C 源码: {rec.qname or rec.name} (id={rec.id}) 来自 {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.BLUE)
-            c_code = self._read_source_span(rec)
-            typer.secho(f"[c2rust-transpiler][read] 已加载 {len(c_code.splitlines()) if c_code else 0} 行", fg=typer.colors.BLUE)
-
-            # 若缺少源码片段且缺乏签名/参数信息，则跳过本函数，记录进度以便后续处理
-            if not c_code and not (getattr(rec, "signature", "") or getattr(rec, "params", None)):
-                skipped = self.progress.get("skipped_missing_source") or []
-                if rec.id not in skipped:
-                    skipped.append(rec.id)
-                self.progress["skipped_missing_source"] = skipped
-                typer.secho(f"[c2rust-transpiler] 跳过：缺少源码与签名信息 -> {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.YELLOW)
-                self._save_progress()
-                continue
-            # 1) 规划：模块路径与Rust签名
-            typer.secho(f"[c2rust-transpiler][plan] 正在规划模块与签名: {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.CYAN)
-            module, rust_sig, skip_implementation = self._plan_module_and_signature(rec, c_code)
-            typer.secho(f"[c2rust-transpiler][plan] 已选择 模块={module}, 签名={rust_sig}", fg=typer.colors.CYAN)
-
-            # 记录当前进度
-            self._update_progress_current(rec, module, rust_sig)
-            typer.secho(f"[c2rust-transpiler][progress] 已更新当前进度记录 id={rec.id}", fg=typer.colors.CYAN)
-
-            # 如果标记为跳过实现（通过 RAII 自动管理），则直接标记为已转换
-            if skip_implementation:
-                typer.secho(f"[c2rust-transpiler][skip-impl] 函数 {rec.qname or rec.name} 通过 RAII 自动管理，跳过实现阶段", fg=typer.colors.CYAN)
-                # 直接标记为已转换，跳过代码生成、构建和审查阶段
-                self._mark_converted(rec, module, rust_sig)
-                typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module} (跳过实现)", fg=typer.colors.GREEN)
-                continue
-
-            # 初始化函数上下文与代码编写与修复Agent复用缓存（只在当前函数开始时执行一次）
-            self._reset_function_context(rec, module, rust_sig, c_code)
-
-            # 1.5) 确保模块声明链（提前到生成实现之前，避免生成的代码无法被正确引用）
+            os.chdir(str(self.crate_dir))
+            typer.secho(f"[c2rust-transpiler][start] 已切换到 crate 目录: {os.getcwd()}", fg=typer.colors.BLUE)
+            # 准确性兜底：在未执行 prepare 的情况下，确保 crate 目录与最小 Cargo 配置存在
             try:
-                self._ensure_mod_chain_for_module(module)
-                typer.secho(f"[c2rust-transpiler][mod] 已补齐 {module} 的 mod.rs 声明链", fg=typer.colors.GREEN)
-                # 确保顶层模块在 src/lib.rs 中被公开
-                mp = Path(module)
-                crate_root = self.crate_dir.resolve()
-                rel = mp.resolve().relative_to(crate_root) if mp.is_absolute() else Path(module)
-                rel_s = str(rel).replace("\\", "/")
-                if rel_s.startswith("./"):
-                    rel_s = rel_s[2:]
-                if rel_s.startswith("src/"):
-                    parts = rel_s[len("src/"):].strip("/").split("/")
-                    if parts and parts[0]:
-                        top_mod = parts[0]
-                        if not top_mod.endswith(".rs"):
-                            self._ensure_top_level_pub_mod(top_mod)
-                            typer.secho(f"[c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}", fg=typer.colors.GREEN)
-                cur = self.progress.get("current") or {}
-                cur["mod_chain_fixed"] = True
-                cur["mod_visibility_fixed"] = True
-                self.progress["current"] = cur
-                self._save_progress()
+                cd = self.crate_dir.resolve()
+                cd.mkdir(parents=True, exist_ok=True)
+                cargo = cd / "Cargo.toml"
+                src_dir = cd / "src"
+                lib_rs = src_dir / "lib.rs"
+                # 最小 Cargo.toml（不覆盖已有），edition 使用 2021 以兼容更广环境
+                if not cargo.exists():
+                    pkg_name = cd.name
+                    content = (
+                        f'[package]\nname = "{pkg_name}"\nversion = "0.1.0"\nedition = "2021"\n\n'
+                        '[lib]\npath = "src/lib.rs"\n'
+                    )
+                    try:
+                        cargo.write_text(content, encoding="utf-8")
+                        typer.secho(f"[c2rust-transpiler][init] created Cargo.toml at {cargo}", fg=typer.colors.GREEN)
+                    except Exception:
+                        pass
+                # 确保 src/lib.rs 存在
+                src_dir.mkdir(parents=True, exist_ok=True)
+                if not lib_rs.exists():
+                    try:
+                        lib_rs.write_text("// Auto-created by c2rust transpiler\n", encoding="utf-8")
+                        typer.secho(f"[c2rust-transpiler][init] created src/lib.rs at {lib_rs}", fg=typer.colors.GREEN)
+                    except Exception:
+                        pass
             except Exception:
+                # 保持稳健，失败不阻塞主流程
                 pass
 
-            # 在处理函数前，记录当前的 commit id（用于失败回退）
-            self._current_function_start_commit = self._get_crate_commit_hash()
-            if self._current_function_start_commit:
-                typer.secho(f"[c2rust-transpiler][commit] 记录函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.BLUE)
-            else:
-                typer.secho("[c2rust-transpiler][commit] 警告：无法获取 commit id，将无法在失败时回退", fg=typer.colors.YELLOW)
-            
-            # 重置连续失败计数（每个新函数开始时重置）
-            self._consecutive_fix_failures = 0
+            order_path = _ensure_order_file(self.project_root)
+            steps = _iter_order_steps(order_path)
+            if not steps:
+                typer.secho("[c2rust-transpiler] 未找到翻译步骤。", fg=typer.colors.YELLOW)
+                return
 
-            # 使用循环来处理函数，支持失败回退后重新开始
-            function_retry_count = 0
-            max_function_retries = MAX_FUNCTION_RETRIES
-            while function_retry_count <= max_function_retries:
-                if function_retry_count > 0:
-                    typer.secho(f"[c2rust-transpiler][retry] 重新开始处理函数 (第 {function_retry_count} 次重试)", fg=typer.colors.YELLOW)
-                    # 重新记录 commit id（回退后的新 commit）
-                    self._current_function_start_commit = self._get_crate_commit_hash()
-                    if self._current_function_start_commit:
-                        typer.secho(f"[c2rust-transpiler][commit] 重新记录函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.BLUE)
-                    # 重置连续失败计数（重新开始时重置）
-                    self._consecutive_fix_failures = 0
+            # 构建自包含 order 索引（id -> FnRecord，name/qname -> id）
+            self._load_order_index(order_path)
 
-                # 2) 生成实现
-                unresolved = self._untranslated_callee_symbols(rec)
-                typer.secho(f"[c2rust-transpiler][deps] 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
-                typer.secho(f"[c2rust-transpiler][gen] 正在为 {rec.qname or rec.name} 生成 Rust 实现", fg=typer.colors.GREEN)
-                self._codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
-                typer.secho(f"[c2rust-transpiler][gen] 已在 {module} 生成或更新实现", fg=typer.colors.GREEN)
-                # 刷新精简上下文（防止签名/模块调整后提示不同步）
+            # 扁平化顺序，按单个函数处理（保持原有顺序）
+            seq: List[int] = []
+            for grp in steps:
+                seq.extend(grp)
+
+            # 若支持 resume，则跳过 progress['converted'] 中已完成的
+            done: Set[int] = set(self.progress.get("converted") or [])
+            typer.secho(f"[c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)}", fg=typer.colors.BLUE)
+
+            for fid in seq:
+                if fid in done:
+                    continue
+                rec = self.fn_index_by_id.get(fid)
+                if not rec:
+                    continue
+                if self._should_skip(rec):
+                    typer.secho(f"[c2rust-transpiler][skip] 跳过 {rec.qname or rec.name} (id={rec.id}) 位于 {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.YELLOW)
+                    continue
+
+                # 读取C函数源码
+                typer.secho(f"[c2rust-transpiler][read] 读取 C 源码: {rec.qname or rec.name} (id={rec.id}) 来自 {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.BLUE)
+                c_code = self._read_source_span(rec)
+                typer.secho(f"[c2rust-transpiler][read] 已加载 {len(c_code.splitlines()) if c_code else 0} 行", fg=typer.colors.BLUE)
+
+                # 若缺少源码片段且缺乏签名/参数信息，则跳过本函数，记录进度以便后续处理
+                if not c_code and not (getattr(rec, "signature", "") or getattr(rec, "params", None)):
+                    skipped = self.progress.get("skipped_missing_source") or []
+                    if rec.id not in skipped:
+                        skipped.append(rec.id)
+                    self.progress["skipped_missing_source"] = skipped
+                    typer.secho(f"[c2rust-transpiler] 跳过：缺少源码与签名信息 -> {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.YELLOW)
+                    self._save_progress()
+                    continue
+                # 1) 规划：模块路径与Rust签名
+                typer.secho(f"[c2rust-transpiler][plan] 正在规划模块与签名: {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.CYAN)
+                module, rust_sig, skip_implementation = self._plan_module_and_signature(rec, c_code)
+                typer.secho(f"[c2rust-transpiler][plan] 已选择 模块={module}, 签名={rust_sig}", fg=typer.colors.CYAN)
+
+                # 记录当前进度
+                self._update_progress_current(rec, module, rust_sig)
+                typer.secho(f"[c2rust-transpiler][progress] 已更新当前进度记录 id={rec.id}", fg=typer.colors.CYAN)
+
+                # 如果标记为跳过实现（通过 RAII 自动管理），则直接标记为已转换
+                if skip_implementation:
+                    typer.secho(f"[c2rust-transpiler][skip-impl] 函数 {rec.qname or rec.name} 通过 RAII 自动管理，跳过实现阶段", fg=typer.colors.CYAN)
+                    # 直接标记为已转换，跳过代码生成、构建和审查阶段
+                    self._mark_converted(rec, module, rust_sig)
+                    typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module} (跳过实现)", fg=typer.colors.GREEN)
+                    continue
+
+                # 初始化函数上下文与代码编写与修复Agent复用缓存（只在当前函数开始时执行一次）
+                self._reset_function_context(rec, module, rust_sig, c_code)
+
+                # 1.5) 确保模块声明链（提前到生成实现之前，避免生成的代码无法被正确引用）
                 try:
-                    self._refresh_compact_context(rec, module, rust_sig)
+                    self._ensure_mod_chain_for_module(module)
+                    typer.secho(f"[c2rust-transpiler][mod] 已补齐 {module} 的 mod.rs 声明链", fg=typer.colors.GREEN)
+                    # 确保顶层模块在 src/lib.rs 中被公开
+                    mp = Path(module)
+                    crate_root = self.crate_dir.resolve()
+                    rel = mp.resolve().relative_to(crate_root) if mp.is_absolute() else Path(module)
+                    rel_s = str(rel).replace("\\", "/")
+                    if rel_s.startswith("./"):
+                        rel_s = rel_s[2:]
+                    if rel_s.startswith("src/"):
+                        parts = rel_s[len("src/"):].strip("/").split("/")
+                        if parts and parts[0]:
+                            top_mod = parts[0]
+                            if not top_mod.endswith(".rs"):
+                                self._ensure_top_level_pub_mod(top_mod)
+                                typer.secho(f"[c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}", fg=typer.colors.GREEN)
+                    cur = self.progress.get("current") or {}
+                    cur["mod_chain_fixed"] = True
+                    cur["mod_visibility_fixed"] = True
+                    self.progress["current"] = cur
+                    self._save_progress()
                 except Exception:
                     pass
 
-                # 3) 构建与修复
-                typer.secho("[c2rust-transpiler][build] 开始 cargo 测试循环", fg=typer.colors.MAGENTA)
-                ok = self._cargo_build_loop()
+                # 在处理函数前，记录当前的 commit id（用于失败回退）
+                self._current_function_start_commit = self._get_crate_commit_hash()
+                if self._current_function_start_commit:
+                    typer.secho(f"[c2rust-transpiler][commit] 记录函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.BLUE)
+                else:
+                    typer.secho("[c2rust-transpiler][commit] 警告：无法获取 commit id，将无法在失败时回退", fg=typer.colors.YELLOW)
                 
-                # 检查是否需要重新开始（回退后）
-                if ok is None:
-                    # 需要重新开始
-                    function_retry_count += 1
-                    if function_retry_count > max_function_retries:
-                        typer.secho(f"[c2rust-transpiler] 函数重新开始次数已达上限({max_function_retries})，停止处理该函数", fg=typer.colors.RED)
+                # 重置连续失败计数（每个新函数开始时重置）
+                self._consecutive_fix_failures = 0
+
+                # 使用循环来处理函数，支持失败回退后重新开始
+                function_retry_count = 0
+                max_function_retries = MAX_FUNCTION_RETRIES
+                while function_retry_count <= max_function_retries:
+                    if function_retry_count > 0:
+                        typer.secho(f"[c2rust-transpiler][retry] 重新开始处理函数 (第 {function_retry_count} 次重试)", fg=typer.colors.YELLOW)
+                        # 重新记录 commit id（回退后的新 commit）
+                        self._current_function_start_commit = self._get_crate_commit_hash()
+                        if self._current_function_start_commit:
+                            typer.secho(f"[c2rust-transpiler][commit] 重新记录函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.BLUE)
+                        # 重置连续失败计数（重新开始时重置）
+                        self._consecutive_fix_failures = 0
+
+                    # 2) 生成实现
+                    unresolved = self._untranslated_callee_symbols(rec)
+                    typer.secho(f"[c2rust-transpiler][deps] 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
+                    typer.secho(f"[c2rust-transpiler][gen] 正在为 {rec.qname or rec.name} 生成 Rust 实现", fg=typer.colors.GREEN)
+                    self._codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
+                    typer.secho(f"[c2rust-transpiler][gen] 已在 {module} 生成或更新实现", fg=typer.colors.GREEN)
+                    # 刷新精简上下文（防止签名/模块调整后提示不同步）
+                    try:
+                        self._refresh_compact_context(rec, module, rust_sig)
+                    except Exception:
+                        pass
+
+                    # 3) 构建与修复
+                    typer.secho("[c2rust-transpiler][build] 开始 cargo 测试循环", fg=typer.colors.MAGENTA)
+                    ok = self._cargo_build_loop()
+                    
+                    # 检查是否需要重新开始（回退后）
+                    if ok is None:
+                        # 需要重新开始
+                        function_retry_count += 1
+                        if function_retry_count > max_function_retries:
+                            typer.secho(f"[c2rust-transpiler] 函数重新开始次数已达上限({max_function_retries})，停止处理该函数", fg=typer.colors.RED)
+                            # 保留当前状态，便于下次 resume
+                            return
+                        # 重置连续失败计数
+                        self._consecutive_fix_failures = 0
+                        # 继续循环，重新开始处理
+                        continue
+                    
+                    typer.secho(f"[c2rust-transpiler][build] 构建结果: {'通过' if ok else '失败'}", fg=typer.colors.MAGENTA)
+                    if not ok:
+                        typer.secho("[c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。", fg=typer.colors.RED)
                         # 保留当前状态，便于下次 resume
                         return
-                    # 重置连续失败计数
-                    self._consecutive_fix_failures = 0
-                    # 继续循环，重新开始处理
-                    continue
-                
-                typer.secho(f"[c2rust-transpiler][build] 构建结果: {'通过' if ok else '失败'}", fg=typer.colors.MAGENTA)
-                if not ok:
-                    typer.secho("[c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。", fg=typer.colors.RED)
-                    # 保留当前状态，便于下次 resume
-                    return
-                
-                # 构建成功，跳出循环继续后续流程
-                break
+                    
+                    # 构建成功，跳出循环继续后续流程
+                    break
 
-            # 4) 审查与优化（复用 Review Agent）
-            typer.secho(f"[c2rust-transpiler][review] 开始代码审查: {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
-            self._review_and_optimize(rec, module, rust_sig)
-            typer.secho("[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
+                # 4) 审查与优化（复用 Review Agent）
+                typer.secho(f"[c2rust-transpiler][review] 开始代码审查: {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
+                self._review_and_optimize(rec, module, rust_sig)
+                typer.secho("[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
 
-            # 5) 标记已转换与映射记录（JSONL）
-            self._mark_converted(rec, module, rust_sig)
-            typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module}", fg=typer.colors.GREEN)
+                # 5) 标记已转换与映射记录（JSONL）
+                self._mark_converted(rec, module, rust_sig)
+                typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module}", fg=typer.colors.GREEN)
 
-            # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用代码编写与修复Agent）
-            current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
-            # 收集需要处理的符号（去重，避免 qname 和 name 相同时重复处理）
-            symbols_to_resolve = []
-            if rec.qname:
-                symbols_to_resolve.append(rec.qname)
-            if rec.name and rec.name != rec.qname:  # 如果 name 与 qname 不同，才添加
-                symbols_to_resolve.append(rec.name)
-            # 处理每个符号（去重后）
-            for sym in symbols_to_resolve:
-                typer.secho(f"[c2rust-transpiler][todo] 清理 todo!(\'{sym}\') 的出现位置", fg=typer.colors.BLUE)
-                self._resolve_pending_todos_for_symbol(sym, module, current_rust_fn, rust_sig)
-            # 如果有处理任何符号，统一运行一次 cargo test（避免重复运行）
-            if symbols_to_resolve:
-                typer.secho("[c2rust-transpiler][build] 处理 todo 后重新运行 cargo test", fg=typer.colors.MAGENTA)
-                self._cargo_build_loop()
+                # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用代码编写与修复Agent）
+                current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)
+                # 收集需要处理的符号（去重，避免 qname 和 name 相同时重复处理）
+                symbols_to_resolve = []
+                if rec.qname:
+                    symbols_to_resolve.append(rec.qname)
+                if rec.name and rec.name != rec.qname:  # 如果 name 与 qname 不同，才添加
+                    symbols_to_resolve.append(rec.name)
+                # 处理每个符号（去重后）
+                for sym in symbols_to_resolve:
+                    typer.secho(f"[c2rust-transpiler][todo] 清理 todo!(\'{sym}\') 的出现位置", fg=typer.colors.BLUE)
+                    self._resolve_pending_todos_for_symbol(sym, module, current_rust_fn, rust_sig)
+                # 如果有处理任何符号，统一运行一次 cargo test（避免重复运行）
+                if symbols_to_resolve:
+                    typer.secho("[c2rust-transpiler][build] 处理 todo 后重新运行 cargo test", fg=typer.colors.MAGENTA)
+                    self._cargo_build_loop()
 
-        typer.secho("[c2rust-transpiler] 所有符合条件的函数均已处理完毕。", fg=typer.colors.GREEN)
+            typer.secho("[c2rust-transpiler] 所有符合条件的函数均已处理完毕。", fg=typer.colors.GREEN)
+        finally:
+            os.chdir(prev_cwd)
+            typer.secho(f"[c2rust-transpiler][end] 已恢复工作目录: {os.getcwd()}", fg=typer.colors.BLUE)
 
 
 def run_transpile(
