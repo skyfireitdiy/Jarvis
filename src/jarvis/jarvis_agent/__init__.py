@@ -74,6 +74,7 @@ from jarvis.jarvis_utils.config import (
     get_tool_filter_threshold,
     get_after_tool_call_cb_dirs,
     get_addon_prompt_threshold,
+    is_enable_memory_organizer,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import (
@@ -1058,7 +1059,9 @@ class Agent:
         # - TaskAnalyzer 通过订阅 before_summary/task_completed 事件执行分析与满意度收集
         # - MemoryManager 通过订阅 before_history_clear/task_completed 事件执行记忆保存（受 force_save_memory 控制）
         # 为减少耦合，这里不再直接调用上述组件，保持行为由事件触发
-        self._check_and_organize_memory()
+        # 仅在启用自动记忆整理时检查并整理记忆
+        if is_enable_memory_organizer():
+            self._check_and_organize_memory()
 
         result = "任务完成"
 

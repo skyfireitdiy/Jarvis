@@ -869,3 +869,13 @@ def is_enable_intent_recognition() -> bool:
         bool: 是否启用意图识别，默认为True（可通过 GLOBAL_CONFIG_DATA['JARVIS_ENABLE_INTENT_RECOGNITION'] 配置）
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_INTENT_RECOGNITION", True) is True
+
+
+def is_enable_memory_organizer() -> bool:
+    """
+    获取是否启用自动记忆整理功能。
+    
+    返回:
+        bool: 是否启用自动记忆整理，默认为False（可通过 GLOBAL_CONFIG_DATA['JARVIS_ENABLE_MEMORY_ORGANIZER'] 配置）
+    """
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_MEMORY_ORGANIZER", False) is True
