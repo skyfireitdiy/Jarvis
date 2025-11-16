@@ -368,7 +368,6 @@ class LLMRustCratePlannerAgent:
         - 若最终未收集到任何 root 组，则回退为单组 'project'，包含所有 items 的函数名集合
         """
         from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
-        import json
         order_path = self._order_path()
         if not order_path.exists():
             raise FileNotFoundError(f"未找到 translation_order.jsonl: {order_path}")

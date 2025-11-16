@@ -3,7 +3,6 @@
 
 from typing import List, Optional
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
-import json
 
 
 def parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:

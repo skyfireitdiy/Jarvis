@@ -735,7 +735,7 @@ class EditFileTool:
                         failed_patches.append({"patch": patch, "error": error_msg})
                 else:
                     # 如果不支持的模式，记录错误
-                    error_msg = f"不支持的补丁格式。支持的格式: STRUCTURED_BLOCK_ID"
+                    error_msg = "不支持的补丁格式。支持的格式: STRUCTURED_BLOCK_ID"
                     failed_patches.append({"patch": patch, "error": error_msg})
             
             # 如果有失败的补丁，且没有成功的补丁，则不写入文件
