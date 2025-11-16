@@ -1496,7 +1496,7 @@ class Agent:
             f"并且存在3个以上标签重叠的记忆。\n"
             f"是否立即整理记忆库以优化性能和相关性？"
         )
-        if self.confirm_callback(prompt, True):
+        if self.confirm_callback(prompt, False):
             PrettyOutput.print(
                 f"正在开始整理 '{scope_name}' ({memory_type}) 记忆库...",
                 OutputType.INFO,
