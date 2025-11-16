@@ -450,6 +450,7 @@ class Transpiler:
         resume: bool = True,
         only: Optional[List[str]] = None,  # 仅转译指定函数名（简单名或限定名）
         disabled_libraries: Optional[List[str]] = None,  # 禁用库列表（在实现时禁止使用这些库）
+        root_symbols: Optional[List[str]] = None,  # 根符号列表（这些符号对应的接口实现时要求对外暴露，main除外）
         non_interactive: bool = True,
     ) -> None:
         self.project_root = Path(project_root).resolve()
@@ -470,16 +471,40 @@ class Transpiler:
         self.review_max_iterations = review_max_iterations
         self.resume = resume
         self.only = set(only or [])
-        self.disabled_libraries = disabled_libraries or []
         self.non_interactive = non_interactive
-        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []} disabled_libraries={self.disabled_libraries} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
+        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
         self.fn_index_by_id: Dict[int, FnRecord] = {}
         self.fn_name_to_id: Dict[str, int] = {}
 
-        self.progress: Dict[str, Any] = _read_json(self.progress_path, {"current": None, "converted": []})
+        # 读取进度文件，如果存在则从中恢复配置（根符号和禁用库）
+        default_progress = {"current": None, "converted": []}
+        self.progress: Dict[str, Any] = _read_json(self.progress_path, default_progress)
+        
+        # 如果提供了新的根符号或禁用库，更新配置；否则从进度文件中恢复
+        if root_symbols is not None:
+            self.root_symbols = root_symbols
+            self.progress["config"] = self.progress.get("config", {})
+            self.progress["config"]["root_symbols"] = root_symbols
+        else:
+            # 从进度文件恢复
+            config = self.progress.get("config", {})
+            self.root_symbols = config.get("root_symbols", [])
+        
+        if disabled_libraries is not None:
+            self.disabled_libraries = disabled_libraries
+            self.progress["config"] = self.progress.get("config", {})
+            self.progress["config"]["disabled_libraries"] = disabled_libraries
+        else:
+            # 从进度文件恢复
+            config = self.progress.get("config", {})
+            self.disabled_libraries = config.get("disabled_libraries", [])
+        
+        # 保存配置到进度文件
+        if "config" in self.progress:
+            self._save_progress()
         # 使用 JSONL 存储的符号映射
         self.symbol_map = _SymbolMapJsonl(self.symbol_map_path)
 
@@ -797,6 +822,7 @@ class Transpiler:
           "notes": "optional"
         }
         """
+        is_root = self._is_root_symbol(rec)
         system_prompt = (
             "你是资深Rust工程师，擅长为C/C++函数选择合适的Rust模块位置并产出对应的Rust函数签名。\n"
             "目标：根据提供的C源码、调用者上下文与crate目录结构，为该函数选择合适的Rust模块文件并给出Rust函数签名（不实现）。\n"
@@ -806,6 +832,7 @@ class Transpiler:
             "- 函数接口设计应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型（如 i32/u32/usize、&[T]/&mut [T]、String、Result<T, E> 等），而不是 C 风格类型（如 core::ffi::c_*、libc::c_*）；\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI；\n"
             "- 参数个数与顺序可以保持与 C 一致，但类型设计应优先考虑 Rust 的惯用法和安全性；\n"
+            f"{'- **根符号要求**：此函数是根符号，必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。\n' if is_root else ''}"
             "- **特殊处理：对于资源释放类函数（如文件关闭、内存释放、句柄释放等），在 Rust 中通常通过 RAII 自动管理，可以跳过实现或提供空实现；请在 notes 字段中标注此类情况；\n"
             "- 仅输出必要信息，避免冗余解释。"
         )
@@ -871,6 +898,7 @@ class Transpiler:
             "  * 字符串：优先使用 String、&str 而非 *const c_char/*mut c_char；\n"
             "  * 错误处理：考虑使用 Result<T, E> 而非 C 风格的错误码；\n"
             "  * 参数个数与顺序可以保持与 C 一致，但类型应优先考虑 Rust 的惯用法、安全性和可读性；\n"
+            f"{'- **根符号要求**：此函数是根符号，rust_signature 必须包含 `pub` 关键字，确保可以从 crate 外部访问。\n' if is_root else ''}"
             "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n"
             "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
@@ -1205,6 +1233,13 @@ class Transpiler:
 
     # ========= 代码生成与修复 =========
 
+    def _is_root_symbol(self, rec: FnRecord) -> bool:
+        """判断函数是否为根符号（排除 main）"""
+        if not self.root_symbols:
+            return False
+        # 检查函数名或限定名是否在根符号列表中
+        return (rec.name in self.root_symbols) or (rec.qname in self.root_symbols)
+
     def _build_generate_impl_prompt(
         self, rec: FnRecord, c_code: str, module: str, rust_sig: str, unresolved: List[str]
     ) -> str:
@@ -1214,10 +1249,12 @@ class Transpiler:
         返回完整的提示词字符串。
         """
         symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
+        is_root = self._is_root_symbol(rec)
         requirement_lines = [
             f"目标：在 crate 目录 {self.crate_dir.resolve()} 的 {module} 中，为 C 函数 {rec.qname or rec.name} 生成对应的 Rust 实现，并同时生成测试用例。",
             "要求：",
             f"- 函数签名（建议）：{rust_sig}",
+            *([f"- **根符号要求**：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if is_root else []),
             f"- 原 C 工程目录位置：{self.project_root.resolve()}",
             "- 若 module 文件不存在则新建；为所在模块添加必要的 mod 声明（若需要）；",
             "- 若已有函数占位/实现，尽量最小修改，不要破坏现有代码；",
@@ -1745,6 +1782,8 @@ class Transpiler:
         
         返回基础行列表。
         """
+        # 检查是否为根符号
+        is_root = sym_name in (self.root_symbols or [])
         base_lines = [
             f"目标：以最小的改动修复问题，使 `{stage}` 命令可以通过。",
             f"阶段：{stage}",
@@ -1758,6 +1797,7 @@ class Transpiler:
             f"- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == 'cargo test' else '')}；",
             *([f"- **禁用库约束**：禁止在修复中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果修复需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
+            *([f"- **根符号要求**：此函数是根符号（{sym_name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if is_root else []),
             "",
             "【重要：依赖检查与实现要求】",
             "在修复问题之前，请务必检查以下内容：",
@@ -2278,6 +2318,7 @@ class Transpiler:
                 json.dumps(librep_ctx, ensure_ascii=False, indent=2),
                 "",
                 *([f"禁用库列表（禁止在实现中使用这些库）：{', '.join(self.disabled_libraries)}"] if self.disabled_libraries else []),
+                *([f"根符号要求：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if self._is_root_symbol(rec) else []),
             ]
             # 添加编译参数（如果存在）
             if compile_flags:
@@ -2505,6 +2546,7 @@ class Transpiler:
                 "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在优化之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高优化效率和准确性；",
                 "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
                 *([f"- **禁用库约束**：禁止在优化中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果优化需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
+                *([f"- **根符号要求**：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。"] if self._is_root_symbol(rec) else []),
                 "",
                 "【重要：依赖检查与实现要求】",
                 "在优化函数之前，请务必检查以下内容：",
@@ -2823,6 +2865,7 @@ def run_transpile(
     resume: bool = True,
     only: Optional[List[str]] = None,
     disabled_libraries: Optional[List[str]] = None,
+    root_symbols: Optional[List[str]] = None,
     non_interactive: bool = True,
 ) -> None:
     """
@@ -2846,6 +2889,7 @@ def run_transpile(
         resume=resume,
         only=only,
         disabled_libraries=disabled_libraries,
+        root_symbols=root_symbols,
         non_interactive=non_interactive,
     )
     t.transpile()

@@ -121,6 +121,9 @@ def transpile(
     disabled_libs: Optional[str] = typer.Option(
         None, "--disabled-libs", help="禁用库列表（逗号分隔，在实现时禁止使用这些库）"
     ),
+    root_symbols: Optional[str] = typer.Option(
+        None, "--root-symbols", help="根符号列表（逗号分隔，这些符号对应的接口实现时要求对外暴露，main除外）"
+    ),
     interactive: bool = typer.Option(
         False,
         "--interactive",
@@ -146,6 +149,9 @@ def transpile(
         disabled_list: Optional[List[str]] = None
         if isinstance(disabled_libs, str) and disabled_libs.strip():
             disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
+        root_symbols_list: Optional[List[str]] = None
+        if isinstance(root_symbols, str) and root_symbols.strip():
+            root_symbols_list = [s.strip() for s in root_symbols.replace("\n", ",").split(",") if s.strip()]
         _run_transpile(
             project_root=Path("."),
             crate_dir=None,
@@ -154,6 +160,7 @@ def transpile(
             resume=resume,
             only=only_list,
             disabled_libraries=disabled_list,
+            root_symbols=root_symbols_list,
             non_interactive=not interactive,
         )
     except Exception as e:
@@ -482,6 +489,8 @@ def run(
         # Step 5: transpile
         typer.secho("[c2rust-run] transpile: 开始", fg=typer.colors.BLUE)
         from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
+        # 使用收集到的根符号列表（排除 main）
+        root_symbols_list = [s for s in root_names if s.lower() != "main"] if root_names else None
         _run_transpile(
             project_root=Path("."),
             crate_dir=None,
@@ -490,6 +499,7 @@ def run(
             resume=resume,
             only=None,
             disabled_libraries=disabled_list,
+            root_symbols=root_symbols_list,
             non_interactive=not interactive,
         )
         typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
