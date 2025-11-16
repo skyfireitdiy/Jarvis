@@ -118,6 +118,9 @@ def transpile(
     resume: bool = typer.Option(
         True, "--resume/--no-resume", help="是否启用断点续跑（默认启用）"
     ),
+    disabled_libs: Optional[str] = typer.Option(
+        None, "--disabled-libs", help="禁用库列表（逗号分隔，在实现时禁止使用这些库）"
+    ),
     interactive: bool = typer.Option(
         False,
         "--interactive",
@@ -140,6 +143,9 @@ def transpile(
         # Lazy import to avoid hard dependency if not used
         from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
         only_list = [s.strip() for s in str(only).split(",") if s.strip()] if only else None
+        disabled_list: Optional[List[str]] = None
+        if isinstance(disabled_libs, str) and disabled_libs.strip():
+            disabled_list = [s.strip() for s in disabled_libs.replace("\n", ",").split(",") if s.strip()]
         _run_transpile(
             project_root=Path("."),
             crate_dir=None,
@@ -147,6 +153,7 @@ def transpile(
             max_retries=max_retries,
             resume=resume,
             only=only_list,
+            disabled_libraries=disabled_list,
             non_interactive=not interactive,
         )
     except Exception as e:
@@ -482,6 +489,7 @@ def run(
             max_retries=max_retries,
             resume=resume,
             only=None,
+            disabled_libraries=disabled_list,
             non_interactive=not interactive,
         )
         typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)

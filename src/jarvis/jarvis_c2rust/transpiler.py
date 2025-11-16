@@ -449,6 +449,7 @@ class Transpiler:
         review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,  # 审查阶段最大迭代次数（0表示无限重试）
         resume: bool = True,
         only: Optional[List[str]] = None,  # 仅转译指定函数名（简单名或限定名）
+        disabled_libraries: Optional[List[str]] = None,  # 禁用库列表（在实现时禁止使用这些库）
         non_interactive: bool = True,
     ) -> None:
         self.project_root = Path(project_root).resolve()
@@ -469,8 +470,9 @@ class Transpiler:
         self.review_max_iterations = review_max_iterations
         self.resume = resume
         self.only = set(only or [])
+        self.disabled_libraries = disabled_libraries or []
         self.non_interactive = non_interactive
-        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
+        typer.secho(f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} resume={self.resume} only={sorted(list(self.only)) if self.only else []} disabled_libraries={self.disabled_libraries} non_interactive={self.non_interactive}", fg=typer.colors.BLUE)
 
         self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
@@ -838,6 +840,8 @@ class Transpiler:
             json.dumps(getattr(rec, "lib_replacement", None), ensure_ascii=False, indent=2),
             compile_flags_section,
             "",
+            *([f"禁用库列表（禁止在实现中使用这些库）：{', '.join(self.disabled_libraries)}"] if self.disabled_libraries else []),
+            *([""] if self.disabled_libraries else []),
             "当前crate目录结构（部分）：",
             "<CRATE_TREE>",
             crate_tree,
@@ -1247,6 +1251,7 @@ class Transpiler:
             "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             "- 导入：禁止使用 use ...::* 通配；仅允许精确导入所需符号",
             "- 依赖管理：如引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值；",
+            *([f"- **禁用库约束**：禁止在实现中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果实现需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
             "",
             "【重要：资源释放类函数处理】",
             "- 识别标准：如果函数名或功能属于以下类别，通常可以通过 RAII 自动管理：",
@@ -1752,6 +1757,7 @@ class Transpiler:
             "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在修复之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高修复效率和准确性；",
             f"- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == 'cargo test' else '')}；",
+            *([f"- **禁用库约束**：禁止在修复中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果修复需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
             "",
             "【重要：依赖检查与实现要求】",
             "在修复问题之前，请务必检查以下内容：",
@@ -2270,6 +2276,8 @@ class Transpiler:
                 "",
                 "库替代上下文（若存在）：",
                 json.dumps(librep_ctx, ensure_ascii=False, indent=2),
+                "",
+                *([f"禁用库列表（禁止在实现中使用这些库）：{', '.join(self.disabled_libraries)}"] if self.disabled_libraries else []),
             ]
             # 添加编译参数（如果存在）
             if compile_flags:
@@ -2496,6 +2504,7 @@ class Transpiler:
                 "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号（禁止通配）；",
                 "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在优化之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高优化效率和准确性；",
                 "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
+                *([f"- **禁用库约束**：禁止在优化中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果优化需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
                 "",
                 "【重要：依赖检查与实现要求】",
                 "在优化函数之前，请务必检查以下内容：",
@@ -2813,6 +2822,7 @@ def run_transpile(
     review_max_iterations: int = DEFAULT_REVIEW_MAX_ITERATIONS,
     resume: bool = True,
     only: Optional[List[str]] = None,
+    disabled_libraries: Optional[List[str]] = None,
     non_interactive: bool = True,
 ) -> None:
     """
@@ -2835,6 +2845,7 @@ def run_transpile(
         review_max_iterations=review_max_iterations,
         resume=resume,
         only=only,
+        disabled_libraries=disabled_libraries,
         non_interactive=non_interactive,
     )
     t.transpile()
