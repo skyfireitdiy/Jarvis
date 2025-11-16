@@ -441,11 +441,19 @@ class EditFileTool:
         blocks = cache_info.get("blocks", {})
         
         result = []
-        for block_id in id_list:
+        for i, block_id in enumerate(id_list):
             block = blocks.get(block_id)
             if block:
                 content = block.get('content', '')
                 if content:
+                    # 如果不是第一个块，且前一个块的内容不以换行符结尾，
+                    # 且当前块的内容不以换行符开头，则在块之间插入换行符
+                    if i > 0 and result:
+                        prev_content = result[-1]
+                        # 如果前一个块不以换行符结尾，且当前块不以换行符开头，则插入换行
+                        if prev_content and not prev_content.endswith('\n'):
+                            if content and not content.startswith('\n'):
+                                result.append('\n')
                     result.append(content)
         
         return ''.join(result) if result else ""

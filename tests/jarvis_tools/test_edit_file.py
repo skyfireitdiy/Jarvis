@@ -403,6 +403,124 @@ class Calculator:
         assert success is True
         assert cache_info["blocks"]["block-1"]["content"].endswith(" suffix")
 
+    def test_restore_file_from_cache_with_newline_insertion(self, tool):
+        """测试从缓存恢复文件内容时，块之间自动插入换行符"""
+        cache_info = {
+            "id_list": ["block-1", "block-2"],
+            "blocks": {
+                "block-1": {"content": "pub fn test() {\n}\n\n#[cfg(test)]"},  # 不以换行符结尾
+                "block-2": {"content": "mod tests {"}  # 不以换行符开头
+            }
+        }
+        
+        recovered = EditFileTool._restore_file_from_cache(cache_info)
+        
+        # 应该自动在块之间插入换行符
+        assert "#[cfg(test)]\nmod tests {" in recovered
+        assert "#[cfg(test)]mod tests {" not in recovered  # 不应该没有换行
+
+    def test_restore_file_from_cache_no_duplicate_newline(self, tool):
+        """测试块之间已经有换行符时，不应该重复插入"""
+        cache_info = {
+            "id_list": ["block-1", "block-2"],
+            "blocks": {
+                "block-1": {"content": "pub fn test() {\n}\n\n#[cfg(test)]\n"},  # 以换行符结尾
+                "block-2": {"content": "mod tests {"}  # 不以换行符开头
+            }
+        }
+        
+        recovered = EditFileTool._restore_file_from_cache(cache_info)
+        
+        # 不应该在已有换行符后再插入换行符
+        assert "#[cfg(test)]\nmod tests {" in recovered
+        # 不应该有两个连续的换行符（除了块1内部已有的）
+        lines = recovered.split('\n')
+        # 检查 #[cfg(test)] 和 mod tests { 之间只有一个换行
+        cfg_idx = None
+        mod_idx = None
+        for i, line in enumerate(lines):
+            if '#[cfg(test)]' in line:
+                cfg_idx = i
+            if 'mod tests {' in line:
+                mod_idx = i
+        if cfg_idx is not None and mod_idx is not None:
+            assert mod_idx == cfg_idx + 1, "应该只有一个换行符分隔"
+
+    def test_restore_file_from_cache_block_starts_with_newline(self, tool):
+        """测试当前块以换行符开头时，不需要插入换行符"""
+        cache_info = {
+            "id_list": ["block-1", "block-2"],
+            "blocks": {
+                "block-1": {"content": "pub fn test() {\n}\n\n#[cfg(test)]"},  # 不以换行符结尾
+                "block-2": {"content": "\nmod tests {"}  # 以换行符开头
+            }
+        }
+        
+        recovered = EditFileTool._restore_file_from_cache(cache_info)
+        
+        # 不应该重复插入换行符
+        assert "#[cfg(test)]\nmod tests {" in recovered
+        # 不应该有两个连续的换行符
+        assert "#[cfg(test)]\n\nmod tests {" not in recovered
+
+    def test_restore_file_from_cache_multiple_blocks(self, tool):
+        """测试多个块连续时，正确插入换行符"""
+        cache_info = {
+            "id_list": ["block-1", "block-2", "block-3", "block-4"],
+            "blocks": {
+                "block-1": {"content": "first"},  # 不以换行符结尾
+                "block-2": {"content": "second"},  # 不以换行符开头或结尾
+                "block-3": {"content": "third\n"},  # 以换行符结尾
+                "block-4": {"content": "fourth"}  # 不以换行符开头
+            }
+        }
+        
+        recovered = EditFileTool._restore_file_from_cache(cache_info)
+        
+        # block-1 和 block-2 之间应该插入换行
+        assert "first\nsecond" in recovered
+        # block-2 和 block-3 之间应该插入换行
+        assert "second\nthird" in recovered
+        # block-3 和 block-4 之间不应该插入换行（block-3 以换行结尾）
+        assert "third\nfourth" in recovered
+        assert "third\n\nfourth" not in recovered  # 不应该有两个换行
+
+    def test_restore_file_from_cache_empty_blocks(self, tool):
+        """测试空块的处理"""
+        cache_info = {
+            "id_list": ["block-1", "block-2", "block-3"],
+            "blocks": {
+                "block-1": {"content": "first"},
+                "block-2": {"content": ""},  # 空块
+                "block-3": {"content": "third"}
+            }
+        }
+        
+        recovered = EditFileTool._restore_file_from_cache(cache_info)
+        
+        # 空块应该被跳过（不添加到结果中）
+        assert "first" in recovered
+        assert "third" in recovered
+        # first 和 third 之间应该插入换行
+        assert "first\nthird" in recovered
+
+    def test_restore_file_from_cache_all_blocks_with_newlines(self, tool):
+        """测试所有块都以换行符结尾时，不需要额外插入"""
+        cache_info = {
+            "id_list": ["block-1", "block-2"],
+            "blocks": {
+                "block-1": {"content": "first\n"},  # 以换行符结尾
+                "block-2": {"content": "second\n"}  # 以换行符开头（实际上会以换行符结尾）
+            }
+        }
+        
+        recovered = EditFileTool._restore_file_from_cache(cache_info)
+        
+        # 应该直接连接，不需要额外插入换行
+        assert "first\nsecond" in recovered
+        # 不应该有两个连续的换行符（除了块内部的）
+        # 这里 first\n 和 second 之间应该只有一个换行（来自 block-1 的结尾）
+
     def test_restore_file_from_cache(self, tool):
         """测试从缓存恢复文件"""
         cache_info = {
