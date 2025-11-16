@@ -494,6 +494,9 @@ class EditFileTool:
                 return (False, "insert_before操作需要提供content参数")
             
             current_content = block.get('content', '')
+            # 自动添加换行符：在插入内容后添加换行符（如果插入内容不以换行符结尾）
+            if new_content and not new_content.endswith('\n'):
+                new_content = new_content + '\n'
             block['content'] = new_content + current_content
             return (True, None)
         
@@ -503,6 +506,12 @@ class EditFileTool:
                 return (False, "insert_after操作需要提供content参数")
             
             current_content = block.get('content', '')
+            # 自动添加换行符：在插入内容前添加换行符（如果插入内容不以换行符开头）
+            # 避免重复换行符：如果当前内容以换行符结尾，则不需要添加
+            if new_content and not new_content.startswith('\n'):
+                # 如果当前内容不以换行符结尾，则在插入内容前添加换行符
+                if not current_content or not current_content.endswith('\n'):
+                    new_content = '\n' + new_content
             block['content'] = current_content + new_content
             return (True, None)
         
