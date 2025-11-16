@@ -456,7 +456,11 @@ class EditFileTool:
                                 result.append('\n')
                     result.append(content)
         
-        return ''.join(result) if result else ""
+        restored_content = ''.join(result) if result else ""
+        # 确保最后一行有换行符（如果内容不为空）
+        if restored_content and not restored_content.endswith('\n'):
+            restored_content = restored_content + '\n'
+        return restored_content
 
     @staticmethod
     def _apply_structured_edit_to_cache(
