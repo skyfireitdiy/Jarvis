@@ -20,24 +20,38 @@ def _strip_markdown_code_blocks(s: str) -> str:
     if not isinstance(s, str):
         return s
     
+    import re
+    
     block = s.strip()
     
-    # 去除开头的代码块标记（如 ```json5、```json、``` 等）
-    if block.startswith("```"):
-        # 找到第一个换行符或字符串结尾
-        first_newline = block.find("\n")
-        if first_newline >= 0:
-            block = block[first_newline + 1:]
-        else:
-            # 没有换行符，说明整个块可能就是 ```language
-            block = ""
-    
-    # 去除结尾的代码块标记（包括前面的换行）
-    if block.rstrip().endswith("```"):
-        # 找到最后一个 ``` 的位置
-        last_backticks = block.rfind("```")
-        if last_backticks >= 0:
-            block = block[:last_backticks].rstrip()
+    # 使用正则表达式匹配并去除代码块标记
+    # 匹配开头的 ```language 或 ```（可选语言标识，后跟换行或字符串结尾）
+    # 匹配结尾的 ```（前面可能有换行和空白）
+    pattern = r'^```[a-zA-Z0-9_+-]*\s*\n?(.*?)\n?```\s*$'
+    match = re.match(pattern, block, re.DOTALL)
+    if match:
+        # 如果匹配成功，提取代码块内容
+        block = match.group(1).strip()
+    else:
+        # 如果正则不匹配，尝试手动去除（向后兼容）
+        # 去除开头的代码块标记（如 ```json5、```json、``` 等）
+        if block.startswith("```"):
+            # 找到第一个换行符或字符串结尾
+            first_newline = block.find("\n")
+            if first_newline >= 0:
+                block = block[first_newline + 1:]
+            else:
+                # 没有换行符，说明整个块可能就是 ```language
+                block = ""
+        
+        # 去除结尾的代码块标记（包括前面的换行）
+        # 使用 rstrip 去除末尾空白后再检查，确保能匹配到 ``` 即使前面有空白
+        block_rstripped = block.rstrip()
+        if block_rstripped.endswith("```"):
+            # 找到最后一个 ``` 的位置（在原始 block 上查找，但考虑空白）
+            last_backticks = block.rfind("```")
+            if last_backticks >= 0:
+                block = block[:last_backticks].rstrip()
     
     return block.strip()
 
