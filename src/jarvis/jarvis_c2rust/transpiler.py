@@ -931,28 +931,30 @@ class Transpiler:
         use_direct_model = False  # 标记是否使用直接模型调用
         agent = None  # 在循环外声明，以便重试时复用
         
-        while plan_max_retries_val == 0 or attempt < plan_max_retries_val:
-            attempt += 1
-            sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
-
-            # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
-            if agent is None or not use_direct_model:
-                agent = Agent(
-                    system_prompt=sys_p,
-                    name="C2Rust-Function-Planner",
-                    model_group=self.llm_group,
-                    summary_prompt=sum_p,
-                    need_summary=True,
-                    auto_complete=True,
-                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                    non_interactive=self.non_interactive,
-                    use_methodology=False,
-                    use_analysis=False,
-                )
+        # 切换到 crate 根目录，确保 Agent 创建时在正确的目录
+        prev_cwd = os.getcwd()
+        try:
+            os.chdir(str(self.crate_dir))
             
-            prev_cwd = os.getcwd()
-            try:
-                os.chdir(str(self.crate_dir))
+            while plan_max_retries_val == 0 or attempt < plan_max_retries_val:
+                attempt += 1
+                sum_p = base_sum_p if attempt == 1 else _retry_sum_prompt(last_reason)
+
+                # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
+                # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+                if agent is None or not use_direct_model:
+                    agent = Agent(
+                        system_prompt=sys_p,
+                        name="C2Rust-Function-Planner",
+                        model_group=self.llm_group,
+                        summary_prompt=sum_p,
+                        need_summary=True,
+                        auto_complete=True,
+                        use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                        non_interactive=self.non_interactive,
+                        use_methodology=False,
+                        use_analysis=False,
+                    )
                 
                 if use_direct_model:
                     # 格式校验失败后，直接调用模型接口
@@ -974,36 +976,37 @@ class Transpiler:
                 else:
                     # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
                     summary = agent.run(usr_p)
-            finally:
-                os.chdir(prev_cwd)
-            
-            meta, parse_error = _extract_json_from_summary(str(summary or ""))
-            if parse_error:
-                # JSON解析失败，将错误信息反馈给模型
-                typer.secho(f"[c2rust-transpiler][plan] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
-                last_reason = f"JSON解析失败: {parse_error}"
-                use_direct_model = True
-                # 解析失败，继续重试
-                continue
-            else:
-                ok, reason = _validate(meta)
-            if ok:
-                module = str(meta.get("module") or "").strip()
-                rust_sig = str(meta.get("rust_signature") or "").strip()
-                skip_impl = bool(meta.get("skip_implementation") is True)
-                if skip_impl:
-                    notes = str(meta.get("notes") or "")
-                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}, 跳过实现={skip_impl}", fg=typer.colors.GREEN)
-                    if notes:
-                        typer.secho(f"[c2rust-transpiler][plan] 跳过实现原因: {notes}", fg=typer.colors.CYAN)
+                
+                meta, parse_error = _extract_json_from_summary(str(summary or ""))
+                if parse_error:
+                    # JSON解析失败，将错误信息反馈给模型
+                    typer.secho(f"[c2rust-transpiler][plan] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
+                    last_reason = f"JSON解析失败: {parse_error}"
+                    use_direct_model = True
+                    # 解析失败，继续重试
+                    continue
                 else:
-                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
-                return module, rust_sig, skip_impl
-            else:
-                typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
-                last_reason = reason
-                # 格式校验失败，后续重试使用直接模型调用
-                use_direct_model = True
+                    ok, reason = _validate(meta)
+                if ok:
+                    module = str(meta.get("module") or "").strip()
+                    rust_sig = str(meta.get("rust_signature") or "").strip()
+                    skip_impl = bool(meta.get("skip_implementation") is True)
+                    if skip_impl:
+                        notes = str(meta.get("notes") or "")
+                        typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}, 跳过实现={skip_impl}", fg=typer.colors.GREEN)
+                        if notes:
+                            typer.secho(f"[c2rust-transpiler][plan] 跳过实现原因: {notes}", fg=typer.colors.CYAN)
+                    else:
+                        typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}", fg=typer.colors.GREEN)
+                    return module, rust_sig, skip_impl
+                else:
+                    typer.secho(f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}", fg=typer.colors.YELLOW)
+                    last_reason = reason
+                    # 格式校验失败，后续重试使用直接模型调用
+                    use_direct_model = True
+        finally:
+            os.chdir(prev_cwd)
+        
         # 规划超出重试上限：回退到兜底方案（默认模块 src/ffi.rs + 简单占位签名）
         # 注意：如果 plan_max_retries_val == 0（无限重试），理论上不应该到达这里
         try:
@@ -1114,37 +1117,12 @@ class Transpiler:
         self._current_context_full_sent = False
 
         # 初始化代码生成Agent（CodeAgent），单个函数生命周期内复用
-        # 代码生成阶段：禁用方法论和分析，仅启用强制记忆功能
-        self._current_agents[f"code_agent_gen::{rec.id}"] = CodeAgent(
-            need_summary=False,
-            non_interactive=self.non_interactive,
-            model_group=self.llm_group,
-            use_methodology=False,
-            use_analysis=False,
-            force_save_memory=True,
-        )
-        # 初始化修复Agent（CodeAgent），单个函数生命周期内复用
-        # 修复阶段：启用方法论、分析和强制记忆功能
-        self._current_agents[f"code_agent_repair::{rec.id}"] = CodeAgent(
-            need_summary=False,
-            non_interactive=self.non_interactive,
-            model_group=self.llm_group,
-            use_methodology=True,
-            use_analysis=True,
-            force_save_memory=True,
-        )
-
-    def _get_generate_agent(self) -> CodeAgent:
-        """
-        获取代码生成Agent（CodeAgent）。若未初始化，则按当前函数id创建。
-        代码生成阶段：禁用方法论和分析，仅启用强制记忆功能。
-        """
-        fid = self._current_function_id
-        key = f"code_agent_gen::{fid}" if fid is not None else "code_agent_gen::default"
-        agent = self._current_agents.get(key)
-        if agent is None:
-            # 代码生成Agent禁用方法论和分析，仅启用强制记忆功能
-            agent = CodeAgent(
+        # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+        prev_cwd = os.getcwd()
+        try:
+            os.chdir(str(self.crate_dir))
+            # 代码生成阶段：禁用方法论和分析，仅启用强制记忆功能
+            self._current_agents[f"code_agent_gen::{rec.id}"] = CodeAgent(
                 need_summary=False,
                 non_interactive=self.non_interactive,
                 model_group=self.llm_group,
@@ -1152,20 +1130,9 @@ class Transpiler:
                 use_analysis=False,
                 force_save_memory=True,
             )
-            self._current_agents[key] = agent
-        return agent
-
-    def _get_repair_agent(self) -> CodeAgent:
-        """
-        获取修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
-        修复阶段：启用方法论、分析和强制记忆功能。
-        """
-        fid = self._current_function_id
-        key = f"code_agent_repair::{fid}" if fid is not None else "code_agent_repair::default"
-        agent = self._current_agents.get(key)
-        if agent is None:
-            # 修复Agent启用方法论、分析和强制记忆功能
-            agent = CodeAgent(
+            # 初始化修复Agent（CodeAgent），单个函数生命周期内复用
+            # 修复阶段：启用方法论、分析和强制记忆功能
+            self._current_agents[f"code_agent_repair::{rec.id}"] = CodeAgent(
                 need_summary=False,
                 non_interactive=self.non_interactive,
                 model_group=self.llm_group,
@@ -1173,7 +1140,63 @@ class Transpiler:
                 use_analysis=True,
                 force_save_memory=True,
             )
-            self._current_agents[key] = agent
+        finally:
+            os.chdir(prev_cwd)
+
+    def _get_generate_agent(self) -> CodeAgent:
+        """
+        获取代码生成Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        代码生成阶段：禁用方法论和分析，仅启用强制记忆功能。
+        注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表。
+        """
+        fid = self._current_function_id
+        key = f"code_agent_gen::{fid}" if fid is not None else "code_agent_gen::default"
+        agent = self._current_agents.get(key)
+        if agent is None:
+            # 确保在 crate 根目录下创建 Agent
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                # 代码生成Agent禁用方法论和分析，仅启用强制记忆功能
+                agent = CodeAgent(
+                    need_summary=False,
+                    non_interactive=self.non_interactive,
+                    model_group=self.llm_group,
+                    use_methodology=False,
+                    use_analysis=False,
+                    force_save_memory=True,
+                )
+                self._current_agents[key] = agent
+            finally:
+                os.chdir(prev_cwd)
+        return agent
+
+    def _get_repair_agent(self) -> CodeAgent:
+        """
+        获取修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        修复阶段：启用方法论、分析和强制记忆功能。
+        注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表。
+        """
+        fid = self._current_function_id
+        key = f"code_agent_repair::{fid}" if fid is not None else "code_agent_repair::default"
+        agent = self._current_agents.get(key)
+        if agent is None:
+            # 确保在 crate 根目录下创建 Agent
+            prev_cwd = os.getcwd()
+            try:
+                os.chdir(str(self.crate_dir))
+                # 修复Agent启用方法论、分析和强制记忆功能
+                agent = CodeAgent(
+                    need_summary=False,
+                    non_interactive=self.non_interactive,
+                    model_group=self.llm_group,
+                    use_methodology=True,
+                    use_analysis=True,
+                    force_save_memory=True,
+                )
+                self._current_agents[key] = agent
+            finally:
+                os.chdir(prev_cwd)
         return agent
 
     def _refresh_compact_context(self, rec: FnRecord, module: str, rust_sig: str) -> None:
@@ -2317,21 +2340,29 @@ class Transpiler:
         i = 0
         max_iterations = self.review_max_iterations
         # 复用 Review Agent（仅在本函数生命周期内构建一次）
+        # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
         review_key = f"review::{rec.id}"
         sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
-        if self._current_agents.get(review_key) is None:
-            self._current_agents[review_key] = Agent(
-                system_prompt=sys_p_init,
-                name="C2Rust-Review-Agent",
-                model_group=self.llm_group,
-                summary_prompt=sum_p_init,
-                need_summary=True,
-                auto_complete=True,
-                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
-                non_interactive=self.non_interactive,
-                use_methodology=False,
-                use_analysis=False,
-            )
+        
+        # 切换到 crate 根目录，确保 Agent 创建时在正确的目录
+        prev_cwd_init = os.getcwd()
+        try:
+            os.chdir(str(self.crate_dir))
+            if self._current_agents.get(review_key) is None:
+                self._current_agents[review_key] = Agent(
+                    system_prompt=sys_p_init,
+                    name="C2Rust-Review-Agent",
+                    model_group=self.llm_group,
+                    summary_prompt=sum_p_init,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                    non_interactive=self.non_interactive,
+                    use_methodology=False,
+                    use_analysis=False,
+                )
+        finally:
+            os.chdir(prev_cwd_init)
 
         # 0表示无限重试，否则限制迭代次数
         use_direct_model_review = False  # 标记是否使用直接模型调用
