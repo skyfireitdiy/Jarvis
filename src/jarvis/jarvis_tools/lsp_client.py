@@ -526,13 +526,72 @@ class LSPClient:
         """关闭LSP连接。"""
         if self.process:
             try:
-                self._send_notification("shutdown", {})
-                self.process.terminate()
-                self.process.wait(timeout=5)
+                # 尝试优雅关闭
+                try:
+                    self._send_notification("shutdown", {})
+                except Exception:
+                    pass  # 如果发送失败，直接终止进程
+                
+                # 关闭标准输入，通知服务器可以退出
+                if self.process.stdin:
+                    try:
+                        self.process.stdin.close()
+                    except Exception:
+                        pass
+                
+                # 等待进程退出
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # 超时后强制终止
+                    self.process.terminate()
+                    try:
+                        self.process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        self.process.kill()
             except Exception as e:
                 PrettyOutput.print(f"Error closing LSP client: {e}", OutputType.WARNING)
                 if self.process:
-                    self.process.kill()
+                    try:
+                        self.process.kill()
+                    except Exception:
+                        pass
+            finally:
+                # 确保进程对象被清理
+                if self.process:
+                    try:
+                        # 确保所有文件描述符都被关闭
+                        if self.process.stdin:
+                            try:
+                                self.process.stdin.close()
+                            except Exception:
+                                pass
+                        if self.process.stdout:
+                            try:
+                                self.process.stdout.close()
+                            except Exception:
+                                pass
+                        if self.process.stderr:
+                            try:
+                                self.process.stderr.close()
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                self.process = None
+    
+    def __del__(self):
+        """析构函数，确保资源被释放。"""
+        self.close()
+    
+    def __enter__(self):
+        """上下文管理器入口。"""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """上下文管理器出口，自动关闭连接。"""
+        self.close()
+        return False
 
 
 class TreeSitterFallback:
@@ -815,6 +874,8 @@ class LSPClientTool:
     _clients: Dict[Tuple[str, str], LSPClient] = {}
     # Tree-sitter 后备客户端缓存
     _treesitter_clients: Dict[Tuple[str, str], TreeSitterFallback] = {}
+    # 最大缓存大小，防止内存和文件句柄泄露
+    _max_cache_size = 10
     
     @staticmethod
     def check() -> bool:
@@ -830,6 +891,20 @@ class LSPClientTool:
             return True
         except ImportError:
             return False
+    
+    @staticmethod
+    def cleanup_all_clients():
+        """清理所有缓存的LSP客户端，释放资源。"""
+        # 关闭所有LSP客户端
+        for client in list(LSPClientTool._clients.values()):
+            try:
+                client.close()
+            except Exception:
+                pass
+        LSPClientTool._clients.clear()
+        
+        # Tree-sitter 客户端不需要特殊清理（没有进程）
+        LSPClientTool._treesitter_clients.clear()
     
     def _get_or_create_client(self, project_root: str, file_path: str) -> Optional[Any]:
         """获取或创建LSP客户端，如果LSP不可用则使用Tree-sitter后备。
@@ -856,7 +931,27 @@ class LSPClientTool:
         # 检查LSP客户端缓存
         cache_key = (project_root, language)
         if cache_key in LSPClientTool._clients:
-            return LSPClientTool._clients[cache_key]
+            client = LSPClientTool._clients[cache_key]
+            # 检查客户端是否仍然有效（进程是否还在运行）
+            if client.process and client.process.poll() is None:
+                return client
+            else:
+                # 进程已退出，从缓存中移除并关闭
+                try:
+                    client.close()
+                except Exception:
+                    pass
+                del LSPClientTool._clients[cache_key]
+        
+        # 如果缓存过大，清理最旧的客户端
+        if len(LSPClientTool._clients) >= LSPClientTool._max_cache_size:
+            # 关闭并移除最旧的客户端（FIFO）
+            oldest_key = next(iter(LSPClientTool._clients))
+            oldest_client = LSPClientTool._clients.pop(oldest_key)
+            try:
+                oldest_client.close()
+            except Exception:
+                pass
         
         # 尝试创建LSP客户端
         try:

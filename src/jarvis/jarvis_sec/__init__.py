@@ -279,6 +279,13 @@ def run_security_analysis(
             error_type=type(e).__name__
         )
         raise
+    finally:
+        # 清理LSP客户端资源，防止文件句柄泄露
+        try:
+            from jarvis.jarvis_tools.lsp_client import LSPClientTool
+            LSPClientTool.cleanup_all_clients()
+        except Exception:
+            pass  # 清理失败不影响主流程
 
 
 
