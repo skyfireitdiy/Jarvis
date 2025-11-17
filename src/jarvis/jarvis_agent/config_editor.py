@@ -9,8 +9,6 @@ from typing import Optional
 
 import typer
 
-from jarvis.jarvis_agent import OutputType, PrettyOutput
-
 
 class ConfigEditor:
     """配置文件编辑器"""
@@ -47,11 +45,8 @@ class ConfigEditor:
                 )
                 raise typer.Exit(code=0)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                PrettyOutput.print(f"Failed to open editor: {e}", OutputType.ERROR)
+                print(f"❌ Failed to open editor: {e}")
                 raise typer.Exit(code=1)
         else:
-            PrettyOutput.print(
-                "No suitable editor found. Please install one of: vim, nano, emacs, code",
-                OutputType.ERROR,
-            )
+            print("❌ No suitable editor found. Please install one of: vim, nano, emacs, code")
             raise typer.Exit(code=1)

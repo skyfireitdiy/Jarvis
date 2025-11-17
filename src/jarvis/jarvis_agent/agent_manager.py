@@ -6,8 +6,6 @@ import typer
 
 from jarvis.jarvis_agent import (
     Agent,
-    OutputType,
-    PrettyOutput,
     get_multiline_input,
     origin_agent_system_prompt,
 )
@@ -62,9 +60,9 @@ class AgentManager:
         # 尝试恢复会话
         if self.restore_session:
             if self.agent.restore_session():
-                PrettyOutput.print("会话已成功恢复。", OutputType.SUCCESS)
+                print("✅ 会话已成功恢复。")
             else:
-                PrettyOutput.print("无法恢复会话。", OutputType.WARNING)
+                print("⚠️ 无法恢复会话。")
 
         return self.agent
 
@@ -83,7 +81,7 @@ class AgentManager:
             task_manager = TaskManager()
             tasks = task_manager.load_tasks()
             if tasks and (selected_task := task_manager.select_task(tasks)):
-                PrettyOutput.print(f"开始执行任务: \n{selected_task}", OutputType.INFO)
+                print(f"ℹ️ 开始执行任务: \n{selected_task}")
                 self.agent.run(selected_task)
                 raise typer.Exit(code=0)
 
