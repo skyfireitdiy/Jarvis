@@ -7,7 +7,6 @@ from typing import Any, Dict, Generator, List, Tuple
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.utils import while_success
 
@@ -282,7 +281,7 @@ class TongyiPlatform(BasePlatform):
                     if not os.path.exists(file_path):
                         # 先输出已收集的日志与错误后返回
                         log_lines.append(f"文件不存在: {file_path}")
-                        PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                        print(f"❌ {'\n'.join(log_lines)}")
                         return False
 
                     # Get file name and content type
@@ -312,7 +311,7 @@ class TongyiPlatform(BasePlatform):
 
                     if response.status_code != 200:
                         log_lines.append(f"上传失败 {file_name}: HTTP {response.status_code}")
-                        PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                        print(f"❌ {'\n'.join(log_lines)}")
                         return False
 
                     # Determine file type based on extension
@@ -345,13 +344,13 @@ class TongyiPlatform(BasePlatform):
                     response = http.post(url, headers=headers, json=payload)
                     if response.status_code != 200:
                         log_lines.append(f"获取下载链接失败: HTTP {response.status_code}")
-                        PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                        print(f"❌ {'\n'.join(log_lines)}")
                         return False
 
                     result = response.json()
                     if not result.get("success"):
                         log_lines.append(f"获取下载链接失败: {result.get('errorMsg')}")
-                        PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                        print(f"❌ {'\n'.join(log_lines)}")
                         return False
 
                     # Add files to chat
@@ -391,17 +390,17 @@ class TongyiPlatform(BasePlatform):
                         file_info.update(add_result.get("data", {}))
 
                     log_lines.append(f"文件 {file_name} 上传成功")
-                    PrettyOutput.print("\n".join(log_lines), OutputType.INFO)
+                    print(f"ℹ️ {'\n'.join(log_lines)}")
                     time.sleep(1)  # 短暂暂停以便用户看到成功状态
 
                 except Exception as e:
                     log_lines.append(f"上传文件 {file_name} 时出错: {str(e)}")
-                    PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                    print(f"❌ {'\n'.join(log_lines)}")
                     return False
             return True
 
         except Exception as e:
-            PrettyOutput.print(f"Error uploading files: {str(e)}", OutputType.ERROR)
+            print(f"❌ Error uploading files: {str(e)}")
             return False
 
     def _get_content_type(self, file_path: str) -> str:
@@ -469,10 +468,7 @@ class TongyiPlatform(BasePlatform):
                 lambda: http.post(url, headers=headers, json=payload), sleep_time=5
             )
             if response.status_code != 200:
-                PrettyOutput.print(
-                    f"Failed to delete chat: HTTP {response.status_code}",
-                    OutputType.ERROR,
-                )
+                print(f"❌ Failed to delete chat: HTTP {response.status_code}")
                 return False
             self.request_id = ""
             self.session_id = ""
@@ -480,13 +476,13 @@ class TongyiPlatform(BasePlatform):
             self.first_chat = True  # Reset first_chat flag
             return True
         except Exception as e:
-            PrettyOutput.print(f"Error deleting chat: {str(e)}", OutputType.ERROR)
+            print(f"❌ Error deleting chat: {str(e)}")
             return False
 
     def save(self, file_path: str) -> bool:
         """Save chat session to a file."""
         if not self.session_id:
-            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            print("⚠️ 没有活动的会话可供保存")
             return False
 
         state = {
@@ -503,10 +499,10 @@ class TongyiPlatform(BasePlatform):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=4)
             self._saved = True
-            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            print(f"✅ 会话已成功保存到 {file_path}")
             return True
         except Exception as e:
-            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 保存会话失败: {str(e)}")
             return False
 
     def restore(self, file_path: str) -> bool:
@@ -524,13 +520,13 @@ class TongyiPlatform(BasePlatform):
             self.first_chat = state.get("first_chat", True)
             self._saved = True
 
-            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            print(f"✅ 从 {file_path} 成功恢复会话")
             return True
         except FileNotFoundError:
-            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            print(f"❌ 会话文件未找到: {file_path}")
             return False
         except Exception as e:
-            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 恢复会话失败: {str(e)}")
             return False
 
     def set_system_prompt(self, message: str):

@@ -25,7 +25,7 @@ from jarvis.jarvis_utils.config import (
 from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
 import jarvis.jarvis_utils.globals as G
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
 
@@ -86,7 +86,7 @@ class BasePlatform(ABC):
 
         # 当输入为空白字符串时，打印警告并直接返回空字符串
         if message.strip() == "":
-            PrettyOutput.print("输入为空白字符串，已忽略本次请求", OutputType.WARNING)
+            print("⚠️ 输入为空白字符串，已忽略本次请求")
             return ""
 
         input_token_count = get_context_token_count(message)
@@ -97,9 +97,7 @@ class BasePlatform(ABC):
             )  # 留出一些余量
             min_chunk_size = get_max_input_token_count(self.model_group) - 2048
             inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-            PrettyOutput.print(
-                f"长上下文，分批提交，共{len(inputs)}部分...", OutputType.INFO
-            )
+            print(f"ℹ️ 长上下文，分批提交，共{len(inputs)}部分...")
             prefix_prompt = """
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
@@ -120,10 +118,10 @@ class BasePlatform(ABC):
                         5,
                     ),
                     5,
-                ):
-                    response += trunk
+                    ):
+                        response += trunk
 
-            PrettyOutput.print("提交完成", OutputType.SUCCESS)
+            print("✅ 提交完成")
             response += "\n" + while_true(
                 lambda: while_success(
                     lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
@@ -284,7 +282,7 @@ class BasePlatform(ABC):
         try:
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
-                PrettyOutput.print(f"{message}", OutputType.USER)
+                PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
             result: str = while_true(
                 lambda: while_success(lambda: self._chat(message), 5), 5
             )

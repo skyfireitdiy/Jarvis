@@ -6,7 +6,6 @@ from typing import Dict, Generator, List, Tuple
 from openai import OpenAI
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class OpenAIModel(BasePlatform):
@@ -19,7 +18,7 @@ class OpenAIModel(BasePlatform):
         self.system_message = ""
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            PrettyOutput.print("OPENAI_API_KEY 未设置", OutputType.WARNING)
+            print("⚠️ OPENAI_API_KEY 未设置")
 
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
         self.model_name = os.getenv("JARVIS_MODEL") or "gpt-4o"
@@ -35,9 +34,9 @@ class OpenAIModel(BasePlatform):
                     # Ensure all header keys/values are strings
                     self.extra_headers = {str(k): str(v) for k, v in parsed.items()}
                 else:
-                    PrettyOutput.print("OPENAI_EXTRA_HEADERS 应为 JSON 对象，如 {'X-Source':'jarvis'}", OutputType.WARNING)
+                    print("⚠️ OPENAI_EXTRA_HEADERS 应为 JSON 对象，如 {'X-Source':'jarvis'}")
             except Exception as e:
-                PrettyOutput.print(f"解析 OPENAI_EXTRA_HEADERS 失败: {e}", OutputType.WARNING)
+                print(f"⚠️ 解析 OPENAI_EXTRA_HEADERS 失败: {e}")
 
         # Initialize OpenAI client, try to pass default headers if SDK supports it
         try:
@@ -49,7 +48,7 @@ class OpenAIModel(BasePlatform):
             # Fallback: SDK version may not support default_headers
             self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
             if self.extra_headers:
-                PrettyOutput.print("当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头", OutputType.WARNING)
+                print("⚠️ 当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头")
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
 
@@ -82,7 +81,7 @@ class OpenAIModel(BasePlatform):
                 model_list.append((model.id, model.id))
             return model_list
         except Exception as e:
-            PrettyOutput.print(f"获取模型列表失败：{str(e)}", OutputType.ERROR)
+            print(f"❌ 获取模型列表失败：{str(e)}")
             return []
 
     def set_model_name(self, model_name: str):
@@ -144,7 +143,7 @@ class OpenAIModel(BasePlatform):
             return None
 
         except Exception as e:
-            PrettyOutput.print(f"对话失败：{str(e)}", OutputType.ERROR)
+            print(f"❌ 对话失败：{str(e)}")
             raise Exception(f"Chat failed: {str(e)}")
 
     def name(self) -> str:
@@ -193,10 +192,10 @@ class OpenAIModel(BasePlatform):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=4)
             self._saved = True
-            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            print(f"✅ 会话已成功保存到 {file_path}")
             return True
         except Exception as e:
-            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 保存会话失败: {str(e)}")
             return False
 
     def restore(self, file_path: str) -> bool:
@@ -210,13 +209,13 @@ class OpenAIModel(BasePlatform):
             # atexit.register(self.delete_chat)
             self._saved = True
 
-            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            print(f"✅ 从 {file_path} 成功恢复会话")
             return True
         except FileNotFoundError:
-            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            print(f"❌ 会话文件未找到: {file_path}")
             return False
         except Exception as e:
-            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 恢复会话失败: {str(e)}")
             return False
 
     def support_web(self) -> bool:

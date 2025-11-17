@@ -12,7 +12,6 @@ from typing import Generator, List, Tuple
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class HumanPlatform(BasePlatform):
@@ -39,7 +38,7 @@ class HumanPlatform(BasePlatform):
         if model_name == "human":
             self.model_name = model_name
         else:
-            PrettyOutput.print(f"错误：不支持的模型: {model_name}", OutputType.ERROR)
+            print(f"❌ 错误：不支持的模型: {model_name}")
 
     def chat(self, message: str) -> Generator[str, None, None]:
         """发送消息并获取人类响应"""
@@ -66,7 +65,7 @@ class HumanPlatform(BasePlatform):
 
     def upload_files(self, file_list: List[str]) -> bool:
         """文件上传功能，人类平台不需要实际处理"""
-        PrettyOutput.print("人类交互平台不支持文件上传", OutputType.WARNING)
+        print("⚠️ 人类交互平台不支持文件上传")
         return False
 
     def delete_chat(self) -> bool:
@@ -88,10 +87,10 @@ class HumanPlatform(BasePlatform):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=4)
             self._saved = True
-            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            print(f"✅ 会话已成功保存到 {file_path}")
             return True
         except Exception as e:
-            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 保存会话失败: {str(e)}")
             return False
 
     def restore(self, file_path: str) -> bool:
@@ -106,13 +105,13 @@ class HumanPlatform(BasePlatform):
             self.first_message = state.get("first_message", True)
             self._saved = True
 
-            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            print(f"✅ 从 {file_path} 成功恢复会话")
             return True
         except FileNotFoundError:
-            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            print(f"❌ 会话文件未找到: {file_path}")
             return False
         except Exception as e:
-            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 恢复会话失败: {str(e)}")
             return False
 
     def name(self) -> str:
