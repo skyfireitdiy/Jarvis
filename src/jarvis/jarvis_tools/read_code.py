@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 尝试导入语言支持模块
 try:
@@ -919,7 +918,7 @@ class ReadCodeTool:
             return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
-            PrettyOutput.print(str(e), OutputType.ERROR)
+            print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": f"文件读取失败: {str(e)}"}
 
     def _get_file_context(
@@ -958,7 +957,7 @@ class ReadCodeTool:
                 line_info = f"第{start_line}行"
             else:
                 line_info = f"第{start_line}-{end_line}行"
-            PrettyOutput.print(f"🧠 正在分析代码上下文 ({file_name}, {line_info})...", OutputType.INFO)
+            print(f"🧠 正在分析代码上下文 ({file_name}, {line_info})...")
 
             # 确保文件已更新到上下文管理器
             # 如果文件内容已缓存，直接使用；否则读取并更新
@@ -1011,7 +1010,7 @@ class ReadCodeTool:
 
             # 打印上下文感知结果到控制台
             context_output = "\n".join(context_lines)
-            PrettyOutput.print(f"🧠 上下文感知结果:\n{context_output}", OutputType.INFO)
+            print(f"🧠 上下文感知结果:\n{context_output}")
             
             return context_output
 
@@ -1170,7 +1169,7 @@ class ReadCodeTool:
             }
 
         except Exception as e:
-            PrettyOutput.print(str(e), OutputType.ERROR)
+            print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": f"代码读取失败: {str(e)}"}
 
 

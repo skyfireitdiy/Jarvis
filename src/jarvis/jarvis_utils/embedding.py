@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from typing import List
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 设置tiktoken缓存目录
 script_dir = Path(__file__).parent
@@ -30,7 +29,7 @@ def get_context_token_count(text: str) -> int:
         encoding = tiktoken.get_encoding("cl100k_base")
         return len(encoding.encode(text))
     except Exception as e:
-        PrettyOutput.print(f"计算token失败: {str(e)}", OutputType.WARNING)
+        print(f"⚠️ 计算token失败: {str(e)}")
         return len(text) // 4  # 每个token大约4个字符的粗略估计
 
 
@@ -80,6 +79,6 @@ def split_text_into_chunks(
         return chunks
 
     except Exception as e:
-        PrettyOutput.print(f"文本分割失败: {str(e)}", OutputType.WARNING)
+        print(f"⚠️ 文本分割失败: {str(e)}")
         # 发生错误时回退到简单的字符分割
         return [text[i : i + max_length] for i in range(0, len(text), max_length)]

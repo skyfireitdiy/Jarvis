@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
 
 
 class ScriptTool:
@@ -236,10 +235,3 @@ class ScriptTool:
             return {"success": False, "stdout": "", "stderr": str(e)}
 
 
-if __name__ == "__main__":
-    script_tool = ScriptTool()
-    PrettyOutput.print(
-        script_tool.get_display_output("/path/to/a.txt"),
-        OutputType.CODE,
-        lang="text",
-    )  # 保留用于语法高亮

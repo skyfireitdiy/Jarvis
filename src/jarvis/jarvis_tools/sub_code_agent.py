@@ -14,7 +14,6 @@ from typing import Any, Dict, List
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.globals import delete_agent
 from jarvis.jarvis_utils.config import set_config, get_git_check_mode
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class SubCodeAgentTool:
@@ -181,10 +180,7 @@ class SubCodeAgentTool:
                                         available_names = [m for m, _ in available_models]
                                         current_model_name = model_obj.name()
                                         if current_model_name not in available_names:
-                                            PrettyOutput.print(
-                                                f"检测到子CodeAgent模型 {current_model_name} 不存在于平台 {model_obj.platform_name()} 的可用模型列表，将回退到 {available_names[0]}",
-                                                OutputType.WARNING,
-                                            )
+                                            print(f"⚠️ 检测到子CodeAgent模型 {current_model_name} 不存在于平台 {model_obj.platform_name()} 的可用模型列表，将回退到 {available_names[0]}")
                                             model_obj.set_model_name(available_names[0])
                                 except Exception:
                                     # 获取模型列表或设置模型失败时，保持原设置并继续，交由底层报错处理

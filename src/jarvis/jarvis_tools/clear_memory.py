@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.globals import (
     clear_short_term_memories,
     short_term_memories,
@@ -146,9 +145,7 @@ class ClearMemoryTool:
                     removed_count += 1
 
             except Exception as e:
-                PrettyOutput.print(
-                    f"处理记忆文件 {memory_file} 时出错: {str(e)}", OutputType.WARNING
-                )
+                print(f"⚠️ 处理记忆文件 {memory_file} 时出错: {str(e)}")
 
         # 如果目录为空，可以删除目录
         if not any(memory_dir.iterdir()) and memory_dir != self.project_memory_dir:
@@ -221,5 +218,5 @@ class ClearMemoryTool:
 
         except Exception as e:
             error_msg = f"清除记忆失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}

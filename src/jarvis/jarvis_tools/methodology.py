@@ -5,7 +5,6 @@ import os
 from typing import Any, Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class MethodologyTool:
@@ -45,7 +44,7 @@ class MethodologyTool:
             try:
                 os.makedirs(self.methodology_dir, exist_ok=True)
             except Exception as e:
-                PrettyOutput.print(f"创建方法论目录失败：{str(e)}", OutputType.ERROR)
+                print(f"❌ 创建方法论目录失败：{str(e)}")
 
     def _get_methodology_file_path(self, problem_type: str) -> str:
         """
@@ -127,7 +126,7 @@ class MethodologyTool:
                         indent=2,
                     )
 
-                PrettyOutput.print(f"方法论已保存到 {file_path}", OutputType.INFO)
+                print(f"ℹ️ 方法论已保存到 {file_path}")
 
                 action = "更新" if os.path.exists(file_path) else "添加"
                 return {
