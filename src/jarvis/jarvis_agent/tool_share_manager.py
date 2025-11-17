@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Set
 
 import typer
 
-from jarvis.jarvis_agent import OutputType, PrettyOutput, user_confirm
+from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_agent.share_manager import ShareManager
 from jarvis.jarvis_utils.config import get_central_tool_repo, get_data_dir
 
@@ -18,13 +18,8 @@ class ToolShareManager(ShareManager):
     def __init__(self):
         central_repo = get_central_tool_repo()
         if not central_repo:
-            PrettyOutput.print(
-                "错误：未配置中心工具仓库（JARVIS_CENTRAL_TOOL_REPO）",
-                OutputType.ERROR,
-            )
-            PrettyOutput.print(
-                "请在配置文件中设置中心工具仓库的Git地址", OutputType.INFO
-            )
+            print("❌ 错误：未配置中心工具仓库（JARVIS_CENTRAL_TOOL_REPO）")
+            print("ℹ️ 请在配置文件中设置中心工具仓库的Git地址")
             raise typer.Exit(code=1)
 
         super().__init__(central_repo, "central_tool_repo")
@@ -52,10 +47,7 @@ class ToolShareManager(ShareManager):
         # 只从数据目录的tools目录获取工具
         local_tools_dir = os.path.join(get_data_dir(), "tools")
         if not os.path.exists(local_tools_dir):
-            PrettyOutput.print(
-                f"本地工具目录不存在: {local_tools_dir}",
-                OutputType.WARNING,
-            )
+            print(f"⚠️ 本地工具目录不存在: {local_tools_dir}")
             return []
 
         # 收集本地工具文件（排除已存在的）
@@ -84,7 +76,7 @@ class ToolShareManager(ShareManager):
         share_list = ["\n将要分享以下工具到中心仓库（注意：文件将被移动而非复制）："]
         for tool in resources:
             share_list.append(f"- {tool['tool_name']} ({tool['filename']})")
-        PrettyOutput.print("\n".join(share_list), OutputType.WARNING)
+        print(f"⚠️ {'\n'.join(share_list)}")
 
         if not user_confirm("确认移动这些工具到中心仓库吗？（原文件将被删除）"):
             return []
@@ -108,10 +100,7 @@ class ToolShareManager(ShareManager):
             # 获取本地资源
             local_resources = self.get_local_resources()
             if not local_resources:
-                PrettyOutput.print(
-                    "没有找到新的工具文件（所有工具可能已存在于中心仓库）",
-                    OutputType.WARNING,
-                )
+                print("⚠️ 没有找到新的工具文件（所有工具可能已存在于中心仓库）")
                 return
 
             # 选择要分享的资源
@@ -123,17 +112,14 @@ class ToolShareManager(ShareManager):
             moved_list = self.share_resources(selected_resources)
             if moved_list:
                 # 一次性显示所有移动结果
-                PrettyOutput.print("\n".join(moved_list), OutputType.SUCCESS)
+                print(f"✅ {'\n'.join(moved_list)}")
 
                 # 提交并推送
                 self.commit_and_push(len(selected_resources))
 
-                PrettyOutput.print("\n工具已成功分享到中心仓库！", OutputType.SUCCESS)
-                PrettyOutput.print(
-                    f"原文件已从 {os.path.join(get_data_dir(), 'tools')} 移动到中心仓库",
-                    OutputType.INFO,
-                )
+                print("✅ 工具已成功分享到中心仓库！")
+                print(f"ℹ️ 原文件已从 {os.path.join(get_data_dir(), 'tools')} 移动到中心仓库")
 
         except Exception as e:
-            PrettyOutput.print(f"分享工具时出错: {str(e)}", OutputType.ERROR)
+            print(f"❌ 分享工具时出错: {str(e)}")
             raise typer.Exit(code=1)

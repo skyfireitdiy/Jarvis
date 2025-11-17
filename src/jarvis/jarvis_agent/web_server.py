@@ -27,7 +27,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
 from jarvis.jarvis_utils.globals import set_interrupt, console
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 # ---------------------------
 # 应用与页面
@@ -707,7 +706,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
             except Exception:
                 pass
 
-    PrettyOutput.print(f"启动 Jarvis Web 服务: http://{host}:{port}", OutputType.SUCCESS)
+    print(f"✅ 启动 Jarvis Web 服务: http://{host}:{port}")
     # 在服务端进程内也写入并维护 PID 文件，增强可检测性与可清理性
     try:
         pidfile = Path(os.path.expanduser("~/.jarvis")) / f"jarvis_web_{port}.pid"
