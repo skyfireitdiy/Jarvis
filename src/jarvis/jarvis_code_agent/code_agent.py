@@ -50,7 +50,7 @@ from jarvis.jarvis_utils.git_utils import (
     revert_change,
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
 from jarvis.jarvis_utils.utils import init_env, _acquire_single_instance_lock
 
 app = typer.Typer(help="Jarvis 代码助手")
@@ -179,7 +179,7 @@ class CodeAgent(Agent):
             )
         except Exception as e:
             # LLM推荐器初始化失败
-            PrettyOutput.print(f"上下文推荐器初始化失败: {e}，将跳过上下文推荐功能", OutputType.WARNING)
+            print(f"⚠️ 上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
 
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
         
@@ -278,25 +278,22 @@ class CodeAgent(Agent):
                 message = "❌ Git 配置不完整\n\n请运行以下命令配置 Git：\n" + "\n".join(
                     missing_configs
                 )
-                PrettyOutput.print(message, OutputType.WARNING)
+                print(f"⚠️ {message}")
                 # 通过配置控制严格校验模式（JARVIS_GIT_CHECK_MODE）：
                 # - warn: 仅告警并继续，后续提交可能失败
                 # - strict: 严格模式（默认），直接退出
                 mode = get_git_check_mode().lower()
                 if mode == "warn":
-                    PrettyOutput.print(
-                        "已启用 Git 校验警告模式（JARVIS_GIT_CHECK_MODE=warn），将继续运行。"
-                        "注意：后续提交可能失败，请尽快配置 git user.name 与 user.email。",
-                        OutputType.INFO,
-                    )
+                    print("ℹ️ 已启用 Git 校验警告模式（JARVIS_GIT_CHECK_MODE=warn），将继续运行。"
+                        "注意：后续提交可能失败，请尽快配置 git user.name 与 user.email。")
                     return
                 sys.exit(1)
 
         except FileNotFoundError:
-            PrettyOutput.print("❌ 未找到 git 命令，请先安装 Git", OutputType.ERROR)
+            print("❌ 未找到 git 命令，请先安装 Git")
             sys.exit(1)
         except Exception as e:
-            PrettyOutput.print(f"❌ 检查 Git 配置时出错: {str(e)}", OutputType.ERROR)
+            print(f"❌ 检查 Git 配置时出错: {str(e)}")
             sys.exit(1)
 
     def _find_git_root(self) -> str:
@@ -445,7 +442,7 @@ class CodeAgent(Agent):
                 content_to_write = "\n".join(new_lines).rstrip()
                 if content_to_write:
                     f.write(content_to_write + "\n")
-            PrettyOutput.print("已创建 .gitignore 并添加常用忽略规则", OutputType.SUCCESS)
+            print("✅ 已创建 .gitignore 并添加常用忽略规则")
         else:
             if new_lines:
                 # 追加缺失的规则
@@ -454,7 +451,7 @@ class CodeAgent(Agent):
                     if existing_content and not existing_content.endswith("\n"):
                         f.write("\n")
                     f.write("\n".join(new_lines).rstrip() + "\n")
-                PrettyOutput.print("已更新 .gitignore，追加常用忽略规则", OutputType.SUCCESS)
+                print("✅ 已更新 .gitignore，追加常用忽略规则")
 
     def _handle_git_changes(self, prefix: str, suffix: str) -> None:
         """处理git仓库中的未提交修改"""
@@ -505,16 +502,13 @@ class CodeAgent(Agent):
 
             return
 
-        PrettyOutput.print(
-            "⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式",
-            OutputType.WARNING,
-        )
+        print("⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式")
         # 避免在循环中逐条打印，先拼接后统一打印
         lines = ["将进行以下设置："]
         for key, value in target_settings.items():
             current = current_settings.get(key, "未设置")
             lines.append(f"{key}: {current} -> {value}")
-        PrettyOutput.print("\n".join(lines), OutputType.INFO)
+        print(f"ℹ️ {'\n'.join(lines)}")
 
         # 直接执行设置，不需要用户确认
         for key, value in target_settings.items():
@@ -524,7 +518,7 @@ class CodeAgent(Agent):
         if sys.platform.startswith("win"):
             self._handle_windows_line_endings()
 
-        PrettyOutput.print("git换行符敏感设置已更新", OutputType.SUCCESS)
+        print("✅ git换行符敏感设置已更新")
 
     def _handle_windows_line_endings(self) -> None:
         """在Windows系统上处理换行符问题，提供建议而非强制修改"""
@@ -538,13 +532,8 @@ class CodeAgent(Agent):
             if any(keyword in content for keyword in ["text=", "eol=", "binary"]):
                 return
 
-        PrettyOutput.print(
-            "提示：在Windows系统上，建议配置 .gitattributes 文件来避免换行符问题。",
-            OutputType.INFO,
-        )
-        PrettyOutput.print(
-            "这可以防止仅因换行符不同而导致整个文件被标记为修改。", OutputType.INFO
-        )
+        print("ℹ️ 提示：在Windows系统上，建议配置 .gitattributes 文件来避免换行符问题。")
+        print("ℹ️ 这可以防止仅因换行符不同而导致整个文件被标记为修改。")
 
         if user_confirm("是否要创建一个最小化的.gitattributes文件？", False):
             # 最小化的内容，只影响特定类型的文件
@@ -563,25 +552,18 @@ class CodeAgent(Agent):
             if not os.path.exists(gitattributes_path):
                 with open(gitattributes_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(minimal_content)
-                PrettyOutput.print(
-                    "已创建最小化的 .gitattributes 文件", OutputType.SUCCESS
-                )
+                print("✅ 已创建最小化的 .gitattributes 文件")
             else:
-                PrettyOutput.print(
-                    "将以下内容追加到现有 .gitattributes 文件：", OutputType.INFO
-                )
-                PrettyOutput.print(minimal_content, OutputType.CODE, lang="text")
+                print("ℹ️ 将以下内容追加到现有 .gitattributes 文件：")
+                PrettyOutput.print(minimal_content, OutputType.CODE, lang="text")  # 保留语法高亮
                 if user_confirm("是否追加到现有文件？", True):
                     with open(
                         gitattributes_path, "a", encoding="utf-8", newline="\n"
                     ) as f:
                         f.write("\n" + minimal_content)
-                    PrettyOutput.print("已更新 .gitattributes 文件", OutputType.SUCCESS)
+                    print("✅ 已更新 .gitattributes 文件")
         else:
-            PrettyOutput.print(
-                "跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。",
-                OutputType.INFO,
-            )
+            print("ℹ️ 跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。")
 
     def _record_code_changes_stats(self, diff_text: str) -> None:
         """记录代码变更的统计信息。
@@ -632,7 +614,7 @@ class CodeAgent(Agent):
             except subprocess.CalledProcessError:
                 pass
 
-            PrettyOutput.print("检测到未提交的修改，是否要提交？", OutputType.WARNING)
+            print("⚠️ 检测到未提交的修改，是否要提交？")
             if not user_confirm("是否要提交？", True):
                 return
 
@@ -670,7 +652,7 @@ class CodeAgent(Agent):
                     check=True,
                 )
             except subprocess.CalledProcessError as e:
-                PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
+                print(f"❌ 提交失败: {str(e)}")
 
     def _show_commit_history(
         self, start_commit: Optional[str], end_commit: Optional[str]
@@ -698,7 +680,7 @@ class CodeAgent(Agent):
             commit_messages = "检测到以下提交记录:\n" + "\n".join(
                 f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits
             )
-            PrettyOutput.print(commit_messages, OutputType.INFO)
+            print(f"ℹ️ {commit_messages}")
         return commits
 
     def _handle_commit_confirmation(
@@ -730,7 +712,7 @@ class CodeAgent(Agent):
         elif start_commit:
             if user_confirm("是否要重置到初始提交？", True):
                 os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
-                PrettyOutput.print("已重置到初始提交", OutputType.INFO)
+                print("ℹ️ 已重置到初始提交")
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理。
@@ -767,7 +749,7 @@ class CodeAgent(Agent):
                     was_suppressed = getattr(self.model, '_suppress_output', False)
                     self.model.set_suppress_output(True)
                 try:
-                    PrettyOutput.print("🔍 正在进行智能上下文推荐....", OutputType.INFO)
+                    print("🔍 正在进行智能上下文推荐....")
                     
                     # 生成上下文推荐（基于关键词和项目上下文）
                     recommendation = self.context_recommender.recommend_context(
@@ -779,10 +761,10 @@ class CodeAgent(Agent):
                     
                     # 打印推荐的上下文
                     if context_recommendation_text:
-                        PrettyOutput.print(context_recommendation_text, OutputType.INFO)
+                        print(f"ℹ️ {context_recommendation_text}")
                 except Exception as e:
                     # 上下文推荐失败不应该影响主流程
-                    PrettyOutput.print(f"上下文推荐失败: {e}", OutputType.WARNING)
+                    print(f"⚠️ 上下文推荐失败: {e}")
                 finally:
                     # 恢复模型输出设置
                     if self.model:
@@ -805,7 +787,7 @@ class CodeAgent(Agent):
                     self.model.set_suppress_output(False)
                 super().run(enhanced_input)
             except RuntimeError as e:
-                PrettyOutput.print(f"执行失败: {str(e)}", OutputType.WARNING)
+                print(f"⚠️ 执行失败: {str(e)}")
                 return str(e)
 
 
@@ -956,7 +938,7 @@ class CodeAgent(Agent):
         """更新上下文管理器：当文件被修改后，更新符号表和依赖图"""
         if not modified_files:
             return
-        PrettyOutput.print("🔄 正在更新代码上下文...", OutputType.INFO)
+        print("🔄 正在更新代码上下文...")
         for file_path in modified_files:
             if os.path.exists(file_path):
                 try:
@@ -976,7 +958,7 @@ class CodeAgent(Agent):
         if not is_enable_impact_analysis():
             return None
         
-        PrettyOutput.print("🔍 正在进行变更影响分析...", OutputType.INFO)
+        print("🔍 正在进行变更影响分析...")
         try:
             impact_analyzer = ImpactAnalyzer(self.context_manager)
             all_edits = []
@@ -1039,7 +1021,7 @@ class CodeAgent(Agent):
             return impact_report
         except Exception as e:
             # 影响分析失败不应该影响主流程，仅记录日志
-            PrettyOutput.print(f"影响范围分析失败: {e}", OutputType.WARNING)
+            print(f"⚠️ 影响范围分析失败: {e}")
             return None
 
     def _handle_impact_report(self, impact_report: Optional[Any], agent: Agent, final_ret: str) -> str:
@@ -1111,15 +1093,9 @@ class CodeAgent(Agent):
         if not config.has_been_asked():
             # 首次失败，询问用户
             error_preview = _format_build_error(build_validation_result)
-            PrettyOutput.print(
-                f"\n⚠️ 构建验证失败:\n{error_preview}\n",
-                OutputType.WARNING,
-            )
-            PrettyOutput.print(
-                "提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
-                "可以选择禁用构建验证，后续将仅进行基础静态检查。",
-                OutputType.INFO,
-            )
+            print(f"\n⚠️ 构建验证失败:\n{error_preview}\n")
+            print("ℹ️ 提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
+                "可以选择禁用构建验证，后续将仅进行基础静态检查。")
             
             if user_confirm(
                 "是否要禁用构建验证，后续仅进行基础静态检查？",
@@ -1205,7 +1181,7 @@ class CodeAgent(Agent):
         """
         # 检查是否启用静态分析
         if not is_enable_static_analysis():
-            PrettyOutput.print("ℹ️  静态分析已禁用，跳过静态检查", OutputType.INFO)
+            print("ℹ️ 静态分析已禁用，跳过静态检查")
             return final_ret
         
         # 检查是否有可用的lint工具
@@ -1216,7 +1192,7 @@ class CodeAgent(Agent):
         )
         
         if not lint_tools_info:
-            PrettyOutput.print("ℹ️  未找到可用的静态检查工具，跳过静态检查", OutputType.INFO)
+            print("ℹ️ 未找到可用的静态检查工具，跳过静态检查")
             return final_ret
         
         # 如果构建验证失败且未禁用，不进行静态分析（避免重复错误）
@@ -1228,7 +1204,7 @@ class CodeAgent(Agent):
         )
         
         if should_skip_static:
-            PrettyOutput.print("ℹ️  构建验证失败，跳过静态分析（避免重复错误）", OutputType.INFO)
+            print("ℹ️ 构建验证失败，跳过静态分析（避免重复错误）")
             return final_ret
         
         # 直接执行静态扫描
@@ -1237,7 +1213,7 @@ class CodeAgent(Agent):
             # 有错误或警告，让大模型修复
             errors_summary = self._format_lint_results(lint_results)
             # 打印完整的检查结果
-            PrettyOutput.print(f"\n静态扫描发现问题:\n{errors_summary}", OutputType.WARNING)
+            print(f"⚠️ 静态扫描发现问题:\n{errors_summary}")
             addon_prompt = f"""
 静态扫描发现以下问题，请根据错误信息修复代码:
 
@@ -1294,29 +1270,23 @@ class CodeAgent(Agent):
 """
         
         try:
-            PrettyOutput.print("🤖 正在询问大模型判断大量代码删除是否合理...", OutputType.INFO)
+            print("🤖 正在询问大模型判断大量代码删除是否合理...")
             response = self.model.chat_until_success(prompt)  # type: ignore
             
             # 使用确定的协议标记解析回答
             if "<!!!YES!!!>" in response:
-                PrettyOutput.print("✅ 大模型确认：代码删除合理", OutputType.SUCCESS)
+                print("✅ 大模型确认：代码删除合理")
                 return True
             elif "<!!!NO!!!>" in response:
-                PrettyOutput.print("❌ 大模型确认：代码删除不合理", OutputType.WARNING)
+                print("⚠️ 大模型确认：代码删除不合理")
                 return False
             else:
                 # 如果无法找到协议标记，默认认为不合理（保守策略）
-                PrettyOutput.print(
-                    f"⚠️ 无法找到协议标记，默认认为不合理。回答内容: {response[:200]}",
-                    OutputType.WARNING
-                )
+                print(f"⚠️ 无法找到协议标记，默认认为不合理。回答内容: {response[:200]}")
                 return False
         except Exception as e:
             # 如果询问失败，默认认为不合理（保守策略）
-            PrettyOutput.print(
-                f"⚠️ 询问大模型失败: {str(e)}，默认认为不合理",
-                OutputType.WARNING
-            )
+            print(f"⚠️ 询问大模型失败: {str(e)}，默认认为不合理")
             return False
 
     def _on_after_tool_call(self, agent: Agent, current_response=None, need_return=None, tool_prompt=None, **kwargs) -> None:
@@ -1326,7 +1296,7 @@ class CodeAgent(Agent):
 
         if diff:
             start_hash = get_latest_commit_hash()
-            PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+            PrettyOutput.print(diff, OutputType.CODE, lang="diff")  # 保留语法高亮
             modified_files = get_diff_file_list()
             
             # 更新上下文管理器
@@ -1344,11 +1314,11 @@ class CodeAgent(Agent):
                 is_reasonable = self._ask_llm_about_large_deletion(detection_result, per_file_preview)
                 if not is_reasonable:
                     # 大模型认为不合理，撤销修改
-                    PrettyOutput.print("已撤销修改（大模型认为代码删除不合理）", OutputType.INFO)
+                    print("ℹ️ 已撤销修改（大模型认为代码删除不合理）")
                     revert_change()
                     final_ret += "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
                     final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
-                    PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
+                    PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")  # 保留语法高亮
                     self.session.prompt += final_ret
                     return
             
@@ -1439,7 +1409,7 @@ class CodeAgent(Agent):
         if commited:
             self.session.prompt += final_ret
             return
-        PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")
+        PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")  # 保留语法高亮
         if not is_confirm_before_apply_patch() or user_confirm(
             "是否使用此回复？", default=True
         ):
@@ -1479,7 +1449,7 @@ class CodeAgent(Agent):
         tools_str = ", ".join(tool_names[:3])
         if len(tool_names) > 3:
             tools_str += f" 等{len(tool_names)}个工具"
-        PrettyOutput.print("🔍 静态检查中...", OutputType.INFO)
+        print("🔍 静态检查中...")
         
         results = []
         # 记录每个文件的检查结果
@@ -1499,7 +1469,7 @@ class CodeAgent(Agent):
                         continue
                     
                     # 打印执行的命令
-                    PrettyOutput.print(f"执行: {command}", OutputType.INFO)
+                    print(f"ℹ️ 执行: {command}")
                     
                     # 执行命令
                     result = subprocess.run(
@@ -1521,9 +1491,9 @@ class CodeAgent(Agent):
                             file_results.append((file_name, tool_name, "失败", "发现问题"))
                             # 失败时打印检查结果
                             output_preview = output[:2000] if len(output) > 2000 else output
-                            PrettyOutput.print(f"检查失败 ({file_name}):\n{output_preview}", OutputType.WARNING)
+                            print(f"⚠️ 检查失败 ({file_name}):\n{output_preview}")
                             if len(output) > 2000:
-                                PrettyOutput.print(f"... (输出已截断，共 {len(output)} 字符)", OutputType.WARNING)
+                                print(f"⚠️ ... (输出已截断，共 {len(output)} 字符)")
                         else:
                             file_results.append((file_name, tool_name, "通过", ""))
                     else:
@@ -1532,14 +1502,14 @@ class CodeAgent(Agent):
                 except subprocess.TimeoutExpired:
                     results.append((tool_name, file_path, command, -1, "执行超时（30秒）"))
                     file_results.append((file_name, tool_name, "超时", "执行超时（30秒）"))
-                    PrettyOutput.print(f"检查超时 ({file_name}): 执行超时（30秒）", OutputType.WARNING)
+                    print(f"⚠️ 检查超时 ({file_name}): 执行超时（30秒）")
                 except FileNotFoundError:
                     # 工具未安装，跳过
                     file_results.append((file_name, tool_name, "跳过", "工具未安装"))
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
-                    PrettyOutput.print(f"执行lint命令失败: {command}, 错误: {e}", OutputType.WARNING)
+                    print(f"⚠️ 执行lint命令失败: {command}, 错误: {e}")
                     file_results.append((file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}"))
                     continue
         
@@ -1560,10 +1530,12 @@ class CodeAgent(Agent):
             if passed_count == total_files:
                 summary += " ✅全部通过"
             
-            output_type = OutputType.WARNING if (failed_count > 0 or timeout_count > 0) else OutputType.SUCCESS
-            PrettyOutput.print(summary, output_type)
+            if failed_count > 0 or timeout_count > 0:
+                print(f"⚠️ {summary}")
+            else:
+                print(f"✅ {summary}")
         else:
-            PrettyOutput.print("✅ 静态检查完成", OutputType.SUCCESS)
+            print("✅ 静态检查完成")
         
         return results
     
@@ -1619,7 +1591,7 @@ class CodeAgent(Agent):
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
         if file_count > 3:
             files_str += f" 等{file_count}个文件"
-        PrettyOutput.print(f"🔨 正在进行编译检查 ({files_str})...", OutputType.INFO)
+        print(f"🔨 正在进行编译检查 ({files_str})...")
         
         try:
             timeout = get_build_validation_timeout()
@@ -1628,7 +1600,7 @@ class CodeAgent(Agent):
             return result
         except Exception as e:
             # 构建验证失败不应该影响主流程，仅记录日志
-            PrettyOutput.print(f"构建验证执行失败: {e}", OutputType.WARNING)
+            print(f"⚠️ 构建验证执行失败: {e}")
             return None
 
 
@@ -1678,10 +1650,7 @@ def cli(
         # 注意：全局配置同步放在 init_env 之后执行，避免被 init_env 覆盖
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (requirement and str(requirement).strip()):
-        PrettyOutput.print(
-            "非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。",
-            OutputType.ERROR,
-        )
+        print("❌ 非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。")
         raise typer.Exit(code=2)
     init_env(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
@@ -1713,9 +1682,7 @@ def cli(
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         curr_dir_path = os.getcwd()
-        PrettyOutput.print(
-            f"警告：当前目录 '{curr_dir_path}' 不是一个git仓库。", OutputType.WARNING
-        )
+        print(f"⚠️ 警告：当前目录 '{curr_dir_path}' 不是一个git仓库。")
         init_git = True if non_interactive else user_confirm(
             f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True
         )
@@ -1729,14 +1696,12 @@ def cli(
                     encoding="utf-8",
                     errors="replace",
                 )
-                PrettyOutput.print("✅ 已成功初始化git仓库。", OutputType.SUCCESS)
+                print("✅ 已成功初始化git仓库。")
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                PrettyOutput.print(f"❌ 初始化git仓库失败: {e}", OutputType.ERROR)
+                print(f"❌ 初始化git仓库失败: {e}")
                 sys.exit(1)
         else:
-            PrettyOutput.print(
-                "操作已取消。Jarvis需要在git仓库中运行。", OutputType.INFO
-            )
+            print("ℹ️ 操作已取消。Jarvis需要在git仓库中运行。")
             sys.exit(0)
 
     curr_dir = os.getcwd()
@@ -1762,13 +1727,9 @@ def cli(
         # 尝试恢复会话
         if restore_session:
             if agent.restore_session():
-                PrettyOutput.print(
-                    "已从 .jarvis/saved_session.json 恢复会话。", OutputType.SUCCESS
-                )
+                print("✅ 已从 .jarvis/saved_session.json 恢复会话。")
             else:
-                PrettyOutput.print(
-                    "无法从 .jarvis/saved_session.json 恢复会话。", OutputType.WARNING
-                )
+                print("⚠️ 无法从 .jarvis/saved_session.json 恢复会话。")
 
         if requirement:
             agent.run(requirement, prefix=prefix, suffix=suffix)
@@ -1782,7 +1743,7 @@ def cli(
     except typer.Exit:
         raise
     except RuntimeError as e:
-        PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+        print(f"❌ 错误: {str(e)}")
         sys.exit(1)
 
 
