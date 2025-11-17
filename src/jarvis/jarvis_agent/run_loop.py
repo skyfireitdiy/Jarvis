@@ -11,7 +11,6 @@ import os
 from enum import Enum
 from typing import Any, TYPE_CHECKING
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
 from jarvis.jarvis_agent.utils import join_prompts, is_auto_complete, normalize_next_action
 from jarvis.jarvis_utils.config import get_auto_summary_rounds
@@ -167,5 +166,5 @@ class AgentRunLoop:
                     return ag._complete_task(auto_completed=False)
 
             except Exception as e:
-                PrettyOutput.print(f"任务失败: {str(e)}", OutputType.ERROR)
+                print(f"❌ 任务失败: {str(e)}")
                 return f"Task failed: {str(e)}"

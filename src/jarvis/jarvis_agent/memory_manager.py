@@ -5,7 +5,6 @@
 """
 
 from jarvis.jarvis_utils.globals import get_all_memory_tags
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_agent.events import TASK_STARTED, BEFORE_HISTORY_CLEAR, TASK_COMPLETED
 
 
@@ -110,14 +109,12 @@ class MemoryManager:
                 saved = False
 
             if saved:
-                PrettyOutput.print(
-                    "已自动保存有价值的信息到记忆系统", OutputType.SUCCESS
-                )
+                print("✅ 已自动保存有价值的信息到记忆系统")
             else:
-                PrettyOutput.print("本次任务没有特别需要记忆的信息", OutputType.INFO)
+                print("ℹ️ 本次任务没有特别需要记忆的信息")
 
         except Exception as e:
-            PrettyOutput.print(f"记忆分析失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 记忆分析失败: {str(e)}")
         finally:
             # 设置记忆提示完成标记，避免事件触发造成重复处理
             self._memory_prompted = True
