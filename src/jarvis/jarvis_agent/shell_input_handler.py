@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from typing import Any, Tuple
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_agent.utils import join_prompts
 
@@ -24,7 +23,7 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
 
         # Build script while stripping the no-confirm marker from each line
         script = "\n".join([_clean(c) for c in cmdline])
-        PrettyOutput.print(script, OutputType.CODE, lang="bash")
+        print(script)
 
         # If any line contains the no-confirm marker, skip the pre-execution confirmation
         no_confirm = any(marker in c for c in cmdline)

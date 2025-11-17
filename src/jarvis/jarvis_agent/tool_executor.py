@@ -2,7 +2,6 @@
 from typing import Any, Tuple, TYPE_CHECKING
 
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 if TYPE_CHECKING:
     from jarvis.jarvis_agent import Agent
@@ -31,7 +30,7 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
             f"操作失败：检测到多个操作。一次只能执行一个操作。"
             f"尝试执行的操作：{', '.join([handler.name() for handler in tool_list])}"
         )
-        PrettyOutput.print(error_message, OutputType.WARNING)
+        print(f"⚠️ {error_message}")
         return False, error_message
 
     if not tool_list:
@@ -47,7 +46,7 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
             print(f"✅ {tool_to_execute.name()}执行完成")
             return result
         except Exception as e:
-            PrettyOutput.print(f"工具执行失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 工具执行失败: {str(e)}")
             return False, str(e)
 
     return False, ""

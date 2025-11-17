@@ -7,7 +7,6 @@
 from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 
 from jarvis.jarvis_agent.prompts import get_task_analysis_prompt
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL, BEFORE_SUMMARY, TASK_COMPLETED
 
@@ -46,7 +45,7 @@ class TaskAnalyzer:
             self._process_analysis_loop()
 
         except Exception:
-            PrettyOutput.print("分析失败", OutputType.ERROR)
+            print("❌ 分析失败")
         finally:
             # 标记已完成一次分析，避免事件回调重复执行
             self._analysis_done = True

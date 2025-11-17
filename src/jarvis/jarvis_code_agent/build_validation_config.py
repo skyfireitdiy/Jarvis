@@ -12,7 +12,6 @@ import yaml
 from typing import Optional, Dict, Any
 from pathlib import Path
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 CONFIG_FILE_NAME = "build_validation_config.yaml"
 
@@ -46,7 +45,7 @@ class BuildValidationConfig:
             return self._config
         except Exception as e:
             # 配置文件损坏时，返回空配置
-            PrettyOutput.print(f"加载构建验证配置失败: {e}，使用默认配置", OutputType.WARNING)
+            print(f"⚠️ 加载构建验证配置失败: {e}，使用默认配置")
             self._config = {}
             return self._config
     
@@ -58,7 +57,7 @@ class BuildValidationConfig:
                 yaml.safe_dump(self._config, f, allow_unicode=True, default_flow_style=False)
             return True
         except Exception as e:
-            PrettyOutput.print(f"保存构建验证配置失败: {e}", OutputType.ERROR)
+            print(f"❌ 保存构建验证配置失败: {e}")
             return False
     
     def is_build_validation_disabled(self) -> bool:
