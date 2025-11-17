@@ -2,7 +2,6 @@
 from typing import Any, Dict
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.config import (
     get_web_search_platform_name,
     get_web_search_model_name,
@@ -83,17 +82,14 @@ class WebpageTool:
                 resp = http_get(url, timeout=10.0, allow_redirects=True)
                 content_md = md(resp.text, strip=["script", "style"])
             except requests.exceptions.HTTPError as e:
-                PrettyOutput.print(
-                    f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}",
-                    OutputType.WARNING,
-                )
+                print(f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}")
                 return {
                     "success": False,
                     "stdout": "",
                     "stderr": f"HTTP错误：{e.response.status_code}",
                 }
             except requests.exceptions.RequestException as e:
-                PrettyOutput.print(f"⚠️ 请求错误: {e}", OutputType.WARNING)
+                print(f"⚠️ 请求错误: {e}")
                 return {"success": False, "stdout": "", "stderr": f"请求错误：{e}"}
 
             if not content_md or not content_md.strip():
@@ -119,7 +115,7 @@ class WebpageTool:
             return {"success": True, "stdout": summary, "stderr": ""}
 
         except Exception as e:
-            PrettyOutput.print(f"读取网页失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 读取网页失败: {str(e)}")
             return {
                 "success": False,
                 "stdout": "",

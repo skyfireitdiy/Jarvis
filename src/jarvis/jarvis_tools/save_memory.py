@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.globals import add_short_term_memory
 
 
@@ -152,7 +151,7 @@ class SaveMemoryTool:
                 except Exception as e:
                     failed_count += 1
                     error_msg = f"保存第 {i+1} 条记忆失败: {str(e)}"
-                    PrettyOutput.print(error_msg, OutputType.ERROR)
+                    print(f"❌ {error_msg}")
                     results.append(
                         {
                             "error": error_msg,
@@ -179,5 +178,5 @@ class SaveMemoryTool:
 
         except Exception as e:
             error_msg = f"保存记忆失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}

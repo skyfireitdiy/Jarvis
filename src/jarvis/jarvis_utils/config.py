@@ -63,13 +63,7 @@ def get_replace_map() -> dict:
     if not os.path.exists(replace_map_path):
         return BUILTIN_REPLACE_MAP.copy()
 
-    from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
-    PrettyOutput.print(
-        "警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。"
-        "请迁移到使用GLOBAL_CONFIG_DATA中的JARVIS_REPLACE_MAP配置。",
-        output_type=OutputType.WARNING,
-    )
+    print("⚠️ 警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。请迁移到使用GLOBAL_CONFIG_DATA中的JARVIS_REPLACE_MAP配置。")
 
     with open(replace_map_path, "r", encoding="utf-8", errors="ignore") as file:
         file_map = yaml.safe_load(file) or {}
@@ -148,20 +142,13 @@ def _get_resolved_model_config(
         
         # 当显式指定了模型组但未找到时，报错并退出
         if model_group_override and not found:
-            from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-            PrettyOutput.print(
-                f"错误：指定的模型组 '{model_group_name}' 不存在于配置中。",
-                output_type=OutputType.ERROR,
-            )
-            PrettyOutput.print(
-                "可用的模型组: " + 
+            print(f"❌ 错误：指定的模型组 '{model_group_name}' 不存在于配置中。")
+            print("ℹ️ 可用的模型组: " + 
                 ", ".join(
                     list(group.keys())[0] 
                     for group in model_groups 
                     if isinstance(group, dict)
-                ) if model_groups else "无可用模型组",
-                output_type=OutputType.INFO,
-            )
+                ) if model_groups else "无可用模型组")
             import sys
             sys.exit(1)
     

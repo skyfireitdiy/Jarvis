@@ -3,7 +3,6 @@ import os
 import sys
 import time
 from typing import Any, Dict, TYPE_CHECKING
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 为了类型检查，总是导入这些模块
 if TYPE_CHECKING:
@@ -111,9 +110,7 @@ class VirtualTTYTool:
         try:
             if action == "launch":
                 if args.get("keys", "") != "":
-                    PrettyOutput.print(
-                        "启动虚拟终端时，不能同时指定 keys 参数", OutputType.ERROR
-                    )
+                    print("❌ 启动虚拟终端时，不能同时指定 keys 参数")
                     return {
                         "success": False,
                         "stdout": "",
@@ -122,9 +119,7 @@ class VirtualTTYTool:
 
                 result = self._launch_tty(agent, tty_id)
                 if not result["success"]:
-                    PrettyOutput.print(
-                        f"启动虚拟终端 [{tty_id}] 失败", OutputType.ERROR
-                    )
+                    print(f"❌ 启动虚拟终端 [{tty_id}] 失败")
                 return result
             elif action == "send_keys":
                 keys = args.get("keys", "").strip()
@@ -133,40 +128,32 @@ class VirtualTTYTool:
 
                 result = self._input_command(agent, tty_id, keys, timeout, add_enter)
                 if not result["success"]:
-                    PrettyOutput.print(
-                        f"发送按键序列到终端 [{tty_id}] 失败", OutputType.ERROR
-                    )
+                    print(f"❌ 发送按键序列到终端 [{tty_id}] 失败")
                 return result
             elif action == "output":
                 timeout = args.get("timeout", 5.0)  # 默认5秒超时
 
                 result = self._get_output(agent, tty_id, timeout)
                 if not result["success"]:
-                    PrettyOutput.print(
-                        f"获取终端 [{tty_id}] 输出失败", OutputType.ERROR
-                    )
+                    print(f"❌ 获取终端 [{tty_id}] 输出失败")
                 return result
             elif action == "close":
 
                 result = self._close_tty(agent, tty_id)
                 if not result["success"]:
-                    PrettyOutput.print(
-                        f"关闭虚拟终端 [{tty_id}] 失败", OutputType.ERROR
-                    )
+                    print(f"❌ 关闭虚拟终端 [{tty_id}] 失败")
                 return result
             elif action == "get_screen":
 
                 result = self._get_screen(agent, tty_id)
                 if not result["success"]:
-                    PrettyOutput.print(
-                        f"获取终端 [{tty_id}] 屏幕内容失败", OutputType.ERROR
-                    )
+                    print(f"❌ 获取终端 [{tty_id}] 屏幕内容失败")
                 return result
             elif action == "list":
 
                 result = self._list_ttys(agent)
                 if not result["success"]:
-                    PrettyOutput.print("获取虚拟终端列表失败", OutputType.ERROR)
+                    print("❌ 获取虚拟终端列表失败")
                 return result
             return {"success": False, "stdout": "", "stderr": "不支持的操作"}
 

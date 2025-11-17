@@ -38,7 +38,7 @@ def list_tools(
                 lang="json",
             )
     else:
-        PrettyOutput.section("可用工具列表", OutputType.SYSTEM)
+        print("📋 可用工具列表")
         # 为避免 PrettyOutput 对每行加框造成信息稀疏，先拼接字符串再统一打印
         lines = []
         import json as _json  # local import to ensure available
@@ -54,7 +54,7 @@ def list_tools(
                 except Exception:
                     lines.append(str(tool.get("parameters")))
                 lines.append("```")
-        PrettyOutput.print("\n".join(lines), OutputType.INFO, lang="markdown")
+        PrettyOutput.print("\n".join(lines), OutputType.CODE, lang="markdown")
 
 
 @app.command("stat")
@@ -90,7 +90,7 @@ def stat_tools(
             )
         else:
             time_desc = f"最近{last_days}天" if last_days else "所有历史"
-            PrettyOutput.section(f"工具调用统计 ({time_desc})", OutputType.SYSTEM)
+            print(f"📊 工具调用统计 ({time_desc})")
             if table_data:
                 PrettyOutput.print(
                     tabulate(
@@ -99,15 +99,12 @@ def stat_tools(
                     OutputType.CODE,
                     lang="text",
                 )
-                PrettyOutput.print(
-                    f"\n总计: {len(table_data)} 个工具被使用，共 {sum(x[1] for x in table_data)} 次调用",
-                    OutputType.INFO,
-                )
+                print(f"ℹ️ 总计: {len(table_data)} 个工具被使用，共 {sum(x[1] for x in table_data)} 次调用")
             else:
-                PrettyOutput.print("暂无工具调用记录", OutputType.INFO)
+                print("ℹ️ 暂无工具调用记录")
     else:
         # 使用 stats 系统的高级功能
-        PrettyOutput.section("工具组统计", OutputType.SYSTEM)
+        print("📊 工具组统计")
         # 显示所有标记为 tool 组的指标
         metrics = StatsManager.list_metrics()
         tool_metrics = []
@@ -166,7 +163,7 @@ def stat_tools(
                             tags={"group": "tool"},
                         )
         else:
-            PrettyOutput.print("暂无工具调用记录", OutputType.INFO)
+            print("ℹ️ 暂无工具调用记录")
 
 
 @app.command("call")
@@ -182,9 +179,9 @@ def call_tool(
     tool_obj = registry.get_tool(tool_name)
 
     if not tool_obj:
-        PrettyOutput.print(f"错误: 工具 '{tool_name}' 不存在", OutputType.ERROR)
+        print(f"❌ 错误: 工具 '{tool_name}' 不存在")
         available_tools = ", ".join([t["name"] for t in registry.get_all_tools()])
-        PrettyOutput.print(f"可用工具: {available_tools}", OutputType.INFO)
+        print(f"ℹ️ 可用工具: {available_tools}")
         raise typer.Exit(code=1)
 
     tool_args = {}
@@ -192,14 +189,14 @@ def call_tool(
         try:
             tool_args = json.loads(args)
         except Exception:
-            PrettyOutput.print("错误: 参数必须是有效的JSON格式", OutputType.ERROR)
+            print("❌ 错误: 参数必须是有效的JSON格式")
             raise typer.Exit(code=1)
     elif args_file:
         try:
             with open(args_file, "r", encoding="utf-8") as f:
                 tool_args = json.load(f)
         except (Exception, FileNotFoundError) as e:
-            PrettyOutput.print(f"错误: 无法从文件加载参数: {str(e)}", OutputType.ERROR)
+            print(f"❌ 错误: 无法从文件加载参数: {str(e)}")
             raise typer.Exit(code=1)
 
     required_params = tool_obj.parameters.get("required", [])
@@ -217,23 +214,23 @@ def call_tool(
             param_info = params.get(param_name, {})
             desc = param_info.get("description", "无描述")
             lines.append(f"  - {param_name}: {desc}")
-        PrettyOutput.print("\n".join(lines), OutputType.ERROR)
+        print("❌ " + "\n❌ ".join(lines))
         raise typer.Exit(code=1)
 
     result = registry.execute_tool(tool_name, tool_args)
 
     if result["success"]:
-        PrettyOutput.section(f"工具 {tool_name} 执行成功", OutputType.SUCCESS)
+        print(f"✅ 工具 {tool_name} 执行成功")
     else:
-        PrettyOutput.section(f"工具 {tool_name} 执行失败", OutputType.ERROR)
+        print(f"❌ 工具 {tool_name} 执行失败")
 
     if result.get("stdout"):
-        PrettyOutput.print("\n输出:", OutputType.INFO)
+        print("\n📤 输出:")
         PrettyOutput.print(result["stdout"], OutputType.CODE, lang="text")
 
     if result.get("stderr"):
-        PrettyOutput.print("\n错误:", OutputType.ERROR)
-        PrettyOutput.print(result["stderr"], OutputType.ERROR, lang="text")
+        print("\n❌ 错误:")
+        PrettyOutput.print(result["stderr"], OutputType.CODE, lang="text")
 
     if not result["success"]:
         raise typer.Exit(code=1)

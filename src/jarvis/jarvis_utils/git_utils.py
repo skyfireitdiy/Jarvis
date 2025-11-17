@@ -17,7 +17,6 @@ import sys
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.utils import is_rag_installed
 
@@ -111,7 +110,7 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
         )
         if result.returncode != 0:
             error_msg = result.stderr.decode("utf-8", errors="replace")
-            PrettyOutput.print(f"获取commit历史失败: {error_msg}", OutputType.ERROR)
+            print(f"❌ 获取commit历史失败: {error_msg}")
             return []
 
         output = result.stdout.decode("utf-8", errors="replace")
@@ -123,7 +122,7 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
         return commits
 
     except Exception as e:
-        PrettyOutput.print(f"获取commit历史异常: {str(e)}", OutputType.ERROR)
+        print(f"❌ 获取commit历史异常: {str(e)}")
         return []
 
 
@@ -191,7 +190,7 @@ def revert_file(filepath: str) -> None:
         subprocess.run(["git", "clean", "-f", "--", filepath], check=True)
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
-        PrettyOutput.print(f"恢复文件失败: {error_msg}", OutputType.ERROR)
+        print(f"❌ 恢复文件失败: {error_msg}")
 
 
 # 修改后的恢复函数
@@ -212,7 +211,7 @@ def revert_change() -> None:
             subprocess.run(["git", "reset", "--hard", "HEAD"], check=True)
         subprocess.run(["git", "clean", "-fd"], check=True)
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(f"恢复更改失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 恢复更改失败: {str(e)}")
 
 
 def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
@@ -504,23 +503,17 @@ def check_and_update_git_repo(repo_path: str) -> bool:
             and remote_tag_result.returncode == 0
             and local_tag_result.stdout.strip() != remote_tag_result.stdout.strip()
         ):
-            PrettyOutput.print(
-                f"检测到新版本tag {remote_tag_result.stdout.strip()}，正在更新Jarvis...",
-                OutputType.INFO,
-            )
+            print(f"ℹ️ 检测到新版本tag {remote_tag_result.stdout.strip()}，正在更新Jarvis...")
             subprocess.run(
                 ["git", "checkout", remote_tag_result.stdout.strip()],
                 cwd=git_root,
                 check=True,
             )
-            PrettyOutput.print(
-                f"Jarvis已更新到tag {remote_tag_result.stdout.strip()}",
-                OutputType.SUCCESS,
-            )
+            print(f"✅ Jarvis已更新到tag {remote_tag_result.stdout.strip()}")
 
             # 执行pip安装更新代码
             try:
-                PrettyOutput.print("正在安装更新后的代码...", OutputType.INFO)
+                print("ℹ️ 正在安装更新后的代码...")
 
                 # 检查是否在虚拟环境中
                 in_venv = hasattr(sys, "real_prefix") or (
@@ -577,7 +570,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                 )
 
                 if result.returncode == 0:
-                    PrettyOutput.print("代码更新安装成功", OutputType.SUCCESS)
+                    print("✅ 代码更新安装成功")
                     return True
 
                 # 处理权限错误
@@ -595,23 +588,21 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                             text=True,
                         )
                         if user_result.returncode == 0:
-                            PrettyOutput.print("用户级代码安装成功", OutputType.SUCCESS)
+                            print("✅ 用户级代码安装成功")
                             return True
                         error_msg = user_result.stderr.strip()
 
-                PrettyOutput.print(f"代码安装失败: {error_msg}", OutputType.ERROR)
+                print(f"❌ 代码安装失败: {error_msg}")
                 return False
             except Exception as e:
-                PrettyOutput.print(
-                    f"安装过程中发生意外错误: {str(e)}", OutputType.ERROR
-                )
+                print(f"❌ 安装过程中发生意外错误: {str(e)}")
                 return False
         # 更新检查日期文件
         with open(last_check_file, "w") as f:
             f.write(today_str)
         return False
     except Exception as e:
-        PrettyOutput.print(f"Git仓库更新检查失败: {e}", OutputType.WARNING)
+        print(f"⚠️ Git仓库更新检查失败: {e}")
         return False
     finally:
         os.chdir(curr_dir)
@@ -638,18 +629,16 @@ def get_diff_file_list() -> List[str]:
         subprocess.run(["git", "reset"], check=True)
 
         if result.returncode != 0:
-            PrettyOutput.print(
-                f"获取差异文件列表失败: {result.stderr}", OutputType.ERROR
-            )
+            print(f"❌ 获取差异文件列表失败: {result.stderr}")
             return []
 
         return [f for f in result.stdout.splitlines() if f]
 
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(f"获取差异文件列表失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 获取差异文件列表失败: {str(e)}")
         return []
     except Exception as e:
-        PrettyOutput.print(f"获取差异文件列表异常: {str(e)}", OutputType.ERROR)
+        print(f"❌ 获取差异文件列表异常: {str(e)}")
         return []
 
 
@@ -798,10 +787,8 @@ def confirm_add_new_files() -> None:
             need_confirm = True
 
         if output_lines:
-            PrettyOutput.print(
-                "\n".join(output_lines),
-                OutputType.WARNING if need_confirm else OutputType.INFO,
-            )
+            emoji = "⚠️ " if need_confirm else "ℹ️ "
+            print(emoji + ("\n" + emoji).join(output_lines))
 
         return need_confirm
 
@@ -852,9 +839,9 @@ def confirm_add_new_files() -> None:
                         entry = rel_path if not rel_path.startswith("..") else file
                         if entry not in existing_lines:
                             f.write(entry + "\n")
-                PrettyOutput.print("已将未跟踪文件添加到 .gitignore，正在重新检测...", OutputType.INFO)
+                print("ℹ️ 已将未跟踪文件添加到 .gitignore，正在重新检测...")
             except Exception as e:
-                PrettyOutput.print(f"更新 .gitignore 失败: {str(e)}", OutputType.WARNING)
+                print(f"⚠️ 更新 .gitignore 失败: {str(e)}")
 
             continue
 

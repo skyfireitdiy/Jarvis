@@ -2,7 +2,6 @@
 import platform
 import subprocess
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 def copy_to_clipboard(text: str) -> None:
@@ -11,9 +10,9 @@ def copy_to_clipboard(text: str) -> None:
     参数:
         text: 要复制的文本
     """
-    PrettyOutput.print("--- 剪贴板内容开始 ---", OutputType.INFO)
+    print("ℹ️ --- 剪贴板内容开始 ---")
     print(text)
-    PrettyOutput.print("--- 剪贴板内容结束 ---", OutputType.INFO)
+    print("ℹ️ --- 剪贴板内容结束 ---")
 
     system = platform.system()
 
@@ -33,7 +32,7 @@ def copy_to_clipboard(text: str) -> None:
                 process.stdin.close()
             return
         except Exception as e:
-            PrettyOutput.print(f"使用Windows clip命令时出错: {e}", OutputType.WARNING)
+            print(f"⚠️ 使用Windows clip命令时出错: {e}")
 
     # macOS系统
     elif system == "Darwin":
@@ -49,7 +48,7 @@ def copy_to_clipboard(text: str) -> None:
                 process.stdin.close()
             return
         except Exception as e:
-            PrettyOutput.print(f"使用macOS pbcopy命令时出错: {e}", OutputType.WARNING)
+            print(f"⚠️ 使用macOS pbcopy命令时出错: {e}")
 
     # Linux系统
     else:
@@ -68,7 +67,7 @@ def copy_to_clipboard(text: str) -> None:
         except FileNotFoundError:
             pass  # xsel 未安装，继续尝试下一个
         except Exception as e:
-            PrettyOutput.print(f"使用xsel时出错: {e}", OutputType.WARNING)
+            print(f"⚠️ 使用xsel时出错: {e}")
 
         # 尝试使用 xclip
         try:
@@ -83,8 +82,6 @@ def copy_to_clipboard(text: str) -> None:
                 process.stdin.close()
             return
         except FileNotFoundError:
-            PrettyOutput.print(
-                "xsel 和 xclip 均未安装, 无法复制到剪贴板", OutputType.WARNING
-            )
+            print("⚠️ xsel 和 xclip 均未安装, 无法复制到剪贴板")
         except Exception as e:
-            PrettyOutput.print(f"使用xclip时出错: {e}", OutputType.WARNING)
+            print(f"⚠️ 使用xclip时出错: {e}")

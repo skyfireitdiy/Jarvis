@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.config import get_data_dir, get_max_input_token_count
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.embedding import get_context_token_count
 
@@ -89,9 +88,7 @@ class RetrieveMemoryTool:
 
                     memories.append(memory_data)
                 except Exception as e:
-                    PrettyOutput.print(
-                        f"读取记忆文件 {memory_file} 失败: {str(e)}", OutputType.WARNING
-                    )
+                    print(f"⚠️ 读取记忆文件 {memory_file} 失败: {str(e)}")
 
         return memories
 
@@ -213,5 +210,5 @@ class RetrieveMemoryTool:
 
         except Exception as e:
             error_msg = f"检索记忆失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}

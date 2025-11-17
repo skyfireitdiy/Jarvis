@@ -20,7 +20,6 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class ReadSymbolsTool:
@@ -137,5 +136,5 @@ class ReadSymbolsTool:
             return {"success": True, "stdout": stdout, "stderr": ""}
 
         except Exception as e:
-            PrettyOutput.print(str(e), OutputType.ERROR)
+            print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": f"读取符号表失败: {str(e)}"}

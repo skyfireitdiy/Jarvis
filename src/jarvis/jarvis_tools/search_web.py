@@ -17,7 +17,6 @@ from jarvis.jarvis_utils.config import (
     get_web_search_model_name,
 )
 from jarvis.jarvis_utils.http import get as http_get
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class SearchWebTool:
@@ -65,12 +64,9 @@ class SearchWebTool:
                         visited_urls.append(url)
                         visited_count += 1
                 except requests.exceptions.HTTPError as e:
-                    PrettyOutput.print(
-                        f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}",
-                        OutputType.WARNING,
-                    )
+                    print(f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}")
                 except requests.exceptions.RequestException as e:
-                    PrettyOutput.print(f"⚠️ 请求错误: {e}", OutputType.WARNING)
+                    print(f"⚠️ 请求错误: {e}")
 
             if not full_content.strip():
                 return {
@@ -108,7 +104,7 @@ class SearchWebTool:
             return {"stdout": summary, "stderr": "", "success": True}
 
         except Exception as e:
-            PrettyOutput.print(f"❌ 网页搜索过程中发生错误: {e}", OutputType.ERROR)
+            print(f"❌ 网页搜索过程中发生错误: {e}")
             return {
                 "stdout": "",
                 "stderr": f"网页搜索过程中发生错误: {e}",

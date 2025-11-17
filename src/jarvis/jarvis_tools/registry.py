@@ -16,7 +16,6 @@ from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_data_dir, get_tool_load_dirs
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
 
@@ -114,10 +113,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     tools_prompt += "    </tool>\n"
 
                 except Exception as e:
-                    PrettyOutput.print(
-                        f"工具 {tool['name']} 参数序列化失败: {str(e)}",
-                        OutputType.ERROR,
-                    )
+                    print(f"❌ 工具 {tool['name']} 参数序列化失败: {str(e)}")
                     continue
 
             tools_prompt += "  </tools_list>\n"
@@ -145,7 +141,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 result = f"检测到工具调用缺少结束标签，已自动补全{ct('TOOL_CALL')}。请确保后续工具调用包含完整的开始和结束标签。\n\n{result}"
             return False, result
         except Exception as e:
-            PrettyOutput.print(f"工具调用处理失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 工具调用处理失败: {str(e)}")
             from jarvis.jarvis_agent import Agent
 
             agent: Agent = agent_
@@ -210,10 +206,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
         if missing_tools:
-            PrettyOutput.print(
-                f"工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
-                OutputType.WARNING,
-            )
+            print(f"⚠️ 工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}")
         self.tools = {
             tool_name: self.tools[tool_name]
             for tool_name in name
@@ -247,10 +240,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 else:
                     missing.append(tool_name)
             if missing:
-                PrettyOutput.print(
-                    "警告: 配置的工具不存在: " + ", ".join(f"'{name}'" for name in missing),
-                    OutputType.WARNING,
-                )
+                print("⚠️ 警告: 配置的工具不存在: " + ", ".join(f"'{name}'" for name in missing))
             self.tools = filtered_tools
 
         # 如果配置了 dont_use 列表，排除列表中的工具
@@ -276,10 +266,7 @@ class ToolRegistry(OutputHandlerProtocol):
             return
 
         # 添加警告信息
-        PrettyOutput.print(
-            "警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到JARVIS_MCP配置方式",
-            OutputType.WARNING,
-        )
+        print("⚠️ 警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到JARVIS_MCP配置方式")
 
         # 遍历目录中的所有.yaml文件
         error_lines = []
@@ -291,7 +278,7 @@ class ToolRegistry(OutputHandlerProtocol):
             except Exception as e:
                 error_lines.append(f"文件 {file_path} 加载失败: {str(e)}")
         if error_lines:
-            PrettyOutput.print("\n".join(error_lines), OutputType.WARNING)
+            print("⚠️ " + "\n⚠️ ".join(error_lines))
 
     def _load_builtin_tools(self) -> None:
         """从内置工具目录加载工具"""
@@ -333,9 +320,7 @@ class ToolRegistry(OutputHandlerProtocol):
                             ["git", "clone", central_repo, central_repo_path], check=True
                         )
                     except Exception as e:
-                        PrettyOutput.print(
-                            f"克隆中心工具仓库失败: {str(e)}", OutputType.ERROR
-                        )
+                        print(f"❌ 克隆中心工具仓库失败: {str(e)}")
 
         # --- 全局每日更新检查 ---
         daily_check_git_updates(tool_dirs, "tools")
@@ -364,9 +349,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         try:
             if "type" not in config:
-                PrettyOutput.print(
-                    f"配置{config.get('name', '')}缺少type字段", OutputType.WARNING
-                )
+                print(f"⚠️ 配置{config.get('name', '')}缺少type字段")
                 return False
 
             # 检查enable标志
@@ -422,29 +405,18 @@ class ToolRegistry(OutputHandlerProtocol):
 
             if config["type"] == "stdio":
                 if "command" not in config:
-                    PrettyOutput.print(
-                        f"配置{config.get('name', '')}缺少command字段",
-                        OutputType.WARNING,
-                    )
+                    print(f"⚠️ 配置{config.get('name', '')}缺少command字段")
                     return False
             elif config["type"] == "sse":
                 if "base_url" not in config:
-                    PrettyOutput.print(
-                        f"配置{config.get('name', '')}缺少base_url字段",
-                        OutputType.WARNING,
-                    )
+                    print(f"⚠️ 配置{config.get('name', '')}缺少base_url字段")
                     return False
             elif config["type"] == "streamable":
                 if "base_url" not in config:
-                    PrettyOutput.print(
-                        f"配置{config.get('name', '')}缺少base_url字段",
-                        OutputType.WARNING,
-                    )
+                    print(f"⚠️ 配置{config.get('name', '')}缺少base_url字段")
                     return False
             else:
-                PrettyOutput.print(
-                    f"不支持的MCP客户端类型: {config['type']}", OutputType.WARNING
-                )
+                print(f"⚠️ 不支持的MCP客户端类型: {config['type']}")
                 return False
 
             # 创建MCP客户端
@@ -461,10 +433,7 @@ class ToolRegistry(OutputHandlerProtocol):
             # 获取工具信息
             tools = mcp_client.get_tool_list()
             if not tools:
-                PrettyOutput.print(
-                    f"从配置{config.get('name', '')}获取工具列表失败",
-                    OutputType.WARNING,
-                )
+                print(f"⚠️ 从配置{config.get('name', '')}获取工具列表失败")
                 return False
 
             # 注册每个工具
@@ -502,9 +471,7 @@ class ToolRegistry(OutputHandlerProtocol):
             return True
 
         except Exception as e:
-            PrettyOutput.print(
-                f"MCP配置{config.get('name', '')}加载失败: {str(e)}", OutputType.WARNING
-            )
+            print(f"⚠️ MCP配置{config.get('name', '')}加载失败: {str(e)}")
             return False
 
     def register_tool_by_file(self, file_path: str) -> bool:
@@ -519,7 +486,7 @@ class ToolRegistry(OutputHandlerProtocol):
         try:
             p_file_path = Path(file_path).resolve()  # 获取绝对路径
             if not p_file_path.exists() or not p_file_path.is_file():
-                PrettyOutput.print(f"文件不存在: {p_file_path}", OutputType.ERROR)
+                print(f"❌ 文件不存在: {p_file_path}")
                 return False
 
             # 临时将父目录添加到sys.path
@@ -574,9 +541,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 sys.path.remove(parent_dir)
 
         except Exception as e:
-            PrettyOutput.print(
-                f"从 {Path(file_path).name} 加载工具失败: {str(e)}", OutputType.ERROR
-            )
+            print(f"❌ 从 {Path(file_path).name} 加载工具失败: {str(e)}")
             return False
 
     @staticmethod
@@ -697,9 +662,7 @@ class ToolRegistry(OutputHandlerProtocol):
             func: 工具执行函数
         """
         if name in self.tools:
-            PrettyOutput.print(
-                f"警告: 工具 '{name}' 已存在，将被覆盖", OutputType.WARNING
-            )
+            print(f"⚠️ 警告: 工具 '{name}' 已存在，将被覆盖")
         self.tools[name] = Tool(name, description, parameters, func, protocol_version)
 
     def get_tool(self, name: str) -> Optional[Tool]:
