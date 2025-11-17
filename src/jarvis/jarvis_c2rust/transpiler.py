@@ -6,7 +6,7 @@ C2Rust 转译器模块
 - 基于 scanner 生成的 translation_order.jsonl 顺序，逐个函数进行转译
 - 为每个函数：
   1) 准备上下文：C 源码片段+位置信息、被调用符号（若已转译则提供Rust模块与符号，否则提供原C位置信息）、crate目录结构
-  2) 创建“模块选择与签名Agent”：让其选择合适的Rust模块路径，并在summary输出函数签名
+  2) 创建"模块选择与签名Agent"：让其选择合适的Rust模块路径，并在summary输出函数签名
   3) 记录当前进度到 progress.json
   4) 基于上述信息与落盘位置，创建 CodeAgent 生成转译后的Rust函数
   5) 尝试 cargo build，如失败则携带错误上下文创建 CodeAgent 修复，直到构建通过或达到上限
@@ -24,416 +24,40 @@ import os
 import re
 import subprocess
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union, Set
 
-from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
-# json5 已替换为 jsonnet，通过 jsonnet_compat 模块提供兼容接口
 import typer
 
-from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 
-
-# 数据文件常量
-C2RUST_DIRNAME = ".jarvis/c2rust"
-
-SYMBOLS_JSONL = "symbols.jsonl"
-ORDER_JSONL = "translation_order.jsonl"
-PROGRESS_JSON = "progress.json"
-CONFIG_JSON = "config.json"
-SYMBOL_MAP_JSONL = "symbol_map.jsonl"
-
-# 配置常量
-ERROR_SUMMARY_MAX_LENGTH = 2000  # 错误信息摘要最大长度
-DEFAULT_PLAN_MAX_RETRIES = 0  # 规划阶段默认最大重试次数（0表示无限重试）
-DEFAULT_REVIEW_MAX_ITERATIONS = 0  # 审查阶段最大迭代次数（0表示无限重试）
-DEFAULT_CHECK_MAX_RETRIES = 0  # cargo check 阶段默认最大重试次数（0表示无限重试）
-DEFAULT_TEST_MAX_RETRIES = 0  # cargo test 阶段默认最大重试次数（0表示无限重试）
-
-# 回退与重试常量
-CONSECUTIVE_FIX_FAILURE_THRESHOLD = 10  # 连续修复失败次数阈值，达到此值将触发回退
-MAX_FUNCTION_RETRIES = 10  # 函数重新开始处理的最大次数
-DEFAULT_PLAN_MAX_RETRIES_ENTRY = 5  # run_transpile 入口函数的 plan_max_retries 默认值
-
-
-@dataclass
-class FnRecord:
-    id: int
-    name: str
-    qname: str
-    file: str
-    start_line: int
-    start_col: int
-    end_line: int
-    end_col: int
-    refs: List[str]
-    # 额外元信息（来自 symbols/items）：函数签名、返回类型与参数（可选）
-    signature: str = ""
-    return_type: str = ""
-    params: Optional[List[Dict[str, str]]] = None
-    # 来自库替代阶段的上下文元数据（若存在）
-    lib_replacement: Optional[Dict[str, Any]] = None
-
-
-class _DbLoader:
-    """读取 symbols.jsonl 并提供按 id/name 查询与源码片段读取"""
-
-    def __init__(self, project_root: Union[str, Path]) -> None:
-        self.project_root = Path(project_root).resolve()
-        self.data_dir = self.project_root / C2RUST_DIRNAME
-
-        self.symbols_path = self.data_dir / SYMBOLS_JSONL
-        # 统一流程：仅使用 symbols.jsonl，不再兼容 functions.jsonl
-        if not self.symbols_path.exists():
-            raise FileNotFoundError(
-                f"在目录下未找到 symbols.jsonl: {self.data_dir}"
-            )
-
-        self.fn_by_id: Dict[int, FnRecord] = {}
-        self.name_to_id: Dict[str, int] = {}
-        self._load()
-
-    def _load(self) -> None:
-        """
-        读取统一的 symbols.jsonl。
-        不区分函数与类型定义，均加载为通用记录（位置与引用信息）。
-        """
-        def _iter_records_from_file(path: Path):
-            try:
-                with path.open("r", encoding="utf-8") as f:
-                    idx = 0
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            obj = json.loads(line)
-                        except Exception:
-                            continue
-                        idx += 1
-                        yield idx, obj
-            except FileNotFoundError:
-                return
-
-        # 加载所有符号记录（函数、类型等）
-        for idx, obj in _iter_records_from_file(self.symbols_path):
-            fid = int(obj.get("id") or idx)
-            nm = obj.get("name") or ""
-            qn = obj.get("qualified_name") or ""
-            fp = obj.get("file") or ""
-            refs = obj.get("ref")
-            # 统一使用列表类型的引用字段
-            if not isinstance(refs, list):
-                refs = []
-            refs = [c for c in refs if isinstance(c, str) and c]
-            sr = int(obj.get("start_line") or 0)
-            sc = int(obj.get("start_col") or 0)
-            er = int(obj.get("end_line") or 0)
-            ec = int(obj.get("end_col") or 0)
-            lr = obj.get("lib_replacement") if isinstance(obj.get("lib_replacement"), dict) else None
-            rec = FnRecord(
-                id=fid,
-                name=nm,
-                qname=qn,
-                file=fp,
-                start_line=sr,
-                start_col=sc,
-                end_line=er,
-                end_col=ec,
-                refs=refs,
-                lib_replacement=lr,
-            )
-            self.fn_by_id[fid] = rec
-            if nm:
-                self.name_to_id.setdefault(nm, fid)
-            if qn:
-                self.name_to_id.setdefault(qn, fid)
-
-    def get(self, fid: int) -> Optional[FnRecord]:
-        return self.fn_by_id.get(fid)
-
-    def get_id_by_name(self, name_or_qname: str) -> Optional[int]:
-        return self.name_to_id.get(name_or_qname)
-
-    def read_source_span(self, rec: FnRecord) -> str:
-        """按起止行读取源码片段（忽略列边界，尽量完整）"""
-        try:
-            p = Path(rec.file)
-            # 若记录为相对路径，基于 project_root 解析
-            if not p.is_absolute():
-                p = (self.project_root / p).resolve()
-            if not p.exists():
-                return ""
-            lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
-            s = max(1, rec.start_line)
-            e = min(len(lines), max(rec.end_line, s))
-            # Python 索引从0开始，包含终止行
-            chunk = "\n".join(lines[s - 1 : e])
-            return chunk
-        except Exception:
-            return ""
-
-
-class _SymbolMapJsonl:
-    """
-    JSONL 形式的符号映射管理：
-    - 每行一条记录，支持同名函数的多条映射（用于处理重载/同名符号）
-    - 记录字段：
-      {
-        "c_name": "<简单名>",
-        "c_qname": "<限定名，可为空字符串>",
-        "c_file": "<源文件路径>",
-        "start_line": <int>,
-        "end_line": <int>,
-        "module": "src/xxx.rs 或 src/xxx/mod.rs",
-        "rust_symbol": "<Rust函数名>",
-        "updated_at": "YYYY-MM-DDTHH:MM:SS"
-      }
-    - 提供按名称（c_name/c_qname）查询、按源位置判断是否已记录等能力
-    """
-
-    def __init__(self, jsonl_path: Path) -> None:
-        self.jsonl_path = jsonl_path
-        self.records: List[Dict[str, Any]] = []
-        # 索引：名称 -> 记录列表索引
-        self.by_key: Dict[str, List[int]] = {}
-        # 唯一定位（避免同名冲突）：(c_file, start_line, end_line, c_qname or c_name) -> 记录索引列表
-        self.by_pos: Dict[Tuple[str, int, int, str], List[int]] = {}
-        self._load()
-
-    def _load(self) -> None:
-        self.records = []
-        self.by_key = {}
-        self.by_pos = {}
-        # 读取 JSONL
-        if self.jsonl_path.exists():
-            try:
-                with self.jsonl_path.open("r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            obj = json.loads(line)
-                        except Exception:
-                            continue
-                        self._add_record_in_memory(obj)
-            except Exception:
-                pass
-
-    def _add_record_in_memory(self, rec: Dict[str, Any]) -> None:
-        idx = len(self.records)
-        self.records.append(rec)
-        for key in [rec.get("c_name") or "", rec.get("c_qname") or ""]:
-            k = str(key or "").strip()
-            if not k:
-                continue
-            self.by_key.setdefault(k, []).append(idx)
-        pos_key = (str(rec.get("c_file") or ""), int(rec.get("start_line") or 0), int(rec.get("end_line") or 0), str(rec.get("c_qname") or rec.get("c_name") or ""))
-        self.by_pos.setdefault(pos_key, []).append(idx)
-
-    def has_symbol(self, sym: str) -> bool:
-        return bool(self.by_key.get(sym))
-
-    def get(self, sym: str) -> List[Dict[str, Any]]:
-        idxs = self.by_key.get(sym) or []
-        return [self.records[i] for i in idxs]
-
-    def get_any(self, sym: str) -> Optional[Dict[str, Any]]:
-        recs = self.get(sym)
-        return recs[-1] if recs else None
-
-    def has_rec(self, rec: FnRecord) -> bool:
-        key = (str(rec.file or ""), int(rec.start_line or 0), int(rec.end_line or 0), str(rec.qname or rec.name or ""))
-        return bool(self.by_pos.get(key))
-
-    def add(self, rec: FnRecord, module: str, rust_symbol: str) -> None:
-        obj = {
-            "c_name": rec.name or "",
-            "c_qname": rec.qname or "",
-            "c_file": rec.file or "",
-            "start_line": int(rec.start_line or 0),
-            "end_line": int(rec.end_line or 0),
-            "module": str(module or ""),
-            "rust_symbol": str(rust_symbol or (rec.name or f"fn_{rec.id}")),
-            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()),
-        }
-        # 先写盘，再更新内存索引
-        try:
-            self.jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.jsonl_path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-        self._add_record_in_memory(obj)
-
-
-def _ensure_order_file(project_root: Path) -> Path:
-    """确保 translation_order.jsonl 存在且包含有效步骤；仅基于 symbols.jsonl 生成，不使用任何回退。"""
-    data_dir = project_root / C2RUST_DIRNAME
-    order_path = data_dir / ORDER_JSONL
-    typer.secho(f"[c2rust-transpiler][order] 目标顺序文件: {order_path}", fg=typer.colors.BLUE)
-
-    def _has_steps(p: Path) -> bool:
-        try:
-            steps = _iter_order_steps(p)
-            return bool(steps)
-        except Exception:
-            return False
-
-    # 已存在则校验是否有步骤
-    typer.secho(f"[c2rust-transpiler][order] 检查现有顺序文件有效性: {order_path}", fg=typer.colors.BLUE)
-    if order_path.exists():
-        if _has_steps(order_path):
-            typer.secho(f"[c2rust-transpiler][order] 现有顺序文件有效，将使用 {order_path}", fg=typer.colors.GREEN)
-            return order_path
-        # 为空或不可读：基于标准路径重新计算（仅 symbols.jsonl）
-        typer.secho("[c2rust-transpiler][order] 现有顺序文件为空/无效，正基于 symbols.jsonl 重新计算", fg=typer.colors.YELLOW)
-        try:
-            compute_translation_order_jsonl(data_dir, out_path=order_path)
-        except Exception as e:
-            raise RuntimeError(f"重新计算翻译顺序失败: {e}")
-        return order_path
-
-    # 不存在：按标准路径生成到固定文件名（仅 symbols.jsonl）
-    try:
-        compute_translation_order_jsonl(data_dir, out_path=order_path)
-    except Exception as e:
-        raise RuntimeError(f"计算翻译顺序失败: {e}")
-
-    typer.secho(f"[c2rust-transpiler][order] 已生成顺序文件: {order_path} (exists={order_path.exists()})", fg=typer.colors.BLUE)
-    if not order_path.exists():
-        raise FileNotFoundError(f"计算后未找到 translation_order.jsonl: {order_path}")
-
-    # 最终校验：若仍无有效步骤，直接报错并提示先执行 scan 或检查 symbols.jsonl
-    if not _has_steps(order_path):
-        raise RuntimeError("translation_order.jsonl 无有效步骤。请先执行 'jarvis-c2rust scan' 生成 symbols.jsonl 并重试。")
-
-    return order_path
-
-def _iter_order_steps(order_jsonl: Path) -> List[List[int]]:
-    """
-    读取翻译顺序（兼容新旧格式），返回按步骤的函数id序列列表。
-    新格式：每行包含 "ids": [int, ...] 以及 "items": [完整符号对象,...]。
-    不再兼容旧格式（不支持 "records"/"symbols" 键）。
-    """
-    # 旧格式已移除：不再需要基于 symbols.jsonl 的 name->id 映射
-
-    steps: List[List[int]] = []
-    with order_jsonl.open("r", encoding="utf-8") as f:
-        for ln in f:
-            ln = ln.strip()
-            if not ln:
-                continue
-            try:
-                obj = json.loads(ln)
-            except Exception:
-                continue
-
-            ids = obj.get("ids")
-            if isinstance(ids, list) and ids:
-                # 新格式：仅支持 ids
-                try:
-                    ids_int = [int(x) for x in ids if isinstance(x, (int, str)) and str(x).strip()]
-                except Exception:
-                    ids_int = []
-                if ids_int:
-                    steps.append(ids_int)
-                continue
-            # 不支持旧格式（无 ids 则跳过该行）
-    return steps
-
-
-def _dir_tree(root: Path) -> str:
-    """格式化 crate 目录结构（过滤部分常见目录）"""
-    lines: List[str] = []
-    exclude = {".git", "target", ".jarvis"}
-    if not root.exists():
-        return ""
-    for p in sorted(root.rglob("*")):
-        if any(part in exclude for part in p.parts):
-            continue
-        rel = p.relative_to(root)
-        depth = len(rel.parts) - 1
-        indent = "  " * depth
-        name = rel.name + ("/" if p.is_dir() else "")
-        lines.append(f"{indent}- {name}")
-    return "\n".join(lines)
-
-
-def _default_crate_dir(project_root: Path) -> Path:
-    """遵循 llm_module_agent 的默认crate目录选择：<parent>/<cwd.name>_rs（与当前目录同级）当传入为 '.' 时"""
-    try:
-        cwd = Path(".").resolve()
-        if project_root.resolve() == cwd:
-            return cwd.parent / f"{cwd.name}_rs"
-        else:
-            return project_root
-    except Exception:
-        return project_root
-
-
-def _read_json(path: Path, default: Any) -> Any:
-    try:
-        if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        pass
-    return default
-
-
-def _write_json(path: Path, obj: Any) -> None:
-    """原子性写入JSON文件：先写入临时文件，再重命名"""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # 使用临时文件确保原子性
-        temp_path = path.with_suffix(path.suffix + ".tmp")
-        temp_path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-        # 原子性重命名
-        temp_path.replace(path)
-    except Exception:
-        # 如果原子写入失败，回退到直接写入
-        try:
-            path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            pass
-
-
-def _extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]]:
-    """
-    从 Agent summary 中提取结构化数据（使用 JSON 格式）：
-    - 仅在 <SUMMARY>...</SUMMARY> 块内查找；
-    - 直接解析 <SUMMARY> 块内的内容为 JSON 对象（不需要额外的 <json> 标签）；
-    - 使用 jsonnet 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）；
-    返回(解析结果, 错误信息)
-    如果解析成功，返回(data, None)
-    如果解析失败，返回({}, 错误信息)
-    """
-    if not isinstance(text, str) or not text.strip():
-        return {}, "摘要文本为空"
-
-    # 提取 <SUMMARY> 块
-    m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", text, flags=re.IGNORECASE)
-    block = (m.group(1) if m else text).strip()
-
-    if not block:
-        return {}, "未找到 <SUMMARY> 或 </SUMMARY> 标签，或标签内容为空"
-
-    try:
-        try:
-            obj = json5_loads(block)
-        except Exception as json_err:
-            error_msg = f"JSON 解析失败: {str(json_err)}"
-            return {}, error_msg
-        if isinstance(obj, dict):
-            return obj, None
-        return {}, f"JSON 解析结果不是字典，而是 {type(obj).__name__}"
-    except Exception as e:
-        return {}, f"解析过程发生异常: {str(e)}"
+from jarvis.jarvis_c2rust.constants import (
+    C2RUST_DIRNAME,
+    CONFIG_JSON,
+    CONSECUTIVE_FIX_FAILURE_THRESHOLD,
+    DEFAULT_CHECK_MAX_RETRIES,
+    DEFAULT_PLAN_MAX_RETRIES,
+    DEFAULT_PLAN_MAX_RETRIES_ENTRY,
+    DEFAULT_REVIEW_MAX_ITERATIONS,
+    DEFAULT_TEST_MAX_RETRIES,
+    ERROR_SUMMARY_MAX_LENGTH,
+    MAX_FUNCTION_RETRIES,
+    PROGRESS_JSON,
+    SYMBOL_MAP_JSONL,
+)
+from jarvis.jarvis_c2rust.loaders import _SymbolMapJsonl
+from jarvis.jarvis_c2rust.models import FnRecord
+from jarvis.jarvis_c2rust.utils import (
+    default_crate_dir,
+    dir_tree,
+    ensure_order_file,
+    extract_json_from_summary,
+    iter_order_steps,
+    read_json,
+    write_json,
+)
 
 
 class Transpiler:
@@ -470,7 +94,7 @@ class Transpiler:
         self.review_max_iterations = review_max_iterations
         self.non_interactive = non_interactive
 
-        self.crate_dir = Path(crate_dir) if crate_dir else _default_crate_dir(self.project_root)
+        self.crate_dir = Path(crate_dir) if crate_dir else default_crate_dir(self.project_root)
         # 使用自包含的 order.jsonl 记录构建索引，避免依赖 symbols.jsonl
         self.fn_index_by_id: Dict[int, FnRecord] = {}
         self.fn_name_to_id: Dict[str, int] = {}
@@ -480,7 +104,7 @@ class Transpiler:
         
         # 读取进度文件（仅用于进度信息，不包含配置）
         default_progress = {"current": None, "converted": []}
-        self.progress: Dict[str, Any] = _read_json(self.progress_path, default_progress)
+        self.progress: Dict[str, Any] = read_json(self.progress_path, default_progress)
         
         # 从独立的配置文件加载配置（支持从 progress.json 向后兼容迁移）
         config = self._load_config()
@@ -648,7 +272,7 @@ class Transpiler:
 
     def _save_progress(self) -> None:
         """保存进度，使用原子性写入"""
-        _write_json(self.progress_path, self.progress)
+        write_json(self.progress_path, self.progress)
 
     def _load_config(self) -> Dict[str, Any]:
         """
@@ -660,7 +284,7 @@ class Transpiler:
         
         # 尝试从配置文件读取
         if config_path.exists():
-            config = _read_json(config_path, default_config)
+            config = read_json(config_path, default_config)
             if isinstance(config, dict):
                 return config
         
@@ -672,7 +296,7 @@ class Transpiler:
                 "root_symbols": progress_config.get("root_symbols", []),
                 "disabled_libraries": progress_config.get("disabled_libraries", []),
             }
-            _write_json(config_path, migrated_config)
+            write_json(config_path, migrated_config)
             typer.secho(f"[c2rust-transpiler][config] 已从 progress.json 迁移配置到 {config_path}", fg=typer.colors.YELLOW)
             # 从 progress.json 中移除 config（可选，保持兼容性）
             # if "config" in self.progress:
@@ -689,7 +313,7 @@ class Transpiler:
             "root_symbols": self.root_symbols,
             "disabled_libraries": self.disabled_libraries,
         }
-        _write_json(config_path, config)
+        write_json(config_path, config)
 
 
     def _read_source_span(self, rec: FnRecord) -> str:
@@ -949,7 +573,7 @@ class Transpiler:
 
     def _plan_module_and_signature(self, rec: FnRecord, c_code: str) -> Tuple[str, str, bool]:
         """调用 Agent 选择模块与签名，返回 (module_path, rust_signature, skip_implementation)，若格式不满足将自动重试直到满足"""
-        crate_tree = _dir_tree(self.crate_dir)
+        crate_tree = dir_tree(self.crate_dir)
         callees_ctx = self._collect_callees_context(rec)
         sys_p, usr_p, base_sum_p = self._build_module_selection_prompts(rec, c_code, callees_ctx, crate_tree)
 
@@ -1044,7 +668,7 @@ class Transpiler:
                 # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
                 summary = agent.run(usr_p)
             
-            meta, parse_error = _extract_json_from_summary(str(summary or ""))
+            meta, parse_error = extract_json_from_summary(str(summary or ""))
             if parse_error:
                 # JSON解析失败，将错误信息反馈给模型
                 typer.secho(f"[c2rust-transpiler][plan] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
@@ -1129,7 +753,7 @@ class Transpiler:
 
         # 汇总上下文头部，供后续复用时拼接
         callees_ctx = self._collect_callees_context(rec)
-        crate_tree = _dir_tree(self.crate_dir)
+        crate_tree = dir_tree(self.crate_dir)
         librep_ctx = rec.lib_replacement if isinstance(rec.lib_replacement, dict) else None
         # 提取编译参数
         compile_flags = self._extract_compile_flags(rec.file)
@@ -2333,7 +1957,7 @@ class Transpiler:
             # 附加被引用符号上下文与库替代上下文，以及crate目录结构，提供更完整审查背景
             callees_ctx = self._collect_callees_context(rec)
             librep_ctx = rec.lib_replacement if isinstance(rec.lib_replacement, dict) else None
-            crate_tree = _dir_tree(self.crate_dir)
+            crate_tree = dir_tree(self.crate_dir)
             # 提取编译参数
             compile_flags = self._extract_compile_flags(rec.file)
             
@@ -2506,7 +2130,7 @@ class Transpiler:
                 summary = str(agent.run(composed_prompt) or "")
             
             # 解析 JSON 格式的审查结果
-            verdict, parse_error_review = _extract_json_from_summary(summary)
+            verdict, parse_error_review = extract_json_from_summary(summary)
             parse_failed = False
             parse_error_msg = None
             if parse_error_review:
@@ -2572,7 +2196,7 @@ class Transpiler:
                 return
             
             # 需要优化：提供详细上下文背景，并明确审查意见仅针对 Rust crate，不修改 C 源码
-            crate_tree = _dir_tree(self.crate_dir)
+            crate_tree = dir_tree(self.crate_dir)
             issues_text = "\n".join([
                 "功能一致性问题：" if function_issues else "",
                 *[f"  - {issue}" for issue in function_issues],
@@ -2729,8 +2353,8 @@ class Transpiler:
                 # 保持稳健，失败不阻塞主流程
                 pass
 
-            order_path = _ensure_order_file(self.project_root)
-            steps = _iter_order_steps(order_path)
+            order_path = ensure_order_file(self.project_root)
+            steps = iter_order_steps(order_path)
             if not steps:
                 typer.secho("[c2rust-transpiler] 未找到翻译步骤。", fg=typer.colors.YELLOW)
                 return

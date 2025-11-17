@@ -47,7 +47,7 @@ def _load_config() -> dict:
     返回包含 root_symbols 和 disabled_libraries 的字典。
     """
     import json
-    from jarvis.jarvis_c2rust.transpiler import CONFIG_JSON, C2RUST_DIRNAME
+    from jarvis.jarvis_c2rust.constants import CONFIG_JSON, C2RUST_DIRNAME
     
     data_dir = Path(".") / C2RUST_DIRNAME
     config_path = data_dir / CONFIG_JSON
@@ -75,7 +75,7 @@ RUN_STATE_JSON = "run_state.json"
 
 def _get_run_state_path() -> Path:
     """获取 run 状态文件路径"""
-    from jarvis.jarvis_c2rust.transpiler import C2RUST_DIRNAME
+    from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
     data_dir = Path(".") / C2RUST_DIRNAME
     return data_dir / RUN_STATE_JSON
 
@@ -497,7 +497,7 @@ def config(
       jarvis-c2rust config --clear
     """
     import json
-    from jarvis.jarvis_c2rust.transpiler import CONFIG_JSON, C2RUST_DIRNAME
+    from jarvis.jarvis_c2rust.constants import CONFIG_JSON, C2RUST_DIRNAME
     
     data_dir = Path(".") / C2RUST_DIRNAME
     config_path = data_dir / CONFIG_JSON
