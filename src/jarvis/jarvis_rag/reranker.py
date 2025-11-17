@@ -6,7 +6,6 @@ from sentence_transformers.cross_encoder import (  # type: ignore
     CrossEncoder,
 )
 from huggingface_hub import snapshot_download
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class Reranker:
@@ -22,13 +21,13 @@ class Reranker:
         参数:
             model_name (str): 要使用的Cross-Encoder模型的名称。
         """
-        PrettyOutput.print(f"正在初始化重排模型: {model_name}...", OutputType.INFO)
+        print(f"ℹ️ 正在初始化重排模型: {model_name}...")
         try:
             local_dir = None
 
             if os.path.isdir(model_name):
                 self.model = CrossEncoder(model_name)
-                PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
+                print("✅ 重排模型初始化成功。")
                 return
             try:
                 # Prefer local cache; avoid any network access
@@ -41,9 +40,9 @@ class Reranker:
             else:
                 self.model = CrossEncoder(model_name)
 
-            PrettyOutput.print("重排模型初始化成功。", OutputType.SUCCESS)
+            print("✅ 重排模型初始化成功。")
         except Exception as e:
-            PrettyOutput.print(f"初始化重排模型失败: {e}", OutputType.ERROR)
+            print(f"❌ 初始化重排模型失败: {e}")
             raise
 
     def rerank(

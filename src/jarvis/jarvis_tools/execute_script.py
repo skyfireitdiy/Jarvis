@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
 
 
 class ScriptTool:
@@ -150,7 +150,7 @@ class ScriptTool:
                                     proc.wait()
                                 except Exception:
                                     pass
-                        PrettyOutput.print(str(e), OutputType.ERROR)
+                        print(f"❌ {str(e)}")
                         # Attempt to read any partial output if available
                         try:
                             output = self.get_display_output(output_file)
@@ -204,7 +204,7 @@ class ScriptTool:
                 Path(output_file).unlink(missing_ok=True)
 
         except Exception as e:
-            PrettyOutput.print(str(e), OutputType.ERROR)
+            print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
 
     def execute(self, args: Dict) -> Dict[str, Any]:
@@ -232,7 +232,7 @@ class ScriptTool:
             return self._execute_script_with_interpreter(interpreter, script_content)
 
         except Exception as e:
-            PrettyOutput.print(str(e), OutputType.ERROR)
+            print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
 
 
@@ -242,4 +242,4 @@ if __name__ == "__main__":
         script_tool.get_display_output("/path/to/a.txt"),
         OutputType.CODE,
         lang="text",
-    )
+    )  # 保留用于语法高亮

@@ -4,7 +4,6 @@ import shutil
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class EditFileTool:
@@ -374,7 +373,7 @@ class EditFileTool:
 
         except Exception as e:
             error_msg = f"文件编辑失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}
 
     @staticmethod
@@ -650,7 +649,7 @@ class EditFileTool:
                 except Exception:
                     pass
             error_msg = f"文件写入失败: {str(write_error)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return (False, error_msg)
 
     @staticmethod
@@ -748,7 +747,7 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
-                PrettyOutput.print(summary, OutputType.ERROR)
+                print(f"❌ {summary}")
                 return False, summary
             
             # 从缓存恢复文件内容
@@ -789,7 +788,7 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
-                PrettyOutput.print(summary, OutputType.ERROR)
+                print(f"❌ {summary}")
                 return False, summary
             
             return True, modified_content
@@ -803,6 +802,6 @@ class EditFileTool:
                 except Exception:
                     pass
             error_msg = f"文件修改失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return False, error_msg
 

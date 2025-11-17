@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any, Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class generate_new_tool:
@@ -38,8 +37,8 @@ class generate_new_tool:
                 tools_dir.mkdir(parents=True, exist_ok=True)
                 return True
             except Exception as e:
-                PrettyOutput.print(
-                    f"无法创建工具目录 {tools_dir}: {e}", OutputType.ERROR
+                print(
+                    f"❌ 无法创建工具目录 {tools_dir}: {e}"
                 )
                 return False
 
@@ -122,9 +121,8 @@ class generate_new_tool:
                         success_message += "\n已成功注册到当前会话的工具注册表中"
                     else:
                         # 注册失败，删除已创建的文件
-                        PrettyOutput.print(
-                            f"注册工具 '{tool_name}' 失败，正在删除文件...",
-                            OutputType.WARNING,
+                        print(
+                            f"⚠️ 注册工具 '{tool_name}' 失败，正在删除文件..."
                         )
                         if tool_file_path.exists():
                             tool_file_path.unlink()
@@ -134,8 +132,8 @@ class generate_new_tool:
                             "stderr": "工具文件已生成，但注册失败。文件已被删除。",
                         }
                 else:
-                    PrettyOutput.print(
-                        "未找到工具注册表，无法自动注册工具", OutputType.WARNING
+                    print(
+                        "⚠️ 未找到工具注册表，无法自动注册工具"
                     )
                     success_message += "\n注册到当前会话失败，可能需要重新启动Jarvis"
 
@@ -184,14 +182,14 @@ class generate_new_tool:
 
 
             except Exception as e:
-                PrettyOutput.print(f"依赖检查/安装失败: {str(e)}", OutputType.WARNING)
+                print(f"⚠️ 依赖检查/安装失败: {str(e)}")
 
             return {"success": True, "stdout": success_message, "stderr": ""}
 
         except Exception as e:
             # 如果发生异常，删除已创建的文件并返回失败响应
             error_msg = f"生成工具失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
 
             # 删除已创建的文件
             if tool_file_path and tool_file_path.exists():
@@ -200,8 +198,8 @@ class generate_new_tool:
                     tool_file_path.unlink()
 
                 except Exception as delete_error:
-                    PrettyOutput.print(
-                        f"删除文件失败: {str(delete_error)}", OutputType.ERROR
+                    print(
+                        f"❌ 删除文件失败: {str(delete_error)}"
                     )
 
             return {"success": False, "stdout": "", "stderr": error_msg}
