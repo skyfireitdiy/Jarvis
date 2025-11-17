@@ -9,7 +9,6 @@ from typing import Dict, Generator, List, Tuple
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
 
@@ -37,7 +36,7 @@ class KimiModel(BasePlatform):
         self.chat_id = ""  # 当前会话ID
         self.api_key = os.getenv("KIMI_API_KEY")  # 从环境变量获取API密钥
         if not self.api_key:
-            PrettyOutput.print("KIMI_API_KEY 未设置", OutputType.WARNING)
+            print("⚠️ KIMI_API_KEY 未设置")
         self.auth_header = f"Bearer {self.api_key}"  # 认证头信息
         self.uploaded_files = []  # 存储已上传文件的信息
         self.chat_id = ""  # 当前会话ID
@@ -69,14 +68,12 @@ class KimiModel(BasePlatform):
                 sleep_time=5,
             )
             if response.status_code != 200:
-                PrettyOutput.print(
-                    f"错误：创建会话失败：{response.json()}", OutputType.ERROR
-                )
+                print(f"❌ 错误：创建会话失败：{response.json()}")
                 return False
             self.chat_id = response.json()["id"]
             return True
         except Exception as e:
-            PrettyOutput.print(f"错误：创建会话失败：{e}", OutputType.ERROR)
+            print(f"❌ 错误：创建会话失败：{e}")
             return False
 
     def _get_presigned_url(self, filename: str, action: str) -> Dict:
@@ -109,9 +106,9 @@ class KimiModel(BasePlatform):
                 response = while_success(
                     lambda: http.put(presigned_url, data=content), sleep_time=5
                 )
-                return response.status_code == 200
+                    return response.status_code == 200
         except Exception as e:
-            PrettyOutput.print(f"错误：上传文件失败：{e}", OutputType.ERROR)
+            print(f"❌ 错误：上传文件失败：{e}")
             return False
 
     def _get_file_info(self, file_data: Dict, name: str, file_type: str) -> Dict:
@@ -185,11 +182,11 @@ class KimiModel(BasePlatform):
             return True
 
         if not self.chat_id:
-            PrettyOutput.print("正在创建聊天会话...", OutputType.INFO)
+            print("ℹ️ 正在创建聊天会话...")
             if not self._create_chat():
-                PrettyOutput.print("创建聊天会话失败", OutputType.ERROR)
+                print("❌ 创建聊天会话失败")
                 return False
-            PrettyOutput.print("创建聊天会话成功", OutputType.SUCCESS)
+            print("✅ 创建聊天会话成功")
 
         uploaded_files = []
         for index, file_path in enumerate(file_list, 1):
@@ -220,22 +217,22 @@ class KimiModel(BasePlatform):
                             log_lines.append(f"文件处理完成: {file_name}")
                         else:
                             log_lines.append(f"文件解析失败: {file_name}")
-                            PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                            print(f"❌ {'\n'.join(log_lines)}")
                             return False
-                    else:
-                        uploaded_files.append(file_info)
-                        log_lines.append(f"图片处理完成: {file_name}")
+                        else:
+                            uploaded_files.append(file_info)
+                            log_lines.append(f"图片处理完成: {file_name}")
                 else:
                     log_lines.append(f"文件上传失败: {file_name}")
-                    PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                    print(f"❌ {'\n'.join(log_lines)}")
                     return False
 
                 # 成功路径统一输出本文件的处理日志
-                PrettyOutput.print("\n".join(log_lines), OutputType.INFO)
+                print(f"ℹ️ {'\n'.join(log_lines)}")
 
             except Exception as e:
                 log_lines.append(f"处理文件出错 {file_path}: {str(e)}")
-                PrettyOutput.print("\n".join(log_lines), OutputType.ERROR)
+                print(f"❌ {'\n'.join(log_lines)}")
                 return False
 
         self.uploaded_files = uploaded_files
@@ -335,18 +332,16 @@ class KimiModel(BasePlatform):
                 self.first_chat = True  # 重置first_chat标记
                 return True
             else:
-                PrettyOutput.print(
-                    f"删除会话失败: HTTP {response.status_code}", OutputType.WARNING
-                )
+                print(f"⚠️ 删除会话失败: HTTP {response.status_code}")
                 return False
         except Exception as e:
-            PrettyOutput.print(f"删除会话时发生错误: {str(e)}", OutputType.ERROR)
+            print(f"❌ 删除会话时发生错误: {str(e)}")
             return False
 
     def save(self, file_path: str) -> bool:
         """Save chat session to a file."""
         if not self.chat_id:
-            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            print("⚠️ 没有活动的会话可供保存")
             return False
 
         state = {
@@ -361,10 +356,10 @@ class KimiModel(BasePlatform):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=4)
             self._saved = True
-            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            print(f"✅ 会话已成功保存到 {file_path}")
             return True
         except Exception as e:
-            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 保存会话失败: {str(e)}")
             return False
 
     def restore(self, file_path: str) -> bool:
@@ -380,13 +375,13 @@ class KimiModel(BasePlatform):
             self.uploaded_files = state.get("uploaded_files", [])
             self._saved = True
 
-            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            print(f"✅ 从 {file_path} 成功恢复会话")
             return True
         except FileNotFoundError:
-            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            print(f"❌ 会话文件未找到: {file_path}")
             return False
         except Exception as e:
-            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 恢复会话失败: {str(e)}")
             return False
 
     def name(self) -> str:

@@ -5,7 +5,6 @@ from jarvis.jarvis_platform.base import BasePlatform
 import json
 
 from jarvis.jarvis_utils import http
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
 
@@ -28,7 +27,7 @@ class AI8Model(BasePlatform):
 
         self.token = os.getenv("AI8_API_KEY")
         if not self.token:
-            PrettyOutput.print("未设置 AI8_API_KEY", OutputType.WARNING)
+            print("⚠️ 未设置 AI8_API_KEY")
 
         self.headers = {
             "Authorization": self.token,
@@ -76,9 +75,7 @@ class AI8Model(BasePlatform):
 
             data = response.json()
             if data["code"] != 0:
-                PrettyOutput.print(
-                    f"创建会话失败: {data.get('msg', '未知错误')}", OutputType.WARNING
-                )
+                print(f"⚠️ 创建会话失败: {data.get('msg', '未知错误')}")
                 return False
 
             self.conversation = data["data"]
@@ -109,14 +106,11 @@ class AI8Model(BasePlatform):
                 self.conversation = data["data"]
                 return True
             else:
-                PrettyOutput.print(
-                    f"更新会话设置失败: {data.get('msg', '未知错误')}",
-                    OutputType.WARNING,
-                )
+                print(f"⚠️ 更新会话设置失败: {data.get('msg', '未知错误')}")
                 return False
 
         except Exception as e:
-            PrettyOutput.print(f"创建会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 创建会话失败: {str(e)}")
             return False
 
     def set_system_prompt(self, message: str):
@@ -166,7 +160,7 @@ class AI8Model(BasePlatform):
             return None
 
         except Exception as e:
-            PrettyOutput.print(f"对话异常: {str(e)}", OutputType.ERROR)
+            print(f"❌ 对话异常: {str(e)}")
             raise e
 
     def name(self) -> str:
@@ -198,17 +192,17 @@ class AI8Model(BasePlatform):
                 return True
             else:
                 error_msg = f"删除会话失败: {data.get('msg', '未知错误')}"
-                PrettyOutput.print(error_msg, OutputType.WARNING)
+                print(f"⚠️ {error_msg}")
                 return False
 
         except Exception as e:
-            PrettyOutput.print(f"删除会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 删除会话失败: {str(e)}")
             return False
 
     def save(self, file_path: str) -> bool:
         """Save chat session to a file."""
         if not self.conversation:
-            PrettyOutput.print("没有活动的会话可供保存", OutputType.WARNING)
+            print("⚠️ 没有活动的会话可供保存")
             return False
 
         state = {
@@ -221,10 +215,10 @@ class AI8Model(BasePlatform):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=4)
             self._saved = True
-            PrettyOutput.print(f"会话已成功保存到 {file_path}", OutputType.SUCCESS)
+            print(f"✅ 会话已成功保存到 {file_path}")
             return True
         except Exception as e:
-            PrettyOutput.print(f"保存会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 保存会话失败: {str(e)}")
             return False
 
     def restore(self, file_path: str) -> bool:
@@ -240,18 +234,16 @@ class AI8Model(BasePlatform):
             # A restored session should not be deleted on exit, as it's persistent.
             self._saved = True
 
-            PrettyOutput.print(f"从 {file_path} 成功恢复会话", OutputType.SUCCESS)
+            print(f"✅ 从 {file_path} 成功恢复会话")
             return True
         except FileNotFoundError:
-            PrettyOutput.print(f"会话文件未找到: {file_path}", OutputType.ERROR)
+            print(f"❌ 会话文件未找到: {file_path}")
             return False
         except KeyError as e:
-            PrettyOutput.print(
-                f"恢复失败: 会话文件格式不正确，缺少键 {e}", OutputType.ERROR
-            )
+            print(f"❌ 恢复失败: 会话文件格式不正确，缺少键 {e}")
             return False
         except Exception as e:
-            PrettyOutput.print(f"恢复会话失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 恢复会话失败: {str(e)}")
             return False
 
     def get_available_models(self) -> List[str]:
@@ -273,10 +265,7 @@ class AI8Model(BasePlatform):
 
             data = response.json()
             if data["code"] != 0:
-                PrettyOutput.print(
-                    f"获取模型列表失败: {data.get('msg', '未知错误')}",
-                    OutputType.WARNING,
-                )
+                print(f"⚠️ 获取模型列表失败: {data.get('msg', '未知错误')}")
                 return []
 
             # 保存模型信息
@@ -309,7 +298,7 @@ class AI8Model(BasePlatform):
             return list(self.models.keys())
 
         except Exception as e:
-            PrettyOutput.print(f"获取模型列表失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 获取模型列表失败: {str(e)}")
             return []
 
     def support_upload_files(self) -> bool:

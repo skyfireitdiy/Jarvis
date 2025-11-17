@@ -11,7 +11,6 @@ from jarvis.jarvis_utils.config import (
     get_normal_model_name,
     get_normal_platform_name,
 )
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 REQUIRED_METHODS = [
     ("chat", ["message"]),  # 方法名和参数列表
@@ -42,7 +41,7 @@ class PlatformRegistry:
                 ):
                     pass
             except Exception as e:
-                PrettyOutput.print(f"创建平台目录失败: {str(e)}", OutputType.ERROR)
+                print(f"❌ 创建平台目录失败: {str(e)}")
                 return ""
         return user_platform_dir
 
@@ -77,10 +76,7 @@ class PlatformRegistry:
                 missing_methods.append(f"{method_name}(parameter mismatch)")
 
         if missing_methods:
-            PrettyOutput.print(
-                f"平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}",
-                OutputType.WARNING,
-            )
+            print(f"⚠️ 平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}")
             return False
 
         return True
@@ -99,7 +95,7 @@ class PlatformRegistry:
 
         # 确保目录存在
         if not os.path.exists(directory):
-            PrettyOutput.print(f"平台目录不存在: {directory}", OutputType.WARNING)
+            print(f"⚠️ 平台目录不存在: {directory}")
             return platforms
 
         # 获取目录的包名
@@ -149,7 +145,7 @@ class PlatformRegistry:
                     error_lines.append(f"加载平台 {module_name} 失败: {str(e)}")
 
         if error_lines:
-            PrettyOutput.print("\n".join(error_lines), OutputType.ERROR)
+            print(f"❌ {'\n'.join(error_lines)}")
         return platforms
 
     @staticmethod
@@ -207,7 +203,7 @@ class PlatformRegistry:
             BasePlatform: Platform instance
         """
         if name not in self.platforms:
-            PrettyOutput.print(f"未找到平台: {name}", OutputType.WARNING)
+            print(f"⚠️ 未找到平台: {name}")
             return None
 
         try:
@@ -215,7 +211,7 @@ class PlatformRegistry:
             platform = self.platforms[name]()
             return platform
         except Exception as e:
-            PrettyOutput.print(f"创建平台失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 创建平台失败: {str(e)}")
             return None
 
     def get_available_platforms(self) -> List[str]:
