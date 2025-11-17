@@ -219,9 +219,9 @@ class KimiModel(BasePlatform):
                             log_lines.append(f"文件解析失败: {file_name}")
                             print(f"❌ {'\n'.join(log_lines)}")
                             return False
-                        else:
-                            uploaded_files.append(file_info)
-                            log_lines.append(f"图片处理完成: {file_name}")
+                    else:
+                        uploaded_files.append(file_info)
+                        log_lines.append(f"图片处理完成: {file_name}")
                 else:
                     log_lines.append(f"文件上传失败: {file_name}")
                     print(f"❌ {'\n'.join(log_lines)}")
