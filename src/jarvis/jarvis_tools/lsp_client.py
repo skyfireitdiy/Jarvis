@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 # 延迟导入，避免循环依赖
 _treesitter_available = None
@@ -165,23 +164,20 @@ class LSPClient:
             return True
             
         except FileNotFoundError:
-            PrettyOutput.print(
-                f"LSP服务器 {self.server_config.name} 未找到。"
-                f"命令: {' '.join(check_cmd)}",
-                OutputType.WARNING
+            print(
+                f"⚠️ LSP服务器 {self.server_config.name} 未找到。"
+                f"命令: {' '.join(check_cmd)}"
             )
             return False
         except subprocess.TimeoutExpired:
-            PrettyOutput.print(
-                f"LSP服务器 {self.server_config.name} 检测超时。"
-                f"命令: {' '.join(check_cmd)}",
-                OutputType.WARNING
+            print(
+                f"⚠️ LSP服务器 {self.server_config.name} 检测超时。"
+                f"命令: {' '.join(check_cmd)}"
             )
             return False
         except Exception as e:
-            PrettyOutput.print(
-                f"检测LSP服务器 {self.server_config.name} 时出错: {e}",
-                OutputType.WARNING
+            print(
+                f"⚠️ 检测LSP服务器 {self.server_config.name} 时出错: {e}"
             )
             return False
     
@@ -220,9 +216,9 @@ class LSPClient:
             # 发送initialized通知
             self._send_notification("initialized", {})
             
-            PrettyOutput.print(f"LSP client initialized for {self.server_config.name}", OutputType.INFO)
+            print(f"ℹ️ LSP client initialized for {self.server_config.name}")
         except Exception as e:
-            PrettyOutput.print(f"Failed to initialize LSP client: {e}", OutputType.ERROR)
+            print(f"❌ Failed to initialize LSP client: {e}")
             raise
     
     def _send_request(self, method: str, params: Dict) -> Optional[Dict]:
@@ -267,7 +263,7 @@ class LSPClient:
                         response = json.loads(response_line)
                         response_queue.put(response)
                 except Exception as e:
-                    PrettyOutput.print(f"Error reading LSP response: {e}", OutputType.ERROR)
+                    print(f"❌ Error reading LSP response: {e}")
                     response_queue.put(None)
             
             # 启动读取线程
@@ -284,7 +280,7 @@ class LSPClient:
             
             return None
         except Exception as e:
-            PrettyOutput.print(f"Error sending LSP request: {e}", OutputType.ERROR)
+            print(f"❌ Error sending LSP request: {e}")
             return None
     
     def _send_notification(self, method: str, params: Dict):
@@ -308,7 +304,7 @@ class LSPClient:
             self.process.stdin.write(notification_str)
             self.process.stdin.flush()
         except Exception as e:
-            PrettyOutput.print(f"Error sending LSP notification: {e}", OutputType.ERROR)
+            print(f"❌ Error sending LSP notification: {e}")
     
     def get_completion(self, file_path: str, line: int, character: int) -> List[Dict]:
         """获取代码补全。
@@ -550,7 +546,7 @@ class LSPClient:
                     except subprocess.TimeoutExpired:
                         self.process.kill()
             except Exception as e:
-                PrettyOutput.print(f"Error closing LSP client: {e}", OutputType.WARNING)
+                print(f"⚠️ Error closing LSP client: {e}")
                 if self.process:
                     try:
                         self.process.kill()
@@ -671,7 +667,7 @@ class TreeSitterFallback:
             self._symbols_cache[file_path] = lsp_symbols
             return lsp_symbols
         except Exception as e:
-            PrettyOutput.print(f"Tree-sitter 提取符号失败: {e}", OutputType.WARNING)
+            print(f"⚠️ Tree-sitter 提取符号失败: {e}")
             return []
     
     def _map_kind_to_lsp(self, kind: str) -> int:
@@ -958,7 +954,7 @@ class LSPClientTool:
             config = LSP_SERVERS[language]
             client = LSPClient(project_root, config)
             LSPClientTool._clients[cache_key] = client
-            PrettyOutput.print(f"LSP客户端创建成功: {config.name} for {language}", OutputType.INFO)
+            print(f"ℹ️ LSP客户端创建成功: {config.name} for {language}")
             return client
         except RuntimeError:
             # LSP服务器不可用，尝试使用Tree-sitter后备
@@ -966,7 +962,7 @@ class LSPClientTool:
                 # 检查Tree-sitter后备缓存
                 if cache_key in LSPClientTool._treesitter_clients:
                     fallback = LSPClientTool._treesitter_clients[cache_key]
-                    PrettyOutput.print(f"使用Tree-sitter后备客户端: {language}", OutputType.INFO)
+                    print(f"ℹ️ 使用Tree-sitter后备客户端: {language}")
                     return fallback
                 
                 # 检查是否有该语言的符号提取器
@@ -975,19 +971,19 @@ class LSPClientTool:
                     if extractor:
                         fallback = TreeSitterFallback(project_root, language)
                         LSPClientTool._treesitter_clients[cache_key] = fallback
-                        PrettyOutput.print(f"创建Tree-sitter后备客户端: {language}", OutputType.INFO)
+                        print(f"ℹ️ 创建Tree-sitter后备客户端: {language}")
                         return fallback
                     else:
-                        PrettyOutput.print(f"Tree-sitter不支持语言: {language}", OutputType.WARNING)
+                        print(f"⚠️ Tree-sitter不支持语言: {language}")
                         return None
                 else:
-                    PrettyOutput.print(f"Tree-sitter不可用，且LSP服务器 {config.name} 也不可用", OutputType.WARNING)
+                    print(f"⚠️ Tree-sitter不可用，且LSP服务器 {config.name} 也不可用")
                     return None
             else:
-                PrettyOutput.print(f"LSP服务器 {config.name} 不可用，且Tree-sitter也不可用", OutputType.WARNING)
+                print(f"⚠️ LSP服务器 {config.name} 不可用，且Tree-sitter也不可用")
                 return None
         except Exception as e:
-            PrettyOutput.print(f"Failed to create LSP client: {e}", OutputType.ERROR)
+            print(f"❌ Failed to create LSP client: {e}")
             # 尝试使用Tree-sitter后备
             if _check_treesitter_available() and _symbol_extractor_module:
                 extractor = _symbol_extractor_module.get_symbol_extractor(language)
@@ -995,7 +991,7 @@ class LSPClientTool:
                     if cache_key not in LSPClientTool._treesitter_clients:
                         fallback = TreeSitterFallback(project_root, language)
                         LSPClientTool._treesitter_clients[cache_key] = fallback
-                        PrettyOutput.print(f"创建Tree-sitter后备客户端: {language}", OutputType.INFO)
+                        print(f"ℹ️ 创建Tree-sitter后备客户端: {language}")
                         return fallback
                     return LSPClientTool._treesitter_clients[cache_key]
             return None
@@ -1178,7 +1174,7 @@ class LSPClientTool:
             }
             
         except Exception as e:
-            PrettyOutput.print(f"LSP client tool error: {e}", OutputType.ERROR)
+            print(f"❌ LSP client tool error: {e}")
             return {
                 "success": False,
                 "stdout": "",

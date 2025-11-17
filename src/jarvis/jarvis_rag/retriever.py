@@ -10,7 +10,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from rank_bm25 import BM25Okapi  # type: ignore
 
 from .embedding_manager import EmbeddingManager
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class ChromaRetriever:
@@ -42,9 +41,8 @@ class ChromaRetriever:
         self.collection = self.client.get_or_create_collection(
             name=self.collection_name
         )
-        PrettyOutput.print(
-            f"ChromaDB 客户端已在 '{db_path}' 初始化，集合为 '{collection_name}'。",
-            OutputType.SUCCESS,
+        print(
+            f"✅ ChromaDB 客户端已在 '{db_path}' 初始化，集合为 '{collection_name}'。"
         )
 
         # BM25索引设置
@@ -58,15 +56,15 @@ class ChromaRetriever:
     def _load_or_initialize_bm25(self):
         """从磁盘加载BM25索引或初始化一个新索引。"""
         if os.path.exists(self.bm25_index_path):
-            PrettyOutput.print("正在加载现有的 BM25 索引...", OutputType.INFO)
+            print("ℹ️ 正在加载现有的 BM25 索引...")
             with open(self.bm25_index_path, "rb") as f:
                 data = pickle.load(f)
                 self.bm25_corpus = data["corpus"]
                 self.bm25_index = BM25Okapi(self.bm25_corpus)
-            PrettyOutput.print("BM25 索引加载成功。", OutputType.SUCCESS)
+            print("✅ BM25 索引加载成功。")
         else:
-            PrettyOutput.print(
-                "未找到 BM25 索引，将初始化一个新的。", OutputType.WARNING
+            print(
+                "⚠️ 未找到 BM25 索引，将初始化一个新的。"
             )
             self.bm25_corpus = []
             self.bm25_index = None
@@ -74,10 +72,10 @@ class ChromaRetriever:
     def _save_bm25_index(self):
         """将BM25索引保存到磁盘。"""
         if self.bm25_index:
-            PrettyOutput.print("正在保存 BM25 索引...", OutputType.INFO)
+            print("ℹ️ 正在保存 BM25 索引...")
             with open(self.bm25_index_path, "wb") as f:
                 pickle.dump({"corpus": self.bm25_corpus, "index": self.bm25_index}, f)
-            PrettyOutput.print("BM25 索引保存成功。", OutputType.SUCCESS)
+            print("✅ BM25 索引保存成功。")
 
     def _load_manifest(self) -> Dict[str, Dict[str, Any]]:
         """加载已索引文件清单，用于变更检测。"""
@@ -97,7 +95,7 @@ class ChromaRetriever:
             with open(self.manifest_path, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            PrettyOutput.print(f"保存索引清单失败: {e}", OutputType.WARNING)
+            print(f"⚠️ 保存索引清单失败: {e}")
 
     def _compute_md5(
         self, file_path: str, chunk_size: int = 1024 * 1024
@@ -136,8 +134,8 @@ class ChromaRetriever:
                 continue
         if updated > 0:
             self._save_manifest(manifest)
-            PrettyOutput.print(
-                f"已更新索引清单，记录 {updated} 个源文件状态。", OutputType.INFO
+            print(
+                f"ℹ️ 已更新索引清单，记录 {updated} 个源文件状态。"
             )
 
     def _detect_changed_or_deleted(self) -> Dict[str, List[str]]:
@@ -203,7 +201,7 @@ class ChromaRetriever:
         lines.append(
             "提示：请使用 'jarvis-rag add <路径>' 重新索引相关文件，以更新向量库与BM25索引。"
         )
-        PrettyOutput.print("\n".join(lines), OutputType.WARNING)
+        print(f"⚠️ {'\n'.join(lines)}")
 
     def detect_index_changes(self) -> Dict[str, List[str]]:
         """
@@ -225,8 +223,8 @@ class ChromaRetriever:
                 removed += 1
         if removed > 0:
             self._save_manifest(manifest)
-            PrettyOutput.print(
-                f"已从索引清单中移除 {removed} 个已删除的源文件记录。", OutputType.INFO
+            print(
+                f"ℹ️ 已从索引清单中移除 {removed} 个已删除的源文件记录。"
             )
 
     def update_index_for_changes(self, changed: List[str], deleted: List[str]) -> None:
@@ -254,7 +252,7 @@ class ChromaRetriever:
             except Exception as e:
                 delete_errors.append(f"删除源 '{src}' 时出错: {e}")
         if delete_errors:
-            PrettyOutput.print("\n".join(delete_errors), OutputType.WARNING)
+            print(f"⚠️ {'\n'.join(delete_errors)}")
 
         # 再处理变更（重建）
         docs_to_add: List[Document] = []
@@ -275,14 +273,14 @@ class ChromaRetriever:
             except Exception as e:
                 rebuild_errors.append(f"重建源 '{src}' 内容时出错: {e}")
         if rebuild_errors:
-            PrettyOutput.print("\n".join(rebuild_errors), OutputType.WARNING)
+            print(f"⚠️ {'\n'.join(rebuild_errors)}")
 
         if docs_to_add:
             try:
                 # 复用现有拆分与嵌入逻辑
                 self.add_documents(docs_to_add)
             except Exception as e:
-                PrettyOutput.print(f"添加变更文档到索引时出错: {e}", OutputType.ERROR)
+                print(f"❌ 添加变更文档到索引时出错: {e}")
 
         # 重建BM25索引，确保删除后的语料被清理
         try:
@@ -292,7 +290,7 @@ class ChromaRetriever:
             self.bm25_index = BM25Okapi(self.bm25_corpus) if self.bm25_corpus else None
             self._save_bm25_index()
         except Exception as e:
-            PrettyOutput.print(f"重建BM25索引失败: {e}", OutputType.WARNING)
+            print(f"⚠️ 重建BM25索引失败: {e}")
 
         # 更新manifest：变更文件更新状态；删除文件从清单中移除
         try:
@@ -301,11 +299,10 @@ class ChromaRetriever:
             if deleted:
                 self._remove_sources_from_manifest(deleted)
         except Exception as e:
-            PrettyOutput.print(f"更新索引清单时出错: {e}", OutputType.WARNING)
+            print(f"⚠️ 更新索引清单时出错: {e}")
 
-        PrettyOutput.print(
-            f"索引已更新：变更 {len(changed)} 个，删除 {len(deleted)} 个。",
-            OutputType.SUCCESS,
+        print(
+            f"✅ 索引已更新：变更 {len(changed)} 个，删除 {len(deleted)} 个。"
         )
 
     def add_documents(
@@ -319,9 +316,8 @@ class ChromaRetriever:
         )
         chunks = text_splitter.split_documents(documents)
 
-        PrettyOutput.print(
-            f"已将 {len(documents)} 个文档拆分为 {len(chunks)} 个块。",
-            OutputType.INFO,
+        print(
+            f"ℹ️ 已将 {len(documents)} 个文档拆分为 {len(chunks)} 个块。"
         )
 
         if not chunks:
@@ -341,9 +337,8 @@ class ChromaRetriever:
             documents=chunk_texts,
             metadatas=cast(Any, metadatas),
         )
-        PrettyOutput.print(
-            f"成功将 {len(chunks)} 个块添加到 ChromaDB 集合中。",
-            OutputType.SUCCESS,
+        print(
+            f"✅ 成功将 {len(chunks)} 个块添加到 ChromaDB 集合中。"
         )
 
         # 更新并保存BM25索引

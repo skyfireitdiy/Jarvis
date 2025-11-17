@@ -52,9 +52,8 @@ class FileAnalyzerTool:
                 else:
                     missing_files.append(file_path)
             if missing_files:
-                PrettyOutput.print(
-                    "以下文件不存在:\n" + "\n".join(f"  - {p}" for p in missing_files),
-                    OutputType.WARNING,
+                print(
+                    f"⚠️ 以下文件不存在:\n{'\n'.join(f'  - {p}' for p in missing_files)}"
                 )
 
             if not valid_files:
@@ -81,7 +80,7 @@ class FileAnalyzerTool:
             try:
                 upload_result = platform.upload_files(valid_files)
                 if not upload_result:
-                    PrettyOutput.print("文件上传失败", OutputType.ERROR)
+                    print("❌ 文件上传失败")
                     return {
                         "success": False,
                         "stdout": "",
@@ -89,7 +88,7 @@ class FileAnalyzerTool:
                     }
 
             except Exception as e:
-                PrettyOutput.print(f"文件上传失败: {str(e)}", OutputType.ERROR)
+                print(f"❌ 文件上传失败: {str(e)}")
                 return {
                     "success": False,
                     "stdout": "",
