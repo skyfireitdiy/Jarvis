@@ -12,8 +12,8 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
-    def test_windows_clipboard(self, mock_pretty, mock_popen, mock_platform):
+    @patch("jarvis.jarvis_utils.clipboard.print")
+    def test_windows_clipboard(self, mock_print, mock_popen, mock_platform):
         """测试 Windows 剪贴板"""
         mock_platform.return_value = "Windows"
         mock_process = MagicMock()
@@ -28,8 +28,8 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
-    def test_macos_clipboard(self, mock_pretty, mock_popen, mock_platform):
+    @patch("jarvis.jarvis_utils.clipboard.print")
+    def test_macos_clipboard(self, mock_print, mock_popen, mock_platform):
         """测试 macOS 剪贴板"""
         mock_platform.return_value = "Darwin"
         mock_process = MagicMock()
@@ -48,8 +48,8 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
-    def test_linux_xsel_clipboard(self, mock_pretty, mock_popen, mock_platform):
+    @patch("jarvis.jarvis_utils.clipboard.print")
+    def test_linux_xsel_clipboard(self, mock_print, mock_popen, mock_platform):
         """测试 Linux xsel 剪贴板"""
         mock_platform.return_value = "Linux"
         mock_process = MagicMock()
@@ -65,8 +65,8 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
-    def test_linux_xsel_not_found_fallback_xclip(self, mock_pretty, mock_popen, mock_platform):
+    @patch("jarvis.jarvis_utils.clipboard.print")
+    def test_linux_xsel_not_found_fallback_xclip(self, mock_print, mock_popen, mock_platform):
         """测试 Linux xsel 未找到时回退到 xclip"""
         mock_platform.return_value = "Linux"
         # 第一次调用（xsel）抛出 FileNotFoundError，第二次（xclip）成功
@@ -85,8 +85,8 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
-    def test_windows_clipboard_error(self, mock_pretty, mock_popen, mock_platform):
+    @patch("jarvis.jarvis_utils.clipboard.print")
+    def test_windows_clipboard_error(self, mock_print, mock_popen, mock_platform):
         """测试 Windows 剪贴板错误处理"""
         mock_platform.return_value = "Windows"
         mock_popen.side_effect = Exception("Clip error")
@@ -94,12 +94,12 @@ class TestCopyToClipboard:
         copy_to_clipboard("test text")
         
         # 应该打印警告
-        mock_pretty.print.assert_called()
+        mock_print.assert_called()
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.PrettyOutput")
-    def test_linux_no_clipboard_tools(self, mock_pretty, mock_popen, mock_platform):
+    @patch("jarvis.jarvis_utils.clipboard.print")
+    def test_linux_no_clipboard_tools(self, mock_print, mock_popen, mock_platform):
         """测试 Linux 没有剪贴板工具"""
         mock_platform.return_value = "Linux"
         mock_popen.side_effect = FileNotFoundError()
@@ -107,5 +107,5 @@ class TestCopyToClipboard:
         copy_to_clipboard("test text")
         
         # 应该打印警告
-        mock_pretty.print.assert_called()
+        mock_print.assert_called()
 

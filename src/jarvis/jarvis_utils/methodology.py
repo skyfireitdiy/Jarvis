@@ -20,7 +20,6 @@ from jarvis.jarvis_utils.config import (
     get_central_methodology_repo,
     get_max_input_token_count,
 )
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import daily_check_git_updates
 from jarvis.jarvis_utils.embedding import get_context_token_count
 
@@ -37,7 +36,7 @@ def _get_methodology_directory() -> str:
         try:
             os.makedirs(methodology_dir, exist_ok=True)
         except Exception as e:
-            PrettyOutput.print(f"创建方法论目录失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 创建方法论目录失败: {str(e)}")
     return methodology_dir
 
 
@@ -69,16 +68,12 @@ def _load_all_methodologies() -> Dict[str, str]:
                 try:
                     import subprocess
 
-                    PrettyOutput.print(
-                        f"正在克隆中心方法论仓库: {central_repo}", OutputType.INFO
-                    )
+                    print(f"ℹ️ 正在克隆中心方法论仓库: {central_repo}")
                     subprocess.run(
                         ["git", "clone", central_repo, central_repo_path], check=True
                     )
                 except Exception as e:
-                    PrettyOutput.print(
-                        f"克隆中心方法论仓库失败: {str(e)}", OutputType.ERROR
-                    )
+                    print(f"❌ 克隆中心方法论仓库失败: {str(e)}")
 
     # --- 全局每日更新检查 ---
     daily_check_git_updates(methodology_dirs, "methodologies")
@@ -110,9 +105,9 @@ def _load_all_methodologies() -> Dict[str, str]:
 
     # 统一打印目录警告与文件加载失败信息
     if warn_dirs:
-        PrettyOutput.print("\n".join(warn_dirs), OutputType.WARNING)
+        print("⚠️ " + "\n⚠️ ".join(warn_dirs))
     if error_lines:
-        PrettyOutput.print("\n".join(error_lines), OutputType.WARNING)
+        print("⚠️ " + "\n⚠️ ".join(error_lines))
     return all_methodologies
 
 
@@ -145,7 +140,7 @@ def _create_methodology_temp_file(methodologies: Dict[str, str]) -> Optional[str
 
         return temp_path
     except Exception as e:
-        PrettyOutput.print(f"创建方法论临时文件失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 创建方法论临时文件失败: {str(e)}")
         return None
 
 
@@ -161,12 +156,12 @@ def upload_methodology(platform: BasePlatform, other_files: List[str] = []) -> b
     """
     methodology_dir = _get_methodology_directory()
     if not os.path.exists(methodology_dir):
-        PrettyOutput.print("方法论文档不存在", OutputType.WARNING)
+        print("⚠️ 方法论文档不存在")
         return False
 
     methodologies = _load_all_methodologies()
     if not methodologies:
-        PrettyOutput.print("没有可用的方法论文档", OutputType.WARNING)
+        print("⚠️ 没有可用的方法论文档")
         return False
 
     temp_file_path = _create_methodology_temp_file(methodologies)
@@ -212,14 +207,12 @@ def load_methodology(
 
     try:
         # 加载所有方法论
-        PrettyOutput.print("📁 加载方法论文件...", OutputType.INFO)
+        print("📁 加载方法论文件...")
         methodologies = _load_all_methodologies()
         if not methodologies:
-            PrettyOutput.print("没有找到方法论文件", OutputType.WARNING)
+            print("⚠️ 没有找到方法论文件")
             return ""
-        PrettyOutput.print(
-            f"加载方法论文件完成 (共 {len(methodologies)} 个)", OutputType.SUCCESS
-        )
+        print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
         if platform_name:
             platform = PlatformRegistry().create_platform(platform_name)
@@ -229,7 +222,7 @@ def load_methodology(
             platform = PlatformRegistry().get_normal_platform()
 
         if not platform:
-            PrettyOutput.print("无法创建平台实例", OutputType.ERROR)
+            print("❌ 无法创建平台实例")
             return ""
 
         platform.set_suppress_output(True)
@@ -347,10 +340,7 @@ def load_methodology(
 
             # 检查是否会超过token限制
             if total_methodology_tokens + methodology_tokens > available_tokens:
-                PrettyOutput.print(
-                    f"达到方法论token限制 ({total_methodology_tokens}/{available_tokens})，停止加载更多方法论",
-                    OutputType.INFO,
-                )
+                print(f"ℹ️ 达到方法论token限制 ({total_methodology_tokens}/{available_tokens})，停止加载更多方法论")
                 break
 
             final_prompt += methodology_text
@@ -359,21 +349,16 @@ def load_methodology(
 
         # 如果一个方法论都没有加载成功
         if selected_count == 0:
-            PrettyOutput.print(
-                "警告：由于token限制，无法加载任何方法论内容", OutputType.WARNING
-            )
+            print("⚠️ 警告：由于token限制，无法加载任何方法论内容")
             return "没有历史方法论可参考"
 
         final_prompt += suffix_prompt
 
-        PrettyOutput.print(
-            f"成功加载 {selected_count} 个方法论，总token数: {total_methodology_tokens}",
-            OutputType.INFO,
-        )
+        print(f"ℹ️ 成功加载 {selected_count} 个方法论，总token数: {total_methodology_tokens}")
 
         # 如果内容不大，直接使用chat_until_success
         return platform.chat_until_success(final_prompt)
 
     except Exception as e:
-        PrettyOutput.print(f"加载方法论失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 加载方法论失败: {str(e)}")
         return ""

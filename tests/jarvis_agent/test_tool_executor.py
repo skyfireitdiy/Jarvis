@@ -58,8 +58,8 @@ class TestToolExecutor:
             call("✅ MockTool执行完成")
         ])
     
-    @patch('jarvis.jarvis_agent.tool_executor.PrettyOutput')
-    def test_multiple_handlers_error(self, mock_output, mock_agent):
+    @patch('jarvis.jarvis_agent.tool_executor.print')
+    def test_multiple_handlers_error(self, mock_print, mock_agent):
         """测试多个处理器匹配时的错误"""
         # 创建两个都匹配的处理器
         handler1 = Mock()
@@ -81,8 +81,8 @@ class TestToolExecutor:
         assert "Tool2" in result[1]
         
         # 验证警告输出
-        mock_output.print.assert_called_once()
-        args = mock_output.print.call_args[0]
+        mock_print.assert_called_once()
+        args = mock_print.call_args[0]
         assert "检测到多个操作" in args[0]
     
     @patch('jarvis.jarvis_agent.tool_executor.user_confirm')

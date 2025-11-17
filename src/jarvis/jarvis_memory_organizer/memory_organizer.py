@@ -649,7 +649,8 @@ def export(
         valid_types = ["project_long_term", "global_long_term"]
         invalid_types = [mt for mt in memory_types if mt not in valid_types]
         if invalid_types:
-            print(f"❌ 错误：不支持的记忆类型: {', '.join(f\"'{mt}'\" for mt in invalid_types)}")
+            invalid_str = ", ".join(f"'{mt}'" for mt in invalid_types)
+            print(f"❌ 错误：不支持的记忆类型: {invalid_str}")
             raise typer.Exit(1)
 
         count = organizer.export_memories(
