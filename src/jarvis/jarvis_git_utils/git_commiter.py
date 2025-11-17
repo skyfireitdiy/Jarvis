@@ -16,7 +16,6 @@ from jarvis.jarvis_utils.git_utils import (
     has_uncommitted_changes,
 )
 from jarvis.jarvis_utils.globals import get_agent, current_agent_name
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 
@@ -75,7 +74,7 @@ class GitCommitTool:
         os.chdir(root_dir)
         find_git_root_and_cd()
         if not has_uncommitted_changes():
-            PrettyOutput.print("没有未提交的更改", OutputType.SUCCESS)
+            print("✅ 没有未提交的更改")
             return None
         return original_dir
 
@@ -130,7 +129,7 @@ class GitCommitTool:
             try:
                 temp_diff_file_path = None
                 # 生成提交信息
-                PrettyOutput.print("正在生成提交消息...", OutputType.INFO)
+                print("ℹ️ 正在生成提交消息...")
 
                 # 准备提示信息
                 custom_prompt = get_git_commit_prompt()
@@ -260,7 +259,7 @@ commit信息
 
                 if is_large_content:
                     if not platform.support_upload_files():
-                        PrettyOutput.print("差异文件太大，无法处理", OutputType.ERROR)
+                        print("❌ 差异文件太大，无法处理")
                         return {
                             "success": False,
                             "stdout": "",
@@ -279,7 +278,7 @@ commit信息
                     if upload_success:
                         pass
                     else:
-                        PrettyOutput.print("上传代码差异文件失败", OutputType.ERROR)
+                        print("❌ 上传代码差异文件失败")
                         return {
                             "success": False,
                             "stdout": "",
@@ -378,14 +377,9 @@ commit信息
                     try:
                         os.unlink(temp_diff_file_path)
                     except Exception as e:
-                        PrettyOutput.print(
-                            f"无法删除临时文件: {str(e)}", OutputType.WARNING
-                        )
+                        print(f"⚠️ 无法删除临时文件: {str(e)}")
 
-            PrettyOutput.print(
-                f"提交哈希: {commit_hash}\n提交消息: {commit_message}",
-                OutputType.SUCCESS,
-            )
+            print(f"✅ 提交哈希: {commit_hash}\n提交消息: {commit_message}")
 
             return {
                 "success": True,
@@ -396,7 +390,7 @@ commit信息
                 "stderr": "",
             }
         except Exception as e:
-            PrettyOutput.print(f"提交失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 提交失败: {str(e)}")
             return {
                 "success": False,
                 "stdout": "",

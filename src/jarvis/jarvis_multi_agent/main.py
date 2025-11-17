@@ -9,7 +9,6 @@ from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.config import set_config
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 app = typer.Typer(help="多智能体系统启动器")
 
@@ -37,10 +36,7 @@ def cli(
         # 注意：全局配置同步在 init_env 之后执行，避免被覆盖
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (user_input and str(user_input).strip()):
-        PrettyOutput.print(
-            "非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。",
-            OutputType.ERROR,
-        )
+        print("❌ 非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。")
         raise typer.Exit(code=2)
     init_env("欢迎使用 Jarvis-MultiAgent，您的多智能体系统已准备就绪！")
     
@@ -85,7 +81,7 @@ def cli(
     except typer.Exit:
         return
     except (ValueError, RuntimeError, yaml.YAMLError) as e:
-        PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+        print(f"❌ 错误: {str(e)}")
         raise typer.Exit(code=1)
 
 

@@ -12,7 +12,6 @@ import os
 import time
 from typing import List, Optional
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from .base import BuildValidatorBase, BuildResult, BuildSystem
 
 
@@ -64,7 +63,7 @@ class NodeJSBuildValidator(BuildValidatorBase):
                             duration=duration,
                         )
             except Exception as e:
-                PrettyOutput.print(f"读取package.json失败: {e}", OutputType.WARNING)
+                print(f"⚠️ 读取package.json失败: {e}")
         
         # 策略3: 使用 eslint 进行语法检查（如果存在）
         if modified_files:

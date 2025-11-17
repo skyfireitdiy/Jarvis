@@ -20,7 +20,6 @@ from jarvis.jarvis_utils.methodology import (
     _get_methodology_directory,
     _load_all_methodologies,
 )
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 app = typer.Typer(help="方法论管理工具")
 
@@ -55,12 +54,9 @@ def import_methodology(
                     indent=2,
                 )
 
-        PrettyOutput.print(
-            f"成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）",
-            OutputType.SUCCESS,
-        )
+        print(f"✅ 成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）")
     except (ValueError, OSError) as e:
-        PrettyOutput.print(f"导入失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 导入失败: {str(e)}")
         raise typer.Exit(code=1)
 
 
@@ -73,12 +69,9 @@ def export_methodology(output_file: str = typer.Argument(..., help="导出文件
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(methodologies, f, ensure_ascii=False, indent=2)
 
-        PrettyOutput.print(
-            f"成功导出 {len(methodologies)} 个方法论到 {output_file}",
-            OutputType.SUCCESS,
-        )
+        print(f"✅ 成功导出 {len(methodologies)} 个方法论到 {output_file}")
     except (OSError, TypeError) as e:
-        PrettyOutput.print(f"导出失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 导出失败: {str(e)}")
         raise typer.Exit(code=1)
 
 
@@ -89,16 +82,16 @@ def list_methodologies():
         methodologies = _load_all_methodologies()
 
         if not methodologies:
-            PrettyOutput.print("没有找到方法论", OutputType.INFO)
+            print("ℹ️ 没有找到方法论")
             return
 
         # 先拼接再统一打印，避免在循环中逐条输出造成信息稀疏
         lines = ["可用方法论:"]
         for i, (problem_type, _) in enumerate(methodologies.items(), 1):
             lines.append(f"{i}. {problem_type}")
-        PrettyOutput.print("\n".join(lines), OutputType.INFO)
+        print(f"ℹ️ {'\n'.join(lines)}")
     except (OSError, ValueError) as e:
-        PrettyOutput.print(f"列出方法论失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 列出方法论失败: {str(e)}")
         raise typer.Exit(code=1)
 
 
@@ -144,22 +137,20 @@ def extract_methodology(
 """
 
         # 调用大模型平台提取方法论
-        PrettyOutput.print("正在提取方法论...", OutputType.INFO)
+        print("ℹ️ 正在提取方法论...")
         try:
             response = platform.chat_until_success(prompt)
         except Exception as e:
-            PrettyOutput.print("提取失败", OutputType.ERROR)
-            PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
+            print("❌ 提取失败")
+            print(f"❌ 提取方法论失败: {str(e)}")
             raise typer.Exit(code=1)
 
         # 提取YAML部分
         methodologies_start = response.find("<methodologies>") + len("<methodologies>")
         methodologies_end = response.find("</methodologies>")
         if methodologies_start == -1 or methodologies_end == -1:
-            PrettyOutput.print("响应格式无效", OutputType.ERROR)
-            PrettyOutput.print(
-                "大模型未返回有效的<methodologies>格式", OutputType.ERROR
-            )
+            print("❌ 响应格式无效")
+            print("❌ 大模型未返回有效的<methodologies>格式")
             raise typer.Exit(code=1)
 
         yaml_content = response[methodologies_start:methodologies_end].strip()
@@ -170,14 +161,14 @@ def extract_methodology(
                 item["problem_type"]: item["content"] for item in data
             }
         except (yaml.YAMLError, KeyError, TypeError) as e:
-            PrettyOutput.print("YAML解析失败", OutputType.ERROR)
-            PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+            print("❌ YAML解析失败")
+            print(f"❌ YAML解析错误: {str(e)}")
             raise typer.Exit(code=1)
 
         if not extracted_methodologies:
-            PrettyOutput.print("未提取到有效方法论", OutputType.WARNING)
+            print("⚠️ 未提取到有效方法论")
             return
-        PrettyOutput.print("提取到有效方法论", OutputType.SUCCESS)
+        print("✅ 提取到有效方法论")
 
         # 加载现有方法论
         existing_methodologies = _load_all_methodologies()
@@ -199,12 +190,9 @@ def extract_methodology(
                     indent=2,
                 )
 
-        PrettyOutput.print(
-            f"成功从文件提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）",
-            OutputType.SUCCESS,
-        )
+        print(f"✅ 成功从文件提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）")
     except Exception as e:
-        PrettyOutput.print(f"提取失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 提取失败: {str(e)}")
         raise typer.Exit(code=1)
 
 
@@ -247,22 +235,20 @@ def extract_methodology_from_url(
 6. 内容字段使用|保留多行格式
 """
         # 调用大模型平台提取方法论
-        PrettyOutput.print("正在从URL提取方法论...", OutputType.INFO)
+        print("ℹ️ 正在从URL提取方法论...")
         try:
             response = platform.chat_until_success(prompt)
         except Exception as e:
-            PrettyOutput.print("提取失败", OutputType.ERROR)
-            PrettyOutput.print(f"提取方法论失败: {str(e)}", OutputType.ERROR)
+            print("❌ 提取失败")
+            print(f"❌ 提取方法论失败: {str(e)}")
             raise typer.Exit(code=1)
 
         # 提取YAML部分
         methodologies_start = response.find("<methodologies>") + len("<methodologies>")
         methodologies_end = response.find("</methodologies>")
         if methodologies_start == -1 or methodologies_end == -1:
-            PrettyOutput.print("响应格式无效", OutputType.ERROR)
-            PrettyOutput.print(
-                "大模型未返回有效的<methodologies>格式", OutputType.ERROR
-            )
+            print("❌ 响应格式无效")
+            print("❌ 大模型未返回有效的<methodologies>格式")
             raise typer.Exit(code=1)
 
         yaml_content = response[methodologies_start:methodologies_end].strip()
@@ -273,14 +259,14 @@ def extract_methodology_from_url(
                 item["problem_type"]: item["content"] for item in data
             }
         except (yaml.YAMLError, KeyError, TypeError) as e:
-            PrettyOutput.print("YAML解析失败", OutputType.ERROR)
-            PrettyOutput.print(f"YAML解析错误: {str(e)}", OutputType.ERROR)
+            print("❌ YAML解析失败")
+            print(f"❌ YAML解析错误: {str(e)}")
             raise typer.Exit(code=1)
 
         if not extracted_methodologies:
-            PrettyOutput.print("未提取到有效方法论", OutputType.WARNING)
+            print("⚠️ 未提取到有效方法论")
             return
-        PrettyOutput.print("提取到有效方法论", OutputType.SUCCESS)
+        print("✅ 提取到有效方法论")
 
         # 加载现有方法论
         existing_methodologies = _load_all_methodologies()
@@ -302,12 +288,9 @@ def extract_methodology_from_url(
                     indent=2,
                 )
 
-        PrettyOutput.print(
-            f"成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）",
-            OutputType.SUCCESS,
-        )
+        print(f"✅ 成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）")
     except Exception as e:
-        PrettyOutput.print(f"从URL提取失败: {str(e)}", OutputType.ERROR)
+        print(f"❌ 从URL提取失败: {str(e)}")
         raise typer.Exit(code=1)
 
 
