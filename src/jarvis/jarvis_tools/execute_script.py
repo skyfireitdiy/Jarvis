@@ -116,6 +116,7 @@ class ScriptTool:
 
                 timed_out = False
                 if is_non_interactive():
+                    proc = None
                     try:
                         proc = subprocess.Popen(tee_command, shell=True)
                         try:
@@ -123,10 +124,32 @@ class ScriptTool:
                         except subprocess.TimeoutExpired:
                             timed_out = True
                             try:
-                                proc.kill()
+                                proc.terminate()
+                                proc.wait(timeout=2)
+                            except subprocess.TimeoutExpired:
+                                try:
+                                    proc.kill()
+                                    proc.wait()
+                                except Exception:
+                                    pass
                             except Exception:
-                                pass
+                                try:
+                                    proc.kill()
+                                    proc.wait()
+                                except Exception:
+                                    pass
                     except Exception as e:
+                        # 确保进程被关闭
+                        if proc is not None:
+                            try:
+                                proc.terminate()
+                                proc.wait(timeout=1)
+                            except Exception:
+                                try:
+                                    proc.kill()
+                                    proc.wait()
+                                except Exception:
+                                    pass
                         PrettyOutput.print(str(e), OutputType.ERROR)
                         # Attempt to read any partial output if available
                         try:
@@ -138,6 +161,18 @@ class ScriptTool:
                             "stdout": output,
                             "stderr": f"执行脚本失败: {str(e)}",
                         }
+                    finally:
+                        # 确保进程和文件描述符被关闭
+                        if proc is not None:
+                            try:
+                                if proc.stdin:
+                                    proc.stdin.close()
+                                if proc.stdout:
+                                    proc.stdout.close()
+                                if proc.stderr:
+                                    proc.stderr.close()
+                            except Exception:
+                                pass
                 else:
                     # Execute command and capture return code
                     os.system(tee_command)

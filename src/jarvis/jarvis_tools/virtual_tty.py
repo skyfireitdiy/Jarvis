@@ -563,9 +563,35 @@ class VirtualTTYTool:
             }
 
         try:
+            process = agent.tty_sessions[tty_id]["process"]
             # 终止进程
-            agent.tty_sessions[tty_id]["process"].terminate()
-            agent.tty_sessions[tty_id]["process"].wait()
+            try:
+                import subprocess as _subprocess  # pylint: disable=import-outside-toplevel
+                process.terminate()
+                process.wait(timeout=2)
+            except _subprocess.TimeoutExpired:
+                try:
+                    process.kill()
+                    process.wait()
+                except Exception:
+                    pass
+            except Exception:
+                try:
+                    process.kill()
+                    process.wait()
+                except Exception:
+                    pass
+            finally:
+                # 确保所有文件描述符被关闭
+                try:
+                    if process.stdin:
+                        process.stdin.close()
+                    if process.stdout:
+                        process.stdout.close()
+                    if process.stderr:
+                        process.stderr.close()
+                except Exception:
+                    pass
 
             # 重置终端数据
             import queue as _queue  # pylint: disable=import-outside-toplevel

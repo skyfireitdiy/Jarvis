@@ -284,7 +284,8 @@ class ToolRegistry(OutputHandlerProtocol):
         error_lines = []
         for file_path in mcp_tools_dir.glob("*.yaml"):
             try:
-                config = yaml.safe_load(open(file_path, "r", encoding="utf-8"))
+                with open(file_path, "r", encoding="utf-8") as f:
+                    config = yaml.safe_load(f)
                 self.register_mcp_tool_by_config(config)
             except Exception as e:
                 error_lines.append(f"文件 {file_path} 加载失败: {str(e)}")
