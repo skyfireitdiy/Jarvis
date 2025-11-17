@@ -102,7 +102,6 @@ def get_task_analysis_prompt(
     "tool_name": "工具名称",
     "tool_code": `# -*- coding: utf-8 -*-
 from typing import Dict, Any
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
 class 工具名称:
     name = "工具名称"
@@ -119,18 +118,18 @@ class 工具名称:
         return True
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # 使用PrettyOutput显示执行过程
-            PrettyOutput.print("开始执行操作...", OutputType.INFO)
+            # 使用print显示执行过程
+            print("ℹ️ 开始执行操作...")
             # 实现逻辑
             # ...
-            PrettyOutput.print("操作已完成", OutputType.SUCCESS)
+            print("✅ 操作已完成")
             return {{
                 "success": True,
                 "stdout": "结果输出",
                 "stderr": ""
             }}
         except Exception as e:
-            PrettyOutput.print(f"操作失败: {{str(e)}}", OutputType.ERROR)
+            print(f"❌ 操作失败: {{str(e)}}")
             return {{
                 "success": False,
                 "stdout": "",
@@ -217,7 +216,7 @@ class 工具名称:
 工具代码要求:
 1. 工具类名与工具名称一致，包含name、description、parameters属性，实现execute方法
 2. 参数定义遵循JSON Schema，工具调用使用Jsonnet格式（支持 ||| 分隔符多行字符串、尾随逗号）
-3. 使用PrettyOutput显示执行过程，返回{{success, stdout, stderr}}结构化结果
+3. 使用print显示执行过程，返回{{success, stdout, stderr}}结构化结果
 4. 妥善处理异常，失败时清理资源。如需调用大模型，创建独立实例避免干扰主流程
 </tool_requirements>
 <methodology_requirements>

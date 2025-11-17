@@ -2,7 +2,6 @@
 import os
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 if TYPE_CHECKING:
     from jarvis.jarvis_platform.base import BasePlatform
@@ -61,9 +60,9 @@ class SessionManager:
         if self.model.restore(session_file):
             try:
                 os.remove(session_file)
-                PrettyOutput.print("会话已恢复，并已删除会话文件。", OutputType.SUCCESS)
+                print("✅ 会话已恢复，并已删除会话文件。")
             except OSError as e:
-                PrettyOutput.print(f"删除会话文件失败: {e}", OutputType.ERROR)
+                print(f"❌ 删除会话文件失败: {e}")
             return True
         return False
 

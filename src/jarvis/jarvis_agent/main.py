@@ -7,7 +7,6 @@ import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.config import set_config
 
@@ -24,9 +23,7 @@ def load_config(config_path: str) -> dict:
         dict: 配置字典
     """
     if not os.path.exists(config_path):
-        PrettyOutput.print(
-            f"配置文件 {config_path} 不存在，使用默认配置", OutputType.WARNING
-        )
+        print(f"⚠️ 配置文件 {config_path} 不存在，使用默认配置")
         return {}
 
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -34,7 +31,7 @@ def load_config(config_path: str) -> dict:
             config = yaml.safe_load(f)
             return config if config else {}
         except yaml.YAMLError as e:
-            PrettyOutput.print(f"配置文件解析失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 配置文件解析失败: {str(e)}")
             return {}
 
 
@@ -68,10 +65,7 @@ def cli(
             pass
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (task and str(task).strip()):
-        PrettyOutput.print(
-            "非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。",
-            OutputType.ERROR,
-        )
+        print("❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。")
         raise typer.Exit(code=2)
     # Initialize环境
     init_env(
@@ -101,7 +95,7 @@ def cli(
 
         # Run agent with initial task if specified
         if task:
-            PrettyOutput.print(f"执行初始任务: {task}", OutputType.INFO)
+            print(f"ℹ️ 执行初始任务: {task}")
             agent.run(task)
             return
 
@@ -120,12 +114,12 @@ def cli(
             # 来自输入流程的正常退出
             return
         except Exception as e:
-            PrettyOutput.print(f"错误: {str(e)}", OutputType.ERROR)
+            print(f"❌ 错误: {str(e)}")
 
     except typer.Exit:
         return
     except Exception as e:
-        PrettyOutput.print(f"初始化错误: {str(e)}", OutputType.ERROR)
+        print(f"❌ 初始化错误: {str(e)}")
         raise typer.Exit(code=1)
 
 
