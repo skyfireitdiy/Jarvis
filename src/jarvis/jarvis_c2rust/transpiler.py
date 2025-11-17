@@ -1191,7 +1191,7 @@ class Transpiler:
             model_group=self.llm_group,
             use_methodology=False,
             use_analysis=False,
-            force_save_memory=True,
+            force_save_memory=False,
         )
         # 初始化修复Agent（CodeAgent），单个函数生命周期内复用
         # 修复阶段：启用方法论、分析和强制记忆功能
@@ -1201,7 +1201,7 @@ class Transpiler:
             model_group=self.llm_group,
             use_methodology=True,
             use_analysis=True,
-            force_save_memory=True,
+            force_save_memory=False,
         )
 
     def _get_generate_agent(self) -> CodeAgent:
@@ -1223,7 +1223,7 @@ class Transpiler:
                 model_group=self.llm_group,
                 use_methodology=False,
                 use_analysis=False,
-                force_save_memory=True,
+                force_save_memory=False,
             )
             self._current_agents[key] = agent
         return agent
@@ -1247,7 +1247,7 @@ class Transpiler:
                 model_group=self.llm_group,
                 use_methodology=True,
                 use_analysis=True,
-                force_save_memory=True,
+                force_save_memory=False,
             )
             self._current_agents[key] = agent
         return agent
