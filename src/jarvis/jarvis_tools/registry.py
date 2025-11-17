@@ -79,6 +79,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def can_handle(self, response: str) -> bool:
         # 仅当 {ot("TOOL_CALL")} 出现在行首时才认为可以处理（忽略大小写）
+        print("🛠️ 有工具调用")  # 增加工具emoji
         return re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', response) is not None
 
     def prompt(self) -> str:
@@ -791,6 +792,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         if len(output.splitlines()) > 60:
             lines = output.splitlines()
+            print(f"⚠️ 输出太长，截取前后30行") 
             return "\n".join(
                 lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
             )
@@ -816,10 +818,13 @@ class ToolRegistry(OutputHandlerProtocol):
                         usage_prompt = agent_instance.get_tool_usage_prompt()
                     except Exception:
                         usage_prompt = tool_call_help
+                    print("❌ 工具参数格式无效") 
                     return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，推荐使用 ||| 分隔符包裹，直接换行无需转义，支持保留缩进。\n\n{usage_prompt}"
 
+            print(f"🛠️ 执行工具调用 {name}") 
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)
+            print(f"✅ 执行工具调用 {name} 完成") 
 
             # 记录本轮实际执行的工具，供上层逻辑（如记忆保存判定）使用
             try:
@@ -904,7 +909,7 @@ class ToolRegistry(OutputHandlerProtocol):
             return output
 
         except Exception as e:
-            PrettyOutput.print(f"工具执行失败：{str(e)}", OutputType.ERROR)
+            print(f"❌ 工具调用失败：{str(e)}") 
             try:
                 from jarvis.jarvis_agent import Agent  # 延迟导入避免循环依赖
                 agent_instance_for_prompt: Agent = agent  # type: ignore
