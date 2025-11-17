@@ -39,7 +39,6 @@ from prompt_toolkit.styles import Style as PromptStyle
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
 from jarvis.jarvis_utils.config import get_data_dir, get_replace_map
 from jarvis.jarvis_utils.globals import get_message_history
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 
 # Sentinel value to indicate that Ctrl+O was pressed
@@ -423,7 +422,7 @@ def _show_history_and_copy():
 
     history = get_message_history()
     if not history:
-        PrettyOutput.print("没有可复制的消息", OutputType.INFO)
+        print("ℹ️ 没有可复制的消息")
         return
 
     # 为避免 PrettyOutput 在循环中为每行加框，先拼接后统一打印
@@ -435,8 +434,8 @@ def _show_history_and_copy():
             (cleaned_msg[:70] + "...") if len(cleaned_msg) > 70 else cleaned_msg
         )
         lines.append(f"  {i + 1}: {display_msg.strip()}")
-    lines.append("=" * 58 + "\n")
-    PrettyOutput.print("\n".join(lines), OutputType.INFO)
+        lines.append("=" * 58 + "\n")
+    print("ℹ️ " + "\n".join(lines))
 
     while True:
         try:
@@ -445,11 +444,11 @@ def _show_history_and_copy():
 
             if not choice_str:  # User pressed Enter
                 if not history:
-                    PrettyOutput.print("没有历史记录可供选择。", OutputType.INFO)
+                    print("ℹ️ 没有历史记录可供选择。")
                     break
                 choice = len(history) - 1
             elif choice_str.lower() == "c":
-                PrettyOutput.print("已取消", OutputType.INFO)
+                print("ℹ️ 已取消")
                 break
             else:
                 choice = int(choice_str) - 1
@@ -457,16 +456,14 @@ def _show_history_and_copy():
             if 0 <= choice < len(history):
                 selected_msg = history[choice]
                 copy_to_clipboard(selected_msg)
-                PrettyOutput.print(
-                    f"已复制消息: {selected_msg[:70]}...", OutputType.SUCCESS
-                )
+                print(f"✅ 已复制消息: {selected_msg[:70]}...")
                 break
             else:
-                PrettyOutput.print("无效的序号，请重试。", OutputType.WARNING)
+                print("⚠️ 无效的序号，请重试。")
         except ValueError:
-            PrettyOutput.print("无效的输入，请输入数字。", OutputType.WARNING)
+            print("⚠️ 无效的输入，请输入数字。")
         except (KeyboardInterrupt, EOFError):
-            PrettyOutput.print("\n操作取消", OutputType.INFO)
+            print("\nℹ️ 操作取消")
             break
 
 
@@ -489,10 +486,7 @@ def _get_multiline_input_internal(
             first_enter_hint_shown = True
 
             def _show_notice():
-                PrettyOutput.print(
-                    "提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。",
-                    OutputType.INFO,
-                )
+                print("ℹ️ 提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。")
                 try:
                     input("按回车继续...")
                 except Exception:
@@ -771,9 +765,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 import subprocess
 
                 if shutil.which("fzf") is None:
-                    PrettyOutput.print(
-                        "未检测到 fzf，无法打开文件选择器。", OutputType.WARNING
-                    )
+                    print("⚠️ 未检测到 fzf，无法打开文件选择器。")
                 else:
                     files = []
                     try:
@@ -802,7 +794,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                                 break
 
                     if not files:
-                        PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
+                        print("ℹ️ 未找到可选择的文件。")
                     else:
                         try:
                             specials = [
@@ -846,7 +838,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         if sel:
                             selected_path = sel
             except Exception as e:
-                PrettyOutput.print(f"FZF 执行失败: {e}", OutputType.ERROR)
+                print(f"❌ FZF 执行失败: {e}")
 
             # Compute new text based on selection (or keep original if none)
             if selected_path:
@@ -904,9 +896,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 import subprocess
 
                 if shutil.which("fzf") is None:
-                    PrettyOutput.print(
-                        "未检测到 fzf，无法打开文件选择器。", OutputType.WARNING
-                    )
+                    print("⚠️ 未检测到 fzf，无法打开文件选择器。")
                 else:
                     files = []
                     try:
@@ -927,7 +917,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         files = []
 
                     if not files:
-                        PrettyOutput.print("未找到可选择的文件。", OutputType.INFO)
+                        print("ℹ️ 未找到可选择的文件。")
                     else:
                         try:
                             specials = [
@@ -971,7 +961,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         if sel:
                             selected_path = sel
             except Exception as e:
-                PrettyOutput.print(f"FZF 执行失败: {e}", OutputType.ERROR)
+                print(f"❌ FZF 执行失败: {e}")
 
             # Compute new text based on selection (or keep original if none)
             if selected_path:
@@ -1025,5 +1015,5 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             continue
         else:
             if not user_input and print_on_empty:
-                PrettyOutput.print("输入已取消", OutputType.INFO)
+                print("ℹ️ 输入已取消")
             return user_input

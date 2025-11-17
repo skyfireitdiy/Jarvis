@@ -109,8 +109,8 @@ class TestSessionManager:
     
     @patch('os.path.exists')
     @patch('os.remove')
-    @patch('jarvis.jarvis_agent.session_manager.PrettyOutput')
-    def test_restore_session_success(self, mock_output, mock_remove, mock_exists, session_manager, mock_model):
+    @patch('jarvis.jarvis_agent.session_manager.print')
+    def test_restore_session_success(self, mock_print, mock_remove, mock_exists, session_manager, mock_model):
         """测试成功恢复会话"""
         mock_exists.return_value = True
         
@@ -126,7 +126,7 @@ class TestSessionManager:
             mock_remove.assert_called_once_with(expected_path)
             
             # 验证输出
-            mock_output.print.assert_called_once()
+            mock_print.assert_called_once()
     
     @patch('os.path.exists')
     def test_restore_session_file_not_exists(self, mock_exists, session_manager):
@@ -140,8 +140,8 @@ class TestSessionManager:
     
     @patch('os.path.exists')
     @patch('os.remove')
-    @patch('jarvis.jarvis_agent.session_manager.PrettyOutput')
-    def test_restore_session_remove_failure(self, mock_output, mock_remove, mock_exists, session_manager, mock_model):
+    @patch('jarvis.jarvis_agent.session_manager.print')
+    def test_restore_session_remove_failure(self, mock_print, mock_remove, mock_exists, session_manager, mock_model):
         """测试删除会话文件失败的情况"""
         mock_exists.return_value = True
         mock_remove.side_effect = OSError("Permission denied")
@@ -155,10 +155,10 @@ class TestSessionManager:
             # 验证输出：根据代码逻辑，成功恢复和删除失败时应该有两次print调用
             # 但实际测试中只有一次调用，说明mock可能有问题
             # 让我们只验证至少有一次调用，并且包含错误消息
-            assert mock_output.print.call_count >= 1
+            assert mock_print.call_count >= 1
             
             # 检查最后一次调用的消息内容应该包含错误信息
-            last_call = mock_output.print.call_args_list[-1]
+            last_call = mock_print.call_args_list[-1]
             assert "删除会话文件失败" in str(last_call) or "会话已恢复" in str(last_call)
     
     @patch('os.path.exists')
