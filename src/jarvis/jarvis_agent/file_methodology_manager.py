@@ -7,7 +7,6 @@ import os
 import tempfile
 
 from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_agent.utils import join_prompts
 
 
@@ -41,7 +40,7 @@ class FileMethodologyManager:
         """处理方法论上传"""
         if not upload_methodology(self.agent.model, other_files=self.agent.files):  # type: ignore
             if self.agent.files:
-                PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+                print("⚠️ 文件上传失败，将忽略文件列表")
             # 上传失败则回退到本地加载
             self._load_local_methodology()
         else:
@@ -61,7 +60,7 @@ class FileMethodologyManager:
     def _handle_files_upload(self):
         """处理普通文件上传"""
         if not self.agent.model.upload_files(self.agent.files):  # type: ignore
-            PrettyOutput.print("文件上传失败，将忽略文件列表", OutputType.WARNING)
+            print("⚠️ 文件上传失败，将忽略文件列表")
         else:
             self.agent.session.prompt = join_prompts([
                 self.agent.session.prompt,
@@ -71,7 +70,7 @@ class FileMethodologyManager:
     def _handle_local_mode(self):
         """处理本地模式（不支持文件上传）"""
         if self.agent.files:
-            PrettyOutput.print("不支持上传文件，将忽略文件列表", OutputType.WARNING)
+            print("⚠️ 不支持上传文件，将忽略文件列表")
         if self.agent.use_methodology:
             self._load_local_methodology()
 

@@ -55,14 +55,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "SaveSession":
             if agent.save_session():
-                from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
-                PrettyOutput.print("会话已成功保存。正在退出...", OutputType.SUCCESS)
+                print("✅ 会话已成功保存。正在退出...")
                 sys.exit(0)
             else:
-                from jarvis.jarvis_utils.output import OutputType, PrettyOutput
-
-                PrettyOutput.print("保存会话失败。", OutputType.ERROR)
+                print("❌ 保存会话失败。")
             return "", True
 
         processed_tag = set()
