@@ -106,7 +106,7 @@ class KimiModel(BasePlatform):
                 response = while_success(
                     lambda: http.put(presigned_url, data=content), sleep_time=5
                 )
-                    return response.status_code == 200
+                return response.status_code == 200
         except Exception as e:
             print(f"❌ 错误：上传文件失败：{e}")
             return False
