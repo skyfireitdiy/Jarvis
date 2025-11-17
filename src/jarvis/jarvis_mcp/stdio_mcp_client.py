@@ -5,7 +5,6 @@ import subprocess
 from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_mcp import McpClient
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class StdioMcpClient(McpClient):
@@ -50,7 +49,7 @@ class StdioMcpClient(McpClient):
             )
 
         except Exception as e:
-            PrettyOutput.print(f"启动MCP进程失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 启动MCP进程失败: {str(e)}")
             raise
 
     def _initialize(self) -> None:
@@ -79,7 +78,7 @@ class StdioMcpClient(McpClient):
             self._send_notification("notifications/initialized", {})
 
         except Exception as e:
-            PrettyOutput.print(f"MCP初始化失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ MCP初始化失败: {str(e)}")
             raise
 
     def _send_request(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -108,7 +107,7 @@ class StdioMcpClient(McpClient):
             return json.loads(response)
 
         except Exception as e:
-            PrettyOutput.print(f"发送请求失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 发送请求失败: {str(e)}")
             raise
 
     def _send_notification(self, method: str, params: Dict[str, Any]) -> None:
@@ -129,7 +128,7 @@ class StdioMcpClient(McpClient):
             self.process.stdin.flush()  # type: ignore
 
         except Exception as e:
-            PrettyOutput.print(f"发送通知失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 发送通知失败: {str(e)}")
             raise
 
     def get_tool_list(self) -> List[Dict[str, Any]]:
@@ -172,10 +171,10 @@ class StdioMcpClient(McpClient):
                 else:
                     error_msg += ": 未知错误"
 
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                print(f"❌ {error_msg}")
                 return []
         except Exception as e:
-            PrettyOutput.print(f"获取工具列表失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 获取工具列表失败: {str(e)}")
             return []
 
     def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -214,7 +213,7 @@ class StdioMcpClient(McpClient):
                     "stderr": response.get("error", "Unknown error"),
                 }
         except Exception as e:
-            PrettyOutput.print(f"执行工具失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 执行工具失败: {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
 
     def get_resource_list(self) -> List[Dict[str, Any]]:
@@ -237,10 +236,10 @@ class StdioMcpClient(McpClient):
                     error_msg += f": {response['error']}"
                 else:
                     error_msg += ": 未知错误"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                print(f"❌ {error_msg}")
                 return []
         except Exception as e:
-            PrettyOutput.print(f"获取资源列表失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 获取资源列表失败: {str(e)}")
             return []
 
     def get_resource(self, uri: str) -> Dict[str, Any]:
@@ -281,11 +280,11 @@ class StdioMcpClient(McpClient):
                     error_msg += f": {response['error']}"
                 else:
                     error_msg += ": 未知错误"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                print(f"❌ {error_msg}")
                 return {"success": False, "stdout": "", "stderr": error_msg}
         except Exception as e:
             error_msg = f"获取资源内容失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}
 
     def __del__(self):

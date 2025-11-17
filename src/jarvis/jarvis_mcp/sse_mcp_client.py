@@ -8,7 +8,6 @@ from urllib.parse import parse_qs, urlencode, urljoin
 import requests  # type: ignore[import-untyped]
 
 from jarvis.jarvis_mcp import McpClient
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 class SSEMcpClient(McpClient):
@@ -78,13 +77,10 @@ class SSEMcpClient(McpClient):
 
             if not self.messages_endpoint:
                 self.messages_endpoint = "/messages"  # 默认端点
-                PrettyOutput.print(
-                    f"未获取到消息端点，使用默认值: {self.messages_endpoint}",
-                    OutputType.WARNING,
-                )
+                print(f"⚠️ 未获取到消息端点，使用默认值: {self.messages_endpoint}")
 
             if not self.session_id:
-                PrettyOutput.print("未获取到会话ID", OutputType.WARNING)
+                print("⚠️ 未获取到会话ID")
 
             # 发送初始化请求
             response = self._send_request(
@@ -107,7 +103,7 @@ class SSEMcpClient(McpClient):
             self._send_notification("notifications/initialized", {})
 
         except Exception as e:
-            PrettyOutput.print(f"MCP初始化失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ MCP初始化失败: {str(e)}")
             raise
 
     def _start_sse_connection(self) -> None:
@@ -138,7 +134,7 @@ class SSEMcpClient(McpClient):
                 self.sse_thread.start()
 
         except Exception as e:
-            PrettyOutput.print(f"SSE连接失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ SSE连接失败: {str(e)}")
             raise
 
     def _process_sse_events(self) -> None:
@@ -166,9 +162,7 @@ class SSEMcpClient(McpClient):
                                 if "session_id" in query_params:
                                     self.session_id = query_params["session_id"][0]
                         except Exception as e:
-                            PrettyOutput.print(
-                                f"解析消息端点或会话ID失败: {e}", OutputType.WARNING
-                            )
+                            print(f"⚠️ 解析消息端点或会话ID失败: {e}")
                     else:
                         buffer += data
                 elif line.startswith(":"):  # 忽略注释行
@@ -184,10 +178,10 @@ class SSEMcpClient(McpClient):
                     try:
                         self._handle_sse_event(buffer)
                     except Exception as e:
-                        PrettyOutput.print(f"处理SSE事件出错: {e}", OutputType.ERROR)
+                        print(f"❌ 处理SSE事件出错: {e}")
                     buffer = ""
 
-        PrettyOutput.print("SSE连接已关闭", OutputType.WARNING)
+        print("⚠️ SSE连接已关闭")
 
     def _handle_sse_event(self, data: str) -> None:
         """处理单个SSE事件数据"""
@@ -217,9 +211,9 @@ class SSEMcpClient(McpClient):
                         except Exception as e:
                             error_lines.append(f"处理通知时出错 ({method}): {e}")
                     if error_lines:
-                        PrettyOutput.print("\n".join(error_lines), OutputType.ERROR)
+                        print(f"❌ {'\n'.join(error_lines)}")
         except Exception:
-            PrettyOutput.print(f"无法解析SSE事件: {data}", OutputType.WARNING)
+            print(f"⚠️ 无法解析SSE事件: {data}")
 
     def register_notification_handler(self, method: str, handler: Callable) -> None:
         """注册通知处理器
@@ -339,7 +333,7 @@ class SSEMcpClient(McpClient):
                 self.pending_requests.pop(req_id, None)
                 self.request_results.pop(req_id, None)
 
-            PrettyOutput.print(f"发送请求失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 发送请求失败: {str(e)}")
             raise
 
     def _send_notification(self, method: str, params: Dict[str, Any]) -> None:
@@ -394,7 +388,7 @@ class SSEMcpClient(McpClient):
                     post_response.raise_for_status()
 
         except Exception as e:
-            PrettyOutput.print(f"发送通知失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 发送通知失败: {str(e)}")
             raise
 
     def get_tool_list(self) -> List[Dict[str, Any]]:
@@ -437,10 +431,10 @@ class SSEMcpClient(McpClient):
                 else:
                     error_msg += ": 未知错误"
 
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                print(f"❌ {error_msg}")
                 return []
         except Exception as e:
-            PrettyOutput.print(f"获取工具列表失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 获取工具列表失败: {str(e)}")
             return []
 
     def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -479,7 +473,7 @@ class SSEMcpClient(McpClient):
                     "stderr": response.get("error", "Unknown error"),
                 }
         except Exception as e:
-            PrettyOutput.print(f"执行工具失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 执行工具失败: {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
 
     def get_resource_list(self) -> List[Dict[str, Any]]:
@@ -502,10 +496,10 @@ class SSEMcpClient(McpClient):
                     error_msg += f": {response['error']}"
                 else:
                     error_msg += ": 未知错误"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                print(f"❌ {error_msg}")
                 return []
         except Exception as e:
-            PrettyOutput.print(f"获取资源列表失败: {str(e)}", OutputType.ERROR)
+            print(f"❌ 获取资源列表失败: {str(e)}")
             return []
 
     def get_resource(self, uri: str) -> Dict[str, Any]:
@@ -546,11 +540,11 @@ class SSEMcpClient(McpClient):
                     error_msg += f": {response['error']}"
                 else:
                     error_msg += ": 未知错误"
-                PrettyOutput.print(error_msg, OutputType.ERROR)
+                print(f"❌ {error_msg}")
                 return {"success": False, "stdout": "", "stderr": error_msg}
         except Exception as e:
             error_msg = f"获取资源内容失败: {str(e)}"
-            PrettyOutput.print(error_msg, OutputType.ERROR)
+            print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}
 
     def __del__(self):

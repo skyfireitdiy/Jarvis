@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 
 
@@ -343,7 +342,7 @@ class MultiAgent(OutputHandler):
 
             if not isinstance(msg, Dict):
                 # Should not happen if agent.run() returns str or Dict
-                PrettyOutput.print(f"未知消息类型: {type(msg)}", OutputType.WARNING)
+                print(f"⚠️ 未知消息类型: {type(msg)}")
                 break
 
             # Generate a brief summary via direct model call to avoid run-loop recursion
@@ -382,9 +381,7 @@ content: {msg['content']}
                 return "消息中未指定 `to` 字段"
 
             if to_agent_name not in self.agents_config_map:
-                PrettyOutput.print(
-                    f"未找到智能体 {to_agent_name}，正在重试...", OutputType.WARNING
-                )
+                print(f"⚠️ 未找到智能体 {to_agent_name}，正在重试...")
                 agent = self._get_agent(last_agent_name)
                 if not agent:
                     return f"智能体 {last_agent_name} 未找到"
@@ -393,9 +390,7 @@ content: {msg['content']}
                 )
                 continue
 
-            PrettyOutput.print(
-                f"{last_agent_name} 正在向 {to_agent_name} 发送消息...", OutputType.INFO
-            )
+            print(f"ℹ️ {last_agent_name} 正在向 {to_agent_name} 发送消息...")
 
             # Keep a reference to the sender before switching to the receiver
             sender_agent = agent
@@ -408,7 +403,7 @@ content: {msg['content']}
             sender_config = self.agents_config_map.get(last_agent_name, {})
             if sender_config.get("clear_after_send_message"):
                 if sender_agent:
-                    PrettyOutput.print(f"清除智能体 {last_agent_name} 在发送消息后的历史记录...", OutputType.INFO)
+                    print(f"ℹ️ 清除智能体 {last_agent_name} 在发送消息后的历史记录...")
                     sender_agent.clear_history()
 
             last_agent_name = agent.name
