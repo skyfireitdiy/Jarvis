@@ -60,7 +60,7 @@ def build_summary_prompt() -> str:
 - **关键**：仅当 `has_risk` 为 `true` 时，才会被记录为确认的问题。对于确认是误报的条目，请确保 `has_risk` 为 `false` 或不输出该条目。
 - **输出格式**：有告警的条目必须包含所有字段（gid 或 gids, has_risk, preconditions, trigger_path, consequences, suggestions）；无告警的条目只需包含 gid 和 has_risk。
 - **调用路径推导要求**：trigger_path 字段必须包含完整的调用路径推导，不能省略或简化。必须明确说明从可控输入到缺陷代码的完整调用链，以及每个调用点的校验情况。如果无法推导出完整的调用路径，应该判定为误报（has_risk: false）。
-- 支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。
+- 支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。
 """.strip()
 
 
@@ -115,7 +115,7 @@ def build_verification_summary_prompt() -> str:
 - **合并格式优化**：如果多个告警（gid）的验证结果（is_valid）和验证说明（verification_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
 - 必须对所有输入的 gid 进行验证，不能遗漏。
 - 如果验证通过（is_valid: true），则保留该告警；如果验证不通过（is_valid: false），则视为误报，不记录为问题。
-- 支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。
+- 支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。
 """.strip()
 
 
@@ -190,7 +190,7 @@ def get_review_summary_prompt() -> str:
 - **合并格式优化**：如果多个告警（gid）的复核结果（is_reason_sufficient）和复核说明（review_notes）完全一致，可以使用 gids 数组格式合并输出，减少重复内容。单个告警使用 gid，多个告警合并使用 gids。gid 和 gids 不能同时出现。
 - 必须对所有输入的gid进行复核，不能遗漏。
 - 如果理由不充分（is_reason_sufficient: false），该候选将重新加入验证流程；如果理由充分（is_reason_sufficient: true），该候选将被确认为无效。
-- 支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。
+- 支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。
     """.strip()
 
 
@@ -254,7 +254,7 @@ def get_cluster_summary_prompt() -> str:
     - 不要因为局部有保护措施就设置为 true，要考虑是否有其他路径绕过保护。
     - 不要因为某些调用者已做校验就设置为 true，要考虑是否有其他调用者未做校验。
     - 如果设置为 true，必须在 invalid_reason 中详细说明已检查的所有路径和原因。
-  - 支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。
+  - 支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。
 <CLUSTERS>
 [
   {

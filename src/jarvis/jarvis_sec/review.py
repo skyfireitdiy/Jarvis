@@ -266,7 +266,7 @@ def run_review_agent_with_retry(
             review_summary_prompt_text = build_verification_summary_prompt()
             error_guidance = ""
             if prev_parse_error_review:
-                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {prev_parse_error_review}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释、|||分隔符多行字符串等）。"
+                error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {prev_parse_error_review}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
             
             full_review_prompt = f"{review_task}{error_guidance}\n\n{review_summary_prompt_text}"
             try:
