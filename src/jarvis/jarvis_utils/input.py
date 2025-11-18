@@ -13,7 +13,6 @@ import sys
 import base64
 from typing import Iterable, List, Optional
 import wcwidth
-
 from colorama import Fore
 from colorama import Style as ColoramaStyle
 from fuzzywuzzy import process
@@ -35,7 +34,6 @@ from prompt_toolkit.layout.containers import Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.styles import Style as PromptStyle
-
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
 from jarvis.jarvis_utils.config import get_data_dir, get_replace_map
 from jarvis.jarvis_utils.globals import get_message_history
@@ -53,9 +51,8 @@ FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
 
-
 def _display_width(s: str) -> int:
-    """Calculate printable width of a string in terminal columns (handles wide chars)."""
+    """计算字符串在终端中的可打印宽度(处理宽字符)。"""
     try:
         w = 0
         for ch in s:
@@ -68,11 +65,10 @@ def _display_width(s: str) -> int:
     except Exception:
         return len(s)
 
-
 def _calc_prompt_rows(prev_text: str) -> int:
     """
-    Estimate how many terminal rows the previous prompt occupied.
-    Considers prompt prefix and soft-wrapping across terminal columns.
+    估算上一个提示占用了多少终端行数。
+    考虑提示前缀和跨终端列的软换行。
     """
     try:
         cols = os.get_terminal_size().columns
@@ -101,17 +97,15 @@ def _calc_prompt_rows(prev_text: str) -> int:
         total_rows += rows
     return max(1, total_rows)
 
-
 def _multiline_hint_already_shown() -> bool:
-    """Check if the multiline Enter hint has been shown before (persisted)."""
+    """检查是否已显示过多行输入提示(持久化存储)。"""
     try:
         return os.path.exists(_MULTILINE_HINT_MARK_FILE)
     except Exception:
         return False
 
-
 def _mark_multiline_hint_shown() -> None:
-    """Persist that the multiline Enter hint has been shown."""
+    """持久化存储多行输入提示已显示的状态。"""
     try:
         os.makedirs(os.path.dirname(_MULTILINE_HINT_MARK_FILE), exist_ok=True)
         with open(_MULTILINE_HINT_MARK_FILE, "w", encoding="utf-8") as f:
@@ -119,7 +113,6 @@ def _mark_multiline_hint_shown() -> None:
     except Exception:
         # Non-critical persistence failure; ignore to avoid breaking input flow
         pass
-
 
 def get_single_line_input(tip: str, default: str = "") -> str:
     """
@@ -131,7 +124,6 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     )
     prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
     return session.prompt(prompt, default=default, style=style)
-
 
 def get_choice(tip: str, choices: List[str]) -> str:
     """
@@ -227,7 +219,6 @@ def get_choice(tip: str, choices: List[str]) -> str:
         return result if result is not None else ""
     except (KeyboardInterrupt, EOFError):
         return ""
-
 
 class FileCompleter(Completer):
     """
@@ -374,7 +365,6 @@ def _get_current_agent_for_input():
     except Exception:
         pass
     return None
-
 def _is_non_interactive_for_current_agent() -> bool:
     try:
         from jarvis.jarvis_utils.config import is_non_interactive
@@ -385,7 +375,6 @@ def _is_non_interactive_for_current_agent() -> bool:
             return bool(is_non_interactive())
     except Exception:
         return False
-
 def _is_auto_complete_for_current_agent() -> bool:
     try:
         from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
@@ -401,7 +390,6 @@ def _is_auto_complete_for_current_agent() -> bool:
         return bool(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_COMPLETE", False))
     except Exception:
         return False
-
 def user_confirm(tip: str, default: bool = True) -> bool:
     """提示用户确认是/否问题（按当前Agent优先判断非交互）"""
     try:
@@ -413,11 +401,10 @@ def user_confirm(tip: str, default: bool = True) -> bool:
     except KeyboardInterrupt:
         return False
 
-
 def _show_history_and_copy():
     """
-    Displays message history and handles copying to clipboard.
-    This function uses standard I/O and is safe to call outside a prompt session.
+    显示消息历史记录并处理复制到剪贴板。
+    此函数使用标准I/O，可在提示会话之外安全调用。
     """
 
     history = get_message_history()
@@ -465,7 +452,6 @@ def _show_history_and_copy():
         except (KeyboardInterrupt, EOFError):
             print("\nℹ️ 操作取消")
             break
-
 
 def _get_multiline_input_internal(
     tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
@@ -685,7 +671,6 @@ def _get_multiline_input_internal(
         ).strip()
     except (KeyboardInterrupt, EOFError):
         return ""
-
 
 def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     """
