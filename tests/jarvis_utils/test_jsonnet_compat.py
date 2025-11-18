@@ -615,3 +615,94 @@ function hello() {
         assert "第二行" in text
         assert "第三行" in text
 
+    def test_multiple_backticks_in_multiline(self):
+        """测试 ||| 多行字符串中包含多个反引号"""
+        json_str = """{
+  "text": |||
+第一行包含 `反引号1`
+第二行包含 `反引号2` 和 `反引号3`
+第三行没有反引号
+|||
+}"""
+        result = loads(json_str)
+        assert "text" in result
+        text = result["text"]
+        assert "`反引号1`" in text or "反引号1" in text
+        assert "`反引号2`" in text or "反引号2" in text
+        assert "`反引号3`" in text or "反引号3" in text
+
+    def test_backtick_at_line_start_in_multiline(self):
+        """测试 ||| 多行字符串中反引号在行首的情况"""
+        json_str = """{
+  "text": |||
+`反引号` 在行首
+正常内容 `反引号` 在中间
+反引号在行尾 `反引号`
+|||
+}"""
+        result = loads(json_str)
+        assert "text" in result
+        text = result["text"]
+        assert "`反引号`" in text or "反引号" in text
+
+    def test_backticks_with_code_block_markers_in_multiline(self):
+        """测试 ||| 多行字符串中包含 ``` 的情况（不应被误识别为代码块标记）"""
+        json_str = """{
+  "text": |||
+包含 ``` 的内容
+还有 `单个反引号`
+以及 ```三个反引号```
+|||
+}"""
+        result = loads(json_str)
+        assert "text" in result
+        text = result["text"]
+        assert "```" in text
+        assert "`单个反引号`" in text or "单个反引号" in text
+
+    def test_backticks_in_multiline_within_markdown_code_block(self):
+        """测试 markdown 代码块中包含多行字符串，而多行字符串中又包含反引号"""
+        input_str = """```json5
+{
+  "text": |||
+包含 `反引号` 的多行字符串
+在 markdown 代码块中
+|||
+}
+```"""
+        result = loads(input_str)
+        assert "text" in result
+        text = result["text"]
+        assert "`反引号`" in text or "反引号" in text
+        assert "markdown" in text or "代码块" in text
+
+    def test_backticks_in_nested_multiline_strings(self):
+        """测试嵌套的多行字符串中都包含反引号"""
+        json_str = """{
+  "text1": |||
+第一个多行字符串包含 `反引号1`
+|||,
+  "text2": |||
+第二个多行字符串包含 `反引号2`
+|||
+}"""
+        result = loads(json_str)
+        assert "text1" in result
+        assert "text2" in result
+        assert "`反引号1`" in result["text1"] or "反引号1" in result["text1"]
+        assert "`反引号2`" in result["text2"] or "反引号2" in result["text2"]
+
+    def test_backticks_with_special_characters_in_multiline(self):
+        """测试多行字符串中包含反引号和特殊字符的组合"""
+        json_str = """{
+  "text": |||
+包含 `反引号` 和特殊字符: !@#$%^&*()
+还有换行符和 `反引号` 的组合
+|||
+}"""
+        result = loads(json_str)
+        assert "text" in result
+        text = result["text"]
+        assert "`反引号`" in text or "反引号" in text
+        assert "!@#$%^&*()" in text or "特殊字符" in text
+
