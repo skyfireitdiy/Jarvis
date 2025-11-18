@@ -316,6 +316,89 @@ class Calculator:
         # 应该失败，因为缓存无效
         assert result["success"] is False
 
+    def test_cache_invalid_after_external_file_modification(self, tool, sample_file, mock_agent):
+        """测试外部修改文件后缓存失效（实际修改文件）"""
+        abs_path = os.path.abspath(sample_file)
+        
+        # 创建原始文件内容
+        original_content = """def hello():
+    print("Hello, World!")
+
+def add(a, b):
+    return a + b
+"""
+        with open(abs_path, 'w') as f:
+            f.write(original_content)
+        
+        # 等待一小段时间，确保文件时间戳稳定
+        time.sleep(0.2)
+        
+        # 建立缓存
+        file_mtime = os.path.getmtime(abs_path)
+        cache = {
+            abs_path: {
+                "id_list": ["block-1", "block-2"],
+                "blocks": {
+                    "block-1": {"content": "def hello():\n    print(\"Hello, World!\")\n"},
+                    "block-2": {"content": "\ndef add(a, b):\n    return a + b\n"},
+                },
+                "total_lines": 5,
+                "read_time": time.time(),
+                "file_mtime": file_mtime,
+            }
+        }
+        
+        def get_user_data_side_effect(key):
+            if key == "read_code_cache":
+                return cache
+            return None
+        
+        mock_agent.get_user_data.side_effect = get_user_data_side_effect
+        
+        # 验证缓存有效
+        cache_info = EditFileTool._get_file_cache(mock_agent, abs_path)
+        is_valid_before = EditFileTool._is_cache_valid(cache_info, abs_path)
+        assert is_valid_before is True
+        
+        # 外部修改文件（模拟外部编辑器修改）
+        modified_content = """def hello():
+    print("Hello, Modified World!")
+
+def add(a, b):
+    return a + b
+
+def multiply(a, b):
+    return a * b
+"""
+        with open(abs_path, 'w') as f:
+            f.write(modified_content)
+        
+        # 等待一小段时间，确保文件时间戳更新
+        time.sleep(0.2)
+        
+        # 验证缓存失效
+        cache_info_after = EditFileTool._get_file_cache(mock_agent, abs_path)
+        is_valid_after = EditFileTool._is_cache_valid(cache_info_after, abs_path)
+        assert is_valid_after is False, "文件被外部修改后，缓存应该失效"
+        
+        # 尝试编辑文件，应该失败并提示缓存无效
+        result = tool.execute({
+            "file_path": sample_file,
+            "diffs": [{
+                "type": "structured",
+                "block_id": "block-1",
+                "action": "replace",
+                "content": "new content\n"
+            }],
+            "agent": mock_agent
+        })
+        
+        # 应该失败，因为缓存无效
+        assert result["success"] is False
+        # 验证错误信息包含缓存无效的提示
+        error_msg = result.get("stderr", "") + result.get("stdout", "")
+        assert "缓存无效" in error_msg or "文件已被外部修改" in error_msg or "重新读取文件" in error_msg
+
     def test_cache_update_after_edit(self, tool, sample_file, mock_agent):
         """测试编辑后缓存更新"""
         abs_path = os.path.abspath(sample_file)
