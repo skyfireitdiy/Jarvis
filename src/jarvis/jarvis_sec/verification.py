@@ -305,7 +305,24 @@ def process_verification_batch(
 
     # 显示进度
     try:
-        typer.secho(f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}'", fg=typer.colors.CYAN)
+        # 提取批次中的所有 gid
+        batch_gids = []
+        for item in batch:
+            try:
+                gid_val = item.get("gid", 0)
+                gid_int = int(gid_val) if gid_val else 0
+                if gid_int >= 1:
+                    batch_gids.append(gid_int)
+            except Exception:
+                pass
+        
+        # 格式化 gid 列表显示（显示完整列表）
+        if batch_gids:
+            batch_gids_sorted = sorted(batch_gids)
+            gids_str = str(batch_gids_sorted)
+            typer.secho(f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' gids={gids_str}", fg=typer.colors.CYAN)
+        else:
+            typer.secho(f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' (无有效gid)", fg=typer.colors.CYAN)
     except Exception:
         pass
 
@@ -578,14 +595,6 @@ def process_verification_phase(
         except Exception:
             pass
     
-    # 更新验证阶段状态
-    if total_batches > 0:
-        status_mgr.update_verification(
-            current_batch=0,
-            total_batches=total_batches,
-            message="开始安全验证..."
-        )
-    
     meta_records: List[Dict] = []
     gid_counts: Dict[int, int] = {}
     
@@ -593,12 +602,26 @@ def process_verification_phase(
     from jarvis.jarvis_sec.file_manager import load_clusters
     clusters = load_clusters(sec_dir)
     
+    # 计算实际需要处理的批次数量（排除已完成的批次）
+    pending_batches = []
+    skipped_count = 0
+    
+    # 调试：显示已分析的 gid 信息
+    if analyzed_gids:
+        try:
+            analyzed_gids_sorted = sorted(list(analyzed_gids))
+            sample_gids = analyzed_gids_sorted[:10] if len(analyzed_gids_sorted) > 10 else analyzed_gids_sorted
+            typer.secho(f"[jarvis-sec] 断点恢复：已分析的 gid 示例: {sample_gids}{'...' if len(analyzed_gids_sorted) > 10 else ''} (共 {len(analyzed_gids)} 个)", fg=typer.colors.BLUE)
+        except Exception:
+            pass
+    
     for bidx, batch in enumerate(batches, start=1):
         task_id = f"JARVIS-SEC-Batch-{bidx}"
         batch_file = batch[0].get("file") if batch else None
         
         # 检查批次是否已完成
         is_batch_completed = False
+        completion_reason = ""
         
         # 从批次中提取 gids（确保类型为整数）
         batch_gids = set()
@@ -611,8 +634,14 @@ def process_verification_phase(
             except Exception:
                 pass
         
+        if not batch_gids:
+            # 批次中没有有效的 gid，跳过
+            skipped_count += 1
+            continue
+        
         # 方法1：通过 cluster_id 检查是否已完成
-        # 查找匹配的聚类
+        # 查找匹配的聚类（精确匹配：文件相同且 gid 集合完全相同）
+        matched_cluster_id = None
         for cluster in clusters:
             cluster_file = str(cluster.get("file", ""))
             cluster_gids_list = cluster.get("gids", [])
@@ -624,39 +653,86 @@ def process_verification_phase(
                 except Exception:
                     pass
             
-            if cluster_file == batch_file and cluster_gids == batch_gids:
+            # 文件路径匹配：使用标准化路径进行比较（去除尾部斜杠等）
+            def normalize_path(p: str) -> str:
+                if not p:
+                    return ""
+                # 统一使用正斜杠，去除尾部斜杠
+                return p.replace("\\", "/").rstrip("/")
+            
+            batch_file_normalized = normalize_path(batch_file or "")
+            cluster_file_normalized = normalize_path(cluster_file)
+            
+            # 匹配条件：文件路径相同（标准化后）且 gid 集合完全相同
+            if cluster_file_normalized == batch_file_normalized and cluster_gids == batch_gids:
                 cluster_id = cluster.get("cluster_id", "")
                 if cluster_id and cluster_id in completed_cluster_ids:
                     is_batch_completed = True
+                    matched_cluster_id = cluster_id
+                    completion_reason = f"通过 cluster_id 匹配: {cluster_id}"
                     break
         
         # 方法2：如果所有 gid 都已分析，则认为该批次已完成
         if not is_batch_completed and batch_gids and analyzed_gids:
             # batch_gids已经是整数集合，analyzed_gids也应该是整数集合
             # 直接使用issubset检查
-            if batch_gids.issubset(analyzed_gids):
+            missing_gids = batch_gids - analyzed_gids
+            if not missing_gids:  # 所有 gid 都已分析
                 is_batch_completed = True
+                completion_reason = f"所有 gid 已分析 (批次 gids: {sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''})"
+            elif bidx <= 3:  # 调试：显示前3个批次的匹配情况
+                try:
+                    typer.secho(f"[jarvis-sec] 批次 {bidx} 部分 gid 未分析: 缺失={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''}, 已分析={sorted(list(batch_gids & analyzed_gids))[:5]}{'...' if len(batch_gids & analyzed_gids) > 5 else ''}", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
         
         if is_batch_completed:
+            skipped_count += 1
+            # 调试日志：显示跳过的批次信息
             try:
-                typer.secho(f"[jarvis-sec] 跳过批次 {bidx}/{total_batches}：已在之前的运行中完成", fg=typer.colors.GREEN)
+                typer.secho(f"[jarvis-sec] 跳过批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}): {completion_reason}", fg=typer.colors.GREEN)
             except Exception:
                 pass
-            # 更新进度但不实际处理
-            status_mgr.update_verification(
-                current_batch=bidx,
-                total_batches=total_batches,
-                batch_id=task_id,
-                file_name=batch_file,
-                message=f"跳过已完成的批次 {bidx}/{total_batches}"
-            )
-            continue
+        else:
+            # 调试日志：显示待处理的批次信息
+            if bidx <= 3:  # 只显示前3个待处理批次
+                try:
+                    missing_gids = batch_gids - analyzed_gids if analyzed_gids else batch_gids
+                    typer.secho(f"[jarvis-sec] 待处理批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}, 未分析={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''})", fg=typer.colors.YELLOW)
+                except Exception:
+                    pass
+            pending_batches.append((bidx, batch))
+    
+    # 实际需要处理的批次数量
+    actual_total_batches = len(pending_batches)
+    processed_count = 0
+    
+    # 显示跳过批次的信息
+    if skipped_count > 0:
+        try:
+            typer.secho(f"[jarvis-sec] 断点恢复：跳过 {skipped_count} 个已完成的批次，剩余 {actual_total_batches} 个批次待处理", fg=typer.colors.GREEN)
+        except Exception:
+            pass
+    
+    # 更新验证阶段状态（使用实际需要处理的总批次数）
+    if actual_total_batches > 0:
+        status_mgr.update_verification(
+            current_batch=0,
+            total_batches=actual_total_batches,
+            message=f"开始安全验证...（共 {actual_total_batches} 个批次待处理）"
+        )
+    
+    # 处理待处理的批次
+    for bidx, batch in pending_batches:
+        processed_count += 1
+        task_id = f"JARVIS-SEC-Batch-{bidx}"
+        batch_file = batch[0].get("file") if batch else None
         
-        # 处理验证批次
+        # 处理验证批次（使用实际已处理的批次编号）
         process_verification_batch(
             batch,
-            bidx,
-            total_batches,
+            processed_count,  # 使用实际已处理的批次编号
+            actual_total_batches,  # 使用实际需要处理的总批次数
             entry_path,
             langs,
             llm_group,
