@@ -322,7 +322,7 @@ def loads(s: str) -> Any:
     """
     解析 JSON/Jsonnet 格式的字符串，返回 Python 对象
     
-    使用 jsonnet 来解析，支持 JSON5 特性（注释、尾随逗号、|||分隔符多行字符串等）
+    使用 jsonnet 来解析，支持 JSON5 特性（注释、尾随逗号、||| 或 ``` 分隔符多行字符串等）
     
     自动处理：
     - markdown 代码块标记：如果输入包含 ```json5、```json、``` 等代码块标记，
