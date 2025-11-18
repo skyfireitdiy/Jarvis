@@ -95,7 +95,6 @@ class YuanbaoPlatform(BasePlatform):
         try:
             response = while_success(
                 lambda: http.post(url, headers=headers, data=payload),
-                sleep_time=5,
             )
             response_json = response.json()
 
@@ -256,7 +255,6 @@ class YuanbaoPlatform(BasePlatform):
         try:
             response = while_success(
                 lambda: http.post(url, headers=headers, json=payload),
-                sleep_time=5,
             )
 
             if response.status_code != 200:
@@ -466,7 +464,6 @@ class YuanbaoPlatform(BasePlatform):
             # 使用新的stream_post接口发送消息请求，获取流式响应
             response_stream = while_success(
                 lambda: http.stream_post(url, headers=headers, json=payload),
-                sleep_time=5,
             )
 
             in_thinking = False
@@ -542,7 +539,6 @@ class YuanbaoPlatform(BasePlatform):
         try:
             response = while_success(
                 lambda: http.post(url, headers=headers, json=payload),
-                sleep_time=5,
             )
 
             if response.status_code == 200:

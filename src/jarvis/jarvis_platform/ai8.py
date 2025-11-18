@@ -70,7 +70,6 @@ class AI8Model(BasePlatform):
                         "rags": [],
                     },
                 ),
-                sleep_time=5,
             )
 
             data = response.json()
@@ -98,7 +97,6 @@ class AI8Model(BasePlatform):
                     headers=self.headers,
                     json=session_data,
                 ),
-                sleep_time=5,
             )
 
             data = response.json()
@@ -142,7 +140,6 @@ class AI8Model(BasePlatform):
                     headers=stream_headers,
                     json=payload,
                 ),
-                sleep_time=5,
             )
 
             # 处理流式响应
@@ -183,7 +180,6 @@ class AI8Model(BasePlatform):
                     f"{self.BASE_URL}/api/chat/session/{self.conversation['id']}",  # type: ignore
                     headers=self.headers,
                 ),
-                sleep_time=5,
             )
 
             data = response.json()
@@ -260,7 +256,6 @@ class AI8Model(BasePlatform):
                 lambda: http.get(
                     f"{self.BASE_URL}/api/chat/tmpl", headers=self.headers
                 ),
-                sleep_time=5,
             )
 
             data = response.json()
