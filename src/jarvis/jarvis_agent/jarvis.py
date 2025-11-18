@@ -700,6 +700,11 @@ def run_cli(
     web: bool = typer.Option(False, "--web", help="以 Web 模式启动，通过浏览器 WebSocket 交互"),
     web_host: str = typer.Option("127.0.0.1", "--web-host", help="Web 服务主机"),
     web_port: int = typer.Option(8765, "--web-port", help="Web 服务端口"),
+    web_launch_cmd: Optional[str] = typer.Option(
+        None,
+        "--web-launch-cmd",
+        help="交互式终端启动命令（字符串格式，用空格分隔，如: --web-launch-cmd 'jca --task \"xxx\"'）",
+    ),
     stop: bool = typer.Option(False, "--stop", help="停止后台 Web 服务（需与 --web 一起使用）"),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
@@ -953,6 +958,8 @@ def run_cli(
                     args += ["-D"]
                 if non_interactive:
                     args += ["-n"]
+                if web_launch_cmd:
+                    args += ["--web-launch-cmd", str(web_launch_cmd)]
                 env = os.environ.copy()
                 env["JARVIS_WEB_DAEMON"] = "1"
                 # 启动子进程（后台运行）
@@ -1061,42 +1068,74 @@ def run_cli(
                     enable_web_stdin_redirect()
                 except Exception:
                     pass
-                # 记录用于交互式终端（PTY）重启的 jvs 启动命令（移除 web 相关参数）
-                try:
-                    import sys as _sys
-                    import os as _os
-                    import json as _json
-                    _argv = list(_sys.argv)
-                    # 去掉程序名（argv[0]），并过滤 --web 相关参数
-                    filtered = []
-                    i = 1
-                    while i < len(_argv):
-                        a = _argv[i]
-                        if a == "--web" or a.startswith("--web="):
+                # 构建用于交互式终端（PTY）重启的启动命令
+                launch_cmd = None
+                # 优先使用命令行参数指定的启动命令
+                if web_launch_cmd and web_launch_cmd.strip():
+                    # 解析字符串命令（支持引号）
+                    try:
+                        import shlex
+                        launch_cmd = shlex.split(web_launch_cmd.strip())
+                        # 调试输出（可选，可以通过环境变量控制）
+                        if os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                            print(f"🔍 解析后的启动命令: {launch_cmd}")
+                    except Exception:
+                        # 如果解析失败，使用简单的空格分割
+                        launch_cmd = web_launch_cmd.strip().split()
+                        if os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                            print(f"🔍 使用简单分割的启动命令: {launch_cmd}")
+                else:
+                    # 如果没有指定，则自动构建（移除 web 相关参数）
+                    try:
+                        import sys as _sys
+                        import os as _os
+                        _argv = list(_sys.argv)
+                        # 去掉程序名（argv[0]），并过滤 --web 相关参数
+                        filtered = []
+                        i = 1
+                        while i < len(_argv):
+                            a = _argv[i]
+                            if a == "--web" or a.startswith("--web="):
+                                i += 1
+                                continue
+                            if a == "--web-host":
+                                i += 2
+                                continue
+                            if a.startswith("--web-host="):
+                                i += 1
+                                continue
+                            if a == "--web-port":
+                                i += 2
+                                continue
+                            if a.startswith("--web-port="):
+                                i += 1
+                                continue
+                            if a == "--web-launch-cmd":
+                                # 跳过 --web-launch-cmd 及其值
+                                i += 2
+                                continue
+                            if a.startswith("--web-launch-cmd="):
+                                i += 1
+                                continue
+                            filtered.append(a)
                             i += 1
-                            continue
-                        if a == "--web-host":
-                            i += 2
-                            continue
-                        if a.startswith("--web-host="):
-                            i += 1
-                            continue
-                        if a == "--web-port":
-                            i += 2
-                            continue
-                        if a.startswith("--web-port="):
-                            i += 1
-                            continue
-                        filtered.append(a)
-                        i += 1
-                    # 使用 jvs 命令作为可执行文件，保留其余业务参数
-                    cmd = ["jvs"] + filtered
-                    _os.environ["JARVIS_WEB_LAUNCH_JSON"] = _json.dumps(cmd, ensure_ascii=False)
-                except Exception:
-                    pass
+                        # 使用 jvs 命令作为可执行文件，保留其余业务参数
+                        launch_cmd = ["jvs"] + filtered
+                    except Exception:
+                        pass
+                
+                # 同时写入环境变量作为备选（向后兼容）
+                if launch_cmd:
+                    try:
+                        import os as _os
+                        import json as _json
+                        _os.environ["JARVIS_WEB_LAUNCH_JSON"] = _json.dumps(launch_cmd, ensure_ascii=False)
+                    except Exception:
+                        pass
+                
                 print("ℹ️ 以 Web 模式启动，请在浏览器中打开提供的地址进行交互。")
-                # 启动 Web 服务（阻塞调用）
-                start_web_server(agent_manager, host=web_host, port=web_port)
+                # 启动 Web 服务（阻塞调用），传入启动命令
+                start_web_server(agent_manager, host=web_host, port=web_port, launch_command=launch_cmd)
                 return
             except Exception as e:
                 print(f"❌ Web 模式启动失败: {e}")
