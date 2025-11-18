@@ -18,7 +18,7 @@ import os
 import signal
 import atexit
 from pathlib import Path
-from typing import Any, Dict, Callable, Optional
+from typing import Any, Dict, Callable, Optional, List
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -289,10 +289,14 @@ def _run_and_notify(agent: Any, text: str) -> None:
         except Exception:
             pass
 
-def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> None:
+def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, launch_command: Optional[List[str]] = None) -> None:
     """
     启动Web服务，并将Agent绑定到应用上下文。
     - agent: 现有的 Agent 实例（已完成初始化）
+    - host: Web 服务主机地址
+    - port: Web 服务端口
+    - launch_command: 交互式终端启动命令（列表格式，如 ["jvs", "--task", "xxx"]），
+                      如果为 None，则从环境变量 JARVIS_WEB_LAUNCH_JSON 读取
     """
     app = _build_app()
     app.state.agent = agent  # 供 WS 端点调用
@@ -303,6 +307,8 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         app.state.agent_manager = agent if hasattr(agent, "initialize") else None
     except Exception:
         app.state.agent_manager = None
+    # 存储启动命令到应用状态
+    app.state.launch_command = launch_command
 
     @app.websocket("/stdio")
     async def websocket_stdio(ws: WebSocket) -> None:
@@ -450,26 +456,48 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
         # 会话结束后等待用户按回车再重启
         waiting_for_ack = False
         ack_event = asyncio.Event()
-
+        
+        # 在 fork 前获取启动命令（避免在子进程中访问 app.state）
+        _launch_cmd = None
+        try:
+            if hasattr(app.state, "launch_command") and app.state.launch_command:
+                _launch_cmd = app.state.launch_command
+                # 调试输出
+                if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                    print(f"🔍 Web服务器: 使用传入的启动命令: {_launch_cmd}")
+            else:
+                # 回退到环境变量
+                import json as _json
+                _cmd_json = _os.environ.get("JARVIS_WEB_LAUNCH_JSON", "")
+                if _cmd_json:
+                    try:
+                        _launch_cmd = _json.loads(_cmd_json)
+                        if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                            print(f"🔍 Web服务器: 从环境变量读取启动命令: {_launch_cmd}")
+                    except Exception:
+                        _launch_cmd = None
+        except Exception:
+            _launch_cmd = None
 
         def _spawn_jvs_session() -> bool:
-            nonlocal session
+            nonlocal session, _launch_cmd
             try:
                 pid, master_fd = _pty.fork()
                 if pid == 0:
-                    # 子进程：执行 jvs 启动命令（移除 web 相关参数），失败时回退到系统 shell
-                    try:
-                        import json as _json
-                        _cmd_json = _os.environ.get("JARVIS_WEB_LAUNCH_JSON", "")
-                        if _cmd_json:
-                            try:
-                                _argv = _json.loads(_cmd_json)
-                            except Exception:
-                                _argv = []
-                            if isinstance(_argv, list) and len(_argv) > 0 and isinstance(_argv[0], str):
-                                _os.execvp(_argv[0], _argv)
-                    except Exception:
-                        pass
+                    # 子进程：执行启动命令，失败时回退到系统 shell
+                    # 使用在 fork 前获取的命令
+                    _argv = _launch_cmd
+                    
+                    # 如果获取到有效命令，执行它
+                    if _argv and isinstance(_argv, list) and len(_argv) > 0 and isinstance(_argv[0], str):
+                        try:
+                            if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                                print(f"🔍 子进程: 执行命令: {_argv}")
+                            _os.execvp(_argv[0], _argv)
+                        except Exception as e:
+                            if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                                print(f"⚠️ 子进程: 执行命令失败: {e}")
+                            pass
                     # 若未配置或执行失败，回退到 /bin/bash 或 /bin/sh
                     try:
                         _os.execvp("/bin/bash", ["/bin/bash"])
@@ -747,4 +775,12 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765) -> N
             pass
     except Exception:
         pass
-    uvicorn.run(app, host=host, port=port)
+    # 配置 uvicorn 日志级别，隐藏连接信息和访问日志
+    import logging
+    # 禁用 uvicorn 的访问日志
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    # 禁用 uvicorn 的常规日志（连接信息等）
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    # 禁用 uvicorn.error 的 INFO 级别日志
+    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+    uvicorn.run(app, host=host, port=port, log_level="warning", access_log=False)
