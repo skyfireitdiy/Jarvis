@@ -438,28 +438,26 @@ class EditFileTool:
         # 按照 id_list 的顺序恢复
         id_list = cache_info.get("id_list", [])
         blocks = cache_info.get("blocks", {})
+        file_ends_with_newline = cache_info.get("file_ends_with_newline", False)
         
         result = []
-        for i, block_id in enumerate(id_list):
+        for idx, block_id in enumerate(id_list):
             block = blocks.get(block_id)
             if block:
                 content = block.get('content', '')
                 if content:
-                    # 如果不是第一个块，且前一个块的内容不以换行符结尾，
-                    # 且当前块的内容不以换行符开头，则在块之间插入换行符
-                    if i > 0 and result:
-                        prev_content = result[-1]
-                        # 如果前一个块不以换行符结尾，且当前块不以换行符开头，则插入换行
-                        if prev_content and not prev_content.endswith('\n'):
-                            if content and not content.startswith('\n'):
-                                result.append('\n')
                     result.append(content)
+                    # 在块之间添加换行符（最后一个块后面根据文件是否以换行符结尾决定）
+                    is_last_block = (idx == len(id_list) - 1)
+                    if is_last_block:
+                        # 最后一个块：如果文件以换行符结尾，添加换行符
+                        if file_ends_with_newline:
+                            result.append('\n')
+                    else:
+                        # 非最后一个块：在块之间添加换行符
+                        result.append('\n')
         
-        restored_content = ''.join(result) if result else ""
-        # 确保最后一行有换行符（如果内容不为空）
-        if restored_content and not restored_content.endswith('\n'):
-            restored_content = restored_content + '\n'
-        return restored_content
+        return ''.join(result) if result else ""
 
     @staticmethod
     def _apply_structured_edit_to_cache(
@@ -693,6 +691,7 @@ class EditFileTool:
                 "total_lines": cache_info["total_lines"],
                 "read_time": cache_info.get("read_time", time.time()),
                 "file_mtime": cache_info.get("file_mtime", 0),
+                "file_ends_with_newline": cache_info.get("file_ends_with_newline", False),
             }
             
             # 创建备份
