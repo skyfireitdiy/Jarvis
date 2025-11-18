@@ -165,7 +165,7 @@ class Calculator:
         assert is_valid is True
 
     def test_cache_invalid_when_file_modified(self, tool, sample_file, mock_agent):
-        """测试文件修改后缓存失效"""
+        """测试文件修改后缓存失效（通过模拟旧时间戳）"""
         abs_path = os.path.abspath(sample_file)
         old_mtime = os.path.getmtime(abs_path) - 100  # 旧的时间戳
         
@@ -185,6 +185,71 @@ class Calculator:
         is_valid = tool._is_cache_valid(cache_info, abs_path)
         
         assert is_valid is False
+
+    def test_cache_invalid_after_external_file_modification(self, tool, sample_file, mock_agent):
+        """测试外部修改文件后缓存失效（实际修改文件）"""
+        abs_path = os.path.abspath(sample_file)
+        
+        # 第一次读取文件，建立缓存
+        original_content = """def hello():
+    print("Hello, World!")
+
+def add(a, b):
+    return a + b
+"""
+        with open(abs_path, 'w') as f:
+            f.write(original_content)
+        
+        # 等待一小段时间，确保文件时间戳稳定
+        time.sleep(0.2)
+        
+        # 第一次读取，建立缓存
+        result1 = tool.execute({
+            "files": [{"path": sample_file}],
+            "agent": mock_agent
+        })
+        assert result1["success"] is True
+        
+        # 获取缓存
+        cache = mock_agent.get_user_data("read_code_cache")
+        assert cache is not None
+        assert abs_path in cache
+        
+        # 验证缓存有效
+        cache_info = tool._get_file_cache(mock_agent, abs_path)
+        is_valid_before = tool._is_cache_valid(cache_info, abs_path)
+        assert is_valid_before is True
+        
+        # 外部修改文件（模拟外部编辑器修改）
+        modified_content = """def hello():
+    print("Hello, Modified World!")
+
+def add(a, b):
+    return a + b
+
+def multiply(a, b):
+    return a * b
+"""
+        with open(abs_path, 'w') as f:
+            f.write(modified_content)
+        
+        # 等待一小段时间，确保文件时间戳更新
+        time.sleep(0.2)
+        
+        # 验证缓存失效
+        cache_info_after = tool._get_file_cache(mock_agent, abs_path)
+        is_valid_after = tool._is_cache_valid(cache_info_after, abs_path)
+        assert is_valid_after is False, "文件被外部修改后，缓存应该失效"
+        
+        # 再次读取文件，应该读取新内容而不是使用缓存
+        result2 = tool.execute({
+            "files": [{"path": sample_file}],
+            "agent": mock_agent
+        })
+        assert result2["success"] is True
+        
+        # 验证读取的是新内容
+        assert "Modified World" in result2["stdout"] or "multiply" in result2["stdout"]
 
     def test_convert_units_to_sequential_ids(self, tool):
         """测试将单元转换为id_list和blocks格式"""
