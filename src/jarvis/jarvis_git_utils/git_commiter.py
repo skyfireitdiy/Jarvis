@@ -16,6 +16,7 @@ from jarvis.jarvis_utils.git_utils import (
     has_uncommitted_changes,
 )
 from jarvis.jarvis_utils.globals import get_agent, current_agent_name
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 
@@ -379,7 +380,7 @@ commit信息
                     except Exception as e:
                         print(f"⚠️ 无法删除临时文件: {str(e)}")
 
-            print(f"✅ 提交哈希: {commit_hash}\n提交消息: {commit_message}")
+            PrettyOutput.print(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
 
             return {
                 "success": True,
