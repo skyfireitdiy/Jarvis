@@ -706,3 +706,77 @@ function hello() {
         assert "`反引号`" in text or "反引号" in text
         assert "!@#$%^&*()" in text or "特殊字符" in text
 
+    def test_backtick_as_multiline_string_marker(self):
+        """测试使用 ``` 代替 ||| 作为多行字符串标识"""
+        json_str = """{
+  "text": ```
+第一行
+第二行
+```
+}"""
+        result = loads(json_str)
+        assert "text" in result
+        text = result["text"]
+        assert "第一行" in text
+        assert "第二行" in text
+
+    def test_backtick_multiline_with_indent(self):
+        """测试使用 ``` 作为多行字符串标识（带缩进）"""
+        json_str = """{
+  "text": ```
+    第一行有缩进
+    第二行也有缩进
+```
+}"""
+        result = loads(json_str)
+        assert "text" in result
+        text = result["text"]
+        assert "第一行" in text
+        assert "第二行" in text
+
+    def test_backtick_multiline_in_markdown_code_block(self):
+        """测试 markdown 代码块中使用 ``` 作为多行字符串标识"""
+        input_str = """```json5
+{
+  "text": ```
+第一行
+第二行
+```
+}
+```"""
+        result = loads(input_str)
+        assert "text" in result
+        text = result["text"]
+        assert "第一行" in text
+        assert "第二行" in text
+
+    def test_backtick_and_pipe_multiline_mixed(self):
+        """测试混合使用 ``` 和 ||| 作为多行字符串标识"""
+        json_str = """{
+  "text1": ```
+第一个多行字符串
+```,
+  "text2": |||
+第二个多行字符串
+|||
+}"""
+        result = loads(json_str)
+        assert "text1" in result
+        assert "text2" in result
+        assert "第一个" in result["text1"]
+        assert "第二个" in result["text2"]
+
+    def test_backtick_multiline_with_backticks_in_content(self):
+        """测试使用 ``` 作为多行字符串标识，内容中包含反引号"""
+        json_str = """{
+  "text": ```
+包含 `单个反引号` 的内容
+还有 ```三个反引号``` 的内容
+```
+}"""
+        result = loads(json_str)
+        assert "text" in result
+        text = result["text"]
+        assert "`单个反引号`" in text or "单个反引号" in text
+        # 注意：内容中的 ``` 会被保留，不会被误识别为结束标记
+
