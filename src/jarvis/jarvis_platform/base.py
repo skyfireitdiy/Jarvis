@@ -101,7 +101,7 @@ class BasePlatform(ABC):
             prefix_prompt = """
             我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
             """
-            while_true(lambda: while_success(lambda: self._chat(prefix_prompt), 5), 5)
+            while_true(lambda: while_success(lambda: self._chat(prefix_prompt)))
             submit_count = 0
             length = 0
             response = ""
@@ -114,19 +114,16 @@ class BasePlatform(ABC):
                     lambda: while_success(
                         lambda: self._chat(
                             f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
-                        ),
-                        5,
-                    ),
-                    5,
+                        )
+                    )
                     ):
                         response += trunk
 
             print("✅ 提交完成")
             response += "\n" + while_true(
                 lambda: while_success(
-                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续"), 5
-                ),
-                5,
+                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续")
+                )
             )
         else:
             response = ""
@@ -284,7 +281,7 @@ class BasePlatform(ABC):
             if not self.suppress_output and is_print_prompt():
                 PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
             result: str = while_true(
-                lambda: while_success(lambda: self._chat(message), 5), 5
+                lambda: while_success(lambda: self._chat(message))
             )
             from jarvis.jarvis_utils.globals import set_last_message
 

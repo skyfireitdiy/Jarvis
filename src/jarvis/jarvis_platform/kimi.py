@@ -64,8 +64,7 @@ class KimiModel(BasePlatform):
         }
         try:
             response = while_success(
-                lambda: http.post(url, headers=headers, data=payload),
-                sleep_time=5,
+                lambda: http.post(url, headers=headers, data=payload)
             )
             if response.status_code != 200:
                 print(f"❌ 错误：创建会话失败：{response.json()}")
@@ -90,8 +89,7 @@ class KimiModel(BasePlatform):
         }
 
         response = while_success(
-            lambda: http.post(url, headers=headers, data=payload), sleep_time=5
-        )
+            lambda: http.post(url, headers=headers, data=payload)        )
         return response.json()
 
     def support_upload_files(self) -> bool:
@@ -104,7 +102,7 @@ class KimiModel(BasePlatform):
             with open(file_path, "rb") as f:
                 content = f.read()
                 response = while_success(
-                    lambda: http.put(presigned_url, data=content), sleep_time=5
+                    lambda: http.put(presigned_url, data=content)
                 )
                 return response.status_code == 200
         except Exception as e:
@@ -131,8 +129,7 @@ class KimiModel(BasePlatform):
         }
 
         response = while_success(
-            lambda: http.post(url, headers=headers, data=payload), sleep_time=5
-        )
+            lambda: http.post(url, headers=headers, data=payload)        )
         return response.json()
 
     def _wait_for_parse(self, file_id: str) -> bool:
@@ -150,7 +147,6 @@ class KimiModel(BasePlatform):
             payload = {"ids": [file_id]}
             response_stream = while_success(
                 lambda: http.stream_post(url, headers=headers, json=payload),
-                sleep_time=5,
             )
 
             # 处理流式响应
@@ -284,7 +280,6 @@ class KimiModel(BasePlatform):
             # 使用新的stream_post接口发送消息请求，获取流式响应
             response_stream = while_success(
                 lambda: http.stream_post(url, headers=headers, json=payload),
-                sleep_time=5,
             )
 
             # 处理流式响应
@@ -324,7 +319,7 @@ class KimiModel(BasePlatform):
 
         try:
             response = while_success(
-                lambda: http.delete(url, headers=headers), sleep_time=5
+                lambda: http.delete(url, headers=headers)
             )
             if response.status_code == 200:
                 self.chat_id = ""

@@ -8,6 +8,7 @@ import sys
 import time
 import atexit
 import errno
+import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from datetime import datetime, date
@@ -1931,57 +1932,110 @@ def _read_old_config_file(config_file):
     print("⚠️ 检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式")
 
 
-def while_success(func: Callable[[], Any], sleep_time: float = 0.1, max_retries: int = 5) -> Any:
+# 线程本地存储，用于共享重试计数器
+_retry_context = threading.local()
+
+
+def _get_retry_count() -> int:
+    """获取当前线程的重试计数"""
+    if not hasattr(_retry_context, 'count'):
+        _retry_context.count = 0
+    return _retry_context.count
+
+
+def _increment_retry_count() -> int:
+    """增加重试计数并返回新的计数值"""
+    if not hasattr(_retry_context, 'count'):
+        _retry_context.count = 0
+    _retry_context.count += 1
+    return _retry_context.count
+
+
+def _reset_retry_count():
+    """重置重试计数"""
+    _retry_context.count = 0
+
+
+def while_success(func: Callable[[], Any]) -> Any:
     """循环执行函数直到成功（累计日志后统一打印，避免逐次加框）
 
     参数：
     func -- 要执行的函数
-    sleep_time -- 每次失败后的等待时间（秒）
-    max_retries -- 最大重试次数，默认5次
 
     返回：
     函数执行结果
+
+    注意：
+    与while_true共享重试计数器，累计重试5次，使用指数退避（第一次等待1s）
     """
+    MAX_RETRIES = 5
     result: Any = None
-    retry_count = 0
-    while retry_count < max_retries:
+    
+    while True:
         try:
             result = func()
+            _reset_retry_count()  # 成功后重置计数器
             break
         except Exception as e:
-            retry_count += 1
-            if retry_count < max_retries:
-                print(f"⚠️ 发生异常:\n{e}\n重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...")
-                time.sleep(sleep_time)
-            continue
+            retry_count = _increment_retry_count()
+            if retry_count <= MAX_RETRIES:
+                # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第5次等待16s (2^4)
+                sleep_time = 2 ** (retry_count - 1)
+                if retry_count < MAX_RETRIES:
+                    print(f"⚠️ 发生异常:\n{e}\n重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s...")
+                    time.sleep(sleep_time)
+                else:
+                    print(f"⚠️ 发生异常:\n{e}\n已达到最大重试次数 ({retry_count}/{MAX_RETRIES})")
+                    _reset_retry_count()
+                    raise
+            else:
+                _reset_retry_count()
+                raise
     return result
 
 
-def while_true(func: Callable[[], bool], sleep_time: float = 0.1, max_retries: int = 5) -> Any:
+def while_true(func: Callable[[], bool]) -> Any:
     """循环执行函数直到返回True（累计日志后统一打印，避免逐次加框）
 
     参数:
         func: 要执行的函数，必须返回布尔值
-        sleep_time: 每次失败后的等待时间(秒)
-        max_retries: 最大重试次数，默认5次
 
     返回:
         函数最终返回的True值
 
     注意:
         与while_success不同，此函数只检查返回是否为True，
-        不捕获异常，异常会直接抛出
+        不捕获异常，异常会直接抛出。
+        与while_success共享重试计数器，累计重试5次，使用指数退避（第一次等待1s）
     """
+    MAX_RETRIES = 5
     ret: bool = False
-    retry_count = 0
-    while retry_count < max_retries:
-        ret = func()
-        if ret:
+    
+    while True:
+        try:
+            ret = func()
+            if ret:
+                _reset_retry_count()  # 成功后重置计数器
+                break
+        except Exception:
+            # 异常直接抛出，不捕获
+            _reset_retry_count()
+            raise
+        
+        retry_count = _increment_retry_count()
+        if retry_count <= MAX_RETRIES:
+            # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第5次等待16s (2^4)
+            sleep_time = 2 ** (retry_count - 1)
+            if retry_count < MAX_RETRIES:
+                print(f"⚠️ 返回空值，重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s...")
+                time.sleep(sleep_time)
+            else:
+                print(f"⚠️ 返回空值，已达到最大重试次数 ({retry_count}/{MAX_RETRIES})")
+                _reset_retry_count()
+                break
+        else:
+            _reset_retry_count()
             break
-        retry_count += 1
-        if retry_count < max_retries:
-            print(f"⚠️ 返回空值，重试中 ({retry_count}/{max_retries})，等待 {sleep_time}s...")
-            time.sleep(sleep_time)
     return ret
 
 
