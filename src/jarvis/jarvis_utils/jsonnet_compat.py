@@ -225,6 +225,50 @@ def _restore_first_line_indent(obj: Any, indent_info: dict) -> Any:
         return obj
 
 
+def _convert_backtick_multiline_strings(s: str) -> str:
+    """
+    将 JSON 值中的 ``` 多行字符串标识转换为 |||。
+    
+    此函数识别 JSON 值位置（如 "key": ```）的 ``` 标记，并将其转换为 |||，
+    以便与 jsonnet 的 ||| 多行字符串语法兼容。
+    
+    识别规则：
+    - 在 JSON 值位置（冒号后）的 ``` 会被转换为 |||
+    - 已经去除 markdown 代码块标记后，剩余的 ``` 通常是多行字符串标识
+    
+    参数:
+        s: 输入字符串（应该已经去除 markdown 代码块标记）
+        
+    返回:
+        转换后的字符串（``` 转换为 |||）
+    """
+    if not isinstance(s, str):
+        return s
+    
+    import re
+    
+    # 匹配 JSON 值中的 ``` 多行字符串
+    # 格式：": ``` 或 ":``` 后跟可选空白和换行，然后是内容，最后是换行和 ```
+    # 使用非贪婪匹配，确保匹配到最近的 ```
+    # 注意：这个模式匹配的是 JSON 值位置（冒号后）的 ```
+    pattern = r'(:\s*)(```)(\s*\n)(.*?)(\n\s*```)'
+    
+    def convert_match(match):
+        colon = match.group(1)  # 冒号和可选空白
+        start_backticks = match.group(2)  # ```
+        whitespace_after = match.group(3)  # 空白和换行
+        content = match.group(4)  # 多行内容
+        end_backticks = match.group(5)  # 换行、空白和 ```
+        
+        # 将 ``` 转换为 |||
+        return colon + '|||' + whitespace_after + content + '\n|||'
+    
+    # 替换所有匹配的模式
+    result = re.sub(pattern, convert_match, s, flags=re.DOTALL)
+    
+    return result
+
+
 def _strip_markdown_code_blocks(s: str) -> str:
     """
     去除字符串中的 markdown 代码块标记（如 ```json5、```json、``` 等）
@@ -283,6 +327,7 @@ def loads(s: str) -> Any:
     自动处理：
     - markdown 代码块标记：如果输入包含 ```json5、```json、``` 等代码块标记，
       会自动去除这些标记后再解析。
+    - ``` 多行字符串：支持使用 ``` 代替 ||| 作为多行字符串标识（在 JSON 值位置）。
     - ||| 多行字符串缩进：自动为 ||| 多行字符串的第一行添加必要的缩进，
       避免 "text block's first line must start with whitespace" 错误。
     
@@ -297,6 +342,9 @@ def loads(s: str) -> Any:
     """
     # 自动去除 markdown 代码块标记
     cleaned = _strip_markdown_code_blocks(s)
+    
+    # 将 JSON 值中的 ``` 多行字符串标识转换为 |||
+    cleaned = _convert_backtick_multiline_strings(cleaned)
     
     # 自动修复 ||| 多行字符串的缩进问题
     cleaned, indent_info = _fix_jsonnet_multiline_strings(cleaned)
