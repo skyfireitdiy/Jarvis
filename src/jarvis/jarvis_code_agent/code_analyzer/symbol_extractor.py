@@ -16,6 +16,9 @@ class Symbol:
     docstring: Optional[str] = None
     # Add more fields as needed, e.g., parent scope
     parent: Optional[str] = None
+    # Definition location (for references/calls, points to where the symbol is defined)
+    definition_location: Optional['Symbol'] = None  # Reference to the definition Symbol
+    is_definition: bool = False  # True if this symbol is a definition, False if it's a reference/call
 
 
 class SymbolTable:
@@ -93,7 +96,7 @@ class SymbolTable:
 
     def _symbol_to_dict(self, symbol: Symbol) -> dict:
         """Convert a Symbol object to a dictionary."""
-        return {
+        result = {
             'name': symbol.name,
             'kind': symbol.kind,
             'file_path': symbol.file_path,
@@ -101,12 +104,22 @@ class SymbolTable:
             'line_end': symbol.line_end,
             'signature': symbol.signature,
             'docstring': symbol.docstring,
-            'parent': symbol.parent
+            'parent': symbol.parent,
+            'is_definition': getattr(symbol, 'is_definition', False),
         }
+        # 序列化定义位置（只保存基本信息，避免循环引用）
+        if hasattr(symbol, 'definition_location') and symbol.definition_location:
+            result['definition_location'] = {
+                'file_path': symbol.definition_location.file_path,
+                'line_start': symbol.definition_location.line_start,
+                'line_end': symbol.definition_location.line_end,
+                'name': symbol.definition_location.name,
+            }
+        return result
 
     def _dict_to_symbol(self, data: dict) -> Symbol:
         """Convert a dictionary back to a Symbol object."""
-        return Symbol(
+        symbol = Symbol(
             name=data['name'],
             kind=data['kind'],
             file_path=data['file_path'],
@@ -114,8 +127,20 @@ class SymbolTable:
             line_end=data['line_end'],
             signature=data.get('signature'),
             docstring=data.get('docstring'),
-            parent=data.get('parent')
+            parent=data.get('parent'),
+            is_definition=data.get('is_definition', False),
         )
+        # 恢复定义位置（创建临时 Symbol 对象）
+        if 'definition_location' in data and data['definition_location']:
+            def_loc = data['definition_location']
+            symbol.definition_location = Symbol(
+                name=def_loc['name'],
+                kind='',  # 未知类型
+                file_path=def_loc['file_path'],
+                line_start=def_loc['line_start'],
+                line_end=def_loc['line_end'],
+            )
+        return symbol
 
     def add_symbol(self, symbol: Symbol, save_to_cache: bool = False):
         """Adds a symbol to the table.
