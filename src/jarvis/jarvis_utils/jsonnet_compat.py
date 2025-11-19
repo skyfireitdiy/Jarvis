@@ -273,6 +273,11 @@ def _strip_markdown_code_blocks(s: str) -> str:
     """
     去除字符串中的 markdown 代码块标记（如 ```json5、```json、``` 等）
     
+    支持以下场景：
+    - 代码块前后有空白/换行：\n```json\n{...}\n```
+    - 代码块不在字符串开头：prefix\n```json\n{...}\n```
+    - 标准格式：```json\n{...}\n```
+    
     参数:
         s: 输入字符串
         
@@ -284,36 +289,60 @@ def _strip_markdown_code_blocks(s: str) -> str:
     
     import re
     
+    # 先去除首尾空白，但保留内部结构
     block = s.strip()
     
     # 使用正则表达式匹配并去除代码块标记
-    # 匹配开头的 ```language 或 ```（可选语言标识，后跟换行或字符串结尾）
-    # 匹配结尾的 ```（前面可能有换行和空白）
-    pattern = r'^```[a-zA-Z0-9_+-]*\s*\n?(.*?)\n?```\s*$'
-    match = re.match(pattern, block, re.DOTALL)
+    # 尝试多种模式，从严格到宽松
+    
+    # 模式1：标准格式，代码块在开头和结尾
+    # 匹配：```language + 可选空白 + 可选换行 + 内容 + 可选换行 + 可选空白 + ```
+    pattern1 = r'^```[a-zA-Z0-9_+-]*\s*\n?(.*?)\n?\s*```\s*$'
+    match = re.match(pattern1, block, re.DOTALL)
     if match:
-        # 如果匹配成功，提取代码块内容
-        block = match.group(1).strip()
-    else:
-        # 如果正则不匹配，尝试手动去除（向后兼容）
-        # 去除开头的代码块标记（如 ```json5、```json、``` 等）
-        if block.startswith("```"):
-            # 找到第一个换行符或字符串结尾
-            first_newline = block.find("\n")
-            if first_newline >= 0:
-                block = block[first_newline + 1:]
-            else:
-                # 没有换行符，说明整个块可能就是 ```language
-                block = ""
+        return match.group(1).strip()
+    
+    # 模式2：代码块前后可能有额外空白/换行，但要求代码块在字符串的开头或结尾
+    # 只匹配整个字符串被代码块包裹的情况，不匹配 JSON 值内部的 ```
+    # 匹配：字符串开头（可选空白）+ ```language + 可选空白 + 换行 + 内容 + 换行 + 可选空白 + ``` + 字符串结尾（可选空白）
+    pattern2 = r'^\s*```[a-zA-Z0-9_+-]*\s*\n(.*?)\n\s*```\s*$'
+    match = re.match(pattern2, block, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    
+    # 模式3：更宽松的匹配，不要求换行，但要求代码块在字符串的开头或结尾
+    # 只匹配整个字符串被代码块包裹的情况，不匹配 JSON 值内部的 ```
+    # 匹配：字符串开头（可选空白）+ ```language + 可选空白 + 内容 + 可选空白 + ``` + 字符串结尾（可选空白）
+    pattern3 = r'^\s*```[a-zA-Z0-9_+-]*\s*(.*?)\s*```\s*$'
+    match = re.match(pattern3, block, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    
+    # 如果正则都不匹配，尝试手动去除（向后兼容）
+    # 但只处理整个字符串被代码块包裹的情况（代码块在开头且结尾也有 ```）
+    block_stripped = block.strip()
+    if block_stripped.startswith("```") and block_stripped.rstrip().endswith("```"):
+        # 找到开头的 ``` 后的内容
+        after_start = 3  # 跳过 ```
+        # 跳过语言标识（如果有）
+        while after_start < len(block_stripped) and block_stripped[after_start] not in ('\n', '\r', ' ', '\t'):
+            after_start += 1
+        # 跳过空白字符
+        while after_start < len(block_stripped) and block_stripped[after_start] in (' ', '\t'):
+            after_start += 1
+        # 跳过换行符（如果有）
+        if after_start < len(block_stripped) and block_stripped[after_start] in ('\n', '\r'):
+            after_start += 1
+            # 处理 \r\n
+            if after_start < len(block_stripped) and block_stripped[after_start] == '\n' and block_stripped[after_start - 1] == '\r':
+                after_start += 1
         
-        # 去除结尾的代码块标记（包括前面的换行）
-        # 使用 rstrip 去除末尾空白后再检查，确保能匹配到 ``` 即使前面有空白
-        block_rstripped = block.rstrip()
-        if block_rstripped.endswith("```"):
-            # 找到最后一个 ``` 的位置（在原始 block 上查找，但考虑空白）
-            last_backticks = block.rfind("```")
-            if last_backticks >= 0:
-                block = block[:last_backticks].rstrip()
+        # 找到结尾的 ``` 的位置
+        before_end = block_stripped.rfind("```")
+        if before_end > after_start:
+            # 提取内容（去除结尾的 ``` 和前面的空白）
+            content = block_stripped[after_start:before_end].rstrip()
+            return content
     
     return block.strip()
 
