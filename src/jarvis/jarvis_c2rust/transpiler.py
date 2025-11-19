@@ -1571,11 +1571,22 @@ class Transpiler:
         if stage == "cargo test":
             section_lines.extend([
                 "",
-                "【测试失败信息】",
+                "【⚠️ 重要：测试失败 - 必须修复】",
                 "以下输出来自 `cargo test` 命令，包含测试执行结果和失败详情：",
+                "- **测试当前状态：失败** - 必须修复才能继续",
                 "- 如果看到测试用例名称和断言失败，说明测试逻辑或实现有问题",
                 "- 如果看到编译错误，说明代码存在语法或类型错误",
-                "- 请仔细阅读失败信息，包括：测试用例名称、断言失败位置、期望值与实际值、堆栈跟踪等",
+                "- **请仔细阅读失败信息**，包括：",
+                "  * 测试用例名称（如 `test_bz_read_get_unused`）",
+                "  * 失败位置（文件路径和行号，如 `src/ffi/decompress.rs:76:47`）",
+                "  * 错误类型（如 `SequenceError`、`Result::unwrap()` 失败等）",
+                "  * 期望值与实际值的差异",
+                "  * 完整的堆栈跟踪信息",
+                "",
+                "**关键要求：**",
+                "- 必须分析测试失败的根本原因，而不是假设问题已解决",
+                "- 必须实际修复导致测试失败的代码，而不是只修改测试用例",
+                "- 修复后必须确保测试能够通过，而不是只修复编译错误",
                 "",
             ])
             if command:
@@ -1583,10 +1594,18 @@ class Transpiler:
                 section_lines.append("提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。")
             section_lines.extend([
                 "",
-                "请阅读以下测试失败信息并进行必要修复：",
+                "【测试失败详细信息 - 必须仔细阅读并修复】",
+                "以下是从 `cargo test` 命令获取的完整输出，包含测试失败的具体信息：",
                 "<TEST_FAILURE>",
                 output,
                 "</TEST_FAILURE>",
+                "",
+                "**修复要求：**",
+                "1. 仔细分析上述测试失败信息，找出失败的根本原因",
+                "2. 定位到具体的代码位置（文件路径和行号）",
+                "3. 修复导致测试失败的代码逻辑",
+                "4. 确保修复后测试能够通过（不要只修复编译错误）",
+                "5. 如果测试用例本身有问题，可以修改测试用例，但必须确保测试能够正确验证函数行为",
                 "",
                 "修复后请再次执行 `cargo test` 进行验证。",
             ])
@@ -1765,7 +1784,7 @@ class Transpiler:
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             agent = self._get_repair_agent()
             agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={check_iter}][check]", suffix="")
-            # 修复后进行轻量验证：检查语法是否正确
+            # 修复后进行验证：检查编译是否正确
             res_verify = subprocess.run(
                 ["cargo", "check", "--message-format=short", "-q"],
                 capture_output=True,
@@ -1857,6 +1876,18 @@ class Transpiler:
         tags = self._classify_rust_error(output)
         symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
         curr, sym_name, src_loc, c_code = self._get_current_function_context()
+        
+        # 调试输出：确认测试失败信息是否正确传递
+        typer.secho(f"[c2rust-transpiler][debug] 测试失败信息长度: {len(output)} 字符", fg=typer.colors.CYAN)
+        if output:
+            # 提取关键错误信息用于调试
+            error_lines = output.split('\n')
+            key_errors = [line for line in error_lines if any(keyword in line.lower() for keyword in ['failed', 'error', 'panic', 'unwrap', 'sequence'])]
+            if key_errors:
+                typer.secho(f"[c2rust-transpiler][debug] 关键错误信息（前5行）:", fg=typer.colors.CYAN)
+                for i, line in enumerate(key_errors[:5], 1):
+                    typer.secho(f"  {i}. {line[:100]}", fg=typer.colors.CYAN)
+        
         repair_prompt = self._build_repair_prompt(
             stage="cargo test",
             output=output,
@@ -1872,26 +1903,51 @@ class Transpiler:
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         agent = self._get_repair_agent()
         agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
-        # 修复后进行轻量验证：检查语法是否正确
-        res_verify = subprocess.run(
+        # 修复后验证：先检查编译，再实际运行测试
+        # 第一步：检查编译是否通过
+        res_compile = subprocess.run(
             ["cargo", "test", "--message-format=short", "-q", "--no-run"],
             capture_output=True,
             text=True,
             check=False,
             cwd=workspace_root,
         )
-        if res_verify.returncode == 0:
-            typer.secho("[c2rust-transpiler][build] 修复后验证通过，继续构建循环", fg=typer.colors.GREEN)
-            # 修复成功，重置连续失败计数
-            self._consecutive_fix_failures = 0
-            return (False, False)  # 需要继续循环
-        else:
-            typer.secho("[c2rust-transpiler][build] 修复后验证仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
-            # 修复失败，增加连续失败计数
+        if res_compile.returncode != 0:
+            typer.secho("[c2rust-transpiler][build] 修复后编译仍有错误，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+            # 编译失败，增加连续失败计数
             self._consecutive_fix_failures += 1
             # 检查是否需要回退
             if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
                 typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次，回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
+                if self._reset_to_commit(self._current_function_start_commit):
+                    typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
+                    # 返回特殊值，表示需要重新开始
+                    return (False, None)  # type: ignore
+                else:
+                    typer.secho("[c2rust-transpiler][build] 回退失败，继续尝试修复", fg=typer.colors.YELLOW)
+            return (False, False)  # 需要继续循环
+        
+        # 第二步：编译通过，实际运行测试验证
+        res_test_verify = subprocess.run(
+            ["cargo", "test", "--", "--nocapture"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=workspace_root,
+        )
+        if res_test_verify.returncode == 0:
+            typer.secho("[c2rust-transpiler][build] 修复后测试通过，继续构建循环", fg=typer.colors.GREEN)
+            # 测试真正通过，重置连续失败计数
+            self._consecutive_fix_failures = 0
+            return (False, False)  # 需要继续循环（但下次应该会通过）
+        else:
+            # 编译通过但测试仍然失败，说明修复没有解决测试逻辑问题
+            typer.secho("[c2rust-transpiler][build] 修复后编译通过，但测试仍然失败，将在下一轮循环中处理", fg=typer.colors.YELLOW)
+            # 测试失败，增加连续失败计数（即使编译通过）
+            self._consecutive_fix_failures += 1
+            # 检查是否需要回退
+            if self._consecutive_fix_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD and self._current_function_start_commit:
+                typer.secho(f"[c2rust-transpiler][build] 连续修复失败 {self._consecutive_fix_failures} 次（编译通过但测试失败），回退到函数开始时的 commit: {self._current_function_start_commit}", fg=typer.colors.RED)
                 if self._reset_to_commit(self._current_function_start_commit):
                     typer.secho("[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数", fg=typer.colors.YELLOW)
                     # 返回特殊值，表示需要重新开始

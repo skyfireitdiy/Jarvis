@@ -279,9 +279,32 @@ class LSPClient:
                 pass
             
             return None
+        except BrokenPipeError:
+            # LSP服务器连接已断开
+            print(f"⚠️ LSP服务器连接已断开，无法发送请求: {method}")
+            return None
         except Exception as e:
             print(f"❌ Error sending LSP request: {e}")
             return None
+    
+    def _path_to_uri(self, file_path: str) -> str:
+        """将文件路径转换为URI。
+        
+        Args:
+            file_path: 文件路径（可以是相对路径或绝对路径）
+            
+        Returns:
+            文件URI
+        """
+        # 确保路径是绝对路径
+        if not os.path.isabs(file_path):
+            # 如果是相对路径，尝试相对于项目根目录解析
+            abs_path = os.path.join(self.project_root, file_path)
+            abs_path = os.path.abspath(abs_path)
+        else:
+            abs_path = os.path.abspath(file_path)
+        
+        return Path(abs_path).as_uri()
     
     def _send_notification(self, method: str, params: Dict):
         """发送LSP通知（无响应）。
@@ -303,6 +326,9 @@ class LSPClient:
             notification_str = json.dumps(notification) + "\n"
             self.process.stdin.write(notification_str)
             self.process.stdin.flush()
+        except BrokenPipeError:
+            # LSP服务器连接已断开，静默处理
+            print(f"⚠️ LSP服务器连接已断开，无法发送通知: {method}")
         except Exception as e:
             print(f"❌ Error sending LSP notification: {e}")
     
@@ -317,7 +343,7 @@ class LSPClient:
         Returns:
             补全项列表
         """
-        uri = Path(file_path).as_uri()
+        uri = self._path_to_uri(file_path)
         result = self._send_request("textDocument/completion", {
             "textDocument": {"uri": uri},
             "position": {"line": line, "character": character}
@@ -338,7 +364,7 @@ class LSPClient:
         Returns:
             悬停信息
         """
-        uri = Path(file_path).as_uri()
+        uri = self._path_to_uri(file_path)
         return self._send_request("textDocument/hover", {
             "textDocument": {"uri": uri},
             "position": {"line": line, "character": character}
@@ -355,7 +381,7 @@ class LSPClient:
         Returns:
             定义位置
         """
-        uri = Path(file_path).as_uri()
+        uri = self._path_to_uri(file_path)
         return self._send_request("textDocument/definition", {
             "textDocument": {"uri": uri},
             "position": {"line": line, "character": character}
@@ -372,7 +398,7 @@ class LSPClient:
         Returns:
             引用位置列表
         """
-        uri = Path(file_path).as_uri()
+        uri = self._path_to_uri(file_path)
         result = self._send_request("textDocument/references", {
             "textDocument": {"uri": uri},
             "position": {"line": line, "character": character},
@@ -392,7 +418,7 @@ class LSPClient:
         Returns:
             符号列表
         """
-        uri = Path(file_path).as_uri()
+        uri = self._path_to_uri(file_path)
         result = self._send_request("textDocument/documentSymbol", {
             "textDocument": {"uri": uri}
         })
@@ -487,7 +513,7 @@ class LSPClient:
             file_path: 文件路径
             content: 文件内容
         """
-        uri = Path(file_path).as_uri()
+        uri = self._path_to_uri(file_path)
         self._send_notification("textDocument/didOpen", {
             "textDocument": {
                 "uri": uri,
@@ -504,7 +530,7 @@ class LSPClient:
             file_path: 文件路径
             content: 文件内容
         """
-        uri = Path(file_path).as_uri()
+        uri = self._path_to_uri(file_path)
         self._send_notification("textDocument/didChange", {
             "textDocument": {"uri": uri, "version": 1},
             "contentChanges": [{"text": content}]
@@ -607,6 +633,25 @@ class TreeSitterFallback:
         self.language = language
         self._extractor = None
         self._symbols_cache: Dict[str, List[Dict]] = {}  # 文件路径 -> 符号列表
+    
+    def _path_to_uri(self, file_path: str) -> str:
+        """将文件路径转换为URI。
+        
+        Args:
+            file_path: 文件路径（可以是相对路径或绝对路径）
+            
+        Returns:
+            文件URI
+        """
+        # 确保路径是绝对路径
+        if not os.path.isabs(file_path):
+            # 如果是相对路径，尝试相对于项目根目录解析
+            abs_path = os.path.join(self.project_root, file_path)
+            abs_path = os.path.abspath(abs_path)
+        else:
+            abs_path = os.path.abspath(file_path)
+        
+        return Path(abs_path).as_uri()
     
     def _get_extractor(self):
         """获取符号提取器（延迟加载）"""
@@ -766,7 +811,7 @@ class TreeSitterFallback:
                 }
             },
             "definition": {
-                "uri": Path(file_path).as_uri(),
+                "uri": self._path_to_uri(file_path),
                 "range": range_info
             },
             "references": [],  # Tree-sitter 不支持引用查找
@@ -786,7 +831,7 @@ class TreeSitterFallback:
         """
         # Tree-sitter 无法精确查找定义，返回当前位置
         return {
-            "uri": Path(file_path).as_uri(),
+            "uri": self._path_to_uri(file_path),
             "range": {
                 "start": {"line": line, "character": character},
                 "end": {"line": line, "character": character}
