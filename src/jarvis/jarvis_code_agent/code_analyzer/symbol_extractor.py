@@ -6,68 +6,68 @@ from typing import Dict, List, Optional
 
 @dataclass
 class Symbol:
-    """Represents a single symbol in the code."""
+    """表示代码中的单个符号。"""
     name: str
-    kind: str  # e.g., 'function', 'class', 'variable', 'import'
+    kind: str  # 例如：'function'(函数)、'class'(类)、'variable'(变量)、'import'(导入)
     file_path: str
     line_start: int
     line_end: int
     signature: Optional[str] = None
     docstring: Optional[str] = None
-    # Add more fields as needed, e.g., parent scope
+    # 根据需要添加更多字段，例如父作用域
     parent: Optional[str] = None
-    # Definition location (for references/calls, points to where the symbol is defined)
-    definition_location: Optional['Symbol'] = None  # Reference to the definition Symbol
-    is_definition: bool = False  # True if this symbol is a definition, False if it's a reference/call
+    # 定义位置（对于引用/调用，指向符号定义的位置）
+    definition_location: Optional['Symbol'] = None  # 指向定义Symbol的引用
+    is_definition: bool = False  # 如果此符号是定义则为True，如果是引用/调用则为False
 
 
 class SymbolTable:
-    """Stores and provides access to symbols across a project."""
+    """存储并提供对项目中符号的访问。"""
 
     def __init__(self, cache_dir: Optional[str] = None):
-        # A dictionary to store symbols by their name for quick lookups.
-        # A symbol name can appear in multiple files, so it's a list.
+        # 按名称存储符号的字典，用于快速查找
+        # 一个符号名可能出现在多个文件中，因此使用列表存储
         self.symbols_by_name: Dict[str, List[Symbol]] = {}
-        # A dictionary to store symbols on a per-file basis.
+        # 按文件存储符号的字典
         self.symbols_by_file: Dict[str, List[Symbol]] = {}
-        # Track file modification times for cache invalidation
+        # 跟踪文件修改时间用于缓存失效
         self._file_mtimes: Dict[str, float] = {}
-        # Cache directory for persistent storage
+        # 持久化存储的缓存目录
         self.cache_dir = cache_dir or ".jarvis/symbol_cache"
-        # Load cached data if available
+        # 如果可用则加载缓存数据
         self._load_from_cache()
 
     def _get_cache_file(self) -> str:
-        """Get the cache file path."""
+        """获取缓存文件路径。"""
         return os.path.join(self.cache_dir, "symbol_table.json")
 
     def _load_from_cache(self):
-        """Load symbol table data from cache file."""
+        """从缓存文件加载符号表数据。"""
         cache_file = self._get_cache_file()
         if os.path.exists(cache_file):
             try:
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                # Convert JSON data back to Symbol objects
+                # 将JSON数据转换回Symbol对象
                 self.symbols_by_name = self._deserialize_symbols(data.get('symbols_by_name', {}))
                 self.symbols_by_file = self._deserialize_symbols(data.get('symbols_by_file', {}))
-                # Load file modification times
+                # 加载文件修改时间
                 self._file_mtimes = data.get('file_mtimes', {})
             except Exception:
-                # If cache loading fails, start with empty tables
+                # 如果缓存加载失败，则从空表开始
                 pass
 
     def _save_to_cache(self):
-        """Save symbol table data to cache file."""
+        """将符号表数据保存到缓存文件。"""
         try:
-            # Ensure cache directory exists
+            # 确保缓存目录存在
             os.makedirs(self.cache_dir, exist_ok=True)
             cache_file = self._get_cache_file()
             
-            # Update file modification times before saving
+            # 保存前更新文件修改时间
             self._update_file_mtimes()
             
-            # Serialize symbols for JSON storage
+            # 序列化符号以便JSON存储
             data = {
                 'symbols_by_name': self._serialize_symbols(self.symbols_by_name),
                 'symbols_by_file': self._serialize_symbols(self.symbols_by_file),
@@ -77,25 +77,25 @@ class SymbolTable:
             with open(cache_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception:
-            # If cache saving fails, continue without caching
+            # 如果缓存保存失败，则继续而不缓存
             pass
 
     def _serialize_symbols(self, symbol_dict: Dict[str, List[Symbol]]) -> Dict[str, List[dict]]:
-        """Convert Symbol objects to serializable dictionaries."""
+        """将Symbol对象转换为可序列化的字典。"""
         serialized = {}
         for key, symbols in symbol_dict.items():
             serialized[key] = [self._symbol_to_dict(symbol) for symbol in symbols]
         return serialized
 
     def _deserialize_symbols(self, symbol_dict: Dict[str, List[dict]]) -> Dict[str, List[Symbol]]:
-        """Convert serialized dictionaries back to Symbol objects."""
+        """将序列化的字典转换回Symbol对象。"""
         deserialized = {}
         for key, symbol_data_list in symbol_dict.items():
             deserialized[key] = [self._dict_to_symbol(data) for data in symbol_data_list]
         return deserialized
 
     def _symbol_to_dict(self, symbol: Symbol) -> dict:
-        """Convert a Symbol object to a dictionary."""
+        """将Symbol对象转换为字典。"""
         result = {
             'name': symbol.name,
             'kind': symbol.kind,
@@ -118,7 +118,7 @@ class SymbolTable:
         return result
 
     def _dict_to_symbol(self, data: dict) -> Symbol:
-        """Convert a dictionary back to a Symbol object."""
+        """将字典转换回Symbol对象。"""
         symbol = Symbol(
             name=data['name'],
             kind=data['kind'],
@@ -143,12 +143,12 @@ class SymbolTable:
         return symbol
 
     def add_symbol(self, symbol: Symbol, save_to_cache: bool = False):
-        """Adds a symbol to the table.
+        """向表中添加符号。
         
-        Args:
-            symbol: The symbol to add
-            save_to_cache: If True, save to cache immediately. Default False for performance.
-                          Use save_cache() to save all symbols at once after batch operations.
+        参数:
+            symbol: 要添加的符号
+            save_to_cache: 如果为True，立即保存到缓存。默认为False以提高性能。
+                          批量操作后使用save_cache()一次性保存所有符号。
         """
         if symbol.name not in self.symbols_by_name:
             self.symbols_by_name[symbol.name] = []
@@ -158,18 +158,18 @@ class SymbolTable:
             self.symbols_by_file[symbol.file_path] = []
         self.symbols_by_file[symbol.file_path].append(symbol)
         
-        # Only save to cache if explicitly requested (for performance)
+        # 仅在明确请求时保存到缓存（出于性能考虑）
         if save_to_cache:
             self._save_to_cache()
     
     def save_cache(self):
-        """Save the entire symbol table to cache. Call this after batch operations."""
+        """将整个符号表保存到缓存。批量操作后调用此方法。"""
         self._save_to_cache()
 
     def find_symbol(self, name: str, file_path: Optional[str] = None) -> List[Symbol]:
         """
-        Finds a symbol by name.
-        If file_path is provided, the search is limited to that file.
+        通过名称查找符号。
+        如果提供了file_path，则搜索仅限于该文件。
         """
         if file_path:
             return [
@@ -178,11 +178,11 @@ class SymbolTable:
         return self.symbols_by_name.get(name, [])
 
     def get_file_symbols(self, file_path: str) -> List[Symbol]:
-        """Gets all symbols within a specific file."""
+        """获取特定文件中的所有符号。"""
         return self.symbols_by_file.get(file_path, [])
 
     def clear_file_symbols(self, file_path: str):
-        """Removes all symbols associated with a specific file."""
+        """移除与特定文件关联的所有符号。"""
         if file_path in self.symbols_by_file:
             symbols_to_remove = self.symbols_by_file.pop(file_path)
             for symbol in symbols_to_remove:
@@ -194,42 +194,42 @@ class SymbolTable:
                     if not self.symbols_by_name[symbol.name]:
                         del self.symbols_by_name[symbol.name]
             
-            # Remove file mtime tracking
+            # 移除文件修改时间跟踪
             if file_path in self._file_mtimes:
                 del self._file_mtimes[file_path]
             
-            # Save to cache after clearing
+            # 清除后保存到缓存
             self._save_to_cache()
     
     def _update_file_mtimes(self):
-        """Update modification times for all tracked files."""
+        """更新所有跟踪文件的修改时间。"""
         for file_path in list(self.symbols_by_file.keys()):
             if os.path.exists(file_path):
                 try:
                     self._file_mtimes[file_path] = os.path.getmtime(file_path)
                 except Exception:
-                    # If we can't get mtime, remove from tracking
+                    # 如果无法获取修改时间，则从跟踪中移除
                     self._file_mtimes.pop(file_path, None)
     
     def is_file_stale(self, file_path: str) -> bool:
-        """Check if a file has been modified since it was cached.
+        """检查文件自缓存后是否已被修改。
         
-        Args:
-            file_path: Path to the file to check
+        参数:
+            file_path: 要检查的文件路径
             
-        Returns:
-            True if file is newer than cache, False otherwise
+        返回:
+            如果文件比缓存新则为True，否则为False
         """
         if file_path not in self.symbols_by_file:
-            # File not in cache, consider it stale (needs to be loaded)
+            # 文件不在缓存中，视为已过期（需要加载）
             return True
         
         if file_path not in self._file_mtimes:
-            # No mtime recorded, consider it stale
+            # 没有记录修改时间，视为已过期
             return True
         
         if not os.path.exists(file_path):
-            # File doesn't exist, not stale (will be handled by clear_file_symbols)
+            # 文件不存在，不算过期（将由clear_file_symbols处理）
             return False
         
         try:
@@ -237,16 +237,16 @@ class SymbolTable:
             cached_mtime = self._file_mtimes.get(file_path, 0)
             return current_mtime > cached_mtime
         except Exception:
-            # If we can't get mtime, assume not stale
+            # 如果无法获取修改时间，则假定未过期
             return False
 
 
 class SymbolExtractor:
-    """Extracts symbols from a source code file."""
+    """从源代码文件中提取符号。"""
 
     def extract_symbols(self, file_path: str, content: str) -> List[Symbol]:
         """
-        Extracts symbols (functions, classes, variables, etc.) from the code.
-        This method should be implemented by language-specific subclasses.
+        从代码中提取符号（函数、类、变量等）。
+        此方法应由特定语言的子类实现。
         """
         raise NotImplementedError("Subclasses must implement this method.")
