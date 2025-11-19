@@ -988,12 +988,38 @@ class ReadCodeTool:
                 context_lines.append(scope_info)
 
             if edit_context.used_symbols:
-                symbol_names = [s.name for s in edit_context.used_symbols[:10]]
-                symbols_str = ", ".join(f"`{name}`" for name in symbol_names)
+                # 区分定义和调用，显示定义位置信息
+                definitions = []
+                calls = []
+                for symbol in edit_context.used_symbols[:10]:
+                    is_def = getattr(symbol, 'is_definition', False)
+                    if is_def:
+                        definitions.append(symbol)
+                    else:
+                        calls.append(symbol)
+                
+                # 显示定义
+                if definitions:
+                    def_names = [f"`{s.name}`" for s in definitions]
+                    context_lines.append(f"📝 定义的符号: {', '.join(def_names)}")
+                
+                # 显示调用（带定义位置信息）
+                if calls:
+                    call_info = []
+                    for symbol in calls:
+                        def_loc = getattr(symbol, 'definition_location', None)
+                        if def_loc:
+                            def_file = os.path.basename(def_loc.file_path)
+                            def_line = def_loc.line_start
+                            call_info.append(f"`{symbol.name}` → {def_file}:{def_line}")
+                        else:
+                            call_info.append(f"`{symbol.name}`")
+                    context_lines.append(f"🔗 调用的符号: {', '.join(call_info)}")
+                
+                # 如果还有更多符号
                 more = len(edit_context.used_symbols) - 10
                 if more > 0:
-                    symbols_str += f" (还有{more}个)"
-                context_lines.append(f"🔗 使用的符号: {symbols_str}")
+                    context_lines.append(f"   ... 还有{more}个符号")
 
             # 不再感知导入符号
 

@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Set
+from typing import Any, List, Optional, Set
 
 from .dependency_analyzer import DependencyGraph
 from .file_ignore import filter_walk_dirs
@@ -276,7 +276,13 @@ class ContextManager:
         return current_scope
 
     def _find_used_symbols(self, file_path: str, content: str, line_start: int, line_end: int) -> List[Symbol]:
-        """Find symbols used in the specified line range."""
+        """Find symbols used in the specified line range.
+        
+        改进版本：
+        1. 区分定义和调用：检查符号是否在当前行范围内定义
+        2. 获取定义位置：优先使用 LSP，如果不支持则使用 tree-sitter
+        3. 为每个使用的符号添加定义位置信息
+        """
         # Check if file is stale and update if needed
         if self.symbol_table.is_file_stale(file_path):
             self._refresh_file_symbols(file_path)
@@ -288,16 +294,243 @@ class ContextManager:
         used_symbols: List[Symbol] = []
         all_symbols = self.symbol_table.get_file_symbols(file_path)
         
+        # 尝试获取 LSP 客户端（优先使用）
+        lsp_client = None
+        try:
+            from jarvis.jarvis_tools.lsp_client import LSPClientTool
+            lsp_client = LSPClientTool.get_client_for_file(file_path, self.project_root)
+        except Exception:
+            pass
+        
+        # 尝试获取 tree-sitter 提取器（作为后备）
+        treesitter_extractor = None
+        try:
+            from jarvis.jarvis_code_agent.code_analyzer.language_support import (
+                detect_language,
+                get_symbol_extractor,
+            )
+            language = detect_language(file_path)
+            if language:
+                treesitter_extractor = get_symbol_extractor(language)
+        except Exception:
+            pass
+        
+        # 用于跟踪已处理的符号，避免重复
+        processed_symbols = {}  # {symbol_name: (symbol, is_definition, definition_location)}
+        
         # Simple pattern matching to find symbol usage
         for symbol in all_symbols:
             if symbol.kind == 'import':
                 continue
             
             pattern = r'\b' + re.escape(symbol.name) + r'\b'
-            if re.search(pattern, region_content):
-                used_symbols.append(symbol)
+            matches = list(re.finditer(pattern, region_content))
+            if not matches:
+                continue
+            
+            # 检查符号是否在当前行范围内定义
+            is_definition_in_range = (
+                symbol.file_path == file_path and
+                symbol.line_start >= line_start and
+                symbol.line_start <= line_end
+            )
+            
+            # 检查是否有调用（不在定义行的使用）
+            has_calls = False
+            call_line = None
+            call_column = None
+            for match in matches:
+                match_start = match.start()
+                match_line_in_region = region_content[:match_start].count('\n') + 1
+                match_line = line_start + match_line_in_region - 1
+                
+                # 如果使用位置不在定义行，则认为是调用
+                if not is_definition_in_range or match_line != symbol.line_start:
+                    has_calls = True
+                    call_line = match_line
+                    # 计算列号
+                    line_start_pos = region_content[:match_start].rfind('\n') + 1
+                    call_column = match_start - line_start_pos
+                    break
+            
+            # 处理定义
+            if is_definition_in_range:
+                symbol.is_definition = True
+                if symbol.name not in processed_symbols:
+                    processed_symbols[symbol.name] = (symbol, True, None)
+            
+            # 处理调用
+            if has_calls or not is_definition_in_range:
+                # 创建或更新引用符号
+                if symbol.name in processed_symbols:
+                    existing_symbol, existing_is_def, existing_def_loc = processed_symbols[symbol.name]
+                    # 如果已有定义，跳过；否则更新定义位置
+                    if not existing_is_def and not existing_def_loc:
+                        # 尝试获取定义位置
+                        definition_location = self._find_definition_location(
+                            symbol.name,
+                            file_path,
+                            call_line or line_start,
+                            call_column or 0,
+                            lsp_client,
+                            treesitter_extractor,
+                            content,
+                        )
+                        
+                        if definition_location:
+                            processed_symbols[symbol.name] = (existing_symbol, False, definition_location)
+                        else:
+                            # 从符号表中查找
+                            definition_symbols = self.symbol_table.find_symbol(symbol.name)
+                            if definition_symbols:
+                                def_symbol = definition_symbols[0]
+                                definition_location = Symbol(
+                                    name=def_symbol.name,
+                                    kind=def_symbol.kind,
+                                    file_path=def_symbol.file_path,
+                                    line_start=def_symbol.line_start,
+                                    line_end=def_symbol.line_end,
+                                    signature=def_symbol.signature,
+                                )
+                                processed_symbols[symbol.name] = (existing_symbol, False, definition_location)
+                else:
+                    # 创建新的引用符号
+                    reference_symbol = Symbol(
+                        name=symbol.name,
+                        kind=symbol.kind,
+                        file_path=file_path,
+                        line_start=call_line or line_start,
+                        line_end=call_line or line_start,
+                        signature=symbol.signature,
+                        docstring=symbol.docstring,
+                        parent=symbol.parent,
+                        is_definition=False,
+                    )
+                    
+                    # 尝试获取定义位置
+                    definition_location = self._find_definition_location(
+                        symbol.name,
+                        file_path,
+                        call_line or line_start,
+                        call_column or 0,
+                        lsp_client,
+                        treesitter_extractor,
+                        content,
+                    )
+                    
+                    if definition_location:
+                        reference_symbol.definition_location = definition_location
+                    else:
+                        # 从符号表中查找
+                        definition_symbols = self.symbol_table.find_symbol(symbol.name)
+                        if definition_symbols:
+                            def_symbol = definition_symbols[0]
+                            reference_symbol.definition_location = Symbol(
+                                name=def_symbol.name,
+                                kind=def_symbol.kind,
+                                file_path=def_symbol.file_path,
+                                line_start=def_symbol.line_start,
+                                line_end=def_symbol.line_end,
+                                signature=def_symbol.signature,
+                            )
+                    
+                    processed_symbols[symbol.name] = (reference_symbol, False, reference_symbol.definition_location)
+        
+        # 将处理后的符号添加到结果列表
+        for symbol, is_def, def_loc in processed_symbols.values():
+            if is_def:
+                symbol.is_definition = True
+            if def_loc:
+                symbol.definition_location = def_loc
+            used_symbols.append(symbol)
         
         return used_symbols
+    
+    def _find_definition_location(
+        self,
+        symbol_name: str,
+        file_path: str,
+        line: int,
+        column: int,
+        lsp_client: Optional[Any],
+        treesitter_extractor: Optional[Any],
+        content: str,
+    ) -> Optional[Symbol]:
+        """查找符号的定义位置。
+        
+        优先使用 LSP，如果不支持则使用 tree-sitter。
+        
+        Args:
+            symbol_name: 符号名称
+            file_path: 文件路径
+            line: 行号（1-based）
+            column: 列号（0-based）
+            lsp_client: LSP 客户端（可选）
+            treesitter_extractor: tree-sitter 提取器（可选）
+            content: 文件内容
+            
+        Returns:
+            定义位置的 Symbol 对象，如果找不到则返回 None
+        """
+        # 优先使用 LSP
+        if lsp_client:
+            try:
+                # LSP 使用 0-based 行号
+                definition = lsp_client.get_definition(file_path, line - 1, column)
+                if definition:
+                    # 处理 LSP 返回的定义（可能是单个对象或列表）
+                    if isinstance(definition, list):
+                        if definition:
+                            definition = definition[0]
+                        else:
+                            return None
+                    
+                    # 解析 LSP 返回的定义位置
+                    uri = definition.get("uri", "")
+                    if uri.startswith("file://"):
+                        def_file_path = uri[7:]  # 移除 "file://" 前缀
+                    else:
+                        def_file_path = uri
+                    
+                    range_info = definition.get("range", {})
+                    start = range_info.get("start", {})
+                    end = range_info.get("end", {})
+                    
+                    # LSP 使用 0-based 行号，转换为 1-based
+                    def_line_start = start.get("line", 0) + 1
+                    def_line_end = end.get("line", 0) + 1
+                    
+                    return Symbol(
+                        name=symbol_name,
+                        kind="",  # LSP 可能不提供类型信息
+                        file_path=def_file_path,
+                        line_start=def_line_start,
+                        line_end=def_line_end,
+                    )
+            except Exception:
+                # LSP 失败，继续尝试 tree-sitter
+                pass
+        
+        # 后备：使用 tree-sitter
+        if treesitter_extractor:
+            try:
+                # 从符号表中查找定义（tree-sitter 已经提取了符号）
+                definition_symbols = self.symbol_table.find_symbol(symbol_name)
+                if definition_symbols:
+                    # 选择第一个定义（可以改进为选择最相关的）
+                    def_symbol = definition_symbols[0]
+                    return Symbol(
+                        name=def_symbol.name,
+                        kind=def_symbol.kind,
+                        file_path=def_symbol.file_path,
+                        line_start=def_symbol.line_start,
+                        line_end=def_symbol.line_end,
+                        signature=def_symbol.signature,
+                    )
+            except Exception:
+                pass
+        
+        return None
 
     def _find_imported_symbols(self, file_path: str) -> List[Symbol]:
         """Find all imported symbols in a file."""
