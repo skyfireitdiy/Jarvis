@@ -936,6 +936,183 @@ class TestSummaryBlockScenarios:
         assert "notes" in result
         assert "反引号" in result["notes"]
 
+    def test_summary_block_with_single_backtick_in_string(self):
+        """测试从 <SUMMARY> 块提取的内容中包含单个反引号（如 `bzip2-rs`）"""
+        input_str = """
+```json
+{
+  "replaceable": false,
+  "libraries": [],
+  "confidence": 0.95,
+  "notes": "该函数是 bzip2 算法中用于构建霍夫曼解码表的底层核心实现。由于 `bzip2-rs` 等直接实现该算法的库被明确禁止使用，因此没有成熟的通用库能直接替代这个特定的、算法内部的函数。用户通常会使用高级 API（如 `BzDecoder`）来完成解压缩，而不是手动构建解码表。"
+}
+```
+"""
+        result = loads(input_str)
+        assert result["replaceable"] is False
+        assert "notes" in result
+        assert "`bzip2-rs`" in result["notes"]
+        assert "`BzDecoder`" in result["notes"]
+        assert "bzip2" in result["notes"].lower()
+
+    def test_summary_block_with_triple_backticks_in_string(self):
+        """测试从 <SUMMARY> 块提取的内容中包含三个反引号（```）"""
+        input_str = """
+```json
+{
+  "notes": "包含 ```三个反引号``` 的内容，这不应该被误识别为代码块标记"
+}
+```
+"""
+        result = loads(input_str)
+        assert "notes" in result
+        assert "```三个反引号```" in result["notes"]
+        assert "代码块标记" in result["notes"]
+
+    def test_summary_block_with_backticks_at_string_start(self):
+        """测试从 <SUMMARY> 块提取的内容中反引号在字符串开头"""
+        input_str = """
+```json
+{
+  "code": "`function_name()` 是一个函数调用"
+}
+```
+"""
+        result = loads(input_str)
+        assert "code" in result
+        assert result["code"].startswith("`function_name()`")
+
+    def test_summary_block_with_backticks_at_string_end(self):
+        """测试从 <SUMMARY> 块提取的内容中反引号在字符串结尾"""
+        input_str = """
+```json
+{
+  "code": "这是一个函数调用 `function_name()`"
+}
+```
+"""
+        result = loads(input_str)
+        assert "code" in result
+        assert result["code"].endswith("`function_name()`")
+
+    def test_summary_block_with_multiple_backticks_in_different_fields(self):
+        """测试从 <SUMMARY> 块提取的内容中多个字段都包含反引号"""
+        input_str = """
+```json
+{
+  "library": "`bzip2-rs`",
+  "api": "`BzDecoder::new()`",
+  "notes": "使用 `bzip2-rs` 库的 `BzDecoder` API 可以替代此功能"
+}
+```
+"""
+        result = loads(input_str)
+        assert "library" in result
+        assert "`bzip2-rs`" in result["library"]
+        assert "api" in result
+        assert "`BzDecoder::new()`" in result["api"]
+        assert "notes" in result
+        assert "`bzip2-rs`" in result["notes"]
+        assert "`BzDecoder`" in result["notes"]
+
+    def test_summary_block_with_backticks_in_array(self):
+        """测试从 <SUMMARY> 块提取的内容中数组元素包含反引号"""
+        input_str = """
+```json
+{
+  "apis": [
+    "`bzip2_rs::encoder::Encoder`",
+    "`bzip2_rs::tokio::Encoder`"
+  ]
+}
+```
+"""
+        result = loads(input_str)
+        assert "apis" in result
+        assert isinstance(result["apis"], list)
+        assert len(result["apis"]) == 2
+        assert "`bzip2_rs::encoder::Encoder`" in result["apis"]
+        assert "`bzip2_rs::tokio::Encoder`" in result["apis"]
+
+    def test_summary_block_with_backticks_in_nested_object(self):
+        """测试从 <SUMMARY> 块提取的内容中嵌套对象包含反引号"""
+        input_str = """
+```json
+{
+  "metadata": {
+    "library": "`bzip2-rs`",
+    "api": "`BzDecoder`"
+  },
+  "notes": "使用 `bzip2-rs` 库"
+}
+```
+"""
+        result = loads(input_str)
+        assert "metadata" in result
+        assert isinstance(result["metadata"], dict)
+        assert "`bzip2-rs`" in result["metadata"]["library"]
+        assert "`BzDecoder`" in result["metadata"]["api"]
+        assert "`bzip2-rs`" in result["notes"]
+
+    def test_summary_block_with_backticks_and_escaped_quotes(self):
+        """测试从 <SUMMARY> 块提取的内容中同时包含反引号和转义引号"""
+        input_str = """
+```json
+{
+  "notes": "包含 `反引号` 和 \\"转义引号\\" 的内容"
+}
+```
+"""
+        result = loads(input_str)
+        assert "notes" in result
+        assert "`反引号`" in result["notes"]
+        assert '"转义引号"' in result["notes"] or '转义引号' in result["notes"]
+
+    def test_summary_block_with_backticks_in_multiline_string_value(self):
+        """测试从 <SUMMARY> 块提取的内容中使用 ||| 多行字符串，内容包含反引号"""
+        input_str = """
+```json5
+{
+  "replaceable": true,
+  "notes": |||
+这是第一行，包含 `bzip2-rs`
+这是第二行，包含 `BzDecoder`
+|||
+}
+```
+"""
+        result = loads(input_str)
+        assert result["replaceable"] is True
+        assert "notes" in result
+        assert "`bzip2-rs`" in result["notes"]
+        assert "`BzDecoder`" in result["notes"]
+        assert "第一行" in result["notes"]
+        assert "第二行" in result["notes"]
+
+    def test_summary_block_with_backticks_real_world_scenario(self):
+        """测试真实场景：从 <SUMMARY> 块提取的完整评估结果，包含反引号"""
+        input_str = """
+```json
+{
+  "replaceable": false,
+  "libraries": [],
+  "confidence": 0.95,
+  "notes": "该函数是 bzip2 算法中用于构建霍夫曼解码表的底层核心实现。它是一个非常具体的算法步骤，而不是一个独立的、可复用的功能。虽然有 Rust 库（如 flate2）可以处理整个 bzip2 解压缩流程，但它们通常封装了这些内部细节，不单独暴露解码表构建的功能。由于 `bzip2-rs` 等直接实现该算法的库被明确禁止使用，因此没有成熟的通用库能直接替代这个特定的、算法内部的函数。用户通常会使用高级 API（如 `BzDecoder`）来完成解压缩，而不是手动构建解码表。"
+}
+```
+"""
+        result = loads(input_str)
+        assert result["replaceable"] is False
+        assert isinstance(result["libraries"], list)
+        assert len(result["libraries"]) == 0
+        assert result["confidence"] == 0.95
+        assert "notes" in result
+        notes = result["notes"]
+        assert "`bzip2-rs`" in notes
+        assert "`BzDecoder`" in notes
+        assert "bzip2" in notes.lower()
+        assert "霍夫曼解码表" in notes
+
     def test_summary_block_no_language_identifier(self):
         """测试从 <SUMMARY> 块提取的内容（无语言标识的代码块）"""
         input_str = """

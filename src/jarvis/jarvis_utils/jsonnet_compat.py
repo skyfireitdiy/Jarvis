@@ -369,8 +369,42 @@ def loads(s: str) -> Any:
     异常:
         ValueError: 如果解析失败
     """
+    if not isinstance(s, str) or not s.strip():
+        raise ValueError("输入字符串为空")
+    
     # 自动去除 markdown 代码块标记
     cleaned = _strip_markdown_code_blocks(s)
+    
+    # 验证：确保没有残留的代码块标记（在字符串开头或结尾）
+    # 字符串内容中的 ``` 是合法的，不需要处理
+    cleaned_stripped = cleaned.strip()
+    if cleaned_stripped.startswith("```") or cleaned_stripped.rstrip().endswith("```"):
+        # 如果还有代码块标记，可能是手动去除逻辑没有正确工作
+        # 再次尝试去除（防止边界情况）
+        cleaned = _strip_markdown_code_blocks(cleaned)
+        cleaned_stripped = cleaned.strip()
+        # 如果仍然有，说明可能是格式问题，记录警告但继续处理
+        if cleaned_stripped.startswith("```") or cleaned_stripped.rstrip().endswith("```"):
+            # 最后尝试：手动去除开头和结尾的 ```
+            while cleaned_stripped.startswith("```"):
+                # 找到第一个换行或字符串结尾
+                first_newline = cleaned_stripped.find("\n", 3)
+                if first_newline >= 0:
+                    cleaned_stripped = cleaned_stripped[first_newline + 1:]
+                else:
+                    # 没有换行，可能是 ```language 格式
+                    cleaned_stripped = cleaned_stripped[3:].lstrip()
+                    # 跳过语言标识
+                    while cleaned_stripped and cleaned_stripped[0] not in ('\n', '\r', ' ', '\t'):
+                        cleaned_stripped = cleaned_stripped[1:]
+                    break
+            while cleaned_stripped.rstrip().endswith("```"):
+                last_backticks = cleaned_stripped.rfind("```")
+                if last_backticks >= 0:
+                    cleaned_stripped = cleaned_stripped[:last_backticks].rstrip()
+                else:
+                    break
+            cleaned = cleaned_stripped
     
     # 将 JSON 值中的 ``` 多行字符串标识转换为 |||
     cleaned = _convert_backtick_multiline_strings(cleaned)
@@ -379,7 +413,33 @@ def loads(s: str) -> Any:
     cleaned, indent_info = _fix_jsonnet_multiline_strings(cleaned)
     
     # 使用 jsonnet 解析，支持 JSON5 和 Jsonnet 语法
-    result_json = _jsonnet.evaluate_snippet("<input>", cleaned)
+    try:
+        result_json = _jsonnet.evaluate_snippet("<input>", cleaned)
+    except RuntimeError as e:
+        # 提供更详细的错误信息
+        error_msg = str(e)
+        if "Could not lex the character" in error_msg or "`" in error_msg:
+            # 检查是否还有残留的代码块标记
+            if "```" in cleaned:
+                # 找到所有 ``` 的位置
+                import re
+                matches = list(re.finditer(r'```', cleaned))
+                for match in matches:
+                    pos = match.start()
+                    context = cleaned[max(0, pos-30):min(len(cleaned), pos+50)]
+                    # 检查是否在字符串内部（被引号包围）
+                    before = cleaned[:pos]
+                    # 简单检查：如果前面有奇数个引号，说明在字符串内部
+                    quote_count = before.count('"') - before.count('\\"')
+                    if quote_count % 2 == 0:
+                        # 不在字符串内部，可能是残留的代码块标记
+                        raise ValueError(
+                            f"检测到残留的代码块标记 ``` 在位置 {pos}。"
+                            f"上下文: {repr(context)}。"
+                            f"原始错误: {error_msg}"
+                        )
+        raise ValueError(f"JSON 解析失败: {error_msg}")
+    
     # jsonnet 返回的是 JSON 字符串，需要再次解析
     result = json.loads(result_json)
     
