@@ -2073,28 +2073,49 @@ class Transpiler:
         while max_iterations == 0 or i < max_iterations:
             agent = self._current_agents[review_key]
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            # 如果是修复后的审查（i > 0），在提示词中明确说明代码已变更，需要重新读取
+            # 如果是修复后的审查（i > 0），强制要求重新读取代码
             if i > 0:
+                # 修复后重新创建 Agent，清除之前的对话历史和记忆，确保基于最新代码审查
+                typer.secho(f"[c2rust-transpiler][review] 代码已修复，重新创建审查 Agent 以清除历史（第 {i+1} 次迭代）", fg=typer.colors.YELLOW)
+                self._current_agents[review_key] = Agent(
+                    system_prompt=sys_p_init,
+                    name="C2Rust-Review-Agent",
+                    model_group=self.llm_group,
+                    summary_prompt=sum_p_init,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                    non_interactive=self.non_interactive,
+                    use_methodology=False,
+                    use_analysis=False,
+                )
+                agent = self._current_agents[review_key]
+                
                 code_changed_notice = "\n".join([
                     "",
-                    "【重要提示：代码已变更】",
+                    "【强制要求：必须重新读取代码】",
                     f"在本次审查之前（第 {i} 次迭代），已根据审查意见对代码进行了修复和优化。",
-                    "目标函数的实现可能已经发生变化，包括但不限于：",
+                    "目标函数的实现已经发生变化，包括但不限于：",
                     "- 函数实现逻辑的修改",
                     "- 类型和签名的调整",
                     "- 依赖关系的更新",
                     "- 错误处理的改进",
                     "",
-                    "**请务必重新读取目标模块文件中的函数实现，不要基于之前的审查结果或缓存信息进行判断。**",
-                    "请使用 read_code 工具重新读取以下文件的最新内容：",
-                    f"- 目标模块文件: {module}",
-                    "- 以及相关的依赖模块文件（如有需要）",
+                    "**强制要求：在开始审查之前，你必须使用 read_code 工具重新读取目标模块文件的最新内容。**",
+                    "**禁止基于之前的审查结果、对话历史或任何缓存信息进行判断。**",
                     "",
-                    "审查时请基于重新读取的最新代码内容进行评估。",
+                    "必须执行的步骤：",
+                    f"1. 使用 read_code 工具读取目标模块文件: {module}",
+                    "2. 如果目标函数依赖其他模块，也请读取相关模块文件",
+                    "3. 基于重新读取的最新代码内容进行审查评估",
+                    "",
+                    "如果未执行 read_code 工具读取最新代码，审查结果将被视为无效。",
                     "",
                 ])
                 usr_p_with_notice = usr_p_init + code_changed_notice
                 composed_prompt = self._compose_prompt_with_context(usr_p_with_notice)
+                # 修复后必须使用 Agent.run()，不能使用直接模型调用（因为需要工具调用）
+                use_direct_model_review = False
             else:
                 composed_prompt = self._compose_prompt_with_context(usr_p_init)
             

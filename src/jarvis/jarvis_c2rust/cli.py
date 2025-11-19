@@ -682,7 +682,8 @@ def run(
             typer.secho("[c2rust-run] scan: 开始", fg=typer.colors.BLUE)
             _run_scan(dot=None, only_dot=False, subgraphs_dir=None, only_subgraphs=False, png=False, non_interactive=True)
             typer.secho("[c2rust-run] scan: 完成", fg=typer.colors.GREEN)
-            # 状态由 scan 命令自己记录
+            # 保存状态（因为直接调用 _run_scan 函数，需要手动保存状态）
+            _save_run_state("scan", completed=True)
         else:
             typer.secho("[c2rust-run] scan: 已完成，跳过", fg=typer.colors.CYAN)
 
@@ -734,7 +735,8 @@ def run(
                 )
             except Exception as _e:
                 typer.secho(f"[c2rust-run] lib-replace: 结果输出时发生非致命错误: {_e}", fg=typer.colors.YELLOW, err=True)
-            # 状态由 lib-replace 命令自己记录
+            # 保存状态（因为直接调用 _apply_library_replacement 函数，需要手动保存状态）
+            _save_run_state("lib_replace", completed=True)
         else:
             typer.secho("[c2rust-run] lib-replace: 已完成，跳过", fg=typer.colors.CYAN)
 
@@ -743,7 +745,8 @@ def run(
             typer.secho("[c2rust-run] prepare: 开始", fg=typer.colors.BLUE)
             _execute_llm_plan(apply=True, llm_group=llm_group, non_interactive=not interactive)
             typer.secho("[c2rust-run] prepare: 完成", fg=typer.colors.GREEN)
-            # 状态由 prepare 命令自己记录
+            # 保存状态（因为直接调用 _execute_llm_plan 函数，需要手动保存状态）
+            _save_run_state("prepare", completed=True)
         else:
             typer.secho("[c2rust-run] prepare: 已完成，跳过", fg=typer.colors.CYAN)
 
@@ -762,7 +765,8 @@ def run(
                 non_interactive=not interactive,
             )
             typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
-            # 状态由 transpile 命令自己记录
+            # 保存状态（因为直接调用 _run_transpile 函数，需要手动保存状态）
+            _save_run_state("transpile", completed=True)
         else:
             typer.secho("[c2rust-run] transpile: 已完成，跳过", fg=typer.colors.CYAN)
 
@@ -784,7 +788,8 @@ def run(
                 )
                 typer.secho(summary, fg=typer.colors.GREEN)
                 typer.secho("[c2rust-run] optimize: 完成", fg=typer.colors.GREEN)
-                # 状态由 optimize 命令自己记录
+                # 保存状态（因为直接调用 _optimize_project 函数，需要手动保存状态）
+                _save_run_state("optimize", completed=True)
             except Exception as _e:
                 typer.secho(f"[c2rust-run] optimize: 错误: {_e}", fg=typer.colors.RED, err=True)
                 raise
