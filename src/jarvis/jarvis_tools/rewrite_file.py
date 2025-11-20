@@ -8,7 +8,7 @@ class RewriteFileTool:
     """文件重写工具，用于完全重写文件内容"""
 
     name = "rewrite_file"
-    description = "完全重写文件内容，适用于新增文件或大范围改写。具备失败回滚能力。局部修改请使用 edit_file。"
+    description = "完全重写文件内容，适用于新增文件或大范围改写。具备失败回滚能力。局部修改请使用 edit_file。\n\n    ⚠️ 重要提示：\n    - 不要一次重写太多内容，建议分多次进行，避免超过LLM的上下文窗口大小\n    - 如果文件内容较长（超过2048字符），建议采用以下策略：\n      1. 第一次调用 rewrite_file 写入部分内容（如文件的前半部分或关键部分）\n      2. 然后多次调用 edit_file 工具，使用 insert_after 操作补充后续内容\n    - 这样可以避免单次操作内容过长导致上下文溢出"
 
     parameters = {
         "type": "object",
