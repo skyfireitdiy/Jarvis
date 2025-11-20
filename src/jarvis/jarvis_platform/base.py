@@ -79,19 +79,74 @@ class BasePlatform(ABC):
         """Check if platform supports upload files"""
         return False
 
-    def _handle_long_context(self, message: str) -> str:
+    def _submit_part_with_split(self, part_content: str, threshold_factor: float = 1.0) -> str:
+        """Submit a single part, splitting it in half if it fails repeatedly.
+        
+        Args:
+            part_content: The content of the part to submit.
+            threshold_factor: Factor to adjust the token threshold.
+            
+        Returns:
+            The response from submitting the part(s).
+        """
+        try:
+            response = ""
+            for trunk in while_true(
+                lambda: while_success(
+                    lambda: self._chat(
+                        f"<part_content>{part_content}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
+                    )
+                )
+            ):
+                response += trunk
+            return response
+        except Exception as e:
+            # 如果单个part反复失败，尝试将其拆分成两份
+            part_token_count = get_context_token_count(part_content)
+            base_max_token = get_max_input_token_count(self.model_group)
+            adjusted_max_token = int(base_max_token * threshold_factor)
+            min_chunk_size = adjusted_max_token - 2048
+            
+            # 如果part已经很小（小于最小chunk size），或者token数已经很小，不再拆分
+            if part_token_count <= min_chunk_size or len(part_content) < 100:
+                print(f"⚠️ Part提交失败且已无法进一步拆分，重新抛出异常: {e}")
+                raise
+            
+            print(f"⚠️ Part提交失败，尝试拆分成两份: {e}")
+            # 将part拆分成两份，使用更小的max_length以确保拆分成功
+            # 使用更保守的阈值因子（进一步降低20%）来拆分
+            split_threshold_factor = threshold_factor * 0.8
+            split_max_token = int(base_max_token * split_threshold_factor)
+            split_max_chunk_size = split_max_token - 1024
+            chunks = split_text_into_chunks(part_content, split_max_chunk_size, split_max_chunk_size // 2)
+            if len(chunks) < 2:
+                # 如果无法拆分，直接抛出异常
+                print(f"⚠️ 无法拆分part，重新抛出异常: {e}")
+                raise
+            
+            # 递归处理两个更小的部分，使用更保守的阈值因子
+            response = ""
+            for i, chunk in enumerate(chunks, 1):
+                print(f"ℹ️ 处理拆分后的第{i}/{len(chunks)}部分...")
+                chunk_response = self._submit_part_with_split(chunk, split_threshold_factor)
+                response += "\n" + chunk_response
+            return response
+
+    def _handle_long_context(self, message: str, threshold_factor: float = 1.0) -> str:
         """Handle long context by splitting and submitting in chunks.
         
         Args:
             message: The long message to be split and submitted.
+            threshold_factor: Factor to adjust the token threshold (default 1.0).
+                             Use a value < 1.0 (e.g., 0.8) to lower the threshold when retrying.
             
         Returns:
             The accumulated response from all chunk submissions.
         """
-        max_chunk_size = (
-            get_max_input_token_count(self.model_group) - 1024
-        )  # 留出一些余量
-        min_chunk_size = get_max_input_token_count(self.model_group) - 2048
+        base_max_token = get_max_input_token_count(self.model_group)
+        adjusted_max_token = int(base_max_token * threshold_factor)
+        max_chunk_size = adjusted_max_token - 1024  # 留出一些余量
+        min_chunk_size = adjusted_max_token - 2048
         inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
         print(f"ℹ️ 长上下文，分批提交，共{len(inputs)}部分...")
         prefix_prompt = """
@@ -106,14 +161,12 @@ class BasePlatform(ABC):
             length += len(input)
 
             response += "\n"
-            for trunk in while_true(
-                lambda: while_success(
-                    lambda: self._chat(
-                        f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
-                    )
-                )
-            ):
-                response += trunk
+            try:
+                part_response = self._submit_part_with_split(input, threshold_factor)
+                response += part_response
+            except Exception as e:
+                print(f"⚠️ 第{submit_count}部分提交最终失败: {e}")
+                raise
 
         print("✅ 提交完成")
         response += "\n" + while_true(
@@ -299,14 +352,16 @@ class BasePlatform(ABC):
             
             # Check if we should use long context handling based on token count
             input_token_count = get_context_token_count(message)
-            use_long_context = input_token_count > get_max_input_token_count(self.model_group)
+            max_token_count = get_max_input_token_count(self.model_group)
+            use_long_context = input_token_count > max_token_count
             
             result: str = ""
+            threshold_factor = 1.0  # 初始阈值因子
             try:
                 if use_long_context:
                     # Use long context handling directly
                     result = while_true(
-                        lambda: while_success(lambda: self._handle_long_context(message))
+                        lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
                     )
                 else:
                     # Try normal chat first
@@ -323,14 +378,34 @@ class BasePlatform(ABC):
                 # retry with long context handling (token estimation might be inaccurate)
                 if not use_long_context:
                     print(f"⚠️ 首次尝试失败，可能是token估算不准确，尝试使用长上下文处理: {e}")
-                    result = while_true(
-                        lambda: while_success(lambda: self._handle_long_context(message))
+                    # 重试时降低阈值，使用更保守的判断，避免再次超出
+                    # 降低20%的阈值，或者至少降低1024个token
+                    adjusted_max_token = max(
+                        int(max_token_count * 0.8),
+                        max_token_count - 1024
                     )
+                    if input_token_count > adjusted_max_token:
+                        # 如果降低阈值后仍然超出，直接使用长上下文处理，并降低阈值因子
+                        threshold_factor = 0.8
+                        result = while_true(
+                            lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
+                        )
+                    else:
+                        # 如果降低阈值后不超出，再次尝试正常chat
+                        result = while_true(
+                            lambda: while_success(lambda: self._chat(message))
+                        )
                     if result is False or result == "":
                         raise ValueError("长上下文处理也失败，返回结果为空")
                 else:
-                    # Already tried long context, re-raise the exception
-                    raise
+                    # Already tried long context, retry with lowered threshold
+                    print(f"⚠️ 长上下文处理失败，降低阈值后重试: {e}")
+                    threshold_factor = 0.8  # 降低20%的阈值
+                    result = while_true(
+                        lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
+                    )
+                    if result is False or result == "":
+                        raise ValueError("降低阈值后长上下文处理仍然失败，返回结果为空")
             
             from jarvis.jarvis_utils.globals import set_last_message
 
