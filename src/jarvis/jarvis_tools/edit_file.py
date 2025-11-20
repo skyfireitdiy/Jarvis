@@ -821,13 +821,14 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
+                summary += f"\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 print(f"❌ {summary}")
                 return False, summary
             
             # 从缓存恢复文件内容
             modified_content = EditFileTool._restore_file_from_cache(cache_copy)
             if not modified_content:
-                error_msg = "从缓存恢复文件内容失败"
+                error_msg = "从缓存恢复文件内容失败\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 if backup_path and os.path.exists(backup_path):
                     try:
                         os.remove(backup_path)
@@ -838,6 +839,7 @@ class EditFileTool:
             # 写入文件
             success, error_msg = EditFileTool._write_file_with_rollback(abs_path, modified_content, backup_path)
             if not success:
+                error_msg += "\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 return False, error_msg
             
             # 写入成功，更新缓存
@@ -862,6 +864,7 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
+                summary += f"\n\n💡 提示：部分编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 print(f"❌ {summary}")
                 return False, summary
             
@@ -875,7 +878,7 @@ class EditFileTool:
                     os.remove(backup_path)
                 except Exception:
                     pass
-            error_msg = f"文件修改失败: {str(e)}"
+            error_msg = f"文件修改失败: {str(e)}\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
             print(f"❌ {error_msg}")
             return False, error_msg
 
