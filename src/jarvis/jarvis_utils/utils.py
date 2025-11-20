@@ -1558,37 +1558,10 @@ def _ask_git_check_mode(config_data: dict, ask_all: bool) -> bool:
         return False
 
 
-def _ask_patch_format_mode(config_data: dict, ask_all: bool) -> bool:
-    """询问补丁格式模式"""
-    try:
-        _key = "JARVIS_PATCH_FORMAT"
-        if not ask_all and _key in config_data:
-            return False
-        from jarvis.jarvis_utils.input import get_choice
-        from jarvis.jarvis_utils.config import get_patch_format
-        current_mode = config_data.get(_key, get_patch_format())
-        choices = ["all", "search", "search_range"]
-        tip = (
-            "请选择补丁格式处理模式 (JARVIS_PATCH_FORMAT):\n"
-            "该设置影响 edit_file 工具在处理补丁时允许的匹配方式。\n"
-            "  - all: 同时支持 SEARCH 与 SEARCH_START/SEARCH_END 两种模式（默认）。\n"
-            "  - search: 仅允许精确片段匹配（SEARCH）。更稳定，适合较弱模型或严格控制改动。\n"
-            "  - search_range: 仅允许范围匹配（SEARCH_START/SEARCH_END）。更灵活，适合较强模型和块内细粒度修改。"
-        )
-        new_mode = get_choice(tip, choices)
-        if new_mode == current_mode:
-            return False
-        config_data[_key] = new_mode
-        return True
-    except Exception:
-        return False
-
-
 def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
     """收集Git相关配置"""
     changed = False
     changed = _ask_git_check_mode(config_data, ask_all) or changed
-    changed = _ask_patch_format_mode(config_data, ask_all) or changed
     changed = _ask_config_optional_str(
         config_data, ask_all,
         "JARVIS_GIT_COMMIT_PROMPT",
