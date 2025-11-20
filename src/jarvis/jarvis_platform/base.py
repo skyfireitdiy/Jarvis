@@ -79,6 +79,50 @@ class BasePlatform(ABC):
         """Check if platform supports upload files"""
         return False
 
+    def _handle_long_context(self, message: str) -> str:
+        """Handle long context by splitting and submitting in chunks.
+        
+        Args:
+            message: The long message to be split and submitted.
+            
+        Returns:
+            The accumulated response from all chunk submissions.
+        """
+        max_chunk_size = (
+            get_max_input_token_count(self.model_group) - 1024
+        )  # 留出一些余量
+        min_chunk_size = get_max_input_token_count(self.model_group) - 2048
+        inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
+        print(f"ℹ️ 长上下文，分批提交，共{len(inputs)}部分...")
+        prefix_prompt = """
+        我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
+        """
+        while_true(lambda: while_success(lambda: self._chat(prefix_prompt)))
+        submit_count = 0
+        length = 0
+        response = ""
+        for input in inputs:
+            submit_count += 1
+            length += len(input)
+
+            response += "\n"
+            for trunk in while_true(
+                lambda: while_success(
+                    lambda: self._chat(
+                        f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
+                    )
+                )
+            ):
+                response += trunk
+
+        print("✅ 提交完成")
+        response += "\n" + while_true(
+            lambda: while_success(
+                lambda: self._chat("内容已经全部提供完毕，请根据内容继续")
+            )
+        )
+        return response
+
     def _chat(self, message: str):
         import time
 
@@ -92,39 +136,7 @@ class BasePlatform(ABC):
         input_token_count = get_context_token_count(message)
 
         if input_token_count > get_max_input_token_count(self.model_group):
-            max_chunk_size = (
-                get_max_input_token_count(self.model_group) - 1024
-            )  # 留出一些余量
-            min_chunk_size = get_max_input_token_count(self.model_group) - 2048
-            inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-            print(f"ℹ️ 长上下文，分批提交，共{len(inputs)}部分...")
-            prefix_prompt = """
-            我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
-            """
-            while_true(lambda: while_success(lambda: self._chat(prefix_prompt)))
-            submit_count = 0
-            length = 0
-            response = ""
-            for input in inputs:
-                submit_count += 1
-                length += len(input)
-
-                response += "\n"
-                for trunk in while_true(
-                    lambda: while_success(
-                        lambda: self._chat(
-                            f"<part_content>{input}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
-                        )
-                    )
-                    ):
-                        response += trunk
-
-            print("✅ 提交完成")
-            response += "\n" + while_true(
-                lambda: while_success(
-                    lambda: self._chat("内容已经全部提供完毕，请根据内容继续")
-                )
-            )
+            response = self._handle_long_context(message)
         else:
             response = ""
 
@@ -275,14 +287,51 @@ class BasePlatform(ABC):
         return response
 
     def chat_until_success(self, message: str) -> str:
-        """Chat with model until successful response"""
+        """Chat with model until successful response.
+        
+        If the initial attempt fails (possibly due to inaccurate token estimation),
+        automatically retry using long context handling.
+        """
         try:
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
                 PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
-            result: str = while_true(
-                lambda: while_success(lambda: self._chat(message))
-            )
+            
+            # Check if we should use long context handling based on token count
+            input_token_count = get_context_token_count(message)
+            use_long_context = input_token_count > get_max_input_token_count(self.model_group)
+            
+            result: str = ""
+            try:
+                if use_long_context:
+                    # Use long context handling directly
+                    result = while_true(
+                        lambda: while_success(lambda: self._handle_long_context(message))
+                    )
+                else:
+                    # Try normal chat first
+                    result = while_true(
+                        lambda: while_success(lambda: self._chat(message))
+                    )
+                
+                # Check if result is empty or False (retry exhausted)
+                # Convert False to empty string for type safety
+                if result is False or result == "":
+                    raise ValueError("返回结果为空")
+            except Exception as e:
+                # If normal chat failed and we haven't tried long context yet,
+                # retry with long context handling (token estimation might be inaccurate)
+                if not use_long_context:
+                    print(f"⚠️ 首次尝试失败，可能是token估算不准确，尝试使用长上下文处理: {e}")
+                    result = while_true(
+                        lambda: while_success(lambda: self._handle_long_context(message))
+                    )
+                    if result is False or result == "":
+                        raise ValueError("长上下文处理也失败，返回结果为空")
+                else:
+                    # Already tried long context, re-raise the exception
+                    raise
+            
             from jarvis.jarvis_utils.globals import set_last_message
 
             set_last_message(result)
