@@ -274,6 +274,46 @@ class Optimizer:
         self._load_or_reset_progress()
         self._last_snapshot_commit: Optional[str] = None
         self.log_prefix = "[c2rust-优化器]"
+        # 读取附加说明
+        self.additional_notes = self._load_additional_notes()
+
+    def _load_additional_notes(self) -> str:
+        """从配置文件加载附加说明"""
+        try:
+            from jarvis.jarvis_c2rust.constants import CONFIG_JSON
+            # 尝试从项目根目录读取配置（crate_dir 的父目录或同级目录）
+            # 首先尝试 crate_dir 的父目录
+            project_root = self.crate_dir.parent
+            config_path = project_root / ".jarvis" / "c2rust" / CONFIG_JSON
+            if config_path.exists():
+                with config_path.open("r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    if isinstance(config, dict):
+                        return str(config.get("additional_notes", "") or "").strip()
+            # 如果父目录没有，尝试当前目录
+            config_path = self.crate_dir / ".jarvis" / "c2rust" / CONFIG_JSON
+            if config_path.exists():
+                with config_path.open("r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    if isinstance(config, dict):
+                        return str(config.get("additional_notes", "") or "").strip()
+        except Exception:
+            pass
+        return ""
+
+    def _append_additional_notes(self, prompt: str) -> str:
+        """
+        在提示词末尾追加附加说明（如果存在）。
+        
+        Args:
+            prompt: 原始提示词
+            
+        Returns:
+            追加了附加说明的提示词
+        """
+        if self.additional_notes and self.additional_notes.strip():
+            return prompt + "\n\n" + "【附加说明（用户自定义）】\n" + self.additional_notes.strip()
+        return prompt
 
     def _snapshot_commit(self) -> None:
         """
@@ -797,6 +837,7 @@ class Optimizer:
             "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
         ]
         prompt = "\n".join(prompt_lines)
+        prompt = self._append_additional_notes(prompt)
         prev_cwd = os.getcwd()
         print(f"{self.log_prefix} [CodeAgent] 正在调用 CodeAgent 进行整体优化...")
         try:
@@ -896,6 +937,7 @@ class Optimizer:
                 "</BUILD_ERROR>",
             ]
             prompt = "\n".join(prompt_lines)
+            prompt = self._append_additional_notes(prompt)
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(crate))
