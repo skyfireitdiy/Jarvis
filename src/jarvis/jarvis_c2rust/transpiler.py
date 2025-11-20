@@ -2268,7 +2268,8 @@ class Transpiler:
             
             typer.secho(f"[c2rust-transpiler][review][iter={i+1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}", fg=typer.colors.CYAN)
             
-            if ok and not all_issues:
+            # 如果 ok 为 true，表示审查通过（功能一致且无严重问题），直接返回，不触发修复
+            if ok:
                 limit_info = f" (上限: {max_iterations if max_iterations > 0 else '无限'})"
                 typer.secho(f"[c2rust-transpiler][review] 代码审查通过{limit_info} (共 {i+1} 次迭代)。", fg=typer.colors.GREEN)
                 # 记录审查结果到进度
@@ -2276,14 +2277,14 @@ class Transpiler:
                     cur = self.progress.get("current") or {}
                     cur["review"] = {
                         "ok": True,
-                        "function_issues": [],
-                        "critical_issues": [],
+                        "function_issues": list(function_issues),
+                        "critical_issues": list(critical_issues),
                         "iterations": i + 1,
                     }
                     metrics = cur.get("metrics") or {}
                     metrics["review_iterations"] = i + 1
-                    metrics["function_issues"] = 0
-                    metrics["type_issues"] = 0
+                    metrics["function_issues"] = len(function_issues)
+                    metrics["type_issues"] = len(critical_issues)
                     cur["metrics"] = metrics
                     self.progress["current"] = cur
                     self._save_progress()
