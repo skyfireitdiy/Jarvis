@@ -114,8 +114,8 @@ class BasePlatform(ABC):
             
             print(f"⚠️ Part提交失败，尝试拆分成两份: {e}")
             # 将part拆分成两份，使用更小的max_length以确保拆分成功
-            # 使用更保守的阈值因子（进一步降低20%）来拆分
-            split_threshold_factor = threshold_factor * 0.8
+            # 使用更保守的阈值因子（进一步降低40%）来拆分
+            split_threshold_factor = threshold_factor * 0.6
             split_max_token = int(base_max_token * split_threshold_factor)
             split_max_chunk_size = split_max_token - 1024
             chunks = split_text_into_chunks(part_content, split_max_chunk_size, split_max_chunk_size // 2)
@@ -138,7 +138,7 @@ class BasePlatform(ABC):
         参数:
             message: 要拆分和提交的较长消息。
             threshold_factor: 调整token阈值的因素（默认为1.0）。
-                             使用小于1.0的值（例如0.8）在重试时降低阈值。
+                             使用小于1.0的值（例如0.6）在重试时降低阈值。
             
         返回:
             所有块提交的累积响应。
@@ -379,14 +379,14 @@ class BasePlatform(ABC):
                 if not use_long_context:
                     print(f"⚠️ 首次尝试失败，可能是token估算不准确，尝试使用长上下文处理: {e}")
                     # 重试时降低阈值，使用更保守的判断，避免再次超出
-                    # 降低20%的阈值，或者至少降低1024个token
+                    # 降低40%的阈值，或者至少降低1024个token
                     adjusted_max_token = max(
-                        int(max_token_count * 0.8),
+                        int(max_token_count * 0.6),
                         max_token_count - 1024
                     )
                     if input_token_count > adjusted_max_token:
                         # 如果降低阈值后仍然超出，直接使用长上下文处理，并降低阈值因子
-                        threshold_factor = 0.8
+                        threshold_factor = 0.6
                         result = while_true(
                             lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
                         )
@@ -400,7 +400,7 @@ class BasePlatform(ABC):
                 else:
                     # Already tried long context, retry with lowered threshold
                     print(f"⚠️ 长上下文处理失败，降低阈值后重试: {e}")
-                    threshold_factor = 0.8  # 降低20%的阈值
+                    threshold_factor = 0.6  # 降低40%的阈值
                     result = while_true(
                         lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
                     )
