@@ -10,48 +10,58 @@ class EditFileTool:
     """文件编辑工具，用于对文件进行结构化编辑"""
 
     name = "edit_file"
-    description = "对文件进行结构化编辑（通过块id）。\n\n    💡 使用步骤：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换、编辑）\n    3. 避免手动计算行号，减少错误风险\n\n    📝 支持的操作类型：\n    - delete: 删除块\n    - insert_before: 在块前插入内容\n    - insert_after: 在块后插入内容\n    - replace: 替换整个块\n    - edit: 在块内进行search/replace（需要提供search和replace参数）"
+    description = "对文件进行结构化编辑（通过块id），支持同时修改多个文件。\n\n    💡 使用步骤：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换、编辑）\n    3. 避免手动计算行号，减少错误风险\n    4. 可以在一次调用中同时修改多个文件\n\n    📝 支持的操作类型：\n    - delete: 删除块\n    - insert_before: 在块前插入内容\n    - insert_after: 在块后插入内容\n    - replace: 替换整个块\n    - edit: 在块内进行search/replace（需要提供search和replace参数）"
 
     parameters = {
         "type": "object",
         "properties": {
-            "file_path": {
-                "type": "string",
-                "description": "要修改的文件路径（支持绝对路径和相对路径）",
-            },
-            "diffs": {
+            "files": {
                 "type": "array",
                 "items": {
-                            "type": "object",
-                            "properties": {
-                                "block_id": {
-                                    "type": "string",
-                                    "description": "要操作的块id（从read_code工具获取的结构化块id）",
-                                },
-                                "action": {
-                                    "type": "string",
-                                    "enum": ["delete", "insert_before", "insert_after", "replace", "edit"],
-                                    "description": "操作类型：delete（删除块）、insert_before（在块前插入）、insert_after（在块后插入）、replace（替换块）、edit（在块内进行search/replace）",
-                                },
-                                "content": {
-                                    "type": "string",
-                                    "description": "新内容（对于insert_before、insert_after、replace操作必需，delete和edit操作不需要）",
-                                },
-                                "search": {
-                                    "type": "string",
-                                    "description": "要搜索的文本（对于edit操作必需）",
-                                },
-                                "replace": {
-                                    "type": "string",
-                                    "description": "替换后的文本（对于edit操作必需）",
-                                },
-                            },
-                            "required": ["block_id", "action"],
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "要修改的文件路径（支持绝对路径和相对路径）",
                         },
-                "description": "修改操作列表，每个操作包含一个结构化编辑块",
+                        "diffs": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "block_id": {
+                                        "type": "string",
+                                        "description": "要操作的块id（从read_code工具获取的结构化块id）",
+                                    },
+                                    "action": {
+                                        "type": "string",
+                                        "enum": ["delete", "insert_before", "insert_after", "replace", "edit"],
+                                        "description": "操作类型：delete（删除块）、insert_before（在块前插入）、insert_after（在块后插入）、replace（替换块）、edit（在块内进行search/replace）",
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "description": "新内容（对于insert_before、insert_after、replace操作必需，delete和edit操作不需要）",
+                                    },
+                                    "search": {
+                                        "type": "string",
+                                        "description": "要搜索的文本（对于edit操作必需）",
+                                    },
+                                    "replace": {
+                                        "type": "string",
+                                        "description": "替换后的文本（对于edit操作必需）",
+                                    },
+                                },
+                                "required": ["block_id", "action"],
+                            },
+                            "description": "修改操作列表，每个操作包含一个结构化编辑块",
+                        },
+                    },
+                    "required": ["file_path", "diffs"],
+                },
+                "description": "要修改的文件列表，每个文件包含文件路径和对应的编辑操作列表",
             },
         },
-        "required": ["file_path", "diffs"],
+        "required": ["files"],
     }
 
     def __init__(self):
@@ -66,29 +76,61 @@ class EditFileTool:
         Returns:
             如果验证失败，返回错误响应；否则返回None
         """
-        file_path = args.get("file_path")
-        diffs = args.get("diffs", [])
+        files = args.get("files")
 
-        if not file_path:
+        if not files:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少必需参数：file_path",
+                "stderr": "缺少必需参数：files",
             }
 
-        if not diffs:
+        if not isinstance(files, list):
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少必需参数：diffs",
+                "stderr": "files参数必须是数组类型",
             }
-
-        if not isinstance(diffs, list):
+        
+        if len(files) == 0:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "diffs参数必须是数组类型",
+                "stderr": "files数组不能为空",
             }
+        
+        # 验证每个文件项
+        for idx, file_item in enumerate(files):
+            if not isinstance(file_item, dict):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx+1} 项必须是字典类型",
+                }
+            
+            file_path = file_item.get("file_path")
+            diffs = file_item.get("diffs", [])
+            
+            if not file_path:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx+1} 项缺少必需参数：file_path",
+                }
+            
+            if not diffs:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx+1} 项缺少必需参数：diffs",
+                }
+            
+            if not isinstance(diffs, list):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx+1} 项的diffs参数必须是数组类型",
+                }
         
         return None
 
@@ -329,20 +371,15 @@ class EditFileTool:
         return (None, patches)
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        """执行文件编辑操作"""
+        """执行文件编辑操作（支持同时修改多个文件）"""
         try:
             # 验证基本参数
             error_response = EditFileTool._validate_basic_args(args)
             if error_response:
                 return error_response
             
-            file_path = args.get("file_path")
-            diffs = args.get("diffs", [])
-
-            # 转换diffs为patches
-            error_response, patches = EditFileTool._convert_diffs_to_patches(diffs)
-            if error_response:
-                return error_response
+            files = args.get("files", [])
+            agent = args.get("agent", None)
 
             # 记录 PATCH 操作调用统计
             try:
@@ -352,23 +389,61 @@ class EditFileTool:
             except Exception:
                 pass
 
-            # 获取 agent
-            agent = args.get("agent", None)
+            # 处理每个文件
+            all_results = []
+            overall_success = True
+            successful_files = []
+            failed_files = []
 
-            # 执行编辑
-            success, result = self._fast_edit(file_path, patches, agent)
+            for file_item in files:
+                file_path = file_item.get("file_path")
+                diffs = file_item.get("diffs", [])
 
-            if success:
+                # 转换diffs为patches
+                error_response, patches = EditFileTool._convert_diffs_to_patches(diffs)
+                if error_response:
+                    all_results.append(f"❌ {file_path}: {error_response.get('stderr', '参数验证失败')}")
+                    failed_files.append(file_path)
+                    overall_success = False
+                    continue
+
+                # 执行编辑
+                success, result = self._fast_edit(file_path, patches, agent)
+
+                if success:
+                    all_results.append(f"✅ {file_path}: 修改成功")
+                    successful_files.append(file_path)
+                else:
+                    all_results.append(f"❌ {file_path}: {result}")
+                    failed_files.append(file_path)
+                    overall_success = False
+
+            # 构建输出信息
+            output_lines = []
+            if successful_files:
+                output_lines.append(f"✅ 成功修改 {len(successful_files)} 个文件:")
+                for file_path in successful_files:
+                    output_lines.append(f"   - {file_path}")
+            
+            if failed_files:
+                output_lines.append(f"\n❌ 失败 {len(failed_files)} 个文件:")
+                for file_path in failed_files:
+                    output_lines.append(f"   - {file_path}")
+            
+            stdout_text = "\n".join(all_results)
+            summary = "\n".join(output_lines) if output_lines else ""
+
+            if overall_success:
                 return {
                     "success": True,
-                    "stdout": f"文件 {file_path} 修改成功",
+                    "stdout": stdout_text + ("\n\n" + summary if summary else ""),
                     "stderr": "",
                 }
             else:
                 return {
                     "success": False,
-                    "stdout": "",
-                    "stderr": result,
+                    "stdout": stdout_text + ("\n\n" + summary if summary else ""),
+                    "stderr": summary if summary else "部分文件修改失败",
                 }
 
         except Exception as e:

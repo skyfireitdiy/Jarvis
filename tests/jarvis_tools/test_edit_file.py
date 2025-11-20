@@ -100,12 +100,13 @@ class Calculator:
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "replace",
-                "content": "def hello():\n    print('Hi!')\n"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "replace",
+                    "content": "def hello():\n    print('Hi!')\n"
+                }]
             }],
             "agent": mock_agent
         })
@@ -122,11 +123,12 @@ class Calculator:
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "delete"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "delete"
+                }]
             }],
             "agent": mock_agent
         })
@@ -148,12 +150,13 @@ class Calculator:
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-2",
-                "action": "insert_before",
-                "content": "# New comment\n"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-2",
+                    "action": "insert_before",
+                    "content": "# New comment\n"
+                }]
             }],
             "agent": mock_agent
         })
@@ -170,12 +173,13 @@ class Calculator:
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-2",
-                "action": "insert_after",
-                "content": "# After comment\n"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-2",
+                    "action": "insert_after",
+                    "content": "# After comment\n"
+                }]
             }],
             "agent": mock_agent
         })
@@ -190,58 +194,62 @@ class Calculator:
     def test_edit_without_cache(self, tool, sample_file, mock_agent):
         """测试在没有缓存的情况下编辑"""
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "replace",
-                "content": "new content"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "replace",
+                    "content": "new content"
+                }]
             }],
             "agent": mock_agent
         })
         
         # 应该失败，提示需要先读取文件
         assert result["success"] is False
-        assert "缓存" in result["stderr"] or "read_code" in result["stderr"].lower()
+        error_msg = result.get("stdout", "") + result.get("stderr", "")
+        assert "缓存" in error_msg or "read_code" in error_msg.lower()
 
     def test_edit_with_invalid_block_id(self, tool, sample_file_with_cache):
         """测试使用无效的块id"""
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-999",
-                "action": "replace",
-                "content": "new content"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-999",
+                    "action": "replace",
+                    "content": "new content"
+                }]
             }],
             "agent": mock_agent
         })
         
         assert result["success"] is False
-        assert "未找到" in result["stderr"] or "not found" in result["stderr"].lower()
+        error_msg = result.get("stdout", "") + result.get("stderr", "")
+        assert "未找到" in error_msg or "not found" in error_msg.lower()
 
     def test_edit_multiple_operations(self, tool, sample_file_with_cache):
         """测试多个编辑操作"""
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [
-                {
-                    "type": "structured",
-                    "block_id": "block-1",
-                    "action": "replace",
-                    "content": "def hello():\n    print('Modified')\n"
-                },
-                {
-                    "type": "structured",
-                    "block_id": "block-2",
-                    "action": "insert_before",
-                    "content": "# Before add\n"
-                }
-            ],
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [
+                    {
+                        "block_id": "block-1",
+                        "action": "replace",
+                        "content": "def hello():\n    print('Modified')\n"
+                    },
+                    {
+                        "block_id": "block-2",
+                        "action": "insert_before",
+                        "content": "# Before add\n"
+                    }
+                ]
+            }],
             "agent": mock_agent
         })
         
@@ -258,35 +266,39 @@ class Calculator:
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "replace"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "replace"
+                }]
             }],
             "agent": mock_agent
         })
         
         assert result["success"] is False
-        assert "content" in result["stderr"].lower()
+        error_msg = result.get("stdout", "") + result.get("stderr", "")
+        assert "content" in error_msg.lower()
 
     def test_edit_with_invalid_action(self, tool, sample_file_with_cache):
         """测试无效的操作类型"""
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "invalid_action",
-                "content": "content"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "invalid_action",
+                    "content": "content"
+                }]
             }],
             "agent": mock_agent
         })
         
         assert result["success"] is False
-        assert "action" in result["stderr"].lower()
+        error_msg = result.get("stdout", "") + result.get("stderr", "")
+        assert "action" in error_msg.lower()
 
     def test_edit_nonexistent_file(self, tool, mock_agent):
         """测试编辑不存在的文件"""
@@ -303,12 +315,13 @@ class Calculator:
         mock_agent.get_user_data.return_value = cache
         
         result = tool.execute({
-            "file_path": "/nonexistent/file.py",
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "replace",
-                "content": "new content"
+            "files": [{
+                "file_path": "/nonexistent/file.py",
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "replace",
+                    "content": "new content"
+                }]
             }],
             "agent": mock_agent
         })
@@ -383,12 +396,13 @@ def multiply(a, b):
         
         # 尝试编辑文件，应该失败并提示缓存无效
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "replace",
-                "content": "new content\n"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "replace",
+                    "content": "new content\n"
+                }]
             }],
             "agent": mock_agent
         })
@@ -426,12 +440,13 @@ def multiply(a, b):
         mock_agent.get_user_data.side_effect = get_user_data_side_effect
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [{
-                "type": "structured",
-                "block_id": "block-1",
-                "action": "replace",
-                "content": "new content\n"
+            "files": [{
+                "file_path": sample_file,
+                "diffs": [{
+                    "block_id": "block-1",
+                    "action": "replace",
+                    "content": "new content\n"
+                }]
             }],
             "agent": mock_agent
         })
@@ -663,8 +678,10 @@ def multiply(a, b):
         sample_file, mock_agent = sample_file_with_cache
         
         result = tool.execute({
-            "file_path": sample_file,
-            "diffs": [],
+            "files": [{
+                "file_path": sample_file,
+                "diffs": []
+            }],
             "agent": mock_agent
         })
         
@@ -673,17 +690,16 @@ def multiply(a, b):
 
     def test_edit_file_validation(self, tool):
         """测试文件编辑参数验证"""
-        # 缺少 file_path
+        # 缺少 files
         result = tool.execute({
             "diffs": [{
-                "type": "structured",
                 "block_id": "block-1",
                 "action": "replace",
                 "content": "content"
             }]
         })
         assert result["success"] is False
-        assert "file_path" in result["stderr"].lower()
+        assert "files" in result["stderr"].lower()
 
     def test_restore_empty_cache(self, tool):
         """测试恢复空缓存"""
@@ -737,12 +753,13 @@ def func2():
             
             # 编辑文件
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-1",
-                    "action": "replace",
-                    "content": "def func1():\n    return 100\n"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-1",
+                        "action": "replace",
+                        "content": "def func1():\n    return 100\n"
+                    }]
                 }],
                 "agent": mock_agent
             })
@@ -802,12 +819,13 @@ void func2() {
             
             # 编辑文件
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-2",
-                    "action": "replace",
-                    "content": "void func1() {\n    printf(\"modified\");\n}\n\n"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-2",
+                        "action": "replace",
+                        "content": "void func1() {\n    printf(\"modified\");\n}\n\n"
+                    }]
                 }],
                 "agent": mock_agent
             })
@@ -866,12 +884,13 @@ void func2() {
             
             # 编辑文件
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-2",
-                    "action": "insert_before",
-                    "content": "    // New comment\n"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-2",
+                        "action": "insert_before",
+                        "content": "    // New comment\n"
+                    }]
                 }],
                 "agent": mock_agent
             })
@@ -929,11 +948,12 @@ struct Point {
             
             # 编辑文件
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-1",
-                    "action": "delete"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-1",
+                        "action": "delete"
+                    }]
                 }],
                 "agent": mock_agent
             })
@@ -996,12 +1016,13 @@ type Point struct {
             
             # 编辑文件
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-2",
-                    "action": "insert_after",
-                    "content": "    fmt.Println(\"World\")\n"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-2",
+                        "action": "insert_after",
+                        "content": "    fmt.Println(\"World\")\n"
+                    }]
                 }],
                 "agent": mock_agent
             })
@@ -1052,12 +1073,13 @@ type Point struct {
             
             # 编辑文件
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-1",
-                    "action": "replace",
-                    "content": "def test():\n    return 999\n"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-1",
+                        "action": "replace",
+                        "content": "def test():\n    return 999\n"
+                    }]
                 }],
                 "agent": mock_agent
             })
@@ -1128,12 +1150,13 @@ type Point struct {
                 
                 # 编辑文件
                 result = tool.execute({
-                    "file_path": filepath,
-                    "diffs": [{
-                        "type": "structured",
-                        "block_id": "block-1",
-                        "action": "replace",
-                        "content": content.replace("func", "modified_func")
+                    "files": [{
+                        "file_path": filepath,
+                        "diffs": [{
+                            "block_id": "block-1",
+                            "action": "replace",
+                            "content": content.replace("func", "modified_func")
+                        }]
                     }],
                     "agent": mock_agent
                 })
@@ -1272,12 +1295,13 @@ type Point struct {
             
             # 编辑文件
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-1",
-                    "action": "replace",
-                    "content": "def func1():\n    return 999\n"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-1",
+                        "action": "replace",
+                        "content": "def func1():\n    return 999\n"
+                    }]
                 }],
                 "agent": mock_agent
             })
@@ -1385,12 +1409,13 @@ type Point struct {
             
             # 执行编辑操作（这会创建缓存副本）
             result = tool.execute({
-                "file_path": filepath,
-                "diffs": [{
-                    "type": "structured",
-                    "block_id": "block-1",
-                    "action": "replace",
-                    "content": "def test():\n    return 42\n"
+                "files": [{
+                    "file_path": filepath,
+                    "diffs": [{
+                        "block_id": "block-1",
+                        "action": "replace",
+                        "content": "def test():\n    return 42\n"
+                    }]
                 }],
                 "agent": mock_agent
             })
