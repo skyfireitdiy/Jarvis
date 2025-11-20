@@ -561,6 +561,20 @@ class ToolRegistry(OutputHandlerProtocol):
         return re.search(pattern, content) is not None
 
     @staticmethod
+    def _get_long_response_hint(content: str) -> str:
+        """生成长响应的提示信息
+        
+        参数:
+            content: 响应内容
+            
+        返回:
+            str: 如果响应较长，返回提示信息；否则返回空字符串
+        """
+        if len(content) > 2048:
+            return "\n\n⚠️ 提示：响应内容较长（超过2048字符），可能是上下文溢出导致工具调用解析失败。如果是修改文件（edit_file）或重写文件（rewrite_file）操作，建议分多次进行，每次处理文件的一部分。"
+        return ""
+
+    @staticmethod
     def _extract_tool_calls(
         content: str,
     ) -> Tuple[Dict[str, Dict[str, Any]], str, bool]:
@@ -621,9 +635,10 @@ class ToolRegistry(OutputHandlerProtocol):
                         pass
 
             if not data:
+                long_hint = ToolRegistry._get_long_response_hint(content)
                 return (
                     {},
-                    f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}",
+                    f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}{long_hint}",
                     False,
                 )
         ret = []
@@ -631,24 +646,26 @@ class ToolRegistry(OutputHandlerProtocol):
             try:
                 msg = json_loads(item)
             except Exception as e:
+                long_hint = ToolRegistry._get_long_response_hint(content)
                 return (
                     {},
                     f"""Jsonnet 解析失败：{e}
 
 提示：Jsonnet支持双引号/单引号、尾随逗号、注释。多行字符串推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。
 
-{tool_call_help}""",
+{tool_call_help}{long_hint}""",
                     False,
                 )
 
             if "name" in msg and "arguments" in msg and "want" in msg:
                 ret.append(msg)
             else:
+                long_hint = ToolRegistry._get_long_response_hint(content)
                 return (
                     {},
                     f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
 
-                {tool_call_help}""",
+                {tool_call_help}{long_hint}""",
                     False,
                 )
         if len(ret) > 1:
