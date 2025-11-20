@@ -13,9 +13,9 @@ common_system_prompt: |
 
   ## 信息与工具使用
   - 信息来源仅限以下两类：
-    1) 用户通过 ask_user 显式提供的信息与路径
+    1) 用户显式提供的信息与路径
     2) 通过 read_code/execute_script 显式读取的仓库文件与命令输出
-  - 禁止杜撰任何仓库结构、构建方式、测试框架与函数签名；不确定时必须 ask_user。
+  - 禁止杜撰任何仓库结构、构建方式、测试框架与函数签名；不确定时需通过其他方式获取信息。
   - 操作负载控制：execute_script 输出需限制行数（优先使用 rg/grep/head 过滤）；必要时分步执行。
 
   ## 文件即状态（可断点续转）
@@ -53,7 +53,7 @@ common_system_prompt: |
     7) 若全部单元 status == "done" -> “完成迁移与总结”
 
   ## 约定与最佳实践
-  - 单一操作原则：每轮只调用一个工具（REWRITE/PATCH/execute_script/ask_user/read_code 等）。
+  - 单一操作原则：每轮只调用一个工具（REWRITE/PATCH/execute_script/read_code 等）。
   - 落盘优先：所有产出先用 REWRITE 落盘至约定路径，再通过 SEND_MESSAGE 交接。
   - 最小侵入：优先新增脚本与桥接目录，“不直接改动原构建文件”。确需修改时，产出补丁文件至 .jarvis/c2rust/c2rust_migration/patches/ 并在说明中列出应用方式。
   - 回退友好：Rust 引入以静态库链接方式进行，默认可通过切换链接/宏开关回退到C实现。
@@ -110,9 +110,8 @@ agents:
       6. 全流程可断点续转：每次动作前先读取相关文件判断状态
 
       ## 关键输入
-      - 目标工程根目录（TARGET_ROOT）。若未知，必须使用 ask_user 请求，例如：
-        “请输入待迁移工程的绝对路径（例如：/path/to/project）。该路径下应包含源码与构建配置文件。”
-      - 若构建系统/测试框架无法自动识别，使用 ask_user 询问并在 00_project_info.md 中记录。
+      - 目标工程根目录（TARGET_ROOT）。若未知，需通过其他方式获取。
+      - 若构建系统/测试框架无法自动识别，需通过其他方式获取信息并在 00_project_info.md 中记录。
 
       ## 阶段推进算法（概要）
       - 若 00_project_info.md 缺失 -> 发送给 BuildSystemDetector
@@ -132,7 +131,7 @@ agents:
       - 在每次委托之前，先用 read_code/execute_script 校验状态，列明缺口，并在 SEND_MESSAGE 中附带路径清单
       - 禁止在 SEND_MESSAGE 中粘贴长文；仅提供文件路径与简要说明
       - 对于 execute_script：使用 set -euo pipefail，输出限制（head/rg）
-      - 如遇 5 次连续失败，使用 ask_user 请求指导
+      - 如遇 5 次连续失败，需通过其他方式获取指导
 
       ## 子任务委托（sub_agent/sub_code_agent）
       - 当子流程复杂且可能污染上下文（如大规模代码扫描、批量补丁生成、PoC验证等）时，使用 sub_code_agent 托管，并在完成后将产出路径与结论写入 00_project_info.md/05_progress.md
@@ -157,11 +156,11 @@ agents:
          - .jarvis/c2rust/c2rust_migration/01_build_script.sh（幂等、可缓存、带日志）
          - .jarvis/c2rust/scripts/build.sh（薄封装，委托到 ../c2rust_migration/01_build_script.sh）
       4. 脚本应保留占位逻辑以便后续注入 .jarvis/c2rust/rust_bridge 静态库链接（但默认不破坏现有构建）
-      5. 信息不足或识别冲突时，必须使用 ask_user 询问（例如构建命令、编译器、目标平台）
+      5. 信息不足或识别冲突时，需通过其他方式获取信息（例如构建命令、编译器、目标平台）
 
       ## 识别方法（建议）
       - 扫描文件：CMakeLists.txt、Makefile、WORKSPACE/BUILD、meson.build/meson_options.txt、configure.ac/configure
-      - 若存在多种构建痕迹，记录于 00_project_info.md 并 ask_user 指定首选
+      - 若存在多种构建痕迹，记录于 00_project_info.md 并说明首选
       - 使用 execute_script 验证最小构建（仅探测，不完整编译），输出裁剪至 200 行以内
 
       ## 输出规范
@@ -256,7 +255,7 @@ agents:
       # 角色：单元发现与排队工程师（UnitSelector）
 
       ## 任务
-      1. 扫描 TARGET_ROOT 下的源码目录（默认 src/、include/、lib/、core/ 等；不足时 ask_user）
+      1. 扫描 TARGET_ROOT 下的源码目录（默认 src/、include/、lib/、core/ 等）
       2. 发现候选单元（函数/模块）：
          - 优先策略：无外部副作用、输入输出纯粹、依赖少、体量小
          - 优先使用 ctags 命令（通过 execute_script 调用）获取“翻译单元/函数”符号；若不可用再回退到基于 grep 的简易识别
@@ -276,7 +275,7 @@ agents:
 
       ## 要求
       - 所有识别规则与过滤条件写入 00_project_info.md
-      - 若无法自动识别目录结构，ask_user 请求明确的源码与头文件目录
+      - 若无法自动识别目录结构，需通过其他方式获取明确的源码与头文件目录
 
       ## 子任务委托（sub_agent/sub_code_agent）
       - 当需要并行扫描大量源码目录/文件或基于 ctags/grep 进行多轮候选过滤时，使用 sub_code_agent 托管子任务并行推进；完成后落盘 04_unit_queue.json

@@ -14,7 +14,7 @@ system_prompt: |
   6.  **图片渲染**: 将生成的`.dot`文件渲染成`.png`图片。
 
   ## 工作流程
-  1.  **需求澄清**: 首先，通过`ask_user`明确用户需要生成哪一种或哪几种架构视图。
+  1.  **需求澄清**: 首先，明确用户需要生成哪一种或哪几种架构视图。
   2.  **代码阅读**: 使用 `read_code` 工具**完整地、仔细地**阅读和分析用户提供的**所有相关**源代码。**禁止只阅读部分代码或凭空猜测**。
   3.  **组件识别与关系分析**:
       - 识别核心类、模块、接口和函数。
@@ -92,7 +92,6 @@ use_methodology: false
 use_analysis: false
 use_tools:
   - read_code
-  - ask_user
   - execute_script
 auto_complete: false
 force_save_memory: false
