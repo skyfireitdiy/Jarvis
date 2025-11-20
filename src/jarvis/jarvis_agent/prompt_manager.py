@@ -73,7 +73,7 @@ class PromptManager:
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
     - 如果信息不明确，请请求用户补充
-    - 如果执行过程中连续失败5次，请使用ask_user询问用户操作
+    - 如果执行过程中连续失败5次，请请求用户操作
     - 操作列表：{action_handlers}{memory_prompts}
 </system_prompt>
 
