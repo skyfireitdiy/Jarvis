@@ -814,7 +814,12 @@ class ToolRegistry(OutputHandlerProtocol):
             print(f"🛠️ 执行工具调用 {name}") 
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)
-            print(f"✅ 执行工具调用 {name} 完成") 
+            
+            # 打印执行状态
+            if result.get("success", False):
+                print(f"✅ 执行工具调用 {name} 成功")
+            else:
+                print(f"❌ 执行工具调用 {name} 失败")
 
             # 记录本轮实际执行的工具，供上层逻辑（如记忆保存判定）使用
             try:
@@ -899,7 +904,17 @@ class ToolRegistry(OutputHandlerProtocol):
             return output
 
         except Exception as e:
-            print(f"❌ 工具调用失败：{str(e)}") 
+            # 尝试获取工具名称（如果已定义）
+            tool_name = ""
+            try:
+                if 'name' in locals():
+                    tool_name = name
+            except Exception:
+                pass
+            if tool_name:
+                print(f"❌ 执行工具调用 {tool_name} 失败：{str(e)}")
+            else:
+                print(f"❌ 工具调用失败：{str(e)}")
             try:
                 from jarvis.jarvis_agent import Agent  # 延迟导入避免循环依赖
                 agent_instance_for_prompt: Agent = agent  # type: ignore
