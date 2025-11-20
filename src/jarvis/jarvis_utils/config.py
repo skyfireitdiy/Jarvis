@@ -245,28 +245,11 @@ def is_confirm_before_apply_patch() -> bool:
     return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False))
 
 
-def get_patch_format() -> str:
-    """
-    获取补丁格式。
-
-    - "search": 仅使用精确匹配的 `SEARCH` 模式。此模式对能力较弱的模型更稳定，因为它要求代码片段完全匹配。
-    - "search_range": 仅使用 `SEARCH_START` 和 `SEARCH_END` 的范围匹配模式。此模式对能力较强的模型更灵活，因为它允许在代码块内部进行修改，而不要求整个块完全匹配。
-    - "all": 同时支持以上两种模式（默认）。
-
-    返回:
-        str: "all", "search", or "search_range"
-    """
-    mode = GLOBAL_CONFIG_DATA.get("JARVIS_PATCH_FORMAT", "all")
-    if mode in ["all", "search", "search_range"]:
-        return cast(str, mode)
-    return "all"
-
-
 def get_data_dir() -> str:
     """
     获取Jarvis数据存储目录路径。
 
-    返回:
+    返回: 
         str: 数据目录路径，优先从JARVIS_DATA_PATH环境变量获取，
              如果未设置或为空，则使用~/.jarvis作为默认值
     """

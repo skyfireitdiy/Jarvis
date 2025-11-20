@@ -203,12 +203,6 @@
       "description": "应用补丁前是否需要确认",
       "default": false
     },
-    "JARVIS_PATCH_FORMAT": {
-      "type": "string",
-      "enum": ["all", "search", "search_range"],
-      "description": "补丁格式处理模式：all 同时支持 SEARCH 与 SEARCH_START/SEARCH_END；search 仅允许精确片段匹配；search_range 仅允许范围匹配。",
-      "default": "all"
-    },
     "JARVIS_DATA_PATH": {
       "type": "string",
       "description": "Jarvis数据存储目录路径",
