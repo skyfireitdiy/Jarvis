@@ -95,12 +95,12 @@ class CodeAgent(Agent):
         self._check_git_config()
         base_tools = [
             "execute_script",
-            "search_web",
-            "ask_user",
+            # "search_web",
+            # "ask_user",
             "read_code",
-            "save_memory",
-            "retrieve_memory",
-            "clear_memory",
+            # "save_memory",
+            # "retrieve_memory",
+            # "clear_memory",
             "edit_file",
             "rewrite_file",
             "lsp_client",  # LSP客户端工具，用于获取代码补全、悬停等信息
