@@ -31,10 +31,10 @@ from jarvis.jarvis_utils.utils import get_context_token_count, while_success, wh
 
 
 class BasePlatform(ABC):
-    """Base class for large language models"""
+    """大语言模型基类"""
 
     def __init__(self):
-        """Initialize model"""
+        """初始化模型"""
         self.suppress_output = True  # 添加输出控制标志
         self.web = False  # 添加web属性，默认false
         self._saved = False
@@ -42,7 +42,7 @@ class BasePlatform(ABC):
         self._session_history_file: Optional[str] = None
 
     def __enter__(self) -> Self:
-        """Enter context manager"""
+        """进入上下文管理器"""
         return self
 
     def __exit__(
@@ -51,23 +51,23 @@ class BasePlatform(ABC):
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        """Exit context manager"""
+        """退出上下文管理器"""
         if not self._saved:
             self.delete_chat()
 
     @abstractmethod
     def set_model_name(self, model_name: str):
-        """Set model name"""
+        """设置模型名称"""
         raise NotImplementedError("set_model_name is not implemented")
 
     def reset(self):
-        """Reset model"""
+        """重置模型"""
         self.delete_chat()
         self._session_history_file = None
 
     @abstractmethod
     def chat(self, message: str) -> Generator[str, None, None]:
-        """Execute conversation"""
+        """执行对话"""
         raise NotImplementedError("chat is not implemented")
 
     @abstractmethod
@@ -76,18 +76,18 @@ class BasePlatform(ABC):
 
     @abstractmethod
     def support_upload_files(self) -> bool:
-        """Check if platform supports upload files"""
+        """检查平台是否支持文件上传"""
         return False
 
     def _submit_part_with_split(self, part_content: str, threshold_factor: float = 1.0) -> str:
-        """Submit a single part, splitting it in half if it fails repeatedly.
+        """提交单个部分，如果反复失败则将其拆分。
         
-        Args:
-            part_content: The content of the part to submit.
-            threshold_factor: Factor to adjust the token threshold.
+        参数:
+            part_content: 要提交的内容。
+            threshold_factor: 调整token阈值的因素。
             
-        Returns:
-            The response from submitting the part(s).
+        返回:
+            提交部分后的响应。
         """
         try:
             response = ""
@@ -133,15 +133,15 @@ class BasePlatform(ABC):
             return response
 
     def _handle_long_context(self, message: str, threshold_factor: float = 1.0) -> str:
-        """Handle long context by splitting and submitting in chunks.
+        """通过拆分和分块提交来处理长上下文。
         
-        Args:
-            message: The long message to be split and submitted.
-            threshold_factor: Factor to adjust the token threshold (default 1.0).
-                             Use a value < 1.0 (e.g., 0.8) to lower the threshold when retrying.
+        参数:
+            message: 要拆分和提交的较长消息。
+            threshold_factor: 调整token阈值的因素（默认为1.0）。
+                             使用小于1.0的值（例如0.8）在重试时降低阈值。
             
-        Returns:
-            The accumulated response from all chunk submissions.
+        返回:
+            所有块提交的累积响应。
         """
         base_max_token = get_max_input_token_count(self.model_group)
         adjusted_max_token = int(base_max_token * threshold_factor)
@@ -340,10 +340,10 @@ class BasePlatform(ABC):
         return response
 
     def chat_until_success(self, message: str) -> str:
-        """Chat with model until successful response.
+        """与模型对话直到成功响应。
         
-        If the initial attempt fails (possibly due to inaccurate token estimation),
-        automatically retry using long context handling.
+        如果初始尝试失败（可能是由于token估算不准确），
+        自动使用长上下文处理重试。
         """
         try:
             set_in_chat(True)
@@ -416,88 +416,88 @@ class BasePlatform(ABC):
 
     @abstractmethod
     def name(self) -> str:
-        """Model name"""
+        """模型名称"""
         raise NotImplementedError("name is not implemented")
 
     @classmethod
     @abstractmethod
     def platform_name(cls) -> str:
-        """Platform name"""
+        """平台名称"""
         raise NotImplementedError("platform_name is not implemented")
 
     @abstractmethod
     def delete_chat(self) -> bool:
-        """Delete chat"""
+        """删除对话"""
         raise NotImplementedError("delete_chat is not implemented")
 
     @abstractmethod
     def save(self, file_path: str) -> bool:
-        """Save chat session to a file.
+        """保存对话会话到文件。
 
-        Note:
-            Implementations of this method should set `self._saved = True` upon successful saving
-            to prevent the session from being deleted on object destruction.
+        注意:
+            此方法的实现应在成功保存后将`self._saved`设置为True，
+            以防止在对象销毁时删除会话。
 
-        Args:
-            file_path: The path to save the session file.
+        参数:
+            file_path: 保存会话文件的路径。
 
-        Returns:
-            True if saving is successful, False otherwise.
+        返回:
+            如果保存成功返回True，否则返回False。
         """
         raise NotImplementedError("save is not implemented")
 
     @abstractmethod
     def restore(self, file_path: str) -> bool:
-        """Restore chat session from a file.
+        """从文件恢复对话会话。
 
-        Args:
-            file_path: The path to restore the session file from.
+        参数:
+            file_path: 要恢复会话文件的路径。
 
-        Returns:
-            True if restoring is successful, False otherwise.
+        返回:
+            如果恢复成功返回True，否则返回False。
         """
         raise NotImplementedError("restore is not implemented")
 
     @abstractmethod
     def set_system_prompt(self, message: str):
-        """Set system message"""
+        """设置系统消息"""
         raise NotImplementedError("set_system_prompt is not implemented")
 
     @abstractmethod
     def get_model_list(self) -> List[Tuple[str, str]]:
-        """Get model list"""
+        """获取模型列表"""
         raise NotImplementedError("get_model_list is not implemented")
 
     @classmethod
     @abstractmethod
     def get_required_env_keys(cls) -> List[str]:
-        """Get required env keys"""
+        """获取必需的环境变量键"""
         raise NotImplementedError("get_required_env_keys is not implemented")
 
     @classmethod
     def get_env_defaults(cls) -> Dict[str, str]:
-        """Get env default values"""
+        """获取环境变量默认值"""
         return {}
 
     @classmethod
     def get_env_config_guide(cls) -> Dict[str, str]:
-        """Get environment variable configuration guide
+        """获取环境变量配置指南
 
-        Returns:
-            Dict[str, str]: A dictionary mapping env key names to their configuration instructions
+        返回:
+            Dict[str, str]: 将环境变量键名映射到其配置说明的字典
         """
         return {}
 
     def set_suppress_output(self, suppress: bool):
-        """Set whether to suppress output"""
+        """设置是否抑制输出"""
         self.suppress_output = suppress
 
     def set_model_group(self, model_group: Optional[str]):
-        """Set model group"""
+        """设置模型组"""
         self.model_group = model_group
 
     def set_web(self, web: bool):
-        """Set web flag"""
+        """设置网页标志"""
         self.web = web
 
     def _append_session_history(self, user_input: str, model_output: str) -> None:
@@ -548,5 +548,5 @@ class BasePlatform(ABC):
 
     @abstractmethod
     def support_web(self) -> bool:
-        """Check if platform supports web functionality"""
+        """检查平台是否支持网页功能"""
         return False
