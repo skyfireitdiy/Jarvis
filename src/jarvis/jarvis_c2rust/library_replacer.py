@@ -324,6 +324,21 @@ def _normalize_disabled_libraries(disabled_libraries: Optional[List[str]]) -> tu
     return disabled_norm, disabled_display
 
 
+def _load_additional_notes(data_dir: Path) -> str:
+    """从配置文件加载附加说明"""
+    try:
+        from jarvis.jarvis_c2rust.constants import CONFIG_JSON
+        config_path = data_dir / CONFIG_JSON
+        if config_path.exists():
+            with config_path.open("r", encoding="utf-8") as f:
+                config = json.load(f)
+                if isinstance(config, dict):
+                    return str(config.get("additional_notes", "") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
 def _normalize_list(items: Optional[List[str]]) -> List[str]:
     """规范化列表，去重并排序"""
     if not isinstance(items, list):
@@ -492,6 +507,7 @@ def _build_subtree_prompt(
     by_id: Dict[int, Dict[str, Any]],
     adj_func: Dict[int, List[int]],
     disabled_display: str,
+    additional_notes: str = "",
 ) -> str:
     """构建子树评估提示词"""
     root_rec = by_id.get(fid, {})
@@ -578,6 +594,7 @@ def _build_subtree_prompt(
         + "代表性源码样本（部分节点，可能截断，仅供辅助判断）:\n"
         + "\n".join(samples)
         + "\n"
+        + (f"\n【附加说明（用户自定义）】\n{additional_notes}\n" if additional_notes else "")
     )
 
 
@@ -590,6 +607,7 @@ def _llm_evaluate_subtree(
     disabled_display: str,
     _model_available: bool,
     _new_model_func: Callable,
+    additional_notes: str = "",
 ) -> Dict[str, Any]:
     """使用LLM评估子树是否可替代，支持最多3次重试"""
     if not _model_available:
@@ -598,7 +616,7 @@ def _llm_evaluate_subtree(
     if not model:
         return {"replaceable": False}
     
-    base_prompt = _build_subtree_prompt(fid, desc, by_id, adj_func, disabled_display)
+    base_prompt = _build_subtree_prompt(fid, desc, by_id, adj_func, disabled_display, additional_notes)
     last_parse_error = None
     
     for attempt in range(1, MAX_LLM_RETRIES + 1):
@@ -972,6 +990,9 @@ def apply_library_replacement(
     # 预处理禁用库
     disabled_norm, disabled_display = _normalize_disabled_libraries(disabled_libraries)
 
+    # 读取附加说明
+    additional_notes = _load_additional_notes(data_dir)
+
     # 断点恢复支持：工具函数与关键键构造
     ckpt_path: Path = Path(checkpoint_path) if checkpoint_path is not None else (data_dir / DEFAULT_CHECKPOINT_FILE)
     checkpoint_key = _make_checkpoint_key(sjsonl, library_name, llm_group, candidates, disabled_libraries, max_funcs)
@@ -1068,7 +1089,7 @@ def apply_library_replacement(
         # 执行 LLM 评估
         res = _llm_evaluate_subtree(
             fid, desc, by_id, adj_func, disabled_norm, disabled_display,
-            _model_available, _new_model
+            _model_available, _new_model, additional_notes
         )
         eval_counter += 1
         processed_roots.add(fid)

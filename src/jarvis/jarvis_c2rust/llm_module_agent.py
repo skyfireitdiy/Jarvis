@@ -319,6 +319,36 @@ class LLMRustCratePlannerAgent:
         )
         self.llm_group = llm_group
         self.loader = _GraphLoader(self.db_path, self.project_root)
+        # 读取附加说明
+        self.additional_notes = self._load_additional_notes()
+
+    def _load_additional_notes(self) -> str:
+        """从配置文件加载附加说明"""
+        try:
+            from jarvis.jarvis_c2rust.constants import CONFIG_JSON
+            config_path = self.project_root / ".jarvis" / "c2rust" / CONFIG_JSON
+            if config_path.exists():
+                with config_path.open("r", encoding="utf-8") as f:
+                    config = json.load(f)
+                    if isinstance(config, dict):
+                        return str(config.get("additional_notes", "") or "").strip()
+        except Exception:
+            pass
+        return ""
+
+    def _append_additional_notes(self, prompt: str) -> str:
+        """
+        在提示词末尾追加附加说明（如果存在）。
+        
+        Args:
+            prompt: 原始提示词
+            
+        Returns:
+            追加了附加说明的提示词
+        """
+        if self.additional_notes and self.additional_notes.strip():
+            return prompt + "\n\n" + "【附加说明（用户自定义）】\n" + self.additional_notes.strip()
+        return prompt
 
     def _crate_name(self) -> str:
         """
@@ -454,7 +484,7 @@ class LLMRustCratePlannerAgent:
             ensure_ascii=False,
             indent=2,
         )
-        return f"""
+        prompt = f"""
 下面提供了项目的调用图上下文（JSON），请先通读理解，不要输出任何规划或JSON内容：
 <context>
 {context_json}
@@ -462,13 +492,14 @@ class LLMRustCratePlannerAgent:
 
 如果已准备好进入总结阶段以生成完整输出，请仅输出：<!!!COMPLETE!!!>
 """.strip()
+        return self._append_additional_notes(prompt)
 
     def _build_system_prompt(self) -> str:
         """
         系统提示：描述如何基于依赖关系进行 crate 规划的原则（不涉及对话流程或输出方式）
         """
         crate_name = self._crate_name()
-        return (
+        prompt = (
             "你是资深 Rust 架构师。任务：根据给定的函数级调用关系（仅包含 root_function 及其可达的函数名列表），为目标项目规划合理的 Rust crate 结构。\n"
             "\n"
             "规划原则：\n"
@@ -488,6 +519,7 @@ class LLMRustCratePlannerAgent:
             "  * 多可执行仅在确有多个清晰入口时才使用 src/bin/<name>.rs；每个 bin 文件仅做入口，尽量调用库；\n"
             "  * 二进制命名：<name> 使用小写下划线，体现入口意图，避免与模块/文件重名。\n"
         )
+        return self._append_additional_notes(prompt)
 
     def _build_summary_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
         """
@@ -554,7 +586,7 @@ class LLMRustCratePlannerAgent:
 </PROJECT>
 """.strip()
         guidance = f"{guidance_common}\n{entry_rule}"
-        return f"""
+        prompt = f"""
 请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 JSON）。严格遵循以下要求：
 
 {guidance}
@@ -564,6 +596,7 @@ class LLMRustCratePlannerAgent:
 [...]
 </PROJECT>
 """.strip()
+        return self._append_additional_notes(prompt)
 
     def _extract_json_from_project(self, text: str) -> str:
         """

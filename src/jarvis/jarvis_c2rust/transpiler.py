@@ -127,6 +127,9 @@ class Transpiler:
             # 如果配置文件中有配置则使用，否则使用空列表
             self.disabled_libraries = config.get("disabled_libraries", [])
         
+        # 从配置文件读取附加说明（不支持通过参数传入，只能通过配置文件设置）
+        self.additional_notes = config.get("additional_notes", "")
+        
         # 保存配置到独立的配置文件
         self._save_config()
         
@@ -280,12 +283,15 @@ class Transpiler:
         如果配置文件不存在，尝试从 progress.json 迁移配置（向后兼容）。
         """
         config_path = self.data_dir / CONFIG_JSON
-        default_config = {"root_symbols": [], "disabled_libraries": []}
+        default_config = {"root_symbols": [], "disabled_libraries": [], "additional_notes": ""}
         
         # 尝试从配置文件读取
         if config_path.exists():
             config = read_json(config_path, default_config)
             if isinstance(config, dict):
+                # 确保包含所有必需的键（向后兼容）
+                if "additional_notes" not in config:
+                    config["additional_notes"] = ""
                 return config
         
         # 向后兼容：如果配置文件不存在，尝试从 progress.json 迁移
@@ -295,6 +301,7 @@ class Transpiler:
             migrated_config = {
                 "root_symbols": progress_config.get("root_symbols", []),
                 "disabled_libraries": progress_config.get("disabled_libraries", []),
+                "additional_notes": progress_config.get("additional_notes", ""),
             }
             write_json(config_path, migrated_config)
             typer.secho(f"[c2rust-transpiler][config] 已从 progress.json 迁移配置到 {config_path}", fg=typer.colors.YELLOW)
@@ -312,6 +319,7 @@ class Transpiler:
         config = {
             "root_symbols": self.root_symbols,
             "disabled_libraries": self.disabled_libraries,
+            "additional_notes": getattr(self, "additional_notes", ""),
         }
         write_json(config_path, config)
 
@@ -468,6 +476,21 @@ class Transpiler:
             syms = sorted(list(set(syms)))
         return syms
 
+    def _append_additional_notes(self, prompt: str) -> str:
+        """
+        在提示词末尾追加附加说明（如果存在）。
+        
+        Args:
+            prompt: 原始提示词
+            
+        Returns:
+            追加了附加说明的提示词
+        """
+        additional_notes = getattr(self, "additional_notes", "")
+        if additional_notes and additional_notes.strip():
+            return prompt + "\n\n" + "【附加说明（用户自定义）】\n" + additional_notes.strip()
+        return prompt
+
     def _build_module_selection_prompts(
         self,
         rec: FnRecord,
@@ -569,6 +592,9 @@ class Transpiler:
             "示例2（资源释放类函数，可跳过实现）：\n"
             "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"skip_implementation\": true,\n  \"notes\": \"通过 RAII 自动管理，无需显式实现\"\n}\n</SUMMARY>"
         )
+        # 在 user_prompt 和 summary_prompt 中追加附加说明（system_prompt 通常不需要）
+        user_prompt = self._append_additional_notes(user_prompt)
+        summary_prompt = self._append_additional_notes(summary_prompt)
         return system_prompt, user_prompt, summary_prompt
 
     def _plan_module_and_signature(self, rec: FnRecord, c_code: str) -> Tuple[str, str, bool]:
@@ -1078,7 +1104,8 @@ class Transpiler:
             "记忆标签建议：使用 'c2rust', 'function_impl', 函数名等作为标签，便于后续检索。",
             "请在完成代码实现之后保存记忆，记录本次实现的完整信息。",
         ])
-        return "\n".join(requirement_lines)
+        prompt = "\n".join(requirement_lines)
+        return self._append_additional_notes(prompt)
 
     def _codeagent_generate_impl(self, rec: FnRecord, c_code: str, module: str, rust_sig: str, unresolved: List[str]) -> None:
         """
@@ -1666,7 +1693,8 @@ class Transpiler:
             stage, tags, sym_name, src_loc, c_code, curr, symbols_path, include_output_patch_hint
         )
         stage_lines = self._build_repair_prompt_stage_section(stage, output, command)
-        return "\n".join(base_lines + stage_lines)
+        prompt = "\n".join(base_lines + stage_lines)
+        return self._append_additional_notes(prompt)
 
     def _detect_crate_kind(self) -> str:
         """
@@ -2117,6 +2145,9 @@ class Transpiler:
                 "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
                 "<SUMMARY>\n{\n  \"ok\": true,\n  \"function_issues\": [],\n  \"critical_issues\": []\n}\n</SUMMARY>"
             )
+            # 在 usr_p 和 sum_p 中追加附加说明（sys_p 通常不需要）
+            usr_p = self._append_additional_notes(usr_p)
+            sum_p = self._append_additional_notes(sum_p)
             return sys_p, usr_p, sum_p
 
         i = 0
@@ -2356,7 +2387,8 @@ class Transpiler:
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             ca = self._get_repair_agent()
             limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
-            ca.run(self._compose_prompt_with_context(fix_prompt), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}]", suffix="")
+            fix_prompt_with_notes = self._append_additional_notes(fix_prompt)
+            ca.run(self._compose_prompt_with_context(fix_prompt_with_notes), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}]", suffix="")
             # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
             self._cargo_build_loop()
             

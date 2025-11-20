@@ -44,14 +44,14 @@ def _root():
 def _load_config() -> dict:
     """
     从配置文件加载配置。
-    返回包含 root_symbols 和 disabled_libraries 的字典。
+    返回包含 root_symbols、disabled_libraries 和 additional_notes 的字典。
     """
     import json
     from jarvis.jarvis_c2rust.constants import CONFIG_JSON, C2RUST_DIRNAME
     
     data_dir = Path(".") / C2RUST_DIRNAME
     config_path = data_dir / CONFIG_JSON
-    default_config = {"root_symbols": [], "disabled_libraries": []}
+    default_config = {"root_symbols": [], "disabled_libraries": [], "additional_notes": ""}
     
     if not config_path.exists():
         return default_config
@@ -65,6 +65,7 @@ def _load_config() -> dict:
             return {
                 "root_symbols": config.get("root_symbols", []),
                 "disabled_libraries": config.get("disabled_libraries", []),
+                "additional_notes": config.get("additional_notes", ""),
             }
     except Exception:
         return default_config
@@ -458,6 +459,9 @@ def config(
     disabled_libs: Optional[str] = typer.Option(
         None, "--disabled-libs", help="禁用库列表（逗号分隔）"
     ),
+    additional_notes: Optional[str] = typer.Option(
+        None, "--additional-notes", help="附加说明（将在所有 agent 的提示词中追加）"
+    ),
     show: bool = typer.Option(
         False, "--show", help="显示当前配置内容"
     ),
@@ -468,7 +472,7 @@ def config(
     """
     管理转译配置文件（.jarvis/c2rust/config.json）。
     
-    可以设置根符号列表（root_symbols）和禁用库列表（disabled_libraries）。
+    可以设置根符号列表（root_symbols）、禁用库列表（disabled_libraries）和附加说明（additional_notes）。
     这些配置会被 transpile 命令自动读取和使用。
     
     示例:
@@ -487,8 +491,11 @@ def config(
       # 设置禁用库列表
       jarvis-c2rust config --disabled-libs "libc,libm"
       
+      # 设置附加说明（将在所有 agent 的提示词中追加）
+      jarvis-c2rust config --additional-notes "注意：所有函数必须处理错误情况，避免 panic"
+      
       # 同时设置多个参数
-      jarvis-c2rust config --files bzlib.h --disabled-libs "libc"
+      jarvis-c2rust config --files bzlib.h --disabled-libs "libc" --additional-notes "特殊要求说明"
       
       # 查看当前配置
       jarvis-c2rust config --show
@@ -504,7 +511,7 @@ def config(
     data_dir.mkdir(parents=True, exist_ok=True)
     
     # 读取现有配置
-    default_config = {"root_symbols": [], "disabled_libraries": []}
+    default_config = {"root_symbols": [], "disabled_libraries": [], "additional_notes": ""}
     current_config = default_config.copy()
     
     if config_path.exists():
@@ -602,8 +609,16 @@ def config(
             current_config["disabled_libraries"] = disabled_list
             typer.secho(f"[c2rust-config] 已设置禁用库列表: {', '.join(disabled_list)}", fg=typer.colors.GREEN)
     
+    # 读取附加说明
+    if isinstance(additional_notes, str):
+        current_config["additional_notes"] = additional_notes.strip()
+        if additional_notes.strip():
+            typer.secho(f"[c2rust-config] 已设置附加说明: {len(additional_notes.strip())} 字符", fg=typer.colors.GREEN)
+        else:
+            typer.secho("[c2rust-config] 已清空附加说明", fg=typer.colors.GREEN)
+    
     # 如果没有提供任何参数，提示用户
-    if not files and not root_list_syms and not disabled_libs:
+    if not files and not root_list_syms and not disabled_libs and additional_notes is None:
         typer.secho("[c2rust-config] 未提供任何参数，使用 --show 查看当前配置，或使用 --help 查看帮助", fg=typer.colors.YELLOW)
         return
     
