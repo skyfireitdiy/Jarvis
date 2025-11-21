@@ -846,7 +846,15 @@ class Transpiler:
             # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             # 代码生成Agent禁用方法论和分析，仅启用强制记忆功能
+            # 获取函数信息用于 Agent name
+            fn_name = ""
+            if fid is not None:
+                rec = self.fn_index_by_id.get(fid)
+                if rec:
+                    fn_name = rec.qname or rec.name or f"fn_{fid}"
+            agent_name = f"C2Rust-CodeGenerator" + (f"({fn_name})" if fn_name else "")
             agent = CodeAgent(
+                name=agent_name,
                 need_summary=False,
                 non_interactive=self.non_interactive,
                 model_group=self.llm_group,
@@ -871,7 +879,15 @@ class Transpiler:
             # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             # 修复Agent启用方法论、分析和强制记忆功能
+            # 获取函数信息用于 Agent name
+            fn_name = ""
+            if fid is not None:
+                rec = self.fn_index_by_id.get(fid)
+                if rec:
+                    fn_name = rec.qname or rec.name or f"fn_{fid}"
+            agent_name = f"C2Rust-CodeRepairer" + (f"({fn_name})" if fn_name else "")
             agent = CodeAgent(
+                name=agent_name,
                 need_summary=False,
                 non_interactive=self.non_interactive,
                 model_group=self.llm_group,
