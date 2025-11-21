@@ -1525,7 +1525,7 @@ class CodeAgent(Agent):
                         text=True,
                         encoding="utf-8",
                         errors="replace",
-                        timeout=30,  # 30秒超时
+                        timeout=600,  # 600秒超时
                     )
                     
                     # 只记录有错误或警告的结果
