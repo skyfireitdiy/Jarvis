@@ -1545,9 +1545,9 @@ class CodeAgent(Agent):
                         file_results.append((file_name, tool_name, "通过", ""))
                 
                 except subprocess.TimeoutExpired:
-                    results.append((tool_name, file_path, command, -1, "执行超时（30秒）"))
-                    file_results.append((file_name, tool_name, "超时", "执行超时（30秒）"))
-                    print(f"⚠️ 检查超时 ({file_name}): 执行超时（30秒）")
+                    results.append((tool_name, file_path, command, -1, "执行超时（600秒）"))
+                    file_results.append((file_name, tool_name, "超时", "执行超时（600秒）"))
+                    print(f"⚠️ 检查超时 ({file_name}): 执行超时（600秒）")
                 except FileNotFoundError:
                     # 工具未安装，跳过
                     file_results.append((file_name, tool_name, "跳过", "工具未安装"))

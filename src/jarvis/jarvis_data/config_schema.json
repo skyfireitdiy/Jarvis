@@ -304,7 +304,7 @@
     "JARVIS_BUILD_VALIDATION_TIMEOUT": {
       "type": "number",
       "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
-      "default": 30
+      "default": 600
     },
     "JARVIS_ENABLE_IMPACT_ANALYSIS": {
       "type": "boolean",
