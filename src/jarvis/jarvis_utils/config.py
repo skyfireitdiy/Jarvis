@@ -474,9 +474,9 @@ def get_build_validation_timeout() -> int:
     获取构建验证的超时时间（秒）。
 
     返回：
-        int: 超时时间，默认为30秒
+        int: 超时时间，默认为600秒
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_BUILD_VALIDATION_TIMEOUT", 30))
+    return int(GLOBAL_CONFIG_DATA.get("JARVIS_BUILD_VALIDATION_TIMEOUT", 600))
 
 
 def get_git_check_mode() -> str:
