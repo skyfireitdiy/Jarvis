@@ -213,6 +213,8 @@ class VirtualTTYTool:
                     except BlockingIOError:
                         continue
 
+                if output:
+                    print(f"📥 启动终端时的初始输出 [{tty_id}]:\n{output}")
                 return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
@@ -278,6 +280,8 @@ class VirtualTTYTool:
                 except _queue.Empty:
                     continue
 
+            if output:
+                print(f"📥 启动终端时的初始输出 [{tty_id}]:\n{output}")
             return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
@@ -354,6 +358,8 @@ class VirtualTTYTool:
                             output += data.decode()
                 except BlockingIOError:
                     continue
+            if output:
+                print(f"📥 命令执行后的输出内容 [{tty_id}]:\n{output}")
             return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
@@ -402,6 +408,8 @@ class VirtualTTYTool:
                 except Exception:  # queue.Empty
                     continue
 
+            if output:
+                print(f"📥 命令执行后的输出内容 [{tty_id}]:\n{output}")
             return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
@@ -454,6 +462,8 @@ class VirtualTTYTool:
                                 break
                         except BlockingIOError:
                             break
+            if output:
+                print(f"📥 获取到的输出内容 [{tty_id}]:\n{output}")
             return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
@@ -485,6 +495,8 @@ class VirtualTTYTool:
                 except Exception:  # queue.Empty
                     continue
 
+            if output:
+                print(f"📥 获取到的输出内容 [{tty_id}]:\n{output}")
             return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
