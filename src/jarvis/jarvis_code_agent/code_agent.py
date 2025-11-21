@@ -11,6 +11,7 @@ import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 
 import typer
+import yaml
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
@@ -81,6 +82,7 @@ class CodeAgent(Agent):
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
         non_interactive: Optional[bool] = None,
+        rule_name: Optional[str] = None,
         **kwargs,
     ):
         self.root_dir = os.getcwd()
@@ -123,6 +125,12 @@ class CodeAgent(Agent):
             combined_parts.append(global_rules)
         if project_rules:
             combined_parts.append(project_rules)
+        
+        # 如果指定了 rule_name，从 rules.yaml 文件中读取并添加
+        if rule_name:
+            named_rule = self._get_named_rule(rule_name)
+            if named_rule:
+                combined_parts.append(named_rule)
 
         if combined_parts:
             merged_rules = "\n\n".join(combined_parts)
@@ -218,7 +226,7 @@ class CodeAgent(Agent):
     def _read_project_rules(self) -> Optional[str]:
         """读取 .jarvis/rules 内容，如果存在则返回字符串，否则返回 None"""
         try:
-            rules_path = os.path.join(self.root_dir, ".jarvis", "rules")
+            rules_path = os.path.join(self.root_dir, ".jarvis", "rule")
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
                 with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
@@ -231,7 +239,7 @@ class CodeAgent(Agent):
     def _read_global_rules(self) -> Optional[str]:
         """读取数据目录 rules 内容，如果存在则返回字符串，否则返回 None"""
         try:
-            rules_path = os.path.join(get_data_dir(), "rules")
+            rules_path = os.path.join(get_data_dir(), "rule")
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
                 with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
@@ -240,6 +248,48 @@ class CodeAgent(Agent):
             # 读取规则失败时忽略，不影响主流程
             pass
         return None
+
+    def _get_named_rule(self, rule_name: str) -> Optional[str]:
+        """从 rules.yaml 文件中获取指定名称的规则
+        
+        参数:
+            rule_name: 规则名称
+            
+        返回:
+            str: 规则内容，如果未找到则返回 None
+        """
+        try:
+            # 读取全局数据目录下的 rules.yaml
+            global_rules_yaml_path = os.path.join(get_data_dir(), "rules.yaml")
+            global_rules = {}
+            if os.path.exists(global_rules_yaml_path) and os.path.isfile(global_rules_yaml_path):
+                with open(global_rules_yaml_path, "r", encoding="utf-8", errors="replace") as f:
+                    global_rules = yaml.safe_load(f) or {}
+            
+            # 读取 git 根目录下的 rules.yaml
+            project_rules_yaml_path = os.path.join(self.root_dir, "rules.yaml")
+            project_rules = {}
+            if os.path.exists(project_rules_yaml_path) and os.path.isfile(project_rules_yaml_path):
+                with open(project_rules_yaml_path, "r", encoding="utf-8", errors="replace") as f:
+                    project_rules = yaml.safe_load(f) or {}
+            
+            # 合并配置：项目配置覆盖全局配置
+            merged_rules = {**global_rules, **project_rules}
+            
+            # 查找指定的规则
+            if rule_name in merged_rules:
+                rule_value = merged_rules[rule_name]
+                # 如果值是字符串，直接返回
+                if isinstance(rule_value, str):
+                    return rule_value.strip() if rule_value.strip() else None
+                # 如果值是其他类型，转换为字符串
+                return str(rule_value).strip() if str(rule_value).strip() else None
+            
+            return None
+        except Exception as e:
+            # 读取规则失败时忽略，不影响主流程
+            print(f"⚠️ 读取 rules.yaml 失败: {e}")
+            return None
 
     def _check_git_config(self) -> None:
         """检查 git username 和 email 是否已设置，如果没有则提示并退出"""
@@ -1638,6 +1688,9 @@ def cli(
     non_interactive: bool = typer.Option(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
+    rule_name: Optional[str] = typer.Option(
+        None, "--rule-name", help="指定规则名称，从 rules.yaml 文件中读取对应的规则内容"
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # CLI 标志：非交互模式（不依赖配置文件）
@@ -1721,6 +1774,7 @@ def cli(
             append_tools=append_tools,
             tool_group=tool_group,
             non_interactive=non_interactive,
+            rule_name=rule_name,
         )
 
         # 尝试恢复会话
