@@ -15,13 +15,13 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 
 
 class PythonBuildValidator(BuildValidatorBase):
-    """Python构建验证器"""
+    """Python构建验证器（包括编译和测试）"""
     
     BUILD_SYSTEM_NAME = "Python"
     SUPPORTED_LANGUAGES = ["python"]
     
     def _extract_python_errors(self, output: str) -> str:
-        """提取Python错误信息"""
+        """提取Python错误信息（包括编译错误和测试失败）"""
         if not output:
             return ""
         
@@ -31,17 +31,21 @@ class PythonBuildValidator(BuildValidatorBase):
         
         for line in lines:
             line_lower = line.lower()
-            # 检测错误关键词
-            if any(keyword in line_lower for keyword in ["error", "failed", "exception", "traceback", "syntaxerror", "indentationerror"]):
+            # 检测错误关键词（包括编译错误和测试失败）
+            if any(keyword in line_lower for keyword in [
+                "error", "failed", "exception", "traceback", 
+                "syntaxerror", "indentationerror", "assertionerror",
+                "failed:", "failures:", "test", "assert"
+            ]):
                 in_error = True
                 errors.append(line.strip())
             elif in_error and line.strip():
                 # 继续收集错误相关的行
-                if line.strip().startswith(("File", "  File", "    ", "E ", "FAILED")):
+                if line.strip().startswith(("File", "  File", "    ", "E ", "FAILED", "FAILURES", "assert")):
                     errors.append(line.strip())
                 elif not line.strip().startswith("="):
                     # 如果遇到非错误相关的行，停止收集
-                    if len(errors) > 0 and not any(keyword in line_lower for keyword in ["error", "failed", "exception"]):
+                    if len(errors) > 0 and not any(keyword in line_lower for keyword in ["error", "failed", "exception", "assert", "test"]):
                         break
         
         # 如果收集到错误，返回前20行（限制长度）
@@ -95,37 +99,46 @@ class PythonBuildValidator(BuildValidatorBase):
                     duration=duration,
                 )
         
-        # 策略2: 尝试运行 pytest --collect-only（如果存在）
-        if os.path.exists(os.path.join(self.project_root, "pytest.ini")) or \
-           os.path.exists(os.path.join(self.project_root, "setup.py")):
+        # 策略2: 尝试运行 pytest（会自动编译并运行测试，即使没有配置文件也会自动发现测试）
+        # 首先尝试 pytest
+        returncode, stdout, stderr = self._run_command(
+            ["python", "-m", "pytest", "-v"],
+            timeout=30,
+        )
+        # 如果 pytest 命令本身失败（如未安装），尝试 unittest
+        if returncode == 1 and "No module named pytest" in stderr:
+            # pytest 未安装，尝试使用 unittest
             returncode, stdout, stderr = self._run_command(
-                ["python", "-m", "pytest", "--collect-only", "-q"],
-                timeout=10,
-            )
-            duration = time.time() - start_time
-            success = returncode == 0
-            output = stdout + stderr
-            # 如果失败，提取关键错误信息
-            if not success:
-                error_msg = self._extract_python_errors(output)
-                if not error_msg:
-                    error_msg = "Python项目验证失败"
-            else:
-                error_msg = None
-            return BuildResult(
-                success=success,
-                output=output,
-                error_message=error_msg,
-                build_system=BuildSystem.PYTHON,
-                duration=duration,
+                ["python", "-m", "unittest", "discover", "-v"],
+                timeout=30,
             )
         
-        # 策略3: 如果没有测试框架，仅验证语法（已在上面的策略1中完成）
         duration = time.time() - start_time
+        success = returncode == 0
+        output = stdout + stderr
+        
+        # 如果失败，提取关键错误信息（包括编译错误和测试失败）
+        if not success:
+            error_msg = self._extract_python_errors(output)
+            if not error_msg:
+                # 检查是否是"没有找到测试"的情况（这不算失败）
+                if "no tests ran" in output.lower() or "no tests found" in output.lower():
+                    # 没有测试文件，但语法检查通过，视为成功
+                    return BuildResult(
+                        success=True,
+                        output="Python语法检查通过（未发现测试文件）",
+                        error_message=None,
+                        build_system=BuildSystem.PYTHON,
+                        duration=duration,
+                    )
+                error_msg = "Python项目验证失败（编译或测试失败）"
+        else:
+            error_msg = None
+        
         return BuildResult(
-            success=True,
-            output="Python语法检查通过",
-            error_message=None,
+            success=success,
+            output=output,
+            error_message=error_msg,
             build_system=BuildSystem.PYTHON,
             duration=duration,
         )
