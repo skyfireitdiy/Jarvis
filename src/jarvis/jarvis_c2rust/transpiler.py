@@ -661,9 +661,12 @@ class Transpiler:
             # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
             # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
             if agent is None or not use_direct_model:
+                # 获取函数信息用于 Agent name
+                fn_name = rec.qname or rec.name or f"fn_{rec.id}"
+                agent_name = f"C2Rust-Function-Planner({fn_name})"
                 agent = Agent(
                     system_prompt=sys_p,
-                    name="C2Rust-Function-Planner",
+                    name=agent_name,
                     model_group=self.llm_group,
                     summary_prompt=sum_p,
                     need_summary=True,
@@ -2141,8 +2144,15 @@ class Transpiler:
                     "**重要：commit变更上下文说明**",
                     "- 上述diff显示了从函数开始处理时的commit到当前commit之间的所有变更",
                     "- 这些变更可能包括：当前函数的实现、依赖函数的实现、模块结构的调整等",
+                    "- **优先使用diff信息进行审查判断**：如果diff中已经包含了足够的信息（如函数实现、签名变更、模块结构等），可以直接基于diff进行审查，无需读取原始文件",
+                    "- 只有在diff信息不足或需要查看完整上下文时，才使用 read_code 工具读取原始文件",
                     "- 在审查破坏性变更时，请特别关注这些变更对现有代码的影响",
                     "- 如果发现变更中存在问题（如破坏性变更、文件结构不合理等），请在审查报告中指出",
+                ])
+            else:
+                usr_p_lines.extend([
+                    "",
+                    "**注意**：由于无法获取commit差异信息，请使用 read_code 工具读取目标模块文件的最新内容进行审查。",
                 ])
             
             usr_p_lines.extend([
@@ -2153,12 +2163,13 @@ class Transpiler:
                 f"  {{\"symbols_file\": \"{(self.data_dir / 'symbols.jsonl').resolve()}\", \"symbols\": [\"{rec.qname or rec.name}\"]}}",
                 "",
                 "**重要：审查要求**",
-                "- 必须基于最新的代码进行审查，使用 read_code 工具读取目标模块文件的最新内容",
+                "- **优先使用diff信息**：如果提供了commit差异（COMMIT_DIFF），优先基于diff信息进行审查判断，只有在diff信息不足时才使用 read_code 工具读取原始文件",
+                "- 必须基于最新的代码进行审查，如果使用 read_code 工具，请读取目标模块文件的最新内容",
                 "- 禁止依赖任何历史记忆、之前的审查结论或对话历史进行判断",
-                "- 每次审查都必须重新读取代码，确保审查结果反映当前代码的真实状态",
-                "- 结合commit变更上下文，全面评估代码变更的影响和合理性",
+                "- 每次审查都必须基于最新的代码状态（通过diff或read_code获取），确保审查结果反映当前代码的真实状态",
+                "- 结合commit变更上下文（如果提供），全面评估代码变更的影响和合理性",
                 "",
-                "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
+                "请基于提供的diff信息（如果可用）或读取crate中该函数的当前实现进行审查，并准备总结。",
             ])
             usr_p = "\n".join(usr_p_lines)
             sum_p = (
@@ -2238,7 +2249,7 @@ class Transpiler:
                 
                 code_changed_notice = "\n".join([
                     "",
-                    "【强制要求：必须重新读取代码】",
+                    "【重要：代码已更新】",
                     f"在本次审查之前（第 {i} 次迭代），已根据审查意见对代码进行了修复和优化。",
                     "目标函数的实现已经发生变化，包括但不限于：",
                     "- 函数实现逻辑的修改",
@@ -2246,15 +2257,13 @@ class Transpiler:
                     "- 依赖关系的更新",
                     "- 错误处理的改进",
                     "",
-                    "**强制要求：在开始审查之前，你必须使用 read_code 工具重新读取目标模块文件的最新内容。**",
-                    "**禁止基于之前的审查结果、对话历史或任何缓存信息进行判断。**",
+                    "**审查要求：**",
+                    "- **优先使用diff信息**：如果提供了最新的commit差异（COMMIT_DIFF），优先基于diff信息进行审查判断，只有在diff信息不足时才使用 read_code 工具读取原始文件",
+                    "- 如果必须使用 read_code 工具，请读取目标模块文件的最新内容",
+                    "- **禁止基于之前的审查结果、对话历史或任何缓存信息进行判断**",
+                    "- 必须基于最新的代码状态（通过diff或read_code获取）进行审查评估",
                     "",
-                    "必须执行的步骤：",
-                    f"1. 使用 read_code 工具读取目标模块文件: {module}",
-                    "2. 如果目标函数依赖其他模块，也请读取相关模块文件",
-                    "3. 基于重新读取的最新代码内容进行审查评估",
-                    "",
-                    "如果未执行 read_code 工具读取最新代码，审查结果将被视为无效。",
+                    "如果diff信息充足，可以直接基于diff进行审查；如果diff信息不足，请使用 read_code 工具读取最新代码。",
                     "",
                 ])
                 usr_p_with_notice = usr_p_init + code_changed_notice
