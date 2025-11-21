@@ -112,13 +112,10 @@ class SubCodeAgentTool:
             try:
                 base_tools = [
                     "execute_script",
-                    "search_web",
                     "read_code",
-
-                    "save_memory",
-                    "retrieve_memory",
-                    "clear_memory",
-                    "sub_code_agent",
+                    "edit_file",
+                    "rewrite_file",
+                    "lsp_client",
                 ]
                 if use_tools:
                     extras = [t for t in use_tools if t not in base_tools]

@@ -832,28 +832,6 @@ class Transpiler:
         self._current_context_compact_header = "\n".join(compact_lines)
         self._current_context_full_sent = False
 
-        # 初始化代码生成Agent（CodeAgent），单个函数生命周期内复用
-        # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
-        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-        # 代码生成阶段：禁用方法论和分析，仅启用强制记忆功能
-        self._current_agents[f"code_agent_gen::{rec.id}"] = CodeAgent(
-            need_summary=False,
-            non_interactive=self.non_interactive,
-            model_group=self.llm_group,
-            use_methodology=False,
-            use_analysis=False,
-            force_save_memory=False,
-        )
-        # 初始化修复Agent（CodeAgent），单个函数生命周期内复用
-        # 修复阶段：启用方法论、分析和强制记忆功能
-        self._current_agents[f"code_agent_repair::{rec.id}"] = CodeAgent(
-            need_summary=False,
-            non_interactive=self.non_interactive,
-            model_group=self.llm_group,
-            use_methodology=True,
-            use_analysis=True,
-            force_save_memory=False,
-        )
 
     def _get_generate_agent(self) -> CodeAgent:
         """
@@ -872,6 +850,7 @@ class Transpiler:
                 need_summary=False,
                 non_interactive=self.non_interactive,
                 model_group=self.llm_group,
+                append_tools=["read_symbols"],
                 use_methodology=False,
                 use_analysis=False,
                 force_save_memory=False,
@@ -896,6 +875,7 @@ class Transpiler:
                 need_summary=False,
                 non_interactive=self.non_interactive,
                 model_group=self.llm_group,
+                append_tools=["read_symbols"],
                 use_methodology=True,
                 use_analysis=True,
                 force_save_memory=False,
@@ -972,7 +952,6 @@ class Transpiler:
             "- 实现中禁止使用 todo!/unimplemented! 占位；对于尚未实现的被调符号，应基于其 C 源码补齐等价 Rust 实现；",
             "- 返回值必须与 C 语义等价，不得使用占位返回或随意默认值；避免 panic!/todo!/unimplemented!；",
             "- 若依赖未实现符号，请通过 read_symbols/read_code 获取其 C 源码并生成等价的 Rust 实现（可放置在同一模块或合理模块），而不是使用 todo!；",
-            "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在实现之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高实现效率和准确性；",
             "- 文档：为新增函数添加简要文档注释，注明来源C函数与意图；",
             "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             "- 导入：禁止使用 use ...::* 通配；仅允许精确导入所需符号",
@@ -1022,19 +1001,13 @@ class Transpiler:
             "注意：所有修改均以补丁方式进行。",
             "",
             "【工具使用建议】",
-            "1. 召回记忆（推荐优先使用）：",
-            "   - 工具: retrieve_memory",
-            "   - 用途: 检索已保存的函数实现记忆，可能包含类似函数的实现模式、设计决策、关键逻辑等",
-            "   - 建议标签: 使用 'c2rust', 'function_impl', 函数名等作为检索标签",
-            "   - 示例: 在实现之前，先检索与当前函数或依赖函数相关的记忆，参考已有的实现模式",
-            "",
-            "2. 符号表检索：",
+            "1. 符号表检索：",
             "   - 工具: read_symbols",
             "   - 用途: 按需获取指定符号记录",
             "   - 参数示例(JSON):",
             f"     {{\"symbols_file\": \"{symbols_path}\", \"symbols\": [\"符号1\", \"符号2\"]}}",
             "",
-            "3. 代码读取：",
+            "2. 代码读取：",
             "   - 工具: read_code",
             "   - 用途: 读取 C 源码实现或 Rust 模块文件",
             "",
@@ -1050,7 +1023,6 @@ class Transpiler:
             "   - 遍历当前函数调用的所有被调函数（包括直接调用和间接调用）",
             "   - 对于每个被调函数，检查其在 Rust crate 中是否已有完整实现",
             "   - 可以使用 read_code 工具读取相关模块文件进行检查",
-            "   - 可以使用 retrieve_memory 工具检索已保存的函数实现记忆",
             "3. 对于未实现的依赖函数：",
             "   - 使用 read_symbols 工具获取其 C 源码和符号信息",
             "   - 使用 read_code 工具读取其 C 源码实现",
@@ -1088,23 +1060,6 @@ class Transpiler:
                 compile_flags,
                 "",
             ])
-        requirement_lines.extend([
-            "",
-            "【重要：记忆保存要求】",
-            "在完成函数实现之后，请务必使用 save_memory 工具记录以下关键信息，以便后续检索和复用：",
-            f"- 函数名称：{rec.qname or rec.name} (id={rec.id})",
-            f"- 源文件位置：{rec.file}:{rec.start_line}-{rec.end_line}",
-            f"- 目标模块：{module}",
-            f"- Rust 函数签名：{rust_sig}",
-            "- C 函数的核心功能与语义",
-            "- 关键实现细节与设计决策",
-            "- 依赖关系与调用链",
-            "- 类型转换与边界处理要点",
-            "- 错误处理策略",
-            "- 实际实现的 Rust 代码要点与关键逻辑",
-            "记忆标签建议：使用 'c2rust', 'function_impl', 函数名等作为标签，便于后续检索。",
-            "请在完成代码实现之后保存记忆，记录本次实现的完整信息。",
-        ])
         prompt = "\n".join(requirement_lines)
         return self._append_additional_notes(prompt)
 
@@ -1502,7 +1457,6 @@ class Transpiler:
             "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
             "- 禁止使用 todo!/unimplemented! 作为占位；",
             "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
-            "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在修复之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高修复效率和准确性；",
             "- **⚠️ 重要：修复后必须验证** - 修复完成后，必须使用 `execute_script` 工具执行相应的验证命令（如 `cargo check` 或 `cargo test`），确认修复是否成功。不要假设修复成功，必须实际执行命令验证。",
             "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
             f"- 依赖管理：如修复中引入新的外部 crate 或需要启用 feature，请同步更新 Cargo.toml 的 [dependencies]/[dev-dependencies]/[features]{('，避免未声明依赖导致构建失败；版本号可使用兼容范围（如 ^x.y）或默认值' if stage == 'cargo test' else '')}；",
@@ -1519,7 +1473,6 @@ class Transpiler:
             "   - 遍历当前函数调用的所有被调函数（包括直接调用和间接调用）",
             "   - 对于每个被调函数，检查其在 Rust crate 中是否已有完整实现",
             "   - 可以使用 read_code 工具读取相关模块文件进行检查",
-            "   - 可以使用 retrieve_memory 工具检索已保存的函数实现记忆",
             "3. 对于未实现的依赖函数：",
             "   - 使用 read_symbols 工具获取其 C 源码和符号信息",
             "   - 使用 read_code 工具读取其 C 源码实现",
@@ -1563,19 +1516,13 @@ class Transpiler:
         base_lines.extend([
             "",
             "【工具使用建议】",
-            "1. 召回记忆（推荐优先使用）：",
-            "   - 工具: retrieve_memory",
-            "   - 用途: 检索已保存的函数实现记忆，可能包含类似函数的实现模式、设计决策、关键逻辑等",
-            "   - 建议标签: 使用 'c2rust', 'function_impl', 函数名等作为检索标签",
-            "   - 示例: 检索与当前函数相关的记忆，特别是已实现的依赖函数记忆",
-            "",
-            "2. 符号表检索：",
+            "1. 符号表检索：",
             "   - 工具: read_symbols",
             "   - 用途: 定位或交叉验证 C 符号位置",
             "   - 参数示例(JSON):",
             f"     {{\"symbols_file\": \"{symbols_path}\", \"symbols\": [\"{sym_name}\"]}}",
             "",
-            "3. 代码读取：",
+            "2. 代码读取：",
             "   - 工具: read_code",
             "   - 用途: 读取 C 源码实现或 Rust 模块文件",
             "",
@@ -2438,7 +2385,6 @@ class Transpiler:
                 "- 如审查问题涉及缺失/未实现的被调函数或依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时在合理模块新增函数或引入精确 use；",
                 "- 禁止使用 todo!/unimplemented! 作为占位；",
                 "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号（禁止通配）；",
-                "- **强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆**：在优化之前，先尝试使用 retrieve_memory 工具检索相关的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高优化效率和准确性；",
                 "- 注释规范：所有代码注释（包括文档注释、行内注释、块注释等）必须使用中文；",
                 *([f"- **禁用库约束**：禁止在优化中使用以下库：{', '.join(self.disabled_libraries)}。如果这些库在 Cargo.toml 中已存在，请移除相关依赖；如果优化需要使用这些库的功能，请使用标准库或其他允许的库替代。"] if self.disabled_libraries else []),
                 *([f"- **根符号要求**：此函数是根符号（{rec.qname or rec.name}），必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。"] if self._is_root_symbol(rec) else []),
@@ -2452,7 +2398,6 @@ class Transpiler:
                 "   - 遍历当前函数调用的所有被调函数（包括直接调用和间接调用）",
                 "   - 对于每个被调函数，检查其在 Rust crate 中是否已有完整实现",
                 "   - 可以使用 read_code 工具读取相关模块文件进行检查",
-                "   - 可以使用 retrieve_memory 工具检索已保存的函数实现记忆",
                 "3. 对于未实现的依赖函数：",
                 "   - 使用 read_symbols 工具获取其 C 源码和符号信息",
                 "   - 使用 read_code 工具读取其 C 源码实现",
