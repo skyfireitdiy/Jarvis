@@ -575,6 +575,90 @@ class ToolRegistry(OutputHandlerProtocol):
         return ""
 
     @staticmethod
+    def _extract_json_from_text(text: str, start_pos: int = 0) -> Tuple[Optional[str], int]:
+        """从文本中提取完整的JSON对象（通过括号匹配）
+        
+        参数:
+            text: 要提取的文本
+            start_pos: 开始搜索的位置
+            
+        返回:
+            Tuple[Optional[str], int]:
+                - 第一个元素是提取的JSON字符串（如果找到），否则为None
+                - 第二个元素是JSON结束后的位置
+        """
+        # 跳过空白字符
+        pos = start_pos
+        while pos < len(text) and text[pos] in (' ', '\t', '\n', '\r'):
+            pos += 1
+        
+        if pos >= len(text):
+            return None, pos
+        
+        # 检查是否以 { 开头
+        if text[pos] != '{':
+            return None, pos
+        
+        # 使用括号匹配找到完整的JSON对象
+        brace_count = 0
+        in_string = False
+        escape_next = False
+        string_char = None
+        
+        json_start = pos
+        for i in range(pos, len(text)):
+            char = text[i]
+            
+            if escape_next:
+                escape_next = False
+                continue
+            
+            if char == '\\':
+                escape_next = True
+                continue
+            
+            if not in_string:
+                if char in ('"', "'"):
+                    in_string = True
+                    string_char = char
+                elif char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        # 找到完整的JSON对象
+                        return text[json_start:i+1], i + 1
+            else:
+                if char == string_char:
+                    in_string = False
+                    string_char = None
+        
+        return None, len(text)
+    
+    @staticmethod
+    def _clean_extra_markers(text: str) -> str:
+        """清理文本中的额外标记（如 <|tool_call_end|> 等）
+        
+        参数:
+            text: 要清理的文本
+            
+        返回:
+            清理后的文本
+        """
+        # 常见的额外标记模式
+        extra_markers = [
+            r'<\|tool_call_end\|>',
+            r'<\|tool_calls_section_end\|>',
+            r'<\|.*?\|>',  # 匹配所有 <|...|> 格式的标记
+        ]
+        
+        cleaned = text
+        for pattern in extra_markers:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+        
+        return cleaned.strip()
+
+    @staticmethod
     def _extract_tool_calls(
         content: str,
     ) -> Tuple[Dict[str, Dict[str, Any]], str, bool]:
@@ -602,15 +686,18 @@ class ToolRegistry(OutputHandlerProtocol):
             if pos > 0 and content[pos - 1] not in ("\n", "\r"):
                 content = content[:pos] + "\n" + content[pos:]
 
-        # 将内容拆分为行（忽略大小写）
+        # 首先尝试标准的提取方式（忽略大小写）
         pattern = rf'(?msi){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
         data = re.findall(pattern, content)
         auto_completed = False
+        
+        # 如果标准提取失败，尝试更宽松的提取方式
         if not data:
             # can_handle 确保 ot("TOOL_CALL") 在内容中（行首）。
             # 如果数据为空，则表示行首的 ct("TOOL_CALL") 可能丢失。
             has_open_at_bol = re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', content) is not None
             has_close_at_bol = re.search(rf'(?mi)^{re.escape(ct("TOOL_CALL"))}', content) is not None
+            
             if has_open_at_bol and not has_close_at_bol:
                 # 尝试通过附加结束标签来修复它（确保结束标签位于行首）
                 fixed_content = content.strip() + f"\n{ct('TOOL_CALL')}"
@@ -624,16 +711,38 @@ class ToolRegistry(OutputHandlerProtocol):
                 if temp_data:
                     try:
                         json_loads(temp_data[0])  # Check if valid JSON
-
-                        # Ask user for confirmation
-
                         data = temp_data
                         auto_completed = True
                     except (Exception, EOFError, KeyboardInterrupt):
                         # Even after fixing, it's not valid JSON, or user cancelled.
-                        # Fall through to the original error.
+                        # Fall through to try more lenient extraction.
                         pass
-
+            
+            # 如果仍然没有数据，尝试更宽松的提取：直接从开始标签后提取JSON
+            if not data:
+                # 找到开始标签的位置
+                open_tag_match = re.search(rf'(?i){re.escape(ot("TOOL_CALL"))}', content)
+                if open_tag_match:
+                    # 从开始标签后提取JSON
+                    start_pos = open_tag_match.end()
+                    json_str, end_pos = ToolRegistry._extract_json_from_text(content, start_pos)
+                    
+                    if json_str:
+                        # 清理JSON字符串中的额外标记
+                        json_str = ToolRegistry._clean_extra_markers(json_str)
+                        
+                        # 尝试解析JSON
+                        try:
+                            parsed = json_loads(json_str)
+                            # 验证是否包含必要字段
+                            if "name" in parsed and "arguments" in parsed and "want" in parsed:
+                                data = [json_str]
+                                auto_completed = True
+                        except Exception:
+                            # JSON解析失败，继续尝试其他方法
+                            pass
+            
+            # 如果仍然没有数据，返回错误
             if not data:
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 return (
@@ -641,10 +750,13 @@ class ToolRegistry(OutputHandlerProtocol):
                     f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}{long_hint}",
                     False,
                 )
+        
         ret = []
         for item in data:
             try:
-                msg = json_loads(item)
+                # 清理可能存在的额外标记
+                cleaned_item = ToolRegistry._clean_extra_markers(item)
+                msg = json_loads(cleaned_item)
             except Exception as e:
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 return (
