@@ -2589,7 +2589,10 @@ class Transpiler:
 
             # 若支持 resume，则跳过 progress['converted'] 中已完成的
             done: Set[int] = set(self.progress.get("converted") or [])
-            typer.secho(f"[c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)}", fg=typer.colors.BLUE)
+            # 计算需要处理的函数总数（排除已完成的）
+            total_to_process = len([fid for fid in seq if fid not in done])
+            current_index = 0
+            typer.secho(f"[c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)} 待处理={total_to_process}", fg=typer.colors.BLUE)
 
             for fid in seq:
                 if fid in done:
@@ -2601,8 +2604,12 @@ class Transpiler:
                     typer.secho(f"[c2rust-transpiler][skip] 跳过 {rec.qname or rec.name} (id={rec.id}) 位于 {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.YELLOW)
                     continue
 
+                # 更新进度索引
+                current_index += 1
+                progress_info = f"({current_index}/{total_to_process})" if total_to_process > 0 else ""
+
                 # 读取C函数源码
-                typer.secho(f"[c2rust-transpiler][read] 读取 C 源码: {rec.qname or rec.name} (id={rec.id}) 来自 {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.BLUE)
+                typer.secho(f"[c2rust-transpiler][read] {progress_info} 读取 C 源码: {rec.qname or rec.name} (id={rec.id}) 来自 {rec.file}:{rec.start_line}-{rec.end_line}", fg=typer.colors.BLUE)
                 c_code = self._read_source_span(rec)
                 typer.secho(f"[c2rust-transpiler][read] 已加载 {len(c_code.splitlines()) if c_code else 0} 行", fg=typer.colors.BLUE)
 
@@ -2612,11 +2619,11 @@ class Transpiler:
                     if rec.id not in skipped:
                         skipped.append(rec.id)
                     self.progress["skipped_missing_source"] = skipped
-                    typer.secho(f"[c2rust-transpiler] 跳过：缺少源码与签名信息 -> {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.YELLOW)
+                    typer.secho(f"[c2rust-transpiler] {progress_info} 跳过：缺少源码与签名信息 -> {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.YELLOW)
                     self._save_progress()
                     continue
                 # 1) 规划：模块路径与Rust签名
-                typer.secho(f"[c2rust-transpiler][plan] 正在规划模块与签名: {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.CYAN)
+                typer.secho(f"[c2rust-transpiler][plan] {progress_info} 正在规划模块与签名: {rec.qname or rec.name} (id={rec.id})", fg=typer.colors.CYAN)
                 module, rust_sig, skip_implementation = self._plan_module_and_signature(rec, c_code)
                 typer.secho(f"[c2rust-transpiler][plan] 已选择 模块={module}, 签名={rust_sig}", fg=typer.colors.CYAN)
 
@@ -2687,8 +2694,8 @@ class Transpiler:
 
                     # 2) 生成实现
                     unresolved = self._untranslated_callee_symbols(rec)
-                    typer.secho(f"[c2rust-transpiler][deps] 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
-                    typer.secho(f"[c2rust-transpiler][gen] 正在为 {rec.qname or rec.name} 生成 Rust 实现", fg=typer.colors.GREEN)
+                    typer.secho(f"[c2rust-transpiler][deps] {progress_info} 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}", fg=typer.colors.BLUE)
+                    typer.secho(f"[c2rust-transpiler][gen] {progress_info} 正在为 {rec.qname or rec.name} 生成 Rust 实现", fg=typer.colors.GREEN)
                     self._codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
                     typer.secho(f"[c2rust-transpiler][gen] 已在 {module} 生成或更新实现", fg=typer.colors.GREEN)
                     # 刷新精简上下文（防止签名/模块调整后提示不同步）
@@ -2724,13 +2731,13 @@ class Transpiler:
                     break
 
                 # 4) 审查与优化（复用 Review Agent）
-                typer.secho(f"[c2rust-transpiler][review] 开始代码审查: {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
+                typer.secho(f"[c2rust-transpiler][review] {progress_info} 开始代码审查: {rec.qname or rec.name}", fg=typer.colors.MAGENTA)
                 self._review_and_optimize(rec, module, rust_sig)
                 typer.secho("[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
 
                 # 5) 标记已转换与映射记录（JSONL）
                 self._mark_converted(rec, module, rust_sig)
-                typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module}", fg=typer.colors.GREEN)
+                typer.secho(f"[c2rust-transpiler][mark] {progress_info} 已标记并建立映射: {rec.qname or rec.name} -> {module}", fg=typer.colors.GREEN)
 
                 # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用代码编写与修复Agent）
                 current_rust_fn = self._extract_rust_fn_name_from_sig(rust_sig)

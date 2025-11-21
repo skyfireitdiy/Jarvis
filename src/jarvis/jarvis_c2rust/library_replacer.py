@@ -1080,8 +1080,12 @@ def apply_library_replacement(
         desc = _collect_descendants(fid, adj_func, desc_cache)
         rec_meta = by_id.get(fid, {})
         label = rec_meta.get("qualified_name") or rec_meta.get("name") or f"sym_{fid}"
+        # 计算进度：已评估的根函数数 / 总根函数数
+        total_roots = len(root_funcs)
+        current_progress = len(processed_roots) + 1  # +1 因为当前这个即将被处理
+        progress_info = f"({current_progress}/{total_roots})" if total_roots > 0 else ""
         typer.secho(
-            f"[c2rust-library] 正在评估: {label} (ID: {fid}), 子树函数数={len(desc)}",
+            f"[c2rust-library] {progress_info} 正在评估: {label} (ID: {fid}), 子树函数数={len(desc)}",
             fg=typer.colors.CYAN,
             err=True,
         )
@@ -1111,7 +1115,11 @@ def apply_library_replacement(
                     conf = 0.0
                 libs_str = ", ".join(libs) if libs else "(未指定库)"
                 apis_str = ", ".join([str(a) for a in apis]) if isinstance(apis, list) else (api if api else "")
-                msg = f"[c2rust-library] 可替换: {label} -> 库: {libs_str}"
+                # 计算进度：已评估的根函数数 / 总根函数数
+                total_roots = len(root_funcs)
+                current_progress = len(processed_roots)
+                progress_info = f"({current_progress}/{total_roots})" if total_roots > 0 else ""
+                msg = f"[c2rust-library] {progress_info} 可替换: {label} -> 库: {libs_str}"
                 if apis_str:
                     msg += f"; 参考API: {apis_str}"
                 msg += f"; 置信度: {conf:.2f}"
