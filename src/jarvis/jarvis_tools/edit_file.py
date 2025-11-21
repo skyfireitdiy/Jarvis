@@ -615,10 +615,16 @@ class EditFileTool:
                 return (False, "edit操作需要提供replace参数")
             
             current_content = block.get('content', '')
-            if search not in current_content:
-                return (False, f"在块 {block_id} 中未找到要搜索的文本: {search[:100]}...")
             
-            # 在块内进行替换（只替换第一次出现）
+            # 检查匹配次数：必须刚好只有一处匹配
+            match_count = current_content.count(search)
+            if match_count == 0:
+                return (False, f"在块 {block_id} 中未找到要搜索的文本: {search[:100]}...")
+            elif match_count > 1:
+                search_preview = search[:100] + "..." if len(search) > 100 else search
+                return (False, f"在块 {block_id} 中找到 {match_count} 处匹配，但 edit 操作要求刚好只有一处匹配。搜索文本: {search_preview}")
+            
+            # 在块内进行替换（只替换第一次出现，此时已经确认只有一处）
             block['content'] = current_content.replace(search, replace, 1)
             return (True, None)
         
