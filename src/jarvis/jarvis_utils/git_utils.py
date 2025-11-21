@@ -171,6 +171,59 @@ def get_diff() -> str:
         return f"发生意外错误: {str(e)}"
 
 
+def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) -> str:
+    """获取两个commit之间的差异
+
+    参数:
+        start_hash: 起始commit哈希值（不包含）
+        end_hash: 结束commit哈希值（包含），如果为None则使用HEAD
+
+    返回:
+        str: 差异内容或错误信息
+    """
+    try:
+        if end_hash is None:
+            # 如果end_hash为None，使用HEAD
+            end_hash = "HEAD"
+        
+        # 检查start_hash是否存在
+        start_check = subprocess.run(
+            ["git", "rev-parse", "--verify", start_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if start_check.returncode != 0:
+            return f"起始commit不存在: {start_hash}"
+        
+        # 检查end_hash是否存在
+        end_check = subprocess.run(
+            ["git", "rev-parse", "--verify", end_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if end_check.returncode != 0:
+            return f"结束commit不存在: {end_hash}"
+        
+        # 获取两个commit之间的差异
+        result = subprocess.run(
+            ["git", "diff", f"{start_hash}..{end_hash}"],
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+        
+        try:
+            return result.stdout.decode("utf-8")
+        except UnicodeDecodeError:
+            return result.stdout.decode("utf-8", errors="replace")
+
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
+        return f"获取commit差异失败: {error_msg}"
+    except Exception as e:
+        return f"发生意外错误: {str(e)}"
+
+
 def revert_file(filepath: str) -> None:
     """增强版git恢复，处理新文件"""
     import subprocess
