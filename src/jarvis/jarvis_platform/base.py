@@ -261,7 +261,7 @@ class BasePlatform(ABC):
                         # 缓存机制：降低更新频率，减少界面闪烁
                         buffer = ""  # 内容缓存
                         last_update_time = time.time()  # 上次更新时间
-                        update_interval = 0.5  # 最小更新间隔（秒）
+                        update_interval = 1  # 最小更新间隔（秒）
                         min_buffer_size = 5  # 最小缓存大小（字符数）
 
                         def _flush_buffer():
