@@ -134,7 +134,8 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def handle(self, response: str, agent_: Any) -> Tuple[bool, Any]:
         try:
-            tool_call, err_msg, auto_completed = self._extract_tool_calls(response)
+            # 传递agent给_extract_tool_calls，以便在解析失败时调用大模型修复
+            tool_call, err_msg, auto_completed = self._extract_tool_calls(response, agent_)
             if err_msg:
                 # 只要工具解析错误，追加工具使用帮助信息（相当于一次 <ToolUsage>）
                 try:
@@ -659,13 +660,68 @@ class ToolRegistry(OutputHandlerProtocol):
         return cleaned.strip()
 
     @staticmethod
+    def _try_llm_fix(content: str, agent: Any, error_msg: str) -> Optional[str]:
+        """尝试使用大模型修复工具调用格式
+        
+        参数:
+            content: 包含错误工具调用的内容
+            agent: Agent实例，用于调用大模型
+            error_msg: 错误消息
+            
+        返回:
+            Optional[str]: 修复后的内容，如果修复失败则返回None
+        """
+        try:
+            from jarvis.jarvis_agent import Agent
+            agent_instance: Agent = agent
+            
+            # 获取工具使用说明
+            tool_usage = agent_instance.get_tool_usage_prompt()
+            
+            # 构建修复提示
+            fix_prompt = f"""你之前的工具调用格式有误，请根据工具使用说明修复以下内容。
+
+**错误信息：**
+{error_msg}
+
+**工具使用说明：**
+{tool_usage}
+
+**错误的工具调用内容：**
+{content}
+
+请修复上述工具调用内容，确保：
+1. 包含完整的 {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 标签
+2. JSON格式正确，包含 name、arguments、want 三个字段
+3. 如果使用多行字符串，推荐使用 ||| 或 ``` 分隔符包裹
+
+请直接返回修复后的完整工具调用内容，不要添加其他说明文字。"""
+            
+            # 调用大模型修复
+            print("🤖 尝试使用大模型修复工具调用格式...")
+            fixed_content = agent_instance.model.chat_until_success(fix_prompt)  # type: ignore
+            
+            if fixed_content:
+                print("✅ 大模型修复完成")
+                return fixed_content
+            else:
+                print("❌ 大模型修复失败：返回内容为空")
+                return None
+                
+        except Exception as e:
+            print(f"❌ 大模型修复失败：{str(e)}")
+            return None
+
+    @staticmethod
     def _extract_tool_calls(
         content: str,
+        agent: Optional[Any] = None,
     ) -> Tuple[Dict[str, Dict[str, Any]], str, bool]:
         """从内容中提取工具调用。
 
         参数:
             content: 包含工具调用的内容
+            agent: 可选的Agent实例，用于在解析失败时调用大模型修复
 
         返回:
             Tuple[Dict[str, Dict[str, Any]], str, bool]:
@@ -742,12 +798,22 @@ class ToolRegistry(OutputHandlerProtocol):
                             # JSON解析失败，继续尝试其他方法
                             pass
             
-            # 如果仍然没有数据，返回错误
+            # 如果仍然没有数据，尝试使用大模型修复
             if not data:
                 long_hint = ToolRegistry._get_long_response_hint(content)
+                error_msg = f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}{long_hint}"
+                
+                # 如果提供了agent，尝试使用大模型修复
+                if agent is not None:
+                    fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
+                    if fixed_content:
+                        # 递归调用自身，尝试解析修复后的内容
+                        return ToolRegistry._extract_tool_calls(fixed_content, None)
+                
+                # 如果大模型修复失败或未提供agent，返回错误
                 return (
                     {},
-                    f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}{long_hint}",
+                    error_msg,
                     False,
                 )
         
@@ -759,13 +825,23 @@ class ToolRegistry(OutputHandlerProtocol):
                 msg = json_loads(cleaned_item)
             except Exception as e:
                 long_hint = ToolRegistry._get_long_response_hint(content)
-                return (
-                    {},
-                    f"""Jsonnet 解析失败：{e}
+                error_msg = f"""Jsonnet 解析失败：{e}
 
 提示：Jsonnet支持双引号/单引号、尾随逗号、注释。多行字符串推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。
 
-{tool_call_help}{long_hint}""",
+{tool_call_help}{long_hint}"""
+                
+                # 如果提供了agent，尝试使用大模型修复
+                if agent is not None:
+                    fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
+                    if fixed_content:
+                        # 递归调用自身，尝试解析修复后的内容
+                        return ToolRegistry._extract_tool_calls(fixed_content, None)
+                
+                # 如果大模型修复失败或未提供agent，返回错误
+                return (
+                    {},
+                    error_msg,
                     False,
                 )
 
@@ -773,11 +849,21 @@ class ToolRegistry(OutputHandlerProtocol):
                 ret.append(msg)
             else:
                 long_hint = ToolRegistry._get_long_response_hint(content)
+                error_msg = f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
+
+                {tool_call_help}{long_hint}"""
+                
+                # 如果提供了agent，尝试使用大模型修复
+                if agent is not None:
+                    fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
+                    if fixed_content:
+                        # 递归调用自身，尝试解析修复后的内容
+                        return ToolRegistry._extract_tool_calls(fixed_content, None)
+                
+                # 如果大模型修复失败或未提供agent，返回错误
                 return (
                     {},
-                    f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
-
-                {tool_call_help}{long_hint}""",
+                    error_msg,
                     False,
                 )
         if len(ret) > 1:

@@ -735,7 +735,7 @@ class LLMRustCratePlannerAgent:
                 summary_prompt=summary_prompt,
                 need_summary=True,
                 auto_complete=True,
-                use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory"],
+                use_tools=["execute_script", "read_code"],
                 non_interactive=True, # 非交互
                 use_methodology=False,
                 use_analysis=False,
