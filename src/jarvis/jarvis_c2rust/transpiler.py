@@ -2208,10 +2208,14 @@ class Transpiler:
         review_key = f"review::{rec.id}"
         sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
         
+        # 获取函数信息用于 Agent name
+        fn_name = rec.qname or rec.name or f"fn_{rec.id}"
+        agent_name = f"C2Rust-Review-Agent({fn_name})"
+        
         if self._current_agents.get(review_key) is None:
             self._current_agents[review_key] = Agent(
                 system_prompt=sys_p_init,
-                name="C2Rust-Review-Agent",
+                name=agent_name,
                 model_group=self.llm_group,
                 summary_prompt=sum_p_init,
                 need_summary=True,
@@ -2235,7 +2239,7 @@ class Transpiler:
                 typer.secho(f"[c2rust-transpiler][review] 代码已修复，重新创建审查 Agent 以清除历史（第 {i+1} 次迭代）", fg=typer.colors.YELLOW)
                 self._current_agents[review_key] = Agent(
                     system_prompt=sys_p_init,
-                    name="C2Rust-Review-Agent",
+                    name=agent_name,
                     model_group=self.llm_group,
                     summary_prompt=sum_p_init,
                     need_summary=True,
