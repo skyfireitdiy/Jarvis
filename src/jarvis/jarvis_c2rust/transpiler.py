@@ -836,60 +836,27 @@ class Transpiler:
         self._current_context_full_sent = False
 
 
-    def _get_generate_agent(self) -> CodeAgent:
+    def _get_code_agent(self) -> CodeAgent:
         """
-        获取代码生成Agent（CodeAgent）。若未初始化，则按当前函数id创建。
-        代码生成阶段：禁用方法论和分析，仅启用强制记忆功能。
+        获取代码生成/修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        统一用于代码生成和修复，启用方法论和分析功能以提供更好的代码质量。
         注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表。
         提示：代码生成遵循 TDD（测试驱动开发）方法，通过提示词指导 Agent 先写测试再写实现。
         """
         fid = self._current_function_id
-        key = f"code_agent_gen::{fid}" if fid is not None else "code_agent_gen::default"
+        key = f"code_agent::{fid}" if fid is not None else "code_agent::default"
         agent = self._current_agents.get(key)
         if agent is None:
             # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            # 代码生成Agent禁用方法论和分析，仅启用强制记忆功能
+            # 统一启用方法论和分析功能，提供更好的代码生成和修复能力
             # 获取函数信息用于 Agent name
             fn_name = ""
             if fid is not None:
                 rec = self.fn_index_by_id.get(fid)
                 if rec:
                     fn_name = rec.qname or rec.name or f"fn_{fid}"
-            agent_name = f"C2Rust-CodeGenerator" + (f"({fn_name})" if fn_name else "")
-            agent = CodeAgent(
-                name=agent_name,
-                need_summary=False,
-                non_interactive=self.non_interactive,
-                model_group=self.llm_group,
-                append_tools="read_symbols",
-                use_methodology=False,
-                use_analysis=False,
-                force_save_memory=False,
-            )
-            self._current_agents[key] = agent
-        return agent
-
-    def _get_repair_agent(self) -> CodeAgent:
-        """
-        获取修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
-        修复阶段：启用方法论、分析和强制记忆功能。
-        注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表。
-        """
-        fid = self._current_function_id
-        key = f"code_agent_repair::{fid}" if fid is not None else "code_agent_repair::default"
-        agent = self._current_agents.get(key)
-        if agent is None:
-            # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
-            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            # 修复Agent启用方法论、分析和强制记忆功能
-            # 获取函数信息用于 Agent name
-            fn_name = ""
-            if fid is not None:
-                rec = self.fn_index_by_id.get(fid)
-                if rec:
-                    fn_name = rec.qname or rec.name or f"fn_{fid}"
-            agent_name = f"C2Rust-CodeRepairer" + (f"({fn_name})" if fn_name else "")
+            agent_name = f"C2Rust-CodeAgent" + (f"({fn_name})" if fn_name else "")
             agent = CodeAgent(
                 name=agent_name,
                 need_summary=False,
@@ -1031,7 +998,7 @@ class Transpiler:
             pass
         
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-        agent = self._get_generate_agent()  # 使用代码生成Agent（禁用分析和方法论）
+        agent = self._get_code_agent()
         agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen]", suffix="")
         
         # 如果是根符号，确保其模块在 lib.rs 中被暴露
@@ -1324,7 +1291,7 @@ class Transpiler:
                 f"仅修改 {target_file} 中与上述占位相关的代码，其他位置不要改动。",
                 "请仅输出补丁，不要输出解释或多余文本。",
             ])
-            agent = self._get_repair_agent()
+            agent = self._get_code_agent()
             agent.run(self._compose_prompt_with_context(prompt), prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
 
     def _classify_rust_error(self, text: str) -> List[str]:
@@ -1729,7 +1696,7 @@ class Transpiler:
                 command="cargo check -q",
             )
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            agent = self._get_repair_agent()
+            agent = self._get_code_agent()
             agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={check_iter}][check]", suffix="")
             # 修复后进行验证：检查编译是否正确
             res_verify = subprocess.run(
@@ -1848,7 +1815,7 @@ class Transpiler:
             command="cargo test -- --nocapture",
         )
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-        agent = self._get_repair_agent()
+        agent = self._get_code_agent()
         agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
         # 修复后验证：先检查编译，再实际运行测试
         # 第一步：检查编译是否通过
@@ -2397,7 +2364,7 @@ class Transpiler:
                 "请仅以补丁形式输出修改，避免冗余解释。",
             ])
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            ca = self._get_repair_agent()
+            ca = self._get_code_agent()
             limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
             fix_prompt_with_notes = self._append_additional_notes(fix_prompt)
             ca.run(self._compose_prompt_with_context(fix_prompt_with_notes), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}]", suffix="")
