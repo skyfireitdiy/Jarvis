@@ -780,16 +780,34 @@ class ReadCodeTool:
             # 检查单文件读取token数是否超过2/3限制
             if content_tokens > max_token_limit:
                 read_lines = end_line - start_line + 1
+                
+                # 计算安全读取的行数 (按比例缩减)
+                safe_lines = int((max_token_limit / content_tokens) * read_lines)
+                safe_lines = max(1, min(safe_lines, read_lines))
+                safe_end_line = start_line + safe_lines - 1
+                
+                # 读取安全范围内的内容
+                selected_content_lines = []
+                for i in range(start_line - 1, min(safe_end_line, len(lines))):
+                    selected_content_lines.append(lines[i])
+                
+                # 构造部分读取结果
+                partial_content = '\n'.join(selected_content_lines)
+                
                 return {
-                    "success": False,
-                    "stdout": "",
+                    "success": True,
+                    "stdout": (
+                        f"⚠️ 警告: 仅读取前{safe_lines}行 (共{read_lines}行)，因为内容超出限制\n"
+                        f"📊 实际读取范围: {start_line}-{safe_end_line} (原请求范围: {start_line}-{end_line})\n\n"
+                        f"{partial_content}\n\n"
+                        f"💡 建议:\n"
+                        f"   1. 如需继续读取，请使用:\n"
+                        f"      start_line={safe_end_line + 1}&end_line={end_line}\n"
+                        f"   2. 需要读取全部内容? 请缩小行范围或分批读取"
+                    ),
                     "stderr": (
-                        f"⚠️ 读取范围过大: 请求读取内容约 {content_tokens} tokens，超过限制 ({max_token_limit} tokens，约2/3最大窗口)\n"
-                        f"📊 读取范围: {read_lines} 行 (第 {start_line}-{end_line} 行，文件总行数 {total_lines})\n"
-                        f"💡 建议：\n"
-                        f"   1. 分批读取：将范围分成多个较小的批次，每批内容不超过 {max_token_limit} tokens\n"
-                        f"   2. 先定位：使用搜索或分析工具定位大致位置，再读取具体范围\n"
-                        f"   3. 缩小范围：为文件指定更精确的行号范围"
+                        f"原始请求范围 {start_line}-{end_line} 超过token限制 "
+                        f"({content_tokens}/{max_token_limit} tokens)"
                     ),
                 }
 
