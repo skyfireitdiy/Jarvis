@@ -76,8 +76,8 @@ class AgentManager:
             self.agent.run(task_content)
             raise typer.Exit(code=0)
 
-        # 处理预定义任务（非交互模式下跳过；支持配置跳过加载）
-        if not is_non_interactive() and not is_skip_predefined_tasks() and self.agent.first:
+        # 处理预定义任务（非交互模式下跳过；支持配置跳过加载；命令行指定任务时跳过）
+        if not is_non_interactive() and not is_skip_predefined_tasks() and not task_content and self.agent.first:
             task_manager = TaskManager()
             tasks = task_manager.load_tasks()
             if tasks and (selected_task := task_manager.select_task(tasks)):
