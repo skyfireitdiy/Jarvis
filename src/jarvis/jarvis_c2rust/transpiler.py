@@ -31,7 +31,8 @@ import typer
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, get_diff_between_commits
+from jarvis.jarvis_utils.config import get_max_input_token_count
 
 from jarvis.jarvis_c2rust.constants import (
     C2RUST_DIRNAME,
@@ -2048,11 +2049,23 @@ class Transpiler:
                 "2. 严重问题检查（可能导致功能错误）：\n"
                 "   - 明显的空指针解引用或会导致 panic 的严重错误；\n"
                 "   - 明显的越界访问或会导致程序崩溃的问题；\n"
+                "3. 破坏性变更检测（对现有代码的影响）：\n"
+                "   - 检查函数签名变更是否会导致调用方代码无法编译（如参数类型、参数数量、返回类型的变更）；\n"
+                "   - 检查模块导出变更是否会影响其他模块的导入（如 pub 关键字缺失、模块路径变更）；\n"
+                "   - 检查类型定义变更是否会导致依赖该类型的代码失效（如结构体字段变更、枚举变体变更）；\n"
+                "   - 检查常量或静态变量变更是否会影响引用该常量的代码；\n"
+                "   - 必须使用 read_code 工具读取调用方代码，验证是否存在破坏性变更；\n"
+                "4. 文件结构合理性检查：\n"
+                "   - 检查模块文件位置是否符合 Rust 项目约定（如 src/ 目录结构、模块层次）；\n"
+                "   - 检查文件命名是否符合 Rust 命名规范（如 snake_case、模块文件命名）；\n"
+                "   - 检查模块组织是否合理（如相关功能是否放在同一模块、模块拆分是否过度或不足）；\n"
+                "   - 检查模块导出是否合理（如 lib.rs 中的 pub mod 声明是否正确、是否遗漏必要的导出）；\n"
+                "   - 检查是否存在循环依赖或过度耦合；\n"
                 "不检查类型匹配、指针可变性、边界检查细节、资源释放细节、内存语义等技术细节（除非会导致功能错误）。\n"
                 "**重要要求：在总结阶段，对于发现的每个问题，必须提供：**\n"
                 "1. 详细的问题描述：明确指出问题所在的位置（文件、函数、行号等）、问题的具体表现、为什么这是一个问题\n"
                 "2. 具体的修复建议：提供详细的修复方案，包括需要修改的代码位置、修改方式、预期效果等\n"
-                "3. 问题分类：使用 [function] 标记功能一致性问题，使用 [critical] 标记严重问题\n"
+                "3. 问题分类：使用 [function] 标记功能一致性问题，使用 [critical] 标记严重问题，使用 [breaking] 标记破坏性变更，使用 [structure] 标记文件结构问题\n"
                 "请在总结阶段详细指出问题和修改建议，但不要尝试修复或修改任何代码，不要输出补丁。"
             )
             # 附加原始C函数源码片段，供审查作为只读参考
@@ -2063,6 +2076,24 @@ class Transpiler:
             crate_tree = dir_tree(self.crate_dir)
             # 提取编译参数
             compile_flags = self._extract_compile_flags(rec.file)
+            
+            # 获取从初始commit到当前commit的变更作为上下文
+            commit_diff = ""
+            if self._current_function_start_commit:
+                current_commit = self._get_crate_commit_hash()
+                if current_commit and current_commit != self._current_function_start_commit:
+                    try:
+                        # 注意：transpile()开始时已切换到crate目录，此处无需再次切换
+                        commit_diff = get_diff_between_commits(self._current_function_start_commit, current_commit)
+                        if commit_diff and not commit_diff.startswith("获取") and not commit_diff.startswith("发生"):
+                            # 成功获取diff，限制长度避免上下文过大
+                            # 使用最大输入token数量的一半作为字符限制（1 token ≈ 4字符，所以 token/2 * 4 = token * 2）
+                            max_input_tokens = get_max_input_token_count(self.llm_group)
+                            max_diff_chars = max_input_tokens * 2  # 最大输入token数量的一半转换为字符数
+                            if len(commit_diff) > max_diff_chars:
+                                commit_diff = commit_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
+                    except Exception as e:
+                        typer.secho(f"[c2rust-transpiler][review] 获取commit差异失败: {e}", fg=typer.colors.YELLOW)
             
             usr_p_lines = [
                 f"待审查函数：{rec.qname or rec.name}",
@@ -2084,16 +2115,32 @@ class Transpiler:
                 "2. 严重问题（可能导致功能错误）：",
                 "   - 明显的空指针解引用或会导致 panic 的严重错误；",
                 "   - 明显的越界访问或会导致程序崩溃的问题；",
+                "3. 破坏性变更检测（对现有代码的影响）：",
+                "   - 检查函数签名变更是否会导致调用方代码无法编译（如参数类型、参数数量、返回类型的变更）；",
+                "   - 检查模块导出变更是否会影响其他模块的导入（如 pub 关键字缺失、模块路径变更）；",
+                "   - 检查类型定义变更是否会导致依赖该类型的代码失效（如结构体字段变更、枚举变体变更）；",
+                "   - 检查常量或静态变量变更是否会影响引用该常量的代码；",
+                "   - **必须使用 read_code 工具读取调用方代码，验证是否存在破坏性变更**；",
+                "   - 如果该函数是根符号或被其他已转译函数调用，必须检查调用方代码是否仍能正常编译和使用；",
+                "4. 文件结构合理性检查：",
+                "   - 检查模块文件位置是否符合 Rust 项目约定（如 src/ 目录结构、模块层次）；",
+                "   - 检查文件命名是否符合 Rust 命名规范（如 snake_case、模块文件命名）；",
+                "   - 检查模块组织是否合理（如相关功能是否放在同一模块、模块拆分是否过度或不足）；",
+                "   - 检查模块导出是否合理（如 lib.rs 中的 pub mod 声明是否正确、是否遗漏必要的导出）；",
+                "   - 检查是否存在循环依赖或过度耦合；",
+                "   - 检查文件大小是否合理（如单个文件是否过大需要拆分，或是否过度拆分导致文件过多）；",
                 "不检查类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）。",
                 "",
                 "**重要：问题报告要求**",
                 "对于发现的每个问题，必须在总结中提供：",
                 "1. 详细的问题描述：明确指出问题所在的位置（文件、函数、行号等）、问题的具体表现、为什么这是一个问题",
                 "2. 具体的修复建议：提供详细的修复方案，包括需要修改的代码位置、修改方式、预期效果等",
-                "3. 问题分类：使用 [function] 标记功能一致性问题，使用 [critical] 标记严重问题",
+                "3. 问题分类：使用 [function] 标记功能一致性问题，使用 [critical] 标记严重问题，使用 [breaking] 标记破坏性变更，使用 [structure] 标记文件结构问题",
                 "示例：",
                 '  "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。"',
                 '  "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。"',
+                '  "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。"',
+                '  "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。"',
                 "",
                 "被引用符号上下文（如已转译则包含Rust模块信息）：",
                 json.dumps(callees_ctx, ensure_ascii=False, indent=2),
@@ -2117,6 +2164,25 @@ class Transpiler:
                 "<CRATE_TREE>",
                 crate_tree,
                 "</CRATE_TREE>",
+            ])
+            
+            # 添加commit变更上下文（如果存在）
+            if commit_diff:
+                usr_p_lines.extend([
+                    "",
+                    "从函数开始到当前的commit变更（用于了解代码变更历史和上下文）：",
+                    "<COMMIT_DIFF>",
+                    commit_diff,
+                    "</COMMIT_DIFF>",
+                    "",
+                    "**重要：commit变更上下文说明**",
+                    "- 上述diff显示了从函数开始处理时的commit到当前commit之间的所有变更",
+                    "- 这些变更可能包括：当前函数的实现、依赖函数的实现、模块结构的调整等",
+                    "- 在审查破坏性变更时，请特别关注这些变更对现有代码的影响",
+                    "- 如果发现变更中存在问题（如破坏性变更、文件结构不合理等），请在审查报告中指出",
+                ])
+            
+            usr_p_lines.extend([
                 "",
                 "如需定位或交叉验证 C 符号位置，请使用符号表检索工具：",
                 "- 工具: read_symbols",
@@ -2127,28 +2193,33 @@ class Transpiler:
                 "- 必须基于最新的代码进行审查，使用 read_code 工具读取目标模块文件的最新内容",
                 "- 禁止依赖任何历史记忆、之前的审查结论或对话历史进行判断",
                 "- 每次审查都必须重新读取代码，确保审查结果反映当前代码的真实状态",
+                "- 结合commit变更上下文，全面评估代码变更的影响和合理性",
                 "",
                 "请阅读crate中该函数的当前实现（你可以在上述crate根路径下自行读取必要上下文），并准备总结。",
             ])
             usr_p = "\n".join(usr_p_lines)
             sum_p = (
                 "请仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：\n"
-                '"ok": bool  // 若满足功能一致且无严重问题，则为 true\n'
+                '"ok": bool  // 若满足功能一致且无严重问题、无破坏性变更、文件结构合理，则为 true\n'
                 '"function_issues": [string, ...]  // 功能一致性问题，每项以 [function] 开头，必须包含详细的问题描述和修复建议\n'
                 '"critical_issues": [string, ...]  // 严重问题（可能导致功能错误），每项以 [critical] 开头，必须包含详细的问题描述和修复建议\n'
+                '"breaking_issues": [string, ...]  // 破坏性变更问题（对现有代码的影响），每项以 [breaking] 开头，必须包含详细的问题描述和修复建议\n'
+                '"structure_issues": [string, ...]  // 文件结构问题，每项以 [structure] 开头，必须包含详细的问题描述和修复建议\n'
                 "注意：\n"
                 "- 前置条件：必须在crate中找到该函数的实现（匹配函数名或签名）。若未找到，ok 必须为 false，function_issues 应包含 [function] function not found: 详细描述问题位置和如何查找函数实现\n"
-                "- 若Rust实现修复了C代码中的安全漏洞或使用了不同的实现方式但保持了功能一致，且无严重问题，ok 应为 true\n"
-                "- 仅报告功能不一致和严重问题，不报告类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）\n"
+                "- 若Rust实现修复了C代码中的安全漏洞或使用了不同的实现方式但保持了功能一致，且无严重问题、无破坏性变更、文件结构合理，ok 应为 true\n"
+                "- 仅报告功能不一致、严重问题、破坏性变更和文件结构问题，不报告类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）\n"
                 "- **重要：每个问题描述必须包含以下内容：**\n"
                 "  1. 问题的详细描述：明确指出问题所在的位置（文件、函数、行号等）、问题的具体表现、为什么这是一个问题\n"
                 "  2. 修复建议：提供具体的修复方案，包括需要修改的代码位置、修改方式、预期效果等\n"
-                "  3. 问题格式：[function] 或 [critical] 开头，后跟详细的问题描述和修复建议\n"
+                "  3. 问题格式：[function]、[critical]、[breaking] 或 [structure] 开头，后跟详细的问题描述和修复建议\n"
                 "  示例格式：\n"
                 '    "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。"\n'
                 '    "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。"\n'
+                '    "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。"\n'
+                '    "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。"\n'
                 "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
-                "<SUMMARY>\n{\n  \"ok\": true,\n  \"function_issues\": [],\n  \"critical_issues\": []\n}\n</SUMMARY>"
+                "<SUMMARY>\n{\n  \"ok\": true,\n  \"function_issues\": [],\n  \"critical_issues\": [],\n  \"breaking_issues\": [],\n  \"structure_issues\": []\n}\n</SUMMARY>"
             )
             # 在 usr_p 和 sum_p 中追加附加说明（sys_p 通常不需要）
             usr_p = self._append_additional_notes(usr_p)
@@ -2240,13 +2311,13 @@ class Transpiler:
                     error_guidance = (
                         f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n"
                         f"- JSON解析失败: {parse_error_msg}\n\n"
-                        f"请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
+                        f"请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）、breaking_issues（字符串数组）、structure_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
                     )
                 elif parse_failed:
                     error_guidance = (
                         "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n"
                         "- 无法从摘要中解析出有效的 JSON 对象\n\n"
-                        "请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
+                        "请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）、breaking_issues（字符串数组）、structure_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
                     )
                 
                 full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
@@ -2274,7 +2345,7 @@ class Transpiler:
                 m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
                 content = (m.group(1).strip() if m else summary.strip()).upper()
                 if content == "OK":
-                    verdict = {"ok": True, "function_issues": [], "critical_issues": []}
+                    verdict = {"ok": True, "function_issues": [], "critical_issues": [], "breaking_issues": [], "structure_issues": []}
                     parse_failed = False  # 兼容格式成功，不算解析失败
                     parse_error_msg = None
                 else:
@@ -2288,7 +2359,7 @@ class Transpiler:
                 m = re.search(r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE)
                 content = (m.group(1).strip() if m else summary.strip()).upper()
                 if content == "OK":
-                    verdict = {"ok": True, "function_issues": [], "critical_issues": []}
+                    verdict = {"ok": True, "function_issues": [], "critical_issues": [], "breaking_issues": [], "structure_issues": []}
                     parse_failed = False  # 兼容格式成功，不算解析失败
                 else:
                     # 无法解析，立即重试：设置标志并继续循环
@@ -2300,11 +2371,13 @@ class Transpiler:
             ok = bool(verdict.get("ok") is True)
             function_issues = verdict.get("function_issues") if isinstance(verdict.get("function_issues"), list) else []
             critical_issues = verdict.get("critical_issues") if isinstance(verdict.get("critical_issues"), list) else []
-            all_issues = function_issues + critical_issues
+            breaking_issues = verdict.get("breaking_issues") if isinstance(verdict.get("breaking_issues"), list) else []
+            structure_issues = verdict.get("structure_issues") if isinstance(verdict.get("structure_issues"), list) else []
+            all_issues = function_issues + critical_issues + breaking_issues + structure_issues
             
-            typer.secho(f"[c2rust-transpiler][review][iter={i+1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}", fg=typer.colors.CYAN)
+            typer.secho(f"[c2rust-transpiler][review][iter={i+1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}, breaking_issues={len(breaking_issues)}, structure_issues={len(structure_issues)}", fg=typer.colors.CYAN)
             
-            # 如果 ok 为 true，表示审查通过（功能一致且无严重问题），直接返回，不触发修复
+            # 如果 ok 为 true，表示审查通过（功能一致且无严重问题、无破坏性变更、文件结构合理），直接返回，不触发修复
             if ok:
                 limit_info = f" (上限: {max_iterations if max_iterations > 0 else '无限'})"
                 typer.secho(f"[c2rust-transpiler][review] 代码审查通过{limit_info} (共 {i+1} 次迭代)。", fg=typer.colors.GREEN)
@@ -2315,12 +2388,16 @@ class Transpiler:
                         "ok": True,
                         "function_issues": list(function_issues),
                         "critical_issues": list(critical_issues),
+                        "breaking_issues": list(breaking_issues),
+                        "structure_issues": list(structure_issues),
                         "iterations": i + 1,
                     }
                     metrics = cur.get("metrics") or {}
                     metrics["review_iterations"] = i + 1
                     metrics["function_issues"] = len(function_issues)
                     metrics["type_issues"] = len(critical_issues)
+                    metrics["breaking_issues"] = len(breaking_issues)
+                    metrics["structure_issues"] = len(structure_issues)
                     cur["metrics"] = metrics
                     self.progress["current"] = cur
                     self._save_progress()
@@ -2335,6 +2412,10 @@ class Transpiler:
                 *[f"  - {issue}" for issue in function_issues],
                 "严重问题（可能导致功能错误）：" if critical_issues else "",
                 *[f"  - {issue}" for issue in critical_issues],
+                "破坏性变更问题（对现有代码的影响）：" if breaking_issues else "",
+                *[f"  - {issue}" for issue in breaking_issues],
+                "文件结构问题：" if structure_issues else "",
+                *[f"  - {issue}" for issue in structure_issues],
             ])
             fix_prompt = "\n".join([
                 "请根据以下审查结论对目标函数进行最小优化（保留结构与意图，不进行大范围重构）：",
@@ -2404,11 +2485,15 @@ class Transpiler:
                     "ok": False,
                     "function_issues": list(function_issues),
                     "critical_issues": list(critical_issues),
+                    "breaking_issues": list(breaking_issues),
+                    "structure_issues": list(structure_issues),
                     "iterations": i + 1,
                 }
                 metrics = cur.get("metrics") or {}
                 metrics["function_issues"] = len(function_issues)
                 metrics["type_issues"] = len(critical_issues)
+                metrics["breaking_issues"] = len(breaking_issues)
+                metrics["structure_issues"] = len(structure_issues)
                 cur["metrics"] = metrics
                 self.progress["current"] = cur
                 self._save_progress()
