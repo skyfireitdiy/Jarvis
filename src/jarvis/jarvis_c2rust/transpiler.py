@@ -1122,7 +1122,8 @@ class Transpiler:
                     parts = rel_s[len("src/"):].strip("/").split("/")
                     if parts and parts[0]:
                         top_mod = parts[0]
-                        if not top_mod.endswith(".rs"):
+                        # 过滤掉 "mod" 关键字和 .rs 文件
+                        if top_mod != "mod" and not top_mod.endswith(".rs"):
                             self._ensure_top_level_pub_mod(top_mod)
                             typer.secho(f"[c2rust-transpiler][gen] 根符号 {rec.qname or rec.name} 的模块 {top_mod} 已在 lib.rs 中暴露", fg=typer.colors.GREEN)
             except Exception:
@@ -1147,7 +1148,7 @@ class Transpiler:
         - 最小改动，不覆盖其他内容
         """
         try:
-            if not mod_name or mod_name in ("lib", "main"):
+            if not mod_name or mod_name in ("lib", "main", "mod"):
                 return
             lib_rs = (self.crate_dir / "src" / "lib.rs").resolve()
             lib_rs.parent.mkdir(parents=True, exist_ok=True)
@@ -1185,7 +1186,7 @@ class Transpiler:
         - 最小改动，不覆盖其他内容
         """
         try:
-            if not child_mod or child_mod in ("lib", "main"):
+            if not child_mod or child_mod in ("lib", "main", "mod"):
                 return
             mod_rs = (dir_path / "mod.rs").resolve()
             mod_rs.parent.mkdir(parents=True, exist_ok=True)
@@ -1242,6 +1243,9 @@ class Transpiler:
                 if parts[-1] in ("lib.rs", "main.rs"):
                     return
                 child = parts[-1][:-3]  # 去掉 .rs
+                # 过滤掉 "mod" 关键字
+                if child == "mod":
+                    return
                 if len(parts) > 1:
                     start_dir = crate_root / "src" / "/".join(parts[:-1])
                 else:
@@ -1287,6 +1291,10 @@ class Transpiler:
                     break
                 # 在 parent/mod.rs 确保 pub mod <cur_dir.name>
                 # 确保 parent 在 crate/src 下
+                # 过滤掉 "mod" 关键字
+                if cur_dir.name == "mod":
+                    cur_dir = parent
+                    continue
                 try:
                     parent_rel = parent.relative_to(crate_root)
                     if str(parent_rel).replace("\\", "/").startswith("src/"):
@@ -2642,7 +2650,8 @@ class Transpiler:
                         parts = rel_s[len("src/"):].strip("/").split("/")
                         if parts and parts[0]:
                             top_mod = parts[0]
-                            if not top_mod.endswith(".rs"):
+                            # 过滤掉 "mod" 关键字和 .rs 文件
+                            if top_mod != "mod" and not top_mod.endswith(".rs"):
                                 self._ensure_top_level_pub_mod(top_mod)
                                 typer.secho(f"[c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}", fg=typer.colors.GREEN)
                     cur = self.progress.get("current") or {}
