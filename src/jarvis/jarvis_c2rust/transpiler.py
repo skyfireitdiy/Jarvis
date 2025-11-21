@@ -668,7 +668,7 @@ class Transpiler:
                     summary_prompt=sum_p,
                     need_summary=True,
                     auto_complete=True,
-                    use_tools=["execute_script", "read_code", "retrieve_memory", "save_memory", "read_symbols"],
+                    use_tools=["execute_script", "read_code", "read_symbols"],
                     non_interactive=self.non_interactive,
                     use_methodology=False,
                     use_analysis=False,
