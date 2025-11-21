@@ -1939,9 +1939,9 @@ def while_success(func: Callable[[], Any]) -> Any:
     函数执行结果
 
     注意：
-    与while_true共享重试计数器，累计重试5次，使用指数退避（第一次等待1s）
+    与while_true共享重试计数器，累计重试6次，使用指数退避（第一次等待1s）
     """
-    MAX_RETRIES = 5
+    MAX_RETRIES = 6
     result: Any = None
     
     while True:
@@ -1952,7 +1952,7 @@ def while_success(func: Callable[[], Any]) -> Any:
         except Exception as e:
             retry_count = _increment_retry_count()
             if retry_count <= MAX_RETRIES:
-                # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第5次等待16s (2^4)
+                # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
                 sleep_time = 2 ** (retry_count - 1)
                 if retry_count < MAX_RETRIES:
                     print(f"⚠️ 发生异常:\n{e}\n重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s...")
@@ -1979,9 +1979,9 @@ def while_true(func: Callable[[], bool]) -> Any:
     注意:
         与while_success不同，此函数只检查返回是否为True，
         不捕获异常，异常会直接抛出。
-        与while_success共享重试计数器，累计重试5次，使用指数退避（第一次等待1s）
+        与while_success共享重试计数器，累计重试6次，使用指数退避（第一次等待1s）
     """
-    MAX_RETRIES = 5
+    MAX_RETRIES = 6
     ret: bool = False
     
     while True:
@@ -1997,7 +1997,7 @@ def while_true(func: Callable[[], bool]) -> Any:
         
         retry_count = _increment_retry_count()
         if retry_count <= MAX_RETRIES:
-            # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第5次等待16s (2^4)
+            # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
             sleep_time = 2 ** (retry_count - 1)
             if retry_count < MAX_RETRIES:
                 print(f"⚠️ 返回空值，重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s...")
