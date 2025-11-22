@@ -77,6 +77,8 @@ class VirtualTTYTool:
         # 确保agent有tty_sessions字典
         if not hasattr(agent, "tty_sessions"):
             agent.tty_sessions = {}
+        elif agent.tty_sessions is None:
+            agent.tty_sessions = {}
 
         # 如果指定的tty_id不存在，为其创建一个新的tty_data
         if tty_id not in agent.tty_sessions:

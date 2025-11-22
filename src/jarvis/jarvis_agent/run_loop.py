@@ -109,18 +109,17 @@ class AgentRunLoop:
                 # 关键流程：直接调用 after_tool_call 回调函数
                 try:
                     # 获取所有订阅了 AFTER_TOOL_CALL 事件的回调
-                    if hasattr(ag.event_bus, "_listeners"):
-                        listeners = ag.event_bus._listeners.get(AFTER_TOOL_CALL, [])
-                        for callback in listeners:
-                            try:
-                                callback(
-                                    agent=ag,
-                                    current_response=current_response,
-                                    need_return=need_return,
-                                    tool_prompt=tool_prompt,
-                                )
-                            except Exception:
-                                pass
+                    listeners = ag.event_bus._listeners.get(AFTER_TOOL_CALL, [])
+                    for callback in listeners:
+                        try:
+                            callback(
+                                agent=ag,
+                                current_response=current_response,
+                                need_return=need_return,
+                                tool_prompt=tool_prompt,
+                            )
+                        except Exception:
+                            pass
                 except Exception:
                     pass
                 

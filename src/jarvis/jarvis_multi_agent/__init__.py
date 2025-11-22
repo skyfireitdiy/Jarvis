@@ -356,7 +356,7 @@ class MultiAgent(OutputHandler):
 
             # Generate a brief summary via direct model call to avoid run-loop recursion
             # 如果在配置中显式设置了 summary_on_send=False，则不生成摘要
-            sender_config = self.agents_config_map.get(last_agent_name, {}) if hasattr(self, "agents_config_map") else {}
+            sender_config = self.agents_config_map.get(last_agent_name, {})
             summary_on_send = sender_config.get("summary_on_send", True)
             summary_text = ""
             if summary_on_send:
