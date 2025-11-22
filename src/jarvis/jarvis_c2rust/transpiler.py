@@ -1844,7 +1844,8 @@ class Transpiler:
                 "   - 明显的越界访问或会导致程序崩溃的问题；\n"
                 "   - 会导致程序无法正常运行的逻辑错误；\n"
                 "3. 破坏性变更检测（对现有代码的影响）：\n"
-                "   - 检查函数签名变更是否会导致调用方代码无法编译（如参数类型、参数数量、返回类型的变更）；\n"
+                "   - **允许签名不一致**：允许函数签名、参数数量、参数类型、返回类型等与C实现不一致，只要功能实现了即可。这是Rust转译的正常现象，因为Rust的类型系统和设计理念与C不同；\n"
+                "   - **仅检查实际破坏性影响**：只有当函数签名变更确实导致调用方代码无法编译或运行时，才报告为破坏性变更。如果调用方代码已经适配了新签名，或可以通过简单的适配解决，则不应视为破坏性变更；\n"
                 "   - 检查模块导出变更是否会影响其他模块的导入（如 pub 关键字缺失、模块路径变更）；\n"
                 "   - 检查类型定义变更是否会导致依赖该类型的代码失效（如结构体字段变更、枚举变体变更）；\n"
                 "   - 检查常量或静态变量变更是否会影响引用该常量的代码；\n"
@@ -1881,25 +1882,9 @@ class Transpiler:
                         commit_diff = get_diff_between_commits(self._current_function_start_commit, current_commit)
                         if commit_diff and not commit_diff.startswith("获取") and not commit_diff.startswith("发生"):
                             # 成功获取diff，限制长度避免上下文过大
-                            # 优先使用agent的剩余token数量，回退到输入窗口限制
-                            max_diff_chars = None
-                            try:
-                                # 优先尝试使用已有的agent获取剩余token（更准确，包含对话历史）
-                                review_key = f"review::{rec.id}"
-                                agent = self._current_agents.get(review_key)
-                                if agent:
-                                    remaining_tokens = agent.get_remaining_token_count()
-                                    # 使用剩余token的50%作为字符限制（1 token ≈ 4字符，所以 remaining_tokens * 0.5 * 4 = remaining_tokens * 2）
-                                    max_diff_chars = int(remaining_tokens * 2)
-                                    if max_diff_chars <= 0:
-                                        max_diff_chars = None
-                            except Exception:
-                                pass
-                            
-                            # 回退方案2：使用输入窗口的50%转换为字符数
-                            if max_diff_chars is None:
-                                max_input_tokens = get_max_input_token_count(self.llm_group)
-                                max_diff_chars = max_input_tokens * 2  # 最大输入token数量的一半转换为字符数
+                            # 使用输入窗口的50%转换为字符数（由于每次重新创建agent，无法获取剩余token）
+                            max_input_tokens = get_max_input_token_count(self.llm_group)
+                            max_diff_chars = max_input_tokens * 2  # 最大输入token数量的一半转换为字符数
                             
                             if len(commit_diff) > max_diff_chars:
                                 commit_diff = commit_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
@@ -1935,12 +1920,13 @@ class Transpiler:
                 "   - 明显的空指针解引用或会导致 panic 的严重错误；",
                 "   - 明显的越界访问或会导致程序崩溃的问题；",
                 "3. 破坏性变更检测（对现有代码的影响）：",
-                "   - 检查函数签名变更是否会导致调用方代码无法编译（如参数类型、参数数量、返回类型的变更）；",
+                "   - **允许签名不一致**：允许函数签名、参数数量、参数类型、返回类型等与C实现不一致，只要功能实现了即可。这是Rust转译的正常现象，因为Rust的类型系统和设计理念与C不同；",
+                "   - **仅检查实际破坏性影响**：只有当函数签名变更确实导致调用方代码无法编译或运行时，才报告为破坏性变更。如果调用方代码已经适配了新签名，或可以通过简单的适配解决，则不应视为破坏性变更；",
                 "   - 检查模块导出变更是否会影响其他模块的导入（如 pub 关键字缺失、模块路径变更）；",
                 "   - 检查类型定义变更是否会导致依赖该类型的代码失效（如结构体字段变更、枚举变体变更）；",
                 "   - 检查常量或静态变量变更是否会影响引用该常量的代码；",
                 "   - **优先使用diff信息**：如果diff中已包含调用方代码信息，优先基于diff判断；只有在diff信息不足时，才使用 read_code 工具读取调用方代码进行验证；",
-                "   - 如果该函数是根符号或被其他已转译函数调用，必须检查调用方代码是否仍能正常编译和使用；",
+                "   - 如果该函数是根符号或被其他已转译函数调用，检查调用方代码是否仍能正常编译和使用；如果调用方已经适配了新签名，则不应视为破坏性变更；",
                 "4. 文件结构合理性检查：",
                 "   - 检查模块文件位置是否符合 Rust 项目约定（如 src/ 目录结构、模块层次）；",
                 "   - 检查文件命名是否符合 Rust 命名规范（如 snake_case、模块文件命名）；",
@@ -1958,7 +1944,7 @@ class Transpiler:
                 "示例：",
                 '  "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。"',
                 '  "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。"',
-                '  "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。"',
+                '  "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，且无法通过简单适配解决，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。注意：如果调用方已经适配了新签名，或可以通过简单的类型转换解决，则不应视为破坏性变更。"',
                 '  "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。"',
                 "",
                 "被引用符号上下文（如已转译则包含Rust模块信息）：",
@@ -2036,6 +2022,8 @@ class Transpiler:
                 "- 前置条件：必须在crate中找到该函数的实现（匹配函数名或签名）。若未找到，ok 必须为 false，function_issues 应包含 [function] function not found: 详细描述问题位置和如何查找函数实现\n"
                 "- **安全改进允许行为不一致**：若Rust实现修复了C代码中的安全漏洞（如缓冲区溢出、空指针解引用、未初始化内存使用等），即使导致行为与 C 实现不一致，这也是允许的，不应被视为功能不一致；\n"
                 "- **忽略语言差异导致的行为不一致**：由于 Rust 和 C 语言的本质差异（如内存安全、类型系统、错误处理、未定义行为处理等），某些行为差异是不可避免的，这些差异应被忽略，不应被视为功能不一致；\n"
+                "- **允许签名不一致**：允许函数签名、参数数量、参数类型、返回类型等与C实现不一致，只要功能实现了即可。这是Rust转译的正常现象，不应被视为破坏性变更；\n"
+                "- **破坏性变更判断标准**：只有当函数签名变更确实导致调用方代码无法编译或运行时，才报告为破坏性变更。如果调用方代码已经适配了新签名，或可以通过简单的适配解决，则不应视为破坏性变更；\n"
                 "- 若Rust实现使用了不同的实现方式但保持了功能一致，且无严重问题、无破坏性变更、文件结构合理，ok 应为 true\n"
                 "- 仅报告功能不一致、严重问题、破坏性变更和文件结构问题，不报告类型匹配、指针可变性、边界检查细节等技术细节（除非会导致功能错误）\n"
                 "- **重要：每个问题描述必须包含以下内容：**\n"
@@ -2045,7 +2033,7 @@ class Transpiler:
                 "  示例格式：\n"
                 '    "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。"\n'
                 '    "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。"\n'
-                '    "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。"\n'
+                '    "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，且无法通过简单适配解决，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。注意：如果调用方已经适配了新签名，或可以通过简单的类型转换解决，则不应视为破坏性变更。"\n'
                 '    "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。"\n'
                 "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
                 "<SUMMARY>\n{\n  \"ok\": true,\n  \"function_issues\": [],\n  \"critical_issues\": [],\n  \"breaking_issues\": [],\n  \"structure_issues\": []\n}\n</SUMMARY>"
@@ -2057,18 +2045,23 @@ class Transpiler:
 
         i = 0
         max_iterations = self.review_max_iterations
-        # 复用 Review Agent（仅在本函数生命周期内构建一次）
+        # 每次都重新创建 Review Agent，确保基于最新代码审查，不依赖历史对话
         # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-        review_key = f"review::{rec.id}"
         sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
         
         # 获取函数信息用于 Agent name
         fn_name = rec.qname or rec.name or f"fn_{rec.id}"
         agent_name = f"C2Rust-Review-Agent({fn_name})"
-        
-        if self._current_agents.get(review_key) is None:
-            self._current_agents[review_key] = Agent(
+
+        # 0表示无限重试，否则限制迭代次数
+        use_direct_model_review = False  # 标记是否使用直接模型调用
+        parse_failed = False  # 标记上一次解析是否失败
+        parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
+        while max_iterations == 0 or i < max_iterations:
+            # 每次迭代都重新创建 Agent，清除之前的对话历史和记忆，确保基于最新代码审查
+            typer.secho(f"[c2rust-transpiler][review] 创建新的审查 Agent（第 {i+1} 次迭代）", fg=typer.colors.CYAN)
+            agent = Agent(
                 system_prompt=sys_p_init,
                 name=agent_name,
                 model_group=self.llm_group,
@@ -2080,31 +2073,9 @@ class Transpiler:
                 use_methodology=False,
                 use_analysis=False,
             )
-
-        # 0表示无限重试，否则限制迭代次数
-        use_direct_model_review = False  # 标记是否使用直接模型调用
-        parse_failed = False  # 标记上一次解析是否失败
-        parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
-        while max_iterations == 0 or i < max_iterations:
-            agent = self._current_agents[review_key]
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            # 如果是修复后的审查（i > 0），强制要求重新读取代码
+            # 如果是修复后的审查（i > 0），添加代码已更新的提示
             if i > 0:
-                # 修复后重新创建 Agent，清除之前的对话历史和记忆，确保基于最新代码审查
-                typer.secho(f"[c2rust-transpiler][review] 代码已修复，重新创建审查 Agent 以清除历史（第 {i+1} 次迭代）", fg=typer.colors.YELLOW)
-                self._current_agents[review_key] = Agent(
-                    system_prompt=sys_p_init,
-                    name=agent_name,
-                    model_group=self.llm_group,
-                    summary_prompt=sum_p_init,
-                    need_summary=True,
-                    auto_complete=True,
-                    use_tools=["execute_script", "read_code", "read_symbols"],
-                    non_interactive=self.non_interactive,
-                    use_methodology=False,
-                    use_analysis=False,
-                )
-                agent = self._current_agents[review_key]
                 
                 code_changed_notice = "\n".join([
                     "",
