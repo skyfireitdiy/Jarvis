@@ -124,21 +124,60 @@ class OpenAIModel(BasePlatform):
             # Add user message to history
             self.messages.append({"role": "user", "content": message})
 
-            response = self.client.chat.completions.create(
-                model=self.model_name,  # Use the configured model name
-                messages=self.messages,  # type: ignore
-                stream=True,
-            )  # type: ignore
+            # 累计完整响应
+            accumulated_response = ""
+            
+            # 循环处理，直到不是因为长度限制而结束
+            while True:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,  # Use the configured model name
+                    messages=self.messages,  # type: ignore
+                    stream=True,
+                )  # type: ignore
 
-            full_response = ""
-            for chunk in response:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    text = chunk.choices[0].delta.content
-                    full_response += text
-                    yield text
+                full_response = ""
+                finish_reason = None
+                
+                for chunk in response:
+                    if chunk.choices and len(chunk.choices) > 0:
+                        choice = chunk.choices[0]
+                        
+                        # 检查 finish_reason（通常在最后一个 chunk 中）
+                        if choice.finish_reason:
+                            finish_reason = choice.finish_reason
+                        
+                        # 获取内容增量
+                        if choice.delta and choice.delta.content:
+                            text = choice.delta.content
+                            full_response += text
+                            accumulated_response += text
+                            yield text
 
-            # Add assistant reply to history
-            self.messages.append({"role": "assistant", "content": full_response})
+                # 如果是因为长度限制而结束，继续获取剩余内容
+                if finish_reason == "length":
+                    # 将已获取的内容追加到消息历史中，以便下次请求时模型知道已生成的内容
+                    if self.messages and self.messages[-1].get("role") == "assistant":
+                        # 追加到现有的 assistant 消息
+                        self.messages[-1]["content"] += full_response
+                    else:
+                        # 创建新的 assistant 消息
+                        self.messages.append({"role": "assistant", "content": full_response})
+                    
+                    # 添加一个继续请求的用户消息，让模型继续生成
+                    self.messages.append({"role": "user", "content": "请继续。"})
+                    # 继续循环，获取剩余内容
+                    continue
+                else:
+                    # 正常结束（stop、null 或其他原因）
+                    # 将完整响应添加到消息历史
+                    if accumulated_response:
+                        if self.messages and self.messages[-1].get("role") == "assistant":
+                            # 如果最后一条是 assistant 消息，追加本次的内容
+                            self.messages[-1]["content"] += full_response
+                        else:
+                            # 创建新的 assistant 消息，使用累计的完整响应
+                            self.messages.append({"role": "assistant", "content": accumulated_response})
+                    break
 
             return None
 
