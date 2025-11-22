@@ -282,7 +282,23 @@ class BasePlatform(ABC):
                     return response
 
             _flush_buffer()
-            text_content.plain = response
+            # 最后更新时也需要应用滚动逻辑，确保显示正确
+            # 注意：不要重置 text_content.plain，因为 _flush_buffer 已经通过 _update_panel_content 更新了内容
+            # 只需要确保滚动逻辑正确应用
+            max_text_height = console.height - 5
+            if max_text_height <= 0:
+                max_text_height = 1
+
+            lines = text_content.wrap(
+                console,
+                console.width - 4 if console.width > 4 else 1,
+            )
+
+            if len(lines) > max_text_height:
+                # 只保留最后 max_text_height 行
+                text_content.plain = "\n".join(
+                    [line.plain for line in lines[-max_text_height:]]
+                )
 
             end_time = time.time()
             duration = end_time - start_time
