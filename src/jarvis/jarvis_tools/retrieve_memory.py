@@ -118,9 +118,23 @@ class RetrieveMemoryTool:
             # 按创建时间排序（最新的在前）
             all_memories.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
-            # 获取最大输入token数的2/3作为记忆的token限制
-            max_input_tokens = get_max_input_token_count()
-            memory_token_limit = int(max_input_tokens * 2 / 3)
+            # 优先使用剩余token数量，回退到输入窗口限制
+            memory_token_limit = None
+            agent = args.get("agent")
+            if agent and hasattr(agent, "model"):
+                try:
+                    remaining_tokens = agent.model.get_remaining_token_count()
+                    # 使用剩余token的2/3作为限制，保留1/3作为安全余量
+                    memory_token_limit = int(remaining_tokens * 2 / 3)
+                    if memory_token_limit <= 0:
+                        memory_token_limit = None
+                except Exception:
+                    pass
+            
+            # 回退方案：使用输入窗口的2/3
+            if memory_token_limit is None:
+                max_input_tokens = get_max_input_token_count()
+                memory_token_limit = int(max_input_tokens * 2 / 3)
 
             # 基于token限制和条数限制筛选记忆
             filtered_memories: List[Dict[str, Any]] = []

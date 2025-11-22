@@ -256,7 +256,7 @@ commit信息
                 upload_success = False
 
                 # Check if content is too large
-                is_large_content = is_context_overflow(diff, model_group)
+                is_large_content = is_context_overflow(diff, model_group, platform)
 
                 if is_large_content:
                     if not platform.support_upload_files():

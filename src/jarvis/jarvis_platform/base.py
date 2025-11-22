@@ -15,19 +15,19 @@ from rich.status import Status  # type: ignore
 from rich.text import Text  # type: ignore
 
 from jarvis.jarvis_utils.config import (
-    get_max_input_token_count,
     get_pretty_output,
     is_print_prompt,
     is_immediate_abort,
     is_save_session_history,
     get_data_dir,
+    get_max_input_token_count,
 )
-from jarvis.jarvis_utils.embedding import split_text_into_chunks
 from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
 import jarvis.jarvis_utils.globals as G
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
 from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import get_context_token_count, while_success, while_true
+from jarvis.jarvis_utils.utils import while_success, while_true
+from jarvis.jarvis_utils.embedding import get_context_token_count
 
 
 class BasePlatform(ABC):
@@ -79,103 +79,6 @@ class BasePlatform(ABC):
         """检查平台是否支持文件上传"""
         return False
 
-    def _submit_part_with_split(self, part_content: str, threshold_factor: float = 1.0) -> str:
-        """提交单个部分，如果反复失败则将其拆分。
-        
-        参数:
-            part_content: 要提交的内容。
-            threshold_factor: 调整token阈值的因素。
-            
-        返回:
-            提交部分后的响应。
-        """
-        try:
-            response = ""
-            for trunk in while_true(
-                lambda: while_success(
-                    lambda: self._chat(
-                        f"<part_content>{part_content}</part_content>\n\n请返回<已收到>，不需要返回其他任何内容"
-                    )
-                )
-            ):
-                response += trunk
-            return response
-        except Exception as e:
-            # 如果单个part反复失败，尝试将其拆分成两份
-            part_token_count = get_context_token_count(part_content)
-            base_max_token = get_max_input_token_count(self.model_group)
-            adjusted_max_token = int(base_max_token * threshold_factor)
-            min_chunk_size = adjusted_max_token - 2048
-            
-            # 如果part已经很小（小于最小chunk size），或者token数已经很小，不再拆分
-            if part_token_count <= min_chunk_size or len(part_content) < 100:
-                print(f"⚠️ Part提交失败且已无法进一步拆分，重新抛出异常: {e}")
-                raise
-            
-            print(f"⚠️ Part提交失败，尝试拆分成两份: {e}")
-            # 将part拆分成两份，使用更小的max_length以确保拆分成功
-            # 使用更保守的阈值因子（进一步降低40%）来拆分
-            split_threshold_factor = threshold_factor * 0.6
-            split_max_token = int(base_max_token * split_threshold_factor)
-            split_max_chunk_size = split_max_token - 1024
-            chunks = split_text_into_chunks(part_content, split_max_chunk_size, split_max_chunk_size // 2)
-            if len(chunks) < 2:
-                # 如果无法拆分，直接抛出异常
-                print(f"⚠️ 无法拆分part，重新抛出异常: {e}")
-                raise
-            
-            # 递归处理两个更小的部分，使用更保守的阈值因子
-            response = ""
-            for i, chunk in enumerate(chunks, 1):
-                print(f"ℹ️ 处理拆分后的第{i}/{len(chunks)}部分...")
-                chunk_response = self._submit_part_with_split(chunk, split_threshold_factor)
-                response += "\n" + chunk_response
-            return response
-
-    def _handle_long_context(self, message: str, threshold_factor: float = 1.0) -> str:
-        """通过拆分和分块提交来处理长上下文。
-        
-        参数:
-            message: 要拆分和提交的较长消息。
-            threshold_factor: 调整token阈值的因素（默认为1.0）。
-                             使用小于1.0的值（例如0.6）在重试时降低阈值。
-            
-        返回:
-            所有块提交的累积响应。
-        """
-        base_max_token = get_max_input_token_count(self.model_group)
-        adjusted_max_token = int(base_max_token * threshold_factor)
-        max_chunk_size = adjusted_max_token - 1024  # 留出一些余量
-        min_chunk_size = adjusted_max_token - 2048
-        inputs = split_text_into_chunks(message, max_chunk_size, min_chunk_size)
-        print(f"ℹ️ 长上下文，分批提交，共{len(inputs)}部分...")
-        prefix_prompt = """
-        我将分多次提供大量内容，在我明确告诉你内容已经全部提供完毕之前，每次仅需要输出"已收到"，明白请输出"开始接收输入"。
-        """
-        while_true(lambda: while_success(lambda: self._chat(prefix_prompt)))
-        submit_count = 0
-        length = 0
-        response = ""
-        for input in inputs:
-            submit_count += 1
-            length += len(input)
-
-            response += "\n"
-            try:
-                part_response = self._submit_part_with_split(input, threshold_factor)
-                response += part_response
-            except Exception as e:
-                print(f"⚠️ 第{submit_count}部分提交最终失败: {e}")
-                raise
-
-        print("✅ 提交完成")
-        response += "\n" + while_true(
-            lambda: while_success(
-                lambda: self._chat("内容已经全部提供完毕，请根据内容继续")
-            )
-        )
-        return response
-
     def _chat(self, message: str):
         import time
 
@@ -186,127 +89,122 @@ class BasePlatform(ABC):
             print("⚠️ 输入为空白字符串，已忽略本次请求")
             return ""
 
-        input_token_count = get_context_token_count(message)
+        response = ""
 
-        if input_token_count > get_max_input_token_count(self.model_group):
-            response = self._handle_long_context(message)
-        else:
-            response = ""
+        if not self.suppress_output:
+            if get_pretty_output():
+                chat_iterator = self.chat(message)
+                first_chunk = None
 
-            if not self.suppress_output:
-                if get_pretty_output():
-                    chat_iterator = self.chat(message)
-                    first_chunk = None
+                with Status(
+                    f"🤔 {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()} 正在思考中...",
+                    spinner="dots",
+                    console=console,
+                ):
+                    try:
+                        while True:
+                            first_chunk = next(chat_iterator)
+                            if first_chunk:
+                                break
+                    except StopIteration:
+                        self._append_session_history(message, "")
+                        return ""
 
-                    with Status(
-                        f"🤔 {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()} 正在思考中...",
-                        spinner="dots",
-                        console=console,
-                    ):
-                        try:
-                            while True:
-                                first_chunk = next(chat_iterator)
-                                if first_chunk:
-                                    break
-                        except StopIteration:
-                            self._append_session_history(message, "")
-                            return ""
+                text_content = Text(overflow="fold")
+                panel = Panel(
+                    text_content,
+                    title=f"[bold cyan]{(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}[/bold cyan]",
+                    subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
+                    border_style="bright_blue",
+                    box=box.ROUNDED,
+                    expand=True,  # 允许面板自动调整大小
+                )
 
-                    text_content = Text(overflow="fold")
-                    panel = Panel(
-                        text_content,
-                        title=f"[bold cyan]{(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}[/bold cyan]",
-                        subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
-                        border_style="bright_blue",
-                        box=box.ROUNDED,
-                        expand=True,  # 允许面板自动调整大小
-                    )
+                with Live(panel, refresh_per_second=4, transient=False) as live:
 
-                    with Live(panel, refresh_per_second=4, transient=False) as live:
+                    def _update_panel_content(content: str):
+                        text_content.append(content, style="bright_white")
+                        # --- Scrolling Logic ---
+                        # Calculate available height in the panel
+                        max_text_height = (
+                            console.height - 5
+                        )  # Leave space for borders/titles
+                        if max_text_height <= 0:
+                            max_text_height = 1
 
-                        def _update_panel_content(content: str):
-                            text_content.append(content, style="bright_white")
-                            # --- Scrolling Logic ---
-                            # Calculate available height in the panel
-                            max_text_height = (
-                                console.height - 5
-                            )  # Leave space for borders/titles
-                            if max_text_height <= 0:
-                                max_text_height = 1
+                        # Get the actual number of lines the text will wrap to
+                        lines = text_content.wrap(
+                            console,
+                            console.width - 4 if console.width > 4 else 1,
+                        )
 
-                            # Get the actual number of lines the text will wrap to
-                            lines = text_content.wrap(
-                                console,
-                                console.width - 4 if console.width > 4 else 1,
+                        # If content overflows, truncate to show only the last few lines
+                        if len(lines) > max_text_height:
+                            # Rebuild the text from the wrapped lines to ensure visual consistency
+                            # This correctly handles both wrapped long lines and explicit newlines
+                            text_content.plain = "\n".join(
+                                [line.plain for line in lines[-max_text_height:]]
                             )
 
-                            # If content overflows, truncate to show only the last few lines
-                            if len(lines) > max_text_height:
-                                # Rebuild the text from the wrapped lines to ensure visual consistency
-                                # This correctly handles both wrapped long lines and explicit newlines
-                                text_content.plain = "\n".join(
-                                    [line.plain for line in lines[-max_text_height:]]
-                                )
-
-                            panel.subtitle = (
-                                "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
-                            )
-                            live.update(panel)
-
-                        # Process first chunk
-                        response += first_chunk
-                        if first_chunk:
-                            _update_panel_content(first_chunk)
-
-                        # 缓存机制：降低更新频率，减少界面闪烁
-                        buffer = ""  # 内容缓存
-                        last_update_time = time.time()  # 上次更新时间
-                        update_interval = 1  # 最小更新间隔（秒）
-                        min_buffer_size = 5  # 最小缓存大小（字符数）
-
-                        def _flush_buffer():
-                            """刷新缓存内容到面板"""
-                            nonlocal buffer, last_update_time
-                            if buffer:
-                                _update_panel_content(buffer)
-                                buffer = ""
-                                last_update_time = time.time()
-
-                        # Process rest of the chunks
-                        for s in chat_iterator:
-                            if not s:
-                                continue
-                            response += s  # Accumulate the full response string
-                            buffer += s  # 累积到缓存
-
-                            # 检查是否需要更新：缓存达到阈值或超过时间间隔
-                            current_time = time.time()
-                            should_update = (
-                                len(buffer) >= min_buffer_size
-                                or (current_time - last_update_time) >= update_interval
-                            )
-
-                            if should_update:
-                                _flush_buffer()
-
-                            if is_immediate_abort() and get_interrupt():
-                                # 中断时也要刷新剩余缓存
-                                _flush_buffer()
-                                self._append_session_history(message, response)
-                                return response  # Return the partial response immediately
-
-                        # 循环结束时，刷新所有剩余缓存内容
-                        _flush_buffer()
-
-                        # At the end, display the entire response
-                        text_content.plain = response
-
-                        end_time = time.time()
-                        duration = end_time - start_time
-                        panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+                        panel.subtitle = (
+                            "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                        )
                         live.update(panel)
-                    console.print()
-                else:
+
+                    # Process first chunk
+                    response += first_chunk
+                    if first_chunk:
+                        _update_panel_content(first_chunk)
+
+                    # 缓存机制：降低更新频率，减少界面闪烁
+                    buffer = ""  # 内容缓存
+                    last_update_time = time.time()  # 上次更新时间
+                    update_interval = 1  # 最小更新间隔（秒）
+                    min_buffer_size = 5  # 最小缓存大小（字符数）
+
+                    def _flush_buffer():
+                        """刷新缓存内容到面板"""
+                        nonlocal buffer, last_update_time
+                        if buffer:
+                            _update_panel_content(buffer)
+                            buffer = ""
+                            last_update_time = time.time()
+
+                    # Process rest of the chunks
+                    for s in chat_iterator:
+                        if not s:
+                            continue
+                        response += s  # Accumulate the full response string
+                        buffer += s  # 累积到缓存
+
+                        # 检查是否需要更新：缓存达到阈值或超过时间间隔
+                        current_time = time.time()
+                        should_update = (
+                            len(buffer) >= min_buffer_size
+                            or (current_time - last_update_time) >= update_interval
+                        )
+
+                        if should_update:
+                            _flush_buffer()
+
+                        if is_immediate_abort() and get_interrupt():
+                            # 中断时也要刷新剩余缓存
+                            _flush_buffer()
+                            self._append_session_history(message, response)
+                            return response  # Return the partial response immediately
+
+                    # 循环结束时，刷新所有剩余缓存内容
+                    _flush_buffer()
+
+                    # At the end, display the entire response
+                    text_content.plain = response
+
+                    end_time = time.time()
+                    duration = end_time - start_time
+                    panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    live.update(panel)
+                console.print()
+            else:
                     # Print a clear prefix line before streaming model output (non-pretty mode)
                     console.print(
                         f"🤖 模型输出 - {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
@@ -322,12 +220,12 @@ class BasePlatform(ABC):
                     end_time = time.time()
                     duration = end_time - start_time
                     console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
-            else:
-                for s in self.chat(message):
-                    response += s
-                    if is_immediate_abort() and get_interrupt():
-                        self._append_session_history(message, response)
-                        return response
+        else:
+            for s in self.chat(message):
+                response += s
+                if is_immediate_abort() and get_interrupt():
+                    self._append_session_history(message, response)
+                    return response
         # Keep original think tag handling
         response = re.sub(
             ot("think") + r".*?" + ct("think"), "", response, flags=re.DOTALL
@@ -340,72 +238,21 @@ class BasePlatform(ABC):
         return response
 
     def chat_until_success(self, message: str) -> str:
-        """与模型对话直到成功响应。
-        
-        如果初始尝试失败（可能是由于token估算不准确），
-        自动使用长上下文处理重试。
-        """
+        """与模型对话直到成功响应。"""
         try:
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
                 PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
             
-            # Check if we should use long context handling based on token count
-            input_token_count = get_context_token_count(message)
-            max_token_count = get_max_input_token_count(self.model_group)
-            use_long_context = input_token_count > max_token_count
-            
             result: str = ""
-            threshold_factor = 1.0  # 初始阈值因子
-            try:
-                if use_long_context:
-                    # Use long context handling directly
-                    result = while_true(
-                        lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
-                    )
-                else:
-                    # Try normal chat first
-                    result = while_true(
-                        lambda: while_success(lambda: self._chat(message))
-                    )
-                
-                # Check if result is empty or False (retry exhausted)
-                # Convert False to empty string for type safety
-                if result is False or result == "":
-                    raise ValueError("返回结果为空")
-            except Exception as e:
-                # If normal chat failed and we haven't tried long context yet,
-                # retry with long context handling (token estimation might be inaccurate)
-                if not use_long_context:
-                    print(f"⚠️ 首次尝试失败，可能是token估算不准确，尝试使用长上下文处理: {e}")
-                    # 重试时降低阈值，使用更保守的判断，避免再次超出
-                    # 降低40%的阈值，或者至少降低1024个token
-                    adjusted_max_token = max(
-                        int(max_token_count * 0.6),
-                        max_token_count - 1024
-                    )
-                    if input_token_count > adjusted_max_token:
-                        # 如果降低阈值后仍然超出，直接使用长上下文处理，并降低阈值因子
-                        threshold_factor = 0.6
-                        result = while_true(
-                            lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
-                        )
-                    else:
-                        # 如果降低阈值后不超出，再次尝试正常chat
-                        result = while_true(
-                            lambda: while_success(lambda: self._chat(message))
-                        )
-                    if result is False or result == "":
-                        raise ValueError("长上下文处理也失败，返回结果为空")
-                else:
-                    # Already tried long context, retry with lowered threshold
-                    print(f"⚠️ 长上下文处理失败，降低阈值后重试: {e}")
-                    threshold_factor = 0.6  # 降低40%的阈值
-                    result = while_true(
-                        lambda: while_success(lambda: self._handle_long_context(message, threshold_factor))
-                    )
-                    if result is False or result == "":
-                        raise ValueError("降低阈值后长上下文处理仍然失败，返回结果为空")
+            result = while_true(
+                lambda: while_success(lambda: self._chat(message))
+            )
+            
+            # Check if result is empty or False (retry exhausted)
+            # Convert False to empty string for type safety
+            if result is False or result == "":
+                raise ValueError("返回结果为空")
             
             from jarvis.jarvis_utils.globals import set_last_message
 
@@ -545,6 +392,48 @@ class BasePlatform(ABC):
         except Exception:
             # Do not break chat flow if writing history fails
             pass
+
+    def get_conversation_history(self) -> List[Dict[str, str]]:
+        """获取当前对话历史
+        
+        返回:
+            List[Dict[str, str]]: 对话历史列表，每个元素包含 role 和 content
+            
+        注意:
+            默认实现检查是否有 messages 属性，子类可以重写此方法以提供自定义实现
+        """
+        if hasattr(self, "messages"):
+            return getattr(self, "messages", [])
+        return []
+
+    def get_used_token_count(self) -> int:
+        """计算当前对话历史使用的token数量
+        
+        返回:
+            int: 当前对话历史使用的token数量
+        """
+        history = self.get_conversation_history()
+        if not history:
+            return 0
+        
+        total_tokens = 0
+        for message in history:
+            content = message.get("content", "")
+            if content:
+                total_tokens += get_context_token_count(content)
+        
+        return total_tokens
+
+    def get_remaining_token_count(self) -> int:
+        """获取剩余可用的token数量
+        
+        返回:
+            int: 剩余可用的token数量（输入窗口限制 - 当前使用的token数量）
+        """
+        max_tokens = get_max_input_token_count(self.model_group)
+        used_tokens = self.get_used_token_count()
+        remaining = max_tokens - used_tokens
+        return max(0, remaining)  # 确保返回值不为负数
 
     @abstractmethod
     def support_web(self) -> bool:

@@ -2069,12 +2069,35 @@ def count_cmd_usage() -> None:
 
 
 def is_context_overflow(
-    content: str, model_group_override: Optional[str] = None
+    content: str, 
+    model_group_override: Optional[str] = None,
+    platform: Optional[Any] = None
 ) -> bool:
-    """判断文件内容是否超出上下文限制"""
-    return get_context_token_count(content) > get_max_big_content_size(
-        model_group_override
-    )
+    """判断文件内容是否超出上下文限制
+    
+    参数:
+        content: 要检查的内容
+        model_group_override: 模型组覆盖（可选）
+        platform: 平台实例（可选），如果提供则使用剩余token数量判断
+        
+    返回:
+        bool: 如果内容超出上下文限制返回True
+    """
+    content_tokens = get_context_token_count(content)
+    
+    # 优先使用剩余token数量
+    if platform is not None:
+        try:
+            remaining_tokens = platform.get_remaining_token_count()
+            # 如果内容token数超过剩余token的80%，认为超出限制
+            threshold = int(remaining_tokens * 0.8)
+            if threshold > 0:
+                return content_tokens > threshold
+        except Exception:
+            pass
+    
+    # 回退方案：使用输入窗口限制
+    return content_tokens > get_max_big_content_size(model_group_override)
 
 
 def get_loc_stats() -> str:

@@ -554,6 +554,19 @@ class Agent:
         """Gets user data from the session."""
         return self.session.get_user_data(key)
 
+    def get_remaining_token_count(self) -> int:
+        """获取剩余可用的token数量
+        
+        返回:
+            int: 剩余可用的token数量，如果无法获取则返回0
+        """
+        if not self.model:
+            return 0
+        try:
+            return self.model.get_remaining_token_count()
+        except Exception:
+            return 0
+
     def set_use_tools(self, use_tools):
         """设置要使用的工具列表"""
         for handler in self.output_handler:
@@ -858,7 +871,7 @@ class Agent:
         return message
 
     def _manage_conversation_length(self, message: str) -> str:
-        """管理对话长度计数；摘要触发由token数量在 AgentRunLoop 中统一处理（超过输入窗口80%时触发）。"""
+        """管理对话长度计数；摘要触发由剩余token数量在 AgentRunLoop 中统一处理（剩余token低于20%时触发）。"""
         self.session.conversation_length += get_context_token_count(message)
 
 

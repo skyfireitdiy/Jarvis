@@ -645,8 +645,9 @@ def execute_code_review(
 
             try:
                 # Check if content is too large
+                platform = agent.model if agent and agent.model else None
                 is_large_content = is_context_overflow(
-                    diff_output, model_group
+                    diff_output, model_group, platform
                 )
 
                 # Upload the file to the agent's model
