@@ -309,8 +309,8 @@ def load_methodology(
         
         # 回退方案：使用输入窗口的2/3
         if methodology_token_limit is None:
-            max_input_tokens = get_max_input_token_count()
-            methodology_token_limit = int(max_input_tokens * 2 / 3)
+        max_input_tokens = get_max_input_token_count()
+        methodology_token_limit = int(max_input_tokens * 2 / 3)
 
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
         # 首先构建基础提示词部分

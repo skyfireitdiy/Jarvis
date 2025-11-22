@@ -89,6 +89,9 @@ class BasePlatform(ABC):
             print("⚠️ 输入为空白字符串，已忽略本次请求")
             return ""
 
+        # 检查并截断消息以避免超出剩余token限制
+        message = self._truncate_message_if_needed(message)
+
         response = ""
 
         if not self.suppress_output:
@@ -205,21 +208,21 @@ class BasePlatform(ABC):
                     live.update(panel)
                 console.print()
             else:
-                    # Print a clear prefix line before streaming model output (non-pretty mode)
-                    console.print(
-                        f"🤖 模型输出 - {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
-                        soft_wrap=False,
-                    )
-                    for s in self.chat(message):
-                        console.print(s, end="")
-                        response += s
-                        if is_immediate_abort() and get_interrupt():
-                            self._append_session_history(message, response)
-                            return response
-                    console.print()
-                    end_time = time.time()
-                    duration = end_time - start_time
-                    console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
+                # Print a clear prefix line before streaming model output (non-pretty mode)
+                console.print(
+                    f"🤖 模型输出 - {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
+                    soft_wrap=False,
+                )
+                for s in self.chat(message):
+                    console.print(s, end="")
+                    response += s
+                    if is_immediate_abort() and get_interrupt():
+                        self._append_session_history(message, response)
+                        return response
+                console.print()
+                end_time = time.time()
+                duration = end_time - start_time
+                console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
         else:
             for s in self.chat(message):
                 response += s
@@ -434,6 +437,63 @@ class BasePlatform(ABC):
         used_tokens = self.get_used_token_count()
         remaining = max_tokens - used_tokens
         return max(0, remaining)  # 确保返回值不为负数
+
+    def _truncate_message_if_needed(self, message: str) -> str:
+        """如果消息超出剩余token限制，则截断消息
+        
+        参数:
+            message: 原始消息
+            
+        返回:
+            str: 截断后的消息（如果不需要截断则返回原消息）
+        """
+        try:
+            # 获取剩余token数量
+            remaining_tokens = self.get_remaining_token_count()
+            
+            # 如果剩余token为0或负数，返回空消息
+            if remaining_tokens <= 0:
+                print("⚠️ 警告：剩余token为0，无法发送消息")
+                return ""
+            
+            # 计算消息的token数量
+            message_tokens = get_context_token_count(message)
+            
+            # 如果消息token数小于等于剩余token数，不需要截断
+            if message_tokens <= remaining_tokens:
+                return message
+            
+            # 需要截断：保留剩余token的80%用于消息，20%作为安全余量
+            target_tokens = int(remaining_tokens * 0.8)
+            if target_tokens <= 0:
+                print("⚠️ 警告：剩余token不足，无法发送消息")
+                return ""
+            
+            # 估算字符数（1 token ≈ 4字符）
+            target_chars = target_tokens * 4
+            
+            # 如果消息长度小于目标字符数，不需要截断（token估算可能有误差）
+            if len(message) <= target_chars:
+                return message
+            
+            # 截断消息：保留前面的内容，添加截断提示
+            truncated_message = message[:target_chars]
+            # 尝试在最后一个完整句子处截断
+            last_period = truncated_message.rfind('.')
+            last_newline = truncated_message.rfind('\n')
+            last_break = max(last_period, last_newline)
+            
+            if last_break > target_chars * 0.5:  # 如果找到的断点不太靠前
+                truncated_message = truncated_message[:last_break + 1]
+            
+            truncated_message += "\n\n... (消息过长，已截断以避免超出上下文限制)"
+            print(f"⚠️ 警告：消息过长（{message_tokens} tokens），已截断至约 {target_tokens} tokens")
+            
+            return truncated_message
+        except Exception as e:
+            # 如果截断过程中出错，返回原消息（避免阻塞对话）
+            print(f"⚠️ 警告：检查消息长度时出错: {e}，使用原消息")
+            return message
 
     @abstractmethod
     def support_web(self) -> bool:
