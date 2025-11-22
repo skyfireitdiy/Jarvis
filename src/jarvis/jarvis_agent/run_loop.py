@@ -85,7 +85,7 @@ class AgentRunLoop:
                     return interrupt_result
 
                 # 处理工具调用
-                # 广播工具调用前事件（不影响主流程）
+                # 非关键流程：广播工具调用前事件（用于日志、监控等）
                 try:
                     ag.event_bus.emit(
                         BEFORE_TOOL_CALL,
@@ -106,7 +106,25 @@ class AgentRunLoop:
                 
                 ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
-                # 广播工具调用后的事件（不影响主流程）
+                # 关键流程：直接调用 after_tool_call 回调函数
+                try:
+                    # 获取所有订阅了 AFTER_TOOL_CALL 事件的回调
+                    if hasattr(ag.event_bus, "_listeners"):
+                        listeners = ag.event_bus._listeners.get(AFTER_TOOL_CALL, [])
+                        for callback in listeners:
+                            try:
+                                callback(
+                                    agent=ag,
+                                    current_response=current_response,
+                                    need_return=need_return,
+                                    tool_prompt=tool_prompt,
+                                )
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                
+                # 非关键流程：广播工具调用后的事件（用于日志、监控等）
                 try:
                     ag.event_bus.emit(
                         AFTER_TOOL_CALL,

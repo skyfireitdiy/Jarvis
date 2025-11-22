@@ -257,9 +257,16 @@ class Agent:
     def clear_history(self):
         """
         Clears the current conversation history by delegating to the session manager.
-        Emits BEFORE_HISTORY_CLEAR/AFTER_HISTORY_CLEAR and reapplies system prompt to preserve constraints.
+        直接调用关键流程函数，事件总线仅用于非关键流程（如日志、监控等）。
         """
-        # 广播清理历史前事件（不影响主流程）
+        # 关键流程：直接调用 memory_manager 确保记忆提示
+        try:
+            if hasattr(self, "memory_manager"):
+                self.memory_manager._ensure_memory_prompt(agent=self)
+        except Exception:
+            pass
+        
+        # 非关键流程：广播清理历史前事件（用于日志、监控等）
         try:
             self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
         except Exception:
@@ -278,7 +285,7 @@ class Agent:
         except Exception:
             pass
 
-        # 广播清理历史后的事件
+        # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
         except Exception:
@@ -986,13 +993,21 @@ class Agent:
         if summary:
             formatted_summary = self._format_summary_message(summary)
 
+        # 关键流程：直接调用 memory_manager 确保记忆提示
+        try:
+            if hasattr(self, "memory_manager"):
+                self.memory_manager._ensure_memory_prompt(agent=self)
+        except Exception:
+            pass
+        
+        # 非关键流程：广播清理历史前事件（用于日志、监控等）
+        try:
+            self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
+        except Exception:
+            pass
+
         # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
         if self.model:
-            # 广播清理历史前事件
-            try:
-                self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
-            except Exception:
-                pass
             self.model.reset()
             # 重置后重新设置系统提示词，确保系统约束仍然生效
             self._setup_system_prompt()
@@ -1002,7 +1017,8 @@ class Agent:
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
-        # 广播清理历史后的事件
+        
+        # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
         except Exception:
@@ -1012,17 +1028,26 @@ class Agent:
 
     def _handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""
-        # 广播清理历史前事件
+        # 关键流程：直接调用 memory_manager 确保记忆提示
+        try:
+            if hasattr(self, "memory_manager"):
+                self.memory_manager._ensure_memory_prompt(agent=self)
+        except Exception:
+            pass
+        
+        # 非关键流程：广播清理历史前事件（用于日志、监控等）
         try:
             self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
         except Exception:
             pass
+        
         result = self.file_methodology_manager.handle_history_with_file_upload()
         # 重置 addon_prompt 跳过轮数计数器
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
-        # 广播清理历史后的事件
+        
+        # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
         except Exception:
@@ -1074,8 +1099,21 @@ class Agent:
             safe_summary_prompt = self.summary_prompt or ""
             if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() == "":
                 safe_summary_prompt = DEFAULT_SUMMARY_PROMPT
-            # 注意：不要写回 session.prompt，避免 BEFORE_SUMMARY 事件回调修改/清空后导致使用空prompt
-            # 广播将要生成总结事件
+            # 注意：不要写回 session.prompt，避免回调修改/清空后导致使用空prompt
+            
+            # 关键流程：直接调用 task_analyzer 执行任务分析
+            try:
+                if hasattr(self, "task_analyzer"):
+                    self.task_analyzer._on_before_summary(
+                        agent=self,
+                        prompt=safe_summary_prompt,
+                        auto_completed=auto_completed,
+                        need_summary=self.need_summary,
+                    )
+            except Exception:
+                pass
+            
+            # 非关键流程：广播将要生成总结事件（用于日志、监控等）
             try:
                 self.event_bus.emit(
                     BEFORE_SUMMARY,
@@ -1100,7 +1138,7 @@ class Agent:
                 ret = ""
             result = ret
 
-            # 广播完成总结事件
+            # 非关键流程：广播完成总结事件（用于日志、监控等）
             try:
                 self.event_bus.emit(
                     AFTER_SUMMARY,
@@ -1110,7 +1148,28 @@ class Agent:
             except Exception:
                 pass
 
-        # 广播任务完成事件（不影响主流程）
+            # 关键流程：直接调用 task_analyzer 和 memory_manager
+        try:
+            if hasattr(self, "task_analyzer"):
+                self.task_analyzer._on_task_completed(
+                    agent=self,
+                    auto_completed=auto_completed,
+                    need_summary=self.need_summary,
+                )
+        except Exception:
+            pass
+        
+        try:
+            if hasattr(self, "memory_manager"):
+                self.memory_manager._ensure_memory_prompt(
+                    agent=self,
+                    auto_completed=auto_completed,
+                    need_summary=self.need_summary,
+                )
+        except Exception:
+            pass
+        
+        # 非关键流程：广播任务完成事件（用于日志、监控等）
         try:
             self.event_bus.emit(
                 TASK_COMPLETED,
@@ -1185,7 +1244,20 @@ class Agent:
         self.session.prompt = f"{user_input}"
         try:
             set_agent(self.name, self)
-            # 广播任务开始事件（不影响主流程）
+            
+            # 关键流程：直接调用 memory_manager 重置任务状态
+            try:
+                if hasattr(self, "memory_manager"):
+                    self.memory_manager._on_task_started(
+                        agent=self,
+                        name=self.name,
+                        description=self.description,
+                        user_input=self.session.prompt,
+                    )
+            except Exception:
+                pass
+            
+            # 非关键流程：广播任务开始事件（用于日志、监控等）
             try:
                 self.event_bus.emit(
                     TASK_STARTED,
