@@ -238,7 +238,7 @@ def call_tool(
 
 def cli():
     """Typer application entry point"""
-    init_env("欢迎使用 Jarvis-Tools，您的工具系统已准备就绪！")
+    init_env()
     app()
 
 

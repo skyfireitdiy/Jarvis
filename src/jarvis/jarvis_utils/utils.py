@@ -901,7 +901,7 @@ def _show_usage_stats(welcome_str: str) -> None:
         print(f"❌ {traceback.format_exc()}")
 
 
-def init_env(welcome_str: str, config_file: Optional[str] = None) -> None:
+def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
     """初始化Jarvis环境
 
     参数:

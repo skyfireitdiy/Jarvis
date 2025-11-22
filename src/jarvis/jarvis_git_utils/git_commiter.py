@@ -420,7 +420,7 @@ def cli(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
-    init_env("欢迎使用 Jarvis-GitCommitTool，您的Git提交助手已准备就绪！")
+    init_env()
     tool = GitCommitTool()
     tool.execute(
         {

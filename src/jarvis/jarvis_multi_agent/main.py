@@ -38,7 +38,7 @@ def cli(
     if non_interactive and not (user_input and str(user_input).strip()):
         print("❌ 非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。")
         raise typer.Exit(code=2)
-    init_env("欢迎使用 Jarvis-MultiAgent，您的多智能体系统已准备就绪！")
+    init_env()
     
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:

@@ -504,7 +504,7 @@ def role_command(
 
 def main() -> None:
     """Jarvis平台管理器的主入口点。"""
-    init_env("欢迎使用 Jarvis-PlatformManager，您的平台管理助手已准备就绪！")
+    init_env()
     app()
 
 

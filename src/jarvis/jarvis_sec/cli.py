@@ -56,7 +56,7 @@ def agent(
 ) -> None:
     # 初始化环境，确保平台/模型等全局配置就绪（避免 NoneType 平台）
     try:
-        init_env("欢迎使用 Jarvis 安全套件！", None)
+        init_env()
     except Exception:
         # 环境初始化失败不应阻塞CLI基础功能，继续后续流程
         pass
