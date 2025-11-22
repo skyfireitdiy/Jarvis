@@ -303,9 +303,12 @@ class BasePlatform(ABC):
             end_time = time.time()
             duration = end_time - start_time
             self._update_panel_subtitle_with_token(panel, response, is_completed=True, duration=duration)
+            # 最后更新 panel，Live 上下文退出时会自动打印（transient=False）
             live.update(panel)
-            console.print()
+            # 注意：不要在这里调用 console.print()，因为 Live 退出时会自动打印 panel
 
+        # Live 退出后添加空行分隔
+        console.print()
         return response
 
     def _chat_with_simple_output(self, message: str, start_time: float) -> str:
