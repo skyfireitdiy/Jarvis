@@ -803,14 +803,14 @@ class ToolRegistry(OutputHandlerProtocol):
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 error_msg = f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}{long_hint}"
                 
-                # 如果提供了agent，尝试使用大模型修复
-                if agent is not None:
+                # 如果提供了agent且long_hint为空，尝试使用大模型修复
+                if agent is not None and not long_hint:
                     fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
                     if fixed_content:
                         # 递归调用自身，尝试解析修复后的内容
                         return ToolRegistry._extract_tool_calls(fixed_content, None)
                 
-                # 如果大模型修复失败或未提供agent，返回错误
+                # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
                     {},
                     error_msg,
@@ -831,14 +831,14 @@ class ToolRegistry(OutputHandlerProtocol):
 
 {tool_call_help}{long_hint}"""
                 
-                # 如果提供了agent，尝试使用大模型修复
-                if agent is not None:
+                # 如果提供了agent且long_hint为空，尝试使用大模型修复
+                if agent is not None and not long_hint:
                     fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
                     if fixed_content:
                         # 递归调用自身，尝试解析修复后的内容
                         return ToolRegistry._extract_tool_calls(fixed_content, None)
                 
-                # 如果大模型修复失败或未提供agent，返回错误
+                # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
                     {},
                     error_msg,
@@ -853,14 +853,14 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 {tool_call_help}{long_hint}"""
                 
-                # 如果提供了agent，尝试使用大模型修复
-                if agent is not None:
+                # 如果提供了agent且long_hint为空，尝试使用大模型修复
+                if agent is not None and not long_hint:
                     fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
                     if fixed_content:
                         # 递归调用自身，尝试解析修复后的内容
                         return ToolRegistry._extract_tool_calls(fixed_content, None)
                 
-                # 如果大模型修复失败或未提供agent，返回错误
+                # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
                     {},
                     error_msg,
