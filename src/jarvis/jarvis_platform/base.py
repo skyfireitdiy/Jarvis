@@ -149,9 +149,41 @@ class BasePlatform(ABC):
                                 [line.plain for line in lines[-max_text_height:]]
                             )
 
-                        panel.subtitle = (
-                            "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
-                        )
+                        # 计算并显示 token 使用百分比
+                        try:
+                            # 计算当前使用的 token（消息 + 已生成的响应）
+                            message_tokens = get_context_token_count(message)
+                            response_tokens = get_context_token_count(response)
+                            total_tokens = message_tokens + response_tokens
+                            
+                            # 获取最大输入 token 数量
+                            max_tokens = get_max_input_token_count(self.model_group)
+                            
+                            # 计算使用百分比
+                            if max_tokens > 0:
+                                usage_percent = (total_tokens / max_tokens) * 100
+                                # 根据百分比选择颜色
+                                if usage_percent >= 90:
+                                    percent_color = "red"
+                                elif usage_percent >= 80:
+                                    percent_color = "yellow"
+                                else:
+                                    percent_color = "green"
+                                
+                                panel.subtitle = (
+                                    f"[yellow]正在回答... (按 Ctrl+C 中断) | "
+                                    f"[{percent_color}]Token: {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
+                                )
+                            else:
+                                panel.subtitle = (
+                                    "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                                )
+                        except Exception:
+                            # 如果计算 token 失败，使用默认 subtitle
+                            panel.subtitle = (
+                                "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                            )
+                        
                         live.update(panel)
 
                     # Process first chunk
@@ -204,7 +236,33 @@ class BasePlatform(ABC):
 
                     end_time = time.time()
                     duration = end_time - start_time
-                    panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    
+                    # 计算并显示最终的 token 使用百分比
+                    try:
+                        message_tokens = get_context_token_count(message)
+                        response_tokens = get_context_token_count(response)
+                        total_tokens = message_tokens + response_tokens
+                        max_tokens = get_max_input_token_count(self.model_group)
+                        
+                        if max_tokens > 0:
+                            usage_percent = (total_tokens / max_tokens) * 100
+                            # 根据百分比选择颜色
+                            if usage_percent >= 90:
+                                percent_color = "red"
+                            elif usage_percent >= 80:
+                                percent_color = "yellow"
+                            else:
+                                percent_color = "green"
+                            
+                            panel.subtitle = (
+                                f"[bold green]✓ 对话完成耗时: {duration:.2f}秒 | "
+                                f"[{percent_color}]Token: {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
+                            )
+                        else:
+                            panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    except Exception:
+                        panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    
                     live.update(panel)
                 console.print()
             else:
