@@ -29,6 +29,9 @@ class TestReadCodeTool:
         # 显式设置 model_group 为 None，避免 MagicMock 自动创建属性
         agent.model_group = None
         
+        # 显式设置 model 为 None，避免 MagicMock 自动创建属性导致 get_remaining_token_count 返回 MagicMock
+        agent.model = None
+        
         def get_user_data(key):
             return agent._user_data.get(key)
         
