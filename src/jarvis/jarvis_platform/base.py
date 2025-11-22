@@ -109,6 +109,252 @@ class BasePlatform(ABC):
         
         return f"[{color}]{bar}[/{color}]"
 
+    def _get_token_usage_info(self, current_response: str = "") -> Tuple[float, str, str]:
+        """获取 token 使用信息
+        
+        参数:
+            current_response: 当前响应内容（用于计算流式输出时的 token）
+            
+        返回:
+            Tuple[float, str, str]: (usage_percent, percent_color, progress_bar)
+        """
+        try:
+            history_tokens = self.get_used_token_count()
+            current_response_tokens = get_context_token_count(current_response)
+            total_tokens = history_tokens + current_response_tokens
+            max_tokens = get_max_input_token_count(self.model_group)
+            
+            if max_tokens > 0:
+                usage_percent = (total_tokens / max_tokens) * 100
+                if usage_percent >= 90:
+                    percent_color = "red"
+                elif usage_percent >= 80:
+                    percent_color = "yellow"
+                else:
+                    percent_color = "green"
+                progress_bar = self._format_progress_bar(usage_percent, width=15)
+                return usage_percent, percent_color, progress_bar
+            return 0.0, "green", ""
+        except Exception:
+            return 0.0, "green", ""
+
+    def _update_panel_subtitle_with_token(
+        self, panel: Panel, response: str, is_completed: bool = False, duration: float = 0.0
+    ) -> None:
+        """更新面板的 subtitle，包含 token 使用信息
+        
+        参数:
+            panel: 要更新的面板
+            response: 当前响应内容
+            is_completed: 是否已完成
+            duration: 耗时（秒）
+        """
+        try:
+            usage_percent, percent_color, progress_bar = self._get_token_usage_info(response)
+            max_tokens = get_max_input_token_count(self.model_group)
+            total_tokens = self.get_used_token_count() + get_context_token_count(response)
+            
+            if is_completed:
+                if max_tokens > 0 and progress_bar:
+                    panel.subtitle = (
+                        f"[bold green]✓ 对话完成耗时: {duration:.2f}秒 | "
+                        f"Token: {progress_bar} "
+                        f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
+                    )
+                else:
+                    panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+            else:
+                if max_tokens > 0 and progress_bar:
+                    panel.subtitle = (
+                        f"[yellow]正在回答... (按 Ctrl+C 中断) | "
+                        f"Token: {progress_bar} "
+                        f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
+                    )
+                else:
+                    panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+        except Exception:
+            if is_completed:
+                panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+            else:
+                panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+
+    def _chat_with_pretty_output(self, message: str, start_time: float) -> str:
+        """使用 pretty output 模式进行聊天
+        
+        参数:
+            message: 用户消息
+            start_time: 开始时间
+            
+        返回:
+            str: 模型响应
+        """
+        import time
+        
+        chat_iterator = self.chat(message)
+        first_chunk = None
+
+        with Status(
+            f"🤔 {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()} 正在思考中...",
+            spinner="dots",
+            console=console,
+        ):
+            try:
+                while True:
+                    first_chunk = next(chat_iterator)
+                    if first_chunk:
+                        break
+            except StopIteration:
+                self._append_session_history(message, "")
+                return ""
+
+        text_content = Text(overflow="fold")
+        panel = Panel(
+            text_content,
+            title=f"[bold cyan]{(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}[/bold cyan]",
+            subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
+            border_style="bright_blue",
+            box=box.ROUNDED,
+            expand=True,
+        )
+
+        response = ""
+        with Live(panel, refresh_per_second=4, transient=False) as live:
+            def _update_panel_content(content: str):
+                nonlocal response
+                text_content.append(content, style="bright_white")
+                
+                # Scrolling Logic
+                max_text_height = console.height - 5
+                if max_text_height <= 0:
+                    max_text_height = 1
+
+                lines = text_content.wrap(
+                    console,
+                    console.width - 4 if console.width > 4 else 1,
+                )
+
+                if len(lines) > max_text_height:
+                    text_content.plain = "\n".join(
+                        [line.plain for line in lines[-max_text_height:]]
+                    )
+
+                # 更新 token 使用信息
+                self._update_panel_subtitle_with_token(panel, response, is_completed=False)
+                live.update(panel)
+
+            # Process first chunk
+            response += first_chunk
+            if first_chunk:
+                _update_panel_content(first_chunk)
+
+            # 缓存机制：降低更新频率，减少界面闪烁
+            buffer = ""
+            last_update_time = time.time()
+            update_interval = 1
+            min_buffer_size = 5
+
+            def _flush_buffer():
+                nonlocal buffer, last_update_time
+                if buffer:
+                    _update_panel_content(buffer)
+                    buffer = ""
+                    last_update_time = time.time()
+
+            # Process rest of the chunks
+            for s in chat_iterator:
+                if not s:
+                    continue
+                response += s
+                buffer += s
+
+                current_time = time.time()
+                should_update = (
+                    len(buffer) >= min_buffer_size
+                    or (current_time - last_update_time) >= update_interval
+                )
+
+                if should_update:
+                    _flush_buffer()
+
+                if is_immediate_abort() and get_interrupt():
+                    _flush_buffer()
+                    self._append_session_history(message, response)
+                    return response
+
+            _flush_buffer()
+            text_content.plain = response
+
+            end_time = time.time()
+            duration = end_time - start_time
+            self._update_panel_subtitle_with_token(panel, response, is_completed=True, duration=duration)
+            live.update(panel)
+            console.print()
+
+        return response
+
+    def _chat_with_simple_output(self, message: str, start_time: float) -> str:
+        """使用简单输出模式进行聊天
+        
+        参数:
+            message: 用户消息
+            start_time: 开始时间
+            
+        返回:
+            str: 模型响应
+        """
+        import time
+        
+        console.print(
+            f"🤖 模型输出 - {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
+            soft_wrap=False,
+        )
+        response = ""
+        for s in self.chat(message):
+            console.print(s, end="")
+            response += s
+            if is_immediate_abort() and get_interrupt():
+                self._append_session_history(message, response)
+                return response
+        console.print()
+        end_time = time.time()
+        duration = end_time - start_time
+        console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
+        return response
+
+    def _chat_with_suppressed_output(self, message: str) -> str:
+        """使用静默模式进行聊天
+        
+        参数:
+            message: 用户消息
+            
+        返回:
+            str: 模型响应
+        """
+        response = ""
+        for s in self.chat(message):
+            response += s
+            if is_immediate_abort() and get_interrupt():
+                self._append_session_history(message, response)
+                return response
+        return response
+
+    def _process_response(self, response: str) -> str:
+        """处理响应，移除 think 标签
+        
+        参数:
+            response: 原始响应
+            
+        返回:
+            str: 处理后的响应
+        """
+        response = re.sub(
+            ot("think") + r".*?" + ct("think"), "", response, flags=re.DOTALL
+        )
+        response = re.sub(
+            ot("thinking") + r".*?" + ct("thinking"), "", response, flags=re.DOTALL
+        )
+        return response
+
     def _chat(self, message: str):
         import time
 
@@ -122,226 +368,17 @@ class BasePlatform(ABC):
         # 检查并截断消息以避免超出剩余token限制
         message = self._truncate_message_if_needed(message)
 
-        response = ""
-
+        # 根据输出模式选择不同的处理方式
         if not self.suppress_output:
             if get_pretty_output():
-                    chat_iterator = self.chat(message)
-                    first_chunk = None
-
-                    with Status(
-                        f"🤔 {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()} 正在思考中...",
-                        spinner="dots",
-                        console=console,
-                    ):
-                        try:
-                            while True:
-                                first_chunk = next(chat_iterator)
-                                if first_chunk:
-                                    break
-                        except StopIteration:
-                            self._append_session_history(message, "")
-                            return ""
-
-                    text_content = Text(overflow="fold")
-                    panel = Panel(
-                        text_content,
-                        title=f"[bold cyan]{(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}[/bold cyan]",
-                        subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
-                        border_style="bright_blue",
-                        box=box.ROUNDED,
-                        expand=True,  # 允许面板自动调整大小
-                    )
-
-                    with Live(panel, refresh_per_second=4, transient=False) as live:
-                        def _update_panel_content(content: str):
-                            nonlocal response  # 确保可以访问和更新 response
-                            text_content.append(content, style="bright_white")
-                            # --- Scrolling Logic ---
-                            # Calculate available height in the panel
-                            max_text_height = (
-                                console.height - 5
-                            )  # Leave space for borders/titles
-                            if max_text_height <= 0:
-                                max_text_height = 1
-
-                            # Get the actual number of lines the text will wrap to
-                            lines = text_content.wrap(
-                                console,
-                                console.width - 4 if console.width > 4 else 1,
-                            )
-
-                            # If content overflows, truncate to show only the last few lines
-                            if len(lines) > max_text_height:
-                                # Rebuild the text from the wrapped lines to ensure visual consistency
-                                # This correctly handles both wrapped long lines and explicit newlines
-                                text_content.plain = "\n".join(
-                                    [line.plain for line in lines[-max_text_height:]]
-                                )
-
-                            # 计算并显示 token 使用百分比（在每次更新时重新计算，使用最新的 response）
-                            try:
-                                # 获取历史对话已使用的 token（不包括当前正在生成的响应）
-                                # 注意：get_used_token_count() 返回的是 self.messages 中的历史消息 token
-                                # 当前正在生成的响应还没有被添加到 messages 中
-                                history_tokens = self.get_used_token_count()
-                                # 计算当前响应的 token（使用最新的 response 值）
-                                # response 在闭包中会随着流式输出不断更新
-                                current_response_tokens = get_context_token_count(response)
-                                # 总 token = 历史对话 token + 当前响应 token
-                                total_tokens = history_tokens + current_response_tokens
-                                
-                                # 获取最大输入 token 数量
-                                max_tokens = get_max_input_token_count(self.model_group)
-                                
-                                # 计算使用百分比
-                                if max_tokens > 0:
-                                    usage_percent = (total_tokens / max_tokens) * 100
-                                    # 根据百分比选择颜色
-                                    if usage_percent >= 90:
-                                        percent_color = "red"
-                                    elif usage_percent >= 80:
-                                        percent_color = "yellow"
-                                    else:
-                                        percent_color = "green"
-                                    
-                                    # 生成进度条
-                                    progress_bar = self._format_progress_bar(usage_percent, width=15)
-                                    
-                                    panel.subtitle = (
-                                        f"[yellow]正在回答... (按 Ctrl+C 中断) | "
-                                        f"Token: {progress_bar} "
-                                        f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
-                                    )
-                                else:
-                                    panel.subtitle = (
-                                        "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
-                                    )
-                            except Exception:
-                                # 如果计算 token 失败，使用默认 subtitle
-                                panel.subtitle = (
-                                    "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
-                                )
-                            
-                            live.update(panel)
-
-                        # Process first chunk
-                        response += first_chunk
-                        if first_chunk:
-                            _update_panel_content(first_chunk)
-
-                        # 缓存机制：降低更新频率，减少界面闪烁
-                        buffer = ""  # 内容缓存
-                        last_update_time = time.time()  # 上次更新时间
-                        update_interval = 1  # 最小更新间隔（秒）
-                        min_buffer_size = 5  # 最小缓存大小（字符数）
-
-                        def _flush_buffer():
-                            """刷新缓存内容到面板"""
-                            nonlocal buffer, last_update_time
-                            if buffer:
-                                _update_panel_content(buffer)
-                                buffer = ""
-                                last_update_time = time.time()
-
-                        # Process rest of the chunks
-                        for s in chat_iterator:
-                            if not s:
-                                continue
-                            response += s  # Accumulate the full response string
-                            buffer += s  # 累积到缓存
-
-                            # 检查是否需要更新：缓存达到阈值或超过时间间隔
-                            current_time = time.time()
-                            should_update = (
-                                len(buffer) >= min_buffer_size
-                                or (current_time - last_update_time) >= update_interval
-                            )
-
-                            if should_update:
-                                _flush_buffer()
-
-                            if is_immediate_abort() and get_interrupt():
-                                # 中断时也要刷新剩余缓存
-                                _flush_buffer()
-                                self._append_session_history(message, response)
-                                return response  # Return the partial response immediately
-
-                        # 循环结束时，刷新所有剩余缓存内容
-                        _flush_buffer()
-
-                        # At the end, display the entire response
-                        text_content.plain = response
-
-                        end_time = time.time()
-                        duration = end_time - start_time
-                    
-                    # 计算并显示最终的 token 使用百分比
-                    # 注意：此时响应还未被添加到历史中，所以需要单独计算
-                    try:
-                        # 获取历史对话已使用的 token（包括历史消息和当前消息）
-                        history_tokens = self.get_used_token_count()
-                        # 计算当前响应的 token
-                        response_tokens = get_context_token_count(response)
-                        # 总 token = 历史对话 token + 当前响应 token
-                        total_tokens = history_tokens + response_tokens
-                        max_tokens = get_max_input_token_count(self.model_group)
-                        
-                        if max_tokens > 0:
-                            usage_percent = (total_tokens / max_tokens) * 100
-                            # 根据百分比选择颜色
-                            if usage_percent >= 90:
-                                percent_color = "red"
-                            elif usage_percent >= 80:
-                                percent_color = "yellow"
-                            else:
-                                percent_color = "green"
-                            
-                            # 生成进度条
-                            progress_bar = self._format_progress_bar(usage_percent, width=15)
-                            
-                            panel.subtitle = (
-                                f"[bold green]✓ 对话完成耗时: {duration:.2f}秒 | "
-                                f"Token: {progress_bar} "
-                                f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
-                            )
-                        else:
-                            panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
-                    except Exception:
-                        panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
-                    
-                    live.update(panel)
-                    console.print()
+                response = self._chat_with_pretty_output(message, start_time)
             else:
-                    # Print a clear prefix line before streaming model output (non-pretty mode)
-                    console.print(
-                        f"🤖 模型输出 - {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
-                        soft_wrap=False,
-                    )
-                    for s in self.chat(message):
-                        console.print(s, end="")
-                        response += s
-                        if is_immediate_abort() and get_interrupt():
-                            self._append_session_history(message, response)
-                            return response
-                    console.print()
-                    end_time = time.time()
-                    duration = end_time - start_time
-                    console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
+                response = self._chat_with_simple_output(message, start_time)
         else:
-            for s in self.chat(message):
-                response += s
-                if is_immediate_abort() and get_interrupt():
-                    self._append_session_history(message, response)
-                    return response
-        # Keep original think tag handling
-        response = re.sub(
-            ot("think") + r".*?" + ct("think"), "", response, flags=re.DOTALL
-        )
-        response = re.sub(
-            ot("thinking") + r".*?" + ct("thinking"), "", response, flags=re.DOTALL
-        )
-        # Save session history (input and full response)
+            response = self._chat_with_suppressed_output(message)
+
+        # 处理响应并保存会话历史
+        response = self._process_response(response)
         self._append_session_history(message, response)
         return response
 
