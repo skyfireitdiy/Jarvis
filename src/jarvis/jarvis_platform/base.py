@@ -151,10 +151,12 @@ class BasePlatform(ABC):
 
                         # 计算并显示 token 使用百分比
                         try:
-                            # 计算当前使用的 token（消息 + 已生成的响应）
-                            message_tokens = get_context_token_count(message)
+                            # 获取历史对话已使用的 token（包括历史消息和当前消息）
+                            history_tokens = self.get_used_token_count()
+                            # 计算当前响应的 token
                             response_tokens = get_context_token_count(response)
-                            total_tokens = message_tokens + response_tokens
+                            # 总 token = 历史对话 token + 当前响应 token
+                            total_tokens = history_tokens + response_tokens
                             
                             # 获取最大输入 token 数量
                             max_tokens = get_max_input_token_count(self.model_group)
@@ -238,10 +240,14 @@ class BasePlatform(ABC):
                     duration = end_time - start_time
                     
                     # 计算并显示最终的 token 使用百分比
+                    # 注意：此时响应还未被添加到历史中，所以需要单独计算
                     try:
-                        message_tokens = get_context_token_count(message)
+                        # 获取历史对话已使用的 token（包括历史消息和当前消息）
+                        history_tokens = self.get_used_token_count()
+                        # 计算当前响应的 token
                         response_tokens = get_context_token_count(response)
-                        total_tokens = message_tokens + response_tokens
+                        # 总 token = 历史对话 token + 当前响应 token
+                        total_tokens = history_tokens + response_tokens
                         max_tokens = get_max_input_token_count(self.model_group)
                         
                         if max_tokens > 0:
