@@ -7,6 +7,8 @@ Rust构建验证器模块
 提供Rust项目的构建验证功能。
 """
 
+import os
+import subprocess
 import time
 from typing import List, Optional
 
@@ -23,9 +25,47 @@ class RustBuildValidator(BuildValidatorBase):
         start_time = time.time()
         
         # 使用 cargo test 进行构建和测试验证（会自动编译并运行测试）
+        # 设置 RUST_BACKTRACE=1 以启用调用链回溯
+        # 设置 RUSTFLAGS="-A warnings" 以屏蔽警告，只显示错误
         cmd = ["cargo", "test", "--", "--nocapture"]
         
-        returncode, stdout, stderr = self._run_command(cmd)
+        # 准备环境变量（继承当前环境并设置 RUST_BACKTRACE 和 RUSTFLAGS）
+        env = os.environ.copy()
+        env["RUST_BACKTRACE"] = "1"
+        # 如果已存在 RUSTFLAGS，则追加；否则新建
+        if "RUSTFLAGS" in env:
+            env["RUSTFLAGS"] = env["RUSTFLAGS"] + " -A warnings"
+        else:
+            env["RUSTFLAGS"] = "-A warnings"
+        
+        # 直接使用 subprocess.run 以支持环境变量
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=self.project_root,
+                timeout=self.timeout,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=env,
+            )
+            returncode = result.returncode
+            stdout = result.stdout
+            stderr = result.stderr
+        except subprocess.TimeoutExpired:
+            returncode = -1
+            stdout = ""
+            stderr = f"命令执行超时（{self.timeout}秒）"
+        except FileNotFoundError:
+            returncode = -1
+            stdout = ""
+            stderr = f"命令未找到: {cmd[0]}"
+        except Exception as e:
+            returncode = -1
+            stdout = ""
+            stderr = f"执行命令时出错: {str(e)}"
+        
         duration = time.time() - start_time
         
         success = returncode == 0
