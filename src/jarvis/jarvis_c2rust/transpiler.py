@@ -1667,15 +1667,32 @@ class Transpiler:
             (是否成功, 是否需要回退重新开始，None表示需要回退)
         """
         # 测试失败时需要详细输出，移除 -q 参数以获取完整的测试失败信息（包括堆栈跟踪、断言详情等）
-        res_test = subprocess.run(
-            ["cargo", "test", "--", "--nocapture"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            check=False,
-            cwd=workspace_root,
-        )
-        if res_test.returncode == 0:
+        try:
+            res_test = subprocess.run(
+                ["cargo", "test", "--", "--nocapture"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+                cwd=workspace_root,
+            )
+            returncode = res_test.returncode
+            stdout = res_test.stdout or ""
+            stderr = res_test.stderr or ""
+        except subprocess.TimeoutExpired as e:
+            # 超时视为测试失败，继续修复流程
+            returncode = -1
+            stdout = e.stdout.decode("utf-8", errors="replace") if e.stdout else ""
+            stderr = f"命令执行超时（30秒）\n" + (e.stderr.decode("utf-8", errors="replace") if e.stderr else "")
+            typer.secho(f"[c2rust-transpiler][build] Cargo 测试超时（30秒），视为失败并继续修复流程", fg=typer.colors.YELLOW)
+        except Exception as e:
+            # 其他异常也视为测试失败
+            returncode = -1
+            stdout = ""
+            stderr = f"执行 cargo test 时发生异常: {str(e)}"
+            typer.secho(f"[c2rust-transpiler][build] Cargo 测试执行异常: {e}，视为失败并继续修复流程", fg=typer.colors.YELLOW)
+        
+        if returncode == 0:
             typer.secho("[c2rust-transpiler][build] Cargo 测试通过。", fg=typer.colors.GREEN)
             # 测试通过，重置连续失败计数
             self._consecutive_fix_failures = 0
@@ -1693,7 +1710,7 @@ class Transpiler:
             return (True, False)
 
         # 测试失败
-        output = (res_test.stdout or "") + "\n" + (res_test.stderr or "")
+        output = stdout + "\n" + stderr
         limit_info = f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})" if test_iter % 10 == 0 or test_iter == 1 else ""
         typer.secho(f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试{limit_info})。", fg=typer.colors.RED)
         typer.secho(output, fg=typer.colors.RED)
@@ -1773,14 +1790,32 @@ class Transpiler:
             return (False, False)  # 需要继续循环
         
         # 第二步：编译通过，实际运行测试验证
-        res_test_verify = subprocess.run(
-            ["cargo", "test", "--", "--nocapture"],
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=workspace_root,
-        )
-        if res_test_verify.returncode == 0:
+        try:
+            res_test_verify = subprocess.run(
+                ["cargo", "test", "--", "--nocapture"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+                cwd=workspace_root,
+            )
+            verify_returncode = res_test_verify.returncode
+            verify_stdout = res_test_verify.stdout or ""
+            verify_stderr = res_test_verify.stderr or ""
+        except subprocess.TimeoutExpired as e:
+            # 超时视为测试失败
+            verify_returncode = -1
+            verify_stdout = e.stdout.decode("utf-8", errors="replace") if e.stdout else ""
+            verify_stderr = f"命令执行超时（30秒）\n" + (e.stderr.decode("utf-8", errors="replace") if e.stderr else "")
+            typer.secho(f"[c2rust-transpiler][build] 修复后验证测试超时（30秒），视为失败", fg=typer.colors.YELLOW)
+        except Exception as e:
+            # 其他异常也视为测试失败
+            verify_returncode = -1
+            verify_stdout = ""
+            verify_stderr = f"执行 cargo test 验证时发生异常: {str(e)}"
+            typer.secho(f"[c2rust-transpiler][build] 修复后验证测试执行异常: {e}，视为失败", fg=typer.colors.YELLOW)
+        
+        if verify_returncode == 0:
             typer.secho("[c2rust-transpiler][build] 修复后测试通过，继续构建循环", fg=typer.colors.GREEN)
             # 测试真正通过，重置连续失败计数
             self._consecutive_fix_failures = 0
