@@ -930,6 +930,7 @@ class Agent:
             if not self.model:
                 raise RuntimeError("Model not initialized")
             # 优先使用外部传入的 summary_prompt；如为空则回退到默认的会话摘要请求
+            print("🔍 开始生成对话历史摘要...")
             safe_summary_prompt = self.summary_prompt or ""
             if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() != "":
                 prompt_to_use = safe_summary_prompt
@@ -966,9 +967,6 @@ class Agent:
         注意:
             当上下文长度超过最大值时使用
         """
-        # 在清理历史之前，提示用户保存重要记忆（事件驱动触发实际保存）
-        if self.force_save_memory:
-            print("ℹ️ 对话历史即将被总结和清理，请先保存重要信息...")
 
         if self._should_use_file_upload():
             return self._handle_history_with_file_upload()
