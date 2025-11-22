@@ -33,6 +33,7 @@ from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, get_diff_between_commits
 from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_platform.registry import PlatformRegistry
 
 from jarvis.jarvis_c2rust.constants import (
     C2RUST_DIRNAME,
@@ -1861,9 +1862,26 @@ class Transpiler:
                         commit_diff = get_diff_between_commits(self._current_function_start_commit, current_commit)
                         if commit_diff and not commit_diff.startswith("获取") and not commit_diff.startswith("发生"):
                             # 成功获取diff，限制长度避免上下文过大
-                            # 使用最大输入token数量的一半作为字符限制（1 token ≈ 4字符，所以 token/2 * 4 = token * 2）
-                            max_input_tokens = get_max_input_token_count(self.llm_group)
-                            max_diff_chars = max_input_tokens * 2  # 最大输入token数量的一半转换为字符数
+                            # 优先使用agent的剩余token数量，回退到输入窗口限制
+                            max_diff_chars = None
+                            try:
+                                # 优先尝试使用已有的agent获取剩余token（更准确，包含对话历史）
+                                review_key = f"review::{rec.id}"
+                                agent = self._current_agents.get(review_key)
+                                if agent:
+                                    remaining_tokens = agent.get_remaining_token_count()
+                                    # 使用剩余token的50%作为字符限制（1 token ≈ 4字符，所以 remaining_tokens * 0.5 * 4 = remaining_tokens * 2）
+                                    max_diff_chars = int(remaining_tokens * 2)
+                                    if max_diff_chars <= 0:
+                                        max_diff_chars = None
+                            except Exception:
+                                pass
+                            
+                            # 回退方案2：使用输入窗口的50%转换为字符数
+                            if max_diff_chars is None:
+                                max_input_tokens = get_max_input_token_count(self.llm_group)
+                                max_diff_chars = max_input_tokens * 2  # 最大输入token数量的一半转换为字符数
+                            
                             if len(commit_diff) > max_diff_chars:
                                 commit_diff = commit_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
                     except Exception as e:

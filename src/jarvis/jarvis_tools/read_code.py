@@ -654,16 +654,28 @@ class ReadCodeTool:
             return get_context_token_count(numbered_content)
     
     def _get_max_token_limit(self, agent: Any = None) -> int:
-        """获取基于最大窗口数量的token限制
+        """获取基于剩余token数量的token限制
         
         Args:
-            agent: Agent实例，用于获取模型组配置
+            agent: Agent实例，用于获取模型和剩余token数量
             
         Returns:
-            int: 允许的最大token数（2/3最大窗口）
+            int: 允许的最大token数（剩余token的2/3，或至少保留1/3剩余token）
         """
         try:
-            # 尝试从agent获取模型组
+            # 优先使用剩余token数量
+            if agent and hasattr(agent, "model"):
+                try:
+                    remaining_tokens = agent.model.get_remaining_token_count()
+                    # 使用剩余token的2/3作为限制，保留1/3作为安全余量
+                    limit_tokens = int(remaining_tokens * 2 / 3)
+                    # 确保至少返回一个合理的值
+                    if limit_tokens > 0:
+                        return limit_tokens
+                except Exception:
+                    pass
+            
+            # 回退方案：使用输入窗口的2/3
             model_group = None
             if agent:
                 model_group = getattr(agent, "model_group", None)

@@ -25,9 +25,9 @@ class AgentRunLoop:
         self.agent = agent
         self.conversation_rounds = 0
         self.tool_reminder_rounds = int(os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20))
-        # 基于token数量的自动总结阈值：当对话累计token超过输入窗口的80%时触发
+        # 基于剩余token数量的自动总结阈值：当剩余token低于输入窗口的20%时触发
         max_input_tokens = get_max_input_token_count(self.agent.model_group)
-        self.summary_token_threshold = int(max_input_tokens * 0.8)
+        self.summary_remaining_token_threshold = int(max_input_tokens * 0.2)
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
@@ -40,8 +40,9 @@ class AgentRunLoop:
                     self.agent.session.addon_prompt = join_prompts(
                         [self.agent.session.addon_prompt, self.agent.get_tool_usage_prompt()]
                     )
-                # 基于token数量的自动总结判断：当对话累计token超过输入窗口的80%时触发
-                if self.agent.session.conversation_length >= self.summary_token_threshold:
+                # 基于剩余token数量的自动总结判断：当剩余token低于阈值时触发
+                remaining_tokens = self.agent.model.get_remaining_token_count()
+                if remaining_tokens <= self.summary_remaining_token_threshold:
                     summary_text = self.agent._summarize_and_clear_history()
                     if summary_text:
                         # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
