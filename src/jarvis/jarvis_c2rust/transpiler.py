@@ -1671,6 +1671,7 @@ class Transpiler:
             ["cargo", "test", "--", "--nocapture"],
             capture_output=True,
             text=True,
+            timeout=30,
             check=False,
             cwd=workspace_root,
         )
