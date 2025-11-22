@@ -251,7 +251,7 @@ class BasePlatform(ABC):
             buffer = ""
             last_update_time = time.time()
             update_interval = 1
-            min_buffer_size = 5
+            min_buffer_size = 20
 
             def _flush_buffer():
                 nonlocal buffer, last_update_time
