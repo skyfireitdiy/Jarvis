@@ -555,7 +555,8 @@ class CodeAgent(Agent):
         for key, value in target_settings.items():
             current = current_settings.get(key, "未设置")
             lines.append(f"{key}: {current} -> {value}")
-        print(f"ℹ️ {'\n'.join(lines)}")
+        joined_lines = '\n'.join(lines)
+        print(f"ℹ️ {joined_lines}")
 
         # 直接执行设置，不需要用户确认
         for key, value in target_settings.items():

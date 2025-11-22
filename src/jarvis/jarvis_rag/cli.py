@@ -255,7 +255,8 @@ def add_documents(
             # 当批处理已满或是最后一个文件时处理批处理
             if docs_batch and (len(docs_batch) >= batch_size or (i + 1) == total_files):
                 if loaded_msgs:
-                    print(f"ℹ️ {'\n'.join(loaded_msgs)}")
+                    joined_msgs = '\n'.join(loaded_msgs)
+                    print(f"ℹ️ {joined_msgs}")
                     loaded_msgs = []
                 print(
                     f"ℹ️ 正在处理批次，包含 {len(docs_batch)} 个文档..."
@@ -328,7 +329,8 @@ def list_documents(
         lines = [f"知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:"]
         for i, source in enumerate(sorted(list(sources)), 1):
             lines.append(f"  {i}. {source}")
-        print(f"ℹ️ {'\n'.join(lines)}")
+        joined_lines = '\n'.join(lines)
+        print(f"ℹ️ {joined_lines}")
 
     except Exception as e:
         print(f"❌ 发生错误: {e}")

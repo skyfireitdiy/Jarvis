@@ -51,8 +51,9 @@ class FileAnalyzerTool:
                 else:
                     missing_files.append(file_path)
             if missing_files:
+                missing_list = '\n'.join(f'  - {p}' for p in missing_files)
                 print(
-                    f"⚠️ 以下文件不存在:\n{'\n'.join(f'  - {p}' for p in missing_files)}"
+                    f"⚠️ 以下文件不存在:\n{missing_list}"
                 )
 
             if not valid_files:

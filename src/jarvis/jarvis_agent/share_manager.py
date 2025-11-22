@@ -169,7 +169,8 @@ class ShareManager(ABC):
             resource_list.append(f"[{i}] {self.format_resource_display(resource)}")
 
         # 一次性打印所有资源
-        print(f"ℹ️ {'\n'.join(resource_list)}")
+        joined_resources = '\n'.join(resource_list)
+        print(f"ℹ️ {joined_resources}")
 
         # 让用户选择
         while True:

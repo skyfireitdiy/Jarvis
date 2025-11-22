@@ -211,7 +211,8 @@ class SSEMcpClient(McpClient):
                         except Exception as e:
                             error_lines.append(f"处理通知时出错 ({method}): {e}")
                     if error_lines:
-                        print(f"❌ {'\n'.join(error_lines)}")
+                        joined_errors = '\n'.join(error_lines)
+                        print(f"❌ {joined_errors}")
         except Exception:
             print(f"⚠️ 无法解析SSE事件: {data}")
 

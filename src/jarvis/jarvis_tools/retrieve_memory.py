@@ -133,8 +133,8 @@ class RetrieveMemoryTool:
             
             # 回退方案：使用输入窗口的2/3
             if memory_token_limit is None:
-            max_input_tokens = get_max_input_token_count()
-            memory_token_limit = int(max_input_tokens * 2 / 3)
+                max_input_tokens = get_max_input_token_count()
+                memory_token_limit = int(max_input_tokens * 2 / 3)
 
             # 基于token限制和条数限制筛选记忆
             filtered_memories: List[Dict[str, Any]] = []

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
-import json
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
 

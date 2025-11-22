@@ -33,7 +33,6 @@ from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, get_diff_between_commits
 from jarvis.jarvis_utils.config import get_max_input_token_count
-from jarvis.jarvis_platform.registry import PlatformRegistry
 
 from jarvis.jarvis_c2rust.constants import (
     C2RUST_DIRNAME,
@@ -519,8 +518,8 @@ class Transpiler:
             "- 函数接口设计应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型（如 i32/u32/usize、&[T]/&mut [T]、String、Result<T, E> 等），而不是 C 风格类型（如 core::ffi::c_*、libc::c_*）；\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI；\n"
             "- 参数个数与顺序可以保持与 C 一致，但类型设计应优先考虑 Rust 的惯用法和安全性；\n"
-            f"{'- **根符号要求**：此函数是根符号，必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n' if is_root else ''}"
-            "- **特殊处理：对于资源释放类函数（如文件关闭、内存释放、句柄释放等），在 Rust 中通常通过 RAII 自动管理，可以跳过实现或提供空实现；请在 notes 字段中标注此类情况；\n"
+            + ("- **根符号要求**：此函数是根符号，必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n" if is_root else "")
+            + "- **特殊处理：对于资源释放类函数（如文件关闭、内存释放、句柄释放等），在 Rust 中通常通过 RAII 自动管理，可以跳过实现或提供空实现；请在 notes 字段中标注此类情况；\n"
             "- 仅输出必要信息，避免冗余解释。"
         )
         # 提取编译参数
@@ -585,8 +584,8 @@ class Transpiler:
             "  * 字符串：优先使用 String、&str 而非 *const c_char/*mut c_char；\n"
             "  * 错误处理：考虑使用 Result<T, E> 而非 C 风格的错误码；\n"
             "  * 参数个数与顺序可以保持与 C 一致，但类型应优先考虑 Rust 的惯用法、安全性和可读性；\n"
-            f"{'- **根符号要求**：此函数是根符号，rust_signature 必须包含 `pub` 关键字，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n' if is_root else ''}"
-            "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
+            + ("- **根符号要求**：此函数是根符号，rust_signature 必须包含 `pub` 关键字，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n" if is_root else "")
+            + "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n"
             "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
             "示例1（正常函数）：\n"
@@ -857,7 +856,7 @@ class Transpiler:
                 rec = self.fn_index_by_id.get(fid)
                 if rec:
                     fn_name = rec.qname or rec.name or f"fn_{fid}"
-            agent_name = f"C2Rust-CodeAgent" + (f"({fn_name})" if fn_name else "")
+            agent_name = "C2Rust-CodeAgent" + (f"({fn_name})" if fn_name else "")
             agent = CodeAgent(
                 name=agent_name,
                 need_summary=False,
@@ -912,7 +911,7 @@ class Transpiler:
             f"函数签名：{rust_sig}",
             f"crate 目录：{self.crate_dir.resolve()}",
             f"C 工程目录：{self.project_root.resolve()}",
-            *([f"根符号要求：必须使用 `pub` 关键字，模块必须在 src/lib.rs 中导出"] if is_root else []),
+            *(["根符号要求：必须使用 `pub` 关键字，模块必须在 src/lib.rs 中导出"] if is_root else []),
             "",
             "【TDD 流程】",
             "1. Red：先写测试（#[cfg(test)] mod tests），基于 C 函数行为设计测试用例",
@@ -1710,7 +1709,7 @@ class Transpiler:
             error_lines = output.split('\n')
             key_errors = [line for line in error_lines if any(keyword in line.lower() for keyword in ['failed', 'error', 'panic', 'unwrap', 'sequence'])]
             if key_errors:
-                typer.secho(f"[c2rust-transpiler][debug] 关键错误信息（前5行）:", fg=typer.colors.CYAN)
+                typer.secho("[c2rust-transpiler][debug] 关键错误信息（前5行）:", fg=typer.colors.CYAN)
                 for i, line in enumerate(key_errors[:5], 1):
                     typer.secho(f"  {i}. {line[:100]}", fg=typer.colors.CYAN)
         
@@ -2185,7 +2184,6 @@ class Transpiler:
             critical_issues = verdict.get("critical_issues") if isinstance(verdict.get("critical_issues"), list) else []
             breaking_issues = verdict.get("breaking_issues") if isinstance(verdict.get("breaking_issues"), list) else []
             structure_issues = verdict.get("structure_issues") if isinstance(verdict.get("structure_issues"), list) else []
-            all_issues = function_issues + critical_issues + breaking_issues + structure_issues
             
             typer.secho(f"[c2rust-transpiler][review][iter={i+1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}, breaking_issues={len(breaking_issues)}, structure_issues={len(structure_issues)}", fg=typer.colors.CYAN)
             

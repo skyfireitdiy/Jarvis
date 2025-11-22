@@ -201,7 +201,8 @@ class ChromaRetriever:
         lines.append(
             "提示：请使用 'jarvis-rag add <路径>' 重新索引相关文件，以更新向量库与BM25索引。"
         )
-        print(f"⚠️ {'\n'.join(lines)}")
+        joined_lines = '\n'.join(lines)
+        print(f"⚠️ {joined_lines}")
 
     def detect_index_changes(self) -> Dict[str, List[str]]:
         """
@@ -252,7 +253,8 @@ class ChromaRetriever:
             except Exception as e:
                 delete_errors.append(f"删除源 '{src}' 时出错: {e}")
         if delete_errors:
-            print(f"⚠️ {'\n'.join(delete_errors)}")
+            joined_errors = '\n'.join(delete_errors)
+            print(f"⚠️ {joined_errors}")
 
         # 再处理变更（重建）
         docs_to_add: List[Document] = []
@@ -273,7 +275,8 @@ class ChromaRetriever:
             except Exception as e:
                 rebuild_errors.append(f"重建源 '{src}' 内容时出错: {e}")
         if rebuild_errors:
-            print(f"⚠️ {'\n'.join(rebuild_errors)}")
+            joined_errors = '\n'.join(rebuild_errors)
+            print(f"⚠️ {joined_errors}")
 
         if docs_to_add:
             try:

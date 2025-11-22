@@ -118,7 +118,8 @@ class MethodologyShareManager(ShareManager):
         share_list = ["\n将要分享以下方法论到中心仓库："]
         for meth in resources:
             share_list.append(f"- {meth['problem_type']}")
-        print(f"ℹ️ {'\n'.join(share_list)}")
+        joined_list = '\n'.join(share_list)
+        print(f"ℹ️ {joined_list}")
 
         if not user_confirm("确认分享这些方法论吗？"):
             return []
@@ -154,7 +155,8 @@ class MethodologyShareManager(ShareManager):
             copied_list = self.share_resources(selected_resources)
             if copied_list:
                 # 一次性显示所有复制结果
-                print(f"✅ {'\n'.join(copied_list)}")
+                joined_copied = '\n'.join(copied_list)
+                print(f"✅ {joined_copied}")
 
                 # 提交并推送
                 self.commit_and_push(len(selected_resources))

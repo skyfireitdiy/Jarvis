@@ -928,7 +928,7 @@ class LSPClientTool:
             bool: 如果CodeAgent可用返回True，否则返回False
         """
         try:
-            from jarvis.jarvis_code_agent.code_agent import CodeAgent
+            from jarvis.jarvis_code_agent.code_agent import CodeAgent  # noqa: F401
             return True
         except ImportError:
             return False

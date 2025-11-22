@@ -247,7 +247,7 @@ class TestFixJsonnetMultilineStrings:
         assert "第三行" in text
         # 验证行数（应该包含换行符）
         lines = text.split("\n")
-        assert len([l for l in lines if l.strip()]) >= 3  # 至少3个非空行
+        assert len([line for line in lines if line.strip()]) >= 3  # 至少3个非空行
 
     def test_first_line_with_indent_mixed_with_indented_lines(self):
         """测试第一行有缩进，部分后续行也有缩进（不同级别）的情况"""
