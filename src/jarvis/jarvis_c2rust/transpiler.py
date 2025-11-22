@@ -2095,7 +2095,7 @@ class Transpiler:
         # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         review_key = f"review::{rec.id}"
-        sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
+        sys_p_init, _, sum_p_init = build_review_prompts()  # 只获取一次 sys_p 和 sum_p，usr_p 每次重新构建
         
         # 获取函数信息用于 Agent name
         fn_name = rec.qname or rec.name or f"fn_{rec.id}"
@@ -2122,24 +2122,13 @@ class Transpiler:
         while max_iterations == 0 or i < max_iterations:
             agent = self._current_agents[review_key]
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            # 如果是修复后的审查（i > 0），强制要求重新读取代码
+            
+            # 每次迭代都重新获取最新的 diff（从保存的 commit 到当前的 HEAD）
+            # 重新构建 user prompt，包含最新的 diff
+            _, usr_p_current, _ = build_review_prompts()  # 重新构建，获取最新的 diff
+            
             if i > 0:
-                # 修复后重新创建 Agent，清除之前的对话历史和记忆，确保基于最新代码审查
-                typer.secho(f"[c2rust-transpiler][review] 代码已修复，重新创建审查 Agent 以清除历史（第 {i+1} 次迭代）", fg=typer.colors.YELLOW)
-                self._current_agents[review_key] = Agent(
-                    system_prompt=sys_p_init,
-                    name=agent_name,
-                    model_group=self.llm_group,
-                    summary_prompt=sum_p_init,
-                    need_summary=True,
-                    auto_complete=True,
-                    use_tools=["execute_script", "read_code", "read_symbols"],
-                    non_interactive=self.non_interactive,
-                    use_methodology=False,
-                    use_analysis=False,
-                )
-                agent = self._current_agents[review_key]
-                
+                # 修复后的审查，添加代码已更新的提示
                 code_changed_notice = "\n".join([
                     "",
                     "【重要：代码已更新】",
@@ -2159,12 +2148,12 @@ class Transpiler:
                     "如果diff信息充足，可以直接基于diff进行审查；如果diff信息不足，请使用 read_code 工具读取最新代码。",
                     "",
                 ])
-                usr_p_with_notice = usr_p_init + code_changed_notice
+                usr_p_with_notice = usr_p_current + code_changed_notice
                 composed_prompt = self._compose_prompt_with_context(usr_p_with_notice)
                 # 修复后必须使用 Agent.run()，不能使用直接模型调用（因为需要工具调用）
                 use_direct_model_review = False
             else:
-                composed_prompt = self._compose_prompt_with_context(usr_p_init)
+                composed_prompt = self._compose_prompt_with_context(usr_p_current)
             
             if use_direct_model_review:
                 # 格式解析失败后，直接调用模型接口
