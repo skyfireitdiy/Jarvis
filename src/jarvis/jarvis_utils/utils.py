@@ -1453,12 +1453,6 @@ def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
     changed = False
     changed = _ask_config_int(
         config_data, ask_all,
-        "JARVIS_AUTO_SUMMARY_ROUNDS",
-        "基于对话轮次的自动总结阈值（达到该轮次后自动总结并清理历史，默认50）",
-        50,
-    ) or changed
-    changed = _ask_config_int(
-        config_data, ask_all,
         "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
         "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
         300,

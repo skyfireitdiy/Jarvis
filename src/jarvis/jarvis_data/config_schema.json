@@ -193,11 +193,6 @@
       "description": "脚本执行的超时时间（秒），仅在非交互模式下生效。",
       "default": 300
     },
-    "JARVIS_AUTO_SUMMARY_ROUNDS": {
-      "type": "number",
-      "description": "基于对话轮次的自动总结阈值（达到该轮次后自动总结并清理历史）",
-      "default": 50
-    },
     "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
       "type": "boolean",
       "description": "应用补丁前是否需要确认",

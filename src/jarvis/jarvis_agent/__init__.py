@@ -324,7 +324,6 @@ class Agent:
         use_tools: Optional[List[str]] = None,
         execute_tool_confirm: Optional[bool] = None,
         need_summary: bool = True,
-        auto_summary_rounds: Optional[int] = None,
         multiline_inputer: Optional[Callable[[str], str]] = None,
         use_methodology: Optional[bool] = None,
         use_analysis: Optional[bool] = None,
@@ -362,8 +361,6 @@ class Agent:
         # 行为控制开关（原始入参值）
         self.auto_complete = bool(auto_complete)
         self.need_summary = bool(need_summary)
-        # 自动摘要轮次：None 表示使用配置文件中的默认值，由 AgentRunLoop 决定最终取值
-        self.auto_summary_rounds = auto_summary_rounds
         self.use_methodology = use_methodology
         self.use_analysis = use_analysis
         self.execute_tool_confirm = execute_tool_confirm
@@ -861,7 +858,7 @@ class Agent:
         return message
 
     def _manage_conversation_length(self, message: str) -> str:
-        """管理对话长度计数；摘要触发由轮次在 AgentRunLoop 中统一处理。"""
+        """管理对话长度计数；摘要触发由token数量在 AgentRunLoop 中统一处理（超过输入窗口80%时触发）。"""
         self.session.conversation_length += get_context_token_count(message)
 
 
@@ -1316,7 +1313,6 @@ class Agent:
             "use_tools": use_tools_param,
             "execute_tool_confirm": self.execute_tool_confirm,
             "need_summary": self.need_summary,
-            "auto_summary_rounds": self.auto_summary_rounds,
             "multiline_inputer": self.multiline_inputer,
             "use_methodology": self.use_methodology,
             "use_analysis": self.use_analysis,

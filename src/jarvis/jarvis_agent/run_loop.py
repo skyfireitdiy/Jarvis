@@ -13,7 +13,7 @@ from typing import Any, TYPE_CHECKING
 
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
 from jarvis.jarvis_agent.utils import join_prompts, is_auto_complete, normalize_next_action
-from jarvis.jarvis_utils.config import get_auto_summary_rounds
+from jarvis.jarvis_utils.config import get_max_input_token_count
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
@@ -25,12 +25,9 @@ class AgentRunLoop:
         self.agent = agent
         self.conversation_rounds = 0
         self.tool_reminder_rounds = int(os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20))
-        # 基于轮次的自动总结阈值：优先使用 Agent 入参，否则回落到全局配置（默认20轮）
-        self.auto_summary_rounds = (
-            self.agent.auto_summary_rounds
-            if getattr(self.agent, "auto_summary_rounds", None) is not None
-            else get_auto_summary_rounds()
-        )
+        # 基于token数量的自动总结阈值：当对话累计token超过输入窗口的80%时触发
+        max_input_tokens = get_max_input_token_count(self.agent.model_group)
+        self.summary_token_threshold = int(max_input_tokens * 0.8)
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
@@ -43,15 +40,15 @@ class AgentRunLoop:
                     self.agent.session.addon_prompt = join_prompts(
                         [self.agent.session.addon_prompt, self.agent.get_tool_usage_prompt()]
                     )
-                # 基于轮次的自动总结判断：达到阈值后执行一次总结与历史清理
-                if self.conversation_rounds >= self.auto_summary_rounds:
+                # 基于token数量的自动总结判断：当对话累计token超过输入窗口的80%时触发
+                if self.agent.session.conversation_length >= self.summary_token_threshold:
                     summary_text = self.agent._summarize_and_clear_history()
                     if summary_text:
                         # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
                         self.agent.session.addon_prompt = join_prompts(
                             [self.agent.session.addon_prompt, summary_text]
                         )
-                    # 重置轮次计数与对话长度计数器，开始新一轮周期
+                    # 重置轮次计数（用于工具提醒）与对话长度计数器（用于摘要触发），开始新一轮周期
                     self.conversation_rounds = 0
                     self.agent.session.conversation_length = 0
 
