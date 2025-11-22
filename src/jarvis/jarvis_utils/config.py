@@ -721,17 +721,6 @@ def get_tool_filter_threshold() -> int:
     """
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_FILTER_THRESHOLD", 30))
 
-def get_auto_summary_rounds() -> int:
-    """
-    获取基于对话轮次的自动总结阈值。
-
-    返回:
-        int: 轮次阈值，默认20
-    """
-    try:
-        return int(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_SUMMARY_ROUNDS", 50))
-    except Exception:
-        return 50
 
 
 
