@@ -379,7 +379,7 @@ def demo():
 def main():
     """主入口函数"""
     # 初始化环境，防止设置初始化太迟
-    init_env("欢迎使用 Jarvis-Stats，您的统计分析工具已准备就绪！", None)
+    init_env()
     app()
 
 

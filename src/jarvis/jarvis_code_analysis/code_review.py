@@ -826,7 +826,7 @@ def review_file(
 
 def cli():
     """Typer application entry point"""
-    init_env("欢迎使用 Jarvis-CodeReview，您的代码审查助手已准备就绪！")
+    init_env("")
     app()
 
 

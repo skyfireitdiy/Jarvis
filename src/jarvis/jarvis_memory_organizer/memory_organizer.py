@@ -720,7 +720,7 @@ def import_memories(
 def main():
     """Application entry point"""
     # 统一初始化环境
-    init_env("欢迎使用记忆整理工具！")
+    init_env()
     app()
 
 

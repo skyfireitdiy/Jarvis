@@ -60,7 +60,7 @@ def cli(
     commit_hash: str = typer.Argument(..., help="要压缩的基础提交哈希"),
     lang: str = typer.Option("Chinese", "--lang", help="提交信息的语言"),
 ):
-    init_env("欢迎使用 Jarvis-GitSquash，您的Git压缩助手已准备就绪！")
+    init_env()
     tool = GitSquashTool()
     tool.execute({"commit_hash": commit_hash, "lang": lang})
 
