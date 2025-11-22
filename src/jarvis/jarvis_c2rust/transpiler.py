@@ -862,7 +862,7 @@ class Transpiler:
                 need_summary=False,
                 non_interactive=self.non_interactive,
                 model_group=self.llm_group,
-                append_tools="read_symbols",
+                append_tools="read_symbols,methodology",
                 use_methodology=True,
                 use_analysis=True,
                 force_save_memory=False,
