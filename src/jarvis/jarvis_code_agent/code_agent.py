@@ -82,7 +82,7 @@ class CodeAgent(Agent):
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
         non_interactive: Optional[bool] = None,
-        rule_name: Optional[str] = None,
+        rule_names: Optional[str] = None,
         **kwargs,
     ):
         self.root_dir = os.getcwd()
@@ -122,11 +122,13 @@ class CodeAgent(Agent):
         if project_rules:
             combined_parts.append(project_rules)
         
-        # 如果指定了 rule_name，从 rules.yaml 文件中读取并添加
-        if rule_name:
-            named_rule = self._get_named_rule(rule_name)
-            if named_rule:
-                combined_parts.append(named_rule)
+        # 如果指定了 rule_names，从 rules.yaml 文件中读取并添加多个规则
+        if rule_names:
+            rule_list = [name.strip() for name in rule_names.split(',') if name.strip()]
+            for rule_name in rule_list:
+                named_rule = self._get_named_rule(rule_name)
+                if named_rule:
+                    combined_parts.append(named_rule)
 
         if combined_parts:
             merged_rules = "\n\n".join(combined_parts)
@@ -1684,8 +1686,8 @@ def cli(
     non_interactive: bool = typer.Option(
         False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
     ),
-    rule_name: Optional[str] = typer.Option(
-        None, "--rule-name", help="指定规则名称，从 rules.yaml 文件中读取对应的规则内容"
+    rule_names: Optional[str] = typer.Option(
+        None, "--rule-names", help="指定规则名称列表，用逗号分隔，从 rules.yaml 文件中读取对应的规则内容"
     ),
 ) -> None:
     """Jarvis主入口点。"""
@@ -1770,7 +1772,7 @@ def cli(
             append_tools=append_tools,
             tool_group=tool_group,
             non_interactive=non_interactive,
-            rule_name=rule_name,
+            rule_names=rule_names,
         )
 
         # 尝试恢复会话
