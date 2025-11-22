@@ -108,6 +108,8 @@ class SubCodeAgentTool:
                 pass
 
             # 依据父Agent已启用工具集，推导 append_tools（作为在 CodeAgent 基础工具上的增量）
+            # 禁用 sub_agent 和 sub_code_agent，避免无限递归
+            forbidden_tools = {"sub_agent", "sub_code_agent"}
             append_tools = None
             try:
                 base_tools = [
@@ -118,7 +120,8 @@ class SubCodeAgentTool:
                     "lsp_client",
                 ]
                 if use_tools:
-                    extras = [t for t in use_tools if t not in base_tools]
+                    # 过滤掉基础工具和禁止的工具
+                    extras = [t for t in use_tools if t not in base_tools and t not in forbidden_tools]
                     append_tools = ",".join(extras) if extras else None
             except Exception:
                 append_tools = None
@@ -153,9 +156,12 @@ class SubCodeAgentTool:
             # 子Agent需要自动完成
             try:
                 code_agent.auto_complete = True
-                # 同步父Agent工具使用集（如可用）
+                # 同步父Agent工具使用集（如可用），但禁用 sub_agent 和 sub_code_agent 避免无限递归
                 if use_tools:
-                    code_agent.set_use_tools(use_tools)
+                    forbidden_tools = {"sub_agent", "sub_code_agent"}
+                    filtered_tools = [t for t in use_tools if t not in forbidden_tools]
+                    if filtered_tools:
+                        code_agent.set_use_tools(filtered_tools)
                 # 同步父Agent的模型名称（如可用），以尽量保持平台与模型一致
                 if (
                     parent_agent is not None

@@ -1004,10 +1004,10 @@ class Agent:
             pass
         
         # 非关键流程：广播清理历史前事件（用于日志、监控等）
-        try:
-            self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
-        except Exception:
-            pass
+            try:
+                self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
+            except Exception:
+                pass
 
         # 清理历史（但不清理prompt，因为prompt会在builtin_input_handler中设置）
         if self.model:
