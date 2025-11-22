@@ -1596,6 +1596,25 @@ class Transpiler:
         # 默认假设为 lib
         return "lib"
 
+    def _run_cargo_fmt(self, workspace_root: str) -> None:
+        """执行 cargo fmt 格式化代码"""
+        try:
+            res = subprocess.run(
+                ["cargo", "fmt"],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=workspace_root,
+            )
+            if res.returncode == 0:
+                typer.secho("[c2rust-transpiler][fmt] 代码格式化完成", fg=typer.colors.CYAN)
+            else:
+                # fmt 失败不影响主流程，只记录警告
+                typer.secho(f"[c2rust-transpiler][fmt] 代码格式化失败（非致命）: {res.stderr or res.stdout}", fg=typer.colors.YELLOW)
+        except Exception as e:
+            # fmt 失败不影响主流程，只记录警告
+            typer.secho(f"[c2rust-transpiler][fmt] 代码格式化异常（非致命）: {e}", fg=typer.colors.YELLOW)
+
     def _get_crate_commit_hash(self) -> Optional[str]:
         """获取 crate 目录的当前 commit id"""
         try:
@@ -1788,6 +1807,8 @@ class Transpiler:
         typer.secho(f"[c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（test，{test_limit}）", fg=typer.colors.MAGENTA)
         test_iter = 0
         while True:
+            # 每一轮开始前执行 cargo fmt
+            self._run_cargo_fmt(workspace_root)
             # 运行所有测试（不区分项目结构）
             # cargo test 会自动编译并运行所有类型的测试：lib tests、bin tests、integration tests、doc tests 等
             test_iter += 1
@@ -2065,7 +2086,10 @@ class Transpiler:
         use_direct_model_review = False  # 标记是否使用直接模型调用
         parse_failed = False  # 标记上一次解析是否失败
         parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
+        workspace_root = str(self.crate_dir)
         while max_iterations == 0 or i < max_iterations:
+            # 每一轮开始前执行 cargo fmt
+            self._run_cargo_fmt(workspace_root)
             agent = self._current_agents[review_key]
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             # 如果是修复后的审查（i > 0），强制要求重新读取代码
