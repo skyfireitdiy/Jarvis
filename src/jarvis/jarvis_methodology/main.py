@@ -89,7 +89,8 @@ def list_methodologies():
         lines = ["可用方法论:"]
         for i, (problem_type, _) in enumerate(methodologies.items(), 1):
             lines.append(f"{i}. {problem_type}")
-        print(f"ℹ️ {'\n'.join(lines)}")
+        joined_lines = '\n'.join(lines)
+        print(f"ℹ️ {joined_lines}")
     except (OSError, ValueError) as e:
         print(f"❌ 列出方法论失败: {str(e)}")
         raise typer.Exit(code=1)

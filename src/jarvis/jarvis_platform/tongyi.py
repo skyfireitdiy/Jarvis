@@ -279,7 +279,8 @@ class TongyiPlatform(BasePlatform):
                     if not os.path.exists(file_path):
                         # 先输出已收集的日志与错误后返回
                         log_lines.append(f"文件不存在: {file_path}")
-                        print(f"❌ {'\n'.join(log_lines)}")
+                        joined_logs = '\n'.join(log_lines)
+                        print(f"❌ {joined_logs}")
                         return False
 
                     # Get file name and content type
@@ -309,7 +310,8 @@ class TongyiPlatform(BasePlatform):
 
                     if response.status_code != 200:
                         log_lines.append(f"上传失败 {file_name}: HTTP {response.status_code}")
-                        print(f"❌ {'\n'.join(log_lines)}")
+                        joined_logs = '\n'.join(log_lines)
+                        print(f"❌ {joined_logs}")
                         return False
 
                     # Determine file type based on extension
@@ -342,13 +344,15 @@ class TongyiPlatform(BasePlatform):
                     response = http.post(url, headers=headers, json=payload)
                     if response.status_code != 200:
                         log_lines.append(f"获取下载链接失败: HTTP {response.status_code}")
-                        print(f"❌ {'\n'.join(log_lines)}")
+                        joined_logs = '\n'.join(log_lines)
+                        print(f"❌ {joined_logs}")
                         return False
 
                     result = response.json()
                     if not result.get("success"):
                         log_lines.append(f"获取下载链接失败: {result.get('errorMsg')}")
-                        print(f"❌ {'\n'.join(log_lines)}")
+                        joined_logs = '\n'.join(log_lines)
+                        print(f"❌ {joined_logs}")
                         return False
 
                     # Add files to chat
@@ -388,12 +392,14 @@ class TongyiPlatform(BasePlatform):
                         file_info.update(add_result.get("data", {}))
 
                     log_lines.append(f"文件 {file_name} 上传成功")
-                    print(f"ℹ️ {'\n'.join(log_lines)}")
+                    joined_logs = '\n'.join(log_lines)
+                    print(f"ℹ️ {joined_logs}")
                     time.sleep(1)  # 短暂暂停以便用户看到成功状态
 
                 except Exception as e:
                     log_lines.append(f"上传文件 {file_name} 时出错: {str(e)}")
-                    print(f"❌ {'\n'.join(log_lines)}")
+                    joined_logs = '\n'.join(log_lines)
+                    print(f"❌ {joined_logs}")
                     return False
             return True
 

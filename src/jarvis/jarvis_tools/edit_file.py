@@ -827,7 +827,7 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
-                summary += f"\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
+                summary += "\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 print(f"❌ {summary}")
                 return False, summary
             
@@ -870,7 +870,7 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
-                summary += f"\n\n💡 提示：部分编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
+                summary += "\n\n💡 提示：部分编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 print(f"❌ {summary}")
                 return False, summary
             

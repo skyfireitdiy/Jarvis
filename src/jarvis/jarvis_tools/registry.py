@@ -980,7 +980,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         if len(output.splitlines()) > 60:
             lines = output.splitlines()
-            print(f"⚠️ 输出太长，截取前后30行") 
+            print("⚠️ 输出太长，截取前后30行") 
             return "\n".join(
                 lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
             )

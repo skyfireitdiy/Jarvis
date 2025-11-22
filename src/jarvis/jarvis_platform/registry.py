@@ -145,7 +145,8 @@ class PlatformRegistry:
                     error_lines.append(f"加载平台 {module_name} 失败: {str(e)}")
 
         if error_lines:
-            print(f"❌ {'\n'.join(error_lines)}")
+            joined_errors = '\n'.join(error_lines)
+            print(f"❌ {joined_errors}")
         return platforms
 
     @staticmethod

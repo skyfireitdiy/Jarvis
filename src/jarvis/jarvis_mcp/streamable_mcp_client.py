@@ -186,9 +186,11 @@ class StreamableMcpClient(McpClient):
                         continue
 
             if warning_lines:
-                print(f"⚠️ {'\n'.join(warning_lines)}")
+                joined_warnings = '\n'.join(warning_lines)
+                print(f"⚠️ {joined_warnings}")
             if error_lines:
-                print(f"❌ {'\n'.join(error_lines)}")
+                joined_errors = '\n'.join(error_lines)
+                print(f"❌ {joined_errors}")
             # Ensure response is closed after streaming
             response.close()
             if result is None:

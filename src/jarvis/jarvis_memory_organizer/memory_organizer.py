@@ -74,7 +74,8 @@ class MemoryOrganizer:
                 error_lines.append(f"读取记忆文件 {memory_file} 失败: {str(e)}")
 
         if error_lines:
-            print(f"⚠️ {'\n'.join(error_lines)}")
+            joined_errors = '\n'.join(error_lines)
+            print(f"⚠️ {joined_errors}")
 
         return memories
 
@@ -305,7 +306,8 @@ class MemoryOrganizer:
                             f"  - ID: {mem.get('id', '未知')}, "
                             f"标签: {', '.join(mem.get('tags', []))[:50]}..."
                         )
-                    print(f"ℹ️ {'\n'.join(lines)}")
+                    joined_lines = '\n'.join(lines)
+                    print(f"ℹ️ {joined_lines}")
 
                     if not dry_run:
                         # 合并记忆
@@ -390,9 +392,11 @@ class MemoryOrganizer:
                         f"删除记忆文件失败 {orig_memory.get('file_path', '')}: {str(e)}"
                     )
         if info_lines:
-            print(f"ℹ️ {'\n'.join(info_lines)}")
+            joined_info = '\n'.join(info_lines)
+            print(f"ℹ️ {joined_info}")
         if warn_lines:
-            print(f"⚠️ {'\n'.join(warn_lines)}")
+            joined_warn = '\n'.join(warn_lines)
+            print(f"⚠️ {joined_warn}")
 
     def export_memories(
         self,
@@ -437,7 +441,8 @@ class MemoryOrganizer:
 
         # 统一展示导出进度日志
         if progress_lines:
-            print(f"ℹ️ {'\n'.join(progress_lines)}")
+            joined_progress = '\n'.join(progress_lines)
+            print(f"ℹ️ {joined_progress}")
 
         # 保存到文件
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -533,7 +538,8 @@ class MemoryOrganizer:
         print("\n✅ 导入完成！")
         if import_stats:
             lines = [f"{memory_type}: 导入了 {count} 个记忆" for memory_type, count in import_stats.items()]
-            print(f"ℹ️ {'\n'.join(lines)}")
+            joined_lines = '\n'.join(lines)
+            print(f"ℹ️ {joined_lines}")
 
         if skipped_count > 0:
             print(f"⚠️ 跳过了 {skipped_count} 个记忆")

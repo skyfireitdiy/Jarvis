@@ -707,7 +707,6 @@ def process_verification_phase(
             pass
     
     for bidx, batch in enumerate(batches, start=1):
-        task_id = f"JARVIS-SEC-Batch-{bidx}"
         batch_file = batch[0].get("file") if batch else None
         
         # 检查批次是否已完成
@@ -732,7 +731,6 @@ def process_verification_phase(
         
         # 方法1：通过 cluster_id 检查是否已完成
         # 查找匹配的聚类（精确匹配：文件相同且 gid 集合完全相同）
-        matched_cluster_id = None
         for cluster in clusters:
             cluster_file = str(cluster.get("file", ""))
             cluster_gids_list = cluster.get("gids", [])
@@ -759,7 +757,6 @@ def process_verification_phase(
                 cluster_id = cluster.get("cluster_id", "")
                 if cluster_id and cluster_id in completed_cluster_ids:
                     is_batch_completed = True
-                    matched_cluster_id = cluster_id
                     completion_reason = f"通过 cluster_id 匹配: {cluster_id}"
                     break
         
@@ -816,7 +813,6 @@ def process_verification_phase(
     # 处理待处理的批次
     for bidx, batch in pending_batches:
         processed_count += 1
-        task_id = f"JARVIS-SEC-Batch-{bidx}"
         batch_file = batch[0].get("file") if batch else None
         
         # 处理验证批次（使用实际已处理的批次编号）

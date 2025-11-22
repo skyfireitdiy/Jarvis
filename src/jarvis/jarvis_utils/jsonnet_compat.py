@@ -255,10 +255,10 @@ def _convert_backtick_multiline_strings(s: str) -> str:
     
     def convert_match(match):
         colon = match.group(1)  # 冒号和可选空白
-        start_backticks = match.group(2)  # ```
+        match.group(2)  # ``` (保留用于匹配，但不使用)
         whitespace_after = match.group(3)  # 空白和换行
         content = match.group(4)  # 多行内容
-        end_backticks = match.group(5)  # 换行、空白和 ```
+        match.group(5)  # 换行、空白和 ``` (保留用于匹配，但不使用)
         
         # 将 ``` 转换为 |||
         return colon + '|||' + whitespace_after + content + '\n|||'

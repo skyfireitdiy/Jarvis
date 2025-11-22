@@ -171,7 +171,8 @@ class JarvisRAGPipeline:
                 lines.extend([f"  变更: {p}" for p in changed[:3]])
             if deleted:
                 lines.extend([f"  删除: {p}" for p in deleted[:3]])
-            print(f"⚠️ {'\n'.join(lines)}")
+            joined_lines = '\n'.join(lines)
+            print(f"⚠️ {joined_lines}")
             # 询问用户
             if get_yes_no(
                 "检测到索引变更，是否现在更新索引后再开始检索？", default=True
@@ -241,8 +242,9 @@ class JarvisRAGPipeline:
             rewritten_queries = [query_text]
 
         # 2. 为每个重写的查询检索初始候选文档
+        query_lines = '\n'.join([f'  - {q}' for q in rewritten_queries])
         print(
-            f"ℹ️ 将为以下查询变体进行混合检索:\n{'\n'.join([f'  - {q}' for q in rewritten_queries])}"
+            f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}"
         )
         all_candidate_docs = []
         for q in rewritten_queries:
@@ -285,7 +287,8 @@ class JarvisRAGPipeline:
         if sources:
             # 合并来源列表后一次性打印，避免多次加框
             lines = ["根据以下文档回答:"] + [f"  - {source}" for source in sources]
-            print(f"ℹ️ {'\n'.join(lines)}")
+            joined_lines = '\n'.join(lines)
+            print(f"ℹ️ {joined_lines}")
 
         # 4. 创建最终提示并生成答案
         # 我们使用原始的query_text作为给LLM的最终提示
@@ -319,8 +322,9 @@ class JarvisRAGPipeline:
             rewritten_queries = [query_text]
 
         # 2. 检索候选文档
+        query_lines = '\n'.join([f'  - {q}' for q in rewritten_queries])
         print(
-            f"ℹ️ 将为以下查询变体进行混合检索:\n{'\n'.join([f'  - {q}' for q in rewritten_queries])}"
+            f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}"
         )
         all_candidate_docs = []
         for q in rewritten_queries:

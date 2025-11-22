@@ -213,22 +213,26 @@ class KimiModel(BasePlatform):
                             log_lines.append(f"文件处理完成: {file_name}")
                         else:
                             log_lines.append(f"文件解析失败: {file_name}")
-                            print(f"❌ {'\n'.join(log_lines)}")
+                            joined_logs = '\n'.join(log_lines)
+                            print(f"❌ {joined_logs}")
                             return False
                     else:
                         uploaded_files.append(file_info)
                         log_lines.append(f"图片处理完成: {file_name}")
                 else:
                     log_lines.append(f"文件上传失败: {file_name}")
-                    print(f"❌ {'\n'.join(log_lines)}")
+                    joined_logs = '\n'.join(log_lines)
+                    print(f"❌ {joined_logs}")
                     return False
 
                 # 成功路径统一输出本文件的处理日志
-                print(f"ℹ️ {'\n'.join(log_lines)}")
+                joined_logs = '\n'.join(log_lines)
+                print(f"ℹ️ {joined_logs}")
 
             except Exception as e:
                 log_lines.append(f"处理文件出错 {file_path}: {str(e)}")
-                print(f"❌ {'\n'.join(log_lines)}")
+                joined_logs = '\n'.join(log_lines)
+                print(f"❌ {joined_logs}")
                 return False
 
         self.uploaded_files = uploaded_files

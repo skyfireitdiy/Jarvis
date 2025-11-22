@@ -76,7 +76,8 @@ class ToolShareManager(ShareManager):
         share_list = ["\n将要分享以下工具到中心仓库（注意：文件将被移动而非复制）："]
         for tool in resources:
             share_list.append(f"- {tool['tool_name']} ({tool['filename']})")
-        print(f"⚠️ {'\n'.join(share_list)}")
+        joined_list = '\n'.join(share_list)
+        print(f"⚠️ {joined_list}")
 
         if not user_confirm("确认移动这些工具到中心仓库吗？（原文件将被删除）"):
             return []
@@ -112,7 +113,8 @@ class ToolShareManager(ShareManager):
             moved_list = self.share_resources(selected_resources)
             if moved_list:
                 # 一次性显示所有移动结果
-                print(f"✅ {'\n'.join(moved_list)}")
+                joined_moved = '\n'.join(moved_list)
+                print(f"✅ {joined_moved}")
 
                 # 提交并推送
                 self.commit_and_push(len(selected_resources))
