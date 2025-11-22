@@ -519,8 +519,15 @@ class Transpiler:
             "- 禁止使用 extern \"C\"；函数应使用标准的 Rust 调用约定，不需要 C ABI；\n"
             "- 参数个数与顺序可以保持与 C 一致，但类型设计应优先考虑 Rust 的惯用法和安全性；\n"
             + ("- **根符号要求**：此函数是根符号，必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n" if is_root else "")
-            + "- **特殊处理：对于资源释放类函数（如文件关闭、内存释放、句柄释放等），在 Rust 中通常通过 RAII 自动管理，可以跳过实现或提供空实现；请在 notes 字段中标注此类情况；\n"
-            "- 仅输出必要信息，避免冗余解释。"
+            + "- **评估是否需要实现**：在规划阶段，请评估此函数是否真的需要实现。以下情况可以跳过实现（设置 skip_implementation 为 true）：\n"
+            + "  * **已实现的函数**：如果函数已经在目标模块（module）中实现，可以使用 read_code 工具检查目标文件，确认函数已存在且实现正确，则无需重复实现\n"
+            + "  * **资源释放类函数**：如文件关闭 fclose、内存释放 free、句柄释放、锁释放等，在 Rust 中通常通过 RAII（Drop trait）自动管理，无需显式实现\n"
+            + "  * **已被库替代**：如果函数已被标准库或第三方 crate 替代（lib_replacement 字段已设置），且不需要兼容层，可以跳过实现\n"
+            + "  * **空实现或无意义函数**：如果 C 函数本身是空实现、简单返回常量、或仅用于兼容性占位，在 Rust 中可能不需要实现\n"
+            + "  * **内联函数或宏**：如果函数在 C 中是内联函数或宏，在 Rust 中可能不需要单独实现\n"
+            + "  * **其他不需要实现的情况**：根据具体情况判断，如果函数在 Rust 转译中确实不需要实现，可以跳过\n"
+            + "  * 如果设置 skip_implementation 为 true，请在 notes 字段中详细说明原因\n"
+            + "- 仅输出必要信息，避免冗余解释。"
         )
         # 提取编译参数
         compile_flags = self._extract_compile_flags(rec.file)
@@ -565,6 +572,13 @@ class Transpiler:
             "- 参数示例(JSON):",
             f"  {{\"symbols_file\": \"{(self.data_dir / 'symbols.jsonl').resolve()}\", \"symbols\": [\"符号1\", \"符号2\"]}}",
             "",
+            "**重要：检查函数是否已实现**",
+            "在确定目标模块（module）后，请使用 read_code 工具检查该模块文件，确认函数是否已经实现：",
+            "- 工具: read_code",
+            "- 参数示例(JSON):",
+            "  {\"file_path\": \"<目标模块路径>\"}",
+            "- 如果函数已经在目标模块中实现，且实现正确，可以设置 skip_implementation 为 true，并在 notes 中说明 \"函数已在目标模块中实现\"",
+            "",
             "如果理解完毕，请进入总结阶段。",
         ])
         summary_prompt = (
@@ -572,12 +586,25 @@ class Transpiler:
             "允许字段（JSON 对象）：\n"
             '- "module": "<绝对路径>/src/xxx.rs 或 <绝对路径>/src/xxx/mod.rs；或相对路径 src/xxx.rs / src/xxx/mod.rs"\n'
             '- "rust_signature": "pub fn xxx(...)->..."\n'
-            '- "skip_implementation": bool  // 可选，如果为 true，表示此函数可通过 RAII 自动管理，可以跳过实现阶段\n'
-            '- "notes": "可选说明（若有上下文缺失或风险点，请在此列出）"\n'
+            '- "skip_implementation": bool  // 可选，如果为 true，表示此函数不需要实现，可以直接标记为已实现\n'
+            '- "notes": "可选说明（若有上下文缺失或风险点，请在此列出；如果 skip_implementation 为 true，必须在此说明原因）"\n'
             "注意：\n"
             "- module 必须位于 crate 的 src/ 目录下，接受绝对路径或以 src/ 开头的相对路径；尽量选择已有文件；如需新建文件，给出合理路径；\n"
             "- rust_signature 应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；优先使用 Rust 原生类型和惯用法，而不是 C 风格类型。\n"
-            "- **资源释放类函数处理**：如果函数是资源释放类（如文件关闭 fclose、内存释放 free、句柄释放、锁释放等），在 Rust 中通常通过 RAII（Drop trait）自动管理，可以跳过实现阶段；请设置 skip_implementation 为 true，并在 notes 字段中说明原因（如 \"通过 RAII 自动管理，无需显式实现\"）。\n"
+            "- **评估是否需要实现**：请仔细评估此函数是否真的需要实现。以下情况可以设置 skip_implementation 为 true：\n"
+            + "  * **已实现的函数**：如果函数已经在目标模块（module）中实现，可以使用 read_code 工具检查目标文件，确认函数已存在且实现正确，则无需重复实现\n"
+            + "  * **资源释放类函数**：如文件关闭 fclose、内存释放 free、句柄释放、锁释放等，在 Rust 中通常通过 RAII（Drop trait）自动管理，无需显式实现\n"
+            + "  * **已被库替代**：如果函数已被标准库或第三方 crate 替代（lib_replacement 字段已设置），且不需要兼容层，可以跳过实现\n"
+            + "  * **空实现或无意义函数**：如果 C 函数本身是空实现、简单返回常量、或仅用于兼容性占位，在 Rust 中可能不需要实现\n"
+            + "  * **内联函数或宏**：如果函数在 C 中是内联函数或宏，在 Rust 中可能不需要单独实现\n"
+            + "  * **其他不需要实现的情况**：根据具体情况判断，如果函数在 Rust 转译中确实不需要实现，可以跳过\n"
+            + "  * **重要**：如果设置 skip_implementation 为 true，必须在 notes 字段中详细说明原因，例如：\n"
+            + "    - \"函数已在目标模块中实现\"\n"
+            + "    - \"通过 RAII 自动管理，无需显式实现\"\n"
+            + "    - \"已被标准库 std::xxx 替代，无需实现\"\n"
+            + "    - \"空实现函数，在 Rust 中不需要\"\n"
+            + "    - \"内联函数，已在调用处展开，无需单独实现\"\n"
+            + "- 如果函数确实需要实现，则不要设置 skip_implementation 或设置为 false\n"
             "- 类型设计原则：\n"
             "  * 基本类型：优先使用 i32/u32/i64/u64/isize/usize/f32/f64 等原生 Rust 类型，而不是 core::ffi::c_* 或 libc::c_*；\n"
             "  * 指针/引用：优先使用引用 &T/&mut T 或切片 &[T]/&mut [T]，而非原始指针 *const T/*mut T；仅在必要时使用原始指针；\n"
@@ -590,8 +617,14 @@ class Transpiler:
             "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
             "示例1（正常函数）：\n"
             "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"notes\": \"...\"\n}\n</SUMMARY>\n"
-            "示例2（资源释放类函数，可跳过实现）：\n"
-            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"skip_implementation\": true,\n  \"notes\": \"通过 RAII 自动管理，无需显式实现\"\n}\n</SUMMARY>"
+            "示例2（已实现的函数，可跳过实现）：\n"
+            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"skip_implementation\": true,\n  \"notes\": \"函数已在目标模块中实现\"\n}\n</SUMMARY>\n"
+            "示例3（不需要实现的函数，可跳过实现）：\n"
+            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"skip_implementation\": true,\n  \"notes\": \"通过 RAII 自动管理，无需显式实现\"\n}\n</SUMMARY>\n"
+            "示例4（已被库替代，可跳过实现）：\n"
+            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"skip_implementation\": true,\n  \"notes\": \"已被标准库 std::xxx 替代，无需实现\"\n}\n</SUMMARY>\n"
+            "示例5（空实现函数，可跳过实现）：\n"
+            "<SUMMARY>\n{\n  \"module\": \"...\",\n  \"rust_signature\": \"...\",\n  \"skip_implementation\": true,\n  \"notes\": \"C 函数为空实现，在 Rust 中不需要\"\n}\n</SUMMARY>"
         )
         # 在 user_prompt 和 summary_prompt 中追加附加说明（system_prompt 通常不需要）
         user_prompt = self._append_additional_notes(user_prompt)
@@ -2559,12 +2592,12 @@ class Transpiler:
                 self._update_progress_current(rec, module, rust_sig)
                 typer.secho(f"[c2rust-transpiler][progress] 已更新当前进度记录 id={rec.id}", fg=typer.colors.CYAN)
 
-                # 如果标记为跳过实现（通过 RAII 自动管理），则直接标记为已转换
+                # 如果标记为跳过实现，则直接标记为已转换
                 if skip_implementation:
-                    typer.secho(f"[c2rust-transpiler][skip-impl] 函数 {rec.qname or rec.name} 通过 RAII 自动管理，跳过实现阶段", fg=typer.colors.CYAN)
+                    typer.secho(f"[c2rust-transpiler][skip-impl] 函数 {rec.qname or rec.name} 评估为不需要实现，跳过实现阶段", fg=typer.colors.CYAN)
                     # 直接标记为已转换，跳过代码生成、构建和审查阶段
                     self._mark_converted(rec, module, rust_sig)
-                    typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module} (跳过实现)", fg=typer.colors.GREEN)
+                    typer.secho(f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module} (跳过实现，视为已实现)", fg=typer.colors.GREEN)
                     continue
 
                 # 初始化函数上下文与代码编写与修复Agent复用缓存（只在当前函数开始时执行一次）
