@@ -218,12 +218,16 @@ class BasePlatform(ABC):
         )
 
         response = ""
+        last_subtitle_update_time = time.time()
+        subtitle_update_interval = 3  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
+        update_count = 0  # 更新计数器，用于控制 subtitle 更新频率
         with Live(panel, refresh_per_second=4, transient=False) as live:
-            def _update_panel_content(content: str):
-                nonlocal response
+            def _update_panel_content(content: str, update_subtitle: bool = False):
+                nonlocal response, last_subtitle_update_time, update_count
                 text_content.append(content, style="bright_white")
+                update_count += 1
                 
-                # Scrolling Logic
+                # Scrolling Logic - 只在内容超过一定行数时才应用滚动
                 max_text_height = console.height - 5
                 if max_text_height <= 0:
                     max_text_height = 1
@@ -233,19 +237,32 @@ class BasePlatform(ABC):
                     console.width - 4 if console.width > 4 else 1,
                 )
 
+                # 只在内容超过最大高度时才截取，减少不必要的操作
                 if len(lines) > max_text_height:
                     text_content.plain = "\n".join(
                         [line.plain for line in lines[-max_text_height:]]
                     )
-
-                # 更新 token 使用信息
-                self._update_panel_subtitle_with_token(panel, response, is_completed=False)
+                
+                # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
+                # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
+                current_time = time.time()
+                should_update_subtitle = (
+                    update_subtitle 
+                    or update_count % 10 == 0  # 每 10 次更新一次
+                    or (current_time - last_subtitle_update_time) >= subtitle_update_interval
+                )
+                
+                if should_update_subtitle:
+                    self._update_panel_subtitle_with_token(panel, response, is_completed=False)
+                    last_subtitle_update_time = current_time
+                
+                # 更新 panel（只更新内容，subtitle 更新频率已降低）
                 live.update(panel)
 
             # Process first chunk
             response += first_chunk
             if first_chunk:
-                _update_panel_content(first_chunk)
+                _update_panel_content(first_chunk, update_subtitle=True)  # 第一次更新时更新 subtitle
 
             # 缓存机制：降低更新频率，减少界面闪烁
             buffer = ""
@@ -282,24 +299,8 @@ class BasePlatform(ABC):
                     return response
 
             _flush_buffer()
-            # 最后更新时也需要应用滚动逻辑，确保显示正确
-            # 注意：不要重置 text_content.plain，因为 _flush_buffer 已经通过 _update_panel_content 更新了内容
-            # 只需要确保滚动逻辑正确应用
-            max_text_height = console.height - 5
-            if max_text_height <= 0:
-                max_text_height = 1
-
-            lines = text_content.wrap(
-                console,
-                console.width - 4 if console.width > 4 else 1,
-            )
-
-            if len(lines) > max_text_height:
-                # 只保留最后 max_text_height 行
-                text_content.plain = "\n".join(
-                    [line.plain for line in lines[-max_text_height:]]
-                )
-
+            # 最后更新 subtitle 和 panel
+            # 注意：使用 Rich 的内置滚动（vertical_overflow="crop"），不需要手动截取内容
             end_time = time.time()
             duration = end_time - start_time
             self._update_panel_subtitle_with_token(panel, response, is_completed=True, duration=duration)
