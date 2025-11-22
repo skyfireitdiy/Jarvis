@@ -1005,6 +1005,7 @@ def apply_library_replacement(
     pruned_dynamic: Set[int] = set()  # 动态累计的"将被剪除"的函数集合（不含选中根）
     selected_roots: List[Tuple[int, Dict[str, Any]]] = []  # 实时选中的可替代根（fid, LLM结果）
     processed_roots: Set[int] = set()  # 已处理（评估或跳过）的根集合
+    root_funcs_processed: Set[int] = set()  # 已处理的初始根函数集合（用于进度显示）
     last_ckpt_saved = 0  # 上次保存的计数
 
     # 若存在匹配的断点文件，则加载恢复
@@ -1030,6 +1031,11 @@ def apply_library_replacement(
             selected_roots = sr_list
         except Exception:
             selected_roots = []
+        # 恢复已处理的初始根函数集合（从 processed_roots 中筛选出在 root_funcs 中的）
+        try:
+            root_funcs_processed = {fid for fid in processed_roots if fid in root_funcs}
+        except Exception:
+            root_funcs_processed = set()
         typer.secho(
             f"[c2rust-library] 已从断点恢复: 已评估={eval_counter}, 已处理根={len(processed_roots)}, 已剪除={len(pruned_dynamic)}, 已选中替代根={len(selected_roots)}",
             fg=typer.colors.YELLOW,
@@ -1067,7 +1073,7 @@ def apply_library_replacement(
         except Exception:
             pass
 
-    def _evaluate_node(fid: int) -> None:
+    def _evaluate_node(fid: int, is_root_func: bool = False) -> None:
         nonlocal eval_counter
         # 限流
         if max_funcs is not None and eval_counter >= max_funcs:
@@ -1080,10 +1086,20 @@ def apply_library_replacement(
         desc = _collect_descendants(fid, adj_func, desc_cache)
         rec_meta = by_id.get(fid, {})
         label = rec_meta.get("qualified_name") or rec_meta.get("name") or f"sym_{fid}"
-        # 计算进度：已评估的根函数数 / 总根函数数
+        # 计算进度：区分初始根函数和递归评估的子节点
         total_roots = len(root_funcs)
-        current_progress = len(processed_roots) + 1  # +1 因为当前这个即将被处理
-        progress_info = f"({current_progress}/{total_roots})" if total_roots > 0 else ""
+        total_evaluated = len(processed_roots) + 1  # +1 因为当前这个即将被处理
+        if is_root_func:
+            # 初始根函数：显示 (当前根函数索引/总根函数数)
+            root_progress = len(root_funcs_processed) + 1
+            progress_info = f"({root_progress}/{total_roots})" if total_roots > 0 else ""
+        else:
+            # 递归评估的子节点：显示 (当前根函数索引/总根函数数, 总评估节点数)
+            root_progress = len(root_funcs_processed)
+            if total_roots > 0:
+                progress_info = f"({root_progress}/{total_roots}, 总评估={total_evaluated})"
+            else:
+                progress_info = f"(总评估={total_evaluated})"
         typer.secho(
             f"[c2rust-library] {progress_info} 正在评估: {label} (ID: {fid}), 子树函数数={len(desc)}",
             fg=typer.colors.CYAN,
@@ -1097,6 +1113,8 @@ def apply_library_replacement(
         )
         eval_counter += 1
         processed_roots.add(fid)
+        if is_root_func:
+            root_funcs_processed.add(fid)
         res["mode"] = "llm"
         _periodic_checkpoint_save()
 
@@ -1115,10 +1133,20 @@ def apply_library_replacement(
                     conf = 0.0
                 libs_str = ", ".join(libs) if libs else "(未指定库)"
                 apis_str = ", ".join([str(a) for a in apis]) if isinstance(apis, list) else (api if api else "")
-                # 计算进度：已评估的根函数数 / 总根函数数
+                # 计算进度：区分初始根函数和递归评估的子节点
                 total_roots = len(root_funcs)
-                current_progress = len(processed_roots)
-                progress_info = f"({current_progress}/{total_roots})" if total_roots > 0 else ""
+                if is_root_func:
+                    # 初始根函数：显示 (当前根函数索引/总根函数数)
+                    root_progress = len(root_funcs_processed)
+                    progress_info = f"({root_progress}/{total_roots})" if total_roots > 0 else ""
+                else:
+                    # 递归评估的子节点：显示 (当前根函数索引/总根函数数, 总评估节点数)
+                    root_progress = len(root_funcs_processed)
+                    total_evaluated = len(processed_roots)
+                    if total_roots > 0:
+                        progress_info = f"({root_progress}/{total_roots}, 总评估={total_evaluated})"
+                    else:
+                        progress_info = f"(总评估={total_evaluated})"
                 msg = f"[c2rust-library] {progress_info} 可替换: {label} -> 库: {libs_str}"
                 if apis_str:
                     msg += f"; 参考API: {apis_str}"
@@ -1135,7 +1163,7 @@ def apply_library_replacement(
                         err=True,
                     )
                     for ch in adj_func.get(fid, []):
-                        _evaluate_node(ch)
+                        _evaluate_node(ch, is_root_func=False)
                 else:
                     # 即时剪枝（不含根）
                     to_prune = set(desc)
@@ -1153,13 +1181,13 @@ def apply_library_replacement(
             else:
                 # 若不可替代，继续评估其子节点（深度优先）
                 for ch in adj_func.get(fid, []):
-                    _evaluate_node(ch)
+                    _evaluate_node(ch, is_root_func=False)
         except Exception:
             pass
 
     # 对每个候选根进行评估；若根不可替代将递归评估其子节点
     for fid in root_funcs:
-        _evaluate_node(fid)
+        _evaluate_node(fid, is_root_func=True)
 
     # 剪枝集合来自动态评估阶段的累计结果
     pruned_funcs: Set[int] = set(pruned_dynamic)
