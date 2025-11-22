@@ -923,8 +923,12 @@ class Agent:
 
         return response
 
-    def generate_summary(self) -> str:
+    def generate_summary(self, for_token_limit: bool = False) -> str:
         """生成对话历史摘要
+
+        参数:
+            for_token_limit: 如果为True，表示由于token限制触发的summary，使用SUMMARY_REQUEST_PROMPT
+                            如果为False，表示任务完成时的summary，使用用户传入的summary_prompt
 
         返回:
             str: 包含对话摘要的字符串
@@ -936,13 +940,19 @@ class Agent:
         try:
             if not self.model:
                 raise RuntimeError("Model not initialized")
-            # 优先使用外部传入的 summary_prompt；如为空则回退到默认的会话摘要请求
+            
             print("🔍 开始生成对话历史摘要...")
-            safe_summary_prompt = self.summary_prompt or ""
-            if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() != "":
-                prompt_to_use = safe_summary_prompt
-            else:
+            
+            if for_token_limit:
+                # token限制触发的summary：使用SUMMARY_REQUEST_PROMPT进行上下文压缩
                 prompt_to_use = self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
+            else:
+                # 任务完成时的summary：使用用户传入的summary_prompt或DEFAULT_SUMMARY_PROMPT
+                safe_summary_prompt = self.summary_prompt or ""
+                if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() != "":
+                    prompt_to_use = safe_summary_prompt
+                else:
+                    prompt_to_use = DEFAULT_SUMMARY_PROMPT
 
             summary = self.model.chat_until_success(prompt_to_use)  # type: ignore
             # 防御: 可能返回空响应(None或空字符串)，统一为空字符串并告警
@@ -986,7 +996,8 @@ class Agent:
 
     def _handle_history_with_summary(self) -> str:
         """使用摘要方式处理历史"""
-        summary = self.generate_summary()
+        # token限制触发的summary，使用SUMMARY_REQUEST_PROMPT
+        summary = self.generate_summary(for_token_limit=True)
 
         # 先获取格式化的摘要消息
         formatted_summary = ""
