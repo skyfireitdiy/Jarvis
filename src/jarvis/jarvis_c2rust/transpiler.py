@@ -1872,24 +1872,62 @@ class Transpiler:
             # 提取编译参数
             compile_flags = self._extract_compile_flags(rec.file)
             
-            # 获取从初始commit到当前commit的变更作为上下文
+            # 获取从初始commit到当前commit的变更作为上下文（每次review都必须获取）
             commit_diff = ""
+            diff_status = ""  # 用于记录diff获取状态
             if self._current_function_start_commit:
                 current_commit = self._get_crate_commit_hash()
-                if current_commit and current_commit != self._current_function_start_commit:
-                    try:
-                        # 注意：transpile()开始时已切换到crate目录，此处无需再次切换
-                        commit_diff = get_diff_between_commits(self._current_function_start_commit, current_commit)
-                        if commit_diff and not commit_diff.startswith("获取") and not commit_diff.startswith("发生"):
-                            # 成功获取diff，限制长度避免上下文过大
-                            # 使用输入窗口的50%转换为字符数（由于每次重新创建agent，无法获取剩余token）
-                            max_input_tokens = get_max_input_token_count(self.llm_group)
-                            max_diff_chars = max_input_tokens * 2  # 最大输入token数量的一半转换为字符数
-                            
-                            if len(commit_diff) > max_diff_chars:
-                                commit_diff = commit_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
-                    except Exception as e:
-                        typer.secho(f"[c2rust-transpiler][review] 获取commit差异失败: {e}", fg=typer.colors.YELLOW)
+                if current_commit:
+                    if current_commit == self._current_function_start_commit:
+                        # commit相同，说明没有变更
+                        commit_diff = "(无变更：当前commit与函数开始时的commit相同)"
+                        diff_status = "no_change"
+                    else:
+                        # commit不同，获取diff
+                        try:
+                            # 注意：transpile()开始时已切换到crate目录，此处无需再次切换
+                            commit_diff = get_diff_between_commits(self._current_function_start_commit, current_commit)
+                            if commit_diff and not commit_diff.startswith("获取") and not commit_diff.startswith("发生"):
+                                # 成功获取diff，限制长度避免上下文过大
+                                # 优先使用agent的剩余token数量，回退到输入窗口限制
+                                max_diff_chars = None
+                                try:
+                                    # 优先尝试使用已有的agent获取剩余token（更准确，包含对话历史）
+                                    review_key = f"review::{rec.id}"
+                                    agent = self._current_agents.get(review_key)
+                                    if agent:
+                                        remaining_tokens = agent.get_remaining_token_count()
+                                        # 使用剩余token的50%作为字符限制（1 token ≈ 4字符，所以 remaining_tokens * 0.5 * 4 = remaining_tokens * 2）
+                                        max_diff_chars = int(remaining_tokens * 2)
+                                        if max_diff_chars <= 0:
+                                            max_diff_chars = None
+                                except Exception:
+                                    pass
+                                
+                                # 回退方案2：使用输入窗口的50%转换为字符数
+                                if max_diff_chars is None:
+                                    max_input_tokens = get_max_input_token_count(self.llm_group)
+                                    max_diff_chars = max_input_tokens * 2  # 最大输入token数量的一半转换为字符数
+                                
+                                if len(commit_diff) > max_diff_chars:
+                                    commit_diff = commit_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
+                                diff_status = "success"
+                            else:
+                                # 获取失败，保留错误信息
+                                diff_status = "error"
+                                typer.secho(f"[c2rust-transpiler][review] 获取commit差异失败: {commit_diff}", fg=typer.colors.YELLOW)
+                        except Exception as e:
+                            commit_diff = f"获取commit差异时发生异常: {str(e)}"
+                            diff_status = "error"
+                            typer.secho(f"[c2rust-transpiler][review] 获取commit差异失败: {e}", fg=typer.colors.YELLOW)
+                else:
+                    # 无法获取当前commit
+                    commit_diff = "(无法获取当前commit id)"
+                    diff_status = "no_current_commit"
+            else:
+                # 没有保存函数开始时的commit
+                commit_diff = "(未记录函数开始时的commit id)"
+                diff_status = "no_start_commit"
             
             usr_p_lines = [
                 f"待审查函数：{rec.qname or rec.name}",
@@ -1971,15 +2009,19 @@ class Transpiler:
                 "</CRATE_TREE>",
             ])
             
-            # 添加commit变更上下文（如果存在）
-            if commit_diff:
+            # 添加commit变更上下文（每次review都必须包含）
+            usr_p_lines.extend([
+                "",
+                "从函数开始到当前的commit变更（用于了解代码变更历史和上下文）：",
+                "<COMMIT_DIFF>",
+                commit_diff,
+                "</COMMIT_DIFF>",
+                "",
+            ])
+            
+            # 根据diff状态添加不同的说明
+            if diff_status == "success":
                 usr_p_lines.extend([
-                    "",
-                    "从函数开始到当前的commit变更（用于了解代码变更历史和上下文）：",
-                    "<COMMIT_DIFF>",
-                    commit_diff,
-                    "</COMMIT_DIFF>",
-                    "",
                     "**重要：commit变更上下文说明**",
                     "- 上述diff显示了从函数开始处理时的commit到当前commit之间的所有变更",
                     "- 这些变更可能包括：当前函数的实现、依赖函数的实现、模块结构的调整等",
@@ -1988,9 +2030,13 @@ class Transpiler:
                     "- 在审查破坏性变更时，请特别关注这些变更对现有代码的影响",
                     "- 如果发现变更中存在问题（如破坏性变更、文件结构不合理等），请在审查报告中指出",
                 ])
-            else:
+            elif diff_status == "no_change":
                 usr_p_lines.extend([
-                    "",
+                    "**注意**：当前commit与函数开始时的commit相同，说明没有代码变更。请使用 read_code 工具读取目标模块文件的最新内容进行审查。",
+                ])
+            else:
+                # diff_status 为 "error"、"no_current_commit" 或 "no_start_commit"
+                usr_p_lines.extend([
                     "**注意**：由于无法获取commit差异信息，请使用 read_code 工具读取目标模块文件的最新内容进行审查。",
                 ])
             
@@ -2045,23 +2091,18 @@ class Transpiler:
 
         i = 0
         max_iterations = self.review_max_iterations
-        # 每次都重新创建 Review Agent，确保基于最新代码审查，不依赖历史对话
+        # 复用 Review Agent（仅在本函数生命周期内构建一次）
         # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        review_key = f"review::{rec.id}"
         sys_p_init, usr_p_init, sum_p_init = build_review_prompts()
         
         # 获取函数信息用于 Agent name
         fn_name = rec.qname or rec.name or f"fn_{rec.id}"
         agent_name = f"C2Rust-Review-Agent({fn_name})"
-
-        # 0表示无限重试，否则限制迭代次数
-        use_direct_model_review = False  # 标记是否使用直接模型调用
-        parse_failed = False  # 标记上一次解析是否失败
-        parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
-        while max_iterations == 0 or i < max_iterations:
-            # 每次迭代都重新创建 Agent，清除之前的对话历史和记忆，确保基于最新代码审查
-            typer.secho(f"[c2rust-transpiler][review] 创建新的审查 Agent（第 {i+1} 次迭代）", fg=typer.colors.CYAN)
-            agent = Agent(
+        
+        if self._current_agents.get(review_key) is None:
+            self._current_agents[review_key] = Agent(
                 system_prompt=sys_p_init,
                 name=agent_name,
                 model_group=self.llm_group,
@@ -2073,9 +2114,31 @@ class Transpiler:
                 use_methodology=False,
                 use_analysis=False,
             )
+
+        # 0表示无限重试，否则限制迭代次数
+        use_direct_model_review = False  # 标记是否使用直接模型调用
+        parse_failed = False  # 标记上一次解析是否失败
+        parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
+        while max_iterations == 0 or i < max_iterations:
+            agent = self._current_agents[review_key]
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-            # 如果是修复后的审查（i > 0），添加代码已更新的提示
+            # 如果是修复后的审查（i > 0），强制要求重新读取代码
             if i > 0:
+                # 修复后重新创建 Agent，清除之前的对话历史和记忆，确保基于最新代码审查
+                typer.secho(f"[c2rust-transpiler][review] 代码已修复，重新创建审查 Agent 以清除历史（第 {i+1} 次迭代）", fg=typer.colors.YELLOW)
+                self._current_agents[review_key] = Agent(
+                    system_prompt=sys_p_init,
+                    name=agent_name,
+                    model_group=self.llm_group,
+                    summary_prompt=sum_p_init,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code", "read_symbols"],
+                    non_interactive=self.non_interactive,
+                    use_methodology=False,
+                    use_analysis=False,
+                )
+                agent = self._current_agents[review_key]
                 
                 code_changed_notice = "\n".join([
                     "",
