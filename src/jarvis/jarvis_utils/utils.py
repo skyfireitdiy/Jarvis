@@ -1346,8 +1346,8 @@ def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
     changed = _ask_config_int(
         config_data, ask_all,
         "JARVIS_BUILD_VALIDATION_TIMEOUT",
-        "构建验证的超时时间（秒，默认600秒）",
-        600,
+        "构建验证的超时时间（秒，默认30秒）",
+        30,
     ) or changed
     changed = _ask_config_bool(
         config_data, ask_all,
