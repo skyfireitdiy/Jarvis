@@ -157,6 +157,21 @@ class SubAgentTool:
                 non_interactive=parent_non_interactive,
             )
 
+            # 禁用 sub_agent 和 sub_code_agent，避免无限递归
+            try:
+                # 获取当前启用的工具列表
+                tool_registry = agent.get_tool_registry()
+                if tool_registry:
+                    current_tools = [t.get("name") for t in tool_registry.get_all_tools() if isinstance(t, dict) and t.get("name")]
+                    # 过滤掉禁止的工具
+                    forbidden_tools = {"sub_agent", "sub_code_agent"}
+                    filtered_tools = [t for t in current_tools if t not in forbidden_tools]
+                    if filtered_tools:
+                        agent.set_use_tools(filtered_tools)
+            except Exception:
+                # 如果禁用工具失败，不影响主流程
+                pass
+
             # 校验子Agent所用模型是否有效，必要时回退到平台可用模型
             try:
                 platform = getattr(agent, "model", None)

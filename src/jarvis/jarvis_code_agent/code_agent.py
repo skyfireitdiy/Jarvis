@@ -117,10 +117,14 @@ class CodeAgent(Agent):
         project_rules = self._read_project_rules()
 
         combined_parts: List[str] = []
+        loaded_rule_names: List[str] = []  # 记录加载的规则名称
+        
         if global_rules:
             combined_parts.append(global_rules)
+            loaded_rule_names.append("global_rule")
         if project_rules:
             combined_parts.append(project_rules)
+            loaded_rule_names.append("project_rule")
         
         # 如果指定了 rule_names，从 rules.yaml 文件中读取并添加多个规则
         if rule_names:
@@ -129,6 +133,7 @@ class CodeAgent(Agent):
                 named_rule = self._get_named_rule(rule_name)
                 if named_rule:
                     combined_parts.append(named_rule)
+                    loaded_rule_names.append(rule_name)
 
         if combined_parts:
             merged_rules = "\n\n".join(combined_parts)
@@ -136,6 +141,10 @@ class CodeAgent(Agent):
                 f"{code_system_prompt}\n\n"
                 f"<rules>\n{merged_rules}\n</rules>"
             )
+            # 显示加载的规则名称
+            if loaded_rule_names:
+                rules_display = ", ".join(loaded_rule_names)
+                print(f"ℹ️ 已加载规则: {rules_display}")
         
         # 调用父类 Agent 的初始化
         # 默认禁用方法论和分析，但允许通过 kwargs 覆盖
