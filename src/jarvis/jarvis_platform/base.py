@@ -79,6 +79,36 @@ class BasePlatform(ABC):
         """检查平台是否支持文件上传"""
         return False
 
+    def _format_progress_bar(self, percent: float, width: int = 20) -> str:
+        """格式化进度条字符串
+        
+        参数:
+            percent: 百分比 (0-100)
+            width: 进度条宽度（字符数）
+            
+        返回:
+            str: 格式化的进度条字符串
+        """
+        # 限制百分比范围
+        percent = max(0, min(100, percent))
+        
+        # 计算填充的字符数
+        filled = int(width * percent / 100)
+        empty = width - filled
+        
+        # 根据百分比选择颜色
+        if percent >= 90:
+            color = "red"
+        elif percent >= 80:
+            color = "yellow"
+        else:
+            color = "green"
+        
+        # 构建进度条：使用 █ 表示已填充，░ 表示未填充
+        bar = "█" * filled + "░" * empty
+        
+        return f"[{color}]{bar}[/{color}]"
+
     def _chat(self, message: str):
         import time
 
@@ -172,9 +202,13 @@ class BasePlatform(ABC):
                                 else:
                                     percent_color = "green"
                                 
+                                # 生成进度条
+                                progress_bar = self._format_progress_bar(usage_percent, width=15)
+                                
                                 panel.subtitle = (
                                     f"[yellow]正在回答... (按 Ctrl+C 中断) | "
-                                    f"[{percent_color}]Token: {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
+                                    f"Token: {progress_bar} "
+                                    f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
                                 )
                             else:
                                 panel.subtitle = (
@@ -260,9 +294,13 @@ class BasePlatform(ABC):
                             else:
                                 percent_color = "green"
                             
+                            # 生成进度条
+                            progress_bar = self._format_progress_bar(usage_percent, width=15)
+                            
                             panel.subtitle = (
                                 f"[bold green]✓ 对话完成耗时: {duration:.2f}秒 | "
-                                f"[{percent_color}]Token: {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
+                                f"Token: {progress_bar} "
+                                f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
                             )
                         else:
                             panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
