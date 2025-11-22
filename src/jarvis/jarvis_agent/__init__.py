@@ -261,8 +261,7 @@ class Agent:
         """
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
-            if hasattr(self, "memory_manager"):
-                self.memory_manager._ensure_memory_prompt(agent=self)
+            self.memory_manager._ensure_memory_prompt(agent=self)
         except Exception:
             pass
         
@@ -532,15 +531,7 @@ class Agent:
     def _setup_system_prompt(self):
         """设置系统提示词"""
         try:
-            if hasattr(self, "prompt_manager"):
-                prompt_text = self.prompt_manager.build_system_prompt()
-            else:
-                action_prompt = self.get_tool_usage_prompt()
-                prompt_text = f"""
-{self.system_prompt}
-
-{action_prompt}
-"""
+            prompt_text = self.prompt_manager.build_system_prompt()
             self.model.set_system_prompt(prompt_text)  # type: ignore
         except Exception:
             # 回退到原始行为，确保兼容性
@@ -597,8 +588,10 @@ class Agent:
         otherwise, fall back to calling with a single argument for compatibility.
         """
         # 优先通过用户交互封装，便于未来替换 UI
-        if hasattr(self, "user_interaction"):
+        try:
             return self.user_interaction.multiline_input(tip, print_on_empty)
+        except Exception:
+            pass
         try:
             # Try to pass the keyword for enhanced input handler
             return self.multiline_inputer(tip, print_on_empty=print_on_empty)  # type: ignore
@@ -1006,8 +999,7 @@ class Agent:
 
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
-            if hasattr(self, "memory_manager"):
-                self.memory_manager._ensure_memory_prompt(agent=self)
+            self.memory_manager._ensure_memory_prompt(agent=self)
         except Exception:
             pass
         
@@ -1041,8 +1033,7 @@ class Agent:
         """使用文件上传方式处理历史"""
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
-            if hasattr(self, "memory_manager"):
-                self.memory_manager._ensure_memory_prompt(agent=self)
+            self.memory_manager._ensure_memory_prompt(agent=self)
         except Exception:
             pass
         
@@ -1114,13 +1105,12 @@ class Agent:
             
             # 关键流程：直接调用 task_analyzer 执行任务分析
             try:
-                if hasattr(self, "task_analyzer"):
-                    self.task_analyzer._on_before_summary(
-                        agent=self,
-                        prompt=safe_summary_prompt,
-                        auto_completed=auto_completed,
-                        need_summary=self.need_summary,
-                    )
+                self.task_analyzer._on_before_summary(
+                    agent=self,
+                    prompt=safe_summary_prompt,
+                    auto_completed=auto_completed,
+                    need_summary=self.need_summary,
+                )
             except Exception:
                 pass
             
@@ -1161,22 +1151,20 @@ class Agent:
 
             # 关键流程：直接调用 task_analyzer 和 memory_manager
         try:
-            if hasattr(self, "task_analyzer"):
-                self.task_analyzer._on_task_completed(
-                    agent=self,
-                    auto_completed=auto_completed,
-                    need_summary=self.need_summary,
-                )
+            self.task_analyzer._on_task_completed(
+                agent=self,
+                auto_completed=auto_completed,
+                need_summary=self.need_summary,
+            )
         except Exception:
             pass
         
         try:
-            if hasattr(self, "memory_manager"):
-                self.memory_manager._ensure_memory_prompt(
-                    agent=self,
-                    auto_completed=auto_completed,
-                    need_summary=self.need_summary,
-                )
+            self.memory_manager._ensure_memory_prompt(
+                agent=self,
+                auto_completed=auto_completed,
+                need_summary=self.need_summary,
+            )
         except Exception:
             pass
         
@@ -1201,10 +1189,12 @@ class Agent:
 
         """
         # 优先使用 PromptManager 以保持逻辑集中
-        if hasattr(self, "prompt_manager"):
+        try:
             return self.prompt_manager.build_default_addon_prompt(need_complete)
+        except Exception:
+            pass
 
-        # 结构化系统指令
+        # 结构化系统指令（回退方案）
         action_handlers = ", ".join([handler.name() for handler in self.output_handler])
 
         # 任务完成提示
@@ -1258,13 +1248,12 @@ class Agent:
             
             # 关键流程：直接调用 memory_manager 重置任务状态
             try:
-                if hasattr(self, "memory_manager"):
-                    self.memory_manager._on_task_started(
-                        agent=self,
-                        name=self.name,
-                        description=self.description,
-                        user_input=self.session.prompt,
-                    )
+                self.memory_manager._on_task_started(
+                    agent=self,
+                    name=self.name,
+                    description=self.description,
+                    user_input=self.session.prompt,
+                )
             except Exception:
                 pass
             

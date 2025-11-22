@@ -175,7 +175,7 @@ class CodeAgent(Agent):
         try:
             # 获取当前Agent的model实例
             parent_model = None
-            if hasattr(self, 'model') and self.model:
+            if self.model:
                 parent_model = self.model
             
             self.context_recommender = ContextRecommender(
