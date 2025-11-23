@@ -888,7 +888,7 @@ class Optimizer:
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
             # CodeAgent 在 crate 目录下创建和执行
-            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent = CodeAgent(name="ClippyWarningEliminator", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][clippy]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -943,7 +943,7 @@ class Optimizer:
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
             # CodeAgent 在 crate 目录下创建和执行
-            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent = CodeAgent(name="UnsafeCleanupAgent", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][unsafe-cleanup]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -998,7 +998,7 @@ class Optimizer:
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
             # CodeAgent 在 crate 目录下创建和执行
-            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent = CodeAgent(name="StructureOptimizer", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][structure]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -1053,7 +1053,7 @@ class Optimizer:
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
             # CodeAgent 在 crate 目录下创建和执行
-            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent = CodeAgent(name="VisibilityOptimizer", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][visibility]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -1108,7 +1108,7 @@ class Optimizer:
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
             # CodeAgent 在 crate 目录下创建和执行
-            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent = CodeAgent(name="DocumentationAgent", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][doc]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -1177,7 +1177,7 @@ class Optimizer:
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
             # CodeAgent 在 crate 目录下创建和执行
-            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent = CodeAgent(name="CrateOptimizer", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent]", suffix="")
         finally:
             os.chdir(prev_cwd)
@@ -1282,7 +1282,7 @@ class Optimizer:
                 # 修复前执行 cargo fmt
                 _run_cargo_fmt(crate)
                 # CodeAgent 在 crate 目录下创建和执行
-                agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+                agent = CodeAgent(name=f"BuildFixAgent-iter{attempt}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
             finally:
                 os.chdir(prev_cwd)
