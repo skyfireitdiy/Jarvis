@@ -50,6 +50,8 @@ class FallbackBuildValidator(BuildValidatorBase):
             
             if errors:
                 duration = time.time() - start_time
+                print(f"❌ 基础语法检查失败（耗时 {duration:.2f} 秒）")
+                print(f"错误信息：语法检查失败\n{chr(10).join(errors[:5])}")
                 return BuildResult(
                     success=False,
                     output="\n".join(errors),
@@ -59,6 +61,7 @@ class FallbackBuildValidator(BuildValidatorBase):
                 )
         
         duration = time.time() - start_time
+        print(f"✅ 基础语法检查通过（耗时 {duration:.2f} 秒，未检测到构建系统）")
         return BuildResult(
             success=True,
             output="基础语法检查通过（未检测到构建系统）",

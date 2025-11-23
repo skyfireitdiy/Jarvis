@@ -35,9 +35,15 @@ class CMakeBuildValidator(BuildValidatorBase):
                 )
                 duration = time.time() - start_time
                 success = returncode == 0
+                output = stdout + stderr
+                if success:
+                    print(f"✅ CMake 构建验证成功（耗时 {duration:.2f} 秒）")
+                else:
+                    print(f"❌ CMake 构建验证失败（耗时 {duration:.2f} 秒）")
+                    print(f"错误信息：CMake构建失败\n{output[:500]}")
                 return BuildResult(
                     success=success,
-                    output=stdout + stderr,
+                    output=output,
                     error_message=None if success else "CMake构建失败",
                     build_system=BuildSystem.C_CMAKE,
                     duration=duration,
@@ -52,9 +58,15 @@ class CMakeBuildValidator(BuildValidatorBase):
         duration = time.time() - start_time
         
         success = returncode == 0
+        output = stdout + stderr
+        if success:
+            print(f"✅ CMake 配置验证成功（耗时 {duration:.2f} 秒）")
+        else:
+            print(f"❌ CMake 配置验证失败（耗时 {duration:.2f} 秒）")
+            print(f"错误信息：CMake配置失败\n{output[:500]}")
         return BuildResult(
             success=success,
-            output=stdout + stderr,
+            output=output,
             error_message=None if success else "CMake配置失败",
             build_system=BuildSystem.C_CMAKE,
             duration=duration,

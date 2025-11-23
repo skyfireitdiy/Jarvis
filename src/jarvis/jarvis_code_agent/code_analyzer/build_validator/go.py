@@ -34,8 +34,14 @@ class GoBuildValidator(BuildValidatorBase):
         if not success:
             # 尝试解析错误信息（包括编译错误和测试失败）
             error_message = self._parse_go_errors(output)
+            print(f"❌ Go 构建验证失败（耗时 {duration:.2f} 秒）")
+            if error_message:
+                print(f"错误信息：\n{error_message}")
+            else:
+                print(f"输出：\n{output[:500]}")
         else:
             error_message = None
+            print(f"✅ Go 构建验证成功（耗时 {duration:.2f} 秒）")
         
         return BuildResult(
             success=success,

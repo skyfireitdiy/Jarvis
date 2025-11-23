@@ -37,6 +37,12 @@ class JavaGradleBuildValidator(BuildValidatorBase):
         success = returncode == 0
         output = stdout + stderr
         
+        if success:
+            print(f"✅ Gradle 构建验证成功（耗时 {duration:.2f} 秒）")
+        else:
+            print(f"❌ Gradle 构建验证失败（耗时 {duration:.2f} 秒）")
+            print(f"错误信息：Gradle编译失败\n{output[:500]}")
+        
         return BuildResult(
             success=success,
             output=output,

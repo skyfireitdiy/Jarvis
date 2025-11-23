@@ -33,9 +33,15 @@ class NodeJSBuildValidator(BuildValidatorBase):
             )
             duration = time.time() - start_time
             success = returncode == 0
+            output = stdout + stderr
+            if success:
+                print(f"✅ Node.js (TypeScript) 构建验证成功（耗时 {duration:.2f} 秒）")
+            else:
+                print(f"❌ Node.js (TypeScript) 构建验证失败（耗时 {duration:.2f} 秒）")
+                print(f"错误信息：TypeScript类型检查失败\n{output[:500]}")
             return BuildResult(
                 success=success,
-                output=stdout + stderr,
+                output=output,
                 error_message=None if success else "TypeScript类型检查失败",
                 build_system=BuildSystem.NODEJS,
                 duration=duration,
@@ -55,9 +61,15 @@ class NodeJSBuildValidator(BuildValidatorBase):
                         )
                         duration = time.time() - start_time
                         success = returncode == 0
+                        output = stdout + stderr
+                        if success:
+                            print(f"✅ Node.js (npm build) 构建验证成功（耗时 {duration:.2f} 秒）")
+                        else:
+                            print(f"❌ Node.js (npm build) 构建验证失败（耗时 {duration:.2f} 秒）")
+                            print(f"错误信息：npm build失败\n{output[:500]}")
                         return BuildResult(
                             success=success,
-                            output=stdout + stderr,
+                            output=output,
                             error_message=None if success else "npm build失败",
                             build_system=BuildSystem.NODEJS,
                             duration=duration,
@@ -75,16 +87,19 @@ class NodeJSBuildValidator(BuildValidatorBase):
                     timeout=15,
                 )
                 duration = time.time() - start_time
+                output = stdout + stderr
                 # eslint返回非0可能是警告，不算失败
+                print(f"✅ Node.js (eslint) 构建验证成功（耗时 {duration:.2f} 秒）")
                 return BuildResult(
                     success=True,  # 仅检查语法，警告不算失败
-                    output=stdout + stderr,
+                    output=output,
                     error_message=None,
                     build_system=BuildSystem.NODEJS,
                     duration=duration,
                 )
         
         duration = time.time() - start_time
+        print(f"✅ Node.js 构建验证成功（耗时 {duration:.2f} 秒，无构建脚本）")
         return BuildResult(
             success=True,
             output="Node.js项目验证通过（无构建脚本）",

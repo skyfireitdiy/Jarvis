@@ -91,6 +91,8 @@ class PythonBuildValidator(BuildValidatorBase):
                     error_message = "\n".join(errors[:5])  # 最多显示5个文件的错误
                     if len(errors) > 5:
                         error_message += f"\n... 还有 {len(errors) - 5} 个文件存在错误"
+                print(f"❌ Python 构建验证失败（耗时 {duration:.2f} 秒）")
+                print(f"错误信息：\n{error_message}")
                 return BuildResult(
                     success=False,
                     output=full_output,
@@ -124,6 +126,7 @@ class PythonBuildValidator(BuildValidatorBase):
                 # 检查是否是"没有找到测试"的情况（这不算失败）
                 if "no tests ran" in output.lower() or "no tests found" in output.lower():
                     # 没有测试文件，但语法检查通过，视为成功
+                    print(f"✅ Python 构建验证成功（耗时 {duration:.2f} 秒，未发现测试文件）")
                     return BuildResult(
                         success=True,
                         output="Python语法检查通过（未发现测试文件）",
@@ -132,8 +135,14 @@ class PythonBuildValidator(BuildValidatorBase):
                         duration=duration,
                     )
                 error_msg = "Python项目验证失败（编译或测试失败）"
+            print(f"❌ Python 构建验证失败（耗时 {duration:.2f} 秒）")
+            if error_msg:
+                print(f"错误信息：\n{error_msg}")
+            else:
+                print(f"输出：\n{output[:500]}")
         else:
             error_msg = None
+            print(f"✅ Python 构建验证成功（耗时 {duration:.2f} 秒）")
         
         return BuildResult(
             success=success,
