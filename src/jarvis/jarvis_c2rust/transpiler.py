@@ -2483,12 +2483,23 @@ class Transpiler:
         # 写入 JSONL 映射（带源位置，用于区分同名符号）
         self.symbol_map.add(rec, module, rust_symbol or (rec.name or f"fn_{rec.id}"))
 
+        # 获取当前 commit id 并记录
+        current_commit = self._get_crate_commit_hash()
+        
         # 更新进度：已转换集合
         converted = self.progress.get("converted") or []
         if rec.id not in converted:
             converted.append(rec.id)
         self.progress["converted"] = converted
         self.progress["current"] = None
+        
+        # 记录每个已转换函数的 commit id
+        converted_commits = self.progress.get("converted_commits") or {}
+        if current_commit:
+            converted_commits[str(rec.id)] = current_commit
+            self.progress["converted_commits"] = converted_commits
+            typer.secho(f"[c2rust-transpiler][progress] 已记录函数 {rec.id} 的 commit: {current_commit}", fg=typer.colors.CYAN)
+        
         self._save_progress()
 
     def transpile(self) -> None:
@@ -2549,6 +2560,31 @@ class Transpiler:
             # 计算需要处理的函数总数（排除已完成的）
             total_to_process = len([fid for fid in seq if fid not in done])
             current_index = 0
+            
+            # 恢复时，reset 到最后一个已转换函数的 commit id
+            if self.resume and done:
+                converted_commits = self.progress.get("converted_commits") or {}
+                if converted_commits:
+                    # 找到最后一个已转换函数的 commit id
+                    last_commit = None
+                    for fid in reversed(seq):
+                        if fid in done:
+                            commit_id = converted_commits.get(str(fid))
+                            if commit_id:
+                                last_commit = commit_id
+                                break
+                    
+                    if last_commit:
+                        current_commit = self._get_crate_commit_hash()
+                        if current_commit != last_commit:
+                            typer.secho(f"[c2rust-transpiler][resume] 检测到代码状态不一致，正在 reset 到最后一个已转换函数的 commit: {last_commit}", fg=typer.colors.YELLOW)
+                            if self._reset_to_commit(last_commit):
+                                typer.secho(f"[c2rust-transpiler][resume] 已 reset 到 commit: {last_commit}", fg=typer.colors.GREEN)
+                            else:
+                                typer.secho(f"[c2rust-transpiler][resume] reset 失败，继续使用当前代码状态", fg=typer.colors.YELLOW)
+                        else:
+                            typer.secho(f"[c2rust-transpiler][resume] 代码状态一致，无需 reset", fg=typer.colors.CYAN)
+            
             typer.secho(f"[c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)} 待处理={total_to_process}", fg=typer.colors.BLUE)
 
             for fid in seq:
