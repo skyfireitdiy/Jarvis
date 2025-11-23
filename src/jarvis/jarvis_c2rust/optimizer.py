@@ -838,6 +838,7 @@ class Optimizer:
     def _codeagent_eliminate_clippy_warnings(self, target_files: List[Path], clippy_output: str) -> None:
         """
         使用 CodeAgent 消除 clippy 告警。
+        每次只修复第一个告警，然后迭代直到没有告警。
         
         注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
         """
@@ -851,47 +852,123 @@ class Optimizer:
             file_list.append(rel)
             self.stats.files_scanned += 1
 
-        prompt_lines: List[str] = [
-            "你是资深 Rust 代码工程师。请在当前 crate 下消除 Clippy 告警，并以补丁形式输出修改：",
-            f"- crate 根目录：{crate}",
-            "",
-            "本次修复仅允许修改以下文件范围（严格限制）：",
-            *[f"- {rel}" for rel in file_list],
-            "",
-            "优化目标：",
-            "1) 消除 Clippy 告警：",
-            "   - 根据以下 Clippy 告警信息，修复所有可以修复的告警；",
-            "   - 对于无法自动修复的告警，请根据 Clippy 的建议进行手动修复；",
-            "   - 如果某些告警确实需要保留（如性能优化相关的告警），可以添加 `#[allow(clippy::...)]` 注释，但需要说明理由。",
-            "",
-            "约束与范围：",
-            "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
-            "- 保持最小改动，不要进行与消除告警无关的重构或格式化。",
-            "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
-            "- 输出仅为补丁，不要输出解释或多余文本。",
-            "",
-            "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo clippy -- -W clippy::all` 进行验证；",
-            "若仍有告警，请继续输出新的补丁进行修复并再次自检，直至所有告警消除或无法进一步修复为止。",
-            "",
-            "Clippy 告警信息如下：",
-            "<CLIPPY_WARNINGS>",
-            clippy_output,
-            "</CLIPPY_WARNINGS>",
-        ]
-        prompt = "\n".join(prompt_lines)
-        prompt = self._append_additional_notes(prompt)
         # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
         prev_cwd = os.getcwd()
-        typer.secho("[c2rust-optimizer][codeagent][clippy] 正在调用 CodeAgent 消除 Clippy 告警...", fg=typer.colors.CYAN)
+        max_iterations = 100  # 最大迭代次数，避免无限循环
+        iteration = 0
+        
         try:
             os.chdir(str(crate))
-            # 修复前执行 cargo fmt
-            _run_cargo_fmt(crate)
-            # CodeAgent 在 crate 目录下创建和执行
-            agent = CodeAgent(name="ClippyWarningEliminator", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
-            agent.run(prompt, prefix="[c2rust-optimizer][codeagent][clippy]", suffix="")
+            
+            # 循环修复告警，每次只修复第一个
+            while iteration < max_iterations:
+                iteration += 1
+                
+                # 检查当前告警
+                has_warnings, current_clippy_output = _check_clippy_warnings(crate)
+                if not has_warnings:
+                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration - 1} 次）", fg=typer.colors.GREEN)
+                    break
+                
+                # 提取第一个告警
+                first_warning = self._extract_first_warning(current_clippy_output)
+                if not first_warning:
+                    typer.secho("[c2rust-optimizer][codeagent][clippy] 无法提取第一个告警，停止修复", fg=typer.colors.YELLOW)
+                    break
+                
+                typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 次迭代：修复第一个告警", fg=typer.colors.CYAN)
+                typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第一个告警预览：{first_warning[:200]}...", fg=typer.colors.CYAN)
+                
+                # 构建提示词，只修复第一个告警
+                prompt_lines: List[str] = [
+                    "你是资深 Rust 代码工程师。请在当前 crate 下修复第一个 Clippy 告警，并以补丁形式输出修改：",
+                    f"- crate 根目录：{crate}",
+                    "",
+                    "本次修复仅允许修改以下文件范围（严格限制）：",
+                    *[f"- {rel}" for rel in file_list],
+                    "",
+                    "重要：本次修复仅修复第一个告警，不要修复其他告警。",
+                    "",
+                    "优化目标：",
+                    "1) 修复第一个 Clippy 告警：",
+                    "   - 根据以下第一个 Clippy 告警信息，修复这个告警；",
+                    "   - 对于无法自动修复的告警，请根据 Clippy 的建议进行手动修复；",
+                    "   - 如果某些告警确实需要保留（如性能优化相关的告警），可以添加 `#[allow(clippy::...)]` 注释，但需要说明理由。",
+                    "",
+                    "约束与范围：",
+                    "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
+                    "- 保持最小改动，不要进行与消除告警无关的重构或格式化。",
+                    "- **只修复第一个告警，不要修复其他告警**。",
+                    "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
+                    "- 输出仅为补丁，不要输出解释或多余文本。",
+                    "",
+                    "第一个 Clippy 告警信息如下：",
+                    "<FIRST_WARNING>",
+                    first_warning,
+                    "</FIRST_WARNING>",
+                ]
+                prompt = "\n".join(prompt_lines)
+                prompt = self._append_additional_notes(prompt)
+                
+                # 修复前执行 cargo fmt
+                _run_cargo_fmt(crate)
+                
+                # CodeAgent 在 crate 目录下创建和执行
+                agent = CodeAgent(name=f"ClippyWarningEliminator-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+                agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][clippy][iter{iteration}]", suffix="")
+                
+                # 修复后再次检查告警，如果告警数量没有减少，可能需要停止
+                has_warnings_after, _ = _check_clippy_warnings(crate)
+                if not has_warnings_after:
+                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration} 次）", fg=typer.colors.GREEN)
+                    break
+                
+            if iteration >= max_iterations:
+                typer.secho(f"[c2rust-optimizer][codeagent][clippy] 达到最大迭代次数 ({max_iterations})，停止修复", fg=typer.colors.YELLOW)
         finally:
             os.chdir(prev_cwd)
+    
+    def _extract_first_warning(self, clippy_output: str) -> str:
+        """
+        从 clippy 输出中提取第一个告警。
+        返回第一个完整的告警信息（从 "warning:" 开始到下一个 "warning:" 或文件结束）。
+        """
+        if not clippy_output:
+            return ""
+        
+        lines = clippy_output.splitlines()
+        first_warning_lines: List[str] = []
+        in_warning = False
+        
+        for line in lines:
+            # 检测告警开始
+            if "warning:" in line.lower() and not in_warning:
+                in_warning = True
+                first_warning_lines.append(line)
+            elif in_warning:
+                # 如果遇到下一个 warning: 或明显的分隔符，停止
+                if "warning:" in line.lower() and first_warning_lines:
+                    break
+                # 如果遇到文件路径行（通常以 --> 开头），继续收集
+                if "-->" in line or line.strip().startswith("|") or line.strip() == "":
+                    first_warning_lines.append(line)
+                # 如果遇到 help: 或 note:，继续收集（这些是告警的一部分）
+                elif "help:" in line.lower() or "note:" in line.lower() or "=" in line:
+                    first_warning_lines.append(line)
+                # 如果遇到空行且已经有内容，可能是告警结束
+                elif not line.strip() and len(first_warning_lines) > 3:
+                    # 检查下一行是否还是告警相关内容
+                    continue
+                else:
+                    first_warning_lines.append(line)
+        
+        result = "\n".join(first_warning_lines).strip()
+        # 如果提取的内容太短，可能没有正确提取，返回前几行作为备选
+        if len(result) < 50 and lines:
+            # 返回前 20 行作为备选
+            result = "\n".join(lines[:20]).strip()
+        
+        return result
 
     # ========== 1) unsafe cleanup (CodeAgent) ==========
 
