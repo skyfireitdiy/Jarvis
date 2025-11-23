@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import subprocess
 from dataclasses import dataclass, asdict
@@ -527,9 +526,9 @@ class Optimizer:
                                 if self._reset_to_commit(last_commit):
                                     typer.secho(f"[c2rust-optimizer][resume] 已 reset 到 commit: {last_commit}", fg=typer.colors.GREEN)
                                 else:
-                                    typer.secho(f"[c2rust-optimizer][resume] reset 失败，继续使用当前代码状态", fg=typer.colors.YELLOW)
+                                    typer.secho("[c2rust-optimizer][resume] reset 失败，继续使用当前代码状态", fg=typer.colors.YELLOW)
                             else:
-                                typer.secho(f"[c2rust-optimizer][resume] 代码状态一致，无需 reset", fg=typer.colors.CYAN)
+                                typer.secho("[c2rust-optimizer][resume] 代码状态一致，无需 reset", fg=typer.colors.CYAN)
                 else:
                     self.processed = set()
                     self.steps_completed = set()
@@ -603,7 +602,7 @@ class Optimizer:
             # 获取当前 commit id
             current_commit = self._get_crate_commit_hash()
             if not current_commit:
-                typer.secho(f"[c2rust-optimizer][progress] 无法获取 commit id，跳过进度记录", fg=typer.colors.YELLOW)
+                typer.secho("[c2rust-optimizer][progress] 无法获取 commit id，跳过进度记录", fg=typer.colors.YELLOW)
                 return
             
             # 加载现有进度
@@ -748,7 +747,7 @@ class Optimizer:
                     typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
                     has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
                     if has_warnings:
-                        typer.secho(f"\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警", fg=typer.colors.MAGENTA)
+                        typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警", fg=typer.colors.MAGENTA)
                         self._snapshot_commit()
                         self._codeagent_eliminate_clippy_warnings(targets, clippy_output)
                         # 验证修复后是否还有告警
@@ -895,7 +894,7 @@ class Optimizer:
                 if not has_warnings:
                     typer.secho(f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration - 1} 次）", fg=typer.colors.GREEN)
                     break
-                
+
                 # 提取第一个告警
                 first_warning = self._extract_first_warning(current_clippy_output)
                 if not first_warning:
@@ -927,6 +926,15 @@ class Optimizer:
                     "- **只修复第一个告警，不要修复其他告警**。",
                     "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
                     "- 输出仅为补丁，不要输出解释或多余文本。",
+                    "",
+                    "优先级说明：",
+                    "- **如果优化过程中出现了测试不通过或编译错误，必须优先解决这些问题**；",
+                    "- 在修复告警之前，先确保代码能够正常编译和通过测试；",
+                    "- 如果修复告警导致了编译错误或测试失败，必须立即修复这些错误，然后再继续优化。",
+                    "",
+                    "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+                    "若出现编译错误或测试失败，请优先修复这些问题，然后再继续修复告警；",
+                    "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。",
                     "",
                     "第一个 Clippy 告警信息如下：",
                     "<FIRST_WARNING>",
@@ -994,7 +1002,7 @@ class Optimizer:
                 elif not line.strip() and len(first_warning_lines) > 3:
                     # 检查下一行是否还是告警相关内容
                     continue
-                else:
+        else:
                     first_warning_lines.append(line)
         
         result = "\n".join(first_warning_lines).strip()
@@ -1054,7 +1062,13 @@ class Optimizer:
                     "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
                     "- 输出仅为补丁，不要输出解释或多余文本。",
                     "",
+                    "优先级说明：",
+                    "- **如果优化过程中出现了测试不通过或编译错误，必须优先解决这些问题**；",
+                    "- 在进行 unsafe 清理之前，先确保代码能够正常编译和通过测试；",
+                    "- 如果 unsafe 清理导致了编译错误或测试失败，必须立即修复这些错误，然后再继续优化。",
+                    "",
                     "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+                    "若出现编译错误或测试失败，请优先修复这些问题，然后再继续 unsafe 清理；",
                     "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
                 ]
                 prompt = "\n".join(prompt_lines)
@@ -1124,7 +1138,13 @@ class Optimizer:
             "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
             "- 输出仅为补丁，不要输出解释或多余文本。",
             "",
+            "优先级说明：",
+            "- **如果优化过程中出现了测试不通过或编译错误，必须优先解决这些问题**；",
+            "- 在进行可见性优化之前，先确保代码能够正常编译和通过测试；",
+            "- 如果可见性优化导致了编译错误或测试失败，必须立即修复这些错误，然后再继续优化。",
+            "",
             "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+            "若出现编译错误或测试失败，请优先修复这些问题，然后再继续可见性优化；",
             "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
         ]
         prompt = "\n".join(prompt_lines)
@@ -1146,9 +1166,9 @@ class Optimizer:
                 # 修复成功，保存进度和 commit id
                 file_paths = [crate / f for f in file_list if (crate / f).exists()]
                 self._save_fix_progress("visibility_opt", "batch", file_paths if file_paths else None)
-                typer.secho(f"[c2rust-optimizer][codeagent][visibility] 可见性优化成功，已保存进度", fg=typer.colors.GREEN)
+                typer.secho("[c2rust-optimizer][codeagent][visibility] 可见性优化成功，已保存进度", fg=typer.colors.GREEN)
             else:
-                typer.secho(f"[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败", fg=typer.colors.YELLOW)
+                typer.secho("[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败", fg=typer.colors.YELLOW)
         finally:
             os.chdir(prev_cwd)
 
@@ -1189,7 +1209,13 @@ class Optimizer:
             "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
             "- 输出仅为补丁，不要输出解释或多余文本。",
             "",
+            "优先级说明：",
+            "- **如果优化过程中出现了测试不通过或编译错误，必须优先解决这些问题**；",
+            "- 在进行文档补充之前，先确保代码能够正常编译和通过测试；",
+            "- 如果文档补充导致了编译错误或测试失败，必须立即修复这些错误，然后再继续优化。",
+            "",
             "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+            "若出现编译错误或测试失败，请优先修复这些问题，然后再继续文档补充；",
             "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
         ]
         prompt = "\n".join(prompt_lines)
@@ -1211,9 +1237,9 @@ class Optimizer:
                 # 修复成功，保存进度和 commit id
                 file_paths = [crate / f for f in file_list if (crate / f).exists()]
                 self._save_fix_progress("doc_opt", "batch", file_paths if file_paths else None)
-                typer.secho(f"[c2rust-optimizer][codeagent][doc] 文档补充成功，已保存进度", fg=typer.colors.GREEN)
+                typer.secho("[c2rust-optimizer][codeagent][doc] 文档补充成功，已保存进度", fg=typer.colors.GREEN)
             else:
-                typer.secho(f"[c2rust-optimizer][codeagent][doc] 文档补充后测试失败", fg=typer.colors.YELLOW)
+                typer.secho("[c2rust-optimizer][codeagent][doc] 文档补充后测试失败", fg=typer.colors.YELLOW)
         finally:
             os.chdir(prev_cwd)
 
@@ -1289,7 +1315,13 @@ class Optimizer:
                 "- 保持最小改动，不要进行与错误无关的重构或格式化；",
                 "- 仅输出补丁，不要输出解释或多余文本。",
                 "",
+                "优先级说明：",
+                "- **必须优先解决所有编译错误和测试失败问题**；",
+                "- 修复时应该先解决编译错误，然后再解决测试失败；",
+                "- 如果修复过程中引入了新的错误，必须立即修复这些新错误。",
+                "",
                 "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+                "若出现编译错误或测试失败，请优先修复这些问题；",
                 "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。",
                 "",
                 "构建错误如下：",
