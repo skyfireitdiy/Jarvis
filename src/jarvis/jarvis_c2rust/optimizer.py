@@ -143,44 +143,50 @@ def _run_cargo_fmt(crate_dir: Path) -> None:
 def _check_clippy_warnings(crate_dir: Path) -> Tuple[bool, str]:
     """
     检查是否有 clippy 告警。
-    返回 (has_warnings, output)，has_warnings 为 True 表示有告警。
+    使用 JSON 格式输出，便于精确解析和指定警告。
+    返回 (has_warnings, json_output)，has_warnings 为 True 表示有告警，json_output 为 JSON 格式的输出。
     """
     try:
         res = subprocess.run(
-            ["cargo", "clippy", "--", "-W", "clippy::all"],
+            ["cargo", "clippy", "--message-format=json", "--", "-W", "clippy::all"],
             capture_output=True,
             text=True,
             check=False,
             cwd=str(crate_dir),
         )
-        # clippy 的输出通常在 stderr，但也要检查 stdout
-        stderr_output = (res.stderr or "").strip()
+        # clippy 的 JSON 输出通常在 stdout
         stdout_output = (res.stdout or "").strip()
-        output = (stderr_output + "\n" + stdout_output).strip() if (stderr_output and stdout_output) else (stderr_output or stdout_output or "").strip()
+        stderr_output = (res.stderr or "").strip()
         
-        # 检测告警的多种方式：
-        # 1. 检查是否有 "warning:" 关键字（clippy 告警的标准格式）
-        # 2. 检查是否有 "clippy::" 关键字（clippy 特定的告警类型）
-        # 3. 检查是否有 "warn(" 关键字（某些告警格式）
-        # 4. 检查返回码（clippy 有告警时通常返回非零，但某些情况下可能返回 0）
-        output_lower = output.lower()
-        has_warning_keyword = "warning:" in output_lower or "warn(" in output_lower
-        has_clippy_keyword = "clippy::" in output_lower
-        has_nonzero_exit = res.returncode != 0
+        # 解析 JSON 输出，提取警告信息
+        warnings = []
+        if stdout_output:
+            for line in stdout_output.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                    # 只处理 warning 类型的消息
+                    if msg.get("reason") == "compiler-message" and msg.get("message", {}).get("level") == "warning":
+                        warnings.append(msg)
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    # 忽略无法解析的行（可能是其他输出）
+                    continue
         
-        # 如果有告警关键字，或者（返回码非零且包含 clippy 关键字），则认为有告警
-        has_warnings = has_warning_keyword or (has_nonzero_exit and has_clippy_keyword)
+        has_warnings = len(warnings) > 0
         
-        # 调试输出：如果检测到告警，输出一些调试信息
+        # 调试输出
         if has_warnings:
-            typer.secho(f"[c2rust-optimizer][clippy-check] 检测到 Clippy 告警（返回码={res.returncode}，输出长度={len(output)}）", fg=typer.colors.YELLOW)
-        else:
-            # 如果返回码非零但没有检测到告警关键字，可能是编译错误，输出调试信息
-            if has_nonzero_exit:
-                typer.secho(f"[c2rust-optimizer][clippy-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警关键字，可能是编译错误", fg=typer.colors.CYAN)
-                typer.secho(f"[c2rust-optimizer][clippy-check] 输出预览（前200字符）: {output[:200]}", fg=typer.colors.CYAN)
+            typer.secho(f"[c2rust-optimizer][clippy-check] 检测到 {len(warnings)} 个 Clippy 告警", fg=typer.colors.YELLOW)
+        elif res.returncode != 0:
+            # 如果返回码非零但没有警告，可能是编译错误
+            typer.secho(f"[c2rust-optimizer][clippy-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警，可能是编译错误", fg=typer.colors.CYAN)
+            if stderr_output:
+                typer.secho(f"[c2rust-optimizer][clippy-check] 错误输出预览（前200字符）: {stderr_output[:200]}", fg=typer.colors.CYAN)
         
-        return has_warnings, output
+        # 返回 JSON 格式的输出（用于后续解析）
+        return has_warnings, stdout_output
     except Exception as e:
         # 检查失败时假设没有告警，避免阻塞流程
         typer.secho(f"[c2rust-optimizer][clippy-check] 检查 Clippy 告警异常（非致命）: {e}", fg=typer.colors.YELLOW)
@@ -899,7 +905,6 @@ class Optimizer:
                     return False  # 仍有告警未消除
                 
                 typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 次迭代：修复第一个告警", fg=typer.colors.CYAN)
-                typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第一个告警预览：{first_warning[:200]}...", fg=typer.colors.CYAN)
                 
                 # 构建提示词，只修复第一个告警
                 prompt_lines: List[str] = [
@@ -914,6 +919,7 @@ class Optimizer:
                     "优化目标：",
                     "1) 修复第一个 Clippy 告警：",
                     "   - 根据以下第一个 Clippy 告警信息，修复这个告警；",
+                    "   - 告警信息包含文件路径、行号、警告类型、消息和建议，请根据这些信息进行修复；",
                     "   - 对于无法自动修复的告警，请根据 Clippy 的建议进行手动修复；",
                     "   - 如果某些告警确实需要保留（如性能优化相关的告警），可以添加 `#[allow(clippy::...)]` 注释，但需要说明理由。",
                     "",
@@ -985,47 +991,80 @@ class Optimizer:
         # 默认返回 False（仍有告警）
         return False
     
-    def _extract_first_warning(self, clippy_output: str) -> str:
+    def _extract_first_warning(self, clippy_json_output: str) -> str:
         """
-        从 clippy 输出中提取第一个告警。
-        返回第一个完整的告警信息（从 "warning:" 开始到下一个 "warning:" 或文件结束）。
+        从 clippy JSON 输出中提取第一个告警。
+        返回第一个警告的格式化信息（包含文件路径、行号、警告类型、消息等）。
         """
-        if not clippy_output:
+        if not clippy_json_output:
             return ""
         
-        lines = clippy_output.splitlines()
-        first_warning_lines: List[str] = []
-        in_warning = False
+        warnings = []
+        for line in clippy_json_output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                msg = json.loads(line)
+                # 只处理 warning 类型的消息
+                if msg.get("reason") == "compiler-message" and msg.get("message", {}).get("level") == "warning":
+                    warnings.append(msg)
+            except (json.JSONDecodeError, KeyError, TypeError):
+                continue
         
-        for line in lines:
-            # 检测告警开始
-            if "warning:" in line.lower() and not in_warning:
-                in_warning = True
-                first_warning_lines.append(line)
-            elif in_warning:
-                # 如果遇到下一个 warning: 或明显的分隔符，停止
-                if "warning:" in line.lower() and first_warning_lines:
-                    break
-                # 如果遇到文件路径行（通常以 --> 开头），继续收集
-                if "-->" in line or line.strip().startswith("|") or line.strip() == "":
-                    first_warning_lines.append(line)
-                # 如果遇到 help: 或 note:，继续收集（这些是告警的一部分）
-                elif "help:" in line.lower() or "note:" in line.lower() or "=" in line:
-                    first_warning_lines.append(line)
-                # 如果遇到空行且已经有内容，可能是告警结束
-                elif not line.strip() and len(first_warning_lines) > 3:
-                    # 检查下一行是否还是告警相关内容
-                    continue
-        else:
-                    first_warning_lines.append(line)
+        if not warnings:
+            return ""
         
-        result = "\n".join(first_warning_lines).strip()
-        # 如果提取的内容太短，可能没有正确提取，返回前几行作为备选
-        if len(result) < 50 and lines:
-            # 返回前 20 行作为备选
-            result = "\n".join(lines[:20]).strip()
+        # 提取第一个警告
+        first_warning = warnings[0]
+        message = first_warning.get("message", {})
+        spans = message.get("spans", [])
         
-        return result
+        # 构建格式化的警告信息
+        warning_parts = []
+        
+        # 警告类型和消息
+        code = message.get("code", {})
+        code_str = code.get("code", "") if code else ""
+        message_text = message.get("message", "")
+        warning_parts.append(f"警告类型: {code_str}")
+        warning_parts.append(f"消息: {message_text}")
+        
+        # 文件位置
+        if spans:
+            primary_span = spans[0]  # 使用第一个 span（通常是主要位置）
+            file_path = primary_span.get("file_name", "")
+            line_start = primary_span.get("line_start", 0)
+            column_start = primary_span.get("column_start", 0)
+            line_end = primary_span.get("line_end", 0)
+            column_end = primary_span.get("column_end", 0)
+            
+            warning_parts.append(f"文件: {file_path}")
+            if line_start == line_end:
+                warning_parts.append(f"位置: {line_start}:{column_start}-{column_end}")
+            else:
+                warning_parts.append(f"位置: {line_start}:{column_start} - {line_end}:{column_end}")
+            
+            # 代码片段
+            label = primary_span.get("label", "")
+            if label:
+                warning_parts.append(f"代码: {label}")
+        
+        # 建议（help 消息）
+        children = message.get("children", [])
+        for child in children:
+            if child.get("level") == "help":
+                help_message = child.get("message", "")
+                help_spans = child.get("spans", [])
+                if help_message:
+                    warning_parts.append(f"建议: {help_message}")
+                if help_spans:
+                    help_span = help_spans[0]
+                    help_label = help_span.get("label", "")
+                    if help_label:
+                        warning_parts.append(f"建议代码: {help_label}")
+        
+        return "\n".join(warning_parts)
 
     # ========== 1) unsafe cleanup (CodeAgent) ==========
 
