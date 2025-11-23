@@ -385,6 +385,7 @@ class Optimizer:
         self.report_dir = _ensure_report_dir(self.crate_dir)
         self.progress_path = self.report_dir / "optimize_progress.json"
         self.processed: Set[str] = set()
+        self.steps_completed: Set[str] = set()  # 已完成的步骤集合
         self._target_files: List[Path] = []
         self._load_or_reset_progress()
         self._last_snapshot_commit: Optional[str] = None
@@ -469,10 +470,11 @@ class Optimizer:
     def _load_or_reset_progress(self) -> None:
         if self.options.reset_progress:
             try:
-                self.progress_path.write_text(json.dumps({"processed": []}, ensure_ascii=False, indent=2), encoding="utf-8")
+                self.progress_path.write_text(json.dumps({"processed": [], "steps_completed": []}, ensure_ascii=False, indent=2), encoding="utf-8")
             except Exception:
                 pass
             self.processed = set()
+            self.steps_completed: Set[str] = set()
             return
         try:
             if self.progress_path.exists():
@@ -483,10 +485,24 @@ class Optimizer:
                         self.processed = {str(x) for x in arr if isinstance(x, str)}
                     else:
                         self.processed = set()
+                    # 加载已完成的步骤
+                    steps = obj.get("steps_completed") or []
+                    if isinstance(steps, list):
+                        self.steps_completed = {str(x) for x in steps if isinstance(x, str)}
+                    else:
+                        self.steps_completed = set()
+                else:
+                    self.processed = set()
+                    self.steps_completed = set()
+            else:
+                self.processed = set()
+                self.steps_completed = set()
         except Exception:
             self.processed = set()
+            self.steps_completed = set()
 
     def _save_progress_for_batch(self, files: List[Path]) -> None:
+        """保存文件处理进度"""
         try:
             rels = []
             for p in files:
@@ -496,10 +512,37 @@ class Optimizer:
                     rel = str(p)
                 rels.append(rel)
             self.processed.update(rels)
-            data = {"processed": sorted(self.processed)}
+            data = {
+                "processed": sorted(self.processed),
+                "steps_completed": sorted(self.steps_completed)
+            }
             self.progress_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
+
+    def _save_step_progress(self, step_name: str, files: List[Path]) -> None:
+        """保存步骤进度：标记步骤完成并更新文件列表"""
+        try:
+            # 标记步骤为已完成
+            self.steps_completed.add(step_name)
+            # 更新已处理的文件列表
+            rels = []
+            for p in files:
+                try:
+                    rel = p.resolve().relative_to(self.crate_dir.resolve()).as_posix()
+                except Exception:
+                    rel = str(p)
+                rels.append(rel)
+            self.processed.update(rels)
+            # 保存进度
+            data = {
+                "processed": sorted(self.processed),
+                "steps_completed": sorted(self.steps_completed)
+            }
+            self.progress_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            typer.secho(f"[c2rust-optimizer] 步骤 '{step_name}' 进度已保存", fg=typer.colors.CYAN)
+        except Exception as e:
+            typer.secho(f"[c2rust-optimizer] 保存步骤进度失败（非致命）: {e}", fg=typer.colors.YELLOW)
 
     def _parse_patterns(self, s: Optional[str]) -> List[str]:
         if not s or not isinstance(s, str):
@@ -584,6 +627,8 @@ class Optimizer:
                             typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
                         else:
                             typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除", fg=typer.colors.YELLOW)
+                        # 保存步骤进度
+                        self._save_step_progress("clippy_elimination", targets)
                     else:
                         typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
 
@@ -605,6 +650,8 @@ class Optimizer:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
+                        # 保存步骤进度
+                        self._save_step_progress("unsafe_cleanup", targets)
                     step_num += 1
 
                 if self.options.enable_structure_opt:
@@ -622,6 +669,8 @@ class Optimizer:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
+                        # 保存步骤进度
+                        self._save_step_progress("structure_opt", targets)
                     step_num += 1
 
                 if self.options.enable_visibility_opt:
@@ -639,6 +688,8 @@ class Optimizer:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
+                        # 保存步骤进度
+                        self._save_step_progress("visibility_opt", targets)
                     step_num += 1
 
                 if self.options.enable_doc_opt:
@@ -656,9 +707,11 @@ class Optimizer:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
+                        # 保存步骤进度
+                        self._save_step_progress("doc_opt", targets)
                     step_num += 1
 
-                # 标记本批次文件为“已处理”
+                # 最终保存进度（确保所有步骤的进度都已记录）
                 self._save_progress_for_batch(targets)
 
         except Exception as e:
