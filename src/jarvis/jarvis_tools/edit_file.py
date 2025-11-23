@@ -621,8 +621,56 @@ class EditFileTool:
             if match_count == 0:
                 return (False, f"在块 {block_id} 中未找到要搜索的文本: {search[:100]}...")
             elif match_count > 1:
+                # 找到所有匹配位置，并显示上下文
+                lines = current_content.split('\n')
+                matches_info = []
+                search_lines = search.split('\n')
+                search_line_count = len(search_lines)
+                
+                # 使用更精确的方法查找所有匹配位置（处理多行搜索）
+                start_pos = 0
+                match_idx = 0
+                while match_idx < match_count and start_pos < len(current_content):
+                    pos = current_content.find(search, start_pos)
+                    if pos == -1:
+                        break
+                    
+                    # 计算匹配位置所在的行号
+                    content_before_match = current_content[:pos]
+                    line_idx = content_before_match.count('\n')
+                    
+                    # 显示上下文（前后各2行）
+                    start_line = max(0, line_idx - 2)
+                    end_line = min(len(lines), line_idx + search_line_count + 2)
+                    context_lines = lines[start_line:end_line]
+                    context = '\n'.join([
+                        f"  {start_line + i + 1:4d}: {context_lines[i]}" 
+                        for i in range(len(context_lines))
+                    ])
+                    
+                    # 标记匹配的行
+                    match_start_in_context = line_idx - start_line
+                    match_end_in_context = match_start_in_context + search_line_count
+                    matches_info.append(f"匹配位置 {len(matches_info) + 1} (行 {line_idx + 1}):\n{context}")
+                    
+                    start_pos = pos + 1  # 继续查找下一个匹配
+                    match_idx += 1
+                    
+                    if len(matches_info) >= 5:  # 最多显示5个匹配位置
+                        break
+                
+                matches_preview = "\n\n".join(matches_info)
+                if match_count > len(matches_info):
+                    matches_preview += f"\n\n... 还有 {match_count - len(matches_info)} 处匹配未显示"
+                
                 search_preview = search[:100] + "..." if len(search) > 100 else search
-                return (False, f"在块 {block_id} 中找到 {match_count} 处匹配，但 edit 操作要求刚好只有一处匹配。搜索文本: {search_preview}")
+                error_msg = (
+                    f"在块 {block_id} 中找到 {match_count} 处匹配，但 edit 操作要求刚好只有一处匹配。\n"
+                    f"搜索文本: {search_preview}\n\n"
+                    f"匹配位置详情:\n{matches_preview}\n\n"
+                    f"💡 提示：请提供更多的上下文（如包含前后几行代码）来唯一标识要替换的位置。"
+                )
+                return (False, error_msg)
             
             # 在块内进行替换（只替换第一次出现，此时已经确认只有一处）
             block['content'] = current_content.replace(search, replace, 1)
@@ -679,10 +727,16 @@ class EditFileTool:
             错误摘要字符串
         """
         error_details = []
+        needs_reread = False  # 是否需要重新读取文件
         for p in failed_patches:
             patch = p["patch"]
             patch_desc = EditFileTool._format_patch_description(patch)
-            error_details.append(f"  - 失败的补丁: {patch_desc}\n    错误: {p['error']}")
+            error_msg = p['error']
+            error_details.append(f"  - 失败的补丁: {patch_desc}\n    错误: {error_msg}")
+            
+            # 判断是否需要重新读取：块id不存在、缓存问题等
+            if "未找到块id" in error_msg or "缓存" in error_msg.lower():
+                needs_reread = True
         
         if successful_patches == 0:
             summary = (
@@ -697,6 +751,14 @@ class EditFileTool:
                 f"失败: {len(failed_patches)}/{patch_count}.\n"
                 f"失败详情:\n" + "\n".join(error_details)
             )
+        
+        # 根据错误类型添加不同的提示
+        if needs_reread:
+            summary += "\n\n💡 提示：检测到块id不存在或缓存问题，请使用 read_code 工具重新读取文件，然后再进行编辑。"
+        else:
+            # 其他错误（如search文本不匹配、参数错误等）不需要重新读取
+            summary += "\n\n💡 提示：请检查块id、操作类型和参数是否正确。"
+        
         return summary
 
     @staticmethod
@@ -827,14 +889,17 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
-                summary += "\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 print(f"❌ {summary}")
                 return False, summary
             
             # 从缓存恢复文件内容
             modified_content = EditFileTool._restore_file_from_cache(cache_copy)
             if not modified_content:
-                error_msg = "从缓存恢复文件内容失败\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
+                error_msg = (
+                    "从缓存恢复文件内容失败。\n"
+                    "可能原因：缓存数据结构损坏或文件结构异常。\n\n"
+                    "💡 提示：请使用 read_code 工具重新读取文件，然后再进行编辑。"
+                )
                 if backup_path and os.path.exists(backup_path):
                     try:
                         os.remove(backup_path)
@@ -845,7 +910,11 @@ class EditFileTool:
             # 写入文件
             success, error_msg = EditFileTool._write_file_with_rollback(abs_path, modified_content, backup_path)
             if not success:
-                error_msg += "\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
+                # 写入失败通常是权限、磁盘空间等问题，不需要重新读取文件
+                error_msg += (
+                    "\n\n💡 提示：文件写入失败，可能是权限不足、磁盘空间不足或文件被锁定。"
+                    "请检查文件权限和磁盘空间，或稍后重试。"
+                )
                 return False, error_msg
             
             # 写入成功，更新缓存
@@ -870,7 +939,6 @@ class EditFileTool:
                 summary = EditFileTool._generate_error_summary(
                     abs_path, failed_patches, patch_count, successful_patches
                 )
-                summary += "\n\n💡 提示：部分编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
                 print(f"❌ {summary}")
                 return False, summary
             
@@ -884,7 +952,60 @@ class EditFileTool:
                     os.remove(backup_path)
                 except Exception:
                     pass
-            error_msg = f"文件修改失败: {str(e)}\n\n💡 提示：编辑失败，建议使用 read_code 工具重新读取文件，然后再进行编辑。"
+            
+            # 根据异常类型给出不同的提示
+            error_type = type(e).__name__
+            error_str = str(e)
+            
+            # 检查是否是权限错误
+            is_permission_error = (
+                error_type == "PermissionError" or
+                (error_type == "OSError" and hasattr(e, 'errno') and e.errno == 13) or
+                "Permission denied" in error_str or
+                "权限" in error_str or
+                "permission" in error_str.lower()
+            )
+            
+            # 检查是否是磁盘空间错误
+            is_space_error = (
+                (error_type == "OSError" and hasattr(e, 'errno') and e.errno == 28) or
+                "No space left" in error_str or
+                "No space" in error_str or
+                "ENOSPC" in error_str or
+                "磁盘" in error_str or
+                "空间" in error_str
+            )
+            
+            # 检查是否是文件不存在错误
+            is_not_found_error = (
+                error_type == "FileNotFoundError" or
+                (error_type == "OSError" and hasattr(e, 'errno') and e.errno == 2) or
+                "No such file" in error_str or
+                "文件不存在" in error_str
+            )
+            
+            # 检查是否是缓存或块相关错误（这些通常是我们自己的错误消息）
+            is_cache_error = (
+                "cache" in error_str.lower() or
+                "缓存" in error_str or
+                "未找到块id" in error_str or
+                "块id" in error_str
+            )
+            
+            if is_permission_error:
+                hint = "💡 提示：文件权限不足，请检查文件权限或使用管理员权限运行。"
+            elif is_space_error:
+                hint = "💡 提示：磁盘空间不足，请清理磁盘空间后重试。"
+            elif is_not_found_error:
+                hint = "💡 提示：文件不存在，请检查文件路径是否正确。"
+            elif is_cache_error:
+                hint = "💡 提示：缓存或块id相关错误，请使用 read_code 工具重新读取文件，然后再进行编辑。"
+            elif "block" in error_str.lower() or "块" in error_str:
+                hint = "💡 提示：块操作错误，请使用 read_code 工具重新读取文件，然后再进行编辑。"
+            else:
+                hint = f"💡 提示：发生未知错误（{error_type}），请检查错误信息或重试。如问题持续，请使用 read_code 工具重新读取文件。"
+            
+            error_msg = f"文件修改失败: {error_str}\n\n{hint}"
             print(f"❌ {error_msg}")
             return False, error_msg
 
