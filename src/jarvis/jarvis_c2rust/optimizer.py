@@ -699,57 +699,67 @@ class Optimizer:
         report_path = self.report_dir / "optimize_report.json"
         typer.secho(f"[c2rust-optimizer][start] 开始优化 Crate: {self.crate_dir}", fg=typer.colors.BLUE)
         try:
-            # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
-            targets = self._compute_target_files()
-            
             # 批次开始前记录快照
             self._snapshot_commit()
 
-            # 检查是否有 clippy 告警，如果有则使用 CodeAgent 消除
+            # ========== 第 0 步：Clippy 告警修复（必须第一步，且必须完成） ==========
             # 注意：clippy 告警修复不依赖于是否有新文件需要处理，即使所有文件都已处理，也应该检查并修复告警
             if not self.options.dry_run:
-                    typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
-                    has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
-                    # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
-                    if "clippy_elimination" in self.steps_completed and has_warnings:
-                        typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
-                        self.steps_completed.discard("clippy_elimination")
-                        # 同时清除对应的 commit id
-                        if "clippy_elimination" in self._step_commits:
-                            del self._step_commits["clippy_elimination"]
-                    if has_warnings:
-                        typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警", fg=typer.colors.MAGENTA)
-                        self._snapshot_commit()
-                        # 如果 targets 为空，使用所有 Rust 文件作为目标（用于 clippy 告警修复）
-                        clippy_targets = targets if targets else list(_iter_rust_files(self.crate_dir))
-                        if not clippy_targets:
-                            typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
-                        else:
-                            all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
-                            # 验证修复后是否还有告警
-                            ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                            if not ok:
-                                fixed = self._build_fix_loop(clippy_targets)
-                                if not fixed:
-                                    first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                    self.stats.errors.append(f"test after clippy_elimination failed: {first}")
-                                    try:
-                                        self._reset_to_snapshot()
-                                    finally:
-                                        return self.stats
-                            # 再次检查是否还有告警
-                            has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
-                            if not has_warnings_after and all_warnings_eliminated:
-                                typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
-                                # 只有所有告警都消除后，才保存步骤进度
-                                self._save_step_progress("clippy_elimination", clippy_targets)
-                            else:
-                                typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成", fg=typer.colors.YELLOW)
-                                # 不保存步骤进度，下次恢复时会继续尝试修复
+                typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
+                has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
+                # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
+                if "clippy_elimination" in self.steps_completed and has_warnings:
+                    typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
+                    self.steps_completed.discard("clippy_elimination")
+                    # 同时清除对应的 commit id
+                    if "clippy_elimination" in self._step_commits:
+                        del self._step_commits["clippy_elimination"]
+                
+                if has_warnings:
+                    typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）", fg=typer.colors.MAGENTA)
+                    self._snapshot_commit()
+                    # 使用所有 Rust 文件作为目标（用于 clippy 告警修复）
+                    clippy_targets = list(_iter_rust_files(self.crate_dir))
+                    if not clippy_targets:
+                        typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
+                        return self.stats
+                    
+                    all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
+                    # 验证修复后是否还有告警
+                    ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+                    if not ok:
+                        fixed = self._build_fix_loop(clippy_targets)
+                        if not fixed:
+                            first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
+                            self.stats.errors.append(f"test after clippy_elimination failed: {first}")
+                            try:
+                                self._reset_to_snapshot()
+                            finally:
+                                return self.stats
+                    # 再次检查是否还有告警
+                    has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
+                    if not has_warnings_after and all_warnings_eliminated:
+                        typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+                        # 只有所有告警都消除后，才保存步骤进度
+                        self._save_step_progress("clippy_elimination", clippy_targets)
                     else:
-                        typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
+                        typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
+                        # 不保存步骤进度，下次恢复时会继续尝试修复
+                        # 由于 clippy 告警修复未完成，不执行后续优化步骤
+                        return self.stats
+                else:
+                    typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
+                    # 如果没有告警，标记 clippy_elimination 为完成（跳过状态）
+                    if "clippy_elimination" not in self.steps_completed:
+                        # 使用所有 Rust 文件作为目标（用于标记步骤完成）
+                        clippy_targets = list(_iter_rust_files(self.crate_dir))
+                        if clippy_targets:
+                            self._save_step_progress("clippy_elimination", clippy_targets)
 
-            # 如果 targets 为空，说明所有文件都已处理，不需要继续其他优化步骤
+            # ========== 后续优化步骤（只有在 clippy 告警修复完成后才执行） ==========
+            # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
+            targets = self._compute_target_files()
+            
             if not targets:
                 typer.secho("[c2rust-optimizer] 根据当前选项，无新文件需要处理。", fg=typer.colors.CYAN)
             else:
