@@ -949,7 +949,7 @@ class Optimizer:
                 
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"ClippyWarningEliminator-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
-                agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][clippy][iter{iteration}]", suffix="")
+                agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][clippy]", suffix="")
                 
                 # 验证修复是否成功（通过 cargo test）
                 ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
