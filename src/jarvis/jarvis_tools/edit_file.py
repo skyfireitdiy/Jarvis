@@ -2,8 +2,20 @@
 import os
 import shutil
 import time
+from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
+
+
+class EditErrorType(Enum):
+    """编辑错误类型枚举"""
+    BLOCK_ID_NOT_FOUND = "block_id_not_found"  # 块id不存在
+    CACHE_INVALID = "cache_invalid"  # 缓存无效
+    MULTIPLE_MATCHES = "multiple_matches"  # 多处匹配
+    SEARCH_NOT_FOUND = "search_not_found"  # 搜索文本未找到
+    PARAMETER_MISSING = "parameter_missing"  # 参数缺失
+    UNSUPPORTED_ACTION = "unsupported_action"  # 不支持的操作
+    OTHER = "other"  # 其他错误
 
 
 class EditFileTool:
@@ -542,7 +554,7 @@ class EditFileTool:
         new_content: Optional[str] = None,
         search: Optional[str] = None,
         replace: Optional[str] = None
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> Tuple[bool, Optional[str], Optional[EditErrorType]]:
         """在缓存中应用结构化编辑
         
         Args:
@@ -554,40 +566,40 @@ class EditFileTool:
             replace: 替换后的文本（对于edit操作）
             
         Returns:
-            (是否成功, 错误信息)
+            (是否成功, 错误信息, 错误类型)
         """
         if not cache_info:
-            return (False, "缓存信息不完整")
+            return (False, "缓存信息不完整", EditErrorType.CACHE_INVALID)
         
         # 从 blocks 字典中查找
         blocks = cache_info.get("blocks", {})
         block = blocks.get(block_id)
         
         if block is None:
-            return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。")
+            return (False, f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。", EditErrorType.BLOCK_ID_NOT_FOUND)
         
         # 根据操作类型执行编辑
         if action == "delete":
             # 删除块：将当前块的内容清空
             block['content'] = ""
-            return (True, None)
+            return (True, None, None)
         
         elif action == "insert_before":
             # 在块前插入：在当前块的内容前面插入文本
             if new_content is None:
-                return (False, "insert_before操作需要提供content参数")
+                return (False, "insert_before操作需要提供content参数", EditErrorType.PARAMETER_MISSING)
             
             current_content = block.get('content', '')
             # 自动添加换行符：在插入内容后添加换行符（如果插入内容不以换行符结尾）
             if new_content and not new_content.endswith('\n'):
                 new_content = new_content + '\n'
             block['content'] = new_content + current_content
-            return (True, None)
+            return (True, None, None)
         
         elif action == "insert_after":
             # 在块后插入：在当前块的内容后面插入文本
             if new_content is None:
-                return (False, "insert_after操作需要提供content参数")
+                return (False, "insert_after操作需要提供content参数", EditErrorType.PARAMETER_MISSING)
             
             current_content = block.get('content', '')
             # 自动添加换行符：在插入内容前添加换行符（如果插入内容不以换行符开头）
@@ -597,29 +609,29 @@ class EditFileTool:
                 if not current_content or not current_content.endswith('\n'):
                     new_content = '\n' + new_content
             block['content'] = current_content + new_content
-            return (True, None)
+            return (True, None, None)
         
         elif action == "replace":
             # 替换块
             if new_content is None:
-                return (False, "replace操作需要提供content参数")
+                return (False, "replace操作需要提供content参数", EditErrorType.PARAMETER_MISSING)
             
             block['content'] = new_content
-            return (True, None)
+            return (True, None, None)
         
         elif action == "edit":
             # 在块内进行search/replace
             if search is None:
-                return (False, "edit操作需要提供search参数")
+                return (False, "edit操作需要提供search参数", EditErrorType.PARAMETER_MISSING)
             if replace is None:
-                return (False, "edit操作需要提供replace参数")
+                return (False, "edit操作需要提供replace参数", EditErrorType.PARAMETER_MISSING)
             
             current_content = block.get('content', '')
             
             # 检查匹配次数：必须刚好只有一处匹配
             match_count = current_content.count(search)
             if match_count == 0:
-                return (False, f"在块 {block_id} 中未找到要搜索的文本: {search[:100]}...")
+                return (False, f"在块 {block_id} 中未找到要搜索的文本: {search[:100]}...", EditErrorType.SEARCH_NOT_FOUND)
             elif match_count > 1:
                 # 找到所有匹配位置，并显示上下文
                 lines = current_content.split('\n')
@@ -670,14 +682,14 @@ class EditFileTool:
                     f"匹配位置详情:\n{matches_preview}\n\n"
                     f"💡 提示：请提供更多的上下文（如包含前后几行代码）来唯一标识要替换的位置。"
                 )
-                return (False, error_msg)
+                return (False, error_msg, EditErrorType.MULTIPLE_MATCHES)
             
             # 在块内进行替换（只替换第一次出现，此时已经确认只有一处）
             block['content'] = current_content.replace(search, replace, 1)
-            return (True, None)
+            return (True, None, None)
         
         else:
-            return (False, f"不支持的操作类型: {action}")
+            return (False, f"不支持的操作类型: {action}", EditErrorType.UNSUPPORTED_ACTION)
 
     @staticmethod
     def _format_patch_description(patch: Dict[str, str]) -> str:
@@ -727,16 +739,53 @@ class EditFileTool:
             错误摘要字符串
         """
         error_details = []
-        needs_reread = False  # 是否需要重新读取文件
+        has_block_id_error = False  # 是否有块id相关错误
+        has_cache_error = False  # 是否有缓存相关错误
+        has_multiple_matches_error = False  # 是否有多处匹配错误
+        has_other_error = False  # 是否有其他错误
+        
         for p in failed_patches:
             patch = p["patch"]
             patch_desc = EditFileTool._format_patch_description(patch)
             error_msg = p['error']
+            error_type = p.get('error_type')  # 获取错误类型（如果存在）
             error_details.append(f"  - 失败的补丁: {patch_desc}\n    错误: {error_msg}")
             
-            # 判断是否需要重新读取：块id不存在、缓存问题等
-            if "未找到块id" in error_msg or "缓存" in error_msg.lower():
-                needs_reread = True
+            # 优先使用错误类型进行判断（如果存在），否则回退到字符串匹配
+            if error_type:
+                if error_type == EditErrorType.BLOCK_ID_NOT_FOUND:
+                    has_block_id_error = True
+                elif error_type == EditErrorType.CACHE_INVALID:
+                    has_cache_error = True
+                elif error_type == EditErrorType.MULTIPLE_MATCHES:
+                    has_multiple_matches_error = True
+                else:
+                    has_other_error = True
+            else:
+                # 回退到字符串匹配（兼容旧代码或异常情况）
+                error_msg_lower = error_msg.lower()
+                
+                # 块id相关错误：检查是否包含"块id"和"未找到"/"不存在"/"找不到"等关键词
+                if ("块id" in error_msg or "block_id" in error_msg_lower or "block id" in error_msg_lower) and (
+                    "未找到" in error_msg or "不存在" in error_msg or "找不到" in error_msg or 
+                    "not found" in error_msg_lower
+                ):
+                    has_block_id_error = True
+                # 缓存相关错误：检查是否包含"缓存"或"cache"关键词
+                elif ("缓存" in error_msg or "cache" in error_msg_lower) and (
+                    "信息不完整" in error_msg or "无效" in error_msg or "过期" in error_msg or
+                    "invalid" in error_msg_lower or "expired" in error_msg_lower
+                ):
+                    has_cache_error = True
+                # 多处匹配错误：检查是否包含"匹配"和数量相关的关键词
+                elif ("匹配" in error_msg or "match" in error_msg_lower) and (
+                    "处" in error_msg or "个" in error_msg or "multiple" in error_msg_lower or
+                    ("找到" in error_msg and ("处" in error_msg or "个" in error_msg))
+                ):
+                    # 识别多处匹配错误（错误消息中已经包含了详细提示）
+                    has_multiple_matches_error = True
+                else:
+                    has_other_error = True
         
         if successful_patches == 0:
             summary = (
@@ -753,11 +802,17 @@ class EditFileTool:
             )
         
         # 根据错误类型添加不同的提示
-        if needs_reread:
-            summary += "\n\n💡 提示：检测到块id不存在或缓存问题，请使用 read_code 工具重新读取文件，然后再进行编辑。"
-        else:
-            # 其他错误（如search文本不匹配、参数错误等）不需要重新读取
-            summary += "\n\n💡 提示：请检查块id、操作类型和参数是否正确。"
+        # 注意：多处匹配错误的错误消息中已经包含了详细提示，不需要额外添加
+        hints = []
+        if has_block_id_error:
+            hints.append("💡 块id不存在：请检查块id是否正确，或使用 read_code 工具重新读取文件以获取最新的块id列表。")
+        if has_cache_error:
+            hints.append("💡 缓存问题：文件可能已被外部修改，请使用 read_code 工具重新读取文件。")
+        if has_other_error and not (has_block_id_error or has_cache_error or has_multiple_matches_error):
+            hints.append("💡 提示：请检查块id、操作类型和参数是否正确。")
+        
+        if hints:
+            summary += "\n\n" + "\n".join(hints)
         
         return summary
 
@@ -861,23 +916,23 @@ class EditFileTool:
                     search = patch.get("STRUCTURED_SEARCH")
                     replace = patch.get("STRUCTURED_REPLACE")
                     try:
-                        success, error_msg = EditFileTool._apply_structured_edit_to_cache(
+                        success, error_msg, error_type = EditFileTool._apply_structured_edit_to_cache(
                             cache_copy, block_id, action, new_content, search, replace
                         )
                         if success:
                             successful_patches += 1
                         else:
-                            failed_patches.append({"patch": patch, "error": error_msg})
+                            failed_patches.append({"patch": patch, "error": error_msg, "error_type": error_type})
                     except Exception as e:
                         error_msg = (
                             f"结构化编辑执行出错: {str(e)}\n"
                             f"block_id: {block_id}, action: {action}"
                         )
-                        failed_patches.append({"patch": patch, "error": error_msg})
+                        failed_patches.append({"patch": patch, "error": error_msg, "error_type": EditErrorType.OTHER})
                 else:
                     # 如果不支持的模式，记录错误
                     error_msg = "不支持的补丁格式。支持的格式: STRUCTURED_BLOCK_ID"
-                    failed_patches.append({"patch": patch, "error": error_msg})
+                    failed_patches.append({"patch": patch, "error": error_msg, "error_type": EditErrorType.OTHER})
             
             # 如果有失败的补丁，且没有成功的补丁，则不写入文件
             if failed_patches and successful_patches == 0:
