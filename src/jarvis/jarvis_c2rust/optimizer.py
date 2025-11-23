@@ -590,6 +590,64 @@ class Optimizer:
         except Exception:
             pass
 
+    def _save_fix_progress(self, step_name: str, fix_key: str, files: Optional[List[Path]] = None) -> None:
+        """
+        保存单个修复的进度（包括 commit id）。
+        
+        Args:
+            step_name: 步骤名称（如 "clippy_elimination", "unsafe_cleanup"）
+            fix_key: 修复的唯一标识（如 "warning-1", "file_path.rs"）
+            files: 修改的文件列表（可选）
+        """
+        try:
+            # 获取当前 commit id
+            current_commit = self._get_crate_commit_hash()
+            if not current_commit:
+                typer.secho(f"[c2rust-optimizer][progress] 无法获取 commit id，跳过进度记录", fg=typer.colors.YELLOW)
+                return
+            
+            # 加载现有进度
+            if self.progress_path.exists():
+                try:
+                    obj = json.loads(self.progress_path.read_text(encoding="utf-8"))
+                except Exception:
+                    obj = {}
+            else:
+                obj = {}
+            
+            # 初始化修复进度结构
+            if "fix_progress" not in obj:
+                obj["fix_progress"] = {}
+            if step_name not in obj["fix_progress"]:
+                obj["fix_progress"][step_name] = {}
+            
+            # 记录修复进度
+            obj["fix_progress"][step_name][fix_key] = {
+                "commit": current_commit,
+                "timestamp": None,  # 可以添加时间戳如果需要
+            }
+            
+            # 更新已处理的文件列表
+            if files:
+                rels = []
+                for p in files:
+                    try:
+                        rel = p.resolve().relative_to(self.crate_dir.resolve()).as_posix()
+                    except Exception:
+                        rel = str(p)
+                    rels.append(rel)
+                self.processed.update(rels)
+                obj["processed"] = sorted(self.processed)
+            
+            # 更新 last_commit
+            obj["last_commit"] = current_commit
+            
+            # 保存进度
+            self.progress_path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+            typer.secho(f"[c2rust-optimizer][progress] 已记录修复进度: {step_name}/{fix_key} -> commit {current_commit[:8]}", fg=typer.colors.CYAN)
+        except Exception as e:
+            typer.secho(f"[c2rust-optimizer] 保存修复进度失败（非致命）: {e}", fg=typer.colors.YELLOW)
+
     def _save_step_progress(self, step_name: str, files: List[Path]) -> None:
         """保存步骤进度：标记步骤完成并更新文件列表"""
         try:
@@ -885,6 +943,15 @@ class Optimizer:
                 agent = CodeAgent(name=f"ClippyWarningEliminator-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][clippy][iter{iteration}]", suffix="")
                 
+                # 验证修复是否成功（通过 cargo test）
+                ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+                if ok:
+                    # 修复成功，保存进度和 commit id
+                    self._save_fix_progress("clippy_elimination", f"warning-{iteration}", target_files)
+                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复成功，已保存进度", fg=typer.colors.GREEN)
+                else:
+                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复后测试失败，继续修复", fg=typer.colors.YELLOW)
+                
                 # 修复后再次检查告警，如果告警数量没有减少，可能需要停止
                 has_warnings_after, _ = _check_clippy_warnings(crate)
                 if not has_warnings_after:
@@ -999,6 +1066,22 @@ class Optimizer:
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"UnsafeCleanupAgent-file{file_idx}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][{file_idx}/{total_files}]", suffix="")
+                
+                # 验证修复是否成功（通过 cargo test）
+                ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+                if ok:
+                    # 修复成功，保存进度和 commit id
+                    try:
+                        file_path = crate / single_file if not Path(single_file).is_absolute() else Path(single_file)
+                        if file_path.exists():
+                            self._save_fix_progress("unsafe_cleanup", single_file, [file_path])
+                        else:
+                            self._save_fix_progress("unsafe_cleanup", single_file, None)
+                    except Exception:
+                        self._save_fix_progress("unsafe_cleanup", single_file, None)
+                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复成功，已保存进度", fg=typer.colors.GREEN)
+                else:
+                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复后测试失败，继续处理", fg=typer.colors.YELLOW)
             
             typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 已完成所有文件处理（共 {total_files} 个文件）", fg=typer.colors.GREEN)
         finally:
@@ -1056,6 +1139,16 @@ class Optimizer:
             # CodeAgent 在 crate 目录下创建和执行
             agent = CodeAgent(name="VisibilityOptimizer", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][visibility]", suffix="")
+            
+            # 验证修复是否成功（通过 cargo test）
+            ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+            if ok:
+                # 修复成功，保存进度和 commit id
+                file_paths = [crate / f for f in file_list if (crate / f).exists()]
+                self._save_fix_progress("visibility_opt", "batch", file_paths if file_paths else None)
+                typer.secho(f"[c2rust-optimizer][codeagent][visibility] 可见性优化成功，已保存进度", fg=typer.colors.GREEN)
+            else:
+                typer.secho(f"[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败", fg=typer.colors.YELLOW)
         finally:
             os.chdir(prev_cwd)
 
@@ -1111,6 +1204,16 @@ class Optimizer:
             # CodeAgent 在 crate 目录下创建和执行
             agent = CodeAgent(name="DocumentationAgent", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][doc]", suffix="")
+            
+            # 验证修复是否成功（通过 cargo test）
+            ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+            if ok:
+                # 修复成功，保存进度和 commit id
+                file_paths = [crate / f for f in file_list if (crate / f).exists()]
+                self._save_fix_progress("doc_opt", "batch", file_paths if file_paths else None)
+                typer.secho(f"[c2rust-optimizer][codeagent][doc] 文档补充成功，已保存进度", fg=typer.colors.GREEN)
+            else:
+                typer.secho(f"[c2rust-optimizer][codeagent][doc] 文档补充后测试失败", fg=typer.colors.YELLOW)
         finally:
             os.chdir(prev_cwd)
 
@@ -1205,6 +1308,18 @@ class Optimizer:
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"BuildFixAgent-iter{attempt}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
+                
+                # 验证修复是否成功（通过 cargo test）
+                ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+                if ok:
+                    # 修复成功，保存进度和 commit id
+                    file_paths = [crate / f for f in allowed if (crate / f).exists()]
+                    self._save_fix_progress("build_fix", f"iter{attempt}", file_paths if file_paths else None)
+                    typer.secho(f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复成功，已保存进度", fg=typer.colors.GREEN)
+                    # 返回 True 表示修复成功
+                    return True
+                else:
+                    typer.secho(f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，继续尝试", fg=typer.colors.YELLOW)
             finally:
                 os.chdir(prev_cwd)
 
