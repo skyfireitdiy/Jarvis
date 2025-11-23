@@ -187,10 +187,33 @@ def _check_clippy_warnings(crate_dir: Path) -> Tuple[bool, str]:
             check=False,
             cwd=str(crate_dir),
         )
-        output = (res.stderr or res.stdout or "").strip()
-        # clippy 返回非零退出码通常表示有告警或错误
-        # 但我们需要检查输出中是否真的有告警（而不是编译错误）
-        has_warnings = res.returncode != 0 and ("warning:" in output.lower() or "clippy::" in output.lower())
+        # clippy 的输出通常在 stderr，但也要检查 stdout
+        stderr_output = (res.stderr or "").strip()
+        stdout_output = (res.stdout or "").strip()
+        output = (stderr_output + "\n" + stdout_output).strip() if (stderr_output and stdout_output) else (stderr_output or stdout_output or "").strip()
+        
+        # 检测告警的多种方式：
+        # 1. 检查是否有 "warning:" 关键字（clippy 告警的标准格式）
+        # 2. 检查是否有 "clippy::" 关键字（clippy 特定的告警类型）
+        # 3. 检查是否有 "warn(" 关键字（某些告警格式）
+        # 4. 检查返回码（clippy 有告警时通常返回非零，但某些情况下可能返回 0）
+        output_lower = output.lower()
+        has_warning_keyword = "warning:" in output_lower or "warn(" in output_lower
+        has_clippy_keyword = "clippy::" in output_lower
+        has_nonzero_exit = res.returncode != 0
+        
+        # 如果有告警关键字，或者（返回码非零且包含 clippy 关键字），则认为有告警
+        has_warnings = has_warning_keyword or (has_nonzero_exit and has_clippy_keyword)
+        
+        # 调试输出：如果检测到告警，输出一些调试信息
+        if has_warnings:
+            typer.secho(f"[c2rust-optimizer][clippy-check] 检测到 Clippy 告警（返回码={res.returncode}，输出长度={len(output)}）", fg=typer.colors.YELLOW)
+        else:
+            # 如果返回码非零但没有检测到告警关键字，可能是编译错误，输出调试信息
+            if has_nonzero_exit:
+                typer.secho(f"[c2rust-optimizer][clippy-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警关键字，可能是编译错误", fg=typer.colors.CYAN)
+                typer.secho(f"[c2rust-optimizer][clippy-check] 输出预览（前200字符）: {output[:200]}", fg=typer.colors.CYAN)
+        
         return has_warnings, output
     except Exception as e:
         # 检查失败时假设没有告警，避免阻塞流程
