@@ -27,6 +27,62 @@ from jarvis.jarvis_c2rust.llm_module_agent import (
     execute_llm_plan as _execute_llm_plan,
 )
 
+
+def _check_optimize_completed(crate_dir: Path) -> bool:
+    """
+    检查优化是否真正完成。
+    需要检查 optimize_progress.json 中所有必要的步骤是否都完成了。
+    特别是 clippy_elimination：如果有告警，必须完成；如果没有告警，可以跳过。
+    """
+    import json
+    from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+    
+    progress_path = crate_dir / C2RUST_DIRNAME / "optimize_progress.json"
+    if not progress_path.exists():
+        # 如果没有进度文件，说明还没开始，不算完成
+        return False
+    
+    try:
+        with progress_path.open("r", encoding="utf-8") as f:
+            progress = json.load(f)
+        
+        steps_completed = set(progress.get("steps_completed", []))
+        
+        # 检查是否有 clippy 告警
+        # 直接调用 optimizer 模块中的函数（虽然是私有函数，但我们需要它来检查）
+        import subprocess
+        try:
+            res = subprocess.run(
+                ["cargo", "clippy", "--", "-W", "clippy::all"],
+                capture_output=True,
+                text=True,
+                check=False,
+                cwd=str(crate_dir),
+            )
+            stderr_output = (res.stderr or "").strip()
+            stdout_output = (res.stdout or "").strip()
+            output = (stderr_output + "\n" + stdout_output).strip() if (stderr_output and stdout_output) else (stderr_output or stdout_output or "").strip()
+            output_lower = output.lower()
+            has_warnings = "warning:" in output_lower or "warn(" in output_lower or ("clippy::" in output_lower and res.returncode != 0)
+        except Exception:
+            # 如果检查失败，保守地认为有告警（需要完成）
+            has_warnings = True
+        
+        # 如果有告警，clippy_elimination 必须在 steps_completed 中
+        if has_warnings:
+            if "clippy_elimination" not in steps_completed:
+                return False
+        
+        # 检查其他必要的步骤（根据 enable_* 选项，但这里我们假设都启用了）
+        # 注意：这里我们只检查 clippy_elimination，其他步骤（unsafe_cleanup, visibility_opt, doc_opt）
+        # 可能因为 enable_* 选项而未执行，所以不强制要求
+        
+        return True
+    except Exception:
+        # 如果读取失败，保守地认为未完成
+        return False
+
+
 app = typer.Typer(help="C2Rust 命令行工具")
 
 # 显式定义根回调，确保为命令组而非单函数入口
@@ -482,15 +538,21 @@ def run(
                     f"  files_scanned: {res.get('files_scanned')}\n"
                     f"  unsafe_removed: {res.get('unsafe_removed')}\n"
                     f"  unsafe_annotated: {res.get('unsafe_annotated')}\n"
-                    f"  duplicates_tagged: {res.get('duplicates_tagged')}\n"
                     f"  visibility_downgraded: {res.get('visibility_downgraded')}\n"
                     f"  docs_added: {res.get('docs_added')}\n"
                     f"  cargo_checks: {res.get('cargo_checks')}\n"
                 )
                 typer.secho(summary, fg=typer.colors.GREEN)
-                typer.secho("[c2rust-run] optimize: 完成", fg=typer.colors.GREEN)
-                # 保存状态（因为直接调用 _optimize_project 函数，需要手动保存状态）
-                _save_run_state("optimize", completed=True)
+                
+                # 检查优化是否真正完成（所有步骤都完成，包括 clippy 告警修复）
+                optimize_truly_completed = _check_optimize_completed(crate_dir)
+                if optimize_truly_completed:
+                    typer.secho("[c2rust-run] optimize: 完成", fg=typer.colors.GREEN)
+                    # 保存状态（因为直接调用 _optimize_project 函数，需要手动保存状态）
+                    _save_run_state("optimize", completed=True)
+                else:
+                    typer.secho("[c2rust-run] optimize: 部分步骤未完成（如 clippy 告警未完全修复），下次将继续", fg=typer.colors.YELLOW)
+                    # 不保存状态，下次恢复时会继续执行优化
             except Exception as _e:
                 typer.secho(f"[c2rust-run] optimize: 错误: {_e}", fg=typer.colors.RED, err=True)
                 raise

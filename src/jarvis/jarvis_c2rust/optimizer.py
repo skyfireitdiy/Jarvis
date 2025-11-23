@@ -701,44 +701,59 @@ class Optimizer:
         try:
             # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
             targets = self._compute_target_files()
-            if not targets:
-                # 无文件可处理：仍然写出报告并返回
-                typer.secho("[c2rust-optimizer] 根据当前选项，无新文件需要处理。", fg=typer.colors.CYAN)
-                pass
-            else:
-                typer.secho(f"[c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。", fg=typer.colors.BLUE)
-                # 批次开始前记录快照
-                self._snapshot_commit()
+            
+            # 批次开始前记录快照
+            self._snapshot_commit()
 
-                # 检查是否有 clippy 告警，如果有则使用 CodeAgent 消除
-                if not self.options.dry_run:
+            # 检查是否有 clippy 告警，如果有则使用 CodeAgent 消除
+            # 注意：clippy 告警修复不依赖于是否有新文件需要处理，即使所有文件都已处理，也应该检查并修复告警
+            if not self.options.dry_run:
                     typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
                     has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
+                    # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
+                    if "clippy_elimination" in self.steps_completed and has_warnings:
+                        typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
+                        self.steps_completed.discard("clippy_elimination")
+                        # 同时清除对应的 commit id
+                        if "clippy_elimination" in self._step_commits:
+                            del self._step_commits["clippy_elimination"]
                     if has_warnings:
                         typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警", fg=typer.colors.MAGENTA)
                         self._snapshot_commit()
-                        self._codeagent_eliminate_clippy_warnings(targets, clippy_output)
-                        # 验证修复后是否还有告警
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                        if not ok:
-                            fixed = self._build_fix_loop(targets)
-                            if not fixed:
-                                first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"test after clippy_elimination failed: {first}")
-                                try:
-                                    self._reset_to_snapshot()
-                                finally:
-                                    return self.stats
-                        # 再次检查是否还有告警
-                        has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
-                        if not has_warnings_after:
-                            typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+                        # 如果 targets 为空，使用所有 Rust 文件作为目标（用于 clippy 告警修复）
+                        clippy_targets = targets if targets else list(_iter_rust_files(self.crate_dir))
+                        if not clippy_targets:
+                            typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
                         else:
-                            typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除", fg=typer.colors.YELLOW)
-                        # 保存步骤进度
-                        self._save_step_progress("clippy_elimination", targets)
+                            all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
+                            # 验证修复后是否还有告警
+                            ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+                            if not ok:
+                                fixed = self._build_fix_loop(clippy_targets)
+                                if not fixed:
+                                    first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
+                                    self.stats.errors.append(f"test after clippy_elimination failed: {first}")
+                                    try:
+                                        self._reset_to_snapshot()
+                                    finally:
+                                        return self.stats
+                            # 再次检查是否还有告警
+                            has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
+                            if not has_warnings_after and all_warnings_eliminated:
+                                typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+                                # 只有所有告警都消除后，才保存步骤进度
+                                self._save_step_progress("clippy_elimination", clippy_targets)
+                            else:
+                                typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成", fg=typer.colors.YELLOW)
+                                # 不保存步骤进度，下次恢复时会继续尝试修复
                     else:
                         typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
+
+            # 如果 targets 为空，说明所有文件都已处理，不需要继续其他优化步骤
+            if not targets:
+                typer.secho("[c2rust-optimizer] 根据当前选项，无新文件需要处理。", fg=typer.colors.CYAN)
+            else:
+                typer.secho(f"[c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。", fg=typer.colors.BLUE)
 
                 # 所有优化步骤都使用 CodeAgent
                 step_num = 1
@@ -828,12 +843,16 @@ class Optimizer:
 
     # ========== 0) clippy warnings elimination (CodeAgent) ==========
 
-    def _codeagent_eliminate_clippy_warnings(self, target_files: List[Path], clippy_output: str) -> None:
+    def _codeagent_eliminate_clippy_warnings(self, target_files: List[Path], clippy_output: str) -> bool:
         """
         使用 CodeAgent 消除 clippy 告警。
         每次只修复第一个告警，然后迭代直到没有告警。
         
         注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
+        
+        返回：
+            True: 所有告警已消除
+            False: 仍有告警未消除（达到最大迭代次数或无法提取告警）
         """
         crate = self.crate_dir.resolve()
         file_list: List[str] = []
@@ -861,13 +880,13 @@ class Optimizer:
                 has_warnings, current_clippy_output = _check_clippy_warnings(crate)
                 if not has_warnings:
                     typer.secho(f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration - 1} 次）", fg=typer.colors.GREEN)
-                    break
+                    return True  # 所有告警已消除
 
                 # 提取第一个告警
                 first_warning = self._extract_first_warning(current_clippy_output)
                 if not first_warning:
                     typer.secho("[c2rust-optimizer][codeagent][clippy] 无法提取第一个告警，停止修复", fg=typer.colors.YELLOW)
-                    break
+                    return False  # 仍有告警未消除
                 
                 typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 次迭代：修复第一个告警", fg=typer.colors.CYAN)
                 typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第一个告警预览：{first_warning[:200]}...", fg=typer.colors.CYAN)
@@ -943,12 +962,18 @@ class Optimizer:
                 has_warnings_after, _ = _check_clippy_warnings(crate)
                 if not has_warnings_after:
                     typer.secho(f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration} 次）", fg=typer.colors.GREEN)
-                    break
+                    return True  # 所有告警已消除
                 
             if iteration >= max_iterations:
                 typer.secho(f"[c2rust-optimizer][codeagent][clippy] 达到最大迭代次数 ({max_iterations})，停止修复", fg=typer.colors.YELLOW)
+                # 检查是否还有告警
+                has_warnings_final, _ = _check_clippy_warnings(crate)
+                return not has_warnings_final  # 如果没有告警则返回 True，否则返回 False
         finally:
             os.chdir(prev_cwd)
+        
+        # 默认返回 False（仍有告警）
+        return False
     
     def _extract_first_warning(self, clippy_output: str) -> str:
         """
