@@ -112,6 +112,58 @@ LSP_SERVERS = {
 }
 
 
+def _find_lsp_work_dir(project_root: str, language: str) -> str:
+    """查找LSP服务器的工作目录。
+    
+    不同语言的LSP服务器需要不同的工作目录：
+    - Rust (rust-analyzer): 需要包含 Cargo.toml 的目录
+    - Python (pylsp): 需要包含 pyproject.toml 或 setup.py 的目录
+    - Node.js (typescript-language-server): 需要包含 package.json 的目录
+    - Go (gopls): 需要包含 go.mod 的目录
+    - Java (jdtls): 需要包含 pom.xml 或 build.gradle 的目录
+    - C/C++ (clangd): 可以使用项目根目录
+    
+    Args:
+        project_root: 项目根目录
+        language: 语言名称
+        
+    Returns:
+        LSP服务器的工作目录
+    """
+    current = Path(project_root)
+    max_depth = 5
+    
+    # 定义每种语言需要查找的配置文件
+    config_files = {
+        "rust": ["Cargo.toml"],
+        "python": ["pyproject.toml", "setup.py", "requirements.txt"],
+        "typescript": ["package.json", "tsconfig.json"],
+        "javascript": ["package.json"],
+        "go": ["go.mod", "go.sum"],
+        "java": ["pom.xml", "build.gradle", "build.gradle.kts"],
+        "c": [],  # clangd 可以使用项目根目录
+        "cpp": [],  # clangd 可以使用项目根目录
+    }
+    
+    files_to_find = config_files.get(language, [])
+    if not files_to_find:
+        # 如果没有特定要求，使用项目根目录
+        return project_root
+    
+    # 向上查找包含配置文件的目录
+    for _ in range(max_depth):
+        for config_file in files_to_find:
+            if (current / config_file).exists():
+                return str(current)
+        parent = current.parent
+        if parent == current:  # 已到达根目录
+            break
+        current = parent
+    
+    # 如果没找到，返回项目根目录
+    return project_root
+
+
 class LSPClient:
     """LSP客户端，用于与LSP服务器通信。"""
     
@@ -184,22 +236,46 @@ class LSPClient:
     def _initialize(self):
         """初始化LSP连接。"""
         try:
+            # 根据语言类型查找合适的工作目录
+            language = None
+            for lang, config in LSP_SERVERS.items():
+                if config.name == self.server_config.name:
+                    language = lang
+                    break
+            
+            work_dir = _find_lsp_work_dir(self.project_root, language or "")
+            
             # 启动LSP服务器进程
             self.process = subprocess.Popen(
                 self.server_config.command,
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=self.project_root,
+                cwd=work_dir,
                 text=True,
                 bufsize=0
             )
             
-            # 发送初始化请求
-            self._send_request("initialize", {
+            # 检查进程是否立即退出
+            import time
+            time.sleep(0.1)  # 短暂等待，让进程启动
+            if self.process.poll() is not None:
+                # 进程已退出，读取 stderr 获取错误信息
+                stderr_output = ""
+                try:
+                    stderr_output = self.process.stderr.read()
+                except Exception:
+                    pass
+                error_msg = f"LSP服务器 {self.server_config.name} 启动后立即退出"
+                if stderr_output:
+                    error_msg += f": {stderr_output[:500]}"
+                raise RuntimeError(error_msg)
+            
+            # 发送初始化请求并等待响应
+            init_result = self._send_request("initialize", {
                 "processId": os.getpid(),
-                "rootPath": self.project_root,
-                "rootUri": Path(self.project_root).as_uri(),
+                "rootPath": work_dir,
+                "rootUri": Path(work_dir).as_uri(),
                 "capabilities": {
                     "textDocument": {
                         "completion": {"completionItem": {}},
@@ -213,12 +289,51 @@ class LSPClient:
                 "initializationOptions": self.server_config.initialization_options or {}
             })
             
-            # 发送initialized通知
-            self._send_notification("initialized", {})
+            # 检查进程是否在初始化后退出
+            if self.process.poll() is not None:
+                stderr_output = ""
+                try:
+                    stderr_output = self.process.stderr.read()
+                except Exception:
+                    pass
+                error_msg = f"LSP服务器 {self.server_config.name} 在初始化后退出"
+                if stderr_output:
+                    error_msg += f": {stderr_output[:500]}"
+                raise RuntimeError(error_msg)
             
-            print(f"ℹ️ LSP client initialized for {self.server_config.name}")
+            # 只有在收到初始化响应后才发送 initialized 通知
+            if init_result is not None:
+                # 发送initialized通知
+                self._send_notification("initialized", {})
+                print(f"ℹ️ LSP client initialized for {self.server_config.name}")
+            else:
+                # 初始化请求失败，但进程还在运行，可能是超时
+                # 检查进程状态
+                if self.process.poll() is None:
+                    print(f"⚠️ LSP client initialization timeout for {self.server_config.name}, but process is still running")
+                else:
+                    stderr_output = ""
+                    try:
+                        stderr_output = self.process.stderr.read()
+                    except Exception:
+                        pass
+                    error_msg = f"LSP服务器 {self.server_config.name} 初始化失败"
+                    if stderr_output:
+                        error_msg += f": {stderr_output[:500]}"
+                    raise RuntimeError(error_msg)
         except Exception as e:
             print(f"❌ Failed to initialize LSP client: {e}")
+            # 清理进程
+            if self.process:
+                try:
+                    self.process.terminate()
+                    self.process.wait(timeout=2)
+                except Exception:
+                    try:
+                        self.process.kill()
+                    except Exception:
+                        pass
+                self.process = None
             raise
     
     def _send_request(self, method: str, params: Dict) -> Optional[Dict]:
@@ -234,19 +349,30 @@ class LSPClient:
         if not self.process:
             return None
         
+        # 检查进程是否还在运行
+        if self.process.poll() is not None:
+            print(f"⚠️ LSP服务器进程已退出，无法发送请求: {method}")
+            return None
+        
         self.request_id += 1
+        request_id = self.request_id
         request = {
             "jsonrpc": "2.0",
-            "id": self.request_id,
+            "id": request_id,
             "method": method,
             "params": params
         }
         
         try:
-            # 发送请求
-            request_str = json.dumps(request) + "\n"
-            self.process.stdin.write(request_str)
-            self.process.stdin.flush()
+            # LSP 协议要求使用 Content-Length header
+            request_body = json.dumps(request, ensure_ascii=False)
+            request_bytes = request_body.encode('utf-8')
+            content_length = len(request_bytes)
+            
+            # 格式化 LSP 消息：Content-Length: <length>\r\n\r\n<body>
+            message = f"Content-Length: {content_length}\r\n\r\n".encode('utf-8') + request_bytes
+            self.process.stdin.buffer.write(message)
+            self.process.stdin.buffer.flush()
             
             # 读取响应（简化实现，实际应该使用异步或线程）
             # 这里使用超时读取
@@ -258,10 +384,62 @@ class LSPClient:
             
             def read_response():
                 try:
-                    response_line = self.process.stdout.readline()
-                    if response_line:
-                        response = json.loads(response_line)
-                        response_queue.put(response)
+                    # 持续读取直到找到匹配的响应ID
+                    while True:
+                        if self.process.poll() is not None:
+                            # 进程已退出
+                            response_queue.put(None)
+                            return
+                        
+                        # LSP 协议：先读取 header（Content-Length: <length>\r\n\r\n）
+                        header = b""
+                        while True:
+                            char = self.process.stdout.buffer.read(1)
+                            if not char:
+                                response_queue.put(None)
+                                return
+                            header += char
+                            if header.endswith(b"\r\n\r\n"):
+                                break
+                        
+                        # 解析 Content-Length
+                        header_str = header.decode('utf-8', errors='ignore')
+                        content_length = None
+                        for line in header_str.split('\r\n'):
+                            if line.startswith('Content-Length:'):
+                                try:
+                                    content_length = int(line.split(':', 1)[1].strip())
+                                    break
+                                except ValueError:
+                                    pass
+                        
+                        if content_length is None:
+                            # 无法解析 Content-Length，跳过这个消息
+                            continue
+                        
+                        # 读取消息体
+                        body = self.process.stdout.buffer.read(content_length)
+                        if len(body) < content_length:
+                            # 读取不完整
+                            response_queue.put(None)
+                            return
+                        
+                        try:
+                            response = json.loads(body.decode('utf-8'))
+                            # 检查是否是匹配的响应
+                            if response.get("id") == request_id:
+                                response_queue.put(response)
+                                return
+                            # 如果是通知或错误，也处理
+                            elif "method" in response or "error" in response:
+                                # 对于通知，继续读取
+                                # 对于错误，返回错误信息
+                                if "error" in response:
+                                    response_queue.put(response)
+                                    return
+                        except json.JSONDecodeError:
+                            # 不是JSON，可能是日志输出，继续读取
+                            continue
                 except Exception as e:
                     print(f"❌ Error reading LSP response: {e}")
                     response_queue.put(None)
@@ -269,14 +447,27 @@ class LSPClient:
             # 启动读取线程
             read_thread = threading.Thread(target=read_response, daemon=True)
             read_thread.start()
-            read_thread.join(timeout=5.0)
+            
+            # 对于 initialize 请求，使用更长的超时时间（rust-analyzer 可能需要更长时间）
+            timeout = 30.0 if method == "initialize" else 10.0
+            read_thread.join(timeout=timeout)
             
             try:
-                response = response_queue.get(timeout=0.1)
-                if response and "result" in response:
-                    return response["result"]
+                response = response_queue.get(timeout=0.5)
+                if response:
+                    if "error" in response:
+                        error = response.get("error", {})
+                        error_msg = error.get("message", "Unknown error")
+                        print(f"⚠️ LSP服务器返回错误 ({method}): {error_msg}")
+                        return None
+                    if "result" in response:
+                        return response["result"]
             except queue.Empty:
-                pass
+                # 超时，检查进程是否还在运行
+                if self.process.poll() is not None:
+                    print(f"⚠️ LSP服务器进程已退出，请求超时: {method}")
+                else:
+                    print(f"⚠️ LSP请求超时: {method}")
             
             return None
         except BrokenPipeError:
@@ -316,6 +507,11 @@ class LSPClient:
         if not self.process:
             return
         
+        # 检查进程是否还在运行
+        if self.process.poll() is not None:
+            print(f"⚠️ LSP服务器进程已退出，无法发送通知: {method}")
+            return
+        
         notification = {
             "jsonrpc": "2.0",
             "method": method,
@@ -323,9 +519,15 @@ class LSPClient:
         }
         
         try:
-            notification_str = json.dumps(notification) + "\n"
-            self.process.stdin.write(notification_str)
-            self.process.stdin.flush()
+            # LSP 协议要求使用 Content-Length header
+            notification_body = json.dumps(notification, ensure_ascii=False)
+            notification_bytes = notification_body.encode('utf-8')
+            content_length = len(notification_bytes)
+            
+            # 格式化 LSP 消息：Content-Length: <length>\r\n\r\n<body>
+            message = f"Content-Length: {content_length}\r\n\r\n".encode('utf-8') + notification_bytes
+            self.process.stdin.buffer.write(message)
+            self.process.stdin.buffer.flush()
         except BrokenPipeError:
             # LSP服务器连接已断开，静默处理
             print(f"⚠️ LSP服务器连接已断开，无法发送通知: {method}")
