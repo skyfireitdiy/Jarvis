@@ -44,6 +44,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Iterable, Set
 import fnmatch
 
+import typer
+
 # 引入 CodeAgent（参考 transpiler）
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
@@ -233,10 +235,31 @@ def _ensure_report_dir(crate_dir: Path) -> Path:
     return report_dir
 
 
+def _find_project_root() -> Optional[Path]:
+    """
+    查找项目根目录（包含 .jarvis/c2rust 的目录）。
+    从当前目录向上查找，最多向上查找 5 层。
+    """
+    from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+    cwd = Path(".").resolve()
+    current = cwd
+    for _ in range(5):
+        if current and current.exists():
+            jarvis_dir = current / C2RUST_DIRNAME
+            if jarvis_dir.exists() and jarvis_dir.is_dir():
+                return current
+            parent = current.parent
+            if parent == current:  # 已到达根目录
+                break
+            current = parent
+    return None
+
+
 def detect_crate_dir(preferred: Optional[Path]) -> Path:
     """
     选择 crate 目录策略：
     - 若提供 preferred 且包含 Cargo.toml，则使用
+    - 否则：尝试从项目根目录推断（查找包含 .jarvis/c2rust 的目录）
     - 否则：优先 <cwd>/<cwd.name>_rs；若存在 Cargo.toml 则用之
     - 否则：在当前目录下递归寻找第一个包含 Cargo.toml 的目录
     - 若失败：若当前目录有 Cargo.toml 则返回当前目录，否则抛错
@@ -245,6 +268,21 @@ def detect_crate_dir(preferred: Optional[Path]) -> Path:
         preferred = preferred.resolve()
         if (preferred / "Cargo.toml").exists():
             return preferred
+
+    # 尝试从项目根目录推断 crate 目录
+    project_root = _find_project_root()
+    if project_root:
+        # 策略1: project_root 的父目录下的 <project_root.name>_rs
+        candidate1 = project_root.parent / f"{project_root.name}_rs"
+        if (candidate1 / "Cargo.toml").exists():
+            return candidate1
+        # 策略2: project_root 本身（如果包含 Cargo.toml）
+        if (project_root / "Cargo.toml").exists():
+            return project_root
+        # 策略3: project_root 下的子目录中包含 Cargo.toml 的
+        for d in project_root.iterdir():
+            if d.is_dir() and (d / "Cargo.toml").exists():
+                return d
 
     cwd = Path(".").resolve()
     candidate = cwd / f"{cwd.name}_rs"
@@ -262,8 +300,9 @@ def detect_crate_dir(preferred: Optional[Path]) -> Path:
 
 
 class Optimizer:
-    def __init__(self, crate_dir: Path, options: OptimizeOptions):
+    def __init__(self, crate_dir: Path, options: OptimizeOptions, project_root: Optional[Path] = None):
         self.crate_dir = crate_dir
+        self.project_root = project_root if project_root else crate_dir.parent  # 默认使用 crate_dir 的父目录
         self.options = options
         self.stats = OptimizeStats()
         # 进度文件
@@ -273,7 +312,6 @@ class Optimizer:
         self._target_files: List[Path] = []
         self._load_or_reset_progress()
         self._last_snapshot_commit: Optional[str] = None
-        self.log_prefix = "[c2rust-优化器]"
         # 读取附加说明
         self.additional_notes = self._load_additional_notes()
 
@@ -427,27 +465,27 @@ class Optimizer:
 
     def run(self) -> OptimizeStats:
         report_path = self.report_dir / "optimize_report.json"
-        print(f"{self.log_prefix} 开始优化 Crate: {self.crate_dir}")
+        typer.secho(f"[c2rust-optimizer][start] 开始优化 Crate: {self.crate_dir}", fg=typer.colors.BLUE)
         try:
             # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
             targets = self._compute_target_files()
             if not targets:
                 # 无文件可处理：仍然写出报告并返回
-                print(f"{self.log_prefix} 根据当前选项，无新文件需要处理。")
+                typer.secho("[c2rust-optimizer] 根据当前选项，无新文件需要处理。", fg=typer.colors.CYAN)
                 pass
             else:
-                print(f"{self.log_prefix} 本次批次发现 {len(targets)} 个待处理文件。")
+                typer.secho(f"[c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。", fg=typer.colors.BLUE)
                 # 批次开始前记录快照
                 self._snapshot_commit()
 
                 if self.options.enable_unsafe_cleanup:
                     # 步骤前快照
-                    print(f"\n{self.log_prefix} 第 1 步：unsafe 清理")
+                    typer.secho("\n[c2rust-optimizer] 第 1 步：unsafe 清理", fg=typer.colors.MAGENTA)
                     self._snapshot_commit()
                     self._opt_unsafe_cleanup(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        print(f"{self.log_prefix} unsafe 清理后，正在验证构建...")
+                        typer.secho("[c2rust-optimizer] unsafe 清理后，正在验证构建...", fg=typer.colors.CYAN)
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             # 循环最小修复
@@ -463,12 +501,12 @@ class Optimizer:
 
                 if self.options.enable_structure_opt:
                     # 步骤前快照
-                    print(f"\n{self.log_prefix} 第 2 步：结构优化 (重复代码检测)")
+                    typer.secho("\n[c2rust-optimizer] 第 2 步：结构优化 (重复代码检测)", fg=typer.colors.MAGENTA)
                     self._snapshot_commit()
                     self._opt_structure_duplicates(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        print(f"{self.log_prefix} 结构优化后，正在验证构建...")
+                        typer.secho("[c2rust-optimizer] 结构优化后，正在验证构建...", fg=typer.colors.CYAN)
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -482,12 +520,12 @@ class Optimizer:
 
                 if self.options.enable_visibility_opt:
                     # 步骤前快照
-                    print(f"\n{self.log_prefix} 第 3 步：可见性优化")
+                    typer.secho("\n[c2rust-optimizer] 第 3 步：可见性优化", fg=typer.colors.MAGENTA)
                     self._snapshot_commit()
                     self._opt_visibility(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        print(f"{self.log_prefix} 可见性优化后，正在验证构建...")
+                        typer.secho("[c2rust-optimizer] 可见性优化后，正在验证构建...", fg=typer.colors.CYAN)
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -501,12 +539,12 @@ class Optimizer:
 
                 if self.options.enable_doc_opt:
                     # 步骤前快照
-                    print(f"\n{self.log_prefix} 第 4 步：文档补充")
+                    typer.secho("\n[c2rust-optimizer] 第 4 步：文档补充", fg=typer.colors.MAGENTA)
                     self._snapshot_commit()
                     self._opt_docs(targets)
                     # Step build verification
                     if not self.options.dry_run:
-                        print(f"{self.log_prefix} 文档补充后，正在验证构建...")
+                        typer.secho("[c2rust-optimizer] 文档补充后，正在验证构建...", fg=typer.colors.CYAN)
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -522,7 +560,7 @@ class Optimizer:
                 # 在静态优化后执行一次 CodeAgent 以最小化进一步提升（可选：dry_run 时跳过）
                 if not self.options.dry_run:
                     try:
-                        print(f"\n{self.log_prefix} 第 5 步：CodeAgent 整体优化")
+                        typer.secho("\n[c2rust-optimizer] 第 5 步：CodeAgent 整体优化", fg=typer.colors.MAGENTA)
                         self._codeagent_optimize_crate(targets)
                     except Exception as _e:
                         self.stats.errors.append(f"codeagent: {_e}")
@@ -534,7 +572,19 @@ class Optimizer:
             self.stats.errors.append(f"fatal: {e}")
         finally:
             # 写出简要报告
-            print(f"{self.log_prefix} 优化流程结束。报告已生成于: {report_path.relative_to(Path.cwd())}")
+            # 尝试显示相对路径，优先相对于 project_root，然后相对于 crate_dir，最后显示绝对路径
+            try:
+                report_display = str(report_path.relative_to(self.project_root))
+            except ValueError:
+                try:
+                    report_display = str(report_path.relative_to(self.crate_dir))
+                except ValueError:
+                    try:
+                        report_display = str(report_path.relative_to(Path.cwd()))
+                    except ValueError:
+                        # 如果都不行，显示绝对路径
+                        report_display = str(report_path)
+            typer.secho(f"[c2rust-optimizer] 优化流程结束。报告已生成于: {report_display}", fg=typer.colors.GREEN)
             try:
                 _write_file(report_path, json.dumps(asdict(self.stats), ensure_ascii=False, indent=2))
             except Exception:
@@ -551,7 +601,7 @@ class Optimizer:
                 rel_path = path.relative_to(self.crate_dir)
             except ValueError:
                 rel_path = path
-            print(f"{self.log_prefix} [unsafe 清理] 正在处理文件 {i + 1}/{len(files)}: {rel_path}")
+            typer.secho(f"[c2rust-optimizer][unsafe-cleanup] 正在处理文件 {i + 1}/{len(files)}: {rel_path}", fg=typer.colors.BLUE)
             try:
                 content = _read_file(path)
             except Exception:
@@ -628,7 +678,7 @@ class Optimizer:
 
     def _opt_structure_duplicates(self, files: List[Path]) -> None:
         # 建立函数签名+主体的简易哈希，重复则为后出现者添加 TODO 注释
-        print(f"{self.log_prefix} [结构优化] 正在扫描 {len(files)} 个文件以查找重复函数...")
+        typer.secho(f"[c2rust-optimizer][structure] 正在扫描 {len(files)} 个文件以查找重复函数...", fg=typer.colors.BLUE)
         seen: Dict[str, Tuple[Path, int]] = {}
         for path in files:
             try:
@@ -701,7 +751,7 @@ class Optimizer:
                 rel_path = path.relative_to(self.crate_dir)
             except ValueError:
                 rel_path = path
-            print(f"{self.log_prefix} [可见性优化] 正在处理文件 {i + 1}/{len(files)}: {rel_path}")
+            typer.secho(f"[c2rust-optimizer][visibility] 正在处理文件 {i + 1}/{len(files)}: {rel_path}", fg=typer.colors.BLUE)
             try:
                 content = _read_file(path)
             except Exception:
@@ -738,7 +788,7 @@ class Optimizer:
                 rel_path = path.relative_to(self.crate_dir)
             except ValueError:
                 rel_path = path
-            print(f"{self.log_prefix} [文档补充] 正在处理文件 {i + 1}/{len(files)}: {rel_path}")
+            typer.secho(f"[c2rust-optimizer][doc] 正在处理文件 {i + 1}/{len(files)}: {rel_path}", fg=typer.colors.BLUE)
             try:
                 content = _read_file(path)
             except Exception:
@@ -839,7 +889,7 @@ class Optimizer:
         prompt = "\n".join(prompt_lines)
         prompt = self._append_additional_notes(prompt)
         prev_cwd = os.getcwd()
-        print(f"{self.log_prefix} [CodeAgent] 正在调用 CodeAgent 进行整体优化...")
+        typer.secho("[c2rust-optimizer][codeagent] 正在调用 CodeAgent 进行整体优化...", fg=typer.colors.CYAN)
         try:
             os.chdir(str(crate))
             agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
@@ -894,7 +944,7 @@ class Optimizer:
                 )
                 self.stats.cargo_checks += 1
                 if res.returncode == 0:
-                    print(f"{self.log_prefix} 构建修复成功。")
+                    typer.secho("[c2rust-optimizer][build-fix] 构建修复成功。", fg=typer.colors.GREEN)
                     return True
                 output = ((res.stdout or "") + ("\n" + (res.stderr or ""))).strip()
             except subprocess.TimeoutExpired as e:
@@ -912,10 +962,10 @@ class Optimizer:
             # 达到重试上限则失败
             attempt += 1
             if attempt > maxr:
-                print(f"{self.log_prefix} 构建修复重试次数已用尽。")
+                typer.secho("[c2rust-optimizer][build-fix] 构建修复重试次数已用尽。", fg=typer.colors.RED)
                 return False
 
-            print(f"{self.log_prefix} 构建失败。正在尝试使用 CodeAgent 进行修复 (第 {attempt}/{maxr} 次尝试)...")
+            typer.secho(f"[c2rust-optimizer][build-fix] 构建失败。正在尝试使用 CodeAgent 进行修复 (第 {attempt}/{maxr} 次尝试)...", fg=typer.colors.YELLOW)
             # 生成最小修复提示
             prompt_lines = [
                 "请根据以下测试/构建错误对 crate 进行最小必要的修复以通过 `cargo test`：",
@@ -949,6 +999,7 @@ class Optimizer:
         return False
 
 def optimize_project(
+    project_root: Optional[Path] = None,
     crate_dir: Optional[Path] = None,
     enable_unsafe_cleanup: bool = True,
     enable_structure_opt: bool = True,
@@ -969,6 +1020,7 @@ def optimize_project(
 ) -> Dict:
     """
     对指定 crate 执行优化。返回结果摘要 dict。
+    - project_root: 原 C 项目根目录（包含 .jarvis/c2rust）；为 None 时自动检测
     - crate_dir: crate 根目录（包含 Cargo.toml）；为 None 时自动检测
     - enable_*: 各优化步骤开关
     - max_checks: 限制 cargo check 调用次数（0 不限）
@@ -978,6 +1030,17 @@ def optimize_project(
     - resume: 启用断点续跑（跳过已处理文件）
     - reset_progress: 清空进度（processed 列表）
     """
+    # 如果 project_root 为 None，尝试从当前目录查找
+    if project_root is None:
+        project_root = _find_project_root()
+        if project_root is None:
+            # 如果找不到项目根目录，使用当前目录
+            project_root = Path(".").resolve()
+    else:
+        project_root = Path(project_root).resolve()
+    
+    # 如果 crate_dir 为 None，使用 detect_crate_dir 自动检测
+    # detect_crate_dir 内部已经包含了从项目根目录推断的逻辑
     crate = detect_crate_dir(crate_dir)
     opts = OptimizeOptions(
         enable_unsafe_cleanup=enable_unsafe_cleanup,
@@ -997,6 +1060,6 @@ def optimize_project(
         cargo_test_timeout=cargo_test_timeout,
         non_interactive=non_interactive,
     )
-    optimizer = Optimizer(crate, opts)
+    optimizer = Optimizer(crate, opts, project_root=project_root)
     stats = optimizer.run()
     return asdict(stats)
