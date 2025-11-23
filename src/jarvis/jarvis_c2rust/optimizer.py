@@ -915,6 +915,9 @@ class Optimizer:
                 # 修复前执行 cargo fmt
                 _run_cargo_fmt(crate)
                 
+                # 记录运行前的 commit id
+                commit_before = self._get_crate_commit_hash()
+                
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"ClippyWarningEliminator-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][clippy][iter{iteration}]", suffix="")
@@ -926,7 +929,15 @@ class Optimizer:
                     self._save_fix_progress("clippy_elimination", f"warning-{iteration}", target_files)
                     typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复成功，已保存进度", fg=typer.colors.GREEN)
                 else:
-                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复后测试失败，继续修复", fg=typer.colors.YELLOW)
+                    # 测试失败，回退到运行前的 commit
+                    if commit_before:
+                        typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
+                        if self._reset_to_commit(commit_before):
+                            typer.secho(f"[c2rust-optimizer][codeagent][clippy] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
+                        else:
+                            typer.secho(f"[c2rust-optimizer][codeagent][clippy] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                    else:
+                        typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复后测试失败，但无法获取运行前的 commit，继续修复", fg=typer.colors.YELLOW)
                 
                 # 修复后再次检查告警，如果告警数量没有减少，可能需要停止
                 has_warnings_after, _ = _check_clippy_warnings(crate)
@@ -1045,6 +1056,9 @@ class Optimizer:
                 # 修复前执行 cargo fmt
                 _run_cargo_fmt(crate)
                 
+                # 记录运行前的 commit id
+                commit_before = self._get_crate_commit_hash()
+                
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"UnsafeCleanupAgent-file{file_idx}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][{file_idx}/{total_files}]", suffix="")
@@ -1063,7 +1077,15 @@ class Optimizer:
                         self._save_fix_progress("unsafe_cleanup", single_file, None)
                     typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复成功，已保存进度", fg=typer.colors.GREEN)
                 else:
-                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复后测试失败，继续处理", fg=typer.colors.YELLOW)
+                    # 测试失败，回退到运行前的 commit
+                    if commit_before:
+                        typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
+                        if self._reset_to_commit(commit_before):
+                            typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
+                        else:
+                            typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                    else:
+                        typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复后测试失败，但无法获取运行前的 commit，继续处理", fg=typer.colors.YELLOW)
             
             typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 已完成所有文件处理（共 {total_files} 个文件）", fg=typer.colors.GREEN)
         finally:
@@ -1124,6 +1146,10 @@ class Optimizer:
             os.chdir(str(crate))
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
+            
+            # 记录运行前的 commit id
+            commit_before = self._get_crate_commit_hash()
+            
             # CodeAgent 在 crate 目录下创建和执行
             agent = CodeAgent(name="VisibilityOptimizer", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][visibility]", suffix="")
@@ -1136,7 +1162,15 @@ class Optimizer:
                 self._save_fix_progress("visibility_opt", "batch", file_paths if file_paths else None)
                 typer.secho("[c2rust-optimizer][codeagent][visibility] 可见性优化成功，已保存进度", fg=typer.colors.GREEN)
             else:
-                typer.secho("[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败", fg=typer.colors.YELLOW)
+                # 测试失败，回退到运行前的 commit
+                if commit_before:
+                    typer.secho(f"[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
+                    if self._reset_to_commit(commit_before):
+                        typer.secho(f"[c2rust-optimizer][codeagent][visibility] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
+                    else:
+                        typer.secho(f"[c2rust-optimizer][codeagent][visibility] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                else:
+                    typer.secho("[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败，但无法获取运行前的 commit", fg=typer.colors.YELLOW)
         finally:
             os.chdir(prev_cwd)
 
@@ -1195,6 +1229,10 @@ class Optimizer:
             os.chdir(str(crate))
             # 修复前执行 cargo fmt
             _run_cargo_fmt(crate)
+            
+            # 记录运行前的 commit id
+            commit_before = self._get_crate_commit_hash()
+            
             # CodeAgent 在 crate 目录下创建和执行
             agent = CodeAgent(name="DocumentationAgent", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][doc]", suffix="")
@@ -1207,7 +1245,15 @@ class Optimizer:
                 self._save_fix_progress("doc_opt", "batch", file_paths if file_paths else None)
                 typer.secho("[c2rust-optimizer][codeagent][doc] 文档补充成功，已保存进度", fg=typer.colors.GREEN)
             else:
-                typer.secho("[c2rust-optimizer][codeagent][doc] 文档补充后测试失败", fg=typer.colors.YELLOW)
+                # 测试失败，回退到运行前的 commit
+                if commit_before:
+                    typer.secho(f"[c2rust-optimizer][codeagent][doc] 文档补充后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
+                    if self._reset_to_commit(commit_before):
+                        typer.secho(f"[c2rust-optimizer][codeagent][doc] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
+                    else:
+                        typer.secho(f"[c2rust-optimizer][codeagent][doc] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                else:
+                    typer.secho("[c2rust-optimizer][codeagent][doc] 文档补充后测试失败，但无法获取运行前的 commit", fg=typer.colors.YELLOW)
         finally:
             os.chdir(prev_cwd)
 
@@ -1305,6 +1351,10 @@ class Optimizer:
                 os.chdir(str(crate))
                 # 修复前执行 cargo fmt
                 _run_cargo_fmt(crate)
+                
+                # 记录运行前的 commit id
+                commit_before = self._get_crate_commit_hash()
+                
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"BuildFixAgent-iter{attempt}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
@@ -1319,7 +1369,15 @@ class Optimizer:
                     # 返回 True 表示修复成功
                     return True
                 else:
-                    typer.secho(f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，继续尝试", fg=typer.colors.YELLOW)
+                    # 测试失败，回退到运行前的 commit
+                    if commit_before:
+                        typer.secho(f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
+                        if self._reset_to_commit(commit_before):
+                            typer.secho(f"[c2rust-optimizer][build-fix] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
+                        else:
+                            typer.secho(f"[c2rust-optimizer][build-fix] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                    else:
+                        typer.secho(f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，但无法获取运行前的 commit，继续尝试", fg=typer.colors.YELLOW)
             finally:
                 os.chdir(prev_cwd)
 
