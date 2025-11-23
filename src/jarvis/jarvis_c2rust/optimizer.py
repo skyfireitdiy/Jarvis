@@ -2,34 +2,38 @@
 """
 Rust 代码优化器：对转译或生成后的 Rust 项目执行若干保守优化步骤。
 
+所有优化步骤均使用 CodeAgent 完成，确保智能、准确且可回退。
+
 目标与策略（保守、可回退）:
 1) unsafe 清理：
-   - 识别可移除的 `unsafe { ... }` 包裹，尝试移除后执行 `cargo check`
-   - 若编译失败，回滚该处修改，并在该块或相邻函数前添加 `/// SAFETY: ` 说明
-2) 代码结构优化（重复代码提示/最小消除）：
-   - 基于文本的简单函数重复检测（签名 + 主体文本），为重复体添加 TODO 文档提示
-   - 在 CodeAgent 阶段，允许最小化抽取公共辅助函数以消除重复（若易于安全完成）
+   - 使用 CodeAgent 识别可移除的 `unsafe { ... }` 包裹，移除后执行 `cargo test` 验证
+   - 若必须保留 unsafe，缩小范围并在紧邻位置添加 `/// SAFETY: ...` 文档注释说明理由
+2) 代码结构优化（重复代码检测与消除）：
+   - 使用 CodeAgent 检测重复函数实现（签名+主体近似或完全相同）
+   - 如能安全抽取公共辅助函数进行复用，进行最小化重构以消除重复
+   - 若无法安全抽取，在重复处添加 `/// TODO: duplicate of ...` 注释标注
 3) 可见性优化（尽可能最小可见性）：
-   - 对 `pub fn` 尝试降为 `pub(crate) fn`，变更后执行 `cargo check` 验证
-   - 若失败回滚
-   - 在 CodeAgent 阶段，允许在不破坏 API 的前提下进一步减少可见性（保持对外接口为 pub）
+   - 使用 CodeAgent 将 `pub fn` 降为 `pub(crate) fn`（如果函数仅在 crate 内部使用）
+   - 保持对外接口（跨 crate 使用的接口，如 lib.rs 中的顶层导出）为 `pub`
 4) 文档补充：
-   - 为缺少文档的模块/函数添加基础占位文档
+   - 使用 CodeAgent 为缺少模块级文档的文件添加 `//! ...` 模块文档注释
+   - 为缺少函数文档的公共函数添加 `/// ...` 文档注释（可以是占位注释或简要说明）
 
 实现说明：
-- 以文件为粒度进行优化，每次微小变更均伴随 cargo check 进行验证
-- 所有修改保留最小必要的文本变动，失败立即回滚
+- 所有优化步骤均通过 CodeAgent 完成，每个步骤后执行 `cargo test` 进行验证
+- 若验证失败，进入构建修复循环（使用 CodeAgent 进行最小修复），直到通过或达到重试上限
+- 所有修改保留最小必要的文本变动，失败时自动回滚到快照（git_guard 启用时）
 - 结果摘要与日志输出到 <crate_dir>/.jarvis/c2rust/optimize_report.json
 - 进度记录（断点续跑）：<crate_dir>/.jarvis/c2rust/optimize_progress.json
   - 字段 processed: 已优化完成的文件（相对 crate 根的路径，posix 斜杠）
 
 限制：
-- 未依赖 rust-analyzer/LSP，主要使用静态文本 + `cargo check` 验证
-- 复杂语法与宏、条件编译等情况下可能存在漏检或误判，将尽量保守处理
-- 提供 CodeAgent 驱动的“整体优化”阶段，参考 transpiler 的 CodeAgent 使用方式；该阶段输出补丁并进行一次 cargo check 验证
+- 依赖 CodeAgent 的智能分析能力，复杂语法与宏、条件编译等情况由 CodeAgent 处理
+- 所有优化步骤均通过 `cargo test` 验证，确保修改后代码可正常编译和运行
+- 提供 Git 保护（git_guard），失败时自动回滚到快照
 
 使用入口：
-- optimize_project(crate_dir: Optional[Path], ...) 作为对外简单入口
+- optimize_project(project_root: Optional[Path], crate_dir: Optional[Path], ...) 作为对外简单入口
 """
 
 from __future__ import annotations
@@ -120,6 +124,78 @@ def _cargo_check(crate_dir: Path, stats: OptimizeStats, max_checks: int, timeout
     # 取首行作为摘要
     first_line = next((ln for ln in diag.splitlines() if ln.strip()), "")
     return ok, first_line
+
+def _run_cargo_fmt(crate_dir: Path) -> None:
+    """
+    执行 cargo fmt 格式化代码。
+    fmt 失败不影响主流程，只记录警告。
+    """
+    try:
+        res = subprocess.run(
+            ["cargo", "fmt"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(crate_dir),
+        )
+        if res.returncode == 0:
+            typer.secho("[c2rust-optimizer][fmt] 代码格式化完成", fg=typer.colors.CYAN)
+        else:
+            # fmt 失败不影响主流程，只记录警告
+            typer.secho(f"[c2rust-optimizer][fmt] 代码格式化失败（非致命）: {res.stderr or res.stdout}", fg=typer.colors.YELLOW)
+    except Exception as e:
+        # fmt 失败不影响主流程，只记录警告
+        typer.secho(f"[c2rust-optimizer][fmt] 代码格式化异常（非致命）: {e}", fg=typer.colors.YELLOW)
+
+def _run_cargo_clippy_fix(crate_dir: Path) -> None:
+    """
+    执行 cargo clippy --fix 自动修复代码。
+    clippy 修复失败不影响主流程，只记录警告。
+    """
+    try:
+        res = subprocess.run(
+            ["cargo", "clippy", "--fix", "--allow-dirty", "--allow-staged"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(crate_dir),
+        )
+        if res.returncode == 0:
+            typer.secho("[c2rust-optimizer][clippy] Clippy 自动修复完成", fg=typer.colors.CYAN)
+        else:
+            # clippy 修复失败不影响主流程，只记录警告
+            # clippy 可能返回非零退出码（如果有无法自动修复的问题），这是正常的
+            output = (res.stderr or res.stdout or "").strip()
+            if output:
+                typer.secho(f"[c2rust-optimizer][clippy] Clippy 自动修复完成（可能有无法自动修复的问题）: {output[:200]}", fg=typer.colors.YELLOW)
+            else:
+                typer.secho("[c2rust-optimizer][clippy] Clippy 自动修复完成（可能有无法自动修复的问题）", fg=typer.colors.YELLOW)
+    except Exception as e:
+        # clippy 修复失败不影响主流程，只记录警告
+        typer.secho(f"[c2rust-optimizer][clippy] Clippy 自动修复异常（非致命）: {e}", fg=typer.colors.YELLOW)
+
+def _check_clippy_warnings(crate_dir: Path) -> Tuple[bool, str]:
+    """
+    检查是否有 clippy 告警。
+    返回 (has_warnings, output)，has_warnings 为 True 表示有告警。
+    """
+    try:
+        res = subprocess.run(
+            ["cargo", "clippy", "--", "-W", "clippy::all"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(crate_dir),
+        )
+        output = (res.stderr or res.stdout or "").strip()
+        # clippy 返回非零退出码通常表示有告警或错误
+        # 但我们需要检查输出中是否真的有告警（而不是编译错误）
+        has_warnings = res.returncode != 0 and ("warning:" in output.lower() or "clippy::" in output.lower())
+        return has_warnings, output
+    except Exception as e:
+        # 检查失败时假设没有告警，避免阻塞流程
+        typer.secho(f"[c2rust-optimizer][clippy-check] 检查 Clippy 告警异常（非致命）: {e}", fg=typer.colors.YELLOW)
+        return False, ""
 
 def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int, timeout: Optional[int] = None) -> Tuple[bool, str]:
     """
@@ -478,35 +554,64 @@ class Optimizer:
                 # 批次开始前记录快照
                 self._snapshot_commit()
 
-                if self.options.enable_unsafe_cleanup:
-                    # 步骤前快照
-                    typer.secho("\n[c2rust-optimizer] 第 1 步：unsafe 清理", fg=typer.colors.MAGENTA)
-                    self._snapshot_commit()
-                    self._opt_unsafe_cleanup(targets)
-                    # Step build verification
-                    if not self.options.dry_run:
-                        typer.secho("[c2rust-optimizer] unsafe 清理后，正在验证构建...", fg=typer.colors.CYAN)
+                # 优化前先执行 clippy 自动修复
+                if not self.options.dry_run:
+                    typer.secho("[c2rust-optimizer] 优化前执行 Clippy 自动修复...", fg=typer.colors.CYAN)
+                    _run_cargo_clippy_fix(self.crate_dir)
+
+                # 检查是否有 clippy 告警，如果有则使用 CodeAgent 消除
+                if not self.options.dry_run:
+                    typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
+                    has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
+                    if has_warnings:
+                        typer.secho(f"\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警", fg=typer.colors.MAGENTA)
+                        self._snapshot_commit()
+                        self._codeagent_eliminate_clippy_warnings(targets, clippy_output)
+                        # 验证修复后是否还有告警
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
-                            # 循环最小修复
                             fixed = self._build_fix_loop(targets)
                             if not fixed:
                                 first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"test after unsafe_cleanup failed: {first}")
-                                # 回滚到快照并结束
+                                self.stats.errors.append(f"test after clippy_elimination failed: {first}")
                                 try:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
+                        # 再次检查是否还有告警
+                        has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
+                        if not has_warnings_after:
+                            typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+                        else:
+                            typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除", fg=typer.colors.YELLOW)
+                    else:
+                        typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
+
+                # 所有优化步骤都使用 CodeAgent
+                step_num = 1
+                
+                if self.options.enable_unsafe_cleanup:
+                    typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：unsafe 清理", fg=typer.colors.MAGENTA)
+                    self._snapshot_commit()
+                    if not self.options.dry_run:
+                        self._codeagent_opt_unsafe_cleanup(targets)
+                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+                        if not ok:
+                            fixed = self._build_fix_loop(targets)
+                            if not fixed:
+                                first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
+                                self.stats.errors.append(f"test after unsafe_cleanup failed: {first}")
+                                try:
+                                    self._reset_to_snapshot()
+                                finally:
+                                    return self.stats
+                    step_num += 1
 
                 if self.options.enable_structure_opt:
-                    # 步骤前快照
-                    typer.secho("\n[c2rust-optimizer] 第 2 步：结构优化 (重复代码检测)", fg=typer.colors.MAGENTA)
+                    typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：结构优化 (重复代码检测)", fg=typer.colors.MAGENTA)
                     self._snapshot_commit()
-                    self._opt_structure_duplicates(targets)
-                    # Step build verification
                     if not self.options.dry_run:
-                        typer.secho("[c2rust-optimizer] 结构优化后，正在验证构建...", fg=typer.colors.CYAN)
+                        self._codeagent_opt_structure_duplicates(targets)
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -517,15 +622,13 @@ class Optimizer:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
+                    step_num += 1
 
                 if self.options.enable_visibility_opt:
-                    # 步骤前快照
-                    typer.secho("\n[c2rust-optimizer] 第 3 步：可见性优化", fg=typer.colors.MAGENTA)
+                    typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：可见性优化", fg=typer.colors.MAGENTA)
                     self._snapshot_commit()
-                    self._opt_visibility(targets)
-                    # Step build verification
                     if not self.options.dry_run:
-                        typer.secho("[c2rust-optimizer] 可见性优化后，正在验证构建...", fg=typer.colors.CYAN)
+                        self._codeagent_opt_visibility(targets)
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -536,15 +639,13 @@ class Optimizer:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
+                    step_num += 1
 
                 if self.options.enable_doc_opt:
-                    # 步骤前快照
-                    typer.secho("\n[c2rust-optimizer] 第 4 步：文档补充", fg=typer.colors.MAGENTA)
+                    typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：文档补充", fg=typer.colors.MAGENTA)
                     self._snapshot_commit()
-                    self._opt_docs(targets)
-                    # Step build verification
                     if not self.options.dry_run:
-                        typer.secho("[c2rust-optimizer] 文档补充后，正在验证构建...", fg=typer.colors.CYAN)
+                        self._codeagent_opt_docs(targets)
                         ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                         if not ok:
                             fixed = self._build_fix_loop(targets)
@@ -555,15 +656,7 @@ class Optimizer:
                                     self._reset_to_snapshot()
                                 finally:
                                     return self.stats
-
-                # CodeAgent 驱动的整体优化（参考 transpiler 使用模式）
-                # 在静态优化后执行一次 CodeAgent 以最小化进一步提升（可选：dry_run 时跳过）
-                if not self.options.dry_run:
-                    try:
-                        typer.secho("\n[c2rust-optimizer] 第 5 步：CodeAgent 整体优化", fg=typer.colors.MAGENTA)
-                        self._codeagent_optimize_crate(targets)
-                    except Exception as _e:
-                        self.stats.errors.append(f"codeagent: {_e}")
+                    step_num += 1
 
                 # 标记本批次文件为“已处理”
                 self._save_progress_for_batch(targets)
@@ -591,250 +684,287 @@ class Optimizer:
                 pass
         return self.stats
 
-    # ========== 1) unsafe cleanup ==========
+    # ========== 0) clippy warnings elimination (CodeAgent) ==========
 
-    _re_unsafe_block = re.compile(r"\bunsafe\s*\{", re.MULTILINE)
-
-    def _opt_unsafe_cleanup(self, files: List[Path]) -> None:
-        for i, path in enumerate(files):
+    def _codeagent_eliminate_clippy_warnings(self, target_files: List[Path], clippy_output: str) -> None:
+        """
+        使用 CodeAgent 消除 clippy 告警。
+        
+        注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
+        """
+        crate = self.crate_dir.resolve()
+        file_list: List[str] = []
+        for p in target_files:
             try:
-                rel_path = path.relative_to(self.crate_dir)
-            except ValueError:
-                rel_path = path
-            typer.secho(f"[c2rust-optimizer][unsafe-cleanup] 正在处理文件 {i + 1}/{len(files)}: {rel_path}", fg=typer.colors.BLUE)
-            try:
-                content = _read_file(path)
+                rel = p.resolve().relative_to(crate).as_posix()
             except Exception:
-                continue
+                rel = p.as_posix()
+            file_list.append(rel)
             self.stats.files_scanned += 1
 
-            # 简单逐处尝试：每次仅移除一个 unsafe 以保持回滚粒度
-            pos = 0
-            while True:
-                m = self._re_unsafe_block.search(content, pos)
-                if not m:
-                    break
+        prompt_lines: List[str] = [
+            "你是资深 Rust 代码工程师。请在当前 crate 下消除 Clippy 告警，并以补丁形式输出修改：",
+            f"- crate 根目录：{crate}",
+            "",
+            "本次修复仅允许修改以下文件范围（严格限制）：",
+            *[f"- {rel}" for rel in file_list],
+            "",
+            "优化目标：",
+            "1) 消除 Clippy 告警：",
+            "   - 根据以下 Clippy 告警信息，修复所有可以修复的告警；",
+            "   - 对于无法自动修复的告警，请根据 Clippy 的建议进行手动修复；",
+            "   - 如果某些告警确实需要保留（如性能优化相关的告警），可以添加 `#[allow(clippy::...)]` 注释，但需要说明理由。",
+            "",
+            "约束与范围：",
+            "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
+            "- 保持最小改动，不要进行与消除告警无关的重构或格式化。",
+            "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
+            "- 输出仅为补丁，不要输出解释或多余文本。",
+            "",
+            "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo clippy -- -W clippy::all` 进行验证；",
+            "若仍有告警，请继续输出新的补丁进行修复并再次自检，直至所有告警消除或无法进一步修复为止。",
+            "",
+            "Clippy 告警信息如下：",
+            "<CLIPPY_WARNINGS>",
+            clippy_output,
+            "</CLIPPY_WARNINGS>",
+        ]
+        prompt = "\n".join(prompt_lines)
+        prompt = self._append_additional_notes(prompt)
+        # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
+        prev_cwd = os.getcwd()
+        typer.secho("[c2rust-optimizer][codeagent][clippy] 正在调用 CodeAgent 消除 Clippy 告警...", fg=typer.colors.CYAN)
+        try:
+            os.chdir(str(crate))
+            # 修复前执行 cargo fmt
+            _run_cargo_fmt(crate)
+            # CodeAgent 在 crate 目录下创建和执行
+            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent.run(prompt, prefix="[c2rust-optimizer][codeagent][clippy]", suffix="")
+        finally:
+            os.chdir(prev_cwd)
 
-                # 准备试移除（仅移除 "unsafe " 关键字，保留后续块）
-                start, end = m.span()
-                trial = content[:start] + "{" + content[end:]  # 将 "unsafe {" 替换为 "{"
+    # ========== 1) unsafe cleanup (CodeAgent) ==========
 
-                if self.options.dry_run:
-                    # 仅统计
-                    self.stats.unsafe_removed += 1  # 计为潜在可移除
-                    pos = start + 1
-                    continue
-
-                # 备份并写入尝试版
-                bak = _backup_file(path)
-                try:
-                    _write_file(path, trial)
-                    ok, diag = _cargo_check(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                    if ok:
-                        # 保留修改
-                        content = trial
-                        self.stats.unsafe_removed += 1
-                        # 不需要移动 pos 太多，继续搜索后续位置
-                        pos = start + 1
-                    else:
-                        # 回滚，并在 unsafe 前添加说明
-                        _restore_file_from_backup(path, bak)
-                        content = _read_file(path)  # 还原后的内容
-                        self._annotate_safety_comment(path, content, start, diag)
-                        # 重新读取注释后的文本，以便继续
-                        content = _read_file(path)
-                        self.stats.unsafe_annotated += 1
-                        pos = start + 1
-                finally:
-                    _remove_backup(bak)
-
-            # 若最后的 content 与磁盘不同步（dry_run 时不会），这里无需写回
-
-    def _annotate_safety_comment(self, path: Path, content: str, unsafe_pos: int, diag: str) -> None:
+    def _codeagent_opt_unsafe_cleanup(self, target_files: List[Path]) -> None:
         """
-        在 unsafe 块前注入一行文档注释，格式：
-        /// SAFETY: 自动清理失败，保留 unsafe。原因摘要: <diag>
+        使用 CodeAgent 进行 unsafe 清理优化。
+        
+        注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
         """
-        # 寻找 unsafe 所在行首
-        line_start = content.rfind("\n", 0, unsafe_pos)
-        if line_start == -1:
-            insert_at = 0
-        else:
-            insert_at = line_start + 1
-
-        annotation = f'/// SAFETY: 自动清理失败，保留 unsafe。原因摘要: {diag}\n'
-        new_content = content[:insert_at] + annotation + content[insert_at:]
-
-        if not self.options.dry_run:
-            _write_file(path, new_content)
-
-    # ========== 2) structure duplicates ==========
-
-    _re_fn = re.compile(
-        r"(?P<leading>\s*(?:pub(?:\([^\)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+\"[^\"]*\"\s+)?fn\s+"
-        r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*(?:->\s*[^ \t\r\n\{]+)?\s*)\{",
-        re.MULTILINE,
-    )
-
-    def _opt_structure_duplicates(self, files: List[Path]) -> None:
-        # 建立函数签名+主体的简易哈希，重复则为后出现者添加 TODO 注释
-        typer.secho(f"[c2rust-optimizer][structure] 正在扫描 {len(files)} 个文件以查找重复函数...", fg=typer.colors.BLUE)
-        seen: Dict[str, Tuple[Path, int]] = {}
-        for path in files:
+        crate = self.crate_dir.resolve()
+        file_list: List[str] = []
+        for p in target_files:
             try:
-                content = _read_file(path)
+                rel = p.resolve().relative_to(crate).as_posix()
             except Exception:
-                continue
+                rel = p.as_posix()
+            file_list.append(rel)
+            self.stats.files_scanned += 1
 
-            for m in self._re_fn.finditer(content):
-                name = m.group("name")
-                body_start = m.end() - 1  # at '{'
-                body_end = self._find_matching_brace(content, body_start)
-                if body_end is None:
-                    continue
-                sig = m.group(0)[: m.group(0).rfind("{")].strip()
-                body = content[body_start: body_end + 1]
-                key = f"{name}::{self._normalize_ws(sig)}::{self._normalize_ws(body)}"
-                if key not in seen:
-                    seen[key] = (path, m.start())
-                else:
-                    # 重复：在该函数前添加 TODO
-                    if self.options.dry_run:
-                        self.stats.duplicates_tagged += 1
-                        continue
-                    bak = _backup_file(path)
-                    try:
-                        insert_pos = content.rfind("\n", 0, m.start())
-                        insert_at = 0 if insert_pos == -1 else insert_pos + 1
-                        origin_path, _ = seen[key]
-                        try:
-                            origin_rel = origin_path.resolve().relative_to(self.crate_dir.resolve()).as_posix()
-                        except Exception:
-                            origin_rel = origin_path.as_posix()
-                        todo = f'/// TODO: duplicate of {origin_rel}::{name}\n'
-                        new_content = content[:insert_at] + todo + content[insert_at:]
-                        _write_file(path, new_content)
-                        content = new_content
-                        self.stats.duplicates_tagged += 1
-                    finally:
-                        _remove_backup(bak)
+        prompt_lines: List[str] = [
+            "你是资深 Rust 代码工程师。请在当前 crate 下执行 unsafe 清理优化，并以补丁形式输出修改：",
+            f"- crate 根目录：{crate}",
+            "",
+            "本次优化仅允许修改以下文件范围（严格限制）：",
+            *[f"- {rel}" for rel in file_list],
+            "",
+            "优化目标：",
+            "1) unsafe 清理：",
+            "   - 识别并移除不必要的 `unsafe { ... }` 包裹；",
+            "   - 若必须使用 unsafe，缩小 unsafe 块的范围，并在紧邻位置添加 `/// SAFETY: ...` 文档注释说明理由；",
+            "   - 对于无法移除的 unsafe，添加详细的 SAFETY 注释说明为什么需要 unsafe。",
+            "",
+            "约束与范围：",
+            "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
+            "- 保持最小改动，不要进行与 unsafe 清理无关的重构或格式化。",
+            "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
+            "- 输出仅为补丁，不要输出解释或多余文本。",
+            "",
+            "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+            "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
+        ]
+        prompt = "\n".join(prompt_lines)
+        prompt = self._append_additional_notes(prompt)
+        # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
+        prev_cwd = os.getcwd()
+        typer.secho("[c2rust-optimizer][codeagent][unsafe-cleanup] 正在调用 CodeAgent 进行 unsafe 清理...", fg=typer.colors.CYAN)
+        try:
+            os.chdir(str(crate))
+            # 修复前执行 cargo fmt
+            _run_cargo_fmt(crate)
+            # CodeAgent 在 crate 目录下创建和执行
+            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent.run(prompt, prefix="[c2rust-optimizer][codeagent][unsafe-cleanup]", suffix="")
+        finally:
+            os.chdir(prev_cwd)
 
-    def _find_matching_brace(self, s: str, open_pos: int) -> Optional[int]:
+    # ========== 2) structure duplicates (CodeAgent) ==========
+
+    def _codeagent_opt_structure_duplicates(self, target_files: List[Path]) -> None:
         """
-        给定 s[open_pos] == '{'，返回匹配的 '}' 位置；简单计数器，忽略字符串/注释的复杂性（保守）
+        使用 CodeAgent 进行结构优化（重复代码检测与消除）。
+        
+        注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
         """
-        if open_pos >= len(s) or s[open_pos] != "{":
-            return None
-        depth = 0
-        for i in range(open_pos, len(s)):
-            if s[i] == "{":
-                depth += 1
-            elif s[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    return i
-        return None
-
-    def _normalize_ws(self, s: str) -> str:
-        return re.sub(r"\s+", " ", s).strip()
-
-    # ========== 3) visibility optimization ==========
-
-    _re_pub_fn = re.compile(
-        r"(?P<prefix>\s*)pub\s+fn\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(",
-        re.MULTILINE,
-    )
-
-    def _opt_visibility(self, files: List[Path]) -> None:
-        for i, path in enumerate(files):
+        crate = self.crate_dir.resolve()
+        file_list: List[str] = []
+        for p in target_files:
             try:
-                rel_path = path.relative_to(self.crate_dir)
-            except ValueError:
-                rel_path = path
-            typer.secho(f"[c2rust-optimizer][visibility] 正在处理文件 {i + 1}/{len(files)}: {rel_path}", fg=typer.colors.BLUE)
-            try:
-                content = _read_file(path)
+                rel = p.resolve().relative_to(crate).as_posix()
             except Exception:
-                continue
+                rel = p.as_posix()
+            file_list.append(rel)
+            self.stats.files_scanned += 1
 
-            for m in list(self._re_pub_fn.finditer(content)):
-                start, end = m.span()
-                name = m.group("name")
-                candidate = content[:start] + f"{m.group('prefix')}pub(crate) fn {name}(" + content[end:]
-                if self.options.dry_run:
-                    self.stats.visibility_downgraded += 1
-                    continue
-                bak = _backup_file(path)
-                try:
-                    _write_file(path, candidate)
-                    ok, _ = _cargo_check(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                    if ok:
-                        content = candidate
-                        self.stats.visibility_downgraded += 1
-                    else:
-                        _restore_file_from_backup(path, bak)
-                        content = _read_file(path)
-                finally:
-                    _remove_backup(bak)
+        prompt_lines: List[str] = [
+            "你是资深 Rust 代码工程师。请在当前 crate 下执行代码结构优化（重复代码检测与消除），并以补丁形式输出修改：",
+            f"- crate 根目录：{crate}",
+            "",
+            "本次优化仅允许修改以下文件范围（严格限制）：",
+            *[f"- {rel}" for rel in file_list],
+            "",
+            "优化目标：",
+            "1) 重复代码检测与消除：",
+            "   - 检测重复函数实现（签名+主体近似或完全相同）；",
+            "   - 如能安全抽取公共辅助函数进行复用，进行最小化重构以消除重复；",
+            "   - 若无法安全抽取（如涉及复杂上下文依赖），在重复处添加 `/// TODO: duplicate of <file>::<function>` 注释标注。",
+            "",
+            "约束与范围：",
+            "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
+            "- 保持最小改动，不要进行与重复代码消除无关的重构或格式化。",
+            "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
+            "- 输出仅为补丁，不要输出解释或多余文本。",
+            "",
+            "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+            "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
+        ]
+        prompt = "\n".join(prompt_lines)
+        prompt = self._append_additional_notes(prompt)
+        # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
+        prev_cwd = os.getcwd()
+        typer.secho("[c2rust-optimizer][codeagent][structure] 正在调用 CodeAgent 进行结构优化...", fg=typer.colors.CYAN)
+        try:
+            os.chdir(str(crate))
+            # 修复前执行 cargo fmt
+            _run_cargo_fmt(crate)
+            # CodeAgent 在 crate 目录下创建和执行
+            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent.run(prompt, prefix="[c2rust-optimizer][codeagent][structure]", suffix="")
+        finally:
+            os.chdir(prev_cwd)
 
-    # ========== 4) doc augmentation ==========
+    # ========== 3) visibility optimization (CodeAgent) ==========
 
-    _re_mod_doc = re.compile(r"(?m)^\s*//!")  # 顶部模块文档
-    _re_any_doc = re.compile(r"(?m)^\s*///")
-
-    def _opt_docs(self, files: List[Path]) -> None:
-        for i, path in enumerate(files):
+    def _codeagent_opt_visibility(self, target_files: List[Path]) -> None:
+        """
+        使用 CodeAgent 进行可见性优化。
+        
+        注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
+        """
+        crate = self.crate_dir.resolve()
+        file_list: List[str] = []
+        for p in target_files:
             try:
-                rel_path = path.relative_to(self.crate_dir)
-            except ValueError:
-                rel_path = path
-            typer.secho(f"[c2rust-optimizer][doc] 正在处理文件 {i + 1}/{len(files)}: {rel_path}", fg=typer.colors.BLUE)
-            try:
-                content = _read_file(path)
+                rel = p.resolve().relative_to(crate).as_posix()
             except Exception:
-                continue
+                rel = p.as_posix()
+            file_list.append(rel)
+            self.stats.files_scanned += 1
 
-            changed = False
-            # 模块级文档：若文件开头不是文档，补充
-            if not self._re_mod_doc.search(content[:500]):  # 仅检查开头部分
-                header = "//! TODO: Add module-level documentation\n"
-                content = header + content
-                changed = True
-                self.stats.docs_added += 1
+        prompt_lines: List[str] = [
+            "你是资深 Rust 代码工程师。请在当前 crate 下执行可见性优化，并以补丁形式输出修改：",
+            f"- crate 根目录：{crate}",
+            "",
+            "本次优化仅允许修改以下文件范围（严格限制）：",
+            *[f"- {rel}" for rel in file_list],
+            "",
+            "优化目标：",
+            "1) 可见性最小化：",
+            "   - 优先将 `pub fn` 降为 `pub(crate) fn`（如果函数仅在 crate 内部使用）；",
+            "   - 保持对外接口（跨 crate 使用的接口，如 lib.rs 中的顶层导出）为 `pub`；",
+            "   - 在 lib.rs 中的顶层导出保持现状，不要修改。",
+            "",
+            "约束与范围：",
+            "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
+            "- 保持最小改动，不要进行与可见性优化无关的重构或格式化。",
+            "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
+            "- 输出仅为补丁，不要输出解释或多余文本。",
+            "",
+            "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+            "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
+        ]
+        prompt = "\n".join(prompt_lines)
+        prompt = self._append_additional_notes(prompt)
+        # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
+        prev_cwd = os.getcwd()
+        typer.secho("[c2rust-optimizer][codeagent][visibility] 正在调用 CodeAgent 进行可见性优化...", fg=typer.colors.CYAN)
+        try:
+            os.chdir(str(crate))
+            # 修复前执行 cargo fmt
+            _run_cargo_fmt(crate)
+            # CodeAgent 在 crate 目录下创建和执行
+            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent.run(prompt, prefix="[c2rust-optimizer][codeagent][visibility]", suffix="")
+        finally:
+            os.chdir(prev_cwd)
 
-            # 函数文档：为未有文档注释的函数前补充
-            new_content = []
-            last_end = 0
-            for m in self._re_fn.finditer(content):
-                fn_start = m.start()
-                # 检查前一行是否有 /// 文档
-                line_start = content.rfind("\n", 0, fn_start)
-                prev_line_start = content.rfind("\n", 0, line_start - 1) if line_start > 0 else -1
-                segment_start = last_end
-                segment_end = line_start + 1 if line_start != -1 else 0
-                new_content.append(content[segment_start:segment_end])
+    # ========== 4) doc augmentation (CodeAgent) ==========
 
-                doc_exists = False
-                if line_start != -1:
-                    prev_line = content[prev_line_start + 1: line_start] if prev_line_start != -1 else content[:line_start]
-                    if self._re_any_doc.search(prev_line):
-                        doc_exists = True
+    def _codeagent_opt_docs(self, target_files: List[Path]) -> None:
+        """
+        使用 CodeAgent 进行文档补充。
+        
+        注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
+        """
+        crate = self.crate_dir.resolve()
+        file_list: List[str] = []
+        for p in target_files:
+            try:
+                rel = p.resolve().relative_to(crate).as_posix()
+            except Exception:
+                rel = p.as_posix()
+            file_list.append(rel)
+            self.stats.files_scanned += 1
 
-                if not doc_exists:
-                    new_content.append("/// TODO: Add documentation\n")
-                    changed = True
-                    self.stats.docs_added += 1
+        prompt_lines: List[str] = [
+            "你是资深 Rust 代码工程师。请在当前 crate 下执行文档补充优化，并以补丁形式输出修改：",
+            f"- crate 根目录：{crate}",
+            "",
+            "本次优化仅允许修改以下文件范围（严格限制）：",
+            *[f"- {rel}" for rel in file_list],
+            "",
+            "优化目标：",
+            "1) 文档补充：",
+            "   - 为缺少模块级文档的文件添加 `//! ...` 模块文档注释（放在文件开头）；",
+            "   - 为缺少函数文档的公共函数（pub 或 pub(crate)）添加 `/// ...` 文档注释；",
+            "   - 文档内容可以是占位注释（如 `//! TODO: Add module-level documentation` 或 `/// TODO: Add documentation`），也可以根据函数签名和实现提供简要说明。",
+            "",
+            "约束与范围：",
+            "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
+            "- 保持最小改动，不要进行与文档补充无关的重构或格式化。",
+            "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
+            "- 输出仅为补丁，不要输出解释或多余文本。",
+            "",
+            "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+            "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
+        ]
+        prompt = "\n".join(prompt_lines)
+        prompt = self._append_additional_notes(prompt)
+        # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
+        prev_cwd = os.getcwd()
+        typer.secho("[c2rust-optimizer][codeagent][doc] 正在调用 CodeAgent 进行文档补充...", fg=typer.colors.CYAN)
+        try:
+            os.chdir(str(crate))
+            # 修复前执行 cargo fmt
+            _run_cargo_fmt(crate)
+            # CodeAgent 在 crate 目录下创建和执行
+            agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+            agent.run(prompt, prefix="[c2rust-optimizer][codeagent][doc]", suffix="")
+        finally:
+            os.chdir(prev_cwd)
 
-                new_content.append(content[segment_end: m.end()])  # 包含到函数体起始的部分
-                last_end = m.end()
-
-            new_content.append(content[last_end:])
-            new_s = "".join(new_content)
-
-            if changed and not self.options.dry_run:
-                _write_file(path, new_s)
-
-    # ========== 5) CodeAgent 整体优化（参考 transpiler 的 CodeAgent 使用方式） ==========
+    # ========== 5) CodeAgent 整体优化（可选，综合优化） ==========
 
     def _codeagent_optimize_crate(self, target_files: List[Path]) -> None:
         """
@@ -850,6 +980,8 @@ class Optimizer:
         - 不得删除公开 API；跨 crate 接口保持 pub
         - 仅在 crate_dir 下进行修改（Cargo.toml、src/**/*.rs）；不得改动其他目录
         - 仅输出补丁（由 CodeAgent 控制），不输出解释
+        
+        注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
         """
         crate = self.crate_dir.resolve()
         file_list: List[str] = []
@@ -888,10 +1020,14 @@ class Optimizer:
         ]
         prompt = "\n".join(prompt_lines)
         prompt = self._append_additional_notes(prompt)
+        # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
         prev_cwd = os.getcwd()
         typer.secho("[c2rust-optimizer][codeagent] 正在调用 CodeAgent 进行整体优化...", fg=typer.colors.CYAN)
         try:
             os.chdir(str(crate))
+            # 修复前执行 cargo fmt
+            _run_cargo_fmt(crate)
+            # CodeAgent 在 crate 目录下创建和执行
             agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent]", suffix="")
         finally:
@@ -913,6 +1049,8 @@ class Optimizer:
         循环执行 cargo check 并用 CodeAgent 进行最小修复，直到通过或达到重试上限或检查预算耗尽。
         仅允许（优先）修改 scope_files（除非确有必要），以支持分批优化。
         返回 True 表示修复成功构建通过；False 表示未能在限制内修复。
+        
+        注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
         """
         maxr = int(self.options.build_fix_retries or 0)
         if maxr <= 0:
@@ -988,9 +1126,13 @@ class Optimizer:
             ]
             prompt = "\n".join(prompt_lines)
             prompt = self._append_additional_notes(prompt)
+            # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
             prev_cwd = os.getcwd()
             try:
                 os.chdir(str(crate))
+                # 修复前执行 cargo fmt
+                _run_cargo_fmt(crate)
+                # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
             finally:
