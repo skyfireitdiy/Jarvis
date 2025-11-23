@@ -140,33 +140,6 @@ def _run_cargo_fmt(crate_dir: Path) -> None:
         # fmt 失败不影响主流程，只记录警告
         typer.secho(f"[c2rust-optimizer][fmt] 代码格式化异常（非致命）: {e}", fg=typer.colors.YELLOW)
 
-def _run_cargo_clippy_fix(crate_dir: Path) -> None:
-    """
-    执行 cargo clippy --fix 自动修复代码。
-    clippy 修复失败不影响主流程，只记录警告。
-    """
-    try:
-        res = subprocess.run(
-            ["cargo", "clippy", "--fix", "--allow-dirty", "--allow-staged"],
-            capture_output=True,
-            text=True,
-            check=False,
-            cwd=str(crate_dir),
-        )
-        if res.returncode == 0:
-            typer.secho("[c2rust-optimizer][clippy] Clippy 自动修复完成", fg=typer.colors.CYAN)
-        else:
-            # clippy 修复失败不影响主流程，只记录警告
-            # clippy 可能返回非零退出码（如果有无法自动修复的问题），这是正常的
-            output = (res.stderr or res.stdout or "").strip()
-            if output:
-                typer.secho(f"[c2rust-optimizer][clippy] Clippy 自动修复完成（可能有无法自动修复的问题）: {output[:200]}", fg=typer.colors.YELLOW)
-            else:
-                typer.secho("[c2rust-optimizer][clippy] Clippy 自动修复完成（可能有无法自动修复的问题）", fg=typer.colors.YELLOW)
-    except Exception as e:
-        # clippy 修复失败不影响主流程，只记录警告
-        typer.secho(f"[c2rust-optimizer][clippy] Clippy 自动修复异常（非致命）: {e}", fg=typer.colors.YELLOW)
-
 def _check_clippy_warnings(crate_dir: Path) -> Tuple[bool, str]:
     """
     检查是否有 clippy 告警。
@@ -736,11 +709,6 @@ class Optimizer:
                 typer.secho(f"[c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。", fg=typer.colors.BLUE)
                 # 批次开始前记录快照
                 self._snapshot_commit()
-
-                # 优化前先执行 clippy 自动修复
-                if not self.options.dry_run:
-                    typer.secho("[c2rust-optimizer] 优化前执行 Clippy 自动修复...", fg=typer.colors.CYAN)
-                    _run_cargo_clippy_fix(self.crate_dir)
 
                 # 检查是否有 clippy 告警，如果有则使用 CodeAgent 消除
                 if not self.options.dry_run:
