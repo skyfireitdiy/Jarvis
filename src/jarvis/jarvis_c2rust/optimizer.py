@@ -386,6 +386,7 @@ class Optimizer:
         self.progress_path = self.report_dir / "optimize_progress.json"
         self.processed: Set[str] = set()
         self.steps_completed: Set[str] = set()  # 已完成的步骤集合
+        self._step_commits: Dict[str, str] = {}  # 每个步骤的 commit id
         self._target_files: List[Path] = []
         self._load_or_reset_progress()
         self._last_snapshot_commit: Optional[str] = None
@@ -475,6 +476,7 @@ class Optimizer:
                 pass
             self.processed = set()
             self.steps_completed: Set[str] = set()
+            self._step_commits = {}
             return
         try:
             if self.progress_path.exists():
@@ -491,15 +493,65 @@ class Optimizer:
                         self.steps_completed = {str(x) for x in steps if isinstance(x, str)}
                     else:
                         self.steps_completed = set()
+                    # 加载步骤的 commit id
+                    step_commits = obj.get("step_commits") or {}
+                    if isinstance(step_commits, dict):
+                        self._step_commits = {str(k): str(v) for k, v in step_commits.items() if isinstance(k, str) and isinstance(v, str)}
+                    else:
+                        self._step_commits = {}
+                    
+                    # 恢复时，reset 到最后一个步骤的 commit id
+                    if self.options.resume and self._step_commits:
+                        last_commit = None
+                        # 按照步骤顺序找到最后一个已完成步骤的 commit
+                        step_order = ["clippy_elimination", "unsafe_cleanup", "structure_opt", "visibility_opt", "doc_opt"]
+                        for step in reversed(step_order):
+                            if step in self.steps_completed and step in self._step_commits:
+                                last_commit = self._step_commits[step]
+                                break
+                        
+                        if last_commit:
+                            current_commit = self._get_crate_commit_hash()
+                            if current_commit != last_commit:
+                                typer.secho(f"[c2rust-optimizer][resume] 检测到代码状态不一致，正在 reset 到最后一个步骤的 commit: {last_commit}", fg=typer.colors.YELLOW)
+                                if self._reset_to_commit(last_commit):
+                                    typer.secho(f"[c2rust-optimizer][resume] 已 reset 到 commit: {last_commit}", fg=typer.colors.GREEN)
+                                else:
+                                    typer.secho(f"[c2rust-optimizer][resume] reset 失败，继续使用当前代码状态", fg=typer.colors.YELLOW)
+                            else:
+                                typer.secho(f"[c2rust-optimizer][resume] 代码状态一致，无需 reset", fg=typer.colors.CYAN)
                 else:
                     self.processed = set()
                     self.steps_completed = set()
+                    self._step_commits = {}
             else:
                 self.processed = set()
                 self.steps_completed = set()
+                self._step_commits = {}
         except Exception:
             self.processed = set()
             self.steps_completed = set()
+            self._step_commits = {}
+
+    def _get_crate_commit_hash(self) -> Optional[str]:
+        """获取 crate 目录的当前 commit id"""
+        try:
+            repo_root = _git_toplevel(self.crate_dir)
+            if repo_root is None:
+                return None
+            return _git_head_commit(repo_root)
+        except Exception:
+            return None
+
+    def _reset_to_commit(self, commit_hash: str) -> bool:
+        """回退 crate 目录到指定的 commit"""
+        try:
+            repo_root = _git_toplevel(self.crate_dir)
+            if repo_root is None:
+                return False
+            return _git_reset_hard(repo_root, commit_hash)
+        except Exception:
+            return False
 
     def _save_progress_for_batch(self, files: List[Path]) -> None:
         """保存文件处理进度"""
@@ -512,10 +564,18 @@ class Optimizer:
                     rel = str(p)
                 rels.append(rel)
             self.processed.update(rels)
+            
+            # 获取当前 commit id 并记录
+            current_commit = self._get_crate_commit_hash()
+            
             data = {
                 "processed": sorted(self.processed),
                 "steps_completed": sorted(self.steps_completed)
             }
+            if current_commit:
+                data["last_commit"] = current_commit
+                typer.secho(f"[c2rust-optimizer][progress] 已记录当前 commit: {current_commit}", fg=typer.colors.CYAN)
+            
             self.progress_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
@@ -534,11 +594,24 @@ class Optimizer:
                     rel = str(p)
                 rels.append(rel)
             self.processed.update(rels)
+            
+            # 获取当前 commit id 并记录
+            current_commit = self._get_crate_commit_hash()
+            
             # 保存进度
             data = {
                 "processed": sorted(self.processed),
                 "steps_completed": sorted(self.steps_completed)
             }
+            if current_commit:
+                # 记录每个步骤的 commit id
+                step_commits = getattr(self, "_step_commits", {})
+                step_commits[step_name] = current_commit
+                self._step_commits = step_commits
+                data["step_commits"] = step_commits
+                data["last_commit"] = current_commit
+                typer.secho(f"[c2rust-optimizer][progress] 已记录步骤 '{step_name}' 的 commit: {current_commit}", fg=typer.colors.CYAN)
+            
             self.progress_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
             typer.secho(f"[c2rust-optimizer] 步骤 '{step_name}' 进度已保存", fg=typer.colors.CYAN)
         except Exception as e:
