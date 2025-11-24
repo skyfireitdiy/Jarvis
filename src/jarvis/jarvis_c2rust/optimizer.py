@@ -701,7 +701,197 @@ class Optimizer:
 
     # ---------- 主运行入口 ----------
 
+    def _get_report_display_path(self, report_path: Path) -> str:
+        """
+        获取报告文件的显示路径（优先使用相对路径）。
+        
+        Args:
+            report_path: 报告文件的绝对路径
+            
+        Returns:
+            显示路径字符串
+        """
+        try:
+            return str(report_path.relative_to(self.project_root))
+        except ValueError:
+            try:
+                return str(report_path.relative_to(self.crate_dir))
+            except ValueError:
+                try:
+                    return str(report_path.relative_to(Path.cwd()))
+                except ValueError:
+                    return str(report_path)
+
+    def _write_final_report(self, report_path: Path) -> None:
+        """
+        写入最终优化报告。
+        
+        Args:
+            report_path: 报告文件路径
+        """
+        try:
+            _write_file(report_path, json.dumps(asdict(self.stats), ensure_ascii=False, indent=2))
+        except Exception:
+            pass
+
+    def _verify_and_fix_after_step(self, step_name: str, target_files: List[Path]) -> bool:
+        """
+        验证步骤执行后的测试，如果失败则尝试修复。
+        
+        Args:
+            step_name: 步骤名称（用于错误消息）
+            target_files: 目标文件列表（用于修复范围）
+            
+        Returns:
+            True: 测试通过或修复成功
+            False: 测试失败且修复失败（已回滚）
+        """
+        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
+        if not ok:
+            fixed = self._build_fix_loop(target_files)
+            if not fixed:
+                first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
+                self.stats.errors.append(f"test after {step_name} failed: {first}")
+                try:
+                    self._reset_to_snapshot()
+                finally:
+                    return False
+        return True
+
+    def _run_optimization_step(self, step_name: str, step_display_name: str, step_num: int, 
+                               target_files: List[Path], opt_func) -> Optional[int]:
+        """
+        执行单个优化步骤（unsafe_cleanup, visibility_opt, doc_opt）。
+        
+        Args:
+            step_name: 步骤名称（用于进度保存和错误消息）
+            step_display_name: 步骤显示名称（用于日志）
+            step_num: 步骤编号
+            target_files: 目标文件列表
+            opt_func: 优化函数（接受 target_files 作为参数）
+            
+        Returns:
+            下一个步骤编号，如果失败则返回 None
+        """
+        typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：{step_display_name}", fg=typer.colors.MAGENTA)
+        self._snapshot_commit()
+        if not self.options.dry_run:
+            opt_func(target_files)
+            if not self._verify_and_fix_after_step(step_name, target_files):
+                # 验证失败，已回滚，返回 None 表示失败
+                return None
+            # 保存步骤进度
+            self._save_step_progress(step_name, target_files)
+        return step_num + 1
+
+    def _handle_clippy_after_auto_fix(self, clippy_targets: List[Path], clippy_output: str) -> bool:
+        """
+        处理自动修复后的 clippy 告警检查。
+        如果仍有告警，使用 CodeAgent 继续修复。
+        
+        Args:
+            clippy_targets: 目标文件列表
+            clippy_output: 当前的 clippy 输出
+            
+        Returns:
+            True: 所有告警已消除
+            False: 仍有告警未消除（步骤未完成）
+        """
+        typer.secho("[c2rust-optimizer] 自动修复后仍有告警，继续使用 CodeAgent 修复...", fg=typer.colors.CYAN)
+        all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
+        
+        # 验证修复后是否还有告警
+        if not self._verify_and_fix_after_step("clippy_elimination", clippy_targets):
+            return False
+        
+        # 再次检查是否还有告警
+        has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
+        if not has_warnings_after and all_warnings_eliminated:
+            typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+            self._save_step_progress("clippy_elimination", clippy_targets)
+            return True
+        else:
+            typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
+            return False
+
+    def _run_clippy_elimination_step(self) -> bool:
+        """
+        执行 Clippy 告警修复步骤（第 0 步）。
+        
+        Returns:
+            True: 步骤完成（无告警或已修复）
+            False: 步骤未完成（仍有告警未修复，应停止后续步骤）
+        """
+        if self.options.dry_run:
+            return True
+            
+        typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
+        has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
+        
+        # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
+        if "clippy_elimination" in self.steps_completed and has_warnings:
+            typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
+            self.steps_completed.discard("clippy_elimination")
+            if "clippy_elimination" in self._step_commits:
+                del self._step_commits["clippy_elimination"]
+        
+        if not has_warnings:
+            typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
+            # 如果没有告警，标记 clippy_elimination 为完成（跳过状态）
+            if "clippy_elimination" not in self.steps_completed:
+                clippy_targets = list(_iter_rust_files(self.crate_dir))
+                if clippy_targets:
+                    self._save_step_progress("clippy_elimination", clippy_targets)
+            return True
+        
+        # 有告警，需要修复
+        typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）", fg=typer.colors.MAGENTA)
+        self._snapshot_commit()
+        
+        clippy_targets = list(_iter_rust_files(self.crate_dir))
+        if not clippy_targets:
+            typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
+            return False
+        
+        # 先尝试使用 clippy --fix 自动修复
+        auto_fix_success = self._try_clippy_auto_fix()
+        if auto_fix_success:
+            typer.secho("[c2rust-optimizer] clippy 自动修复成功，继续检查是否还有告警...", fg=typer.colors.GREEN)
+            # 重新检查告警
+            has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
+            if not has_warnings:
+                typer.secho("[c2rust-optimizer] 所有 Clippy 告警已通过自动修复消除", fg=typer.colors.GREEN)
+                self._save_step_progress("clippy_elimination", clippy_targets)
+                return True
+            else:
+                # 仍有告警，使用 CodeAgent 继续修复
+                return self._handle_clippy_after_auto_fix(clippy_targets, clippy_output)
+        else:
+            # 自动修复失败或未执行，继续使用 CodeAgent 修复
+            typer.secho("[c2rust-optimizer] clippy 自动修复未成功，继续使用 CodeAgent 修复...", fg=typer.colors.CYAN)
+            all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
+            
+            # 验证修复后是否还有告警
+            if not self._verify_and_fix_after_step("clippy_elimination", clippy_targets):
+                return False
+            
+            # 再次检查是否还有告警
+            has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
+            if not has_warnings_after and all_warnings_eliminated:
+                typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+                self._save_step_progress("clippy_elimination", clippy_targets)
+                return True
+            else:
+                typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
+                return False
+
     def run(self) -> OptimizeStats:
+        """
+        执行优化流程的主入口。
+        
+        Returns:
+            优化统计信息
+        """
         report_path = self.report_dir / "optimize_report.json"
         typer.secho(f"[c2rust-optimizer][start] 开始优化 Crate: {self.crate_dir}", fg=typer.colors.BLUE)
         try:
@@ -710,95 +900,9 @@ class Optimizer:
 
             # ========== 第 0 步：Clippy 告警修复（必须第一步，且必须完成） ==========
             # 注意：clippy 告警修复不依赖于是否有新文件需要处理，即使所有文件都已处理，也应该检查并修复告警
-            if not self.options.dry_run:
-                typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
-                has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
-                # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
-                if "clippy_elimination" in self.steps_completed and has_warnings:
-                    typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
-                    self.steps_completed.discard("clippy_elimination")
-                    # 同时清除对应的 commit id
-                    if "clippy_elimination" in self._step_commits:
-                        del self._step_commits["clippy_elimination"]
-                
-                if has_warnings:
-                    typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）", fg=typer.colors.MAGENTA)
-                    self._snapshot_commit()
-                    # 使用所有 Rust 文件作为目标（用于 clippy 告警修复）
-                    clippy_targets = list(_iter_rust_files(self.crate_dir))
-                    if not clippy_targets:
-                        typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
-                        return self.stats
-                    
-                    # 先尝试使用 clippy --fix 自动修复
-                    auto_fix_success = self._try_clippy_auto_fix()
-                    if auto_fix_success:
-                        typer.secho("[c2rust-optimizer] clippy 自动修复成功，继续检查是否还有告警...", fg=typer.colors.GREEN)
-                        # 重新检查告警
-                        has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
-                        if not has_warnings:
-                            typer.secho("[c2rust-optimizer] 所有 Clippy 告警已通过自动修复消除", fg=typer.colors.GREEN)
-                            self._save_step_progress("clippy_elimination", clippy_targets)
-                            # 继续后续步骤（跳过后续验证）
-                        else:
-                            typer.secho("[c2rust-optimizer] 自动修复后仍有告警，继续使用 CodeAgent 修复...", fg=typer.colors.CYAN)
-                            all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
-                            # 验证修复后是否还有告警
-                            ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                            if not ok:
-                                fixed = self._build_fix_loop(clippy_targets)
-                                if not fixed:
-                                    first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                    self.stats.errors.append(f"test after clippy_elimination failed: {first}")
-                                    try:
-                                        self._reset_to_snapshot()
-                                    finally:
-                                        return self.stats
-                            # 再次检查是否还有告警
-                            has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
-                            if not has_warnings_after and all_warnings_eliminated:
-                                typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
-                                # 只有所有告警都消除后，才保存步骤进度
-                                self._save_step_progress("clippy_elimination", clippy_targets)
-                            else:
-                                typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
-                                # 不保存步骤进度，下次恢复时会继续尝试修复
-                                # 由于 clippy 告警修复未完成，不执行后续优化步骤
-                                return self.stats
-                    else:
-                        # 自动修复失败或未执行，继续使用 CodeAgent 修复
-                        typer.secho("[c2rust-optimizer] clippy 自动修复未成功，继续使用 CodeAgent 修复...", fg=typer.colors.CYAN)
-                        all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
-                        # 验证修复后是否还有告警
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                        if not ok:
-                            fixed = self._build_fix_loop(clippy_targets)
-                            if not fixed:
-                                first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"test after clippy_elimination failed: {first}")
-                                try:
-                                    self._reset_to_snapshot()
-                                finally:
-                                    return self.stats
-                        # 再次检查是否还有告警
-                        has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
-                        if not has_warnings_after and all_warnings_eliminated:
-                            typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
-                            # 只有所有告警都消除后，才保存步骤进度
-                            self._save_step_progress("clippy_elimination", clippy_targets)
-                        else:
-                            typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
-                            # 不保存步骤进度，下次恢复时会继续尝试修复
-                            # 由于 clippy 告警修复未完成，不执行后续优化步骤
-                            return self.stats
-                else:
-                    typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
-                    # 如果没有告警，标记 clippy_elimination 为完成（跳过状态）
-                    if "clippy_elimination" not in self.steps_completed:
-                        # 使用所有 Rust 文件作为目标（用于标记步骤完成）
-                        clippy_targets = list(_iter_rust_files(self.crate_dir))
-                        if clippy_targets:
-                            self._save_step_progress("clippy_elimination", clippy_targets)
+            if not self._run_clippy_elimination_step():
+                # Clippy 告警修复未完成，停止后续步骤
+                return self.stats
 
             # ========== 后续优化步骤（只有在 clippy 告警修复完成后才执行） ==========
             # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
@@ -813,61 +917,28 @@ class Optimizer:
                 step_num = 1
                 
                 if self.options.enable_unsafe_cleanup:
-                    typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：unsafe 清理", fg=typer.colors.MAGENTA)
-                    self._snapshot_commit()
-                    if not self.options.dry_run:
-                        self._codeagent_opt_unsafe_cleanup(targets)
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                        if not ok:
-                            fixed = self._build_fix_loop(targets)
-                            if not fixed:
-                                first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"test after unsafe_cleanup failed: {first}")
-                                try:
-                                    self._reset_to_snapshot()
-                                finally:
-                                    return self.stats
-                        # 保存步骤进度
-                        self._save_step_progress("unsafe_cleanup", targets)
-                    step_num += 1
+                    step_num = self._run_optimization_step(
+                        "unsafe_cleanup", "unsafe 清理", step_num, targets,
+                        self._codeagent_opt_unsafe_cleanup
+                    )
+                    if step_num is None:  # 步骤失败，已回滚
+                        return self.stats
 
                 if self.options.enable_visibility_opt:
-                    typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：可见性优化", fg=typer.colors.MAGENTA)
-                    self._snapshot_commit()
-                    if not self.options.dry_run:
-                        self._codeagent_opt_visibility(targets)
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                        if not ok:
-                            fixed = self._build_fix_loop(targets)
-                            if not fixed:
-                                first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"test after visibility_opt failed: {first}")
-                                try:
-                                    self._reset_to_snapshot()
-                                finally:
-                                    return self.stats
-                        # 保存步骤进度
-                        self._save_step_progress("visibility_opt", targets)
-                    step_num += 1
+                    step_num = self._run_optimization_step(
+                        "visibility_opt", "可见性优化", step_num, targets,
+                        self._codeagent_opt_visibility
+                    )
+                    if step_num is None:  # 步骤失败，已回滚
+                        return self.stats
 
                 if self.options.enable_doc_opt:
-                    typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：文档补充", fg=typer.colors.MAGENTA)
-                    self._snapshot_commit()
-                    if not self.options.dry_run:
-                        self._codeagent_opt_docs(targets)
-                        ok, diag_full = _cargo_check_full(self.crate_dir, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
-                        if not ok:
-                            fixed = self._build_fix_loop(targets)
-                            if not fixed:
-                                first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
-                                self.stats.errors.append(f"test after doc_opt failed: {first}")
-                                try:
-                                    self._reset_to_snapshot()
-                                finally:
-                                    return self.stats
-                        # 保存步骤进度
-                        self._save_step_progress("doc_opt", targets)
-                    step_num += 1
+                    step_num = self._run_optimization_step(
+                        "doc_opt", "文档补充", step_num, targets,
+                        self._codeagent_opt_docs
+                    )
+                    if step_num is None:  # 步骤失败，已回滚
+                        return self.stats
 
                 # 最终保存进度（确保所有步骤的进度都已记录）
                 self._save_progress_for_batch(targets)
@@ -876,23 +947,9 @@ class Optimizer:
             self.stats.errors.append(f"fatal: {e}")
         finally:
             # 写出简要报告
-            # 尝试显示相对路径，优先相对于 project_root，然后相对于 crate_dir，最后显示绝对路径
-            try:
-                report_display = str(report_path.relative_to(self.project_root))
-            except ValueError:
-                try:
-                    report_display = str(report_path.relative_to(self.crate_dir))
-                except ValueError:
-                    try:
-                        report_display = str(report_path.relative_to(Path.cwd()))
-                    except ValueError:
-                        # 如果都不行，显示绝对路径
-                        report_display = str(report_path)
+            report_display = self._get_report_display_path(report_path)
             typer.secho(f"[c2rust-optimizer] 优化流程结束。报告已生成于: {report_display}", fg=typer.colors.GREEN)
-            try:
-                _write_file(report_path, json.dumps(asdict(self.stats), ensure_ascii=False, indent=2))
-            except Exception:
-                pass
+            self._write_final_report(report_path)
         return self.stats
 
     # ========== 0) clippy warnings elimination (CodeAgent) ==========
@@ -1080,7 +1137,7 @@ class Optimizer:
                 
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"ClippyWarningEliminator-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
-                agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][clippy]", suffix="")
+                agent.run(prompt, prefix="[c2rust-optimizer][codeagent][clippy]", suffix="")
                 
                 # 验证修复是否成功（通过 cargo test）
                 ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
@@ -1095,7 +1152,7 @@ class Optimizer:
                         if self._reset_to_commit(commit_before):
                             typer.secho(f"[c2rust-optimizer][codeagent][clippy] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                         else:
-                            typer.secho(f"[c2rust-optimizer][codeagent][clippy] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                            typer.secho("[c2rust-optimizer][codeagent][clippy] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
                     else:
                         typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复后测试失败，但无法获取运行前的 commit，继续修复", fg=typer.colors.YELLOW)
                 
@@ -1282,7 +1339,7 @@ class Optimizer:
                         if self._reset_to_commit(commit_before):
                             typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                         else:
-                            typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                            typer.secho("[c2rust-optimizer][codeagent][unsafe-cleanup] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
                     else:
                         typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复后测试失败，但无法获取运行前的 commit，继续处理", fg=typer.colors.YELLOW)
             
@@ -1367,7 +1424,7 @@ class Optimizer:
                     if self._reset_to_commit(commit_before):
                         typer.secho(f"[c2rust-optimizer][codeagent][visibility] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                     else:
-                        typer.secho(f"[c2rust-optimizer][codeagent][visibility] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                        typer.secho("[c2rust-optimizer][codeagent][visibility] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
                 else:
                     typer.secho("[c2rust-optimizer][codeagent][visibility] 可见性优化后测试失败，但无法获取运行前的 commit", fg=typer.colors.YELLOW)
         finally:
@@ -1450,7 +1507,7 @@ class Optimizer:
                     if self._reset_to_commit(commit_before):
                         typer.secho(f"[c2rust-optimizer][codeagent][doc] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                     else:
-                        typer.secho(f"[c2rust-optimizer][codeagent][doc] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                        typer.secho("[c2rust-optimizer][codeagent][doc] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
                 else:
                     typer.secho("[c2rust-optimizer][codeagent][doc] 文档补充后测试失败，但无法获取运行前的 commit", fg=typer.colors.YELLOW)
         finally:
@@ -1574,7 +1631,7 @@ class Optimizer:
                         if self._reset_to_commit(commit_before):
                             typer.secho(f"[c2rust-optimizer][build-fix] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                         else:
-                            typer.secho(f"[c2rust-optimizer][build-fix] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
+                            typer.secho("[c2rust-optimizer][build-fix] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
                     else:
                         typer.secho(f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，但无法获取运行前的 commit，继续尝试", fg=typer.colors.YELLOW)
             finally:
