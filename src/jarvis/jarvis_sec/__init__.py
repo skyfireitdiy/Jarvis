@@ -142,6 +142,7 @@ def run_security_analysis(
     exclude_dirs: Optional[List[str]] = None,
     enable_verification: bool = True,
     force_save_memory: bool = False,
+    output_file: Optional[str] = None,
 ) -> str:
     """
     运行安全分析工作流（混合模式）。
@@ -264,6 +265,7 @@ def run_security_analysis(
             scanned_root=summary.get("scanned_root"),
             scanned_files=summary.get("scanned_files"),
             meta=meta_records or None,
+            output_file=output_file,
         )
         # 标记分析完成
         status_mgr.mark_completed(

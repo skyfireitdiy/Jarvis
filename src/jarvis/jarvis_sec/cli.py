@@ -10,7 +10,7 @@ Jarvis 安全演进套件 —— 命令行入口（Typer 版本）
 可选参数：
 
 - --path, -p: 待分析的根目录（默认当前目录）
-- --output, -o: 最终Markdown报告输出路径（默认 ./report.md）
+- --output, -o: 最终报告输出路径（默认 ./report.md）。如果后缀为 .csv，则输出 CSV 格式；否则输出 Markdown 格式
 """
 
 from __future__ import annotations
@@ -22,7 +22,8 @@ from typing import Optional
 import typer
 from jarvis.jarvis_utils.utils import init_env
 # removed: set_config import（避免全局覆盖模型组配置）
-from jarvis.jarvis_sec.workflow import run_with_agent, direct_scan, format_markdown_report
+from jarvis.jarvis_sec.workflow import run_with_agent, direct_scan, format_markdown_report as format_markdown_report_workflow
+from jarvis.jarvis_sec.report import format_csv_report, aggregate_issues
 
 app = typer.Typer(
     add_completion=False,
@@ -41,7 +42,7 @@ def agent(
         None, "--llm-group", "-g", help="使用的模型组（仅对本次运行生效，不修改全局配置）"
     ),
     output: Optional[str] = typer.Option(
-        "report.md", "--output", "-o", help="最终Markdown报告输出路径（默认 ./report.md）"
+        "report.md", "--output", "-o", help="最终报告输出路径（默认 ./report.md）。如果后缀为 .csv，则输出 CSV 格式；否则输出 Markdown 格式"
     ),
 
     cluster_limit: int = typer.Option(
@@ -72,6 +73,7 @@ def agent(
             cluster_limit=cluster_limit,
             enable_verification=enable_verification,
             force_save_memory=force_save_memory,
+            output_file=output,
         )
     except Exception as e:
         try:
@@ -86,7 +88,18 @@ def agent(
         except Exception:
             pass
         result = direct_scan(path)
-        text = format_markdown_report(result)
+        # 根据输出文件后缀选择格式
+        if output and output.lower().endswith('.csv'):
+            # 使用 report.py 中的函数来格式化 CSV
+            report_json = aggregate_issues(
+                result.get("issues", []),
+                scanned_root=result.get("summary", {}).get("scanned_root"),
+                scanned_files=result.get("summary", {}).get("scanned_files"),
+            )
+            text = format_csv_report(report_json)
+        else:
+            # 使用 workflow.py 中的 format_markdown_report（与 direct_scan 返回结构匹配）
+            text = format_markdown_report_workflow(result)
 
     if output:
         try:
