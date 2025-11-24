@@ -752,7 +752,7 @@ class Optimizer:
             if not fixed:
                 first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
                 self.stats.errors.append(f"test after {step_name} failed: {first}")
-                try:
+        try:
                     self._reset_to_snapshot()
                 finally:
                     return False
@@ -775,7 +775,7 @@ class Optimizer:
         """
         typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：{step_display_name}", fg=typer.colors.MAGENTA)
         self._snapshot_commit()
-        if not self.options.dry_run:
+            if not self.options.dry_run:
             opt_func(target_files)
             if not self._verify_and_fix_after_step(step_name, target_files):
                 # 验证失败，已回滚，返回 None 表示失败
@@ -825,16 +825,16 @@ class Optimizer:
         if self.options.dry_run:
             return True
             
-        typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
-        has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
+                typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
+                has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
         
-        # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
-        if "clippy_elimination" in self.steps_completed and has_warnings:
-            typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
-            self.steps_completed.discard("clippy_elimination")
-            if "clippy_elimination" in self._step_commits:
-                del self._step_commits["clippy_elimination"]
-        
+                # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
+                if "clippy_elimination" in self.steps_completed and has_warnings:
+                    typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
+                    self.steps_completed.discard("clippy_elimination")
+                    if "clippy_elimination" in self._step_commits:
+                        del self._step_commits["clippy_elimination"]
+                
         if not has_warnings:
             typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
             # 如果没有告警，标记 clippy_elimination 为完成（跳过状态）
@@ -845,12 +845,12 @@ class Optimizer:
             return True
         
         # 有告警，需要修复
-        typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）", fg=typer.colors.MAGENTA)
-        self._snapshot_commit()
+                    typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）", fg=typer.colors.MAGENTA)
+                    self._snapshot_commit()
         
-        clippy_targets = list(_iter_rust_files(self.crate_dir))
-        if not clippy_targets:
-            typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
+                    clippy_targets = list(_iter_rust_files(self.crate_dir))
+                    if not clippy_targets:
+                        typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
             return False
         
         # 先尝试使用 clippy --fix 自动修复
@@ -869,20 +869,20 @@ class Optimizer:
         else:
             # 自动修复失败或未执行，继续使用 CodeAgent 修复
             typer.secho("[c2rust-optimizer] clippy 自动修复未成功，继续使用 CodeAgent 修复...", fg=typer.colors.CYAN)
-            all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
+                    all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
             
-            # 验证修复后是否还有告警
+                    # 验证修复后是否还有告警
             if not self._verify_and_fix_after_step("clippy_elimination", clippy_targets):
                 return False
             
-            # 再次检查是否还有告警
-            has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
-            if not has_warnings_after and all_warnings_eliminated:
-                typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
-                self._save_step_progress("clippy_elimination", clippy_targets)
+                    # 再次检查是否还有告警
+                    has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
+                    if not has_warnings_after and all_warnings_eliminated:
+                        typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+                        self._save_step_progress("clippy_elimination", clippy_targets)
                 return True
-            else:
-                typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
+                    else:
+                        typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
                 return False
 
     def run(self) -> OptimizeStats:
@@ -902,7 +902,7 @@ class Optimizer:
             # 注意：clippy 告警修复不依赖于是否有新文件需要处理，即使所有文件都已处理，也应该检查并修复告警
             if not self._run_clippy_elimination_step():
                 # Clippy 告警修复未完成，停止后续步骤
-                return self.stats
+                        return self.stats
 
             # ========== 后续优化步骤（只有在 clippy 告警修复完成后才执行） ==========
             # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
@@ -922,7 +922,7 @@ class Optimizer:
                         self._codeagent_opt_unsafe_cleanup
                     )
                     if step_num is None:  # 步骤失败，已回滚
-                        return self.stats
+                                    return self.stats
 
                 if self.options.enable_visibility_opt:
                     step_num = self._run_optimization_step(
@@ -930,7 +930,7 @@ class Optimizer:
                         self._codeagent_opt_visibility
                     )
                     if step_num is None:  # 步骤失败，已回滚
-                        return self.stats
+                                    return self.stats
 
                 if self.options.enable_doc_opt:
                     step_num = self._run_optimization_step(
@@ -938,7 +938,7 @@ class Optimizer:
                         self._codeagent_opt_docs
                     )
                     if step_num is None:  # 步骤失败，已回滚
-                        return self.stats
+                                    return self.stats
 
                 # 最终保存进度（确保所有步骤的进度都已记录）
                 self._save_progress_for_batch(targets)
@@ -1042,7 +1042,7 @@ class Optimizer:
     def _codeagent_eliminate_clippy_warnings(self, target_files: List[Path], clippy_output: str) -> bool:
         """
         使用 CodeAgent 消除 clippy 告警。
-        每次只修复第一个告警，然后迭代直到没有告警。
+        按文件修复，每次修复单个文件的前10个告警（不足10个就全部给出），修复后重新扫描，不断迭代。
         
         注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
         
@@ -1062,14 +1062,13 @@ class Optimizer:
 
         # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
         prev_cwd = os.getcwd()
-        max_iterations = 100  # 最大迭代次数，避免无限循环
         iteration = 0
         
         try:
             os.chdir(str(crate))
             
-            # 循环修复告警，每次只修复第一个
-            while iteration < max_iterations:
+            # 循环修复告警，按文件处理
+            while True:
                 iteration += 1
                 
                 # 检查当前告警
@@ -1078,27 +1077,55 @@ class Optimizer:
                     typer.secho(f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration - 1} 次）", fg=typer.colors.GREEN)
                     return True  # 所有告警已消除
 
-                # 提取第一个告警
-                first_warning = self._extract_first_warning(current_clippy_output)
-                if not first_warning:
-                    typer.secho("[c2rust-optimizer][codeagent][clippy] 无法提取第一个告警，停止修复", fg=typer.colors.YELLOW)
+                # 按文件提取告警
+                warnings_by_file = self._extract_warnings_by_file(current_clippy_output)
+                if not warnings_by_file:
+                    typer.secho("[c2rust-optimizer][codeagent][clippy] 无法提取告警，停止修复", fg=typer.colors.YELLOW)
                     return False  # 仍有告警未消除
                 
-                typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 次迭代：修复第一个告警", fg=typer.colors.CYAN)
+                # 找到第一个有告警的文件（优先处理目标文件列表中的文件）
+                target_file_path = None
+                target_warnings = None
                 
-                # 构建提示词，只修复第一个告警
+                # 优先处理目标文件列表中的文件
+                for file_rel in file_list:
+                    # 尝试匹配文件路径（可能是相对路径或绝对路径）
+                    for file_path, warnings in warnings_by_file.items():
+                        if file_rel in file_path or file_path.endswith(file_rel):
+                            target_file_path = file_path
+                            target_warnings = warnings
+                            break
+                    if target_file_path:
+                        break
+                
+                # 如果目标文件列表中没有告警，选择第一个有告警的文件
+                if not target_file_path:
+                    target_file_path = next(iter(warnings_by_file.keys()))
+                    target_warnings = warnings_by_file[target_file_path]
+                
+                # 获取该文件的前10个告警（不足10个就全部给出）
+                warnings_to_fix = target_warnings[:10]
+                warning_count = len(warnings_to_fix)
+                total_warnings_in_file = len(target_warnings)
+                
+                typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 次迭代：修复文件 {target_file_path} 的前 {warning_count} 个告警（共 {total_warnings_in_file} 个）", fg=typer.colors.CYAN)
+                
+                # 格式化告警信息
+                formatted_warnings = self._format_warnings_for_prompt(warnings_to_fix, max_count=10)
+                
+                # 构建提示词，修复该文件的前10个告警
                 prompt_lines: List[str] = [
-                    "你是资深 Rust 代码工程师。请在当前 crate 下修复第一个 Clippy 告警，并以补丁形式输出修改：",
+                    "你是资深 Rust 代码工程师。请在当前 crate 下修复指定文件中的 Clippy 告警，并以补丁形式输出修改：",
                     f"- crate 根目录：{crate}",
                     "",
-                    "本次修复仅允许修改以下文件范围（严格限制）：",
-                    *[f"- {rel}" for rel in file_list],
+                    "本次修复仅允许修改以下文件（严格限制，只处理这一个文件）：",
+                    f"- {target_file_path}",
                     "",
-                    "重要：本次修复仅修复第一个告警，不要修复其他告警。",
+                    f"重要：本次修复仅修复该文件中的前 {warning_count} 个告警，不要修复其他告警。",
                     "",
                     "优化目标：",
-                    "1) 修复第一个 Clippy 告警：",
-                    "   - 根据以下第一个 Clippy 告警信息，修复这个告警；",
+                    f"1) 修复文件 {target_file_path} 中的 {warning_count} 个 Clippy 告警：",
+                    "   - 根据以下 Clippy 告警信息，修复这些告警；",
                     "   - 告警信息包含文件路径、行号、警告类型、消息和建议，请根据这些信息进行修复；",
                     "   - 对于无法自动修复的告警，请根据 Clippy 的建议进行手动修复；",
                     "   - **如果确认是误报**（例如：告警建议的修改会导致性能下降、代码可读性降低、或与项目设计意图不符），可以添加 `#[allow(clippy::...)]` 注释来屏蔽该告警；",
@@ -1106,9 +1133,9 @@ class Optimizer:
                     "   - 优先尝试修复告警，只有在确认是误报时才使用 `#[allow(...)]` 屏蔽。",
                     "",
                     "约束与范围：",
-                    "- 仅修改上述列出的文件；除非必须（如修复引用路径），否则不要修改其他文件。",
+                    f"- **仅修改文件 {target_file_path}，不要修改其他文件**；除非必须（如修复引用路径），否则不要修改其他文件。",
                     "- 保持最小改动，不要进行与消除告警无关的重构或格式化。",
-                    "- **只修复第一个告警，不要修复其他告警**。",
+                    f"- **只修复该文件中的前 {warning_count} 个告警，不要修复其他告警**。",
                     "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
                     "- 输出仅为补丁，不要输出解释或多余文本。",
                     "",
@@ -1121,10 +1148,10 @@ class Optimizer:
                     "若出现编译错误或测试失败，请优先修复这些问题，然后再继续修复告警；",
                     "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。",
                     "",
-                    "第一个 Clippy 告警信息如下：",
-                    "<FIRST_WARNING>",
-                    first_warning,
-                    "</FIRST_WARNING>",
+                    f"文件 {target_file_path} 中的 Clippy 告警信息如下：",
+                    "<WARNINGS>",
+                    formatted_warnings,
+                    "</WARNINGS>",
                 ]
                 prompt = "\n".join(prompt_lines)
                 prompt = self._append_additional_notes(prompt)
@@ -1143,18 +1170,25 @@ class Optimizer:
                 ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                 if ok:
                     # 修复成功，保存进度和 commit id
-                    self._save_fix_progress("clippy_elimination", f"warning-{iteration}", target_files)
-                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复成功，已保存进度", fg=typer.colors.GREEN)
+                    try:
+                        file_path = crate / target_file_path if not Path(target_file_path).is_absolute() else Path(target_file_path)
+                        if file_path.exists():
+                            self._save_fix_progress("clippy_elimination", f"{target_file_path}-iter{iteration}", [file_path])
+                        else:
+                            self._save_fix_progress("clippy_elimination", f"{target_file_path}-iter{iteration}", None)
+                    except Exception:
+                        self._save_fix_progress("clippy_elimination", f"{target_file_path}-iter{iteration}", None)
+                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 文件 {target_file_path} 的前 {warning_count} 个告警修复成功，已保存进度", fg=typer.colors.GREEN)
                 else:
                     # 测试失败，回退到运行前的 commit
                     if commit_before:
-                        typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
+                        typer.secho(f"[c2rust-optimizer][codeagent][clippy] 文件 {target_file_path} 修复后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
                         if self._reset_to_commit(commit_before):
                             typer.secho(f"[c2rust-optimizer][codeagent][clippy] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                         else:
                             typer.secho("[c2rust-optimizer][codeagent][clippy] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
                     else:
-                        typer.secho(f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 个告警修复后测试失败，但无法获取运行前的 commit，继续修复", fg=typer.colors.YELLOW)
+                        typer.secho(f"[c2rust-optimizer][codeagent][clippy] 文件 {target_file_path} 修复后测试失败，但无法获取运行前的 commit，继续修复", fg=typer.colors.YELLOW)
                 
                 # 修复后再次检查告警，如果告警数量没有减少，可能需要停止
                 has_warnings_after, _ = _check_clippy_warnings(crate)
@@ -1173,15 +1207,18 @@ class Optimizer:
         # 默认返回 False（仍有告警）
         return False
     
-    def _extract_first_warning(self, clippy_json_output: str) -> str:
+    def _extract_warnings_by_file(self, clippy_json_output: str) -> Dict[str, List[Dict]]:
         """
-        从 clippy JSON 输出中提取第一个告警。
-        返回第一个警告的格式化信息（包含文件路径、行号、警告类型、消息等）。
+        从 clippy JSON 输出中提取所有告警并按文件分组。
+        
+        Returns:
+            字典，键为文件路径，值为该文件的告警列表
         """
         if not clippy_json_output:
-            return ""
+            return {}
         
-        warnings = []
+        warnings_by_file: Dict[str, List[Dict]] = {}
+        
         for line in clippy_json_output.splitlines():
             line = line.strip()
             if not line:
@@ -1190,63 +1227,89 @@ class Optimizer:
                 msg = json.loads(line)
                 # 只处理 warning 类型的消息
                 if msg.get("reason") == "compiler-message" and msg.get("message", {}).get("level") == "warning":
-                    warnings.append(msg)
+                    message = msg.get("message", {})
+                    spans = message.get("spans", [])
+                    if spans:
+                        primary_span = spans[0]
+                        file_path = primary_span.get("file_name", "")
+                        if file_path:
+                            if file_path not in warnings_by_file:
+                                warnings_by_file[file_path] = []
+                            warnings_by_file[file_path].append(msg)
             except (json.JSONDecodeError, KeyError, TypeError):
                 continue
         
+        return warnings_by_file
+
+    def _format_warnings_for_prompt(self, warnings: List[Dict], max_count: int = 10) -> str:
+        """
+        格式化告警列表，用于提示词。
+        
+        Args:
+            warnings: 告警消息列表
+            max_count: 最多格式化多少个告警（默认10个）
+            
+        Returns:
+            格式化后的告警信息字符串
+        """
         if not warnings:
             return ""
         
-        # 提取第一个警告
-        first_warning = warnings[0]
-        message = first_warning.get("message", {})
-        spans = message.get("spans", [])
+        # 只取前 max_count 个告警
+        warnings_to_format = warnings[:max_count]
+        formatted_warnings = []
         
-        # 构建格式化的警告信息
-        warning_parts = []
-        
-        # 警告类型和消息
-        code = message.get("code", {})
-        code_str = code.get("code", "") if code else ""
-        message_text = message.get("message", "")
-        warning_parts.append(f"警告类型: {code_str}")
-        warning_parts.append(f"消息: {message_text}")
-        
-        # 文件位置
-        if spans:
-            primary_span = spans[0]  # 使用第一个 span（通常是主要位置）
-            file_path = primary_span.get("file_name", "")
-            line_start = primary_span.get("line_start", 0)
-            column_start = primary_span.get("column_start", 0)
-            line_end = primary_span.get("line_end", 0)
-            column_end = primary_span.get("column_end", 0)
+        for idx, warning_msg in enumerate(warnings_to_format, 1):
+            message = warning_msg.get("message", {})
+            spans = message.get("spans", [])
             
-            warning_parts.append(f"文件: {file_path}")
-            if line_start == line_end:
-                warning_parts.append(f"位置: {line_start}:{column_start}-{column_end}")
-            else:
-                warning_parts.append(f"位置: {line_start}:{column_start} - {line_end}:{column_end}")
+            warning_parts = [f"告警 {idx}:"]
             
-            # 代码片段
-            label = primary_span.get("label", "")
-            if label:
-                warning_parts.append(f"代码: {label}")
+            # 警告类型和消息
+            code = message.get("code", {})
+            code_str = code.get("code", "") if code else ""
+            message_text = message.get("message", "")
+            warning_parts.append(f"  警告类型: {code_str}")
+            warning_parts.append(f"  消息: {message_text}")
+            
+            # 文件位置
+            if spans:
+                primary_span = spans[0]
+                line_start = primary_span.get("line_start", 0)
+                column_start = primary_span.get("column_start", 0)
+                line_end = primary_span.get("line_end", 0)
+                column_end = primary_span.get("column_end", 0)
+                
+                if line_start == line_end:
+                    warning_parts.append(f"  位置: {line_start}:{column_start}-{column_end}")
+                else:
+                    warning_parts.append(f"  位置: {line_start}:{column_start} - {line_end}:{column_end}")
+                
+                # 代码片段
+                label = primary_span.get("label", "")
+                if label:
+                    warning_parts.append(f"  代码: {label}")
+            
+            # 建议（help 消息）
+            children = message.get("children", [])
+            for child in children:
+                if child.get("level") == "help":
+                    help_message = child.get("message", "")
+                    help_spans = child.get("spans", [])
+                    if help_message:
+                        warning_parts.append(f"  建议: {help_message}")
+                    if help_spans:
+                        help_span = help_spans[0]
+                        help_label = help_span.get("label", "")
+                        if help_label:
+                            warning_parts.append(f"  建议代码: {help_label}")
+            
+            formatted_warnings.append("\n".join(warning_parts))
         
-        # 建议（help 消息）
-        children = message.get("children", [])
-        for child in children:
-            if child.get("level") == "help":
-                help_message = child.get("message", "")
-                help_spans = child.get("spans", [])
-                if help_message:
-                    warning_parts.append(f"建议: {help_message}")
-                if help_spans:
-                    help_span = help_spans[0]
-                    help_label = help_span.get("label", "")
-                    if help_label:
-                        warning_parts.append(f"建议代码: {help_label}")
+        if len(warnings) > max_count:
+            formatted_warnings.append(f"\n（该文件还有 {len(warnings) - max_count} 个告警，将在后续迭代中处理）")
         
-        return "\n".join(warning_parts)
+        return "\n\n".join(formatted_warnings)
 
     # ========== 1) unsafe cleanup (CodeAgent) ==========
 
