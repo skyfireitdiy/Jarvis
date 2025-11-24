@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, Set
 import typer
 
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, get_diff_between_commits
 from jarvis.jarvis_utils.config import get_max_input_token_count
@@ -157,6 +158,8 @@ class Transpiler:
         self._current_function_start_commit: Optional[str] = None
         # 连续修复失败的次数（用于判断是否需要回退）
         self._consecutive_fix_failures: int = 0
+        # 每个 Agent 对应的工具调用前的 commit id（用于细粒度检测）
+        self._agent_before_commits: Dict[str, Optional[str]] = {}
 
     def _find_compile_commands(self) -> Optional[Path]:
         """
@@ -710,6 +713,15 @@ class Transpiler:
                     use_methodology=False,
                     use_analysis=False,
                 )
+                # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
+                agent.event_bus.subscribe(BEFORE_TOOL_CALL, self._on_before_tool_call)
+                agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
+                # 记录 Agent 创建时的 commit id（作为初始值）
+                agent_id = id(agent)
+                agent_key = f"agent_{agent_id}"
+                initial_commit = self._get_crate_commit_hash()
+                if initial_commit:
+                    self._agent_before_commits[agent_key] = initial_commit
             
             if use_direct_model:
                 # 格式校验失败后，直接调用模型接口
@@ -870,6 +882,89 @@ class Transpiler:
         self._current_context_full_sent = False
 
 
+    def _on_before_tool_call(self, agent: Any, current_response=None, **kwargs) -> None:
+        """
+        工具调用前的事件处理器，用于记录工具调用前的 commit id。
+        
+        在每次工具调用前记录当前的 commit，以便在工具调用后检测到问题时能够回退。
+        """
+        try:
+            # 只关注可能修改代码的工具
+            # 注意：在 BEFORE_TOOL_CALL 时，工具还未执行，无法获取工具名称
+            # 但我们可以在 AFTER_TOOL_CALL 时检查工具名称，这里先记录 commit
+            agent_id = id(agent)
+            agent_key = f"agent_{agent_id}"
+            current_commit = self._get_crate_commit_hash()
+            if current_commit:
+                # 记录工具调用前的 commit（如果之前没有记录，或者 commit 已变化）
+                if agent_key not in self._agent_before_commits or self._agent_before_commits[agent_key] != current_commit:
+                    self._agent_before_commits[agent_key] = current_commit
+        except Exception as e:
+            # 事件处理器异常不应影响主流程
+            typer.secho(f"[c2rust-transpiler][test-detection] BEFORE_TOOL_CALL 事件处理器异常: {e}", fg=typer.colors.YELLOW)
+
+    def _on_after_tool_call(self, agent: Any, current_response=None, need_return=None, tool_prompt=None, **kwargs) -> None:
+        """
+        工具调用后的事件处理器，用于细粒度检测测试代码删除。
+        
+        在每次工具调用后立即检测，如果检测到测试代码被错误删除，立即回退。
+        """
+        try:
+            # 只检测编辑文件的工具调用
+            last_tool = agent.get_user_data("__last_executed_tool__") if hasattr(agent, "get_user_data") else None
+            if not last_tool:
+                return
+            
+            # 只关注可能修改代码的工具
+            edit_tools = {"edit_file", "rewrite_file", "apply_patch"}
+            if last_tool not in edit_tools:
+                return
+            
+            # 获取该 Agent 对应的工具调用前的 commit id
+            agent_id = id(agent)
+            agent_key = f"agent_{agent_id}"
+            before_commit = self._agent_before_commits.get(agent_key)
+            
+            # 如果没有 commit 信息，无法检测
+            if not before_commit:
+                return
+            
+            # 检测测试代码删除
+            from jarvis.jarvis_c2rust.utils import detect_test_deletion, ask_llm_about_test_deletion
+            
+            detection_result = detect_test_deletion("[c2rust-transpiler]")
+            if not detection_result:
+                # 没有检测到删除，更新 commit 记录
+                current_commit = self._get_crate_commit_hash()
+                if current_commit and current_commit != before_commit:
+                    self._agent_before_commits[agent_key] = current_commit
+                return
+            
+            typer.secho("[c2rust-transpiler][test-detection] 检测到可能错误删除了测试代码标记（工具调用后检测）", fg=typer.colors.YELLOW)
+            
+            # 询问 LLM 是否合理
+            need_reset = ask_llm_about_test_deletion(detection_result, agent, "[c2rust-transpiler]")
+            
+            if need_reset:
+                typer.secho(f"[c2rust-transpiler][test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}", fg=typer.colors.RED)
+                if self._reset_to_commit(before_commit):
+                    typer.secho("[c2rust-transpiler][test-detection] 已回退到之前的 commit（工具调用后检测）", fg=typer.colors.GREEN)
+                    # 回退后，保持之前的 commit 记录
+                    self._agent_before_commits[agent_key] = before_commit
+                    # 在 agent 的 session 中添加提示，告知修改被撤销
+                    if hasattr(agent, "session") and hasattr(agent.session, "prompt"):
+                        agent.session.prompt += "\n\n⚠️ 修改被撤销：检测到测试代码被错误删除，已回退到之前的版本。\n"
+                else:
+                    typer.secho("[c2rust-transpiler][test-detection] 回退失败", fg=typer.colors.RED)
+            else:
+                # LLM 认为删除合理，更新 commit 记录
+                current_commit = self._get_crate_commit_hash()
+                if current_commit and current_commit != before_commit:
+                    self._agent_before_commits[agent_key] = current_commit
+        except Exception as e:
+            # 事件处理器异常不应影响主流程
+            typer.secho(f"[c2rust-transpiler][test-detection] AFTER_TOOL_CALL 事件处理器异常: {e}", fg=typer.colors.YELLOW)
+
     def _get_code_agent(self) -> CodeAgent:
         """
         获取代码生成/修复Agent（CodeAgent）。若未初始化，则按当前函数id创建。
@@ -901,6 +996,15 @@ class Transpiler:
                 use_analysis=True,
                 force_save_memory=False,
             )
+            # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
+            agent.event_bus.subscribe(BEFORE_TOOL_CALL, self._on_before_tool_call)
+            agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
+            # 记录 Agent 创建时的 commit id（作为初始值）
+            agent_id = id(agent)
+            agent_key = f"agent_{agent_id}"
+            initial_commit = self._get_crate_commit_hash()
+            if initial_commit:
+                self._agent_before_commits[agent_key] = initial_commit
             self._current_agents[key] = agent
         return agent
 
@@ -2269,7 +2373,7 @@ class Transpiler:
         agent_name = f"C2Rust-Review-Agent({fn_name})"
         
         if self._current_agents.get(review_key) is None:
-            self._current_agents[review_key] = Agent(
+            review_agent = Agent(
                 system_prompt=sys_p_init,
                 name=agent_name,
                 model_group=self.llm_group,
@@ -2281,6 +2385,16 @@ class Transpiler:
                 use_methodology=False,
                 use_analysis=False,
             )
+            # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
+            review_agent.event_bus.subscribe(BEFORE_TOOL_CALL, self._on_before_tool_call)
+            review_agent.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
+            # 记录 Agent 创建时的 commit id（作为初始值）
+            agent_id = id(review_agent)
+            agent_key = f"agent_{agent_id}"
+            initial_commit = self._get_crate_commit_hash()
+            if initial_commit:
+                self._agent_before_commits[agent_key] = initial_commit
+            self._current_agents[review_key] = review_agent
 
         # 0表示无限重试，否则限制迭代次数
         use_direct_model_review = False  # 标记是否使用直接模型调用
