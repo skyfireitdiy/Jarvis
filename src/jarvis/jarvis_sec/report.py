@@ -40,12 +40,16 @@
 提供的函数：
 - aggregate_issues(issues: List[Union[Issue, Dict]], scanned_root: Optional[str] = None, scanned_files: Optional[int] = None) -> Dict
 - format_markdown_report(report_json: Dict) -> str
-- build_json_and_markdown(issues: List[Union[Issue, Dict]], scanned_root: Optional[str] = None, scanned_files: Optional[int] = None) -> str
+- format_csv_report(report_json: Dict) -> str
+- build_json_and_markdown(issues: List[Union[Issue, Dict]], scanned_root: Optional[str] = None, scanned_files: Optional[int] = None, output_file: Optional[str] = None) -> str
+  - 如果 output_file 后缀为 .csv，则输出 CSV 格式；否则输出 Markdown 格式
 """
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 from typing import Dict, List, Optional, Union
 
 # 依赖 Issue 结构，但本模块不直接导入 dataclass，接受 dict/Issue 两种形态
@@ -250,14 +254,65 @@ def format_markdown_report(report_json: Dict) -> str:
     return "\n".join(lines)
 
 
+def format_csv_report(report_json: Dict) -> str:
+    """
+    将聚合后的 JSON 报告渲染为 CSV 格式。
+    """
+    issues: List[Dict] = report_json.get("issues", [])
+    
+    # 定义 CSV 列
+    fieldnames = [
+        "id",
+        "language",
+        "category",
+        "pattern",
+        "file",
+        "line",
+        "evidence",
+        "preconditions",
+        "trigger_path",
+        "consequences",
+        "suggestions",
+        "confidence",
+        "severity",
+        "score",
+    ]
+    
+    # 使用 StringIO 来构建 CSV 字符串
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
+    
+    # 写入表头
+    writer.writeheader()
+    
+    # 写入数据行
+    for it in issues:
+        row = {field: str(it.get(field, "")) for field in fieldnames}
+        writer.writerow(row)
+    
+    return output.getvalue()
+
+
 def build_json_and_markdown(
     issues: List[Union[Issue, Dict]],
     scanned_root: Optional[str] = None,
     scanned_files: Optional[int] = None,
     meta: Optional[List[Dict]] = None,
+    output_file: Optional[str] = None,
 ) -> str:
     """
-    一次性生成报告文本（仅 Markdown）。
+    一次性生成报告文本。
+    如果 output_file 后缀为 .csv，则输出 CSV 格式；否则输出 Markdown 格式。
+    
+    Args:
+        issues: 问题列表
+        scanned_root: 扫描根目录
+        scanned_files: 扫描文件数
+        meta: 可选元数据
+        output_file: 输出文件名（可选），用于判断输出格式
+        
+    Returns:
+        报告文本（Markdown 或 CSV 格式）
     """
     report = aggregate_issues(issues, scanned_root=scanned_root, scanned_files=scanned_files)
     if meta is not None:
@@ -265,11 +320,17 @@ def build_json_and_markdown(
             report["meta"] = meta  # 注入可选审计信息（仅用于JSON时保留，为兼容未来需要）
         except Exception:
             pass
-    return format_markdown_report(report)
+    
+    # 根据输出文件名后缀选择格式
+    if output_file and output_file.lower().endswith('.csv'):
+        return format_csv_report(report)
+    else:
+        return format_markdown_report(report)
 
 
 __all__ = [
     "aggregate_issues",
     "format_markdown_report",
+    "format_csv_report",
     "build_json_and_markdown",
 ]
