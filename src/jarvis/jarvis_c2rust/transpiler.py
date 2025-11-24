@@ -31,7 +31,7 @@ import typer
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, get_diff_between_commits
+from jarvis.jarvis_utils.git_utils import get_latest_commit_hash, get_diff_between_commits, get_diff, get_diff_file_list
 from jarvis.jarvis_utils.config import get_max_input_token_count
 
 from jarvis.jarvis_c2rust.constants import (
@@ -1031,8 +1031,20 @@ class Transpiler:
             pass
         
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        # 记录运行前的 commit
+        before_commit = self._get_crate_commit_hash()
         agent = self._get_code_agent()
         agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen]", suffix="")
+        
+        # 检测并处理测试代码删除
+        if self._check_and_handle_test_deletion(before_commit, agent):
+            # 如果回退了，需要重新运行 agent
+            typer.secho("[c2rust-transpiler][gen] 检测到测试代码删除问题，已回退，重新运行 agent", fg=typer.colors.YELLOW)
+            before_commit = self._get_crate_commit_hash()
+            agent.run(self._compose_prompt_with_context(prompt), prefix="[c2rust-transpiler][gen][retry]", suffix="")
+            # 再次检测
+            if self._check_and_handle_test_deletion(before_commit, agent):
+                typer.secho("[c2rust-transpiler][gen] 再次检测到测试代码删除问题，已回退", fg=typer.colors.RED)
         
         # 如果是根符号，确保其模块在 lib.rs 中被暴露
         if self._is_root_symbol(rec):
@@ -1324,8 +1336,20 @@ class Transpiler:
                 f"仅修改 {target_file} 中与上述占位相关的代码，其他位置不要改动。",
                 "请仅输出补丁，不要输出解释或多余文本。",
             ])
+            # 记录运行前的 commit
+            before_commit = self._get_crate_commit_hash()
             agent = self._get_code_agent()
             agent.run(self._compose_prompt_with_context(prompt), prefix=f"[c2rust-transpiler][todo-fix:{symbol}]", suffix="")
+            
+            # 检测并处理测试代码删除
+            if self._check_and_handle_test_deletion(before_commit, agent):
+                # 如果回退了，需要重新运行 agent
+                typer.secho(f"[c2rust-transpiler][todo-fix] 检测到测试代码删除问题，已回退，重新运行 agent (symbol={symbol})", fg=typer.colors.YELLOW)
+                before_commit = self._get_crate_commit_hash()
+                agent.run(self._compose_prompt_with_context(prompt), prefix=f"[c2rust-transpiler][todo-fix:{symbol}][retry]", suffix="")
+                # 再次检测
+                if self._check_and_handle_test_deletion(before_commit, agent):
+                    typer.secho(f"[c2rust-transpiler][todo-fix] 再次检测到测试代码删除问题，已回退 (symbol={symbol})", fg=typer.colors.RED)
 
     def _classify_rust_error(self, text: str) -> List[str]:
         """
@@ -1731,6 +1755,190 @@ class Transpiler:
         except Exception:
             return False
 
+    def _detect_test_deletion(self) -> Optional[Dict[str, Any]]:
+        """
+        检测是否错误删除了 #[test] 或 #[cfg(test)]。
+        
+        返回:
+            如果检测到删除，返回包含 'diff', 'files' 的字典；否则返回 None
+        """
+        try:
+            diff = get_diff()
+            if not diff:
+                return None
+            
+            # 检查 diff 中是否包含删除的 #[test] 或 #[cfg(test)]
+            test_patterns = [
+                r'^-\s*#\[test\]',
+                r'^-\s*#\[cfg\(test\)\]',
+                r'^-\s*#\[cfg\(test\)',
+            ]
+            
+            deleted_tests = []
+            lines = diff.split('\n')
+            current_file = None
+            
+            for i, line in enumerate(lines):
+                # 检测文件路径
+                if line.startswith('diff --git') or line.startswith('---') or line.startswith('+++'):
+                    # 尝试从 diff 行中提取文件名
+                    if line.startswith('---'):
+                        parts = line.split()
+                        if len(parts) > 1:
+                            current_file = parts[1].lstrip('a/').lstrip('b/')
+                    elif line.startswith('+++'):
+                        parts = line.split()
+                        if len(parts) > 1:
+                            current_file = parts[1].lstrip('a/').lstrip('b/')
+                    continue
+                
+                # 检查是否匹配删除的测试标记
+                for pattern in test_patterns:
+                    if re.search(pattern, line, re.IGNORECASE):
+                        # 检查上下文，确认是删除而不是修改
+                        if i > 0 and lines[i-1].startswith('-'):
+                            # 可能是删除的一部分
+                            deleted_tests.append({
+                                'file': current_file or 'unknown',
+                                'line': line,
+                                'line_number': i + 1,
+                            })
+                        elif not (i < len(lines) - 1 and lines[i+1].startswith('+')):
+                            # 下一行不是添加，说明是删除
+                            deleted_tests.append({
+                                'file': current_file or 'unknown',
+                                'line': line,
+                                'line_number': i + 1,
+                            })
+                        break
+            
+            if deleted_tests:
+                modified_files = get_diff_file_list()
+                return {
+                    'diff': diff,
+                    'files': modified_files,
+                    'deleted_tests': deleted_tests,
+                }
+            return None
+        except Exception as e:
+            typer.secho(f"[c2rust-transpiler][test-detection] 检测测试删除时发生异常: {e}", fg=typer.colors.YELLOW)
+            return None
+
+    def _ask_llm_about_test_deletion(self, detection_result: Dict[str, Any], agent: Any) -> bool:
+        """
+        询问 LLM 是否错误删除了测试代码。
+        
+        参数:
+            detection_result: 检测结果字典，包含 'diff', 'files', 'deleted_tests'
+            agent: 代码生成或修复的 agent 实例，使用其 model 进行询问
+            
+        返回:
+            bool: 如果 LLM 认为删除不合理返回 True（需要回退），否则返回 False
+        """
+        if not agent or not hasattr(agent, 'model'):
+            # 如果没有 agent 或 agent 没有 model，默认认为有问题（保守策略）
+            return True
+        
+        try:
+            deleted_tests = detection_result.get('deleted_tests', [])
+            diff = detection_result.get('diff', '')
+            files = detection_result.get('files', [])
+            
+            # 构建预览（限制长度）
+            preview_lines = []
+            preview_lines.append("检测到可能错误删除了测试代码标记：")
+            preview_lines.append("")
+            for item in deleted_tests[:10]:  # 最多显示10个
+                preview_lines.append(f"- 文件: {item.get('file', 'unknown')}")
+                preview_lines.append(f"  行: {item.get('line', '')}")
+            if len(deleted_tests) > 10:
+                preview_lines.append(f"... 还有 {len(deleted_tests) - 10} 个删除的测试标记")
+            
+            # 限制 diff 长度
+            diff_preview = diff[:5000] if len(diff) > 5000 else diff
+            if len(diff) > 5000:
+                diff_preview += "\n... (diff 内容过长，已截断)"
+            
+            prompt = f"""检测到代码变更中可能错误删除了测试代码标记（#[test] 或 #[cfg(test)]），请判断是否合理：
+
+删除的测试标记统计：
+- 删除的测试标记数量: {len(deleted_tests)}
+- 涉及的文件: {', '.join(files[:5])}{' ...' if len(files) > 5 else ''}
+
+删除的测试标记详情：
+{chr(10).join(preview_lines)}
+
+代码变更预览（diff）：
+{diff_preview}
+
+请仔细分析以上代码变更，判断这些测试代码标记的删除是否合理。可能的情况包括：
+1. 重构代码，将测试代码移动到其他位置（这种情况下应该看到对应的添加）
+2. 删除过时或重复的测试代码
+3. 错误地删除了重要的测试代码标记，导致测试无法运行
+
+请使用以下协议回答（必须包含且仅包含以下标记之一）：
+- 如果认为这些删除是合理的（测试代码被正确移动或确实需要删除），回答: <!!!YES!!!>
+- 如果认为这些删除不合理或存在风险（可能错误删除了测试代码），回答: <!!!NO!!!>
+
+请严格按照协议格式回答，不要添加其他内容。
+"""
+            
+            typer.secho("[c2rust-transpiler][test-detection] 正在询问 LLM 判断测试代码删除是否合理...", fg=typer.colors.YELLOW)
+            response = agent.model.chat_until_success(prompt)  # type: ignore
+            response_str = str(response or "")
+            
+            # 使用确定的协议标记解析回答
+            if "<!!!NO!!!>" in response_str:
+                typer.secho("⚠️ LLM 确认：测试代码删除不合理，需要回退", fg=typer.colors.RED)
+                return True  # 需要回退
+            elif "<!!!YES!!!>" in response_str:
+                typer.secho("✅ LLM 确认：测试代码删除合理", fg=typer.colors.GREEN)
+                return False  # 不需要回退
+            else:
+                # 如果无法找到协议标记，默认认为有问题（保守策略）
+                typer.secho(f"⚠️ 无法找到协议标记，默认认为有问题。回答内容: {response_str[:200]}", fg=typer.colors.YELLOW)
+                return True  # 保守策略：默认回退
+        except Exception as e:
+            # 如果询问失败，默认认为有问题（保守策略）
+            typer.secho(f"⚠️ 询问 LLM 失败: {str(e)}，默认认为有问题", fg=typer.colors.YELLOW)
+            return True  # 保守策略：默认回退
+
+    def _check_and_handle_test_deletion(self, before_commit: Optional[str], agent: Any) -> bool:
+        """
+        检测并处理测试代码删除。
+        
+        参数:
+            before_commit: agent 运行前的 commit hash
+            agent: 代码生成或修复的 agent 实例，使用其 model 进行询问
+            
+        返回:
+            bool: 如果检测到问题且已回退，返回 True；否则返回 False
+        """
+        if not before_commit:
+            # 没有记录 commit，无法回退
+            return False
+        
+        detection_result = self._detect_test_deletion()
+        if not detection_result:
+            # 没有检测到删除
+            return False
+        
+        typer.secho("[c2rust-transpiler][test-detection] 检测到可能错误删除了测试代码标记", fg=typer.colors.YELLOW)
+        
+        # 询问 LLM（使用传入的 agent 的 model）
+        need_reset = self._ask_llm_about_test_deletion(detection_result, agent)
+        
+        if need_reset:
+            typer.secho(f"[c2rust-transpiler][test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}", fg=typer.colors.RED)
+            if self._reset_to_commit(before_commit):
+                typer.secho("[c2rust-transpiler][test-detection] 已回退到之前的 commit", fg=typer.colors.GREEN)
+                return True
+            else:
+                typer.secho("[c2rust-transpiler][test-detection] 回退失败", fg=typer.colors.RED)
+                return False
+        
+        return False
+
     def _run_cargo_test_and_fix(self, workspace_root: str, test_iter: int) -> Tuple[bool, Optional[bool]]:
         """
         运行 cargo test 并在失败时修复。
@@ -1755,8 +1963,8 @@ class Transpiler:
             # 超时视为测试失败，继续修复流程
             returncode = -1
             stdout = e.stdout.decode("utf-8", errors="replace") if e.stdout else ""
-            stderr = f"命令执行超时（30秒）\n" + (e.stderr.decode("utf-8", errors="replace") if e.stderr else "")
-            typer.secho(f"[c2rust-transpiler][build] Cargo 测试超时（30秒），视为失败并继续修复流程", fg=typer.colors.YELLOW)
+            stderr = "命令执行超时（30秒）\n" + (e.stderr.decode("utf-8", errors="replace") if e.stderr else "")
+            typer.secho("[c2rust-transpiler][build] Cargo 测试超时（30秒），视为失败并继续修复流程", fg=typer.colors.YELLOW)
         except Exception as e:
             # 其他异常也视为测试失败
             returncode = -1
@@ -1835,8 +2043,21 @@ class Transpiler:
             command="cargo test -- --nocapture",
         )
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        # 记录运行前的 commit
+        before_commit = self._get_crate_commit_hash()
         agent = self._get_code_agent()
         agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]", suffix="")
+        
+        # 检测并处理测试代码删除
+        if self._check_and_handle_test_deletion(before_commit, agent):
+            # 如果回退了，需要重新运行 agent
+            typer.secho(f"[c2rust-transpiler][build-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={test_iter})", fg=typer.colors.YELLOW)
+            before_commit = self._get_crate_commit_hash()
+            agent.run(self._compose_prompt_with_context(repair_prompt), prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test][retry]", suffix="")
+            # 再次检测
+            if self._check_and_handle_test_deletion(before_commit, agent):
+                typer.secho(f"[c2rust-transpiler][build-fix] 再次检测到测试代码删除问题，已回退 (iter={test_iter})", fg=typer.colors.RED)
+        
         # 修复后验证：先检查编译，再实际运行测试
         # 第一步：检查编译是否通过
         res_compile = subprocess.run(
@@ -1872,19 +2093,13 @@ class Transpiler:
                 cwd=workspace_root,
             )
             verify_returncode = res_test_verify.returncode
-            verify_stdout = res_test_verify.stdout or ""
-            verify_stderr = res_test_verify.stderr or ""
-        except subprocess.TimeoutExpired as e:
+        except subprocess.TimeoutExpired:
             # 超时视为测试失败
             verify_returncode = -1
-            verify_stdout = e.stdout.decode("utf-8", errors="replace") if e.stdout else ""
-            verify_stderr = f"命令执行超时（30秒）\n" + (e.stderr.decode("utf-8", errors="replace") if e.stderr else "")
-            typer.secho(f"[c2rust-transpiler][build] 修复后验证测试超时（30秒），视为失败", fg=typer.colors.YELLOW)
+            typer.secho("[c2rust-transpiler][build] 修复后验证测试超时（30秒），视为失败", fg=typer.colors.YELLOW)
         except Exception as e:
             # 其他异常也视为测试失败
             verify_returncode = -1
-            verify_stdout = ""
-            verify_stderr = f"执行 cargo test 验证时发生异常: {str(e)}"
             typer.secho(f"[c2rust-transpiler][build] 修复后验证测试执行异常: {e}，视为失败", fg=typer.colors.YELLOW)
         
         if verify_returncode == 0:
@@ -2429,10 +2644,23 @@ class Transpiler:
                 "请仅以补丁形式输出修改，避免冗余解释。",
             ])
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            # 记录运行前的 commit
+            before_commit = self._get_crate_commit_hash()
             ca = self._get_code_agent()
             limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
             fix_prompt_with_notes = self._append_additional_notes(fix_prompt)
             ca.run(self._compose_prompt_with_context(fix_prompt_with_notes), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}]", suffix="")
+            
+            # 检测并处理测试代码删除
+            if self._check_and_handle_test_deletion(before_commit, ca):
+                # 如果回退了，需要重新运行 agent
+                typer.secho(f"[c2rust-transpiler][review-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={i+1})", fg=typer.colors.YELLOW)
+                before_commit = self._get_crate_commit_hash()
+                ca.run(self._compose_prompt_with_context(fix_prompt_with_notes), prefix=f"[c2rust-transpiler][review-fix iter={i+1}{limit_info}][retry]", suffix="")
+                # 再次检测
+                if self._check_and_handle_test_deletion(before_commit, ca):
+                    typer.secho(f"[c2rust-transpiler][review-fix] 再次检测到测试代码删除问题，已回退 (iter={i+1})", fg=typer.colors.RED)
+            
             # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
             self._cargo_build_loop()
             
@@ -2581,9 +2809,9 @@ class Transpiler:
                             if self._reset_to_commit(last_commit):
                                 typer.secho(f"[c2rust-transpiler][resume] 已 reset 到 commit: {last_commit}", fg=typer.colors.GREEN)
                             else:
-                                typer.secho(f"[c2rust-transpiler][resume] reset 失败，继续使用当前代码状态", fg=typer.colors.YELLOW)
+                                typer.secho("[c2rust-transpiler][resume] reset 失败，继续使用当前代码状态", fg=typer.colors.YELLOW)
                         else:
-                            typer.secho(f"[c2rust-transpiler][resume] 代码状态一致，无需 reset", fg=typer.colors.CYAN)
+                            typer.secho("[c2rust-transpiler][resume] 代码状态一致，无需 reset", fg=typer.colors.CYAN)
             
             typer.secho(f"[c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)} 待处理={total_to_process}", fg=typer.colors.BLUE)
 
