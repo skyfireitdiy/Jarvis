@@ -279,8 +279,8 @@ def config(
         typer.secho(f"[c2rust-config] 配置已清空: {config_path}", fg=typer.colors.GREEN)
         return
     
-    # 读取根符号列表
-    root_symbols: List[str] = []
+    # 读取根符号列表（从现有配置开始，以便追加而不是替换）
+    root_symbols: List[str] = list(current_config.get("root_symbols", []))
     header_exts = {".h", ".hh", ".hpp", ".hxx"}
     
     if files:
@@ -327,19 +327,20 @@ def config(
                 typer.secho(f"[c2rust-config] 处理文件失败: {file_path}: {e}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(code=1)
     
+    # 标记是否处理了 root_list_syms，以便即使结果为空也更新配置
+    processed_root_list_syms = False
     if isinstance(root_list_syms, str) and root_list_syms.strip():
         parts = [s.strip() for s in root_list_syms.replace("\n", ",").split(",") if s.strip()]
         root_symbols.extend(parts)
+        processed_root_list_syms = True
         typer.secho(f"[c2rust-config] 从命令行读取根符号: {len(parts)} 个", fg=typer.colors.BLUE)
     
-    # 去重根符号列表
-    if root_symbols:
+    # 去重根符号列表（如果处理了 files 或 root_list_syms，或者 root_symbols 非空，则更新配置）
+    if files or processed_root_list_syms or root_symbols:
         try:
             root_symbols = list(dict.fromkeys(root_symbols))
         except Exception:
             root_symbols = sorted(list(set(root_symbols)))
-        # 排除 main
-        root_symbols = [s for s in root_symbols if s.lower() != "main"]
         current_config["root_symbols"] = root_symbols
         typer.secho(f"[c2rust-config] 已设置根符号列表: {len(root_symbols)} 个", fg=typer.colors.GREEN)
     
@@ -452,8 +453,6 @@ def run(
                     root_names = list(dict.fromkeys(root_names))
                 except Exception:
                     root_names = sorted(list(set(root_names)))
-                # 排除 main
-                root_names = [s for s in root_names if s.lower() != "main"]
             
             candidates_list: Optional[List[str]] = root_names if root_names else None
             if not candidates_list:
