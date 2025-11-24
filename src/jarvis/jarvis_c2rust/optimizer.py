@@ -192,6 +192,63 @@ def _check_clippy_warnings(crate_dir: Path) -> Tuple[bool, str]:
         typer.secho(f"[c2rust-optimizer][clippy-check] 检查 Clippy 告警异常（非致命）: {e}", fg=typer.colors.YELLOW)
         return False, ""
 
+def _check_missing_safety_doc_warnings(crate_dir: Path) -> Tuple[bool, str]:
+    """
+    检查是否有 missing_safety_doc 告警。
+    使用 JSON 格式输出，便于精确解析和指定警告。
+    返回 (has_warnings, json_output)，has_warnings 为 True 表示有告警，json_output 为 JSON 格式的输出。
+    """
+    try:
+        res = subprocess.run(
+            ["cargo", "clippy", "--message-format=json", "--", "-W", "clippy::missing_safety_doc"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(crate_dir),
+        )
+        # clippy 的 JSON 输出通常在 stdout
+        stdout_output = (res.stdout or "").strip()
+        stderr_output = (res.stderr or "").strip()
+        
+        # 解析 JSON 输出，提取警告信息
+        warnings = []
+        if stdout_output:
+            for line in stdout_output.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                    # 只处理 warning 类型的消息，且是 missing_safety_doc
+                    if msg.get("reason") == "compiler-message":
+                        message = msg.get("message", {})
+                        if message.get("level") == "warning":
+                            code = message.get("code", {})
+                            code_str = code.get("code", "") if code else ""
+                            if "missing_safety_doc" in code_str:
+                                warnings.append(msg)
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    # 忽略无法解析的行（可能是其他输出）
+                    continue
+        
+        has_warnings = len(warnings) > 0
+        
+        # 调试输出
+        if has_warnings:
+            typer.secho(f"[c2rust-optimizer][missing-safety-doc-check] 检测到 {len(warnings)} 个 missing_safety_doc 告警", fg=typer.colors.YELLOW)
+        elif res.returncode != 0:
+            # 如果返回码非零但没有警告，可能是编译错误
+            typer.secho(f"[c2rust-optimizer][missing-safety-doc-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警，可能是编译错误", fg=typer.colors.CYAN)
+            if stderr_output:
+                typer.secho(f"[c2rust-optimizer][missing-safety-doc-check] 错误输出预览（前200字符）: {stderr_output[:200]}", fg=typer.colors.CYAN)
+        
+        # 返回 JSON 格式的输出（用于后续解析）
+        return has_warnings, stdout_output
+    except Exception as e:
+        # 检查失败时假设没有告警，避免阻塞流程
+        typer.secho(f"[c2rust-optimizer][missing-safety-doc-check] 检查 missing_safety_doc 告警异常（非致命）: {e}", fg=typer.colors.YELLOW)
+        return False, ""
+
 def _cargo_check_full(crate_dir: Path, stats: OptimizeStats, max_checks: int, timeout: Optional[int] = None) -> Tuple[bool, str]:
     """
     执行 cargo test，返回是否成功与完整输出（stdout+stderr）。
@@ -752,7 +809,7 @@ class Optimizer:
             if not fixed:
                 first = (diag_full.splitlines()[0] if isinstance(diag_full, str) and diag_full else "failed")
                 self.stats.errors.append(f"test after {step_name} failed: {first}")
-        try:
+                try:
                     self._reset_to_snapshot()
                 finally:
                     return False
@@ -775,7 +832,7 @@ class Optimizer:
         """
         typer.secho(f"\n[c2rust-optimizer] 第 {step_num} 步：{step_display_name}", fg=typer.colors.MAGENTA)
         self._snapshot_commit()
-            if not self.options.dry_run:
+        if not self.options.dry_run:
             opt_func(target_files)
             if not self._verify_and_fix_after_step(step_name, target_files):
                 # 验证失败，已回滚，返回 None 表示失败
@@ -825,16 +882,16 @@ class Optimizer:
         if self.options.dry_run:
             return True
             
-                typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
-                has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
+        typer.secho("[c2rust-optimizer] 检查 Clippy 告警...", fg=typer.colors.CYAN)
+        has_warnings, clippy_output = _check_clippy_warnings(self.crate_dir)
         
-                # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
-                if "clippy_elimination" in self.steps_completed and has_warnings:
-                    typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
-                    self.steps_completed.discard("clippy_elimination")
-                    if "clippy_elimination" in self._step_commits:
-                        del self._step_commits["clippy_elimination"]
-                
+        # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
+        if "clippy_elimination" in self.steps_completed and has_warnings:
+            typer.secho("[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复", fg=typer.colors.YELLOW)
+            self.steps_completed.discard("clippy_elimination")
+            if "clippy_elimination" in self._step_commits:
+                del self._step_commits["clippy_elimination"]
+        
         if not has_warnings:
             typer.secho("[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤", fg=typer.colors.CYAN)
             # 如果没有告警，标记 clippy_elimination 为完成（跳过状态）
@@ -845,12 +902,12 @@ class Optimizer:
             return True
         
         # 有告警，需要修复
-                    typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）", fg=typer.colors.MAGENTA)
-                    self._snapshot_commit()
+        typer.secho("\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）", fg=typer.colors.MAGENTA)
+        self._snapshot_commit()
         
-                    clippy_targets = list(_iter_rust_files(self.crate_dir))
-                    if not clippy_targets:
-                        typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
+        clippy_targets = list(_iter_rust_files(self.crate_dir))
+        if not clippy_targets:
+            typer.secho("[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警", fg=typer.colors.YELLOW)
             return False
         
         # 先尝试使用 clippy --fix 自动修复
@@ -869,20 +926,20 @@ class Optimizer:
         else:
             # 自动修复失败或未执行，继续使用 CodeAgent 修复
             typer.secho("[c2rust-optimizer] clippy 自动修复未成功，继续使用 CodeAgent 修复...", fg=typer.colors.CYAN)
-                    all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
+            all_warnings_eliminated = self._codeagent_eliminate_clippy_warnings(clippy_targets, clippy_output)
             
-                    # 验证修复后是否还有告警
+            # 验证修复后是否还有告警
             if not self._verify_and_fix_after_step("clippy_elimination", clippy_targets):
                 return False
             
-                    # 再次检查是否还有告警
-                    has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
-                    if not has_warnings_after and all_warnings_eliminated:
-                        typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
-                        self._save_step_progress("clippy_elimination", clippy_targets)
+            # 再次检查是否还有告警
+            has_warnings_after, _ = _check_clippy_warnings(self.crate_dir)
+            if not has_warnings_after and all_warnings_eliminated:
+                typer.secho("[c2rust-optimizer] Clippy 告警已全部消除", fg=typer.colors.GREEN)
+                self._save_step_progress("clippy_elimination", clippy_targets)
                 return True
-                    else:
-                        typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
+            else:
+                typer.secho("[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤", fg=typer.colors.YELLOW)
                 return False
 
     def run(self) -> OptimizeStats:
@@ -1195,12 +1252,6 @@ class Optimizer:
                 if not has_warnings_after:
                     typer.secho(f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration} 次）", fg=typer.colors.GREEN)
                     return True  # 所有告警已消除
-                
-            if iteration >= max_iterations:
-                typer.secho(f"[c2rust-optimizer][codeagent][clippy] 达到最大迭代次数 ({max_iterations})，停止修复", fg=typer.colors.YELLOW)
-                # 检查是否还有告警
-                has_warnings_final, _ = _check_clippy_warnings(crate)
-                return not has_warnings_final  # 如果没有告警则返回 True，否则返回 False
         finally:
             os.chdir(prev_cwd)
         
@@ -1316,7 +1367,7 @@ class Optimizer:
     def _codeagent_opt_unsafe_cleanup(self, target_files: List[Path]) -> None:
         """
         使用 CodeAgent 进行 unsafe 清理优化。
-        每次只处理一个文件，迭代处理所有文件。
+        使用 clippy 的 missing_safety_doc checker 来查找 unsafe 告警，按文件处理，每次处理一个文件的所有告警。
         
         注意：CodeAgent 必须在 crate 目录下创建和执行，以确保所有文件操作和命令执行都在正确的上下文中进行。
         """
@@ -1332,42 +1383,107 @@ class Optimizer:
 
         # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
         prev_cwd = os.getcwd()
-        total_files = len(file_list)
+        iteration = 0
         
         try:
             os.chdir(str(crate))
             
-            # 迭代处理每个文件
-            for file_idx, single_file in enumerate(file_list, 1):
-                typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 处理文件 {file_idx}/{total_files}: {single_file}", fg=typer.colors.CYAN)
+            # 循环修复 unsafe 告警，按文件处理
+            while True:
+                iteration += 1
                 
+                # 检查当前 missing_safety_doc 告警
+                has_warnings, current_clippy_output = _check_missing_safety_doc_warnings(crate)
+                if not has_warnings:
+                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 所有 missing_safety_doc 告警已消除（共迭代 {iteration - 1} 次）", fg=typer.colors.GREEN)
+                    return  # 所有告警已消除
+
+                # 按文件提取告警
+                warnings_by_file = self._extract_warnings_by_file(current_clippy_output)
+                if not warnings_by_file:
+                    typer.secho("[c2rust-optimizer][codeagent][unsafe-cleanup] 无法提取告警，停止修复", fg=typer.colors.YELLOW)
+                    return  # 仍有告警未消除
+                
+                # 找到第一个有告警的文件（优先处理目标文件列表中的文件）
+                target_file_path = None
+                target_warnings = None
+                
+                # 优先处理目标文件列表中的文件
+                for file_rel in file_list:
+                    # 尝试匹配文件路径（可能是相对路径或绝对路径）
+                    for file_path, warnings in warnings_by_file.items():
+                        if file_rel in file_path or file_path.endswith(file_rel):
+                            target_file_path = file_path
+                            target_warnings = warnings
+                            break
+                    if target_file_path:
+                        break
+                
+                # 如果目标文件列表中没有告警，选择第一个有告警的文件
+                if not target_file_path:
+                    target_file_path = next(iter(warnings_by_file.keys()))
+                    target_warnings = warnings_by_file[target_file_path]
+                
+                # 获取该文件的所有告警（一次处理一个文件的所有告警）
+                warnings_to_fix = target_warnings
+                warning_count = len(warnings_to_fix)
+                
+                typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 第 {iteration} 次迭代：修复文件 {target_file_path} 的 {warning_count} 个 missing_safety_doc 告警", fg=typer.colors.CYAN)
+                
+                # 格式化告警信息
+                formatted_warnings = self._format_warnings_for_prompt(warnings_to_fix, max_count=len(warnings_to_fix))
+                
+                # 构建提示词，修复该文件的所有 missing_safety_doc 告警
                 prompt_lines: List[str] = [
-                    "你是资深 Rust 代码工程师。请在当前 crate 下对指定文件执行 unsafe 清理优化，并以补丁形式输出修改：",
+                    "你是资深 Rust 代码工程师。请在当前 crate 下修复指定文件中的 missing_safety_doc 告警，并以补丁形式输出修改：",
                     f"- crate 根目录：{crate}",
                     "",
                     "本次优化仅允许修改以下文件（严格限制，只处理这一个文件）：",
-                    f"- {single_file}",
+                    f"- {target_file_path}",
+                    "",
+                    f"重要：本次修复仅修复该文件中的 {warning_count} 个 missing_safety_doc 告警。",
                     "",
                     "优化目标：",
-                    "1) unsafe 清理：",
-                    "   - 识别并移除该文件中不必要的 `unsafe { ... }` 包裹；",
-                    "   - 若必须使用 unsafe，缩小 unsafe 块的范围，并在紧邻位置添加 `/// SAFETY: ...` 文档注释说明理由；",
-                    "   - 对于无法移除的 unsafe，添加详细的 SAFETY 注释说明为什么需要 unsafe。",
+                    f"1) 修复文件 {target_file_path} 中的 {warning_count} 个 missing_safety_doc 告警：",
+                    "   **修复原则：能消除就消除，不能消除才增加 SAFETY 注释**",
+                    "",
+                    "   优先级 1（优先尝试）：消除 unsafe",
+                    "   - 如果 unsafe 函数或方法实际上不需要是 unsafe 的，应该移除 unsafe 关键字；",
+                    "   - 如果 unsafe 块可以移除，应该移除整个 unsafe 块；",
+                    "   - 如果 unsafe 块可以缩小范围，应该缩小范围；",
+                    "   - 仔细分析代码，判断是否真的需要 unsafe，如果可以通过安全的方式实现，优先使用安全的方式。",
+                    "",
+                    "   优先级 2（无法消除时）：添加 SAFETY 注释",
+                    "   - 只有在确认无法消除 unsafe 的情况下，才为 unsafe 函数或方法添加 `/// SAFETY: ...` 文档注释；",
+                    "   - SAFETY 注释必须详细说明为什么该函数或方法是 unsafe 的，包括：",
+                    "     * 哪些不变量必须由调用者维护；",
+                    "     * 哪些前提条件必须满足；",
+                    "     * 可能导致未定义行为的情况；",
+                    "     * 为什么不能使用安全的替代方案；",
+                    "   - 如果 unsafe 块无法移除但可以缩小范围，应该缩小范围并在紧邻位置添加 `/// SAFETY: ...` 注释。",
                     "",
                     "约束与范围：",
-                    f"- **仅修改文件 {single_file}，不要修改其他文件**；除非必须（如修复引用路径），否则不要修改其他文件。",
-                    "- 保持最小改动，不要进行与 unsafe 清理无关的重构或格式化。",
+                    f"- **仅修改文件 {target_file_path}，不要修改其他文件**；除非必须（如修复引用路径），否则不要修改其他文件。",
+                    "- 保持最小改动，不要进行与修复 missing_safety_doc 告警无关的重构或格式化。",
+                    f"- **只修复该文件中的 {warning_count} 个 missing_safety_doc 告警，不要修复其他告警**。",
                     "- 修改后需保证 `cargo test` 可以通过；如需引入少量配套改动，请一并包含在补丁中以确保通过。",
                     "- 输出仅为补丁，不要输出解释或多余文本。",
                     "",
                     "优先级说明：",
+                    "- **修复 unsafe 的优先级：能消除就消除，不能消除才增加 SAFETY 注释**；",
+                    "- 对于每个 unsafe，首先尝试分析是否可以安全地移除，只有在确认无法移除时才添加 SAFETY 注释；",
                     "- **如果优化过程中出现了测试不通过或编译错误，必须优先解决这些问题**；",
-                    "- 在进行 unsafe 清理之前，先确保代码能够正常编译和通过测试；",
-                    "- 如果 unsafe 清理导致了编译错误或测试失败，必须立即修复这些错误，然后再继续优化。",
+                    "- 在修复告警之前，先确保代码能够正常编译和通过测试；",
+                    "- 如果修复告警导致了编译错误或测试失败，必须立即修复这些错误，然后再继续优化。",
                     "",
                     "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
-                    "若出现编译错误或测试失败，请优先修复这些问题，然后再继续 unsafe 清理；",
-                    "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。"
+                    "若出现编译错误或测试失败，请优先修复这些问题，然后再继续修复告警；",
+                    "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。",
+                    "",
+                    f"文件 {target_file_path} 中的 missing_safety_doc 告警信息如下：",
+                    "<WARNINGS>",
+                    formatted_warnings,
+                    "</WARNINGS>",
                 ]
                 prompt = "\n".join(prompt_lines)
                 prompt = self._append_additional_notes(prompt)
@@ -1379,34 +1495,39 @@ class Optimizer:
                 commit_before = self._get_crate_commit_hash()
                 
                 # CodeAgent 在 crate 目录下创建和执行
-                agent = CodeAgent(name=f"UnsafeCleanupAgent-file{file_idx}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
-                agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][{file_idx}/{total_files}]", suffix="")
+                agent = CodeAgent(name=f"UnsafeCleanupAgent-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
+                agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][iter{iteration}]", suffix="")
                 
                 # 验证修复是否成功（通过 cargo test）
                 ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                 if ok:
                     # 修复成功，保存进度和 commit id
                     try:
-                        file_path = crate / single_file if not Path(single_file).is_absolute() else Path(single_file)
+                        file_path = crate / target_file_path if not Path(target_file_path).is_absolute() else Path(target_file_path)
                         if file_path.exists():
-                            self._save_fix_progress("unsafe_cleanup", single_file, [file_path])
+                            self._save_fix_progress("unsafe_cleanup", f"{target_file_path}-iter{iteration}", [file_path])
                         else:
-                            self._save_fix_progress("unsafe_cleanup", single_file, None)
+                            self._save_fix_progress("unsafe_cleanup", f"{target_file_path}-iter{iteration}", None)
                     except Exception:
-                        self._save_fix_progress("unsafe_cleanup", single_file, None)
-                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复成功，已保存进度", fg=typer.colors.GREEN)
+                        self._save_fix_progress("unsafe_cleanup", f"{target_file_path}-iter{iteration}", None)
+                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {target_file_path} 的 {warning_count} 个告警修复成功，已保存进度", fg=typer.colors.GREEN)
                 else:
                     # 测试失败，回退到运行前的 commit
                     if commit_before:
-                        typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
+                        typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {target_file_path} 修复后测试失败，回退到运行前的 commit: {commit_before[:8]}", fg=typer.colors.YELLOW)
                         if self._reset_to_commit(commit_before):
                             typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 已成功回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                         else:
                             typer.secho("[c2rust-optimizer][codeagent][unsafe-cleanup] 回退失败，请手动检查代码状态", fg=typer.colors.RED)
                     else:
-                        typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {single_file} 修复后测试失败，但无法获取运行前的 commit，继续处理", fg=typer.colors.YELLOW)
+                        typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 文件 {target_file_path} 修复后测试失败，但无法获取运行前的 commit，继续修复", fg=typer.colors.YELLOW)
+                
+                # 修复后再次检查告警
+                has_warnings_after, _ = _check_missing_safety_doc_warnings(crate)
+                if not has_warnings_after:
+                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 所有 missing_safety_doc 告警已消除（共迭代 {iteration} 次）", fg=typer.colors.GREEN)
+                    return  # 所有告警已消除
             
-            typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 已完成所有文件处理（共 {total_files} 个文件）", fg=typer.colors.GREEN)
         finally:
             os.chdir(prev_cwd)
 
