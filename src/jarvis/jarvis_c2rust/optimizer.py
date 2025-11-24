@@ -40,13 +40,14 @@ import shutil
 import subprocess
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Iterable, Set
+from typing import Any, Dict, List, Optional, Tuple, Iterable, Set
 import fnmatch
 
 import typer
 
 # 引入 CodeAgent（参考 transpiler）
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_c2rust.utils import check_and_handle_test_deletion
 
 
 @dataclass
@@ -597,6 +598,24 @@ class Optimizer:
             return _git_reset_hard(repo_root, commit_hash)
         except Exception:
             return False
+
+    def _check_and_handle_test_deletion(self, before_commit: Optional[str], agent: Any) -> bool:
+        """
+        检测并处理测试代码删除。
+        
+        参数:
+            before_commit: agent 运行前的 commit hash
+            agent: 代码优化或修复的 agent 实例，使用其 model 进行询问
+            
+        返回:
+            bool: 如果检测到问题且已回退，返回 True；否则返回 False
+        """
+        return check_and_handle_test_deletion(
+            before_commit,
+            agent,
+            self._reset_to_commit,
+            "[c2rust-optimizer]"
+        )
 
     def _save_progress_for_batch(self, files: List[Path]) -> None:
         """保存文件处理进度"""
@@ -1223,6 +1242,16 @@ class Optimizer:
                 agent = CodeAgent(name=f"ClippyWarningEliminator-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix="[c2rust-optimizer][codeagent][clippy]", suffix="")
                 
+                # 检测并处理测试代码删除
+                if self._check_and_handle_test_deletion(commit_before, agent):
+                    # 如果回退了，需要重新运行 agent
+                    typer.secho(f"[c2rust-optimizer][codeagent][clippy] 检测到测试代码删除问题，已回退，重新运行 agent (iter={iteration})", fg=typer.colors.YELLOW)
+                    commit_before = self._get_crate_commit_hash()
+                    agent.run(prompt, prefix="[c2rust-optimizer][codeagent][clippy][retry]", suffix="")
+                    # 再次检测
+                    if self._check_and_handle_test_deletion(commit_before, agent):
+                        typer.secho(f"[c2rust-optimizer][codeagent][clippy] 再次检测到测试代码删除问题，已回退 (iter={iteration})", fg=typer.colors.RED)
+                
                 # 验证修复是否成功（通过 cargo test）
                 ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                 if ok:
@@ -1498,6 +1527,16 @@ class Optimizer:
                 agent = CodeAgent(name=f"UnsafeCleanupAgent-iter{iteration}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][iter{iteration}]", suffix="")
                 
+                # 检测并处理测试代码删除
+                if self._check_and_handle_test_deletion(commit_before, agent):
+                    # 如果回退了，需要重新运行 agent
+                    typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 检测到测试代码删除问题，已回退，重新运行 agent (iter={iteration})", fg=typer.colors.YELLOW)
+                    commit_before = self._get_crate_commit_hash()
+                    agent.run(prompt, prefix=f"[c2rust-optimizer][codeagent][unsafe-cleanup][iter{iteration}][retry]", suffix="")
+                    # 再次检测
+                    if self._check_and_handle_test_deletion(commit_before, agent):
+                        typer.secho(f"[c2rust-optimizer][codeagent][unsafe-cleanup] 再次检测到测试代码删除问题，已回退 (iter={iteration})", fg=typer.colors.RED)
+                
                 # 验证修复是否成功（通过 cargo test）
                 ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
                 if ok:
@@ -1594,6 +1633,16 @@ class Optimizer:
             agent = CodeAgent(name="VisibilityOptimizer", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][visibility]", suffix="")
             
+            # 检测并处理测试代码删除
+            if self._check_and_handle_test_deletion(commit_before, agent):
+                # 如果回退了，需要重新运行 agent
+                typer.secho("[c2rust-optimizer][codeagent][visibility] 检测到测试代码删除问题，已回退，重新运行 agent", fg=typer.colors.YELLOW)
+                commit_before = self._get_crate_commit_hash()
+                agent.run(prompt, prefix="[c2rust-optimizer][codeagent][visibility][retry]", suffix="")
+                # 再次检测
+                if self._check_and_handle_test_deletion(commit_before, agent):
+                    typer.secho("[c2rust-optimizer][codeagent][visibility] 再次检测到测试代码删除问题，已回退", fg=typer.colors.RED)
+            
             # 验证修复是否成功（通过 cargo test）
             ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
             if ok:
@@ -1676,6 +1725,16 @@ class Optimizer:
             # CodeAgent 在 crate 目录下创建和执行
             agent = CodeAgent(name="DocumentationAgent", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
             agent.run(prompt, prefix="[c2rust-optimizer][codeagent][doc]", suffix="")
+            
+            # 检测并处理测试代码删除
+            if self._check_and_handle_test_deletion(commit_before, agent):
+                # 如果回退了，需要重新运行 agent
+                typer.secho("[c2rust-optimizer][codeagent][doc] 检测到测试代码删除问题，已回退，重新运行 agent", fg=typer.colors.YELLOW)
+                commit_before = self._get_crate_commit_hash()
+                agent.run(prompt, prefix="[c2rust-optimizer][codeagent][doc][retry]", suffix="")
+                # 再次检测
+                if self._check_and_handle_test_deletion(commit_before, agent):
+                    typer.secho("[c2rust-optimizer][codeagent][doc] 再次检测到测试代码删除问题，已回退", fg=typer.colors.RED)
             
             # 验证修复是否成功（通过 cargo test）
             ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
@@ -1798,6 +1857,16 @@ class Optimizer:
                 # CodeAgent 在 crate 目录下创建和执行
                 agent = CodeAgent(name=f"BuildFixAgent-iter{attempt}", need_summary=False, non_interactive=self.options.non_interactive, model_group=self.options.llm_group)
                 agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}]", suffix="")
+                
+                # 检测并处理测试代码删除
+                if self._check_and_handle_test_deletion(commit_before, agent):
+                    # 如果回退了，需要重新运行 agent
+                    typer.secho(f"[c2rust-optimizer][build-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={attempt})", fg=typer.colors.YELLOW)
+                    commit_before = self._get_crate_commit_hash()
+                    agent.run(prompt, prefix=f"[c2rust-optimizer][build-fix iter={attempt}][retry]", suffix="")
+                    # 再次检测
+                    if self._check_and_handle_test_deletion(commit_before, agent):
+                        typer.secho(f"[c2rust-optimizer][build-fix] 再次检测到测试代码删除问题，已回退 (iter={attempt})", fg=typer.colors.RED)
                 
                 # 验证修复是否成功（通过 cargo test）
                 ok, _ = _cargo_check_full(crate, self.stats, self.options.max_checks, timeout=self.options.cargo_test_timeout)
