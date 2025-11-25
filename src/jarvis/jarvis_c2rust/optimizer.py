@@ -978,14 +978,28 @@ class Optimizer:
             # 注意：clippy 告警修复不依赖于是否有新文件需要处理，即使所有文件都已处理，也应该检查并修复告警
             if not self._run_clippy_elimination_step():
                 # Clippy 告警修复未完成，停止后续步骤
-                        return self.stats
+                return self.stats
 
             # ========== 后续优化步骤（只有在 clippy 告警修复完成后才执行） ==========
             # 计算本次批次的目标文件列表（按 include/exclude/resume/max_files）
             targets = self._compute_target_files()
             
+            # 检查是否有未完成的步骤需要执行
+            has_pending_steps = False
+            if self.options.enable_unsafe_cleanup and "unsafe_cleanup" not in self.steps_completed:
+                has_pending_steps = True
+            if self.options.enable_visibility_opt and "visibility_opt" not in self.steps_completed:
+                has_pending_steps = True
+            if self.options.enable_doc_opt and "doc_opt" not in self.steps_completed:
+                has_pending_steps = True
+            
+            # 如果没有新文件但有未完成的步骤，使用所有 Rust 文件作为目标
+            if not targets and has_pending_steps:
+                typer.secho("[c2rust-optimizer] 无新文件需要处理，但检测到未完成的步骤，使用所有 Rust 文件作为目标。", fg=typer.colors.CYAN)
+                targets = list(_iter_rust_files(self.crate_dir))
+            
             if not targets:
-                typer.secho("[c2rust-optimizer] 根据当前选项，无新文件需要处理。", fg=typer.colors.CYAN)
+                typer.secho("[c2rust-optimizer] 根据当前选项，无新文件需要处理，且所有步骤均已完成。", fg=typer.colors.CYAN)
             else:
                 typer.secho(f"[c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。", fg=typer.colors.BLUE)
 
@@ -998,7 +1012,7 @@ class Optimizer:
                         self._codeagent_opt_unsafe_cleanup
                     )
                     if step_num is None:  # 步骤失败，已回滚
-                                    return self.stats
+                        return self.stats
 
                 if self.options.enable_visibility_opt:
                     step_num = self._run_optimization_step(
@@ -1006,7 +1020,7 @@ class Optimizer:
                         self._codeagent_opt_visibility
                     )
                     if step_num is None:  # 步骤失败，已回滚
-                                    return self.stats
+                        return self.stats
 
                 if self.options.enable_doc_opt:
                     step_num = self._run_optimization_step(
@@ -1014,7 +1028,7 @@ class Optimizer:
                         self._codeagent_opt_docs
                     )
                     if step_num is None:  # 步骤失败，已回滚
-                                    return self.stats
+                        return self.stats
 
                 # 最终保存进度（确保所有步骤的进度都已记录）
                 self._save_progress_for_batch(targets)
