@@ -177,6 +177,8 @@ class CodeAgent(Agent):
             **kwargs,
         )
 
+        self._agent_type = "code_agent"
+
         # 建立CodeAgent与Agent的关联，便于工具获取上下文管理器
         self._code_agent = self
 

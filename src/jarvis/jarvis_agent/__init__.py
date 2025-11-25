@@ -387,6 +387,8 @@ class Agent:
         self._addon_prompt_skip_rounds: int = 0
         # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
         self._no_tool_call_count: int = 0
+        
+        self._agent_type = "normal"
 
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
