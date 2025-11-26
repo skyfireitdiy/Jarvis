@@ -61,6 +61,7 @@ class ContextRecommender:
             
             # 优先根据 model_group 获取配置（确保配置一致性）
             # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
+            # 使用normal平台，上下文推荐是一般任务
             if model_group:
                 try:
                     platform_name = get_normal_platform_name(model_group)
@@ -73,7 +74,7 @@ class ContextRecommender:
             if platform_name:
                 self.llm_model = registry.create_platform(platform_name)
                 if self.llm_model is None:
-                    # 如果创建失败，使用默认平台
+                    # 如果创建失败，使用normal平台
                     self.llm_model = registry.get_normal_platform()
             else:
                 self.llm_model = registry.get_normal_platform()

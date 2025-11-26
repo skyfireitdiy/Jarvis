@@ -305,11 +305,13 @@ def _read_source_snippet(rec: Dict[str, Any], max_lines: int = DEFAULT_SOURCE_SN
 
 
 def _check_llm_availability() -> tuple[bool, Any, Any, Any]:
-    """检查LLM可用性，返回(是否可用, PlatformRegistry, get_normal_platform_name, get_normal_model_name)"""
+    """检查LLM可用性，返回(是否可用, PlatformRegistry, get_smart_platform_name, get_smart_model_name)
+    使用smart平台，适用于代码生成等复杂场景
+    """
     try:
         from jarvis.jarvis_platform.registry import PlatformRegistry  # type: ignore
-        from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name  # type: ignore
-        return True, PlatformRegistry, get_normal_platform_name, get_normal_model_name
+        from jarvis.jarvis_utils.config import get_smart_platform_name, get_smart_model_name  # type: ignore
+        return True, PlatformRegistry, get_smart_platform_name, get_smart_model_name
     except Exception:
         return False, None, None, None
 
@@ -426,10 +428,10 @@ def _create_llm_model(
     disabled_display: str,
     _model_available: bool,
     PlatformRegistry: Any,
-    get_normal_platform_name: Any,
-    get_normal_model_name: Any,
+    get_smart_platform_name: Any,
+    get_smart_model_name: Any,
 ) -> Optional[Any]:
-    """创建LLM模型"""
+    """创建LLM模型，使用smart平台，适用于代码生成等复杂场景"""
     if not _model_available:
         return None
     try:
@@ -437,20 +439,20 @@ def _create_llm_model(
         model = None
         if llm_group:
             try:
-                platform_name = get_normal_platform_name(llm_group)  # type: ignore
+                platform_name = get_smart_platform_name(llm_group)  # type: ignore
                 if platform_name:
                     model = registry.create_platform(platform_name)  # type: ignore
             except Exception:
                 model = None
         if model is None:
-            model = registry.get_normal_platform()  # type: ignore
+            model = registry.get_smart_platform()  # type: ignore
         try:
             model.set_model_group(llm_group)  # type: ignore
         except Exception:
             pass
         if llm_group:
             try:
-                mn = get_normal_model_name(llm_group)  # type: ignore
+                mn = get_smart_model_name(llm_group)  # type: ignore
                 if mn:
                     model.set_model_name(mn)  # type: ignore
             except Exception:

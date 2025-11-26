@@ -60,8 +60,8 @@ class WebpageTool:
                         if response and response.strip():
                             return {"success": True, "stdout": response, "stderr": ""}
 
-            # 2) 然后尝试使用默认平台（normal）的 web 能力
-            model = PlatformRegistry().get_normal_platform()
+            # 2) 然后尝试使用cheap平台的 web 能力（适用于网页读取等简单任务）
+            model = PlatformRegistry().get_cheap_platform()
             if model.support_web():
 
                 model.set_web(True)
@@ -108,7 +108,8 @@ class WebpageTool:
 - 包含网页标题（若可推断）
 - 提供准确、完整的信息"""
 
-            model = PlatformRegistry().get_normal_platform()
+            # 使用cheap平台进行网页内容总结（简单任务）
+            model = PlatformRegistry().get_cheap_platform()
             model.set_suppress_output(False)  # type: ignore
             summary = model.chat_until_success(summary_prompt)  # type: ignore
 
