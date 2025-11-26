@@ -36,7 +36,10 @@ from jarvis.jarvis_utils.config import (
     get_data_dir,
     is_enable_intent_recognition,
     is_enable_impact_analysis,
+    get_smart_platform_name,
+    get_smart_model_name,
 )
+from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_utils.git_utils import (
     confirm_add_new_files,
@@ -205,6 +208,25 @@ class CodeAgent(Agent):
             print_language_support_table()
         except Exception:
             pass
+
+    def _init_model(self, model_group: Optional[str]):
+        """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
+        platform_name = get_smart_platform_name(model_group)
+        model_name = get_smart_model_name(model_group)
+
+        maybe_model = PlatformRegistry().create_platform(platform_name)
+        if maybe_model is None:
+            print(f"⚠️ 平台 {platform_name} 不存在，将使用smart模型")
+            maybe_model = PlatformRegistry().get_smart_platform()
+
+        # 在此处收敛为非可选类型，确保后续赋值满足类型检查
+        self.model = maybe_model
+
+        if model_name:
+            self.model.set_model_name(model_name)
+
+        self.model.set_model_group(model_group)
+        self.model.set_suppress_output(False)
 
     def _get_system_prompt(self) -> str:
         """获取代码工程师的系统提示词"""
