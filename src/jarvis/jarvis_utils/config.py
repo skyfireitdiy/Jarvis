@@ -165,6 +165,10 @@ def _get_resolved_model_config(
         "JARVIS_PLATFORM",
         "JARVIS_MODEL",
         "JARVIS_MAX_INPUT_TOKEN_COUNT",
+        "JARVIS_CHEAP_PLATFORM",
+        "JARVIS_CHEAP_MODEL",
+        "JARVIS_SMART_PLATFORM",
+        "JARVIS_SMART_MODEL",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:
@@ -222,6 +226,62 @@ def _deprecated_model_name_v1(model_group_override: Optional[str] = None) -> str
     """
     _get_resolved_model_config(model_group_override)
     # Fallback to normal model if thinking model is not specified
+    return get_normal_model_name(model_group_override)
+
+
+def get_cheap_platform_name(model_group_override: Optional[str] = None) -> str:
+    """
+    获取廉价操作的平台名称。
+
+    返回：
+        str: 平台名称，如果未配置则回退到正常操作平台
+    """
+    config = _get_resolved_model_config(model_group_override)
+    cheap_platform = config.get("JARVIS_CHEAP_PLATFORM")
+    if cheap_platform:
+        return cast(str, cheap_platform)
+    return get_normal_platform_name(model_group_override)
+
+
+def get_cheap_model_name(model_group_override: Optional[str] = None) -> str:
+    """
+    获取廉价操作的模型名称。
+
+    返回：
+        str: 模型名称，如果未配置则回退到正常操作模型
+    """
+    config = _get_resolved_model_config(model_group_override)
+    cheap_model = config.get("JARVIS_CHEAP_MODEL")
+    if cheap_model:
+        return cast(str, cheap_model)
+    return get_normal_model_name(model_group_override)
+
+
+def get_smart_platform_name(model_group_override: Optional[str] = None) -> str:
+    """
+    获取智能操作的平台名称。
+
+    返回：
+        str: 平台名称，如果未配置则回退到正常操作平台
+    """
+    config = _get_resolved_model_config(model_group_override)
+    smart_platform = config.get("JARVIS_SMART_PLATFORM")
+    if smart_platform:
+        return cast(str, smart_platform)
+    return get_normal_platform_name(model_group_override)
+
+
+def get_smart_model_name(model_group_override: Optional[str] = None) -> str:
+    """
+    获取智能操作的模型名称。
+
+    返回：
+        str: 模型名称，如果未配置则回退到正常操作模型
+    """
+    config = _get_resolved_model_config(model_group_override)
+    smart_model = config.get("JARVIS_SMART_MODEL")
+    if smart_model:
+        return cast(str, smart_model)
     return get_normal_model_name(model_group_override)
 
 

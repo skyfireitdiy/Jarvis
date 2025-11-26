@@ -7,9 +7,13 @@ from typing import Dict, List, Optional, Type
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import (
+    get_cheap_model_name,
+    get_cheap_platform_name,
     get_data_dir,
     get_normal_model_name,
     get_normal_platform_name,
+    get_smart_model_name,
+    get_smart_platform_name,
 )
 
 REQUIRED_METHODS = [
@@ -176,13 +180,28 @@ class PlatformRegistry:
                 self.register_platform(platform_name, platform_class)
 
     def get_normal_platform(self) -> BasePlatform:
+        """获取正常操作的平台实例"""
         platform_name = get_normal_platform_name()
         model_name = get_normal_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name)  # type: ignore
         return platform  # type: ignore
 
+    def get_cheap_platform(self) -> BasePlatform:
+        """获取廉价操作的平台实例"""
+        platform_name = get_cheap_platform_name()
+        model_name = get_cheap_model_name()
+        platform = self.create_platform(platform_name)
+        platform.set_model_name(model_name)  # type: ignore
+        return platform  # type: ignore
 
+    def get_smart_platform(self) -> BasePlatform:
+        """获取智能操作的平台实例"""
+        platform_name = get_smart_platform_name()
+        model_name = get_smart_model_name()
+        platform = self.create_platform(platform_name)
+        platform.set_model_name(model_name)  # type: ignore
+        return platform  # type: ignore
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:
         """Register platform class
