@@ -127,6 +127,26 @@
       "description": "常规操作模型名称",
       "default": "gpt-5"
     },
+    "JARVIS_CHEAP_PLATFORM": {
+      "type": "string",
+      "description": "廉价操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值",
+      "default": ""
+    },
+    "JARVIS_CHEAP_MODEL": {
+      "type": "string",
+      "description": "廉价操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值",
+      "default": ""
+    },
+    "JARVIS_SMART_PLATFORM": {
+      "type": "string",
+      "description": "智能操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值",
+      "default": ""
+    },
+    "JARVIS_SMART_MODEL": {
+      "type": "string",
+      "description": "智能操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值",
+      "default": ""
+    },
     "JARVIS_WEB_SEARCH_PLATFORM": {
       "type": "string",
       "description": "Web搜索使用的平台名称",
@@ -162,6 +182,22 @@
             "JARVIS_MAX_INPUT_TOKEN_COUNT": {
               "type": "number",
               "default": 32000
+            },
+            "JARVIS_CHEAP_PLATFORM": {
+              "type": "string",
+              "description": "廉价操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值"
+            },
+            "JARVIS_CHEAP_MODEL": {
+              "type": "string",
+              "description": "廉价操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值"
+            },
+            "JARVIS_SMART_PLATFORM": {
+              "type": "string",
+              "description": "智能操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值"
+            },
+            "JARVIS_SMART_MODEL": {
+              "type": "string",
+              "description": "智能操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值"
             },
             "ENV": {
               "type": "object",
