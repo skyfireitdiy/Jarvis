@@ -394,6 +394,7 @@ def process_request(request: str) -> Optional[str]:
     """
     try:
         # Get language model instance
+        # 使用normal平台，智能shell命令生成是一般任务
         model = PlatformRegistry.get_global_platform_registry().get_normal_platform()
 
         shell = get_shell_name()
