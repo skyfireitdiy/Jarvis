@@ -1196,23 +1196,47 @@ class Optimizer:
             else:
                 typer.secho("[c2rust-optimizer][clippy-auto-fix] 自动修复后测试失败，正在撤销修复...", fg=typer.colors.YELLOW)
                 # 撤销修复：回退到修复前的 commit
-                if self._reset_to_commit(commit_before):
+                if commit_before and self._reset_to_commit(commit_before):
                     typer.secho(f"[c2rust-optimizer][clippy-auto-fix] 已成功撤销自动修复，回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
                 else:
                     typer.secho("[c2rust-optimizer][clippy-auto-fix] 撤销修复失败，请手动检查代码状态", fg=typer.colors.RED)
                 return False
                 
         except subprocess.TimeoutExpired:
-            typer.secho("[c2rust-optimizer][clippy-auto-fix] clippy --fix 执行超时，跳过自动修复", fg=typer.colors.YELLOW)
-            # 尝试撤销（如果有修改）
+            typer.secho("[c2rust-optimizer][clippy-auto-fix] clippy --fix 执行超时，正在检查是否有修改并撤销...", fg=typer.colors.YELLOW)
+            # 检查是否有修改，如果有则回退
             if commit_before:
-                self._reset_to_commit(commit_before)
+                repo_root = _git_toplevel(crate)
+                if repo_root:
+                    try:
+                        code, _, _ = _run_cmd(["git", "diff", "--quiet", "--exit-code"], repo_root)
+                        has_changes = (code != 0)  # 非零表示有修改
+                        if has_changes:
+                            if self._reset_to_commit(commit_before):
+                                typer.secho(f"[c2rust-optimizer][clippy-auto-fix] 已撤销超时前的修改，回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
+                            else:
+                                typer.secho("[c2rust-optimizer][clippy-auto-fix] 撤销修改失败，请手动检查代码状态", fg=typer.colors.RED)
+                    except Exception:
+                        # 无法检查状态，尝试直接回退
+                        self._reset_to_commit(commit_before)
             return False
         except Exception as e:
-            typer.secho(f"[c2rust-optimizer][clippy-auto-fix] clippy --fix 执行异常: {e}，跳过自动修复", fg=typer.colors.YELLOW)
-            # 尝试撤销（如果有修改）
+            typer.secho(f"[c2rust-optimizer][clippy-auto-fix] clippy --fix 执行异常: {e}，正在检查是否有修改并撤销...", fg=typer.colors.YELLOW)
+            # 检查是否有修改，如果有则回退
             if commit_before:
-                self._reset_to_commit(commit_before)
+                repo_root = _git_toplevel(crate)
+                if repo_root:
+                    try:
+                        code, _, _ = _run_cmd(["git", "diff", "--quiet", "--exit-code"], repo_root)
+                        has_changes = (code != 0)  # 非零表示有修改
+                        if has_changes:
+                            if self._reset_to_commit(commit_before):
+                                typer.secho(f"[c2rust-optimizer][clippy-auto-fix] 已撤销异常前的修改，回退到 commit: {commit_before[:8]}", fg=typer.colors.CYAN)
+                            else:
+                                typer.secho("[c2rust-optimizer][clippy-auto-fix] 撤销修改失败，请手动检查代码状态", fg=typer.colors.RED)
+                    except Exception:
+                        # 无法检查状态，尝试直接回退
+                        self._reset_to_commit(commit_before)
             return False
 
     def _codeagent_eliminate_clippy_warnings(self, target_files: List[Path], clippy_output: str) -> bool:
