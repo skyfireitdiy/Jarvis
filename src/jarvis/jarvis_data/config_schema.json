@@ -120,12 +120,12 @@
     "JARVIS_PLATFORM": {
       "type": "string",
       "description": "常规操作平台名称",
-      "default": "yuanbao"
+      "default": "openai"
     },
     "JARVIS_MODEL": {
       "type": "string",
       "description": "常规操作模型名称",
-      "default": "deep_seek_v3"
+      "default": "gpt-5"
     },
     "JARVIS_WEB_SEARCH_PLATFORM": {
       "type": "string",
@@ -153,11 +153,11 @@
           "properties": {
             "JARVIS_PLATFORM": {
               "type": "string",
-              "default": "yuanbao"
+              "default": "openai"
             },
             "JARVIS_MODEL": {
               "type": "string",
-              "default": "deep_seek_v3"
+              "default": "gpt-5"
             },
             "JARVIS_MAX_INPUT_TOKEN_COUNT": {
               "type": "number",
