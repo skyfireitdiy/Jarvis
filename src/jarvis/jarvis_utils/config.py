@@ -184,10 +184,10 @@ def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
     获取正常操作的平台名称。
 
     返回：
-        str: 平台名称，默认为'yuanbao'
+        str: 平台名称，默认为'openai'
     """
     config = _get_resolved_model_config(model_group_override)
-    return cast(str, config.get("JARVIS_PLATFORM", "yuanbao"))
+    return cast(str, config.get("JARVIS_PLATFORM", "openai"))
 
 
 def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
@@ -195,10 +195,10 @@ def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
     获取正常操作的模型名称。
 
     返回：
-        str: 模型名称，默认为'deep_seek_v3'
+        str: 模型名称，默认为'gpt-5'
     """
     config = _get_resolved_model_config(model_group_override)
-    return cast(str, config.get("JARVIS_MODEL", "deep_seek_v3"))
+    return cast(str, config.get("JARVIS_MODEL", "gpt-5"))
 
 
 def _deprecated_platform_name_v1(model_group_override: Optional[str] = None) -> str:
