@@ -205,10 +205,23 @@ class ReadCodeTool:
                 block_id = f"block-{idx}"
             # 显示id
             output_lines.append(f"[id:{block_id}]")
-            # 添加内容，保持原有缩进
+            # 添加内容，保持原有缩进，并为每行添加行号
             content = unit.get('content', '')
             if content:
-                output_lines.append(content)
+                # 获取单元的起始行号
+                start_line = unit.get('start_line', 1)
+                # 将内容按行分割
+                content_lines = content.split('\n')
+                # 为每一行添加行号（右对齐，4位，不足补空格）
+                numbered_lines = []
+                current_line = start_line
+                for line in content_lines:
+                    # 行号右对齐，占4位
+                    line_number_str = f"{current_line:4d}"
+                    numbered_lines.append(f"{line_number_str}:{line}")
+                    current_line += 1
+                # 将带行号的内容添加到输出
+                output_lines.append('\n'.join(numbered_lines))
             # 块结束分界符
             output_lines.append("-" * 80)
             output_lines.append("")  # 单元之间空行分隔
