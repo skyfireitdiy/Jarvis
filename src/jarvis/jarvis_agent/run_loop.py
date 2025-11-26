@@ -72,6 +72,25 @@ class AgentRunLoop:
                 ag.session.prompt = ""
                 run_input_handlers = False
 
+                # 检查是否包含 <!!!SUMMARY!!!> 标记，触发总结并清空历史
+                if "<!!!SUMMARY!!!>" in current_response:
+                    print("ℹ️ 检测到 <!!!SUMMARY!!!> 标记，正在触发总结并清空历史...")
+                    # 移除标记，避免在后续处理中出现
+                    current_response = current_response.replace("<!!!SUMMARY!!!>", "").strip()
+                    # 触发总结并清空历史
+                    summary_text = ag._summarize_and_clear_history()
+                    if summary_text:
+                        # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
+                        ag.session.addon_prompt = join_prompts(
+                            [ag.session.addon_prompt, summary_text]
+                        )
+                    # 重置轮次计数（用于工具提醒）与对话长度计数器（用于摘要触发），开始新一轮周期
+                    self.conversation_rounds = 0
+                    ag.session.conversation_length = 0
+                    # 如果响应中还有其他内容，继续处理；否则继续下一轮
+                    if not current_response:
+                        continue
+
                 # 处理中断
                 interrupt_result = ag._handle_run_interrupt(current_response)
                 if (
