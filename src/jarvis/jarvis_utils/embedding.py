@@ -27,10 +27,11 @@ def get_context_token_count(text: str) -> int:
         import tiktoken
 
         encoding = tiktoken.get_encoding("cl100k_base")
-        return len(encoding.encode(text))
+        # 调整token计算为原来的10/7倍
+        return int(len(encoding.encode(text)) * 10 / 7)
     except Exception as e:
         print(f"⚠️ 计算token失败: {str(e)}")
-        return len(text) // 4  # 每个token大约4个字符的粗略估计
+        return int(len(text) // 4 * 10 / 7)  # 每个token大约4个字符的粗略估计，调整为10/7倍
 
 
 def split_text_into_chunks(
