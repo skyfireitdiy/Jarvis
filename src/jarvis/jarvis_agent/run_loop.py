@@ -40,9 +40,13 @@ class AgentRunLoop:
                     self.agent.session.addon_prompt = join_prompts(
                         [self.agent.session.addon_prompt, self.agent.get_tool_usage_prompt()]
                     )
-                # 基于剩余token数量的自动总结判断：当剩余token低于阈值时触发
+                # 基于剩余token数量或对话轮次的自动总结判断
                 remaining_tokens = self.agent.model.get_remaining_token_count()
-                if remaining_tokens <= self.summary_remaining_token_threshold:
+                should_summarize = (
+                    remaining_tokens <= self.summary_remaining_token_threshold or
+                    self.conversation_rounds > 20
+                )
+                if should_summarize:
                     summary_text = self.agent._summarize_and_clear_history()
                     if summary_text:
                         # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
