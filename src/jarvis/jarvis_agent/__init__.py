@@ -1411,7 +1411,10 @@ class Agent:
         }
 
     def _filter_tools_if_needed(self, task: str):
-        """如果工具数量超过阈值，使用大模型筛选相关工具"""
+        """如果工具数量超过阈值，使用大模型筛选相关工具
+        
+        注意：仅筛选用户自定义工具，内置工具不参与筛选（始终保留）
+        """
         tool_registry = self.get_tool_registry()
         if not isinstance(tool_registry, ToolRegistry):
             return
@@ -1421,10 +1424,16 @@ class Agent:
         if len(all_tools) <= threshold:
             return
 
-        # 为工具选择构建提示
+        # 获取用户自定义工具（非内置工具），仅对这些工具进行筛选
+        custom_tools = tool_registry.get_custom_tools()
+        if not custom_tools:
+            # 没有用户自定义工具，无需筛选
+            return
+
+        # 为工具选择构建提示（仅包含用户自定义工具）
         tools_prompt_part = ""
         tool_names = []
-        for i, tool in enumerate(all_tools, 1):
+        for i, tool in enumerate(custom_tools, 1):
             tool_names.append(tool["name"])
             tools_prompt_part += f"{i}. {tool['name']}: {tool['description']}\n"
 
@@ -1475,7 +1484,10 @@ class Agent:
             if selected_tool_names:
                 # 移除重复项
                 selected_tool_names = sorted(list(set(selected_tool_names)))
-                tool_registry.use_tools(selected_tool_names)
+                # 合并内置工具名称和筛选出的用户自定义工具名称
+                builtin_names = list(tool_registry._builtin_tool_names)
+                final_tool_names = sorted(list(set(builtin_names + selected_tool_names)))
+                tool_registry.use_tools(final_tool_names)
                 # 使用筛选后的工具列表重新设置系统提示
                 self._setup_system_prompt()
                 print(f"✅ 已筛选出 {len(selected_tool_names)} 个相关工具: {', '.join(selected_tool_names)}")
