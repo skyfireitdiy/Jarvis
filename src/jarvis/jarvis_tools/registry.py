@@ -166,6 +166,8 @@ class ToolRegistry(OutputHandlerProtocol):
     def __init__(self) -> None:
         """初始化工具注册表"""
         self.tools: Dict[str, Tool] = {}
+        # 记录内置工具名称，用于区分内置工具和用户自定义工具
+        self._builtin_tool_names: set = set()
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
@@ -304,6 +306,9 @@ class ToolRegistry(OutputHandlerProtocol):
                 continue
 
             self.register_tool_by_file(str(file_path))
+        
+        # 记录当前已加载的工具名称为内置工具
+        self._builtin_tool_names = set(self.tools.keys())
 
     def _load_external_tools(self) -> None:
         """从jarvis_data/tools和配置的目录加载外部工具"""
@@ -910,6 +915,18 @@ class ToolRegistry(OutputHandlerProtocol):
             List[Dict[str, Any]]: 包含所有工具信息的列表
         """
         return [tool.to_dict() for tool in self.tools.values()]
+
+    def get_custom_tools(self) -> List[Dict[str, Any]]:
+        """获取用户自定义工具（非内置工具）
+
+        返回:
+            List[Dict[str, Any]]: 包含用户自定义工具信息的列表
+        """
+        return [
+            tool.to_dict()
+            for tool in self.tools.values()
+            if tool.name not in self._builtin_tool_names
+        ]
 
     def execute_tool(
         self, name: str, arguments: Dict[str, Any], agent: Optional[Any] = None
