@@ -88,8 +88,10 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def can_handle(self, response: str) -> bool:
         # 仅当 {ot("TOOL_CALL")} 出现在行首时才认为可以处理（忽略大小写）
-        print("🛠️ 检测到工具调用")  # 增加工具emoji
-        return re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', response) is not None
+        has_tool_call = re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', response) is not None
+        if has_tool_call:
+            print("🛠️ 检测到工具调用")  # 增加工具emoji
+        return has_tool_call
 
     def prompt(self) -> str:
         """加载工具"""
