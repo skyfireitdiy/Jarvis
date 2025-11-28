@@ -1173,10 +1173,19 @@ class ReadCodeTool:
                 context_lines.append(scope_info)
 
             if edit_context.used_symbols:
+                # 对符号去重（基于 name + file_path + line_start）
+                seen_symbols = set()
+                unique_symbols = []
+                for s in edit_context.used_symbols:
+                    key = (s.name, getattr(s, 'file_path', ''), getattr(s, 'line_start', 0))
+                    if key not in seen_symbols:
+                        seen_symbols.add(key)
+                        unique_symbols.append(s)
+                
                 # 区分定义和调用，显示定义位置信息
                 definitions = []
                 calls = []
-                for symbol in edit_context.used_symbols[:10]:
+                for symbol in unique_symbols[:10]:
                     is_def = getattr(symbol, 'is_definition', False)
                     if is_def:
                         definitions.append(symbol)
@@ -1209,12 +1218,14 @@ class ReadCodeTool:
             # 不再感知导入符号
 
             if edit_context.relevant_files:
-                rel_files = edit_context.relevant_files[:10]
+                # 对相关文件去重
+                unique_files = list(dict.fromkeys(edit_context.relevant_files))
+                rel_files = unique_files[:10]
                 files_str = "\n   ".join(f"• {os.path.relpath(f, context_manager.project_root)}" for f in rel_files)
-                more = len(edit_context.relevant_files) - 10
+                more = len(unique_files) - 10
                 if more > 0:
                     files_str += f"\n   ... 还有{more}个相关文件"
-                context_lines.append(f"📁 相关文件 ({len(edit_context.relevant_files)}个):\n   {files_str}")
+                context_lines.append(f"📁 相关文件 ({len(unique_files)}个):\n   {files_str}")
 
             context_lines.append("─" * 60)
             context_lines.append("")  # 空行

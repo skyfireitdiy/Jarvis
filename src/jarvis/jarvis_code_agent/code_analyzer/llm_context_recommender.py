@@ -155,10 +155,22 @@ class ContextRecommender:
         else:
             print("⚠️ 无符号名可用，跳过符号推荐")
 
-        # 4. 限制符号数量
-        final_symbols = recommended_symbols[:10]
-        if len(recommended_symbols) > 10:
-            print(f"📌 推荐结果已限制为前 10 个符号（共 {len(recommended_symbols)} 个）")
+        # 4. 对推荐符号去重（基于 name + file_path + line_start）
+        seen = set()
+        unique_symbols = []
+        for symbol in recommended_symbols:
+            key = (symbol.name, symbol.file_path, symbol.line_start)
+            if key not in seen:
+                seen.add(key)
+                unique_symbols.append(symbol)
+       
+        if len(unique_symbols) < len(recommended_symbols):
+            print(f"🔄 去重: {len(recommended_symbols)} -> {len(unique_symbols)} 个符号")
+       
+        # 5. 限制符号数量
+        final_symbols = unique_symbols[:10]
+        if len(unique_symbols) > 10:
+            print(f"📌 推荐结果已限制为前 10 个符号（共 {len(unique_symbols)} 个）")
 
         print(f"✨ 上下文推荐完成，共推荐 {len(final_symbols)} 个符号")
 
@@ -401,7 +413,6 @@ class ContextRecommender:
             # 解析失败，返回空列表
             print(f"❌ LLM符号名生成失败: {e}")
             return []
-
     def _search_symbols_by_names(self, symbol_names: List[str]) -> List[Symbol]:
         """基于符号名在符号表中精确查找相关符号
         
