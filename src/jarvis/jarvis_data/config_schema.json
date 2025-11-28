@@ -560,6 +560,13 @@
       "type": "string",
       "description": "系统Shell路径，用于获取当前使用的shell类型",
       "default": "/bin/bash"
+    },
+    "JARVIS_CONVERSATION_TURN_THRESHOLD": {
+      "type": "number",
+      "description": "对话轮次阈值，用于触发总结。当对话轮次超过此值时，系统会自动触发对话总结",
+      "default": 30,
+      "minimum": 1,
+      "maximum": 1000
     }
   },
   "additionalProperties": true
