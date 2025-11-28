@@ -13,7 +13,7 @@ from typing import Any, TYPE_CHECKING
 
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
 from jarvis.jarvis_agent.utils import join_prompts, is_auto_complete, normalize_next_action
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count, get_conversation_turn_threshold
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
@@ -28,6 +28,7 @@ class AgentRunLoop:
         # 基于剩余token数量的自动总结阈值：当剩余token低于输入窗口的20%时触发
         max_input_tokens = get_max_input_token_count(self.agent.model_group)
         self.summary_remaining_token_threshold = int(max_input_tokens * 0.2)
+        self.conversation_turn_threshold = get_conversation_turn_threshold()
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
@@ -44,7 +45,7 @@ class AgentRunLoop:
                 remaining_tokens = self.agent.model.get_remaining_token_count()
                 should_summarize = (
                     remaining_tokens <= self.summary_remaining_token_threshold or
-                    self.conversation_rounds > 20
+                    self.conversation_rounds > self.conversation_turn_threshold
                 )
                 if should_summarize:
                     summary_text = self.agent._summarize_and_clear_history()
