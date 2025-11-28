@@ -19,6 +19,7 @@ from jarvis.jarvis_code_agent.lint import (
     get_lint_tools,
     get_lint_commands_for_files,
     group_commands_by_tool,
+    get_format_commands_for_files,
 )
 from jarvis.jarvis_code_agent.code_analyzer.build_validator import BuildValidator, BuildResult, FallbackBuildValidator
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
@@ -801,6 +802,78 @@ class CodeAgent(Agent):
             print(f"ℹ️ {commit_messages}")
         return commits
 
+    def _format_modified_files(self, modified_files: List[str]) -> None:
+        """格式化修改的文件
+        
+        Args:
+            modified_files: 修改的文件列表
+        """
+        if not modified_files:
+            return
+        
+        # 获取格式化命令
+        format_commands = get_format_commands_for_files(modified_files, self.root_dir)
+        if not format_commands:
+            return
+        
+        print("🔧 正在格式化代码...")
+        
+        # 执行格式化命令
+        formatted_files = set()
+        for tool_name, file_path, command in format_commands:
+            try:
+                # 检查文件是否存在
+                abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
+                if not os.path.exists(abs_file_path):
+                    continue
+                
+                # 执行格式化命令
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    cwd=self.root_dir,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=300,  # 300秒超时
+                )
+                
+                if result.returncode == 0:
+                    formatted_files.add(file_path)
+                    print(f"✅ 已格式化: {os.path.basename(file_path)} ({tool_name})")
+                else:
+                    # 格式化失败，记录但不中断流程
+                    error_msg = (result.stderr or result.stdout or "").strip()
+                    if error_msg:
+                        print(f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {error_msg[:200]}")
+            except subprocess.TimeoutExpired:
+                print(f"⚠️ 格式化超时: {os.path.basename(file_path)} ({tool_name})")
+            except FileNotFoundError:
+                # 工具未安装，跳过
+                continue
+            except Exception as e:
+                # 其他错误，记录但继续
+                print(f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {str(e)[:100]}")
+                continue
+        
+        if formatted_files:
+            print(f"✅ 已格式化 {len(formatted_files)} 个文件")
+            # 暂存格式化后的文件
+            try:
+                for file_path in formatted_files:
+                    abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
+                    if os.path.exists(abs_file_path):
+                        subprocess.run(
+                            ["git", "add", file_path],
+                            cwd=self.root_dir,
+                            check=False,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
+            except Exception:
+                pass
+
     def _handle_commit_confirmation(
         self,
         commits: List[Tuple[str, str]],
@@ -821,6 +894,12 @@ class CodeAgent(Agent):
                 stderr=subprocess.DEVNULL,
                 check=True,
             )
+            
+            # 检测变更文件并格式化
+            modified_files = get_diff_file_list()
+            if modified_files:
+                self._format_modified_files(modified_files)
+            
             git_commiter = GitCommitTool()
             git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self, "model_group": getattr(self.model, "model_group", None)})
 
