@@ -21,6 +21,7 @@ from jarvis.jarvis_utils.config import (
     is_save_session_history,
     get_data_dir,
     get_max_input_token_count,
+    get_conversation_turn_threshold,
 )
 from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
 import jarvis.jarvis_utils.globals as G
@@ -40,6 +41,7 @@ class BasePlatform(ABC):
         self._saved = False
         self.model_group: Optional[str] = None
         self._session_history_file: Optional[str] = None
+        self._conversation_turn = 0  # 对话轮次计数器
 
     def __enter__(self) -> Self:
         """进入上下文管理器"""
@@ -64,6 +66,7 @@ class BasePlatform(ABC):
         """重置模型"""
         self.delete_chat()
         self._session_history_file = None
+        self._conversation_turn = 0  # 重置对话轮次计数器
 
     @abstractmethod
     def chat(self, message: str) -> Generator[str, None, None]:
@@ -157,29 +160,31 @@ class BasePlatform(ABC):
             max_tokens = get_max_input_token_count(self.model_group)
             total_tokens = self.get_used_token_count() + get_context_token_count(response)
             
+            threshold = get_conversation_turn_threshold()
             if is_completed:
                 if max_tokens > 0 and progress_bar:
                     panel.subtitle = (
-                        f"[bold green]✓ {current_time} | 对话完成耗时: {duration:.2f}秒 | "
+                        f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
                         f"Token: {progress_bar} "
                         f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
                     )
                 else:
-                    panel.subtitle = f"[bold green]✓ {current_time} | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    panel.subtitle = f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
             else:
                 if max_tokens > 0 and progress_bar:
                     panel.subtitle = (
-                        f"[yellow]{current_time} | 正在回答... (按 Ctrl+C 中断) | "
+                        f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断) | "
                         f"Token: {progress_bar} "
                         f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
                     )
                 else:
-                    panel.subtitle = f"[yellow]{current_time} | 正在回答... (按 Ctrl+C 中断)[/yellow]"
+                    panel.subtitle = f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
         except Exception:
+            threshold = get_conversation_turn_threshold()
             if is_completed:
-                panel.subtitle = f"[bold green]✓ {current_time} | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                panel.subtitle = f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
             else:
-                panel.subtitle = f"[yellow]{current_time} | 正在回答... (按 Ctrl+C 中断)[/yellow]"
+                panel.subtitle = f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
 
     def _chat_with_pretty_output(self, message: str, start_time: float) -> str:
         """使用 pretty output 模式进行聊天
@@ -403,6 +408,8 @@ class BasePlatform(ABC):
         # 处理响应并保存会话历史
         response = self._process_response(response)
         self._append_session_history(message, response)
+        # 增加对话轮次计数
+        self._conversation_turn += 1
         return response
 
     def chat_until_success(self, message: str) -> str:

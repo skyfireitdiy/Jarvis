@@ -898,3 +898,11 @@ def is_enable_memory_organizer() -> bool:
         bool: 是否启用自动记忆整理，默认为False（可通过 GLOBAL_CONFIG_DATA['JARVIS_ENABLE_MEMORY_ORGANIZER'] 配置）
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_MEMORY_ORGANIZER", False) is True
+def get_conversation_turn_threshold() -> int:
+    """
+    获取对话轮次阈值，用于触发总结。
+    
+    返回:
+        int: 对话轮次阈值，默认为30
+    """
+    return int(GLOBAL_CONFIG_DATA.get("JARVIS_CONVERSATION_TURN_THRESHOLD", 30))
