@@ -129,43 +129,7 @@ class GitCommitTool:
 
             try:
                 temp_diff_file_path = None
-                # 生成提交信息
-                model_display_name = model_name or platform.name() if platform else "AI"
-                print(f"ℹ️ 正在使用{model_display_name}生成提交消息...")
-
-                # 准备提示信息
-                custom_prompt = get_git_commit_prompt()
-                base_prompt = (
-                    custom_prompt
-                    if custom_prompt
-                    else """根据代码差异生成提交信息：
-                提交信息应使用中文书写
-# 格式模板
-必须使用以下格式：
-
-<类型>(<范围>): <主题>
-
-[可选] 详细描述变更内容和原因
-
-# 格式规则
-1. 类型: fix(修复bug), feat(新功能), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
-2. 范围表示变更的模块或组件 (例如: auth, database, ui)
-3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
-4. 如有详细描述，使用空行分隔主题和详细描述
-5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
-6. 仅输出提交信息，不要输出其他内容
-"""
-                )
-                base_prompt += f"""
-# 输出格式
-{ot("COMMIT_MESSAGE")}
-commit信息
-{ct("COMMIT_MESSAGE")}
-                """
-
-                # 优先从调用方传入的 agent 获取平台与模型
-                agent_from_args = args.get("agent")
-
+                
                 # Get model_group from args
                 model_group = args.get("model_group")
 
@@ -185,6 +149,7 @@ commit信息
                     model_name = get_normal_model_name(model_group)
                 else:
                     # 如果没有提供 model_group，尝试从传入的 agent 获取
+                    agent_from_args = args.get("agent")
                     if (
                         agent_from_args
                         and hasattr(agent_from_args, "model")
@@ -239,6 +204,40 @@ commit信息
                             platform.model_group = model_group  # type: ignore
                 else:
                     platform = PlatformRegistry().get_normal_platform()
+
+                # 生成提交信息
+                model_display_name = model_name or (platform.name() if platform else "AI")
+                print(f"ℹ️ 正在使用{model_display_name}生成提交消息...")
+
+                # 准备提示信息
+                custom_prompt = get_git_commit_prompt()
+                base_prompt = (
+                    custom_prompt
+                    if custom_prompt
+                    else """根据代码差异生成提交信息：
+                提交信息应使用中文书写
+# 格式模板
+必须使用以下格式：
+
+<类型>(<范围>): <主题>
+
+[可选] 详细描述变更内容和原因
+
+# 格式规则
+1. 类型: fix(修复bug), feat(新功能), docs(文档), style(格式), refactor(重构), test(测试), chore(其他)
+2. 范围表示变更的模块或组件 (例如: auth, database, ui)
+3. 主题行不超过72个字符，不以句号结尾，使用祈使语气
+4. 如有详细描述，使用空行分隔主题和详细描述
+5. 详细描述部分应解释"是什么"和"为什么"，而非"如何"
+6. 仅输出提交信息，不要输出其他内容
+"""
+                )
+                base_prompt += f"""
+# 输出格式
+{ot("COMMIT_MESSAGE")}
+commit信息
+{ct("COMMIT_MESSAGE")}
+                """
 
                 # 跳过模型可用性校验：
                 # 为避免某些平台/代理不支持 get_model_list 接口导致的噪音日志（如 404），
