@@ -41,19 +41,16 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
         end_marker = match.group(4)  # 换行、空白和 |||
         
         # jsonnet 要求结束标记 ||| 必须单独一行且没有缩进（从行首开始）
-        # 如果结束标记前面有空白，需要去除
-        if end_marker.startswith('\n'):
-            # 提取结束标记前的空白
-            end_whitespace = end_marker[1:]  # 去除第一个换行
-            if end_whitespace.startswith(' '):
-                # 去除所有前导空白，只保留换行和 |||
-                end_marker = '\n|||'
+        # 无论原来是什么格式，统一修复为 '\n|||'
+        end_marker = '\n|||'
         
-        # 如果内容为空，直接返回
+
+        # 如果内容为空，返回修复后的结束标记
         if not content.strip():
-            return match.group(0), {}
+            return start_marker + whitespace_after + content + end_marker, {}
         
         # 按行分割内容
+
         lines = content.split('\n')
         
         # 确定缩进级别：
@@ -110,23 +107,23 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
         original_indents = {}  # 键：行内容（去除缩进后），值：原始缩进级别
         has_mixed_indents = False
         
-        # 检查是否有混合缩进（不同行有不同的缩进级别）
+        # 记录所有行的原始缩进信息（无论是否混合缩进，都需要记录以便恢复）
         if lines:
             seen_indents = set()
             for line in lines:
+
                 if line.strip():
                     line_indent = len(line) - len(line.lstrip())
-                    if line_indent > 0:
-                        seen_indents.add(line_indent)
+                    seen_indents.add(line_indent)
                     line_content = line.lstrip()
-                    # 记录原始缩进（如果有）
-                    if line_indent > 0:
-                        original_indents[line_content] = line_indent
+                    # 记录原始缩进（包括0缩进的情况，用特殊值标记）
+                    original_indents[line_content] = line_indent
             
             # 如果有多个不同的缩进级别，说明是混合缩进
             if len(seen_indents) > 1:
                 has_mixed_indents = True
         
+
         # 如果第一行有缩进，但后续行没有，我们也需要记录
         if first_line_has_indent and has_unindented_lines:
             has_mixed_indents = True
@@ -134,26 +131,29 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
             first_line_content = lines[0].lstrip()
             original_indents[first_line_content] = first_line_indent
         
-        # 统一所有行的缩进级别（以满足 jsonnet 的要求）
-        # 但我们会记录原始缩进信息，以便在解析后恢复
+        # jsonnet的text block规则：所有行缩进必须 >= 首行缩进
+        # 因此我们统一所有行为相同的基础缩进，通过恢复逻辑还原原始缩进
+        base_indent = 1  # 统一使用1空格缩进
+
+        # 统一所有行的缩进为基础缩进（满足jsonnet要求）
+
         for i in range(len(lines)):
             line = lines[i]
             if line.strip():  # 只处理非空行
                 line_content = line.lstrip()
-                # 统一使用第一行的缩进级别（如果第一行有缩进）
-                # 或者使用默认的缩进级别
-                lines[i] = ' ' * indent_level + line_content
+                lines[i] = ' ' * base_indent + line_content
+
         
         # 重新组合内容
         fixed_content = '\n'.join(lines)
         
         # 返回修复后的内容和原始缩进信息
-        indent_info = {}
-        if has_mixed_indents and original_indents:
-            indent_info = original_indents
+        # 只要有混合缩进，就返回缩进信息以便恢复
+        indent_info = original_indents if has_mixed_indents else {}
         
         return start_marker + whitespace_after + fixed_content + end_marker, indent_info
     
+
     # 使用 DOTALL 标志，使 . 匹配换行符
     # 收集所有修复后的内容和缩进信息
     all_indent_info = {}
