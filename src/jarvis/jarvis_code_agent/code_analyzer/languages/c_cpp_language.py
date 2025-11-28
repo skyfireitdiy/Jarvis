@@ -28,6 +28,12 @@ C_SYMBOL_QUERY = """
   
 (enum_specifier
   name: (type_identifier) @enum.name)
+
+(preproc_def
+  name: (identifier) @macro.name)
+
+(type_definition
+  declarator: (type_identifier) @typedef.name)
 """
 
 # C++语言查询（包含class_specifier）
@@ -49,6 +55,14 @@ CPP_SYMBOL_QUERY = """
 
 (namespace_definition
   name: (identifier)? @namespace.name)
+
+(preproc_def
+  name: (identifier) @macro.name)
+
+(type_definition
+  declarator: (type_identifier) @typedef.name)
+
+(template_declaration) @template
 """
 
 # --- C/C++ Language Setup ---
@@ -82,6 +96,8 @@ class CSymbolExtractor(TreeSitterExtractor):
             "struct.name": "struct",
             "union.name": "union",
             "enum.name": "enum",
+            "macro.name": "macro",
+            "typedef.name": "typedef",
         }
         symbol_kind = kind_map.get(name)
         if not symbol_kind:
@@ -112,6 +128,9 @@ class CppSymbolExtractor(TreeSitterExtractor):
             "union.name": "union",
             "enum.name": "enum",
             "namespace.name": "namespace",
+            "macro.name": "macro",
+            "typedef.name": "typedef",
+            "template": "template",
         }
         symbol_kind = kind_map.get(name)
         if not symbol_kind:
@@ -120,6 +139,26 @@ class CppSymbolExtractor(TreeSitterExtractor):
         # For anonymous namespaces, use a generated name
         if name == "namespace.name":
             symbol_name = node.text.decode('utf8') if node.text else "<anonymous_namespace>"
+        elif name == "template":
+            # For template declarations, extract the template name or use a generic name
+            # Try to find the function/class name after template
+            template_text = node.text.decode('utf8').strip()
+            # Extract template parameters and the following declaration
+            # This is a simplified extraction - in practice, you might want more sophisticated parsing
+            if 'template' in template_text:
+                # Try to extract the name after template<...>
+                parts = template_text.split('>', 1)
+                if len(parts) > 1:
+                    # Look for function/class name in the second part
+                    match = re.search(r'\b(function|class|struct)\s+(\w+)', parts[1])
+                    if match:
+                        symbol_name = f"template_{match.group(2)}"
+                    else:
+                        symbol_name = "template"
+                else:
+                    symbol_name = "template"
+            else:
+                symbol_name = "template"
         else:
             symbol_name = node.text.decode('utf8')
         

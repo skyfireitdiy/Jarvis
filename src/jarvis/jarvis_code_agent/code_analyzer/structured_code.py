@@ -119,7 +119,7 @@ class StructuredCodeExtractor:
             
             # 过滤符号：返回与请求范围有重叠的所有语法单元（包括边界上的）
             # 重叠条件：symbol.line_start <= end_line AND symbol.line_end >= start_line
-            syntax_kinds = {'function', 'method', 'class', 'struct', 'enum', 'union', 'interface', 'trait', 'impl', 'module', 'attribute', 'const', 'static', 'type', 'extern', 'macro'}
+            syntax_kinds = {'function', 'method', 'class', 'struct', 'enum', 'union', 'interface', 'trait', 'impl', 'module', 'attribute', 'const', 'static', 'type', 'extern', 'macro', 'typedef', 'template', 'namespace'}
             filtered_symbols = [
                 s for s in symbols
                 if s.kind in syntax_kinds
