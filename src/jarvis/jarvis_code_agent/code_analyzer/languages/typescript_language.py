@@ -27,6 +27,12 @@ TS_SYMBOL_QUERY = """
 (function_expression
   name: (identifier) @function.name)
 
+(generator_function_declaration
+  name: (identifier) @generator.name)
+
+(generator_function
+  name: (identifier) @generator.name)
+
 (arrow_function) @arrow.function
 
 (method_definition
@@ -53,6 +59,8 @@ TS_SYMBOL_QUERY = """
 (variable_declaration
   (variable_declarator
     name: (identifier) @variable.name))
+
+(decorator) @decorator
 """
 
 
@@ -74,6 +82,7 @@ class TypeScriptSymbolExtractor(TreeSitterExtractor):
         kind_map = {
             "function.name": "function",
             "arrow.function": "function",
+            "generator.name": "function",
             "method.name": "method",
             "class.name": "class",
             "interface.name": "interface",
@@ -81,6 +90,7 @@ class TypeScriptSymbolExtractor(TreeSitterExtractor):
             "type.name": "type",
             "namespace.name": "namespace",
             "variable.name": "variable",
+            "decorator": "decorator",
         }
         
         symbol_kind = kind_map.get(name)
@@ -90,6 +100,15 @@ class TypeScriptSymbolExtractor(TreeSitterExtractor):
         # For arrow functions without names, use a generated name
         if name == "arrow.function":
             symbol_name = "<anonymous_arrow_function>"
+        elif name == "decorator":
+            # Extract decorator name (e.g., @Component -> Component)
+            decorator_text = node.text.decode('utf8').strip()
+            if decorator_text.startswith('@'):
+                symbol_name = decorator_text[1:].split('(')[0].strip()
+            else:
+                symbol_name = decorator_text.split('(')[0].strip()
+        elif name == "generator.name":
+            symbol_name = node.text.decode('utf8')
         else:
             symbol_name = node.text.decode('utf8')
         
