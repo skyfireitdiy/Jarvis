@@ -149,6 +149,9 @@ class BasePlatform(ABC):
             is_completed: 是否已完成
             duration: 耗时（秒）
         """
+        from datetime import datetime
+        
+        current_time = datetime.now().strftime("%H:%M:%S")
         try:
             usage_percent, percent_color, progress_bar = self._get_token_usage_info(response)
             max_tokens = get_max_input_token_count(self.model_group)
@@ -157,26 +160,26 @@ class BasePlatform(ABC):
             if is_completed:
                 if max_tokens > 0 and progress_bar:
                     panel.subtitle = (
-                        f"[bold green]✓ 对话完成耗时: {duration:.2f}秒 | "
+                        f"[bold green]✓ {current_time} | 对话完成耗时: {duration:.2f}秒 | "
                         f"Token: {progress_bar} "
                         f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
                     )
                 else:
-                    panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    panel.subtitle = f"[bold green]✓ {current_time} | 对话完成耗时: {duration:.2f}秒[/bold green]"
             else:
                 if max_tokens > 0 and progress_bar:
                     panel.subtitle = (
-                        f"[yellow]正在回答... (按 Ctrl+C 中断) | "
+                        f"[yellow]{current_time} | 正在回答... (按 Ctrl+C 中断) | "
                         f"Token: {progress_bar} "
                         f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
                     )
                 else:
-                    panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                    panel.subtitle = f"[yellow]{current_time} | 正在回答... (按 Ctrl+C 中断)[/yellow]"
         except Exception:
             if is_completed:
-                panel.subtitle = f"[bold green]✓ 对话完成耗时: {duration:.2f}秒[/bold green]"
+                panel.subtitle = f"[bold green]✓ {current_time} | 对话完成耗时: {duration:.2f}秒[/bold green]"
             else:
-                panel.subtitle = "[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]"
+                panel.subtitle = f"[yellow]{current_time} | 正在回答... (按 Ctrl+C 中断)[/yellow]"
 
     def _chat_with_pretty_output(self, message: str, start_time: float) -> str:
         """使用 pretty output 模式进行聊天
