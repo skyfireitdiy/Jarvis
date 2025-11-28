@@ -71,7 +71,7 @@ class ReadCodeTool:
     def _extract_syntax_units_with_split(
         self, filepath: str, content: str, start_line: int, end_line: int
     ) -> List[Dict[str, Any]]:
-        """提取语法单元，然后对超过20行的单元再按每20行分割
+        """提取语法单元，然后对超过50行的单元再按每50行分割
         
         Args:
             filepath: 文件路径
@@ -80,7 +80,7 @@ class ReadCodeTool:
             end_line: 结束行号
             
         Returns:
-            语法单元列表，每个单元不超过20行
+            语法单元列表，每个单元不超过50行
         """
         # 先获取语法单元
         syntax_units = self._extract_syntax_units(filepath, content, start_line, end_line)
@@ -91,14 +91,14 @@ class ReadCodeTool:
         result = []
         for unit in syntax_units:
             unit_line_count = unit['end_line'] - unit['start_line'] + 1
-            if unit_line_count > 20:
-                # 如果单元超过20行，按每20行分割
+            if unit_line_count > 50:
+                # 如果单元超过50行，按每50行分割
                 sub_groups = self._extract_line_groups(
-                    content, unit['start_line'], unit['end_line'], group_size=20
+                    content, unit['start_line'], unit['end_line'], group_size=50
                 )
                 result.extend(sub_groups)
             else:
-                # 如果单元不超过20行，直接添加
+                # 如果单元不超过50行，直接添加
                 result.append(unit)
         
         return result
@@ -601,7 +601,7 @@ class ReadCodeTool:
                     else:
                         return get_context_token_count(sample_output)
             else:
-                # 尝试提取语法单元（确保每个单元不超过20行）
+                # 尝试提取语法单元（确保每个单元不超过50行）
                 syntax_units = self._extract_syntax_units_with_split(filepath, content, start_line, end_line)
                 
                 if syntax_units:
@@ -835,7 +835,7 @@ class ReadCodeTool:
                 full_all_units.sort(key=lambda u: u['start_line'])
                 full_structured_units = full_all_units
             else:
-                # 尝试提取整个文件的语法单元（确保每个单元不超过20行）
+                # 尝试提取整个文件的语法单元（确保每个单元不超过50行）
                 full_syntax_units = self._extract_syntax_units_with_split(abs_path, full_content, 1, total_lines)
                 
                 # 检测语言类型
@@ -905,7 +905,7 @@ class ReadCodeTool:
                         all_units.sort(key=lambda u: u['start_line'])
                         structured_units = all_units
                     else:
-                        # 尝试提取语法单元（结构化读取，full_content 已在上面读取，确保每个单元不超过20行）
+                        # 尝试提取语法单元（结构化读取，full_content 已在上面读取，确保每个单元不超过50行）
                         syntax_units = self._extract_syntax_units_with_split(abs_path, full_content, start_line, end_line)
                         
                         if syntax_units:
