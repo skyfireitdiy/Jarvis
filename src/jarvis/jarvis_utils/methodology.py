@@ -219,7 +219,8 @@ def load_methodology(
             if platform and model_name:
                 platform.set_model_name(model_name)
         else:
-            platform = PlatformRegistry().get_normal_platform()
+            # 方法论推荐使用cheap模型以降低成本
+            platform = PlatformRegistry().get_cheap_platform()
 
         if not platform:
             print("❌ 无法创建平台实例")
