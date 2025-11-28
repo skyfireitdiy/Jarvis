@@ -411,3 +411,201 @@ def group_commands_by_tool(commands: List[Tuple[str, str, str]]) -> Dict[str, Li
             grouped[tool_name] = []
         grouped[tool_name].append((file_path, command))
     return grouped
+
+
+# 格式化工具配置（文件扩展名/文件名 -> 格式化工具列表）
+FORMAT_TOOLS = {
+    # Python
+    ".py": ["black", "ruff format"],
+    ".pyw": ["black", "ruff format"],
+    ".pyi": ["black", "ruff format"],
+    ".pyx": ["black", "ruff format"],
+    ".pxd": ["black", "ruff format"],
+    # JavaScript/TypeScript
+    ".js": ["prettier"],
+    ".mjs": ["prettier"],
+    ".cjs": ["prettier"],
+    ".jsx": ["prettier"],
+    ".ts": ["prettier"],
+    ".tsx": ["prettier"],
+    ".cts": ["prettier"],
+    ".mts": ["prettier"],
+    # Rust
+    ".rs": ["rustfmt"],
+    # Go
+    ".go": ["gofmt"],
+    # Java
+    ".java": ["google-java-format"],
+    # C/C++
+    ".c": ["clang-format"],
+    ".cpp": ["clang-format"],
+    ".cc": ["clang-format"],
+    ".cxx": ["clang-format"],
+    ".h": ["clang-format"],
+    ".hpp": ["clang-format"],
+    ".hxx": ["clang-format"],
+    ".inl": ["clang-format"],
+    ".ipp": ["clang-format"],
+    # HTML/CSS
+    ".html": ["prettier"],
+    ".htm": ["prettier"],
+    ".xhtml": ["prettier"],
+    ".css": ["prettier"],
+    ".scss": ["prettier"],
+    ".sass": ["prettier"],
+    ".less": ["prettier"],
+    # JSON/YAML
+    ".json": ["prettier"],
+    ".jsonl": ["prettier"],
+    ".json5": ["prettier"],
+    ".yaml": ["prettier"],
+    ".yml": ["prettier"],
+    # Markdown
+    ".md": ["prettier"],
+    ".markdown": ["prettier"],
+    # SQL
+    ".sql": ["sqlfluff format"],
+    # Shell/Bash
+    ".sh": ["shfmt"],
+    ".bash": ["shfmt"],
+    # XML
+    ".xml": ["xmllint --format"],
+    ".xsd": ["xmllint --format"],
+    ".dtd": ["xmllint --format"],
+}
+
+
+def load_format_tools_config() -> Dict[str, List[str]]:
+    """从yaml文件加载格式化工具配置"""
+    config_path = os.path.join(get_data_dir(), "format_tools.yaml")
+    if not os.path.exists(config_path):
+        return {}
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f) or {}
+        return {k.lower(): v for k, v in config.items()}  # 确保key是小写
+
+
+# 合并默认配置和yaml配置
+FORMAT_TOOLS.update(load_format_tools_config())
+
+
+def get_format_tools(filename: str) -> List[str]:
+    """
+    根据文件扩展名或文件名获取对应的格式化工具列表
+    优先级：完整文件名匹配 > 扩展名匹配
+
+    Args:
+        filename: 文件路径或文件名(如'test.py'或'Makefile')
+
+    Returns:
+        对应的格式化工具列表，如果找不到则返回空列表
+    """
+    filename = os.path.basename(filename)
+    filename_lower = filename.lower()
+    
+    # 优先尝试完整文件名匹配
+    format_tools = FORMAT_TOOLS.get(filename_lower, [])
+    if format_tools:
+        return format_tools
+    
+    # 如果文件名匹配失败，再尝试扩展名匹配
+    ext = os.path.splitext(filename)[1]
+    if ext:
+        return FORMAT_TOOLS.get(ext.lower(), [])
+    
+    return []
+
+
+# 格式化工具命令模板映射
+# 占位符说明：
+# - {file_path}: 单个文件的完整路径
+# - {files}: 多个文件路径，用空格分隔
+# - {file_name}: 文件名（不含路径）
+FORMAT_COMMAND_TEMPLATES: Dict[str, str] = {
+    # Python
+    "black": "black {file_path}",
+    "ruff format": "ruff format {file_path}",
+    # JavaScript/TypeScript
+    "prettier": "prettier --write {file_path}",
+    # Rust
+    "rustfmt": "rustfmt {file_path}",
+    # Go
+    "gofmt": "gofmt -w {file_path}",
+    # Java
+    "google-java-format": "google-java-format -i {file_path}",
+    # C/C++
+    "clang-format": "clang-format -i {file_path}",
+    # SQL
+    "sqlfluff format": "sqlfluff format {file_path}",
+    # Shell/Bash
+    "shfmt": "shfmt -w {file_path}",
+    # XML (xmllint格式化需要特殊处理，使用临时文件)
+    "xmllint --format": "xmllint --format {file_path} > {file_path}.tmp && mv {file_path}.tmp {file_path}",
+}
+
+
+def get_format_command(tool_name: str, file_path: str, project_root: Optional[str] = None) -> Optional[str]:
+    """
+    获取格式化工具的具体命令
+
+    Args:
+        tool_name: 格式化工具名称（如 'black', 'prettier'）
+        file_path: 文件路径（相对或绝对路径）
+        project_root: 项目根目录（可选，用于处理相对路径）
+
+    Returns:
+        命令字符串，如果工具不支持则返回None
+    """
+    template = FORMAT_COMMAND_TEMPLATES.get(tool_name)
+    if not template:
+        return None
+    
+    # 如果是绝对路径，直接使用；否则转换为绝对路径
+    if os.path.isabs(file_path):
+        abs_file_path = file_path
+    elif project_root:
+        abs_file_path = os.path.join(project_root, file_path)
+    else:
+        abs_file_path = os.path.abspath(file_path)
+    
+    # 准备占位符替换字典
+    placeholders = {
+        "file_path": abs_file_path,
+        "file_name": os.path.basename(abs_file_path),
+    }
+    
+    # 替换占位符
+    try:
+        command = template.format(**placeholders)
+    except KeyError:
+        # 如果模板中有未定义的占位符，返回None
+        return None
+    
+    return command
+
+
+def get_format_commands_for_files(
+    files: List[str], 
+    project_root: Optional[str] = None
+) -> List[Tuple[str, str, str]]:
+    """
+    获取多个文件的格式化命令列表
+
+    Args:
+        files: 文件路径列表
+        project_root: 项目根目录（可选）
+
+    Returns:
+        [(tool_name, file_path, command), ...] 格式的命令列表
+    """
+    commands = []
+    
+    for file_path in files:
+        tools = get_format_tools(file_path)
+        for tool_name in tools:
+            command = get_format_command(tool_name, file_path, project_root)
+            if command:
+                commands.append((tool_name, file_path, command))
+    
+    return commands
