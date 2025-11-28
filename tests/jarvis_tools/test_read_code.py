@@ -1493,3 +1493,867 @@ def world():
             if os.path.exists(filepath):
                 os.unlink(filepath)
 
+    def test_cache_restore_various_file_structures(self, tool, mock_agent):
+        """测试不同文件结构在read_code读取后从cache恢复与原文件内容的一致性"""
+        
+        test_cases = [
+            # 测试用例1: 文件末尾有换行符
+            {
+                "name": "文件末尾有换行符",
+                "content": "def hello():\n    print('Hello')\n",
+                "description": "测试文件末尾有换行符的情况"
+            },
+            # 测试用例2: 文件末尾无换行符
+            {
+                "name": "文件末尾无换行符",
+                "content": "def hello():\n    print('Hello')",
+                "description": "测试文件末尾无换行符的情况"
+            },
+            # 测试用例3: 单行文件（有换行符）
+            {
+                "name": "单行文件（有换行符）",
+                "content": "print('Hello')\n",
+                "description": "测试单行文件且末尾有换行符"
+            },
+            # 测试用例4: 单行文件（无换行符）
+            {
+                "name": "单行文件（无换行符）",
+                "content": "print('Hello')",
+                "description": "测试单行文件且末尾无换行符"
+            },
+            # 测试用例5: 空文件
+            {
+                "name": "空文件",
+                "content": "",
+                "description": "测试空文件"
+            },
+            # 测试用例6: 只有空行的文件
+            {
+                "name": "只有空行的文件",
+                "content": "\n\n\n",
+                "description": "测试只有空行的文件"
+            },
+            # 测试用例7: 多块结构（多个函数）
+            {
+                "name": "多块结构（多个函数）",
+                "content": "def func1():\n    pass\n\ndef func2():\n    pass\n\ndef func3():\n    pass\n",
+                "description": "测试包含多个函数的文件"
+            },
+            # 测试用例8: 多块结构（无末尾换行符）
+            {
+                "name": "多块结构（无末尾换行符）",
+                "content": "def func1():\n    pass\n\ndef func2():\n    pass\n\ndef func3():\n    pass",
+                "description": "测试包含多个函数但末尾无换行符的文件"
+            },
+            # 测试用例9: 包含特殊字符
+            {
+                "name": "包含特殊字符",
+                "content": "# 注释：包含中文和特殊字符 !@#$%^&*()\ndef hello():\n    print('测试')\n",
+                "description": "测试包含特殊字符和中文的文件"
+            },
+            # 测试用例10: 大文件（多个语法单元）
+            {
+                "name": "大文件（多个语法单元）",
+                "content": "\n".join([
+                    f"def func{i}():\n    pass"
+                    for i in range(10)
+                ]) + "\n",
+                "description": "测试包含多个语法单元的大文件"
+            },
+            # 测试用例11: 包含导入语句
+            {
+                "name": "包含导入语句",
+                "content": "import os\nimport sys\n\ndef main():\n    pass\n",
+                "description": "测试包含导入语句的文件"
+            },
+            # 测试用例12: 混合结构（类、函数、导入）
+            {
+                "name": "混合结构（类、函数、导入）",
+                "content": "import os\n\nclass MyClass:\n    def method(self):\n        pass\n\ndef standalone():\n    pass\n",
+                "description": "测试包含类、函数、导入的混合结构"
+            },
+            # 测试用例13: 连续空行
+            {
+                "name": "连续空行",
+                "content": "def func1():\n    pass\n\n\n\ndef func2():\n    pass\n",
+                "description": "测试包含连续空行的文件"
+            },
+            # 测试用例14: 文件开头有空行
+            {
+                "name": "文件开头有空行",
+                "content": "\n\ndef hello():\n    print('Hello')\n",
+                "description": "测试文件开头有空行的情况"
+            },
+            # 测试用例15: 文件开头和结尾都有空行
+            {
+                "name": "文件开头和结尾都有空行",
+                "content": "\n\ndef hello():\n    print('Hello')\n\n\n",
+                "description": "测试文件开头和结尾都有空行的情况"
+            },
+        ]
+        
+        for test_case in test_cases:
+            content = test_case["content"]
+            name = test_case["name"]
+            description = test_case["description"]
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+                f.write(content)
+                filepath = f.name
+            
+            try:
+                abs_path = os.path.abspath(filepath)
+                
+                # 步骤1: 读取文件并生成缓存
+                result = tool.execute({
+                    "files": [{"path": filepath}],
+                    "agent": mock_agent
+                })
+                
+                assert result["success"] is True, \
+                    f"测试用例 '{name}' 读取文件失败: {result.get('stderr', '')}"
+                
+                # 步骤2: 获取缓存
+                cache = mock_agent.get_user_data("read_code_cache")
+                
+                # 空文件可能不会被缓存，这是正常行为
+                if not content.strip() and (cache is None or abs_path not in cache):
+                    # 空文件或只有空白字符的文件可能不被缓存，跳过验证
+                    continue
+                
+                assert cache is not None, \
+                    f"测试用例 '{name}' 缓存为空"
+                assert abs_path in cache, \
+                    f"测试用例 '{name}' 缓存中不存在文件路径"
+                
+                cache_info = cache[abs_path]
+                
+                # 步骤3: 从缓存恢复内容
+                restored_content = tool._restore_file_from_cache(cache_info)
+                
+                # 步骤4: 验证恢复的内容与原始内容完全一致
+                assert restored_content == content, \
+                    f"测试用例 '{name}' ({description}) 恢复的内容与原始内容不一致\n" \
+                    f"原始内容长度: {len(content)}, 恢复内容长度: {len(restored_content)}\n" \
+                    f"原始内容 (repr): {repr(content)}\n" \
+                    f"恢复内容 (repr): {repr(restored_content)}\n" \
+                    f"差异位置: {self._find_first_diff(content, restored_content)}"
+                
+                # 步骤5: 验证缓存结构正确
+                assert "id_list" in cache_info, \
+                    f"测试用例 '{name}' 缓存缺少 id_list"
+                assert "blocks" in cache_info, \
+                    f"测试用例 '{name}' 缓存缺少 blocks"
+                
+                id_list = cache_info["id_list"]
+                blocks = cache_info["blocks"]
+                
+                # 验证所有块ID都在blocks中
+                for block_id in id_list:
+                    assert block_id in blocks, \
+                        f"测试用例 '{name}' 块ID {block_id} 不在blocks中"
+                    block = blocks[block_id]
+                    assert "content" in block, \
+                        f"测试用例 '{name}' 块 {block_id} 缺少content字段"
+                    assert isinstance(block["content"], str), \
+                        f"测试用例 '{name}' 块 {block_id} 的content不是字符串"
+                
+            finally:
+                if os.path.exists(filepath):
+                    os.unlink(filepath)
+    
+    def test_cache_restore_preserves_newlines_between_blocks(self, tool, mock_agent):
+        """测试从缓存恢复时保留块之间的换行符（包括多个空行）"""
+        
+        test_cases = [
+            # 测试用例1: 块之间有单个空行
+            {
+                "name": "块之间有单个空行",
+                "content": "def func1():\n    pass\n\ndef func2():\n    pass\n",
+                "description": "测试两个函数之间有一个空行的情况"
+            },
+            # 测试用例2: 块之间有两个空行
+            {
+                "name": "块之间有两个空行",
+                "content": "def func1():\n    pass\n\n\ndef func2():\n    pass\n",
+                "description": "测试两个函数之间有两个空行的情况"
+            },
+            # 测试用例3: 块之间有三个空行
+            {
+                "name": "块之间有三个空行",
+                "content": "def func1():\n    pass\n\n\n\ndef func2():\n    pass\n",
+                "description": "测试两个函数之间有三个空行的情况"
+            },
+            # 测试用例4: 块之间无空行（紧挨着）
+            {
+                "name": "块之间无空行",
+                "content": "def func1():\n    pass\ndef func2():\n    pass\n",
+                "description": "测试两个函数之间没有空行的情况"
+            },
+            # 测试用例5: 多个块，每个之间都有空行
+            {
+                "name": "多个块之间都有空行",
+                "content": "def func1():\n    pass\n\ndef func2():\n    pass\n\ndef func3():\n    pass\n",
+                "description": "测试多个函数之间都有空行的情况"
+            },
+            # 测试用例6: 混合：有些块之间有空行，有些没有
+            {
+                "name": "混合空行情况",
+                "content": "def func1():\n    pass\ndef func2():\n    pass\n\ndef func3():\n    pass\n",
+                "description": "测试混合情况：func1和func2之间无空行，func2和func3之间有空行"
+            },
+            # 测试用例7: 块之间有空行，但文件末尾无换行符
+            {
+                "name": "块之间有空行但文件末尾无换行符",
+                "content": "def func1():\n    pass\n\ndef func2():\n    pass",
+                "description": "测试块之间有空行但文件末尾无换行符的情况"
+            },
+            # 测试用例8: 块之间有多行注释和空行
+            {
+                "name": "块之间有多行注释和空行",
+                "content": "def func1():\n    pass\n\n# 这是注释\n\ndef func2():\n    pass\n",
+                "description": "测试块之间有多行注释和空行的情况"
+            },
+            # 测试用例9: 块之间只有注释，无空行
+            {
+                "name": "块之间只有注释无空行",
+                "content": "def func1():\n    pass\n# 这是注释\ndef func2():\n    pass\n",
+                "description": "测试块之间只有注释没有空行的情况"
+            },
+            # 测试用例10: 块之间有空行，且块内容本身包含换行符
+            {
+                "name": "块之间有空行且块内容包含换行符",
+                "content": "def func1():\n    print('line1')\n    print('line2')\n\ndef func2():\n    print('line1')\n    print('line2')\n",
+                "description": "测试块之间有空行，且每个块内容本身包含多行的情况"
+            },
+            # 测试用例11: 导入语句和函数之间有空行
+            {
+                "name": "导入语句和函数之间有空行",
+                "content": "import os\nimport sys\n\ndef main():\n    pass\n",
+                "description": "测试导入语句和函数定义之间有空行的情况"
+            },
+            # 测试用例12: 类和函数之间有空行
+            {
+                "name": "类和函数之间有空行",
+                "content": "class MyClass:\n    pass\n\ndef standalone():\n    pass\n",
+                "description": "测试类定义和函数定义之间有空行的情况"
+            },
+            # 测试用例13: 块之间有空行，文件开头也有空行
+            {
+                "name": "文件开头和块之间都有空行",
+                "content": "\n\ndef func1():\n    pass\n\ndef func2():\n    pass\n",
+                "description": "测试文件开头有空行，块之间也有空行的情况"
+            },
+            # 测试用例14: 块之间有空行，文件末尾也有空行
+            {
+                "name": "块之间和文件末尾都有空行",
+                "content": "def func1():\n    pass\n\ndef func2():\n    pass\n\n\n",
+                "description": "测试块之间有空行，文件末尾也有空行的情况"
+            },
+            # 测试用例15: 复杂场景：多个块，不同数量的空行
+            {
+                "name": "复杂场景：多个块不同空行数",
+                "content": "def func1():\n    pass\ndef func2():\n    pass\n\ndef func3():\n    pass\n\n\ndef func4():\n    pass\n",
+                "description": "测试多个块，func1和func2之间无空行，func2和func3之间有一个空行，func3和func4之间有两个空行"
+            },
+            # 测试用例16: 块内容末尾本身有换行符，块之间也有空行
+            {
+                "name": "块内容末尾有换行符且块之间有空行",
+                "content": "def func1():\n    print('test')\n    print('test2')\n\n\ndef func2():\n    print('test')\n    print('test2')\n",
+                "description": "测试块内容本身包含多行且末尾有换行符，块之间也有空行的情况"
+            },
+            # 测试用例17: 块之间原本有多个空行，且块内容末尾有换行符
+            {
+                "name": "块之间多个空行且块内容末尾有换行符",
+                "content": "def func1():\n    pass\n\n\n\ndef func2():\n    pass\n",
+                "description": "测试块之间原本有多个空行，且块内容末尾有换行符的情况"
+            },
+            # 测试用例18: 块内容为空字符串（只有换行符）
+            {
+                "name": "块内容为空字符串",
+                "content": "def func1():\n    pass\n\n\ndef func2():\n    pass\n",
+                "description": "测试块之间有空行，且空行本身可能被识别为独立块的情况"
+            },
+            # 测试用例19: 块之间有空行，但块内容以空行结尾
+            {
+                "name": "块内容以空行结尾且块之间有空行",
+                "content": "def func1():\n    pass\n\n\ndef func2():\n    pass\n",
+                "description": "测试块内容以空行结尾，块之间也有空行的情况"
+            },
+            # 测试用例20: 极端情况：块之间原本只有一个换行符（无空行）
+            {
+                "name": "块之间只有一个换行符",
+                "content": "def func1():\n    pass\ndef func2():\n    pass\n",
+                "description": "测试块之间原本只有一个换行符（无空行）的情况"
+            },
+        ]
+        
+        for test_case in test_cases:
+            content = test_case["content"]
+            name = test_case["name"]
+            description = test_case["description"]
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+                f.write(content)
+                filepath = f.name
+            
+            try:
+                abs_path = os.path.abspath(filepath)
+                
+                # 步骤1: 读取文件并生成缓存
+                result = tool.execute({
+                    "files": [{"path": filepath}],
+                    "agent": mock_agent
+                })
+                
+                assert result["success"] is True, \
+                    f"测试用例 '{name}' 读取文件失败: {result.get('stderr', '')}"
+                
+                # 步骤2: 获取缓存
+                cache = mock_agent.get_user_data("read_code_cache")
+                assert cache is not None, \
+                    f"测试用例 '{name}' 缓存为空"
+                assert abs_path in cache, \
+                    f"测试用例 '{name}' 缓存中不存在文件路径"
+                
+                cache_info = cache[abs_path]
+                
+                # 步骤3: 从缓存恢复内容
+                restored_content = tool._restore_file_from_cache(cache_info)
+                
+                # 步骤4: 验证恢复的内容与原始内容完全一致
+                # 特别关注块之间的换行符是否被正确保留
+                assert restored_content == content, \
+                    f"测试用例 '{name}' ({description}) 恢复的内容与原始内容不一致\n" \
+                    f"原始内容长度: {len(content)}, 恢复内容长度: {len(restored_content)}\n" \
+                    f"原始内容 (repr): {repr(content)}\n" \
+                    f"恢复内容 (repr): {repr(restored_content)}\n" \
+                    f"差异位置: {self._find_first_diff(content, restored_content)}\n" \
+                    f"原始内容行数: {len(content.split(chr(10)))}, 恢复内容行数: {len(restored_content.split(chr(10)))}\n" \
+                    f"原始内容换行符数量: {content.count(chr(10))}, 恢复内容换行符数量: {restored_content.count(chr(10))}"
+                
+                # 步骤5: 额外验证：检查块之间的换行符数量
+                # 通过比较原始内容和恢复内容中连续换行符的模式
+                original_newline_patterns = self._extract_newline_patterns(content)
+                restored_newline_patterns = self._extract_newline_patterns(restored_content)
+                
+                assert original_newline_patterns == restored_newline_patterns, \
+                    f"测试用例 '{name}' 换行符模式不一致\n" \
+                    f"原始模式: {original_newline_patterns}\n" \
+                    f"恢复模式: {restored_newline_patterns}"
+                
+            finally:
+                if os.path.exists(filepath):
+                    os.unlink(filepath)
+    
+    def test_cache_restore_large_units_with_split(self, tool, mock_agent):
+        """测试超过20行的语法单元被分割后，从缓存恢复时保留块之间换行符的场景"""
+        
+        test_cases = [
+            # 测试用例1: 单个超过20行的函数（会被分割成多个块）
+            {
+                "name": "单个超过20行的函数",
+                "content": "def large_function():\n" + 
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 31)]) + "\n",
+                "description": "测试单个超过20行的函数被分割成多个块后，恢复时内容一致"
+            },
+            # 测试用例2: 两个超过20行的函数，它们之间有空行
+            {
+                "name": "两个超过20行的函数之间有空行",
+                "content": "def large_function1():\n" + 
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 26)]) + "\n\n" +
+                          "def large_function2():\n" + 
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 26)]) + "\n",
+                "description": "测试两个超过20行的函数，它们之间有空行，每个函数会被分割成多个块"
+            },
+            # 测试用例3: 超过20行的类（会被分割成多个块）
+            {
+                "name": "超过20行的类",
+                "content": "class LargeClass:\n" +
+                          "    def __init__(self):\n" +
+                          "\n".join([f"        self.attr{i} = {i}" for i in range(1, 26)]) + "\n" +
+                          "    \n" +
+                          "    def method1(self):\n" +
+                          "\n".join([f"        print('Method1 line {i}')" for i in range(1, 21)]) + "\n",
+                "description": "测试超过20行的类被分割成多个块后，恢复时内容一致"
+            },
+            # 测试用例4: 混合场景：小函数、大函数、小函数，它们之间有空行
+            {
+                "name": "混合场景：小函数和大函数之间有空行",
+                "content": "def small_func1():\n    pass\n\n" +
+                          "def large_function():\n" + 
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 31)]) + "\n\n" +
+                          "def small_func2():\n    pass\n",
+                "description": "测试小函数和大函数混合，大函数会被分割，它们之间有空行"
+            },
+            # 测试用例5: 多个超过20行的函数，每个之间都有空行
+            {
+                "name": "多个超过20行的函数之间都有空行",
+                "content": "def large_func1():\n" + 
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(1, 26)]) + "\n\n" +
+                          "def large_func2():\n" + 
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(1, 26)]) + "\n\n" +
+                          "def large_func3():\n" + 
+                          "\n".join([f"    print('Func3 line {i}')" for i in range(1, 26)]) + "\n",
+                "description": "测试多个超过20行的函数，每个函数会被分割，它们之间都有空行"
+            },
+            # 测试用例6: 超过20行的函数，函数内部有空行
+            {
+                "name": "超过20行的函数内部有空行",
+                "content": "def large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(11, 21)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(21, 31)]) + "\n",
+                "description": "测试超过20行的函数，函数内部有空行，被分割后恢复时保留所有空行"
+            },
+            # 测试用例7: 超过20行的函数，文件末尾无换行符
+            {
+                "name": "超过20行的函数文件末尾无换行符",
+                "content": "def large_function():\n" + 
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 31)]),
+                "description": "测试超过20行的函数，文件末尾无换行符，被分割后恢复时正确"
+            },
+            # 测试用例8: 超过20行的函数，函数之间有两个空行
+            {
+                "name": "超过20行的函数之间有两个空行",
+                "content": "def large_func1():\n" + 
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(1, 26)]) + "\n\n\n" +
+                          "def large_func2():\n" + 
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(1, 26)]) + "\n",
+                "description": "测试两个超过20行的函数，它们之间有两个空行，每个函数被分割后恢复时保留空行"
+            },
+            # 测试用例9: 超过20行的类方法，方法之间有空行
+            {
+                "name": "超过20行的类方法之间有空行",
+                "content": "class MyClass:\n" +
+                          "    def large_method1(self):\n" +
+                          "\n".join([f"        print('Method1 line {i}')" for i in range(1, 26)]) + "\n\n" +
+                          "    def large_method2(self):\n" +
+                          "\n".join([f"        print('Method2 line {i}')" for i in range(1, 26)]) + "\n",
+                "description": "测试类中超过20行的方法，方法之间有空行，每个方法被分割后恢复时保留空行"
+            },
+            # 测试用例10: 复杂场景：导入、小函数、大函数、类、小函数
+            {
+                "name": "复杂场景：导入和大函数混合",
+                "content": "import os\nimport sys\n\n" +
+                          "def small_func():\n    pass\n\n" +
+                          "def large_function():\n" + 
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 31)]) + "\n\n" +
+                          "class MyClass:\n" +
+                          "    def method(self):\n" +
+                          "\n".join([f"        print('Method line {i}')" for i in range(1, 26)]) + "\n\n" +
+                          "def another_small_func():\n    pass\n",
+                "description": "测试复杂场景：导入、小函数、大函数、类混合，大函数和类方法会被分割"
+            },
+            # 测试用例11: 超过20行的函数，函数开头和结尾都有空行
+            {
+                "name": "超过20行的函数前后都有空行",
+                "content": "\n\ndef large_function():\n" + 
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 31)]) + "\n\n\n",
+                "description": "测试超过20行的函数，函数前后都有空行，被分割后恢复时保留所有空行"
+            },
+            # 测试用例12: 超过20行的函数，函数内部有多个连续空行
+            {
+                "name": "超过20行的函数内部有多个连续空行",
+                "content": "def large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 11)]) + "\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(11, 21)]) + "\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(21, 31)]) + "\n",
+                "description": "测试超过20行的函数，函数内部有多个连续空行，被分割后恢复时保留所有空行"
+            },
+            # 测试用例13: 超过20行的函数，函数之间有注释和空行
+            {
+                "name": "超过20行的函数之间有注释和空行",
+                "content": "def large_func1():\n" + 
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(1, 26)]) + "\n\n" +
+                          "# 这是注释\n" +
+                          "# 多行注释\n\n" +
+                          "def large_func2():\n" + 
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(1, 26)]) + "\n",
+                "description": "测试两个超过20行的函数，它们之间有注释和空行，被分割后恢复时保留注释和空行"
+            },
+            # 测试用例14: 超过20行的函数，函数内部有嵌套结构
+            {
+                "name": "超过20行的函数内部有嵌套结构",
+                "content": "def large_function():\n" +
+                          "    for i in range(10):\n" +
+                          "\n".join([f"        print('Outer loop {i}, inner {j}')" for i in range(10) for j in range(3)]) + "\n" +
+                          "    return True\n",
+                "description": "测试超过20行的函数，函数内部有嵌套循环，被分割后恢复时内容一致"
+            },
+            # 测试用例15: 超过20行的函数，函数之间有多个空行和注释
+            {
+                "name": "超过20行的函数之间有多个空行和注释",
+                "content": "def large_func1():\n" + 
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(1, 26)]) + "\n\n\n" +
+                          "# 第一个函数的结束\n" +
+                          "# 第二个函数的开始\n\n\n" +
+                          "def large_func2():\n" + 
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(1, 26)]) + "\n",
+                "description": "测试两个超过20行的函数，它们之间有多个空行和注释，被分割后恢复时保留所有内容"
+            },
+        ]
+        
+        for test_case in test_cases:
+            content = test_case["content"]
+            name = test_case["name"]
+            description = test_case["description"]
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+                f.write(content)
+                filepath = f.name
+            
+            try:
+                abs_path = os.path.abspath(filepath)
+                
+                # 步骤1: 读取文件并生成缓存
+                result = tool.execute({
+                    "files": [{"path": filepath}],
+                    "agent": mock_agent
+                })
+                
+                assert result["success"] is True, \
+                    f"测试用例 '{name}' 读取文件失败: {result.get('stderr', '')}"
+                
+                # 步骤2: 获取缓存
+                cache = mock_agent.get_user_data("read_code_cache")
+                assert cache is not None, \
+                    f"测试用例 '{name}' 缓存为空"
+                assert abs_path in cache, \
+                    f"测试用例 '{name}' 缓存中不存在文件路径"
+                
+                cache_info = cache[abs_path]
+                
+                # 验证缓存中有多个块（证明大函数被分割了）
+                id_list = cache_info.get("id_list", [])
+                blocks = cache_info.get("blocks", {})
+                
+                # 步骤3: 从缓存恢复内容
+                restored_content = tool._restore_file_from_cache(cache_info)
+                
+                # 步骤4: 验证恢复的内容与原始内容完全一致
+                # 特别关注块之间的换行符是否被正确保留
+                assert restored_content == content, \
+                    f"测试用例 '{name}' ({description}) 恢复的内容与原始内容不一致\n" \
+                    f"原始内容长度: {len(content)}, 恢复内容长度: {len(restored_content)}\n" \
+                    f"原始内容行数: {len(content.split(chr(10)))}, 恢复内容行数: {len(restored_content.split(chr(10)))}\n" \
+                    f"原始内容换行符数量: {content.count(chr(10))}, 恢复内容换行符数量: {restored_content.count(chr(10))}\n" \
+                    f"缓存块数量: {len(id_list)}\n" \
+                    f"差异位置: {self._find_first_diff(content, restored_content)}\n" \
+                    f"原始内容前100字符 (repr): {repr(content[:100])}\n" \
+                    f"恢复内容前100字符 (repr): {repr(restored_content[:100])}\n" \
+                    f"原始内容后100字符 (repr): {repr(content[-100:])}\n" \
+                    f"恢复内容后100字符 (repr): {repr(restored_content[-100:])}"
+                
+                # 步骤5: 验证块之间的换行符模式
+                original_newline_patterns = self._extract_newline_patterns(content)
+                restored_newline_patterns = self._extract_newline_patterns(restored_content)
+                
+                assert original_newline_patterns == restored_newline_patterns, \
+                    f"测试用例 '{name}' 换行符模式不一致\n" \
+                    f"原始模式: {original_newline_patterns[:10]}...\n" \
+                    f"恢复模式: {restored_newline_patterns[:10]}...\n" \
+                    f"缓存块数量: {len(id_list)}"
+                
+                # 步骤6: 验证块内容拼接后的换行符
+                # 检查每个块的内容和块之间的连接
+                restored_by_blocks = []
+                for idx, block_id in enumerate(id_list):
+                    block = blocks.get(block_id)
+                    if block:
+                        block_content = block.get('content', '')
+                        restored_by_blocks.append(block_content)
+                        # 在块之间添加换行符（最后一个块根据 file_ends_with_newline 决定）
+                        is_last = (idx == len(id_list) - 1)
+                        if not is_last:
+                            restored_by_blocks.append('\n')
+                        elif cache_info.get("file_ends_with_newline", False):
+                            restored_by_blocks.append('\n')
+                
+                manual_restored = ''.join(restored_by_blocks)
+                assert manual_restored == content, \
+                    f"测试用例 '{name}' 手动拼接块内容与原始内容不一致\n" \
+                    f"块数量: {len(id_list)}\n" \
+                    f"原始长度: {len(content)}, 手动拼接长度: {len(manual_restored)}"
+                
+            finally:
+                if os.path.exists(filepath):
+                    os.unlink(filepath)
+    
+    def test_cache_restore_very_large_units_with_internal_newlines(self, tool, mock_agent):
+        """测试超过50行的语法单元，且块中间有换行符，被分割后恢复时保留所有换行符"""
+        
+        test_cases = [
+            # 测试用例1: 单个超过50行的函数，函数内部有多个空行
+            {
+                "name": "超过50行的函数内部有多个空行",
+                "content": "def very_large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 16)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(16, 31)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(31, 46)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(46, 61)]) + "\n",
+                "description": "测试超过50行的函数，函数内部有多个空行，会被分割成多个块"
+            },
+            # 测试用例2: 超过50行的函数，函数内部有连续多个空行
+            {
+                "name": "超过50行的函数内部有连续多个空行",
+                "content": "def very_large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 11)]) + "\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(11, 21)]) + "\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(21, 31)]) + "\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(31, 41)]) + "\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(41, 51)]) + "\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(51, 61)]) + "\n",
+                "description": "测试超过50行的函数，函数内部有连续多个空行，会被分割成多个块"
+            },
+            # 测试用例3: 两个超过50行的函数，它们之间有空行，每个函数内部也有空行
+            {
+                "name": "两个超过50行的函数，函数之间和内部都有空行",
+                "content": "def very_large_func1():\n" +
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(1, 16)]) + "\n\n" +
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(16, 31)]) + "\n\n" +
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(31, 46)]) + "\n\n" +
+                          "\n".join([f"    print('Func1 line {i}')" for i in range(46, 61)]) + "\n\n\n" +
+                          "def very_large_func2():\n" +
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(1, 16)]) + "\n\n" +
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(16, 31)]) + "\n\n" +
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(31, 46)]) + "\n\n" +
+                          "\n".join([f"    print('Func2 line {i}')" for i in range(46, 61)]) + "\n",
+                "description": "测试两个超过50行的函数，函数之间有两个空行，每个函数内部也有空行"
+            },
+            # 测试用例4: 超过50行的函数，函数内部有空行和注释
+            {
+                "name": "超过50行的函数内部有空行和注释",
+                "content": "def very_large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "    # 这是第一个注释块\n" +
+                          "    # 多行注释\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(11, 21)]) + "\n\n" +
+                          "    # 这是第二个注释块\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(21, 31)]) + "\n\n" +
+                          "    # 这是第三个注释块\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(31, 41)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(41, 51)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(51, 61)]) + "\n",
+                "description": "测试超过50行的函数，函数内部有空行和注释，会被分割成多个块"
+            },
+            # 测试用例5: 超过50行的类，类方法之间有空行，方法内部也有空行
+            {
+                "name": "超过50行的类，方法之间和内部都有空行",
+                "content": "class VeryLargeClass:\n" +
+                          "    def __init__(self):\n" +
+                          "\n".join([f"        self.attr{i} = {i}" for i in range(1, 16)]) + "\n\n" +
+                          "\n".join([f"        self.attr{i} = {i}" for i in range(16, 31)]) + "\n\n" +
+                          "    def large_method1(self):\n" +
+                          "\n".join([f"        print('Method1 line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "\n".join([f"        print('Method1 line {i}')" for i in range(11, 21)]) + "\n\n" +
+                          "    def large_method2(self):\n" +
+                          "\n".join([f"        print('Method2 line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "\n".join([f"        print('Method2 line {i}')" for i in range(11, 21)]) + "\n",
+                "description": "测试超过50行的类，类方法之间有空行，方法内部也有空行"
+            },
+            # 测试用例6: 超过50行的函数，函数内部有嵌套结构和空行
+            {
+                "name": "超过50行的函数内部有嵌套结构和空行",
+                "content": "def very_large_function():\n" +
+                          "    # 第一部分：循环处理\n" +
+                          "    for i in range(10):\n" +
+                          "\n".join([f"        print(f'Outer {i}, inner {j}')" for i in range(10) for j in range(3)]) + "\n\n" +
+                          "    # 第二部分：条件处理\n" +
+                          "    if True:\n" +
+                          "\n".join([f"        print('Conditional line {i}')" for i in range(1, 16)]) + "\n\n" +
+                          "    # 第三部分：返回处理\n" +
+                          "\n".join([f"    print('Final line {i}')" for i in range(1, 11)]) + "\n",
+                "description": "测试超过50行的函数，函数内部有嵌套循环和条件，且有空行分隔"
+            },
+            # 测试用例7: 超过50行的函数，函数内部有多个连续空行
+            {
+                "name": "超过50行的函数内部有多个连续空行",
+                "content": "def very_large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 11)]) + "\n\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(11, 21)]) + "\n\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(21, 31)]) + "\n\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(31, 41)]) + "\n\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(41, 51)]) + "\n\n\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(51, 61)]) + "\n",
+                "description": "测试超过50行的函数，函数内部有多个连续空行（4个），会被分割成多个块"
+            },
+            # 测试用例8: 超过50行的函数，函数开头和结尾都有空行，内部也有空行
+            {
+                "name": "超过50行的函数前后和内部都有空行",
+                "content": "\n\ndef very_large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 16)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(16, 31)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(31, 46)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(46, 61)]) + "\n\n\n",
+                "description": "测试超过50行的函数，函数前后都有空行，内部也有空行"
+            },
+            # 测试用例9: 超过50行的函数，函数内部有空行，且文件末尾无换行符
+            {
+                "name": "超过50行的函数内部有空行但文件末尾无换行符",
+                "content": "def very_large_function():\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(1, 16)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(16, 31)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(31, 46)]) + "\n\n" +
+                          "\n".join([f"    print('Line {i}')" for i in range(46, 61)]),
+                "description": "测试超过50行的函数，函数内部有空行，但文件末尾无换行符"
+            },
+            # 测试用例10: 超过50行的函数，函数内部有注释块和空行混合
+            {
+                "name": "超过50行的函数内部有注释块和空行混合",
+                "content": "def very_large_function():\n" +
+                          "    # 第一部分：初始化\n" +
+                          "\n".join([f"    print('Init line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "    # 第二部分：处理逻辑\n\n" +
+                          "\n".join([f"    print('Process line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "    # 第三部分：验证逻辑\n\n" +
+                          "\n".join([f"    print('Validate line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "    # 第四部分：清理逻辑\n\n" +
+                          "\n".join([f"    print('Cleanup line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "    # 第五部分：返回处理\n\n" +
+                          "\n".join([f"    print('Return line {i}')" for i in range(1, 11)]) + "\n\n" +
+                          "    return True\n",
+                "description": "测试超过50行的函数，函数内部有多个注释块和空行混合"
+            },
+        ]
+        
+        for test_case in test_cases:
+            content = test_case["content"]
+            name = test_case["name"]
+            description = test_case["description"]
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+                f.write(content)
+                filepath = f.name
+            
+            try:
+                abs_path = os.path.abspath(filepath)
+                
+                # 步骤1: 读取文件并生成缓存
+                result = tool.execute({
+                    "files": [{"path": filepath}],
+                    "agent": mock_agent
+                })
+                
+                assert result["success"] is True, \
+                    f"测试用例 '{name}' 读取文件失败: {result.get('stderr', '')}"
+                
+                # 步骤2: 获取缓存
+                cache = mock_agent.get_user_data("read_code_cache")
+                assert cache is not None, \
+                    f"测试用例 '{name}' 缓存为空"
+                assert abs_path in cache, \
+                    f"测试用例 '{name}' 缓存中不存在文件路径"
+                
+                cache_info = cache[abs_path]
+                
+                # 验证缓存中有多个块（证明大函数被分割了）
+                id_list = cache_info.get("id_list", [])
+                blocks = cache_info.get("blocks", {})
+                
+                # 验证确实被分割成了多个块（超过50行应该至少被分割成3个块）
+                assert len(id_list) >= 3, \
+                    f"测试用例 '{name}' 应该被分割成至少3个块，实际只有 {len(id_list)} 个块"
+                
+                # 步骤3: 从缓存恢复内容
+                restored_content = tool._restore_file_from_cache(cache_info)
+                
+                # 步骤4: 验证恢复的内容与原始内容完全一致
+                # 特别关注块之间的换行符和块内部的换行符是否被正确保留
+                assert restored_content == content, \
+                    f"测试用例 '{name}' ({description}) 恢复的内容与原始内容不一致\n" \
+                    f"原始内容长度: {len(content)}, 恢复内容长度: {len(restored_content)}\n" \
+                    f"原始内容行数: {len(content.split(chr(10)))}, 恢复内容行数: {len(restored_content.split(chr(10)))}\n" \
+                    f"原始内容换行符数量: {content.count(chr(10))}, 恢复内容换行符数量: {restored_content.count(chr(10))}\n" \
+                    f"缓存块数量: {len(id_list)}\n" \
+                    f"块ID列表: {id_list[:10]}...\n" \
+                    f"差异位置: {self._find_first_diff(content, restored_content)}\n" \
+                    f"原始内容前200字符 (repr): {repr(content[:200])}\n" \
+                    f"恢复内容前200字符 (repr): {repr(restored_content[:200])}\n" \
+                    f"原始内容后200字符 (repr): {repr(content[-200:])}\n" \
+                    f"恢复内容后200字符 (repr): {repr(restored_content[-200:])}"
+                
+                # 步骤5: 验证块之间的换行符模式
+                original_newline_patterns = self._extract_newline_patterns(content)
+                restored_newline_patterns = self._extract_newline_patterns(restored_content)
+                
+                assert original_newline_patterns == restored_newline_patterns, \
+                    f"测试用例 '{name}' 换行符模式不一致\n" \
+                    f"原始模式数量: {len(original_newline_patterns)}, 恢复模式数量: {len(restored_newline_patterns)}\n" \
+                    f"原始模式前20个: {original_newline_patterns[:20]}\n" \
+                    f"恢复模式前20个: {restored_newline_patterns[:20]}\n" \
+                    f"缓存块数量: {len(id_list)}"
+                
+                # 步骤6: 验证块内容拼接后的换行符
+                # 检查每个块的内容和块之间的连接
+                restored_by_blocks = []
+                for idx, block_id in enumerate(id_list):
+                    block = blocks.get(block_id)
+                    if block:
+                        block_content = block.get('content', '')
+                        restored_by_blocks.append(block_content)
+                        # 在块之间添加换行符（最后一个块根据 file_ends_with_newline 决定）
+                        is_last = (idx == len(id_list) - 1)
+                        if not is_last:
+                            restored_by_blocks.append('\n')
+                        elif cache_info.get("file_ends_with_newline", False):
+                            restored_by_blocks.append('\n')
+                
+                manual_restored = ''.join(restored_by_blocks)
+                assert manual_restored == content, \
+                    f"测试用例 '{name}' 手动拼接块内容与原始内容不一致\n" \
+                    f"块数量: {len(id_list)}\n" \
+                    f"原始长度: {len(content)}, 手动拼接长度: {len(manual_restored)}\n" \
+                    f"原始换行符数: {content.count(chr(10))}, 手动拼接换行符数: {manual_restored.count(chr(10))}"
+                
+                # 步骤7: 验证每个块的内容本身不包含块之间的分隔换行符
+                # 块内容应该只包含块内部的换行符，块之间的换行符应该由恢复逻辑添加
+                for idx, block_id in enumerate(id_list):
+                    block = blocks.get(block_id)
+                    if block:
+                        block_content = block.get('content', '')
+                        # 验证块内容不为空（除非是特殊情况）
+                        if idx < len(id_list) - 1:  # 非最后一个块
+                            # 非最后一个块的内容不应该以换行符结尾（因为存储时去掉了）
+                            # 但块内容内部可以有换行符
+                            pass  # 这个验证比较复杂，暂时跳过
+                
+            finally:
+                if os.path.exists(filepath):
+                    os.unlink(filepath)
+    
+    def _extract_newline_patterns(self, content: str) -> list:
+        """提取内容中连续换行符的模式（用于验证块之间的空行是否被保留）"""
+        if not content:
+            return []
+        
+        patterns = []
+        lines = content.split('\n')
+        
+        # 统计连续空行的模式
+        consecutive_empty = 0
+        for i, line in enumerate(lines):
+            if line.strip() == '':
+                consecutive_empty += 1
+            else:
+                if consecutive_empty > 0:
+                    patterns.append(('empty', consecutive_empty, i - consecutive_empty))
+                consecutive_empty = 0
+                patterns.append(('content', line, i))
+        
+        # 处理末尾的连续空行
+        if consecutive_empty > 0:
+            patterns.append(('empty', consecutive_empty, len(lines) - consecutive_empty))
+        
+        return patterns
+    
+    def _find_first_diff(self, str1: str, str2: str) -> str:
+        """找到两个字符串的第一个差异位置"""
+        min_len = min(len(str1), len(str2))
+        for i in range(min_len):
+            if str1[i] != str2[i]:
+                return f"位置 {i}: '{repr(str1[i])}' vs '{repr(str2[i])}'"
+        if len(str1) != len(str2):
+            return f"长度不同: {len(str1)} vs {len(str2)}, 第一个差异在位置 {min_len}"
+        return "无差异"
+
