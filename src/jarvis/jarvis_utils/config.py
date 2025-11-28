@@ -903,6 +903,6 @@ def get_conversation_turn_threshold() -> int:
     获取对话轮次阈值，用于触发总结。
     
     返回:
-        int: 对话轮次阈值，默认为30
+        int: 对话轮次阈值，默认为50
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_CONVERSATION_TURN_THRESHOLD", 30))
+    return int(GLOBAL_CONFIG_DATA.get("JARVIS_CONVERSATION_TURN_THRESHOLD", 50))

@@ -1406,8 +1406,8 @@ def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
     changed = _ask_config_int(
         config_data, ask_all,
         "JARVIS_CONVERSATION_TURN_THRESHOLD",
-        "对话轮次阈值（达到此轮次时触发总结，建议30-100）：",
-        30,
+        "对话轮次阈值（达到此轮次时触发总结，建议50-100）：",
+        50,
     ) or changed
     return changed
 
