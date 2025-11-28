@@ -358,46 +358,27 @@ class ReadCodeTool:
                 "file_ends_with_newline": False,  # 无法确定，默认False
             }
         
-        # 收集所有单元的行号范围，用于确定分割点
-        # 关键：只使用行号范围来分割文件，不区分语法单元类型，确保每行只被提取一次
-        ranges = []
+        # 收集所有单元的开始行号作为分割点
+        # 关键：直接使用每个单元的start_line，不合并范围，保留语法单元边界
+        split_points_set = {1}  # 从第1行开始
         for unit in units:
             start_line = unit.get('start_line', 1)
-            end_line = unit.get('end_line', start_line)
-            if start_line > 0 and end_line >= start_line:
-                ranges.append((start_line, end_line))
+            if start_line > 0:
+                split_points_set.add(start_line)
         
-        if not ranges:
-            # 没有有效的行号范围，返回空列表
-            return []
+        if not split_points_set:
+            # 没有有效的分割点，返回空列表
+            return {"id_list": [], "blocks": {}, "file_ends_with_newline": False}
         
-        # 合并重叠的范围，得到连续的行号范围
-        ranges.sort(key=lambda x: (x[0], x[1]))
-        merged_ranges = []
-        for start, end in ranges:
-            if not merged_ranges:
-                merged_ranges.append((start, end))
-            else:
-                last_start, last_end = merged_ranges[-1]
-                # 如果当前范围与上一个范围重叠或相邻，合并它们
-                if start <= last_end + 1:
-                    merged_ranges[-1] = (last_start, max(last_end, end))
-                else:
-                    merged_ranges.append((start, end))
-        
-        # 按照合并后的行号范围，连续分割文件内容
-        # 每个块包含从当前范围的开始到下一个范围的开始之前的所有内容（包括空白行）
+        # 按照每个单元的开始行作为分割点，连续分割文件内容
+        # 每个块包含从当前分割点到下一个分割点之前的所有内容
         # 关键：直接按行号范围从原始内容中提取，确保完美恢复（包括文件末尾的换行符和所有空白行）
         # 使用 split('\n') 分割，然后手动为每行添加换行符（除了最后一行，根据原始文件决定）
         lines = full_content.split('\n')
         result_units = []
         
-        # 确定所有分割点（每个范围的开始行）
-        split_points = [1]  # 从第1行开始
-        for start_line, end_line in merged_ranges:
-            if start_line not in split_points:
-                split_points.append(start_line)
-        split_points.sort()
+        # 排序分割点
+        split_points = sorted(split_points_set)
         split_points.append(len(lines) + 1)  # 文件末尾
         
         # 按照分割点连续分割文件
