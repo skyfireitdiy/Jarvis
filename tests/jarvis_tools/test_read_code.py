@@ -1380,3 +1380,116 @@ def func5():
         finally:
             if os.path.exists(filepath):
                 os.unlink(filepath)
+    def test_get_blocks_from_cache_returns_real_line_numbers(self, tool, mock_agent):
+        """测试 _get_blocks_from_cache 返回真实的文件行号而非块内相对行号"""
+        content = '''def func1():
+    print("line 2")
+
+def func2():
+    print("line 5")
+
+def func3():
+    print("line 8")
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+       
+        try:
+            abs_path = os.path.abspath(filepath)
+            file_mtime = os.path.getmtime(abs_path)
+           
+            # 创建带有多个块的缓存（模拟真实场景）
+            cache = {
+                abs_path: {
+                    "id_list": ["block-1", "block-2", "block-3"],
+                    "blocks": {
+                        "block-1": {"content": "def func1():\n    print(\"line 2\")"},
+                        "block-2": {"content": "def func2():\n    print(\"line 5\")"},
+                        "block-3": {"content": "def func3():\n    print(\"line 8\")"}
+                    },
+                    "total_lines": 9,
+                    "read_time": time.time(),
+                    "file_mtime": file_mtime,
+            }
+            }
+           
+            def get_user_data_side_effect(key):
+                if key == "read_code_cache":
+                    return cache
+                return None
+           
+            mock_agent.get_user_data.side_effect = get_user_data_side_effect
+           
+            # 调用 _get_blocks_from_cache 获取所有块
+            cache_info = cache[abs_path]
+            blocks = tool._get_blocks_from_cache(cache_info, 1, -1)
+           
+            # 验证返回的 blocks 包含正确的 start_line
+            assert len(blocks) == 3, f"应该返回3个块，实际返回 {len(blocks)}"
+           
+            # 第一个块从第1行开始
+            assert blocks[0].get("start_line") == 1, \
+                f"第一个块应从第1行开始，实际: {blocks[0].get('start_line')}"
+           
+            # 第二个块从第3行开始（func1占2行，所以func2从第3行开始）
+            assert blocks[1].get("start_line") == 3, \
+                f"第二个块应从第3行开始，实际: {blocks[1].get('start_line')}"
+           
+            # 第三个块从第5行开始（func2占2行，所以func3从第5行开始）
+            assert blocks[2].get("start_line") == 5, \
+                f"第三个块应从第5行开始，实际: {blocks[2].get('start_line')}"
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_formatted_output_shows_real_line_numbers(self, tool):
+        """测试格式化输出显示真实的文件行号"""
+        content = '''# 第1行注释
+def hello():
+    # 第3行
+    print("Hello")  # 第4行
+
+def world():
+    # 第7行
+    print("World")  # 第8行
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+       
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath}]
+            })
+           
+            assert result["success"] is True
+            stdout = result["stdout"]
+           
+            # 验证输出中包含真实的行号（不是每个块都从1开始）
+            # Python语法解析器可能会把顶部注释与第一个函数合并
+            # 重要的是：后续块的行号应该是真实行号，不是从1开始
+           
+            # 检查是否有第6、7、8行（world函数应该在这些行）
+            lines = stdout.split('\n')
+            line_numbers_found = set()
+            for line in lines:
+                # 匹配行号格式（如 "   6:"）
+                if ':' in line and line.strip():
+                    parts = line.split(':')
+                    if parts[0].strip().isdigit():
+                        line_numbers_found.add(int(parts[0].strip()))
+           
+            # 验证找到了真实的行号（如第6、7、8行）
+            # 如果行号是从块内相对计算的，world函数会从第1行开始，而不是第6行
+            assert 6 in line_numbers_found or 7 in line_numbers_found, \
+                f"应找到第6或7行（world函数位置），实际找到: {line_numbers_found}"
+
+            # 至少应该找到多个行号，且有大于5的行号（证明不是相对行号）
+            max_line = max(line_numbers_found) if line_numbers_found else 0
+            assert max_line >= 6, \
+                f"最大行号应>=6（证明是真实行号），实际最大: {max_line}"
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+

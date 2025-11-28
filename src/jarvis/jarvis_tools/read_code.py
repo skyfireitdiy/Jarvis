@@ -311,6 +311,7 @@ class ReadCodeTool:
                 result.append({
                     "block_id": block_id,
                     "content": block_content,
+                    "start_line": block_start_line,
                 })
             
             # 更新当前行号
@@ -681,7 +682,6 @@ class ReadCodeTool:
         except Exception:
             # 如果获取失败，使用默认值（假设32000 token，2/3是21333）
             return 21333
-
     def _handle_single_file(
         self, filepath: str, start_line: int = 1, end_line: int = -1, agent: Any = None, raw_mode: bool = False
     ) -> Dict[str, Any]:
