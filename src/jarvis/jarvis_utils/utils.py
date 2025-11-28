@@ -2089,6 +2089,23 @@ def is_context_overflow(
     返回:
         bool: 如果内容超出上下文限制返回True
     """
+    # 快速长度预估：如果内容长度明显超过限制，直接返回True，无需精确计算token
+    if content:
+        # 粗略估算：假设平均每个token约4个字符，保守估计使用3.5个字符/token
+        estimated_tokens = len(content) // 3.5
+        
+        # 获取最大token限制
+        max_tokens = get_max_big_content_size(model_group_override)
+        
+        # 如果预估token数超过限制的150%，直接认为超出（避免精确计算）
+        if estimated_tokens > max_tokens * 1.5:
+            return True
+            
+        # 如果预估token数小于限制的50%，直接认为安全
+        if estimated_tokens < max_tokens * 0.5:
+            return False
+    
+    # 只有在预估结果不明确时，才进行精确的token计算
     content_tokens = get_context_token_count(content)
     
     # 优先使用剩余token数量
@@ -2104,8 +2121,6 @@ def is_context_overflow(
     
     # 回退方案：使用输入窗口限制
     return content_tokens > get_max_big_content_size(model_group_override)
-
-
 def get_loc_stats() -> str:
     """使用loc命令获取当前目录的代码统计信息
 
