@@ -35,14 +35,53 @@ class PythonSymbolExtractor(SymbolExtractor):
 
     def _traverse_node(self, node: ast.AST, file_path: str, symbols: List[Symbol], parent_name: Optional[str]):
         if isinstance(node, ast.FunctionDef):
+            # Extract decorators before the function
+            if node.decorator_list:
+                for decorator in node.decorator_list:
+                    if isinstance(decorator, ast.Name):
+                        decorator_symbol = Symbol(
+                            name=decorator.id,
+                            kind='decorator',
+                            file_path=file_path,
+                            line_start=decorator.lineno,
+                            line_end=decorator.lineno,
+                            parent=parent_name,
+                        )
+                        symbols.append(decorator_symbol)
             symbol = self._create_symbol_from_func(node, file_path, parent_name)
             symbols.append(symbol)
             parent_name = node.name
         elif isinstance(node, ast.AsyncFunctionDef):
+            # Extract decorators before the async function
+            if node.decorator_list:
+                for decorator in node.decorator_list:
+                    if isinstance(decorator, ast.Name):
+                        decorator_symbol = Symbol(
+                            name=decorator.id,
+                            kind='decorator',
+                            file_path=file_path,
+                            line_start=decorator.lineno,
+                            line_end=decorator.lineno,
+                            parent=parent_name,
+                        )
+                        symbols.append(decorator_symbol)
             symbol = self._create_symbol_from_func(node, file_path, parent_name, is_async=True)
             symbols.append(symbol)
             parent_name = node.name
         elif isinstance(node, ast.ClassDef):
+            # Extract decorators before the class
+            if node.decorator_list:
+                for decorator in node.decorator_list:
+                    if isinstance(decorator, ast.Name):
+                        decorator_symbol = Symbol(
+                            name=decorator.id,
+                            kind='decorator',
+                            file_path=file_path,
+                            line_start=decorator.lineno,
+                            line_end=decorator.lineno,
+                            parent=parent_name,
+                        )
+                        symbols.append(decorator_symbol)
             symbol = self._create_symbol_from_class(node, file_path, parent_name)
             symbols.append(symbol)
             parent_name = node.name

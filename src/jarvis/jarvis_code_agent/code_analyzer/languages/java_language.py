@@ -39,6 +39,9 @@ JAVA_SYMBOL_QUERY = """
 (field_declaration
   (variable_declarator
     name: (identifier) @field.name))
+
+(constructor_declaration
+  name: (identifier) @constructor.name)
 """
 
 
@@ -64,6 +67,7 @@ class JavaSymbolExtractor(TreeSitterExtractor):
             "enum.name": "enum",
             "annotation.name": "annotation",
             "field.name": "field",
+            "constructor.name": "constructor",
         }
         
         symbol_kind = kind_map.get(name)

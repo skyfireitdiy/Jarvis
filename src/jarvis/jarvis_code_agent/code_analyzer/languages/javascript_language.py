@@ -27,6 +27,12 @@ JS_SYMBOL_QUERY = """
 (function_expression
   name: (identifier) @function.name)
 
+(generator_function_declaration
+  name: (identifier) @generator.name)
+
+(generator_function
+  name: (identifier) @generator.name)
+
 (arrow_function) @arrow.function
 
 (method_definition
@@ -62,6 +68,7 @@ class JavaScriptSymbolExtractor(TreeSitterExtractor):
         kind_map = {
             "function.name": "function",
             "arrow.function": "function",
+            "generator.name": "function",
             "method.name": "method",
             "class.name": "class",
             "variable.name": "variable",
@@ -74,6 +81,9 @@ class JavaScriptSymbolExtractor(TreeSitterExtractor):
         # For arrow functions without names, use a generated name
         if name == "arrow.function":
             symbol_name = "<anonymous_arrow_function>"
+        elif name == "generator.name":
+            # Generator functions are also functions
+            symbol_name = node.text.decode('utf8')
         else:
             symbol_name = node.text.decode('utf8')
         

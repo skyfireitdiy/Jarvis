@@ -30,6 +30,12 @@ GO_SYMBOL_QUERY = """
   (type_spec
     name: (type_identifier) @interface.name
     type: (interface_type)))
+
+(const_declaration) @const
+
+(var_declaration) @var
+
+(struct_type) @struct
 """
 
 # --- Go Language Setup ---
@@ -58,14 +64,38 @@ class GoSymbolExtractor(TreeSitterExtractor):
             "method.name": "method",
             "type.name": "type",
             "interface.name": "interface",
+            "const": "const",
+            "var": "var",
+            "struct": "struct",
         }
         
         symbol_kind = kind_map.get(name)
         if not symbol_kind:
             return None
 
+        # For const/var/struct, extract the first identifier as name
+        if symbol_kind in ("const", "var", "struct"):
+            # Try to find the first identifier in the declaration
+            node_text = node.text.decode('utf8').strip()
+            # Extract first identifier after const/var/struct keyword
+            if symbol_kind == "const":
+                match = re.search(r'const\s+(\w+)', node_text)
+            elif symbol_kind == "var":
+                match = re.search(r'var\s+(\w+)', node_text)
+            else:  # struct
+                # For struct, try to find struct name or use a generic name
+                match = re.search(r'struct\s+(\w+)', node_text)
+            
+            if match:
+                symbol_name = match.group(1)
+            else:
+                # Fallback: use the kind as name
+                symbol_name = symbol_kind
+        else:
+            symbol_name = node.text.decode('utf8')
+
         return Symbol(
-            name=node.text.decode('utf8'),
+            name=symbol_name,
             kind=symbol_kind,
             file_path=file_path,
             line_start=node.start_point[0] + 1,
