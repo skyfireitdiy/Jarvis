@@ -325,7 +325,7 @@ def build_json_and_markdown(
     if output_file and output_file.lower().endswith('.csv'):
         return format_csv_report(report)
     else:
-    return format_markdown_report(report)
+        return format_markdown_report(report)
 
 
 __all__ = [
