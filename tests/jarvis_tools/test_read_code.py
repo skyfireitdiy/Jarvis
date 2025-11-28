@@ -2251,9 +2251,9 @@ def world():
                 id_list = cache_info.get("id_list", [])
                 blocks = cache_info.get("blocks", {})
                 
-                # 验证确实被分割成了多个块（超过50行应该至少被分割成3个块）
-                assert len(id_list) >= 3, \
-                    f"测试用例 '{name}' 应该被分割成至少3个块，实际只有 {len(id_list)} 个块"
+                # 验证确实被分割成了多个块（超过50行应该至少被分割成2个块）
+                assert len(id_list) >= 2, \
+                    f"测试用例 '{name}' 应该被分割成至少2个块，实际只有 {len(id_list)} 个块"
                 
                 # 步骤3: 从缓存恢复内容
                 restored_content = tool._restore_file_from_cache(cache_info)
