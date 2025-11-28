@@ -146,17 +146,17 @@ def get_lint_tools(filename: str) -> List[str]:
     """
     filename = os.path.basename(filename)
     filename_lower = filename.lower()
-    
+
     # 优先尝试完整文件名匹配（例如 docker-compose.yml, .eslintrc, .prettierrc）
     lint_tools = LINT_TOOLS.get(filename_lower, [])
     if lint_tools:
         return lint_tools
-    
+
     # 如果文件名匹配失败，再尝试扩展名匹配
     ext = os.path.splitext(filename)[1]
     if ext:
         return LINT_TOOLS.get(ext.lower(), [])
-    
+
     return []
 
 
@@ -216,23 +216,27 @@ LINT_COMMAND_TEMPLATES: Dict[str, str] = {
 }
 
 
-def find_config_file(config_names: List[str], project_root: Optional[str] = None, file_path: Optional[str] = None) -> Optional[str]:
+def find_config_file(
+    config_names: List[str],
+    project_root: Optional[str] = None,
+    file_path: Optional[str] = None,
+) -> Optional[str]:
     """
     查找配置文件
-    
+
     Args:
         config_names: 配置文件名列表（按优先级排序）
         project_root: 项目根目录
         file_path: 当前文件路径（可选，用于从文件所在目录向上查找）
-    
+
     Returns:
         配置文件的绝对路径，如果未找到则返回None
     """
     search_dirs = []
-    
+
     if project_root:
         search_dirs.append(project_root)
-    
+
     # 如果提供了文件路径，从文件所在目录向上查找
     if file_path:
         if os.path.isabs(file_path):
@@ -241,7 +245,7 @@ def find_config_file(config_names: List[str], project_root: Optional[str] = None
             current_dir = os.path.dirname(os.path.join(project_root, file_path))
         else:
             current_dir = os.path.dirname(os.path.abspath(file_path))
-        
+
         # 向上查找直到项目根目录
         while current_dir:
             if current_dir not in search_dirs:
@@ -252,22 +256,34 @@ def find_config_file(config_names: List[str], project_root: Optional[str] = None
             if parent == current_dir:  # 到达根目录
                 break
             current_dir = parent
-    
+
     # 按优先级查找配置文件
     for config_name in config_names:
         for search_dir in search_dirs:
             config_path = os.path.join(search_dir, config_name)
             if os.path.exists(config_path) and os.path.isfile(config_path):
                 return os.path.abspath(config_path)
-    
+
     return None
 
 
 # 工具配置文件映射（工具名 -> 可能的配置文件名列表）
 TOOL_CONFIG_FILES: Dict[str, List[str]] = {
     "checkstyle": ["checkstyle.xml", ".checkstyle.xml", "checkstyle-config.xml"],
-    "eslint": [".eslintrc.js", ".eslintrc.json", ".eslintrc.yml", ".eslintrc.yaml", ".eslintrc"],
-    "stylelint": [".stylelintrc", ".stylelintrc.json", ".stylelintrc.yml", ".stylelintrc.yaml", "stylelint.config.js"],
+    "eslint": [
+        ".eslintrc.js",
+        ".eslintrc.json",
+        ".eslintrc.yml",
+        ".eslintrc.yaml",
+        ".eslintrc",
+    ],
+    "stylelint": [
+        ".stylelintrc",
+        ".stylelintrc.json",
+        ".stylelintrc.yml",
+        ".stylelintrc.yaml",
+        "stylelint.config.js",
+    ],
     "yamllint": [".yamllint", ".yamllint.yml", ".yamllint.yaml"],
     "markdownlint": [".markdownlint.json", ".markdownlintrc"],
     "rubocop": [".rubocop.yml", ".rubocop.yaml", ".rubocop.toml"],
@@ -280,10 +296,21 @@ TOOL_CONFIG_FILES: Dict[str, List[str]] = {
 REQUIRED_CONFIG_TOOLS = {"checkstyle"}
 
 # 可选配置文件的工具（未找到配置文件时可以使用默认配置）
-OPTIONAL_CONFIG_TOOLS = {"eslint", "stylelint", "yamllint", "markdownlint", "rubocop", "phpstan", "sqlfluff", "hadolint"}
+OPTIONAL_CONFIG_TOOLS = {
+    "eslint",
+    "stylelint",
+    "yamllint",
+    "markdownlint",
+    "rubocop",
+    "phpstan",
+    "sqlfluff",
+    "hadolint",
+}
 
 
-def get_lint_command(tool_name: str, file_path: str, project_root: Optional[str] = None) -> Optional[str]:
+def get_lint_command(
+    tool_name: str, file_path: str, project_root: Optional[str] = None
+) -> Optional[str]:
     """
     获取lint工具的具体命令
 
@@ -298,12 +325,12 @@ def get_lint_command(tool_name: str, file_path: str, project_root: Optional[str]
     template = LINT_COMMAND_TEMPLATES.get(tool_name)
     if not template:
         return None
-    
+
     # 特殊处理：某些工具不需要文件路径（如 cargo clippy）
     if "{file_path}" not in template and "{file_name}" not in template:
         # 不需要文件路径，直接返回模板
         return template
-    
+
     # 如果是绝对路径，直接使用；否则转换为绝对路径
     if os.path.isabs(file_path):
         abs_file_path = file_path
@@ -311,13 +338,13 @@ def get_lint_command(tool_name: str, file_path: str, project_root: Optional[str]
         abs_file_path = os.path.join(project_root, file_path)
     else:
         abs_file_path = os.path.abspath(file_path)
-    
+
     # 准备占位符替换字典
     placeholders = {
         "file_path": abs_file_path,
         "file_name": os.path.basename(abs_file_path),
     }
-    
+
     # 如果模板需要配置文件，尝试查找
     if "{config}" in template:
         config_names = TOOL_CONFIG_FILES.get(tool_name, [])
@@ -344,20 +371,19 @@ def get_lint_command(tool_name: str, file_path: str, project_root: Optional[str]
         else:
             # 工具需要配置但未定义配置文件名，返回None
             return None
-    
+
     # 替换占位符
     try:
         command = template.format(**placeholders)
     except KeyError:
         # 如果模板中有未定义的占位符，返回None
         return None
-    
+
     return command
 
 
 def get_lint_commands_for_files(
-    files: List[str], 
-    project_root: Optional[str] = None
+    files: List[str], project_root: Optional[str] = None
 ) -> List[Tuple[str, str, str]]:
     """
     获取多个文件的lint命令列表
@@ -372,13 +398,17 @@ def get_lint_commands_for_files(
     commands = []
     # 记录不需要文件路径的工具（如 cargo clippy），避免重复执行
     project_level_tools = set()
-    
+
     for file_path in files:
         tools = get_lint_tools(file_path)
         for tool_name in tools:
             # 检查是否是项目级别的工具（不需要文件路径）
             template = LINT_COMMAND_TEMPLATES.get(tool_name)
-            if template and "{file_path}" not in template and "{file_name}" not in template:
+            if (
+                template
+                and "{file_path}" not in template
+                and "{file_name}" not in template
+            ):
                 # 项目级别工具，每个项目只执行一次
                 if tool_name not in project_level_tools:
                     project_level_tools.add(tool_name)
@@ -391,11 +421,13 @@ def get_lint_commands_for_files(
                 command = get_lint_command(tool_name, file_path, project_root)
                 if command:
                     commands.append((tool_name, file_path, command))
-    
+
     return commands
 
 
-def group_commands_by_tool(commands: List[Tuple[str, str, str]]) -> Dict[str, List[Tuple[str, str]]]:
+def group_commands_by_tool(
+    commands: List[Tuple[str, str, str]],
+) -> Dict[str, List[Tuple[str, str]]]:
     """
     按工具分组命令
 
@@ -416,11 +448,11 @@ def group_commands_by_tool(commands: List[Tuple[str, str, str]]) -> Dict[str, Li
 # 格式化工具配置（文件扩展名/文件名 -> 格式化工具列表）
 FORMAT_TOOLS = {
     # Python
-    ".py": ["black", "ruff format"],
-    ".pyw": ["black", "ruff format"],
-    ".pyi": ["black", "ruff format"],
-    ".pyx": ["black", "ruff format"],
-    ".pxd": ["black", "ruff format"],
+    ".py": ["ruff format"],
+    ".pyw": ["ruff format"],
+    ".pyi": ["ruff format"],
+    ".pyx": ["ruff format"],
+    ".pxd": ["ruff format"],
     # JavaScript/TypeScript
     ".js": ["prettier"],
     ".mjs": ["prettier"],
@@ -503,17 +535,17 @@ def get_format_tools(filename: str) -> List[str]:
     """
     filename = os.path.basename(filename)
     filename_lower = filename.lower()
-    
+
     # 优先尝试完整文件名匹配
     format_tools = FORMAT_TOOLS.get(filename_lower, [])
     if format_tools:
         return format_tools
-    
+
     # 如果文件名匹配失败，再尝试扩展名匹配
     ext = os.path.splitext(filename)[1]
     if ext:
         return FORMAT_TOOLS.get(ext.lower(), [])
-    
+
     return []
 
 
@@ -545,7 +577,9 @@ FORMAT_COMMAND_TEMPLATES: Dict[str, str] = {
 }
 
 
-def get_format_command(tool_name: str, file_path: str, project_root: Optional[str] = None) -> Optional[str]:
+def get_format_command(
+    tool_name: str, file_path: str, project_root: Optional[str] = None
+) -> Optional[str]:
     """
     获取格式化工具的具体命令
 
@@ -560,7 +594,7 @@ def get_format_command(tool_name: str, file_path: str, project_root: Optional[st
     template = FORMAT_COMMAND_TEMPLATES.get(tool_name)
     if not template:
         return None
-    
+
     # 如果是绝对路径，直接使用；否则转换为绝对路径
     if os.path.isabs(file_path):
         abs_file_path = file_path
@@ -568,26 +602,25 @@ def get_format_command(tool_name: str, file_path: str, project_root: Optional[st
         abs_file_path = os.path.join(project_root, file_path)
     else:
         abs_file_path = os.path.abspath(file_path)
-    
+
     # 准备占位符替换字典
     placeholders = {
         "file_path": abs_file_path,
         "file_name": os.path.basename(abs_file_path),
     }
-    
+
     # 替换占位符
     try:
         command = template.format(**placeholders)
     except KeyError:
         # 如果模板中有未定义的占位符，返回None
         return None
-    
+
     return command
 
 
 def get_format_commands_for_files(
-    files: List[str], 
-    project_root: Optional[str] = None
+    files: List[str], project_root: Optional[str] = None
 ) -> List[Tuple[str, str, str]]:
     """
     获取多个文件的格式化命令列表
@@ -600,12 +633,12 @@ def get_format_commands_for_files(
         [(tool_name, file_path, command), ...] 格式的命令列表
     """
     commands = []
-    
+
     for file_path in files:
         tools = get_format_tools(file_path)
         for tool_name in tools:
             command = get_format_command(tool_name, file_path, project_root)
             if command:
                 commands.append((tool_name, file_path, command))
-    
+
     return commands
