@@ -39,6 +39,19 @@ RUST_SYMBOL_QUERY = """
 
 (macro_definition
   name: (identifier) @macro.name)
+
+(const_item
+  name: (identifier) @const.name)
+
+(static_item
+  name: (identifier) @static.name)
+
+(type_item
+  name: (type_identifier) @type.name)
+
+(extern_block) @extern
+
+(attribute_item) @attribute
 """
 
 # --- Rust Language Setup ---
@@ -71,14 +84,61 @@ class RustSymbolExtractor(TreeSitterExtractor):
             "enum.name": "enum",
             "union.name": "union",
             "macro.name": "macro",
+            "const.name": "const",
+            "static.name": "static",
+            "type.name": "type",
+            "extern": "extern",
+            "attribute": "attribute",
         }
         
         symbol_kind = kind_map.get(name)
         if not symbol_kind:
             return None
 
+        # 对于 attribute，提取属性内容作为名称
+        if symbol_kind == "attribute":
+            # 提取属性文本
+            attr_text = node.text.decode('utf8').strip()
+            # 移除开头的 # 或 #!
+            if attr_text.startswith('#!'):
+                attr_text = attr_text[2:].strip()
+            elif attr_text.startswith('#'):
+                attr_text = attr_text[1:].strip()
+            # 移除外层的 []
+            if attr_text.startswith('[') and attr_text.endswith(']'):
+                attr_text = attr_text[1:-1].strip()
+            
+            # 提取属性名称（可能是 test, derive(Debug), cfg(test) 等）
+            # 对于简单属性如 #[test]，直接使用 test
+            # 对于复杂属性如 #[derive(Debug)]，使用 derive
+            # 对于路径属性如 #[cfg(test)]，使用 cfg
+            attr_name = attr_text.split('(')[0].split('[')[0].split('=')[0].split(',')[0].strip()
+            
+            # 如果属性名称为空或只包含空白，使用整个属性文本（去掉括号）
+            if not attr_name or attr_name == '':
+                symbol_name = attr_text if attr_text else "attribute"
+            else:
+                # 使用属性名称，但保留完整文本用于显示
+                symbol_name = attr_name
+        elif symbol_kind == "extern":
+            # 对于 extern 块，提取 extern 关键字后的内容作为名称
+            extern_text = node.text.decode('utf8').strip()
+            # 提取 extern "C" 或 extern "Rust" 等
+            if '"' in extern_text:
+                # 提取引号中的内容
+                start = extern_text.find('"')
+                end = extern_text.find('"', start + 1)
+                if end > start:
+                    symbol_name = f"extern_{extern_text[start+1:end]}"
+                else:
+                    symbol_name = "extern"
+            else:
+                symbol_name = "extern"
+        else:
+            symbol_name = node.text.decode('utf8')
+
         return Symbol(
-            name=node.text.decode('utf8'),
+            name=symbol_name,
             kind=symbol_kind,
             file_path=file_path,
             line_start=node.start_point[0] + 1,
