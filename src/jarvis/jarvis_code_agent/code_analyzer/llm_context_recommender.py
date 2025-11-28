@@ -61,7 +61,7 @@ class ContextRecommender:
             
             # 优先根据 model_group 获取配置（确保配置一致性）
             # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
-            # 使用normal平台，上下文推荐是一般任务
+            # 使用cheap平台，上下文推荐可以降低成本
             if model_group:
                 try:
                     platform_name = get_normal_platform_name(model_group)
@@ -74,10 +74,10 @@ class ContextRecommender:
             if platform_name:
                 self.llm_model = registry.create_platform(platform_name)
                 if self.llm_model is None:
-                    # 如果创建失败，使用normal平台
-                    self.llm_model = registry.get_normal_platform()
+                    # 如果创建失败，使用cheap平台
+                    self.llm_model = registry.get_cheap_platform()
             else:
-                self.llm_model = registry.get_normal_platform()
+                self.llm_model = registry.get_cheap_platform()
             
             # 先设置模型组（如果从父Agent获取到），因为 model_group 可能会影响模型名称的解析
             if model_group and self.llm_model:
@@ -119,7 +119,8 @@ class ContextRecommender:
         self._ensure_symbol_table_loaded()
         
         # 1. 使用LLM生成相关符号名
-        print("📝 正在使用LLM生成相关符号名...")
+        model_name = self.llm_model.name() if self.llm_model else "LLM"
+        print(f"📝 正在使用{model_name}生成相关符号名...")
         symbol_names = self._extract_symbol_names_with_llm(user_input)
         if symbol_names:
             print(f"✅ 生成 {len(symbol_names)} 个符号名: {', '.join(symbol_names[:5])}{'...' if len(symbol_names) > 5 else ''}")
@@ -142,12 +143,13 @@ class ContextRecommender:
             
             # 3.2 使用LLM从候选符号中挑选关联度高的条目
             if candidate_symbols_list:
-                print(f"🤖 正在使用LLM从 {len(candidate_symbols_list)} 个候选符号中筛选最相关的条目...")
+                model_name = self.llm_model.name() if self.llm_model else "LLM"
+                print(f"🤖 正在使用{model_name}从 {len(candidate_symbols_list)} 个候选符号中筛选最相关的条目...")
                 selected_symbols = self._select_relevant_symbols_with_llm(
                     user_input, symbol_names, candidate_symbols_list
                 )
                 recommended_symbols.extend(selected_symbols)
-                print(f"✅ LLM筛选完成，选中 {len(selected_symbols)} 个相关符号")
+                print(f"✅ {model_name}筛选完成，选中 {len(selected_symbols)} 个相关符号")
             else:
                 print("⚠️ 没有找到候选符号")
         else:
