@@ -151,7 +151,7 @@ class BasePlatform(ABC):
         """
         from datetime import datetime
         
-        current_time = datetime.now().strftime("%H:%M:%S")
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
             usage_percent, percent_color, progress_bar = self._get_token_usage_info(response)
             max_tokens = get_max_input_token_count(self.model_group)
