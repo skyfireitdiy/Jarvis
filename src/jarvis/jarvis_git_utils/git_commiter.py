@@ -130,7 +130,8 @@ class GitCommitTool:
             try:
                 temp_diff_file_path = None
                 # 生成提交信息
-                print("ℹ️ 正在生成提交消息...")
+                model_display_name = model_name or platform.name() if platform else "AI"
+                print(f"ℹ️ 正在使用{model_display_name}生成提交消息...")
 
                 # 准备提示信息
                 custom_prompt = get_git_commit_prompt()
