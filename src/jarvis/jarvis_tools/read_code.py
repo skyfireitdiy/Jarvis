@@ -980,6 +980,132 @@ class ReadCodeTool:
             print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": f"文件读取失败: {str(e)}"}
 
+    def _handle_merged_ranges(
+        self, filepath: str, requests: List[Dict], agent: Any = None
+    ) -> Dict[str, Any]:
+        """处理同一文件的多个范围请求，合并后去重
+        
+        Args:
+            filepath: 文件绝对路径
+            requests: 范围请求列表，每个请求包含 start_line, end_line, raw_mode
+            agent: Agent实例
+            
+        Returns:
+            Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
+        """
+        try:
+            # 文件存在性检查
+            if not os.path.exists(filepath):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"文件不存在: {filepath}",
+                }
+            
+            # 读取文件内容
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                full_content = f.read()
+            
+            total_lines = len(full_content.split('\n'))
+            if total_lines == 0:
+                return {
+                    "success": True,
+                    "stdout": f"\n🔍 文件: {filepath}\n📄 文件为空 (0行)\n",
+                    "stderr": "",
+                }
+            
+            # 先确保缓存存在（通过读取整个文件建立缓存）
+            first_request = requests[0]
+            self._handle_single_file(
+                filepath, 1, -1, agent, first_request.get("raw_mode", False)
+            )
+            
+            # 获取缓存
+            cache_info = self._get_file_cache(agent, filepath)
+            if not cache_info or not self._is_cache_valid(cache_info, filepath):
+                # 缓存无效，使用合并范围的方式去重
+                # 合并所有范围，计算最小起始行和最大结束行
+                min_start = float('inf')
+                max_end = 0
+                raw_mode = False
+                for req in requests:
+                    start_line = req.get("start_line", 1)
+                    end_line = req.get("end_line", -1)
+                    raw_mode = raw_mode or req.get("raw_mode", False)
+                    
+                    # 处理特殊值
+                    if end_line == -1:
+                        end_line = total_lines
+                    else:
+                        end_line = max(1, min(end_line, total_lines)) if end_line >= 0 else total_lines + end_line + 1
+                    start_line = max(1, min(start_line, total_lines)) if start_line >= 0 else total_lines + start_line + 1
+                    
+                    min_start = min(min_start, start_line)
+                    max_end = max(max_end, end_line)
+                
+                # 用合并后的范围读取一次，自然就去重了
+                result = self._handle_single_file(
+                    filepath, int(min_start), int(max_end), agent, raw_mode
+                )
+                return result
+            
+            # 收集所有范围覆盖的块ID（去重）
+            seen_block_ids = set()
+            merged_blocks = []
+            
+            for req in requests:
+                start_line = req.get("start_line", 1)
+                end_line = req.get("end_line", -1)
+                
+                # 处理特殊值
+                if end_line == -1:
+                    end_line = total_lines
+                else:
+                    end_line = max(1, min(end_line, total_lines)) if end_line >= 0 else total_lines + end_line + 1
+                start_line = max(1, min(start_line, total_lines)) if start_line >= 0 else total_lines + start_line + 1
+                
+                # 从缓存获取对应范围的块
+                cached_blocks = self._get_blocks_from_cache(cache_info, start_line, end_line)
+                for block in cached_blocks:
+                    block_id = block["block_id"]
+                    if block_id not in seen_block_ids:
+                        seen_block_ids.add(block_id)
+                        merged_blocks.append(block)
+            
+            # 按block_id排序（block-1, block-2, ...）
+            def extract_block_num(block):
+                block_id = block.get("block_id", "block-0")
+                try:
+                    return int(block_id.split("-")[1])
+                except (IndexError, ValueError):
+                    return 0
+            
+            merged_blocks.sort(key=extract_block_num)
+            
+            # 转换为units格式并格式化输出
+            structured_units = []
+            for block in merged_blocks:
+                structured_units.append({
+                    "block_id": block["block_id"],
+                    "content": block["content"],
+                })
+            
+            output = self._format_structured_output(filepath, structured_units, total_lines, agent)
+            
+            # 尝试获取上下文信息（使用合并后的范围）
+            all_start_lines = [req.get("start_line", 1) for req in requests]
+            all_end_lines = [req.get("end_line", total_lines) for req in requests]
+            min_start = min(all_start_lines)
+            max_end = max(all_end_lines)
+            context_info = self._get_file_context(filepath, min_start, max_end, agent)
+            if context_info:
+                output += context_info
+            
+            return {"success": True, "stdout": output, "stderr": ""}
+            
+        except Exception as e:
+            return {"success": False, "stdout": "", "stderr": f"合并范围读取失败: {str(e)}"}
+
     def _get_file_context(
         self, filepath: str, start_line: int, end_line: int, agent: Any = None
     ) -> str:
@@ -1219,26 +1345,48 @@ class ReadCodeTool:
                     ),
                 }
 
-            # 第二遍：实际读取文件
+            # 第二遍：实际读取文件（按文件分组，合并同一文件的多个范围请求，避免块重复）
+            # 按文件路径分组
+            from collections import defaultdict
+            file_requests = defaultdict(list)
             for file_info in args["files"]:
                 if not isinstance(file_info, dict) or "path" not in file_info:
                     continue
-
-                result = self._handle_single_file(
-                    file_info["path"].strip(),
-                    file_info.get("start_line", 1),
-                    file_info.get("end_line", -1),
-                    agent,
-                    file_info.get("raw_mode", False),
-                )
-
-                if result["success"]:
-                    all_outputs.append(result["stdout"])
-                    status_lines.append(f"✅ {file_info['path']} 文件读取成功")
+                abs_path = os.path.abspath(file_info["path"].strip())
+                file_requests[abs_path].append(file_info)
+            
+            # 按文件处理，合并同一文件的多个范围请求
+            for abs_path, requests in file_requests.items():
+                if len(requests) == 1:
+                    # 单个范围请求，直接处理
+                    file_info = requests[0]
+                    result = self._handle_single_file(
+                        file_info["path"].strip(),
+                        file_info.get("start_line", 1),
+                        file_info.get("end_line", -1),
+                        agent,
+                        file_info.get("raw_mode", False),
+                    )
+                    if result["success"]:
+                        all_outputs.append(result["stdout"])
+                        status_lines.append(f"✅ {file_info['path']} 文件读取成功")
+                    else:
+                        all_outputs.append(f"❌ {file_info['path']}: {result['stderr']}")
+                        status_lines.append(f"❌ {file_info['path']} 文件读取失败")
+                        overall_success = False
                 else:
-                    all_outputs.append(f"❌ {file_info['path']}: {result['stderr']}")
-                    status_lines.append(f"❌ {file_info['path']} 文件读取失败")
-                    overall_success = False
+                    # 多个范围请求，合并处理并去重
+                    merged_result = self._handle_merged_ranges(
+                        abs_path, requests, agent
+                    )
+                    display_path = requests[0]["path"]
+                    if merged_result["success"]:
+                        all_outputs.append(merged_result["stdout"])
+                        status_lines.append(f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重)")
+                    else:
+                        all_outputs.append(f"❌ {display_path}: {merged_result['stderr']}")
+                        status_lines.append(f"❌ {display_path} 文件读取失败")
+                        overall_success = False
 
             stdout_text = "\n".join(all_outputs)
             # 仅打印每个文件的读取状态，不打印具体内容

@@ -1197,3 +1197,186 @@ Third
             if os.path.exists(filepath):
                 os.unlink(filepath)
 
+
+    def test_merged_ranges_deduplication(self, tool, mock_agent):
+        """测试同一文件多个重叠范围读取时的去重功能"""
+        content = '''class MyClass:
+    def method1(self):
+        print("method1")
+        return 1
+    
+    def method2(self):
+        print("method2")
+        return 2
+    
+    def method3(self):
+        print("method3")
+        return 3
+    
+    def method4(self):
+        print("method4")
+        return 4
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+        try:
+            import re
+            # 测试两个重叠范围
+            result = tool.execute({
+                "files": [
+                    {"path": filepath, "start_line": 1, "end_line": 10},
+                    {"path": filepath, "start_line": 5, "end_line": 15}
+                ],
+                "agent": mock_agent
+            })
+            assert result["success"] is True
+            # 检查没有重复的block_id
+            block_ids = re.findall(r'\[id:(block-\d+)\]', result['stdout'])
+            unique_ids = set(block_ids)
+            assert len(block_ids) == len(unique_ids), f"存在重复block: {block_ids}"
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_merged_ranges_multiple_requests(self, tool, mock_agent):
+        """测试同一文件三个及以上范围请求的去重"""
+        content = '''def func1():
+    pass
+
+def func2():
+    pass
+
+def func3():
+    pass
+
+def func4():
+    pass
+
+def func5():
+    pass
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+        try:
+            import re
+            # 测试三个范围请求
+            result = tool.execute({
+                "files": [
+                    {"path": filepath, "start_line": 1, "end_line": 5},
+                    {"path": filepath, "start_line": 3, "end_line": 10},
+                    {"path": filepath, "start_line": 8, "end_line": 15}
+                ],
+                "agent": mock_agent
+            })
+            assert result["success"] is True
+            # 检查没有重复的block_id
+            block_ids = re.findall(r'\[id:(block-\d+)\]', result['stdout'])
+            unique_ids = set(block_ids)
+            assert len(block_ids) == len(unique_ids), f"存在重复block: {block_ids}"
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_merged_ranges_different_files(self, tool, mock_agent):
+        """测试不同文件的多范围请求不会被错误合并"""
+        content1 = '''def func_a():
+    pass
+'''
+        content2 = '''def func_b():
+    pass
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f1, \
+             tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f2:
+            f1.write(content1)
+            f2.write(content2)
+            filepath1 = f1.name
+            filepath2 = f2.name
+        try:
+            result = tool.execute({
+                "files": [
+                    {"path": filepath1, "start_line": 1, "end_line": -1},
+                    {"path": filepath2, "start_line": 1, "end_line": -1}
+                ],
+                "agent": mock_agent
+            })
+            assert result["success"] is True
+            # 两个文件都应该被读取
+            assert filepath1 in result['stdout'] or "func_a" in result['stdout']
+            assert filepath2 in result['stdout'] or "func_b" in result['stdout']
+        finally:
+            if os.path.exists(filepath1):
+                os.unlink(filepath1)
+            if os.path.exists(filepath2):
+                os.unlink(filepath2)
+
+    def test_merged_ranges_without_agent(self, tool):
+        """测试无agent时多范围请求的去重"""
+        content = '''class Test:
+    def method1(self):
+        pass
+    
+    def method2(self):
+        pass
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+        try:
+            import re
+            # 无agent时也应该去重
+            result = tool.execute({
+                "files": [
+                    {"path": filepath, "start_line": 1, "end_line": 4},
+                    {"path": filepath, "start_line": 3, "end_line": 7}
+                ]
+            })
+            assert result["success"] is True
+            # 检查没有重复的block_id
+            block_ids = re.findall(r'\[id:(block-\d+)\]', result['stdout'])
+            unique_ids = set(block_ids)
+            assert len(block_ids) == len(unique_ids), f"存在重复block: {block_ids}"
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_single_class_file_splits_into_blocks(self, tool):
+        """测试只有一个类的大文件被正确拆分成多个block"""
+        content = '''class MyBigClass:
+    """一个大的测试类"""
+    
+    def __init__(self, name):
+        self.name = name
+        self.data = []
+    
+    def method1(self):
+        """方法1"""
+        print("method1")
+        return 1
+    
+    def method2(self):
+        """方法2"""
+        print("method2")
+        return 2
+    
+    def method3(self):
+        """方法3"""
+        for i in range(10):
+            print(i)
+        return 3
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath}]
+            })
+            assert result["success"] is True
+            # 应该被拆分成多个block（类头部+多个方法）
+            block_count = result['stdout'].count('[id:block-')
+            assert block_count > 1, f"只有一个类的文件应该被拆分成多个block，实际: {block_count}"
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
