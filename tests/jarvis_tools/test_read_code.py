@@ -1493,6 +1493,333 @@ def world():
             if os.path.exists(filepath):
                 os.unlink(filepath)
 
+    def _collect_block_first_lines(self, stdout: str):
+        """辅助函数：从格式化输出中收集每个 block 的首行行号。"""
+        first_lines = set()
+        current_block = None
+        for line in stdout.splitlines():
+            if line.startswith("[id:"):
+                current_block = "seen"
+                continue
+            if current_block and ":" in line:
+                prefix, _ = line.split(":", 1)
+                if prefix.strip().isdigit():
+                    first_lines.add(int(prefix.strip()))
+                    current_block = None
+        return first_lines
+
+    def test_segmentation_python_functions_and_class(self, tool):
+        """端到端测试：Python 语言中函数和类定义出现在块边界行。"""
+        content = '''import os
+
+def func1():
+    print("func1 line 1")
+    print("func1 line 2")
+
+
+class MyClass:
+    def method1(self):
+        print("method1")
+
+
+def func2():
+    return 42
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath, "start_line": 1, "end_line": -1}],
+            })
+            assert result["success"] is True
+            stdout = result["stdout"]
+
+            first_lines = self._collect_block_first_lines(stdout)
+            lines = content.splitlines()
+            expected_starts = set()
+            for idx, line in enumerate(lines, start=1):
+                stripped = line.lstrip()
+                if stripped.startswith("def ") or stripped.startswith("class "):
+                    expected_starts.add(idx)
+
+            # 所有函数/类定义行都应该是某个块的首行
+            assert expected_starts.issubset(first_lines), (
+                f"Python 语法单元的起始行未全部出现在块边界上: 预期 {expected_starts}, 实际 {first_lines}"
+            )
+
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_segmentation_c_struct_enum_union_and_functions(self, tool):
+        """端到端测试：C 语言中的 struct/union/enum/typedef 和函数出现在块边界行。"""
+        content = """#include <stdio.h>
+
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+union Data {
+    int i;
+    float f;
+};
+
+enum Status {
+    OK,
+    ERROR,
+    PENDING
+};
+
+void hello() {
+    printf("Hello\\n");
+}
+
+int add(int a, int b) {
+    return a + b;
+}
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.c', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath, "start_line": 1, "end_line": -1}],
+            })
+            assert result["success"] is True
+            stdout = result["stdout"]
+
+            first_lines = self._collect_block_first_lines(stdout)
+            lines = content.splitlines()
+            expected_starts = set()
+            for idx, line in enumerate(lines, start=1):
+                # 这里更接近实际的符号起始行：类型名/函数名所在行
+                stripped = line.lstrip()
+                if "Point;" in stripped:
+                    expected_starts.add(idx)
+                elif stripped.startswith("union Data"):
+                    expected_starts.add(idx)
+                elif stripped.startswith("enum Status"):
+                    expected_starts.add(idx)
+                elif stripped.startswith("void hello"):
+                    expected_starts.add(idx)
+                elif stripped.startswith("int add"):
+                    expected_starts.add(idx)
+
+            assert expected_starts.issubset(first_lines), (
+                f"C 语法单元的起始行未全部出现在块边界上: 预期 {expected_starts}, 实际 {first_lines}"
+            )
+
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_segmentation_rust_struct_enum_impl_and_functions(self, tool):
+        """端到端测试：Rust 语言中的 struct/enum/impl/fn 出现在块边界行。"""
+        content = """fn main() {
+    println!(\"Hello\");
+}
+
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    fn new(x: i32, y: i32) -> Point {
+        Point { x, y }
+    }
+}
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.rs', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath, "start_line": 1, "end_line": -1}],
+            })
+            assert result["success"] is True
+            stdout = result["stdout"]
+
+            first_lines = self._collect_block_first_lines(stdout)
+            lines = content.splitlines()
+            expected_starts = set()
+            for idx, line in enumerate(lines, start=1):
+                # 只考虑顶层语法单元（无缩进），避免将 impl 内部的 fn new 计入
+                if not line.startswith(" "):  # 顶层
+                    stripped = line.lstrip()
+                    if (stripped.startswith("fn ")
+                            or stripped.startswith("struct ")
+                            or stripped.startswith("impl ")
+                            or stripped.startswith("enum ")):
+                        expected_starts.add(idx)
+
+            assert expected_starts.issubset(first_lines), (
+                f"Rust 语法单元的起始行未全部出现在块边界上: 预期 {expected_starts}, 实际 {first_lines}"
+            )
+
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_segmentation_go_types_interfaces_and_functions(self, tool):
+        """端到端测试：Go 语言中的 type/struct/interface/const/func 出现在块边界行。"""
+        content = """package main
+
+import "fmt"
+
+const (
+    Red = iota
+    Green
+    Blue
+)
+
+type Point struct {
+    x int
+    y int
+}
+
+type Shape interface {
+    Area() float64
+}
+
+func main() {
+    fmt.Println("Hello")
+}
+
+func add(a int, b int) int {
+    return a + b
+}
+"""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.go', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath, "start_line": 1, "end_line": -1}],
+            })
+            assert result["success"] is True
+            stdout = result["stdout"]
+
+            first_lines = self._collect_block_first_lines(stdout)
+            lines = content.splitlines()
+            expected_starts = set()
+            for idx, line in enumerate(lines, start=1):
+                stripped = line.lstrip()
+                if (stripped.startswith("const ")
+                        or stripped.startswith("const(")
+                        or stripped.startswith("type ")
+                        or stripped.startswith("func ")):
+                    expected_starts.add(idx)
+
+            assert expected_starts.issubset(first_lines), (
+                f"Go 语法单元的起始行未全部出现在块边界上: 预期 {expected_starts}, 实际 {first_lines}"
+            )
+
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_execute_preserves_content_and_order_python(self, tool):
+        """端到端测试：Python 语法模式下，代码切分后输出能完整还原原始内容"""
+        content = '''import os
+
+def func1():
+    print("func1 line 1")
+    print("func1 line 2")
+
+
+class MyClass:
+    def method1(self):
+        print("method1")
+
+
+def func2():
+    return 42
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath, "start_line": 1, "end_line": -1}],
+            })
+
+            assert result["success"] is True
+            stdout = result["stdout"]
+
+            # 从带行号的输出中还原出代码内容（忽略头尾说明和分隔线，只看形如 '   3:code' 的行）
+            restored_lines = []
+            for line in stdout.splitlines():
+                if ':' not in line:
+                    continue
+                prefix, code = line.split(':', 1)
+                if prefix.strip().isdigit():
+                    restored_lines.append(code)
+            restored = '\n'.join(restored_lines)
+
+            # 端到端：所有非空代码行的内容与顺序应与原始文件一致（空白行可能在结构化输出中被省略）
+            original_code_lines = [l for l in content.splitlines() if l.strip()]
+            restored_code_lines = [l for l in restored.splitlines() if l.strip()]
+            assert restored_code_lines == original_code_lines, (
+                "read_code 在语法模式下切分/重组后输出的非空代码行与原始文件不一致\n"
+                f"原始非空行数: {len(original_code_lines)}, 还原非空行数: {len(restored_code_lines)}"
+            )
+
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
+    def test_execute_preserves_content_and_order_raw_mode(self, tool):
+        """端到端测试：raw_mode 下按行分组切分后输出能完整还原原始内容"""
+        content = "\n".join(f"line {i}" for i in range(1, 61)) + "\n"
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+
+        try:
+            result = tool.execute({
+                "files": [{"path": filepath, "start_line": 1, "end_line": -1, "raw_mode": True}],
+            })
+
+            assert result["success"] is True
+            stdout = result["stdout"]
+
+            restored_lines = []
+            for line in stdout.splitlines():
+                if ':' not in line:
+                    continue
+                prefix, code = line.split(':', 1)
+                if prefix.strip().isdigit():
+                    restored_lines.append(code)
+            restored = '\n'.join(restored_lines)
+
+            # raw_mode 下应保持所有行内容和顺序一致（末尾是否有换行符不作严格要求）
+            assert restored.rstrip('\n') == content.rstrip('\n'), (
+                "read_code 在 raw_mode 下按行切分/重组后输出的代码内容不等于原始内容（忽略末尾换行差异）\n"
+                f"原始长度: {len(content)}, 还原长度: {len(restored)}"
+            )
+
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
     def test_cache_restore_various_file_structures(self, tool, mock_agent):
         """测试不同文件结构在read_code读取后从cache恢复与原文件内容的一致性"""
         
