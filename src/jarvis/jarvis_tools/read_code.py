@@ -893,12 +893,13 @@ class ReadCodeTool:
                     # 直接从缓存中获取对应范围的blocks
                     cached_blocks = self._get_blocks_from_cache(cache_info, start_line, end_line)
                     if cached_blocks:
-                        # 转换为units格式（用于输出）
+                        # 转换为units格式（用于输出），保留真实的文件起始行号
                         structured_units = []
                         for block in cached_blocks:
                             structured_units.append({
                                 "block_id": block["block_id"],
                                 "content": block["content"],
+                                "start_line": block.get("start_line", 1),
                             })
                         output = self._format_structured_output(abs_path, structured_units, total_lines, agent)
                     else:
@@ -1099,12 +1100,13 @@ class ReadCodeTool:
             
             merged_blocks.sort(key=extract_block_num)
             
-            # 转换为units格式并格式化输出
+            # 转换为units格式并格式化输出（保留真实的文件起始行号）
             structured_units = []
             for block in merged_blocks:
                 structured_units.append({
                     "block_id": block["block_id"],
                     "content": block["content"],
+                    "start_line": block.get("start_line", 1),
                 })
             
             output = self._format_structured_output(filepath, structured_units, total_lines, agent)
