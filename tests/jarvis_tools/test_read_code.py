@@ -1493,6 +1493,51 @@ def world():
             if os.path.exists(filepath):
                 os.unlink(filepath)
 
+    def test_formatted_output_shows_real_line_numbers_with_cache(self, tool, mock_agent):
+        """测试启用缓存（通过agent）时，格式化输出仍然显示真实文件行号。"""
+        content = '''# comment line 1
+def func1():
+    pass
+
+def func2():
+    pass
+'''
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+            f.write(content)
+            filepath = f.name
+
+        try:
+            # 第一次调用，建立缓存
+            result1 = tool.execute({
+                "files": [{"path": filepath}],
+                "agent": mock_agent,
+            })
+            assert result1["success"] is True
+
+            # 第二次调用，命中缓存路径
+            result2 = tool.execute({
+                "files": [{"path": filepath}],
+                "agent": mock_agent,
+            })
+            assert result2["success"] is True
+            stdout = result2["stdout"]
+
+            # 收集输出中的行号
+            lines = stdout.split('\n')
+            nums = set()
+            for line in lines:
+                if ':' in line and line.strip():
+                    prefix, _ = line.split(':', 1)
+                    if prefix.strip().isdigit():
+                        nums.add(int(prefix.strip()))
+
+            # 至少应该包含 func2 所在的真实行号 5
+            assert 5 in nums, f"启用缓存后，应包含 func2 的真实行号 5，实际行号集合: {nums}"
+
+        finally:
+            if os.path.exists(filepath):
+                os.unlink(filepath)
+
     def _collect_block_first_lines(self, stdout: str):
         """辅助函数：从格式化输出中收集每个 block 的首行行号。"""
         first_lines = set()
