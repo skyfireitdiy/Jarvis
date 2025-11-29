@@ -316,8 +316,23 @@ class BasePlatform(ABC):
             live.update(panel)
             # 注意：不要在这里调用 console.print()，因为 Live 退出时会自动打印 panel
 
-        # Live 退出后添加空行分隔
+        # Live 退出后添加空行分隔，并再打印一次完整面板（包含全部响应内容）
         console.print()
+        if response:
+            try:
+                full_text = Text(response, overflow="fold")
+                final_panel = Panel(
+                    full_text,
+                    title=panel.title,
+                    subtitle=panel.subtitle,
+                    border_style=panel.border_style,
+                    box=panel.box,
+                    expand=True,
+                )
+                console.print(final_panel)
+            except Exception:
+                # 如果构造面板失败，退回打印纯文本，避免影响主流程
+                console.print(response)
         return response
 
     def _chat_with_simple_output(self, message: str, start_time: float) -> str:
