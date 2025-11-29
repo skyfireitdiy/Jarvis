@@ -40,15 +40,16 @@ Jarvis 的定位是**个人开发者的高效助理**，旨在将研发流程中
 
 1.  **任务启动**: 在项目根目录，用自然语言向 `jca` (代码助理) 描述需求：`jca "为 'user' 模块增加 'profile' 接口，需要包含用户信息查询和更新功能"`。
 2.  **AI 分析与编码**:
-    *   Jarvis 自动分析代码结构，定位相关文件 (`user/service.py`, `user/controller.py`, `tests/test_user.py`)。
-    *   自动生成新接口的代码、必要的单元测试，并提出修改方案。
+    *   Jarvis 使用 LSP 客户端工具自动分析代码结构，通过符号名称快速定位相关文件 (`user/service.py`, `user/controller.py`, `tests/test_user.py`)。
+    *   使用结构化编辑工具（edit_file）精确修改代码，自动生成新接口的代码、必要的单元测试，并提出修改方案。
+    *   自动检查依赖关系，确保修改不会破坏现有功能。
 3.  **人机协作与迭代**:
     *   你审查 AI 生成的代码，并提出修改意见：`"字段名需要用驼峰式"` 或 `"增加一个输入校验"`。
     *   Jarvis 根据反馈快速迭代，更新代码。
 4.  **自动化提交**:
     *   完成开发后，执行 `jgc` (Git 提交助理)。
     *   Jarvis 自动分析代码变更，生成一条规范的 Git Commit Message (例如: `feat(user): add user profile api with query and update`)。
-> 通过 Jarvis，整个流程从“手动执行”变为了“监督和指导”，开发者可以将精力集中在**架构设计和代码审查**等高价值活动上，而不是繁琐的编码和调试细节。
+> 通过 Jarvis，整个流程从"手动执行"变为了"监督和指导"，开发者可以将精力集中在**架构设计和代码审查**等高价值活动上，而不是繁琐的编码和调试细节。
 
 #### 示例二：用 Jarvis 完善本文档
 
@@ -165,7 +166,7 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 |------|----------|----------|
 | `jarvis` | `jvs` | 通用AI代理，适用于多种任务 |
 | `jarvis-agent` | `ja` | AI代理基础功能，处理会话和任务 |
-| `jarvis-code-agent` | `jca` | 专注于代码分析、修改和生成的代码代理 |
+| `jarvis-code-agent` | `jca` | 专注于代码分析、修改和生成的代码代理，集成 LSP 客户端支持智能符号分析 |
 | `jarvis-code-review` | `jcr` | 智能代码审查工具 |
 | `jarvis-git-commit` | `jgc` | 自动化分析代码变更并生成规范的Git提交信息 |
 | `jarvis-git-squash` | `jgs` | Git提交历史整理工具 |
@@ -177,8 +178,8 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | `jarvis-smart-shell` | `jss` | 实验性的智能Shell功能 |
 | `jarvis-stats` | `jst` | 通用统计模块，支持记录和可视化任意指标数据 |
 | `jarvis-memory-organizer` | `jmo` | 记忆管理工具，支持整理、合并、导入导出记忆 |
-| `jarvis-sec` | `jsec` | 安全分析套件，对代码工程进行安全扫描和分析 |
-| `jarvis-c2rust` | `jc2r` | C→Rust 迁移套件，将 C/C++ 代码迁移到 Rust |
+| `jarvis-sec` | `jsec` | 安全分析套件，结合启发式扫描和 AI 深度验证，支持 C/C++ 和 Rust 语言 |
+| `jarvis-c2rust` | `jc2r` | C→Rust 迁移套件，支持渐进式迁移、断点续跑和智能库替代 |
 
 更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
@@ -191,11 +192,11 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 - **🤖 人机协作**: 支持实时交互，用户可随时介入指导，确保AI行为符合预期。
 - **🔌 高度可扩展**: 支持自定义工具、模型平台和MCP，轻松打造个性化工作流。
 - **🧠 RAG 增强**: 内置RAG功能，可将本地文档作为知识库，实现精准问答。
-
-### 视频演示
-- [使用`jca`为Jarvis快速扩展功能](https://www.bilibili.com/video/BV1TCgLzvE6Q/)
-- [10分钟搭建aarch64容器化Rust开发环境](https://www.bilibili.com/video/BV1K3ghzkEzZ/)
-- [`jarvis-code-agent` 功能演示](https://www.bilibili.com/video/BV1KugbzKE6U/)
+- **💾 记忆系统**: 三层记忆架构（短期、项目长期、全局长期），支持知识持久化和智能检索。
+- **📚 方法论系统**: 将成功经验沉淀为可复用的方法论，支持本地和中心化共享。
+- **🔍 LSP 代码分析**: CodeAgent 集成 LSP 客户端，支持基于符号名称的智能代码分析，无需行列号。
+- **🛡️ 安全分析**: 内置安全扫描套件（jsec），支持启发式扫描和 AI 深度验证。
+- **🦀 代码迁移**: C→Rust 迁移套件（jc2r），支持渐进式迁移和断点续跑。
 
 ---
 
