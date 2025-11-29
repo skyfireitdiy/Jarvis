@@ -71,7 +71,9 @@ class ReadCodeTool:
     def _extract_syntax_units_with_split(
         self, filepath: str, content: str, start_line: int, end_line: int
     ) -> List[Dict[str, Any]]:
-        """提取语法单元，然后对超过50行的单元再按每50行分割
+        """提取语法单元，然后对超过50行的单元进行二级切分：
+        1. 先按连续空白行切分大块
+        2. 如果子块仍然超过50行，再按固定行数（50行一组）切分
         
         Args:
             filepath: 文件路径
@@ -82,7 +84,7 @@ class ReadCodeTool:
         Returns:
             语法单元列表，每个单元不超过50行
         """
-        # 先获取语法单元
+        # 先获取语法单元（仅在支持语法解析的语言中才会返回非空）
         syntax_units = self._extract_syntax_units(filepath, content, start_line, end_line)
         
         if not syntax_units:
@@ -92,11 +94,26 @@ class ReadCodeTool:
         for unit in syntax_units:
             unit_line_count = unit['end_line'] - unit['start_line'] + 1
             if unit_line_count > 50:
-                # 如果单元超过50行，按每50行分割
-                sub_groups = self._extract_line_groups(
-                    content, unit['start_line'], unit['end_line'], group_size=50
+                # 第一步：对大块先按空白行切分（基于 StructuredCodeExtractor）
+                blank_groups = self._extract_blank_line_groups(
+                    content, unit['start_line'], unit['end_line']
                 )
-                result.extend(sub_groups)
+                
+                # 如果按空白行切分失败（例如全部为空白或实现返回空），退回原始大块
+                if not blank_groups:
+                    blank_groups = [unit]
+                
+                for group in blank_groups:
+                    group_line_count = group['end_line'] - group['start_line'] + 1
+                    if group_line_count > 50:
+                        # 第二步：对子块中仍然超过50行的部分，按每50行固定切分
+                        sub_groups = self._extract_line_groups(
+                            content, group['start_line'], group['end_line'], group_size=50
+                        )
+                        result.extend(sub_groups)
+                    else:
+                        # 经过空白行切分得到的中等大小块，直接加入结果
+                        result.append(group)
             else:
                 # 如果单元不超过50行，直接添加
                 result.append(unit)

@@ -1820,6 +1820,95 @@ def func2():
             if os.path.exists(filepath):
                 os.unlink(filepath)
 
+    def test_syntax_units_with_split_prefers_blank_groups_over_fixed_size(self, tool, monkeypatch):
+        """测试：支持语法解析时，大块优先按空白行切分，而不是直接用固定50行分块。"""
+        # 构造一个 60 行的大块，语法单元范围 1-60，其中空白行切分为两个 <=50 行的子块
+        content = "\n".join(f"line {i}" for i in range(1, 61))
+
+        # 1) 语法单元：只有一个大块 1-60
+        def fake_extract_syntax_units(filepath, c, start, end):
+            return [{
+                "id": "unit",
+                "start_line": 1,
+                "end_line": 60,
+                "content": c,
+            }]
+
+        # 2) 空白分组：分成两个子块 1-30 和 31-60，长度都 <=50
+        blank_groups = [
+            {"id": "g1", "start_line": 1, "end_line": 30, "content": "\n".join(f"line {i}" for i in range(1, 31))},
+            {"id": "g2", "start_line": 31, "end_line": 60, "content": "\n".join(f"line {i}" for i in range(31, 61))},
+        ]
+
+        def fake_blank_groups(c, start, end):
+            assert start == 1 and end == 60
+            return blank_groups
+
+        line_groups_called = []
+
+        def fake_line_groups(c, start, end, group_size=20):
+            # 对于这条测试，不希望被调用，因为两个子块都不超过50行
+            line_groups_called.append((start, end, group_size))
+            return []
+
+        monkeypatch.setattr(tool, "_extract_syntax_units", fake_extract_syntax_units)
+        monkeypatch.setattr(tool, "_extract_blank_line_groups", fake_blank_groups)
+        monkeypatch.setattr(tool, "_extract_line_groups", fake_line_groups)
+
+        result = tool._extract_syntax_units_with_split("dummy.py", content, 1, 60)
+
+        # 应该直接使用空白分组结果，不进行固定行数切分
+        assert result == blank_groups
+        assert line_groups_called == []
+
+    def test_syntax_units_with_split_uses_fixed_size_after_blank_groups(self, tool, monkeypatch):
+        """测试：空白分组后仍然 >50 行的子块会再按50行固定分块。"""
+        content = "\n".join(f"line {i}" for i in range(1, 121))  # 120 行
+
+        # 语法单元：一个大块 1-120
+        def fake_extract_syntax_units(filepath, c, start, end):
+            return [{
+                "id": "unit",
+                "start_line": 1,
+                "end_line": 120,
+                "content": c,
+            }]
+
+        # 空白分组：1-40 和 41-120，其中第二块仍然 >50 行
+        blank_groups = [
+            {"id": "g1", "start_line": 1, "end_line": 40, "content": "\n".join(f"line {i}" for i in range(1, 41))},
+            {"id": "g2", "start_line": 41, "end_line": 120, "content": "\n".join(f"line {i}" for i in range(41, 121))},
+        ]
+
+        def fake_blank_groups(c, start, end):
+            assert start == 1 and end == 120
+            return blank_groups
+
+        # 期望：只对第二块 41-120 调用 _extract_line_groups
+        def fake_line_groups(c, start, end, group_size=20):
+            assert start == 41 and end == 120
+            assert group_size == 50
+            # 模拟被切成 2 个子块 41-90, 91-120
+            return [
+                {"id": "sub1", "start_line": 41, "end_line": 90, "content": "\n".join(f"line {i}" for i in range(41, 91))},
+                {"id": "sub2", "start_line": 91, "end_line": 120, "content": "\n".join(f"line {i}" for i in range(91, 121))},
+            ]
+
+        monkeypatch.setattr(tool, "_extract_syntax_units", fake_extract_syntax_units)
+        monkeypatch.setattr(tool, "_extract_blank_line_groups", fake_blank_groups)
+        monkeypatch.setattr(tool, "_extract_line_groups", fake_line_groups)
+
+        result = tool._extract_syntax_units_with_split("dummy.py", content, 1, 120)
+
+        # 结果应为：第一块保持原样 + 第二块被切分后的两个子块
+        assert len(result) == 3
+        assert result[0]["id"] == "g1"
+        assert result[0]["start_line"] == 1 and result[0]["end_line"] == 40
+        assert result[1]["id"] == "sub1"
+        assert result[1]["start_line"] == 41 and result[1]["end_line"] == 90
+        assert result[2]["id"] == "sub2"
+        assert result[2]["start_line"] == 91 and result[2]["end_line"] == 120
+
     def test_cache_restore_various_file_structures(self, tool, mock_agent):
         """测试不同文件结构在read_code读取后从cache恢复与原文件内容的一致性"""
         
