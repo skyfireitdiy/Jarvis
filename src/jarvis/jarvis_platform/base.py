@@ -307,32 +307,18 @@ class BasePlatform(ABC):
                     return response
 
             _flush_buffer()
+            # 在结束前，将面板内容替换为完整响应，确保最后一次渲染的 panel 显示全部内容
+            if response:
+                text_content.plain = response
             # 最后更新 subtitle 和 panel
-            # 注意：使用 Rich 的内置滚动（vertical_overflow="crop"），不需要手动截取内容
             end_time = time.time()
             duration = end_time - start_time
             self._update_panel_subtitle_with_token(panel, response, is_completed=True, duration=duration)
             # 最后更新 panel，Live 上下文退出时会自动打印（transient=False）
             live.update(panel)
             # 注意：不要在这里调用 console.print()，因为 Live 退出时会自动打印 panel
-
-        # Live 退出后添加空行分隔，并再打印一次完整面板（包含全部响应内容）
+        # Live 退出后仅添加空行分隔，不再重复打印 panel，避免内容重复
         console.print()
-        if response:
-            try:
-                full_text = Text(response, overflow="fold")
-                final_panel = Panel(
-                    full_text,
-                    title=panel.title,
-                    subtitle=panel.subtitle,
-                    border_style=panel.border_style,
-                    box=panel.box,
-                    expand=True,
-                )
-                console.print(final_panel)
-            except Exception:
-                # 如果构造面板失败，退回打印纯文本，避免影响主流程
-                console.print(response)
         return response
 
     def _chat_with_simple_output(self, message: str, start_time: float) -> str:
