@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis-ai-assistant"
-version = "0.7.4"
+version = "0.7.5"
 description = "Jarvis: An AI assistant that uses tools to interact with the system"
 readme = "README.md"
 authors = [{ name = "skyfire", email = "skyfireitdiy@hotmail.com" }]
