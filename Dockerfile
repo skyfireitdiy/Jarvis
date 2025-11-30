@@ -65,7 +65,9 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && ln -sf $(/usr/local/bin/uv python find 3.12) /usr/local/bin/python3.12 \
     && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
     && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
-    && python --version
+    && python --version \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /root/.cache/uv 2>/dev/null || true
 
 # 设置 Rust 环境变量（必须在 rustup 操作之前设置）
 ENV PATH="/root/.cargo/bin:$PATH" \
@@ -85,13 +87,19 @@ RUN rustup default stable \
 # 确保默认工具链已设置，然后安装
 RUN rustup default stable \
     && cargo install ripgrep --locked \
-    && rg --version
+    && rg --version \
+    && rm -rf /root/.cargo/registry/cache \
+    && rm -rf /root/.cargo/git \
+    && rm -rf /tmp/*
 
 # 安装 fd
 # 确保默认工具链已设置，然后安装
 RUN rustup default stable \
     && cargo install fd-find --locked \
-    && fd --version
+    && fd --version \
+    && rm -rf /root/.cargo/registry/cache \
+    && rm -rf /root/.cargo/git \
+    && rm -rf /tmp/*
 
 # 安装 fzf
 RUN git clone --depth 1 https://github.com/junegunn/fzf.git /tmp/fzf \
@@ -108,7 +116,12 @@ COPY . /app
 RUN uv venv /app/.venv --python 3.12 \
     && . /app/.venv/bin/activate \
     && uv pip install -e ".[rag,clang19]" \
-    && jarvis --version || echo "Jarvis installed"
+    && jarvis --version || echo "Jarvis installed" \
+    && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
+    && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
+    && find /app/.venv -type f -name "*.pyo" -delete 2>/dev/null || true \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /root/.cache/pip /root/.cache/uv 2>/dev/null || true
 
 # 安装 Python 静态检查、格式化和 LSP 工具
 RUN . /app/.venv/bin/activate \
@@ -116,7 +129,12 @@ RUN . /app/.venv/bin/activate \
     ruff \
     mypy \
     python-lsp-server \
-    && echo "✅ Python 工具安装完成"
+    && echo "✅ Python 工具安装完成" \
+    && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
+    && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
+    && find /app/.venv -type f -name "*.pyo" -delete 2>/dev/null || true \
+    && rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /root/.cache/pip /root/.cache/uv 2>/dev/null || true
 
 # 设置 PATH 环境变量，确保所有工具可用
 # 同时支持 root 用户和非 root 用户
@@ -127,6 +145,18 @@ ENV PATH="/app/.venv/bin:/root/.cargo/bin:/usr/local/bin:$PATH"
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 ARG USER_NAME=jarvis
+
+# 在 chown 之前清理所有临时文件和缓存，释放磁盘空间
+RUN rm -rf /tmp/* /var/tmp/* \
+    && rm -rf /root/.cache/* \
+    && rm -rf /root/.cargo/registry/cache \
+    && rm -rf /root/.cargo/git \
+    && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
+    && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
+    && find /app/.venv -type f -name "*.pyo" -delete 2>/dev/null || true \
+    && find /app -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
+    && find /app -type f -name "*.pyc" -delete 2>/dev/null || true \
+    && find /app -type f -name "*.pyo" -delete 2>/dev/null || true
 
 RUN groupadd -g ${GROUP_ID} ${USER_NAME} || true \
     && useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /usr/bin/fish ${USER_NAME} || true \
