@@ -4,9 +4,9 @@ services:
   jarvis:
     image: ghcr.io/skyfireitdiy/jarvis:latest
     container_name: jarvis
-    # 使用当前用户 ID 和组 ID，防止文件权限问题
-    # 容器内创建的文件将属于当前用户，外部可以直接访问
-    user: "${UID:-1000}:${GID:-1000}"
+    # 使用 jarvis 用户（UID 1000）和当前用户的组 ID，防止文件权限问题
+    # 容器内创建的文件将属于 jarvis 用户，GID 匹配宿主机组以便外部访问
+    user: "1000:${GID:-1000}"
     volumes:
       # 挂载当前目录到容器的工作目录
       - .:/workspace
