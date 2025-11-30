@@ -116,7 +116,7 @@ COPY . /app
 RUN uv venv /app/.venv --python 3.12 \
     && . /app/.venv/bin/activate \
     && uv pip install -e ".[clang19]" \
-    && jarvis --version || echo "Jarvis installed" \
+    && echo "Jarvis installed" \
     && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
     && find /app/.venv -type f -name "*.pyo" -delete 2>/dev/null || true \
@@ -173,21 +173,23 @@ SHELL ["/usr/bin/fish", "-c"]
 # 创建 fish 配置目录并集成 smartshell，同时配置自动激活虚拟环境
 # 为 root 用户配置（默认情况）
 RUN mkdir -p /root/.config/fish; \
-    and /app/.venv/bin/jss install --shell fish; \
+    and env JARVIS_NON_INTERACTIVE=true /app/.venv/bin/jss install --shell fish 2>/dev/null; \
     or echo "JSS install completed"; \
     and echo "# 自动激活 Jarvis 虚拟环境" >> /root/.config/fish/config.fish; \
     and echo "source /app/.venv/bin/activate.fish" >> /root/.config/fish/config.fish; \
     and echo "✅ Fish shell、smartshell 集成和虚拟环境自动激活配置完成"
 
 # 为非 root 用户配置（docker-compose 使用）
-# 使用 bash 执行（因为 fish 的 if 语法不同）
-RUN /bin/bash -c "if [ -d /home/${USER_NAME} ]; then \
+# 临时切换到 bash shell 执行（因为 fish 的 if 语法不同，且需要避免变量解析问题）
+SHELL ["/bin/bash", "-c"]
+RUN if [ -d /home/${USER_NAME} ]; then \
     . /app/.venv/bin/activate && \
-    /app/.venv/bin/jss install --shell fish || echo 'JSS install completed' && \
+    env JARVIS_NON_INTERACTIVE=true /app/.venv/bin/jss install --shell fish 2>/dev/null || echo 'JSS install completed' && \
     echo '# 自动激活 Jarvis 虚拟环境' >> /home/${USER_NAME}/.config/fish/config.fish && \
     echo 'source /app/.venv/bin/activate.fish' >> /home/${USER_NAME}/.config/fish/config.fish && \
     chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME}/.config; \
-    fi"
+    fi
+SHELL ["/usr/bin/fish", "-c"]
 
 # 验证安装的工具
 RUN echo "=== 验证工具安装 ==="; \
