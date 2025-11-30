@@ -53,3 +53,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Make package public
+        run: |
+          # 尝试作为个人账户
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ env.GHCR_ACCESS_TOKEN }}" \
+            https://api.github.com/user/packages/container/jarvis \
+            -d '{"visibility":"public"}')
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          
+          # 如果个人账户失败（404），尝试作为组织
+          if [ "$HTTP_CODE" = "404" ]; then
+            echo "尝试作为组织账户..."
+            curl -X PATCH \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${{ env.GHCR_ACCESS_TOKEN }}" \
+              https://api.github.com/orgs/${{ env.GHCR_USERNAME }}/packages/container/jarvis \
+              -d '{"visibility":"public"}'
+          elif [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
+            echo "✅ 包已设置为公开"
+          else
+            echo "⚠️ 设置包为公开时返回状态码: $HTTP_CODE"
+            echo "$RESPONSE" | head -n-1
+          fi
+
