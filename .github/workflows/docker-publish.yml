@@ -21,22 +21,34 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Set registry token
+      - name: Set registry credentials
         id: registry
         run: |
           if [ -n "${{ secrets.GHCR_ACCESS_TOKEN }}" ]; then
             echo "token=${{ secrets.GHCR_ACCESS_TOKEN }}" >> $GITHUB_OUTPUT
             echo "使用自定义 GHCR_ACCESS_TOKEN"
+            echo "⚠️ 确保使用的是 Classic Personal Access Token，而不是 Fine-grained Token"
+            # 使用 GHCR_USERNAME，如果不存在则使用 repository_owner
+            if [ -n "${{ secrets.GHCR_USERNAME }}" ]; then
+              echo "username=${{ secrets.GHCR_USERNAME }}" >> $GITHUB_OUTPUT
+              echo "使用自定义 GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}"
+            else
+              echo "username=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
+              echo "使用 repository_owner: ${{ github.repository_owner }}"
+            fi
           else
             echo "token=${{ github.token }}" >> $GITHUB_OUTPUT
+            echo "username=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
             echo "使用 GITHUB_TOKEN"
           fi
+          echo "Repository owner: ${{ github.repository_owner }}"
+          echo "Actor: ${{ github.actor }}"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/jarvis
+          images: ghcr.io/${{ steps.registry.outputs.username }}/jarvis
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -47,7 +59,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          # 使用配置的 GHCR_USERNAME，如果不存在则使用 repository_owner
+          username: ${{ steps.registry.outputs.username }}
           password: ${{ steps.registry.outputs.token }}
           logout: false
 
@@ -64,9 +77,9 @@ jobs:
 
       - name: Make package public
         run: |
-          # 使用与登录相同的 token
+          # 使用与登录相同的 token 和用户名
           TOKEN="${{ steps.registry.outputs.token }}"
-          USERNAME="${{ github.repository_owner }}"
+          USERNAME="${{ steps.registry.outputs.username }}"
           echo "用户名: $USERNAME"
           
           # 尝试作为个人账户
