@@ -107,12 +107,12 @@ COPY . /app
 # 同时安装 RAG 功能和 clang 依赖（用于 C/C++ 代码分析）
 RUN uv venv /app/.venv --python 3.12 \
     && . /app/.venv/bin/activate \
-    && uv pip install --system -e ".[rag,clang19]" \
+    && uv pip install -e ".[rag,clang19]" \
     && jarvis --version || echo "Jarvis installed"
 
 # 安装 Python 静态检查、格式化和 LSP 工具
 RUN . /app/.venv/bin/activate \
-    && uv pip install --system \
+    && uv pip install \
     ruff \
     mypy \
     python-lsp-server \
