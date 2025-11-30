@@ -195,39 +195,53 @@ docker pull ghcr.io/skyfireitdiy/jarvis:v1.0.0
 
 **使用 Docker Compose（推荐）：**
 
-```bash
-# 1. 设置用户 ID 和组 ID（Linux/macOS，防止文件权限问题）
-export UID=$(id -u)
-export GID=$(id -g)
+Docker Compose 配置默认使用**非 root 用户**（当前用户的 UID/GID），避免文件权限问题：
 
-# 2. 构建并运行容器
+```bash
+# 构建并运行容器
 docker-compose build
 docker-compose run --rm jarvis
 ```
 
+> **说明**:
+>
+> * 容器会自动使用当前用户的 UID/GID 运行（Linux/macOS 自动获取，Windows 需要设置 `UID` 和 `GID` 环境变量）
+> * 容器内创建的文件将属于当前用户，外部可以直接访问，无需调整权限
+> * 配置文件（`.jarvis` 和 `.gitconfig`）会自动挂载到容器内用户的主目录
+
 **直接使用 Docker 命令：**
 
+**使用非 root 用户（推荐，避免权限问题）：**
+
 ```bash
-# 基本运行（使用 root 用户）
-docker run -it --rm ghcr.io/skyfireitdiy/jarvis:latest
-
-# 挂载当前目录到容器（使用 root 用户）
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/root/.jarvis \
-  -w /workspace \
-  ghcr.io/skyfireitdiy/jarvis:latest
-
-# 推荐：使用非 root 用户（避免文件权限问题）
+# 使用当前用户运行（推荐）
 docker run -it --rm \
   -u $(id -u):$(id -g) \
   -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/home/jarvis/.jarvis \
+  -v $HOME/.jarvis:/home/$(whoami)/.jarvis \
+  -v $HOME/.gitconfig:/home/$(whoami)/.gitconfig:ro \
   -w /workspace \
-  -e USER=jarvis \
-  -e HOME=/home/jarvis \
+  -e USER=$(whoami) \
+  -e HOME=/home/$(whoami) \
   ghcr.io/skyfireitdiy/jarvis:latest
 ```
+
+**使用 root 用户（简单但不推荐，可能产生权限问题）：**
+
+```bash
+# 基本运行（root 用户）
+docker run -it --rm ghcr.io/skyfireitdiy/jarvis:latest
+
+# 挂载当前目录到容器（root 用户）
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v $HOME/.jarvis:/root/.jarvis \
+  -v $HOME/.gitconfig:/root/.gitconfig:ro \
+  -w /workspace \
+  ghcr.io/skyfireitdiy/jarvis:latest
+```
+
+> **注意**：使用 root 用户时，容器内创建的文件将属于 root，在宿主机上可能需要使用 `sudo` 或调整文件权限。
 
 **本地构建镜像（可选）：**
 
@@ -239,21 +253,23 @@ cd Jarvis
 # 构建镜像
 docker build -t jarvis:latest .
 
-# 运行容器（使用 root 用户）
-docker run -it --rm \
-  -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/root/.jarvis \
-  -w /workspace \
-  jarvis:latest
-
-# 或使用非 root 用户（推荐，避免文件权限问题）
+# 运行容器（非 root 用户，推荐）
 docker run -it --rm \
   -u $(id -u):$(id -g) \
   -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/home/jarvis/.jarvis \
+  -v $HOME/.jarvis:/home/$(whoami)/.jarvis \
+  -v $HOME/.gitconfig:/home/$(whoami)/.gitconfig:ro \
   -w /workspace \
-  -e USER=jarvis \
-  -e HOME=/home/jarvis \
+  -e USER=$(whoami) \
+  -e HOME=/home/$(whoami) \
+  jarvis:latest
+
+# 或使用 root 用户
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -v $HOME/.jarvis:/root/.jarvis \
+  -v $HOME/.gitconfig:/root/.gitconfig:ro \
+  -w /workspace \
   jarvis:latest
 ```
 
@@ -262,7 +278,9 @@ docker run -it --rm \
 > * Docker 镜像已预装所有工具（Python 3.12、Rust、Clang、Fish shell 等），开箱即用
 > * 容器启动后会自动进入 fish shell，虚拟环境已激活
 > * 使用 `-v` 挂载目录可以方便地在容器内处理本地代码
-> * 使用 `-v $HOME/.jarvis:/root/.jarvis` 可以保留您的 Jarvis 配置
+> * **推荐使用非 root 用户**，避免文件权限问题，容器内创建的文件可直接在宿主机访问
+> * 挂载 `.gitconfig` 可以保留 Git 用户信息，方便在容器内使用 Git
+> * 使用 Docker Compose 是最简单的方式，自动处理用户权限配置和文件挂载
 > * 推荐直接使用 GHCR 上的预构建镜像，无需本地构建
 
 ### 基本使用
