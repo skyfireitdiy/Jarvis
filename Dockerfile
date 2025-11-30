@@ -112,10 +112,10 @@ RUN git clone --depth 1 https://github.com/junegunn/fzf.git /tmp/fzf \
 COPY . /app
 
 # 创建虚拟环境并安装 Jarvis（使用 -e 参数以可编辑模式安装，便于自动更新生效）
-# 同时安装 RAG 功能和 clang 依赖（用于 C/C++ 代码分析）
+# 同时安装 clang 依赖（用于 C/C++ 代码分析）
 RUN uv venv /app/.venv --python 3.12 \
     && . /app/.venv/bin/activate \
-    && uv pip install -e ".[rag,clang19]" \
+    && uv pip install -e ".[clang19]" \
     && jarvis --version || echo "Jarvis installed" \
     && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
