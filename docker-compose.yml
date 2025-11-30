@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  jarvis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # 构建时传入用户 ID 和组 ID（从环境变量获取，默认 1000）
+        # Linux/macOS: 会自动从系统获取，Windows: 需要手动设置或使用默认值
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
+        USER_NAME: ${USER:-jarvis}
+    image: jarvis:latest
+    container_name: jarvis
+    # 使用当前用户 ID 和组 ID，防止文件权限问题
+    # 容器内创建的文件将属于当前用户，外部可以直接访问
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      # 挂载当前目录到容器的工作目录
+      - .:/workspace
+      # 挂载 Jarvis 配置文件（可选，保留本地配置）
+      - ${HOME}/.jarvis:/home/${USER:-jarvis}/.jarvis
+      # 挂载 Git 配置（可选，保留 Git 用户信息）
+      - ${HOME}/.gitconfig:/home/${USER:-jarvis}/.gitconfig:ro
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: /usr/bin/fish
+    environment:
+      # 传递用户信息到容器
+      - USER=${USER:-jarvis}
+      - HOME=/home/${USER:-jarvis}
+      # 保持终端颜色输出
+      - TERM=${TERM:-xterm-256color}
+      # 设置 PATH（确保虚拟环境和工具可用）
+      - PATH=/app/.venv/bin:/home/${USER:-jarvis}/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+    # 如果需要网络访问（如访问外部 API）
+    network_mode: bridge
+
