@@ -13,7 +13,10 @@ ARG NO_PROXY="localhost,127.0.0.1"
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    LANG=zh_CN.UTF-8 \
+    LANGUAGE=zh_CN:en_US \
+    LC_ALL=zh_CN.UTF-8
 
 # 如果提供了代理，设置代理环境变量
 RUN if [ -n "$HTTP_PROXY" ]; then \
@@ -27,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     ca-certificates \
+    # Locale 支持（中文输入）
+    locales \
     # Python 基础依赖（用于编译 Python 扩展，基础镜像已包含大部分）
     build-essential \
     libssl-dev \
@@ -55,6 +60,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # timeout 命令
     coreutils \
     && rm -rf /var/lib/apt/lists/* \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && sed -i '/zh_CN.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen \
     && python3 --version
 
 
