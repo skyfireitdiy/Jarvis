@@ -12,93 +12,51 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
     steps:
-      # 1. 拉取 GitHub 代码到运行环境
       - name: 检出代码
         uses: actions/checkout@v4
 
-      # 2. 设置 Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 3. 设置注册表凭据
-      - name: 设置注册表凭据
-        id: registry
-        run: |
-          if [ -n "${{ secrets.GHCR_USERNAME }}" ]; then
-            echo "username=${{ secrets.GHCR_USERNAME }}" >> $GITHUB_OUTPUT
-          else
-            echo "username=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
-          fi
-          if [ -n "${{ secrets.GHCR_ACCESS_TOKEN }}" ]; then
-            echo "password=${{ secrets.GHCR_ACCESS_TOKEN }}" >> $GITHUB_OUTPUT
-          else
-            echo "password=${{ github.token }}" >> $GITHUB_OUTPUT
-          fi
-
-      # 4. 配置 Docker 镜像标签
       - name: 生成镜像标签
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # GHCR 镜像名称
-          images: ghcr.io/${{ steps.registry.outputs.username }}/jarvis
-          # 标签规则：
-          # - 标签推送（如 v1.0.0）→ 标签为 v1.0.0、v1.0、v1、latest（版本化）
+          images: ghcr.io/${{ secrets.GHCR_USERNAME }}/jarvis
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest
 
-      # 5. 登录到 GHCR
       - name: 登录 GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ steps.registry.outputs.username }}
-          password: ${{ steps.registry.outputs.password }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_ACCESS_TOKEN }}
 
-      # 6. 构建 Docker 镜像并推送到仓库
       - name: 构建并推送镜像
         uses: docker/build-push-action@v5
         with:
-          context: .  # 构建上下文（当前项目根目录）
+          context: .
           file: ./Dockerfile
-          push: true  # 启用推送
-          tags: ${{ steps.meta.outputs.tags }}  # 引用步骤3生成的标签
-          labels: ${{ steps.meta.outputs.labels }}  # 自动生成镜像元数据标签
-          cache-from: type=gha  # 启用 GitHub Actions 缓存（加速下次构建）
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # 7. 设置包为公开
       - name: Make package public
         run: |
-          TOKEN="${{ steps.registry.outputs.password }}"
-          USERNAME="${{ steps.registry.outputs.username }}"
-          echo "用户名: $USERNAME"
-          
-          # 尝试作为个人账户
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
+          curl -X PATCH \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $TOKEN" \
+            -H "Authorization: Bearer ${{ secrets.GHCR_ACCESS_TOKEN }}" \
             https://api.github.com/user/packages/container/jarvis \
-            -d '{"visibility":"public"}')
-          
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          
-          # 如果个人账户失败（404），尝试作为组织
-          if [ "$HTTP_CODE" = "404" ]; then
-            echo "尝试作为组织账户..."
-            curl -X PATCH \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer $TOKEN" \
-              https://api.github.com/orgs/$USERNAME/packages/container/jarvis \
-              -d '{"visibility":"public"}'
-          elif [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
-            echo "✅ 包已设置为公开"
-          else
-            echo "⚠️ 设置包为公开时返回状态码: $HTTP_CODE"
-            echo "$RESPONSE" | head -n-1
-          fi
+            -d '{"visibility":"public"}' || \
+          curl -X PATCH \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GHCR_ACCESS_TOKEN }}" \
+            https://api.github.com/orgs/${{ secrets.GHCR_USERNAME }}/packages/container/jarvis \
+            -d '{"visibility":"public"}'
