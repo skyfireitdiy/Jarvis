@@ -67,14 +67,10 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
     && python --version
 
-# 安装 Rust 组件（Rust 镜像已包含 Rust，只需添加组件）
-# 设置默认工具链，确保 cargo 可以正常工作
-RUN rustup default stable \
-    && rustup component add rust-analyzer \
-    && rustup component add rustfmt \
-    && rustup component add clippy \
-    && echo "✅ Rust 组件安装完成" \
-    && rustc --version && cargo --version
+# 设置 Rust 环境变量（必须在 rustup 操作之前设置）
+ENV PATH="/root/.cargo/bin:$PATH" \
+    CARGO_HOME="/root/.cargo" \
+    RUSTUP_HOME="/root/.rustup"
 
 # 配置 crates.io 使用中科大镜像源
 RUN mkdir -p /root/.cargo \
@@ -84,17 +80,25 @@ RUN mkdir -p /root/.cargo \
     && echo '[source.ustc]' >> /root/.cargo/config.toml \
     && echo 'registry = "https://mirrors.ustc.edu.cn/crates.io-index"' >> /root/.cargo/config.toml
 
-# 设置 Rust 环境变量（Rust 镜像已设置，这里确保路径正确）
-ENV PATH="/root/.cargo/bin:$PATH" \
-    CARGO_HOME="/root/.cargo" \
-    RUSTUP_HOME="/root/.rustup"
+# 安装 Rust 组件（Rust 镜像已包含 Rust，只需添加组件）
+# 设置默认工具链，确保 cargo 可以正常工作
+RUN rustup default stable \
+    && rustup component add rust-analyzer \
+    && rustup component add rustfmt \
+    && rustup component add clippy \
+    && echo "✅ Rust 组件安装完成" \
+    && rustc --version && cargo --version
 
 # 安装 ripgrep (rg)
-RUN cargo install ripgrep --locked \
+# 确保默认工具链已设置，然后安装
+RUN rustup default stable \
+    && cargo install ripgrep --locked \
     && rg --version
 
 # 安装 fd
-RUN cargo install fd-find --locked \
+# 确保默认工具链已设置，然后安装
+RUN rustup default stable \
+    && cargo install fd-find --locked \
     && fd --version
 
 # 安装 fzf
