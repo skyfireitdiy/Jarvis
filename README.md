@@ -195,18 +195,17 @@ docker pull ghcr.io/skyfireitdiy/jarvis:v1.0.0
 
 **使用 Docker Compose（推荐）：**
 
-Docker Compose 配置默认使用**非 root 用户**（当前用户的 UID/GID），避免文件权限问题：
+Docker Compose 配置默认使用**非 root 用户**（jarvis 用户，UID 1000），避免文件权限问题：
 
 ```bash
-# 构建并运行容器
-docker-compose build
+# 运行容器（使用预构建镜像，无需本地构建）
 docker-compose run --rm jarvis
 ```
 
 > **说明**:
 >
-> * 容器会自动使用当前用户的 UID/GID 运行（Linux/macOS 自动获取，Windows 需要设置 `UID` 和 `GID` 环境变量）
-> * 容器内创建的文件将属于当前用户，外部可以直接访问，无需调整权限
+> * 容器使用 jarvis 用户（UID 1000）运行，GID 可通过环境变量 `GID` 设置（默认 1000），建议设置为当前用户的组 ID 以避免文件权限问题
+> * 容器内创建的文件将属于 jarvis 用户，如果 GID 匹配宿主机组，外部可以直接访问，无需调整权限
 > * 配置文件（`.jarvis` 和 `.gitconfig`）会自动挂载到容器内用户的主目录
 
 **直接使用 Docker 命令：**
