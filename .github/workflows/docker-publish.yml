@@ -5,63 +5,58 @@ on:
     tags:
       - 'v*'
 
+# 定义环境变量：容器注册表域名和镜像名称
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/jarvis
+
 jobs:
   build-and-push:
     name: Build and push Docker image to GHCR
     runs-on: ubuntu-latest
+    # 设置授予 GITHUB_TOKEN 的权限
     permissions:
       contents: read
       packages: write
+      attestations: write
+      id-token: write
     steps:
-      - name: 检出代码
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: 生成镜像标签
+      # 使用 docker/login-action 登录到容器注册表
+      # 使用将发布包的账户和密码登录
+      # 发布后，包将作用域到此处定义的账户
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 使用 docker/metadata-action 提取将应用于指定镜像的标签和标签
+      # id "meta" 允许在后续步骤中引用此步骤的输出
+      # images 值提供标签和标签的基础名称
+      - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          # 使用 github.repository_owner 作为命名空间（推荐方式）
-          # 如果使用 GITHUB_TOKEN，仓库会自动链接到包
-          images: ghcr.io/${{ github.repository_owner }}/jarvis
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=raw,value=latest
-          # 添加标签以连接仓库到包（根据 GitHub 文档推荐）
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
-      - name: 设置认证凭据
-        id: auth
-        run: |
-          # 优先使用 GITHUB_TOKEN（推荐，会自动链接仓库）
-          # 如果配置了自定义 token，则使用自定义 token
-          if [ -n "${{ secrets.GHCR_ACCESS_TOKEN }}" ]; then
-            if [ -n "${{ secrets.GHCR_USERNAME }}" ]; then
-              echo "username=${{ secrets.GHCR_USERNAME }}" >> $GITHUB_OUTPUT
-            else
-              echo "username=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
-            fi
-            echo "password=${{ secrets.GHCR_ACCESS_TOKEN }}" >> $GITHUB_OUTPUT
-            echo "使用自定义 GHCR_ACCESS_TOKEN"
-          else
-            echo "username=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
-            echo "password=${{ github.token }}" >> $GITHUB_OUTPUT
-            echo "使用 GITHUB_TOKEN（推荐）"
-          fi
-
-      - name: 登录 GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ steps.auth.outputs.username }}
-          password: ${{ steps.auth.outputs.password }}
-
-      - name: 构建并推送镜像
+      # 使用 docker/build-push-action 构建镜像
+      # 如果构建成功，它将镜像推送到 GitHub Packages
+      # context 参数将构建上下文定义为位于指定路径中的文件集
+      # tags 和 labels 参数使用 "meta" 步骤的输出标记和标记镜像
+      - name: Build and push Docker image
+        id: push
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -71,3 +66,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # 为镜像生成 artifact attestation（工件证明）
+      # 这是关于镜像在何处以及如何构建的不可伪造的声明
+      # 它提高了使用镜像的人员的供应链安全性
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
