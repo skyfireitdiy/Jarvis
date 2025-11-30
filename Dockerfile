@@ -121,7 +121,8 @@ RUN uv venv /app/.venv --python 3.12 \
     && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
     && find /app/.venv -type f -name "*.pyo" -delete 2>/dev/null || true \
     && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /root/.cache/pip /root/.cache/uv 2>/dev/null || true
+    && rm -rf /root/.cache/pip /root/.cache/uv 2>/dev/null || true \
+    && chmod +x /app/.venv/bin/* 2>/dev/null || true
 
 # 安装 Python 静态检查、格式化和 LSP 工具
 RUN . /app/.venv/bin/activate \
@@ -164,7 +165,20 @@ RUN groupadd -g ${GROUP_ID} ${USER_NAME} || true \
     && mkdir -p /home/${USER_NAME}/.jarvis \
     && mkdir -p /home/${USER_NAME}/.cargo \
     && chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME} \
-    && chown -R ${USER_ID}:${GROUP_ID} /app
+    && chown -R ${USER_ID}:${GROUP_ID} /app \
+    && chmod -R u+x /app/.venv/bin/* 2>/dev/null || true \
+    && find /app/.venv/bin -type f -exec chmod +x {} \; 2>/dev/null || true \
+    && if [ -L /app/.venv/bin/python3 ]; then \
+        PYTHON_TARGET=$(readlink -f /app/.venv/bin/python3 2>/dev/null || readlink /app/.venv/bin/python3); \
+        if [ ! -f "$PYTHON_TARGET" ] || [ ! -x "$PYTHON_TARGET" ]; then \
+            rm -f /app/.venv/bin/python3 /app/.venv/bin/python; \
+            ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python3; \
+            ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python; \
+        fi; \
+    elif [ ! -f /app/.venv/bin/python3 ]; then \
+        ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python3; \
+        ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python; \
+    fi
 
 
 # 设置 fish 为默认 shell（后续 RUN 命令将使用 fish）
@@ -183,7 +197,10 @@ SHELL ["/bin/bash", "-c"]
 RUN if [ -d /home/${USER_NAME} ]; then \
     echo '# 自动激活 Jarvis 虚拟环境' >> /home/${USER_NAME}/.config/fish/config.fish && \
     echo 'source /app/.venv/bin/activate.fish' >> /home/${USER_NAME}/.config/fish/config.fish && \
-    chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME}/.config; \
+    echo '# 确保 Python 解释器路径正确' >> /home/${USER_NAME}/.config/fish/config.fish && \
+    echo 'set -gx VIRTUAL_ENV /app/.venv' >> /home/${USER_NAME}/.config/fish/config.fish && \
+    chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME}/.config && \
+    chmod +x /app/.venv/bin/* 2>/dev/null || true; \
     fi
 SHELL ["/usr/bin/fish", "-c"]
 
