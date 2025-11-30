@@ -6,10 +6,6 @@ name: Publish Docker Image to GHCR
     tags:
       - 'v*'
 
-env:
-  GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-  GHCR_ACCESS_TOKEN: ${{ secrets.GHCR_ACCESS_TOKEN }}
-
 jobs:
   docker-publish:
     name: Build and publish Docker image to GHCR
@@ -17,9 +13,21 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up registry credentials
+        id: registry
+        run: |
+          if [ -n "${{ secrets.GHCR_ACCESS_TOKEN }}" ]; then
+            echo "username=${{ secrets.GHCR_USERNAME || github.repository_owner }}" >> $GITHUB_OUTPUT
+            echo "password=${{ secrets.GHCR_ACCESS_TOKEN }}" >> $GITHUB_OUTPUT
+          else
+            echo "username=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
+            echo "password=${{ github.token }}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -28,7 +36,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ env.GHCR_USERNAME }}/jarvis
+          images: ghcr.io/${{ steps.registry.outputs.username }}/jarvis
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -39,8 +47,9 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ env.GHCR_USERNAME }}
-          password: ${{ env.GHCR_ACCESS_TOKEN }}
+          username: ${{ steps.registry.outputs.username }}
+          password: ${{ steps.registry.outputs.password }}
+          logout: false
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -55,10 +64,13 @@ jobs:
 
       - name: Make package public
         run: |
+          TOKEN="${{ steps.registry.outputs.password }}"
+          USERNAME="${{ steps.registry.outputs.username }}"
+          
           # 尝试作为个人账户
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ env.GHCR_ACCESS_TOKEN }}" \
+            -H "Authorization: Bearer $TOKEN" \
             https://api.github.com/user/packages/container/jarvis \
             -d '{"visibility":"public"}')
           
@@ -69,8 +81,8 @@ jobs:
             echo "尝试作为组织账户..."
             curl -X PATCH \
               -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ env.GHCR_ACCESS_TOKEN }}" \
-              https://api.github.com/orgs/${{ env.GHCR_USERNAME }}/packages/container/jarvis \
+              -H "Authorization: Bearer $TOKEN" \
+              https://api.github.com/orgs/$USERNAME/packages/container/jarvis \
               -d '{"visibility":"public"}'
           elif [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
             echo "✅ 包已设置为公开"
