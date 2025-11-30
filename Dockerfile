@@ -170,21 +170,17 @@ RUN groupadd -g ${GROUP_ID} ${USER_NAME} || true \
 # 设置 fish 为默认 shell（后续 RUN 命令将使用 fish）
 SHELL ["/usr/bin/fish", "-c"]
 
-# 创建 fish 配置目录并集成 smartshell，同时配置自动激活虚拟环境
+# 创建 fish 配置目录并配置自动激活虚拟环境
 # 为 root 用户配置（默认情况）
 RUN mkdir -p /root/.config/fish; \
-    and env JARVIS_NON_INTERACTIVE=true /app/.venv/bin/jss install --shell fish 2>/dev/null; \
-    or echo "JSS install completed"; \
     and echo "# 自动激活 Jarvis 虚拟环境" >> /root/.config/fish/config.fish; \
     and echo "source /app/.venv/bin/activate.fish" >> /root/.config/fish/config.fish; \
-    and echo "✅ Fish shell、smartshell 集成和虚拟环境自动激活配置完成"
+    and echo "✅ Fish shell 和虚拟环境自动激活配置完成"
 
 # 为非 root 用户配置（docker-compose 使用）
 # 临时切换到 bash shell 执行（因为 fish 的 if 语法不同，且需要避免变量解析问题）
 SHELL ["/bin/bash", "-c"]
 RUN if [ -d /home/${USER_NAME} ]; then \
-    . /app/.venv/bin/activate && \
-    env JARVIS_NON_INTERACTIVE=true /app/.venv/bin/jss install --shell fish 2>/dev/null || echo 'JSS install completed' && \
     echo '# 自动激活 Jarvis 虚拟环境' >> /home/${USER_NAME}/.config/fish/config.fish && \
     echo 'source /app/.venv/bin/activate.fish' >> /home/${USER_NAME}/.config/fish/config.fish && \
     chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME}/.config; \
