@@ -20,13 +20,18 @@ RUN if [ -n "$HTTP_PROXY" ]; then \
         echo "使用代理: HTTP_PROXY=$HTTP_PROXY, HTTPS_PROXY=$HTTPS_PROXY"; \
     fi
 
-# 安装系统依赖（不包括 Python 3.12，将使用 uv 安装）
+# 安装系统依赖（包括 Python 3.12）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # 基础工具
     git \
     curl \
     wget \
     ca-certificates \
+    # Python 3.12 和虚拟环境支持
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    python3-pip \
     # Python 基础依赖（用于编译 Python 扩展）
     build-essential \
     libssl-dev \
@@ -54,20 +59,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     # timeout 命令
     coreutils \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.12 /usr/local/bin/python3.12 \
+    && ln -sf /usr/bin/python3.12 /usr/local/bin/python3 \
+    && ln -sf /usr/bin/python3.12 /usr/local/bin/python \
+    && python3.12 --version
 
-# 安装 uv（Python 包管理器），然后使用 uv 安装 Python 3.12
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && (mv "$HOME/.local/bin/uv" /usr/local/bin/uv 2>/dev/null || mv "$HOME/.cargo/bin/uv" /usr/local/bin/uv 2>/dev/null || cp "$HOME/.local/bin/uv" /usr/local/bin/uv 2>/dev/null || true) \
-    && /usr/local/bin/uv --version \
-    && echo "📦 使用 uv 安装 Python 3.12..." \
-    && /usr/local/bin/uv python install 3.12 \
-    && ln -sf $(/usr/local/bin/uv python find 3.12) /usr/local/bin/python3.12 \
-    && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3 \
-    && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python \
-    && python --version \
-    && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /root/.cache/uv 2>/dev/null || true
 
 # 设置 Rust 环境变量（必须在 rustup 操作之前设置）
 ENV PATH="/root/.cargo/bin:$PATH" \
@@ -113,27 +110,22 @@ COPY . /app
 
 # 创建虚拟环境并安装 Jarvis（使用 -e 参数以可编辑模式安装，便于自动更新生效）
 # 同时安装 clang 依赖（用于 C/C++ 代码分析）
-RUN uv venv /app/.venv --python 3.12 \
-    && rm -f /app/.venv/bin/python3 /app/.venv/bin/python \
-    && ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python3 \
-    && ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python \
-    && chmod +x /app/.venv/bin/python3 /app/.venv/bin/python \
+RUN python3.12 -m venv /app/.venv \
     && . /app/.venv/bin/activate \
-    && uv pip install -e ".[clang19]" \
+    && pip install --upgrade pip setuptools wheel \
+    && pip install -e ".[clang19]" \
     && echo "Jarvis installed" \
     && find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
     && find /app/.venv -type f -name "*.pyo" -delete 2>/dev/null || true \
     && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /root/.cache/pip /root/.cache/uv 2>/dev/null || true \
+    && rm -rf /root/.cache/pip 2>/dev/null || true \
     && chmod +x /app/.venv/bin/* 2>/dev/null || true \
-    && find /app/.venv/bin -type f -name "*.py" -exec sed -i '1s|^#!.*python3|#!/usr/local/bin/python3.12|' {} \; 2>/dev/null || true \
-    && find /app/.venv/bin -type f ! -name "*.py" -exec grep -l "^#!.*python3" {} \; 2>/dev/null | xargs -r sed -i '1s|^#!.*python3|#!/usr/local/bin/python3.12|' 2>/dev/null || true \
     && /app/.venv/bin/python3 --version
 
 # 安装 Python 静态检查、格式化和 LSP 工具
 RUN . /app/.venv/bin/activate \
-    && uv pip install \
+    && pip install \
     ruff \
     mypy \
     python-lsp-server \
@@ -142,7 +134,7 @@ RUN . /app/.venv/bin/activate \
     && find /app/.venv -type f -name "*.pyc" -delete 2>/dev/null || true \
     && find /app/.venv -type f -name "*.pyo" -delete 2>/dev/null || true \
     && rm -rf /tmp/* /var/tmp/* \
-    && rm -rf /root/.cache/pip /root/.cache/uv 2>/dev/null || true
+    && rm -rf /root/.cache/pip 2>/dev/null || true
 
 # 设置 PATH 环境变量，确保所有工具可用
 # 同时支持 root 用户和非 root 用户
@@ -173,14 +165,7 @@ RUN groupadd -g ${GROUP_ID} ${USER_NAME} || true \
     && mkdir -p /home/${USER_NAME}/.cargo \
     && chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME} \
     && chown -R ${USER_ID}:${GROUP_ID} /app \
-    && rm -f /app/.venv/bin/python3 /app/.venv/bin/python \
-    && ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python3 \
-    && ln -sf /usr/local/bin/python3.12 /app/.venv/bin/python \
-    && chmod +x /usr/local/bin/python3.12 \
-    && chmod +x /app/.venv/bin/python3 /app/.venv/bin/python \
-    && find /app/.venv/bin -type f -exec chmod +x {} \; 2>/dev/null || true \
-    && find /app/.venv/bin -type f ! -name "*.py" -exec grep -l "^#!.*python3" {} \; 2>/dev/null | xargs -r sed -i '1s|^#!.*python3|#!/usr/local/bin/python3.12|' 2>/dev/null || true \
-    && chown -R ${USER_ID}:${GROUP_ID} /app/.venv/bin/python3 /app/.venv/bin/python 2>/dev/null || true
+    && find /app/.venv/bin -type f -exec chmod +x {} \; 2>/dev/null || true
 
 
 # 设置 fish 为默认 shell（后续 RUN 命令将使用 fish）
@@ -233,7 +218,7 @@ RUN echo "=== 验证工具安装 ==="; \
     and ruff --version; \
     and mypy --version; \
     and pylsp --version; or echo "pylsp installed"; \
-    and uv --version; \
+    and pip --version; \
     and fish --version; \
     and echo "=== 所有工具安装完成 ==="
 
