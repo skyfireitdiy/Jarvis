@@ -1,3 +1,68 @@
+### Release Note - v0.8.0 2025-11-30
+
+#### **🚀 新功能 (Features)**
+
+- **Docker 容器化支持（全新功能）**
+  - 新增完整的 Dockerfile，基于 Python 3.12 官方镜像，预装所有开发工具（Python、Rust、Clang、Fish shell 等）
+  - 新增 docker-compose.yml 配置，支持非 root 用户运行，自动处理 UID/GID，避免文件权限问题
+  - 新增 GitHub Actions CI/CD 工作流（`.github/workflows/docker-publish.yml`），自动构建并发布 Docker 镜像到 GHCR
+  - 新增 artifact attestation（工件证明）支持，使用 `actions/attest-build-provenance@v3` 提升镜像供应链安全性
+  - 新增完整的中文 locale 支持（`zh_CN.UTF-8`），确保中文输入输出正常显示
+  - 新增 `.dockerignore` 文件，优化构建上下文，减小镜像体积
+
+- **代码分析能力增强**
+  - **多语言符号提取器增强**：
+    - C/C++：新增宏（macro）、类型定义（typedef）、模板（template）支持
+    - Go：新增常量（const）、变量（var）、结构体（struct）支持
+    - Java：增强符号提取能力
+    - JavaScript/TypeScript：增强符号提取能力
+    - Python：增强符号提取能力
+    - Rust：增强符号提取能力
+  - **read_code 工具优化**：
+    - 优化代码分块逻辑，优先按语义空白行分组，再对超过 50 行的块进行固定行数切分
+    - 修复缓存命中时输出保留真实文件行号的问题，确保行号显示准确
+
+#### **🔧 优化与重构 (Refactors & Improvements)**
+
+- **Dockerfile 构建优化**
+  - 使用 Python 3.12 官方镜像作为基础镜像，简化构建流程
+  - 直接使用系统 Python 和 `pip` 安装依赖，移除虚拟环境配置
+  - Rust 工具链使用官方 `rustup` 安装脚本安装
+  - 增强缓存清理策略，自动清理 Python 缓存和构建临时文件，减小镜像体积
+  - 优化 PATH 环境变量配置，确保所有工具可用
+
+- **CI/CD 流程优化**
+  - 采用标准的 GitHub Actions 实践（`docker/login-action@v3`、`docker/metadata-action@v5`）
+  - 优化环境变量定义，使用 `REGISTRY` 和 `IMAGE_NAME` 变量简化配置
+  - 支持语义化版本标签（如 `v0.8.0`、`0.8`、`0`、`latest`）
+
+- **测试覆盖增强**
+  - 新增 `test_structured_code.py` 测试文件（408 行），覆盖结构化代码分析功能
+  - 新增 `test_read_code.py` 测试文件（461 行），覆盖代码读取工具功能
+
+#### **📚 文档更新 (Documentation)**
+
+- **README 全面更新**
+  - 新增完整的 Docker 安装和使用指南，包括镜像拉取、docker-compose 使用、非 root 用户配置等
+  - 优化文档格式，统一列表符号和段落间距
+  - 更新工作流示例，强调 LSP 客户端和结构化编辑工具的使用
+  - 补充 Windows 用户使用 Docker 的注意事项
+
+- **Jarvis Book 文档更新**
+  - 更新项目介绍、快速开始、核心概念与架构等章节
+  - 新增 Docker 相关内容到使用指南
+  - 更新功能扩展和高级主题章节
+
+本次更新是 **Docker 容器化支持的首次引入**，为 Jarvis 提供了完整的容器化部署方案。通过 Docker 镜像，用户可以无需本地安装 Python/Rust 环境即可使用 Jarvis，特别适合需要隔离环境或快速部署的场景。同时，代码分析能力得到进一步增强，支持更多语言特性和符号类型，read_code 工具的分块逻辑更加智能。新增的大量测试用例也为代码质量提供了保障。
+
+**技术亮点**：
+
+- **Docker 容器化**：基于 Python 3.12 官方镜像，预装所有开发工具，开箱即用
+- **非 root 用户支持**：通过 docker-compose 自动配置当前用户的 UID/GID，避免文件权限问题
+- **CI/CD 自动化**：GitHub Actions 自动构建并发布镜像到 GHCR，支持语义化版本标签
+- **代码分析增强**：支持更多语言特性（宏、模板、类型定义等），提升代码理解能力
+- **智能代码分块**：优先按语义空白行分组，再按固定行数切分，提升代码读取效率
+
 ### Release Note - v0.7.4 2025-11-30
 
 #### **新功能 (Features)**  
