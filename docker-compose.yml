@@ -11,21 +11,21 @@ services:
       # 挂载当前目录到容器的工作目录
       - .:/workspace
       # 挂载 Jarvis 配置文件（可选，保留本地配置）
-      - ${HOME}/.jarvis:/home/${USER:-jarvis}/.jarvis
+      - ${HOME}/.jarvis:/home/jarvis/.jarvis
       # 挂载 Git 配置（可选，保留 Git 用户信息）
-      - ${HOME}/.gitconfig:/home/${USER:-jarvis}/.gitconfig:ro
+      - ${HOME}/.gitconfig:/home/jarvis/.gitconfig:ro
     working_dir: /workspace
     stdin_open: true
     tty: true
     command: /usr/bin/fish
     environment:
-      # 传递用户信息到容器
-      - USER=${USER:-jarvis}
-      - HOME=/home/${USER:-jarvis}
+      # 固定使用 jarvis 用户
+      - USER=jarvis
+      - HOME=/home/jarvis
       # 保持终端颜色输出
       - TERM=${TERM:-xterm-256color}
       # 设置 PATH（确保虚拟环境和工具可用）
-      - PATH=/app/.venv/bin:/home/${USER:-jarvis}/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+      - PATH=/app/.venv/bin:/home/jarvis/.cargo/bin:/usr/local/bin:/usr/bin:/bin
     # 如果需要网络访问（如访问外部 API）
     network_mode: bridge
 
