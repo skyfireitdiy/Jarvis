@@ -72,14 +72,6 @@ ENV PATH="/root/.cargo/bin:$PATH" \
     CARGO_HOME="/root/.cargo" \
     RUSTUP_HOME="/root/.rustup"
 
-# 配置 crates.io 使用中科大镜像源
-RUN mkdir -p /root/.cargo \
-    && echo '[source.crates-io]' > /root/.cargo/config.toml \
-    && echo 'replace-with = "ustc"' >> /root/.cargo/config.toml \
-    && echo '' >> /root/.cargo/config.toml \
-    && echo '[source.ustc]' >> /root/.cargo/config.toml \
-    && echo 'registry = "https://mirrors.ustc.edu.cn/crates.io-index"' >> /root/.cargo/config.toml
-
 # 安装 Rust 组件（Rust 镜像已包含 Rust，只需添加组件）
 # 设置默认工具链，确保 cargo 可以正常工作
 RUN rustup default stable \
@@ -144,16 +136,6 @@ RUN groupadd -g ${GROUP_ID} ${USER_NAME} || true \
     && chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME} \
     && chown -R ${USER_ID}:${GROUP_ID} /app
 
-# 为非 root 用户配置 crates.io 镜像源
-RUN if [ -d /home/${USER_NAME} ]; then \
-        mkdir -p /home/${USER_NAME}/.cargo && \
-        echo '[source.crates-io]' > /home/${USER_NAME}/.cargo/config.toml && \
-        echo 'replace-with = "ustc"' >> /home/${USER_NAME}/.cargo/config.toml && \
-        echo '' >> /home/${USER_NAME}/.cargo/config.toml && \
-        echo '[source.ustc]' >> /home/${USER_NAME}/.cargo/config.toml && \
-        echo 'registry = "https://mirrors.ustc.edu.cn/crates.io-index"' >> /home/${USER_NAME}/.cargo/config.toml && \
-        chown -R ${USER_ID}:${GROUP_ID} /home/${USER_NAME}/.cargo; \
-    fi
 
 # 设置 fish 为默认 shell（后续 RUN 命令将使用 fish）
 SHELL ["/usr/bin/fish", "-c"]
