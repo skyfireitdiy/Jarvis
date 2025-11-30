@@ -13,7 +13,6 @@ from typing import Any, Dict, List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.globals import delete_agent
-from jarvis.jarvis_utils.config import set_config, get_git_check_mode
 
 
 class SubCodeAgentTool:
@@ -126,12 +125,8 @@ class SubCodeAgentTool:
             except Exception:
                 append_tools = None
 
-            # 在子Agent中放宽 Git 配置校验，避免因严格校验导致进程退出
-            # 使用配置项将校验模式临时切换为 warn，构造完成后恢复原值
-            old_mode = None
+            # 创建 CodeAgent，捕获 SystemExit 异常（如 git 配置不完整）
             try:
-                old_mode = get_git_check_mode()
-                set_config("JARVIS_GIT_CHECK_MODE", "warn")
                 code_agent = CodeAgent(
                     model_group=model_group,
                     need_summary=True,
@@ -146,12 +141,6 @@ class SubCodeAgentTool:
                     "stdout": "",
                     "stderr": f"初始化 CodeAgent 失败（可能未配置 git 或当前非 git 仓库）: {se}",
                 }
-            finally:
-                if old_mode is not None:
-                    try:
-                        set_config("JARVIS_GIT_CHECK_MODE", old_mode)
-                    except Exception:
-                        pass
 
             # 子Agent需要自动完成
             try:

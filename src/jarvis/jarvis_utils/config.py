@@ -539,18 +539,6 @@ def get_build_validation_timeout() -> int:
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_BUILD_VALIDATION_TIMEOUT", 30))
 
 
-def get_git_check_mode() -> str:
-    """
-    获取Git校验模式。
-
-    返回:
-        str: "strict" 或 "warn"，默认为 "strict"
-    """
-    mode = GLOBAL_CONFIG_DATA.get("JARVIS_GIT_CHECK_MODE", "strict")
-    try:
-        return str(mode)
-    except Exception:
-        return "strict"
 
 
 def get_mcp_config() -> List[Dict[str, Any]]:
