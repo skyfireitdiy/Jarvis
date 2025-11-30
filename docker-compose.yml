@@ -2,16 +2,7 @@ version: '3.8'
 
 services:
   jarvis:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        # 构建时传入用户 ID 和组 ID（从环境变量获取，默认 1000）
-        # Linux/macOS: 会自动从系统获取，Windows: 需要手动设置或使用默认值
-        USER_ID: ${UID:-1000}
-        GROUP_ID: ${GID:-1000}
-        USER_NAME: ${USER:-jarvis}
-    image: jarvis:latest
+    image: ghcr.io/skyfireitdiy/jarvis:latest
     container_name: jarvis
     # 使用当前用户 ID 和组 ID，防止文件权限问题
     # 容器内创建的文件将属于当前用户，外部可以直接访问
