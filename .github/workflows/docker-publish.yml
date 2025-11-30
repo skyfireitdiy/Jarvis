@@ -18,25 +18,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up registry credentials
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set registry token
         id: registry
         run: |
           if [ -n "${{ secrets.GHCR_ACCESS_TOKEN }}" ]; then
-            echo "username=${{ secrets.GHCR_USERNAME || github.repository_owner }}" >> $GITHUB_OUTPUT
-            echo "password=${{ secrets.GHCR_ACCESS_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "token=${{ secrets.GHCR_ACCESS_TOKEN }}" >> $GITHUB_OUTPUT
+            echo "使用自定义 GHCR_ACCESS_TOKEN"
           else
-            echo "username=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
-            echo "password=${{ github.token }}" >> $GITHUB_OUTPUT
+            echo "token=${{ github.token }}" >> $GITHUB_OUTPUT
+            echo "使用 GITHUB_TOKEN"
           fi
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ steps.registry.outputs.username }}/jarvis
+          images: ghcr.io/${{ github.repository_owner }}/jarvis
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -47,8 +47,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ steps.registry.outputs.username }}
-          password: ${{ steps.registry.outputs.password }}
+          username: ${{ github.repository_owner }}
+          password: ${{ steps.registry.outputs.token }}
           logout: false
 
       - name: Build and push Docker image
@@ -64,8 +64,10 @@ jobs:
 
       - name: Make package public
         run: |
-          TOKEN="${{ steps.registry.outputs.password }}"
-          USERNAME="${{ steps.registry.outputs.username }}"
+          # 使用与登录相同的 token
+          TOKEN="${{ steps.registry.outputs.token }}"
+          USERNAME="${{ github.repository_owner }}"
+          echo "用户名: $USERNAME"
           
           # 尝试作为个人账户
           RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH \
