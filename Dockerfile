@@ -1,5 +1,5 @@
 # 使用 Rust 作为基础镜像
-FROM rust:latest as base
+FROM rust:latest AS base
 
 # 设置工作目录
 WORKDIR /app
@@ -68,7 +68,9 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && python --version
 
 # 安装 Rust 组件（Rust 镜像已包含 Rust，只需添加组件）
-RUN rustup component add rust-analyzer \
+# 设置默认工具链，确保 cargo 可以正常工作
+RUN rustup default stable \
+    && rustup component add rust-analyzer \
     && rustup component add rustfmt \
     && rustup component add clippy \
     && echo "✅ Rust 组件安装完成" \
