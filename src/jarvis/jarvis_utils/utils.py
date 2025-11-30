@@ -1530,38 +1530,9 @@ def _collect_web_search_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _ask_git_check_mode(config_data: dict, ask_all: bool) -> bool:
-    """询问Git校验模式"""
-    try:
-        _key = "JARVIS_GIT_CHECK_MODE"
-        if not ask_all and _key in config_data:
-            return False
-        from jarvis.jarvis_utils.input import get_choice
-        from jarvis.jarvis_utils.config import get_git_check_mode
-        current_mode = config_data.get(_key, get_git_check_mode())
-        choices = ["strict", "warn"]
-        tip = (
-            "请选择 Git 仓库检查模式 (JARVIS_GIT_CHECK_MODE):\n"
-            "此设置决定了当在 Git 仓库中检测到未提交的更改时，Jarvis应如何处理。\n"
-            "这对于确保代码修改和提交操作在干净的工作区上进行至关重要。\n"
-            "  - strict: (推荐) 如果存在未提交的更改，则中断相关操作（如代码修改、自动提交）。\n"
-            "            这可以防止意外覆盖或丢失本地工作。\n"
-            "  - warn:   如果存在未提交的更改，仅显示警告信息，然后继续执行操作。\n"
-            "            适用于您希望绕过检查并自行管理仓库状态的场景。"
-        )
-        new_mode = get_choice(tip, choices)
-        if new_mode == current_mode:
-            return False
-        config_data[_key] = new_mode
-        return True
-    except Exception:
-        return False
-
-
 def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
     """收集Git相关配置"""
     changed = False
-    changed = _ask_git_check_mode(config_data, ask_all) or changed
     changed = _ask_config_optional_str(
         config_data, ask_all,
         "JARVIS_GIT_COMMIT_PROMPT",

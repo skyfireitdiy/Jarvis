@@ -32,7 +32,6 @@ from jarvis.jarvis_utils.config import (
     is_enable_static_analysis,
     is_enable_build_validation,
     get_build_validation_timeout,
-    get_git_check_mode,
     set_config,
     get_data_dir,
     is_enable_intent_recognition,
@@ -396,15 +395,7 @@ class CodeAgent(Agent):
                 message = "❌ Git 配置不完整\n\n请运行以下命令配置 Git：\n" + "\n".join(
                     missing_configs
                 )
-                print(f"⚠️ {message}")
-                # 通过配置控制严格校验模式（JARVIS_GIT_CHECK_MODE）：
-                # - warn: 仅告警并继续，后续提交可能失败
-                # - strict: 严格模式（默认），直接退出
-                mode = get_git_check_mode().lower()
-                if mode == "warn":
-                    print("ℹ️ 已启用 Git 校验警告模式（JARVIS_GIT_CHECK_MODE=warn），将继续运行。"
-                        "注意：后续提交可能失败，请尽快配置 git user.name 与 user.email。")
-                    return
+                print(f"❌ {message}")
                 sys.exit(1)
 
         except FileNotFoundError:
