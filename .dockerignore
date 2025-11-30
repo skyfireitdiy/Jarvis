@@ -1,17 +1,61 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
 __pycache__
-.env
-run.sh
-.vscode
-*.txt
-temp_scripts
-dist
-*egg-info.jarvis
-.jarvis
-jarvis_ai_assistant.egg-info
-PKG-INFO
-.jarvis-*
-tags
-logs
-patches*
+*.py[cod]
+*$py.class
+*.so
+.Python
 .venv
-build
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jarvis specific
+.jarvis/
+*.log
+*.tmp
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# Test files
+tests/
+*.test.py
+*_test.py
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Other
+*.md
+!README.md
+LICENSE
