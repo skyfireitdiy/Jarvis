@@ -5,16 +5,15 @@ on:
     tags:
       - 'v*'
 
-# 定义环境变量：容器注册表域名和镜像名称
+# 定义环境变量：容器注册表域名
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/jarvis
+  IMAGE_NAME: ${{ secrets.GHCR_USERNAME }}/jarvis
 
 jobs:
   build-and-push:
     name: Build and push Docker image to GHCR
     runs-on: ubuntu-latest
-    # 设置授予 GITHUB_TOKEN 的权限
     permissions:
       contents: read
       packages: write
@@ -34,8 +33,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_ACCESS_TOKEN }}
 
       # 使用 docker/metadata-action 提取将应用于指定镜像的标签和标签
       # id "meta" 允许在后续步骤中引用此步骤的输出
