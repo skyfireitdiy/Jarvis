@@ -632,9 +632,30 @@ class EditFileTool:
         block = blocks.get(block_id)
 
         if block is None:
+            # 获取当前可用的块id列表
+            available_block_ids = list(blocks.keys())
+            
+            # 构建错误消息
+            error_msg = f"未找到块id: {block_id}。\n\n"
+            
+            if available_block_ids:
+                # 限制显示的块id数量，避免消息过长
+                max_show = 20
+                shown_ids = available_block_ids[:max_show]
+                error_msg += f"当前可用的块id列表（共 {len(available_block_ids)} 个）:\n"
+                for idx, bid in enumerate(shown_ids, 1):
+                    error_msg += f"  {idx}. {bid}\n"
+                
+                if len(available_block_ids) > max_show:
+                    error_msg += f"  ... 还有 {len(available_block_ids) - max_show} 个块id未显示\n"
+                
+                error_msg += "\n💡 提示：请使用 read_code 工具查看文件的结构化块id，或从上述列表中选择正确的块id。"
+            else:
+                error_msg += "当前文件中没有可用的块id。\n\n💡 提示：请使用 read_code 工具读取文件以获取结构化块id。"
+            
             return (
                 False,
-                f"未找到块id: {block_id}。请使用read_code工具查看文件的结构化块id。",
+                error_msg,
                 EditErrorType.BLOCK_ID_NOT_FOUND,
             )
 

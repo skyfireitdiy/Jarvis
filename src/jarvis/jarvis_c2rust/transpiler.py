@@ -118,6 +118,14 @@ class Transpiler:
         # 断点续跑功能默认始终启用
         self.resume = True
 
+        # 初始化状态变量（需要在初始化管理器之前）
+        # 当前函数开始时的 commit id（用于失败回退）
+        self._current_function_start_commit: Optional[str] = None
+        # 连续修复失败的次数（用于判断是否需要回退）
+        self._consecutive_fix_failures: int = 0
+        # 每个 Agent 对应的工具调用前的 commit id（用于细粒度检测）
+        self._agent_before_commits: Dict[str, Optional[str]] = {}
+
         # 初始化各个功能模块
         self.config_manager = ConfigManager(self.data_dir, self.progress_path)
         self.progress = self.config_manager.progress
@@ -257,13 +265,6 @@ class Transpiler:
             self.config_manager,
             self.git_manager,
         )
-
-        # 当前函数开始时的 commit id（用于失败回退）
-        self._current_function_start_commit: Optional[str] = None
-        # 连续修复失败的次数（用于判断是否需要回退）
-        self._consecutive_fix_failures: int = 0
-        # 每个 Agent 对应的工具调用前的 commit id（用于细粒度检测）
-        self._agent_before_commits: Dict[str, Optional[str]] = {}
 
     def _extract_compile_flags(self, c_file_path: Union[str, Path]) -> Optional[str]:
         """从 compile_commands.json 中提取指定 C 文件的编译参数（委托给 CompileCommandsManager）"""
