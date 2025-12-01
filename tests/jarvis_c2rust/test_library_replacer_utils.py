@@ -218,9 +218,7 @@ class TestLoadAdditionalNotes:
         data_dir = tmp_path / ".jarvis" / "c2rust"
         data_dir.mkdir(parents=True)
         config_file = data_dir / "config.json"
-        config_file.write_text(
-            json.dumps({"additional_notes": "Test notes"})
-        )
+        config_file.write_text(json.dumps({"additional_notes": "Test notes"}))
         result = load_additional_notes(data_dir)
         assert result == "Test notes"
 
@@ -361,4 +359,3 @@ class TestIsEntryFunction:
         """测试空名称"""
         rec = {"name": "", "qualified_name": ""}
         assert is_entry_function(rec) is False
-

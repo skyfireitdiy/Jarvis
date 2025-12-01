@@ -52,7 +52,7 @@ from jarvis.jarvis_c2rust.library_replacer_loader import (
     collect_descendants,
     load_symbols,
     process_candidate_scope,
-        )
+)
 from jarvis.jarvis_c2rust.library_replacer_llm import (
     check_llm_availability,
     create_llm_model,
