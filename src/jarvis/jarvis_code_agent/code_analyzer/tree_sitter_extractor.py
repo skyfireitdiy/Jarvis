@@ -27,10 +27,28 @@ class TreeSitterExtractor(SymbolExtractor):
         """
         Parses the code with tree-sitter and extracts symbols based on the query.
         """
+        # 检查内容是否为空或只包含空白
+        if not content or not content.strip():
+            return []
+        
         try:
+            # 解析代码
             tree = self.parser.parse(bytes(content, "utf8"))
-            # 使用 Query 构造函数（新 API）
-            query = Query(self.language, self.symbol_query)
+            
+            # 检查解析是否成功（tree.root_node 应该存在）
+            if not tree or not tree.root_node:
+                return []
+            
+            # 尝试构造查询
+            try:
+                query = Query(self.language, self.symbol_query)
+            except Exception as query_error:
+                # Query 构造失败（可能是查询语法问题），静默返回空列表
+                import os
+                if os.getenv("DEBUG_TREE_SITTER", "").lower() in ("1", "true", "yes"):
+                    print(f"Error creating query for {file_path}: {query_error}")
+                return []
+            
             # 使用 QueryCursor 执行查询
             cursor = QueryCursor(query)
             matches = cursor.matches(tree.root_node)
@@ -40,14 +58,22 @@ class TreeSitterExtractor(SymbolExtractor):
             for pattern_index, captures_dict in matches:
                 for capture_name, nodes in captures_dict.items():
                     for node in nodes:
-                        symbol = self._create_symbol_from_capture(
-                            node, capture_name, file_path
-                        )
-                        if symbol:
-                            symbols.append(symbol)
+                        try:
+                            symbol = self._create_symbol_from_capture(
+                                node, capture_name, file_path
+                            )
+                            if symbol:
+                                symbols.append(symbol)
+                        except Exception:
+                            # 单个符号提取失败，继续处理其他符号
+                            continue
             return symbols
         except Exception as e:
-            print(f"Error extracting symbols from {file_path} with tree-sitter: {e}")
+            # 静默处理解析错误（可能是语法错误、文件损坏等）
+            # 只在调试模式下打印错误信息
+            import os
+            if os.getenv("DEBUG_TREE_SITTER", "").lower() in ("1", "true", "yes"):
+                print(f"Error extracting symbols from {file_path} with tree-sitter: {e}")
             return []
 
     @abstractmethod
