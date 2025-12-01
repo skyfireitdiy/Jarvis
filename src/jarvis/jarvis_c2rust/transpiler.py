@@ -247,8 +247,8 @@ class Transpiler:
         # 在初始化完成后打印日志
         typer.secho(
             f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}",
-            fg=typer.colors.BLUE,
-        )
+                        fg=typer.colors.BLUE,
+                    )
         # 使用 JSONL 存储的符号映射
         self.symbol_map = _SymbolMapJsonl(self.symbol_map_path)
 
@@ -374,7 +374,7 @@ class Transpiler:
         """工具调用后的事件处理器（委托给 AgentManager）"""
         return self.agent_manager.on_after_tool_call(
             agent, current_response, need_return, tool_prompt, **kwargs
-        )
+            )
 
     def _get_code_agent(self) -> CodeAgent:
         """获取代码生成/修复Agent（委托给 AgentManager）"""
@@ -481,7 +481,7 @@ class Transpiler:
                 lambda: self._consecutive_fix_failures,
                 lambda v: setattr(self, "_consecutive_fix_failures", v),
                 lambda: self._current_function_start_commit,
-            )
+                    )
 
     def _classify_rust_error(self, text: str) -> List[str]:
         """朴素错误分类（委托给 BuildManager）"""
@@ -541,7 +541,7 @@ class Transpiler:
             tags,
             sym_name,
             src_loc,
-            c_code,
+                c_code,
             curr,
             symbols_path,
             include_output_patch_hint,

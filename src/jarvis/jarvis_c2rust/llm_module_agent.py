@@ -318,7 +318,7 @@ from jarvis.jarvis_c2rust.llm_module_agent_utils import (  # noqa: E402
 # 向后兼容：导出 apply_project_structure_from_json
 from jarvis.jarvis_c2rust.llm_module_agent_apply import (  # noqa: E402
     apply_project_structure_from_json,
-)
+                )
 
 __all__ = [
     "LLMRustCratePlannerAgent",
