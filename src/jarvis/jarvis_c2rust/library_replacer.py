@@ -334,15 +334,15 @@ def apply_library_replacement(
                     msg += f"; 备注: {notes[:MAX_NOTES_DISPLAY_LENGTH]}"
                 typer.secho(msg, fg=typer.colors.GREEN, err=True)
 
-                # 入口函数保护：不替代 main（保留进行转译），改为深入评估其子节点
+                # 如果节点可替代，无论是否最终替代（如入口函数保护），都不评估其子节点
+                # 入口函数保护：不替代 main（保留进行转译），但不评估其子节点
                 if is_entry_function(rec_meta):
                     typer.secho(
-                        "[c2rust-library] 入口函数保护：跳过对 main 的库替代，继续评估其子节点。",
+                        "[c2rust-library] 入口函数保护：跳过对 main 的库替代，不评估其子节点。",
                         fg=typer.colors.YELLOW,
                         err=True,
                     )
-                    for ch in adj_func.get(fid, []):
-                        evaluate_node(ch, is_root_func=False)
+                    # 不评估子节点，也不添加到 selected_roots（因为入口函数不会被替代）
                 else:
                     # 即时剪枝（不含根）
                     to_prune = set(desc)
@@ -374,6 +374,7 @@ def apply_library_replacement(
                         fg=typer.colors.MAGENTA,
                         err=True,
                     )
+                # 注意：无论是否入口函数，只要 replaceable 为 True，都不评估子节点
             else:
                 # 若不可替代，继续评估其子节点（深度优先）
                 for ch in adj_func.get(fid, []):
