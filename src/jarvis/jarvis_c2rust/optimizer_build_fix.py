@@ -64,7 +64,7 @@ class BuildFixOptimizer:
             output = ""
             try:
                 res = subprocess.run(
-                    ["cargo", "test", "-q"],
+                    ["cargo", "test", "--doc", "-q"],
                     capture_output=True,
                     text=True,
                     check=False,
@@ -134,7 +134,7 @@ class BuildFixOptimizer:
                 "- 修复时应该先解决编译错误，然后再解决测试失败；",
                 "- 如果修复过程中引入了新的错误，必须立即修复这些新错误。",
                 "",
-                "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test -q` 进行验证；",
+                "自检要求：在每次输出补丁后，请使用 execute_script 工具在 crate 根目录执行 `cargo test --doc -q` 进行验证；",
                 "若出现编译错误或测试失败，请优先修复这些问题；",
                 "若未通过，请继续输出新的补丁进行最小修复并再次自检，直至 `cargo test` 通过为止。",
                 "",
