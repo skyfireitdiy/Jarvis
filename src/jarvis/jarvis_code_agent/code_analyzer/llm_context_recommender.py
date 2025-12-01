@@ -119,6 +119,15 @@ class ContextRecommender:
         # 0. 检查并填充符号表（如果为空）
         self._ensure_symbol_table_loaded()
 
+        # 检查符号表是否为空（构建完成后仍然为空）
+        symbol_count = sum(
+            len(symbols)
+            for symbols in self.context_manager.symbol_table.symbols_by_name.values()
+        )
+        if symbol_count == 0:
+            print("⚠️ 符号表为空，无法进行上下文推荐")
+            return ContextRecommendation(recommended_symbols=[])
+
         # 1. 使用LLM生成相关符号名
         model_name = self.llm_model.name() if self.llm_model else "LLM"
         print(f"📝 正在使用{model_name}生成相关符号名...")
