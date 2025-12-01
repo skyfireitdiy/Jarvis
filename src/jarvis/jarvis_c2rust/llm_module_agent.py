@@ -21,288 +21,20 @@ CLI 集成建议:
 
 from __future__ import annotations
 
-from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 import json
-
-# removed sqlite3 (migrated to JSONL/JSON)
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
-import re
+from typing import Any, List, Optional, Union
 
 from jarvis.jarvis_agent import Agent  # 复用 LLM Agent 能力
-from jarvis.jarvis_utils.input import user_confirm
 
-
-@dataclass
-class _FnMeta:
-    id: int
-    name: str
-    qname: str
-    signature: str
-    file: str
-    refs: List[str]
-
-    @property
-    def label(self) -> str:
-        base = self.qname or self.name or f"fn_{self.id}"
-        if self.signature and self.signature != base:
-            return f"{base}\n{self.signature}"
-        return base
-
-    @property
-    def top_namespace(self) -> str:
-        """
-        提取顶层命名空间/类名:
-        - qualified_name 形如 ns1::ns2::Class::method -> 返回 ns1
-        - C 函数或无命名空间 -> 返回 "c"
-        """
-        if self.qname and "::" in self.qname:
-            return self.qname.split("::", 1)[0] or "c"
-        return "c"
-
-
-def _sanitize_mod_name(s: str) -> str:
-    s = (s or "").replace("::", "__")
-    safe = []
-    for ch in s:
-        if ch.isalnum() or ch == "_":
-            safe.append(ch.lower())
-        else:
-            safe.append("_")
-    out = "".join(safe).strip("_")
-    return out[:80] or "mod"
-
-
-class _GraphLoader:
-    """
-    仅从 symbols.jsonl 读取符号与调用关系，提供子图遍历能力：
-    - 数据源：<project_root>/.jarvis/c2rust/symbols.jsonl 或显式传入的 .jsonl 文件
-    - 不再支持任何回退策略（不考虑 symbols_raw.jsonl、functions.jsonl 等）
-    """
-
-    def __init__(self, db_path: Path, project_root: Path):
-        self.project_root = Path(project_root).resolve()
-
-        def _resolve_data_path(hint: Path) -> Path:
-            p = Path(hint)
-            # 仅支持 symbols.jsonl；不再兼容 functions.jsonl 或其他旧格式
-            # 若直接传入文件路径且为 .jsonl，则直接使用（要求内部包含 category/ref 字段）
-            if p.is_file() and p.suffix.lower() == ".jsonl":
-                return p
-            # 目录：仅支持 <dir>/.jarvis/c2rust/symbols.jsonl
-            if p.is_dir():
-                return p / ".jarvis" / "c2rust" / "symbols.jsonl"
-            # 默认：项目 .jarvis/c2rust/symbols.jsonl
-            return self.project_root / ".jarvis" / "c2rust" / "symbols.jsonl"
-
-        self.data_path = _resolve_data_path(Path(db_path))
-        if not self.data_path.exists():
-            raise FileNotFoundError(f"未找到 symbols.jsonl: {self.data_path}")
-        # Initialize in-memory graph structures
-        self.adj: Dict[int, List[str]] = {}
-        self.name_to_id: Dict[str, int] = {}
-        self.fn_by_id: Dict[int, _FnMeta] = {}
-
-        # 从 symbols.jsonl 加载符号元数据与邻接关系（统一处理函数与类型，按 ref 构建名称邻接）
-        rows_loaded = 0
-        try:
-            with open(self.data_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json_loads(line)
-                    except Exception:
-                        # 跳过无效的 JSON 行，但记录以便调试
-                        continue
-                    # 不区分函数与类型，统一处理 symbols.jsonl 中的所有记录
-                    rows_loaded += 1
-                    fid = int(obj.get("id") or rows_loaded)
-                    nm = obj.get("name") or ""
-                    qn = obj.get("qualified_name") or ""
-                    sg = obj.get("signature") or ""
-                    fp = obj.get("file") or ""
-                    refs = obj.get("ref")
-                    # 不兼容旧数据：严格要求为列表类型，缺失则视为空
-                    if not isinstance(refs, list):
-                        refs = []
-                    refs = [c for c in refs if isinstance(c, str) and c]
-                    self.adj[fid] = refs
-                    # 建立名称索引与函数元信息，供子图遍历与上下文构造使用
-                    if isinstance(nm, str) and nm:
-                        self.name_to_id.setdefault(nm, fid)
-                    if isinstance(qn, str) and qn:
-                        self.name_to_id.setdefault(qn, fid)
-                    try:
-                        rel_file = self._rel_path(fp)
-                    except (ValueError, OSError):
-                        rel_file = fp
-                    self.fn_by_id[fid] = _FnMeta(
-                        id=fid,
-                        name=nm,
-                        qname=qn,
-                        signature=sg,
-                        file=rel_file,
-                        refs=refs,
-                    )
-        except FileNotFoundError:
-            raise
-        except (OSError, IOError) as e:
-            raise RuntimeError(f"读取 symbols.jsonl 时发生错误: {e}") from e
-        except Exception as e:
-            raise RuntimeError(f"解析 symbols.jsonl 时发生未知错误: {e}") from e
-
-    def _rel_path(self, abs_path: str) -> str:
-        try:
-            p = Path(abs_path).resolve()
-            return str(p.relative_to(self.project_root))
-        except Exception:
-            return abs_path
-
-    def collect_subgraph(self, root_id: int) -> Tuple[Set[int], Set[str]]:
-        """
-        从 root_id 出发，收集所有可达的内部函数 (visited_ids) 与外部调用名称 (externals)
-        """
-        visited: Set[int] = set()
-        externals: Set[str] = set()
-        stack: List[int] = [root_id]
-        visited.add(root_id)
-        while stack:
-            src = stack.pop()
-            for callee in self.adj.get(src, []):
-                cid = self.name_to_id.get(callee)
-                if cid is not None:
-                    if cid not in visited:
-                        visited.add(cid)
-                        stack.append(cid)
-                else:
-                    externals.add(callee)
-        return visited, externals
-
-    def build_roots_context(
-        self,
-        roots: List[int],
-        max_functions_per_ns: int = 200,  # 保留参数以保持兼容性，但当前未使用
-        max_namespaces_per_root: int = 50,  # 保留参数以保持兼容性，但当前未使用
-    ) -> List[Dict[str, Any]]:
-        """
-        为每个根函数构造上下文（仅函数名的调用关系，且不包含任何其他信息）：
-        - root_function: 根函数的简单名称（不包含签名/限定名）
-        - functions: 该根函数子图内所有可达函数的简单名称列表（不包含签名/限定名），去重、排序、可选截断
-        注意：
-        - 不包含文件路径、签名、限定名、命名空间、外部符号等任何其他元信息
-        """
-        root_contexts: List[Dict[str, Any]] = []
-        for rid in roots:
-            meta = self.fn_by_id.get(rid)
-            root_label = (meta.name or f"fn_{rid}") if meta else f"fn_{rid}"
-
-            visited_ids, _externals = self.collect_subgraph(rid)
-            # 收集所有简单函数名
-            fn_names: List[str] = []
-            for fid in sorted(visited_ids):
-                m = self.fn_by_id.get(fid)
-                if not m:
-                    continue
-                simple = m.name or f"fn_{fid}"
-                fn_names.append(simple)
-
-            # 去重并排序（优先使用 dict.fromkeys 保持顺序）
-            try:
-                fn_names = sorted(list(dict.fromkeys(fn_names)))
-            except (TypeError, ValueError):
-                # 如果 dict.fromkeys 失败（理论上不应该），回退到 set
-                fn_names = sorted(list(set(fn_names)))
-
-            root_contexts.append(
-                {
-                    "root_function": root_label,
-                    "functions": fn_names,
-                }
-            )
-        return root_contexts
-
-
-def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
-    """
-    预清理：如存在将删除将要生成的 crate 目录、当前目录的 workspace 文件 Cargo.toml、
-    以及 project_root/.jarvis/c2rust 下的 progress.json 与 symbol_map.jsonl。
-    用户不同意则直接退出。
-    """
-    import sys
-    import shutil
-
-    try:
-        cwd = Path(".").resolve()
-    except (OSError, ValueError) as e:
-        raise RuntimeError(f"无法解析当前工作目录: {e}") from e
-
-    try:
-        requested_root = Path(project_root).resolve()
-    except (OSError, ValueError):
-        requested_root = Path(project_root)
-
-    created_dir = (
-        cwd.parent / f"{cwd.name}_rs" if requested_root == cwd else requested_root
-    )
-
-    cargo_path = cwd / "Cargo.toml"
-    data_dir = requested_root / ".jarvis" / "c2rust"
-    progress_path = data_dir / "progress.json"
-    symbol_map_jsonl_path = data_dir / "symbol_map.jsonl"
-
-    targets: List[str] = []
-    if created_dir.exists():
-        targets.append(f"- 删除 crate 目录（如存在）：{created_dir}")
-    if cargo_path.exists():
-        targets.append(f"- 删除工作区文件：{cargo_path}")
-    if progress_path.exists():
-        targets.append(f"- 删除进度文件：{progress_path}")
-    if symbol_map_jsonl_path.exists():
-        targets.append(f"- 删除符号映射文件：{symbol_map_jsonl_path}")
-
-    if not targets:
-        return
-
-    tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
-    if not user_confirm("\n".join(tip_lines), default=False):
-        print("[c2rust-llm-planner] 用户取消清理操作，退出。")
-        sys.exit(0)
-
-    # 执行清理操作
-    try:
-        if created_dir.exists():
-            shutil.rmtree(created_dir, ignore_errors=True)
-        if cargo_path.exists():
-            cargo_path.unlink()
-        if progress_path.exists():
-            progress_path.unlink()
-        if symbol_map_jsonl_path.exists():
-            symbol_map_jsonl_path.unlink()
-    except (OSError, PermissionError) as e:
-        raise RuntimeError(f"清理操作失败: {e}") from e
-
-
-def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
-    """
-    解析 crate 目录路径：
-    - 若 target_root 为 "." 或解析后等于当前工作目录，则返回 "<cwd.name>_rs" 目录；
-    - 否则返回解析后的目标路径；
-    - 解析失败则回退到 Path(target_root)。
-    """
-    try:
-        cwd = Path(".").resolve()
-        try:
-            resolved_target = Path(target_root).resolve()
-        except Exception:
-            resolved_target = Path(target_root)
-        if target_root == "." or resolved_target == cwd:
-            return cwd.parent / f"{cwd.name}_rs"
-        return resolved_target
-    except Exception:
-        return Path(target_root)
+from jarvis.jarvis_c2rust.llm_module_agent_loader import GraphLoader
+from jarvis.jarvis_c2rust.llm_module_agent_prompts import PromptBuilder
+from jarvis.jarvis_c2rust.llm_module_agent_types import sanitize_mod_name
+from jarvis.jarvis_c2rust.llm_module_agent_utils import (
+    parse_project_json_entries,
+    perform_pre_cleanup_for_planner,
+)
+from jarvis.jarvis_c2rust.llm_module_agent_validator import ProjectValidator
 
 
 class LLMRustCratePlannerAgent:
@@ -323,9 +55,22 @@ class LLMRustCratePlannerAgent:
             else (self.project_root / ".jarvis" / "c2rust" / "symbols.jsonl")
         )
         self.llm_group = llm_group
-        self.loader = _GraphLoader(self.db_path, self.project_root)
+        self.loader = GraphLoader(self.db_path, self.project_root)
         # 读取附加说明
         self.additional_notes = self._load_additional_notes()
+
+        # 初始化提示词构建器和验证器
+        self.prompt_builder = PromptBuilder(
+            self.project_root,
+            self.loader,
+            self._crate_name,
+            self._has_original_main,
+            self._append_additional_notes,
+        )
+        self.validator = ProjectValidator(
+            self._crate_name,
+            self._has_original_main,
+        )
 
     def _load_additional_notes(self) -> str:
         """从配置文件加载附加说明"""
@@ -376,7 +121,7 @@ class LLMRustCratePlannerAgent:
                 base = self.project_root.name or "c2rust_crate"
         except Exception:
             base = "c2rust_crate"
-        return _sanitize_mod_name(base)
+        return sanitize_mod_name(base)
 
     def _has_original_main(self) -> bool:
         """
@@ -394,341 +139,6 @@ class LLMRustCratePlannerAgent:
             pass
         return False
 
-    def _order_path(self) -> Path:
-        """
-        返回 translation_order.jsonl 的标准路径：<project_root>/.jarvis/c2rust/translation_order.jsonl
-        """
-        return self.project_root / ".jarvis" / "c2rust" / "translation_order.jsonl"
-
-    def _build_roots_context_from_order(self) -> List[Dict[str, Any]]:
-        """
-        基于 translation_order.jsonl 生成用于规划的上下文：
-        - 以每个 step 的 roots 标签为分组键（通常每步一个 root 标签）
-        - 函数列表来自每步的 items 中的符号 'name' 字段，按 root 聚合去重
-        - 跳过无 roots 标签的 residual 步骤（仅保留明确 root 的上下文）
-        - 若最终未收集到任何 root 组，则回退为单组 'project'，包含所有 items 的函数名集合
-        """
-        from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
-
-        order_path = self._order_path()
-        if not order_path.exists():
-            raise FileNotFoundError(f"未找到 translation_order.jsonl: {order_path}")
-
-        def _deduplicate_names(names: List[str]) -> List[str]:
-            """去重并排序函数名列表"""
-            try:
-                return sorted(list(dict.fromkeys(names)))
-            except (TypeError, ValueError):
-                return sorted(list(set(names)))
-
-        def _extract_names_from_items(items: List[Any]) -> List[str]:
-            """从 items 中提取函数名"""
-            names: List[str] = []
-            for it in items:
-                if isinstance(it, dict):
-                    nm = it.get("name") or ""
-                    if isinstance(nm, str) and nm.strip():
-                        names.append(str(nm).strip())
-            return names
-
-        groups: Dict[str, List[str]] = {}
-        all_names_fallback: List[str] = []  # 用于回退场景
-
-        try:
-            with order_path.open("r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json_loads(line)
-                    except Exception:
-                        continue
-
-                    roots = obj.get("roots") or []
-                    items = obj.get("items") or []
-                    if not isinstance(items, list) or not items:
-                        continue
-
-                    # 提取所有函数名（用于回退场景）
-                    item_names = _extract_names_from_items(items)
-                    all_names_fallback.extend(item_names)
-
-                    # 提取 root 标签
-                    root_labels = [
-                        str(r).strip()
-                        for r in roots
-                        if isinstance(r, str) and str(r).strip()
-                    ]
-                    if not root_labels:
-                        continue
-
-                    # 去重 step_names
-                    step_names = _deduplicate_names(item_names)
-                    if not step_names:
-                        continue
-
-                    # 按 root 聚合
-                    for r in root_labels:
-                        groups.setdefault(r, []).extend(step_names)
-        except (OSError, IOError) as e:
-            raise RuntimeError(f"读取 translation_order.jsonl 时发生错误: {e}") from e
-
-        contexts: List[Dict[str, Any]] = []
-        for root_label, names in groups.items():
-            names = _deduplicate_names(names)
-            contexts.append({"root_function": root_label, "functions": sorted(names)})
-
-        # 回退：如果没有任何 root 组，使用所有 items 作为单组 'project'
-        if not contexts:
-            all_names = _deduplicate_names(all_names_fallback)
-            if all_names:
-                contexts.append(
-                    {"root_function": "project", "functions": sorted(all_names)}
-                )
-
-        return contexts
-
-    def _build_user_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
-        """
-        主对话阶段：传入上下文，不给出输出要求，仅用于让模型获取信息并触发进入总结阶段。
-        请模型仅输出 <!!!COMPLETE!!!> 以进入总结（summary）阶段。
-        """
-        crate_name = self._crate_name()
-        has_main = self._has_original_main()
-        created_dir = _resolve_created_dir(self.project_root)
-        context_json = json.dumps(
-            {
-                "meta": {
-                    "crate_name": crate_name,
-                    "main_present": has_main,
-                    "crate_dir": str(created_dir),
-                },
-                "roots": roots_context,
-            },
-            ensure_ascii=False,
-            indent=2,
-        )
-        prompt = f"""
-下面提供了项目的调用图上下文（JSON），请先通读理解，不要输出任何规划或JSON内容：
-<context>
-{context_json}
-</context>
-
-如果已准备好进入总结阶段以生成完整输出，请仅输出：<!!!COMPLETE!!!>
-""".strip()
-        return self._append_additional_notes(prompt)
-
-    def _build_system_prompt(self) -> str:
-        """
-        系统提示：描述如何基于依赖关系进行 crate 规划的原则（不涉及对话流程或输出方式）
-        """
-        crate_name = self._crate_name()
-        prompt = (
-            "你是资深 Rust 架构师。任务：根据给定的函数级调用关系（仅包含 root_function 及其可达的函数名列表），为目标项目规划合理的 Rust crate 结构。\n"
-            "\n"
-            "规划原则：\n"
-            "- 根导向：以每个 root_function 为边界组织顶层模块，形成清晰的入口与责任范围。\n"
-            "- 内聚优先：按调用内聚性拆分子模块，使强相关函数位于同一子模块，减少跨模块耦合。\n"
-            "- 去环与分层：尽量消除循环依赖；遵循由上到下的调用方向，保持稳定依赖方向与层次清晰。\n"
-            "- 共享抽取：被多个 root 使用的通用能力抽取到 common/ 或 shared/ 模块，避免重复与交叉依赖。\n"
-            "- 边界隔离：将平台/IO/外设等边界能力独立到 adapter/ 或 ffi/ 等模块（如存在）。\n"
-            "- 命名规范：目录/文件采用小写下划线；模块名简洁可读，避免特殊字符与过长名称。\n"
-            "- 可演进性：模块粒度适中，保留扩展点，便于后续重构与逐步替换遗留代码。\n"
-            "- 模块组织：每个目录的 mod.rs 声明其子目录与 .rs 子模块；顶层 lib.rs 汇聚导出主要模块与公共能力。\n"
-            "- 入口策略（务必遵循，bin 仅做入口，功能尽量在 lib 中实现）：\n"
-            "  * 若原始项目包含 main 函数：不要生成 src/main.rs；使用 src/bin/"
-            + crate_name
-            + ".rs 作为唯一可执行入口，并在其中仅保留最小入口逻辑（调用库层）；共享代码放在 src/lib.rs；\n"
-            "  * 若原始项目不包含 main 函数：不要生成任何二进制入口（不创建 src/main.rs 或 src/bin/），仅生成 src/lib.rs；\n"
-            "  * 多可执行仅在确有多个清晰入口时才使用 src/bin/<name>.rs；每个 bin 文件仅做入口，尽量调用库；\n"
-            "  * 二进制命名：<name> 使用小写下划线，体现入口意图，避免与模块/文件重名。\n"
-        )
-        return self._append_additional_notes(prompt)
-
-    def _build_summary_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
-        """
-        总结阶段：只输出目录结构的 JSON。
-        要求：
-        - 仅输出一个 <PROJECT> 块
-        - <PROJECT> 与 </PROJECT> 之间必须是可解析的 JSON 数组
-        - 目录以对象表示，键为 '目录名/'，值为子项数组；文件为字符串
-        - 块外不得有任何字符（包括空行、注释、Markdown、解释文字、schema等）
-        - 不要输出 crate 名称或其他多余字段
-        """
-        has_main = self._has_original_main()
-        crate_name = self._crate_name()
-        guidance_common = """
-输出规范：
-- 只输出一个 <PROJECT> 块
-- 块外不得有任何字符（包括空行、注释、Markdown 等）
-- 块内必须是 JSON 数组：
-  - 目录项使用对象表示，键为 '<name>/'，值为子项数组
-  - 文件为字符串项（例如 "lib.rs"）
-- 不要创建与入口无关的占位文件
-- 支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）
-""".strip()
-        if has_main:
-            entry_rule = f"""
-入口约定（基于原始项目存在 main）：
-- 必须包含 src/lib.rs；
-- 不要包含 src/main.rs；
-- 必须包含 src/bin/{crate_name}.rs，作为唯一可执行入口（仅做入口，调用库逻辑）；
-- 如无明确多个入口，不要创建额外 bin 文件。
-正确示例（JSON格式）：
-<PROJECT>
-[
-  "Cargo.toml",
-  {{
-    "src/": [
-      "lib.rs",
-      {{
-        "bin/": [
-          "{crate_name}.rs"
-        ]
-      }}
-    ]
-  }}
-]
-</PROJECT>
-""".strip()
-        else:
-            entry_rule = """
-入口约定（基于原始项目不存在 main）：
-- 必须包含 src/lib.rs；
-- 不要包含 src/main.rs；
-- 不要包含 src/bin/ 目录。
-正确示例（JSON格式）：
-<PROJECT>
-[
-  "Cargo.toml",
-  {
-    "src/": [
-      "lib.rs"
-    ]
-  }
-]
-</PROJECT>
-""".strip()
-        guidance = f"{guidance_common}\n{entry_rule}"
-        prompt = f"""
-请基于之前对话中已提供的<context>信息，生成总结输出（项目目录结构的 JSON）。严格遵循以下要求：
-
-{guidance}
-
-你的输出必须仅包含以下单个块（用项目的真实目录结构替换块内内容）：
-<PROJECT>
-[...]
-</PROJECT>
-""".strip()
-        return self._append_additional_notes(prompt)
-
-    def _extract_json_from_project(self, text: str) -> str:
-        """
-        从 <PROJECT> 块中提取内容作为最终 JSON；若未匹配，返回原文本（兜底）。
-        """
-        if not isinstance(text, str) or not text:
-            return ""
-        m_proj = re.search(r"<PROJECT>([\s\S]*?)</PROJECT>", text, flags=re.IGNORECASE)
-        if m_proj:
-            return m_proj.group(1).strip()
-        return text.strip()
-
-    def _validate_project_entries(self, entries: List[Any]) -> Tuple[bool, str]:
-        """
-        校验目录结构是否满足强约束：
-        - 必须存在 src/lib.rs
-        - 若原始项目包含 main：
-          * 不允许 src/main.rs
-          * 必须包含 src/bin/<crate_name>.rs
-        - 若原始项目不包含 main：
-          * 不允许 src/main.rs
-          * 不允许存在 src/bin/ 目录
-        返回 (是否通过, 错误原因)
-        """
-        if not isinstance(entries, list) or not entries:
-            return False, "JSON 不可解析或为空数组"
-
-        # 提取 src 目录子项
-        src_children: Optional[List[Any]] = None
-        for it in entries:
-            if isinstance(it, dict) and len(it) == 1:
-                k, v = next(iter(it.items()))
-                kk = str(k).rstrip("/").strip().lower()
-                if kk == "src":
-                    if isinstance(v, list):
-                        src_children = v
-                    else:
-                        src_children = []
-                    break
-        if src_children is None:
-            return False, "缺少 src 目录"
-
-        # 建立便捷索引
-        def has_file(name: str) -> bool:
-            for ch in src_children or []:
-                if isinstance(ch, str) and ch.strip().lower() == name.lower():
-                    return True
-            return False
-
-        def find_dir(name: str) -> Optional[List[Any]]:
-            for ch in src_children or []:
-                if isinstance(ch, dict) and len(ch) == 1:
-                    k, v = next(iter(ch.items()))
-                    kk = str(k).rstrip("/").strip().lower()
-                    if kk == name.lower():
-                        return v if isinstance(v, list) else []
-            return None
-
-        # 1) 必须包含 lib.rs
-        if not has_file("lib.rs"):
-            return False, "src 目录下必须包含 lib.rs"
-
-        has_main = self._has_original_main()
-        crate_name = self._crate_name()
-
-        # 2) 入口约束
-        if has_main:
-            # 不允许 src/main.rs
-            if has_file("main.rs"):
-                return (
-                    False,
-                    "原始项目包含 main：不应生成 src/main.rs，请使用 src/bin/<crate>.rs",
-                )
-            # 必须包含 src/bin/<crate_name>.rs
-            bin_children = find_dir("bin")
-            if bin_children is None:
-                return False, f"原始项目包含 main：必须包含 src/bin/{crate_name}.rs"
-            expect_bin = f"{crate_name}.rs".lower()
-            if not any(
-                isinstance(ch, str) and ch.strip().lower() == expect_bin
-                for ch in bin_children
-            ):
-                return False, f"原始项目包含 main：必须包含 src/bin/{crate_name}.rs"
-        else:
-            # 不允许 src/main.rs
-            if has_file("main.rs"):
-                return False, "原始项目不包含 main：不应生成 src/main.rs"
-            # 不允许有 bin 目录
-            if find_dir("bin") is not None:
-                return False, "原始项目不包含 main：不应生成 src/bin/ 目录"
-
-        return True, ""
-
-    def _build_retry_summary_prompt(
-        self, base_summary_prompt: str, error_reason: str
-    ) -> str:
-        """
-        在原始 summary_prompt 基础上，附加错误反馈，要求严格重试。
-        """
-        feedback = (
-            "\n\n[格式校验失败，必须重试]\n"
-            f"- 失败原因：{error_reason}\n"
-            "- 请严格遵循上述“输出规范”与“入口约定”，重新输出；\n"
-            "- 仅输出一个 <PROJECT> 块，块内为可解析的 JSON 数组；块外不得有任何字符。\n"
-        )
-        return base_summary_prompt + feedback
-
     def _get_project_json_text(self, max_retries: int = 10) -> str:
         """
         执行主流程并返回原始 <PROJECT> JSON 文本，不进行解析。
@@ -741,11 +151,11 @@ class LLMRustCratePlannerAgent:
             RuntimeError: 达到最大重试次数仍未生成有效输出
         """
         # 从 translation_order.jsonl 生成上下文，不再基于 symbols.jsonl 的调用图遍历
-        roots_ctx = self._build_roots_context_from_order()
+        roots_ctx = self.prompt_builder.build_roots_context_from_order()
 
-        system_prompt = self._build_system_prompt()
-        user_prompt = self._build_user_prompt(roots_ctx)
-        base_summary_prompt = self._build_summary_prompt(roots_ctx)
+        system_prompt = self.prompt_builder.build_system_prompt()
+        user_prompt = self.prompt_builder.build_user_prompt(roots_ctx)
+        base_summary_prompt = self.prompt_builder.build_summary_prompt(roots_ctx)
 
         last_error = "未知错误"
         attempt = 0
@@ -758,7 +168,9 @@ class LLMRustCratePlannerAgent:
             summary_prompt = (
                 base_summary_prompt
                 if attempt == 1
-                else self._build_retry_summary_prompt(base_summary_prompt, last_error)
+                else self.prompt_builder.build_retry_summary_prompt(
+                    base_summary_prompt, last_error
+                )
             )
 
             # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
@@ -799,10 +211,10 @@ class LLMRustCratePlannerAgent:
                 summary_output = agent.run(user_prompt)  # type: ignore
 
             project_text = str(summary_output) if summary_output is not None else ""
-            json_text = self._extract_json_from_project(project_text)
+            json_text = self.validator.extract_json_from_project(project_text)
 
             # 尝试解析并校验
-            entries, parse_error_json = _parse_project_json_entries(json_text)
+            entries, parse_error_json = parse_project_json_entries(json_text)
             if parse_error_json:
                 # JSON解析失败，记录错误并重试
                 last_error = parse_error_json
@@ -810,7 +222,7 @@ class LLMRustCratePlannerAgent:
                 print(f"[c2rust-llm-planner] JSON解析失败: {parse_error_json}")
                 continue
 
-            ok, reason = self._validate_project_entries(entries)
+            ok, reason = self.validator.validate_project_entries(entries)
             if ok:
                 return json_text
             else:
@@ -831,7 +243,7 @@ class LLMRustCratePlannerAgent:
           * 字典：目录及其子项，如 {"src/": [ ... ]}
         """
         json_text = self._get_project_json_text()
-        json_entries, parse_error = _parse_project_json_entries(json_text)
+        json_entries, parse_error = parse_project_json_entries(json_text)
         if parse_error:
             raise RuntimeError(f"JSON解析失败: {parse_error}")
         return json_entries
@@ -863,7 +275,7 @@ def plan_crate_json_text(
         )
         return agent.plan_crate_json_text()
 
-    _perform_pre_cleanup_for_planner(project_root)
+    perform_pre_cleanup_for_planner(project_root)
 
     agent = LLMRustCratePlannerAgent(
         project_root=project_root, db_path=db_path, llm_group=llm_group
@@ -887,472 +299,14 @@ def plan_crate_json_llm(
         agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
         return agent.plan_crate_json_with_project()
 
-    _perform_pre_cleanup_for_planner(project_root)
+    perform_pre_cleanup_for_planner(project_root)
 
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
     return agent.plan_crate_json_with_project()
 
 
-def entries_to_json(entries: List[Any]) -> str:
-    """
-    将解析后的 entries 列表序列化为 JSON 文本（目录使用对象表示，文件为字符串）
-    """
-    return json.dumps(entries, ensure_ascii=False, indent=2)
+# 向后兼容：导出 execute_llm_plan
 
+# 向后兼容：导出 entries_to_json
 
-def _parse_project_json_entries_fallback(json_text: str) -> List[Any]:
-    """
-    Fallback 解析器：当 jsonnet 解析失败时，尝试使用标准 json 解析。
-    注意：此函数主要用于兼容性，正常情况下应使用 jsonnet 解析。
-    """
-    try:
-        import json as std_json
-
-        data = std_json.loads(json_text)
-        if isinstance(data, list):
-            return data
-        return []
-    except Exception:
-        return []
-
-
-def _parse_project_json_entries(json_text: str) -> Tuple[List[Any], Optional[str]]:
-    """
-    使用 jsonnet 解析 <PROJECT> 块中的目录结构 JSON 为列表结构:
-    - 文件项: 字符串，如 "lib.rs"
-    - 目录项: 字典，形如 {"src/": [ ... ]} 或 {"src": [ ... ]}
-    返回(解析结果, 错误信息)
-    如果解析成功，返回(data, None)
-    如果解析失败，返回([], 错误信息)
-    使用 jsonnet 解析，支持更宽松的 JSON 语法（如尾随逗号、注释等）。
-    """
-    try:
-        try:
-            data = json_loads(json_text)
-            if isinstance(data, list):
-                return data, None
-            # 如果解析结果不是列表
-            return [], f"JSON 解析结果不是数组，而是 {type(data).__name__}"
-        except Exception as json_err:
-            # JSON 解析错误
-            error_msg = f"JSON 解析失败: {str(json_err)}"
-            return [], error_msg
-    except Exception as e:
-        # 其他未知错误
-        return [], f"解析过程发生异常: {str(e)}"
-
-
-def _ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> str:
-    """
-    在给定文本中确保存在并升级子模块声明为 `pub mod <name>;`：
-    - 解析已有的 `mod`/`pub mod`/`pub(...) mod` 声明；
-    - 已存在但非 pub 的同名声明就地升级为 `pub mod`，保留原行的缩进；
-    - 不存在的模块名则在末尾追加一行 `pub mod <name>;`；
-    - 返回更新后的完整文本（保留结尾换行）。
-    """
-    try:
-        lines = (existing_text or "").splitlines()
-    except Exception:
-        lines = []
-    mod_decl_pattern = re.compile(
-        r"^\s*(pub(?:\s*\([^)]+\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;\s*$"
-    )
-    name_to_indices: Dict[str, List[int]] = {}
-    name_has_pub: Set[str] = set()
-    for i, ln in enumerate(lines):
-        m = mod_decl_pattern.match(ln.strip())
-        if not m:
-            continue
-        mod_name = m.group(2)
-        name_to_indices.setdefault(mod_name, []).append(i)
-        if m.group(1):
-            name_has_pub.add(mod_name)
-    for mod_name in sorted(set(child_mods or [])):
-        if mod_name in name_to_indices:
-            if mod_name not in name_has_pub:
-                for idx in name_to_indices[mod_name]:
-                    ws_match = re.match(r"^(\s*)", lines[idx])
-                    leading_ws = ws_match.group(1) if ws_match else ""
-                    lines[idx] = f"{leading_ws}pub mod {mod_name};"
-        else:
-            lines.append(f"pub mod {mod_name};")
-    return "\n".join(lines).rstrip() + ("\n" if lines else "")
-
-
-def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
-    """
-    根据解析出的 entries 创建目录与文件结构（不在此阶段写入/更新任何 Rust 源文件内容）：
-    - 对于目录项：创建目录，并递归创建其子项；
-    - 对于文件项：若不存在则创建空文件；
-    约束与约定：
-    - crate 根的 src 目录：不生成 src/mod.rs，也不写入 src/lib.rs 的模块声明；
-    - 非 src 目录：不创建或更新 mod.rs；如需创建 mod.rs，请在 YAML 中显式列出；
-    - 模块声明的补齐将在后续 CodeAgent 阶段完成（扫描目录结构并最小化补齐 pub mod 声明）。
-    """
-
-    def apply_item(item: Any, dir_path: Path) -> None:
-        if isinstance(item, str):
-            # 文件
-            file_path = dir_path / item
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            if not file_path.exists():
-                try:
-                    file_path.touch(exist_ok=True)
-                except Exception:
-                    pass
-            return
-
-        if isinstance(item, dict) and len(item) == 1:
-            dir_name, children = next(iter(item.items()))
-            name = str(dir_name).rstrip("/").strip()
-            new_dir = dir_path / name
-            new_dir.mkdir(parents=True, exist_ok=True)
-
-            child_mods: List[str] = []
-            # 是否为 crate 根下的 src 目录
-            is_src_root_dir = new_dir == base_path / "src"
-
-            # 先创建子项
-            for child in children or []:
-                if isinstance(child, str):
-                    apply_item(child, new_dir)
-                    # 收集 .rs 文件作为子模块
-                    if child.endswith(".rs") and child != "mod.rs":
-                        stem = Path(child).stem
-                        # 在 src 根目录下，忽略 lib.rs 与 main.rs 的自引用
-                        if is_src_root_dir and stem in ("lib", "main"):
-                            pass
-                        else:
-                            child_mods.append(stem)
-                    if child == "mod.rs":
-                        pass
-                elif isinstance(child, dict):
-                    # 子目录
-                    sub_name = list(child.keys())[0]
-                    sub_mod_name = str(sub_name).rstrip("/").strip()
-                    child_mods.append(sub_mod_name)
-                    apply_item(child, new_dir)
-
-            # 对 crate 根的 src 目录，使用 lib.rs 聚合子模块，不创建/更新 src/mod.rs
-            if is_src_root_dir:
-                # 不在 src 根目录写入任何文件内容；仅由子项创建对应空文件（如有）
-                return
-
-            # 非 src 目录：
-            # 为避免覆盖现有实现，当前阶段不创建或更新 mod.rs 内容。
-            # 如需创建 mod.rs，应在 JSON 中显式指定为文件项；
-            # 如需补齐模块声明，将由后续的 CodeAgent 阶段根据目录结构自动补齐。
-            return
-
-    for entry in entries:
-        apply_item(entry, base_path)
-
-
-def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
-    """
-    确保在 base_dir 下存在合理的 Cargo.toml：
-    - 如果不存在，则创建最小可用的 Cargo.toml，并设置 package.name = package_name
-    - 如果已存在，则不覆盖现有内容（避免误改）
-    """
-    cargo_path = base_dir / "Cargo.toml"
-    if cargo_path.exists():
-        return
-    try:
-        cargo_path.touch(exist_ok=True)
-    except (OSError, PermissionError):
-        # 如果无法创建文件，记录错误但不中断流程
-        # 后续 CodeAgent 可能会处理 Cargo.toml 的创建
-        pass
-
-
-def apply_project_structure_from_json(
-    json_text: str, project_root: Union[Path, str] = "."
-) -> None:
-    """
-    基于 Agent 返回的 <PROJECT> 中的目录结构 JSON，创建实际目录与文件（不在此阶段写入或更新任何 Rust 源文件内容）。
-    - project_root: 目标应用路径；当为 "."（默认）时，将使用"父目录/当前目录名_rs"作为crate根目录
-    注意：模块声明（mod/pub mod）补齐将在后续的 CodeAgent 步骤中完成。按新策略不再创建或更新 workspace（构建直接在 crate 目录内进行）。
-    """
-    entries, parse_error = _parse_project_json_entries(json_text)
-    if parse_error:
-        raise ValueError(f"JSON解析失败: {parse_error}")
-    if not entries:
-        # 严格模式：解析失败直接报错并退出，由上层 CLI 捕获打印错误
-        raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
-    requested_root = Path(project_root).resolve()
-    try:
-        cwd = Path(".").resolve()
-        if requested_root == cwd:
-            # 默认crate不能设置为 .，设置为 父目录/当前目录名_rs（与当前目录同级）
-            base_dir = cwd.parent / f"{cwd.name}_rs"
-        else:
-            base_dir = requested_root
-    except Exception:
-        base_dir = requested_root
-    base_dir.mkdir(parents=True, exist_ok=True)
-    # crate name 与目录名保持一致（用于 Cargo 包名，允许连字符）
-    crate_pkg_name = base_dir.name
-    _apply_entries_with_mods(entries, base_dir)
-    # 确保 Cargo.toml 存在并设置包名
-    _ensure_cargo_toml(base_dir, crate_pkg_name)
-
-    # 已弃用：不再将 crate 添加到 workspace（按新策略去除 workspace）
-    # 构建与工具运行将直接在 crate 目录内进行
-
-
-def execute_llm_plan(
-    out: Optional[Union[Path, str]] = None,
-    apply: bool = False,
-    crate_name: Optional[Union[Path, str]] = None,
-    llm_group: Optional[str] = None,
-    non_interactive: bool = True,
-) -> List[Any]:
-    """
-    返回 LLM 生成的目录结构原始 JSON 文本（来自 <PROJECT> 块）。
-    不进行解析，便于后续按原样应用并在需要时使用更健壮的解析器处理。
-    """
-    # execute_llm_plan 是顶层入口，需要执行清理（skip_cleanup=False）
-    # plan_crate_json_text 内部会根据 skip_cleanup 决定是否执行清理
-    json_text = plan_crate_json_text(llm_group=llm_group, skip_cleanup=False)
-    entries, parse_error = _parse_project_json_entries(json_text)
-    if parse_error:
-        raise ValueError(f"JSON解析失败: {parse_error}")
-    if not entries:
-        raise ValueError("[c2rust-llm-planner] 从LLM输出解析目录结构失败。正在中止。")
-
-    # 2) 如需应用到磁盘
-    if apply:
-        target_root = crate_name if crate_name else "."
-        try:
-            apply_project_structure_from_json(json_text, project_root=target_root)
-            print("[c2rust-llm-planner] 项目结构已应用。")
-        except Exception as e:
-            print(f"[c2rust-llm-planner] 应用项目结构失败: {e}")
-            raise
-
-        # Post-apply: 检查生成的目录结构，使用 CodeAgent 更新 Cargo.toml
-        from jarvis.jarvis_code_agent.code_agent import (
-            CodeAgent,
-        )  # 延迟导入以避免全局耦合
-        import os
-        import subprocess
-
-        # 解析 crate 目录路径（与 apply 逻辑保持一致）
-        try:
-            created_dir = _resolve_created_dir(target_root)
-        except Exception:
-            # 兜底：无法解析时直接使用传入的 target_root
-            created_dir = Path(target_root)
-
-        # 在 crate 目录内执行 git 初始化与初始提交（按新策略）
-        try:
-            # 初始化 git 仓库（若已存在则该命令为幂等）
-            subprocess.run(["git", "init"], check=False, cwd=str(created_dir))
-            # 添加所有文件并尝试提交
-            subprocess.run(["git", "add", "-A"], check=False, cwd=str(created_dir))
-            subprocess.run(
-                ["git", "commit", "-m", "[c2rust-llm-planner] init crate"],
-                check=False,
-                cwd=str(created_dir),
-            )
-        except Exception:
-            # 保持稳健，不因 git 失败影响主流程
-            pass
-
-        # 构建用于 CodeAgent 的目录上下文（简化版树形）
-        def _format_tree(root: Path) -> str:
-            lines: List[str] = []
-            exclude = {".git", "target", ".jarvis"}
-            if not root.exists():
-                return ""
-            for p in sorted(root.rglob("*")):
-                if any(part in exclude for part in p.parts):
-                    continue
-                rel = p.relative_to(root)
-                depth = len(rel.parts) - 1
-                indent = "  " * depth
-                name = rel.name + ("/" if p.is_dir() else "")
-                lines.append(f"{indent}- {name}")
-            return "\n".join(lines)
-
-        dir_ctx = _format_tree(created_dir)
-        crate_pkg_name = created_dir.name
-
-        requirement_lines = [
-            "目标：在该 crate 目录下确保 `cargo build` 能成功完成；如失败则根据错误最小化修改并重试，直到构建通过为止。",
-            f"- crate_dir: {created_dir}",
-            f"- crate_name: {crate_pkg_name}",
-            "目录结构（部分）：",
-            dir_ctx,
-            "",
-            "执行与修复流程（务必按序执行，可多轮迭代）：",
-            "1) 先补齐 Rust 模块声明（仅最小化追加/升级，不覆盖业务实现）：",
-            "   - 扫描 src 目录：",
-            "     * 在每个子目录下（除 src 根）创建或更新 mod.rs，仅追加缺失的 `pub mod <child>;` 声明；",
-            "     * 在 src/lib.rs 中为顶级子模块追加 `pub mod <name>;`；不要创建 src/mod.rs；忽略 lib.rs 与 main.rs 的自引用；",
-            "   - 若存在 `mod <name>;` 但非 pub，则就地升级为 `pub mod <name>;`，保留原缩进与其他内容；",
-            "   - 严禁删除现有声明或修改非声明代码；",
-            '2) 在 Cargo.toml 的 [package] 中设置 edition："2024"；若本地工具链不支持 2024，请降级为 "2021" 并在说明中记录原因；保留其他已有字段与依赖不变。',
-            "3) 根据当前源代码实际情况配置入口：",
-            "   - 仅库：仅配置 [lib]（path=src/lib.rs），不要生成 main.rs；",
-            "   - 单一可执行：存在 src/main.rs 时配置 [[bin]] 或默认二进制；可选保留 [lib] 以沉淀共享逻辑；",
-            "   - 多可执行：为每个 src/bin/<name>.rs 配置 [[bin]]；共享代码放在 src/lib.rs；",
-            "   - 不要创建与目录结构不一致的占位入口。",
-            "4) 对被作为入口的源文件：若不存在 fn main() 则仅添加最小可用实现（不要改动已存在的实现）：",
-            '   fn main() { println!("ok"); }',
-            "5) 执行一次构建验证：`cargo build -q`（或 `cargo check -q`）。",
-            "6) 若构建失败，读取错误并进行最小化修复，然后再次构建；重复直至成功。仅允许的修复类型：",
-            "   - 依赖缺失：在 [dependencies] 中添加必要且稳定版本的依赖（优先无特性），避免新增未使用依赖；",
-            "   - 入口/crate-type 配置错误：修正 [lib] 或 [[bin]] 的 name/path/crate-type 使之与目录与入口文件一致；",
-            "   - 语言/工具链不兼容：将 edition 从 2024 调整为 2021；必要时可添加 rust-version 要求；",
-            "   - 语法级/最小实现缺失：仅在入口文件中补充必要的 use/空实现/feature gate 以通过编译，避免改动非入口业务文件；",
-            "   - 不要删除或移动现有文件与目录。",
-            "7) 每轮修改后必须运行 `cargo build -q` 验证，直到构建成功为止。",
-            "",
-            "修改约束：",
-            "- 允许修改的文件范围：Cargo.toml、src/lib.rs、src/main.rs、src/bin/*.rs、src/**/mod.rs（仅最小必要变更）；除非为修复构建与模块声明补齐，不要修改其他文件。",
-            "- 尽量保持现有内容与结构不变，不要引入与构建无关的改动或格式化。",
-            "",
-            "交付要求：",
-            "- 以补丁方式提交实际修改的文件；",
-            "- 在最终回复中简要说明所做变更与最终 `cargo build` 的结果（成功/失败及原因）。",
-        ]
-        requirement_text = "\n".join(requirement_lines)
-
-        prev_cwd = os.getcwd()
-        try:
-            # 切换到 crate 目录运行 CodeAgent 与构建
-            os.chdir(str(created_dir))
-            print(
-                f"[c2rust-llm-planner] 已切换到 crate 目录: {os.getcwd()}，执行 CodeAgent 初始化"
-            )
-            if llm_group:
-                print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
-            try:
-                # 验证模型配置在切换目录后是否仍然有效
-                from jarvis.jarvis_utils.config import (
-                    get_normal_model_name,
-                    get_normal_platform_name,
-                )
-
-                if llm_group:
-                    resolved_model = get_normal_model_name(llm_group)
-                    resolved_platform = get_normal_platform_name(llm_group)
-                    print(
-                        f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}"
-                    )
-            except Exception as e:
-                print(f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}")
-
-            try:
-                agent = CodeAgent(
-                    need_summary=False,
-                    non_interactive=non_interactive,
-                    model_group=llm_group,
-                )
-                # 验证 agent 内部的模型配置
-                if hasattr(agent, "model") and agent.model:
-                    actual_model = getattr(agent.model, "model_name", "unknown")
-                    actual_platform = type(agent.model).__name__
-                    print(
-                        f"[c2rust-llm-planner] CodeAgent 内部模型: {actual_platform}.{actual_model}"
-                    )
-                agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
-                print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
-            except Exception as e:
-                error_msg = str(e)
-                if "does not exist" in error_msg or "404" in error_msg:
-                    print(f"[c2rust-llm-planner] 模型配置错误: {error_msg}")
-                    print(
-                        f"[c2rust-llm-planner] 提示: 请检查模型组 '{llm_group}' 的配置是否正确"
-                    )
-                    print(f"[c2rust-llm-planner] 当前工作目录: {os.getcwd()}")
-                    # 尝试显示当前解析的模型配置
-                    try:
-                        from jarvis.jarvis_utils.config import (
-                            get_normal_model_name,
-                            get_normal_platform_name,
-                        )
-
-                        if llm_group:
-                            print(
-                                f"[c2rust-llm-planner] 当前解析的模型: {get_normal_platform_name(llm_group)}/{get_normal_model_name(llm_group)}"
-                            )
-                    except Exception:
-                        pass
-                raise
-
-            # 进入构建与修复循环：构建失败则生成新的 CodeAgent，携带错误上下文进行最小修复
-            iter_count = 0
-            while True:
-                iter_count += 1
-                print(f"[c2rust-llm-planner] 在 {os.getcwd()} 执行: cargo build -q")
-                build_res = subprocess.run(
-                    ["cargo", "build", "-q"],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                stdout = build_res.stdout or ""
-                stderr = build_res.stderr or ""
-                output = (stdout + "\n" + stderr).strip()
-
-                if build_res.returncode == 0:
-                    print("[c2rust-llm-planner] Cargo 构建成功。")
-                    break
-
-                print(f"[c2rust-llm-planner] Cargo 构建失败 (iter={iter_count})。")
-                # 打印编译错误输出，便于可视化与调试
-                print("[c2rust-llm-planner] 构建错误输出:")
-                print(output)
-                # 将错误信息作为上下文，附加修复原则，生成新的 CodeAgent 进行最小修复
-                repair_prompt = "\n".join(
-                    [
-                        requirement_text,
-                        "",
-                        "请根据以下构建错误进行最小化修复，然后再次执行 `cargo build` 验证：",
-                        "<BUILD_ERROR>",
-                        output,
-                        "</BUILD_ERROR>",
-                    ]
-                )
-
-                if llm_group:
-                    print(
-                        f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}"
-                    )
-                try:
-                    repair_agent = CodeAgent(
-                        need_summary=False,
-                        non_interactive=non_interactive,
-                        model_group=llm_group,
-                    )
-                    repair_agent.run(
-                        repair_prompt,
-                        prefix=f"[c2rust-llm-planner][iter={iter_count}]",
-                        suffix="",
-                    )
-                except Exception as e:
-                    error_msg = str(e)
-                    if "does not exist" in error_msg or "404" in error_msg:
-                        print(
-                            f"[c2rust-llm-planner][iter={iter_count}] 模型配置错误: {error_msg}"
-                        )
-                        print(
-                            f"[c2rust-llm-planner][iter={iter_count}] 提示: 请检查模型组 '{llm_group}' 的配置"
-                        )
-                    raise
-                # 不切换目录，保持在原始工作目录
-        finally:
-            # 恢复之前的工作目录
-            os.chdir(prev_cwd)
-
-    # 3) 输出 JSON 到文件（如指定），并返回解析后的 entries
-    if out is not None:
-        out_path = Path(out)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        # 使用原始文本写出，便于可读
-        out_path.write_text(json_text, encoding="utf-8")
-        print(f"[c2rust-llm-planner] JSON 已写入: {out_path}")
-
-    return entries
+# 向后兼容：导出 apply_project_structure_from_json
