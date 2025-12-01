@@ -177,4 +177,3 @@ class TestEntriesToJson:
         result = entries_to_json(entries)
         parsed = json.loads(result)
         assert parsed == entries
-

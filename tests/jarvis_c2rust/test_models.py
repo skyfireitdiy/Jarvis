@@ -138,4 +138,3 @@ class TestFnRecord:
         )
         assert rec.qname == "namespace::Class::method"
         assert rec.name == "method"
-

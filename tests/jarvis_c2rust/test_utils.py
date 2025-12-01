@@ -148,8 +148,10 @@ class TestDefaultCrateDir:
 
     def test_exception_handling(self, monkeypatch):
         """测试异常处理"""
+
         def mock_resolve():
             raise OSError("Cannot resolve")
+
         monkeypatch.setattr(Path, "resolve", lambda self: mock_resolve())
         project_root = Path("test")
         result = default_crate_dir(project_root)
@@ -230,21 +232,21 @@ class TestExtractJsonFromSummary:
 
     def test_valid_summary_block(self):
         """测试有效的 SUMMARY 块"""
-        text = "<SUMMARY>{\"key\": \"value\"}</SUMMARY>"
+        text = '<SUMMARY>{"key": "value"}</SUMMARY>'
         result, error = extract_json_from_summary(text)
         assert error is None
         assert result == {"key": "value"}
 
     def test_summary_with_whitespace(self):
         """测试包含空白字符的 SUMMARY 块"""
-        text = "<SUMMARY>\n{\"key\": \"value\"}\n</SUMMARY>"
+        text = '<SUMMARY>\n{"key": "value"}\n</SUMMARY>'
         result, error = extract_json_from_summary(text)
         assert error is None
         assert result == {"key": "value"}
 
     def test_summary_with_trailing_comma(self):
         """测试包含尾随逗号的 JSON（jsonnet 兼容）"""
-        text = "<SUMMARY>{\"key\": \"value\",}</SUMMARY>"
+        text = '<SUMMARY>{"key": "value",}</SUMMARY>'
         result, error = extract_json_from_summary(text)
         # jsonnet 应该能处理尾随逗号
         assert error is None or result == {"key": "value"}
@@ -272,7 +274,7 @@ class TestExtractJsonFromSummary:
 
     def test_non_dict_result(self):
         """测试非字典结果"""
-        text = "<SUMMARY>[\"array\"]</SUMMARY>"
+        text = '<SUMMARY>["array"]</SUMMARY>'
         result, error = extract_json_from_summary(text)
         assert error is not None
         assert result == {}
@@ -291,8 +293,7 @@ class TestExtractJsonFromSummary:
 
     def test_case_insensitive_tags(self):
         """测试大小写不敏感的标签"""
-        text = "<summary>{\"key\": \"value\"}</summary>"
+        text = '<summary>{"key": "value"}</summary>'
         result, error = extract_json_from_summary(text)
         assert error is None
         assert result == {"key": "value"}
-
