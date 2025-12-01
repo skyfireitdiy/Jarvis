@@ -125,16 +125,34 @@ def normalize_list(items: Optional[List[str]]) -> List[str]:
             continue
         if s:
             vals.append(s)
+    # 去重并排序
     try:
-        vals = list(dict.fromkeys(vals))
-    except Exception:
         vals = sorted(set(vals))
+    except Exception:
+        # 如果排序失败，至少去重（保留顺序）
+        vals = list(dict.fromkeys(vals))
     return vals
 
 
 def normalize_list_lower(items: Optional[List[str]]) -> List[str]:
-    """规范化列表并转为小写"""
-    return [s.lower() for s in normalize_list(items)]
+    """规范化列表并转为小写（先转小写，再去重并排序）"""
+    if not isinstance(items, list):
+        return []
+    # 先转小写，然后规范化
+    lower_items = []
+    for x in items:
+        try:
+            s = str(x).strip().lower()
+        except Exception:
+            continue
+        if s:
+            lower_items.append(s)
+    # 去重并排序
+    try:
+        return sorted(set(lower_items))
+    except Exception:
+        # 如果排序失败，至少去重（保留顺序）
+        return list(dict.fromkeys(lower_items))
 
 
 def is_entry_function(rec_meta: dict) -> bool:
