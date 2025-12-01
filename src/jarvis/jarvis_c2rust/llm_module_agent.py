@@ -306,7 +306,25 @@ def plan_crate_json_llm(
 
 
 # 向后兼容：导出 execute_llm_plan
+from jarvis.jarvis_c2rust.llm_module_agent_executor import (  # noqa: E402
+    execute_llm_plan,
+)
 
 # 向后兼容：导出 entries_to_json
+from jarvis.jarvis_c2rust.llm_module_agent_utils import (  # noqa: E402
+    entries_to_json,
+)
 
 # 向后兼容：导出 apply_project_structure_from_json
+from jarvis.jarvis_c2rust.llm_module_agent_apply import (  # noqa: E402
+    apply_project_structure_from_json,
+)
+
+__all__ = [
+    "LLMRustCratePlannerAgent",
+    "plan_crate_json_text",
+    "plan_crate_json_llm",
+    "execute_llm_plan",  # 向后兼容
+    "entries_to_json",  # 向后兼容
+    "apply_project_structure_from_json",  # 向后兼容
+]
