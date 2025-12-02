@@ -27,7 +27,7 @@ class RustBuildValidator(BuildValidatorBase):
         # 使用 cargo test 进行构建和测试验证（会自动编译并运行测试，包括文档测试）
         # 设置 RUST_BACKTRACE=1 以启用调用链回溯
         # 设置 RUSTFLAGS="-A warnings" 以屏蔽警告，只显示错误
-        cmd = ["cargo", "test", "--doc", "--", "--nocapture"]
+        cmd = ["cargo", "test", "--", "--nocapture"]
 
         # 准备环境变量（继承当前环境并设置 RUST_BACKTRACE 和 RUSTFLAGS）
         env = os.environ.copy()

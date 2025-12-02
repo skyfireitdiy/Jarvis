@@ -213,11 +213,11 @@ class BuildManager:
             "  * 对比 C 实现：使用 `read_symbols` 和 `read_code` 工具读取 C 源码，对比 Rust 实现与 C 实现的差异",
             "  * 检查类型转换：确认 Rust 类型与 C 类型的对应关系是否正确，特别是指针、数组、结构体等",
             "  * 验证边界条件：检查数组边界、空值处理、溢出处理等边界情况",
-            "  * 运行单个测试：如果测试套件很大，可以使用 `cargo test --doc -- --nocapture <test_name>` 运行特定测试，加快调试速度",
+            "  * 运行单个测试：如果测试套件很大，可以使用 `cargo test -- --nocapture <test_name>` 运行特定测试，加快调试速度",
             "  * 查看完整错误信息：确保阅读完整的错误输出，包括堆栈跟踪、类型信息、位置信息等",
             "  * 注意：调试输出可以在修复后移除，但建议保留关键位置的调试信息直到问题完全解决",
             "- **⚠️ 重要：修复后必须验证** - 修复完成后，必须使用 `execute_script` 工具执行验证命令：",
-            "  * 执行 `cargo test --doc -- --nocapture` 验证编译和测试是否通过",
+            "  * 执行 `cargo test -- --nocapture` 验证编译和测试是否通过",
             "  * 命令必须成功（返回码为 0），才说明修复成功",
             "  * **不要假设修复成功，必须实际执行命令验证**",
             "  * **cargo test 会自动编译，无需单独执行 cargo check**",
@@ -310,7 +310,7 @@ class BuildManager:
                 "3. 脚本执行（调试辅助）：",
                 "   - 工具: execute_script",
                 "   - 调试用途:",
-                "     * 执行 `cargo test --doc -- --nocapture <test_name>` 运行特定测试，加快调试速度",
+                "     * 执行 `cargo test -- --nocapture <test_name>` 运行特定测试，加快调试速度",
                 "     * 执行 `cargo test --message-format=short --no-run` 只检查编译，不运行测试",
                 "     * 执行 `cargo check` 快速检查编译错误（如果测试太慢）",
                 "     * 执行 `cargo test --lib` 只运行库测试，跳过集成测试",
@@ -385,14 +385,14 @@ class BuildManager:
                     "",
                     "**⚠️ 重要：修复后必须验证**",
                     "- 修复完成后，**必须使用 `execute_script` 工具执行以下命令验证修复效果**：",
-                    f"  - 命令：`{command or 'cargo test --doc -- --nocapture'}`",
+                    f"  - 命令：`{command or 'cargo test -- --nocapture'}`",
                     "- 验证要求：",
                     "  * 如果命令执行成功（返回码为 0），说明修复成功",
                     "  * 如果命令执行失败（返回码非 0），说明修复未成功，需要继续修复",
                     "  * **不要假设修复成功，必须实际执行命令验证**",
                     "- 如果验证失败，请分析失败原因并继续修复，直到验证通过",
                     "",
-                    "修复后请再次执行 `cargo test --doc` 进行验证。",
+                    "修复后请再次执行 `cargo test -q` 进行验证。",
                 ]
             )
         else:
@@ -428,14 +428,14 @@ class BuildManager:
                     "",
                     "**⚠️ 重要：修复后必须验证**",
                     "- 修复完成后，**必须使用 `execute_script` 工具执行以下命令验证修复效果**：",
-                    "  - 命令：`cargo test --doc -- --nocapture`",
+                    "  - 命令：`cargo test -- --nocapture`",
                     "- 验证要求：",
                     "  * 命令必须执行成功（返回码为 0），才说明修复成功",
                     "  * 如果命令执行失败（返回码非 0），说明修复未成功，需要继续修复",
                     "  * **不要假设修复成功，必须实际执行命令验证**",
                     "- 如果验证失败，请分析失败原因并继续修复，直到验证通过",
                     "",
-                    "修复后请执行 `cargo test --doc -- --nocapture` 进行验证。",
+                    "修复后请执行 `cargo test -- --nocapture` 进行验证。",
                 ]
             )
         return section_lines
@@ -494,7 +494,7 @@ class BuildManager:
         # 测试失败时需要详细输出，移除 -q 参数以获取完整的测试失败信息（包括堆栈跟踪、断言详情等）
         try:
             res_test = subprocess.run(
-                ["cargo", "test", "--doc", "--", "--nocapture"],
+                ["cargo", "test", "--", "--nocapture"],
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -620,7 +620,7 @@ class BuildManager:
             curr=curr,
             symbols_path=symbols_path,
             include_output_patch_hint=True,
-            command="cargo test --doc -- --nocapture",
+            command="cargo test -- --nocapture",
         )
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         # 记录运行前的 commit
@@ -696,7 +696,7 @@ class BuildManager:
         # 第二步：编译通过，实际运行测试验证
         try:
             res_test_verify = subprocess.run(
-                ["cargo", "test", "--doc", "--", "--nocapture"],
+                ["cargo", "test", "--", "--nocapture"],
                 capture_output=True,
                 text=True,
                 timeout=30,

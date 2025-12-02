@@ -64,6 +64,23 @@ class StructuredCodeExtractor:
         start_line = symbol.line_start
         end_line = symbol.line_end
 
+        # 对于 Rust，如果符号开始行是文档注释（以 /// 或 //! 开头），
+        # 向上查找实际的函数/结构体定义开始行
+        if language == "rust" and start_line > 1:
+            # 向上查找，跳过文档注释
+            for i in range(start_line - 2, -1, -1):  # 从 start_line - 2 开始向上查找
+                line = lines[i] if i < len(lines) else ""
+                stripped = line.strip()
+                # 如果是文档注释（/// 或 //!），继续向上查找
+                if stripped.startswith("///") or stripped.startswith("//!"):
+                    start_line = i + 1  # 更新起始行号
+                # 如果是空行或普通注释，也继续向上查找
+                elif not stripped or stripped.startswith("//"):
+                    continue
+                else:
+                    # 找到非文档注释的行，停止查找
+                    break
+
         # 如果结束行号看起来不完整（比如只有1-2行），尝试查找函数体结束
         if end_line - start_line < 2:
             # 从结束行开始向下查找，寻找匹配的大括号或缩进变化
@@ -150,6 +167,11 @@ class StructuredCodeExtractor:
                 "annotation",
                 "decorator",
             }
+            # 处理end_line为-1的情况（表示文件末尾）
+            if end_line == -1:
+                lines = content.split("\n")
+                end_line = len(lines)
+            
             filtered_symbols = [
                 s
                 for s in symbols
@@ -161,8 +183,8 @@ class StructuredCodeExtractor:
             # 按行号排序（导入语句通常在文件开头，所以会排在最前面）
             filtered_symbols.sort(key=lambda s: s.line_start)
 
-            # 构建语法单元列表（先收集所有单元信息）
-            units_info = []
+            # 返回原始语法单元（不进行切分，切分统一在read_code.py的_merge_and_split_by_points中处理）
+            units = []
             lines = content.split("\n")
 
             for symbol in filtered_symbols:
@@ -172,10 +194,15 @@ class StructuredCodeExtractor:
                         symbol, content, language
                     )
                 )
+                
+                # 确保在请求范围内
+                unit_start = max(unit_start, start_line)
+                unit_end = min(unit_end, end_line)
 
                 # 提取该符号的完整内容（不截断到请求范围）
                 symbol_start_idx = max(0, unit_start - 1)  # 转为0-based索引
-                symbol_end_idx = min(len(lines), unit_end)
+                # unit_end 是包含的（inclusive），所以需要 +1 来包含最后一行
+                symbol_end_idx = min(len(lines), unit_end + 1)
 
                 symbol_content = "\n".join(lines[symbol_start_idx:symbol_end_idx])
 
@@ -185,103 +212,19 @@ class StructuredCodeExtractor:
                 else:
                     unit_id = symbol.name
 
-                # 如果id重复，加上行号
-                if any(u["id"] == unit_id for u in units_info):
+                # 重复id处理
+                if any(u["id"] == unit_id for u in units):
                     if symbol.parent:
                         unit_id = f"{symbol.parent}.{symbol.name}_{unit_start}"
                     else:
                         unit_id = f"{symbol.name}_{unit_start}"
 
-                units_info.append(
-                    {
-                        "id": unit_id,
-                        "start_line": unit_start,
-                        "end_line": unit_end,
-                        "content": symbol_content,
-                        "has_parent": symbol.parent is not None,
-                    }
-                )
-
-            # 处理重叠：如果一个单元完全包含另一个单元，父符号排除被子符号覆盖的行
-            # 策略：保留所有符号，但父符号只显示未被子符号覆盖的部分
-            units = []
-            for unit in units_info:
-                # 找出所有被unit包含的子符号
-                child_ranges = []
-                for other in units_info:
-                    if unit == other:
-                        continue
-                    # 检查other是否完全被unit包含（other是unit的子符号）
-                    if (
-                        unit["start_line"] <= other["start_line"]
-                        and unit["end_line"] >= other["end_line"]
-                    ):
-                        # 排除范围完全相同的情况（范围相同时不认为是父子关系）
-                        if not (
-                            unit["start_line"] == other["start_line"]
-                            and unit["end_line"] == other["end_line"]
-                        ):
-                            child_ranges.append(
-                                (other["start_line"], other["end_line"])
-                            )
-
-                # 如果有子符号，需要排除被子符号覆盖的行
-                if child_ranges:
-                    # 合并重叠的子符号范围
-                    child_ranges.sort()
-                    merged_ranges = []
-                    for start, end in child_ranges:
-                        if merged_ranges and start <= merged_ranges[-1][1] + 1:
-                            # 合并重叠或相邻的范围
-                            merged_ranges[-1] = (
-                                merged_ranges[-1][0],
-                                max(merged_ranges[-1][1], end),
-                            )
-                        else:
-                            merged_ranges.append((start, end))
-
-                    # 提取未被覆盖的行
-                    unit_lines = unit["content"].split("\n")
-                    filtered_lines = []
-                    current_line = unit["start_line"]
-
-                    for line in unit_lines:
-                        # 检查当前行是否在任何子符号范围内
-                        is_covered = any(
-                            start <= current_line <= end for start, end in merged_ranges
-                        )
-                        if not is_covered:
-                            filtered_lines.append(line)
-                        current_line += 1
-
-                    # 如果还有未被覆盖的行，创建新的单元
-                    if filtered_lines:
-                        filtered_content = "\n".join(filtered_lines)
-                        # 计算新的结束行号（最后一个未被覆盖的行）
-                        unit["start_line"] + len(filtered_lines) - 1
-                        # 需要调整，因为跳过了被覆盖的行
-                        # 重新计算：找到最后一个未被覆盖的实际行号
-                        actual_last_line = unit["start_line"]
-                        for i, line in enumerate(unit_lines):
-                            line_num = unit["start_line"] + i
-                            is_covered = any(
-                                start <= line_num <= end for start, end in merged_ranges
-                            )
-                            if not is_covered:
-                                actual_last_line = line_num
-
-                        new_unit = {
-                            "id": unit["id"],
-                            "start_line": unit["start_line"],
-                            "end_line": actual_last_line,
-                            "content": filtered_content,
-                        }
-                        units.append(new_unit)
-                    # 如果所有行都被覆盖，跳过父符号
-                else:
-                    # 没有子符号，直接添加
-                    unit.pop("has_parent", None)
-                    units.append(unit)
+                units.append({
+                    "id": unit_id,
+                    "start_line": unit_start,
+                    "end_line": unit_end,
+                    "content": symbol_content,
+                })
 
             return units
         except Exception:
@@ -308,7 +251,8 @@ class StructuredCodeExtractor:
         groups = []
 
         # 获取实际要处理的行范围
-        actual_lines = lines[start_line - 1 : end_line]
+        # end_line 是包含的（inclusive），所以需要 +1 来包含最后一行
+        actual_lines = lines[start_line - 1 : end_line + 1]
 
         if not actual_lines:
             return groups
@@ -406,7 +350,8 @@ class StructuredCodeExtractor:
 
             # 提取该组的内容（0-based索引）
             group_start_idx = current_start - 1
-            group_end_idx = current_end
+            # current_end 是包含的（inclusive），所以需要 +1 来包含最后一行
+            group_end_idx = current_end + 1
             group_content = "\n".join(lines[group_start_idx:group_end_idx])
 
             # 生成id：行号范围

@@ -49,8 +49,6 @@ RUST_SYMBOL_QUERY = """
 (type_item
   name: (type_identifier) @type.name)
 
-(extern_block) @extern
-
 (attribute_item) @attribute
 """
 

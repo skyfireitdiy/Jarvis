@@ -14,13 +14,29 @@ class TreeSitterExtractor(SymbolExtractor):
     """
 
     def __init__(self, language: Language, symbol_query: str):
-        # 如果传入的是 PyCapsule，需要转换为 Language 对象
-        if not isinstance(language, Language):
-            language = Language(language)
         self.language = language
         self.parser = Parser()
-        # 使用 language 属性而不是 set_language 方法
-        self.parser.language = self.language
+        # 设置language（tree-sitter的Parser需要Language对象）
+        try:
+            # 尝试使用set_language方法（如果可用）
+            if hasattr(self.parser, 'set_language'):
+                self.parser.set_language(self.language)
+            else:
+                # 否则直接赋值language属性
+                self.parser.language = self.language
+        except (AttributeError, TypeError):
+            # 如果都失败，尝试创建Language对象
+            try:
+                from tree_sitter import Language as LangClass
+                if not isinstance(language, LangClass):
+                    lang_obj = LangClass(language)
+                    self.parser.language = lang_obj
+                    self.language = lang_obj
+                else:
+                    self.parser.language = language
+            except Exception:
+                # 最后的fallback：直接赋值
+                self.parser.language = language
         self.symbol_query = symbol_query
 
     def extract_symbols(self, file_path: str, content: str) -> List[Symbol]:
