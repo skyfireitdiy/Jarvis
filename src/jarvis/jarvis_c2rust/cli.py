@@ -117,7 +117,6 @@ def _load_config() -> dict:
     from jarvis.jarvis_c2rust.constants import (
         CONFIG_JSON,
         C2RUST_DIRNAME,
-        RUN_STATE_JSON,
     )
 
     data_dir = Path(".") / C2RUST_DIRNAME

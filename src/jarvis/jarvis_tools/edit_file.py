@@ -662,7 +662,7 @@ class EditFileTool:
                     
                     # 标记匹配的行
                     match_start_in_context = line_idx - start_line
-                    match_end_in_context = match_start_in_context + search_line_count
+                    match_start_in_context + search_line_count
                     matches_info.append(f"匹配位置 {len(matches_info) + 1} (行 {line_idx + 1}):\n{context}")
                     
                     start_pos = pos + 1  # 继续查找下一个匹配

@@ -368,17 +368,16 @@ def load_compile_commands(cc_path: Path) -> Dict[str, List[str]]:
     except Exception:
         return {}
 
-    mapping: Dict[str, List[str]] = {}
     for entry in data:
         file_path = Path(entry.get("file", "")).resolve()
         if not file_path:
             continue
         if "arguments" in entry and isinstance(entry["arguments"], list):
             # arguments usually includes the compiler as argv[0]
-            args = entry["arguments"][1:] if entry["arguments"] else []
+            entry["arguments"][1:] if entry["arguments"] else []
         else:
             # fallback to split command string
-            cmd = entry.get("command", "")
+            entry.get("command", "")
 
 
 def iter_source_files(root: Path) -> Iterable[Path]:
