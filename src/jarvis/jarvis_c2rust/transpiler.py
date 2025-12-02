@@ -244,6 +244,7 @@ class Transpiler:
             self._on_after_tool_call,
             self._agent_before_commits,
             self.agent_manager._current_agents,
+            self._get_git_diff,
         )
 
         # 在初始化完成后打印日志
@@ -483,6 +484,7 @@ class Transpiler:
                 lambda: self._consecutive_fix_failures,
                 lambda v: setattr(self, "_consecutive_fix_failures", v),
                 lambda: self._current_function_start_commit,
+                self._get_git_diff,
             )
 
     def _classify_rust_error(self, text: str) -> List[str]:
@@ -603,6 +605,10 @@ class Transpiler:
     def _get_crate_commit_hash(self) -> Optional[str]:
         """获取 crate 目录的当前 commit id（委托给 GitManager）"""
         return self.git_manager.get_crate_commit_hash()
+
+    def _get_git_diff(self, base_commit: Optional[str] = None) -> str:
+        """获取 git diff，显示从 base_commit 到当前工作区的变更（委托给 GitManager）"""
+        return self.git_manager.get_git_diff(base_commit)
 
     def _reset_to_commit(self, commit_hash: str) -> bool:
         """回退 crate 目录到指定的 commit（委托给 GitManager）"""

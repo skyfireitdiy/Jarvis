@@ -16,9 +16,8 @@ from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.utils import (
     dir_tree,
     extract_json_from_summary,
+    truncate_git_diff_with_context_limit,
 )
-from jarvis.jarvis_utils.git_utils import get_diff_between_commits
-from jarvis.jarvis_utils.config import get_max_input_token_count
 
 
 class ReviewManager:
@@ -50,6 +49,7 @@ class ReviewManager:
         on_after_tool_call_func: Callable[[Any, Any, Any, Any], None],
         agent_before_commits: Dict[str, Optional[str]],
         current_agents: Dict[str, Any],
+        get_git_diff_func: Optional[Callable[[Optional[str]], str]] = None,
     ) -> None:
         self.crate_dir = crate_dir
         self.data_dir = data_dir
@@ -75,6 +75,7 @@ class ReviewManager:
         self.on_after_tool_call = on_after_tool_call_func
         self.agent_before_commits = agent_before_commits
         self._current_agents = current_agents
+        self.get_git_diff = get_git_diff_func
 
     def review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """
@@ -146,84 +147,50 @@ class ReviewManager:
             # 提取编译参数
             compile_flags = self.extract_compile_flags(rec.file)
 
-            # 获取从初始commit到当前commit的变更作为上下文（每次review都必须获取）
+            # 获取从初始commit到当前工作区的变更作为上下文（每次review都必须获取）
+            # 使用统一的 get_git_diff 方法，可以获取到当前工作区的变更（包括未提交的修改）
             commit_diff = ""
             diff_status = ""  # 用于记录diff获取状态
-            if self.current_function_start_commit_getter():
-                current_commit = self.get_crate_commit_hash()
-                if current_commit:
-                    if current_commit == self.current_function_start_commit_getter():
-                        # commit相同，说明没有变更
-                        commit_diff = "(无变更：当前commit与函数开始时的commit相同)"
-                        diff_status = "no_change"
+            if self.get_git_diff:
+                base_commit = self.current_function_start_commit_getter()
+                try:
+                    commit_diff = self.get_git_diff(base_commit)
+                    if commit_diff and commit_diff.strip():
+                        # 成功获取diff，限制长度避免上下文过大
+                        # 使用50%的比例，因为review阶段需要更多的上下文信息
+                        review_key = f"review::{rec.id}"
+                        agent = self._current_agents.get(review_key)
+                        commit_diff = truncate_git_diff_with_context_limit(
+                            commit_diff,
+                            agent=agent,
+                            llm_group=self.llm_group,
+                            token_ratio=0.5,
+                        )
+                        diff_status = "success"
                     else:
-                        # commit不同，获取diff
-                        try:
-                            # 注意：transpile()开始时已切换到crate目录，此处无需再次切换
-                            commit_diff = get_diff_between_commits(
-                                self.current_function_start_commit_getter(),
-                                current_commit,
-                            )
-                            if (
-                                commit_diff
-                                and not commit_diff.startswith("获取")
-                                and not commit_diff.startswith("发生")
-                            ):
-                                # 成功获取diff，限制长度避免上下文过大
-                                # 优先使用agent的剩余token数量，回退到输入窗口限制
-                                max_diff_chars = None
-                                try:
-                                    # 优先尝试使用已有的agent获取剩余token（更准确，包含对话历史）
-                                    review_key = f"review::{rec.id}"
-                                    agent = self._current_agents.get(review_key)
-                                    if agent:
-                                        remaining_tokens = (
-                                            agent.get_remaining_token_count()
-                                        )
-                                        # 使用剩余token的50%作为字符限制（1 token ≈ 4字符，所以 remaining_tokens * 0.5 * 4 = remaining_tokens * 2）
-                                        max_diff_chars = int(remaining_tokens * 2)
-                                        if max_diff_chars <= 0:
-                                            max_diff_chars = None
-                                except Exception:
-                                    pass
-
-                                # 回退方案2：使用输入窗口的50%转换为字符数
-                                if max_diff_chars is None:
-                                    max_input_tokens = get_max_input_token_count(
-                                        self.llm_group
-                                    )
-                                    max_diff_chars = (
-                                        max_input_tokens * 2
-                                    )  # 最大输入token数量的一半转换为字符数
-
-                                if len(commit_diff) > max_diff_chars:
-                                    commit_diff = (
-                                        commit_diff[:max_diff_chars]
-                                        + "\n... (差异内容过长，已截断)"
-                                    )
-                                diff_status = "success"
+                        # 没有变更或获取失败
+                        if base_commit:
+                            current_commit = self.get_crate_commit_hash()
+                            if current_commit == base_commit:
+                                commit_diff = "(无变更：当前commit与函数开始时的commit相同，且工作区无修改)"
+                                diff_status = "no_change"
                             else:
-                                # 获取失败，保留错误信息
+                                commit_diff = "(无法获取git差异)"
                                 diff_status = "error"
-                                typer.secho(
-                                    f"[c2rust-transpiler][review] 获取commit差异失败: {commit_diff}",
-                                    fg=typer.colors.YELLOW,
-                                )
-                        except Exception as e:
-                            commit_diff = f"获取commit差异时发生异常: {str(e)}"
-                            diff_status = "error"
-                            typer.secho(
-                                f"[c2rust-transpiler][review] 获取commit差异失败: {e}",
-                                fg=typer.colors.YELLOW,
-                            )
-                else:
-                    # 无法获取当前commit
-                    commit_diff = "(无法获取当前commit id)"
-                    diff_status = "no_current_commit"
+                        else:
+                            commit_diff = "(未记录函数开始时的commit id)"
+                            diff_status = "no_start_commit"
+                except Exception as e:
+                    commit_diff = f"获取git差异时发生异常: {str(e)}"
+                    diff_status = "error"
+                    typer.secho(
+                        f"[c2rust-transpiler][review] 获取git差异失败: {e}",
+                        fg=typer.colors.YELLOW,
+                    )
             else:
-                # 没有保存函数开始时的commit
-                commit_diff = "(未记录函数开始时的commit id)"
-                diff_status = "no_start_commit"
+                # 没有提供 get_git_diff 函数
+                commit_diff = "(未提供git差异获取函数)"
+                diff_status = "no_git_diff_func"
 
             usr_p_lines = [
                 f"待审查函数：{rec.qname or rec.name}",
@@ -334,14 +301,14 @@ class ReviewManager:
                 ]
             )
 
-            # 添加commit变更上下文（每次review都必须包含）
+            # 添加git变更上下文（每次review都必须包含）
             usr_p_lines.extend(
                 [
                     "",
-                    "从函数开始到当前的commit变更（用于了解代码变更历史和上下文）：",
-                    "<COMMIT_DIFF>",
+                    "从函数开始到当前的git变更（用于了解代码变更历史和上下文，包括未提交的修改）：",
+                    "<GIT_DIFF>",
                     commit_diff,
-                    "</COMMIT_DIFF>",
+                    "</GIT_DIFF>",
                     "",
                 ]
             )
@@ -350,8 +317,8 @@ class ReviewManager:
             if diff_status == "success":
                 usr_p_lines.extend(
                     [
-                        "**重要：commit变更上下文说明**",
-                        "- 上述diff显示了从函数开始处理时的commit到当前commit之间的所有变更",
+                        "**重要：git变更上下文说明**",
+                        "- 上述diff显示了从函数开始处理时的commit到当前工作区的所有变更（包括已提交和未提交的修改）",
                         "- 这些变更可能包括：当前函数的实现、依赖函数的实现、模块结构的调整等",
                         "- **优先使用diff信息进行审查判断**：如果diff中已经包含了足够的信息（如函数实现、签名变更、模块结构等），可以直接基于diff进行审查，无需读取原始文件",
                         "- 只有在diff信息不足或需要查看完整上下文时，才使用 read_code 工具读取原始文件",
@@ -362,14 +329,14 @@ class ReviewManager:
             elif diff_status == "no_change":
                 usr_p_lines.extend(
                     [
-                        "**注意**：当前commit与函数开始时的commit相同，说明没有代码变更。请使用 read_code 工具读取目标模块文件的最新内容进行审查。",
+                        "**注意**：当前commit与函数开始时的commit相同，且工作区无修改，说明没有代码变更。请使用 read_code 工具读取目标模块文件的最新内容进行审查。",
                     ]
                 )
             else:
-                # diff_status 为 "error"、"no_current_commit" 或 "no_start_commit"
+                # diff_status 为 "error"、"no_current_commit"、"no_start_commit" 或 "no_git_diff_func"
                 usr_p_lines.extend(
                     [
-                        "**注意**：由于无法获取commit差异信息，请使用 read_code 工具读取目标模块文件的最新内容进行审查。",
+                        "**注意**：由于无法获取git差异信息，请使用 read_code 工具读取目标模块文件的最新内容进行审查。",
                     ]
                 )
 
@@ -382,11 +349,11 @@ class ReviewManager:
                     f'  {{"symbols_file": "{(self.data_dir / "symbols.jsonl").resolve()}", "symbols": ["{rec.qname or rec.name}"]}}',
                     "",
                     "**重要：审查要求**",
-                    "- **优先使用diff信息**：如果提供了commit差异（COMMIT_DIFF），优先基于diff信息进行审查判断，只有在diff信息不足时才使用 read_code 工具读取原始文件",
+                    "- **优先使用diff信息**：如果提供了git差异（GIT_DIFF），优先基于diff信息进行审查判断，只有在diff信息不足时才使用 read_code 工具读取原始文件",
                     "- 必须基于最新的代码进行审查，如果使用 read_code 工具，请读取目标模块文件的最新内容",
                     "- 禁止依赖任何历史记忆、之前的审查结论或对话历史进行判断",
                     "- 每次审查都必须基于最新的代码状态（通过diff或read_code获取），确保审查结果反映当前代码的真实状态",
-                    "- 结合commit变更上下文（如果提供），全面评估代码变更的影响和合理性",
+                    "- 结合git变更上下文（如果提供），全面评估代码变更的影响和合理性",
                     "",
                     "请基于提供的diff信息（如果可用）或读取crate中该函数的当前实现进行审查，并准备总结。",
                 ]
@@ -494,7 +461,7 @@ class ReviewManager:
                         "- 错误处理的改进",
                         "",
                         "**审查要求：**",
-                        "- **优先使用diff信息**：如果提供了最新的commit差异（COMMIT_DIFF），优先基于diff信息进行审查判断，只有在diff信息不足时才使用 read_code 工具读取原始文件",
+                        "- **优先使用diff信息**：如果提供了最新的git差异（GIT_DIFF），优先基于diff信息进行审查判断，只有在diff信息不足时才使用 read_code 工具读取原始文件",
                         "- 如果必须使用 read_code 工具，请读取目标模块文件的最新内容",
                         "- **禁止基于之前的审查结果、对话历史或任何缓存信息进行判断**",
                         "- 必须基于最新的代码状态（通过diff或read_code获取）进行审查评估",
@@ -758,9 +725,46 @@ class ReviewManager:
                     "   - 确保没有遗留的 todo!/unimplemented! 占位",
                     "   - 确保所有函数调用都能正确解析",
                     "",
-                    "请仅以补丁形式输出修改，避免冗余解释。",
                 ]
             )
+
+            # 添加 git 变更信息作为上下文
+            if self.get_git_diff:
+                try:
+                    base_commit = self.current_function_start_commit_getter()
+                    git_diff = self.get_git_diff(base_commit)
+                    if git_diff and git_diff.strip():
+                        # 限制 git diff 长度，避免上下文过大
+                        # 使用较小的比例（30%）因为修复提示词本身已经很长
+                        agent = self.get_code_agent()
+                        git_diff = truncate_git_diff_with_context_limit(
+                            git_diff,
+                            agent=agent,
+                            llm_group=self.llm_group,
+                            token_ratio=0.3,
+                        )
+
+                        fix_prompt += "\n\n"
+                        fix_prompt += "【Git 变更信息】\n"
+                        fix_prompt += "以下是从函数开始处理到当前的 git 变更，可以帮助你了解已经做了哪些修改：\n"
+                        fix_prompt += "<GIT_DIFF>\n"
+                        fix_prompt += git_diff
+                        fix_prompt += "\n</GIT_DIFF>\n"
+                        fix_prompt += "\n"
+                        fix_prompt += "提示：\n"
+                        fix_prompt += "- 请仔细查看上述 git diff，了解当前代码的状态和已做的修改\n"
+                        fix_prompt += (
+                            "- 如果看到之前的修改引入了问题，可以在修复时一并处理\n"
+                        )
+                        fix_prompt += (
+                            "- 如果看到某些文件被意外修改，需要确认这些修改是否必要\n"
+                        )
+                        fix_prompt += "- 结合审查问题，有针对性地修复代码\n"
+                except Exception:
+                    # 如果获取 git diff 失败，不影响主流程
+                    pass
+
+            fix_prompt += "\n请仅以补丁形式输出修改，避免冗余解释。"
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             # 记录运行前的 commit
             before_commit = self.get_crate_commit_hash()
