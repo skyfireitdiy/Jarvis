@@ -116,18 +116,43 @@ class BuildValidator:
         Returns:
             BuildResult: 验证结果
         """
-        # 检测所有可能的构建系统
-        detected_systems = self.detector.detect_all()
+        # 优先检查配置文件中是否已有保存的构建系统
+        saved_system = self.config.get_selected_build_system()
+        if saved_system:
+            try:
+                saved_enum = BuildSystem(saved_system)
+                if saved_enum in self._validators:
+                    validator = self._validators[saved_enum]
+                    print(f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}")
+                    try:
+                        return validator.validate(modified_files)
+                    except Exception as e:
+                        print(f"⚠️ 验证器 {validator.__class__.__name__} 执行失败: {e}, 使用兜底验证器")
+                        return self._fallback_validator.validate(modified_files)
+                elif saved_enum == BuildSystem.UNKNOWN:
+                    print("ℹ️ 使用配置文件中保存的构建系统: unknown，使用兜底验证器")
+                    return self._fallback_validator.validate(modified_files)
+            except ValueError:
+                # 配置文件中保存的构建系统无效，继续检测
+                pass
+        
+        # 使用LLM检测构建系统（基于文件统计和文件列表）
+        detected_systems = self.detector.detect_with_llm_and_confirm()
         
         if not detected_systems:
-            # 未检测到构建系统，使用兜底验证器
-            print("ℹ️ 未检测到构建系统，使用兜底验证器")
+            # 用户取消或未检测到构建系统，使用兜底验证器
+            print("ℹ️ 未检测到构建系统或用户取消，使用兜底验证器")
             return self._fallback_validator.validate(modified_files)
         
-        # 让用户选择构建系统（如果多个）
-        build_system = self._select_build_system(detected_systems)
+        # 使用检测到的第一个构建系统（用户已确认）
+        build_system = detected_systems[0]
         
-        if build_system and build_system in self._validators:
+        if build_system == BuildSystem.UNKNOWN:
+            # 未知构建系统，使用兜底验证器
+            print("ℹ️ 构建系统为unknown，使用兜底验证器")
+            return self._fallback_validator.validate(modified_files)
+        
+        if build_system in self._validators:
             validator = self._validators[build_system]
             print(f"ℹ️ 使用构建系统: {build_system.value}, 验证器: {validator.__class__.__name__}")
             try:
@@ -137,8 +162,8 @@ class BuildValidator:
                 # 验证器执行失败时，使用兜底验证器
                 return self._fallback_validator.validate(modified_files)
         else:
-            # 用户取消或未选择，使用兜底验证器
-            print("ℹ️ 使用兜底验证器")
+            # 未找到对应的验证器，使用兜底验证器
+            print("ℹ️ 未找到对应的验证器，使用兜底验证器")
             return self._fallback_validator.validate(modified_files)
     
     def register_validator(self, build_system: BuildSystem, validator: BuildValidatorBase):
