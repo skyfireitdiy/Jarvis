@@ -103,6 +103,14 @@ RUN . "$HOME/.cargo/env" \
     && rm -rf "$HOME/.cargo/git" \
     && rm -rf /tmp/*
 
+# 使用 jarvis 用户安装 loc 工具（代码行数统计工具）
+RUN . "$HOME/.cargo/env" \
+    && cargo install loc --locked \
+    && loc --version \
+    && rm -rf "$HOME/.cargo/registry/cache" \
+    && rm -rf "$HOME/.cargo/git" \
+    && rm -rf /tmp/*
+
 # 切换回 root 用户安装系统级工具
 USER root
 
@@ -177,6 +185,7 @@ RUN echo "=== 验证工具安装 ==="; \
     and rg --version; \
     and fd --version; \
     and fzf --version; \
+    and loc --version; \
     and git --version; \
     and clang-19 --version | head -1; \
     and clang-tidy --version | head -1; \
