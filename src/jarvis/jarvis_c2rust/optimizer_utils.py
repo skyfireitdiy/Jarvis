@@ -51,7 +51,7 @@ def cargo_check(
     if max_checks and stats.cargo_checks >= max_checks:
         return False, "cargo test budget exhausted"
     code, out, err = run_cmd(
-        ["cargo", "test", "--doc", "-q"], crate_dir, timeout=timeout
+        ["cargo", "test", "-q"], crate_dir, timeout=timeout
     )
     stats.cargo_checks += 1
     ok = code == 0
@@ -246,7 +246,7 @@ def cargo_check_full(
         return False, "cargo test budget exhausted"
     try:
         res = subprocess.run(
-            ["cargo", "test", "--doc", "-q"],
+            ["cargo", "test", "-q"],
             capture_output=True,
             text=True,
             check=False,

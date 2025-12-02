@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import time
 from typing import Any, Dict, List
 
@@ -78,9 +79,7 @@ class ReadCodeTool:
     def _extract_syntax_units_with_split(
         self, filepath: str, content: str, start_line: int, end_line: int
     ) -> List[Dict[str, Any]]:
-        """提取语法单元，然后对超过50行的单元进行二级切分：
-        1. 先按连续空白行切分大块
-        2. 如果子块仍然超过50行，再按固定行数（50行一组）切分
+        """提取语法单元（不进行切分，切分统一在_merge_and_split_by_points中处理）
 
         Args:
             filepath: 文件路径
@@ -89,48 +88,13 @@ class ReadCodeTool:
             end_line: 结束行号
 
         Returns:
-            语法单元列表，每个单元不超过50行
+            语法单元列表（原始单元，不切分）
         """
-        # 先获取语法单元（仅在支持语法解析的语言中才会返回非空）
-        syntax_units = self._extract_syntax_units(
+        # 直接返回语法单元，不进行切分
+        # 切分逻辑统一在_merge_and_split_by_points中处理
+        return self._extract_syntax_units(
             filepath, content, start_line, end_line
         )
-
-        if not syntax_units:
-            return []
-
-        result = []
-        for unit in syntax_units:
-            unit_line_count = unit["end_line"] - unit["start_line"] + 1
-            if unit_line_count > 50:
-                # 第一步：对大块先按空白行切分（基于 StructuredCodeExtractor）
-                blank_groups = self._extract_blank_line_groups(
-                    content, unit["start_line"], unit["end_line"]
-                )
-
-                # 如果按空白行切分失败（例如全部为空白或实现返回空），退回原始大块
-                if not blank_groups:
-                    blank_groups = [unit]
-
-                for group in blank_groups:
-                    group_line_count = group["end_line"] - group["start_line"] + 1
-                    if group_line_count > 50:
-                        # 第二步：对子块中仍然超过50行的部分，按每50行固定切分
-                        sub_groups = self._extract_line_groups(
-                            content,
-                            group["start_line"],
-                            group["end_line"],
-                            group_size=50,
-                        )
-                        result.extend(sub_groups)
-                    else:
-                        # 经过空白行切分得到的中等大小块，直接加入结果
-                        result.append(group)
-            else:
-                # 如果单元不超过50行，直接添加
-                result.append(unit)
-
-        return result
 
     def _extract_blank_line_groups(
         self, content: str, start_line: int, end_line: int
@@ -193,6 +157,338 @@ class ReadCodeTool:
         if StructuredCodeExtractor:
             return StructuredCodeExtractor.ensure_unique_ids(units)
         return units
+
+    def _merge_and_split_by_points(
+        self,
+        filepath: str,
+        content: str,
+        start_line: int,
+        end_line: int,
+        import_units: List[Dict[str, Any]],
+        syntax_units: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """统一按切分点切分：按照规则逐步添加切分点，然后统一切分
+        
+        注意：设置环境变量 DEBUG_SPLIT_POINTS=1 可以输出切分点调试信息
+        
+        处理逻辑：
+        1. 如果支持语法解析，将语法元素的所有边界作为切分点
+        2. 如果语法元素过大，根据连续换行插入切分点
+        3. 如果还有更大的，按照行数量插入切分点
+        4. 按照切分点划分块
+        
+        Args:
+            filepath: 文件路径
+            content: 文件内容
+            start_line: 起始行号
+            end_line: 结束行号
+            import_units: 导入单元列表
+            syntax_units: 语法单元列表
+            
+        Returns:
+            统一按切分点切分后的单元列表
+        """
+        lines = content.split("\n")
+        
+        # 1. 收集语法元素的所有边界作为切分点
+        split_points = set()
+        split_points.add(start_line)
+        split_points.add(end_line + 1)
+        
+        # 记录每个切分段对应的单元信息（用于生成id）
+        segment_info = {}  # {(start_line, end_line): [unit_ids]}
+        
+        # 收集导入单元的切分点
+        seen_ranges = set()  # 用于去重（跨导入和语法单元）
+        for unit in import_units:
+            unit_start = unit.get("start_line", 0)
+            unit_end = unit.get("end_line", 0)
+            if unit_start > 0 and unit_end > 0:
+                range_key = (unit_start, unit_end)
+                if range_key not in seen_ranges:
+                    seen_ranges.add(range_key)
+                    split_points.add(unit_start)
+                    split_points.add(unit_end + 1)
+                    segment_key = (unit_start, unit_end)
+                    if segment_key not in segment_info:
+                        segment_info[segment_key] = []
+                    segment_info[segment_key].append(unit.get("id", f"import_{unit_start}"))
+        
+        # 收集语法单元的切分点
+        for unit in syntax_units:
+            unit_start = unit.get("start_line", 0)
+            unit_end = unit.get("end_line", 0)
+            if unit_start > 0 and unit_end > 0:
+                range_key = (unit_start, unit_end)
+                if range_key not in seen_ranges:
+                    seen_ranges.add(range_key)
+                    split_points.add(unit_start)
+                    split_points.add(unit_end + 1)
+                    segment_key = (unit_start, unit_end)
+                    if segment_key not in segment_info:
+                        segment_info[segment_key] = []
+                    segment_info[segment_key].append(unit.get("id", f"{unit_start}-{unit_end}"))
+        
+        # 2. 如果语法元素过大（超过50行），根据连续换行插入切分点
+        max_unit_size = 50  # 最大单元大小
+        
+        # 检查每个切分段，如果超过阈值，根据连续换行插入切分点
+        new_split_points = set(split_points)
+        # 需要循环处理，直到所有段都不超过阈值
+        max_iterations = 10  # 防止无限循环
+        iteration = 0
+        while iteration < max_iterations:
+            sorted_split_points = sorted(new_split_points)
+            added_new_points = False
+            i = 0
+            while i < len(sorted_split_points) - 1:
+                seg_start = sorted_split_points[i]
+                seg_end = sorted_split_points[i + 1] - 1
+                
+                # 确保在请求范围内
+                seg_start = max(seg_start, start_line)
+                seg_end = min(seg_end, end_line)
+                
+                if seg_start <= seg_end:
+                    seg_size = seg_end - seg_start + 1
+                    if seg_size > max_unit_size:
+                        # 根据连续换行插入切分点
+                        blank_line_points = self._find_blank_line_split_points(
+                            lines, seg_start, seg_end, max_unit_size
+                        )
+                        if blank_line_points:
+                            new_split_points.update(blank_line_points)
+                            added_new_points = True
+                            break  # 重新开始检查
+                
+                i += 1
+            
+            if not added_new_points:
+                break  # 没有添加新点，可以退出循环
+            iteration += 1
+        
+        # 3. 如果还有更大的段，按照行数量插入切分点
+        # 需要循环处理，直到所有段都不超过阈值
+        max_iterations = 10  # 防止无限循环
+        iteration = 0
+        while iteration < max_iterations:
+            sorted_split_points = sorted(new_split_points)
+            added_new_points = False
+            i = 0
+            while i < len(sorted_split_points) - 1:
+                seg_start = sorted_split_points[i]
+                seg_end = sorted_split_points[i + 1] - 1
+                
+                # 确保在请求范围内
+                seg_start = max(seg_start, start_line)
+                seg_end = min(seg_end, end_line)
+                
+                if seg_start <= seg_end:
+                    seg_size = seg_end - seg_start + 1
+                    if seg_size > max_unit_size:
+                        # 按固定行数插入切分点
+                        fixed_points = self._find_fixed_size_split_points(
+                            seg_start, seg_end, max_unit_size
+                        )
+                        if fixed_points:
+                            new_split_points.update(fixed_points)
+                            added_new_points = True
+                            break  # 重新开始检查
+                
+                i += 1
+            
+            if not added_new_points:
+                break  # 没有添加新点，可以退出循环
+            iteration += 1
+        
+        # 4. 按照最终切分点划分块
+        final_split_points = sorted(new_split_points)
+        
+        # 调试：输出切分点信息（可以通过环境变量控制）
+        if os.environ.get('DEBUG_SPLIT_POINTS') == '1':
+            print(f"\n[DEBUG] 初始切分点（语法元素边界）: {sorted(split_points)}", file=sys.stderr)
+            print(f"[DEBUG] 最终切分点（包含空白行和固定大小切分）: {final_split_points}", file=sys.stderr)
+            print(f"[DEBUG] 导入单元数: {len(import_units)}", file=sys.stderr)
+            for i, unit in enumerate(import_units, 1):
+                print(f"[DEBUG]   导入单元{i}: 行 {unit.get('start_line')}-{unit.get('end_line')} ({unit.get('id', 'N/A')})", file=sys.stderr)
+            print(f"[DEBUG] 语法单元数: {len(syntax_units)}", file=sys.stderr)
+            for i, unit in enumerate(syntax_units, 1):
+                print(f"[DEBUG]   语法单元{i}: 行 {unit.get('start_line')}-{unit.get('end_line')} ({unit.get('id', 'N/A')})", file=sys.stderr)
+            print(f"[DEBUG] 根据最终切分点生成的段:", file=sys.stderr)
+            for i in range(len(final_split_points) - 1):
+                seg_start = final_split_points[i]
+                seg_end = final_split_points[i + 1] - 1
+                print(f"[DEBUG]   段{i+1}: 行 {seg_start}-{seg_end} ({seg_end - seg_start + 1} 行)", file=sys.stderr)
+        
+        units = []
+        seen_ranges = set()  # 用于去重，避免重复的段
+        
+        for i in range(len(final_split_points) - 1):
+            seg_start = final_split_points[i]
+            seg_end = final_split_points[i + 1] - 1  # 切分点是下一行的开始，所以-1
+            
+            # 确保在请求范围内
+            if seg_start > end_line or seg_end < start_line:
+                continue
+            
+            seg_start = max(seg_start, start_line)
+            seg_end = min(seg_end, end_line)
+            
+            if seg_start > seg_end:
+                continue
+            
+            # 检查是否有完全相同的段（行号范围相同），如果有则跳过
+            range_key = (seg_start, seg_end)
+            if range_key in seen_ranges:
+                if os.environ.get('DEBUG_SPLIT_POINTS') == '1':
+                    print(f"[DEBUG] ⚠️  跳过重复段: ({seg_start}, {seg_end})", file=sys.stderr)
+                continue
+            
+            # 按照切分点切分不应该有重叠，但为了安全起见，检查一下
+            # 如果按照切分点正确切分，相邻段应该是：seg1_end + 1 == seg2_start
+            # 如果发现重叠，说明切分点设置有问题
+            overlap_found = False
+            for existing_start, existing_end in seen_ranges:
+                # 检查是否有重叠（不是相邻）
+                if not (seg_end < existing_start or seg_start > existing_end):
+                    # 有重叠，这是不应该发生的
+                    if os.environ.get('DEBUG_SPLIT_POINTS') == '1':
+                        print(f"[DEBUG] ⚠️  发现重叠段: ({seg_start}, {seg_end}) 与 ({existing_start}, {existing_end})", file=sys.stderr)
+                    # 跳过新段（保留已有的段）
+                    overlap_found = True
+                    break
+            
+            if overlap_found:
+                continue
+            
+            seen_ranges.add(range_key)
+            
+            if os.environ.get('DEBUG_SPLIT_POINTS') == '1':
+                print(f"[DEBUG] ✅ 添加段: ({seg_start}, {seg_end})", file=sys.stderr)
+            
+            # 提取该段的内容
+            seg_start_idx = max(0, seg_start - 1)  # 转为0-based索引
+            seg_end_idx = min(len(lines) - 1, seg_end - 1)  # 转为0-based索引
+            
+            # 确保索引有效
+            if seg_start_idx >= len(lines) or seg_end_idx < seg_start_idx:
+                continue
+            
+            # Python切片是左闭右开，所以需要seg_end_idx+1来包含最后一行
+            seg_content = "\n".join(lines[seg_start_idx:seg_end_idx + 1])
+            
+            # 过滤空段：如果内容为空或只有空白字符，跳过
+            if not seg_content.strip():
+                continue
+            
+            # 生成id：查找覆盖这个段的单元
+            segment_key = (seg_start, seg_end)
+            unit_ids = segment_info.get(segment_key, [])
+            
+            # 如果没有完全匹配，查找包含这个段的单元
+            if not unit_ids:
+                # 查找包含这个段的单元，优先选择范围最接近的
+                best_match = None
+                best_match_size = float('inf')
+                for (unit_start, unit_end), ids in segment_info.items():
+                    if unit_start <= seg_start and unit_end >= seg_end:
+                        match_size = (unit_end - unit_start) - (seg_end - seg_start)
+                        if match_size < best_match_size:
+                            best_match_size = match_size
+                            best_match = ids
+                if best_match:
+                    unit_ids = best_match
+            
+            if unit_ids:
+                # 如果有多个单元覆盖这个段，使用第一个（通常是更具体的）
+                unit_id = unit_ids[0]
+                # 如果id重复但行号不同，加上行号
+                if any(u["id"] == unit_id for u in units):
+                    unit_id = f"{unit_id}_{seg_start}"
+            else:
+                # 没有对应的单元，使用行号范围作为id
+                unit_id = f"{seg_start}-{seg_end}"
+            
+            units.append({
+                "id": unit_id,
+                "start_line": seg_start,
+                "end_line": seg_end,
+                "content": seg_content,
+            })
+        
+        return units
+
+    def _find_blank_line_split_points(
+        self, lines: List[str], start_line: int, end_line: int, max_size: int
+    ) -> List[int]:
+        """根据连续换行查找切分点
+        
+        Args:
+            lines: 文件行列表
+            start_line: 起始行号（1-based）
+            end_line: 结束行号（1-based）
+            max_size: 最大段大小
+            
+        Returns:
+            切分点列表（行号，1-based）
+        """
+        split_points = []
+        
+        # 如果段大小不超过阈值，不需要切分
+        if end_line - start_line + 1 <= max_size:
+            return split_points
+        
+        # 查找连续换行（空白行）的位置
+        # 从start_line开始，每max_size行检查一次是否有空白行
+        current = start_line
+        while current + max_size <= end_line:
+            # 检查从current到current + max_size之间是否有空白行
+            check_end = current + max_size
+            
+            # 从check_end向前查找最近的空白行（最多向前查找max_size行）
+            found_blank = False
+            search_start = max(current + 1, check_end - max_size // 2)  # 只在前半部分查找
+            for line_num in range(check_end, search_start - 1, -1):
+                line_idx = line_num - 1  # 转为0-based索引
+                if line_idx >= 0 and line_idx < len(lines) and not lines[line_idx].strip():
+                    # 找到空白行，在下一行添加切分点
+                    split_points.append(line_num + 1)
+                    current = line_num + 1
+                    found_blank = True
+                    break
+            
+            if not found_blank:
+                # 没有找到空白行，按固定大小切分
+                current = check_end
+        
+        return split_points
+
+    def _find_fixed_size_split_points(
+        self, start_line: int, end_line: int, max_size: int
+    ) -> List[int]:
+        """按照固定行数查找切分点
+        
+        Args:
+            start_line: 起始行号（1-based）
+            end_line: 结束行号（1-based）
+            max_size: 最大段大小
+            
+        Returns:
+            切分点列表（行号，1-based）
+        """
+        split_points = []
+        
+        # 如果段大小不超过阈值，不需要切分
+        if end_line - start_line + 1 <= max_size:
+            return split_points
+        
+        # 按max_size行一组插入切分点
+        current = start_line
+        while current + max_size <= end_line:
+            current += max_size
+            split_points.append(current)
+        
+        return split_points
 
     def _extract_imports(
         self, filepath: str, content: str, start_line: int, end_line: int
@@ -1042,13 +1338,11 @@ class ReadCodeTool:
                         )
 
                         if syntax_units:
-                            # 合并导入单元和语法单元
-                            all_units = import_units + syntax_units
-                            # 确保id唯一
-                            all_units = self._ensure_unique_ids(all_units)
-                            # 按行号排序，所有单元按在文件中的实际位置排序
-                            all_units.sort(key=lambda u: u["start_line"])
-                            structured_units = all_units
+                            # 统一按切分点切分：收集所有切分点，然后统一切分
+                            structured_units = self._merge_and_split_by_points(
+                                abs_path, full_content, start_line, end_line,
+                                import_units, syntax_units
+                            )
                         else:
                             # 使用空白行分组结构化输出（不支持语言时）
                             # 先按空行分割，然后对超过20行的块再按每20行分割
@@ -1088,10 +1382,11 @@ class ReadCodeTool:
                         abs_path, full_content, start_line, end_line
                     )
                     if syntax_units:
-                        all_units = import_units + syntax_units
-                        all_units = self._ensure_unique_ids(all_units)
-                        all_units.sort(key=lambda u: u["start_line"])
-                        structured_units = all_units
+                        # 统一按切分点切分：收集所有切分点，然后统一切分
+                        structured_units = self._merge_and_split_by_points(
+                            abs_path, full_content, start_line, end_line,
+                            import_units, syntax_units
+                        )
                     else:
                         line_groups = self._extract_blank_line_groups_with_split(
                             full_content, start_line, end_line
