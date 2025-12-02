@@ -41,43 +41,30 @@ from jarvis.jarvis_c2rust.scanner import (
     compute_translation_order_jsonl,
     find_root_function_ids,
 )
+from jarvis.jarvis_c2rust.constants import (
+    MAX_LLM_RETRIES,
+    DEFAULT_SOURCE_SNIPPET_MAX_LINES,
+    SUBTREE_SOURCE_SNIPPET_MAX_LINES,
+    MAX_SUBTREE_NODES_META,
+    MAX_SUBTREE_EDGES,
+    MAX_DOT_EDGES,
+    MAX_CHILD_SAMPLES,
+    MAX_SOURCE_SAMPLES,
+    MAX_NOTES_DISPLAY_LENGTH,
+    DEFAULT_SYMBOLS_OUTPUT,
+    DEFAULT_MAPPING_OUTPUT,
+    SYMBOLS_PRUNE_OUTPUT,
+    ORDER_PRUNE_OUTPUT,
+    ORDER_ALIAS_OUTPUT,
+    DEFAULT_CHECKPOINT_FILE,
+    DEFAULT_CHECKPOINT_INTERVAL,
+    JSON_INDENT,
+)
+
 
 # ============================================================================
-# 常量定义
+# 其他配置
 # ============================================================================
-
-# LLM评估重试配置
-MAX_LLM_RETRIES = 3  # LLM评估最大重试次数
-
-# 源码片段读取配置
-DEFAULT_SOURCE_SNIPPET_MAX_LINES = 200  # 默认源码片段最大行数
-SUBTREE_SOURCE_SNIPPET_MAX_LINES = 120  # 子树提示词中源码片段最大行数
-
-# 子树提示词构建配置
-MAX_SUBTREE_NODES_META = 200  # 子树节点元数据列表最大长度
-MAX_SUBTREE_EDGES = 400  # 子树边列表最大长度
-MAX_DOT_EDGES = 200  # DOT图边数阈值（超过此值不生成DOT）
-MAX_CHILD_SAMPLES = 2  # 子节点采样数量
-MAX_SOURCE_SAMPLES = 3  # 代表性源码样本最大数量（注释说明）
-
-# 显示配置
-MAX_NOTES_DISPLAY_LENGTH = 200  # 备注显示最大长度
-
-# 输出文件路径配置
-DEFAULT_SYMBOLS_OUTPUT = "symbols_library_pruned.jsonl"  # 默认符号表输出文件名
-DEFAULT_MAPPING_OUTPUT = "library_replacements.jsonl"  # 默认替代映射输出文件名
-SYMBOLS_PRUNE_OUTPUT = "symbols_prune.jsonl"  # 兼容符号表输出文件名
-ORDER_PRUNE_OUTPUT = "translation_order_prune.jsonl"  # 剪枝阶段转译顺序输出文件名
-ORDER_ALIAS_OUTPUT = "translation_order.jsonl"  # 通用转译顺序输出文件名
-DEFAULT_CHECKPOINT_FILE = "library_replacer_checkpoint.json"  # 默认检查点文件名
-
-# Checkpoint配置
-DEFAULT_CHECKPOINT_INTERVAL = 1  # 默认检查点保存间隔（每评估N个节点保存一次）
-
-# JSON格式化配置
-JSON_INDENT = 2  # JSON格式化缩进空格数
-
-
 def _resolve_symbols_jsonl_path(hint: Path) -> Path:
     """解析symbols.jsonl路径"""
     p = Path(hint)
@@ -102,23 +89,37 @@ def _setup_output_paths(
         out_mapping_path = data_dir / DEFAULT_MAPPING_OUTPUT
     else:
         out_mapping_path = Path(out_mapping_path)
-    
+
     # 兼容输出
     out_symbols_prune_path = data_dir / SYMBOLS_PRUNE_OUTPUT
     order_prune_path = data_dir / ORDER_PRUNE_OUTPUT
     alias_order_path = data_dir / ORDER_ALIAS_OUTPUT
-    
-    return out_symbols_path, out_mapping_path, out_symbols_prune_path, order_prune_path, alias_order_path
+
+    return (
+        out_symbols_path,
+        out_mapping_path,
+        out_symbols_prune_path,
+        order_prune_path,
+        alias_order_path,
+    )
 
 
-def _load_symbols(sjsonl: Path) -> tuple[List[Dict[str, Any]], Dict[int, Dict[str, Any]], Dict[str, int], Set[int], Dict[int, List[str]]]:
+def _load_symbols(
+    sjsonl: Path,
+) -> tuple[
+    List[Dict[str, Any]],
+    Dict[int, Dict[str, Any]],
+    Dict[str, int],
+    Set[int],
+    Dict[int, List[str]],
+]:
     """加载符号表，返回(所有记录, id到记录映射, 名称到id映射, 函数id集合, id到引用名称映射)"""
     all_records: List[Dict[str, Any]] = []
     by_id: Dict[int, Dict[str, Any]] = {}
     name_to_id: Dict[str, int] = {}
     func_ids: Set[int] = set()
     id_refs_names: Dict[int, List[str]] = {}
-    
+
     with open(sjsonl, "r", encoding="utf-8") as f:
         idx = 0
         for line in f:
@@ -139,7 +140,7 @@ def _load_symbols(sjsonl: Path) -> tuple[List[Dict[str, Any]], Dict[int, Dict[st
             if not isinstance(refs, list):
                 refs = []
             refs = [r for r in refs if isinstance(r, str) and r]
-            
+
             all_records.append(obj)
             by_id[fid] = obj
             id_refs_names[fid] = refs
@@ -149,7 +150,7 @@ def _load_symbols(sjsonl: Path) -> tuple[List[Dict[str, Any]], Dict[int, Dict[st
                 name_to_id.setdefault(qn, fid)
             if cat == "function":
                 func_ids.add(fid)
-    
+
     return all_records, by_id, name_to_id, func_ids, id_refs_names
 
 
@@ -189,7 +190,7 @@ def _build_evaluation_order(
     seeds = [rid for rid in roots_all if rid in func_ids]
     if not seeds:
         seeds = sorted(list(func_ids))
-    
+
     visited: Set[int] = set()
     order: List[int] = []
     q: List[int] = list(seeds)
@@ -208,7 +209,7 @@ def _build_evaluation_order(
     if len(visited) < len(func_ids):
         leftovers = [fid for fid in sorted(func_ids) if fid not in visited]
         order.extend(leftovers)
-    
+
     return order
 
 
@@ -245,7 +246,7 @@ def _process_candidate_scope(
     scope_unreachable_funcs: Set[int] = set()
     if not candidates:
         return root_funcs, scope_unreachable_funcs
-    
+
     cand_ids: Set[int] = set()
     # 支持重载：同名/同限定名可能对应多个函数ID，需全部纳入候选
     key_set = set(candidates)
@@ -259,10 +260,10 @@ def _process_candidate_scope(
                 cand_ids.add(int(rec.get("id")))
             except Exception:
                 continue
-    
+
     if not cand_ids:
         return root_funcs, scope_unreachable_funcs
-    
+
     filtered_roots = [rid for rid in root_funcs if rid in cand_ids]
     # 计算从候选根出发的可达函数集合（含根）
     reachable_all: Set[int] = set()
@@ -276,11 +277,13 @@ def _process_candidate_scope(
             fg=typer.colors.YELLOW,
             err=True,
         )
-    
+
     return filtered_roots, scope_unreachable_funcs
 
 
-def _read_source_snippet(rec: Dict[str, Any], max_lines: int = DEFAULT_SOURCE_SNIPPET_MAX_LINES) -> str:
+def _read_source_snippet(
+    rec: Dict[str, Any], max_lines: int = DEFAULT_SOURCE_SNIPPET_MAX_LINES
+) -> str:
     """读取源码片段"""
     path = rec.get("file") or ""
     try:
@@ -310,19 +313,29 @@ def _check_llm_availability() -> tuple[bool, Any, Any, Any]:
     """
     try:
         from jarvis.jarvis_platform.registry import PlatformRegistry  # type: ignore
-        from jarvis.jarvis_utils.config import get_smart_platform_name, get_smart_model_name  # type: ignore
+        from jarvis.jarvis_utils.config import (
+            get_smart_platform_name,
+            get_smart_model_name,
+        )  # type: ignore
+
         return True, PlatformRegistry, get_smart_platform_name, get_smart_model_name
     except Exception:
         return False, None, None, None
 
 
-def _normalize_disabled_libraries(disabled_libraries: Optional[List[str]]) -> tuple[List[str], str]:
+def _normalize_disabled_libraries(
+    disabled_libraries: Optional[List[str]],
+) -> tuple[List[str], str]:
     """规范化禁用库列表，返回(规范化列表, 显示字符串)"""
     disabled_norm: List[str] = []
     disabled_display: str = ""
     if isinstance(disabled_libraries, list):
-        disabled_norm = [str(x).strip().lower() for x in disabled_libraries if str(x).strip()]
-        disabled_display = ", ".join([str(x).strip() for x in disabled_libraries if str(x).strip()])
+        disabled_norm = [
+            str(x).strip().lower() for x in disabled_libraries if str(x).strip()
+        ]
+        disabled_display = ", ".join(
+            [str(x).strip() for x in disabled_libraries if str(x).strip()]
+        )
     return disabled_norm, disabled_display
 
 
@@ -330,6 +343,7 @@ def _load_additional_notes(data_dir: Path) -> str:
     """从配置文件加载附加说明"""
     try:
         from jarvis.jarvis_c2rust.constants import CONFIG_JSON
+
         config_path = data_dir / CONFIG_JSON
         if config_path.exists():
             with config_path.open("r", encoding="utf-8") as f:
@@ -384,7 +398,12 @@ def _make_checkpoint_key(
         "llm_group": str(llm_group or ""),
         "candidates": _normalize_list(candidates),
         "disabled_libraries": _normalize_list_lower(disabled_libraries),
-        "max_funcs": (int(max_funcs) if isinstance(max_funcs, int) or (isinstance(max_funcs, float) and float(max_funcs).is_integer()) else None),
+        "max_funcs": (
+            int(max_funcs)
+            if isinstance(max_funcs, int)
+            or (isinstance(max_funcs, float) and float(max_funcs).is_integer())
+            else None
+        ),
     }
     return key
 
@@ -473,7 +492,9 @@ def _create_llm_model(
         return None
 
 
-def _parse_agent_json_summary(text: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+def _parse_agent_json_summary(
+    text: str,
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """
     解析Agent返回的JSON摘要
     返回(解析结果, 错误信息)
@@ -517,7 +538,7 @@ def _build_subtree_prompt(
     root_sig = root_rec.get("signature") or ""
     root_lang = root_rec.get("language") or ""
     root_src = _read_source_snippet(root_rec)
-    
+
     # 子树摘要（限制长度，避免超长）
     nodes_meta: List[str] = []
     for nid in sorted(desc):
@@ -529,8 +550,10 @@ def _build_subtree_prompt(
         else:
             nodes_meta.append(f"- {nm}")
     if len(nodes_meta) > MAX_SUBTREE_NODES_META:
-        nodes_meta = nodes_meta[:MAX_SUBTREE_NODES_META] + [f"...({len(desc)-MAX_SUBTREE_NODES_META} more)"]
-    
+        nodes_meta = nodes_meta[:MAX_SUBTREE_NODES_META] + [
+            f"...({len(desc) - MAX_SUBTREE_NODES_META} more)"
+        ]
+
     # 选取部分代表性叶子/内部节点源码（最多 MAX_SOURCE_SAMPLES 个）
     samples: List[str] = []
     sample_ids: List[int] = [fid]
@@ -542,12 +565,12 @@ def _build_subtree_prompt(
         sg = rec.get("signature") or ""
         src = _read_source_snippet(rec, max_lines=SUBTREE_SOURCE_SNIPPET_MAX_LINES)
         samples.append(f"--- BEGIN {nm} ---\n{sg}\n{src}\n--- END {nm} ---")
-    
+
     # 构建依赖图（子树内的调用有向边）
     def _label(nid: int) -> str:
         r = by_id.get(nid, {})
         return r.get("qualified_name") or r.get("name") or f"sym_{nid}"
-    
+
     edges_list: List[str] = []
     for u in sorted(desc):
         for v in adj_func.get(u, []):
@@ -555,10 +578,13 @@ def _build_subtree_prompt(
                 edges_list.append(f"{_label(u)} -> {_label(v)}")
     edges_text: str
     if len(edges_list) > MAX_SUBTREE_EDGES:
-        edges_text = "\n".join(edges_list[:MAX_SUBTREE_EDGES] + [f"...({len(edges_list) - MAX_SUBTREE_EDGES} more edges)"])
+        edges_text = "\n".join(
+            edges_list[:MAX_SUBTREE_EDGES]
+            + [f"...({len(edges_list) - MAX_SUBTREE_EDGES} more edges)"]
+        )
     else:
         edges_text = "\n".join(edges_list)
-    
+
     # 适度提供 DOT（边数不大时），便于大模型直观看图
     dot_text = ""
     if len(edges_list) <= MAX_DOT_EDGES:
@@ -569,12 +595,13 @@ def _build_subtree_prompt(
                     dot_lines.append(f'  "{_label(u)}" -> "{_label(v)}";')
         dot_lines.append("}")
         dot_text = "\n".join(dot_lines)
-    
+
     disabled_hint = (
         f"重要约束：禁止使用以下库（若这些库为唯一可行选项则判定为不可替代）：{disabled_display}\n"
-        if disabled_display else ""
+        if disabled_display
+        else ""
     )
-    
+
     return (
         "请评估以下 C/C++ 函数子树是否可以由一个或多个成熟的 Rust 库整体替代（语义等价或更强）。"
         "允许库内多个 API 协同，允许多个库组合；如果必须依赖尚不成熟/冷门库或非 Rust 库，则判定为不可替代。\n"
@@ -587,16 +614,22 @@ def _build_subtree_prompt(
         "根函数源码片段（可能截断）:\n"
         f"{root_src}\n\n"
         f"子树规模: {len(desc)} 个函数\n"
-        "子树函数列表（名称|签名）:\n"
-        + "\n".join(nodes_meta)
-        + "\n\n"
+        "子树函数列表（名称|签名）:\n" + "\n".join(nodes_meta) + "\n\n"
         "依赖图（调用边，caller -> callee）:\n"
         f"{edges_text}\n\n"
-        + (f"DOT 表示（边数较少时提供）:\n```dot\n{dot_text}\n```\n\n" if dot_text else "")
+        + (
+            f"DOT 表示（边数较少时提供）:\n```dot\n{dot_text}\n```\n\n"
+            if dot_text
+            else ""
+        )
         + "代表性源码样本（部分节点，可能截断，仅供辅助判断）:\n"
         + "\n".join(samples)
         + "\n"
-        + (f"\n【附加说明（用户自定义）】\n{additional_notes}\n" if additional_notes else "")
+        + (
+            f"\n【附加说明（用户自定义）】\n{additional_notes}\n"
+            if additional_notes
+            else ""
+        )
     )
 
 
@@ -617,10 +650,12 @@ def _llm_evaluate_subtree(
     model = _new_model_func()
     if not model:
         return {"replaceable": False}
-    
-    base_prompt = _build_subtree_prompt(fid, desc, by_id, adj_func, disabled_display, additional_notes)
+
+    base_prompt = _build_subtree_prompt(
+        fid, desc, by_id, adj_func, disabled_display, additional_notes
+    )
     last_parse_error = None
-    
+
     for attempt in range(1, MAX_LLM_RETRIES + 1):
         try:
             # 构建当前尝试的提示词
@@ -635,11 +670,11 @@ def _llm_evaluate_subtree(
                         + "请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签）。"
                     )
                 prompt = base_prompt + error_hint
-            
+
             # 调用LLM
             result = model.chat_until_success(prompt)  # type: ignore
             parsed, parse_error = _parse_agent_json_summary(result or "")
-            
+
             if parse_error:
                 # JSON解析失败，记录错误并准备重试
                 last_parse_error = parse_error
@@ -672,7 +707,7 @@ def _llm_evaluate_subtree(
                         err=True,
                     )
                     return {"replaceable": False}
-            
+
             # 解析成功，检查是否为字典
             if not isinstance(parsed, dict):
                 last_parse_error = f"解析结果不是字典，而是 {type(parsed).__name__}"
@@ -703,7 +738,7 @@ def _llm_evaluate_subtree(
                         err=True,
                     )
                     return {"replaceable": False}
-            
+
             # 成功解析为字典，处理结果
             rep = bool(parsed.get("replaceable") is True)
             lib = str(parsed.get("library") or "").strip()
@@ -725,17 +760,27 @@ def _llm_evaluate_subtree(
             # 不强制要求具体 API 或特定库名；若缺省且存在 library 字段，则纳入 libraries
             if not libraries and lib:
                 libraries = [lib]
-            
+
             # 禁用库命中时，强制视为不可替代
             if disabled_norm:
                 libs_lower = [lib_name.lower() for lib_name in libraries]
                 lib_single_lower = lib.lower() if lib else ""
-                banned_hit = any(lower_lib in disabled_norm for lower_lib in libs_lower) or (lib_single_lower and lib_single_lower in disabled_norm)
+                banned_hit = any(
+                    lower_lib in disabled_norm for lower_lib in libs_lower
+                ) or (lib_single_lower and lib_single_lower in disabled_norm)
                 if banned_hit:
                     rep = False
-                    warn_libs = ", ".join(sorted(set([lib] + libraries))) if (libraries or lib) else "(未提供库名)"
+                    warn_libs = (
+                        ", ".join(sorted(set([lib] + libraries)))
+                        if (libraries or lib)
+                        else "(未提供库名)"
+                    )
                     root_rec = by_id.get(fid, {})
-                    root_name = root_rec.get("qualified_name") or root_rec.get("name") or f"sym_{fid}"
+                    root_name = (
+                        root_rec.get("qualified_name")
+                        or root_rec.get("name")
+                        or f"sym_{fid}"
+                    )
                     typer.secho(
                         f"[c2rust-library] 评估结果包含禁用库，强制判定为不可替代: {root_name} | 命中库: {warn_libs}",
                         fg=typer.colors.YELLOW,
@@ -745,7 +790,7 @@ def _llm_evaluate_subtree(
                         notes = notes + f" | 禁用库命中: {warn_libs}"
                     else:
                         notes = f"禁用库命中: {warn_libs}"
-            
+
             result_obj: Dict[str, Any] = {
                 "replaceable": rep,
                 "library": lib,
@@ -757,7 +802,7 @@ def _llm_evaluate_subtree(
                 result_obj["apis"] = apis
             if notes:
                 result_obj["notes"] = notes
-            
+
             # 成功获取结果，返回
             if attempt > 1:
                 typer.secho(
@@ -766,7 +811,7 @@ def _llm_evaluate_subtree(
                     err=True,
                 )
             return result_obj
-            
+
         except Exception as e:
             # LLM调用异常，记录并准备重试
             last_parse_error = f"LLM调用异常: {str(e)}"
@@ -785,7 +830,7 @@ def _llm_evaluate_subtree(
                     err=True,
                 )
                 return {"replaceable": False}
-    
+
     # 理论上不会到达这里，但作为保险
     return {"replaceable": False}
 
@@ -799,21 +844,34 @@ def _is_entry_function(
     # Configurable entry detection (avoid hard-coding 'main'):
     # Honor env vars: JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS / JARVIS_C2RUST_DELAY_ENTRIES / C2RUST_DELAY_ENTRIES
     import os
-    entries_env = os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS") or \
-                  os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES") or \
-                  os.environ.get("C2RUST_DELAY_ENTRIES") or ""
+
+    entries_env = (
+        os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS")
+        or os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES")
+        or os.environ.get("C2RUST_DELAY_ENTRIES")
+        or ""
+    )
     entries_set = set()
     if entries_env:
         try:
             import re as _re
+
             parts = _re.split(r"[,\s;]+", entries_env.strip())
         except Exception:
             parts = [p.strip() for p in entries_env.replace(";", ",").split(",")]
         entries_set = {p.strip().lower() for p in parts if p and p.strip()}
     if entries_set:
-        is_entry = (nm.lower() in entries_set) or (qn.lower() in entries_set) or any(qn.lower().endswith(f"::{e}") for e in entries_set)
+        is_entry = (
+            (nm.lower() in entries_set)
+            or (qn.lower() in entries_set)
+            or any(qn.lower().endswith(f"::{e}") for e in entries_set)
+        )
     else:
-        is_entry = (nm.lower() == "main") or (qn.lower() == "main") or qn.lower().endswith("::main")
+        is_entry = (
+            (nm.lower() == "main")
+            or (qn.lower() == "main")
+            or qn.lower().endswith("::main")
+        )
     return is_entry
 
 
@@ -836,18 +894,19 @@ def _write_output_symbols(
             kept_ids.add(fid)
         else:
             kept_ids.add(fid)
-    
+
     sel_root_ids = set(fid for fid, _ in selected_roots)
     replacements: List[Dict[str, Any]] = []
-    
-    with open(out_symbols_path, "w", encoding="utf-8") as fo, \
-         open(out_symbols_prune_path, "w", encoding="utf-8") as fo2:
-        
+
+    with (
+        open(out_symbols_path, "w", encoding="utf-8") as fo,
+        open(out_symbols_prune_path, "w", encoding="utf-8") as fo2,
+    ):
         for rec in all_records:
             fid = int(rec.get("id"))
             if fid not in kept_ids:
                 continue
-            
+
             rec_out = dict(rec)
             if (rec.get("category") or "") == "function" and fid in sel_root_ids:
                 # 以库级替代为语义：不要求具体 API；将根 ref 设置为库占位符（支持多库组合）
@@ -887,14 +946,18 @@ def _write_output_symbols(
                     pass
                 # 保存库替代元数据到符号表，供后续转译阶段作为上下文使用
                 try:
-                    meta_apis = apis if isinstance(apis, list) else ([api] if api else [])
+                    meta_apis = (
+                        apis if isinstance(apis, list) else ([api] if api else [])
+                    )
                     lib_primary = libraries_out[0] if libraries_out else lib_single
                     rec_out["lib_replacement"] = {
                         "libraries": libraries_out,
                         "library": lib_primary or "",
                         "apis": meta_apis,
                         "api": api,
-                        "confidence": float(conf) if isinstance(conf, (int, float)) else 0.0,
+                        "confidence": float(conf)
+                        if isinstance(conf, (int, float))
+                        else 0.0,
                         "notes": notes_out,
                         "mode": "llm",
                         "updated_at": now_ts,
@@ -917,12 +980,12 @@ def _write_output_symbols(
                 if notes_out:
                     rep_obj["notes"] = notes_out
                 replacements.append(rep_obj)
-            
+
             line = json.dumps(rec_out, ensure_ascii=False) + "\n"
             fo.write(line)
             fo2.write(line)
             # 不覆写 symbols.jsonl（保留原始扫描/整理结果作为基线）
-    
+
     return replacements
 
 
@@ -960,9 +1023,13 @@ def apply_library_replacement(
         raise FileNotFoundError(f"未找到 symbols.jsonl: {sjsonl}")
 
     data_dir = sjsonl.parent
-    out_symbols_path, out_mapping_path, out_symbols_prune_path, order_prune_path, alias_order_path = _setup_output_paths(
-        data_dir, out_symbols_path, out_mapping_path
-    )
+    (
+        out_symbols_path,
+        out_mapping_path,
+        out_symbols_prune_path,
+        order_prune_path,
+        alias_order_path,
+    ) = _setup_output_paths(data_dir, out_symbols_path, out_mapping_path)
 
     # Checkpoint 默认路径
     if checkpoint_path is None:
@@ -987,7 +1054,12 @@ def apply_library_replacement(
     )
 
     # LLM 可用性
-    _model_available, PlatformRegistry, get_normal_platform_name, get_normal_model_name = _check_llm_availability()
+    (
+        _model_available,
+        PlatformRegistry,
+        get_normal_platform_name,
+        get_normal_model_name,
+    ) = _check_llm_availability()
 
     # 预处理禁用库
     disabled_norm, disabled_display = _normalize_disabled_libraries(disabled_libraries)
@@ -996,16 +1068,31 @@ def apply_library_replacement(
     additional_notes = _load_additional_notes(data_dir)
 
     # 断点恢复支持：工具函数与关键键构造
-    ckpt_path: Path = Path(checkpoint_path) if checkpoint_path is not None else (data_dir / DEFAULT_CHECKPOINT_FILE)
-    checkpoint_key = _make_checkpoint_key(sjsonl, library_name, llm_group, candidates, disabled_libraries, max_funcs)
+    ckpt_path: Path = (
+        Path(checkpoint_path)
+        if checkpoint_path is not None
+        else (data_dir / DEFAULT_CHECKPOINT_FILE)
+    )
+    checkpoint_key = _make_checkpoint_key(
+        sjsonl, library_name, llm_group, candidates, disabled_libraries, max_funcs
+    )
 
     def _new_model() -> Optional[Any]:
-        return _create_llm_model(llm_group, disabled_display, _model_available, PlatformRegistry, get_normal_platform_name, get_normal_model_name)
+        return _create_llm_model(
+            llm_group,
+            disabled_display,
+            _model_available,
+            PlatformRegistry,
+            get_normal_platform_name,
+            get_normal_model_name,
+        )
 
     # 评估阶段：若某节点评估不可替代，则继续评估其子节点（递归/深度优先）
     eval_counter = 0
     pruned_dynamic: Set[int] = set()  # 动态累计的"将被剪除"的函数集合（不含选中根）
-    selected_roots: List[Tuple[int, Dict[str, Any]]] = []  # 实时选中的可替代根（fid, LLM结果）
+    selected_roots: List[
+        Tuple[int, Dict[str, Any]]
+    ] = []  # 实时选中的可替代根（fid, LLM结果）
     processed_roots: Set[int] = set()  # 已处理（评估或跳过）的根集合
     root_funcs_processed: Set[int] = set()  # 已处理的初始根函数集合（用于进度显示）
     last_ckpt_saved = 0  # 上次保存的计数
@@ -1018,16 +1105,20 @@ def apply_library_replacement(
         except Exception:
             pass
         try:
-            processed_roots = set(int(x) for x in (_loaded_ckpt.get("processed_roots") or []))
+            processed_roots = set(
+                int(x) for x in (_loaded_ckpt.get("processed_roots") or [])
+            )
         except Exception:
             processed_roots = set()
         try:
-            pruned_dynamic = set(int(x) for x in (_loaded_ckpt.get("pruned_dynamic") or []))
+            pruned_dynamic = set(
+                int(x) for x in (_loaded_ckpt.get("pruned_dynamic") or [])
+            )
         except Exception:
             pruned_dynamic = set()
         try:
             sr_list = []
-            for it in (_loaded_ckpt.get("selected_roots") or []):
+            for it in _loaded_ckpt.get("selected_roots") or []:
                 if isinstance(it, dict) and "fid" in it and "res" in it:
                     sr_list.append((int(it["fid"]), it["res"]))
             selected_roots = sr_list
@@ -1066,11 +1157,18 @@ def apply_library_replacement(
             interval = int(checkpoint_interval)
         except Exception:
             interval = DEFAULT_CHECKPOINT_INTERVAL
-        need_save = force or (interval <= 0) or ((eval_counter - last_ckpt_saved) >= interval)
+        need_save = (
+            force or (interval <= 0) or ((eval_counter - last_ckpt_saved) >= interval)
+        )
         if not need_save:
             return
         try:
-            _atomic_write(ckpt_path, json.dumps(_current_checkpoint_state(), ensure_ascii=False, indent=JSON_INDENT))
+            _atomic_write(
+                ckpt_path,
+                json.dumps(
+                    _current_checkpoint_state(), ensure_ascii=False, indent=JSON_INDENT
+                ),
+            )
             last_ckpt_saved = eval_counter
         except Exception:
             pass
@@ -1094,12 +1192,16 @@ def apply_library_replacement(
         if is_root_func:
             # 初始根函数：显示 (当前根函数索引/总根函数数)
             root_progress = len(root_funcs_processed) + 1
-            progress_info = f"({root_progress}/{total_roots})" if total_roots > 0 else ""
+            progress_info = (
+                f"({root_progress}/{total_roots})" if total_roots > 0 else ""
+            )
         else:
             # 递归评估的子节点：显示 (当前根函数索引/总根函数数, 总评估节点数)
             root_progress = len(root_funcs_processed)
             if total_roots > 0:
-                progress_info = f"({root_progress}/{total_roots}, 总评估={total_evaluated})"
+                progress_info = (
+                    f"({root_progress}/{total_roots}, 总评估={total_evaluated})"
+                )
             else:
                 progress_info = f"(总评估={total_evaluated})"
         typer.secho(
@@ -1110,8 +1212,15 @@ def apply_library_replacement(
 
         # 执行 LLM 评估
         res = _llm_evaluate_subtree(
-            fid, desc, by_id, adj_func, disabled_norm, disabled_display,
-            _model_available, _new_model, additional_notes
+            fid,
+            desc,
+            by_id,
+            adj_func,
+            disabled_norm,
+            disabled_display,
+            _model_available,
+            _new_model,
+            additional_notes,
         )
         eval_counter += 1
         processed_roots.add(fid)
@@ -1123,7 +1232,9 @@ def apply_library_replacement(
         # 若可替代，打印评估结果摘要（库/参考API/置信度/备注），并即时标记子孙剪除与后续跳过
         try:
             if res.get("replaceable") is True:
-                libs = res.get("libraries") or ([res.get("library")] if res.get("library") else [])
+                libs = res.get("libraries") or (
+                    [res.get("library")] if res.get("library") else []
+                )
                 libs = [str(x) for x in libs if str(x)]
                 api = str(res.get("api") or "")
                 apis = res.get("apis")
@@ -1134,19 +1245,27 @@ def apply_library_replacement(
                 except Exception:
                     conf = 0.0
                 libs_str = ", ".join(libs) if libs else "(未指定库)"
-                apis_str = ", ".join([str(a) for a in apis]) if isinstance(apis, list) else (api if api else "")
+                apis_str = (
+                    ", ".join([str(a) for a in apis])
+                    if isinstance(apis, list)
+                    else (api if api else "")
+                )
                 # 计算进度：区分初始根函数和递归评估的子节点
                 total_roots = len(root_funcs)
                 if is_root_func:
                     # 初始根函数：显示 (当前根函数索引/总根函数数)
                     root_progress = len(root_funcs_processed)
-                    progress_info = f"({root_progress}/{total_roots})" if total_roots > 0 else ""
+                    progress_info = (
+                        f"({root_progress}/{total_roots})" if total_roots > 0 else ""
+                    )
                 else:
                     # 递归评估的子节点：显示 (当前根函数索引/总根函数数, 总评估节点数)
                     root_progress = len(root_funcs_processed)
                     total_evaluated = len(processed_roots)
                     if total_roots > 0:
-                        progress_info = f"({root_progress}/{total_roots}, 总评估={total_evaluated})"
+                        progress_info = (
+                            f"({root_progress}/{total_roots}, 总评估={total_evaluated})"
+                        )
                     else:
                         progress_info = f"(总评估={total_evaluated})"
                 msg = f"[c2rust-library] {progress_info} 可替换: {label} -> 库: {libs_str}"
@@ -1201,8 +1320,11 @@ def apply_library_replacement(
 
     # 写出新符号表
     replacements = _write_output_symbols(
-        all_records, pruned_funcs, selected_roots,
-        out_symbols_path, out_symbols_prune_path
+        all_records,
+        pruned_funcs,
+        selected_roots,
+        out_symbols_path,
+        out_symbols_prune_path,
     )
 
     # 写出替代映射
@@ -1213,17 +1335,27 @@ def apply_library_replacement(
     # 生成转译顺序（剪枝阶段与别名）
     order_path = None
     try:
-        compute_translation_order_jsonl(Path(out_symbols_path), out_path=order_prune_path)
+        compute_translation_order_jsonl(
+            Path(out_symbols_path), out_path=order_prune_path
+        )
         shutil.copy2(order_prune_path, alias_order_path)
         order_path = alias_order_path
     except Exception as e:
-        typer.secho(f"[c2rust-library] 基于剪枝符号表生成翻译顺序失败: {e}", fg=typer.colors.YELLOW, err=True)
+        typer.secho(
+            f"[c2rust-library] 基于剪枝符号表生成翻译顺序失败: {e}",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
 
     # 完成后清理断点（可选）
     try:
         if resume and clear_checkpoint_on_done and ckpt_path.exists():
             ckpt_path.unlink()
-            typer.secho(f"[c2rust-library] 已清理断点文件: {ckpt_path}", fg=typer.colors.BLUE, err=True)
+            typer.secho(
+                f"[c2rust-library] 已清理断点文件: {ckpt_path}",
+                fg=typer.colors.BLUE,
+                err=True,
+            )
     except Exception:
         pass
 
