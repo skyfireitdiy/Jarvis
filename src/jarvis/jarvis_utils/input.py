@@ -745,12 +745,12 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 hint = ""
             if _is_auto_complete_for_current_agent():
                 base_msg = (
-                    "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出"
+                    "当前是非交互模式，所有的事情你都自我决策，如果无法决策，就完成任务。输出"
                     + ot("!!!COMPLETE!!!")
                 )
                 return base_msg + hint
             else:
-                return "我无法与你交互，所有的事情你都自我决策" + hint
+                return "当前是非交互模式，所有的事情你都自我决策" + hint
         user_input = _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
         )
