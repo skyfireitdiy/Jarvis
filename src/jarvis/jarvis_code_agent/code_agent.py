@@ -99,6 +99,8 @@ class CodeAgent(Agent):
     ):
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
+        # 记录当前是否为非交互模式，便于在提示词/输入中动态调整行为说明
+        self.non_interactive: bool = bool(non_interactive)
 
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
@@ -408,10 +410,11 @@ class CodeAgent(Agent):
 
 没有这些确切信号，请保持在当前模式。
 
-默认模式规则：
-- 除非明确指示，否则默认在每次对话开始时处于RESEARCH模式
-- 如果EXECUTE模式发现需要偏离计划，自动回到PLAN模式
-- 完成所有实施，且用户确认成功后，可以从EXECUTE模式转到REVIEW模式
+        默认模式规则：
+        - 除非明确指示，否则默认在每次对话开始时处于RESEARCH模式
+        - 如果EXECUTE模式发现需要偏离计划，自动回到PLAN模式
+        - 完成所有实施，且用户确认成功后，可以从EXECUTE模式转到REVIEW模式
+        - 对于非交互模式（例如通过命令行参数 --non-interactive 或环境变量 JARVIS_NON_INTERACTIVE 启用），在PLAN模式已经给出清晰、可执行的详细计划后，可以直接进入EXECUTE模式执行计划，无需再次等待用户确认
 
 ## 工作流程（闭环执行，每步必落地）
 
@@ -1136,6 +1139,17 @@ class CodeAgent(Agent):
         """
         prev_dir = os.getcwd()
         try:
+            # 根据当前模式生成额外说明，供 LLM 感知执行策略
+            non_interactive_note = ""
+            if getattr(self, "non_interactive", False):
+                non_interactive_note = (
+                    "\n\n[系统说明]\n"
+                    "本次会话处于**非交互模式**（例如通过 --non-interactive 启用）：\n"
+                    "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
+                    "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问“是否继续”；\n"
+                    "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
+                )
+
             self._init_env(prefix, suffix)
             start_commit = get_latest_commit_hash()
 
@@ -1188,6 +1202,7 @@ class CodeAgent(Agent):
                     project_overview
                     + "\n\n"
                     + first_tip
+                    + non_interactive_note
                     + context_recommendation_text
                     + "\n\n任务描述：\n"
                     + user_input
@@ -1195,6 +1210,7 @@ class CodeAgent(Agent):
             else:
                 enhanced_input = (
                     first_tip
+                    + non_interactive_note
                     + context_recommendation_text
                     + "\n\n任务描述：\n"
                     + user_input
