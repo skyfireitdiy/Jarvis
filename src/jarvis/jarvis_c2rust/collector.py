@@ -20,6 +20,7 @@
 - 本模块注重正确性/鲁棒性而非性能
 - 不尝试发现传递包含；仅通过添加-I <file.parent>来辅助解析器
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -32,9 +33,7 @@ from jarvis.jarvis_c2rust.scanner import (
     load_compile_commands,
     scan_file,
 )
-
-
-HEADER_EXTS = {".h", ".hh", ".hpp", ".hxx"}
+from jarvis.jarvis_c2rust.constants import HEADER_EXTS
 
 
 def _guess_lang_header_flag(file: Path) -> List[str]:
@@ -47,7 +46,10 @@ def _guess_lang_header_flag(file: Path) -> List[str]:
     # 对于.h文件默认使用C头文件(保守选择)
     return ["-x", "c-header"]
 
-def _ensure_parse_args_for_header(file: Path, base_args: Optional[List[str]]) -> List[str]:
+
+def _ensure_parse_args_for_header(
+    file: Path, base_args: Optional[List[str]]
+) -> List[str]:
     """
     确保头文件解析所需的最小参数集:
     - 通过-I包含file.parent目录
@@ -92,6 +94,7 @@ def _ensure_parse_args_for_header(file: Path, base_args: Optional[List[str]]) ->
 
     return args
 
+
 def _collect_decl_function_names(cindex, file: Path, args: List[str]) -> List[str]:
     """
     对于没有内联定义的头文件的回退方案:
@@ -110,10 +113,19 @@ def _collect_decl_function_names(cindex, file: Path, args: List[str]) -> List[st
             kind = node.kind.name
         except Exception:
             kind = ""
-        if kind in {"FUNCTION_DECL", "CXX_METHOD", "FUNCTION_TEMPLATE", "CONSTRUCTOR", "DESTRUCTOR"}:
+        if kind in {
+            "FUNCTION_DECL",
+            "CXX_METHOD",
+            "FUNCTION_TEMPLATE",
+            "CONSTRUCTOR",
+            "DESTRUCTOR",
+        }:
             loc_file = getattr(getattr(node, "location", None), "file", None)
             try:
-                same_file = loc_file is not None and Path(loc_file.name).resolve() == file.resolve()
+                same_file = (
+                    loc_file is not None
+                    and Path(loc_file.name).resolve() == file.resolve()
+                )
             except Exception:
                 same_file = False
             if same_file:
@@ -132,6 +144,7 @@ def _collect_decl_function_names(cindex, file: Path, args: List[str]) -> List[st
     except Exception:
         pass
     return names
+
 
 def collect_function_names(
     files: List[Path],
@@ -167,6 +180,7 @@ def collect_function_names(
     cindex = _try_import_libclang()
     if cindex is None:
         from clang import cindex as _ci  # type: ignore
+
         cindex = _ci
 
     # 准备compile_commands参数映射(如果提供了根目录则全局一次，否则每个文件单独处理)
@@ -205,7 +219,11 @@ def collect_function_names(
             funcs = scan_file(cindex, hf, args)
         except Exception:
             try:
-                funcs = scan_file(cindex, hf, _ensure_parse_args_for_header(hf, ["-I", str(hf.parent)]))
+                funcs = scan_file(
+                    cindex,
+                    hf,
+                    _ensure_parse_args_for_header(hf, ["-I", str(hf.parent)]),
+                )
             except Exception:
                 funcs = []
 
@@ -243,7 +261,9 @@ def collect_function_names(
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        out_path.write_text("\n".join(ordered_names) + ("\n" if ordered_names else ""), encoding="utf-8")
+        out_path.write_text(
+            "\n".join(ordered_names) + ("\n" if ordered_names else ""), encoding="utf-8"
+        )
     except Exception as e:
         raise RuntimeError(f"写入输出文件失败: {out_path}: {e}")
 

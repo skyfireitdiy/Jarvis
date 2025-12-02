@@ -58,6 +58,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set
 import typer
 import shutil
+from jarvis.jarvis_c2rust.constants import SOURCE_EXTS, TYPE_KINDS
+
 
 # ---------------------------
 # libclang loader
@@ -90,6 +92,7 @@ def _try_import_libclang() -> Any:
     try:
         import clang as _clang
         import re as _re
+
         v = getattr(_clang, "__version__", None)
         if v:
             m = _re.match(r"(\\d+)", str(v))
@@ -111,8 +114,10 @@ def _try_import_libclang() -> Any:
         try:
             import ctypes
             import re as _re
+
             class CXString(ctypes.Structure):
                 _fields_ = [("data", ctypes.c_void_p), ("private_flags", ctypes.c_uint)]
+
             lib = ctypes.CDLL(path)
             # Ensure correct ctypes signatures to avoid mis-parsing strings
             lib.clang_getClangVersion.restype = CXString
@@ -175,11 +180,13 @@ def _try_import_libclang() -> Any:
         for maj in (21, 20, 19, 18, 17, 16):
             candidates.append(base / f"libclang.so.{maj}")
         # Generic names
-        candidates.extend([
-            base / "libclang.so",      # Linux
-            base / "libclang.dylib",   # macOS
-            base / "libclang.dll",     # Windows
-        ])
+        candidates.extend(
+            [
+                base / "libclang.so",  # Linux
+                base / "libclang.dylib",  # macOS
+                base / "libclang.dll",  # Windows
+            ]
+        )
         for cand in candidates:
             if cand.exists() and _ensure_supported_and_set(str(cand)):
                 return cindex
@@ -196,52 +203,65 @@ def _try_import_libclang() -> Any:
         candidates_llvm: List[Path] = []
         for maj in (21, 20, 19, 18, 17, 16):
             candidates_llvm.append(p / f"libclang.so.{maj}")
-        candidates_llvm.extend([
-            p / "libclang.so",
-            p / "libclang.dylib",
-            p / "libclang.dll",
-        ])
+        candidates_llvm.extend(
+            [
+                p / "libclang.so",
+                p / "libclang.dylib",
+                p / "libclang.dll",
+            ]
+        )
         for cand in candidates_llvm:
             if cand.exists() and _ensure_supported_and_set(str(cand)):
                 return cindex
 
     # 4) Common locations for versions 16-21
     import platform as _platform
+
     sys_name = _platform.system()
     path_candidates: List[Path] = []
     if sys_name == "Linux":
         for maj in (21, 20, 19, 18, 17, 16):
-            path_candidates.extend([
-                Path(f"/usr/lib/llvm-{maj}/lib/libclang.so.{maj}"),
-                Path(f"/usr/lib/llvm-{maj}/lib/libclang.so"),
-            ])
+            path_candidates.extend(
+                [
+                    Path(f"/usr/lib/llvm-{maj}/lib/libclang.so.{maj}"),
+                    Path(f"/usr/lib/llvm-{maj}/lib/libclang.so"),
+                ]
+            )
         # Generic fallbacks
-        path_candidates.extend([
-            Path("/usr/local/lib/libclang.so.21"),
-            Path("/usr/local/lib/libclang.so.20"),
-            Path("/usr/local/lib/libclang.so.19"),
-            Path("/usr/local/lib/libclang.so.18"),
-            Path("/usr/local/lib/libclang.so.17"),
-            Path("/usr/local/lib/libclang.so.16"),
-            Path("/usr/local/lib/libclang.so"),
-            Path("/usr/lib/libclang.so.21"),
-            Path("/usr/lib/libclang.so.20"),
-            Path("/usr/lib/libclang.so.19"),
-            Path("/usr/lib/libclang.so.18"),
-            Path("/usr/lib/libclang.so.17"),
-            Path("/usr/lib/libclang.so.16"),
-            Path("/usr/lib/libclang.so"),
-        ])
+        path_candidates.extend(
+            [
+                Path("/usr/local/lib/libclang.so.21"),
+                Path("/usr/local/lib/libclang.so.20"),
+                Path("/usr/local/lib/libclang.so.19"),
+                Path("/usr/local/lib/libclang.so.18"),
+                Path("/usr/local/lib/libclang.so.17"),
+                Path("/usr/local/lib/libclang.so.16"),
+                Path("/usr/local/lib/libclang.so"),
+                Path("/usr/lib/libclang.so.21"),
+                Path("/usr/lib/libclang.so.20"),
+                Path("/usr/lib/libclang.so.19"),
+                Path("/usr/lib/libclang.so.18"),
+                Path("/usr/lib/libclang.so.17"),
+                Path("/usr/lib/libclang.so.16"),
+                Path("/usr/lib/libclang.so"),
+            ]
+        )
     elif sys_name == "Darwin":
         # Homebrew llvm@N formulas
         for maj in (21, 20, 19, 18, 17, 16):
-            path_candidates.append(Path(f"/opt/homebrew/opt/llvm@{maj}/lib/libclang.dylib"))
-            path_candidates.append(Path(f"/usr/local/opt/llvm@{maj}/lib/libclang.dylib"))
+            path_candidates.append(
+                Path(f"/opt/homebrew/opt/llvm@{maj}/lib/libclang.dylib")
+            )
+            path_candidates.append(
+                Path(f"/usr/local/opt/llvm@{maj}/lib/libclang.dylib")
+            )
         # Generic llvm formula path (may be symlinked to a specific version)
-        path_candidates.extend([
-            Path("/opt/homebrew/opt/llvm/lib/libclang.dylib"),
-            Path("/usr/local/opt/llvm/lib/libclang.dylib"),
-        ])
+        path_candidates.extend(
+            [
+                Path("/opt/homebrew/opt/llvm/lib/libclang.dylib"),
+                Path("/usr/local/opt/llvm/lib/libclang.dylib"),
+            ]
+        )
     else:
         # Best-effort on other systems (Windows)
         path_candidates = [
@@ -298,6 +318,8 @@ def _try_import_libclang() -> Any:
         "    export CLANG_LIBRARY_FILE=/usr/lib/llvm-21/lib/libclang.so   # Linux (请调整版本)\n"
         "    export CLANG_LIBRARY_FILE=/opt/homebrew/opt/llvm@21/lib/libclang.dylib  # macOS (请调整版本)\n"
     )
+
+
 # ---------------------------
 # Data structures
 # ---------------------------
@@ -315,10 +337,6 @@ class FunctionInfo:
     end_line: int
     end_col: int
     language: str
-
-
-
-
 
 
 # ---------------------------
@@ -361,35 +379,7 @@ def load_compile_commands(cc_path: Path) -> Dict[str, List[str]]:
         else:
             # fallback to split command string
             cmd = entry.get("command", "")
-            import shlex
-            parts = shlex.split(cmd) if cmd else []
-            args = parts[1:] if parts else []
 
-        # Clean args: drop compile-only/output flags that confuse libclang
-        cleaned: List[str] = []
-        skip_next = False
-        for a in args:
-            if skip_next:
-                skip_next = False
-                continue
-            if a in ("-c",):
-                continue
-            if a in ("-o", "-MF"):
-                skip_next = True
-                continue
-            if a.startswith("-o"):
-                continue
-            cleaned.append(a)
-        mapping[str(file_path)] = cleaned
-    return mapping
-
-# ---------------------------
-# File discovery
-# ---------------------------
-SOURCE_EXTS: Set[str] = {
-    ".c", ".cc", ".cpp", ".cxx", ".C",
-    ".h", ".hh", ".hpp", ".hxx",
-}
 
 def iter_source_files(root: Path) -> Iterable[Path]:
     for p in root.rglob("*"):
@@ -501,13 +491,18 @@ def scan_file(cindex, file_path: Path, args: List[str]) -> List[FunctionInfo]:
         # Only consider functions with definitions in this file
         if is_function_like(node) and node.is_definition():
             loc_file = node.location.file
-            if loc_file is not None and Path(loc_file.name).resolve() == file_path.resolve():
+            if (
+                loc_file is not None
+                and Path(loc_file.name).resolve() == file_path.resolve()
+            ):
                 try:
                     name = node.spelling or ""
                     qualified_name = get_qualified_name(node)
                     signature = node.displayname or name
                     try:
-                        return_type = node.result_type.spelling  # not available for constructors/destructors
+                        return_type = (
+                            node.result_type.spelling
+                        )  # not available for constructors/destructors
                     except Exception:
                         return_type = ""
                     params = collect_params(node)
@@ -568,6 +563,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     if cindex is None:
         try:
             from clang import cindex as _ci
+
             cindex = _ci
         except Exception as e:
             raise RuntimeError(f"Failed to load libclang bindings: {e}")
@@ -582,6 +578,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             def _has_symbol(lib_path: str, symbol: str) -> bool:
                 try:
                     import ctypes
+
                     lib = ctypes.CDLL(lib_path)
                     getattr(lib, symbol)
                     return True
@@ -590,6 +587,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
 
             # Build candidate search dirs (Linux/macOS)
             import platform as _platform
+
             sys_name = _platform.system()
             lib_candidates = []
             if sys_name == "Linux":
@@ -610,7 +608,11 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                     "/usr/local/opt/llvm/lib/libclang.dylib",
                 ]
 
-            good = [p for p in lib_candidates if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")]
+            good = [
+                p
+                for p in lib_candidates
+                if Path(p).exists() and _has_symbol(p, "clang_getOffsetOfBase")
+            ]
             hint = ""
             if good:
                 hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
@@ -630,7 +632,11 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             raise typer.Exit(code=2)
         else:
             # Other initialization errors: surface and exit
-            typer.secho(f"[c2rust-scanner] libclang 初始化失败: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(
+                f"[c2rust-scanner] libclang 初始化失败: {e}",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(code=2)
 
     # compile_commands
@@ -760,9 +766,11 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 # If we hit undefined symbol, it's a libclang/python bindings mismatch; abort with guidance
                 msg = str(e)
                 if "undefined symbol" in msg:
+
                     def _has_symbol(lib_path: str, symbol: str) -> bool:
                         try:
                             import ctypes
+
                             lib = ctypes.CDLL(lib_path)
                             getattr(lib, symbol)
                             return True
@@ -770,6 +778,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                             return False
 
                     import platform as _platform
+
                     sys_name = _platform.system()
                     lib_candidates2: List[str] = []
                     if sys_name == "Linux":
@@ -786,7 +795,12 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                             "/usr/local/opt/llvm/lib/libclang.dylib",
                         ]
 
-                    good = [lp for lp in lib_candidates2 if Path(lp).exists() and _has_symbol(lp, "clang_getOffsetOfBase")]
+                    good = [
+                        lp
+                        for lp in lib_candidates2
+                        if Path(lp).exists()
+                        and _has_symbol(lp, "clang_getOffsetOfBase")
+                    ]
                     hint = ""
                     if good:
                         hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
@@ -840,7 +854,9 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
 
             scanned += 1
             if scanned % 20 == 0 or scanned == total_files:
-                print(f"[c2rust-scanner] 进度: {scanned}/{total_files} 个文件, {total_functions} 个函数, {total_types} 个类型")
+                print(
+                    f"[c2rust-scanner] 进度: {scanned}/{total_files} 个文件, {total_functions} 个函数, {total_types} 个类型"
+                )
     finally:
         try:
             f_sym.close()
@@ -857,21 +873,32 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         "source_root": str(scan_root),
     }
     try:
-        meta_json.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        meta_json.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     except Exception:
         pass
 
-    print(f"[c2rust-scanner] 完成。收集到的函数: {total_functions}, 类型: {total_types}, 符号: {total_functions + total_types}")
+    print(
+        f"[c2rust-scanner] 完成。收集到的函数: {total_functions}, 类型: {total_types}, 符号: {total_functions + total_types}"
+    )
     print(f"[c2rust-scanner] JSONL 已写入: {symbols_raw_jsonl} (原始符号)")
     # 同步生成基线 symbols.jsonl（与 raw 等价），便于后续流程仅基于 symbols.jsonl 运行
     try:
         shutil.copy2(symbols_raw_jsonl, symbols_curated_jsonl)
-        print(f"[c2rust-scanner] JSONL 基线已写入: {symbols_curated_jsonl} (用于后续流程)")
+        print(
+            f"[c2rust-scanner] JSONL 基线已写入: {symbols_curated_jsonl} (用于后续流程)"
+        )
     except Exception as _e:
-        typer.secho(f"[c2rust-scanner] 生成 symbols.jsonl 失败: {_e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"[c2rust-scanner] 生成 symbols.jsonl 失败: {_e}",
+            fg=typer.colors.RED,
+            err=True,
+        )
         raise
     print(f"[c2rust-scanner] 元数据已写入: {meta_json}")
     return symbols_raw_jsonl
+
 
 # ---------------------------
 # Type scanning
@@ -888,18 +915,6 @@ class TypeInfo:
     end_line: int
     end_col: int
     language: str
-
-
-
-
-TYPE_KINDS: Set[str] = {
-    "STRUCT_DECL",
-    "UNION_DECL",
-    "ENUM_DECL",
-    "CXX_RECORD_DECL",   # C++ class/struct/union
-    "TYPEDEF_DECL",
-    "TYPE_ALIAS_DECL",
-}
 
 
 def scan_types_file(cindex, file_path: Path, args: List[str]) -> List[TypeInfo]:
@@ -922,7 +937,12 @@ def scan_types_file(cindex, file_path: Path, args: List[str]) -> List[TypeInfo]:
 
         if kind in TYPE_KINDS:
             # Accept full definitions for record/enum; typedef/alias are inherently definitions
-            need_def = kind in {"STRUCT_DECL", "UNION_DECL", "ENUM_DECL", "CXX_RECORD_DECL"}
+            need_def = kind in {
+                "STRUCT_DECL",
+                "UNION_DECL",
+                "ENUM_DECL",
+                "CXX_RECORD_DECL",
+            }
             if (not need_def) or node.is_definition():
                 try:
                     name = node.spelling or ""
@@ -1075,6 +1095,7 @@ def find_root_function_ids(db_path: Path) -> List[int]:
     - 严格使用 ref 字段
     - 函数与类型统一处理（不区分）
     """
+
     def _resolve_symbols_jsonl_path(hint: Path) -> Path:
         p = Path(hint)
         if p.is_file() and p.suffix.lower() == ".jsonl":
@@ -1131,7 +1152,9 @@ def find_root_function_ids(db_path: Path) -> List[int]:
     return root_ids
 
 
-def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = None) -> Path:
+def compute_translation_order_jsonl(
+    db_path: Path, out_path: Optional[Path] = None
+) -> Path:
     """
     Compute translation order on reference graph and write order to JSONL.
     Data source: symbols.jsonl (or provided .jsonl path), strictly using ref field and including all symbols.
@@ -1145,6 +1168,7 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
           "created_at": "YYYY-MM-DDTHH:MM:SS"
         }
     """
+
     def _resolve_symbols_jsonl_path(hint: Path) -> Path:
         p = Path(hint)
         if p.is_file() and p.suffix.lower() == ".jsonl":
@@ -1278,6 +1302,7 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
 
     # Kahn on reversed DAG
     from collections import deque
+
     q = deque(sorted([i for i in range(comp_count) if indeg[i] == 0]))
     comp_order: List[int] = []
     while q:
@@ -1325,16 +1350,22 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
             # - JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS
             # - JARVIS_C2RUST_DELAY_ENTRIES
             # - C2RUST_DELAY_ENTRIES
-            entries_env = os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS") or \
-                          os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES") or \
-                          os.environ.get("C2RUST_DELAY_ENTRIES") or ""
+            entries_env = (
+                os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS")
+                or os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES")
+                or os.environ.get("C2RUST_DELAY_ENTRIES")
+                or ""
+            )
             entries_set = set()
             if entries_env:
                 try:
                     import re as _re
+
                     parts = _re.split(r"[,\s;]+", entries_env.strip())
                 except Exception:
-                    parts = [p.strip() for p in entries_env.replace(";", ",").split(",")]
+                    parts = [
+                        p.strip() for p in entries_env.replace(";", ",").split(",")
+                    ]
                 entries_set = {p.strip().lower() for p in parts if p and p.strip()}
             # If configured, use the provided entries; otherwise fallback to default 'main'
             if entries_set:
@@ -1373,17 +1404,25 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
                 roots_labels = []
                 if root_id is not None:
                     meta_r = by_id.get(root_id, {})
-                    rlabel = meta_r.get("qname") or meta_r.get("name") or f"sym_{root_id}"
+                    rlabel = (
+                        meta_r.get("qname") or meta_r.get("name") or f"sym_{root_id}"
+                    )
                     roots_labels = [rlabel]
-                steps.append({
-                    "step": len(steps) + 1,
-                    "ids": sorted(selected),
-                    "items": [by_id.get(nid, {}).get("record") for nid in sorted(selected) if isinstance(by_id.get(nid, {}).get("record"), dict)],
-                    "symbols": syms,
-                    "group": len(syms) > 1,
-                    "roots": roots_labels,
-                    "created_at": now_ts,
-                })
+                steps.append(
+                    {
+                        "step": len(steps) + 1,
+                        "ids": sorted(selected),
+                        "items": [
+                            by_id.get(nid, {}).get("record")
+                            for nid in sorted(selected)
+                            if isinstance(by_id.get(nid, {}).get("record"), dict)
+                        ],
+                        "symbols": syms,
+                        "group": len(syms) > 1,
+                        "roots": roots_labels,
+                        "created_at": now_ts,
+                    }
+                )
 
         # Emit delayed entry functions as the final step for this root
         if delayed_entries:
@@ -1399,15 +1438,21 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
                 meta_r = by_id.get(root_id, {})
                 rlabel = meta_r.get("qname") or meta_r.get("name") or f"sym_{root_id}"
                 roots_labels = [rlabel]
-            steps.append({
-                "step": len(steps) + 1,
-                "ids": sorted(delayed_entries),
-                "items": [by_id.get(nid, {}).get("record") for nid in sorted(delayed_entries) if isinstance(by_id.get(nid, {}).get("record"), dict)],
-                "symbols": syms,
-                "group": len(syms) > 1,
-                "roots": roots_labels,
-                "created_at": now_ts,
-            })
+            steps.append(
+                {
+                    "step": len(steps) + 1,
+                    "ids": sorted(delayed_entries),
+                    "items": [
+                        by_id.get(nid, {}).get("record")
+                        for nid in sorted(delayed_entries)
+                        if isinstance(by_id.get(nid, {}).get("record"), dict)
+                    ],
+                    "symbols": syms,
+                    "group": len(syms) > 1,
+                    "roots": roots_labels,
+                    "created_at": now_ts,
+                }
+            )
 
     for rid in sorted(roots, key=lambda r: len(root_reach.get(r, set())), reverse=True):
         _emit_for_root(rid)
@@ -1430,7 +1475,9 @@ def compute_translation_order_jsonl(db_path: Path, out_path: Optional[Path] = No
     # Purge redundant fields before writing (keep ids and records; drop symbols/items)
     try:
         # 保留 items（包含完整符号记录及替换信息），仅移除冗余的 symbols 文本标签
-        steps = [dict((k, v) for k, v in st.items() if k not in ("symbols",)) for st in steps]
+        steps = [
+            dict((k, v) for k, v in st.items() if k not in ("symbols",)) for st in steps
+        ]
     except Exception:
         pass
     with open(out_path, "w", encoding="utf-8") as fo:
@@ -1502,7 +1549,9 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
         if not s:
             return "root"
         s = s.replace("::", "__")
-        return "".join(ch if ch.isalnum() or ch in ("_", "-") else "_" for ch in s)[:120]
+        return "".join(ch if ch.isalnum() or ch in ("_", "-") else "_" for ch in s)[
+            :120
+        ]
 
     generated: List[Path] = []
     root_ids = find_root_function_ids(db_path)
@@ -1549,7 +1598,11 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
                     edges.add((src_node, dst))
 
         # Write DOT
-        root_base = by_id.get(rid, {}).get("qname") or by_id.get(rid, {}).get("name") or f"sym_{rid}"
+        root_base = (
+            by_id.get(rid, {}).get("qname")
+            or by_id.get(rid, {}).get("name")
+            or f"sym_{rid}"
+        )
         fname = f"subgraph_root_{rid}_{sanitize_filename(root_base)}.dot"
         out_path = out_dir / fname
         with open(out_path, "w", encoding="utf-8") as f:
@@ -1563,7 +1616,9 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
             for nid, lbl in node_labels.items():
                 safe_label = lbl.replace("\\", "\\\\").replace('"', '\\"')
                 if nid.startswith("ext"):
-                    f.write(f'  {nid} [label="{safe_label}", shape=ellipse, style=dashed, color=gray50, fontcolor=gray30];\n')
+                    f.write(
+                        f'  {nid} [label="{safe_label}", shape=ellipse, style=dashed, color=gray50, fontcolor=gray30];\n'
+                    )
                 else:
                     f.write(f'  {nid} [label="{safe_label}", shape=box];\n')
 
@@ -1582,6 +1637,7 @@ def export_root_subgraphs_to_dir(db_path: Path, out_dir: Path) -> List[Path]:
 # Third-party replacement evaluation
 # ---------------------------
 
+
 def run_scan(
     dot: Optional[Path] = None,
     only_dot: bool = False,
@@ -1592,9 +1648,9 @@ def run_scan(
 ) -> None:
     # Scan for C/C++ functions and persist results to JSONL; optionally generate DOT.
     # Determine data path
-    root = Path('.')
-    Path('.') / ".jarvis" / "c2rust" / "symbols_raw.jsonl"
-    data_path_curated = Path('.') / ".jarvis" / "c2rust" / "symbols.jsonl"
+    root = Path(".")
+    Path(".") / ".jarvis" / "c2rust" / "symbols_raw.jsonl"
+    data_path_curated = Path(".") / ".jarvis" / "c2rust" / "symbols.jsonl"
 
     # Helper: render a DOT file to PNG using Graphviz 'dot'
     def _render_dot_to_png(dot_file: Path, png_out: Optional[Path] = None) -> Path:
@@ -1605,7 +1661,9 @@ def run_scan(
             raise RuntimeError(f"准备 PNG 渲染时出现环境问题: {_e}")
         exe = which("dot")
         if not exe:
-            raise RuntimeError("在 PATH 中未找到 Graphviz 'dot'。请安装 graphviz 并确保 'dot' 可用。")
+            raise RuntimeError(
+                "在 PATH 中未找到 Graphviz 'dot'。请安装 graphviz 并确保 'dot' 可用。"
+            )
         dot_file = Path(dot_file)
         if png_out is None:
             png_out = dot_file.with_suffix(".png")
@@ -1613,7 +1671,9 @@ def run_scan(
             png_out = Path(png_out)
         png_out.parent.mkdir(parents=True, exist_ok=True)
         try:
-            subprocess.run([exe, "-Tpng", str(dot_file), "-o", str(png_out)], check=True)
+            subprocess.run(
+                [exe, "-Tpng", str(dot_file), "-o", str(png_out)], check=True
+            )
         except FileNotFoundError:
             raise RuntimeError("未找到 Graphviz 'dot' 可执行文件。")
         except subprocess.CalledProcessError as e:
@@ -1629,13 +1689,25 @@ def run_scan(
     else:
         # Only-generate mode (no rescan). 验证输入，仅基于既有 symbols.jsonl 进行可选的 DOT/子图输出；此处不计算翻译顺序。
         if not data_path_curated.exists():
-            typer.secho(f"[c2rust-scanner] 未找到数据: {data_path_curated}", fg=typer.colors.RED, err=True)
+            typer.secho(
+                f"[c2rust-scanner] 未找到数据: {data_path_curated}",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(code=2)
         if only_dot and dot is None:
-            typer.secho("[c2rust-scanner] --only-dot 需要 --dot 来指定输出文件", fg=typer.colors.RED, err=True)
+            typer.secho(
+                "[c2rust-scanner] --only-dot 需要 --dot 来指定输出文件",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(code=2)
         if only_subgraphs and subgraphs_dir is None:
-            typer.secho("[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录", fg=typer.colors.RED, err=True)
+            typer.secho(
+                "[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(code=2)
 
     # Generate DOT (global) if requested
@@ -1643,12 +1715,21 @@ def run_scan(
         try:
             # 使用正式符号表生成可视化
             generate_dot_from_db(data_path_curated, dot)
-            typer.secho(f"[c2rust-scanner] DOT 文件已写入: {dot}", fg=typer.colors.GREEN)
+            typer.secho(
+                f"[c2rust-scanner] DOT 文件已写入: {dot}", fg=typer.colors.GREEN
+            )
             if png:
                 png_path = _render_dot_to_png(dot)
-                typer.secho(f"[c2rust-scanner] PNG 文件已写入: {png_path}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"[c2rust-scanner] PNG 文件已写入: {png_path}",
+                    fg=typer.colors.GREEN,
+                )
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] 写入 DOT/PNG 失败: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(
+                f"[c2rust-scanner] 写入 DOT/PNG 失败: {e}",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(code=1)
 
     # Generate per-root subgraphs if requested
@@ -1675,7 +1756,9 @@ def run_scan(
                     fg=typer.colors.GREEN,
                 )
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] 写入子图 DOT/PNG 失败: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(
+                f"[c2rust-scanner] 写入子图 DOT/PNG 失败: {e}",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(code=1)
-
-
