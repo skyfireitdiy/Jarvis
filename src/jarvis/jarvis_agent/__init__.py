@@ -1459,7 +1459,20 @@ class Agent:
             3. 包含错误处理和恢复逻辑
             4. 自动加载相关方法论(如果是首次运行)
         """
-        self.session.prompt = f"{user_input}"
+        # 根据当前模式生成额外说明，供 LLM 感知执行策略
+        non_interactive_note = ""
+        if getattr(self, "non_interactive", False):
+            non_interactive_note = (
+                "\n\n[系统说明]\n"
+                "本次会话处于**非交互模式**：\n"
+                "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
+                "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问“是否继续”；\n"
+                "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
+            )
+
+        # 将非交互模式说明添加到用户输入中
+        enhanced_input = user_input + non_interactive_note
+        self.session.prompt = enhanced_input
         try:
             set_agent(self.name, self)
 
