@@ -825,11 +825,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         try:
                             parsed = json_loads(json_str)
                             # 验证是否包含必要字段
-                            if (
-                                "name" in parsed
-                                and "arguments" in parsed
-                                and "want" in parsed
-                            ):
+                            if "name" in parsed and "arguments" in parsed:
                                 data = [json_str]
                                 auto_completed = True
                         except Exception:
@@ -1040,7 +1036,7 @@ class ToolRegistry(OutputHandlerProtocol):
         try:
             name = tool_call["name"]  # 确保name是str类型
             args = tool_call["arguments"]  # 原始参数（来自外部协议）
-            want = tool_call["want"]
+            want = tool_call.get("want", "")
 
             from jarvis.jarvis_agent import Agent
 
