@@ -883,11 +883,11 @@ class ToolRegistry(OutputHandlerProtocol):
                     False,
                 )
 
-            if "name" in msg and "arguments" in msg and "want" in msg:
+            if "name" in msg and "arguments" in msg:
                 ret.append(msg)
             else:
                 long_hint = ToolRegistry._get_long_response_hint(content)
-                error_msg = f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
+                error_msg = f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments字段）。
 
                 {tool_call_help}{long_hint}"""
 
