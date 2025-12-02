@@ -10,7 +10,7 @@
 import os
 import re
 import subprocess
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Tuple
 
 from .base import BuildSystem
 
@@ -21,174 +21,73 @@ class BuildSystemDetector:
     def __init__(self, project_root: str):
         self.project_root = project_root
     
-    def detect(self) -> Optional[BuildSystem]:
-        """检测项目使用的构建系统（兼容旧接口，返回第一个检测到的）
+    def _get_file_statistics(self) -> str:
+        """获取文件数量统计信息
+        
+        使用loc工具获取文件统计信息。
         
         Returns:
-            检测到的构建系统，如果无法检测则返回None
+            loc工具输出的原始字符串，失败时返回空字符串
         """
-        all_systems = self.detect_all()
-        return all_systems[0] if all_systems else None
-    
-    def detect_all(self) -> List[BuildSystem]:
-        """检测所有可能的构建系统
-        
-        Returns:
-            检测到的所有构建系统列表（按优先级排序）
-        """
-        detected = []
-        # 按优先级检测（从最具体到最通用）
-        detectors = [
-            self._detect_rust,
-            self._detect_go,
-            self._detect_java_maven,
-            self._detect_java_gradle,
-            self._detect_nodejs,
-            self._detect_python,
-            self._detect_c_cmake,
-            self._detect_c_makefile,
-        ]
-        
-        for detector in detectors:
-            result = detector()
-            if result and result not in detected:
-                detected.append(result)
-        
-        return detected
-    
-    def _detect_rust(self) -> Optional[BuildSystem]:
-        """检测Rust项目（Cargo.toml）"""
-        cargo_toml = os.path.join(self.project_root, "Cargo.toml")
-        if os.path.exists(cargo_toml):
-            return BuildSystem.RUST
-        return None
-    
-    def _detect_go(self) -> Optional[BuildSystem]:
-        """检测Go项目（go.mod）"""
-        go_mod = os.path.join(self.project_root, "go.mod")
-        if os.path.exists(go_mod):
-            return BuildSystem.GO
-        return None
-    
-    def _detect_java_maven(self) -> Optional[BuildSystem]:
-        """检测Maven项目（pom.xml）"""
-        pom_xml = os.path.join(self.project_root, "pom.xml")
-        if os.path.exists(pom_xml):
-            return BuildSystem.JAVA_MAVEN
-        return None
-    
-    def _detect_java_gradle(self) -> Optional[BuildSystem]:
-        """检测Gradle项目（build.gradle或build.gradle.kts）"""
-        build_gradle = os.path.join(self.project_root, "build.gradle")
-        build_gradle_kts = os.path.join(self.project_root, "build.gradle.kts")
-        if os.path.exists(build_gradle) or os.path.exists(build_gradle_kts):
-            return BuildSystem.JAVA_GRADLE
-        return None
-    
-    def _detect_nodejs(self) -> Optional[BuildSystem]:
-        """检测Node.js项目（package.json）"""
-        package_json = os.path.join(self.project_root, "package.json")
-        if os.path.exists(package_json):
-            return BuildSystem.NODEJS
-        return None
-    
-    def _detect_python(self) -> Optional[BuildSystem]:
-        """检测Python项目（setup.py, pyproject.toml, requirements.txt等）"""
-        indicators = [
-            "setup.py",
-            "pyproject.toml",
-            "requirements.txt",
-            "setup.cfg",
-            "Pipfile",
-            "poetry.lock",
-        ]
-        for indicator in indicators:
-            if os.path.exists(os.path.join(self.project_root, indicator)):
-                return BuildSystem.PYTHON
-        return None
-    
-    def _detect_c_cmake(self) -> Optional[BuildSystem]:
-        """检测CMake项目（CMakeLists.txt）"""
-        cmake_lists = os.path.join(self.project_root, "CMakeLists.txt")
-        if os.path.exists(cmake_lists):
-            # 检查是否同时存在Makefile
-            makefile = os.path.join(self.project_root, "Makefile")
-            if os.path.exists(makefile):
-                return BuildSystem.C_MAKEFILE_CMAKE
-            return BuildSystem.C_CMAKE
-        return None
-    
-    def _detect_c_makefile(self) -> Optional[BuildSystem]:
-        """检测Makefile项目"""
-        makefile = os.path.join(self.project_root, "Makefile")
-        if os.path.exists(makefile):
-            return BuildSystem.C_MAKEFILE
-        return None
-    
-    def _get_file_statistics(self) -> Dict[str, int]:
-        """获取文件数量统计信息（按扩展名）
-        
-        Returns:
-            字典，键为文件扩展名（如 '.py', '.rs'），值为文件数量
-        """
-        stats: Dict[str, int] = {}
-        
         try:
-            # 使用git ls-files获取git跟踪的文件列表（排除.gitignore中的文件）
+            # 调用loc工具获取统计信息
             result = subprocess.run(
-                ["git", "ls-files"],
+                ["loc"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+            
+            if result.returncode == 0 and result.stdout:
+                return result.stdout.strip()
+            else:
+                return ""
+        except FileNotFoundError:
+            # loc工具未安装，返回空字符串
+            print("⚠️ loc工具未安装，无法获取文件统计信息")
+            return ""
+        except Exception as e:
+            # 其他错误，返回空字符串
+            print(f"⚠️ 调用loc工具失败: {e}")
+            return ""
+    
+    def _get_git_root_file_list(self, max_files: int = 100) -> str:
+        """获取git根目录的文件列表（限制数量）
+        
+        先识别git根目录，然后列出根目录下的文件列表。
+        
+        Args:
+            max_files: 最大返回文件数量
+            
+        Returns:
+            文件列表的字符串表示，每行一个文件，失败时返回空字符串
+        """
+        try:
+            # 先识别git根目录
+            git_root_result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
                 cwd=self.project_root,
                 capture_output=True,
                 text=True,
                 check=False,
             )
             
-            if result.returncode == 0:
-                files = result.stdout.strip().split('\n')
-                for file_path in files:
-                    if not file_path.strip():
-                        continue
-                    # 获取文件扩展名
-                    _, ext = os.path.splitext(file_path)
-                    if ext:
-                        stats[ext] = stats.get(ext, 0) + 1
-                    else:
-                        # 无扩展名的文件
-                        stats['(no extension)'] = stats.get('(no extension)', 0) + 1
-        except Exception:
-            # 如果git命令失败，尝试直接遍历目录
-            try:
-                for root, dirs, files in os.walk(self.project_root):
-                    # 跳过.git和.jarvis目录
-                    if '.git' in root or '.jarvis' in root:
-                        continue
-                    for file_name in files:
-                        _, ext = os.path.splitext(file_name)
-                        if ext:
-                            stats[ext] = stats.get(ext, 0) + 1
-                        else:
-                            stats['(no extension)'] = stats.get('(no extension)', 0) + 1
-            except Exception:
-                pass
-        
-        return stats
-    
-    def _get_git_root_file_list(self, max_files: int = 100) -> List[str]:
-        """获取git根目录的文件列表（限制数量）
-        
-        Args:
-            max_files: 最大返回文件数量
+            if git_root_result.returncode != 0:
+                # 如果不是git仓库，尝试直接读取当前目录
+                git_root = self.project_root
+            else:
+                git_root = git_root_result.stdout.strip()
             
-        Returns:
-            文件路径列表（相对于git根目录）
-        """
-        file_list: List[str] = []
-        
-        try:
+            # 列出git根目录下的文件
+            file_list: List[str] = []
+            
             # 使用git ls-files获取git跟踪的文件列表
             result = subprocess.run(
                 ["git", "ls-files"],
-                cwd=self.project_root,
+                cwd=git_root,
                 capture_output=True,
                 text=True,
                 check=False,
@@ -205,19 +104,27 @@ class BuildSystemDetector:
                         file_list.append(file_path)
                         if len(file_list) >= max_files:
                             break
-        except Exception:
-            # 如果git命令失败，尝试直接读取根目录
-            try:
-                for item in os.listdir(self.project_root):
-                    item_path = os.path.join(self.project_root, item)
-                    if os.path.isfile(item_path) and not item.startswith('.'):
-                        file_list.append(item)
-                        if len(file_list) >= max_files:
-                            break
-            except Exception:
-                pass
-        
-        return file_list
+            else:
+                # 如果git命令失败，尝试直接读取根目录
+                try:
+                    for item in os.listdir(git_root):
+                        item_path = os.path.join(git_root, item)
+                        if os.path.isfile(item_path) and not item.startswith('.'):
+                            file_list.append(item)
+                            if len(file_list) >= max_files:
+                                break
+                except Exception:
+                    pass
+            
+            # 返回格式化的字符串
+            if file_list:
+                return "\n".join(file_list)
+            else:
+                return ""
+        except Exception as e:
+            # 发生错误时返回空字符串
+            print(f"⚠️ 获取git根目录文件列表失败: {e}")
+            return ""
     
     def _get_supported_build_systems(self) -> List[str]:
         """获取当前支持的构建系统列表
@@ -267,8 +174,13 @@ class BuildSystemDetector:
         supported_systems = self._get_supported_build_systems()
         
         # 构建上下文
-        stats_text = "\n".join([f"  {ext}: {count}个文件" for ext, count in sorted(file_stats.items(), key=lambda x: x[1], reverse=True)[:20]])
-        files_text = "\n".join([f"  - {f}" for f in root_files[:30]])
+        stats_text = file_stats if file_stats else "  (无统计信息)"
+        # 格式化文件列表，每行前面加 "  - "
+        if root_files:
+            files_lines = root_files.split('\n')[:30]  # 限制前30个文件
+            files_text = "\n".join([f"  - {f}" for f in files_lines])
+        else:
+            files_text = "  (无文件列表)"
         systems_text = "\n".join([f"  - {sys}" for sys in supported_systems])
         
         context = f"""请根据以下信息判断项目的构建系统：
