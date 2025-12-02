@@ -47,8 +47,10 @@ class TreeSitterExtractor(SymbolExtractor):
         if not content or not content.strip():
             return []
 
+        symbols = []
+        
         try:
-            # 解析代码
+            # 解析代码（即使有语法错误，tree-sitter也能部分解析）
             tree = self.parser.parse(bytes(content, "utf8"))
 
             # 检查解析是否成功（tree.root_node 应该存在）
@@ -56,6 +58,7 @@ class TreeSitterExtractor(SymbolExtractor):
                 return []
 
             # 尝试构造查询
+            query = None
             try:
                 query = Query(self.language, self.symbol_query)
             except Exception as query_error:
@@ -67,15 +70,20 @@ class TreeSitterExtractor(SymbolExtractor):
                 return []
 
             # 使用 QueryCursor 执行查询
+            # 即使有语法错误，tree-sitter也能部分解析，所以可以提取部分符号
             cursor = QueryCursor(query)
             matches = cursor.matches(tree.root_node)
 
-            symbols = []
             # matches 返回格式: [(pattern_index, {capture_name: [nodes]})]
             for pattern_index, captures_dict in matches:
                 for capture_name, nodes in captures_dict.items():
                     for node in nodes:
                         try:
+                            # 跳过错误节点（tree-sitter会用ERROR节点标记语法错误）
+                            # 错误节点通常没有有效的文本内容或位置信息
+                            if node.type == "ERROR":
+                                continue
+                            
                             symbol = self._create_symbol_from_capture(
                                 node, capture_name, file_path
                             )
@@ -83,10 +91,13 @@ class TreeSitterExtractor(SymbolExtractor):
                                 symbols.append(symbol)
                         except Exception:
                             # 单个符号提取失败，继续处理其他符号
+                            # 这样可以确保即使部分符号提取失败，也能返回已成功提取的符号
                             continue
+            
+            # 即使有语法错误，也返回已成功提取的符号
             return symbols
         except Exception as e:
-            # 静默处理解析错误（可能是语法错误、文件损坏等）
+            # 如果解析完全失败（不是语法错误，而是其他严重错误），返回空列表
             # 只在调试模式下打印错误信息
             import os
 
@@ -94,7 +105,8 @@ class TreeSitterExtractor(SymbolExtractor):
                 print(
                     f"Error extracting symbols from {file_path} with tree-sitter: {e}"
                 )
-            return []
+            # 即使解析失败，也返回已提取的符号（如果有的话）
+            return symbols
 
     @abstractmethod
     def _create_symbol_from_capture(

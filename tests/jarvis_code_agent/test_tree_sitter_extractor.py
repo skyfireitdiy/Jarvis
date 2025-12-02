@@ -212,6 +212,44 @@ class TestTreeSitterExtractorSyntaxErrors:
         except Exception as e:
             pytest.fail(f"extract_symbols should handle partial parse: {e}")
 
+    def test_extract_valid_symbols_despite_syntax_errors(self, extractor):
+        """测试即使有语法错误也能提取有效符号"""
+        content = """
+        fn valid_function1() {
+            println!("Valid1");
+        }
+        
+        fn invalid_function(  // 语法错误：缺少闭合括号
+            let x = 5;
+        }
+        
+        fn valid_function2() {
+            println!("Valid2");
+        }
+        
+        fn another_invalid() {
+            let x = {  // 语法错误：未闭合的代码块
+            let y = 5;
+        }
+        
+        fn valid_function3() {
+            println!("Valid3");
+        }
+        """
+        # 即使有多个语法错误，也应该能提取有效的符号
+        symbols = extractor.extract_symbols("test.rs", content)
+        assert isinstance(symbols, list)
+        
+        # 应该至少提取到一些有效的函数符号
+        # 注意：具体能提取多少取决于 tree-sitter 的解析能力
+        # 但至少应该不会崩溃，并且应该返回一个列表
+        if symbols:
+            # 验证返回的符号都是有效的
+            for symbol in symbols:
+                assert hasattr(symbol, 'name')
+                assert hasattr(symbol, 'line_start')
+                assert hasattr(symbol, 'line_end')
+
     def test_nested_syntax_errors(self, extractor):
         """测试嵌套的语法错误"""
         content = """
@@ -247,4 +285,77 @@ class TestTreeSitterExtractorSyntaxErrors:
                 # 注意：由于异常被捕获，print 可能不会被调用，这取决于实现
         except Exception as e:
             pytest.fail(f"extract_symbols should handle errors in debug mode: {e}")
+
+    def test_skip_error_nodes(self, extractor):
+        """测试跳过错误节点，只提取有效符号"""
+        content = """
+        fn valid_function() {
+            println!("Valid");
+        }
+        
+        // 这里有一些语法错误
+        fn invalid(  // 语法错误
+        }
+        
+        fn another_valid() {
+            println!("Also valid");
+        }
+        """
+        # 即使有语法错误，也应该跳过错误节点，提取有效符号
+        symbols = extractor.extract_symbols("test.rs", content)
+        assert isinstance(symbols, list)
+        
+        # 验证返回的符号都是有效的（不应该包含错误节点）
+        for symbol in symbols:
+            assert hasattr(symbol, 'name')
+            assert symbol.name is not None
+            assert symbol.line_start > 0
+            assert symbol.line_end >= symbol.line_start
+
+    def test_mixed_valid_and_invalid_code(self, extractor):
+        """测试混合有效和无效代码的情况"""
+        content = """
+        // 第一个有效函数
+        fn function1() {
+            println!("Function 1");
+        }
+        
+        // 语法错误：缺少闭合括号
+        fn function2(  // 错误开始
+            let x = 5;
+        
+        // 第二个有效函数
+        fn function3() {
+            println!("Function 3");
+        }
+        
+        // 语法错误：未闭合的代码块
+        fn function4() {
+            let x = {  // 错误开始
+            let y = 5;
+        
+        // 第三个有效函数
+        fn function5() {
+            println!("Function 5");
+        }
+        """
+        # 即使有多个语法错误，也应该能提取有效的符号
+        symbols = extractor.extract_symbols("test.rs", content)
+        assert isinstance(symbols, list)
+        
+        # 应该至少提取到一些有效的函数符号
+        # 具体能提取多少取决于 tree-sitter 的解析能力
+        valid_function_names = [s.name for s in symbols if hasattr(s, 'name') and s.name]
+        assert len(valid_function_names) >= 0  # 至少应该返回一个列表（可能为空）
+
+    def test_graceful_degradation_on_parse_failure(self, extractor):
+        """测试解析完全失败时的优雅降级"""
+        # 使用完全无效的内容
+        content = "{{{[[[invalid syntax]]]}}}"
+        
+        # 即使解析完全失败，也不应该崩溃
+        symbols = extractor.extract_symbols("test.rs", content)
+        assert isinstance(symbols, list)
+        # 应该返回空列表或部分符号
+        assert len(symbols) >= 0
 

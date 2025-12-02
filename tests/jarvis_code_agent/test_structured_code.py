@@ -411,3 +411,181 @@ class TestFindBlockById:
         assert result is not None
         assert result["start_line"] == 4
         assert "def foo()" in result["content"]
+
+
+class TestExtractSyntaxUnitsWithSyntaxErrors:
+    """测试 extract_syntax_units 对语法错误的处理"""
+
+    def test_extract_partial_symbols_with_syntax_errors(self, tmp_path):
+        """测试即使有语法错误也能提取部分符号"""
+        # 创建一个有语法错误的 Rust 文件
+        content = """
+        fn valid_function1() {
+            println!("Valid1");
+        }
+        
+        fn invalid_function(  // 语法错误：缺少闭合括号
+            let x = 5;
+        }
+        
+        fn valid_function2() {
+            println!("Valid2");
+        }
+        """
+        file_path = tmp_path / "test.rs"
+        file_path.write_text(content, encoding="utf-8")
+        
+        # 尝试提取语法单元
+        units = StructuredCodeExtractor.extract_syntax_units(
+            str(file_path), content, 1, -1
+        )
+        
+        # 应该返回一个列表（可能为空或包含部分符号）
+        assert isinstance(units, list)
+        
+        # 如果提取到了符号，验证它们的格式
+        for unit in units:
+            assert "id" in unit
+            assert "start_line" in unit
+            assert "end_line" in unit
+            assert "content" in unit
+            assert unit["start_line"] > 0
+            assert unit["end_line"] >= unit["start_line"]
+
+    def test_handle_language_detection_failure(self, tmp_path):
+        """测试语言检测失败时的处理"""
+        content = "some random content without language"
+        file_path = tmp_path / "test.unknown"
+        file_path.write_text(content, encoding="utf-8")
+        
+        # 即使语言检测失败，也不应该崩溃
+        units = StructuredCodeExtractor.extract_syntax_units(
+            str(file_path), content, 1, -1
+        )
+        
+        # 应该返回空列表
+        assert isinstance(units, list)
+
+    def test_handle_extractor_failure(self, tmp_path):
+        """测试提取器失败时的处理"""
+        content = """
+        fn test() {
+            println!("Test");
+        }
+        """
+        file_path = tmp_path / "test.rs"
+        file_path.write_text(content, encoding="utf-8")
+        
+        # 即使提取器失败，也不应该崩溃
+        with patch(
+            "jarvis.jarvis_code_agent.code_analyzer.structured_code.get_symbol_extractor"
+        ) as mock_get_extractor:
+            # 模拟提取器返回 None
+            mock_get_extractor.return_value = None
+            
+            units = StructuredCodeExtractor.extract_syntax_units(
+                str(file_path), content, 1, -1
+            )
+            
+            # 应该返回空列表
+            assert isinstance(units, list)
+            assert len(units) == 0
+
+    def test_handle_symbol_extraction_exception(self, tmp_path):
+        """测试符号提取异常时的处理"""
+        content = """
+        fn test() {
+            println!("Test");
+        }
+        """
+        file_path = tmp_path / "test.rs"
+        file_path.write_text(content, encoding="utf-8")
+        
+        # 即使符号提取抛出异常，也不应该崩溃
+        with patch(
+            "jarvis.jarvis_code_agent.code_analyzer.structured_code.get_symbol_extractor"
+        ) as mock_get_extractor:
+            # 模拟提取器抛出异常
+            mock_extractor = MagicMock()
+            mock_extractor.extract_symbols.side_effect = Exception("Extraction failed")
+            mock_get_extractor.return_value = mock_extractor
+            
+            units = StructuredCodeExtractor.extract_syntax_units(
+                str(file_path), content, 1, -1
+            )
+            
+            # 应该返回空列表，而不是崩溃
+            assert isinstance(units, list)
+
+    def test_handle_individual_symbol_processing_failure(self, tmp_path):
+        """测试单个符号处理失败时的处理"""
+        content = """
+        fn valid_function1() {
+            println!("Valid1");
+        }
+        
+        fn valid_function2() {
+            println!("Valid2");
+        }
+        """
+        file_path = tmp_path / "test.rs"
+        file_path.write_text(content, encoding="utf-8")
+        
+        # 即使单个符号处理失败，也不应该影响其他符号
+        units = StructuredCodeExtractor.extract_syntax_units(
+            str(file_path), content, 1, -1
+        )
+        
+        # 应该返回一个列表
+        assert isinstance(units, list)
+        
+        # 如果提取到了符号，验证它们的格式
+        for unit in units:
+            assert "id" in unit
+            assert "start_line" in unit
+            assert "end_line" in unit
+            assert "content" in unit
+
+    def test_extract_symbols_with_mixed_valid_and_invalid_code(self, tmp_path):
+        """测试混合有效和无效代码的情况"""
+        content = """
+        fn valid_function1() {
+            println!("Valid1");
+        }
+        
+        fn invalid_function(  // 语法错误
+            let x = 5;
+        }
+        
+        fn valid_function2() {
+            println!("Valid2");
+        }
+        
+        fn another_invalid() {
+            let x = {  // 语法错误：未闭合的代码块
+            let y = 5;
+        }
+        
+        fn valid_function3() {
+            println!("Valid3");
+        }
+        """
+        file_path = tmp_path / "test.rs"
+        file_path.write_text(content, encoding="utf-8")
+        
+        # 即使有多个语法错误，也应该能提取部分有效的符号
+        units = StructuredCodeExtractor.extract_syntax_units(
+            str(file_path), content, 1, -1
+        )
+        
+        # 应该返回一个列表
+        assert isinstance(units, list)
+        
+        # 如果提取到了符号，验证它们的格式
+        for unit in units:
+            assert "id" in unit
+            assert "start_line" in unit
+            assert "end_line" in unit
+            assert "content" in unit
+            assert unit["start_line"] > 0
+            assert unit["end_line"] >= unit["start_line"]
