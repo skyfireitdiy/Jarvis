@@ -14,6 +14,7 @@ from jarvis.jarvis_c2rust.constants import (
     CONSECUTIVE_FIX_FAILURE_THRESHOLD,
     ERROR_SUMMARY_MAX_LENGTH,
 )
+from jarvis.jarvis_c2rust.utils import truncate_git_diff_with_context_limit
 
 
 class BuildManager:
@@ -40,6 +41,7 @@ class BuildManager:
         consecutive_fix_failures_getter: Callable[[], int],
         consecutive_fix_failures_setter: Callable[[int], None],
         current_function_start_commit_getter: Callable[[], Optional[str]],
+        get_git_diff_func: Optional[Callable[[Optional[str]], str]] = None,
     ) -> None:
         self.crate_dir = crate_dir
         self.project_root = project_root
@@ -62,6 +64,7 @@ class BuildManager:
         self._current_function_start_commit_getter = (
             current_function_start_commit_getter
         )
+        self.get_git_diff = get_git_diff_func
         self._build_loop_has_fixes = False  # 标记构建循环中是否进行了修复
 
     def classify_rust_error(self, text: str) -> List[str]:
@@ -342,6 +345,39 @@ class BuildManager:
                 f"- 包名称（用于 cargo -p）: {self.crate_dir.name}",
             ]
         )
+
+        # 添加 git 变更信息作为上下文
+        if self.get_git_diff:
+            try:
+                base_commit = self._current_function_start_commit_getter()
+                git_diff = self.get_git_diff(base_commit)
+                if git_diff and git_diff.strip():
+                    # 限制 git diff 长度，避免上下文过大
+                    # 使用较小的比例（30%）因为修复提示词本身已经很长
+                    agent = self.get_code_agent()
+                    git_diff = truncate_git_diff_with_context_limit(
+                        git_diff, agent=agent, token_ratio=0.3
+                    )
+
+                    base_lines.extend(
+                        [
+                            "",
+                            "【Git 变更信息】",
+                            "以下是从函数开始处理到当前的 git 变更，可以帮助你了解已经做了哪些修改：",
+                            "<GIT_DIFF>",
+                            git_diff,
+                            "</GIT_DIFF>",
+                            "",
+                            "提示：",
+                            "- 请仔细查看上述 git diff，了解当前代码的状态和已做的修改",
+                            "- 如果看到之前的修改引入了问题，可以在修复时一并处理",
+                            "- 如果看到某些文件被意外修改，需要确认这些修改是否必要",
+                        ]
+                    )
+            except Exception:
+                # 如果获取 git diff 失败，不影响主流程，只记录警告
+                pass
+
         return base_lines
 
     def build_repair_prompt_stage_section(

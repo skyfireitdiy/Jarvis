@@ -14,6 +14,7 @@ import typer
 
 from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME, ORDER_JSONL
 from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
+from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.git_utils import get_diff, get_diff_file_list
 from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
 
@@ -433,3 +434,55 @@ def check_and_handle_test_deletion(
             return False
 
     return False
+
+
+def truncate_git_diff_with_context_limit(
+    git_diff: str,
+    agent: Optional[Any] = None,
+    llm_group: Optional[str] = None,
+    token_ratio: float = 0.3,
+) -> str:
+    """
+    限制 git diff 的长度，避免上下文过大。
+
+    参数:
+        git_diff: 原始的 git diff 内容
+        agent: 可选的 agent 实例，用于获取剩余 token 数量（更准确）
+        llm_group: 可选的 LLM 组名称，用于获取输入窗口限制
+        token_ratio: token 使用比例（默认 0.3，即 30%）
+
+    返回:
+        str: 限制长度后的 git diff（如果超出限制则截断并添加提示）
+    """
+    if not git_diff or not git_diff.strip():
+        return git_diff
+
+    max_diff_chars = None
+
+    # 优先尝试使用 agent 获取剩余 token（更准确，包含对话历史）
+    if agent:
+        try:
+            remaining_tokens = agent.get_remaining_token_count()
+            if remaining_tokens > 0:
+                # 使用剩余 token 的指定比例作为字符限制（1 token ≈ 4字符）
+                # 所以 remaining_tokens * token_ratio * 4 = remaining_tokens * token_ratio * 4
+                max_diff_chars = int(remaining_tokens * token_ratio * 4)
+                if max_diff_chars <= 0:
+                    max_diff_chars = None
+        except Exception:
+            pass
+
+    # 回退方案：使用输入窗口的指定比例转换为字符数
+    if max_diff_chars is None:
+        try:
+            max_input_tokens = get_max_input_token_count(llm_group)
+            max_diff_chars = int(max_input_tokens * token_ratio * 4)
+        except Exception:
+            # 如果获取失败，使用默认值（约 10000 字符）
+            max_diff_chars = 10000
+
+    # 应用长度限制
+    if len(git_diff) > max_diff_chars:
+        return git_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
+
+    return git_diff
