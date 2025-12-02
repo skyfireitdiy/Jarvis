@@ -446,7 +446,7 @@ def group_commands_by_tool(
 
 
 # 格式化工具配置（文件扩展名/文件名 -> 格式化工具列表）
-FORMAT_TOOLS = {
+POST_COMMAND_FOR_FILE_TYPE = {
     # Python
     ".py": ["ruff format"],
     ".pyw": ["ruff format"],
@@ -519,7 +519,7 @@ def load_format_tools_config() -> Dict[str, List[str]]:
 
 
 # 合并默认配置和yaml配置
-FORMAT_TOOLS.update(load_format_tools_config())
+POST_COMMAND_FOR_FILE_TYPE.update(load_format_tools_config())
 
 
 def get_format_tools(filename: str) -> List[str]:
@@ -537,14 +537,14 @@ def get_format_tools(filename: str) -> List[str]:
     filename_lower = filename.lower()
 
     # 优先尝试完整文件名匹配
-    format_tools = FORMAT_TOOLS.get(filename_lower, [])
+    format_tools = POST_COMMAND_FOR_FILE_TYPE.get(filename_lower, [])
     if format_tools:
         return format_tools
 
     # 如果文件名匹配失败，再尝试扩展名匹配
     ext = os.path.splitext(filename)[1]
     if ext:
-        return FORMAT_TOOLS.get(ext.lower(), [])
+        return POST_COMMAND_FOR_FILE_TYPE.get(ext.lower(), [])
 
     return []
 
@@ -619,7 +619,7 @@ def get_format_command(
     return command
 
 
-def get_format_commands_for_files(
+def get_post_commands_for_files(
     files: List[str], project_root: Optional[str] = None
 ) -> List[Tuple[str, str, str]]:
     """

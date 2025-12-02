@@ -19,7 +19,7 @@ from jarvis.jarvis_code_agent.lint import (
     get_lint_tools,
     get_lint_commands_for_files,
     group_commands_by_tool,
-    get_format_commands_for_files,
+    get_post_commands_for_files,
 )
 from jarvis.jarvis_code_agent.code_analyzer.build_validator import (
     BuildValidator,
@@ -1007,7 +1007,7 @@ class CodeAgent(Agent):
             modified_files: 修改的文件列表
         """
         # 获取格式化命令
-        format_commands = get_format_commands_for_files(modified_files, self.root_dir)
+        format_commands = get_post_commands_for_files(modified_files, self.root_dir)
         if not format_commands:
             return
 
