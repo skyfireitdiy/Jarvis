@@ -78,9 +78,7 @@ class JarvisRAGPipeline:
         self._reranker: Optional[Reranker] = None
         self._query_rewriter: Optional[QueryRewriter] = None
 
-        print(
-            "✅ JarvisRAGPipeline 初始化成功 (模型按需加载)."
-        )
+        print("✅ JarvisRAGPipeline 初始化成功 (模型按需加载).")
 
     def _get_embedding_manager(self) -> EmbeddingManager:
         if self._embedding_manager is None:
@@ -171,7 +169,7 @@ class JarvisRAGPipeline:
                 lines.extend([f"  变更: {p}" for p in changed[:3]])
             if deleted:
                 lines.extend([f"  删除: {p}" for p in deleted[:3]])
-            joined_lines = '\n'.join(lines)
+            joined_lines = "\n".join(lines)
             print(f"⚠️ {joined_lines}")
             # 询问用户
             if get_yes_no(
@@ -179,9 +177,7 @@ class JarvisRAGPipeline:
             ):
                 retriever.update_index_for_changes(changed, deleted)
             else:
-                print(
-                    "ℹ️ 已跳过索引更新，将直接使用当前索引进行检索。"
-                )
+                print("ℹ️ 已跳过索引更新，将直接使用当前索引进行检索。")
         except Exception as e:
             print(f"⚠️ 检索前索引检查失败：{e}")
 
@@ -236,16 +232,12 @@ class JarvisRAGPipeline:
         if self.use_query_rewrite:
             rewritten_queries = self._get_query_rewriter().rewrite(query_text)
         else:
-            print(
-                "ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。"
-            )
+            print("ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。")
             rewritten_queries = [query_text]
 
         # 2. 为每个重写的查询检索初始候选文档
-        query_lines = '\n'.join([f'  - {q}' for q in rewritten_queries])
-        print(
-            f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}"
-        )
+        query_lines = "\n".join([f"  - {q}" for q in rewritten_queries])
+        print(f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}")
         all_candidate_docs = []
         for q in rewritten_queries:
             candidates = self._get_retriever().retrieve(
@@ -287,7 +279,7 @@ class JarvisRAGPipeline:
         if sources:
             # 合并来源列表后一次性打印，避免多次加框
             lines = ["根据以下文档回答:"] + [f"  - {source}" for source in sources]
-            joined_lines = '\n'.join(lines)
+            joined_lines = "\n".join(lines)
             print(f"ℹ️ {joined_lines}")
 
         # 4. 创建最终提示并生成答案
@@ -316,16 +308,12 @@ class JarvisRAGPipeline:
         if self.use_query_rewrite:
             rewritten_queries = self._get_query_rewriter().rewrite(query_text)
         else:
-            print(
-                "ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。"
-            )
+            print("ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。")
             rewritten_queries = [query_text]
 
         # 2. 检索候选文档
-        query_lines = '\n'.join([f'  - {q}' for q in rewritten_queries])
-        print(
-            f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}"
-        )
+        query_lines = "\n".join([f"  - {q}" for q in rewritten_queries])
+        print(f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}")
         all_candidate_docs = []
         for q in rewritten_queries:
             candidates = self._get_retriever().retrieve(
@@ -341,9 +329,7 @@ class JarvisRAGPipeline:
 
         # 3. 重排
         if self.use_rerank:
-            print(
-                f"ℹ️ 正在对 {len(unique_candidate_docs)} 个候选文档进行重排..."
-            )
+            print(f"ℹ️ 正在对 {len(unique_candidate_docs)} 个候选文档进行重排...")
             retrieved_docs = self._get_reranker().rerank(
                 query_text, unique_candidate_docs, top_n=n_results
             )

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_c2rust.llm_module_agent 模块单元测试"""
 
-
 from jarvis.jarvis_c2rust.llm_module_agent import _sanitize_mod_name
 
 
@@ -105,4 +104,3 @@ class TestSanitizeModName:
         # 如果所有字符都是 Unicode，结果可能保留原样或变成 "mod"
         assert isinstance(result, str)
         assert len(result) > 0
-

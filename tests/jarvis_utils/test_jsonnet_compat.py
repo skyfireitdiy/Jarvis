@@ -100,7 +100,9 @@ class TestFixJsonnetMultilineStrings:
 }"""
         result, _ = _fix_jsonnet_multiline_strings(input_str)
         # 第一行应该有缩进
-        assert " 第一行没有缩进" in result or "第一行没有缩进" not in result.split("\n")[2]
+        assert (
+            " 第一行没有缩进" in result or "第一行没有缩进" not in result.split("\n")[2]
+        )
         # 应该能解析成功
         parsed = loads(result)
         assert "text" in parsed
@@ -128,7 +130,9 @@ class TestFixJsonnetMultilineStrings:
                 if "|||" in lines[i]:
                     break
                 if lines[i].strip():
-                    assert lines[i].startswith(" "), f"行 {i} 应该有缩进: {repr(lines[i])}"
+                    assert lines[i].startswith(" "), (
+                        f"行 {i} 应该有缩进: {repr(lines[i])}"
+                    )
 
     def test_preserve_existing_indent(self):
         """测试保持已有缩进的情况（预处理统一缩进，解析后恢复原始缩进）"""
@@ -143,7 +147,6 @@ class TestFixJsonnetMultilineStrings:
         assert "text" in parsed
         assert "第一行有缩进" in parsed["text"]
         assert "第二行也有" in parsed["text"]
-
 
     def test_mixed_indent(self):
         """测试混合缩进的情况（会被统一为第一行的缩进级别）"""
@@ -198,7 +201,9 @@ class TestFixJsonnetMultilineStrings:
         # 制表符会被转换为空格，所有行统一为第一行的缩进级别
         # 第一行有制表符，会被转换为空格（通常是4个或8个，但这里统一为1个空格）
         # 没有缩进的行应该被修复
-        assert " 第一行有制表符" in result or "第一行有制表符" in result.replace("\t", " ")
+        assert " 第一行有制表符" in result or "第一行有制表符" in result.replace(
+            "\t", " "
+        )
         assert " 第二行没有" in result or "第二行没有" not in result.split("\n")[3]
 
     def test_first_line_with_indent_others_without(self):
@@ -254,7 +259,7 @@ class TestFixJsonnetMultilineStrings:
         assert "text" in parsed
         text = parsed["text"]
         # 验证每行的原始缩进被保留
-        lines = text.split('\n')
+        lines = text.split("\n")
         assert "    第一行有4个空格" in lines[0]  # 4个空格
         assert "  第二行有2个空格" in lines[1]  # 2个空格
         assert "第三行没有" in lines[2]  # 没有缩进
@@ -305,14 +310,13 @@ class TestFixJsonnetMultilineStrings:
         assert "text" in parsed
         assert "第一行有4个空格" in parsed["text"]
 
-
     def test_first_line_no_indent_subsequent_lines_have_indent(self):
         """测试首行无缩进，后续行有缩进的情况（应保留相对缩进）"""
         input_str = """{\n  "content": |||\n第一行没有缩进\n    第二行有4个空格缩进\n        第三行有8个空格缩进\n|||\n}"""
         result = loads(input_str)
         assert "content" in result
         content = result["content"]
-        lines = content.split('\n')
+        lines = content.split("\n")
         # 验证相对缩进被保留
         assert lines[0] == "第一行没有缩进"
         assert lines[1] == "    第二行有4个空格缩进"
@@ -324,7 +328,7 @@ class TestFixJsonnetMultilineStrings:
         result = loads(input_str)
         assert "content" in result
         content = result["content"]
-        lines = content.split('\n')
+        lines = content.split("\n")
         # 验证相对缩进被保留
         assert lines[0] == "    第一行有4个空格缩进"
         assert lines[1] == "第二行没有缩进"
@@ -336,13 +340,14 @@ class TestFixJsonnetMultilineStrings:
         result = loads(input_str)
         assert "content" in result
         content = result["content"]
-        lines = content.split('\n')
+        lines = content.split("\n")
         # 验证相对缩进被保留
         assert lines[0] == "第一行无缩进"
         assert lines[1] == "  第二行2空格"
         assert lines[2] == "    第三行4空格"
         assert lines[3] == "  第四行2空格"
         assert lines[4] == "第五行无缩进"
+
 
 class TestLoads:
     """测试 loads 函数"""
@@ -464,6 +469,7 @@ class TestLoads:
         json_str = "{invalid json}"
         with pytest.raises(Exception):
             loads(json_str)
+
     def test_loads_empty_string(self):
         """测试解析空字符串"""
         with pytest.raises(Exception):
@@ -484,6 +490,7 @@ class TestLoads:
         assert "text2" in result
         assert "第一段" in result["text1"]
         assert "第二段" in result["text2"]
+
     def test_loads_multiline_string_with_empty_lines(self):
         """测试 ||| 多行字符串中包含空行"""
         json_str = """{
@@ -854,7 +861,7 @@ class TestSummaryBlockScenarios:
 
     def test_summary_block_with_prefix_text(self):
         """测试代码块前有文本的情况（虽然不应该发生，但为了健壮性测试）
-        
+
         注意：当前实现只处理整个字符串被代码块包裹的情况。
         如果代码块前有文本，需要先手动提取代码块部分。
         这个测试用例改为测试：即使有前缀文本，如果整个字符串被代码块包裹，也能正确解析。
@@ -995,6 +1002,7 @@ class TestSummaryBlockScenarios:
         result = loads(input_str)
         assert "code" in result
         assert result["code"].startswith("`function_name()`")
+
     def test_summary_block_with_backticks_at_string_end(self):
         """测试从 <SUMMARY> 块提取的内容中反引号在字符串结尾"""
         input_str = """
@@ -1079,7 +1087,7 @@ class TestSummaryBlockScenarios:
         result = loads(input_str)
         assert "notes" in result
         assert "`反引号`" in result["notes"]
-        assert '"转义引号"' in result["notes"] or '转义引号' in result["notes"]
+        assert '"转义引号"' in result["notes"] or "转义引号" in result["notes"]
 
     def test_summary_block_with_backticks_in_multiline_string_value(self):
         """测试从 <SUMMARY> 块提取的内容中使用 ||| 多行字符串，内容包含反引号"""
@@ -1140,13 +1148,13 @@ class TestSummaryBlockScenarios:
 
     def test_summary_block_with_crlf_newlines(self):
         """测试从 <SUMMARY> 块提取的内容（使用 CRLF 换行符）"""
-        input_str = "\r\n```json\r\n{\r\n  \"key\": \"value\"\r\n}\r\n```\r\n"
+        input_str = '\r\n```json\r\n{\r\n  "key": "value"\r\n}\r\n```\r\n'
         result = loads(input_str)
         assert result == {"key": "value"}
 
     def test_summary_block_with_mixed_newlines(self):
         """测试从 <SUMMARY> 块提取的内容（混合换行符）"""
-        input_str = "\n```json\r\n{\n  \"key\": \"value\"\r\n}\n```\n"
+        input_str = '\n```json\r\n{\n  "key": "value"\r\n}\n```\n'
         result = loads(input_str)
         assert result == {"key": "value"}
 
@@ -1182,4 +1190,3 @@ class TestSummaryBlockScenarios:
 """
         result = loads(input_str)
         assert result == {"key1": "value1", "key2": "value2"}
-

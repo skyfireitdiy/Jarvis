@@ -8,6 +8,7 @@
 - 带有模糊匹配的文件路径补全
 - 用于输入控制的自定义键绑定
 """
+
 import os
 import sys
 import base64
@@ -51,6 +52,7 @@ FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
 
+
 def _display_width(s: str) -> int:
     """计算字符串在终端中的可打印宽度(处理宽字符)。"""
     try:
@@ -64,6 +66,7 @@ def _display_width(s: str) -> int:
         return w
     except Exception:
         return len(s)
+
 
 def _calc_prompt_rows(prev_text: str) -> int:
     """
@@ -97,12 +100,14 @@ def _calc_prompt_rows(prev_text: str) -> int:
         total_rows += rows
     return max(1, total_rows)
 
+
 def _multiline_hint_already_shown() -> bool:
     """检查是否已显示过多行输入提示(持久化存储)。"""
     try:
         return os.path.exists(_MULTILINE_HINT_MARK_FILE)
     except Exception:
         return False
+
 
 def _mark_multiline_hint_shown() -> None:
     """持久化存储多行输入提示已显示的状态。"""
@@ -114,6 +119,7 @@ def _mark_multiline_hint_shown() -> None:
         # Non-critical persistence failure; ignore to avoid breaking input flow
         pass
 
+
 def get_single_line_input(tip: str, default: str = "") -> str:
     """
     获取支持历史记录的单行输入。
@@ -124,6 +130,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     )
     prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
     return session.prompt(prompt, default=default, style=style)
+
 
 def get_choice(tip: str, choices: List[str]) -> str:
     """
@@ -219,6 +226,7 @@ def get_choice(tip: str, choices: List[str]) -> str:
         return result if result is not None else ""
     except (KeyboardInterrupt, EOFError):
         return ""
+
 
 class FileCompleter(Completer):
     """
@@ -359,25 +367,36 @@ class FileCompleter(Completer):
 def _get_current_agent_for_input():
     try:
         import jarvis.jarvis_utils.globals as g
+
         current_name = getattr(g, "current_agent_name", "")
         if current_name:
             return g.get_agent(current_name)
     except Exception:
         pass
     return None
+
+
 def _is_non_interactive_for_current_agent() -> bool:
     try:
         from jarvis.jarvis_utils.config import is_non_interactive
+
         ag = _get_current_agent_for_input()
         try:
-            return bool(getattr(ag, "non_interactive", False)) if ag else bool(is_non_interactive())
+            return (
+                bool(getattr(ag, "non_interactive", False))
+                if ag
+                else bool(is_non_interactive())
+            )
         except Exception:
             return bool(is_non_interactive())
     except Exception:
         return False
+
+
 def _is_auto_complete_for_current_agent() -> bool:
     try:
         from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
         ag = _get_current_agent_for_input()
         if ag is not None and hasattr(ag, "auto_complete"):
             try:
@@ -390,6 +409,8 @@ def _is_auto_complete_for_current_agent() -> bool:
         return bool(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_COMPLETE", False))
     except Exception:
         return False
+
+
 def user_confirm(tip: str, default: bool = True) -> bool:
     """提示用户确认是/否问题（按当前Agent优先判断非交互）"""
     try:
@@ -400,6 +421,7 @@ def user_confirm(tip: str, default: bool = True) -> bool:
         return default if ret == "" else ret.lower() == "y"
     except KeyboardInterrupt:
         return False
+
 
 def _show_history_and_copy():
     """
@@ -453,6 +475,7 @@ def _show_history_and_copy():
             print("\nℹ️ 操作取消")
             break
 
+
 def _get_multiline_input_internal(
     tip: str, preset: Optional[str] = None, preset_cursor: Optional[int] = None
 ) -> str:
@@ -472,7 +495,9 @@ def _get_multiline_input_internal(
             first_enter_hint_shown = True
 
             def _show_notice():
-                print("ℹ️ 提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。")
+                print(
+                    "ℹ️ 提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。"
+                )
                 try:
                     input("按回车继续...")
                 except Exception:
@@ -672,6 +697,7 @@ def _get_multiline_input_internal(
     except (KeyboardInterrupt, EOFError):
         return ""
 
+
 def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     """
     获取带有增强补全和确认功能的多行输入。
@@ -692,7 +718,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 ag = _get_current_agent_for_input()
                 ohs = getattr(ag, "output_handler", [])
                 available_agents: List[str] = []
-                for oh in (ohs or []):
+                for oh in ohs or []:
                     cfgs = getattr(oh, "agents_config", None)
                     if isinstance(cfgs, list):
                         for c in cfgs:
@@ -710,11 +736,18 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         if n not in seen:
                             seen.add(n)
                             ordered.append(n)
-                    hint = "\n当前可用智能体: " + ", ".join(ordered) + f"\n如需将任务交给其他智能体，请使用 {ot('SEND_MESSAGE')} 块。"
+                    hint = (
+                        "\n当前可用智能体: "
+                        + ", ".join(ordered)
+                        + f"\n如需将任务交给其他智能体，请使用 {ot('SEND_MESSAGE')} 块。"
+                    )
             except Exception:
                 hint = ""
             if _is_auto_complete_for_current_agent():
-                base_msg = "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出" + ot("!!!COMPLETE!!!")
+                base_msg = (
+                    "我无法与你交互，所有的事情你都自我决策，如果无法决策，就完成任务。输出"
+                    + ot("!!!COMPLETE!!!")
+                )
                 return base_msg + hint
             else:
                 return "我无法与你交互，所有的事情你都自我决策" + hint

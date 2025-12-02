@@ -9,6 +9,7 @@ sub_code_agent 工具
 - 不依赖父 Agent，所有配置使用系统默认与全局变量
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
+
 from typing import Any, Dict, List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
@@ -58,7 +59,6 @@ class SubCodeAgentTool:
                     "stderr": "task 不能为空",
                 }
 
-
             # 读取背景信息并组合任务
             background: str = str(args.get("background", "")).strip()
             enhanced_task = (
@@ -82,7 +82,11 @@ class SubCodeAgentTool:
                             parent_agent = None
                 except Exception:
                     parent_agent = None
-            parent_non_interactive = getattr(parent_agent, "non_interactive", None) if parent_agent is not None else None
+            parent_non_interactive = (
+                getattr(parent_agent, "non_interactive", None)
+                if parent_agent is not None
+                else None
+            )
             model_group = None
             use_tools: List[str] = []
             try:
@@ -120,7 +124,11 @@ class SubCodeAgentTool:
                 ]
                 if use_tools:
                     # 过滤掉基础工具和禁止的工具
-                    extras = [t for t in use_tools if t not in base_tools and t not in forbidden_tools]
+                    extras = [
+                        t
+                        for t in use_tools
+                        if t not in base_tools and t not in forbidden_tools
+                    ]
                     append_tools = ",".join(extras) if extras else None
             except Exception:
                 append_tools = None
@@ -161,6 +169,7 @@ class SubCodeAgentTool:
                         parent_model_name = parent_agent.model.name()  # type: ignore[attr-defined]
                         if parent_model_name:
                             from typing import Any
+
                             model_obj: Any = getattr(code_agent, "model", None)
                             if model_obj is not None:
                                 model_obj.set_model_name(parent_model_name)
@@ -168,10 +177,14 @@ class SubCodeAgentTool:
                                 try:
                                     available_models = model_obj.get_model_list()
                                     if available_models:
-                                        available_names = [m for m, _ in available_models]
+                                        available_names = [
+                                            m for m, _ in available_models
+                                        ]
                                         current_model_name = model_obj.name()
                                         if current_model_name not in available_names:
-                                            print(f"⚠️ 检测到子CodeAgent模型 {current_model_name} 不存在于平台 {model_obj.platform_name()} 的可用模型列表，将回退到 {available_names[0]}")
+                                            print(
+                                                f"⚠️ 检测到子CodeAgent模型 {current_model_name} 不存在于平台 {model_obj.platform_name()} 的可用模型列表，将回退到 {available_names[0]}"
+                                            )
                                             model_obj.set_model_name(available_names[0])
                                 except Exception:
                                     # 获取模型列表或设置模型失败时，保持原设置并继续，交由底层报错处理

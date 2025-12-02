@@ -47,7 +47,6 @@ class WebpageTool:
                 if model:
                     model.set_model_name(web_search_model)
                     if model.support_web():
-
                         model.set_web(True)
                         model.set_suppress_output(False)  # type: ignore
                         prompt = f"""请帮我处理这个网页：{url}
@@ -63,7 +62,6 @@ class WebpageTool:
             # 2) 然后尝试使用cheap平台的 web 能力（适用于网页读取等简单任务）
             model = PlatformRegistry().get_cheap_platform()
             if model.support_web():
-
                 model.set_web(True)
                 model.set_suppress_output(False)  # type: ignore
                 prompt = f"""请帮我处理这个网页：{url}

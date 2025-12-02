@@ -88,8 +88,7 @@ class KimiModel(BasePlatform):
             "Content-Type": "application/json",
         }
 
-        response = while_success(
-            lambda: http.post(url, headers=headers, data=payload)        )
+        response = while_success(lambda: http.post(url, headers=headers, data=payload))
         return response.json()
 
     def support_upload_files(self) -> bool:
@@ -101,9 +100,7 @@ class KimiModel(BasePlatform):
         try:
             with open(file_path, "rb") as f:
                 content = f.read()
-                response = while_success(
-                    lambda: http.put(presigned_url, data=content)
-                )
+                response = while_success(lambda: http.put(presigned_url, data=content))
                 return response.status_code == 200
         except Exception as e:
             print(f"❌ 错误：上传文件失败：{e}")
@@ -128,8 +125,7 @@ class KimiModel(BasePlatform):
             "Content-Type": "application/json",
         }
 
-        response = while_success(
-            lambda: http.post(url, headers=headers, data=payload)        )
+        response = while_success(lambda: http.post(url, headers=headers, data=payload))
         return response.json()
 
     def _wait_for_parse(self, file_id: str) -> bool:
@@ -213,7 +209,7 @@ class KimiModel(BasePlatform):
                             log_lines.append(f"文件处理完成: {file_name}")
                         else:
                             log_lines.append(f"文件解析失败: {file_name}")
-                            joined_logs = '\n'.join(log_lines)
+                            joined_logs = "\n".join(log_lines)
                             print(f"❌ {joined_logs}")
                             return False
                     else:
@@ -221,17 +217,17 @@ class KimiModel(BasePlatform):
                         log_lines.append(f"图片处理完成: {file_name}")
                 else:
                     log_lines.append(f"文件上传失败: {file_name}")
-                    joined_logs = '\n'.join(log_lines)
+                    joined_logs = "\n".join(log_lines)
                     print(f"❌ {joined_logs}")
                     return False
 
                 # 成功路径统一输出本文件的处理日志
-                joined_logs = '\n'.join(log_lines)
+                joined_logs = "\n".join(log_lines)
                 print(f"ℹ️ {joined_logs}")
 
             except Exception as e:
                 log_lines.append(f"处理文件出错 {file_path}: {str(e)}")
-                joined_logs = '\n'.join(log_lines)
+                joined_logs = "\n".join(log_lines)
                 print(f"❌ {joined_logs}")
                 return False
 
@@ -322,9 +318,7 @@ class KimiModel(BasePlatform):
         }
 
         try:
-            response = while_success(
-                lambda: http.delete(url, headers=headers)
-            )
+            response = while_success(lambda: http.delete(url, headers=headers))
             if response.status_code == 200:
                 self.chat_id = ""
                 self.uploaded_files = []

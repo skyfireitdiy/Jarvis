@@ -50,7 +50,57 @@ def _iter_source_files(
         return
 
     exts = set((languages or ["c", "cpp", "h", "hpp", "rs"]))
-    excludes = set(exclude_dirs or [".git", "build", "out", "target", "dist", "bin", "obj", "third_party", "vendor", "deps", "dependencies", "libs", "libraries", "external", "node_modules", "test", "tests", "__tests__", "spec", "testsuite", "testdata", "benchmark", "benchmarks", "perf", "performance", "bench", "benches", "profiling", "profiler", "example", "examples", "tmp", "temp", "cache", ".cache", "docs", "doc", "documentation", "generated", "gen", "mocks", "fixtures", "samples", "sample", "playground", "sandbox"])
+    excludes = set(
+        exclude_dirs
+        or [
+            ".git",
+            "build",
+            "out",
+            "target",
+            "dist",
+            "bin",
+            "obj",
+            "third_party",
+            "vendor",
+            "deps",
+            "dependencies",
+            "libs",
+            "libraries",
+            "external",
+            "node_modules",
+            "test",
+            "tests",
+            "__tests__",
+            "spec",
+            "testsuite",
+            "testdata",
+            "benchmark",
+            "benchmarks",
+            "perf",
+            "performance",
+            "bench",
+            "benches",
+            "profiling",
+            "profiler",
+            "example",
+            "examples",
+            "tmp",
+            "temp",
+            "cache",
+            ".cache",
+            "docs",
+            "doc",
+            "documentation",
+            "generated",
+            "gen",
+            "mocks",
+            "fixtures",
+            "samples",
+            "sample",
+            "playground",
+            "sandbox",
+        ]
+    )
 
     for p in entry.rglob("*"):
         if not p.is_file():
@@ -69,10 +119,10 @@ def _iter_source_files(
             yield p.relative_to(entry)
 
 
-
 # ---------------------------
 # 汇总与报告
 # ---------------------------
+
 
 def direct_scan(
     entry_path: str,
@@ -85,9 +135,56 @@ def direct_scan(
     """
     base = Path(entry_path).resolve()
     # 计算实际使用的排除目录列表
-    default_excludes = [".git", "build", "out", "target", "dist", "bin", "obj", "third_party", "vendor", "deps", "dependencies", "libs", "libraries", "external", "node_modules", "test", "tests", "__tests__", "spec", "testsuite", "testdata", "benchmark", "benchmarks", "perf", "performance", "bench", "benches", "profiling", "profiler", "example", "examples", "tmp", "temp", "cache", ".cache", "docs", "doc", "documentation", "generated", "gen", "mocks", "fixtures", "samples", "sample", "playground", "sandbox"]
+    default_excludes = [
+        ".git",
+        "build",
+        "out",
+        "target",
+        "dist",
+        "bin",
+        "obj",
+        "third_party",
+        "vendor",
+        "deps",
+        "dependencies",
+        "libs",
+        "libraries",
+        "external",
+        "node_modules",
+        "test",
+        "tests",
+        "__tests__",
+        "spec",
+        "testsuite",
+        "testdata",
+        "benchmark",
+        "benchmarks",
+        "perf",
+        "performance",
+        "bench",
+        "benches",
+        "profiling",
+        "profiler",
+        "example",
+        "examples",
+        "tmp",
+        "temp",
+        "cache",
+        ".cache",
+        "docs",
+        "doc",
+        "documentation",
+        "generated",
+        "gen",
+        "mocks",
+        "fixtures",
+        "samples",
+        "sample",
+        "playground",
+        "sandbox",
+    ]
     actual_excludes = exclude_dirs if exclude_dirs is not None else default_excludes
-    
+
     # 检查代码库中实际存在的排除目录
     excludes_set = set(actual_excludes)
     actual_excluded_dirs = []
@@ -96,14 +193,17 @@ def direct_scan(
             rel_path = item.relative_to(base)
             if str(rel_path) not in actual_excluded_dirs:
                 actual_excluded_dirs.append(str(rel_path))
-    
+
     if actual_excluded_dirs:
         typer.secho("[jarvis-sec] 实际排除的目录:", fg=typer.colors.BLUE)
         for dir_path in sorted(actual_excluded_dirs):
             typer.secho(f"  - {dir_path}", fg=typer.colors.BLUE)
     else:
-        typer.secho(f"[jarvis-sec] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）", fg=typer.colors.BLUE)
-    
+        typer.secho(
+            f"[jarvis-sec] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）",
+            fg=typer.colors.BLUE,
+        )
+
     files = list(_iter_source_files(entry_path, languages, exclude_dirs))
 
     # 按语言分组
@@ -114,9 +214,10 @@ def direct_scan(
 
     # 调用检查器（保持相对路径，基于 base_path 解析）
     issues_c = analyze_c_files(str(base), [str(p) for p in c_files]) if c_files else []
-    issues_r = analyze_rust_files(str(base), [str(p) for p in r_files]) if r_files else []
+    issues_r = (
+        analyze_rust_files(str(base), [str(p) for p in r_files]) if r_files else []
+    )
     issues: List[Issue] = issues_c + issues_r
-
 
     summary: Dict[str, Any] = {
         "total": len(issues),
@@ -135,7 +236,9 @@ def direct_scan(
         cat_counts[it.category] = cat_counts.get(it.category, 0) + 1
         file_score[it.file] = file_score.get(it.file, 0) + 1
     # Top 风险文件
-    summary["top_risk_files"] = [f for f, _ in sorted(file_score.items(), key=lambda x: x[1], reverse=True)[:10]]
+    summary["top_risk_files"] = [
+        f for f, _ in sorted(file_score.items(), key=lambda x: x[1], reverse=True)[:10]
+    ]
 
     result = {
         "summary": summary,
@@ -159,7 +262,9 @@ def format_markdown_report(result_json: Dict) -> str:
     md.append("")
     md.append("## 统计概览")
     by_lang = s.get("by_language", {})
-    md.append(f"- 按语言: c/cpp={by_lang.get('c/cpp', 0)}, rust={by_lang.get('rust', 0)}")
+    md.append(
+        f"- 按语言: c/cpp={by_lang.get('c/cpp', 0)}, rust={by_lang.get('rust', 0)}"
+    )
     md.append("- 按类别:")
     for k, v in s.get("by_category", {}).items():
         md.append(f"  - {k}: {v}")
@@ -170,7 +275,9 @@ def format_markdown_report(result_json: Dict) -> str:
     md.append("")
     md.append("## 详细问题")
     for i, it in enumerate(issues, start=1):
-        md.append(f"### [{i}] {it.get('file')}:{it.get('line')} ({it.get('language')}, {it.get('category')})")
+        md.append(
+            f"### [{i}] {it.get('file')}:{it.get('line')} ({it.get('language')}, {it.get('category')})"
+        )
         md.append(f"- 模式: {it.get('pattern')}")
         md.append(f"- 证据: `{it.get('evidence')}`")
         md.append(f"- 描述: {it.get('description')}")
@@ -205,6 +312,7 @@ def run_with_agent(
     - enable_verification: 是否启用二次验证（默认 True），关闭后分析Agent确认的问题将直接写入报告
     """
     from jarvis.jarvis_sec import run_security_analysis  # 延迟导入，避免循环
+
     return run_security_analysis(
         entry_path,
         languages=languages,

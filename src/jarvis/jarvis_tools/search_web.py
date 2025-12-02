@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """网络搜索工具。"""
+
 from typing import Any, Dict
 
 import requests  # type: ignore[import-untyped]
@@ -33,7 +34,6 @@ class SearchWebTool:
         # pylint: disable=too-many-locals, broad-except
         """执行网络搜索、抓取内容并总结结果。"""
         try:
-
             results = list(DDGS().text(query, max_results=50, page=3))
 
             if not results:
@@ -49,14 +49,12 @@ class SearchWebTool:
 
             for r in results:
                 if visited_count >= 10:
-
                     break
 
                 url = r["href"]
                 r.get("title", url)
 
                 try:
-
                     response = http_get(url, timeout=10.0, allow_redirects=True)
                     content = md(response.text, strip=["script", "style"])
                     if content:

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 import json
+
 # removed sqlite3 (migrated to JSONL/JSON)
 from dataclasses import dataclass
 from pathlib import Path
@@ -102,7 +103,7 @@ class _GraphLoader:
         self.adj: Dict[int, List[str]] = {}
         self.name_to_id: Dict[str, int] = {}
         self.fn_by_id: Dict[int, _FnMeta] = {}
-        
+
         # 从 symbols.jsonl 加载符号元数据与邻接关系（统一处理函数与类型，按 ref 构建名称邻接）
         rows_loaded = 0
         try:
@@ -232,18 +233,20 @@ def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
     """
     import sys
     import shutil
-    
+
     try:
         cwd = Path(".").resolve()
     except (OSError, ValueError) as e:
         raise RuntimeError(f"无法解析当前工作目录: {e}") from e
-    
+
     try:
         requested_root = Path(project_root).resolve()
     except (OSError, ValueError):
         requested_root = Path(project_root)
-    
-    created_dir = cwd.parent / f"{cwd.name}_rs" if requested_root == cwd else requested_root
+
+    created_dir = (
+        cwd.parent / f"{cwd.name}_rs" if requested_root == cwd else requested_root
+    )
 
     cargo_path = cwd / "Cargo.toml"
     data_dir = requested_root / ".jarvis" / "c2rust"
@@ -281,6 +284,7 @@ def _perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
     except (OSError, PermissionError) as e:
         raise RuntimeError(f"清理操作失败: {e}") from e
 
+
 def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
     """
     解析 crate 目录路径：
@@ -299,6 +303,7 @@ def _resolve_created_dir(target_root: Union[Path, str]) -> Path:
         return resolved_target
     except Exception:
         return Path(target_root)
+
 
 class LLMRustCratePlannerAgent:
     """
@@ -326,6 +331,7 @@ class LLMRustCratePlannerAgent:
         """从配置文件加载附加说明"""
         try:
             from jarvis.jarvis_c2rust.constants import CONFIG_JSON
+
             config_path = self.project_root / ".jarvis" / "c2rust" / CONFIG_JSON
             if config_path.exists():
                 with config_path.open("r", encoding="utf-8") as f:
@@ -339,15 +345,20 @@ class LLMRustCratePlannerAgent:
     def _append_additional_notes(self, prompt: str) -> str:
         """
         在提示词末尾追加附加说明（如果存在）。
-        
+
         Args:
             prompt: 原始提示词
-            
+
         Returns:
             追加了附加说明的提示词
         """
         if self.additional_notes and self.additional_notes.strip():
-            return prompt + "\n\n" + "【附加说明（用户自定义）】\n" + self.additional_notes.strip()
+            return (
+                prompt
+                + "\n\n"
+                + "【附加说明（用户自定义）】\n"
+                + self.additional_notes.strip()
+            )
         return prompt
 
     def _crate_name(self) -> str:
@@ -398,6 +409,7 @@ class LLMRustCratePlannerAgent:
         - 若最终未收集到任何 root 组，则回退为单组 'project'，包含所有 items 的函数名集合
         """
         from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+
         order_path = self._order_path()
         if not order_path.exists():
             raise FileNotFoundError(f"未找到 translation_order.jsonl: {order_path}")
@@ -421,7 +433,7 @@ class LLMRustCratePlannerAgent:
 
         groups: Dict[str, List[str]] = {}
         all_names_fallback: List[str] = []  # 用于回退场景
-        
+
         try:
             with order_path.open("r", encoding="utf-8") as f:
                 for line in f:
@@ -432,26 +444,30 @@ class LLMRustCratePlannerAgent:
                         obj = json_loads(line)
                     except Exception:
                         continue
-                    
+
                     roots = obj.get("roots") or []
                     items = obj.get("items") or []
                     if not isinstance(items, list) or not items:
                         continue
-                    
+
                     # 提取所有函数名（用于回退场景）
                     item_names = _extract_names_from_items(items)
                     all_names_fallback.extend(item_names)
-                    
+
                     # 提取 root 标签
-                    root_labels = [str(r).strip() for r in roots if isinstance(r, str) and str(r).strip()]
+                    root_labels = [
+                        str(r).strip()
+                        for r in roots
+                        if isinstance(r, str) and str(r).strip()
+                    ]
                     if not root_labels:
                         continue
-                    
+
                     # 去重 step_names
                     step_names = _deduplicate_names(item_names)
                     if not step_names:
                         continue
-                    
+
                     # 按 root 聚合
                     for r in root_labels:
                         groups.setdefault(r, []).extend(step_names)
@@ -467,7 +483,9 @@ class LLMRustCratePlannerAgent:
         if not contexts:
             all_names = _deduplicate_names(all_names_fallback)
             if all_names:
-                contexts.append({"root_function": "project", "functions": sorted(all_names)})
+                contexts.append(
+                    {"root_function": "project", "functions": sorted(all_names)}
+                )
 
         return contexts
 
@@ -480,7 +498,14 @@ class LLMRustCratePlannerAgent:
         has_main = self._has_original_main()
         created_dir = _resolve_created_dir(self.project_root)
         context_json = json.dumps(
-            {"meta": {"crate_name": crate_name, "main_present": has_main, "crate_dir": str(created_dir)}, "roots": roots_context},
+            {
+                "meta": {
+                    "crate_name": crate_name,
+                    "main_present": has_main,
+                    "crate_dir": str(created_dir),
+                },
+                "roots": roots_context,
+            },
             ensure_ascii=False,
             indent=2,
         )
@@ -666,13 +691,19 @@ class LLMRustCratePlannerAgent:
         if has_main:
             # 不允许 src/main.rs
             if has_file("main.rs"):
-                return False, "原始项目包含 main：不应生成 src/main.rs，请使用 src/bin/<crate>.rs"
+                return (
+                    False,
+                    "原始项目包含 main：不应生成 src/main.rs，请使用 src/bin/<crate>.rs",
+                )
             # 必须包含 src/bin/<crate_name>.rs
             bin_children = find_dir("bin")
             if bin_children is None:
                 return False, f"原始项目包含 main：必须包含 src/bin/{crate_name}.rs"
             expect_bin = f"{crate_name}.rs".lower()
-            if not any(isinstance(ch, str) and ch.strip().lower() == expect_bin for ch in bin_children):
+            if not any(
+                isinstance(ch, str) and ch.strip().lower() == expect_bin
+                for ch in bin_children
+            ):
                 return False, f"原始项目包含 main：必须包含 src/bin/{crate_name}.rs"
         else:
             # 不允许 src/main.rs
@@ -684,7 +715,9 @@ class LLMRustCratePlannerAgent:
 
         return True, ""
 
-    def _build_retry_summary_prompt(self, base_summary_prompt: str, error_reason: str) -> str:
+    def _build_retry_summary_prompt(
+        self, base_summary_prompt: str, error_reason: str
+    ) -> str:
         """
         在原始 summary_prompt 基础上，附加错误反馈，要求严格重试。
         """
@@ -700,10 +733,10 @@ class LLMRustCratePlannerAgent:
         """
         执行主流程并返回原始 <PROJECT> JSON 文本，不进行解析。
         若格式校验失败，将自动重试，直到满足为止或达到最大重试次数。
-        
+
         Args:
             max_retries: 最大重试次数，默认 10 次
-            
+
         Raises:
             RuntimeError: 达到最大重试次数仍未生成有效输出
         """
@@ -718,28 +751,30 @@ class LLMRustCratePlannerAgent:
         attempt = 0
         use_direct_model = False  # 标记是否使用直接模型调用
         agent = None  # 在循环外声明，以便重试时复用
-        
+
         while attempt < max_retries:
             attempt += 1
             # 首次使用基础 summary_prompt；失败后附加反馈
             summary_prompt = (
-                base_summary_prompt if attempt == 1 else self._build_retry_summary_prompt(base_summary_prompt, last_error)
+                base_summary_prompt
+                if attempt == 1
+                else self._build_retry_summary_prompt(base_summary_prompt, last_error)
             )
 
             # 第一次创建 Agent，后续重试时复用（如果使用直接模型调用）
             if agent is None or not use_direct_model:
                 agent = Agent(
-                system_prompt=system_prompt,
-                name="C2Rust-LLM-Module-Planner",
-                model_group=self.llm_group,
-                summary_prompt=summary_prompt,
-                need_summary=True,
-                auto_complete=True,
-                use_tools=["execute_script", "read_code"],
-                non_interactive=True, # 非交互
-                use_methodology=False,
-                use_analysis=False,
-            )
+                    system_prompt=system_prompt,
+                    name="C2Rust-LLM-Module-Planner",
+                    model_group=self.llm_group,
+                    summary_prompt=summary_prompt,
+                    need_summary=True,
+                    auto_complete=True,
+                    use_tools=["execute_script", "read_code"],
+                    non_interactive=True,  # 非交互
+                    use_methodology=False,
+                    use_analysis=False,
+                )
 
             # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 JSON）
             if use_direct_model:
@@ -751,7 +786,7 @@ class LLMRustCratePlannerAgent:
                         error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
                     else:
                         error_guidance = f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- {last_error}\n\n请确保输出格式正确：仅输出一个 <PROJECT> 块，块内仅包含 JSON 格式的项目结构定义。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
-                
+
                 full_prompt = f"{user_prompt}{error_guidance}\n\n{summary_prompt}"
                 try:
                     response = agent.model.chat_until_success(full_prompt)  # type: ignore
@@ -762,7 +797,7 @@ class LLMRustCratePlannerAgent:
             else:
                 # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
                 summary_output = agent.run(user_prompt)  # type: ignore
-            
+
             project_text = str(summary_output) if summary_output is not None else ""
             json_text = self._extract_json_from_project(project_text)
 
@@ -781,7 +816,7 @@ class LLMRustCratePlannerAgent:
             else:
                 last_error = reason
                 use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
-        
+
         # 达到最大重试次数
         raise RuntimeError(
             f"达到最大重试次数 ({max_retries}) 仍未生成有效的项目结构。"
@@ -823,12 +858,16 @@ def plan_crate_json_text(
     """
     # 若外层已处理清理确认，则跳过本函数的清理与确认（避免重复询问）
     if skip_cleanup:
-        agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
+        agent = LLMRustCratePlannerAgent(
+            project_root=project_root, db_path=db_path, llm_group=llm_group
+        )
         return agent.plan_crate_json_text()
 
     _perform_pre_cleanup_for_planner(project_root)
 
-    agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path, llm_group=llm_group)
+    agent = LLMRustCratePlannerAgent(
+        project_root=project_root, db_path=db_path, llm_group=llm_group
+    )
     return agent.plan_crate_json_text()
 
 
@@ -868,6 +907,7 @@ def _parse_project_json_entries_fallback(json_text: str) -> List[Any]:
     """
     try:
         import json as std_json
+
         data = std_json.loads(json_text)
         if isinstance(data, list):
             return data
@@ -914,7 +954,9 @@ def _ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> s
         lines = (existing_text or "").splitlines()
     except Exception:
         lines = []
-    mod_decl_pattern = re.compile(r'^\s*(pub(?:\s*\([^)]+\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;\s*$')
+    mod_decl_pattern = re.compile(
+        r"^\s*(pub(?:\s*\([^)]+\))?\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;\s*$"
+    )
     name_to_indices: Dict[str, List[int]] = {}
     name_has_pub: Set[str] = set()
     for i, ln in enumerate(lines):
@@ -929,12 +971,13 @@ def _ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> s
         if mod_name in name_to_indices:
             if mod_name not in name_has_pub:
                 for idx in name_to_indices[mod_name]:
-                    ws_match = re.match(r'^(\s*)', lines[idx])
+                    ws_match = re.match(r"^(\s*)", lines[idx])
                     leading_ws = ws_match.group(1) if ws_match else ""
                     lines[idx] = f"{leading_ws}pub mod {mod_name};"
         else:
             lines.append(f"pub mod {mod_name};")
     return "\n".join(lines).rstrip() + ("\n" if lines else "")
+
 
 def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
     """
@@ -946,6 +989,7 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
     - 非 src 目录：不创建或更新 mod.rs；如需创建 mod.rs，请在 YAML 中显式列出；
     - 模块声明的补齐将在后续 CodeAgent 阶段完成（扫描目录结构并最小化补齐 pub mod 声明）。
     """
+
     def apply_item(item: Any, dir_path: Path) -> None:
         if isinstance(item, str):
             # 文件
@@ -966,10 +1010,10 @@ def _apply_entries_with_mods(entries: List[Any], base_path: Path) -> None:
 
             child_mods: List[str] = []
             # 是否为 crate 根下的 src 目录
-            is_src_root_dir = (new_dir == base_path / "src")
+            is_src_root_dir = new_dir == base_path / "src"
 
             # 先创建子项
-            for child in (children or []):
+            for child in children or []:
                 if isinstance(child, str):
                     apply_item(child, new_dir)
                     # 收集 .rs 文件作为子模块
@@ -1021,7 +1065,9 @@ def _ensure_cargo_toml(base_dir: Path, package_name: str) -> None:
         pass
 
 
-def apply_project_structure_from_json(json_text: str, project_root: Union[Path, str] = ".") -> None:
+def apply_project_structure_from_json(
+    json_text: str, project_root: Union[Path, str] = "."
+) -> None:
     """
     基于 Agent 返回的 <PROJECT> 中的目录结构 JSON，创建实际目录与文件（不在此阶段写入或更新任何 Rust 源文件内容）。
     - project_root: 目标应用路径；当为 "."（默认）时，将使用"父目录/当前目录名_rs"作为crate根目录
@@ -1085,7 +1131,9 @@ def execute_llm_plan(
             raise
 
         # Post-apply: 检查生成的目录结构，使用 CodeAgent 更新 Cargo.toml
-        from jarvis.jarvis_code_agent.code_agent import CodeAgent  # 延迟导入以避免全局耦合
+        from jarvis.jarvis_code_agent.code_agent import (
+            CodeAgent,
+        )  # 延迟导入以避免全局耦合
         import os
         import subprocess
 
@@ -1175,39 +1223,61 @@ def execute_llm_plan(
         try:
             # 切换到 crate 目录运行 CodeAgent 与构建
             os.chdir(str(created_dir))
-            print(f"[c2rust-llm-planner] 已切换到 crate 目录: {os.getcwd()}，执行 CodeAgent 初始化")
+            print(
+                f"[c2rust-llm-planner] 已切换到 crate 目录: {os.getcwd()}，执行 CodeAgent 初始化"
+            )
             if llm_group:
                 print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
             try:
                 # 验证模型配置在切换目录后是否仍然有效
-                from jarvis.jarvis_utils.config import get_normal_model_name, get_normal_platform_name
+                from jarvis.jarvis_utils.config import (
+                    get_normal_model_name,
+                    get_normal_platform_name,
+                )
+
                 if llm_group:
                     resolved_model = get_normal_model_name(llm_group)
                     resolved_platform = get_normal_platform_name(llm_group)
-                    print(f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}")
+                    print(
+                        f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}"
+                    )
             except Exception as e:
                 print(f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}")
-            
+
             try:
-                agent = CodeAgent(need_summary=False, non_interactive=non_interactive, model_group=llm_group)
+                agent = CodeAgent(
+                    need_summary=False,
+                    non_interactive=non_interactive,
+                    model_group=llm_group,
+                )
                 # 验证 agent 内部的模型配置
-                if hasattr(agent, 'model') and agent.model:
-                    actual_model = getattr(agent.model, 'model_name', 'unknown')
+                if hasattr(agent, "model") and agent.model:
+                    actual_model = getattr(agent.model, "model_name", "unknown")
                     actual_platform = type(agent.model).__name__
-                    print(f"[c2rust-llm-planner] CodeAgent 内部模型: {actual_platform}.{actual_model}")
+                    print(
+                        f"[c2rust-llm-planner] CodeAgent 内部模型: {actual_platform}.{actual_model}"
+                    )
                 agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
                 print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
             except Exception as e:
                 error_msg = str(e)
                 if "does not exist" in error_msg or "404" in error_msg:
                     print(f"[c2rust-llm-planner] 模型配置错误: {error_msg}")
-                    print(f"[c2rust-llm-planner] 提示: 请检查模型组 '{llm_group}' 的配置是否正确")
+                    print(
+                        f"[c2rust-llm-planner] 提示: 请检查模型组 '{llm_group}' 的配置是否正确"
+                    )
                     print(f"[c2rust-llm-planner] 当前工作目录: {os.getcwd()}")
                     # 尝试显示当前解析的模型配置
                     try:
-                        from jarvis.jarvis_utils.config import get_normal_model_name, get_normal_platform_name
+                        from jarvis.jarvis_utils.config import (
+                            get_normal_model_name,
+                            get_normal_platform_name,
+                        )
+
                         if llm_group:
-                            print(f"[c2rust-llm-planner] 当前解析的模型: {get_normal_platform_name(llm_group)}/{get_normal_model_name(llm_group)}")
+                            print(
+                                f"[c2rust-llm-planner] 当前解析的模型: {get_normal_platform_name(llm_group)}/{get_normal_model_name(llm_group)}"
+                            )
                     except Exception:
                         pass
                 raise
@@ -1236,25 +1306,41 @@ def execute_llm_plan(
                 print("[c2rust-llm-planner] 构建错误输出:")
                 print(output)
                 # 将错误信息作为上下文，附加修复原则，生成新的 CodeAgent 进行最小修复
-                repair_prompt = "\n".join([
-                    requirement_text,
-                    "",
-                    "请根据以下构建错误进行最小化修复，然后再次执行 `cargo build` 验证：",
-                    "<BUILD_ERROR>",
-                    output,
-                    "</BUILD_ERROR>",
-                ])
+                repair_prompt = "\n".join(
+                    [
+                        requirement_text,
+                        "",
+                        "请根据以下构建错误进行最小化修复，然后再次执行 `cargo build` 验证：",
+                        "<BUILD_ERROR>",
+                        output,
+                        "</BUILD_ERROR>",
+                    ]
+                )
 
                 if llm_group:
-                    print(f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}")
+                    print(
+                        f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}"
+                    )
                 try:
-                    repair_agent = CodeAgent(need_summary=False, non_interactive=non_interactive, model_group=llm_group)
-                    repair_agent.run(repair_prompt, prefix=f"[c2rust-llm-planner][iter={iter_count}]", suffix="")
+                    repair_agent = CodeAgent(
+                        need_summary=False,
+                        non_interactive=non_interactive,
+                        model_group=llm_group,
+                    )
+                    repair_agent.run(
+                        repair_prompt,
+                        prefix=f"[c2rust-llm-planner][iter={iter_count}]",
+                        suffix="",
+                    )
                 except Exception as e:
                     error_msg = str(e)
                     if "does not exist" in error_msg or "404" in error_msg:
-                        print(f"[c2rust-llm-planner][iter={iter_count}] 模型配置错误: {error_msg}")
-                        print(f"[c2rust-llm-planner][iter={iter_count}] 提示: 请检查模型组 '{llm_group}' 的配置")
+                        print(
+                            f"[c2rust-llm-planner][iter={iter_count}] 模型配置错误: {error_msg}"
+                        )
+                        print(
+                            f"[c2rust-llm-planner][iter={iter_count}] 提示: 请检查模型组 '{llm_group}' 的配置"
+                        )
                     raise
                 # 不切换目录，保持在原始工作目录
         finally:

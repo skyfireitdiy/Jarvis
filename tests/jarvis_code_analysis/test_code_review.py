@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_code_analysis.code_review 模块单元测试"""
 
-
 from jarvis.jarvis_code_analysis.code_review import _detect_languages_from_files
 
 
@@ -95,4 +94,3 @@ class TestDetectLanguagesFromFiles:
         files = ["schema.sql", "query.sql"]
         result = _detect_languages_from_files(files)
         assert "sql" in result
-

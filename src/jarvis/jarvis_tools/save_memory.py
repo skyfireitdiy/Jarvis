@@ -150,7 +150,7 @@ class SaveMemoryTool:
 
                 except Exception as e:
                     failed_count += 1
-                    error_msg = f"保存第 {i+1} 条记忆失败: {str(e)}"
+                    error_msg = f"保存第 {i + 1} 条记忆失败: {str(e)}"
                     print(f"❌ {error_msg}")
                     results.append(
                         {

@@ -41,11 +41,13 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
             )
             if user_confirm("是否将执行结果反馈给Agent？", default=True):
                 return (
-                    join_prompts([
-                        user_input,
-                        f"用户执行以下脚本：\n{script}",
-                        f"执行结果：\n{output}",
-                    ]),
+                    join_prompts(
+                        [
+                            user_input,
+                            f"用户执行以下脚本：\n{script}",
+                            f"执行结果：\n{output}",
+                        ]
+                    ),
                     False,
                 )
             return "", True

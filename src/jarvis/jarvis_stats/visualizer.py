@@ -267,7 +267,7 @@ class StatsVisualizer:
                 f"显示: {len(display_records)} | "
                 f"最小值: {min(values):.2f} | "
                 f"最大值: {max(values):.2f} | "
-                f"平均值: {sum(values)/len(values):.2f}"
+                f"平均值: {sum(values) / len(values):.2f}"
             )
             self.console.print(
                 Panel(

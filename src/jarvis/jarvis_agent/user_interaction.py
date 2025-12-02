@@ -6,8 +6,8 @@ UserInteractionHandler: 抽象用户交互（多行输入与确认）逻辑，�
 - 仅提供封装，不直接修改 Agent 的现有调用
 - 后续步骤在 Agent 中以旁路方式接入，保持向后兼容
 """
-from typing import Callable
 
+from typing import Callable
 
 
 class UserInteractionHandler:

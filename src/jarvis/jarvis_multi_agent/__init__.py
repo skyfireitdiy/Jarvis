@@ -10,7 +10,12 @@ from jarvis.jarvis_utils.tag import ct, ot
 
 
 class MultiAgent(OutputHandler):
-    def __init__(self, agents_config: List[Dict], main_agent_name: str, common_system_prompt: str = ""):
+    def __init__(
+        self,
+        agents_config: List[Dict],
+        main_agent_name: str,
+        common_system_prompt: str = "",
+    ):
         self.agents_config = agents_config
         self.agents_config_map = {c["name"]: c for c in agents_config}
         self.agents: Dict[str, Agent] = {}
@@ -114,7 +119,9 @@ class MultiAgent(OutputHandler):
             missing = []
             if not to_val:
                 missing.append("to")
-            if content_val is None or (isinstance(content_val, str) and content_val.strip() == ""):
+            if content_val is None or (
+                isinstance(content_val, str) and content_val.strip() == ""
+            ):
                 # 允许空格/空行被视为缺失
                 missing.append("content")
             if missing:
@@ -133,9 +140,15 @@ class MultiAgent(OutputHandler):
                 return False, guidance
             # 类型校验
             if not isinstance(to_val, str):
-                return False, "SEND_MESSAGE 字段类型错误：to 必须为字符串。修复建议：将 to 改为字符串，如 to: ChapterPolisher"
+                return (
+                    False,
+                    "SEND_MESSAGE 字段类型错误：to 必须为字符串。修复建议：将 to 改为字符串，如 to: ChapterPolisher",
+                )
             if not isinstance(content_val, str):
-                return False, "SEND_MESSAGE 字段类型错误：content 必须为字符串。修复建议：将 content 改为字符串"
+                return (
+                    False,
+                    "SEND_MESSAGE 字段类型错误：content 必须为字符串。修复建议：将 content 改为字符串",
+                )
             # 目标校验
             if to_val not in self.agents_config_map:
                 available = ", ".join(self.agents_config_map.keys())
@@ -145,14 +158,14 @@ class MultiAgent(OutputHandler):
                     f"可用智能体：[{available}]\n"
                     "修复建议：\n"
                     "- 将 to 修改为上述可用智能体之一\n"
-                    "- 或检查配置中是否遗漏了该智能体的定义"
+                    "- 或检查配置中是否遗漏了该智能体的定义",
                 )
             # 通过校验，交给上层发送
             return True, {"to": to_val, "content": content_val}
         elif len(parsed) > 1:
             return (
                 False,
-                "检测到多个 SEND_MESSAGE 块。一次只能发送一个消息。\n修复建议：合并消息或分多轮发送，每轮仅保留一个 SEND_MESSAGE 块。"
+                "检测到多个 SEND_MESSAGE 块。一次只能发送一个消息。\n修复建议：合并消息或分多轮发送，每轮仅保留一个 SEND_MESSAGE 块。",
             )
         # 未成功解析，进行诊断并返回可操作指导
         try:
@@ -173,10 +186,11 @@ class MultiAgent(OutputHandler):
                 "to: 目标Agent名称\n"
                 "content: |2\n"
                 "  这里填写要发送的消息内容\n"
-                f"{ct_tag}"
+                f"{ct_tag}",
             )
         # 尝试提取原始块并指出 JSON 问题
         import re as _re
+
         pattern = _re.compile(
             rf"{_re.escape(ot_tag)}[ \t]*\n(.*?)(?:\n)?[ \t]*{_re.escape(ct_tag)}",
             _re.DOTALL,
@@ -192,7 +206,7 @@ class MultiAgent(OutputHandler):
             return (
                 False,
                 "SEND_MESSAGE 格式错误：未能识别完整的消息块。\n"
-                "修复建议：确保起止标签在单独行上，且中间内容为合法的 JSON，包含 to 与 content 字段。"
+                "修复建议：确保起止标签在单独行上，且中间内容为合法的 JSON，包含 to 与 content 字段。",
             )
         raw = blocks[0]
         try:
@@ -205,7 +219,7 @@ class MultiAgent(OutputHandler):
                     "示例：\n"
                     f"{ot('SEND_MESSAGE')}\n"
                     '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
-                    f"{ct('SEND_MESSAGE')}"
+                    f"{ct('SEND_MESSAGE')}",
                 )
             missing_keys = [k for k in ("to", "content") if k not in msg_obj]
             if missing_keys:
@@ -216,7 +230,7 @@ class MultiAgent(OutputHandler):
                     "示例：\n"
                     f"{ot('SEND_MESSAGE')}\n"
                     '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
-                    f"{ct('SEND_MESSAGE')}"
+                    f"{ct('SEND_MESSAGE')}",
                 )
             # 针对值类型的提示（更细）
             if not isinstance(msg_obj.get("to"), str):
@@ -234,7 +248,7 @@ class MultiAgent(OutputHandler):
                 "示例：\n"
                 f"{ot('SEND_MESSAGE')}\n"
                 '{{\n  "to": "目标Agent名称",\n  "content": "这里填写要发送的消息内容"\n}}\n'
-                f"{ct('SEND_MESSAGE')}"
+                f"{ct('SEND_MESSAGE')}",
             )
         except Exception as e:
             return (
@@ -251,7 +265,7 @@ class MultiAgent(OutputHandler):
                 "或使用多行字符串（推荐使用 ||| 或 ``` 分隔符）：\n"
                 f"{ot('SEND_MESSAGE')}\n"
                 '{{\n  "to": "目标Agent名称",\n  "content": |||\n多行消息内容\n可以包含换行\n包含"双引号"和\'单引号\'都无需转义\n更清晰易读\n  |||\n}}\n'
-                f"{ct('SEND_MESSAGE')}"
+                f"{ct('SEND_MESSAGE')}",
             )
 
     def name(self) -> str:
@@ -376,14 +390,16 @@ class MultiAgent(OutputHandler):
                     summary_any: Any = agent.model.chat_until_success(  # type: ignore[attr-defined]
                         f"{agent.session.prompt}\n{multi_agent_summary_prompt}"
                     )
-                    summary_text = summary_any.strip() if isinstance(summary_any, str) else ""
+                    summary_text = (
+                        summary_any.strip() if isinstance(summary_any, str) else ""
+                    )
                 except Exception:
                     summary_text = ""
             prompt = f"""
 Please handle this message:
 from: {last_agent_name}
 summary_of_sender_work: {summary_text}
-content: {msg['content']}
+content: {msg["content"]}
 """
             to_agent_name = msg.get("to")
             if not to_agent_name:

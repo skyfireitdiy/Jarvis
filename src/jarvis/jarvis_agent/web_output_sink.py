@@ -22,6 +22,7 @@ WebSocketOutputSink: 将 PrettyOutput 的输出事件通过 WebBridge 广播给�
       }
     }
 """
+
 from __future__ import annotations
 
 from typing import Any, Dict

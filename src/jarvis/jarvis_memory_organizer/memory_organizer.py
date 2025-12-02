@@ -74,7 +74,7 @@ class MemoryOrganizer:
                 error_lines.append(f"读取记忆文件 {memory_file} 失败: {str(e)}")
 
         if error_lines:
-            joined_errors = '\n'.join(error_lines)
+            joined_errors = "\n".join(error_lines)
             print(f"⚠️ {joined_errors}")
 
         return memories
@@ -161,11 +161,11 @@ class MemoryOrganizer:
         prompt = f"""请将以下{len(memories)}个相关记忆合并成一个综合性的记忆。
 
 原始记忆（按时间从新到旧排序）：
-{"="*50}
+{"=" * 50}
 {memory_contents_str}
-{"="*50}
+{"=" * 50}
 
-原始标签集合：{', '.join(sorted(all_tags))}
+原始标签集合：{", ".join(sorted(all_tags))}
 
 请完成以下任务：
 1. 分析这些记忆的共同主题和关键信息
@@ -288,7 +288,9 @@ class MemoryOrganizer:
 
             if overlap_count in overlap_groups:
                 groups = overlap_groups[overlap_count]
-                print(f"\nℹ️ 发现 {len(groups)} 个具有 {overlap_count} 个重叠标签的记忆组")
+                print(
+                    f"\nℹ️ 发现 {len(groups)} 个具有 {overlap_count} 个重叠标签的记忆组"
+                )
 
                 for group in groups:
                     # 将活跃索引转换回原始索引
@@ -306,7 +308,7 @@ class MemoryOrganizer:
                             f"  - ID: {mem.get('id', '未知')}, "
                             f"标签: {', '.join(mem.get('tags', []))[:50]}..."
                         )
-                    joined_lines = '\n'.join(lines)
+                    joined_lines = "\n".join(lines)
                     print(f"ℹ️ {joined_lines}")
 
                     if not dry_run:
@@ -371,7 +373,9 @@ class MemoryOrganizer:
         with open(new_file, "w", encoding="utf-8") as f:
             json.dump(memory, f, ensure_ascii=False, indent=2)
 
-        print(f"✅ 创建新记忆: {memory['id']} (标签: {', '.join(memory['tags'][:3])}...)")
+        print(
+            f"✅ 创建新记忆: {memory['id']} (标签: {', '.join(memory['tags'][:3])}...)"
+        )
 
         # 删除原始记忆文件（先汇总日志，最后统一打印）
         info_lines: List[str] = []
@@ -382,7 +386,9 @@ class MemoryOrganizer:
                     file_path = Path(orig_memory["file_path"])
                     if file_path.exists():
                         file_path.unlink()
-                        info_lines.append(f"删除原始记忆: {orig_memory.get('id', '未知')}")
+                        info_lines.append(
+                            f"删除原始记忆: {orig_memory.get('id', '未知')}"
+                        )
                     else:
                         info_lines.append(
                             f"原始记忆文件已不存在，跳过删除: {orig_memory.get('id', '未知')}"
@@ -392,10 +398,10 @@ class MemoryOrganizer:
                         f"删除记忆文件失败 {orig_memory.get('file_path', '')}: {str(e)}"
                     )
         if info_lines:
-            joined_info = '\n'.join(info_lines)
+            joined_info = "\n".join(info_lines)
             print(f"ℹ️ {joined_info}")
         if warn_lines:
-            joined_warn = '\n'.join(warn_lines)
+            joined_warn = "\n".join(warn_lines)
             print(f"⚠️ {joined_warn}")
 
     def export_memories(
@@ -441,7 +447,7 @@ class MemoryOrganizer:
 
         # 统一展示导出进度日志
         if progress_lines:
-            joined_progress = '\n'.join(progress_lines)
+            joined_progress = "\n".join(progress_lines)
             print(f"ℹ️ {joined_progress}")
 
         # 保存到文件
@@ -537,8 +543,11 @@ class MemoryOrganizer:
         # 显示导入结果
         print("\n✅ 导入完成！")
         if import_stats:
-            lines = [f"{memory_type}: 导入了 {count} 个记忆" for memory_type, count in import_stats.items()]
-            joined_lines = '\n'.join(lines)
+            lines = [
+                f"{memory_type}: 导入了 {count} 个记忆"
+                for memory_type, count in import_stats.items()
+            ]
+            joined_lines = "\n".join(lines)
             print(f"ℹ️ {joined_lines}")
 
         if skipped_count > 0:
@@ -570,7 +579,6 @@ def organize(
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
-
 ):
     """
     整理和合并具有相似标签的记忆。
@@ -588,7 +596,9 @@ def organize(
     """
     # 验证参数
     if memory_type not in ["project_long_term", "global_long_term"]:
-        print(f"❌ 错误：不支持的记忆类型 '{memory_type}'，请选择 'project_long_term' 或 'global_long_term'")
+        print(
+            f"❌ 错误：不支持的记忆类型 '{memory_type}'，请选择 'project_long_term' 或 'global_long_term'"
+        )
         raise typer.Exit(1)
 
     if min_overlap < 2:

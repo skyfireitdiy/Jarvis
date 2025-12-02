@@ -17,13 +17,13 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 
 class CMakeBuildValidator(BuildValidatorBase):
     """CMake构建验证器"""
-    
+
     BUILD_SYSTEM_NAME = "CMake"
     SUPPORTED_LANGUAGES = ["c", "cpp"]
-    
+
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
-        
+
         # 策略1: 尝试使用 cmake --build（如果已有构建目录）
         build_dirs = ["build", "cmake-build-debug", "cmake-build-release"]
         for build_dir in build_dirs:
@@ -48,7 +48,7 @@ class CMakeBuildValidator(BuildValidatorBase):
                     build_system=BuildSystem.C_CMAKE,
                     duration=duration,
                 )
-        
+
         # 策略2: 仅验证CMakeLists.txt语法
         with tempfile.TemporaryDirectory(prefix="cmake_check_") as tmpdir:
             returncode, stdout, stderr = self._run_command(
@@ -56,7 +56,7 @@ class CMakeBuildValidator(BuildValidatorBase):
                 timeout=10,
             )
         duration = time.time() - start_time
-        
+
         success = returncode == 0
         output = stdout + stderr
         if success:
@@ -71,4 +71,3 @@ class CMakeBuildValidator(BuildValidatorBase):
             build_system=BuildSystem.C_CMAKE,
             duration=duration,
         )
-

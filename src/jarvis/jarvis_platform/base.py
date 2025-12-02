@@ -84,21 +84,21 @@ class BasePlatform(ABC):
 
     def _format_progress_bar(self, percent: float, width: int = 20) -> str:
         """格式化进度条字符串
-        
+
         参数:
             percent: 百分比 (0-100)
             width: 进度条宽度（字符数）
-            
+
         返回:
             str: 格式化的进度条字符串
         """
         # 限制百分比范围
         percent = max(0, min(100, percent))
-        
+
         # 计算填充的字符数
         filled = int(width * percent / 100)
         empty = width - filled
-        
+
         # 根据百分比选择颜色
         if percent >= 90:
             color = "red"
@@ -106,18 +106,20 @@ class BasePlatform(ABC):
             color = "yellow"
         else:
             color = "green"
-        
+
         # 构建进度条：使用 █ 表示已填充，░ 表示未填充
         bar = "█" * filled + "░" * empty
-        
+
         return f"[{color}]{bar}[/{color}]"
 
-    def _get_token_usage_info(self, current_response: str = "") -> Tuple[float, str, str]:
+    def _get_token_usage_info(
+        self, current_response: str = ""
+    ) -> Tuple[float, str, str]:
         """获取 token 使用信息
-        
+
         参数:
             current_response: 当前响应内容（用于计算流式输出时的 token）
-            
+
         返回:
             Tuple[float, str, str]: (usage_percent, percent_color, progress_bar)
         """
@@ -126,7 +128,7 @@ class BasePlatform(ABC):
             current_response_tokens = get_context_token_count(current_response)
             total_tokens = history_tokens + current_response_tokens
             max_tokens = get_max_input_token_count(self.model_group)
-            
+
             if max_tokens > 0:
                 usage_percent = (total_tokens / max_tokens) * 100
                 if usage_percent >= 90:
@@ -142,10 +144,14 @@ class BasePlatform(ABC):
             return 0.0, "green", ""
 
     def _update_panel_subtitle_with_token(
-        self, panel: Panel, response: str, is_completed: bool = False, duration: float = 0.0
+        self,
+        panel: Panel,
+        response: str,
+        is_completed: bool = False,
+        duration: float = 0.0,
     ) -> None:
         """更新面板的 subtitle，包含 token 使用信息
-        
+
         参数:
             panel: 要更新的面板
             response: 当前响应内容
@@ -153,13 +159,17 @@ class BasePlatform(ABC):
             duration: 耗时（秒）
         """
         from datetime import datetime
-        
+
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
-            usage_percent, percent_color, progress_bar = self._get_token_usage_info(response)
+            usage_percent, percent_color, progress_bar = self._get_token_usage_info(
+                response
+            )
             max_tokens = get_max_input_token_count(self.model_group)
-            total_tokens = self.get_used_token_count() + get_context_token_count(response)
-            
+            total_tokens = self.get_used_token_count() + get_context_token_count(
+                response
+            )
+
             threshold = get_conversation_turn_threshold()
             if is_completed:
                 if max_tokens > 0 and progress_bar:
@@ -188,16 +198,16 @@ class BasePlatform(ABC):
 
     def _chat_with_pretty_output(self, message: str, start_time: float) -> str:
         """使用 pretty output 模式进行聊天
-        
+
         参数:
             message: 用户消息
             start_time: 开始时间
-            
+
         返回:
             str: 模型响应
         """
         import time
-        
+
         chat_iterator = self.chat(message)
         first_chunk = None
 
@@ -227,14 +237,17 @@ class BasePlatform(ABC):
 
         response = ""
         last_subtitle_update_time = time.time()
-        subtitle_update_interval = 3  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
+        subtitle_update_interval = (
+            3  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
+        )
         update_count = 0  # 更新计数器，用于控制 subtitle 更新频率
         with Live(panel, refresh_per_second=4, transient=False) as live:
+
             def _update_panel_content(content: str, update_subtitle: bool = False):
                 nonlocal response, last_subtitle_update_time, update_count
                 text_content.append(content, style="bright_white")
                 update_count += 1
-                
+
                 # Scrolling Logic - 只在内容超过一定行数时才应用滚动
                 max_text_height = console.height - 5
                 if max_text_height <= 0:
@@ -250,27 +263,32 @@ class BasePlatform(ABC):
                     text_content.plain = "\n".join(
                         [line.plain for line in lines[-max_text_height:]]
                     )
-                
+
                 # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
                 # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
                 current_time = time.time()
                 should_update_subtitle = (
-                    update_subtitle 
+                    update_subtitle
                     or update_count % 10 == 0  # 每 10 次更新一次
-                    or (current_time - last_subtitle_update_time) >= subtitle_update_interval
+                    or (current_time - last_subtitle_update_time)
+                    >= subtitle_update_interval
                 )
-                
+
                 if should_update_subtitle:
-                    self._update_panel_subtitle_with_token(panel, response, is_completed=False)
+                    self._update_panel_subtitle_with_token(
+                        panel, response, is_completed=False
+                    )
                     last_subtitle_update_time = current_time
-                
+
                 # 更新 panel（只更新内容，subtitle 更新频率已降低）
                 live.update(panel)
 
             # Process first chunk
             response += first_chunk
             if first_chunk:
-                _update_panel_content(first_chunk, update_subtitle=True)  # 第一次更新时更新 subtitle
+                _update_panel_content(
+                    first_chunk, update_subtitle=True
+                )  # 第一次更新时更新 subtitle
 
             # 缓存机制：降低更新频率，减少界面闪烁
             buffer = ""
@@ -313,7 +331,9 @@ class BasePlatform(ABC):
             # 最后更新 subtitle 和 panel
             end_time = time.time()
             duration = end_time - start_time
-            self._update_panel_subtitle_with_token(panel, response, is_completed=True, duration=duration)
+            self._update_panel_subtitle_with_token(
+                panel, response, is_completed=True, duration=duration
+            )
             # 最后更新 panel，Live 上下文退出时会自动打印（transient=False）
             live.update(panel)
             # 注意：不要在这里调用 console.print()，因为 Live 退出时会自动打印 panel
@@ -323,16 +343,16 @@ class BasePlatform(ABC):
 
     def _chat_with_simple_output(self, message: str, start_time: float) -> str:
         """使用简单输出模式进行聊天
-        
+
         参数:
             message: 用户消息
             start_time: 开始时间
-            
+
         返回:
             str: 模型响应
         """
         import time
-        
+
         console.print(
             f"🤖 模型输出 - {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
             soft_wrap=False,
@@ -352,10 +372,10 @@ class BasePlatform(ABC):
 
     def _chat_with_suppressed_output(self, message: str) -> str:
         """使用静默模式进行聊天
-        
+
         参数:
             message: 用户消息
-            
+
         返回:
             str: 模型响应
         """
@@ -369,10 +389,10 @@ class BasePlatform(ABC):
 
     def _process_response(self, response: str) -> str:
         """处理响应，移除 think 标签
-        
+
         参数:
             response: 原始响应
-            
+
         返回:
             str: 处理后的响应
         """
@@ -419,17 +439,15 @@ class BasePlatform(ABC):
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
                 PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
-            
+
             result: str = ""
-            result = while_true(
-                lambda: while_success(lambda: self._chat(message))
-            )
-            
+            result = while_true(lambda: while_success(lambda: self._chat(message)))
+
             # Check if result is empty or False (retry exhausted)
             # Convert False to empty string for type safety
             if result is False or result == "":
                 raise ValueError("返回结果为空")
-            
+
             from jarvis.jarvis_utils.globals import set_last_message
 
             set_last_message(result)
@@ -554,11 +572,14 @@ class BasePlatform(ABC):
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
                 self._session_history_file = os.path.join(
-                    session_dir, f"session_history_{safe_platform}_{safe_model}_{ts}.log"
+                    session_dir,
+                    f"session_history_{safe_platform}_{safe_model}_{ts}.log",
                 )
 
             # Append record
-            with open(self._session_history_file, "a", encoding="utf-8", errors="ignore") as f:
+            with open(
+                self._session_history_file, "a", encoding="utf-8", errors="ignore"
+            ) as f:
                 ts_line = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 f.write(f"===== {ts_line} =====\n")
                 f.write("USER:\n")
@@ -571,10 +592,10 @@ class BasePlatform(ABC):
 
     def get_conversation_history(self) -> List[Dict[str, str]]:
         """获取当前对话历史
-        
+
         返回:
             List[Dict[str, str]]: 对话历史列表，每个元素包含 role 和 content
-            
+
         注意:
             默认实现检查是否有 messages 属性，子类可以重写此方法以提供自定义实现
         """
@@ -584,25 +605,25 @@ class BasePlatform(ABC):
 
     def get_used_token_count(self) -> int:
         """计算当前对话历史使用的token数量
-        
+
         返回:
             int: 当前对话历史使用的token数量
         """
         history = self.get_conversation_history()
         if not history:
             return 0
-        
+
         total_tokens = 0
         for message in history:
             content = message.get("content", "")
             if content:
                 total_tokens += get_context_token_count(content)
-        
+
         return total_tokens
 
     def get_remaining_token_count(self) -> int:
         """获取剩余可用的token数量
-        
+
         返回:
             int: 剩余可用的token数量（输入窗口限制 - 当前使用的token数量）
         """
@@ -613,55 +634,57 @@ class BasePlatform(ABC):
 
     def _truncate_message_if_needed(self, message: str) -> str:
         """如果消息超出剩余token限制，则截断消息
-        
+
         参数:
             message: 原始消息
-            
+
         返回:
             str: 截断后的消息（如果不需要截断则返回原消息）
         """
         try:
             # 获取剩余token数量
             remaining_tokens = self.get_remaining_token_count()
-            
+
             # 如果剩余token为0或负数，返回空消息
             if remaining_tokens <= 0:
                 print("⚠️ 警告：剩余token为0，无法发送消息")
                 return ""
-            
+
             # 计算消息的token数量
             message_tokens = get_context_token_count(message)
-            
+
             # 如果消息token数小于等于剩余token数，不需要截断
             if message_tokens <= remaining_tokens:
                 return message
-            
+
             # 需要截断：保留剩余token的80%用于消息，20%作为安全余量
             target_tokens = int(remaining_tokens * 0.8)
             if target_tokens <= 0:
                 print("⚠️ 警告：剩余token不足，无法发送消息")
                 return ""
-            
+
             # 估算字符数（1 token ≈ 4字符）
             target_chars = target_tokens * 4
-            
+
             # 如果消息长度小于目标字符数，不需要截断（token估算可能有误差）
             if len(message) <= target_chars:
                 return message
-            
+
             # 截断消息：保留前面的内容，添加截断提示
             truncated_message = message[:target_chars]
             # 尝试在最后一个完整句子处截断
-            last_period = truncated_message.rfind('.')
-            last_newline = truncated_message.rfind('\n')
+            last_period = truncated_message.rfind(".")
+            last_newline = truncated_message.rfind("\n")
             last_break = max(last_period, last_newline)
-            
+
             if last_break > target_chars * 0.5:  # 如果找到的断点不太靠前
-                truncated_message = truncated_message[:last_break + 1]
-            
+                truncated_message = truncated_message[: last_break + 1]
+
             truncated_message += "\n\n... (消息过长，已截断以避免超出上下文限制)"
-            print(f"⚠️ 警告：消息过长（{message_tokens} tokens），已截断至约 {target_tokens} tokens")
-            
+            print(
+                f"⚠️ 警告：消息过长（{message_tokens} tokens），已截断至约 {target_tokens} tokens"
+            )
+
             return truncated_message
         except Exception as e:
             # 如果截断过程中出错，返回原消息（避免阻塞对话）

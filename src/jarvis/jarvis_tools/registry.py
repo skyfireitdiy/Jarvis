@@ -88,7 +88,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def can_handle(self, response: str) -> bool:
         # 仅当 {ot("TOOL_CALL")} 出现在行首时才认为可以处理（忽略大小写）
-        has_tool_call = re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', response) is not None
+        has_tool_call = (
+            re.search(rf"(?mi){re.escape(ot('TOOL_CALL'))}", response) is not None
+        )
         if has_tool_call:
             print("🛠️ 检测到工具调用")  # 增加工具emoji
         return has_tool_call
@@ -137,11 +139,14 @@ class ToolRegistry(OutputHandlerProtocol):
     def handle(self, response: str, agent_: Any) -> Tuple[bool, Any]:
         try:
             # 传递agent给_extract_tool_calls，以便在解析失败时调用大模型修复
-            tool_call, err_msg, auto_completed = self._extract_tool_calls(response, agent_)
+            tool_call, err_msg, auto_completed = self._extract_tool_calls(
+                response, agent_
+            )
             if err_msg:
                 # 只要工具解析错误，追加工具使用帮助信息（相当于一次 <ToolUsage>）
                 try:
                     from jarvis.jarvis_agent import Agent
+
                     agent: Agent = agent_
                     tool_usage = agent.get_tool_usage_prompt()
                     return False, f"{err_msg}\n\n{tool_usage}"
@@ -221,7 +226,9 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         missing_tools = [tool_name for tool_name in name if tool_name not in self.tools]
         if missing_tools:
-            print(f"⚠️ 工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}")
+            print(
+                f"⚠️ 工具 {missing_tools} 不存在，可用的工具有: {', '.join(self.tools.keys())}"
+            )
         self.tools = {
             tool_name: self.tools[tool_name]
             for tool_name in name
@@ -255,7 +262,10 @@ class ToolRegistry(OutputHandlerProtocol):
                 else:
                     missing.append(tool_name)
             if missing:
-                print("⚠️ 警告: 配置的工具不存在: " + ", ".join(f"'{name}'" for name in missing))
+                print(
+                    "⚠️ 警告: 配置的工具不存在: "
+                    + ", ".join(f"'{name}'" for name in missing)
+                )
             self.tools = filtered_tools
 
         # 如果配置了 dont_use 列表，排除列表中的工具
@@ -281,7 +291,9 @@ class ToolRegistry(OutputHandlerProtocol):
             return
 
         # 添加警告信息
-        print("⚠️ 警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到JARVIS_MCP配置方式")
+        print(
+            "⚠️ 警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到JARVIS_MCP配置方式"
+        )
 
         # 遍历目录中的所有.yaml文件
         error_lines = []
@@ -306,7 +318,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 continue
 
             self.register_tool_by_file(str(file_path))
-        
+
         # 记录当前已加载的工具名称为内置工具
         self._builtin_tool_names = set(self.tools.keys())
 
@@ -335,7 +347,8 @@ class ToolRegistry(OutputHandlerProtocol):
                         import subprocess
 
                         subprocess.run(
-                            ["git", "clone", central_repo, central_repo_path], check=True
+                            ["git", "clone", central_repo, central_repo_path],
+                            check=True,
                         )
                     except Exception as e:
                         print(f"❌ 克隆中心工具仓库失败: {str(e)}")
@@ -372,7 +385,6 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 检查enable标志
             if not config.get("enable", True):
-
                 return False
 
             name = config.get("name", "mcp")
@@ -565,16 +577,18 @@ class ToolRegistry(OutputHandlerProtocol):
     @staticmethod
     def _has_tool_calls_block(content: str) -> bool:
         """从内容中提取工具调用块（仅匹配行首标签，忽略大小写）"""
-        pattern = rf'(?msi){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
+        pattern = (
+            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?)^{re.escape(ct('TOOL_CALL'))}"
+        )
         return re.search(pattern, content) is not None
 
     @staticmethod
     def _get_long_response_hint(content: str) -> str:
         """生成长响应的提示信息
-        
+
         参数:
             content: 响应内容
-            
+
         返回:
             str: 如果响应较长，返回提示信息；否则返回空字符串
         """
@@ -583,13 +597,15 @@ class ToolRegistry(OutputHandlerProtocol):
         return ""
 
     @staticmethod
-    def _extract_json_from_text(text: str, start_pos: int = 0) -> Tuple[Optional[str], int]:
+    def _extract_json_from_text(
+        text: str, start_pos: int = 0
+    ) -> Tuple[Optional[str], int]:
         """从文本中提取完整的JSON对象（通过括号匹配）
-        
+
         参数:
             text: 要提取的文本
             start_pos: 开始搜索的位置
-            
+
         返回:
             Tuple[Optional[str], int]:
                 - 第一个元素是提取的JSON字符串（如果找到），否则为None
@@ -597,94 +613,95 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         # 跳过空白字符
         pos = start_pos
-        while pos < len(text) and text[pos] in (' ', '\t', '\n', '\r'):
+        while pos < len(text) and text[pos] in (" ", "\t", "\n", "\r"):
             pos += 1
-        
+
         if pos >= len(text):
             return None, pos
-        
+
         # 检查是否以 { 开头
-        if text[pos] != '{':
+        if text[pos] != "{":
             return None, pos
-        
+
         # 使用括号匹配找到完整的JSON对象
         brace_count = 0
         in_string = False
         escape_next = False
         string_char = None
-        
+
         json_start = pos
         for i in range(pos, len(text)):
             char = text[i]
-            
+
             if escape_next:
                 escape_next = False
                 continue
-            
-            if char == '\\':
+
+            if char == "\\":
                 escape_next = True
                 continue
-            
+
             if not in_string:
                 if char in ('"', "'"):
                     in_string = True
                     string_char = char
-                elif char == '{':
+                elif char == "{":
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if brace_count == 0:
                         # 找到完整的JSON对象
-                        return text[json_start:i+1], i + 1
+                        return text[json_start : i + 1], i + 1
             else:
                 if char == string_char:
                     in_string = False
                     string_char = None
-        
+
         return None, len(text)
-    
+
     @staticmethod
     def _clean_extra_markers(text: str) -> str:
         """清理文本中的额外标记（如 <|tool_call_end|> 等）
-        
+
         参数:
             text: 要清理的文本
-            
+
         返回:
             清理后的文本
         """
         # 常见的额外标记模式
         extra_markers = [
-            r'<\|tool_call_end\|>',
-            r'<\|tool_calls_section_end\|>',
-            r'<\|.*?\|>',  # 匹配所有 <|...|> 格式的标记
+            r"<\|tool_call_end\|>",
+            r"<\|tool_calls_section_end\|>",
+            r"<\|.*?\|>",  # 匹配所有 <|...|> 格式的标记
         ]
-        
+
         cleaned = text
         for pattern in extra_markers:
-            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
-        
+            cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+
         return cleaned.strip()
 
     @staticmethod
     def _try_llm_fix(content: str, agent: Any, error_msg: str) -> Optional[str]:
         """尝试使用大模型修复工具调用格式
-        
+
         参数:
             content: 包含错误工具调用的内容
             agent: Agent实例，用于调用大模型
             error_msg: 错误消息
-            
+
         返回:
             Optional[str]: 修复后的内容，如果修复失败则返回None
         """
         try:
             from jarvis.jarvis_agent import Agent
+
             agent_instance: Agent = agent
-            
+
             # 获取工具使用说明
             tool_usage = agent_instance.get_tool_usage_prompt()
-            
+
             # 构建修复提示
             fix_prompt = f"""你之前的工具调用格式有误，请根据工具使用说明修复以下内容。
 
@@ -703,18 +720,18 @@ class ToolRegistry(OutputHandlerProtocol):
 3. 如果使用多行字符串，推荐使用 ||| 或 ``` 分隔符包裹
 
 请直接返回修复后的完整工具调用内容，不要添加其他说明文字。"""
-            
+
             # 调用大模型修复
             print("🤖 尝试使用大模型修复工具调用格式...")
             fixed_content = agent_instance.model.chat_until_success(fix_prompt)  # type: ignore
-            
+
             if fixed_content:
                 print("✅ 大模型修复完成")
                 return fixed_content
             else:
                 print("❌ 大模型修复失败：返回内容为空")
                 return None
-                
+
         except Exception as e:
             print(f"❌ 大模型修复失败：{str(e)}")
             return None
@@ -743,24 +760,30 @@ class ToolRegistry(OutputHandlerProtocol):
         close_tag = ct("TOOL_CALL")
         # 使用正则表达式查找结束标签（忽略大小写），以获取实际位置和原始大小写
         close_tag_pattern = re.escape(close_tag)
-        match = re.search(rf'{close_tag_pattern}$', content.rstrip(), re.IGNORECASE)
+        match = re.search(rf"{close_tag_pattern}$", content.rstrip(), re.IGNORECASE)
         if match:
             pos = match.start()
             if pos > 0 and content[pos - 1] not in ("\n", "\r"):
                 content = content[:pos] + "\n" + content[pos:]
 
         # 首先尝试标准的提取方式（忽略大小写）
-        pattern = rf'(?msi){re.escape(ot("TOOL_CALL"))}(.*?)^{re.escape(ct("TOOL_CALL"))}'
+        pattern = (
+            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?)^{re.escape(ct('TOOL_CALL'))}"
+        )
         data = re.findall(pattern, content)
         auto_completed = False
-        
+
         # 如果标准提取失败，尝试更宽松的提取方式
         if not data:
             # can_handle 确保 ot("TOOL_CALL") 在内容中（行首）。
             # 如果数据为空，则表示行首的 ct("TOOL_CALL") 可能丢失。
-            has_open_at_bol = re.search(rf'(?mi){re.escape(ot("TOOL_CALL"))}', content) is not None
-            has_close_at_bol = re.search(rf'(?mi)^{re.escape(ct("TOOL_CALL"))}', content) is not None
-            
+            has_open_at_bol = (
+                re.search(rf"(?mi){re.escape(ot('TOOL_CALL'))}", content) is not None
+            )
+            has_close_at_bol = (
+                re.search(rf"(?mi)^{re.escape(ct('TOOL_CALL'))}", content) is not None
+            )
+
             if has_open_at_bol and not has_close_at_bol:
                 # 尝试通过附加结束标签来修复它（确保结束标签位于行首）
                 fixed_content = content.strip() + f"\n{ct('TOOL_CALL')}"
@@ -780,50 +803,58 @@ class ToolRegistry(OutputHandlerProtocol):
                         # Even after fixing, it's not valid JSON, or user cancelled.
                         # Fall through to try more lenient extraction.
                         pass
-            
+
             # 如果仍然没有数据，尝试更宽松的提取：直接从开始标签后提取JSON
             if not data:
                 # 找到开始标签的位置
-                open_tag_match = re.search(rf'(?i){re.escape(ot("TOOL_CALL"))}', content)
+                open_tag_match = re.search(
+                    rf"(?i){re.escape(ot('TOOL_CALL'))}", content
+                )
                 if open_tag_match:
                     # 从开始标签后提取JSON
                     start_pos = open_tag_match.end()
-                    json_str, end_pos = ToolRegistry._extract_json_from_text(content, start_pos)
-                    
+                    json_str, end_pos = ToolRegistry._extract_json_from_text(
+                        content, start_pos
+                    )
+
                     if json_str:
                         # 清理JSON字符串中的额外标记
                         json_str = ToolRegistry._clean_extra_markers(json_str)
-                        
+
                         # 尝试解析JSON
                         try:
                             parsed = json_loads(json_str)
                             # 验证是否包含必要字段
-                            if "name" in parsed and "arguments" in parsed and "want" in parsed:
+                            if (
+                                "name" in parsed
+                                and "arguments" in parsed
+                                and "want" in parsed
+                            ):
                                 data = [json_str]
                                 auto_completed = True
                         except Exception:
                             # JSON解析失败，继续尝试其他方法
                             pass
-            
+
             # 如果仍然没有数据，尝试使用大模型修复
             if not data:
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 error_msg = f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}{long_hint}"
-                
+
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
                     fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
                     if fixed_content:
                         # 递归调用自身，尝试解析修复后的内容
                         return ToolRegistry._extract_tool_calls(fixed_content, None)
-                
+
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
                     {},
                     error_msg,
                     False,
                 )
-        
+
         ret = []
         for item in data:
             try:
@@ -837,14 +868,14 @@ class ToolRegistry(OutputHandlerProtocol):
 提示：Jsonnet支持双引号/单引号、尾随逗号、注释。多行字符串推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。
 
 {tool_call_help}{long_hint}"""
-                
+
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
                     fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
                     if fixed_content:
                         # 递归调用自身，尝试解析修复后的内容
                         return ToolRegistry._extract_tool_calls(fixed_content, None)
-                
+
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
                     {},
@@ -859,14 +890,14 @@ class ToolRegistry(OutputHandlerProtocol):
                 error_msg = f"""工具调用格式错误，请检查工具调用格式（缺少name、arguments、want字段）。
 
                 {tool_call_help}{long_hint}"""
-                
+
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
                     fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
                     if fixed_content:
                         # 递归调用自身，尝试解析修复后的内容
                         return ToolRegistry._extract_tool_calls(fixed_content, None)
-                
+
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
                     {},
@@ -999,7 +1030,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         if len(output.splitlines()) > 60:
             lines = output.splitlines()
-            print("⚠️ 输出太长，截取前后30行") 
+            print("⚠️ 输出太长，截取前后30行")
             return "\n".join(
                 lines[:30] + ["\n...内容太长，已截取前后30行...\n"] + lines[-30:]
             )
@@ -1025,13 +1056,13 @@ class ToolRegistry(OutputHandlerProtocol):
                         usage_prompt = agent_instance.get_tool_usage_prompt()
                     except Exception:
                         usage_prompt = tool_call_help
-                    print("❌ 工具参数格式无效") 
+                    print("❌ 工具参数格式无效")
                     return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。\n\n{usage_prompt}"
 
-            print(f"🛠️ 执行工具调用 {name}") 
+            print(f"🛠️ 执行工具调用 {name}")
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)
-            
+
             # 打印执行状态
             if result.get("success", False):
                 print(f"✅ 执行工具调用 {name} 成功")
@@ -1041,15 +1072,20 @@ class ToolRegistry(OutputHandlerProtocol):
             # 记录本轮实际执行的工具，供上层逻辑（如记忆保存判定）使用
             try:
                 from jarvis.jarvis_agent import Agent  # 延迟导入避免循环依赖
+
                 agent_instance_for_record: Agent = agent_instance
                 # 记录最后一次执行的工具
                 agent_instance_for_record.set_user_data("__last_executed_tool__", name)  # type: ignore
                 # 记录本轮累计执行的工具列表
-                executed_list = agent_instance_for_record.get_user_data("__executed_tools__")  # type: ignore
+                executed_list = agent_instance_for_record.get_user_data(
+                    "__executed_tools__"
+                )  # type: ignore
                 if not isinstance(executed_list, list):
                     executed_list = []
                 executed_list.append(name)
-                agent_instance_for_record.set_user_data("__executed_tools__", executed_list)  # type: ignore
+                agent_instance_for_record.set_user_data(
+                    "__executed_tools__", executed_list
+                )  # type: ignore
             except Exception:
                 pass
 
@@ -1059,7 +1095,9 @@ class ToolRegistry(OutputHandlerProtocol):
                     usage_prompt = agent_instance.get_tool_usage_prompt()
                 except Exception:
                     usage_prompt = tool_call_help
-                err_output = self._format_tool_output(result.get("stdout", ""), result.get("stderr", ""))
+                err_output = self._format_tool_output(
+                    result.get("stdout", ""), result.get("stderr", "")
+                )
                 return f"{err_output}\n\n{usage_prompt}"
 
             # 格式化输出
@@ -1106,7 +1144,7 @@ class ToolRegistry(OutputHandlerProtocol):
 </content>
 
 上传的文件是以下工具执行结果：
-{json.dumps({"name":name, "arguments":args, "want":want}, ensure_ascii=False, indent=2)}
+{json.dumps({"name": name, "arguments": args, "want": want}, ensure_ascii=False, indent=2)}
 
 请根据以上信息，继续完成任务。
 """
@@ -1126,7 +1164,7 @@ class ToolRegistry(OutputHandlerProtocol):
             # 尝试获取工具名称（如果已定义）
             tool_name = ""
             try:
-                if 'name' in locals():
+                if "name" in locals():
                     tool_name = name
             except Exception:
                 pass
@@ -1136,6 +1174,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 print(f"❌ 工具调用失败：{str(e)}")
             try:
                 from jarvis.jarvis_agent import Agent  # 延迟导入避免循环依赖
+
                 agent_instance_for_prompt: Agent = agent  # type: ignore
                 usage_prompt = agent_instance_for_prompt.get_tool_usage_prompt()
             except Exception:

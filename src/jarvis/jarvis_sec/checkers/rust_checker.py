@@ -38,11 +38,16 @@ RE_ASSUME_INIT = re.compile(r"\bassume_init\s*\(")
 RE_UNWRAP = re.compile(r"\bunwrap\s*\(", re.IGNORECASE)
 RE_EXPECT = re.compile(r"\bexpect\s*\(", re.IGNORECASE)
 RE_EXTERN_C = re.compile(r'extern\s+"C"')
-RE_UNSAFE_IMPL = re.compile(r"\bunsafe\s+impl\s+(?:Send|Sync)\b|\bimpl\s+unsafe\s+(?:Send|Sync)\b", re.IGNORECASE)
+RE_UNSAFE_IMPL = re.compile(
+    r"\bunsafe\s+impl\s+(?:Send|Sync)\b|\bimpl\s+unsafe\s+(?:Send|Sync)\b",
+    re.IGNORECASE,
+)
 
 # 结果忽略/下划线绑定（可能忽略错误）
 RE_LET_UNDERSCORE = re.compile(r"\blet\s+_+\s*=\s*.+;")
-RE_MATCH_IGNORE_ERR = re.compile(r"\.ok\s*\(\s*\)|\.ok\?\s*;|\._?\s*=\s*.+\.err\(\s*\)", re.IGNORECASE)  # 粗略
+RE_MATCH_IGNORE_ERR = re.compile(
+    r"\.ok\s*\(\s*\)|\.ok\?\s*;|\._?\s*=\s*.+\.err\(\s*\)", re.IGNORECASE
+)  # 粗略
 
 # 类型转换相关
 RE_AS_CAST = re.compile(r"\b\w+\s+as\s+[A-Za-z_]\w*", re.IGNORECASE)
@@ -90,6 +95,7 @@ RE_ZEROED = re.compile(r"\bzeroed\s*\(")
 # 公共工具
 # ---------------------------
 
+
 def _safe_line(lines: Sequence[str], idx: int) -> str:
     if 1 <= idx <= len(lines):
         return lines[idx - 1]
@@ -101,7 +107,9 @@ def _strip_line(s: str, max_len: int = 200) -> str:
     return s if len(s) <= max_len else s[: max_len - 3] + "..."
 
 
-def _window(lines: Sequence[str], center: int, before: int = 3, after: int = 3) -> List[Tuple[int, str]]:
+def _window(
+    lines: Sequence[str], center: int, before: int = 3, after: int = 3
+) -> List[Tuple[int, str]]:
     start = max(1, center - before)
     end = min(len(lines), center + after)
     return [(i, _safe_line(lines, i)) for i in range(start, end + 1)]
@@ -118,9 +126,9 @@ def _remove_comments_preserve_strings(text: str) -> str:
     n = len(text)
     in_sl_comment = False  # //
     in_bl_comment = False  # /* */
-    in_string = False      # "
-    in_char = False        # '
-    in_raw_string = False   # r"..." 或 r#"..."#
+    in_string = False  # "
+    in_char = False  # '
+    in_raw_string = False  # r"..." 或 r#"..."#
     raw_string_hash_count = 0  # 原始字符串的 # 数量
     escape = False
 
@@ -159,7 +167,7 @@ def _remove_comments_preserve_strings(text: str) -> str:
                 # 检查是否有足够的 # 来结束原始字符串
                 hash_count = 0
                 j = i - 1
-                while j >= 0 and text[j] == '#':
+                while j >= 0 and text[j] == "#":
                     hash_count += 1
                     j -= 1
                 if hash_count == raw_string_hash_count:
@@ -238,7 +246,7 @@ def _remove_comments_preserve_strings(text: str) -> str:
             # 计算 # 的数量
             raw_string_hash_count = 1
             j = i + 1
-            while j < n and text[j] == '#':
+            while j < n and text[j] == "#":
                 raw_string_hash_count += 1
                 j += 1
             if j < n and text[j] == '"':
@@ -252,7 +260,7 @@ def _remove_comments_preserve_strings(text: str) -> str:
             # 字节原始字符串：br#"
             raw_string_hash_count = 1
             j = i + 2
-            while j < n and text[j] == '#':
+            while j < n and text[j] == "#":
                 raw_string_hash_count += 1
                 j += 1
             if j < n and text[j] == '"':
@@ -303,21 +311,21 @@ def _mask_strings_preserve_len(text: str) -> str:
     in_raw_string = False
     raw_string_hash_count = 0
     escape = False
-    
+
     i = 0
     n = len(text)
-    
+
     while i < n:
         ch = text[i]
         nxt = text[i + 1] if i + 1 < n else ""
         nxt2 = text[i + 2] if i + 2 < n else ""
-        
+
         if in_raw_string:
             if ch == '"':
                 # 检查是否有足够的 # 来结束原始字符串
                 hash_count = 0
                 j = i - 1
-                while j >= 0 and text[j] == '#':
+                while j >= 0 and text[j] == "#":
                     hash_count += 1
                     j -= 1
                 if hash_count == raw_string_hash_count:
@@ -338,7 +346,7 @@ def _mask_strings_preserve_len(text: str) -> str:
                     res.append(" ")
                 i += 1
             continue
-        
+
         if in_string:
             if escape:
                 # 保留转义反斜杠为两字符（反斜杠+空格），以不破坏列对齐过多
@@ -356,7 +364,7 @@ def _mask_strings_preserve_len(text: str) -> str:
                 res.append(" ")
             i += 1
             continue
-            
+
         if in_char:
             if escape:
                 res.append(" ")
@@ -373,7 +381,7 @@ def _mask_strings_preserve_len(text: str) -> str:
                 res.append(" ")
             i += 1
             continue
-        
+
         # 检测原始字符串开始：r"..." 或 r#"..."# 或 br"..." 或 b"..."（字节字符串）
         if ch == "r" and nxt == '"':
             # 简单原始字符串：r"
@@ -396,7 +404,7 @@ def _mask_strings_preserve_len(text: str) -> str:
             # 带 # 的原始字符串：r#"
             raw_string_hash_count = 1
             j = i + 1
-            while j < n and text[j] == '#':
+            while j < n and text[j] == "#":
                 raw_string_hash_count += 1
                 j += 1
             if j < n and text[j] == '"':
@@ -410,7 +418,7 @@ def _mask_strings_preserve_len(text: str) -> str:
             # 字节原始字符串：br#"
             raw_string_hash_count = 1
             j = i + 2
-            while j < n and text[j] == '#':
+            while j < n and text[j] == "#":
                 raw_string_hash_count += 1
                 j += 1
             if j < n and text[j] == '"':
@@ -422,7 +430,7 @@ def _mask_strings_preserve_len(text: str) -> str:
                     res.append(text[k])
                 i = j + 1
                 continue
-        
+
         # 处理 b"..."（字节字符串，不是原始字符串，需要在原始字符串检测之后）
         if ch == "b" and nxt == '"' and nxt2 != "r":
             in_string = True
@@ -440,14 +448,16 @@ def _mask_strings_preserve_len(text: str) -> str:
             res.append("'")
             i += 1
             continue
-        
+
         res.append(ch)
         i += 1
-    
+
     return "".join(res)
 
 
-def _has_safety_comment_around(lines: Sequence[str], line_no: int, radius: int = 5) -> bool:
+def _has_safety_comment_around(
+    lines: Sequence[str], line_no: int, radius: int = 5
+) -> bool:
     """
     Rust 社区约定在 unsafe 附近写 SAFETY: 注释说明前置条件。
     如存在，适当降低置信度。
@@ -488,6 +498,7 @@ def _severity_from_confidence(conf: float) -> str:
 # ---------------------------
 # 规则实现
 # ---------------------------
+
 
 def _rule_unsafe(lines: Sequence[str], relpath: str) -> List[Issue]:
     issues: List[Issue] = []
@@ -809,13 +820,18 @@ def _rule_unsafe_mem_ops(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     issues: List[Issue] = []
     for idx, s in enumerate(lines, start=1):
-        if not (RE_COPY_NONOVERLAPPING.search(s) or RE_COPY.search(s) or RE_WRITE.search(s) or RE_READ.search(s)):
+        if not (
+            RE_COPY_NONOVERLAPPING.search(s)
+            or RE_COPY.search(s)
+            or RE_WRITE.search(s)
+            or RE_READ.search(s)
+        ):
             continue
         # 检查是否在 unsafe 块中
         window_text = " ".join(t for _, t in _window(lines, idx, before=5, after=5))
         if "unsafe" not in window_text.lower():
             continue  # 这些函数必须在 unsafe 块中使用
-        
+
         conf = 0.8
         if _has_safety_comment_around(lines, idx):
             conf -= 0.1
@@ -938,7 +954,7 @@ def _rule_refcell_borrow(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     issues: List[Issue] = []
     refcell_vars: set[str] = set()
-    
+
     # 收集 RefCell 变量
     for idx, s in enumerate(lines, start=1):
         if RE_REFCELL.search(s):
@@ -946,7 +962,7 @@ def _rule_refcell_borrow(lines: Sequence[str], relpath: str) -> List[Issue]:
             m = re.search(r"\bRefCell\s*<[^>]+>\s*([A-Za-z_]\w*)", s, re.IGNORECASE)
             if m:
                 refcell_vars.add(m.group(1))
-    
+
     # 检测 borrow/borrow_mut 的使用
     for idx, s in enumerate(lines, start=1):
         for var in refcell_vars:
@@ -1042,6 +1058,7 @@ def _rule_uninit_zeroed(lines: Sequence[str], relpath: str) -> List[Issue]:
 # ---------------------------
 # 对外主入口
 # ---------------------------
+
 
 def analyze_rust_text(relpath: str, text: str) -> List[Issue]:
     """

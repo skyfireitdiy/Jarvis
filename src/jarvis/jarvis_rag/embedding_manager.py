@@ -26,9 +26,7 @@ class EmbeddingManager:
         """
         self.model_name = model_name
 
-        print(
-            f"ℹ️ 初始化嵌入管理器, 模型: '{self.model_name}'..."
-        )
+        print(f"ℹ️ 初始化嵌入管理器, 模型: '{self.model_name}'...")
 
         # 缓存的salt是模型名称，以防止冲突
         self.cache = EmbeddingCache(cache_dir=cache_dir, salt=self.model_name)
@@ -57,7 +55,9 @@ class EmbeddingManager:
                 try:
                     home = os.path.expanduser("~")
                     st_home = os.path.join(home, ".cache", "sentence_transformers")
-                    torch_st_home = os.path.join(home, ".cache", "torch", "sentence_transformers")
+                    torch_st_home = os.path.join(
+                        home, ".cache", "torch", "sentence_transformers"
+                    )
                     # Build common name variants found in local caches
                     org, name = (
                         self.model_name.split("/", 1)
@@ -68,7 +68,9 @@ class EmbeddingManager:
                     san2 = self.model_name.replace("/", "__")
                     san3 = self.model_name.replace("/", "--")
                     # include plain 'name' for caches that drop org prefix
-                    name_variants = list(dict.fromkeys([self.model_name, san1, san2, san3, name]))
+                    name_variants = list(
+                        dict.fromkeys([self.model_name, san1, san2, san3, name])
+                    )
                     candidates = []
                     for base in [st_home, torch_st_home]:
                         for nv in name_variants:
@@ -82,7 +84,11 @@ class EmbeddingManager:
                                 if not os.path.isdir(ep):
                                     continue
                                 if (
-                                    (org and entry.startswith(f"{org}__") and name in entry)
+                                    (
+                                        org
+                                        and entry.startswith(f"{org}__")
+                                        and name in entry
+                                    )
                                     or (san1 in entry)
                                     or (name in entry)
                                 ):
@@ -94,16 +100,24 @@ class EmbeddingManager:
                     hf_cache = os.path.join(home, ".cache", "huggingface", "hub")
                     if "/" in self.model_name:
                         org, name = self.model_name.split("/", 1)
-                        models_dir = os.path.join(hf_cache, f"models--{org}--{name}", "snapshots")
+                        models_dir = os.path.join(
+                            hf_cache, f"models--{org}--{name}", "snapshots"
+                        )
                         if os.path.isdir(models_dir):
                             try:
                                 snaps = sorted(
-                                    [os.path.join(models_dir, d) for d in os.listdir(models_dir)],
+                                    [
+                                        os.path.join(models_dir, d)
+                                        for d in os.listdir(models_dir)
+                                    ],
                                     key=lambda p: os.path.getmtime(p),
                                     reverse=True,
                                 )
                             except Exception:
-                                snaps = [os.path.join(models_dir, d) for d in os.listdir(models_dir)]
+                                snaps = [
+                                    os.path.join(models_dir, d)
+                                    for d in os.listdir(models_dir)
+                                ]
                             for sp in snaps:
                                 if os.path.isdir(sp):
                                     candidates.append(sp)
@@ -124,7 +138,9 @@ class EmbeddingManager:
 
                 try:
                     # Try resolve local cached directory; do not hit network
-                    local_dir = snapshot_download(repo_id=self.model_name, local_files_only=True)
+                    local_dir = snapshot_download(
+                        repo_id=self.model_name, local_files_only=True
+                    )
                 except Exception:
                     local_dir = None
 
@@ -135,8 +151,6 @@ class EmbeddingManager:
                         encode_kwargs=encode_kwargs,
                         show_progress=False,
                     )
-
-
 
                 # Fall back to remote download if local cache not found and not offline
                 return HuggingFaceEmbeddings(
@@ -174,12 +188,8 @@ class EmbeddingManager:
                     show_progress=True,
                 )
         except Exception as e:
-            print(
-                f"❌ 加载嵌入模型 '{self.model_name}' 时出错: {e}"
-            )
-            print(
-                "⚠️ 请确保您已安装 'sentence_transformers' 和 'torch'。"
-            )
+            print(f"❌ 加载嵌入模型 '{self.model_name}' 时出错: {e}")
+            print("⚠️ 请确保您已安装 'sentence_transformers' 和 'torch'。")
             raise
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -219,9 +229,7 @@ class EmbeddingManager:
             for i, embedding in zip(indices_to_embed, new_embeddings):
                 cached_embeddings[i] = embedding
         else:
-            print(
-                f"✅ 缓存命中。所有 {len(texts)} 个文档的嵌入均从缓存中检索。"
-            )
+            print(f"✅ 缓存命中。所有 {len(texts)} 个文档的嵌入均从缓存中检索。")
 
         return cast(List[List[float]], cached_embeddings)
 

@@ -31,7 +31,9 @@ def get_context_token_count(text: str) -> int:
         return int(len(encoding.encode(text)) * 10 / 7)
     except Exception as e:
         print(f"⚠️ 计算token失败: {str(e)}")
-        return int(len(text) // 4 * 10 / 7)  # 每个token大约4个字符的粗略估计，调整为10/7倍
+        return int(
+            len(text) // 4 * 10 / 7
+        )  # 每个token大约4个字符的粗略估计，调整为10/7倍
 
 
 def split_text_into_chunks(

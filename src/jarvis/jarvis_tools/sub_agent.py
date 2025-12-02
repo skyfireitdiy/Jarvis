@@ -10,6 +10,7 @@ sub_agent 工具
 - 继承父 Agent 的部分配置：model_group、input_handler、execute_tool_confirm、multiline_inputer、non_interactive、use_methodology、use_analysis；其他参数需显式提供
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
+
 from typing import Any, Dict
 import json
 
@@ -124,11 +125,21 @@ class SubAgentTool:
             try:
                 if parent_agent is not None:
                     if getattr(parent_agent, "model", None):
-                        parent_model_group = getattr(parent_agent.model, "model_group", None)
-                    parent_execute_tool_confirm = getattr(parent_agent, "execute_tool_confirm", None)
-                    parent_multiline_inputer = getattr(parent_agent, "multiline_inputer", None)
-                    parent_non_interactive = getattr(parent_agent, "non_interactive", None)
-                    parent_use_methodology = getattr(parent_agent, "use_methodology", None)
+                        parent_model_group = getattr(
+                            parent_agent.model, "model_group", None
+                        )
+                    parent_execute_tool_confirm = getattr(
+                        parent_agent, "execute_tool_confirm", None
+                    )
+                    parent_multiline_inputer = getattr(
+                        parent_agent, "multiline_inputer", None
+                    )
+                    parent_non_interactive = getattr(
+                        parent_agent, "non_interactive", None
+                    )
+                    parent_use_methodology = getattr(
+                        parent_agent, "use_methodology", None
+                    )
                     parent_use_analysis = getattr(parent_agent, "use_analysis", None)
             except Exception:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
@@ -162,10 +173,16 @@ class SubAgentTool:
                 # 获取当前启用的工具列表
                 tool_registry = agent.get_tool_registry()
                 if tool_registry:
-                    current_tools = [t.get("name") for t in tool_registry.get_all_tools() if isinstance(t, dict) and t.get("name")]
+                    current_tools = [
+                        t.get("name")
+                        for t in tool_registry.get_all_tools()
+                        if isinstance(t, dict) and t.get("name")
+                    ]
                     # 过滤掉禁止的工具
                     forbidden_tools = {"sub_agent", "sub_code_agent"}
-                    filtered_tools = [t for t in current_tools if t not in forbidden_tools]
+                    filtered_tools = [
+                        t for t in current_tools if t not in forbidden_tools
+                    ]
                     if filtered_tools:
                         agent.set_use_tools(filtered_tools)
             except Exception:
@@ -181,7 +198,9 @@ class SubAgentTool:
                         available_names = [m for m, _ in available_models]
                         current_model_name = platform.name()
                         if current_model_name not in available_names:
-                            print(f"⚠️ 检测到子Agent模型 {current_model_name} 不存在于平台 {platform.platform_name()} 的可用模型列表，将回退到 {available_names[0]}")
+                            print(
+                                f"⚠️ 检测到子Agent模型 {current_model_name} 不存在于平台 {platform.platform_name()} 的可用模型列表，将回退到 {available_names[0]}"
+                            )
                             platform.set_model_name(available_names[0])
             except Exception:
                 # 获取模型列表或设置模型失败时，保持原设置并继续，交由底层报错处理

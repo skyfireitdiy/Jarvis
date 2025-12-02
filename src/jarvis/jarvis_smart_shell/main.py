@@ -114,9 +114,7 @@ def install_jss_completion(
 ) -> None:
     """为指定的shell安装'命令未找到'处理器，实现自然语言命令建议"""
     if shell not in ("fish", "bash", "zsh"):
-        print(
-            f"❌ 错误: 不支持的shell类型: {shell}, 仅支持fish, bash, zsh"
-        )
+        print(f"❌ 错误: 不支持的shell类型: {shell}, 仅支持fish, bash, zsh")
         raise typer.Exit(code=1)
 
     if shell == "fish":
@@ -172,9 +170,7 @@ end
             content = f.read()
 
         if start_marker in content:
-            print(
-                "✅ JSS bash completion 已安装，请执行: source ~/.bashrc"
-            )
+            print("✅ JSS bash completion 已安装，请执行: source ~/.bashrc")
             return
         else:
             with open(config_file, "a") as f:
@@ -217,9 +213,7 @@ command_not_found_handle() {{
 {end_marker}
 """
                 )
-            print(
-                "✅ JSS bash completion 已安装，请执行: source ~/.bashrc"
-            )
+            print("✅ JSS bash completion 已安装，请执行: source ~/.bashrc")
     elif shell == "zsh":
         config_file = _get_zsh_config_file()
         start_marker, end_marker = _get_zsh_markers()
@@ -234,9 +228,7 @@ command_not_found_handle() {{
             content = f.read()
 
         if start_marker in content:
-            print(
-                "✅ JSS zsh completion 已安装，请执行: source ~/.zshrc"
-            )
+            print("✅ JSS zsh completion 已安装，请执行: source ~/.zshrc")
             return
 
         with open(config_file, "a") as f:
@@ -283,9 +275,7 @@ command_not_found_handler() {{
 {end_marker}
 """
             )
-        print(
-            "✅ JSS zsh completion 已安装，请执行: source ~/.zshrc"
-        )
+        print("✅ JSS zsh completion 已安装，请执行: source ~/.zshrc")
         return
 
 
@@ -295,9 +285,7 @@ def uninstall_jss_completion(
 ) -> None:
     """卸载JSS shell'命令未找到'处理器"""
     if shell not in ("fish", "bash", "zsh"):
-        print(
-            f"❌ 错误: 不支持的shell类型: {shell}, 仅支持fish, bash, zsh"
-        )
+        print(f"❌ 错误: 不支持的shell类型: {shell}, 仅支持fish, bash, zsh")
         raise typer.Exit(code=1)
 
     if shell == "fish":
@@ -305,18 +293,14 @@ def uninstall_jss_completion(
         start_marker, end_marker = _get_markers()
 
         if not os.path.exists(config_file):
-            print(
-                "ℹ️ 未找到 JSS fish completion 配置，无需卸载"
-            )
+            print("ℹ️ 未找到 JSS fish completion 配置，无需卸载")
             return
 
         with open(config_file, "r") as f:
             content = f.read()
 
         if start_marker not in content:
-            print(
-                "ℹ️ 未找到 JSS fish completion 配置，无需卸载"
-            )
+            print("ℹ️ 未找到 JSS fish completion 配置，无需卸载")
             return
 
         new_content = content.split(start_marker)[0] + content.split(end_marker)[-1]
@@ -332,18 +316,14 @@ def uninstall_jss_completion(
         start_marker, end_marker = _get_bash_markers()
 
         if not os.path.exists(config_file):
-            print(
-                "ℹ️ 未找到 JSS bash completion 配置，无需卸载"
-            )
+            print("ℹ️ 未找到 JSS bash completion 配置，无需卸载")
             return
 
         with open(config_file, "r") as f:
             content = f.read()
 
         if start_marker not in content:
-            print(
-                "ℹ️ 未找到 JSS bash completion 配置，无需卸载"
-            )
+            print("ℹ️ 未找到 JSS bash completion 配置，无需卸载")
             return
 
         new_content = content.split(start_marker)[0] + content.split(end_marker)[-1]
@@ -351,26 +331,20 @@ def uninstall_jss_completion(
         with open(config_file, "w") as f:
             f.write(new_content)
 
-        print(
-            "✅ JSS bash completion 已卸载，请执行: source ~/.bashrc"
-        )
+        print("✅ JSS bash completion 已卸载，请执行: source ~/.bashrc")
     elif shell == "zsh":
         config_file = _get_zsh_config_file()
         start_marker, end_marker = _get_zsh_markers()
 
         if not os.path.exists(config_file):
-            print(
-                "ℹ️ 未找到 JSS zsh completion 配置，无需卸载"
-            )
+            print("ℹ️ 未找到 JSS zsh completion 配置，无需卸载")
             return
 
         with open(config_file, "r") as f:
             content = f.read()
 
         if start_marker not in content:
-            print(
-                "ℹ️ 未找到 JSS zsh completion 配置，无需卸载"
-            )
+            print("ℹ️ 未找到 JSS zsh completion 配置，无需卸载")
             return
 
         new_content = content.split(start_marker)[0] + content.split(end_marker)[-1]
@@ -378,9 +352,7 @@ def uninstall_jss_completion(
         with open(config_file, "w") as f:
             f.write(new_content)
 
-        print(
-            "✅ JSS zsh completion 已卸载，请执行: source ~/.zshrc"
-        )
+        print("✅ JSS zsh completion 已卸载，请执行: source ~/.zshrc")
 
 
 def process_request(request: str) -> Optional[str]:
@@ -437,7 +409,7 @@ def process_request(request: str) -> Optional[str]:
 def request_command(
     request: Optional[str] = typer.Argument(
         None, help="描述您想要执行的操作（用自然语言描述），如果未提供则从标准输入读取"
-    )
+    ),
 ):
     """描述您想要执行的操作（用自然语言描述）"""
     should_run = False

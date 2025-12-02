@@ -59,11 +59,10 @@ SUMMARY_REQUEST_PROMPT = """<summary_request>
 
 
 def get_task_analysis_prompt(
-    has_save_memory: bool = False,
-    has_generate_new_tool: bool = False
+    has_save_memory: bool = False, has_generate_new_tool: bool = False
 ) -> str:
     """根据配置返回任务分析提示词
-    
+
     参数:
         has_save_memory: 是否有 save_memory 工具（工具可用性）
         has_generate_new_tool: 是否有 generate_new_tool 工具
@@ -83,7 +82,7 @@ def get_task_analysis_prompt(
 3. 如果有价值，使用 save_memory 工具保存有价值的信息：
    - project_long_term: 保存与当前项目相关的长期信息（如项目配置、架构决策、开发规范等）
    - global_long_term: 保存通用的信息、用户偏好、知识或方法（如技术知识、最佳实践、用户习惯等）"""
-    
+
     # 第二步：工具/方法论分析部分
     if has_generate_new_tool:
         solution_step = """第二步：分析任务解决方案
@@ -101,7 +100,7 @@ def get_task_analysis_prompt(
 3. 如果可以通过工具解决，请设计并提供工具代码（注意：当前环境不支持 generate_new_tool 工具，需要手动创建工具文件）
 4. 如果无法通过编写通用工具完成，评估当前的执行流程是否可以总结为通用方法论
 5. 如果以上都不可行，给出详细理由"""
-    
+
     # 输出要求部分
     if has_generate_new_tool:
         output_requirements = f"""<output_requirements>
@@ -208,7 +207,7 @@ class 工具名称:
 注意：如果 content 参数包含多行内容，推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
-    
+
     return f"""<task_analysis>
 <request>
 当前任务已结束，请按以下步骤分析该任务：

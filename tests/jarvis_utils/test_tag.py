@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.tag 模块单元测试"""
 
-
 from jarvis.jarvis_utils.tag import ot, ct
 
 
@@ -57,4 +56,3 @@ class TestTagFunctions:
         """测试特殊字符"""
         assert ot("test@123") == "<test@123>"
         assert ct("test@123") == "</test@123>"
-

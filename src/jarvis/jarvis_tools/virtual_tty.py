@@ -140,19 +140,16 @@ class VirtualTTYTool:
                     print(f"❌ 获取终端 [{tty_id}] 输出失败")
                 return result
             elif action == "close":
-
                 result = self._close_tty(agent, tty_id)
                 if not result["success"]:
                     print(f"❌ 关闭虚拟终端 [{tty_id}] 失败")
                 return result
             elif action == "get_screen":
-
                 result = self._get_screen(agent, tty_id)
                 if not result["success"]:
                     print(f"❌ 获取终端 [{tty_id}] 屏幕内容失败")
                 return result
             elif action == "list":
-
                 result = self._list_ttys(agent)
                 if not result["success"]:
                     print("❌ 获取虚拟终端列表失败")
@@ -568,6 +565,7 @@ class VirtualTTYTool:
             # 终止进程
             try:
                 import subprocess as _subprocess  # pylint: disable=import-outside-toplevel
+
                 process.terminate()
                 process.wait(timeout=2)
             except _subprocess.TimeoutExpired:

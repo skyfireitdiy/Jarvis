@@ -76,7 +76,6 @@ class YuanbaoPlatform(BasePlatform):
             "Referer": f"https://yuanbao.tencent.com/chat/{self.agent_id}",
             "X-Source": "web",
             "Accept-Encoding": "gzip, deflate, br, zstd",
-
             "Sec-Fetch-Site": "same-origin",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Dest": "empty",
@@ -192,7 +191,7 @@ class YuanbaoPlatform(BasePlatform):
                 upload_info = self._generate_upload_info(file_name)
                 if not upload_info:
                     log_lines.append(f"无法获取文件 {file_name} 的上传信息")
-                    joined_logs = '\n'.join(log_lines)
+                    joined_logs = "\n".join(log_lines)
                     print(f"❌ {joined_logs}")
                     return False
 
@@ -201,7 +200,7 @@ class YuanbaoPlatform(BasePlatform):
                 upload_success = self._upload_file_to_cos(file_path, upload_info)
                 if not upload_success:
                     log_lines.append(f"上传文件 {file_name} 失败")
-                    joined_logs = '\n'.join(log_lines)
+                    joined_logs = "\n".join(log_lines)
                     print(f"❌ {joined_logs}")
                     return False
 
@@ -228,13 +227,13 @@ class YuanbaoPlatform(BasePlatform):
 
                 uploaded_files.append(file_metadata)
                 log_lines.append(f"文件 {file_name} 上传成功")
-                joined_logs = '\n'.join(log_lines)
+                joined_logs = "\n".join(log_lines)
                 print(f"ℹ️ {joined_logs}")
                 time.sleep(3)  # 上传成功后等待3秒
 
             except Exception as e:
                 log_lines.append(f"上传文件 {file_path} 时出错: {str(e)}")
-                joined_logs = '\n'.join(log_lines)
+                joined_logs = "\n".join(log_lines)
                 print(f"❌ {joined_logs}")
                 return False
 

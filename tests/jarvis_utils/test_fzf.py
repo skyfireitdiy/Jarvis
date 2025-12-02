@@ -27,9 +27,7 @@ class TestFzfSelect:
         with patch("jarvis.jarvis_utils.fzf.shutil.which", return_value="/usr/bin/fzf"):
             with patch("jarvis.jarvis_utils.fzf.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(
-                    returncode=0,
-                    stdout="option2\n",
-                    stderr=""
+                    returncode=0, stdout="option2\n", stderr=""
                 )
                 result = fzf_select(["option1", "option2", "option3"])
                 assert result == "option2"
@@ -41,6 +39,7 @@ class TestFzfSelect:
             with patch("jarvis.jarvis_utils.fzf.subprocess.run") as mock_run:
                 # CalledProcessError 表示用户取消
                 import subprocess
+
                 mock_run.side_effect = subprocess.CalledProcessError(1, "fzf")
                 result = fzf_select(["option1", "option2"])
                 assert result is None
@@ -50,9 +49,7 @@ class TestFzfSelect:
         with patch("jarvis.jarvis_utils.fzf.shutil.which", return_value="/usr/bin/fzf"):
             with patch("jarvis.jarvis_utils.fzf.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(
-                    returncode=0,
-                    stdout="value2\n",
-                    stderr=""
+                    returncode=0, stdout="value2\n", stderr=""
                 )
                 options = [
                     {"name": "option1", "value": "value1"},
@@ -73,9 +70,7 @@ class TestFzfSelect:
         with patch("jarvis.jarvis_utils.fzf.shutil.which", return_value="/usr/bin/fzf"):
             with patch("jarvis.jarvis_utils.fzf.subprocess.run") as mock_run:
                 mock_run.return_value = MagicMock(
-                    returncode=0,
-                    stdout="option1\n",
-                    stderr=""
+                    returncode=0, stdout="option1\n", stderr=""
                 )
                 fzf_select(["option1"], prompt="Choose> ")
                 # 验证 prompt 参数被传递
@@ -91,4 +86,3 @@ class TestFzfSelect:
                 mock_run.side_effect = FileNotFoundError("fzf not found")
                 result = fzf_select(["option1", "option2"])
                 assert result is None
-

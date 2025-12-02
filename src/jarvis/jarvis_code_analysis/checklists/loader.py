@@ -2,6 +2,7 @@
 """
 Utility module for loading language-specific code review checklists.
 """
+
 from typing import Dict, Optional
 
 # Import checklist modules

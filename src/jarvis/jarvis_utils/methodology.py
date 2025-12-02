@@ -7,6 +7,7 @@
 - 生成方法论临时文件
 - 上传方法论文件到大模型
 """
+
 import json
 import os
 import tempfile
@@ -307,7 +308,7 @@ def load_methodology(
                 methodology_token_limit = None
         except Exception:
             pass
-        
+
         # 回退方案：使用输入窗口的2/3
         if methodology_token_limit is None:
             max_input_tokens = get_max_input_token_count()
@@ -353,7 +354,9 @@ def load_methodology(
 
             # 检查是否会超过token限制
             if total_methodology_tokens + methodology_tokens > available_tokens:
-                print(f"ℹ️ 达到方法论token限制 ({total_methodology_tokens}/{available_tokens})，停止加载更多方法论")
+                print(
+                    f"ℹ️ 达到方法论token限制 ({total_methodology_tokens}/{available_tokens})，停止加载更多方法论"
+                )
                 break
 
             final_prompt += methodology_text
@@ -367,7 +370,9 @@ def load_methodology(
 
         final_prompt += suffix_prompt
 
-        print(f"ℹ️ 成功加载 {selected_count} 个方法论，总token数: {total_methodology_tokens}")
+        print(
+            f"ℹ️ 成功加载 {selected_count} 个方法论，总token数: {total_methodology_tokens}"
+        )
 
         # 如果内容不大，直接使用chat_until_success
         return platform.chat_until_success(final_prompt)

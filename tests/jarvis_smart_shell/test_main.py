@@ -87,4 +87,3 @@ class TestCheckBashShell:
         mock_get_shell_name.return_value = "zsh"
         result = _check_bash_shell()
         assert result is False
-

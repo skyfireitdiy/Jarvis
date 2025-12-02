@@ -63,9 +63,7 @@ class ChromaRetriever:
                 self.bm25_index = BM25Okapi(self.bm25_corpus)
             print("✅ BM25 索引加载成功。")
         else:
-            print(
-                "⚠️ 未找到 BM25 索引，将初始化一个新的。"
-            )
+            print("⚠️ 未找到 BM25 索引，将初始化一个新的。")
             self.bm25_corpus = []
             self.bm25_index = None
 
@@ -134,9 +132,7 @@ class ChromaRetriever:
                 continue
         if updated > 0:
             self._save_manifest(manifest)
-            print(
-                f"ℹ️ 已更新索引清单，记录 {updated} 个源文件状态。"
-            )
+            print(f"ℹ️ 已更新索引清单，记录 {updated} 个源文件状态。")
 
     def _detect_changed_or_deleted(self) -> Dict[str, List[str]]:
         """检测已记录的源文件是否发生变化或被删除。"""
@@ -201,7 +197,7 @@ class ChromaRetriever:
         lines.append(
             "提示：请使用 'jarvis-rag add <路径>' 重新索引相关文件，以更新向量库与BM25索引。"
         )
-        joined_lines = '\n'.join(lines)
+        joined_lines = "\n".join(lines)
         print(f"⚠️ {joined_lines}")
 
     def detect_index_changes(self) -> Dict[str, List[str]]:
@@ -224,9 +220,7 @@ class ChromaRetriever:
                 removed += 1
         if removed > 0:
             self._save_manifest(manifest)
-            print(
-                f"ℹ️ 已从索引清单中移除 {removed} 个已删除的源文件记录。"
-            )
+            print(f"ℹ️ 已从索引清单中移除 {removed} 个已删除的源文件记录。")
 
     def update_index_for_changes(self, changed: List[str], deleted: List[str]) -> None:
         """
@@ -253,7 +247,7 @@ class ChromaRetriever:
             except Exception as e:
                 delete_errors.append(f"删除源 '{src}' 时出错: {e}")
         if delete_errors:
-            joined_errors = '\n'.join(delete_errors)
+            joined_errors = "\n".join(delete_errors)
             print(f"⚠️ {joined_errors}")
 
         # 再处理变更（重建）
@@ -275,7 +269,7 @@ class ChromaRetriever:
             except Exception as e:
                 rebuild_errors.append(f"重建源 '{src}' 内容时出错: {e}")
         if rebuild_errors:
-            joined_errors = '\n'.join(rebuild_errors)
+            joined_errors = "\n".join(rebuild_errors)
             print(f"⚠️ {joined_errors}")
 
         if docs_to_add:
@@ -304,9 +298,7 @@ class ChromaRetriever:
         except Exception as e:
             print(f"⚠️ 更新索引清单时出错: {e}")
 
-        print(
-            f"✅ 索引已更新：变更 {len(changed)} 个，删除 {len(deleted)} 个。"
-        )
+        print(f"✅ 索引已更新：变更 {len(changed)} 个，删除 {len(deleted)} 个。")
 
     def add_documents(
         self, documents: List[Document], chunk_size=1000, chunk_overlap=100
@@ -319,9 +311,7 @@ class ChromaRetriever:
         )
         chunks = text_splitter.split_documents(documents)
 
-        print(
-            f"ℹ️ 已将 {len(documents)} 个文档拆分为 {len(chunks)} 个块。"
-        )
+        print(f"ℹ️ 已将 {len(documents)} 个文档拆分为 {len(chunks)} 个块。")
 
         if not chunks:
             return
@@ -340,9 +330,7 @@ class ChromaRetriever:
             documents=chunk_texts,
             metadatas=cast(Any, metadatas),
         )
-        print(
-            f"✅ 成功将 {len(chunks)} 个块添加到 ChromaDB 集合中。"
-        )
+        print(f"✅ 成功将 {len(chunks)} 个块添加到 ChromaDB 集合中。")
 
         # 更新并保存BM25索引
         tokenized_chunks = [doc.split() for doc in chunk_texts]

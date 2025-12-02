@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Agent管理器模块，负责Agent的初始化和任务执行"""
+
 from typing import Optional, Callable
 
 import typer
@@ -77,7 +78,12 @@ class AgentManager:
             raise typer.Exit(code=0)
 
         # 处理预定义任务（非交互模式下跳过；支持配置跳过加载；命令行指定任务时跳过）
-        if not is_non_interactive() and not is_skip_predefined_tasks() and not task_content and self.agent.first:
+        if (
+            not is_non_interactive()
+            and not is_skip_predefined_tasks()
+            and not task_content
+            and self.agent.first
+        ):
             task_manager = TaskManager()
             tasks = task_manager.load_tasks()
             if tasks and (selected_task := task_manager.select_task(tasks)):

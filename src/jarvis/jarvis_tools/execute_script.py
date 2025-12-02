@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 
-
 class ScriptTool:
     """Combined script execution tool
 
@@ -110,7 +109,10 @@ class ScriptTool:
                 )
 
                 # Execute command with optional timeout in non-interactive mode
-                from jarvis.jarvis_utils.config import get_script_execution_timeout, is_non_interactive
+                from jarvis.jarvis_utils.config import (
+                    get_script_execution_timeout,
+                    is_non_interactive,
+                )
                 import subprocess
 
                 timed_out = False
@@ -233,5 +235,3 @@ class ScriptTool:
         except Exception as e:
             print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
-
-

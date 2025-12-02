@@ -5,9 +5,11 @@
 - join_prompts: 统一的提示拼接策略（仅拼接非空段落，使用双换行）
 - is_auto_complete: 统一的自动完成标记检测
 """
+
 from typing import Iterable, List, Any
 from enum import Enum
 from jarvis.jarvis_utils.tag import ot
+
 
 def join_prompts(parts: Iterable[str]) -> str:
     """
@@ -23,6 +25,7 @@ def join_prompts(parts: Iterable[str]) -> str:
         return ""
     return "\n\n".join(non_empty)
 
+
 def is_auto_complete(response: str) -> bool:
     """
     检测是否包含自动完成标记。
@@ -33,6 +36,7 @@ def is_auto_complete(response: str) -> bool:
     except Exception:
         # 防御性处理：即使 ot 出现异常，也不阻塞主流程
         return "!!!COMPLETE!!!" in response
+
 
 def normalize_next_action(next_action: Any) -> str:
     """
@@ -50,5 +54,6 @@ def normalize_next_action(next_action: Any) -> str:
         return ""
     except Exception:
         return ""
+
 
 __all__ = ["join_prompts", "is_auto_complete", "normalize_next_action"]

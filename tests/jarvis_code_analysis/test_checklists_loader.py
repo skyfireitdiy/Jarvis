@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_code_analysis.checklists.loader 模块单元测试"""
 
-
 from jarvis.jarvis_code_analysis.checklists.loader import (
     get_language_checklist,
     get_all_checklists,
@@ -94,11 +93,12 @@ class TestGetAllChecklists:
         """测试所有值都是字符串"""
         result = get_all_checklists()
         for language, checklist in result.items():
-            assert isinstance(checklist, str), f"Checklist for {language} should be a string"
+            assert isinstance(checklist, str), (
+                f"Checklist for {language} should be a string"
+            )
             assert len(checklist) > 0, f"Checklist for {language} should not be empty"
 
     def test_matches_checklist_map(self):
         """测试与 CHECKLIST_MAP 匹配"""
         result = get_all_checklists()
         assert result == CHECKLIST_MAP
-

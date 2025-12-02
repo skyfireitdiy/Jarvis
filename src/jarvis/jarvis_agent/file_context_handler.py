@@ -34,9 +34,9 @@ def count_lines(filepath: str) -> int:
 def register_language_extractor(extensions, extractor_factory=None):
     """
     Register a symbol extractor for one or more file extensions.
-    
+
     Can be used as a decorator or as a regular function.
-    
+
     Args:
         extensions: List of file extensions (e.g., ['.py', '.pyw']) or single extension string.
                    If used as decorator, this is the first argument.
@@ -44,19 +44,19 @@ def register_language_extractor(extensions, extractor_factory=None):
                           The extractor must have an extract_symbols(file_path: str, content: str) method
                           that returns a list of Symbol objects.
                           If used as decorator, this is the decorated function.
-    
+
     Examples:
         # As decorator:
         @register_language_extractor(['.py', '.pyw'])
         def create_python_extractor():
             from jarvis.jarvis_code_agent.code_analyzer.languages.python_language import PythonSymbolExtractor
             return PythonSymbolExtractor()
-        
+
         # As regular function:
         def create_java_extractor():
             # ... create extractor ...
             return JavaExtractor()
-        
+
         register_language_extractor('.java', create_java_extractor)
     """
     # Support both decorator and function call syntax
@@ -67,39 +67,39 @@ def register_language_extractor(extensions, extractor_factory=None):
                 exts = [extensions]
             else:
                 exts = extensions
-            
+
             for ext in exts:
                 ext_lower = ext.lower()
-                if not ext_lower.startswith('.'):
-                    ext_lower = '.' + ext_lower
+                if not ext_lower.startswith("."):
+                    ext_lower = "." + ext_lower
                 _LANGUAGE_EXTRACTORS[ext_lower] = func
-            
+
             return func
-        
+
         return decorator
     else:
         # Used as regular function: register_language_extractor(['.ext'], factory)
         if isinstance(extensions, str):
             extensions = [extensions]
-        
+
         for ext in extensions:
             ext_lower = ext.lower()
-            if not ext_lower.startswith('.'):
-                ext_lower = '.' + ext_lower
+            if not ext_lower.startswith("."):
+                ext_lower = "." + ext_lower
             _LANGUAGE_EXTRACTORS[ext_lower] = extractor_factory
 
 
 def _get_symbol_extractor(filepath: str) -> Optional[Any]:
     """Get appropriate symbol extractor for the file based on extension"""
     ext = os.path.splitext(filepath)[1].lower()
-    
+
     # Check registered extractors
     if ext in _LANGUAGE_EXTRACTORS:
         try:
             return _LANGUAGE_EXTRACTORS[ext]()
         except Exception:
             return None
-    
+
     return None
 
 
@@ -111,29 +111,30 @@ except (ImportError, Exception):
     pass
 
 
-
 def extract_symbols_from_file(filepath: str) -> List[Dict[str, Any]]:
     """Extract symbols from a file using tree-sitter or AST"""
     extractor = _get_symbol_extractor(filepath)
     if not extractor:
         return []
-    
+
     try:
         with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
             content = f.read()
-        
+
         symbols = extractor.extract_symbols(filepath, content)
-        
+
         # Convert Symbol objects to dict format
         result = []
         for symbol in symbols:
-            result.append({
-                "name": symbol.name,
-                "type": symbol.kind,
-                "line": symbol.line_start,
-                "signature": symbol.signature or f"{symbol.kind} {symbol.name}",
-            })
-        
+            result.append(
+                {
+                    "name": symbol.name,
+                    "type": symbol.kind,
+                    "line": symbol.line_start,
+                    "signature": symbol.signature or f"{symbol.kind} {symbol.name}",
+                }
+            )
+
         return result
     except Exception:
         return []
@@ -143,7 +144,7 @@ def format_symbols_output(filepath: str, symbols: List[Dict[str, Any]]) -> str:
     """Format symbols list as output string"""
     if not symbols:
         return ""
-    
+
     # Group symbols by type
     by_type: Dict[str, List[Dict[str, Any]]] = {}
     for symbol in symbols:
@@ -151,14 +152,14 @@ def format_symbols_output(filepath: str, symbols: List[Dict[str, Any]]) -> str:
         if symbol_type not in by_type:
             by_type[symbol_type] = []
         by_type[symbol_type].append(symbol)
-    
+
     # Sort symbols within each type by line number
     for symbol_type in by_type:
         by_type[symbol_type].sort(key=lambda x: x["line"])
-    
+
     output_lines = [f"\n📋 文件符号: {filepath}"]
     output_lines.append("─" * 60)
-    
+
     # Type names in Chinese
     type_names = {
         "function": "函数",
@@ -171,22 +172,22 @@ def format_symbols_output(filepath: str, symbols: List[Dict[str, Any]]) -> str:
         "variable": "变量",
         "constant": "常量",
     }
-    
+
     for symbol_type, type_symbols in sorted(by_type.items()):
         type_name = type_names.get(symbol_type, symbol_type)
         output_lines.append(f"\n{type_name} ({len(type_symbols)} 个):")
         for symbol in type_symbols:
             line_info = f"  行 {symbol['line']:4d}: {symbol['name']}"
-            if 'signature' in symbol and symbol['signature']:
-                sig = symbol['signature'].strip()
+            if "signature" in symbol and symbol["signature"]:
+                sig = symbol["signature"].strip()
                 if len(sig) > 50:
                     sig = sig[:47] + "..."
                 line_info += f" - {sig}"
             output_lines.append(line_info)
-    
+
     output_lines.append("─" * 60)
     output_lines.append("")
-    
+
     return "\n".join(output_lines)
 
 
@@ -224,7 +225,7 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         if os.path.isfile(abs_path) and is_text_file(abs_path):
             # Extract symbols from the file
             symbols = extract_symbols_from_file(abs_path)
-            
+
             if symbols:
                 # Remove all original path tokens that map to this absolute path to avoid redundancy
                 for _raw in abs_to_raws.get(abs_path, []):
@@ -241,45 +242,45 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 # ============================================================================
 # 如何添加新语言支持
 # ============================================================================
-# 
+#
 # 推荐方式：在 language_extractors/ 目录下创建新文件
-# 
+#
 # 1. 创建新文件：jarvis_agent/language_extractors/java_extractor.py
-# 
+#
 #    # -*- coding: utf-8 -*-
 #    """Java language symbol extractor."""
-#    
+#
 #    from typing import Optional, Any, List
 #    from jarvis.jarvis_agent.file_context_handler import register_language_extractor
 #    from jarvis.jarvis_code_agent.code_analyzer.symbol_extractor import Symbol
-#    
+#
 #    def create_java_extractor() -> Optional[Any]:
 #        try:
 #            from tree_sitter import Language, Parser
 #            import tree_sitter_java
-#            
+#
 #            JAVA_LANGUAGE = tree_sitter_java.language()
 #            JAVA_SYMBOL_QUERY = """
 #            (method_declaration
 #              name: (identifier) @method.name)
-#            
+#
 #            (class_declaration
 #              name: (identifier) @class.name)
 #            """
-#            
+#
 #            class JavaSymbolExtractor:
 #                def __init__(self):
 #                    self.language = JAVA_LANGUAGE
 #                    self.parser = Parser()
 #                    self.parser.set_language(self.language)
 #                    self.symbol_query = JAVA_SYMBOL_QUERY
-#                
+#
 #                def extract_symbols(self, file_path: str, content: str) -> List[Any]:
 #                    try:
 #                        tree = self.parser.parse(bytes(content, "utf8"))
 #                        query = self.language.query(self.symbol_query)
 #                        captures = query.captures(tree.root_node)
-#                        
+#
 #                        symbols = []
 #                        for node, name in captures:
 #                            kind_map = {
@@ -298,32 +299,32 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 #                        return symbols
 #                    except Exception:
 #                        return []
-#            
+#
 #            return JavaSymbolExtractor()
 #        except (ImportError, Exception):
 #            return None
-#    
+#
 #    def register_java_extractor() -> None:
 #        register_language_extractor(['.java', '.jav'], create_java_extractor)
-# 
-# 
+#
+#
 # 2. 在 language_extractors/__init__.py 中添加导入和注册：
-# 
+#
 #    try:
 #        from .java_extractor import register_java_extractor
 #        register_java_extractor()
 #    except (ImportError, Exception):
 #        pass
-# 
-# 
+#
+#
 # 方法2: 在运行时动态注册（不推荐，但可用）
-# 
+#
 # from jarvis.jarvis_agent.file_context_handler import register_language_extractor
-# 
+#
 # def create_ruby_extractor():
 #     # ... 实现提取器 ...
 #     return RubyExtractor()
-# 
+#
 # register_language_extractor('.rb', create_ruby_extractor)
-# 
+#
 # ============================================================================

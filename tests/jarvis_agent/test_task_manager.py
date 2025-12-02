@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """TaskManager 单元测试（load_tasks 与 select_task）"""
+
 import os
 
 from jarvis.jarvis_agent.task_manager import TaskManager
@@ -70,4 +71,3 @@ class TestTaskManagerLoadTasks:
             os.chdir(cwd)
 
         assert tasks == {"TaskX": "X", "TaskY": "Y"}
-

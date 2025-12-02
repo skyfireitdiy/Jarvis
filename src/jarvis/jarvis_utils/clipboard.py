@@ -3,7 +3,6 @@ import platform
 import subprocess
 
 
-
 def copy_to_clipboard(text: str) -> None:
     """将文本复制到剪贴板，支持Windows、macOS和Linux
 

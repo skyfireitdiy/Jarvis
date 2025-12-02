@@ -12,6 +12,7 @@ WebBridge: WebSocket 交互桥
   * {"type":"user_input","request_id":"...","text":"..."}
   * {"type":"confirm_response","request_id":"...","value": true/false}
 """
+
 from __future__ import annotations
 
 import threading
@@ -80,7 +81,12 @@ class WebBridge:
     # ---------------------------
     # 输入/确认 请求-响应 管理
     # ---------------------------
-    def request_multiline_input(self, tip: str, print_on_empty: bool = True, timeout: Optional[float] = DEFAULT_WAIT_TIMEOUT) -> str:
+    def request_multiline_input(
+        self,
+        tip: str,
+        print_on_empty: bool = True,
+        timeout: Optional[float] = DEFAULT_WAIT_TIMEOUT,
+    ) -> str:
         """
         发起一个多行输入请求并阻塞等待浏览器返回。
         返回用户输入的文本（可能为空字符串，表示取消）。
@@ -90,13 +96,15 @@ class WebBridge:
         with self._pending_lock:
             self._pending_inputs[req_id] = q
 
-        self.broadcast({
-            "type": "input_request",
-            "mode": "multiline",
-            "tip": tip,
-            "print_on_empty": bool(print_on_empty),
-            "request_id": req_id,
-        })
+        self.broadcast(
+            {
+                "type": "input_request",
+                "mode": "multiline",
+                "tip": tip,
+                "print_on_empty": bool(print_on_empty),
+                "request_id": req_id,
+            }
+        )
 
         try:
             if timeout is None:
@@ -112,7 +120,12 @@ class WebBridge:
         # 规范化为字符串
         return str(result or "")
 
-    def request_confirm(self, tip: str, default: bool = True, timeout: Optional[float] = DEFAULT_WAIT_TIMEOUT) -> bool:
+    def request_confirm(
+        self,
+        tip: str,
+        default: bool = True,
+        timeout: Optional[float] = DEFAULT_WAIT_TIMEOUT,
+    ) -> bool:
         """
         发起一个确认请求并阻塞等待浏览器返回。
         返回 True/False，若超时则回退为 default。
@@ -122,12 +135,14 @@ class WebBridge:
         with self._pending_lock:
             self._pending_confirms[req_id] = q
 
-        self.broadcast({
-            "type": "confirm_request",
-            "tip": tip,
-            "default": bool(default),
-            "request_id": req_id,
-        })
+        self.broadcast(
+            {
+                "type": "confirm_request",
+                "tip": tip,
+                "default": bool(default),
+                "request_id": req_id,
+            }
+        )
 
         try:
             if timeout is None:

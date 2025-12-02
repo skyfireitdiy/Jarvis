@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.embedding 模块单元测试"""
 
-
-from jarvis.jarvis_utils.embedding import get_context_token_count, split_text_into_chunks
+from jarvis.jarvis_utils.embedding import (
+    get_context_token_count,
+    split_text_into_chunks,
+)
 
 
 class TestGetContextTokenCount:
@@ -100,4 +102,3 @@ class TestSplitTextIntoChunks:
         assert len(chunks) > 0
         combined = "".join(chunks)
         assert combined == text
-

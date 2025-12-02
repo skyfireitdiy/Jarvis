@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.output 模块单元测试"""
 
-
 from jarvis.jarvis_utils.output import OutputType, OutputEvent
 
 
@@ -39,10 +38,7 @@ class TestOutputEvent:
 
     def test_basic_creation(self):
         """测试基本创建"""
-        event = OutputEvent(
-            text="Test message",
-            output_type=OutputType.INFO
-        )
+        event = OutputEvent(text="Test message", output_type=OutputType.INFO)
         assert event.text == "Test message"
         assert event.output_type == OutputType.INFO
         assert event.timestamp is True  # 默认值
@@ -60,7 +56,7 @@ class TestOutputEvent:
             lang="python",
             traceback=True,
             section="Test Section",
-            context={"key": "value"}
+            context={"key": "value"},
         )
         assert event.text == "Test message"
         assert event.output_type == OutputType.ERROR
@@ -74,18 +70,13 @@ class TestOutputEvent:
         """测试不同的输出类型"""
         for output_type in OutputType:
             event = OutputEvent(
-                text=f"Message for {output_type.value}",
-                output_type=output_type
+                text=f"Message for {output_type.value}", output_type=output_type
             )
             assert event.output_type == output_type
             assert event.text == f"Message for {output_type.value}"
 
     def test_empty_text(self):
         """测试空文本"""
-        event = OutputEvent(
-            text="",
-            output_type=OutputType.INFO
-        )
+        event = OutputEvent(text="", output_type=OutputType.INFO)
         assert event.text == ""
         assert event.output_type == OutputType.INFO
-

@@ -9,6 +9,7 @@ def parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
     """解析聚类文本，返回(解析结果, 错误信息)"""
     try:
         import re as _re
+
         # 使用正则表达式进行大小写不敏感的匹配
         pattern = r"<CLUSTERS>([\s\S]*?)</CLUSTERS>"
         match = _re.search(pattern, text, flags=_re.IGNORECASE)
@@ -18,10 +19,10 @@ def parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
             end = text.find("</CLUSTERS>")
             if start == -1 or end == -1 or end <= start:
                 return None, "未找到 <CLUSTERS> 或 </CLUSTERS> 标签，或标签顺序错误"
-            content = text[start + len("<CLUSTERS>"):end].strip()
+            content = text[start + len("<CLUSTERS>") : end].strip()
         else:
             content = match.group(1).strip()
-        
+
         if not content:
             return None, "JSON 内容为空"
         try:
@@ -45,6 +46,7 @@ def try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str]
     """
     try:
         import re as _re
+
         # 使用正则表达式进行大小写不敏感的匹配
         pattern = r"<REPORT>([\s\S]*?)</REPORT>"
         match = _re.search(pattern, text, flags=_re.IGNORECASE)
@@ -54,10 +56,10 @@ def try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str]
             end = text.find("</REPORT>")
             if start == -1 or end == -1 or end <= start:
                 return None, "未找到 <REPORT> 或 </REPORT> 标签，或标签顺序错误"
-            content = text[start + len("<REPORT>"):end].strip()
+            content = text[start + len("<REPORT>") : end].strip()
         else:
             content = match.group(1).strip()
-        
+
         if not content:
             return None, "JSON 内容为空"
         try:
@@ -70,4 +72,3 @@ def try_parse_summary_report(text: str) -> tuple[Optional[object], Optional[str]
         return None, f"JSON 解析结果不是字典或数组，而是 {type(data).__name__}"
     except Exception as e:
         return None, f"解析过程发生异常: {str(e)}"
-

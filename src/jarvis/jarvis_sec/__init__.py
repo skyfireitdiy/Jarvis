@@ -126,13 +126,6 @@ from jarvis.jarvis_sec.verification import (  # noqa: F401
 # 本文件中保留了这些函数的别名导入，以便向后兼容。
 
 
-
-
-
-
-
-
-
 def run_security_analysis(
     entry_path: str,
     languages: Optional[List[str]] = None,
@@ -150,7 +143,7 @@ def run_security_analysis(
     改进：
     - 即使在 agent 模式下，也先进行本地正则/启发式直扫，生成候选问题；
       然后将候选问题拆分为子任务，交由多Agent进行深入分析与聚合。
-    
+
     注意：此函数会在发生异常时更新状态文件为 error 状态。
 
     参数：
@@ -174,13 +167,24 @@ def run_security_analysis(
 
     # 状态管理器（不再使用 status.json，使用空对象）
     class DummyStatusManager:
-        def update_pre_scan(self, **kwargs): pass
-        def update_clustering(self, **kwargs): pass
-        def update_review(self, **kwargs): pass
-        def update_verification(self, **kwargs): pass
-        def mark_completed(self, **kwargs): pass
-        def mark_error(self, **kwargs): pass
-    
+        def update_pre_scan(self, **kwargs):
+            pass
+
+        def update_clustering(self, **kwargs):
+            pass
+
+        def update_review(self, **kwargs):
+            pass
+
+        def update_verification(self, **kwargs):
+            pass
+
+        def mark_completed(self, **kwargs):
+            pass
+
+        def mark_error(self, **kwargs):
+            pass
+
     status_mgr = DummyStatusManager()
 
     # 初始化分析上下文
@@ -195,37 +199,45 @@ def run_security_analysis(
 
     # 2) 将候选问题精简为子任务清单，控制上下文长度
     compact_candidates = _prepare_candidates(candidates)
-    
+
     # 3) 保存候选到新的 candidates.jsonl 文件（包含gid）
     from jarvis.jarvis_sec.file_manager import save_candidates, get_candidates_file
+
     try:
         save_candidates(sec_dir, compact_candidates)
-        _progress_append({
-            "event": "candidates_saved",
-            "path": str(get_candidates_file(sec_dir)),
-            "issues_count": len(compact_candidates),
-        })
+        _progress_append(
+            {
+                "event": "candidates_saved",
+                "path": str(get_candidates_file(sec_dir)),
+                "issues_count": len(compact_candidates),
+            }
+        )
     except Exception:
         pass
-    
+
     # 记录批次选择信息（可选，用于日志）
     try:
         groups = _group_candidates_by_file(compact_candidates)
         if groups:
             selected_file, items = max(groups.items(), key=lambda kv: len(kv[1]))
             try:
-                typer.secho(f"[jarvis-sec] 批次选择: 文件={selected_file} 数量={len(items)}", fg=typer.colors.BLUE)
+                typer.secho(
+                    f"[jarvis-sec] 批次选择: 文件={selected_file} 数量={len(items)}",
+                    fg=typer.colors.BLUE,
+                )
             except Exception:
                 pass
-            _progress_append({
-                "event": "batch_selection",
-                "selected_file": selected_file,
-                "selected_count": len(items),
-                "total_in_file": len(items),
-            })
+            _progress_append(
+                {
+                    "event": "batch_selection",
+                    "selected_file": selected_file,
+                    "selected_count": len(items),
+                    "total_in_file": len(items),
+                }
+            )
     except Exception:
         pass
-    
+
     # 创建报告写入函数
     _append_report = _create_report_writer(sec_dir, report_file)
 
@@ -256,10 +268,11 @@ def run_security_analysis(
         enable_verification=enable_verification,
         force_save_memory=force_save_memory,
     )
-    
+
     # 5) 使用统一聚合器生成最终报告（JSON + Markdown）
     try:
         from jarvis.jarvis_sec.report import build_json_and_markdown
+
         result = build_json_and_markdown(
             all_issues,
             scanned_root=summary.get("scanned_root"),
@@ -270,36 +283,26 @@ def run_security_analysis(
         # 标记分析完成
         status_mgr.mark_completed(
             total_issues=len(all_issues),
-            message=f"安全分析完成，共发现 {len(all_issues)} 个问题"
+            message=f"安全分析完成，共发现 {len(all_issues)} 个问题",
         )
         return result
     except Exception as e:
         # 发生错误时更新状态
         error_msg = str(e)
-        status_mgr.mark_error(
-            error_message=error_msg,
-            error_type=type(e).__name__
-        )
+        status_mgr.mark_error(error_message=error_msg, error_type=type(e).__name__)
         raise
     finally:
         # 清理LSP客户端资源，防止文件句柄泄露
         try:
             from jarvis.jarvis_tools.lsp_client import LSPClientTool
+
             LSPClientTool.cleanup_all_clients()
         except Exception:
             pass  # 清理失败不影响主流程
 
 
-
-
-
-
-
-
 __all__ = [
-    
     "run_security_analysis",
-
     "direct_scan",
     "run_with_agent",
 ]

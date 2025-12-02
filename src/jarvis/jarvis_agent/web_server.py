@@ -10,6 +10,7 @@
 - 注入 web_multiline_input 与 web_user_confirm 到 Agent，使输入与确认经由浏览器完成
 - 启动本服务，前端通过页面与 Agent 交互
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -27,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
 from jarvis.jarvis_utils.globals import set_interrupt, console
+
 
 # ---------------------------
 # 应用与页面
@@ -245,10 +247,13 @@ writeLine('消息解析失败: ' + e);
 
     return app
 
+
 # ---------------------------
 # WebSocket 端点
 # ---------------------------
-async def _ws_sender_loop(ws: WebSocket, queue: "asyncio.Queue[Dict[str, Any]]") -> None:
+async def _ws_sender_loop(
+    ws: WebSocket, queue: "asyncio.Queue[Dict[str, Any]]"
+) -> None:
     try:
         while True:
             payload = await queue.get()
@@ -257,20 +262,28 @@ async def _ws_sender_loop(ws: WebSocket, queue: "asyncio.Queue[Dict[str, Any]]")
         # 发送循环异常即退出
         pass
 
-def _make_sender(queue: "asyncio.Queue[Dict[str, Any]]") -> Callable[[Dict[str, Any]], None]:
+
+def _make_sender(
+    queue: "asyncio.Queue[Dict[str, Any]]",
+) -> Callable[[Dict[str, Any]], None]:
     # 同步函数，供 WebBridge 注册；将消息放入异步队列，由协程发送
     def _sender(payload: Dict[str, Any]) -> None:
         try:
             queue.put_nowait(payload)
         except Exception:
             pass
+
     return _sender
 
-def _make_sender_filtered(queue: "asyncio.Queue[Dict[str, Any]]", allowed_types: Optional[list[str]] = None) -> Callable[[Dict[str, Any]], None]:
+
+def _make_sender_filtered(
+    queue: "asyncio.Queue[Dict[str, Any]]", allowed_types: Optional[list[str]] = None
+) -> Callable[[Dict[str, Any]], None]:
     """
     过滤版 sender：仅将指定类型的payload放入队列（用于单独的STDIO通道）。
     """
     allowed = set(allowed_types or [])
+
     def _sender(payload: Dict[str, Any]) -> None:
         try:
             ptype = payload.get("type")
@@ -278,7 +291,9 @@ def _make_sender_filtered(queue: "asyncio.Queue[Dict[str, Any]]", allowed_types:
                 queue.put_nowait(payload)
         except Exception:
             pass
+
     return _sender
+
 
 def _run_and_notify(agent: Any, text: str) -> None:
     try:
@@ -289,7 +304,13 @@ def _run_and_notify(agent: Any, text: str) -> None:
         except Exception:
             pass
 
-def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, launch_command: Optional[List[str]] = None) -> None:
+
+def start_web_server(
+    agent: Any,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    launch_command: Optional[List[str]] = None,
+) -> None:
     """
     启动Web服务，并将Agent绑定到应用上下文。
     - agent: 现有的 Agent 实例（已完成初始化）
@@ -319,7 +340,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
         bridge.add_client(sender)
         send_task = asyncio.create_task(_ws_sender_loop(ws, queue))
         try:
-            await ws.send_text(json.dumps({"type": "output", "payload": {"text": "STDIO 通道已就绪", "output_type": "INFO"}}))
+            await ws.send_text(
+                json.dumps(
+                    {
+                        "type": "output",
+                        "payload": {"text": "STDIO 通道已就绪", "output_type": "INFO"},
+                    }
+                )
+            )
         except Exception:
             pass
         try:
@@ -334,6 +362,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                 if mtype == "stdin":
                     try:
                         from jarvis.jarvis_agent.stdio_redirect import feed_web_stdin
+
                         text = data.get("data", "")
                         if isinstance(text, str) and text:
                             feed_web_stdin(text)
@@ -372,7 +401,9 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                     try:
                         set_interrupt(True)
                         # 可选：发送回执
-                        await ws.send_text(json.dumps({"type": "ack", "cmd": "interrupt"}))
+                        await ws.send_text(
+                            json.dumps({"type": "ack", "cmd": "interrupt"})
+                        )
                     except Exception:
                         pass
                 elif mtype == "resize":
@@ -411,9 +442,20 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
         await ws.accept()
         # 仅在非 Windows 平台提供 PTY 功能
         import sys as _sys
+
         if _sys.platform == "win32":
             try:
-                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "当前平台不支持交互式终端（PTY）", "output_type": "ERROR"}}))
+                await ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "output",
+                            "payload": {
+                                "text": "当前平台不支持交互式终端（PTY）",
+                                "output_type": "ERROR",
+                            },
+                        }
+                    )
+                )
             except Exception:
                 pass
             try:
@@ -423,6 +465,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
             return
 
         import os as _os
+
         try:
             import pty as _pty
             import fcntl as _fcntl
@@ -431,7 +474,17 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
             import struct as _struct
         except Exception:
             try:
-                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "服务端缺少 PTY 相关依赖，无法启动交互式终端", "output_type": "ERROR"}}))
+                await ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "output",
+                            "payload": {
+                                "text": "服务端缺少 PTY 相关依赖，无法启动交互式终端",
+                                "output_type": "ERROR",
+                            },
+                        }
+                    )
+                )
             except Exception:
                 pass
             try:
@@ -456,7 +509,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
         # 会话结束后等待用户按回车再重启
         waiting_for_ack = False
         ack_event = asyncio.Event()
-        
+
         # 在 fork 前获取启动命令（避免在子进程中访问 app.state）
         _launch_cmd = None
         try:
@@ -468,12 +521,15 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
             else:
                 # 回退到环境变量
                 import json as _json
+
                 _cmd_json = _os.environ.get("JARVIS_WEB_LAUNCH_JSON", "")
                 if _cmd_json:
                     try:
                         _launch_cmd = _json.loads(_cmd_json)
                         if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
-                            print(f"🔍 Web服务器: 从环境变量读取启动命令: {_launch_cmd}")
+                            print(
+                                f"🔍 Web服务器: 从环境变量读取启动命令: {_launch_cmd}"
+                            )
                     except Exception:
                         _launch_cmd = None
         except Exception:
@@ -487,9 +543,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                     # 子进程：执行启动命令，失败时回退到系统 shell
                     # 使用在 fork 前获取的命令
                     _argv = _launch_cmd
-                    
+
                     # 如果获取到有效命令，执行它
-                    if _argv and isinstance(_argv, list) and len(_argv) > 0 and isinstance(_argv[0], str):
+                    if (
+                        _argv
+                        and isinstance(_argv, list)
+                        and len(_argv) > 0
+                        and isinstance(_argv[0], str)
+                    ):
                         try:
                             if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
                                 print(f"🔍 子进程: 执行命令: {_argv}")
@@ -530,7 +591,17 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
         ok = _spawn_jvs_session()
         if not ok:
             try:
-                await ws.send_text(json.dumps({"type": "output", "payload": {"text": "启动交互式终端失败", "output_type": "ERROR"}}))
+                await ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "output",
+                            "payload": {
+                                "text": "启动交互式终端失败",
+                                "output_type": "ERROR",
+                            },
+                        }
+                    )
+                )
             except Exception:
                 pass
             try:
@@ -555,7 +626,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                                 waiting_for_ack = False
                                 if _spawn_jvs_session():
                                     try:
-                                        await ws.send_text(json.dumps({"type": "stdio", "text": "\r\njvs 会话已重启\r\n"}))
+                                        await ws.send_text(
+                                            json.dumps(
+                                                {
+                                                    "type": "stdio",
+                                                    "text": "\r\njvs 会话已重启\r\n",
+                                                }
+                                            )
+                                        )
                                     except Exception:
                                         pass
                                     fd = session.get("master_fd")
@@ -568,7 +646,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                         # 非确认流程：自动重启
                         if _spawn_jvs_session():
                             try:
-                                await ws.send_text(json.dumps({"type": "stdio", "text": "\r\njvs 会话已重启\r\n"}))
+                                await ws.send_text(
+                                    json.dumps(
+                                        {
+                                            "type": "stdio",
+                                            "text": "\r\njvs 会话已重启\r\n",
+                                        }
+                                    )
+                                )
                             except Exception:
                                 pass
                             fd = session.get("master_fd")
@@ -591,7 +676,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                             data = b""
                         if data:
                             try:
-                                await ws.send_text(json.dumps({"type": "stdio", "text": data.decode(errors="ignore")}))
+                                await ws.send_text(
+                                    json.dumps(
+                                        {
+                                            "type": "stdio",
+                                            "text": data.decode(errors="ignore"),
+                                        }
+                                    )
+                                )
                             except Exception:
                                 break
                         else:
@@ -609,7 +701,14 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                                 # 标记等待用户回车，并提示
                                 waiting_for_ack = True
                                 try:
-                                    await ws.send_text(json.dumps({"type": "stdio", "text": "\r\nAgent 已结束。按回车继续，系统将重启新的 Agent。\r\n> "}))
+                                    await ws.send_text(
+                                        json.dumps(
+                                            {
+                                                "type": "stdio",
+                                                "text": "\r\nAgent 已结束。按回车继续，系统将重启新的 Agent。\r\n> ",
+                                            }
+                                        )
+                                    )
                                 except Exception:
                                     pass
                                 # 不立即重启，等待顶部 fd None 分支在收到回车后处理
@@ -645,7 +744,17 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
             pass
         # 发送就绪提示
         try:
-            await ws.send_text(json.dumps({"type": "output", "payload": {"text": "交互式终端已就绪（PTY）", "output_type": "INFO"}}))
+            await ws.send_text(
+                json.dumps(
+                    {
+                        "type": "output",
+                        "payload": {
+                            "text": "交互式终端已就绪（PTY）",
+                            "output_type": "INFO",
+                        },
+                    }
+                )
+            )
         except Exception:
             pass
 
@@ -672,12 +781,22 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                                 else:
                                     # 非回车输入时轻提示
                                     try:
-                                        await ws.send_text(json.dumps({"type": "stdio", "text": "\r\n按回车继续。\r\n> "}))
+                                        await ws.send_text(
+                                            json.dumps(
+                                                {
+                                                    "type": "stdio",
+                                                    "text": "\r\n按回车继续。\r\n> ",
+                                                }
+                                            )
+                                        )
                                     except Exception:
                                         pass
                             else:
                                 # 原样写入（保留控制字符）；前端可按需发送回车
-                                _os.write(session.get("master_fd") or -1, text.encode(errors="ignore"))
+                                _os.write(
+                                    session.get("master_fd") or -1,
+                                    text.encode(errors="ignore"),
+                                )
                     except Exception:
                         pass
                 elif mtype == "resize":
@@ -723,6 +842,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                 pid_val = session.get("pid")
                 if isinstance(pid_val, int):
                     import signal as _signal
+
                     try:
                         _os.kill(pid_val, _signal.SIGTERM)
                     except Exception:
@@ -746,16 +866,19 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
             pidfile.write_text(str(os.getpid()), encoding="utf-8")
         except Exception:
             pass
+
         # 退出时清理 PID 文件
         def _cleanup_pidfile() -> None:
             try:
                 pidfile.unlink(missing_ok=True)
             except Exception:
                 pass
+
         try:
             atexit.register(_cleanup_pidfile)
         except Exception:
             pass
+
         # 处理 SIGTERM/SIGINT，清理后退出
         def _signal_handler(signum: int, frame: Any) -> None:
             try:
@@ -765,6 +888,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
                     os._exit(0)
                 except Exception:
                     pass
+
         try:
             signal.signal(signal.SIGTERM, _signal_handler)
         except Exception:
@@ -777,6 +901,7 @@ def start_web_server(agent: Any, host: str = "127.0.0.1", port: int = 8765, laun
         pass
     # 配置 uvicorn 日志级别，隐藏连接信息和访问日志
     import logging
+
     # 禁用 uvicorn 的访问日志
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     # 禁用 uvicorn 的常规日志（连接信息等）

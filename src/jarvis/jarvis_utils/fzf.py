@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """FZF选择器工具。"""
+
 import shutil
 import subprocess
 from typing import List, Optional, Union, Dict, Any, cast
+
 
 def fzf_select(
     options: Union[List[str], List[Dict[str, Any]]],

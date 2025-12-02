@@ -282,9 +282,13 @@ def execute_code_review(
                 # Extract changed files using git command
                 files_cmd = f"git show --name-only --pretty=format: {commit_sha}"
                 try:
-                    files_output = subprocess.check_output(files_cmd, shell=True, text=True)
+                    files_output = subprocess.check_output(
+                        files_cmd, shell=True, text=True
+                    )
                     # Filter out empty lines without using grep
-                    file_paths = [f.strip() for f in files_output.split("\n") if f.strip()]
+                    file_paths = [
+                        f.strip() for f in files_output.split("\n") if f.strip()
+                    ]
                 except subprocess.CalledProcessError:
                     # Fallback to regex extraction if git command fails
                     file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
@@ -320,8 +324,12 @@ def execute_code_review(
                 # Extract changed files using git command
                 files_cmd = f"git diff --name-only {start_commit}..{end_commit}"
                 try:
-                    files_output = subprocess.check_output(files_cmd, shell=True, text=True)
-                    file_paths = [f.strip() for f in files_output.split("\n") if f.strip()]
+                    files_output = subprocess.check_output(
+                        files_cmd, shell=True, text=True
+                    )
+                    file_paths = [
+                        f.strip() for f in files_output.split("\n") if f.strip()
+                    ]
                 except subprocess.CalledProcessError:
                     # Fallback to regex extraction if git command fails
                     file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
@@ -337,7 +345,9 @@ def execute_code_review(
                     }
                 file_path = args["file_path"].strip()
                 file_paths = [file_path]
-                diff_output = ReadCodeTool().execute({"files": [{"path": file_path}]})["stdout"]
+                diff_output = ReadCodeTool().execute({"files": [{"path": file_path}]})[
+                    "stdout"
+                ]
 
             else:  # current changes
                 diff_cmd = "git diff HEAD | cat -"
@@ -360,8 +370,12 @@ def execute_code_review(
                 # Extract changed files using git command
                 files_cmd = "git diff --name-only HEAD"
                 try:
-                    files_output = subprocess.check_output(files_cmd, shell=True, text=True)
-                    file_paths = [f.strip() for f in files_output.split("\n") if f.strip()]
+                    files_output = subprocess.check_output(
+                        files_cmd, shell=True, text=True
+                    )
+                    file_paths = [
+                        f.strip() for f in files_output.split("\n") if f.strip()
+                    ]
                 except subprocess.CalledProcessError:
                     # Fallback to regex extraction if git command fails
                     file_pattern = r"diff --git a/.*?\s+b/(.*?)(\n|$)"
@@ -408,7 +422,9 @@ def execute_code_review(
             # Combine review info with diff output
             diff_output = review_info + diff_output
 
-            PrettyOutput.print(diff_output, OutputType.CODE, lang="diff")  # 保留语法高亮
+            PrettyOutput.print(
+                diff_output, OutputType.CODE, lang="diff"
+            )  # 保留语法高亮
 
             system_prompt = """<code_review_guide>
 <role>
@@ -542,7 +558,6 @@ def execute_code_review(
             # Get model_group from args (thinking mode removed)
             model_group = args.get("model_group")
 
-
             agent = Agent(
                 system_prompt=system_prompt,
                 name="Code Review Agent",
@@ -621,7 +636,9 @@ def execute_code_review(
             max_diff_size = 100 * 1024 * 1024  # Limit to 100MB
 
             if len(diff_output) > max_diff_size:
-                print(f"⚠️ 代码差异内容总大小超过限制 ({len(diff_output)} > {max_diff_size} 字节)，将截断内容")
+                print(
+                    f"⚠️ 代码差异内容总大小超过限制 ({len(diff_output)} > {max_diff_size} 字节)，将截断内容"
+                )
                 diff_output = (
                     diff_output[:max_diff_size]
                     + "\n\n[diff content truncated due to size limitations...]"
@@ -633,12 +650,14 @@ def execute_code_review(
 代码信息：
 - 审查类型: {review_type}
 - 变更文件列表: {len(file_paths)} 个文件
-- 检测到的编程语言: {', '.join(detected_languages) if detected_languages else '未检测到特定语言'}
+- 检测到的编程语言: {", ".join(detected_languages) if detected_languages else "未检测到特定语言"}
 
 请根据SCRIPPPS框架和语言特定的审查清单进行分析，提供详细的代码审查报告。"""
 
             # Write the full diff output to a temporary file for uploading
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".diff", delete=False) as temp_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".diff", delete=False
+            ) as temp_file:
                 temp_file_path = temp_file.name
                 temp_file.write(diff_output)
                 temp_file.flush()
@@ -679,7 +698,7 @@ def execute_code_review(
 我已上传了一个包含代码差异的文件。该文件包含:
 - 审查类型: {review_type}
 - 变更文件数量: {len(file_paths)} 个文件
-- 检测到的编程语言: {', '.join(detected_languages) if detected_languages else '未检测到特定语言'}
+- 检测到的编程语言: {", ".join(detected_languages) if detected_languages else "未检测到特定语言"}
 
 请基于上传的代码差异文件进行全面审查，并生成详细的代码审查报告。"""
                     )
@@ -728,7 +747,9 @@ def review_commit(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
-    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
+    auto_complete: bool = typer.Option(
+        False, "--auto-complete/--no-auto-complete", help="是否自动完成"
+    ),
 ):
     """审查指定的提交"""
     tool_args = {
@@ -753,7 +774,9 @@ def review_current(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
-    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
+    auto_complete: bool = typer.Option(
+        False, "--auto-complete/--no-auto-complete", help="是否自动完成"
+    ),
 ):
     """审查当前的变更"""
     tool_args = {
@@ -779,7 +802,9 @@ def review_range(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
-    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
+    auto_complete: bool = typer.Option(
+        False, "--auto-complete/--no-auto-complete", help="是否自动完成"
+    ),
 ):
     """审查提交范围"""
     tool_args = {
@@ -806,7 +831,9 @@ def review_file(
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
-    auto_complete: bool = typer.Option(False, "--auto-complete/--no-auto-complete", help="是否自动完成"),
+    auto_complete: bool = typer.Option(
+        False, "--auto-complete/--no-auto-complete", help="是否自动完成"
+    ),
 ):
     """审查指定的文件"""
     tool_args = {

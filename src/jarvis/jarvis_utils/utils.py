@@ -134,10 +134,14 @@ def is_editable_install() -> bool:
                         if f.name == "direct_url.json":
                             p = Path(str(dist.locate_file(f)))
                             if p.exists():
-                                with open(p, "r", encoding="utf-8", errors="ignore") as fp:
+                                with open(
+                                    p, "r", encoding="utf-8", errors="ignore"
+                                ) as fp:
                                     info = json.load(fp)
                                 dir_info = info.get("dir_info") or {}
-                                if isinstance(dir_info, dict) and bool(dir_info.get("editable")):
+                                if isinstance(dir_info, dict) and bool(
+                                    dir_info.get("editable")
+                                ):
                                     return True
                                 # 兼容部分工具可能写入顶层 editable 字段
                                 if bool(info.get("editable")):
@@ -186,7 +190,9 @@ def is_editable_install() -> bool:
     try:
         parents = list(Path(__file__).resolve().parents)
         has_git = any((d / ".git").exists() for d in parents)
-        in_site = any(("site-packages" in str(d)) or ("dist-packages" in str(d)) for d in parents)
+        in_site = any(
+            ("site-packages" in str(d)) or ("dist-packages" in str(d)) for d in parents
+        )
         if has_git and not in_site:
             return True
     except Exception:
@@ -284,7 +290,9 @@ def _acquire_single_instance_lock(lock_name: str = "instance.lock") -> None:
     if lock_path.exists():
         pid = _read_lock_owner_pid(lock_path)
         if pid and _is_process_alive(pid):
-            print(f"⚠️ 检测到已有一个 Jarvis 实例正在运行 (PID: {pid})。\n如果确认不存在正在运行的实例，请删除锁文件后重试：{lock_path}")
+            print(
+                f"⚠️ 检测到已有一个 Jarvis 实例正在运行 (PID: {pid})。\n如果确认不存在正在运行的实例，请删除锁文件后重试：{lock_path}"
+            )
             sys.exit(0)
         # 尝试移除陈旧锁
         try:
@@ -368,6 +376,7 @@ def _check_pip_updates() -> bool:
 
             # 检测是否可用 uv（优先使用虚拟环境内的uv，其次PATH中的uv）
             from shutil import which as _which
+
             uv_executable: Optional[str] = None
             if sys.platform == "win32":
                 venv_uv = Path(sys.prefix) / "Scripts" / "uv.exe"
@@ -384,6 +393,7 @@ def _check_pip_updates() -> bool:
             from jarvis.jarvis_utils.utils import (
                 is_rag_installed as _is_rag_installed,
             )  # 延迟导入避免潜在循环依赖
+
             rag_installed = _is_rag_installed()
 
             # 更新命令
@@ -469,7 +479,6 @@ def _check_jarvis_updates() -> bool:
 def _show_usage_stats(welcome_str: str) -> None:
     """显示Jarvis使用统计信息"""
     try:
-
         from rich.console import Console, Group
         from rich.panel import Panel
         from rich.table import Table
@@ -496,7 +505,7 @@ def _show_usage_stats(welcome_str: str) -> None:
 
         # 复用存储实例，避免重复创建
         storage = StatsStorage()
-        
+
         # 一次性读取元数据，避免重复读取
         try:
             meta = storage._load_json(storage.meta_file)
@@ -525,7 +534,7 @@ def _show_usage_stats(welcome_str: str) -> None:
         for metric in all_metrics:
             # 从批量读取的数据中获取总量
             total = metric_totals.get(metric, 0.0)
-            
+
             if not total or total <= 0:
                 continue
 
@@ -569,12 +578,12 @@ def _show_usage_stats(welcome_str: str) -> None:
         # 如果有 generated，则计算采纳率
         if generated_commits > 0:
             adoption_rate = (accepted_commits / generated_commits) * 100
-            categorized_stats["adoption"]["metrics"][
-                "adoption_rate"
-            ] = f"{adoption_rate:.1f}%"
-            categorized_stats["adoption"]["metrics"][
-                "commits_status"
-            ] = f"{accepted_commits}/{generated_commits}"
+            categorized_stats["adoption"]["metrics"]["adoption_rate"] = (
+                f"{adoption_rate:.1f}%"
+            )
+            categorized_stats["adoption"]["metrics"]["commits_status"] = (
+                f"{accepted_commits}/{generated_commits}"
+            )
 
         # 构建输出
         has_data = False
@@ -946,11 +955,13 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
         try:
             # 在后台线程中显示统计，避免阻塞主流程
             import threading
+
             def show_stats_async():
                 try:
                     _show_usage_stats(welcome_str)
                 except Exception:
                     pass
+
             stats_thread = threading.Thread(target=show_stats_async, daemon=True)
             stats_thread.start()
         except Exception:
@@ -1122,8 +1133,6 @@ def load_config():
         _load_and_process_config(str(config_file_path.parent), str(config_file_path))
 
 
-
-
 def _load_config_file(config_file: str) -> Tuple[str, dict]:
     """读取并解析YAML格式的配置文件
 
@@ -1177,12 +1186,15 @@ def _process_env_variables(config_data: dict) -> None:
         )
 
 
-def _ask_config_bool(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: bool) -> bool:
+def _ask_config_bool(
+    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: bool
+) -> bool:
     """询问并设置布尔类型配置项"""
     try:
         if not ask_all and _key in config_data:
             return False
         from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+
         cur = bool(config_data.get(_key, _default))
         val = get_yes_no(_tip, default=cur)
         if bool(val) == cur:
@@ -1193,12 +1205,15 @@ def _ask_config_bool(config_data: dict, ask_all: bool, _key: str, _tip: str, _de
         return False
 
 
-def _ask_config_str(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = "") -> bool:
+def _ask_config_str(
+    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = ""
+) -> bool:
     """询问并设置字符串类型配置项"""
     try:
         if not ask_all and _key in config_data:
             return False
         from jarvis.jarvis_utils.input import get_single_line_input
+
         cur = str(config_data.get(_key, _default or ""))
         val = get_single_line_input(f"{_tip}", default=cur)
         v = ("" if val is None else str(val)).strip()
@@ -1210,12 +1225,15 @@ def _ask_config_str(config_data: dict, ask_all: bool, _key: str, _tip: str, _def
         return False
 
 
-def _ask_config_optional_str(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = "") -> bool:
+def _ask_config_optional_str(
+    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = ""
+) -> bool:
     """询问并设置可选字符串类型配置项（空输入表示不改变）"""
     try:
         if not ask_all and _key in config_data:
             return False
         from jarvis.jarvis_utils.input import get_single_line_input
+
         cur = str(config_data.get(_key, _default or ""))
         val = get_single_line_input(f"{_tip}", default=cur)
         if val is None:
@@ -1229,12 +1247,15 @@ def _ask_config_optional_str(config_data: dict, ask_all: bool, _key: str, _tip: 
         return False
 
 
-def _ask_config_int(config_data: dict, ask_all: bool, _key: str, _tip: str, _default: int) -> bool:
+def _ask_config_int(
+    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: int
+) -> bool:
     """询问并设置整数类型配置项"""
     try:
         if not ask_all and _key in config_data:
             return False
         from jarvis.jarvis_utils.input import get_single_line_input
+
         cur = str(config_data.get(_key, _default))
         val_str = get_single_line_input(f"{_tip}", default=cur)
         s = "" if val_str is None else str(val_str).strip()
@@ -1258,6 +1279,7 @@ def _ask_config_list(config_data: dict, ask_all: bool, _key: str, _tip: str) -> 
         if not ask_all and _key in config_data:
             return False
         from jarvis.jarvis_utils.input import get_single_line_input
+
         cur_val = config_data.get(_key, [])
         if isinstance(cur_val, list):
             cur_display = ", ".join([str(x) for x in cur_val])
@@ -1283,18 +1305,26 @@ def _ask_config_list(config_data: dict, ask_all: bool, _key: str, _tip: str) -> 
 def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
     """收集基础开关配置"""
     changed = False
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_ENABLE_GIT_JCA_SWITCH",
-        "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
-        False,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
-        "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
-        False,
-    ) or changed
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_ENABLE_GIT_JCA_SWITCH",
+            "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
+            False,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
+            "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
+            False,
+        )
+        or changed
+    )
     return changed
 
 
@@ -1303,130 +1333,195 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
     changed = False
     try:
         import platform as _platform_mod
+
         _default_pretty = False if _platform_mod.system() == "Windows" else True
     except Exception:
         _default_pretty = True
-    
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_PRETTY_OUTPUT",
-        "是否启用更美观的终端输出（Pretty Output）？",
-        _default_pretty,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_PRINT_PROMPT",
-        "是否打印发送给模型的提示词（Prompt）？",
-        False,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_IMMEDIATE_ABORT",
-        "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
-        False,
-    ) or changed
+
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_PRETTY_OUTPUT",
+            "是否启用更美观的终端输出（Pretty Output）？",
+            _default_pretty,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_PRINT_PROMPT",
+            "是否打印发送给模型的提示词（Prompt）？",
+            False,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_IMMEDIATE_ABORT",
+            "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
+            False,
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
     """收集代码分析相关配置"""
     changed = False
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_ENABLE_STATIC_ANALYSIS",
-        "是否启用静态代码分析（Static Analysis）？",
-        True,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_ENABLE_BUILD_VALIDATION",
-        "是否启用构建验证（Build Validation）？在代码编辑后自动验证代码能否成功编译/构建。",
-        True,
-    ) or changed
-    changed = _ask_config_int(
-        config_data, ask_all,
-        "JARVIS_BUILD_VALIDATION_TIMEOUT",
-        "构建验证的超时时间（秒，默认30秒）",
-        30,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_ENABLE_IMPACT_ANALYSIS",
-        "是否启用编辑影响范围分析（Impact Analysis）？分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等。",
-        True,
-    ) or changed
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_ENABLE_STATIC_ANALYSIS",
+            "是否启用静态代码分析（Static Analysis）？",
+            True,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_ENABLE_BUILD_VALIDATION",
+            "是否启用构建验证（Build Validation）？在代码编辑后自动验证代码能否成功编译/构建。",
+            True,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "JARVIS_BUILD_VALIDATION_TIMEOUT",
+            "构建验证的超时时间（秒，默认30秒）",
+            30,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_ENABLE_IMPACT_ANALYSIS",
+            "是否启用编辑影响范围分析（Impact Analysis）？分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等。",
+            True,
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_agent_features_config(config_data: dict, ask_all: bool) -> bool:
     """收集Agent功能相关配置"""
     changed = False
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_USE_METHODOLOGY",
-        "是否启用方法论系统（Methodology）？",
-        True,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_USE_ANALYSIS",
-        "是否启用分析流程（Analysis）？",
-        True,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_FORCE_SAVE_MEMORY",
-        "是否强制保存会话记忆？",
-        False,
-    ) or changed
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_USE_METHODOLOGY",
+            "是否启用方法论系统（Methodology）？",
+            True,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_USE_ANALYSIS",
+            "是否启用分析流程（Analysis）？",
+            True,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_FORCE_SAVE_MEMORY",
+            "是否强制保存会话记忆？",
+            False,
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
     """收集会话与调试相关配置"""
     changed = False
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_SAVE_SESSION_HISTORY",
-        "是否保存会话记录？",
-        False,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_PRINT_ERROR_TRACEBACK",
-        "是否在错误输出时打印回溯调用链？",
-        False,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_SKIP_PREDEFINED_TASKS",
-        "是否跳过预定义任务加载（不读取 pre-command 列表）？",
-        False,
-    ) or changed
-    changed = _ask_config_int(
-        config_data, ask_all,
-        "JARVIS_CONVERSATION_TURN_THRESHOLD",
-        "对话轮次阈值（达到此轮次时触发总结，建议50-100）：",
-        50,
-    ) or changed
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_SAVE_SESSION_HISTORY",
+            "是否保存会话记录？",
+            False,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_PRINT_ERROR_TRACEBACK",
+            "是否在错误输出时打印回溯调用链？",
+            False,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_SKIP_PREDEFINED_TASKS",
+            "是否跳过预定义任务加载（不读取 pre-command 列表）？",
+            False,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "JARVIS_CONVERSATION_TURN_THRESHOLD",
+            "对话轮次阈值（达到此轮次时触发总结，建议50-100）：",
+            50,
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_safety_config(config_data: dict, ask_all: bool) -> bool:
     """收集代码与工具操作安全提示配置"""
     changed = False
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_EXECUTE_TOOL_CONFIRM",
-        "执行工具前是否需要确认？",
-        False,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_CONFIRM_BEFORE_APPLY_PATCH",
-        "应用补丁前是否需要确认？",
-        False,
-    ) or changed
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_EXECUTE_TOOL_CONFIRM",
+            "执行工具前是否需要确认？",
+            False,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_CONFIRM_BEFORE_APPLY_PATCH",
+            "应用补丁前是否需要确认？",
+            False,
+        )
+        or changed
+    )
     return changed
 
 
@@ -1434,110 +1529,171 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
     """收集数据目录与最大输入Token配置"""
     changed = False
     from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir
-    changed = _ask_config_optional_str(
-        config_data, ask_all,
-        "JARVIS_DATA_PATH",
-        f"是否自定义数据目录路径(JARVIS_DATA_PATH)？留空使用默认: {_get_data_dir()}",
-    ) or changed
-    changed = _ask_config_int(
-        config_data, ask_all,
-        "JARVIS_MAX_INPUT_TOKEN_COUNT",
-        "自定义最大输入Token数量（留空使用默认: 32000）",
-        32000,
-    ) or changed
-    changed = _ask_config_int(
-        config_data, ask_all,
-        "JARVIS_TOOL_FILTER_THRESHOLD",
-        "设置AI工具筛选阈值 (当可用工具数超过此值时触发AI筛选, 默认30)",
-        30,
-    ) or changed
+
+    changed = (
+        _ask_config_optional_str(
+            config_data,
+            ask_all,
+            "JARVIS_DATA_PATH",
+            f"是否自定义数据目录路径(JARVIS_DATA_PATH)？留空使用默认: {_get_data_dir()}",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "JARVIS_MAX_INPUT_TOKEN_COUNT",
+            "自定义最大输入Token数量（留空使用默认: 32000）",
+            32000,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "JARVIS_TOOL_FILTER_THRESHOLD",
+            "设置AI工具筛选阈值 (当可用工具数超过此值时触发AI筛选, 默认30)",
+            30,
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
     """收集高级配置（自动总结、脚本超时等）"""
     changed = False
-    changed = _ask_config_int(
-        config_data, ask_all,
-        "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
-        "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
-        300,
-    ) or changed
-    changed = _ask_config_int(
-        config_data, ask_all,
-        "JARVIS_ADDON_PROMPT_THRESHOLD",
-        "附加提示的触发阈值（字符数，默认1024）。当消息长度超过此值时，会自动添加默认的附加提示",
-        1024,
-    ) or changed
-    changed = _ask_config_bool(
-        config_data, ask_all,
-        "JARVIS_ENABLE_INTENT_RECOGNITION",
-        "是否启用意图识别功能？用于智能上下文推荐中的LLM意图提取和语义分析",
-        True,
-    ) or changed
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
+            "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
+            300,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "JARVIS_ADDON_PROMPT_THRESHOLD",
+            "附加提示的触发阈值（字符数，默认1024）。当消息长度超过此值时，会自动添加默认的附加提示",
+            1024,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "JARVIS_ENABLE_INTENT_RECOGNITION",
+            "是否启用意图识别功能？用于智能上下文推荐中的LLM意图提取和语义分析",
+            True,
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
     """收集目录类配置（逗号分隔）"""
     changed = False
-    changed = _ask_config_list(
-        config_data, ask_all,
-        "JARVIS_TOOL_LOAD_DIRS",
-        "指定工具加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_config_list(
-        config_data, ask_all,
-        "JARVIS_METHODOLOGY_DIRS",
-        "指定方法论加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_config_list(
-        config_data, ask_all,
-        "JARVIS_AGENT_DEFINITION_DIRS",
-        "指定 agent 定义加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_config_list(
-        config_data, ask_all,
-        "JARVIS_MULTI_AGENT_DIRS",
-        "指定 multi_agent 加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_config_list(
-        config_data, ask_all,
-        "JARVIS_ROLES_DIRS",
-        "指定 roles 加载目录（逗号分隔，留空跳过）：",
-    ) or changed
-    changed = _ask_config_list(
-        config_data, ask_all,
-        "JARVIS_AFTER_TOOL_CALL_CB_DIRS",
-        "指定工具调用后回调实现目录（逗号分隔，留空跳过）：",
-    ) or changed
+    changed = (
+        _ask_config_list(
+            config_data,
+            ask_all,
+            "JARVIS_TOOL_LOAD_DIRS",
+            "指定工具加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_list(
+            config_data,
+            ask_all,
+            "JARVIS_METHODOLOGY_DIRS",
+            "指定方法论加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_list(
+            config_data,
+            ask_all,
+            "JARVIS_AGENT_DEFINITION_DIRS",
+            "指定 agent 定义加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_list(
+            config_data,
+            ask_all,
+            "JARVIS_MULTI_AGENT_DIRS",
+            "指定 multi_agent 加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_list(
+            config_data,
+            ask_all,
+            "JARVIS_ROLES_DIRS",
+            "指定 roles 加载目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_list(
+            config_data,
+            ask_all,
+            "JARVIS_AFTER_TOOL_CALL_CB_DIRS",
+            "指定工具调用后回调实现目录（逗号分隔，留空跳过）：",
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_web_search_config(config_data: dict, ask_all: bool) -> bool:
     """收集Web搜索配置"""
     changed = False
-    changed = _ask_config_optional_str(
-        config_data, ask_all,
-        "JARVIS_WEB_SEARCH_PLATFORM",
-        "配置 Web 搜索平台名称（留空跳过）：",
-    ) or changed
-    changed = _ask_config_optional_str(
-        config_data, ask_all,
-        "JARVIS_WEB_SEARCH_MODEL",
-        "配置 Web 搜索模型名称（留空跳过）：",
-    ) or changed
+    changed = (
+        _ask_config_optional_str(
+            config_data,
+            ask_all,
+            "JARVIS_WEB_SEARCH_PLATFORM",
+            "配置 Web 搜索平台名称（留空跳过）：",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_optional_str(
+            config_data,
+            ask_all,
+            "JARVIS_WEB_SEARCH_MODEL",
+            "配置 Web 搜索模型名称（留空跳过）：",
+        )
+        or changed
+    )
     return changed
 
 
 def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
     """收集Git相关配置"""
     changed = False
-    changed = _ask_config_optional_str(
-        config_data, ask_all,
-        "JARVIS_GIT_COMMIT_PROMPT",
-        "自定义 Git 提交提示模板（留空跳过）：",
-    ) or changed
+    changed = (
+        _ask_config_optional_str(
+            config_data,
+            ask_all,
+            "JARVIS_GIT_COMMIT_PROMPT",
+            "自定义 Git 提交提示模板（留空跳过）：",
+        )
+        or changed
+    )
     return changed
 
 
@@ -1551,7 +1707,7 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
         )
         from jarvis.jarvis_utils.input import user_confirm as get_yes_no
         from jarvis.jarvis_utils.input import get_single_line_input
-        
+
         rag_default_embed = _get_rag_embedding_model()
         rag_default_rerank = _get_rag_rerank_model()
     except Exception:
@@ -1559,7 +1715,7 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
         rag_default_rerank = "BAAI/bge-reranker-v2-m3"
         get_yes_no = None
         get_single_line_input = None
-    
+
     try:
         if "JARVIS_RAG" not in config_data and get_yes_no:
             if get_yes_no("是否配置 RAG 检索增强参数？", default=False):
@@ -1594,18 +1750,26 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
 def _collect_central_repo_config(config_data: dict, ask_all: bool) -> bool:
     """收集中心仓库配置"""
     changed = False
-    changed = _ask_config_str(
-        config_data, ask_all,
-        "JARVIS_CENTRAL_METHODOLOGY_REPO",
-        "请输入中心方法论仓库路径或Git地址（可留空跳过）：",
-        "",
-    ) or changed
-    changed = _ask_config_str(
-        config_data, ask_all,
-        "JARVIS_CENTRAL_TOOL_REPO",
-        "请输入中心工具仓库路径或Git地址（可留空跳过）：",
-        "",
-    ) or changed
+    changed = (
+        _ask_config_str(
+            config_data,
+            ask_all,
+            "JARVIS_CENTRAL_METHODOLOGY_REPO",
+            "请输入中心方法论仓库路径或Git地址（可留空跳过）：",
+            "",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_str(
+            config_data,
+            ask_all,
+            "JARVIS_CENTRAL_TOOL_REPO",
+            "请输入中心工具仓库路径或Git地址（可留空跳过）：",
+            "",
+        )
+        or changed
+    )
     return changed
 
 
@@ -1614,13 +1778,18 @@ def _collect_shell_config(config_data: dict, ask_all: bool) -> bool:
     changed = False
     try:
         import os
+
         default_shell = os.getenv("SHELL", "/bin/bash")
-        changed = _ask_config_optional_str(
-            config_data, ask_all,
-            "SHELL",
-            f"覆盖 SHELL 路径（留空使用系统默认: {default_shell}）：",
-            default_shell,
-        ) or changed
+        changed = (
+            _ask_config_optional_str(
+                config_data,
+                ask_all,
+                "SHELL",
+                f"覆盖 SHELL 路径（留空使用系统默认: {default_shell}）：",
+                default_shell,
+            )
+            or changed
+        )
     except Exception:
         pass
     return changed
@@ -1639,7 +1808,7 @@ def _collect_optional_config_interactively(
         bool: 是否有变更
     """
     changed = False
-    
+
     # 收集各类配置
     changed = _collect_basic_switches(config_data, ask_all) or changed
     changed = _collect_ui_experience_config(config_data, ask_all) or changed
@@ -1655,7 +1824,7 @@ def _collect_optional_config_interactively(
     changed = _collect_rag_config(config_data, ask_all) or changed
     changed = _collect_central_repo_config(config_data, ask_all) or changed
     changed = _collect_shell_config(config_data, ask_all) or changed
-    
+
     return changed
 
 
@@ -1882,14 +2051,14 @@ _retry_context = threading.local()
 
 def _get_retry_count() -> int:
     """获取当前线程的重试计数"""
-    if not hasattr(_retry_context, 'count'):
+    if not hasattr(_retry_context, "count"):
         _retry_context.count = 0
     return _retry_context.count
 
 
 def _increment_retry_count() -> int:
     """增加重试计数并返回新的计数值"""
-    if not hasattr(_retry_context, 'count'):
+    if not hasattr(_retry_context, "count"):
         _retry_context.count = 0
     _retry_context.count += 1
     return _retry_context.count
@@ -1914,7 +2083,7 @@ def while_success(func: Callable[[], Any]) -> Any:
     """
     MAX_RETRIES = 6
     result: Any = None
-    
+
     while True:
         try:
             result = func()
@@ -1926,10 +2095,14 @@ def while_success(func: Callable[[], Any]) -> Any:
                 # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
                 sleep_time = 2 ** (retry_count - 1)
                 if retry_count < MAX_RETRIES:
-                    print(f"⚠️ 发生异常:\n{e}\n重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s...")
+                    print(
+                        f"⚠️ 发生异常:\n{e}\n重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s..."
+                    )
                     time.sleep(sleep_time)
                 else:
-                    print(f"⚠️ 发生异常:\n{e}\n已达到最大重试次数 ({retry_count}/{MAX_RETRIES})")
+                    print(
+                        f"⚠️ 发生异常:\n{e}\n已达到最大重试次数 ({retry_count}/{MAX_RETRIES})"
+                    )
                     _reset_retry_count()
                     raise
             else:
@@ -1954,7 +2127,7 @@ def while_true(func: Callable[[], bool]) -> Any:
     """
     MAX_RETRIES = 6
     ret: bool = False
-    
+
     while True:
         try:
             ret = func()
@@ -1965,13 +2138,15 @@ def while_true(func: Callable[[], bool]) -> Any:
             # 异常直接抛出，不捕获
             _reset_retry_count()
             raise
-        
+
         retry_count = _increment_retry_count()
         if retry_count <= MAX_RETRIES:
             # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
             sleep_time = 2 ** (retry_count - 1)
             if retry_count < MAX_RETRIES:
-                print(f"⚠️ 返回空值，重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s...")
+                print(
+                    f"⚠️ 返回空值，重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s..."
+                )
                 time.sleep(sleep_time)
             else:
                 print(f"⚠️ 返回空值，已达到最大重试次数 ({retry_count}/{MAX_RETRIES})")
@@ -1995,7 +2170,7 @@ def get_file_md5(filepath: str) -> str:
     # 采用流式读取，避免一次性加载100MB到内存
     h = hashlib.md5()
     max_bytes = 100 * 1024 * 1024  # 与原实现保持一致：仅读取前100MB
-    buf_size = 8 * 1024 * 1024     # 8MB缓冲
+    buf_size = 8 * 1024 * 1024  # 8MB缓冲
     read_bytes = 0
     with open(filepath, "rb") as f:
         while read_bytes < max_bytes:
@@ -2046,17 +2221,17 @@ def count_cmd_usage() -> None:
 
 
 def is_context_overflow(
-    content: str, 
+    content: str,
     model_group_override: Optional[str] = None,
-    platform: Optional[Any] = None
+    platform: Optional[Any] = None,
 ) -> bool:
     """判断文件内容是否超出上下文限制
-    
+
     参数:
         content: 要检查的内容
         model_group_override: 模型组覆盖（可选）
         platform: 平台实例（可选），如果提供则使用剩余token数量判断
-        
+
     返回:
         bool: 如果内容超出上下文限制返回True
     """
@@ -2064,21 +2239,21 @@ def is_context_overflow(
     if content:
         # 粗略估算：假设平均每个token约4个字符，保守估计使用3.5个字符/token
         estimated_tokens = len(content) // 3.5
-        
+
         # 获取最大token限制
         max_tokens = get_max_big_content_size(model_group_override)
-        
+
         # 如果预估token数超过限制的150%，直接认为超出（避免精确计算）
         if estimated_tokens > max_tokens * 1.5:
             return True
-            
+
         # 如果预估token数小于限制的50%，直接认为安全
         if estimated_tokens < max_tokens * 0.5:
             return False
-    
+
     # 只有在预估结果不明确时，才进行精确的token计算
     content_tokens = get_context_token_count(content)
-    
+
     # 优先使用剩余token数量
     if platform is not None:
         try:
@@ -2089,9 +2264,11 @@ def is_context_overflow(
                 return content_tokens > threshold
         except Exception:
             pass
-    
+
     # 回退方案：使用输入窗口限制
     return content_tokens > get_max_big_content_size(model_group_override)
+
+
 def get_loc_stats() -> str:
     """使用loc命令获取当前目录的代码统计信息
 
@@ -2250,7 +2427,6 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
             pass
 
     if should_check_for_updates:
-
         for repo_dir in repo_dirs:
             p_repo_dir = Path(repo_dir)
             if p_repo_dir.exists() and p_repo_dir.is_dir():

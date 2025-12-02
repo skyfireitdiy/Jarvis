@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 @dataclass
 class Symbol:
     """表示代码中的单个符号。"""
+
     name: str
     kind: str  # 例如：'function'(函数)、'class'(类)、'variable'(变量)、'import'(导入)
     file_path: str
@@ -17,7 +18,7 @@ class Symbol:
     # 根据需要添加更多字段，例如父作用域
     parent: Optional[str] = None
     # 定义位置（对于引用/调用，指向符号定义的位置）
-    definition_location: Optional['Symbol'] = None  # 指向定义Symbol的引用
+    definition_location: Optional["Symbol"] = None  # 指向定义Symbol的引用
     is_definition: bool = False  # 如果此符号是定义则为True，如果是引用/调用则为False
 
 
@@ -46,13 +47,17 @@ class SymbolTable:
         cache_file = self._get_cache_file()
         if os.path.exists(cache_file):
             try:
-                with open(cache_file, 'r', encoding='utf-8') as f:
+                with open(cache_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 # 将JSON数据转换回Symbol对象
-                self.symbols_by_name = self._deserialize_symbols(data.get('symbols_by_name', {}))
-                self.symbols_by_file = self._deserialize_symbols(data.get('symbols_by_file', {}))
+                self.symbols_by_name = self._deserialize_symbols(
+                    data.get("symbols_by_name", {})
+                )
+                self.symbols_by_file = self._deserialize_symbols(
+                    data.get("symbols_by_file", {})
+                )
                 # 加载文件修改时间
-                self._file_mtimes = data.get('file_mtimes', {})
+                self._file_mtimes = data.get("file_mtimes", {})
             except Exception:
                 # 如果缓存加载失败，则从空表开始
                 pass
@@ -63,88 +68,94 @@ class SymbolTable:
             # 确保缓存目录存在
             os.makedirs(self.cache_dir, exist_ok=True)
             cache_file = self._get_cache_file()
-            
+
             # 保存前更新文件修改时间
             self._update_file_mtimes()
-            
+
             # 序列化符号以便JSON存储
             data = {
-                'symbols_by_name': self._serialize_symbols(self.symbols_by_name),
-                'symbols_by_file': self._serialize_symbols(self.symbols_by_file),
-                'file_mtimes': self._file_mtimes
+                "symbols_by_name": self._serialize_symbols(self.symbols_by_name),
+                "symbols_by_file": self._serialize_symbols(self.symbols_by_file),
+                "file_mtimes": self._file_mtimes,
             }
-            
-            with open(cache_file, 'w', encoding='utf-8') as f:
+
+            with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception:
             # 如果缓存保存失败，则继续而不缓存
             pass
 
-    def _serialize_symbols(self, symbol_dict: Dict[str, List[Symbol]]) -> Dict[str, List[dict]]:
+    def _serialize_symbols(
+        self, symbol_dict: Dict[str, List[Symbol]]
+    ) -> Dict[str, List[dict]]:
         """将Symbol对象转换为可序列化的字典。"""
         serialized = {}
         for key, symbols in symbol_dict.items():
             serialized[key] = [self._symbol_to_dict(symbol) for symbol in symbols]
         return serialized
 
-    def _deserialize_symbols(self, symbol_dict: Dict[str, List[dict]]) -> Dict[str, List[Symbol]]:
+    def _deserialize_symbols(
+        self, symbol_dict: Dict[str, List[dict]]
+    ) -> Dict[str, List[Symbol]]:
         """将序列化的字典转换回Symbol对象。"""
         deserialized = {}
         for key, symbol_data_list in symbol_dict.items():
-            deserialized[key] = [self._dict_to_symbol(data) for data in symbol_data_list]
+            deserialized[key] = [
+                self._dict_to_symbol(data) for data in symbol_data_list
+            ]
         return deserialized
 
     def _symbol_to_dict(self, symbol: Symbol) -> dict:
         """将Symbol对象转换为字典。"""
         result = {
-            'name': symbol.name,
-            'kind': symbol.kind,
-            'file_path': symbol.file_path,
-            'line_start': symbol.line_start,
-            'line_end': symbol.line_end,
-            'signature': symbol.signature,
-            'docstring': symbol.docstring,
-            'parent': symbol.parent,
-            'is_definition': getattr(symbol, 'is_definition', False),
+            "name": symbol.name,
+            "kind": symbol.kind,
+            "file_path": symbol.file_path,
+            "line_start": symbol.line_start,
+            "line_end": symbol.line_end,
+            "signature": symbol.signature,
+            "docstring": symbol.docstring,
+            "parent": symbol.parent,
+            "is_definition": getattr(symbol, "is_definition", False),
         }
         # 序列化定义位置（只保存基本信息，避免循环引用）
-        if hasattr(symbol, 'definition_location') and symbol.definition_location:
-            result['definition_location'] = {
-                'file_path': symbol.definition_location.file_path,
-                'line_start': symbol.definition_location.line_start,
-                'line_end': symbol.definition_location.line_end,
-                'name': symbol.definition_location.name,
+        if hasattr(symbol, "definition_location") and symbol.definition_location:
+            result["definition_location"] = {
+                "file_path": symbol.definition_location.file_path,
+                "line_start": symbol.definition_location.line_start,
+                "line_end": symbol.definition_location.line_end,
+                "name": symbol.definition_location.name,
             }
         return result
 
     def _dict_to_symbol(self, data: dict) -> Symbol:
         """将字典转换回Symbol对象。"""
         symbol = Symbol(
-            name=data['name'],
-            kind=data['kind'],
-            file_path=data['file_path'],
-            line_start=data['line_start'],
-            line_end=data['line_end'],
-            signature=data.get('signature'),
-            docstring=data.get('docstring'),
-            parent=data.get('parent'),
-            is_definition=data.get('is_definition', False),
+            name=data["name"],
+            kind=data["kind"],
+            file_path=data["file_path"],
+            line_start=data["line_start"],
+            line_end=data["line_end"],
+            signature=data.get("signature"),
+            docstring=data.get("docstring"),
+            parent=data.get("parent"),
+            is_definition=data.get("is_definition", False),
         )
         # 恢复定义位置（创建临时 Symbol 对象）
-        if 'definition_location' in data and data['definition_location']:
-            def_loc = data['definition_location']
+        if "definition_location" in data and data["definition_location"]:
+            def_loc = data["definition_location"]
             symbol.definition_location = Symbol(
-                name=def_loc['name'],
-                kind='',  # 未知类型
-                file_path=def_loc['file_path'],
-                line_start=def_loc['line_start'],
-                line_end=def_loc['line_end'],
+                name=def_loc["name"],
+                kind="",  # 未知类型
+                file_path=def_loc["file_path"],
+                line_start=def_loc["line_start"],
+                line_end=def_loc["line_end"],
             )
         return symbol
 
     def add_symbol(self, symbol: Symbol, save_to_cache: bool = False):
         """向表中添加符号。
-        
+
         参数:
             symbol: 要添加的符号
             save_to_cache: 如果为True，立即保存到缓存。默认为False以提高性能。
@@ -157,11 +168,11 @@ class SymbolTable:
         if symbol.file_path not in self.symbols_by_file:
             self.symbols_by_file[symbol.file_path] = []
         self.symbols_by_file[symbol.file_path].append(symbol)
-        
+
         # 仅在明确请求时保存到缓存（出于性能考虑）
         if save_to_cache:
             self._save_to_cache()
-    
+
     def save_cache(self):
         """将整个符号表保存到缓存。批量操作后调用此方法。"""
         self._save_to_cache()
@@ -172,9 +183,7 @@ class SymbolTable:
         如果提供了file_path，则搜索仅限于该文件。
         """
         if file_path:
-            return [
-                s for s in self.get_file_symbols(file_path) if s.name == name
-            ]
+            return [s for s in self.get_file_symbols(file_path) if s.name == name]
         return self.symbols_by_name.get(name, [])
 
     def get_file_symbols(self, file_path: str) -> List[Symbol]:
@@ -188,19 +197,20 @@ class SymbolTable:
             for symbol in symbols_to_remove:
                 if symbol.name in self.symbols_by_name:
                     self.symbols_by_name[symbol.name] = [
-                        s for s in self.symbols_by_name[symbol.name]
+                        s
+                        for s in self.symbols_by_name[symbol.name]
                         if s.file_path != file_path
                     ]
                     if not self.symbols_by_name[symbol.name]:
                         del self.symbols_by_name[symbol.name]
-            
+
             # 移除文件修改时间跟踪
             if file_path in self._file_mtimes:
                 del self._file_mtimes[file_path]
-            
+
             # 清除后保存到缓存
             self._save_to_cache()
-    
+
     def _update_file_mtimes(self):
         """更新所有跟踪文件的修改时间。"""
         for file_path in list(self.symbols_by_file.keys()):
@@ -210,28 +220,28 @@ class SymbolTable:
                 except Exception:
                     # 如果无法获取修改时间，则从跟踪中移除
                     self._file_mtimes.pop(file_path, None)
-    
+
     def is_file_stale(self, file_path: str) -> bool:
         """检查文件自缓存后是否已被修改。
-        
+
         参数:
             file_path: 要检查的文件路径
-            
+
         返回:
             如果文件比缓存新则为True，否则为False
         """
         if file_path not in self.symbols_by_file:
             # 文件不在缓存中，视为已过期（需要加载）
             return True
-        
+
         if file_path not in self._file_mtimes:
             # 没有记录修改时间，视为已过期
             return True
-        
+
         if not os.path.exists(file_path):
             # 文件不存在，不算过期（将由clear_file_symbols处理）
             return False
-        
+
         try:
             current_mtime = os.path.getmtime(file_path)
             cached_mtime = self._file_mtimes.get(file_path, 0)

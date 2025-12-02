@@ -34,13 +34,15 @@ class TreeSitterExtractor(SymbolExtractor):
             # 使用 QueryCursor 执行查询
             cursor = QueryCursor(query)
             matches = cursor.matches(tree.root_node)
-            
+
             symbols = []
             # matches 返回格式: [(pattern_index, {capture_name: [nodes]})]
             for pattern_index, captures_dict in matches:
                 for capture_name, nodes in captures_dict.items():
                     for node in nodes:
-                        symbol = self._create_symbol_from_capture(node, capture_name, file_path)
+                        symbol = self._create_symbol_from_capture(
+                            node, capture_name, file_path
+                        )
                         if symbol:
                             symbols.append(symbol)
             return symbols
@@ -49,7 +51,9 @@ class TreeSitterExtractor(SymbolExtractor):
             return []
 
     @abstractmethod
-    def _create_symbol_from_capture(self, node: Node, name: str, file_path: str) -> Optional[Symbol]:
+    def _create_symbol_from_capture(
+        self, node: Node, name: str, file_path: str
+    ) -> Optional[Symbol]:
         """
         Creates a Symbol object from a tree-sitter query capture.
         This method must be implemented by subclasses to map capture names

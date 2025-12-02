@@ -3,6 +3,7 @@
 
 This module provides an OpenAI-compatible API service for the Jarvis platform.
 """
+
 import asyncio
 import json
 import os
@@ -100,9 +101,7 @@ def start_service(
     print("ℹ️ 本服务提供与 OpenAI 兼容的 API")
 
     if default_platform and default_model:
-        print(
-            f"ℹ️ Default platform: {default_platform}, model: {default_model}"
-        )
+        print(f"ℹ️ Default platform: {default_platform}, model: {default_model}")
 
     # Platform and model cache
     platform_instances: Dict[str, Any] = {}
@@ -172,9 +171,7 @@ def start_service(
                                 }
                             )
             except Exception as exc:
-                print(
-                    f"❌ Error getting models for {default_platform}: {str(exc)}"
-                )
+                print(f"❌ Error getting models for {default_platform}: {str(exc)}")
 
         # Return model list
         return {"object": "list", "data": model_list}

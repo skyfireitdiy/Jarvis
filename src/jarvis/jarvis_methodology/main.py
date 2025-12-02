@@ -26,7 +26,7 @@ app = typer.Typer(help="方法论管理工具")
 
 @app.command("import")
 def import_methodology(
-    input_file: str = typer.Argument(..., help="要导入的方法论文件路径")
+    input_file: str = typer.Argument(..., help="要导入的方法论文件路径"),
 ):
     """导入方法论文件（合并策略）"""
     try:
@@ -89,7 +89,7 @@ def list_methodologies():
         lines = ["可用方法论:"]
         for i, (problem_type, _) in enumerate(methodologies.items(), 1):
             lines.append(f"{i}. {problem_type}")
-        joined_lines = '\n'.join(lines)
+        joined_lines = "\n".join(lines)
         print(f"ℹ️ {joined_lines}")
     except (OSError, ValueError) as e:
         print(f"❌ 列出方法论失败: {str(e)}")
@@ -98,7 +98,7 @@ def list_methodologies():
 
 @app.command("extract")
 def extract_methodology(
-    input_file: str = typer.Argument(..., help="要提取方法论的文本文件路径")
+    input_file: str = typer.Argument(..., help="要提取方法论的文本文件路径"),
 ):
     """从文本文件中提取方法论"""
     try:
@@ -191,7 +191,9 @@ def extract_methodology(
                     indent=2,
                 )
 
-        print(f"✅ 成功从文件提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）")
+        print(
+            f"✅ 成功从文件提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）"
+        )
     except Exception as e:
         print(f"❌ 提取失败: {str(e)}")
         raise typer.Exit(code=1)
@@ -199,7 +201,7 @@ def extract_methodology(
 
 @app.command("extract-url")
 def extract_methodology_from_url(
-    url: str = typer.Argument(..., help="要提取方法论的URL")
+    url: str = typer.Argument(..., help="要提取方法论的URL"),
 ):
     """从URL提取方法论"""
     try:
@@ -289,7 +291,9 @@ def extract_methodology_from_url(
                     indent=2,
                 )
 
-        print(f"✅ 成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）")
+        print(
+            f"✅ 成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）"
+        )
     except Exception as e:
         print(f"❌ 从URL提取失败: {str(e)}")
         raise typer.Exit(code=1)

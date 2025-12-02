@@ -16,38 +16,60 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 
 class PythonBuildValidator(BuildValidatorBase):
     """Python构建验证器（包括编译和测试）"""
-    
+
     BUILD_SYSTEM_NAME = "Python"
     SUPPORTED_LANGUAGES = ["python"]
-    
+
     def _extract_python_errors(self, output: str) -> str:
         """提取Python错误信息（包括编译错误和测试失败）"""
         if not output:
             return ""
-        
+
         lines = output.split("\n")
         errors = []
         in_error = False
-        
+
         for line in lines:
             line_lower = line.lower()
             # 检测错误关键词（包括编译错误和测试失败）
-            if any(keyword in line_lower for keyword in [
-                "error", "failed", "exception", "traceback", 
-                "syntaxerror", "indentationerror", "assertionerror",
-                "failed:", "failures:", "test", "assert"
-            ]):
+            if any(
+                keyword in line_lower
+                for keyword in [
+                    "error",
+                    "failed",
+                    "exception",
+                    "traceback",
+                    "syntaxerror",
+                    "indentationerror",
+                    "assertionerror",
+                    "failed:",
+                    "failures:",
+                    "test",
+                    "assert",
+                ]
+            ):
                 in_error = True
                 errors.append(line.strip())
             elif in_error and line.strip():
                 # 继续收集错误相关的行
-                if line.strip().startswith(("File", "  File", "    ", "E ", "FAILED", "FAILURES", "assert")):
+                if line.strip().startswith(
+                    ("File", "  File", "    ", "E ", "FAILED", "FAILURES", "assert")
+                ):
                     errors.append(line.strip())
                 elif not line.strip().startswith("="):
                     # 如果遇到非错误相关的行，停止收集
-                    if len(errors) > 0 and not any(keyword in line_lower for keyword in ["error", "failed", "exception", "assert", "test"]):
+                    if len(errors) > 0 and not any(
+                        keyword in line_lower
+                        for keyword in [
+                            "error",
+                            "failed",
+                            "exception",
+                            "assert",
+                            "test",
+                        ]
+                    ):
                         break
-        
+
         # 如果收集到错误，返回前20行（限制长度）
         if errors:
             error_text = "\n".join(errors[:20])
@@ -55,13 +77,13 @@ class PythonBuildValidator(BuildValidatorBase):
             if len(error_text) > 1000:
                 error_text = error_text[:1000] + "\n... (错误信息已截断)"
             return error_text
-        
+
         # 如果没有提取到结构化错误，返回原始输出的前500字符
         return output[:500] if output else ""
-    
+
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
-        
+
         # 策略1: 尝试使用 py_compile 编译修改的文件
         if modified_files:
             errors = []
@@ -79,7 +101,7 @@ class PythonBuildValidator(BuildValidatorBase):
                         error_msg = f"{file_path}: {stderr}".strip()
                         errors.append(error_msg)
                         error_outputs.append(stdout + stderr)
-            
+
             if errors:
                 duration = time.time() - start_time
                 # 合并所有错误输出
@@ -100,7 +122,7 @@ class PythonBuildValidator(BuildValidatorBase):
                     build_system=BuildSystem.PYTHON,
                     duration=duration,
                 )
-        
+
         # 策略2: 尝试运行 pytest（会自动编译并运行测试，即使没有配置文件也会自动发现测试）
         # 首先尝试 pytest
         returncode, stdout, stderr = self._run_command(
@@ -114,19 +136,24 @@ class PythonBuildValidator(BuildValidatorBase):
                 ["python", "-m", "unittest", "discover", "-v"],
                 timeout=30,
             )
-        
+
         duration = time.time() - start_time
         success = returncode == 0
         output = stdout + stderr
-        
+
         # 如果失败，提取关键错误信息（包括编译错误和测试失败）
         if not success:
             error_msg = self._extract_python_errors(output)
             if not error_msg:
                 # 检查是否是"没有找到测试"的情况（这不算失败）
-                if "no tests ran" in output.lower() or "no tests found" in output.lower():
+                if (
+                    "no tests ran" in output.lower()
+                    or "no tests found" in output.lower()
+                ):
                     # 没有测试文件，但语法检查通过，视为成功
-                    print(f"✅ Python 构建验证成功（耗时 {duration:.2f} 秒，未发现测试文件）")
+                    print(
+                        f"✅ Python 构建验证成功（耗时 {duration:.2f} 秒，未发现测试文件）"
+                    )
                     return BuildResult(
                         success=True,
                         output="Python语法检查通过（未发现测试文件）",
@@ -143,7 +170,7 @@ class PythonBuildValidator(BuildValidatorBase):
         else:
             error_msg = None
             print(f"✅ Python 构建验证成功（耗时 {duration:.2f} 秒）")
-        
+
         return BuildResult(
             success=success,
             output=output,
@@ -151,4 +178,3 @@ class PythonBuildValidator(BuildValidatorBase):
             build_system=BuildSystem.PYTHON,
             duration=duration,
         )
-

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Jarvis AI 助手主入口模块"""
+
 from typing import Optional, List
 import shutil
 from datetime import datetime
@@ -47,7 +48,9 @@ def _normalize_backup_data_argv(argv: List[str]) -> None:
             if tok == "--backup-data":
                 # 情况1：位于末尾，无参数
                 # 情况2：后续是下一个选项（以 '-' 开头），表示未提供参数
-                if i == len(argv) - 1 or (i + 1 < len(argv) and argv[i + 1].startswith("-")):
+                if i == len(argv) - 1 or (
+                    i + 1 < len(argv) and argv[i + 1].startswith("-")
+                ):
                     argv.insert(i + 1, "~/jarvis_backups")
                     i += 1  # 跳过我们插入的默认值，避免重复插入
             i += 1
@@ -244,7 +247,9 @@ def handle_backup_option(backup_dir_path: Optional[str]) -> bool:
     return True
 
 
-def handle_restore_option(restore_path: Optional[str], config_file: Optional[str]) -> bool:
+def handle_restore_option(
+    restore_path: Optional[str], config_file: Optional[str]
+) -> bool:
     """处理数据恢复选项，返回是否已处理并需提前结束。"""
     if not restore_path:
         return False
@@ -346,7 +351,9 @@ def try_switch_to_jca_if_git_repo(
                             args += ["--restore-session"]
                         if task:
                             args += ["-r", task]
-                        print("ℹ️ 正在切换到 'jca'（jarvis-code-agent）以进入代码开发模式...")
+                        print(
+                            "ℹ️ 正在切换到 'jca'（jarvis-code-agent）以进入代码开发模式..."
+                        )
                         os.execvp(args[0], args)
         except Exception:
             # 静默忽略检测异常，不影响主流程
@@ -428,9 +435,13 @@ def handle_builtin_config_selector(
 
                 # 追加内置目录（支持多个候选）
                 try:
-                    candidates = builtin_dirs if isinstance(builtin_dirs, list) and builtin_dirs else ([builtin_root] if builtin_root else [])
+                    candidates = (
+                        builtin_dirs
+                        if isinstance(builtin_dirs, list) and builtin_dirs
+                        else ([builtin_root] if builtin_root else [])
+                    )
                 except Exception:
-                    candidates = ([builtin_root] if builtin_root else [])
+                    candidates = [builtin_root] if builtin_root else []
                 for _bd in candidates:
                     if _bd:
                         search_dirs.append(Path(_bd) / cat)
@@ -450,7 +461,10 @@ def handle_builtin_config_selector(
                 # 可选调试输出：查看每类的搜索目录
                 try:
                     if os.environ.get("JARVIS_DEBUG_BUILTIN_SELECTOR") == "1":
-                        print(f"ℹ️ DEBUG: category={cat} search_dirs=" + ", ".join(str(p) for p in unique_dirs))
+                        print(
+                            f"ℹ️ DEBUG: category={cat} search_dirs="
+                            + ", ".join(str(p) for p in unique_dirs)
+                        )
                 except Exception:
                     pass
 
@@ -582,7 +596,8 @@ def handle_builtin_config_selector(
                 else:
                     # Fallback to manual input if fzf is not used or available
                     choice = get_single_line_input(
-                        "选择要启动的配置编号，直接回车使用默认通用代理(jvs): ", default=""
+                        "选择要启动的配置编号，直接回车使用默认通用代理(jvs): ",
+                        default="",
                     )
                     if choice.strip():
                         try:
@@ -695,9 +710,14 @@ def run_cli(
         None, "--restore-data", help="从指定的压缩包恢复 Jarvis 数据"
     ),
     non_interactive: bool = typer.Option(
-        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+        False,
+        "-n",
+        "--non-interactive",
+        help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟",
     ),
-    web: bool = typer.Option(False, "--web", help="以 Web 模式启动，通过浏览器 WebSocket 交互"),
+    web: bool = typer.Option(
+        False, "--web", help="以 Web 模式启动，通过浏览器 WebSocket 交互"
+    ),
     web_host: str = typer.Option("127.0.0.1", "--web-host", help="Web 服务主机"),
     web_port: int = typer.Option(8765, "--web-port", help="Web 服务端口"),
     web_launch_cmd: Optional[str] = typer.Option(
@@ -705,7 +725,9 @@ def run_cli(
         "--web-launch-cmd",
         help="交互式终端启动命令（字符串格式，用空格分隔，如: --web-launch-cmd 'jca --task \"xxx\"'）",
     ),
-    stop: bool = typer.Option(False, "--stop", help="停止后台 Web 服务（需与 --web 一起使用）"),
+    stop: bool = typer.Option(
+        False, "--stop", help="停止后台 Web 服务（需与 --web 一起使用）"
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -779,7 +801,10 @@ def run_cli(
                 if not pf.exists():
                     # 兼容旧版本：回退检查数据目录中的旧 PID 文件位置
                     try:
-                        pf_alt = Path(os.path.expanduser(os.path.expandvars(get_data_dir()))) / f"jarvis_web_{web_port}.pid"
+                        pf_alt = (
+                            Path(os.path.expanduser(os.path.expandvars(get_data_dir())))
+                            / f"jarvis_web_{web_port}.pid"
+                        )
                     except Exception:
                         pf_alt = None  # type: ignore[assignment]
                     if pf_alt and pf_alt.exists():  # type: ignore[truthy-bool]
@@ -799,7 +824,9 @@ def run_cli(
                                     candidate_pid = int(ln.strip())
                                     try:
                                         os.kill(candidate_pid, signal.SIGTERM)
-                                        print(f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。")
+                                        print(
+                                            f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。"
+                                        )
                                         killed_any = True
                                     except Exception as e:
                                         print(f"⚠️ 按端口停止失败: {e}")
@@ -809,7 +836,9 @@ def run_cli(
                         pass
                     if not killed_any:
                         try:
-                            res2 = subprocess.run(["ss", "-ltpn"], capture_output=True, text=True)
+                            res2 = subprocess.run(
+                                ["ss", "-ltpn"], capture_output=True, text=True
+                            )
                             if res2.returncode == 0 and res2.stdout:
                                 for ln in res2.stdout.splitlines():
                                     if f":{web_port} " in ln or f":{web_port}\n" in ln:
@@ -817,11 +846,17 @@ def run_cli(
                                             idx = ln.find("pid=")
                                             if idx != -1:
                                                 end = ln.find(",", idx)
-                                                pid_str2 = ln[idx+4:end if end != -1 else None]
+                                                pid_str2 = ln[
+                                                    idx + 4 : end if end != -1 else None
+                                                ]
                                                 candidate_pid = int(pid_str2)
                                                 try:
-                                                    os.kill(candidate_pid, signal.SIGTERM)
-                                                    print(f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。")
+                                                    os.kill(
+                                                        candidate_pid, signal.SIGTERM
+                                                    )
+                                                    print(
+                                                        f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。"
+                                                    )
                                                     killed_any = True
                                                 except Exception as e:
                                                     print(f"⚠️ 按端口停止失败: {e}")
@@ -890,7 +925,9 @@ def run_cli(
                         pass
                     if not candidate_pid:
                         try:
-                            res2 = subprocess.run(["ss", "-ltpn"], capture_output=True, text=True)
+                            res2 = subprocess.run(
+                                ["ss", "-ltpn"], capture_output=True, text=True
+                            )
                             if res2.returncode == 0 and res2.stdout:
                                 for ln in res2.stdout.splitlines():
                                     if f":{web_port} " in ln or f":{web_port}\n" in ln:
@@ -899,7 +936,9 @@ def run_cli(
                                             idx = ln.find("pid=")
                                             if idx != -1:
                                                 end = ln.find(",", idx)
-                                                pid_str2 = ln[idx+4:end if end != -1 else None]
+                                                pid_str2 = ln[
+                                                    idx + 4 : end if end != -1 else None
+                                                ]
                                                 candidate_pid = int(pid_str2)
                                                 break
                                         except Exception:
@@ -909,7 +948,9 @@ def run_cli(
                     if candidate_pid:
                         try:
                             os.kill(candidate_pid, signal.SIGTERM)
-                            print(f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。")
+                            print(
+                                f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。"
+                            )
                             killed = True
                         except Exception as e:
                             print(f"⚠️ 按端口停止失败: {e}")
@@ -919,7 +960,10 @@ def run_cli(
                 except Exception:
                     pass
                 try:
-                    alt_pf = Path(os.path.expanduser(os.path.expandvars(get_data_dir()))) / f"jarvis_web_{web_port}.pid"
+                    alt_pf = (
+                        Path(os.path.expanduser(os.path.expandvars(get_data_dir())))
+                        / f"jarvis_web_{web_port}.pid"
+                    )
                     alt_pf.unlink(missing_ok=True)
                 except Exception:
                     pass
@@ -980,7 +1024,9 @@ def run_cli(
                     pidfile.write_text(str(proc.pid), encoding="utf-8")
                 except Exception:
                     pass
-                print(f"✅ Web 服务已在后台启动 (PID {proc.pid})，地址: http://{web_host}:{web_port}")
+                print(
+                    f"✅ Web 服务已在后台启动 (PID {proc.pid})，地址: http://{web_host}:{web_port}"
+                )
             except Exception as e:
                 print(f"❌ 后台启动 Web 服务失败: {e}")
                 raise typer.Exit(code=1)
@@ -1028,7 +1074,7 @@ def run_cli(
         extra_kwargs = {}
         if web:
             # 纯 xterm 交互模式：不注入 WebBridge 的输入/确认回调，避免阻塞等待浏览器响应
-            #（交互由 /terminal PTY 会话中的 jvs 进程处理）
+            # （交互由 /terminal PTY 会话中的 jvs 进程处理）
             pass
 
         agent_manager = AgentManager(
@@ -1044,16 +1090,21 @@ def run_cli(
 
         if web:
             try:
-
                 from jarvis.jarvis_agent.web_server import start_web_server
-                from jarvis.jarvis_agent.stdio_redirect import enable_web_stdio_redirect, enable_web_stdin_redirect
+                from jarvis.jarvis_agent.stdio_redirect import (
+                    enable_web_stdio_redirect,
+                    enable_web_stdin_redirect,
+                )
+
                 # 在 Web 模式下固定TTY宽度为200，改善前端显示效果
                 try:
                     import os as _os
+
                     _os.environ["COLUMNS"] = "200"
                     # 尝试固定全局 Console 的宽度
                     try:
                         from jarvis.jarvis_utils.globals import console as _console
+
                         try:
                             _console._width = 200  # rich Console的固定宽度参数
                         except Exception:
@@ -1077,6 +1128,7 @@ def run_cli(
                     # 解析字符串命令（支持引号）
                     try:
                         import shlex
+
                         launch_cmd = shlex.split(web_launch_cmd.strip())
                         # 调试输出（可选，可以通过环境变量控制）
                         if os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
@@ -1091,6 +1143,7 @@ def run_cli(
                     try:
                         import sys as _sys
                         import os as _os
+
                         _argv = list(_sys.argv)
                         # 去掉程序名（argv[0]），并过滤 --web 相关参数
                         filtered = []
@@ -1125,19 +1178,27 @@ def run_cli(
                         launch_cmd = ["jvs"] + filtered
                     except Exception:
                         pass
-                
+
                 # 同时写入环境变量作为备选（向后兼容）
                 if launch_cmd:
                     try:
                         import os as _os
                         import json as _json
-                        _os.environ["JARVIS_WEB_LAUNCH_JSON"] = _json.dumps(launch_cmd, ensure_ascii=False)
+
+                        _os.environ["JARVIS_WEB_LAUNCH_JSON"] = _json.dumps(
+                            launch_cmd, ensure_ascii=False
+                        )
                     except Exception:
                         pass
-                
+
                 print("ℹ️ 以 Web 模式启动，请在浏览器中打开提供的地址进行交互。")
                 # 启动 Web 服务（阻塞调用），传入启动命令
-                start_web_server(agent_manager, host=web_host, port=web_port, launch_command=launch_cmd)
+                start_web_server(
+                    agent_manager,
+                    host=web_host,
+                    port=web_port,
+                    launch_command=launch_cmd,
+                )
                 return
             except Exception as e:
                 print(f"❌ Web 模式启动失败: {e}")

@@ -17,7 +17,7 @@ class TestGetFileMd5:
         test_file.write_text(content)
 
         result = get_file_md5(str(test_file))
-        
+
         # 验证 MD5 格式（32 个十六进制字符）
         assert len(result) == 32
         assert all(c in "0123456789abcdef" for c in result)
@@ -28,7 +28,7 @@ class TestGetFileMd5:
         test_file.write_text("")
 
         result = get_file_md5(str(test_file))
-        
+
         # 空文件的 MD5
         expected = hashlib.md5(b"").hexdigest()
         assert result == expected
@@ -40,7 +40,7 @@ class TestGetFileMd5:
         test_file.write_bytes(content)
 
         result = get_file_md5(str(test_file))
-        
+
         expected = hashlib.md5(content).hexdigest()
         assert result == expected
 
@@ -51,7 +51,7 @@ class TestGetFileMd5:
         test_file.write_text(content, encoding="utf-8")
 
         result = get_file_md5(str(test_file))
-        
+
         expected = hashlib.md5(content.encode("utf-8")).hexdigest()
         assert result == expected
 
@@ -65,7 +65,7 @@ class TestGetFileMd5:
                 f.write(chunk)
 
         result = get_file_md5(str(test_file))
-        
+
         # 验证 MD5 格式
         assert len(result) == 32
         assert all(c in "0123456789abcdef" for c in result)

@@ -63,7 +63,9 @@ def get_replace_map() -> dict:
     if not os.path.exists(replace_map_path):
         return BUILTIN_REPLACE_MAP.copy()
 
-    print("⚠️ 警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。请迁移到使用GLOBAL_CONFIG_DATA中的JARVIS_REPLACE_MAP配置。")
+    print(
+        "⚠️ 警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。请迁移到使用GLOBAL_CONFIG_DATA中的JARVIS_REPLACE_MAP配置。"
+    )
 
     with open(replace_map_path, "r", encoding="utf-8", errors="ignore") as file:
         file_map = yaml.safe_load(file) or {}
@@ -139,19 +141,24 @@ def _get_resolved_model_config(
                 group_config = group_item[model_group_name]
                 found = True
                 break
-        
+
         # 当显式指定了模型组但未找到时，报错并退出
         if model_group_override and not found:
             print(f"❌ 错误：指定的模型组 '{model_group_name}' 不存在于配置中。")
-            print("ℹ️ 可用的模型组: " + 
-                ", ".join(
-                    list(group.keys())[0] 
-                    for group in model_groups 
+            print(
+                "ℹ️ 可用的模型组: "
+                + ", ".join(
+                    list(group.keys())[0]
+                    for group in model_groups
                     if isinstance(group, dict)
-                ) if model_groups else "无可用模型组")
+                )
+                if model_groups
+                else "无可用模型组"
+            )
             import sys
+
             sys.exit(1)
-    
+
     _apply_llm_group_env_override(group_config)
 
     # Start with group config
@@ -302,14 +309,16 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False))
+    return cast(
+        bool, GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False)
+    )
 
 
 def get_data_dir() -> str:
     """
     获取Jarvis数据存储目录路径。
 
-    返回: 
+    返回:
         str: 数据目录路径，优先从JARVIS_DATA_PATH环境变量获取，
              如果未设置或为空，则使用~/.jarvis作为默认值
     """
@@ -537,8 +546,6 @@ def get_build_validation_timeout() -> int:
         int: 超时时间，默认为30秒
     """
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_BUILD_VALIDATION_TIMEOUT", 30))
-
-
 
 
 def get_mcp_config() -> List[Dict[str, Any]]:
@@ -770,10 +777,6 @@ def get_tool_filter_threshold() -> int:
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_FILTER_THRESHOLD", 30))
 
 
-
-
-
-
 def get_script_execution_timeout() -> int:
     """
     获取脚本执行的超时时间（秒）。
@@ -797,9 +800,7 @@ def is_enable_builtin_config_selector() -> bool:
     是否启用：在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择
     默认开启
     """
-    return (
-        GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR", True) is True
-    )
+    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR", True) is True
 
 
 def is_save_session_history() -> bool:
@@ -823,13 +824,14 @@ def is_immediate_abort() -> bool:
 def is_non_interactive() -> bool:
     """
     获取是否启用非交互模式。
-    
+
     返回：
         bool: 如果启用非交互模式则返回True，默认为False
     """
     # 优先读取环境变量，确保 CLI 标志生效且不被配置覆盖
     try:
         import os
+
         v = os.getenv("JARVIS_NON_INTERACTIVE")
         if v is not None:
             val = str(v).strip().lower()
@@ -846,7 +848,7 @@ def is_non_interactive() -> bool:
 def is_skip_predefined_tasks() -> bool:
     """
     是否跳过预定义任务加载。
-    
+
     返回：
         bool: 如果跳过预定义任务加载则返回True，默认为False
     """
@@ -856,9 +858,9 @@ def is_skip_predefined_tasks() -> bool:
 def get_addon_prompt_threshold() -> int:
     """
     获取附加提示的触发阈值（字符数）。
-    
+
     当消息长度超过此阈值时，会自动添加默认的附加提示。
-    
+
     返回:
         int: 触发阈值，默认为1024
     """
@@ -871,7 +873,7 @@ def get_addon_prompt_threshold() -> int:
 def is_enable_intent_recognition() -> bool:
     """
     获取是否启用意图识别功能。
-    
+
     返回:
         bool: 是否启用意图识别，默认为True（可通过 GLOBAL_CONFIG_DATA['JARVIS_ENABLE_INTENT_RECOGNITION'] 配置）
     """
@@ -881,15 +883,17 @@ def is_enable_intent_recognition() -> bool:
 def is_enable_memory_organizer() -> bool:
     """
     获取是否启用自动记忆整理功能。
-    
+
     返回:
         bool: 是否启用自动记忆整理，默认为False（可通过 GLOBAL_CONFIG_DATA['JARVIS_ENABLE_MEMORY_ORGANIZER'] 配置）
     """
     return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_MEMORY_ORGANIZER", False) is True
+
+
 def get_conversation_turn_threshold() -> int:
     """
     获取对话轮次阈值，用于触发总结。
-    
+
     返回:
         int: 对话轮次阈值，默认为50
     """

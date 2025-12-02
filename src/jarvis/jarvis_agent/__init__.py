@@ -143,7 +143,9 @@ def show_agent_startup_stats(
 
         # 构建欢迎信息
         platform = platform_name or get_normal_platform_name()
-        welcome_message = f"{agent_name} 初始化完成 - 使用 {platform} 平台 {model_name} 模型"
+        welcome_message = (
+            f"{agent_name} 初始化完成 - 使用 {platform} 平台 {model_name} 模型"
+        )
 
         stats_parts = [
             f"📚  本地方法论: [bold cyan]{methodology_count}[/bold cyan]",
@@ -264,7 +266,7 @@ class Agent:
             self.memory_manager._ensure_memory_prompt(agent=self)
         except Exception:
             pass
-        
+
         # 非关键流程：广播清理历史前事件（用于日志、监控等）
         try:
             self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
@@ -387,9 +389,8 @@ class Agent:
         self._addon_prompt_skip_rounds: int = 0
         # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
         self._no_tool_call_count: int = 0
-        
-        self._agent_type = "normal"
 
+        self._agent_type = "normal"
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
         self.confirm_callback: Callable[[str, bool], bool] = (
@@ -407,7 +408,9 @@ class Agent:
             use_tools or [],
         )
         # 初始化用户交互封装，保持向后兼容
-        self.user_interaction = UserInteractionHandler(self.multiline_inputer, self.confirm_callback)
+        self.user_interaction = UserInteractionHandler(
+            self.multiline_inputer, self.confirm_callback
+        )
         # 将确认函数指向封装后的 confirm，保持既有调用不变
         self.confirm_callback = self.user_interaction.confirm  # type: ignore[assignment]
         # 非交互模式参数支持：允许通过构造参数显式控制，便于其他Agent调用时设置
@@ -416,11 +419,14 @@ class Agent:
             self.non_interactive = (
                 bool(non_interactive)
                 if non_interactive is not None
-                else str(os.environ.get("JARVIS_NON_INTERACTIVE", "")).lower() in ("1", "true", "yes")
+                else str(os.environ.get("JARVIS_NON_INTERACTIVE", "")).lower()
+                in ("1", "true", "yes")
             )
             # 如果构造参数显式提供，则同步到环境变量与全局配置，供下游组件读取
             if non_interactive is not None:
-                os.environ["JARVIS_NON_INTERACTIVE"] = "true" if self.non_interactive else "false"
+                os.environ["JARVIS_NON_INTERACTIVE"] = (
+                    "true" if self.non_interactive else "false"
+                )
 
         except Exception:
             # 防御式回退
@@ -428,36 +434,60 @@ class Agent:
 
         # 初始化配置（直接解析，不再依赖 _init_config）
         try:
-            resolved_use_methodology = bool(use_methodology if use_methodology is not None else is_use_methodology())
+            resolved_use_methodology = bool(
+                use_methodology if use_methodology is not None else is_use_methodology()
+            )
         except Exception:
-            resolved_use_methodology = bool(use_methodology) if use_methodology is not None else True
+            resolved_use_methodology = (
+                bool(use_methodology) if use_methodology is not None else True
+            )
 
         try:
-            resolved_use_analysis = bool(use_analysis if use_analysis is not None else is_use_analysis())
+            resolved_use_analysis = bool(
+                use_analysis if use_analysis is not None else is_use_analysis()
+            )
         except Exception:
-            resolved_use_analysis = bool(use_analysis) if use_analysis is not None else True
+            resolved_use_analysis = (
+                bool(use_analysis) if use_analysis is not None else True
+            )
 
         try:
-            resolved_execute_tool_confirm = bool(execute_tool_confirm if execute_tool_confirm is not None else is_execute_tool_confirm())
+            resolved_execute_tool_confirm = bool(
+                execute_tool_confirm
+                if execute_tool_confirm is not None
+                else is_execute_tool_confirm()
+            )
         except Exception:
-            resolved_execute_tool_confirm = bool(execute_tool_confirm) if execute_tool_confirm is not None else False
+            resolved_execute_tool_confirm = (
+                bool(execute_tool_confirm)
+                if execute_tool_confirm is not None
+                else False
+            )
 
         try:
-            resolved_force_save_memory = bool(force_save_memory if force_save_memory is not None else is_force_save_memory())
+            resolved_force_save_memory = bool(
+                force_save_memory
+                if force_save_memory is not None
+                else is_force_save_memory()
+            )
         except Exception:
-            resolved_force_save_memory = bool(force_save_memory) if force_save_memory is not None else False
+            resolved_force_save_memory = (
+                bool(force_save_memory) if force_save_memory is not None else False
+            )
 
         self.use_methodology = resolved_use_methodology
         self.use_analysis = resolved_use_analysis
         self.execute_tool_confirm = resolved_execute_tool_confirm
-        self.summary_prompt = (summary_prompt or DEFAULT_SUMMARY_PROMPT)
+        self.summary_prompt = summary_prompt or DEFAULT_SUMMARY_PROMPT
         self.force_save_memory = resolved_force_save_memory
         # 多智能体模式下，默认不自动完成（即使是非交互），仅在明确传入 auto_complete=True 时开启
         if self.in_multi_agent:
             self.auto_complete = bool(self.auto_complete)
         else:
             # 非交互模式下默认自动完成；否则保持传入的 auto_complete 值
-            self.auto_complete = bool(self.auto_complete or (self.non_interactive or False))
+            self.auto_complete = bool(
+                self.auto_complete or (self.non_interactive or False)
+            )
 
         # 初始化事件总线需先于管理器，以便管理器在构造中安全订阅事件
         self.event_bus = EventBus()
@@ -485,7 +515,7 @@ class Agent:
             self.get_tool_registry(),  # type: ignore
             platform_name=self.model.platform_name(),  # type: ignore
         )
-        
+
         # 动态加载工具调用后回调
         self._load_after_tool_callbacks()
 
@@ -556,7 +586,7 @@ class Agent:
 
     def get_remaining_token_count(self) -> int:
         """获取剩余可用的token数量
-        
+
         返回:
             int: 剩余可用的token数量，如果无法获取则返回0
         """
@@ -668,6 +698,7 @@ class Agent:
 
                         for cb in candidates:
                             try:
+
                                 def _make_wrapper(callback):
                                     def _wrapper(**kwargs: Any) -> None:
                                         try:
@@ -675,8 +706,12 @@ class Agent:
                                             callback(agent)
                                         except Exception:
                                             pass
+
                                     return _wrapper
-                                self.event_bus.subscribe(AFTER_TOOL_CALL, _make_wrapper(cb))
+
+                                self.event_bus.subscribe(
+                                    AFTER_TOOL_CALL, _make_wrapper(cb)
+                                )
                             except Exception:
                                 pass
 
@@ -813,7 +848,7 @@ class Agent:
 
     def _add_addon_prompt(self, message: str, need_complete: bool) -> str:
         """添加附加提示到消息
-        
+
         规则：
         1. 如果 session.addon_prompt 存在，优先使用它
         2. 如果消息长度超过阈值，添加默认 addon_prompt
@@ -833,7 +868,7 @@ class Agent:
 
         addon_text = ""
         should_add = False
-        
+
         if self.session.addon_prompt:
             # 优先使用 session 中设置的 addon_prompt
             addon_text = self.session.addon_prompt
@@ -852,7 +887,7 @@ class Agent:
                 addon_text = self.make_default_addon_prompt(need_complete)
                 message = join_prompts([message, addon_text])
                 should_add = True
-        
+
         # 更新计数器：如果添加了 addon_prompt，重置计数器；否则递增
         if should_add:
             self._addon_prompt_skip_rounds = 0
@@ -875,7 +910,6 @@ class Agent:
     def _manage_conversation_length(self, message: str) -> str:
         """管理对话长度计数；摘要触发由剩余token数量在 AgentRunLoop 中统一处理（剩余token低于20%时触发）。"""
         self.session.conversation_length += get_context_token_count(message)
-
 
         return message
 
@@ -902,7 +936,7 @@ class Agent:
             except Exception:
                 pass
             response = ""
-        
+
         # 事件：模型调用后
         try:
             self.event_bus.emit(
@@ -935,16 +969,19 @@ class Agent:
         try:
             if not self.model:
                 raise RuntimeError("Model not initialized")
-            
+
             print("🔍 开始生成对话历史摘要...")
-            
+
             if for_token_limit:
                 # token限制触发的summary：使用SUMMARY_REQUEST_PROMPT进行上下文压缩
                 prompt_to_use = self.session.prompt + "\n" + SUMMARY_REQUEST_PROMPT
             else:
                 # 任务完成时的summary：使用用户传入的summary_prompt或DEFAULT_SUMMARY_PROMPT
                 safe_summary_prompt = self.summary_prompt or ""
-                if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() != "":
+                if (
+                    isinstance(safe_summary_prompt, str)
+                    and safe_summary_prompt.strip() != ""
+                ):
                     prompt_to_use = safe_summary_prompt
                 else:
                     prompt_to_use = DEFAULT_SUMMARY_PROMPT
@@ -1004,8 +1041,8 @@ class Agent:
             self.memory_manager._ensure_memory_prompt(agent=self)
         except Exception:
             pass
-        
-        # 非关键流程：广播清理历史前事件（用于日志、监控等）
+
+            # 非关键流程：广播清理历史前事件（用于日志、监控等）
             try:
                 self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
             except Exception:
@@ -1022,7 +1059,7 @@ class Agent:
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
-        
+
         # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
@@ -1038,19 +1075,19 @@ class Agent:
             self.memory_manager._ensure_memory_prompt(agent=self)
         except Exception:
             pass
-        
+
         # 非关键流程：广播清理历史前事件（用于日志、监控等）
         try:
             self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
         except Exception:
             pass
-        
+
         result = self.file_methodology_manager.handle_history_with_file_upload()
         # 重置 addon_prompt 跳过轮数计数器
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
-        
+
         # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
@@ -1098,13 +1135,15 @@ class Agent:
         result = "任务完成"
 
         if self.need_summary:
-
             # 确保总结提示词非空：若为None或仅空白，则回退到默认提示词
             safe_summary_prompt = self.summary_prompt or ""
-            if isinstance(safe_summary_prompt, str) and safe_summary_prompt.strip() == "":
+            if (
+                isinstance(safe_summary_prompt, str)
+                and safe_summary_prompt.strip() == ""
+            ):
                 safe_summary_prompt = DEFAULT_SUMMARY_PROMPT
             # 注意：不要写回 session.prompt，避免回调修改/清空后导致使用空prompt
-            
+
             # 关键流程：直接调用 task_analyzer 执行任务分析
             try:
                 self.task_analyzer._on_before_summary(
@@ -1115,7 +1154,7 @@ class Agent:
                 )
             except Exception:
                 pass
-            
+
             # 非关键流程：广播将要生成总结事件（用于日志、监控等）
             try:
                 self.event_bus.emit(
@@ -1160,7 +1199,7 @@ class Agent:
             )
         except Exception:
             pass
-        
+
         try:
             self.memory_manager._ensure_memory_prompt(
                 agent=self,
@@ -1169,7 +1208,7 @@ class Agent:
             )
         except Exception:
             pass
-        
+
         # 非关键流程：广播任务完成事件（用于日志、监控等）
         try:
             self.event_bus.emit(
@@ -1249,7 +1288,7 @@ class Agent:
         self.session.prompt = f"{user_input}"
         try:
             set_agent(self.name, self)
-            
+
             # 关键流程：直接调用 memory_manager 重置任务状态
             try:
                 self.memory_manager._on_task_started(
@@ -1260,7 +1299,7 @@ class Agent:
                 )
             except Exception:
                 pass
-            
+
             # 非关键流程：广播任务开始事件（用于日志、监控等）
             try:
                 self.event_bus.emit(
@@ -1283,7 +1322,9 @@ class Agent:
         loop = AgentRunLoop(self)
         return loop.run()
 
-    def _handle_run_interrupt(self, current_response: str) -> Optional[Union[Any, "LoopAction"]]:
+    def _handle_run_interrupt(
+        self, current_response: str
+    ) -> Optional[Union[Any, "LoopAction"]]:
         """处理运行中的中断
 
         返回:
@@ -1317,16 +1358,20 @@ class Agent:
 
         if any(handler.can_handle(current_response) for handler in self.output_handler):
             if self.confirm_callback("检测到有工具调用，是否继续处理工具调用？", True):
-                self.session.prompt = join_prompts([
-                    f"被用户中断，用户补充信息为：{user_input}",
-                    "用户同意继续工具调用。"
-                ])
+                self.session.prompt = join_prompts(
+                    [
+                        f"被用户中断，用户补充信息为：{user_input}",
+                        "用户同意继续工具调用。",
+                    ]
+                )
                 return None  # 继续执行工具调用
             else:
-                self.session.prompt = join_prompts([
-                    f"被用户中断，用户补充信息为：{user_input}",
-                    "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
-                ])
+                self.session.prompt = join_prompts(
+                    [
+                        f"被用户中断，用户补充信息为：{user_input}",
+                        "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。",
+                    ]
+                )
                 return LoopAction.SKIP_TURN  # 请求主循环 continue
         else:
             self.session.prompt = f"被用户中断，用户补充信息为：{user_input}"
@@ -1412,7 +1457,7 @@ class Agent:
 
     def _filter_tools_if_needed(self, task: str):
         """如果工具数量超过阈值，使用大模型筛选相关工具
-        
+
         注意：仅筛选用户自定义工具，内置工具不参与筛选（始终保留）
         """
         tool_registry = self.get_tool_registry()
@@ -1467,18 +1512,14 @@ class Agent:
         # 使用临时模型实例调用模型，以避免污染历史记录
         try:
             temp_model = self._create_temp_model("你是一个帮助筛选工具的助手。")
-            selected_tools_str = temp_model.chat_until_success(
-                selection_prompt
-            )  # type: ignore
+            selected_tools_str = temp_model.chat_until_success(selection_prompt)  # type: ignore
 
             # 解析响应并筛选工具
             selected_indices = [
                 int(i.strip()) for i in re.findall(r"\d+", selected_tools_str)
             ]
             selected_tool_names = [
-                tool_names[i - 1]
-                for i in selected_indices
-                if 0 < i <= len(tool_names)
+                tool_names[i - 1] for i in selected_indices if 0 < i <= len(tool_names)
             ]
 
             if selected_tool_names:
@@ -1486,11 +1527,15 @@ class Agent:
                 selected_tool_names = sorted(list(set(selected_tool_names)))
                 # 合并内置工具名称和筛选出的用户自定义工具名称
                 builtin_names = list(tool_registry._builtin_tool_names)
-                final_tool_names = sorted(list(set(builtin_names + selected_tool_names)))
+                final_tool_names = sorted(
+                    list(set(builtin_names + selected_tool_names))
+                )
                 tool_registry.use_tools(final_tool_names)
                 # 使用筛选后的工具列表重新设置系统提示
                 self._setup_system_prompt()
-                print(f"✅ 已筛选出 {len(selected_tool_names)} 个相关工具: {', '.join(selected_tool_names)}")
+                print(
+                    f"✅ 已筛选出 {len(selected_tool_names)} 个相关工具: {', '.join(selected_tool_names)}"
+                )
                 # 广播工具筛选事件
                 try:
                     self.event_bus.emit(
