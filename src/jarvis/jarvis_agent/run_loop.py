@@ -202,12 +202,10 @@ class AgentRunLoop:
                     else:
                         # 没有工具调用，增加计数器
                         ag._no_tool_call_count += 1
-                        # 如果连续5次没有工具调用，添加工具使用提示
-                        if ag._no_tool_call_count >= 5:
+                        # 如果连续3次没有工具调用，发送工具使用提示
+                        if ag._no_tool_call_count >= 3:
                             tool_usage_prompt = ag.get_tool_usage_prompt()
-                            ag.session.addon_prompt = join_prompts(
-                                [ag.session.addon_prompt, tool_usage_prompt]
-                            )
+                            ag.set_addon_prompt(tool_usage_prompt)
                             # 重置计数器，避免重复添加
                             ag._no_tool_call_count = 0
 
