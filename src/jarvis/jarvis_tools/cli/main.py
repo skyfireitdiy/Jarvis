@@ -11,7 +11,6 @@ from jarvis.jarvis_utils.utils import init_env
 app = typer.Typer(help="Jarvis 工具系统命令行界面")
 
 
-
 @app.command("list")
 def list_tools(
     as_json: bool = typer.Option(False, "--json", help="以JSON格式输出"),
@@ -42,6 +41,7 @@ def list_tools(
         # 为避免 PrettyOutput 对每行加框造成信息稀疏，先拼接字符串再统一打印
         lines = []
         import json as _json  # local import to ensure available
+
         for tool in tools:
             lines.append(f"\n{tool['name']}")
             lines.append(f"   描述: {tool['description']}")
@@ -50,7 +50,9 @@ def list_tools(
                 # 使用 Markdown 代码块统一展示参数
                 lines.append("```json")
                 try:
-                    lines.append(_json.dumps(tool["parameters"], ensure_ascii=False, indent=2))
+                    lines.append(
+                        _json.dumps(tool["parameters"], ensure_ascii=False, indent=2)
+                    )
                 except Exception:
                     lines.append(str(tool.get("parameters")))
                 lines.append("```")
@@ -99,7 +101,9 @@ def stat_tools(
                     OutputType.CODE,
                     lang="text",
                 )
-                print(f"ℹ️ 总计: {len(table_data)} 个工具被使用，共 {sum(x[1] for x in table_data)} 次调用")
+                print(
+                    f"ℹ️ 总计: {len(table_data)} 个工具被使用，共 {sum(x[1] for x in table_data)} 次调用"
+                )
             else:
                 print("ℹ️ 暂无工具调用记录")
     else:

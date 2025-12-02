@@ -3,6 +3,7 @@
 文件和方法论管理器模块
 负责处理文件上传和方法论加载功能
 """
+
 import os
 import tempfile
 
@@ -47,25 +48,31 @@ class FileMethodologyManager:
             # 上传成功
 
             if self.agent.files:
-                self.agent.session.prompt = join_prompts([
-                    self.agent.session.prompt,
-                    "上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。"
-                ])
+                self.agent.session.prompt = join_prompts(
+                    [
+                        self.agent.session.prompt,
+                        "上传的文件包含历史对话信息和方法论文件，可以从中获取一些经验信息。",
+                    ]
+                )
             else:
-                self.agent.session.prompt = join_prompts([
-                    self.agent.session.prompt,
-                    "上传的文件包含历史对话信息，可以从中获取一些经验信息。"
-                ])
+                self.agent.session.prompt = join_prompts(
+                    [
+                        self.agent.session.prompt,
+                        "上传的文件包含历史对话信息，可以从中获取一些经验信息。",
+                    ]
+                )
 
     def _handle_files_upload(self):
         """处理普通文件上传"""
         if not self.agent.model.upload_files(self.agent.files):  # type: ignore
             print("⚠️ 文件上传失败，将忽略文件列表")
         else:
-            self.agent.session.prompt = join_prompts([
-                self.agent.session.prompt,
-                "上传的文件包含历史对话信息，可以从中获取一些经验信息。"
-            ])
+            self.agent.session.prompt = join_prompts(
+                [
+                    self.agent.session.prompt,
+                    "上传的文件包含历史对话信息，可以从中获取一些经验信息。",
+                ]
+            )
 
     def _handle_local_mode(self):
         """处理本地模式（不支持文件上传）"""
@@ -89,10 +96,12 @@ class FileMethodologyManager:
             platform_name=self.agent.model.platform_name(),
             model_name=self.agent.model.name(),
         )
-        self.agent.session.prompt = join_prompts([
-            self.agent.session.prompt,
-            f"以下是历史类似问题的执行经验，可参考：\n{methodology}"
-        ])
+        self.agent.session.prompt = join_prompts(
+            [
+                self.agent.session.prompt,
+                f"以下是历史类似问题的执行经验，可参考：\n{methodology}",
+            ]
+        )
 
     def handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""

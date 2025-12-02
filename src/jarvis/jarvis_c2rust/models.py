@@ -2,6 +2,7 @@
 """
 C2Rust 转译器数据模型
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -25,4 +26,3 @@ class FnRecord:
     params: Optional[List[Dict[str, str]]] = None
     # 来自库替代阶段的上下文元数据（若存在）
     lib_replacement: Optional[Dict[str, Any]] = None
-

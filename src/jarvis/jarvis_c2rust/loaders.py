@@ -2,6 +2,7 @@
 """
 C2Rust 转译器数据加载器
 """
+
 from __future__ import annotations
 
 import json
@@ -23,9 +24,7 @@ class _DbLoader:
         self.symbols_path = self.data_dir / SYMBOLS_JSONL
         # 统一流程：仅使用 symbols.jsonl，不再兼容 functions.jsonl
         if not self.symbols_path.exists():
-            raise FileNotFoundError(
-                f"在目录下未找到 symbols.jsonl: {self.data_dir}"
-            )
+            raise FileNotFoundError(f"在目录下未找到 symbols.jsonl: {self.data_dir}")
 
         self.fn_by_id: Dict[int, FnRecord] = {}
         self.name_to_id: Dict[str, int] = {}
@@ -36,6 +35,7 @@ class _DbLoader:
         读取统一的 symbols.jsonl。
         不区分函数与类型定义，均加载为通用记录（位置与引用信息）。
         """
+
         def _iter_records_from_file(path: Path):
             try:
                 with path.open("r", encoding="utf-8") as f:
@@ -68,7 +68,11 @@ class _DbLoader:
             sc = int(obj.get("start_col") or 0)
             er = int(obj.get("end_line") or 0)
             ec = int(obj.get("end_col") or 0)
-            lr = obj.get("lib_replacement") if isinstance(obj.get("lib_replacement"), dict) else None
+            lr = (
+                obj.get("lib_replacement")
+                if isinstance(obj.get("lib_replacement"), dict)
+                else None
+            )
             rec = FnRecord(
                 id=fid,
                 name=nm,
@@ -167,7 +171,12 @@ class _SymbolMapJsonl:
             if not k:
                 continue
             self.by_key.setdefault(k, []).append(idx)
-        pos_key = (str(rec.get("c_file") or ""), int(rec.get("start_line") or 0), int(rec.get("end_line") or 0), str(rec.get("c_qname") or rec.get("c_name") or ""))
+        pos_key = (
+            str(rec.get("c_file") or ""),
+            int(rec.get("start_line") or 0),
+            int(rec.get("end_line") or 0),
+            str(rec.get("c_qname") or rec.get("c_name") or ""),
+        )
         self.by_pos.setdefault(pos_key, []).append(idx)
 
     def has_symbol(self, sym: str) -> bool:
@@ -182,7 +191,12 @@ class _SymbolMapJsonl:
         return recs[-1] if recs else None
 
     def has_rec(self, rec: FnRecord) -> bool:
-        key = (str(rec.file or ""), int(rec.start_line or 0), int(rec.end_line or 0), str(rec.qname or rec.name or ""))
+        key = (
+            str(rec.file or ""),
+            int(rec.start_line or 0),
+            int(rec.end_line or 0),
+            str(rec.qname or rec.name or ""),
+        )
         return bool(self.by_pos.get(key))
 
     def add(self, rec: FnRecord, module: str, rust_symbol: str) -> None:
@@ -204,4 +218,3 @@ class _SymbolMapJsonl:
         except Exception:
             pass
         self._add_record_in_memory(obj)
-

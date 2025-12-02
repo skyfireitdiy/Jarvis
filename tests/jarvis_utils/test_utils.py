@@ -29,6 +29,7 @@ class TestGetMissingRagModules:
     @patch("importlib.util.find_spec")
     def test_missing_modules(self, mock_find_spec):
         """测试缺失模块的情况"""
+
         # 模拟某些模块缺失
         def side_effect(module):
             if module in ["langchain", "chromadb"]:
@@ -86,4 +87,3 @@ class TestIsEditableInstall:
         # 我们主要验证函数能正常执行并返回布尔值
         result = is_editable_install()
         assert isinstance(result, bool)
-

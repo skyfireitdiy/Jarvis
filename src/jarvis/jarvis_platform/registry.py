@@ -80,7 +80,9 @@ class PlatformRegistry:
                 missing_methods.append(f"{method_name}(parameter mismatch)")
 
         if missing_methods:
-            print(f"⚠️ 平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}")
+            print(
+                f"⚠️ 平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}"
+            )
             return False
 
         return True
@@ -149,7 +151,7 @@ class PlatformRegistry:
                     error_lines.append(f"加载平台 {module_name} 失败: {str(e)}")
 
         if error_lines:
-            joined_errors = '\n'.join(error_lines)
+            joined_errors = "\n".join(error_lines)
             print(f"❌ {joined_errors}")
         return platforms
 
@@ -227,7 +229,6 @@ class PlatformRegistry:
             return None
 
         try:
-
             platform = self.platforms[name]()
             return platform
         except Exception as e:

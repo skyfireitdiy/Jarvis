@@ -7,6 +7,7 @@ PromptManager: 统一管理 Agent 的系统提示词与附加提示词的构建�
 - 先行落地构建逻辑，后续在 Agent 中逐步委派使用
 - 保持与现有工具/记忆系统兼容
 """
+
 from typing import TYPE_CHECKING
 
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -15,7 +16,6 @@ from jarvis.jarvis_utils.tag import ot
 if TYPE_CHECKING:
     # 避免运行时循环依赖，仅用于类型标注
     from . import Agent  # noqa: F401
-
 
 
 class PromptManager:
@@ -50,7 +50,9 @@ class PromptManager:
         仅进行字符串拼装，不操作会话状态。
         """
         # 结构化系统指令
-        action_handlers = ", ".join([handler.name() for handler in self.agent.output_handler])
+        action_handlers = ", ".join(
+            [handler.name() for handler in self.agent.output_handler]
+        )
 
         # 任务完成提示
         complete_prompt = (

@@ -17,13 +17,13 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 
 class NodeJSBuildValidator(BuildValidatorBase):
     """Node.js构建验证器"""
-    
+
     BUILD_SYSTEM_NAME = "npm/Node.js"
     SUPPORTED_LANGUAGES = ["javascript", "typescript"]
-    
+
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
-        
+
         # 策略1: 尝试使用 tsc --noEmit（如果存在TypeScript）
         tsconfig = os.path.join(self.project_root, "tsconfig.json")
         if os.path.exists(tsconfig):
@@ -46,7 +46,7 @@ class NodeJSBuildValidator(BuildValidatorBase):
                 build_system=BuildSystem.NODEJS,
                 duration=duration,
             )
-        
+
         # 策略2: 尝试运行 npm run build（如果存在build脚本）
         package_json = os.path.join(self.project_root, "package.json")
         if os.path.exists(package_json):
@@ -63,9 +63,13 @@ class NodeJSBuildValidator(BuildValidatorBase):
                         success = returncode == 0
                         output = stdout + stderr
                         if success:
-                            print(f"✅ Node.js (npm build) 构建验证成功（耗时 {duration:.2f} 秒）")
+                            print(
+                                f"✅ Node.js (npm build) 构建验证成功（耗时 {duration:.2f} 秒）"
+                            )
                         else:
-                            print(f"❌ Node.js (npm build) 构建验证失败（耗时 {duration:.2f} 秒）")
+                            print(
+                                f"❌ Node.js (npm build) 构建验证失败（耗时 {duration:.2f} 秒）"
+                            )
                             print(f"错误信息：npm build失败\n{output[:500]}")
                         return BuildResult(
                             success=success,
@@ -76,14 +80,17 @@ class NodeJSBuildValidator(BuildValidatorBase):
                         )
             except Exception as e:
                 print(f"⚠️ 读取package.json失败: {e}")
-        
+
         # 策略3: 使用 eslint 进行语法检查（如果存在）
         if modified_files:
-            js_files = [f for f in modified_files if f.endswith((".js", ".jsx", ".ts", ".tsx"))]
+            js_files = [
+                f for f in modified_files if f.endswith((".js", ".jsx", ".ts", ".tsx"))
+            ]
             if js_files:
                 # 尝试使用 eslint
                 returncode, stdout, stderr = self._run_command(
-                    ["npx", "eslint", "--max-warnings=0"] + js_files[:5],  # 限制文件数量
+                    ["npx", "eslint", "--max-warnings=0"]
+                    + js_files[:5],  # 限制文件数量
                     timeout=15,
                 )
                 duration = time.time() - start_time
@@ -97,7 +104,7 @@ class NodeJSBuildValidator(BuildValidatorBase):
                     build_system=BuildSystem.NODEJS,
                     duration=duration,
                 )
-        
+
         duration = time.time() - start_time
         print(f"✅ Node.js 构建验证成功（耗时 {duration:.2f} 秒，无构建脚本）")
         return BuildResult(
@@ -107,4 +114,3 @@ class NodeJSBuildValidator(BuildValidatorBase):
             build_system=BuildSystem.NODEJS,
             duration=duration,
         )
-

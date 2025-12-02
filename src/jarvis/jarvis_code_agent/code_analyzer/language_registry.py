@@ -13,7 +13,7 @@ from .symbol_extractor import SymbolExtractor
 
 class LanguageRegistry:
     """语言支持注册表。
-    
+
     负责管理所有已注册的语言支持，提供语言检测和工厂方法。
     """
 
@@ -23,25 +23,27 @@ class LanguageRegistry:
 
     def register(self, language_support: BaseLanguageSupport) -> None:
         """注册一个语言支持。
-        
+
         Args:
             language_support: 语言支持实例
         """
         lang_name = language_support.language_name
         self._languages[lang_name] = language_support
-        
+
         # 注册文件扩展名映射
         for ext in language_support.file_extensions:
             # 如果扩展名已存在，记录警告但不覆盖（保留第一个注册的）
             if ext in self._extension_map and self._extension_map[ext] != lang_name:
-                print(f"Warning: Extension {ext} already registered for "
-                      f"{self._extension_map[ext]}, ignoring registration for {lang_name}")
+                print(
+                    f"Warning: Extension {ext} already registered for "
+                    f"{self._extension_map[ext]}, ignoring registration for {lang_name}"
+                )
             else:
                 self._extension_map[ext] = lang_name
 
     def unregister(self, language_name: str) -> None:
         """取消注册一个语言支持。
-        
+
         Args:
             language_name: 语言名称
         """
@@ -49,7 +51,8 @@ class LanguageRegistry:
             self._languages.pop(language_name)
             # 移除扩展名映射
             extensions_to_remove = [
-                ext for ext, lang in self._extension_map.items()
+                ext
+                for ext, lang in self._extension_map.items()
                 if lang == language_name
             ]
             for ext in extensions_to_remove:
@@ -57,10 +60,10 @@ class LanguageRegistry:
 
     def detect_language(self, file_path: str) -> Optional[str]:
         """根据文件路径检测编程语言。
-        
+
         Args:
             file_path: 文件路径
-            
+
         Returns:
             语言名称，如果无法检测则返回None
         """
@@ -69,10 +72,10 @@ class LanguageRegistry:
 
     def get_language_support(self, language_name: str) -> Optional[BaseLanguageSupport]:
         """获取指定语言的支持实例。
-        
+
         Args:
             language_name: 语言名称
-            
+
         Returns:
             语言支持实例，如果未注册则返回None
         """
@@ -80,10 +83,10 @@ class LanguageRegistry:
 
     def get_symbol_extractor(self, language_name: str) -> Optional[SymbolExtractor]:
         """获取指定语言的符号提取器。
-        
+
         Args:
             language_name: 语言名称
-            
+
         Returns:
             SymbolExtractor实例，如果不支持则返回None
         """
@@ -92,12 +95,14 @@ class LanguageRegistry:
             return lang_support.create_symbol_extractor()
         return None
 
-    def get_dependency_analyzer(self, language_name: str) -> Optional[DependencyAnalyzer]:
+    def get_dependency_analyzer(
+        self, language_name: str
+    ) -> Optional[DependencyAnalyzer]:
         """获取指定语言的依赖分析器。
-        
+
         Args:
             language_name: 语言名称
-            
+
         Returns:
             DependencyAnalyzer实例，如果不支持则返回None
         """
@@ -108,7 +113,7 @@ class LanguageRegistry:
 
     def get_supported_languages(self) -> Set[str]:
         """获取所有已注册的语言名称集合。
-        
+
         Returns:
             语言名称集合
         """
@@ -116,10 +121,10 @@ class LanguageRegistry:
 
     def is_supported(self, file_path: str) -> bool:
         """检查文件是否被支持。
-        
+
         Args:
             file_path: 文件路径
-            
+
         Returns:
             如果文件被支持返回True，否则返回False
         """
@@ -132,7 +137,7 @@ _registry = LanguageRegistry()
 
 def get_registry() -> LanguageRegistry:
     """获取全局语言注册表实例。
-    
+
     Returns:
         全局LanguageRegistry实例
     """
@@ -141,7 +146,7 @@ def get_registry() -> LanguageRegistry:
 
 def register_language(language_support: BaseLanguageSupport) -> None:
     """注册一个语言支持（便捷函数）。
-    
+
     Args:
         language_support: 语言支持实例
     """
@@ -150,10 +155,10 @@ def register_language(language_support: BaseLanguageSupport) -> None:
 
 def detect_language(file_path: str) -> Optional[str]:
     """检测文件的语言（便捷函数）。
-    
+
     Args:
         file_path: 文件路径
-        
+
     Returns:
         语言名称，如果无法检测则返回None
     """
@@ -162,10 +167,10 @@ def detect_language(file_path: str) -> Optional[str]:
 
 def get_symbol_extractor(language: str) -> Optional[SymbolExtractor]:
     """获取指定语言的符号提取器（便捷函数）。
-    
+
     Args:
         language: 语言名称
-        
+
     Returns:
         SymbolExtractor实例，如果不支持则返回None
     """
@@ -174,12 +179,11 @@ def get_symbol_extractor(language: str) -> Optional[SymbolExtractor]:
 
 def get_dependency_analyzer(language: str) -> Optional[DependencyAnalyzer]:
     """获取指定语言的依赖分析器（便捷函数）。
-    
+
     Args:
         language: 语言名称
-        
+
     Returns:
         DependencyAnalyzer实例，如果不支持则返回None
     """
     return _registry.get_dependency_analyzer(language)
-

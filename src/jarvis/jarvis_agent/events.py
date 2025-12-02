@@ -7,6 +7,7 @@
 - 提供事件负载的类型提示，便于静态检查与后续文档化
 - 本文件仅提供常量与类型定义，不改变现有行为
 """
+
 from typing import Any, TypedDict, List
 
 # 事件主题常量
@@ -44,11 +45,13 @@ class BeforeToolCallEvent(TypedDict, total=False):
     agent: Any
     current_response: str
 
+
 class AfterToolCallEvent(TypedDict, total=False):
     agent: Any
     current_response: str
     need_return: bool
     tool_prompt: str
+
 
 # 任务生命周期
 class TaskStartedEvent(TypedDict, total=False):
@@ -57,10 +60,12 @@ class TaskStartedEvent(TypedDict, total=False):
     description: str
     user_input: str
 
+
 class TaskCompletedEvent(TypedDict, total=False):
     agent: Any
     auto_completed: bool
     need_summary: bool
+
 
 # 总结阶段
 class BeforeSummaryEvent(TypedDict, total=False):
@@ -69,9 +74,11 @@ class BeforeSummaryEvent(TypedDict, total=False):
     auto_completed: bool
     need_summary: bool
 
+
 class AfterSummaryEvent(TypedDict, total=False):
     agent: Any
     summary: str
+
 
 # 附加提示
 class BeforeAddonPromptEvent(TypedDict, total=False):
@@ -80,34 +87,41 @@ class BeforeAddonPromptEvent(TypedDict, total=False):
     current_message: str
     has_session_addon: bool
 
+
 class AfterAddonPromptEvent(TypedDict, total=False):
     agent: Any
     need_complete: bool
     addon_text: str
     final_message: str
 
+
 # 历史清理
 class BeforeHistoryClearEvent(TypedDict, total=False):
     agent: Any
 
+
 class AfterHistoryClearEvent(TypedDict, total=False):
     agent: Any
+
 
 # 模型调用
 class BeforeModelCallEvent(TypedDict, total=False):
     agent: Any
     message: str
 
+
 class AfterModelCallEvent(TypedDict, total=False):
     agent: Any
     message: str
     response: str
+
 
 # 中断
 class InterruptTriggeredEvent(TypedDict, total=False):
     agent: Any
     current_response: str
     user_input: str
+
 
 # 工具筛选
 class BeforeToolFilterEvent(TypedDict, total=False):
@@ -116,12 +130,14 @@ class BeforeToolFilterEvent(TypedDict, total=False):
     total_tools: int
     threshold: int
 
+
 class ToolFilteredEvent(TypedDict, total=False):
     agent: Any
     task: str
     selected_tools: List[str]
     total_tools: int
     threshold: int
+
 
 __all__ = [
     "BEFORE_TOOL_CALL",

@@ -46,20 +46,30 @@ RE_IO_API = re.compile(
 )
 
 # 新增：格式化字符串/危险临时文件/命令执行等风险 API 模式
-RE_PRINTF_LIKE = re.compile(r"\b(printf|sprintf|snprintf|vsprintf|vsnprintf)\s*\(", re.IGNORECASE)
+RE_PRINTF_LIKE = re.compile(
+    r"\b(printf|sprintf|snprintf|vsprintf|vsnprintf)\s*\(", re.IGNORECASE
+)
 RE_FPRINTF = re.compile(r"\bfprintf\s*\(", re.IGNORECASE)
 RE_INSECURE_TMP = re.compile(r"\b(tmpnam|tempnam|mktemp)\s*\(", re.IGNORECASE)
 RE_SYSTEM_LIKE = re.compile(r"\b(system|popen)\s*\(", re.IGNORECASE)
-RE_EXEC_LIKE = re.compile(r"\b(execvp|execlp|execvpe|execl|execve|execv)\s*\(", re.IGNORECASE)
+RE_EXEC_LIKE = re.compile(
+    r"\b(execvp|execlp|execvpe|execl|execve|execv)\s*\(", re.IGNORECASE
+)
 RE_SCANF_CALL = re.compile(r'\b(?:[fs]?scanf)\s*\(\s*"([^"]*)"', re.IGNORECASE)
 # 线程/锁相关
-RE_PTHREAD_LOCK = re.compile(r"\bpthread_mutex_lock\s*\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE)
-RE_PTHREAD_UNLOCK = re.compile(r"\bpthread_mutex_unlock\s*\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE)
+RE_PTHREAD_LOCK = re.compile(
+    r"\bpthread_mutex_lock\s*\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE
+)
+RE_PTHREAD_UNLOCK = re.compile(
+    r"\bpthread_mutex_unlock\s*\(\s*&\s*([A-Za-z_]\w*)\s*\)\s*;?", re.IGNORECASE
+)
 # 其他危险用法相关
 RE_ATOI_FAMILY = re.compile(r"\b(atoi|atol|atoll|atof)\s*\(", re.IGNORECASE)
 RE_RAND = re.compile(r"\b(rand|srand)\s*\(", re.IGNORECASE)
 RE_STRTOK = re.compile(r"\bstrtok\s*\(", re.IGNORECASE)
-RE_OPEN_PERMISSIVE = re.compile(r"\bopen\s*\(\s*[^,]+,\s*[^,]*O_CREAT[^,]*,\s*(0[0-7]{3,4})\s*\)", re.IGNORECASE)
+RE_OPEN_PERMISSIVE = re.compile(
+    r"\bopen\s*\(\s*[^,]+,\s*[^,]*O_CREAT[^,]*,\s*(0[0-7]{3,4})\s*\)", re.IGNORECASE
+)
 RE_FOPEN_MODE = re.compile(r'\bfopen\s*\(\s*[^,]+,\s*"([^"]+)"\s*\)', re.IGNORECASE)
 RE_GENERIC_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*")
 RE_FREE_CALL_ANY = re.compile(r"\bfree\s*\(\s*([^)]+?)\s*\)", re.IGNORECASE)
@@ -74,25 +84,42 @@ RE_PTHREAD_RET = re.compile(
     re.IGNORECASE,
 )
 RE_PTHREAD_COND_WAIT = re.compile(r"\bpthread_cond_(?:timed)?wait\s*\(", re.IGNORECASE)
-RE_PTHREAD_CREATE = re.compile(r"\bpthread_create\s*\(\s*&\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE)
+RE_PTHREAD_CREATE = re.compile(
+    r"\bpthread_create\s*\(\s*&\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE
+)
 RE_PTHREAD_JOIN = re.compile(r"\bpthread_join\s*\(\s*([A-Za-z_]\w*)\s*,", re.IGNORECASE)
-RE_PTHREAD_DETACH = re.compile(r"\bpthread_detach\s*\(\s*([A-Za-z_]\w*)\s*\)", re.IGNORECASE)
+RE_PTHREAD_DETACH = re.compile(
+    r"\bpthread_detach\s*\(\s*([A-Za-z_]\w*)\s*\)", re.IGNORECASE
+)
 # C++ 标准库锁相关
 RE_STD_MUTEX = re.compile(r"\b(?:std::)?mutex\s+([A-Za-z_]\w*)", re.IGNORECASE)
 RE_MUTEX_LOCK = re.compile(r"\b([A-Za-z_]\w*)\s*\.lock\s*\(", re.IGNORECASE)
 RE_MUTEX_UNLOCK = re.compile(r"\b([A-Za-z_]\w*)\s*\.unlock\s*\(", re.IGNORECASE)
 RE_MUTEX_TRY_LOCK = re.compile(r"\b([A-Za-z_]\w*)\s*\.try_lock\s*\(", re.IGNORECASE)
-RE_LOCK_GUARD = re.compile(r"\b(?:std::)?lock_guard\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
-RE_UNIQUE_LOCK = re.compile(r"\b(?:std::)?unique_lock\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
-RE_SHARED_LOCK = re.compile(r"\b(?:std::)?shared_lock\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
+RE_LOCK_GUARD = re.compile(
+    r"\b(?:std::)?lock_guard\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE
+)
+RE_UNIQUE_LOCK = re.compile(
+    r"\b(?:std::)?unique_lock\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE
+)
+RE_SHARED_LOCK = re.compile(
+    r"\b(?:std::)?shared_lock\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE
+)
 RE_STD_LOCK = re.compile(r"\bstd::lock\s*\(", re.IGNORECASE)
 RE_SCOPED_LOCK = re.compile(r"\b(?:std::)?scoped_lock\s*<", re.IGNORECASE)
 # 数据竞争检测相关
-RE_STATIC_VAR = re.compile(r"\bstatic\s+(?:const\s+|volatile\s+)?[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE)
-RE_EXTERN_VAR = re.compile(r"\bextern\s+[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_STATIC_VAR = re.compile(
+    r"\bstatic\s+(?:const\s+|volatile\s+)?[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)",
+    re.IGNORECASE,
+)
+RE_EXTERN_VAR = re.compile(
+    r"\bextern\s+[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE
+)
 RE_STD_THREAD = re.compile(r"\b(?:std::)?thread\s+([A-Za-z_]\w*)", re.IGNORECASE)
 RE_ATOMIC = re.compile(r"\b(?:std::)?atomic\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
-RE_VOLATILE = re.compile(r"\bvolatile\s+[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_VOLATILE = re.compile(
+    r"\bvolatile\s+[A-Za-z_]\w*(?:\s+\*|\s+)+([A-Za-z_]\w*)", re.IGNORECASE
+)
 RE_VAR_ACCESS = re.compile(r"\b([A-Za-z_]\w*)\s*(?:=|\[|->|\.)", re.IGNORECASE)
 RE_VAR_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=", re.IGNORECASE)
 RE_INET_LEGACY = re.compile(r"\b(inet_addr|inet_aton)\s*\(", re.IGNORECASE)
@@ -103,20 +130,13 @@ RE_GETENV = re.compile(r'\bgetenv\s*\(\s*"[^"]*"\s*\)', re.IGNORECASE)
 RE_REALLOC_ASSIGN_BACK = re.compile(
     r"\b([A-Za-z_]\w*)\s*=\s*realloc\s*\(\s*\1\s*,", re.IGNORECASE
 )
-RE_MALLOC_ASSIGN = re.compile(
-    r"\b([A-Za-z_]\w*)\s*=\s*malloc\s*\(", re.IGNORECASE
-)
-RE_CALLOC_ASSIGN = re.compile(
-    r"\b([A-Za-z_]\w*)\s*=\s*calloc\s*\(", re.IGNORECASE
-)
-RE_NEW_ASSIGN = re.compile(
-    r"\b([A-Za-z_]\w*)\s*=\s*new\b", re.IGNORECASE
-)
-RE_DEREF = re.compile(
-    r"(\*|->)\s*[A-Za-z_]\w*|\b[A-Za-z_]\w*\s*\[", re.IGNORECASE
-)
+RE_MALLOC_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*malloc\s*\(", re.IGNORECASE)
+RE_CALLOC_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*calloc\s*\(", re.IGNORECASE)
+RE_NEW_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*new\b", re.IGNORECASE)
+RE_DEREF = re.compile(r"(\*|->)\s*[A-Za-z_]\w*|\b[A-Za-z_]\w*\s*\[", re.IGNORECASE)
 RE_NULL_CHECK = re.compile(
-    r"\bif\s*\(\s*(!\s*)?[A-Za-z_]\w*\s*(==|!=)\s*NULL\s*\)|\bif\s*\(\s*[A-Za-z_]\w*\s*\)", re.IGNORECASE
+    r"\bif\s*\(\s*(!\s*)?[A-Za-z_]\w*\s*(==|!=)\s*NULL\s*\)|\bif\s*\(\s*[A-Za-z_]\w*\s*\)",
+    re.IGNORECASE,
 )
 RE_FREE_VAR = re.compile(r"free\s*\(\s*([A-Za-z_]\w*)\s*\)\s*;", re.IGNORECASE)
 RE_USE_VAR = re.compile(r"\b([A-Za-z_]\w*)\b")
@@ -129,7 +149,10 @@ RE_STRNCAT = re.compile(r"\bstrncat\s*\(", re.IGNORECASE)
 RE_SHARED_PTR = re.compile(r"\b(?:std::)?shared_ptr\s*<", re.IGNORECASE)
 RE_UNIQUE_PTR = re.compile(r"\b(?:std::)?unique_ptr\s*<", re.IGNORECASE)
 RE_WEAK_PTR = re.compile(r"\b(?:std::)?weak_ptr\s*<", re.IGNORECASE)
-RE_SMART_PTR_ASSIGN = re.compile(r"\b([A-Za-z_]\w*)\s*=\s*(?:std::)?(?:shared_ptr|unique_ptr|weak_ptr)\s*<", re.IGNORECASE)
+RE_SMART_PTR_ASSIGN = re.compile(
+    r"\b([A-Za-z_]\w*)\s*=\s*(?:std::)?(?:shared_ptr|unique_ptr|weak_ptr)\s*<",
+    re.IGNORECASE,
+)
 RE_NEW_ARRAY = re.compile(r"\bnew\s+[A-Za-z_]\w*\s*\[", re.IGNORECASE)
 RE_DELETE_ARRAY = re.compile(r"\bdelete\s*\[\s*\]", re.IGNORECASE)
 RE_DELETE = re.compile(r"\bdelete\s+(?!\[)", re.IGNORECASE)
@@ -137,10 +160,18 @@ RE_STATIC_CAST = re.compile(r"\bstatic_cast\s*<", re.IGNORECASE)
 RE_DYNAMIC_CAST = re.compile(r"\bdynamic_cast\s*<", re.IGNORECASE)
 RE_REINTERPRET_CAST = re.compile(r"\breinterpret_cast\s*<", re.IGNORECASE)
 RE_CONST_CAST = re.compile(r"\bconst_cast\s*<", re.IGNORECASE)
-RE_VECTOR_ACCESS = re.compile(r"\b(?:std::)?vector\s*<[^>]+>\s*[A-Za-z_]\w*\s*\[", re.IGNORECASE)
-RE_STRING_ACCESS = re.compile(r"\b(?:std::)?(?:string|wstring)\s*[A-Za-z_]\w*\s*\[", re.IGNORECASE)
-RE_VECTOR_VAR = re.compile(r"\b(?:std::)?vector\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE)
-RE_STRING_VAR = re.compile(r"\b(?:std::)?(?:string|wstring)\s+([A-Za-z_]\w*)", re.IGNORECASE)
+RE_VECTOR_ACCESS = re.compile(
+    r"\b(?:std::)?vector\s*<[^>]+>\s*[A-Za-z_]\w*\s*\[", re.IGNORECASE
+)
+RE_STRING_ACCESS = re.compile(
+    r"\b(?:std::)?(?:string|wstring)\s*[A-Za-z_]\w*\s*\[", re.IGNORECASE
+)
+RE_VECTOR_VAR = re.compile(
+    r"\b(?:std::)?vector\s*<[^>]+>\s*([A-Za-z_]\w*)", re.IGNORECASE
+)
+RE_STRING_VAR = re.compile(
+    r"\b(?:std::)?(?:string|wstring)\s+([A-Za-z_]\w*)", re.IGNORECASE
+)
 RE_AT_METHOD = re.compile(r"\.at\s*\(", re.IGNORECASE)
 RE_VIRTUAL_DTOR = re.compile(r"\bvirtual\s+~[A-Za-z_]\w*\s*\(", re.IGNORECASE)
 RE_CLASS_DECL = re.compile(r"\bclass\s+([A-Za-z_]\w*)", re.IGNORECASE)
@@ -157,6 +188,7 @@ RE_NOEXCEPT = re.compile(r"\bnoexcept\s*(?:\([^)]*\))?", re.IGNORECASE)
 # 公共工具
 # ---------------------------
 
+
 def _safe_line(lines: Sequence[str], idx: int) -> str:
     if 1 <= idx <= len(lines):
         return lines[idx - 1]
@@ -168,7 +200,9 @@ def _strip_line(s: str, max_len: int = 200) -> str:
     return s if len(s) <= max_len else s[: max_len - 3] + "..."
 
 
-def _window(lines: Sequence[str], center: int, before: int = 3, after: int = 3) -> List[Tuple[int, str]]:
+def _window(
+    lines: Sequence[str], center: int, before: int = 3, after: int = 3
+) -> List[Tuple[int, str]]:
     start = max(1, center - before)
     end = min(len(lines), center + after)
     return [(i, _safe_line(lines, i)) for i in range(start, end + 1)]
@@ -185,8 +219,8 @@ def _remove_comments_preserve_strings(text: str) -> str:
     n = len(text)
     in_sl_comment = False  # //
     in_bl_comment = False  # /* */
-    in_string = False      # "
-    in_char = False        # '
+    in_string = False  # "
+    in_char = False  # '
     escape = False
 
     while i < n:
@@ -337,7 +371,9 @@ def _strip_if0_blocks(text: str) -> str:
     """
     lines = text.splitlines(keepends=True)
     out: list[str] = []
-    stack: list[dict] = []  # 每帧：{"kind": "if0"|"if", "skipping": bool, "in_else": bool}
+    stack: list[
+        dict
+    ] = []  # 每帧：{"kind": "if0"|"if", "skipping": bool, "in_else": bool}
 
     def any_skipping() -> bool:
         return any(frame.get("skipping", False) for frame in stack)
@@ -351,7 +387,9 @@ def _strip_if0_blocks(text: str) -> str:
         if re.match(r"^\s*#\s*if\b", line):
             # 其他 #if：不求值，仅记录，继承外层 skipping
             stack.append({"kind": "if", "skipping": any_skipping(), "in_else": False})
-            out.append(line if not any_skipping() else ("\n" if line.endswith("\n") else ""))
+            out.append(
+                line if not any_skipping() else ("\n" if line.endswith("\n") else "")
+            )
             continue
         if re.match(r"^\s*#\s*else\b", line):
             if stack:
@@ -360,12 +398,16 @@ def _strip_if0_blocks(text: str) -> str:
                     # #if 0 的 else：翻转 skipping，使 else 分支有效
                     top["skipping"] = not top["skipping"]
                     top["in_else"] = True
-            out.append(line if not any_skipping() else ("\n" if line.endswith("\n") else ""))
+            out.append(
+                line if not any_skipping() else ("\n" if line.endswith("\n") else "")
+            )
             continue
         if re.match(r"^\s*#\s*endif\b", line):
             if stack:
                 stack.pop()
-            out.append(line if not any_skipping() else ("\n" if line.endswith("\n") else ""))
+            out.append(
+                line if not any_skipping() else ("\n" if line.endswith("\n") else "")
+            )
             continue
         # 常规代码
         if any_skipping():
@@ -375,7 +417,9 @@ def _strip_if0_blocks(text: str) -> str:
     return "".join(out)
 
 
-def _has_null_check_around(var: str, lines: Sequence[str], line_no: int, radius: int = 5) -> bool:
+def _has_null_check_around(
+    var: str, lines: Sequence[str], line_no: int, radius: int = 5
+) -> bool:
     """
     扩展空指针检查识别能力，减少误报：
     - if (ptr) / if (!ptr)
@@ -405,7 +449,19 @@ def _has_null_check_around(var: str, lines: Sequence[str], line_no: int, radius:
 def _has_len_bound_around(lines: Sequence[str], line_no: int, radius: int = 3) -> bool:
     for _, s in _window(lines, line_no, before=radius, after=radius):
         # 检测是否出现长度上界/检查（非常粗略）
-        if any(k in s for k in ["sizeof(", "BUFFER_SIZE", "MAX_", "min(", "clamp(", "snprintf", "strlcpy", "strlcat"]):
+        if any(
+            k in s
+            for k in [
+                "sizeof(",
+                "BUFFER_SIZE",
+                "MAX_",
+                "min(",
+                "clamp(",
+                "snprintf",
+                "strlcpy",
+                "strlcat",
+            ]
+        ):
             return True
     return False
 
@@ -423,10 +479,13 @@ def _severity_from_confidence(conf: float, base: str) -> str:
 # 具体验证规则
 # ---------------------------
 
+
 def _rule_unsafe_api(lines: Sequence[str], relpath: str) -> List[Issue]:
     issues: List[Issue] = []
     is_header = str(relpath).lower().endswith((".h", ".hpp"))
-    re_type_kw = re.compile(r"\b(static|inline|const|volatile|unsigned|signed|long|short|int|char|void|size_t|ssize_t)\b")
+    re_type_kw = re.compile(
+        r"\b(static|inline|const|volatile|unsigned|signed|long|short|int|char|void|size_t|ssize_t)\b"
+    )
     for idx, s in enumerate(lines, start=1):
         # 跳过预处理行与声明行，减少原型/宏中的误报
         t = s.lstrip()
@@ -488,7 +547,11 @@ def _rule_boundary_funcs(lines: Sequence[str], relpath: str) -> List[Issue]:
         # 通常为更安全的写法：降低误报（直接跳过告警）
         safe_sizeof = False
         if api.lower() in ("memcpy", "memmove") and args:
-            if "sizeof" in args and not RE_SIZEOF_PTR.search(args) and not RE_STRLEN_IN_SIZE.search(args):
+            if (
+                "sizeof" in args
+                and not RE_SIZEOF_PTR.search(args)
+                and not RE_STRLEN_IN_SIZE.search(args)
+            ):
                 safe_sizeof = True
         if safe_sizeof:
             # 跳过该条，以提高准确性（避免将安全写法误报为风险）
@@ -630,7 +693,11 @@ def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                 reassigned = True
                 break
             # 检测明显的解引用使用
-            if deref_arrow.search(sj) or deref_star.search(sj) or deref_index.search(sj):
+            if (
+                deref_arrow.search(sj)
+                or deref_star.search(sj)
+                or deref_index.search(sj)
+            ):
                 uaf_evidence_line = j
                 break
 
@@ -666,8 +733,12 @@ def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
             continue
 
         # 若本行/紧随其后 2 行出现条件判断，认为已检查（直接跳过）
-        nearby = " ".join(_safe_line(lines, i) for i in range(idx, min(idx + 2, len(lines)) + 1))
-        if re.search(r"\b(if|while|for)\s*\(", nearby) or re.search(r"(>=|<=|==|!=|<|>)", nearby):
+        nearby = " ".join(
+            _safe_line(lines, i) for i in range(idx, min(idx + 2, len(lines)) + 1)
+        )
+        if re.search(r"\b(if|while|for)\s*\(", nearby) or re.search(
+            r"(>=|<=|==|!=|<|>)", nearby
+        ):
             continue
 
         # 若赋值给变量，则在后续窗口内寻找对该变量的检查
@@ -684,8 +755,12 @@ def _rule_unchecked_io(lines: Sequence[str], relpath: str) -> List[Issue]:
         checked_via_var = False
         if assigned_var:
             end = min(len(lines), idx + 5)
-            var_pat_cond = re.compile(rf"\b(if|while|for)\s*\([^)]*\b{re.escape(assigned_var)}\b[^)]*\)")
-            var_pat_cmp = re.compile(rf"\b{re.escape(assigned_var)}\b\s*(>=|<=|==|!=|<|>)")
+            var_pat_cond = re.compile(
+                rf"\b(if|while|for)\s*\([^)]*\b{re.escape(assigned_var)}\b[^)]*\)"
+            )
+            var_pat_cmp = re.compile(
+                rf"\b{re.escape(assigned_var)}\b\s*(>=|<=|==|!=|<|>)"
+            )
             for j in range(idx + 1, end + 1):
                 sj = _safe_line(lines, j)
                 if var_pat_cond.search(sj) or var_pat_cmp.search(sj):
@@ -721,7 +796,10 @@ def _rule_strncpy_no_nullterm(lines: Sequence[str], relpath: str) -> List[Issue]
             conf = 0.55
             # 若邻近窗口未出现手动 '\0' 终止或显式长度-1 等处理，提升风险
             window_text = " ".join(t for _, t in _window(lines, idx, before=1, after=2))
-            if not re.search(r"\\0|'\0'|\"\\0\"|len\s*-\s*1|sizeof\s*\(\s*\w+\s*\)\s*-\s*1", window_text):
+            if not re.search(
+                r"\\0|'\0'|\"\\0\"|len\s*-\s*1|sizeof\s*\(\s*\w+\s*\)\s*-\s*1",
+                window_text,
+            ):
                 conf += 0.15
             issues.append(
                 Issue(
@@ -748,6 +826,7 @@ def _rule_strncpy_no_nullterm(lines: Sequence[str], relpath: str) -> List[Issue]
 # 额外规则（新增）
 # ---------------------------
 
+
 def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测格式化字符串漏洞：printf/sprintf/snprintf/vsprintf/vsnprintf 的格式参数不是字面量；
@@ -758,7 +837,15 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
     - 针对不同函数，准确定位“格式串”所在的参数位置：
       printf: 第1参；sprintf/vsprintf: 第2参；snprintf/vsnprintf: 第3参；fprintf: 第2参
     """
-    SAFE_WRAPPERS = ("_", "gettext", "dgettext", "ngettext", "tr", "QT_TR_NOOP", "QT_TRANSLATE_NOOP")
+    SAFE_WRAPPERS = (
+        "_",
+        "gettext",
+        "dgettext",
+        "ngettext",
+        "tr",
+        "QT_TR_NOOP",
+        "QT_TRANSLATE_NOOP",
+    )
     issues: List[Issue] = []
 
     def _arg_is_literal(s: str, j: int) -> bool:
@@ -789,7 +876,9 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
             return s[j:k]
         return None
 
-    def _var_assigned_literal(var: str, lines: Sequence[str], upto_idx: int, lookback: int = 5) -> bool:
+    def _var_assigned_literal(
+        var: str, lines: Sequence[str], upto_idx: int, lookback: int = 5
+    ) -> bool:
         start = max(1, upto_idx - lookback)
         pat_assign = re.compile(rf"\b{re.escape(var)}\s*=\s*")
         for j in range(start, upto_idx):
@@ -877,12 +966,14 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
                 if j is not None:
                     # 字面量/包装字面量/回看字面量赋值的变量
                     if not _arg_is_literal(s, j):
-                        if (s[j].isalpha() or s[j] == "_"):
+                        if s[j].isalpha() or s[j] == "_":
                             if _arg_is_wrapper_literal(s, j):
                                 flagged = False
                             else:
                                 ident = _leading_ident(s, j)
-                                if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                                if ident and _var_assigned_literal(
+                                    ident, lines, idx, lookback=5
+                                ):
                                     flagged = False
                                 else:
                                     flagged = True
@@ -902,12 +993,14 @@ def _rule_format_string(lines: Sequence[str], relpath: str) -> List[Issue]:
                 j = _nth_arg_start(s, open_idx, 2)
                 if j is not None:
                     if not _arg_is_literal(s, j):
-                        if (s[j].isalpha() or s[j] == "_"):
+                        if s[j].isalpha() or s[j] == "_":
                             if _arg_is_wrapper_literal(s, j):
                                 flagged = False
                             else:
                                 ident = _leading_ident(s, j)
-                                if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                                if ident and _var_assigned_literal(
+                                    ident, lines, idx, lookback=5
+                                ):
                                     flagged = False
                                 else:
                                     flagged = True
@@ -987,7 +1080,9 @@ def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
             return s[j:k]
         return None
 
-    def _var_assigned_literal(var: str, lines: Sequence[str], upto_idx: int, lookback: int = 5) -> bool:
+    def _var_assigned_literal(
+        var: str, lines: Sequence[str], upto_idx: int, lookback: int = 5
+    ) -> bool:
         # 在前 lookback 行内查找 var = "..."
         start = max(1, upto_idx - lookback)
         pat_assign = re.compile(rf"\b{re.escape(var)}\s*=\s*")
@@ -1026,7 +1121,9 @@ def _rule_command_execution(lines: Sequence[str], relpath: str) -> List[Issue]:
                     start = s.index("(", m_exec.start())
                     if not _arg_is_literal_or_wrapper(s, start):
                         ident = _first_arg_identifier(s, start)
-                        if ident and _var_assigned_literal(ident, lines, idx, lookback=5):
+                        if ident and _var_assigned_literal(
+                            ident, lines, idx, lookback=5
+                        ):
                             flagged = False
                         else:
                             flagged = True
@@ -1084,7 +1181,7 @@ def _rule_scanf_no_width(lines: Sequence[str], relpath: str) -> List[Issue]:
                     line=idx,
                     evidence=_strip_line(s),
                     description="scanf/sscanf/fscanf 使用 %s 但未限制最大宽度，存在缓冲区溢出风险。",
-                    suggestion="为 %s 指定最大宽度（如 \"%255s\"），或使用更安全的读取方式；若使用 GNU 扩展 %ms/%m[...] 请确保对返回内存进行释放。",
+                    suggestion='为 %s 指定最大宽度（如 "%255s"），或使用更安全的读取方式；若使用 GNU 扩展 %ms/%m[...] 请确保对返回内存进行释放。',
                     confidence=0.75,
                     severity="high",
                 )
@@ -1131,6 +1228,7 @@ def _rule_alloc_size_overflow(lines: Sequence[str], relpath: str) -> List[Issue]
 # 空指针/野指针/死锁 等新增规则
 # ---------------------------
 
+
 def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     启发式检测空指针解引用：
@@ -1143,7 +1241,9 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
     issues: List[Issue] = []
     re_arrow = re.compile(r"\b([A-Za-z_]\w*)\s*->")
     re_star = re.compile(r"(?<!\w)\*\s*([A-Za-z_]\w*)\b")
-    type_kw = re.compile(r"\b(typedef|struct|union|enum|class|char|int|long|short|void|size_t|ssize_t|FILE)\b")
+    type_kw = re.compile(
+        r"\b(typedef|struct|union|enum|class|char|int|long|short|void|size_t|ssize_t|FILE)\b"
+    )
 
     def _is_deref_context(line: str, star_pos: int) -> bool:
         k = star_pos - 1
@@ -1197,7 +1297,9 @@ def _rule_uninitialized_ptr_use(lines: Sequence[str], relpath: str) -> List[Issu
     # 收集候选未初始化指针声明
     candidates = []  # (var, decl_line)
     decl_ptr_line = re.compile(r"\*")
-    type_prefix = re.compile(r"\b(typedef|struct|union|enum|class|const|volatile|static|register|signed|unsigned|char|int|long|short|void|float|double)\b")
+    type_prefix = re.compile(
+        r"\b(typedef|struct|union|enum|class|const|volatile|static|register|signed|unsigned|char|int|long|short|void|float|double)\b"
+    )
     for idx, s in enumerate(lines, start=1):
         if ";" not in s or "(" in s or "=" in s:
             continue
@@ -1223,7 +1325,9 @@ def _rule_uninitialized_ptr_use(lines: Sequence[str], relpath: str) -> List[Issu
                 initialized = True
                 break
             # 解引用：p-> 或 *p
-            if re.search(rf"\b{re.escape(v)}\s*->", sj) or re.search(rf"(?<!\w)\*\s*{re.escape(v)}\b", sj):
+            if re.search(rf"\b{re.escape(v)}\s*->", sj) or re.search(
+                rf"(?<!\w)\*\s*{re.escape(v)}\b", sj
+            ):
                 deref_line = j
                 # 若命中，若附近没有 NULL 检查/初始化则认为风险较高
                 break
@@ -1352,7 +1456,10 @@ def _rule_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issue]:
 # 其他危险用法规则（新增一批低误报）
 # ---------------------------
 
-def _rule_double_free_and_free_non_heap(lines: Sequence[str], relpath: str) -> List[Issue]:
+
+def _rule_double_free_and_free_non_heap(
+    lines: Sequence[str], relpath: str
+) -> List[Issue]:
     """
     检测：
     - double_free：同一指针在未重新赋值/置空情况下被重复 free
@@ -1374,7 +1481,9 @@ def _rule_double_free_and_free_non_heap(lines: Sequence[str], relpath: str) -> L
             arg = m.group(1).strip()
 
             # 忽略 free(NULL)/free(0)
-            if re.fullmatch(r"\(?\s*(NULL|0|\(void\s*\*\)\s*0)\s*\)?", arg, re.IGNORECASE):
+            if re.fullmatch(
+                r"\(?\s*(NULL|0|\(void\s*\*\)\s*0)\s*\)?", arg, re.IGNORECASE
+            ):
                 continue
 
             # 明显非堆：&... 或 字符串字面量
@@ -1451,11 +1560,24 @@ def _rule_rand_insecure(lines: Sequence[str], relpath: str) -> List[Issue]:
     检测 rand/srand 的使用。若上下文包含安全敏感关键词，提升风险。
     """
     issues: List[Issue] = []
-    keywords = ("token", "nonce", "secret", "password", "passwd", "key", "auth", "salt", "session", "otp")
+    keywords = (
+        "token",
+        "nonce",
+        "secret",
+        "password",
+        "passwd",
+        "key",
+        "auth",
+        "salt",
+        "session",
+        "otp",
+    )
     for idx, s in enumerate(lines, start=1):
         if RE_RAND.search(s):
             conf = 0.55
-            window_text = " ".join(t for _, t in _window(lines, idx, before=1, after=1)).lower()
+            window_text = " ".join(
+                t for _, t in _window(lines, idx, before=1, after=1)
+            ).lower()
             if any(k in window_text for k in keywords):
                 conf += 0.2
             issues.append(
@@ -1506,7 +1628,18 @@ def _rule_open_permissive_perms(lines: Sequence[str], relpath: str) -> List[Issu
     - fopen(..., "w"/"w+") 在安全敏感上下文可提示收紧权限（基于关键词启发）
     """
     issues: List[Issue] = []
-    sensitive_keys = ("key", "secret", "token", "passwd", "password", "cred", "config", "cert", "private", "id_rsa")
+    sensitive_keys = (
+        "key",
+        "secret",
+        "token",
+        "passwd",
+        "password",
+        "cred",
+        "config",
+        "cert",
+        "private",
+        "id_rsa",
+    )
     for idx, s in enumerate(lines, start=1):
         m = RE_OPEN_PERMISSIVE.search(s)
         if m:
@@ -1530,7 +1663,9 @@ def _rule_open_permissive_perms(lines: Sequence[str], relpath: str) -> List[Issu
         if m2:
             mode = m2.group(1)
             if "w" in mode:
-                window = " ".join(t for _, t in _window(lines, idx, before=1, after=1)).lower()
+                window = " ".join(
+                    t for _, t in _window(lines, idx, before=1, after=1)
+                ).lower()
                 if any(k in window for k in sensitive_keys):
                     issues.append(
                         Issue(
@@ -1552,6 +1687,7 @@ def _rule_open_permissive_perms(lines: Sequence[str], relpath: str) -> List[Issu
 # ---------------------------
 # 更多危险用法规则（第二批）
 # ---------------------------
+
 
 def _rule_alloca_unbounded(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
@@ -1596,7 +1732,9 @@ def _rule_vla_usage(lines: Sequence[str], relpath: str) -> List[Issue]:
     仅在长度非纯数字常量时提示。
     """
     issues: List[Issue] = []
-    type_prefix = re.compile(r"\b(typedef|struct|union|enum|class|const|volatile|static|register|signed|unsigned|char|int|long|short|void|float|double|size_t|ssize_t)\b")
+    type_prefix = re.compile(
+        r"\b(typedef|struct|union|enum|class|const|volatile|static|register|signed|unsigned|char|int|long|short|void|float|double|size_t|ssize_t)\b"
+    )
     for idx, s in enumerate(lines, start=1):
         if ";" not in s or "=" in s:
             continue
@@ -1636,7 +1774,9 @@ def _rule_pthread_returns_unchecked(lines: Sequence[str], relpath: str) -> List[
     for idx, s in enumerate(lines, start=1):
         if not RE_PTHREAD_RET.search(s):
             continue
-        nearby = " ".join(_safe_line(lines, i) for i in range(idx, min(idx + 2, len(lines)) + 1))
+        nearby = " ".join(
+            _safe_line(lines, i) for i in range(idx, min(idx + 2, len(lines)) + 1)
+        )
         if not re.search(r"\bif\s*\(|>=|<=|==|!=|<|>", nearby):
             issues.append(
                 Issue(
@@ -1810,6 +1950,7 @@ def _rule_getenv_unchecked(lines: Sequence[str], relpath: str) -> List[Issue]:
 # C++ 特定检查规则
 # ---------------------------
 
+
 def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     检测 new[]/delete[] 和 new/delete 的匹配问题：
@@ -1819,7 +1960,7 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
     issues: List[Issue] = []
     new_array_vars: dict[str, int] = {}  # var -> line_no
     new_vars: dict[str, int] = {}  # var -> line_no
-    
+
     # 收集 new[] 和 new 的分配
     for idx, s in enumerate(lines, start=1):
         # new[] 分配
@@ -1830,13 +1971,13 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
             if assign_match:
                 var = assign_match.group(1)
                 new_array_vars[var] = idx
-        
+
         # new 分配（非数组）
         m_new = re.search(r"\b([A-Za-z_]\w*)\s*=\s*new\s+(?!.*\[)", s, re.IGNORECASE)
         if m_new:
             var = m_new.group(1)
             new_vars[var] = idx
-    
+
     # 检查 delete[] 和 delete 的使用
     for idx, s in enumerate(lines, start=1):
         # delete[] 使用
@@ -1861,7 +2002,7 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
                             severity="high",
                         )
                     )
-        
+
         # delete 使用（非数组）
         if RE_DELETE.search(s):
             m = re.search(r"delete\s+([A-Za-z_]\w*)", s, re.IGNORECASE)
@@ -1883,7 +2024,7 @@ def _rule_new_delete_mismatch(lines: Sequence[str], relpath: str) -> List[Issue]
                             severity="high",
                         )
                     )
-    
+
     return issues
 
 
@@ -1951,7 +2092,7 @@ def _rule_vector_string_bounds_check(lines: Sequence[str], relpath: str) -> List
     issues: List[Issue] = []
     vector_vars: set[str] = set()
     string_vars: set[str] = set()
-    
+
     # 先收集 vector 和 string 变量
     for idx, s in enumerate(lines, start=1):
         m = RE_VECTOR_VAR.search(s)
@@ -1960,7 +2101,7 @@ def _rule_vector_string_bounds_check(lines: Sequence[str], relpath: str) -> List
         m = RE_STRING_VAR.search(s)
         if m:
             string_vars.add(m.group(1))
-    
+
     for idx, s in enumerate(lines, start=1):
         # vector 访问：检测 var[...] 模式
         for var in vector_vars:
@@ -1968,8 +2109,14 @@ def _rule_vector_string_bounds_check(lines: Sequence[str], relpath: str) -> List
                 # 检查是否使用了 .at()（安全访问）
                 if not RE_AT_METHOD.search(s):
                     # 检查附近是否有边界检查
-                    window_text = " ".join(t for _, t in _window(lines, idx, before=2, after=2))
-                    if not re.search(rf"\b{re.escape(var)}\s*\.(size|length|empty|at)\s*\(", window_text, re.IGNORECASE):
+                    window_text = " ".join(
+                        t for _, t in _window(lines, idx, before=2, after=2)
+                    )
+                    if not re.search(
+                        rf"\b{re.escape(var)}\s*\.(size|length|empty|at)\s*\(",
+                        window_text,
+                        re.IGNORECASE,
+                    ):
                         issues.append(
                             Issue(
                                 language="c/cpp",
@@ -1985,13 +2132,19 @@ def _rule_vector_string_bounds_check(lines: Sequence[str], relpath: str) -> List
                             )
                         )
                         break  # 每行只报告一次
-        
+
         # string 访问：检测 var[...] 模式
         for var in string_vars:
             if re.search(rf"\b{re.escape(var)}\s*\[", s):
                 if not RE_AT_METHOD.search(s):
-                    window_text = " ".join(t for _, t in _window(lines, idx, before=2, after=2))
-                    if not re.search(rf"\b{re.escape(var)}\s*\.(size|length|empty|at)\s*\(", window_text, re.IGNORECASE):
+                    window_text = " ".join(
+                        t for _, t in _window(lines, idx, before=2, after=2)
+                    )
+                    if not re.search(
+                        rf"\b{re.escape(var)}\s*\.(size|length|empty|at)\s*\(",
+                        window_text,
+                        re.IGNORECASE,
+                    ):
                         issues.append(
                             Issue(
                                 language="c/cpp",
@@ -2016,37 +2169,43 @@ def _rule_missing_virtual_dtor(lines: Sequence[str], relpath: str) -> List[Issue
     启发式：检测 class 声明，若存在虚函数但析构函数非虚，则提示。
     """
     issues: List[Issue] = []
-    classes: dict[str, dict] = {}  # class_name -> {"line": int, "has_virtual": bool, "has_virtual_dtor": bool}
+    classes: dict[
+        str, dict
+    ] = {}  # class_name -> {"line": int, "has_virtual": bool, "has_virtual_dtor": bool}
     current_class: Optional[str] = None
     in_class = False
     brace_depth = 0
-    
+
     for idx, s in enumerate(lines, start=1):
         # 检测 class 声明
         m_class = RE_CLASS_DECL.search(s)
         if m_class:
             class_name = m_class.group(1)
-            classes[class_name] = {"line": idx, "has_virtual": False, "has_virtual_dtor": False}
+            classes[class_name] = {
+                "line": idx,
+                "has_virtual": False,
+                "has_virtual_dtor": False,
+            }
             current_class = class_name
             in_class = True
             brace_depth = s.count("{") - s.count("}")
             continue
-        
+
         if in_class and current_class:
             brace_depth += s.count("{") - s.count("}")
             if brace_depth <= 0:
                 in_class = False
                 current_class = None
                 continue
-            
+
             # 检测虚函数
             if re.search(r"\bvirtual\s+[^~]", s, re.IGNORECASE):
                 classes[current_class]["has_virtual"] = True
-            
+
             # 检测虚析构函数
             if RE_VIRTUAL_DTOR.search(s):
                 classes[current_class]["has_virtual_dtor"] = True
-    
+
     # 检查有虚函数但无虚析构函数的类
     for class_name, info in classes.items():
         if info["has_virtual"] and not info["has_virtual_dtor"]:
@@ -2064,7 +2223,7 @@ def _rule_missing_virtual_dtor(lines: Sequence[str], relpath: str) -> List[Issue
                     severity="high",
                 )
             )
-    
+
     return issues
 
 
@@ -2074,20 +2233,22 @@ def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     issues: List[Issue] = []
     moved_vars: dict[str, int] = {}  # var -> line_no
-    
+
     for idx, s in enumerate(lines, start=1):
         # 检测 std::move 赋值
         m = RE_MOVE_ASSIGN.search(s)
         if m:
             var = m.group(1)
             moved_vars[var] = idx
-        
+
         # 检测移动后的使用
         vars_to_remove: set[str] = set()  # 收集要删除的键，避免在遍历时修改字典
         for var, move_line in moved_vars.items():
             if idx > move_line and idx <= move_line + 10:  # 在移动后 10 行内
                 # 检测变量使用（排除重新赋值）
-                if re.search(rf"\b{re.escape(var)}\b", s) and not re.search(rf"\b{re.escape(var)}\s*=", s):
+                if re.search(rf"\b{re.escape(var)}\b", s) and not re.search(
+                    rf"\b{re.escape(var)}\s*=", s
+                ):
                     # 检查是否是重新赋值（重置移动状态）
                     if re.search(rf"\b{re.escape(var)}\s*=\s*(?!std::move)", s):
                         # 重新赋值，移除记录
@@ -2111,11 +2272,11 @@ def _rule_move_after_use(lines: Sequence[str], relpath: str) -> List[Issue]:
                             )
                             # 移除记录，避免重复报告
                             vars_to_remove.add(var)
-        
+
         # 遍历结束后再删除
         for var in vars_to_remove:
             moved_vars.pop(var, None)
-    
+
     return issues
 
 
@@ -2127,17 +2288,21 @@ def _rule_uncaught_exception(lines: Sequence[str], relpath: str) -> List[Issue]:
     for idx, s in enumerate(lines, start=1):
         if RE_THROW.search(s):
             # 检查附近是否有 try-catch
-            window_text = " ".join(t for _, t in _window(lines, idx, before=10, after=10))
+            window_text = " ".join(
+                t for _, t in _window(lines, idx, before=10, after=10)
+            )
             has_try = RE_TRY.search(window_text) is not None
             has_catch = RE_CATCH.search(window_text) is not None
-            
+
             if not (has_try and has_catch):
                 conf = 0.6
                 # 如果在 noexcept 函数中抛出异常，风险更高
-                prev_text = " ".join(t for _, t in _window(lines, idx, before=5, after=0))
+                prev_text = " ".join(
+                    t for _, t in _window(lines, idx, before=5, after=0)
+                )
                 if RE_NOEXCEPT.search(prev_text):
                     conf += 0.2
-                
+
                 issues.append(
                     Issue(
                         language="c/cpp",
@@ -2162,7 +2327,7 @@ def _rule_smart_ptr_cycle(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     issues: List[Issue] = []
     shared_ptr_vars: set[str] = set()
-    
+
     for idx, s in enumerate(lines, start=1):
         # 收集 shared_ptr 变量
         if RE_SHARED_PTR.search(s):
@@ -2170,23 +2335,26 @@ def _rule_smart_ptr_cycle(lines: Sequence[str], relpath: str) -> List[Issue]:
             if m:
                 var = m.group(1)
                 shared_ptr_vars.add(var)
-        
+
         # 检测 shared_ptr 之间的相互引用（简单启发式）
         if RE_SHARED_PTR.search(s) and shared_ptr_vars:
             # 检查是否在 shared_ptr 初始化中使用了另一个 shared_ptr
             for var in shared_ptr_vars:
-                if re.search(rf"\b{re.escape(var)}\b", s) and "make_shared" in s.lower():
+                if (
+                    re.search(rf"\b{re.escape(var)}\b", s)
+                    and "make_shared" in s.lower()
+                ):
                     # 简单启发：如果两个 shared_ptr 相互引用，可能存在循环
                     # 这里仅做提示，实际需要更复杂的分析
                     pass
-    
+
     # 检测 weak_ptr 的使用（通常用于打破循环引用）
     has_weak_ptr = False
     for idx, s in enumerate(lines, start=1):
         if RE_WEAK_PTR.search(s):
             has_weak_ptr = True
             break
-    
+
     # 如果大量使用 shared_ptr 但未见 weak_ptr，提示可能的循环引用风险
     if len(shared_ptr_vars) > 3 and not has_weak_ptr:
         # 在第一个 shared_ptr 使用处提示
@@ -2207,7 +2375,7 @@ def _rule_smart_ptr_cycle(lines: Sequence[str], relpath: str) -> List[Issue]:
                     )
                 )
                 break
-    
+
     return issues
 
 
@@ -2224,13 +2392,13 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
     lock_stack: list[str] = []  # 当前持有的锁栈
     order_pairs: dict[tuple[str, str], int] = {}  # 加锁顺序对 -> 行号
     mutex_vars: set[str] = set()  # 所有 mutex 变量名
-    
+
     # 先收集所有 mutex 变量
     for idx, s in enumerate(lines, start=1):
         m = RE_STD_MUTEX.search(s)
         if m:
             mutex_vars.add(m.group(1))
-    
+
     # 扫描加锁/解锁操作
     for idx, s in enumerate(lines, start=1):
         # 检测 lock() 调用
@@ -2259,7 +2427,7 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
                     pair = (lock_stack[-1], mtx)
                     order_pairs.setdefault(pair, idx)
                 lock_stack.append(mtx)
-        
+
         # 检测 unlock() 调用
         m_unlock = RE_MUTEX_UNLOCK.search(s)
         if m_unlock:
@@ -2270,26 +2438,30 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
                     if lock_stack[k] == mtx:
                         del lock_stack[k]
                         break
-        
+
         # 检测 lock_guard/unique_lock（RAII，自动解锁，通常更安全）
         RE_LOCK_GUARD.search(s) or RE_UNIQUE_LOCK.search(s) or RE_SHARED_LOCK.search(s)
-        
+
         # 检测 std::lock 或 scoped_lock（死锁避免机制）
         has_safe_lock = RE_STD_LOCK.search(s) or RE_SCOPED_LOCK.search(s)
-        
+
         # 粗略按作用域结束重置
         if "}" in s and not has_safe_lock:
             # 如果作用域结束且栈中还有锁，可能是问题（但可能是 RAII 锁，所以降低置信度）
             if lock_stack:
                 # 这里不直接报错，因为可能是 RAII 锁
                 pass
-        
+
         # 检测手动锁定多个 mutex 但未使用 std::lock
         if m_lock and len(lock_stack) > 1 and not has_safe_lock:
             # 在锁定第二个 mutex 时，如果之前已持有锁且未使用 std::lock，提示风险
             if idx > 1:
-                prev_text = " ".join(_safe_line(lines, j) for j in range(max(1, idx - 3), idx))
-                if not RE_STD_LOCK.search(prev_text) and not RE_SCOPED_LOCK.search(prev_text):
+                prev_text = " ".join(
+                    _safe_line(lines, j) for j in range(max(1, idx - 3), idx)
+                )
+                if not RE_STD_LOCK.search(prev_text) and not RE_SCOPED_LOCK.search(
+                    prev_text
+                ):
                     issues.append(
                         Issue(
                             language="c/cpp",
@@ -2304,7 +2476,7 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
                             severity="high",
                         )
                     )
-    
+
     # 锁顺序反转检测
     for (a, b), ln in order_pairs.items():
         if (b, a) in order_pairs:
@@ -2322,7 +2494,7 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
                     severity="high",
                 )
             )
-    
+
     # 可能缺失解锁：在 lock() 后的 50 行窗口内未见对应 unlock()
     for idx, s in enumerate(lines, start=1):
         m_lock = RE_MUTEX_LOCK.search(s)
@@ -2331,13 +2503,19 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
         mtx = m_lock.group(1)
         if mtx not in mutex_vars:
             continue
-        
+
         # 检查是否是 lock_guard/unique_lock（RAII，自动解锁）
-        window_text = " ".join(_safe_line(lines, j) for j in range(idx, min(idx + 3, len(lines)) + 1))
-        is_raii = RE_LOCK_GUARD.search(window_text) or RE_UNIQUE_LOCK.search(window_text) or RE_SHARED_LOCK.search(window_text)
+        window_text = " ".join(
+            _safe_line(lines, j) for j in range(idx, min(idx + 3, len(lines)) + 1)
+        )
+        is_raii = (
+            RE_LOCK_GUARD.search(window_text)
+            or RE_UNIQUE_LOCK.search(window_text)
+            or RE_SHARED_LOCK.search(window_text)
+        )
         if is_raii:
             continue  # RAII 锁会自动解锁，跳过
-        
+
         end = min(len(lines), idx + 50)
         unlocked = False
         for j in range(idx + 1, end + 1):
@@ -2349,11 +2527,15 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
             # 检查作用域结束（可能是 RAII 锁）
             if "}" in sj:
                 # 检查是否是 lock_guard/unique_lock 的作用域
-                prev_scope = " ".join(_safe_line(lines, k) for k in range(max(1, j - 5), j))
-                if RE_LOCK_GUARD.search(prev_scope) or RE_UNIQUE_LOCK.search(prev_scope):
+                prev_scope = " ".join(
+                    _safe_line(lines, k) for k in range(max(1, j - 5), j)
+                )
+                if RE_LOCK_GUARD.search(prev_scope) or RE_UNIQUE_LOCK.search(
+                    prev_scope
+                ):
                     unlocked = True
                     break
-        
+
         if not unlocked:
             issues.append(
                 Issue(
@@ -2369,7 +2551,7 @@ def _rule_cpp_deadlock_patterns(lines: Sequence[str], relpath: str) -> List[Issu
                     severity="medium",
                 )
             )
-    
+
     return issues
 
 
@@ -2380,7 +2562,7 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
     - 检测到线程创建但共享变量访问时未见锁保护
     - volatile 误用（volatile 不能保证线程安全）
     - 未使用原子操作保护共享变量
-    
+
     实现基于启发式，需要结合上下文分析。
     """
     issues: List[Issue] = []
@@ -2388,7 +2570,7 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
     thread_creation_lines: list[int] = []  # 线程创建行号
     atomic_vars: set[str] = set()  # 原子变量集合
     volatile_vars: set[str] = set()  # volatile 变量集合
-    
+
     # 第一遍扫描：收集共享变量、线程创建、原子变量
     for idx, s in enumerate(lines, start=1):
         # 收集全局/静态变量
@@ -2398,13 +2580,13 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
             # 排除 const 变量（只读，通常安全）
             if "const" not in s.lower():
                 shared_vars.add(var)
-        
+
         m_extern = RE_EXTERN_VAR.search(s)
         if m_extern:
             var = m_extern.group(1)
             if "const" not in s.lower():
                 shared_vars.add(var)
-        
+
         # 检测全局变量声明（文件作用域）
         if idx == 1 or (idx > 1 and _safe_line(lines, idx - 1).strip().endswith("}")):
             # 可能是文件作用域的变量
@@ -2412,61 +2594,66 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
             if m_global and "const" not in s.lower() and "static" not in s.lower():
                 var = m_global.group(1)
                 shared_vars.add(var)
-        
+
         # 检测线程创建
         if RE_PTHREAD_CREATE.search(s) or RE_STD_THREAD.search(s):
             thread_creation_lines.append(idx)
-        
+
         # 收集原子变量
         m_atomic = RE_ATOMIC.search(s)
         if m_atomic:
             var = m_atomic.group(1)
             atomic_vars.add(var)
-        
+
         # 收集 volatile 变量
         m_volatile = RE_VOLATILE.search(s)
         if m_volatile:
             var = m_volatile.group(1)
             volatile_vars.add(var)
-    
+
     # 如果没有线程创建，通常不存在数据竞争风险
     if not thread_creation_lines:
         return issues
-    
+
     # 第二遍扫描：检测共享变量访问时的保护情况
     for idx, s in enumerate(lines, start=1):
         # 检测共享变量的访问（赋值或读取）
         for var in shared_vars:
             if var in atomic_vars:
                 continue  # 原子变量，通常安全
-            
+
             # 检测变量访问
             var_pattern = re.compile(rf"\b{re.escape(var)}\b")
             if not var_pattern.search(s):
                 continue
-            
+
             # 检查是否是赋值操作
-            is_write = RE_VAR_ASSIGN.search(s) and var in s[:s.find("=")]
-            
+            is_write = RE_VAR_ASSIGN.search(s) and var in s[: s.find("=")]
+
             # 检查附近是否有锁保护
             window_text = " ".join(t for _, t in _window(lines, idx, before=5, after=5))
             has_lock = (
-                RE_PTHREAD_LOCK.search(window_text) is not None or
-                RE_MUTEX_LOCK.search(window_text) is not None or
-                RE_LOCK_GUARD.search(window_text) is not None or
-                RE_UNIQUE_LOCK.search(window_text) is not None or
-                RE_SHARED_LOCK.search(window_text) is not None
+                RE_PTHREAD_LOCK.search(window_text) is not None
+                or RE_MUTEX_LOCK.search(window_text) is not None
+                or RE_LOCK_GUARD.search(window_text) is not None
+                or RE_UNIQUE_LOCK.search(window_text) is not None
+                or RE_SHARED_LOCK.search(window_text) is not None
             )
-            
+
             # 检查是否在锁的作用域内（简单启发式）
             # 查找最近的锁
             lock_line = None
             for j in range(max(1, idx - 10), idx):
                 sj = _safe_line(lines, j)
-                if RE_PTHREAD_LOCK.search(sj) or RE_MUTEX_LOCK.search(sj) or RE_LOCK_GUARD.search(sj) or RE_UNIQUE_LOCK.search(sj):
+                if (
+                    RE_PTHREAD_LOCK.search(sj)
+                    or RE_MUTEX_LOCK.search(sj)
+                    or RE_LOCK_GUARD.search(sj)
+                    or RE_UNIQUE_LOCK.search(sj)
+                ):
                     lock_line = j
                     break
-            
+
             # 检查锁是否已解锁
             unlocked = False
             if lock_line:
@@ -2475,7 +2662,7 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                     if RE_PTHREAD_UNLOCK.search(sj) or RE_MUTEX_UNLOCK.search(sj):
                         unlocked = True
                         break
-            
+
             # 如果未检测到锁保护，且是写操作，风险更高
             if not has_lock or (lock_line and unlocked):
                 conf = 0.6
@@ -2484,12 +2671,12 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                 if var in volatile_vars:
                     # volatile 不能保证线程安全，但可能被误用
                     conf += 0.1
-                
+
                 # 检查是否在函数参数中（可能是局部变量，降低风险）
                 if "(" in s and ")" in s:
                     # 可能是函数调用参数，降低置信度
                     conf -= 0.1
-                
+
                 issues.append(
                     Issue(
                         language="c/cpp",
@@ -2504,30 +2691,32 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                         severity="high" if conf >= 0.7 else "medium",
                     )
                 )
-    
+
     # 检测 volatile 的误用（volatile 不能保证线程安全）
     for idx, s in enumerate(lines, start=1):
         for var in volatile_vars:
             if var in atomic_vars:
                 continue  # 如果同时是原子变量，跳过
-            
+
             if re.search(rf"\b{re.escape(var)}\b", s):
                 # 检查是否在多线程上下文中使用 volatile
-                window_text = " ".join(t for _, t in _window(lines, idx, before=3, after=3))
-                has_thread = (
-                    RE_PTHREAD_CREATE.search(window_text) is not None or
-                    RE_STD_THREAD.search(window_text) is not None or
-                    any(abs(j - idx) < 20 for j in thread_creation_lines)
+                window_text = " ".join(
+                    t for _, t in _window(lines, idx, before=3, after=3)
                 )
-                
+                has_thread = (
+                    RE_PTHREAD_CREATE.search(window_text) is not None
+                    or RE_STD_THREAD.search(window_text) is not None
+                    or any(abs(j - idx) < 20 for j in thread_creation_lines)
+                )
+
                 if has_thread:
                     # 检查是否有锁保护
                     has_lock = (
-                        RE_PTHREAD_LOCK.search(window_text) is not None or
-                        RE_MUTEX_LOCK.search(window_text) is not None or
-                        RE_LOCK_GUARD.search(window_text) is not None
+                        RE_PTHREAD_LOCK.search(window_text) is not None
+                        or RE_MUTEX_LOCK.search(window_text) is not None
+                        or RE_LOCK_GUARD.search(window_text) is not None
                     )
-                    
+
                     if not has_lock:
                         issues.append(
                             Issue(
@@ -2543,7 +2732,7 @@ def _rule_data_race_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
                                 severity="high",
                             )
                         )
-    
+
     return issues
 
 
@@ -2553,7 +2742,7 @@ def _rule_smart_ptr_get_unsafe(lines: Sequence[str], relpath: str) -> List[Issue
     """
     issues: List[Issue] = []
     smart_ptr_vars: set[str] = set()
-    
+
     # 先收集智能指针变量
     for idx, s in enumerate(lines, start=1):
         m = RE_SMART_PTR_ASSIGN.search(s)
@@ -2564,7 +2753,7 @@ def _rule_smart_ptr_get_unsafe(lines: Sequence[str], relpath: str) -> List[Issue
             m = re.search(r"\b([A-Za-z_]\w*)\s*(?:=|;)", s)
             if m:
                 smart_ptr_vars.add(m.group(1))
-    
+
     for idx, s in enumerate(lines, start=1):
         # 检测 .get() 调用
         for var in smart_ptr_vars:
@@ -2573,7 +2762,7 @@ def _rule_smart_ptr_get_unsafe(lines: Sequence[str], relpath: str) -> List[Issue
                 # 如果 .get() 的结果被存储或传递，风险更高
                 if "=" in s or re.search(r"\.get\s*\([^)]*\)\s*[=,\(]", s):
                     conf += 0.1
-                
+
                 issues.append(
                     Issue(
                         language="c/cpp",

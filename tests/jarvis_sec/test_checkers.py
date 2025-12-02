@@ -133,13 +133,12 @@ def test_direct_scan_integration_with_temp_files(tmp_path: Path):
         assert "issues" in result
 
 
-
 def test_direct_scan_and_format_markdown(tmp_path: Path):
     # 构造临时项目
     project = tmp_path / "proj2"
     project.mkdir()
     (project / "b.c").write_text(
-        "#include <stdio.h>\nvoid f(){ char b[4]; sprintf(b, \"%s\", \"x\"); }",
+        '#include <stdio.h>\nvoid f(){ char b[4]; sprintf(b, "%s", "x"); }',
         encoding="utf-8",
     )
     result = direct_scan(str(project))
@@ -220,7 +219,9 @@ def test_report_build_json_with_meta():
             },
         }
     ]
-    text = build_json_and_markdown(issues, scanned_root="/tmp", scanned_files=1, meta=meta)
+    text = build_json_and_markdown(
+        issues, scanned_root="/tmp", scanned_files=1, meta=meta
+    )
     # 现在仅返回 Markdown，检查关键内容
     assert text.startswith("# 安全问题分析报告（聚合）")
     assert "- 扫描根目录: /tmp" in text

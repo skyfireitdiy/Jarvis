@@ -8,6 +8,7 @@ from pathlib import Path
 # 必须在导入 jarvis_rag 模块之前检查，因为 __init__.py 会导入依赖 langchain 的模块
 try:
     import langchain  # noqa: F401
+
     # 如果 langchain 可用，尝试导入 cli 模块
     # 注意：导入 jarvis.jarvis_rag.cli 会触发 jarvis.jarvis_rag.__init__.py 的导入
     # 而 __init__.py 会导入依赖 langchain 的模块，所以需要先检查 langchain
@@ -23,7 +24,7 @@ class TestIsLikelyTextFile:
         """测试文本文件"""
         test_file = temp_dir / "test.txt"
         test_file.write_text("Hello, World!")
-        
+
         result = is_likely_text_file(test_file)
         assert result is True
 
@@ -31,7 +32,7 @@ class TestIsLikelyTextFile:
         """测试 Python 文件"""
         test_file = temp_dir / "test.py"
         test_file.write_text("def hello():\n    print('Hello')")
-        
+
         result = is_likely_text_file(test_file)
         assert result is True
 
@@ -39,7 +40,7 @@ class TestIsLikelyTextFile:
         """测试 JSON 文件"""
         test_file = temp_dir / "test.json"
         test_file.write_text('{"key": "value"}')
-        
+
         result = is_likely_text_file(test_file)
         assert result is True
 
@@ -47,7 +48,7 @@ class TestIsLikelyTextFile:
         """测试二进制文件"""
         test_file = temp_dir / "test.bin"
         test_file.write_bytes(b"\x00\x01\x02\x03\x04\x05")
-        
+
         result = is_likely_text_file(test_file)
         assert result is False
 
@@ -55,7 +56,7 @@ class TestIsLikelyTextFile:
         """测试包含空字节的文件（二进制）"""
         test_file = temp_dir / "test.bin"
         test_file.write_bytes(b"text content\x00more text")
-        
+
         result = is_likely_text_file(test_file)
         assert result is False
 
@@ -63,7 +64,7 @@ class TestIsLikelyTextFile:
         """测试 Markdown 文件"""
         test_file = temp_dir / "test.md"
         test_file.write_text("# Title\n\nContent here")
-        
+
         result = is_likely_text_file(test_file)
         assert result is True
 
@@ -71,7 +72,7 @@ class TestIsLikelyTextFile:
         """测试 XML 文件"""
         test_file = temp_dir / "test.xml"
         test_file.write_text('<?xml version="1.0"?><root></root>')
-        
+
         result = is_likely_text_file(test_file)
         assert result is True
 
@@ -79,7 +80,7 @@ class TestIsLikelyTextFile:
         """测试空文件"""
         test_file = temp_dir / "empty.txt"
         test_file.write_text("")
-        
+
         result = is_likely_text_file(test_file)
         # 空文件应该被认为是文本文件
         assert result is True
@@ -89,7 +90,7 @@ class TestIsLikelyTextFile:
         test_file = temp_dir / "large.txt"
         content = "A" * 5000  # 5KB
         test_file.write_text(content)
-        
+
         result = is_likely_text_file(test_file)
         assert result is True
 
@@ -111,7 +112,6 @@ class TestIsLikelyTextFile:
         """测试 Unicode 文本文件"""
         test_file = temp_dir / "unicode.txt"
         test_file.write_text("你好世界 🌍")
-        
+
         result = is_likely_text_file(test_file)
         assert result is True
-

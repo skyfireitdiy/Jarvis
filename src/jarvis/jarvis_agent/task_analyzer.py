@@ -8,7 +8,12 @@ from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
 
 from jarvis.jarvis_agent.prompts import get_task_analysis_prompt
 from jarvis.jarvis_agent.utils import join_prompts
-from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL, BEFORE_SUMMARY, TASK_COMPLETED
+from jarvis.jarvis_agent.events import (
+    BEFORE_TOOL_CALL,
+    AFTER_TOOL_CALL,
+    BEFORE_SUMMARY,
+    TASK_COMPLETED,
+)
 
 
 class TaskAnalyzer:
@@ -66,19 +71,18 @@ class TaskAnalyzer:
                 # 检查 save_memory 工具
                 save_memory_tool = tool_registry.get_tool("save_memory")
                 has_save_memory = save_memory_tool is not None
-                
+
                 # 检查 generate_new_tool 工具
                 generate_tool = tool_registry.get_tool("generate_new_tool")
                 has_generate_new_tool = generate_tool is not None
         except Exception:
             pass
-        
+
         # 根据配置获取相应的提示词
         analysis_prompt = get_task_analysis_prompt(
-            has_save_memory=has_save_memory,
-            has_generate_new_tool=has_generate_new_tool
+            has_save_memory=has_save_memory, has_generate_new_tool=has_generate_new_tool
         )
-        
+
         return join_prompts([analysis_prompt, satisfaction_feedback])
 
     def _process_analysis_loop(self):
@@ -150,16 +154,19 @@ class TaskAnalyzer:
 
     def _handle_interrupt_with_tool_calls(self, user_input: str) -> str:
         """处理有工具调用时的中断"""
-        if self.agent.confirm_callback("检测到有工具调用，是否继续处理工具调用？", True):
-            return join_prompts([
-                f"被用户中断，用户补充信息为：{user_input}",
-                "用户同意继续工具调用。"
-            ])
+        if self.agent.confirm_callback(
+            "检测到有工具调用，是否继续处理工具调用？", True
+        ):
+            return join_prompts(
+                [f"被用户中断，用户补充信息为：{user_input}", "用户同意继续工具调用。"]
+            )
         else:
-            return join_prompts([
-                f"被用户中断，用户补充信息为：{user_input}",
-                "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。"
-            ])
+            return join_prompts(
+                [
+                    f"被用户中断，用户补充信息为：{user_input}",
+                    "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。",
+                ]
+            )
 
     def collect_satisfaction_feedback(self, auto_completed: bool) -> str:
         """收集满意度反馈"""

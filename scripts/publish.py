@@ -5,6 +5,7 @@
 使用方法：
     python scripts/publish.py [major|minor|patch]
 """
+
 import os
 import re
 import sys
@@ -65,7 +66,14 @@ def update_version(version_type: str) -> str:
 def run_command(cmd: List[str], error_msg: str) -> None:
     """运行命令"""
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
     except subprocess.CalledProcessError as e:
         print(f"Error: {error_msg}")
         print(f"Stderr: {e.stderr}")
@@ -75,6 +83,7 @@ def run_command(cmd: List[str], error_msg: str) -> None:
 def remove_pycache_directories():
     """删除所有的 __pycache__ 目录"""
     import shutil
+
     for root, dirs, files in os.walk("."):
         for dir_name in dirs:
             if dir_name == "__pycache__":

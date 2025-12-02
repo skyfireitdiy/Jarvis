@@ -16,6 +16,7 @@ import typer
 
 # ==================== 文件路径定义 ====================
 
+
 def get_candidates_file(sec_dir: Path) -> Path:
     """获取只扫结果文件路径"""
     return sec_dir / "candidates.jsonl"
@@ -33,10 +34,11 @@ def get_analysis_file(sec_dir: Path) -> Path:
 
 # ==================== 只扫结果文件 (candidates.jsonl) ====================
 
+
 def save_candidates(sec_dir: Path, candidates: List[Dict]) -> None:
     """
     保存只扫结果到 candidates.jsonl
-    
+
     格式：每行一个候选，包含所有原始信息 + gid
     {
         "gid": 1,
@@ -52,14 +54,17 @@ def save_candidates(sec_dir: Path, candidates: List[Dict]) -> None:
     """
     path = get_candidates_file(sec_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # 覆盖模式，确保文件内容是最新的
     with path.open("w", encoding="utf-8") as f:
         for candidate in candidates:
             f.write(json.dumps(candidate, ensure_ascii=False) + "\n")
-    
+
     try:
-        typer.secho(f"[jarvis-sec] 已保存 {len(candidates)} 个候选到 {path}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"[jarvis-sec] 已保存 {len(candidates)} 个候选到 {path}",
+            fg=typer.colors.GREEN,
+        )
     except Exception:
         pass
 
@@ -67,12 +72,12 @@ def save_candidates(sec_dir: Path, candidates: List[Dict]) -> None:
 def load_candidates(sec_dir: Path) -> List[Dict]:
     """
     从 candidates.jsonl 加载只扫结果
-    
+
     返回: 候选列表，每个候选包含gid
     """
     path = get_candidates_file(sec_dir)
     candidates = []
-    
+
     if path.exists():
         try:
             with path.open("r", encoding="utf-8", errors="ignore") as f:
@@ -87,10 +92,13 @@ def load_candidates(sec_dir: Path) -> List[Dict]:
                         pass
         except Exception as e:
             try:
-                typer.secho(f"[jarvis-sec] 警告：加载 candidates.jsonl 失败: {e}", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"[jarvis-sec] 警告：加载 candidates.jsonl 失败: {e}",
+                    fg=typer.colors.YELLOW,
+                )
             except Exception:
                 pass
-    
+
     return candidates
 
 
@@ -110,10 +118,11 @@ def get_all_candidate_gids(sec_dir: Path) -> Set[int]:
 
 # ==================== 聚类信息文件 (clusters.jsonl) ====================
 
+
 def save_cluster(sec_dir: Path, cluster: Dict) -> None:
     """
     保存单个聚类到 clusters.jsonl（追加模式）
-    
+
     格式：每行一个聚类记录
     {
         "cluster_id": "file_path|batch_index|index",  # 唯一标识
@@ -129,7 +138,7 @@ def save_cluster(sec_dir: Path, cluster: Dict) -> None:
     """
     path = get_clusters_file(sec_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # 追加模式
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(cluster, ensure_ascii=False) + "\n")
@@ -138,12 +147,12 @@ def save_cluster(sec_dir: Path, cluster: Dict) -> None:
 def load_clusters(sec_dir: Path) -> List[Dict]:
     """
     从 clusters.jsonl 加载所有聚类
-    
+
     返回: 聚类列表
     """
     path = get_clusters_file(sec_dir)
     clusters = []
-    
+
     if path.exists():
         try:
             # 使用字典合并：key 为 cluster_id，合并同一个 cluster_id 的所有记录的 gid
@@ -159,28 +168,36 @@ def load_clusters(sec_dir: Path) -> List[Dict]:
                         if cluster_id:
                             if cluster_id in seen_clusters:
                                 # 如果已存在，合并 gid 列表（去重）
-                                existing_gids = set(seen_clusters[cluster_id].get("gids", []))
+                                existing_gids = set(
+                                    seen_clusters[cluster_id].get("gids", [])
+                                )
                                 new_gids = set(cluster.get("gids", []))
                                 merged_gids = sorted(list(existing_gids | new_gids))
                                 seen_clusters[cluster_id]["gids"] = merged_gids
                                 # 保留最新的其他字段（verification, is_invalid 等）
-                                seen_clusters[cluster_id].update({
-                                    k: v for k, v in cluster.items() 
-                                    if k != "gids" and k != "cluster_id"
-                                })
+                                seen_clusters[cluster_id].update(
+                                    {
+                                        k: v
+                                        for k, v in cluster.items()
+                                        if k != "gids" and k != "cluster_id"
+                                    }
+                                )
                             else:
                                 # 第一次遇到这个 cluster_id，直接保存
                                 seen_clusters[cluster_id] = cluster
                     except Exception:
                         pass
-            
+
             clusters = list(seen_clusters.values())
         except Exception as e:
             try:
-                typer.secho(f"[jarvis-sec] 警告：加载 clusters.jsonl 失败: {e}", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"[jarvis-sec] 警告：加载 clusters.jsonl 失败: {e}",
+                    fg=typer.colors.YELLOW,
+                )
             except Exception:
                 pass
-    
+
     return clusters
 
 
@@ -204,22 +221,23 @@ def get_all_clustered_gids(sec_dir: Path) -> Set[int]:
 def validate_clustering_completeness(sec_dir: Path) -> Tuple[bool, Set[int]]:
     """
     校验聚类完整性，确保所有候选的gid都被聚类
-    
+
     返回: (is_complete, missing_gids)
     """
     all_candidate_gids = get_all_candidate_gids(sec_dir)
     all_clustered_gids = get_all_clustered_gids(sec_dir)
     missing_gids = all_candidate_gids - all_clustered_gids
-    
+
     return len(missing_gids) == 0, missing_gids
 
 
 # ==================== 分析结果文件 (analysis.jsonl) ====================
 
+
 def save_analysis_result(sec_dir: Path, analysis: Dict) -> None:
     """
     保存单个分析结果到 analysis.jsonl（追加模式）
-    
+
     格式：每行一个分析结果记录
     {
         "cluster_id": "file_path|batch_index|index",  # 对应的聚类ID
@@ -244,7 +262,7 @@ def save_analysis_result(sec_dir: Path, analysis: Dict) -> None:
     """
     path = get_analysis_file(sec_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # 追加模式
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(analysis, ensure_ascii=False) + "\n")
@@ -253,12 +271,12 @@ def save_analysis_result(sec_dir: Path, analysis: Dict) -> None:
 def load_analysis_results(sec_dir: Path) -> List[Dict]:
     """
     从 analysis.jsonl 加载所有分析结果
-    
+
     返回: 分析结果列表
     """
     path = get_analysis_file(sec_dir)
     results = []
-    
+
     if path.exists():
         try:
             # 使用字典合并：key 为 cluster_id，合并同一个 cluster_id 的所有记录
@@ -275,48 +293,74 @@ def load_analysis_results(sec_dir: Path) -> List[Dict]:
                             if cluster_id in seen_results:
                                 # 如果已存在，合并 gid、verified_gids、false_positive_gids 和 issues
                                 existing = seen_results[cluster_id]
-                                
+
                                 # 合并 gids（去重）
                                 existing_gids = set(existing.get("gids", []))
                                 new_gids = set(result.get("gids", []))
-                                existing["gids"] = sorted(list(existing_gids | new_gids))
-                                
+                                existing["gids"] = sorted(
+                                    list(existing_gids | new_gids)
+                                )
+
                                 # 合并 verified_gids（去重）
-                                existing_verified = set(existing.get("verified_gids", []))
+                                existing_verified = set(
+                                    existing.get("verified_gids", [])
+                                )
                                 new_verified = set(result.get("verified_gids", []))
-                                existing["verified_gids"] = sorted(list(existing_verified | new_verified))
-                                
+                                existing["verified_gids"] = sorted(
+                                    list(existing_verified | new_verified)
+                                )
+
                                 # 合并 false_positive_gids（去重）
-                                existing_false = set(existing.get("false_positive_gids", []))
+                                existing_false = set(
+                                    existing.get("false_positive_gids", [])
+                                )
                                 new_false = set(result.get("false_positive_gids", []))
-                                existing["false_positive_gids"] = sorted(list(existing_false | new_false))
-                                
+                                existing["false_positive_gids"] = sorted(
+                                    list(existing_false | new_false)
+                                )
+
                                 # 合并 issues（通过 gid 去重）
-                                existing_issues = {issue.get("gid"): issue for issue in existing.get("issues", [])}
+                                existing_issues = {
+                                    issue.get("gid"): issue
+                                    for issue in existing.get("issues", [])
+                                }
                                 for issue in result.get("issues", []):
                                     gid = issue.get("gid")
                                     if gid:
                                         existing_issues[gid] = issue  # 保留最新的 issue
                                 existing["issues"] = list(existing_issues.values())
-                                
+
                                 # 保留最新的其他字段
-                                existing.update({
-                                    k: v for k, v in result.items() 
-                                    if k not in ["gids", "verified_gids", "false_positive_gids", "issues", "cluster_id"]
-                                })
+                                existing.update(
+                                    {
+                                        k: v
+                                        for k, v in result.items()
+                                        if k
+                                        not in [
+                                            "gids",
+                                            "verified_gids",
+                                            "false_positive_gids",
+                                            "issues",
+                                            "cluster_id",
+                                        ]
+                                    }
+                                )
                             else:
                                 # 第一次遇到这个 cluster_id，直接保存
                                 seen_results[cluster_id] = result
                     except Exception:
                         pass
-            
+
             results = list(seen_results.values())
         except Exception as e:
             try:
-                typer.secho(f"[jarvis-sec] 警告：加载 analysis.jsonl 失败: {e}", fg=typer.colors.YELLOW)
+                typer.secho(
+                    f"[jarvis-sec] 警告：加载 analysis.jsonl 失败: {e}",
+                    fg=typer.colors.YELLOW,
+                )
             except Exception:
                 pass
-    
+
     return results
 
 
@@ -373,10 +417,11 @@ def get_false_positive_gids(sec_dir: Path) -> Set[int]:
 
 # ==================== 断点恢复状态检查 ====================
 
+
 def get_resume_status(sec_dir: Path) -> Dict[str, any]:
     """
     根据3个配置文件的存在性和状态，推断断点恢复状态
-    
+
     返回: {
         "has_candidates": bool,  # 是否有只扫结果
         "has_clusters": bool,  # 是否有聚类结果
@@ -398,30 +443,29 @@ def get_resume_status(sec_dir: Path) -> Dict[str, any]:
         "clustering_complete": False,
         "missing_gids": set(),
     }
-    
+
     # 检查只扫结果
     candidates = load_candidates(sec_dir)
     if candidates:
         status["has_candidates"] = True
         status["candidates_count"] = len(candidates)
-    
+
     # 检查聚类结果
     clusters = load_clusters(sec_dir)
     if clusters:
         status["has_clusters"] = True
         status["clusters_count"] = len(clusters)
-    
+
     # 检查分析结果
     results = load_analysis_results(sec_dir)
     if results:
         status["has_analysis"] = True
         status["analysis_count"] = len(results)
-    
+
     # 校验聚类完整性
     if status["has_candidates"]:
         is_complete, missing_gids = validate_clustering_completeness(sec_dir)
         status["clustering_complete"] = is_complete
         status["missing_gids"] = missing_gids
-    
-    return status
 
+    return status

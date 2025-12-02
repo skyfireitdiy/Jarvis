@@ -16,13 +16,13 @@ from .base import BuildValidatorBase, BuildResult, BuildSystem
 
 class MakefileBuildValidator(BuildValidatorBase):
     """Makefile构建验证器"""
-    
+
     BUILD_SYSTEM_NAME = "Makefile"
     SUPPORTED_LANGUAGES = ["c", "cpp"]
-    
+
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
         start_time = time.time()
-        
+
         # 尝试运行 make（如果存在Makefile）
         makefile = os.path.join(self.project_root, "Makefile")
         if not os.path.exists(makefile):
@@ -36,14 +36,14 @@ class MakefileBuildValidator(BuildValidatorBase):
                 build_system=BuildSystem.C_MAKEFILE,
                 duration=duration,
             )
-        
+
         # 尝试 make -n（dry-run）来验证语法
         returncode, stdout, stderr = self._run_command(
             ["make", "-n"],
             timeout=10,
         )
         duration = time.time() - start_time
-        
+
         success = returncode == 0
         output = stdout + stderr
         if success:
@@ -58,4 +58,3 @@ class MakefileBuildValidator(BuildValidatorBase):
             build_system=BuildSystem.C_MAKEFILE,
             duration=duration,
         )
-

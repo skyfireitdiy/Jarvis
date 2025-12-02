@@ -123,7 +123,9 @@ class TestDelete:
 
         result = delete("http://example.com")
 
-        mock_session.delete.assert_called_once_with(url="http://example.com", timeout=None)
+        mock_session.delete.assert_called_once_with(
+            url="http://example.com", timeout=None
+        )
         assert result == mock_response
 
 
@@ -139,13 +141,13 @@ class TestStreamPost:
         mock_response.raise_for_status = MagicMock()
         # iter_lines 返回一个迭代器，chunk_size=1
         mock_response.iter_lines.return_value = iter([b"line1\n", b"line2\n"])
-        
+
         # post 返回的 context manager
         mock_post_context = MagicMock()
         mock_post_context.__enter__ = MagicMock(return_value=mock_response)
         mock_post_context.__exit__ = MagicMock(return_value=None)
         mock_session.post.return_value = mock_post_context
-        
+
         # session 作为 context manager
         mock_session.__enter__ = MagicMock(return_value=mock_session)
         mock_session.__exit__ = MagicMock(return_value=None)
@@ -161,4 +163,3 @@ class TestStreamPost:
         assert len(result) == 2
         assert result[0] == "line1\n"
         assert result[1] == "line2\n"
-

@@ -15,11 +15,11 @@
 - stdout (str): JSON文本，包含查询结果
 - stderr (str)
 """
+
 import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List
-
 
 
 class ReadSymbolsTool:
@@ -69,17 +69,35 @@ class ReadSymbolsTool:
             symbols_arg = args.get("symbols")
 
             if not isinstance(symbols_file_arg, str) or not symbols_file_arg.strip():
-                return {"success": False, "stdout": "", "stderr": "缺少或无效的 symbols_file 参数"}
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "缺少或无效的 symbols_file 参数",
+                }
 
-            if not isinstance(symbols_arg, list) or not all(isinstance(s, str) for s in symbols_arg):
-                return {"success": False, "stdout": "", "stderr": "symbols 参数必须是字符串列表"}
+            if not isinstance(symbols_arg, list) or not all(
+                isinstance(s, str) for s in symbols_arg
+            ):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "symbols 参数必须是字符串列表",
+                }
 
             symbols_path = self._resolve_symbols_jsonl_path(symbols_file_arg)
             print(f"[read_symbols] Resolved symbols file path: {symbols_path}")
             if not symbols_path.exists():
-                return {"success": False, "stdout": "", "stderr": f"符号表文件不存在: {symbols_path}"}
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"符号表文件不存在: {symbols_path}",
+                }
             if not symbols_path.is_file():
-                return {"success": False, "stdout": "", "stderr": f"符号表路径不是文件: {symbols_path}"}
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"符号表路径不是文件: {symbols_path}",
+                }
 
             # 使用集合提升匹配效率；保持原请求顺序以便输出
             requested: List[str] = [s.strip() for s in symbols_arg if s and s.strip()]
@@ -137,4 +155,8 @@ class ReadSymbolsTool:
 
         except Exception as e:
             print(f"❌ {str(e)}")
-            return {"success": False, "stdout": "", "stderr": f"读取符号表失败: {str(e)}"}
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"读取符号表失败: {str(e)}",
+            }

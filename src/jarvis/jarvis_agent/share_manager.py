@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """分享管理模块，负责工具和方法论的分享功能"""
+
 import os
 import subprocess
 from typing import List, Dict, Any, Set
@@ -123,7 +124,9 @@ class ShareManager(ABC):
                             return
                     subprocess.run(["git", "pull"], cwd=self.repo_path, check=True)
                 else:
-                    print(f"ℹ️ 中心{self.get_resource_type()}仓库是空的，将初始化为新仓库")
+                    print(
+                        f"ℹ️ 中心{self.get_resource_type()}仓库是空的，将初始化为新仓库"
+                    )
             except subprocess.CalledProcessError:
                 # 如果命令失败，可能是网络问题或其他错误
                 print("⚠️ 无法连接到远程仓库，将跳过更新")
@@ -169,7 +172,7 @@ class ShareManager(ABC):
             resource_list.append(f"[{i}] {self.format_resource_display(resource)}")
 
         # 一次性打印所有资源
-        joined_resources = '\n'.join(resource_list)
+        joined_resources = "\n".join(resource_list)
         print(f"ℹ️ {joined_resources}")
 
         # 让用户选择

@@ -3,7 +3,6 @@ import os
 from typing import Any, Dict
 
 
-
 class RewriteFileTool:
     """文件重写工具，用于完全重写文件内容"""
 
@@ -102,4 +101,3 @@ class RewriteFileTool:
             error_msg = f"文件重写失败: {str(e)}"
             print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}
-

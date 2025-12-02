@@ -4,7 +4,10 @@
 import yaml
 from unittest.mock import patch
 
-from jarvis.jarvis_platform_manager.main import validate_platform_model, load_role_config
+from jarvis.jarvis_platform_manager.main import (
+    validate_platform_model,
+    load_role_config,
+)
 
 
 class TestValidatePlatformModel:
@@ -130,4 +133,3 @@ class TestLoadRoleConfig:
         result = load_role_config(str(config_file))
         assert result == config_data
         assert len(result["roles"]) == 2
-

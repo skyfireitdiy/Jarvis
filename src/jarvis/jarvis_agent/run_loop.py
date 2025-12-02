@@ -7,13 +7,21 @@ AgentRunLoop: 承载 Agent 的主运行循环逻辑。
 - 暂不变更外部调用入口，后续在 Agent._main_loop 中委派到该类
 - 保持与现有异常处理、工具调用、用户交互完全一致
 """
+
 import os
 from enum import Enum
 from typing import Any, TYPE_CHECKING
 
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
-from jarvis.jarvis_agent.utils import join_prompts, is_auto_complete, normalize_next_action
-from jarvis.jarvis_utils.config import get_max_input_token_count, get_conversation_turn_threshold
+from jarvis.jarvis_agent.utils import (
+    join_prompts,
+    is_auto_complete,
+    normalize_next_action,
+)
+from jarvis.jarvis_utils.config import (
+    get_max_input_token_count,
+    get_conversation_turn_threshold,
+)
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
@@ -24,7 +32,9 @@ class AgentRunLoop:
     def __init__(self, agent: "Agent") -> None:
         self.agent = agent
         self.conversation_rounds = 0
-        self.tool_reminder_rounds = int(os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20))
+        self.tool_reminder_rounds = int(
+            os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20)
+        )
         # 基于剩余token数量的自动总结阈值：当剩余token低于输入窗口的20%时触发
         max_input_tokens = get_max_input_token_count(self.agent.model_group)
         self.summary_remaining_token_threshold = int(max_input_tokens * 0.2)
@@ -39,13 +49,16 @@ class AgentRunLoop:
                 self.conversation_rounds += 1
                 if self.conversation_rounds % self.tool_reminder_rounds == 0:
                     self.agent.session.addon_prompt = join_prompts(
-                        [self.agent.session.addon_prompt, self.agent.get_tool_usage_prompt()]
+                        [
+                            self.agent.session.addon_prompt,
+                            self.agent.get_tool_usage_prompt(),
+                        ]
                     )
                 # 基于剩余token数量或对话轮次的自动总结判断
                 remaining_tokens = self.agent.model.get_remaining_token_count()
                 should_summarize = (
-                    remaining_tokens <= self.summary_remaining_token_threshold or
-                    self.conversation_rounds > self.conversation_turn_threshold
+                    remaining_tokens <= self.summary_remaining_token_threshold
+                    or self.conversation_rounds > self.conversation_turn_threshold
                 )
                 if should_summarize:
                     summary_text = self.agent._summarize_and_clear_history()
@@ -81,7 +94,9 @@ class AgentRunLoop:
                 if "<!!!SUMMARY!!!>" in current_response:
                     print("ℹ️ 检测到 <!!!SUMMARY!!!> 标记，正在触发总结并清空历史...")
                     # 移除标记，避免在后续处理中出现
-                    current_response = current_response.replace("<!!!SUMMARY!!!>", "").strip()
+                    current_response = current_response.replace(
+                        "<!!!SUMMARY!!!>", ""
+                    ).strip()
                     # 触发总结并清空历史
                     summary_text = ag._summarize_and_clear_history()
                     if summary_text:
@@ -104,7 +119,9 @@ class AgentRunLoop:
                 ):
                     # 中断处理器请求跳过本轮剩余部分，直接开始下一次循环
                     continue
-                elif interrupt_result is not None and not isinstance(interrupt_result, Enum):
+                elif interrupt_result is not None and not isinstance(
+                    interrupt_result, Enum
+                ):
                     # 中断处理器返回了最终结果，任务结束
                     return interrupt_result
 
@@ -127,7 +144,7 @@ class AgentRunLoop:
 
                 # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
                 safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
-                
+
                 ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
                 # 关键流程：直接调用 after_tool_call 回调函数
@@ -146,7 +163,7 @@ class AgentRunLoop:
                             pass
                 except Exception:
                     pass
-                
+
                 # 非关键流程：广播工具调用后的事件（用于日志、监控等）
                 try:
                     ag.event_bus.emit(
@@ -174,10 +191,9 @@ class AgentRunLoop:
                         return current_response
                     return result
 
-                
                 # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
                 has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
-                
+
                 # 在非交互模式下，跟踪连续没有工具调用的次数
                 if ag.non_interactive:
                     if has_tool_call:

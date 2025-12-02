@@ -56,9 +56,7 @@ English version of the query
             一个经过重写、搜索优化的查询列表。
         """
         prompt = self.rewrite_prompt_template.format(query=query)
-        print(
-            "ℹ️ 正在将原始查询重写为多个搜索查询..."
-        )
+        print("ℹ️ 正在将原始查询重写为多个搜索查询...")
 
         import re
 
@@ -77,9 +75,7 @@ English version of the query
                 rewritten_queries = [
                     line.strip() for line in content.split("\n") if line.strip()
                 ]
-                print(
-                    f"✅ 成功从LLM响应中提取到内容 (尝试 {attempts}/{max_retries})。"
-                )
+                print(f"✅ 成功从LLM响应中提取到内容 (尝试 {attempts}/{max_retries})。")
                 break  # 提取成功，退出循环
             else:
                 print(
@@ -88,15 +84,11 @@ English version of the query
 
         # 如果所有重试都失败，则跳过重写步骤
         if not rewritten_queries:
-            print(
-                "❌ 所有重试均失败。跳过查询重写，将仅使用原始查询。"
-            )
+            print("❌ 所有重试均失败。跳过查询重写，将仅使用原始查询。")
 
         # 同时包含原始查询以保证鲁棒性
         if query not in rewritten_queries:
             rewritten_queries.insert(0, query)
 
-        print(
-            f"✅ 生成了 {len(rewritten_queries)} 个查询变体。"
-        )
+        print(f"✅ 生成了 {len(rewritten_queries)} 个查询变体。")
         return rewritten_queries

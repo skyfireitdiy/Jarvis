@@ -198,7 +198,9 @@ class TestExtractSyntaxUnits:
         content = "\n".join(f"line{i}" for i in range(1, 80))
         file_path = "/tmp/all_kinds.c"
 
-        mock_detect_language.return_value = "python"  # 使用 python 路径，避免启发式大括号扩展
+        mock_detect_language.return_value = (
+            "python"  # 使用 python 路径，避免启发式大括号扩展
+        )
 
         extractor = MagicMock()
         mock_get_symbol_extractor.return_value = extractor
@@ -394,7 +396,12 @@ class TestFindBlockById:
             {"id": "block", "start_line": 1, "end_line": 1, "content": "import os"}
         ]
         mock_extract_syntax_units.return_value = [
-            {"id": "block", "start_line": 4, "end_line": 5, "content": "def foo():\n    pass"}
+            {
+                "id": "block",
+                "start_line": 4,
+                "end_line": 5,
+                "content": "def foo():\n    pass",
+            }
         ]
 
         # ensure_unique_ids 会把第二个 "block" 改成 "block_1"
@@ -404,5 +411,3 @@ class TestFindBlockById:
         assert result is not None
         assert result["start_line"] == 4
         assert "def foo()" in result["content"]
-
-

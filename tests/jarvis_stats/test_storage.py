@@ -150,7 +150,7 @@ class TestStatsStorage:
         # 实际返回的是时间戳为key的字典结构
         assert isinstance(result, dict)
         assert len(result) > 0
-        
+
         # 验证聚合数据结构
         total_count = sum(data["count"] for data in result.values())
         total_sum = sum(data["sum"] for data in result.values())
@@ -216,11 +216,11 @@ class TestStatsStorage:
         # 验证数据可以正常读取（替代导出功能）
         start_time = now - timedelta(days=1)
         end_time = now + timedelta(days=1)
-        
+
         records = storage.get_metrics("export_test", start_time, end_time)
         assert len(records) == 1
         assert records[0]["value"] == 50
-        
+
         # 验证指标信息可以获取
         info = storage.get_metric_info("export_test")
         assert info is not None
@@ -234,7 +234,7 @@ class TestStatsStorage:
         # 验证导入成功
         metrics = storage.list_metrics()
         assert "imported_metric" in metrics
-        
+
         # 验证数据正确
         records = storage.get_metrics("imported_metric")
         assert len(records) == 1
@@ -251,7 +251,7 @@ class TestStatsStorage:
         start_time = now - timedelta(hours=1)
         end_time = now + timedelta(hours=1)
         records = storage.get_metrics("summary_test", start_time, end_time)
-        
+
         # 手动计算摘要
         assert len(records) == 10
         total = sum(record["value"] for record in records)

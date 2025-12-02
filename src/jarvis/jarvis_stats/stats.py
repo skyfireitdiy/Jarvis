@@ -191,10 +191,14 @@ class StatsManager:
                         created_at = info.get("created_at")
                         last_updated = info.get("last_updated")
                         start_dt = start_time or (
-                            datetime.fromisoformat(created_at) if created_at else datetime.now()
+                            datetime.fromisoformat(created_at)
+                            if created_at
+                            else datetime.now()
                         )
                         end_dt = end_time or (
-                            datetime.fromisoformat(last_updated) if last_updated else datetime.now()
+                            datetime.fromisoformat(last_updated)
+                            if last_updated
+                            else datetime.now()
                         )
                     except Exception:
                         start_dt = start_time or (datetime.now() - timedelta(days=7))
@@ -270,10 +274,14 @@ class StatsManager:
                         created_at = info.get("created_at")
                         last_updated = info.get("last_updated")
                         start_dt = start_time or (
-                            datetime.fromisoformat(created_at) if created_at else datetime.now()
+                            datetime.fromisoformat(created_at)
+                            if created_at
+                            else datetime.now()
                         )
                         end_dt = end_time or (
-                            datetime.fromisoformat(last_updated) if last_updated else datetime.now()
+                            datetime.fromisoformat(last_updated)
+                            if last_updated
+                            else datetime.now()
                         )
                     except Exception:
                         start_dt = start_time or (datetime.now() - timedelta(days=7))
@@ -422,8 +430,6 @@ class StatsManager:
             if start_time is None:
                 start_time = end_time - timedelta(days=7)
 
-
-
         # 计算时间范围列标题
         if start_time is None or end_time is None:
             period_label = "值"
@@ -446,7 +452,7 @@ class StatsManager:
         displayed_count = 0
         for metric in metrics:
             # 获取该指标的记录（全历史或指定范围）
-            if 'all_time' in locals() and all_time:
+            if "all_time" in locals() and all_time:
                 _start = None
                 _end = None
                 try:
@@ -549,9 +555,7 @@ class StatsManager:
         )
 
         if not aggregated:
-            print(
-                f"⚠️ 没有找到指标 '{metric_name}' 的数据"
-            )
+            print(f"⚠️ 没有找到指标 '{metric_name}' 的数据")
             return
 
         # 获取指标信息
@@ -681,9 +685,7 @@ class StatsManager:
         )
 
         if not aggregated:
-            print(
-                f"⚠️ 没有找到指标 '{metric_name}' 的数据"
-            )
+            print(f"⚠️ 没有找到指标 '{metric_name}' 的数据")
             return
 
         # 获取指标信息

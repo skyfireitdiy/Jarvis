@@ -48,12 +48,12 @@ class StreamableMcpClient(McpClient):
         self.timeout = config.get("timeout", (10, 300))
 
         # 请求相关属性
-        self.pending_requests: Dict[str, threading.Event] = (
-            {}
-        )  # 存储等待响应的请求 {id: Event}
-        self.request_results: Dict[str, Dict[str, Any]] = (
-            {}
-        )  # 存储请求结果 {id: result}
+        self.pending_requests: Dict[
+            str, threading.Event
+        ] = {}  # 存储等待响应的请求 {id: Event}
+        self.request_results: Dict[
+            str, Dict[str, Any]
+        ] = {}  # 存储请求结果 {id: result}
         self.notification_handlers: Dict[str, List[Callable]] = {}
         self.event_lock = threading.Lock()
         self.request_id_counter = 0
@@ -176,20 +176,24 @@ class StreamableMcpClient(McpClient):
                             notify_method = data.get("method", "")
                             params = data.get("params", {})
                             if notify_method in self.notification_handlers:
-                                for handler in self.notification_handlers[notify_method]:
+                                for handler in self.notification_handlers[
+                                    notify_method
+                                ]:
                                     try:
                                         handler(params)
                                     except Exception as e:
-                                        error_lines.append(f"处理通知时出错 ({notify_method}): {e}")
+                                        error_lines.append(
+                                            f"处理通知时出错 ({notify_method}): {e}"
+                                        )
                     except Exception:
                         warning_lines.append(f"无法解析响应: {line}")
                         continue
 
             if warning_lines:
-                joined_warnings = '\n'.join(warning_lines)
+                joined_warnings = "\n".join(warning_lines)
                 print(f"⚠️ {joined_warnings}")
             if error_lines:
-                joined_errors = '\n'.join(error_lines)
+                joined_errors = "\n".join(error_lines)
                 print(f"❌ {joined_errors}")
             # Ensure response is closed after streaming
             response.close()

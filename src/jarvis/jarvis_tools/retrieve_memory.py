@@ -130,7 +130,7 @@ class RetrieveMemoryTool:
                         memory_token_limit = None
                 except Exception:
                     pass
-            
+
             # 回退方案：使用输入窗口的2/3
             if memory_token_limit is None:
                 max_input_tokens = get_max_input_token_count()
@@ -147,12 +147,10 @@ class RetrieveMemoryTool:
 
                 # 检查是否超过token限制
                 if total_tokens + memory_tokens > memory_token_limit:
-
                     break
 
                 # 检查是否超过50条限制
                 if len(filtered_memories) >= 50:
-
                     break
 
                 filtered_memories.append(memory)
@@ -182,7 +180,7 @@ class RetrieveMemoryTool:
 
             # 输出所有记忆
             for i, memory in enumerate(all_memories):
-                markdown_output += f"## {i+1}. {memory.get('id', '未知ID')}\n\n"
+                markdown_output += f"## {i + 1}. {memory.get('id', '未知ID')}\n\n"
                 markdown_output += f"**类型**: {memory.get('type', '未知类型')}\n\n"
                 markdown_output += f"**标签**: {', '.join(memory.get('tags', []))}\n\n"
                 markdown_output += (

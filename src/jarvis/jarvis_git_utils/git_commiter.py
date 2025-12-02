@@ -129,7 +129,7 @@ class GitCommitTool:
 
             try:
                 temp_diff_file_path = None
-                
+
                 # Get model_group from args
                 model_group = args.get("model_group")
 
@@ -164,7 +164,7 @@ class GitCommitTool:
                             # 安全回退到后续逻辑
                             platform_name = None
                             model_name = None
-                    
+
                     # 如果仍未获取到，使用配置文件中的默认值（传入 None 会读取默认配置）
                     if not platform_name:
                         platform_name = get_normal_platform_name(None)
@@ -206,7 +206,9 @@ class GitCommitTool:
                     platform = PlatformRegistry().get_normal_platform()
 
                 # 生成提交信息
-                model_display_name = model_name or (platform.name() if platform else "AI")
+                model_display_name = model_name or (
+                    platform.name() if platform else "AI"
+                )
                 print(f"ℹ️ 正在使用{model_display_name}生成提交消息...")
 
                 # 准备提示信息
@@ -380,7 +382,10 @@ commit信息
                     except Exception as e:
                         print(f"⚠️ 无法删除临时文件: {str(e)}")
 
-            PrettyOutput.print(f"提交哈希: {commit_hash}\n提交消息: {commit_message}", OutputType.SUCCESS)
+            PrettyOutput.print(
+                f"提交哈希: {commit_hash}\n提交消息: {commit_message}",
+                OutputType.SUCCESS,
+            )
 
             return {
                 "success": True,
@@ -415,7 +420,6 @@ def cli(
         "--suffix",
         help="提交信息后缀（用换行分隔）",
     ),
-
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -427,7 +431,6 @@ def cli(
             "root_dir": root_dir,
             "prefix": prefix,
             "suffix": suffix,
-
             "model_group": model_group,
         }
     )

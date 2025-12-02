@@ -3,6 +3,7 @@
 
 该模块提供了Jarvis平台管理器的主要入口点。
 """
+
 import os
 import sys
 from typing import Any, Dict, List, Optional
@@ -26,7 +27,7 @@ app = typer.Typer(help="Jarvis AI 平台")
 def list_platforms(
     platform: Optional[str] = typer.Option(
         None, "--platform", "-p", help="指定要查看的平台"
-    )
+    ),
 ) -> None:
     """列出所有支持的平台和模型，或指定平台的详细信息。"""
     registry = PlatformRegistry.get_global_platform_registry()
@@ -63,9 +64,7 @@ def list_platforms(
             print(f"⚠️ 创建 {platform_name} 平台失败")
 
 
-def chat_with_model(
-    platform_name: str, model_name: str, system_prompt: str
-) -> None:
+def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> None:
     """与指定平台和模型进行对话。
 
     参数:
@@ -165,9 +164,7 @@ def chat_with_model(
                 try:
                     file_path = args
                     if not file_path:
-                        print(
-                            "⚠️ 请指定保存文件名，例如: /save last_message.txt"
-                        )
+                        print("⚠️ 请指定保存文件名，例如: /save last_message.txt")
                         continue
 
                     # Remove quotes if present
@@ -181,9 +178,7 @@ def chat_with_model(
                         with open(file_path, "w", encoding="utf-8") as file_obj:
                             last_entry = conversation_history[-1]
                             file_obj.write(f"{last_entry['content']}\n")
-                        print(
-                            f"✅ 最后一条消息内容已保存到 {file_path}"
-                        )
+                        print(f"✅ 最后一条消息内容已保存到 {file_path}")
                     else:
                         print("⚠️ 没有可保存的消息")
                 except Exception as exc:
@@ -211,13 +206,9 @@ def chat_with_model(
                         for entry in conversation_history:
                             file_obj.write(f"{entry['role']}: {entry['content']}\n\n")
 
-                    print(
-                        f"✅ 所有对话已保存到 {file_path}"
-                    )
+                    print(f"✅ 所有对话已保存到 {file_path}")
                 except Exception as exc:
-                    print(
-                        f"❌ 保存所有对话失败: {str(exc)}"
-                    )
+                    print(f"❌ 保存所有对话失败: {str(exc)}")
                 continue
 
             # Check if it is a save_session command
@@ -237,9 +228,7 @@ def chat_with_model(
                         file_path = file_path[1:-1]
 
                     if platform.save(file_path):
-                        print(
-                            f"✅ 会话已保存到 {file_path}"
-                        )
+                        print(f"✅ 会话已保存到 {file_path}")
                     else:
                         print("❌ 保存会话失败")
                 except Exception as exc:
@@ -264,9 +253,7 @@ def chat_with_model(
 
                     if platform.restore(file_path):
                         conversation_history = []  # Clear local history after loading
-                        print(
-                            f"✅ 会话已从 {file_path} 加载"
-                        )
+                        print(f"✅ 会话已从 {file_path} 加载")
                     else:
                         print("❌ 加载会话失败")
                 except Exception as exc:
@@ -278,9 +265,7 @@ def chat_with_model(
                 try:
                     shell_command = args
                     if not shell_command:
-                        print(
-                            "⚠️ 请指定要执行的shell命令，例如: /shell ls -l"
-                        )
+                        print("⚠️ 请指定要执行的shell命令，例如: /shell ls -l")
                         continue
 
                     print(f"ℹ️ 执行命令: {shell_command}")
@@ -288,9 +273,7 @@ def chat_with_model(
                     if return_code == 0:
                         print("✅ 命令执行完成")
                     else:
-                        print(
-                            f"❌ 命令执行失败(返回码: {return_code})"
-                        )
+                        print(f"❌ 命令执行失败(返回码: {return_code})")
                 except Exception as exc:
                     print(f"❌ 执行命令失败: {str(exc)}")
                 continue
@@ -335,9 +318,7 @@ def validate_platform_model(platform: Optional[str], model: Optional[str]) -> bo
         bool: 如果平台和模型有效返回True，否则返回False。
     """
     if not platform or not model:
-        print(
-            "⚠️ 请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。"
-        )
+        print("⚠️ 请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。")
         return False
     return True
 
@@ -348,7 +329,6 @@ def chat_command(
         None, "--platform", "-p", help="指定要使用的平台"
     ),
     model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
-
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -419,7 +399,6 @@ def role_command(
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="指定要使用的模型，覆盖角色配置"
     ),
-
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -468,8 +447,6 @@ def role_command(
         except (ValueError, IndexError):
             print("❌ 无效的选择")
             return
-
-
 
     # 初始化平台和模型
     # 如果提供了platform或model参数，优先使用命令行参数

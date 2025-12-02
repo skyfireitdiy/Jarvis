@@ -143,12 +143,22 @@ class TestStatsVisualizer:
         """测试显示摘要信息"""
         # 使用实际存在的方法show_summary，需要聚合数据格式
         aggregated_data = {
-            "2024-01-01 10:00": {"count": 10, "sum": 150, "avg": 15.0, "min": 1.0, "max": 50.0},
-            "2024-01-01 11:00": {"count": 20, "sum": 300, "avg": 15.0, "min": 5.0, "max": 40.0}
+            "2024-01-01 10:00": {
+                "count": 10,
+                "sum": 150,
+                "avg": 15.0,
+                "min": 1.0,
+                "max": 50.0,
+            },
+            "2024-01-01 11:00": {
+                "count": 20,
+                "sum": 300,
+                "avg": 15.0,
+                "min": 5.0,
+                "max": 40.0,
+            },
         }
-        result = visualizer.show_summary(
-            aggregated_data, "test_metric", unit="ms"
-        )
+        result = visualizer.show_summary(aggregated_data, "test_metric", unit="ms")
 
         # 验证打印了表格
         mock_print.assert_called()
@@ -163,11 +173,9 @@ class TestStatsVisualizer:
         # 使用实际存在的方法show_table
         records = [
             {"timestamp": "2024-01-01T10:00:00", "value": 10, "tags": {}},
-            {"timestamp": "2024-01-01T11:00:00", "value": 20, "tags": {}}
+            {"timestamp": "2024-01-01T11:00:00", "value": 20, "tags": {}},
         ]
-        result = visualizer.show_table(
-            records=records, metric_name="test_metric"
-        )
+        result = visualizer.show_table(records=records, metric_name="test_metric")
 
         # 验证打印了表格
         mock_print.assert_called()
@@ -200,12 +208,36 @@ class TestStatsVisualizer:
         """测试显示多个指标摘要"""
         # 使用实际存在的方法show_summary分别显示多个指标
         metric1_data = {
-            "2024-01-01 10:00": {"count": 50, "sum": 500, "avg": 10.0, "min": 1, "max": 50},
-            "2024-01-01 11:00": {"count": 50, "sum": 500, "avg": 10.0, "min": 1, "max": 50}
+            "2024-01-01 10:00": {
+                "count": 50,
+                "sum": 500,
+                "avg": 10.0,
+                "min": 1,
+                "max": 50,
+            },
+            "2024-01-01 11:00": {
+                "count": 50,
+                "sum": 500,
+                "avg": 10.0,
+                "min": 1,
+                "max": 50,
+            },
         }
         metric2_data = {
-            "2024-01-01 10:00": {"count": 100, "sum": 1000, "avg": 10.0, "min": 5, "max": 20},
-            "2024-01-01 11:00": {"count": 100, "sum": 1000, "avg": 10.0, "min": 5, "max": 20}
+            "2024-01-01 10:00": {
+                "count": 100,
+                "sum": 1000,
+                "avg": 10.0,
+                "min": 5,
+                "max": 20,
+            },
+            "2024-01-01 11:00": {
+                "count": 100,
+                "sum": 1000,
+                "avg": 10.0,
+                "min": 5,
+                "max": 20,
+            },
         }
 
         result1 = visualizer.show_summary(metric1_data, "metric1", unit="ms")
@@ -230,7 +262,9 @@ class TestStatsVisualizer:
         # 使用实际存在的方法plot_line_chart
         single_point_data = {"2024-01-01 10:00": 42.0}
 
-        result = visualizer.plot_line_chart(data=single_point_data, title="single_point")
+        result = visualizer.plot_line_chart(
+            data=single_point_data, title="single_point"
+        )
 
         # 应该返回图表字符串
         assert isinstance(result, str)
@@ -245,11 +279,10 @@ class TestStatsVisualizer:
         # 创建更多数据点的柱状图
         many_data = {}
         for i in range(20):
-            many_data[f"2024-01-{i+1:02d} 00:00"] = 100.0
+            many_data[f"2024-01-{i + 1:02d} 00:00"] = 100.0
 
         result = visualizer.plot_bar_chart(
-            data=many_data,
-            title="test_metric - daily聚合"
+            data=many_data, title="test_metric - daily聚合"
         )
 
         # 验证返回了图表字符串
@@ -261,7 +294,7 @@ class TestStatsVisualizer:
         # 实际的StatsVisualizer没有_format_value方法，测试基本的数值显示
         data = {"test": 100.0}
         result = visualizer.plot_line_chart(data=data, show_values=True)
-        
+
         # 验证能正常处理数值显示
         assert isinstance(result, str)
         assert result != "无数据可显示"
@@ -318,6 +351,6 @@ class TestStatsVisualizer:
 
         # 不应该崩溃
         result = visualizer.plot_bar_chart(data=invalid_data, title="test")
-        
+
         # 空数据应该返回特定消息
         assert result == "无数据可显示"

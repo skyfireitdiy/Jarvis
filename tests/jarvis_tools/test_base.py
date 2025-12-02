@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_tools.base 模块单元测试"""
 
-
 from jarvis.jarvis_tools.base import Tool
 
 
@@ -10,6 +9,7 @@ class TestTool:
 
     def test_init(self):
         """测试 Tool 初始化"""
+
         def test_func(args):
             return {"success": True, "stdout": "test"}
 
@@ -28,6 +28,7 @@ class TestTool:
 
     def test_init_with_protocol_version(self):
         """测试带协议版本的初始化"""
+
         def test_func(args):
             return {"success": True}
 
@@ -43,6 +44,7 @@ class TestTool:
 
     def test_to_dict(self):
         """测试 to_dict 方法"""
+
         def test_func(args):
             return {"success": True}
 
@@ -59,11 +61,13 @@ class TestTool:
         assert "parameters" in result
         # 验证 parameters 是 JSON 字符串
         import json
+
         params = json.loads(result["parameters"])
         assert params["type"] == "object"
 
     def test_execute_success(self):
         """测试 execute 方法成功执行"""
+
         def test_func(args):
             return {"success": True, "stdout": "test output", "stderr": ""}
 
@@ -80,6 +84,7 @@ class TestTool:
 
     def test_execute_with_exception(self):
         """测试 execute 方法处理异常"""
+
         def test_func(args):
             raise ValueError("Test error")
 
@@ -98,6 +103,7 @@ class TestTool:
 
     def test_execute_with_empty_arguments(self):
         """测试使用空参数执行"""
+
         def test_func(args):
             return {"success": True, "stdout": "empty", "stderr": ""}
 
@@ -110,4 +116,3 @@ class TestTool:
 
         result = tool.execute({})
         assert result["success"] is True
-

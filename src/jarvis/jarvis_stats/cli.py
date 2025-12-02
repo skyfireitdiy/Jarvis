@@ -117,7 +117,6 @@ def show(
 
     stats.show(
         metric_name=metric,
-
         aggregation=aggregation,
         tags=tag_dict if tag_dict else None,
     )
@@ -248,9 +247,6 @@ def clean(
 @app.command()
 def export(
     metric: str = typer.Argument(..., help="指标名称"),
-
-
-
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签过滤，格式: key=value"
     ),

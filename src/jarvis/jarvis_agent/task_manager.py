@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """任务管理模块，负责加载和选择预定义任务"""
+
 import os
 from typing import Dict
 
@@ -94,11 +95,15 @@ class TaskManager:
                     selected_task = tasks[task_names[idx - 1]]
                     print(f"ℹ️ 将要执行任务:\n {selected_task}")
                     # 询问是否需要补充信息
-                    need_additional = user_confirm("需要为此任务添加补充信息吗？", default=False)
+                    need_additional = user_confirm(
+                        "需要为此任务添加补充信息吗？", default=False
+                    )
                     if need_additional:
                         additional_input = get_multiline_input("请输入补充信息：")
                         if additional_input:
-                            selected_task = join_prompts([selected_task, f"补充信息:\n{additional_input}"])
+                            selected_task = join_prompts(
+                                [selected_task, f"补充信息:\n{additional_input}"]
+                            )
                     return selected_task
             except Exception:
                 # 如果解析失败，则回退到手动输入
@@ -125,10 +130,9 @@ class TaskManager:
                     if need_additional:
                         additional_input = get_multiline_input("请输入补充信息：")
                         if additional_input:
-                            selected_task = join_prompts([
-                                selected_task,
-                                f"补充信息:\n{additional_input}"
-                            ])
+                            selected_task = join_prompts(
+                                [selected_task, f"补充信息:\n{additional_input}"]
+                            )
                     return selected_task
                 print("⚠️ 无效的选择。请选择列表中的一个号码。")
 

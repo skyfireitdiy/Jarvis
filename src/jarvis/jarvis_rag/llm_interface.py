@@ -98,9 +98,7 @@ class JarvisPlatform_LLM(LLMInterface):
             self.registry = PlatformRegistry.get_global_platform_registry()
             self.platform: BasePlatform = self.registry.get_cheap_platform()
             self.platform.set_suppress_output(False)  # 确保模型没有控制台输出
-            print(
-                f"ℹ️ 已初始化 Jarvis 平台 LLM（cheap），模型: {self.platform.name()}"
-            )
+            print(f"ℹ️ 已初始化 Jarvis 平台 LLM（cheap），模型: {self.platform.name()}")
         except Exception as e:
             print(f"❌ 初始化 Jarvis 平台 LLM 失败: {e}")
             raise

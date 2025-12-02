@@ -44,12 +44,14 @@ def cli(
         None, "-c", "--agent-definition", help="代理定义文件路径"
     ),
     task: Optional[str] = typer.Option(None, "-T", "--task", help="初始任务内容"),
-    
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     non_interactive: bool = typer.Option(
-        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+        False,
+        "-n",
+        "--non-interactive",
+        help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟",
     ),
 ):
     """Main entry point for Jarvis agent"""

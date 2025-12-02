@@ -23,7 +23,10 @@ def cli(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     non_interactive: bool = typer.Option(
-        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+        False,
+        "-n",
+        "--non-interactive",
+        help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟",
     ),
 ):
     """从YAML配置文件初始化并运行多智能体系统"""
@@ -39,7 +42,7 @@ def cli(
         print("❌ 非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。")
         raise typer.Exit(code=2)
     init_env()
-    
+
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
         if non_interactive:
@@ -65,7 +68,7 @@ def cli(
         multi_agent = MultiAgent(
             agents_config,
             main_agent_name,
-            common_system_prompt=str(config_data.get("common_system_prompt", "") or "")
+            common_system_prompt=str(config_data.get("common_system_prompt", "") or ""),
         )
         final_input = (
             user_input

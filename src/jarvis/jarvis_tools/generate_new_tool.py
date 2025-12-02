@@ -37,9 +37,7 @@ class generate_new_tool:
                 tools_dir.mkdir(parents=True, exist_ok=True)
                 return True
             except Exception as e:
-                print(
-                    f"❌ 无法创建工具目录 {tools_dir}: {e}"
-                )
+                print(f"❌ 无法创建工具目录 {tools_dir}: {e}")
                 return False
 
         return True
@@ -121,9 +119,7 @@ class generate_new_tool:
                         success_message += "\n已成功注册到当前会话的工具注册表中"
                     else:
                         # 注册失败，删除已创建的文件
-                        print(
-                            f"⚠️ 注册工具 '{tool_name}' 失败，正在删除文件..."
-                        )
+                        print(f"⚠️ 注册工具 '{tool_name}' 失败，正在删除文件...")
                         if tool_file_path.exists():
                             tool_file_path.unlink()
                         return {
@@ -132,9 +128,7 @@ class generate_new_tool:
                             "stderr": "工具文件已生成，但注册失败。文件已被删除。",
                         }
                 else:
-                    print(
-                        "⚠️ 未找到工具注册表，无法自动注册工具"
-                    )
+                    print("⚠️ 未找到工具注册表，无法自动注册工具")
                     success_message += "\n注册到当前会话失败，可能需要重新启动Jarvis"
 
             # 检查并安装缺失的依赖
@@ -163,23 +157,26 @@ class generate_new_tool:
                     try:
                         __import__(pkg)
                     except ImportError:
-
                         import subprocess
                         import sys
                         import os
                         from shutil import which as _which
+
                         # 优先使用 uv 安装（先查 venv 内 uv，再查 PATH 中 uv），否则回退到 python -m pip
                         if sys.platform == "win32":
                             venv_uv = os.path.join(sys.prefix, "Scripts", "uv.exe")
                         else:
                             venv_uv = os.path.join(sys.prefix, "bin", "uv")
-                        uv_executable = venv_uv if os.path.exists(venv_uv) else (_which("uv") or None)
+                        uv_executable = (
+                            venv_uv
+                            if os.path.exists(venv_uv)
+                            else (_which("uv") or None)
+                        )
                         if uv_executable:
                             install_cmd = [uv_executable, "pip", "install", pkg]
                         else:
                             install_cmd = [sys.executable, "-m", "pip", "install", pkg]
                         subprocess.run(install_cmd, check=True)
-
 
             except Exception as e:
                 print(f"⚠️ 依赖检查/安装失败: {str(e)}")
@@ -194,12 +191,9 @@ class generate_new_tool:
             # 删除已创建的文件
             if tool_file_path and tool_file_path.exists():
                 try:
-
                     tool_file_path.unlink()
 
                 except Exception as delete_error:
-                    print(
-                        f"❌ 删除文件失败: {str(delete_error)}"
-                    )
+                    print(f"❌ 删除文件失败: {str(delete_error)}")
 
             return {"success": False, "stdout": "", "stderr": error_msg}

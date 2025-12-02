@@ -8,6 +8,7 @@
 - 不引入额外依赖，便于在 Agent 中渐进集成
 - 支持优先级排序，优先级数字越小，执行越早
 """
+
 from collections import defaultdict
 from typing import Callable, DefaultDict, List, Any, Tuple
 
@@ -18,7 +19,7 @@ class EventBus:
     - subscribe(event, callback, priority=100): 订阅事件，支持优先级
     - emit(event, **kwargs): 广播事件，按优先级顺序执行回调
     - unsubscribe(event, callback): 取消订阅
-    
+
     优先级说明：
     - 数字越小，优先级越高，执行越早
     - 默认优先级为 100（中等优先级）
@@ -29,18 +30,24 @@ class EventBus:
     def __init__(self) -> None:
         # 存储 (priority, order, callback) 元组列表，按优先级和注册顺序排序
         # order 用于相同优先级时保持注册顺序
-        self._listeners: DefaultDict[str, List[Tuple[int, int, Callable[..., None]]]] = defaultdict(list)
+        self._listeners: DefaultDict[
+            str, List[Tuple[int, int, Callable[..., None]]]
+        ] = defaultdict(list)
         # 注册顺序计数器（每个事件独立计数）
         self._order_counter: DefaultDict[str, int] = defaultdict(int)
         # 缓存排序后的回调列表，避免每次emit都排序
-        self._sorted_cache: DefaultDict[str, List[Callable[..., None]]] = defaultdict(list)
+        self._sorted_cache: DefaultDict[str, List[Callable[..., None]]] = defaultdict(
+            list
+        )
         # 标记是否需要重新排序
         self._dirty: DefaultDict[str, bool] = defaultdict(lambda: False)
 
-    def subscribe(self, event: str, callback: Callable[..., None], priority: int = 100) -> None:
+    def subscribe(
+        self, event: str, callback: Callable[..., None], priority: int = 100
+    ) -> None:
         """
         订阅事件。
-        
+
         参数:
             event: 事件名称
             callback: 回调函数
@@ -60,7 +67,7 @@ class EventBus:
     def unsubscribe(self, event: str, callback: Callable[..., None]) -> None:
         """
         取消订阅事件。
-        
+
         参数:
             event: 事件名称
             callback: 要取消的回调函数
@@ -78,33 +85,33 @@ class EventBus:
     def _get_sorted_callbacks(self, event: str) -> List[Callable[..., None]]:
         """
         获取排序后的回调列表（带缓存）。
-        
+
         参数:
             event: 事件名称
-            
+
         返回:
             按优先级排序的回调函数列表（相同优先级时按注册顺序）
         """
         # 如果缓存有效，直接返回
         if not self._dirty[event] and event in self._sorted_cache:
             return self._sorted_cache[event]
-        
+
         # 按优先级排序（数字越小优先级越高），相同优先级时按注册顺序（order）
         listeners = self._listeners[event]
         sorted_listeners = sorted(listeners, key=lambda x: (x[0], x[1]))
         callbacks = [cb for _, _, cb in sorted_listeners]
-        
+
         # 更新缓存
         self._sorted_cache[event] = callbacks
         self._dirty[event] = False
-        
+
         return callbacks
 
     def emit(self, event: str, **payload: Any) -> None:
         """
         广播事件。回调中的异常将被捕获并忽略，以保证主流程稳定。
         回调按优先级顺序执行（优先级数字越小，执行越早）。
-        
+
         参数:
             event: 事件名称
             **payload: 事件负载数据

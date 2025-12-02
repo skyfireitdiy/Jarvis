@@ -17,6 +17,7 @@ Web STDIO 重定向模块：
   # ... 运行期间输出将通过 WS 广播 ...
   disable_web_stdio_redirect()
 """
+
 from __future__ import annotations
 
 import sys
@@ -47,11 +48,13 @@ class _WebStreamWrapper:
         except Exception:
             text = repr(s)
         try:
-            WebBridge.instance().broadcast({
-                "type": "stdio",
-                "stream": self._stream_name,
-                "text": text,
-            })
+            WebBridge.instance().broadcast(
+                {
+                    "type": "stdio",
+                    "stream": self._stream_name,
+                    "text": text,
+                }
+            )
         except Exception:
             # 广播异常不影响主流程
             pass
@@ -79,7 +82,10 @@ class _WebStreamWrapper:
     def __getattr__(self, name: str):
         # 兼容性：必要时委派到原始 stdout/stderr 的属性（尽量避免）
         try:
-            return getattr(_original_stdout if self._stream_name == "stdout" else _original_stderr, name)
+            return getattr(
+                _original_stdout if self._stream_name == "stdout" else _original_stderr,
+                name,
+            )
         except Exception:
             raise AttributeError(name)
 

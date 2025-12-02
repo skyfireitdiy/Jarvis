@@ -21,8 +21,13 @@ from typing import Optional
 
 import typer
 from jarvis.jarvis_utils.utils import init_env
+
 # removed: set_config import（避免全局覆盖模型组配置）
-from jarvis.jarvis_sec.workflow import run_with_agent, direct_scan, format_markdown_report as format_markdown_report_workflow
+from jarvis.jarvis_sec.workflow import (
+    run_with_agent,
+    direct_scan,
+    format_markdown_report as format_markdown_report_workflow,
+)
 from jarvis.jarvis_sec.report import format_csv_report, aggregate_issues
 
 app = typer.Typer(
@@ -32,27 +37,38 @@ app = typer.Typer(
 )
 
 
-
-
 @app.command("agent", help="Agent模式（单Agent逐条子任务分析）")
 def agent(
-    path: str = typer.Option(".", "--path", "-p", help="待分析的根目录（默认当前目录）"),
-
+    path: str = typer.Option(
+        ".", "--path", "-p", help="待分析的根目录（默认当前目录）"
+    ),
     llm_group: Optional[str] = typer.Option(
-        None, "--llm-group", "-g", help="使用的模型组（仅对本次运行生效，不修改全局配置）"
+        None,
+        "--llm-group",
+        "-g",
+        help="使用的模型组（仅对本次运行生效，不修改全局配置）",
     ),
     output: Optional[str] = typer.Option(
-        "report.md", "--output", "-o", help="最终报告输出路径（默认 ./report.md）。如果后缀为 .csv，则输出 CSV 格式；否则输出 Markdown 格式"
+        "report.md",
+        "--output",
+        "-o",
+        help="最终报告输出路径（默认 ./report.md）。如果后缀为 .csv，则输出 CSV 格式；否则输出 Markdown 格式",
     ),
-
     cluster_limit: int = typer.Option(
-        50, "--cluster-limit", "-c", help="聚类每批最多处理的告警数（按文件分批聚类，默认50）"
+        50,
+        "--cluster-limit",
+        "-c",
+        help="聚类每批最多处理的告警数（按文件分批聚类，默认50）",
     ),
     enable_verification: bool = typer.Option(
-        True, "--enable-verification/--no-verification", help="是否启用二次验证（默认开启）"
+        True,
+        "--enable-verification/--no-verification",
+        help="是否启用二次验证（默认开启）",
     ),
     force_save_memory: bool = typer.Option(
-        False, "--force-save-memory/--no-force-save-memory", help="强制使用记忆（默认关闭）"
+        False,
+        "--force-save-memory/--no-force-save-memory",
+        help="强制使用记忆（默认关闭）",
     ),
 ) -> None:
     # 初始化环境，确保平台/模型等全局配置就绪（避免 NoneType 平台）
@@ -63,7 +79,6 @@ def agent(
         pass
 
     # 若指定了模型组：仅对本次运行生效，透传给 Agent；不修改全局配置（无需 set_config）
-
 
     text: Optional[str] = None
     try:
@@ -77,19 +92,27 @@ def agent(
         )
     except Exception as e:
         try:
-            typer.secho(f"[jarvis_sec] Agent 分析过程出错，将回退到直扫基线（fast）：{e}", fg=typer.colors.YELLOW, err=True)
+            typer.secho(
+                f"[jarvis_sec] Agent 分析过程出错，将回退到直扫基线（fast）：{e}",
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
         except Exception:
             pass
         text = None
 
     if not text or not str(text).strip():
         try:
-            typer.secho("[jarvis_sec] Agent 无输出，回退到直扫基线（fast）。", fg=typer.colors.YELLOW, err=True)
+            typer.secho(
+                "[jarvis_sec] Agent 无输出，回退到直扫基线（fast）。",
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
         except Exception:
             pass
         result = direct_scan(path)
         # 根据输出文件后缀选择格式
-        if output and output.lower().endswith('.csv'):
+        if output and output.lower().endswith(".csv"):
             # 使用 report.py 中的函数来格式化 CSV
             report_json = aggregate_issues(
                 result.get("issues", []),
@@ -119,12 +142,18 @@ def agent(
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(md_text, encoding="utf-8")
             try:
-                typer.secho(f"[jarvis_sec] Markdown 报告已写入: {p}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"[jarvis_sec] Markdown 报告已写入: {p}", fg=typer.colors.GREEN
+                )
             except Exception:
                 pass
         except Exception as e:
             try:
-                typer.secho(f"[jarvis_sec] 写入Markdown报告失败: {e}", fg=typer.colors.RED, err=True)
+                typer.secho(
+                    f"[jarvis_sec] 写入Markdown报告失败: {e}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
             except Exception:
                 pass
     typer.echo(text)

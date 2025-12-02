@@ -9,7 +9,6 @@ from jarvis.jarvis_platform.base import BasePlatform
 
 
 class OpenAIModel(BasePlatform):
-
     def __init__(self):
         """
         Initialize OpenAI model
@@ -23,7 +22,7 @@ class OpenAIModel(BasePlatform):
         self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
         self.model_name = os.getenv("JARVIS_MODEL") or "gpt-4o"
 
-                # Optional: Inject extra HTTP headers via environment variable
+        # Optional: Inject extra HTTP headers via environment variable
         # Expected format: OPENAI_EXTRA_HEADERS='{"Header-Name": "value", "X-Trace": "abc"}'
         headers_str = os.getenv("OPENAI_EXTRA_HEADERS")
         self.extra_headers: Dict[str, str] = {}
@@ -34,14 +33,20 @@ class OpenAIModel(BasePlatform):
                     # Ensure all header keys/values are strings
                     self.extra_headers = {str(k): str(v) for k, v in parsed.items()}
                 else:
-                    print("⚠️ OPENAI_EXTRA_HEADERS 应为 JSON 对象，如 {'X-Source':'jarvis'}")
+                    print(
+                        "⚠️ OPENAI_EXTRA_HEADERS 应为 JSON 对象，如 {'X-Source':'jarvis'}"
+                    )
             except Exception as e:
                 print(f"⚠️ 解析 OPENAI_EXTRA_HEADERS 失败: {e}")
 
         # Initialize OpenAI client, try to pass default headers if SDK supports it
         try:
             if self.extra_headers:
-                self.client = OpenAI(api_key=self.api_key, base_url=self.base_url, default_headers=self.extra_headers)
+                self.client = OpenAI(
+                    api_key=self.api_key,
+                    base_url=self.base_url,
+                    default_headers=self.extra_headers,
+                )
             else:
                 self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         except TypeError:
@@ -126,7 +131,7 @@ class OpenAIModel(BasePlatform):
 
             # 累计完整响应
             accumulated_response = ""
-            
+
             # 循环处理，直到不是因为长度限制而结束
             while True:
                 response = self.client.chat.completions.create(
@@ -137,15 +142,15 @@ class OpenAIModel(BasePlatform):
 
                 full_response = ""
                 finish_reason = None
-                
+
                 for chunk in response:
                     if chunk.choices and len(chunk.choices) > 0:
                         choice = chunk.choices[0]
-                        
+
                         # 检查 finish_reason（通常在最后一个 chunk 中）
                         if choice.finish_reason:
                             finish_reason = choice.finish_reason
-                        
+
                         # 获取内容增量
                         if choice.delta and choice.delta.content:
                             text = choice.delta.content
@@ -161,8 +166,10 @@ class OpenAIModel(BasePlatform):
                         self.messages[-1]["content"] += full_response
                     else:
                         # 创建新的 assistant 消息
-                        self.messages.append({"role": "assistant", "content": full_response})
-                    
+                        self.messages.append(
+                            {"role": "assistant", "content": full_response}
+                        )
+
                     # 添加一个继续请求的用户消息，让模型继续生成
                     self.messages.append({"role": "user", "content": "请继续。"})
                     # 继续循环，获取剩余内容
@@ -171,12 +178,17 @@ class OpenAIModel(BasePlatform):
                     # 正常结束（stop、null 或其他原因）
                     # 将完整响应添加到消息历史
                     if accumulated_response:
-                        if self.messages and self.messages[-1].get("role") == "assistant":
+                        if (
+                            self.messages
+                            and self.messages[-1].get("role") == "assistant"
+                        ):
                             # 如果最后一条是 assistant 消息，追加本次的内容
                             self.messages[-1]["content"] += full_response
                         else:
                             # 创建新的 assistant 消息，使用累计的完整响应
-                            self.messages.append({"role": "assistant", "content": accumulated_response})
+                            self.messages.append(
+                                {"role": "assistant", "content": accumulated_response}
+                            )
                     break
 
             return None

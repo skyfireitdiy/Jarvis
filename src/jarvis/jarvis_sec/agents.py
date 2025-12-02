@@ -20,13 +20,15 @@ def subscribe_summary_event(agent: Agent) -> Dict[str, str]:
         from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY
     except Exception:
         _AFTER_SUMMARY = None
-    
+
     if _AFTER_SUMMARY:
+
         def _on_after_summary(**kwargs):
             try:
                 summary_container["text"] = str(kwargs.get("summary", "") or "")
             except Exception:
                 summary_container["text"] = ""
+
         try:
             agent.event_bus.subscribe(_AFTER_SUMMARY, _on_after_summary)
         except Exception:
@@ -34,7 +36,9 @@ def subscribe_summary_event(agent: Agent) -> Dict[str, str]:
     return summary_container
 
 
-def create_analysis_agent(task_id: str, llm_group: Optional[str], force_save_memory: bool = False) -> Agent:
+def create_analysis_agent(
+    task_id: str, llm_group: Optional[str], force_save_memory: bool = False
+) -> Agent:
     """创建分析Agent"""
     system_prompt = """
 # 单Agent安全分析约束
@@ -66,7 +70,7 @@ def create_analysis_agent(task_id: str, llm_group: Optional[str], force_save_mem
   - 这样可以避免重复分析，提高效率，并保持分析的一致性。
 - 完成对本批次候选问题的判断后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
 """.strip()
-    
+
     agent_kwargs: Dict = dict(
         system_prompt=system_prompt,
         name=task_id,
@@ -93,7 +97,7 @@ def create_review_agent(
     """创建复核Agent"""
     review_system_prompt = get_review_system_prompt()
     review_summary_prompt = get_review_summary_prompt()
-    
+
     review_task_id = f"JARVIS-SEC-Review-Batch-{current_review_num}"
     review_agent_kwargs: Dict = dict(
         system_prompt=review_system_prompt,
@@ -122,7 +126,7 @@ def create_cluster_agent(
     """创建聚类Agent"""
     cluster_system_prompt = get_cluster_system_prompt()
     cluster_summary_prompt = get_cluster_summary_prompt()
-    
+
     agent_kwargs_cluster: Dict = dict(
         system_prompt=cluster_system_prompt,
         name=f"JARVIS-SEC-Cluster::{file}::batch{chunk_idx}",
@@ -140,4 +144,3 @@ def create_cluster_agent(
     if llm_group:
         agent_kwargs_cluster["model_group"] = llm_group
     return Agent(**agent_kwargs_cluster)
-

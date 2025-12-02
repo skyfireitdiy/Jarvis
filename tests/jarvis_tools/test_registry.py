@@ -22,9 +22,10 @@ class TestToolRegistry:
     @pytest.fixture
     def sample_tool(self):
         """创建示例工具"""
+
         def tool_func(args):
             return {"success": True, "stdout": "test output", "stderr": ""}
-        
+
         return Tool(
             name="test_tool",
             description="Test tool",
@@ -44,7 +45,7 @@ class TestToolRegistry:
             sample_tool.name,
             sample_tool.description,
             sample_tool.parameters,
-            sample_tool.func
+            sample_tool.func,
         )
         assert "test_tool" in registry.tools
         assert registry.tools["test_tool"].name == "test_tool"
@@ -55,7 +56,7 @@ class TestToolRegistry:
             sample_tool.name,
             sample_tool.description,
             sample_tool.parameters,
-            sample_tool.func
+            sample_tool.func,
         )
         tool = registry.get_tool("test_tool")
         assert tool is not None
@@ -72,7 +73,7 @@ class TestToolRegistry:
             sample_tool.name,
             sample_tool.description,
             sample_tool.parameters,
-            sample_tool.func
+            sample_tool.func,
         )
         tools = registry.get_all_tools()
         assert isinstance(tools, list)
@@ -90,7 +91,7 @@ class TestToolRegistry:
             sample_tool.name,
             sample_tool.description,
             sample_tool.parameters,
-            sample_tool.func
+            sample_tool.func,
         )
         result = registry.execute_tool("test_tool", {"arg1": "value1"})
         assert result["success"] is True
@@ -104,32 +105,37 @@ class TestToolRegistry:
         assert "不存在" in result["stderr"]
 
     @patch("jarvis.jarvis_stats.stats.StatsManager")
-    def test_execute_tool_with_agent_v1(self, mock_stats_manager, registry, sample_tool):
+    def test_execute_tool_with_agent_v1(
+        self, mock_stats_manager, registry, sample_tool
+    ):
         """测试使用 v1.0 协议执行工具（带 agent）"""
         registry.register_tool(
             sample_tool.name,
             sample_tool.description,
             sample_tool.parameters,
-            sample_tool.func
+            sample_tool.func,
         )
         mock_agent = MagicMock()
-        result = registry.execute_tool("test_tool", {"arg1": "value1"}, agent=mock_agent)
+        result = registry.execute_tool(
+            "test_tool", {"arg1": "value1"}, agent=mock_agent
+        )
         assert result["success"] is True
 
     @patch("jarvis.jarvis_stats.stats.StatsManager")
     def test_execute_tool_with_agent_v2(self, mock_stats_manager, registry):
         """测试使用 v2.0 协议执行工具"""
+
         def v2_tool_func(args, agent):
             return {"success": True, "stdout": "v2 output", "stderr": ""}
-        
+
         registry.register_tool(
             "v2_tool",
             "V2 tool",
             {"type": "object"},
             v2_tool_func,
-            protocol_version="2.0"
+            protocol_version="2.0",
         )
-        
+
         mock_agent = MagicMock()
         result = registry.execute_tool("v2_tool", {"arg1": "value1"}, agent=mock_agent)
         assert result["success"] is True
@@ -138,17 +144,14 @@ class TestToolRegistry:
     @patch("jarvis.jarvis_stats.stats.StatsManager")
     def test_execute_tool_exception(self, mock_stats_manager, registry):
         """测试工具执行异常"""
+
         def failing_tool(args):
             raise ValueError("Tool error")
-        
+
         registry.register_tool(
-            "failing_tool",
-            "Failing tool",
-            {"type": "object"},
-            failing_tool
+            "failing_tool", "Failing tool", {"type": "object"}, failing_tool
         )
-        
+
         result = registry.execute_tool("failing_tool", {})
         assert result["success"] is False
         assert "stderr" in result
-

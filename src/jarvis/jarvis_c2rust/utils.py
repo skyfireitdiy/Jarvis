@@ -2,6 +2,7 @@
 """
 C2Rust 转译器工具函数
 """
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,9 @@ def ensure_order_file(project_root: Path) -> Path:
     """确保 translation_order.jsonl 存在且包含有效步骤；仅基于 symbols.jsonl 生成，不使用任何回退。"""
     data_dir = project_root / C2RUST_DIRNAME
     order_path = data_dir / ORDER_JSONL
-    typer.secho(f"[c2rust-transpiler][order] 目标顺序文件: {order_path}", fg=typer.colors.BLUE)
+    typer.secho(
+        f"[c2rust-transpiler][order] 目标顺序文件: {order_path}", fg=typer.colors.BLUE
+    )
 
     def _has_steps(p: Path) -> bool:
         try:
@@ -31,13 +34,22 @@ def ensure_order_file(project_root: Path) -> Path:
             return False
 
     # 已存在则校验是否有步骤
-    typer.secho(f"[c2rust-transpiler][order] 检查现有顺序文件有效性: {order_path}", fg=typer.colors.BLUE)
+    typer.secho(
+        f"[c2rust-transpiler][order] 检查现有顺序文件有效性: {order_path}",
+        fg=typer.colors.BLUE,
+    )
     if order_path.exists():
         if _has_steps(order_path):
-            typer.secho(f"[c2rust-transpiler][order] 现有顺序文件有效，将使用 {order_path}", fg=typer.colors.GREEN)
+            typer.secho(
+                f"[c2rust-transpiler][order] 现有顺序文件有效，将使用 {order_path}",
+                fg=typer.colors.GREEN,
+            )
             return order_path
         # 为空或不可读：基于标准路径重新计算（仅 symbols.jsonl）
-        typer.secho("[c2rust-transpiler][order] 现有顺序文件为空/无效，正基于 symbols.jsonl 重新计算", fg=typer.colors.YELLOW)
+        typer.secho(
+            "[c2rust-transpiler][order] 现有顺序文件为空/无效，正基于 symbols.jsonl 重新计算",
+            fg=typer.colors.YELLOW,
+        )
         try:
             compute_translation_order_jsonl(data_dir, out_path=order_path)
         except Exception as e:
@@ -50,13 +62,18 @@ def ensure_order_file(project_root: Path) -> Path:
     except Exception as e:
         raise RuntimeError(f"计算翻译顺序失败: {e}")
 
-    typer.secho(f"[c2rust-transpiler][order] 已生成顺序文件: {order_path} (exists={order_path.exists()})", fg=typer.colors.BLUE)
+    typer.secho(
+        f"[c2rust-transpiler][order] 已生成顺序文件: {order_path} (exists={order_path.exists()})",
+        fg=typer.colors.BLUE,
+    )
     if not order_path.exists():
         raise FileNotFoundError(f"计算后未找到 translation_order.jsonl: {order_path}")
 
     # 最终校验：若仍无有效步骤，直接报错并提示先执行 scan 或检查 symbols.jsonl
     if not _has_steps(order_path):
-        raise RuntimeError("translation_order.jsonl 无有效步骤。请先执行 'jarvis-c2rust scan' 生成 symbols.jsonl 并重试。")
+        raise RuntimeError(
+            "translation_order.jsonl 无有效步骤。请先执行 'jarvis-c2rust scan' 生成 symbols.jsonl 并重试。"
+        )
 
     return order_path
 
@@ -84,7 +101,11 @@ def iter_order_steps(order_jsonl: Path) -> List[List[int]]:
             if isinstance(ids, list) and ids:
                 # 新格式：仅支持 ids
                 try:
-                    ids_int = [int(x) for x in ids if isinstance(x, (int, str)) and str(x).strip()]
+                    ids_int = [
+                        int(x)
+                        for x in ids
+                        if isinstance(x, (int, str)) and str(x).strip()
+                    ]
                 except Exception:
                     ids_int = []
                 if ids_int:
@@ -138,13 +159,17 @@ def write_json(path: Path, obj: Any) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         # 使用临时文件确保原子性
         temp_path = path.with_suffix(path.suffix + ".tmp")
-        temp_path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.write_text(
+            json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         # 原子性重命名
         temp_path.replace(path)
     except Exception:
         # 如果原子写入失败，回退到直接写入
         try:
-            path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+            path.write_text(
+                json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
         except Exception:
             pass
 
@@ -185,10 +210,10 @@ def extract_json_from_summary(text: str) -> Tuple[Dict[str, Any], Optional[str]]
 def detect_test_deletion(log_prefix: str = "[c2rust]") -> Optional[Dict[str, Any]]:
     """
     检测是否错误删除了 #[test] 或 #[cfg(test)]。
-    
+
     参数:
         log_prefix: 日志前缀（如 "[c2rust-transpiler]" 或 "[c2rust-optimizer]"）
-    
+
     返回:
         如果检测到删除，返回包含 'diff', 'files', 'deleted_tests' 的字典；否则返回 None
     """
@@ -196,90 +221,99 @@ def detect_test_deletion(log_prefix: str = "[c2rust]") -> Optional[Dict[str, Any
         diff = get_diff()
         if not diff:
             return None
-        
+
         # 检查 diff 中是否包含删除的 #[test] 或 #[cfg(test)]
         test_patterns = [
-            r'^-\s*#\[test\]',
-            r'^-\s*#\[cfg\(test\)\]',
-            r'^-\s*#\[cfg\(test\)',
+            r"^-\s*#\[test\]",
+            r"^-\s*#\[cfg\(test\)\]",
+            r"^-\s*#\[cfg\(test\)",
         ]
-        
+
         deleted_tests = []
-        lines = diff.split('\n')
+        lines = diff.split("\n")
         current_file = None
-        
+
         for i, line in enumerate(lines):
             # 检测文件路径
-            if line.startswith('diff --git') or line.startswith('---') or line.startswith('+++'):
+            if (
+                line.startswith("diff --git")
+                or line.startswith("---")
+                or line.startswith("+++")
+            ):
                 # 尝试从 diff 行中提取文件名
-                if line.startswith('---'):
+                if line.startswith("---"):
                     parts = line.split()
                     if len(parts) > 1:
-                        current_file = parts[1].lstrip('a/').lstrip('b/')
-                elif line.startswith('+++'):
+                        current_file = parts[1].lstrip("a/").lstrip("b/")
+                elif line.startswith("+++"):
                     parts = line.split()
                     if len(parts) > 1:
-                        current_file = parts[1].lstrip('a/').lstrip('b/')
+                        current_file = parts[1].lstrip("a/").lstrip("b/")
                 continue
-            
+
             # 检查是否匹配删除的测试标记
             for pattern in test_patterns:
                 if re.search(pattern, line, re.IGNORECASE):
                     # 检查上下文，确认是删除而不是修改
-                    if i > 0 and lines[i-1].startswith('-'):
+                    if i > 0 and lines[i - 1].startswith("-"):
                         # 可能是删除的一部分
-                        deleted_tests.append({
-                            'file': current_file or 'unknown',
-                            'line': line,
-                            'line_number': i + 1,
-                        })
-                    elif not (i < len(lines) - 1 and lines[i+1].startswith('+')):
+                        deleted_tests.append(
+                            {
+                                "file": current_file or "unknown",
+                                "line": line,
+                                "line_number": i + 1,
+                            }
+                        )
+                    elif not (i < len(lines) - 1 and lines[i + 1].startswith("+")):
                         # 下一行不是添加，说明是删除
-                        deleted_tests.append({
-                            'file': current_file or 'unknown',
-                            'line': line,
-                            'line_number': i + 1,
-                        })
+                        deleted_tests.append(
+                            {
+                                "file": current_file or "unknown",
+                                "line": line,
+                                "line_number": i + 1,
+                            }
+                        )
                     break
-        
+
         if deleted_tests:
             modified_files = get_diff_file_list()
             return {
-                'diff': diff,
-                'files': modified_files,
-                'deleted_tests': deleted_tests,
+                "diff": diff,
+                "files": modified_files,
+                "deleted_tests": deleted_tests,
             }
         return None
     except Exception as e:
-        typer.secho(f"{log_prefix}[test-detection] 检测测试删除时发生异常: {e}", fg=typer.colors.YELLOW)
+        typer.secho(
+            f"{log_prefix}[test-detection] 检测测试删除时发生异常: {e}",
+            fg=typer.colors.YELLOW,
+        )
         return None
 
 
 def ask_llm_about_test_deletion(
-    detection_result: Dict[str, Any],
-    agent: Any,
-    log_prefix: str = "[c2rust]"
+    detection_result: Dict[str, Any], agent: Any, log_prefix: str = "[c2rust]"
 ) -> bool:
     """
     询问 LLM 是否错误删除了测试代码。
-    
+
     参数:
         detection_result: 检测结果字典，包含 'diff', 'files', 'deleted_tests'
         agent: 代码生成或修复的 agent 实例，使用其 model 进行询问
         log_prefix: 日志前缀（如 "[c2rust-transpiler]" 或 "[c2rust-optimizer]"）
-        
+
     返回:
         bool: 如果 LLM 认为删除不合理返回 True（需要回退），否则返回 False
     """
-    if not agent or not hasattr(agent, 'model'):
+    if not agent or not hasattr(agent, "model"):
         # 如果没有 agent 或 agent 没有 model，默认认为有问题（保守策略）
         return True
-    
+
     try:
-        deleted_tests = detection_result.get('deleted_tests', [])
-        diff = detection_result.get('diff', '')
-        files = detection_result.get('files', [])
-        
+        deleted_tests = detection_result.get("deleted_tests", [])
+        diff = detection_result.get("diff", "")
+        files = detection_result.get("files", [])
+
         # 构建预览（限制长度）
         preview_lines = []
         preview_lines.append("检测到可能错误删除了测试代码标记：")
@@ -289,17 +323,17 @@ def ask_llm_about_test_deletion(
             preview_lines.append(f"  行: {item.get('line', '')}")
         if len(deleted_tests) > 10:
             preview_lines.append(f"... 还有 {len(deleted_tests) - 10} 个删除的测试标记")
-        
+
         # 限制 diff 长度
         diff_preview = diff[:5000] if len(diff) > 5000 else diff
         if len(diff) > 5000:
             diff_preview += "\n... (diff 内容过长，已截断)"
-        
+
         prompt = f"""检测到代码变更中可能错误删除了测试代码标记（#[test] 或 #[cfg(test)]），请判断是否合理：
 
 删除的测试标记统计：
 - 删除的测试标记数量: {len(deleted_tests)}
-- 涉及的文件: {', '.join(files[:5])}{' ...' if len(files) > 5 else ''}
+- 涉及的文件: {", ".join(files[:5])}{" ..." if len(files) > 5 else ""}
 
 删除的测试标记详情：
 {chr(10).join(preview_lines)}
@@ -318,11 +352,14 @@ def ask_llm_about_test_deletion(
 
 请严格按照协议格式回答，不要添加其他内容。
 """
-        
-        typer.secho(f"{log_prefix}[test-detection] 正在询问 LLM 判断测试代码删除是否合理...", fg=typer.colors.YELLOW)
+
+        typer.secho(
+            f"{log_prefix}[test-detection] 正在询问 LLM 判断测试代码删除是否合理...",
+            fg=typer.colors.YELLOW,
+        )
         response = agent.model.chat_until_success(prompt)  # type: ignore
         response_str = str(response or "")
-        
+
         # 使用确定的协议标记解析回答
         if "<!!!NO!!!>" in response_str:
             typer.secho("⚠️ LLM 确认：测试代码删除不合理，需要回退", fg=typer.colors.RED)
@@ -332,11 +369,16 @@ def ask_llm_about_test_deletion(
             return False  # 不需要回退
         else:
             # 如果无法找到协议标记，默认认为有问题（保守策略）
-            typer.secho(f"⚠️ 无法找到协议标记，默认认为有问题。回答内容: {response_str[:200]}", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"⚠️ 无法找到协议标记，默认认为有问题。回答内容: {response_str[:200]}",
+                fg=typer.colors.YELLOW,
+            )
             return True  # 保守策略：默认回退
     except Exception as e:
         # 如果询问失败，默认认为有问题（保守策略）
-        typer.secho(f"⚠️ 询问 LLM 失败: {str(e)}，默认认为有问题", fg=typer.colors.YELLOW)
+        typer.secho(
+            f"⚠️ 询问 LLM 失败: {str(e)}，默认认为有问题", fg=typer.colors.YELLOW
+        )
         return True  # 保守策略：默认回退
 
 
@@ -344,42 +386,50 @@ def check_and_handle_test_deletion(
     before_commit: Optional[str],
     agent: Any,
     reset_to_commit_fn: Callable[[str], bool],
-    log_prefix: str = "[c2rust]"
+    log_prefix: str = "[c2rust]",
 ) -> bool:
     """
     检测并处理测试代码删除。
-    
+
     参数:
         before_commit: agent 运行前的 commit hash
         agent: 代码生成或修复的 agent 实例，使用其 model 进行询问
         reset_to_commit_fn: 回退到指定 commit 的函数，接受 commit hash 作为参数，返回是否成功
         log_prefix: 日志前缀（如 "[c2rust-transpiler]" 或 "[c2rust-optimizer]"）
-        
+
     返回:
         bool: 如果检测到问题且已回退，返回 True；否则返回 False
     """
     if not before_commit:
         # 没有记录 commit，无法回退
         return False
-    
+
     detection_result = detect_test_deletion(log_prefix)
     if not detection_result:
         # 没有检测到删除
         return False
-    
-    typer.secho(f"{log_prefix}[test-detection] 检测到可能错误删除了测试代码标记", fg=typer.colors.YELLOW)
-    
+
+    typer.secho(
+        f"{log_prefix}[test-detection] 检测到可能错误删除了测试代码标记",
+        fg=typer.colors.YELLOW,
+    )
+
     # 询问 LLM（使用传入的 agent 的 model）
     need_reset = ask_llm_about_test_deletion(detection_result, agent, log_prefix)
-    
+
     if need_reset:
-        typer.secho(f"{log_prefix}[test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}", fg=typer.colors.RED)
+        typer.secho(
+            f"{log_prefix}[test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}",
+            fg=typer.colors.RED,
+        )
         if reset_to_commit_fn(before_commit):
-            typer.secho(f"{log_prefix}[test-detection] 已回退到之前的 commit", fg=typer.colors.GREEN)
+            typer.secho(
+                f"{log_prefix}[test-detection] 已回退到之前的 commit",
+                fg=typer.colors.GREEN,
+            )
             return True
         else:
             typer.secho(f"{log_prefix}[test-detection] 回退失败", fg=typer.colors.RED)
             return False
-    
-    return False
 
+    return False

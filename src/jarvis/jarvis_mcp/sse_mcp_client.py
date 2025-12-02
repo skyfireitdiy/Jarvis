@@ -49,12 +49,12 @@ class SSEMcpClient(McpClient):
         self.sse_thread: Optional[threading.Thread] = None
         self.messages_endpoint: Optional[str] = None
         self.session_id: Optional[str] = None
-        self.pending_requests: Dict[str, threading.Event] = (
-            {}
-        )  # 存储等待响应的请求 {id: Event}
-        self.request_results: Dict[str, Dict[str, Any]] = (
-            {}
-        )  # 存储请求结果 {id: result}
+        self.pending_requests: Dict[
+            str, threading.Event
+        ] = {}  # 存储等待响应的请求 {id: Event}
+        self.request_results: Dict[
+            str, Dict[str, Any]
+        ] = {}  # 存储请求结果 {id: result}
         self.notification_handlers: Dict[str, List[Callable]] = {}
         self.event_lock = threading.Lock()
         self.request_id_counter = 0
@@ -211,7 +211,7 @@ class SSEMcpClient(McpClient):
                         except Exception as e:
                             error_lines.append(f"处理通知时出错 ({method}): {e}")
                     if error_lines:
-                        joined_errors = '\n'.join(error_lines)
+                        joined_errors = "\n".join(error_lines)
                         print(f"❌ {joined_errors}")
         except Exception:
             print(f"⚠️ 无法解析SSE事件: {data}")

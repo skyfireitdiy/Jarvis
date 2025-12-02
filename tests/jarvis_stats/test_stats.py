@@ -241,7 +241,9 @@ class TestStatsManager:
             StatsManager.increment("test_analysis", amount=i)
 
         # 执行分析 - 使用实际存在的方法获取聚合数据来模拟分析
-        result = StatsManager.get_stats("test_analysis", last_hours=1, aggregation="hourly")
+        result = StatsManager.get_stats(
+            "test_analysis", last_hours=1, aggregation="hourly"
+        )
 
         assert result is not None
         assert isinstance(result, dict)
@@ -297,7 +299,7 @@ class TestStatsManager:
         """测试错误处理"""
         # 测试空指标名称 - 实际实现会接受空字符串
         StatsManager.increment("")  # 不期望抛出异常
-        
+
         # 验证空指标名确实被添加了
         metrics = StatsManager.list_metrics()
         assert "" in metrics

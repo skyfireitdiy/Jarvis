@@ -17,12 +17,14 @@ from dataclasses import dataclass
 _treesitter_available = None
 _symbol_extractor_module = None
 
+
 def _check_treesitter_available():
     """检查 Tree-sitter 是否可用"""
     global _treesitter_available, _symbol_extractor_module
     if _treesitter_available is None:
         try:
             from jarvis.jarvis_code_agent.code_analyzer import language_support
+
             _symbol_extractor_module = language_support
             _treesitter_available = True
         except ImportError:
@@ -33,6 +35,7 @@ def _check_treesitter_available():
 @dataclass
 class LSPServerConfig:
     """LSP服务器配置。"""
+
     name: str
     command: List[str]
     language_ids: List[str]
@@ -58,7 +61,7 @@ LSP_SERVERS = {
                     "autopep8": {"enabled": False},
                 }
             }
-        }
+        },
     ),
     "typescript": LSPServerConfig(
         name="typescript-language-server",
@@ -114,7 +117,7 @@ LSP_SERVERS = {
 
 def _find_lsp_work_dir(project_root: str, language: str) -> str:
     """查找LSP服务器的工作目录。
-    
+
     不同语言的LSP服务器需要不同的工作目录：
     - Rust (rust-analyzer): 需要包含 Cargo.toml 的目录
     - Python (pylsp): 需要包含 pyproject.toml 或 setup.py 的目录
@@ -122,17 +125,17 @@ def _find_lsp_work_dir(project_root: str, language: str) -> str:
     - Go (gopls): 需要包含 go.mod 的目录
     - Java (jdtls): 需要包含 pom.xml 或 build.gradle 的目录
     - C/C++ (clangd): 可以使用项目根目录
-    
+
     Args:
         project_root: 项目根目录
         language: 语言名称
-        
+
     Returns:
         LSP服务器的工作目录
     """
     current = Path(project_root)
     max_depth = 5
-    
+
     # 定义每种语言需要查找的配置文件
     config_files = {
         "rust": ["Cargo.toml"],
@@ -144,12 +147,12 @@ def _find_lsp_work_dir(project_root: str, language: str) -> str:
         "c": [],  # clangd 可以使用项目根目录
         "cpp": [],  # clangd 可以使用项目根目录
     }
-    
+
     files_to_find = config_files.get(language, [])
     if not files_to_find:
         # 如果没有特定要求，使用项目根目录
         return project_root
-    
+
     # 向上查找包含配置文件的目录
     for _ in range(max_depth):
         for config_file in files_to_find:
@@ -159,21 +162,21 @@ def _find_lsp_work_dir(project_root: str, language: str) -> str:
         if parent == current:  # 已到达根目录
             break
         current = parent
-    
+
     # 如果没找到，返回项目根目录
     return project_root
 
 
 class LSPClient:
     """LSP客户端，用于与LSP服务器通信。"""
-    
+
     def __init__(self, project_root: str, server_config: LSPServerConfig):
         """初始化LSP客户端。
-        
+
         Args:
             project_root: 项目根目录
             server_config: LSP服务器配置
-            
+
         Raises:
             RuntimeError: 如果LSP服务器不可用
         """
@@ -181,7 +184,7 @@ class LSPClient:
         self.server_config = server_config
         self.process: Optional[subprocess.Popen] = None
         self.request_id = 0
-        
+
         # 验证LSP服务器是否可用
         if not self._check_server_available():
             raise RuntimeError(
@@ -189,32 +192,28 @@ class LSPClient:
                 f"请确保已安装并配置了 {server_config.name}。"
                 f"命令: {' '.join(server_config.command)}"
             )
-        
+
         self._initialize()
-    
+
     def _check_server_available(self) -> bool:
         """检查LSP服务器是否可用。
-        
+
         Returns:
             bool: 如果服务器可用返回True，否则返回False
         """
         # 如果没有配置检测命令，尝试直接运行主命令
         check_cmd = self.server_config.check_command or self.server_config.command
-        
+
         try:
             # 尝试运行检测命令
             subprocess.run(
-                check_cmd,
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False
+                check_cmd, capture_output=True, text=True, timeout=5, check=False
             )
-            
+
             # 某些LSP服务器即使返回非零退出码也可能可用（如clangd --version）
             # 只要命令能执行（不是FileNotFoundError），就认为可用
             return True
-            
+
         except FileNotFoundError:
             print(
                 f"⚠️ LSP服务器 {self.server_config.name} 未找到。"
@@ -228,11 +227,9 @@ class LSPClient:
             )
             return False
         except Exception as e:
-            print(
-                f"⚠️ 检测LSP服务器 {self.server_config.name} 时出错: {e}"
-            )
+            print(f"⚠️ 检测LSP服务器 {self.server_config.name} 时出错: {e}")
             return False
-    
+
     def _initialize(self):
         """初始化LSP连接。"""
         try:
@@ -242,9 +239,9 @@ class LSPClient:
                 if config.name == self.server_config.name:
                     language = lang
                     break
-            
+
             work_dir = _find_lsp_work_dir(self.project_root, language or "")
-            
+
             # 启动LSP服务器进程
             self.process = subprocess.Popen(
                 self.server_config.command,
@@ -253,11 +250,12 @@ class LSPClient:
                 stderr=subprocess.PIPE,
                 cwd=work_dir,
                 text=True,
-                bufsize=0
+                bufsize=0,
             )
-            
+
             # 检查进程是否立即退出
             import time
+
             time.sleep(0.1)  # 短暂等待，让进程启动
             if self.process.poll() is not None:
                 # 进程已退出，读取 stderr 获取错误信息
@@ -270,25 +268,29 @@ class LSPClient:
                 if stderr_output:
                     error_msg += f": {stderr_output[:500]}"
                 raise RuntimeError(error_msg)
-            
+
             # 发送初始化请求并等待响应
-            init_result = self._send_request("initialize", {
-                "processId": os.getpid(),
-                "rootPath": work_dir,
-                "rootUri": Path(work_dir).as_uri(),
-                "capabilities": {
-                    "textDocument": {
-                        "completion": {"completionItem": {}},
-                        "hover": {},
-                        "definition": {},
-                        "references": {},
-                        "documentSymbol": {},
+            init_result = self._send_request(
+                "initialize",
+                {
+                    "processId": os.getpid(),
+                    "rootPath": work_dir,
+                    "rootUri": Path(work_dir).as_uri(),
+                    "capabilities": {
+                        "textDocument": {
+                            "completion": {"completionItem": {}},
+                            "hover": {},
+                            "definition": {},
+                            "references": {},
+                            "documentSymbol": {},
+                        },
+                        "workspace": {},
                     },
-                    "workspace": {}
+                    "initializationOptions": self.server_config.initialization_options
+                    or {},
                 },
-                "initializationOptions": self.server_config.initialization_options or {}
-            })
-            
+            )
+
             # 检查进程是否在初始化后退出
             if self.process.poll() is not None:
                 stderr_output = ""
@@ -300,7 +302,7 @@ class LSPClient:
                 if stderr_output:
                     error_msg += f": {stderr_output[:500]}"
                 raise RuntimeError(error_msg)
-            
+
             # 只有在收到初始化响应后才发送 initialized 通知
             if init_result is not None:
                 # 发送initialized通知
@@ -310,7 +312,9 @@ class LSPClient:
                 # 初始化请求失败，但进程还在运行，可能是超时
                 # 检查进程状态
                 if self.process.poll() is None:
-                    print(f"⚠️ LSP client initialization timeout for {self.server_config.name}, but process is still running")
+                    print(
+                        f"⚠️ LSP client initialization timeout for {self.server_config.name}, but process is still running"
+                    )
                 else:
                     stderr_output = ""
                     try:
@@ -335,53 +339,56 @@ class LSPClient:
                         pass
                 self.process = None
             raise
-    
+
     def _send_request(self, method: str, params: Dict) -> Optional[Dict]:
         """发送LSP请求。
-        
+
         Args:
             method: 方法名
             params: 参数
-            
+
         Returns:
             响应结果
         """
         if not self.process:
             return None
-        
+
         # 检查进程是否还在运行
         if self.process.poll() is not None:
             print(f"⚠️ LSP服务器进程已退出，无法发送请求: {method}")
             return None
-        
+
         self.request_id += 1
         request_id = self.request_id
         request = {
             "jsonrpc": "2.0",
             "id": request_id,
             "method": method,
-            "params": params
+            "params": params,
         }
-        
+
         try:
             # LSP 协议要求使用 Content-Length header
             request_body = json.dumps(request, ensure_ascii=False)
-            request_bytes = request_body.encode('utf-8')
+            request_bytes = request_body.encode("utf-8")
             content_length = len(request_bytes)
-            
+
             # 格式化 LSP 消息：Content-Length: <length>\r\n\r\n<body>
-            message = f"Content-Length: {content_length}\r\n\r\n".encode('utf-8') + request_bytes
+            message = (
+                f"Content-Length: {content_length}\r\n\r\n".encode("utf-8")
+                + request_bytes
+            )
             self.process.stdin.buffer.write(message)
             self.process.stdin.buffer.flush()
-            
+
             # 读取响应（简化实现，实际应该使用异步或线程）
             # 这里使用超时读取
             import threading
             import queue
-            
+
             # 使用队列在线程中读取响应
             response_queue = queue.Queue()
-            
+
             def read_response():
                 try:
                     # 持续读取直到找到匹配的响应ID
@@ -390,7 +397,7 @@ class LSPClient:
                             # 进程已退出
                             response_queue.put(None)
                             return
-                        
+
                         # LSP 协议：先读取 header（Content-Length: <length>\r\n\r\n）
                         header = b""
                         while True:
@@ -401,31 +408,31 @@ class LSPClient:
                             header += char
                             if header.endswith(b"\r\n\r\n"):
                                 break
-                        
+
                         # 解析 Content-Length
-                        header_str = header.decode('utf-8', errors='ignore')
+                        header_str = header.decode("utf-8", errors="ignore")
                         content_length = None
-                        for line in header_str.split('\r\n'):
-                            if line.startswith('Content-Length:'):
+                        for line in header_str.split("\r\n"):
+                            if line.startswith("Content-Length:"):
                                 try:
-                                    content_length = int(line.split(':', 1)[1].strip())
+                                    content_length = int(line.split(":", 1)[1].strip())
                                     break
                                 except ValueError:
                                     pass
-                        
+
                         if content_length is None:
                             # 无法解析 Content-Length，跳过这个消息
                             continue
-                        
+
                         # 读取消息体
                         body = self.process.stdout.buffer.read(content_length)
                         if len(body) < content_length:
                             # 读取不完整
                             response_queue.put(None)
                             return
-                        
+
                         try:
-                            response = json.loads(body.decode('utf-8'))
+                            response = json.loads(body.decode("utf-8"))
                             # 检查是否是匹配的响应
                             if response.get("id") == request_id:
                                 response_queue.put(response)
@@ -443,15 +450,15 @@ class LSPClient:
                 except Exception as e:
                     print(f"❌ Error reading LSP response: {e}")
                     response_queue.put(None)
-            
+
             # 启动读取线程
             read_thread = threading.Thread(target=read_response, daemon=True)
             read_thread.start()
-            
+
             # 对于 initialize 请求，使用更长的超时时间（rust-analyzer 可能需要更长时间）
             timeout = 30.0 if method == "initialize" else 10.0
             read_thread.join(timeout=timeout)
-            
+
             try:
                 response = response_queue.get(timeout=0.5)
                 if response:
@@ -468,7 +475,7 @@ class LSPClient:
                     print(f"⚠️ LSP服务器进程已退出，请求超时: {method}")
                 else:
                     print(f"⚠️ LSP请求超时: {method}")
-            
+
             return None
         except BrokenPipeError:
             # LSP服务器连接已断开
@@ -477,13 +484,13 @@ class LSPClient:
         except Exception as e:
             print(f"❌ Error sending LSP request: {e}")
             return None
-    
+
     def _path_to_uri(self, file_path: str) -> str:
         """将文件路径转换为URI。
-        
+
         Args:
             file_path: 文件路径（可以是相对路径或绝对路径）
-            
+
         Returns:
             文件URI
         """
@@ -494,38 +501,37 @@ class LSPClient:
             abs_path = os.path.abspath(abs_path)
         else:
             abs_path = os.path.abspath(file_path)
-        
+
         return Path(abs_path).as_uri()
-    
+
     def _send_notification(self, method: str, params: Dict):
         """发送LSP通知（无响应）。
-        
+
         Args:
             method: 方法名
             params: 参数
         """
         if not self.process:
             return
-        
+
         # 检查进程是否还在运行
         if self.process.poll() is not None:
             print(f"⚠️ LSP服务器进程已退出，无法发送通知: {method}")
             return
-        
-        notification = {
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params
-        }
-        
+
+        notification = {"jsonrpc": "2.0", "method": method, "params": params}
+
         try:
             # LSP 协议要求使用 Content-Length header
             notification_body = json.dumps(notification, ensure_ascii=False)
-            notification_bytes = notification_body.encode('utf-8')
+            notification_bytes = notification_body.encode("utf-8")
             content_length = len(notification_bytes)
-            
+
             # 格式化 LSP 消息：Content-Length: <length>\r\n\r\n<body>
-            message = f"Content-Length: {content_length}\r\n\r\n".encode('utf-8') + notification_bytes
+            message = (
+                f"Content-Length: {content_length}\r\n\r\n".encode("utf-8")
+                + notification_bytes
+            )
             self.process.stdin.buffer.write(message)
             self.process.stdin.buffer.flush()
         except BrokenPipeError:
@@ -533,109 +539,123 @@ class LSPClient:
             print(f"⚠️ LSP服务器连接已断开，无法发送通知: {method}")
         except Exception as e:
             print(f"❌ Error sending LSP notification: {e}")
-    
+
     def get_completion(self, file_path: str, line: int, character: int) -> List[Dict]:
         """获取代码补全。
-        
+
         Args:
             file_path: 文件路径
             line: 行号（0-based）
             character: 列号（0-based）
-            
+
         Returns:
             补全项列表
         """
         uri = self._path_to_uri(file_path)
-        result = self._send_request("textDocument/completion", {
-            "textDocument": {"uri": uri},
-            "position": {"line": line, "character": character}
-        })
-        
+        result = self._send_request(
+            "textDocument/completion",
+            {
+                "textDocument": {"uri": uri},
+                "position": {"line": line, "character": character},
+            },
+        )
+
         if result and "items" in result:
             return result["items"]
         return []
-    
+
     def get_hover(self, file_path: str, line: int, character: int) -> Optional[Dict]:
         """获取悬停信息。
-        
+
         Args:
             file_path: 文件路径
             line: 行号（0-based）
             character: 列号（0-based）
-            
+
         Returns:
             悬停信息
         """
         uri = self._path_to_uri(file_path)
-        return self._send_request("textDocument/hover", {
-            "textDocument": {"uri": uri},
-            "position": {"line": line, "character": character}
-        })
-    
-    def get_definition(self, file_path: str, line: int, character: int) -> Optional[Dict]:
+        return self._send_request(
+            "textDocument/hover",
+            {
+                "textDocument": {"uri": uri},
+                "position": {"line": line, "character": character},
+            },
+        )
+
+    def get_definition(
+        self, file_path: str, line: int, character: int
+    ) -> Optional[Dict]:
         """获取定义位置。
-        
+
         Args:
             file_path: 文件路径
             line: 行号（0-based）
             character: 列号（0-based）
-            
+
         Returns:
             定义位置
         """
         uri = self._path_to_uri(file_path)
-        return self._send_request("textDocument/definition", {
-            "textDocument": {"uri": uri},
-            "position": {"line": line, "character": character}
-        })
-    
+        return self._send_request(
+            "textDocument/definition",
+            {
+                "textDocument": {"uri": uri},
+                "position": {"line": line, "character": character},
+            },
+        )
+
     def get_references(self, file_path: str, line: int, character: int) -> List[Dict]:
         """获取引用位置。
-        
+
         Args:
             file_path: 文件路径
             line: 行号（0-based）
             character: 列号（0-based）
-            
+
         Returns:
             引用位置列表
         """
         uri = self._path_to_uri(file_path)
-        result = self._send_request("textDocument/references", {
-            "textDocument": {"uri": uri},
-            "position": {"line": line, "character": character},
-            "context": {"includeDeclaration": False}
-        })
-        
+        result = self._send_request(
+            "textDocument/references",
+            {
+                "textDocument": {"uri": uri},
+                "position": {"line": line, "character": character},
+                "context": {"includeDeclaration": False},
+            },
+        )
+
         if result:
             return result
         return []
-    
+
     def get_document_symbols(self, file_path: str) -> List[Dict]:
         """获取文档符号。
-        
+
         Args:
             file_path: 文件路径
-            
+
         Returns:
             符号列表
         """
         uri = self._path_to_uri(file_path)
-        result = self._send_request("textDocument/documentSymbol", {
-            "textDocument": {"uri": uri}
-        })
-        
+        result = self._send_request(
+            "textDocument/documentSymbol", {"textDocument": {"uri": uri}}
+        )
+
         if result:
             return result
         return []
-    
+
     def find_symbol_by_name(self, file_path: str, symbol_name: str) -> Optional[Dict]:
         """通过符号名称查找符号位置（适合大模型使用）。
-        
+
         Args:
             file_path: 文件路径
             symbol_name: 符号名称（函数名、类名等）
-            
+
         Returns:
             符号信息，包含位置和详细信息，如果未找到返回None
         """
@@ -643,33 +663,33 @@ class LSPClient:
         symbols = self.get_document_symbols(file_path)
         if not symbols:
             return None
-        
+
         # 精确匹配
         for symbol in symbols:
             if symbol.get("name") == symbol_name:
                 return symbol
-        
+
         # 模糊匹配（不区分大小写）
         symbol_name_lower = symbol_name.lower()
         for symbol in symbols:
             if symbol.get("name", "").lower() == symbol_name_lower:
                 return symbol
-        
+
         # 部分匹配（包含关系）
         for symbol in symbols:
             name = symbol.get("name", "").lower()
             if symbol_name_lower in name or name in symbol_name_lower:
                 return symbol
-        
+
         return None
-    
+
     def get_symbol_info(self, file_path: str, symbol_name: str) -> Optional[Dict]:
         """获取符号的完整信息（定义、悬停、引用等，适合大模型使用）。
-        
+
         Args:
             file_path: 文件路径
             symbol_name: 符号名称
-            
+
         Returns:
             包含符号完整信息的字典，如果未找到返回None
         """
@@ -677,67 +697,73 @@ class LSPClient:
         symbol = self.find_symbol_by_name(file_path, symbol_name)
         if not symbol:
             return None
-        
+
         # 获取符号的位置
         range_info = symbol.get("range", {})
         start = range_info.get("start", {})
         line = start.get("line", 0)
         character = start.get("character", 0)
-        
+
         # 获取悬停信息
         hover_info = self.get_hover(file_path, line, character)
-        
+
         # 获取定义位置
         definition = self.get_definition(file_path, line, character)
-        
+
         # 获取引用
         references = self.get_references(file_path, line, character)
-        
+
         return {
             "name": symbol.get("name"),
             "kind": symbol.get("kind"),
             "location": {
                 "file": file_path,
                 "line": line + 1,  # 转换为1-based
-                "character": character + 1
+                "character": character + 1,
             },
             "range": range_info,
             "hover": hover_info,
             "definition": definition,
             "references": references,
-            "reference_count": len(references) if references else 0
+            "reference_count": len(references) if references else 0,
         }
-    
+
     def notify_did_open(self, file_path: str, content: str):
         """通知文档打开。
-        
+
         Args:
             file_path: 文件路径
             content: 文件内容
         """
         uri = self._path_to_uri(file_path)
-        self._send_notification("textDocument/didOpen", {
-            "textDocument": {
-                "uri": uri,
-                "languageId": self._detect_language(file_path),
-                "version": 1,
-                "text": content
-            }
-        })
-    
+        self._send_notification(
+            "textDocument/didOpen",
+            {
+                "textDocument": {
+                    "uri": uri,
+                    "languageId": self._detect_language(file_path),
+                    "version": 1,
+                    "text": content,
+                }
+            },
+        )
+
     def notify_did_change(self, file_path: str, content: str):
         """通知文档变更。
-        
+
         Args:
             file_path: 文件路径
             content: 文件内容
         """
         uri = self._path_to_uri(file_path)
-        self._send_notification("textDocument/didChange", {
-            "textDocument": {"uri": uri, "version": 1},
-            "contentChanges": [{"text": content}]
-        })
-    
+        self._send_notification(
+            "textDocument/didChange",
+            {
+                "textDocument": {"uri": uri, "version": 1},
+                "contentChanges": [{"text": content}],
+            },
+        )
+
     def _detect_language(self, file_path: str) -> str:
         """检测文件语言ID。"""
         ext = Path(file_path).suffix.lower()
@@ -745,7 +771,7 @@ class LSPClient:
             if ext in config.file_extensions:
                 return config.language_ids[0]
         return "plaintext"
-    
+
     def close(self):
         """关闭LSP连接。"""
         if self.process:
@@ -755,14 +781,14 @@ class LSPClient:
                     self._send_notification("shutdown", {})
                 except Exception:
                     pass  # 如果发送失败，直接终止进程
-                
+
                 # 关闭标准输入，通知服务器可以退出
                 if self.process.stdin:
                     try:
                         self.process.stdin.close()
                     except Exception:
                         pass
-                
+
                 # 等待进程退出
                 try:
                     self.process.wait(timeout=5)
@@ -803,15 +829,15 @@ class LSPClient:
                     except Exception:
                         pass
                 self.process = None
-    
+
     def __del__(self):
         """析构函数，确保资源被释放。"""
         self.close()
-    
+
     def __enter__(self):
         """上下文管理器入口。"""
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """上下文管理器出口，自动关闭连接。"""
         self.close()
@@ -820,13 +846,13 @@ class LSPClient:
 
 class TreeSitterFallback:
     """Tree-sitter 后备客户端，当 LSP 不可用时使用。
-    
+
     提供类似 LSP 的接口，但使用 Tree-sitter 进行符号提取。
     """
-    
+
     def __init__(self, project_root: str, language: str):
         """初始化 Tree-sitter 后备客户端。
-        
+
         Args:
             project_root: 项目根目录
             language: 语言名称
@@ -835,13 +861,13 @@ class TreeSitterFallback:
         self.language = language
         self._extractor = None
         self._symbols_cache: Dict[str, List[Dict]] = {}  # 文件路径 -> 符号列表
-    
+
     def _path_to_uri(self, file_path: str) -> str:
         """将文件路径转换为URI。
-        
+
         Args:
             file_path: 文件路径（可以是相对路径或绝对路径）
-            
+
         Returns:
             文件URI
         """
@@ -852,43 +878,45 @@ class TreeSitterFallback:
             abs_path = os.path.abspath(abs_path)
         else:
             abs_path = os.path.abspath(file_path)
-        
+
         return Path(abs_path).as_uri()
-    
+
     def _get_extractor(self):
         """获取符号提取器（延迟加载）"""
         if self._extractor is None and _symbol_extractor_module:
-            self._extractor = _symbol_extractor_module.get_symbol_extractor(self.language)
+            self._extractor = _symbol_extractor_module.get_symbol_extractor(
+                self.language
+            )
         return self._extractor
-    
+
     def get_document_symbols(self, file_path: str) -> List[Dict]:
         """获取文档符号（使用 Tree-sitter）。
-        
+
         Args:
             file_path: 文件路径
-            
+
         Returns:
             符号列表
         """
         # 检查缓存
         if file_path in self._symbols_cache:
             return self._symbols_cache[file_path]
-        
+
         extractor = self._get_extractor()
         if not extractor:
             return []
-        
+
         try:
             # 读取文件内容
             if not os.path.exists(file_path):
                 return []
-            
-            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            
+
             # 提取符号
             symbols = extractor.extract_symbols(file_path, content)
-            
+
             # 转换为 LSP 格式
             lsp_symbols = []
             for symbol in symbols:
@@ -898,28 +926,28 @@ class TreeSitterFallback:
                     "range": {
                         "start": {
                             "line": symbol.line_start - 1,  # 转换为0-based
-                            "character": 0
+                            "character": 0,
                         },
                         "end": {
                             "line": symbol.line_end - 1,  # 转换为0-based
-                            "character": 0
-                        }
+                            "character": 0,
+                        },
                     },
                     "detail": symbol.signature or "",
-                    "documentation": symbol.docstring or ""
+                    "documentation": symbol.docstring or "",
                 }
                 lsp_symbols.append(lsp_symbol)
-            
+
             # 缓存结果
             self._symbols_cache[file_path] = lsp_symbols
             return lsp_symbols
         except Exception as e:
             print(f"⚠️ Tree-sitter 提取符号失败: {e}")
             return []
-    
+
     def _map_kind_to_lsp(self, kind: str) -> int:
         """将符号类型映射到 LSP 符号类型。
-        
+
         LSP SymbolKind 枚举值：
         1 = File, 2 = Module, 3 = Namespace, 4 = Package, 5 = Class,
         6 = Method, 7 = Property, 8 = Field, 9 = Constructor, 10 = Enum,
@@ -947,64 +975,64 @@ class TreeSitterFallback:
             return 10  # Enum
         else:
             return 13  # 默认 Variable
-    
+
     def find_symbol_by_name(self, file_path: str, symbol_name: str) -> Optional[Dict]:
         """通过符号名称查找符号位置。
-        
+
         Args:
             file_path: 文件路径
             symbol_name: 符号名称
-            
+
         Returns:
             符号信息，如果未找到返回None
         """
         symbols = self.get_document_symbols(file_path)
         if not symbols:
             return None
-        
+
         # 精确匹配
         for symbol in symbols:
             if symbol.get("name") == symbol_name:
                 return symbol
-        
+
         # 模糊匹配（不区分大小写）
         symbol_name_lower = symbol_name.lower()
         for symbol in symbols:
             if symbol.get("name", "").lower() == symbol_name_lower:
                 return symbol
-        
+
         # 部分匹配
         for symbol in symbols:
             name = symbol.get("name", "").lower()
             if symbol_name_lower in name or name in symbol_name_lower:
                 return symbol
-        
+
         return None
-    
+
     def get_symbol_info(self, file_path: str, symbol_name: str) -> Optional[Dict]:
         """获取符号的完整信息。
-        
+
         Args:
             file_path: 文件路径
             symbol_name: 符号名称
-            
+
         Returns:
             包含符号完整信息的字典，如果未找到返回None
         """
         symbol = self.find_symbol_by_name(file_path, symbol_name)
         if not symbol:
             return None
-        
+
         range_info = symbol.get("range", {})
         start = range_info.get("start", {})
-        
+
         return {
             "name": symbol.get("name"),
             "kind": symbol.get("kind"),
             "location": {
                 "file": file_path,
                 "line": start.get("line", 0) + 1,  # 转换为1-based
-                "character": start.get("character", 0) + 1
+                "character": start.get("character", 0) + 1,
             },
             "range": range_info,
             "hover": {
@@ -1012,22 +1040,21 @@ class TreeSitterFallback:
                     "value": symbol.get("documentation") or symbol.get("detail") or ""
                 }
             },
-            "definition": {
-                "uri": self._path_to_uri(file_path),
-                "range": range_info
-            },
+            "definition": {"uri": self._path_to_uri(file_path), "range": range_info},
             "references": [],  # Tree-sitter 不支持引用查找
-            "reference_count": 0
+            "reference_count": 0,
         }
-    
-    def get_definition(self, file_path: str, line: int, character: int) -> Optional[Dict]:
+
+    def get_definition(
+        self, file_path: str, line: int, character: int
+    ) -> Optional[Dict]:
         """获取定义位置（Tree-sitter 版本，实际上就是当前符号的位置）。
-        
+
         Args:
             file_path: 文件路径
             line: 行号（0-based）
             character: 列号（0-based）
-            
+
         Returns:
             定义位置
         """
@@ -1036,32 +1063,32 @@ class TreeSitterFallback:
             "uri": self._path_to_uri(file_path),
             "range": {
                 "start": {"line": line, "character": character},
-                "end": {"line": line, "character": character}
-            }
+                "end": {"line": line, "character": character},
+            },
         }
-    
+
     def get_references(self, file_path: str, line: int, character: int) -> List[Dict]:
         """获取引用位置（Tree-sitter 不支持，返回空列表）。
-        
+
         Args:
             file_path: 文件路径
             line: 行号（0-based）
             character: 列号（0-based）
-            
+
         Returns:
             引用位置列表（Tree-sitter 不支持，返回空列表）
         """
         # Tree-sitter 不支持引用查找
         return []
-    
+
     def get_hover(self, file_path: str, line: int, character: int) -> Optional[Dict]:
         """获取悬停信息。
-        
+
         Args:
             file_path: 文件路径
             line: 行号（0-based）
             character: 列号（0-based）
-            
+
         Returns:
             悬停信息
         """
@@ -1075,7 +1102,9 @@ class TreeSitterFallback:
             if sym_line == line:
                 return {
                     "contents": {
-                        "value": symbol.get("documentation") or symbol.get("detail") or symbol.get("name", "")
+                        "value": symbol.get("documentation")
+                        or symbol.get("detail")
+                        or symbol.get("name", "")
                     }
                 }
         return None
@@ -1083,58 +1112,59 @@ class TreeSitterFallback:
 
 class LSPClientTool:
     """LSP客户端工具，供CodeAgent使用。"""
-    
+
     name = "lsp_client"
     description = "LSP客户端工具，基于符号名称获取代码信息（定义、引用等），无需行列号。仅在CodeAgent模式下可用。"
-    
+
     parameters = {
         "type": "object",
         "properties": {
             "action": {
                 "type": "string",
                 "enum": [
-                    "get_symbol_info",   # 通过符号名获取完整信息
-                    "search_symbol",      # 搜索符号（模糊匹配）
-                    "document_symbols",   # 获取所有符号列表
-                    "definition",         # 查找定义位置
-                    "references"          # 查找所有引用
+                    "get_symbol_info",  # 通过符号名获取完整信息
+                    "search_symbol",  # 搜索符号（模糊匹配）
+                    "document_symbols",  # 获取所有符号列表
+                    "definition",  # 查找定义位置
+                    "references",  # 查找所有引用
                 ],
-                "description": "要执行的LSP操作。所有操作都基于符号名称，无需行列号。"
+                "description": "要执行的LSP操作。所有操作都基于符号名称，无需行列号。",
             },
             "file_path": {
                 "type": "string",
-                "description": "文件路径（相对或绝对路径）"
+                "description": "文件路径（相对或绝对路径）",
             },
             "symbol_name": {
                 "type": "string",
-                "description": "符号名称（函数名、类名、变量名等）。get_symbol_info/definition/references必需；search_symbol可选；document_symbols不需要。支持模糊匹配。"
-            }
+                "description": "符号名称（函数名、类名、变量名等）。get_symbol_info/definition/references必需；search_symbol可选；document_symbols不需要。支持模糊匹配。",
+            },
         },
-        "required": ["action", "file_path"]
+        "required": ["action", "file_path"],
     }
-    
+
     # 全局LSP客户端缓存（按项目根目录和语言）
     _clients: Dict[Tuple[str, str], LSPClient] = {}
     # Tree-sitter 后备客户端缓存
     _treesitter_clients: Dict[Tuple[str, str], TreeSitterFallback] = {}
     # 最大缓存大小，防止内存和文件句柄泄露
     _max_cache_size = 10
-    
+
     @staticmethod
     def check() -> bool:
         """检查工具是否可用。
-        
+
         检查CodeAgent模块是否可用，因为此工具仅在CodeAgent模式下可用。
-        
+
         Returns:
             bool: 如果CodeAgent可用返回True，否则返回False
         """
         try:
             from jarvis.jarvis_code_agent.code_agent import CodeAgent  # noqa: F401
+
             return True
         except ImportError:
             return False
-    
+
     @staticmethod
     def cleanup_all_clients():
         """清理所有缓存的LSP客户端，释放资源。"""
@@ -1145,32 +1175,32 @@ class LSPClientTool:
             except Exception:
                 pass
         LSPClientTool._clients.clear()
-        
+
         # Tree-sitter 客户端不需要特殊清理（没有进程）
         LSPClientTool._treesitter_clients.clear()
-    
+
     def _get_or_create_client(self, project_root: str, file_path: str) -> Optional[Any]:
         """获取或创建LSP客户端，如果LSP不可用则使用Tree-sitter后备。
-        
+
         Args:
             project_root: 项目根目录
             file_path: 文件路径
-            
+
         Returns:
             LSP客户端或Tree-sitter后备客户端实例
         """
         # 检测文件语言
         ext = Path(file_path).suffix.lower()
         language = None
-        
+
         for lang, config in LSP_SERVERS.items():
             if ext in config.file_extensions:
                 language = lang
                 break
-        
+
         if not language:
             return None
-        
+
         # 检查LSP客户端缓存
         cache_key = (project_root, language)
         if cache_key in LSPClientTool._clients:
@@ -1185,7 +1215,7 @@ class LSPClientTool:
                 except Exception:
                     pass
                 del LSPClientTool._clients[cache_key]
-        
+
         # 如果缓存过大，清理最旧的客户端
         if len(LSPClientTool._clients) >= LSPClientTool._max_cache_size:
             # 关闭并移除最旧的客户端（FIFO）
@@ -1195,7 +1225,7 @@ class LSPClientTool:
                 oldest_client.close()
             except Exception:
                 pass
-        
+
         # 尝试创建LSP客户端
         try:
             config = LSP_SERVERS[language]
@@ -1211,7 +1241,7 @@ class LSPClientTool:
                     fallback = LSPClientTool._treesitter_clients[cache_key]
                     print(f"ℹ️ 使用Tree-sitter后备客户端: {language}")
                     return fallback
-                
+
                 # 检查是否有该语言的符号提取器
                 if _symbol_extractor_module:
                     extractor = _symbol_extractor_module.get_symbol_extractor(language)
@@ -1242,13 +1272,13 @@ class LSPClientTool:
                         return fallback
                     return LSPClientTool._treesitter_clients[cache_key]
             return None
-    
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行LSP客户端工具。
-        
+
         Args:
             args: 工具参数
-            
+
         Returns:
             执行结果
         """
@@ -1258,22 +1288,24 @@ class LSPClientTool:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "lsp_client工具仅在CodeAgent模式下可用"
+                    "stderr": "lsp_client工具仅在CodeAgent模式下可用",
                 }
-            
+
             action = args.get("action")
             file_path = args.get("file_path")
-            
+
             if not action or not file_path:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": "缺少必需参数: action 和 file_path"
+                    "stderr": "缺少必需参数: action 和 file_path",
                 }
-            
+
             # 获取项目根目录（从agent获取，或使用文件所在目录）
-            project_root = args.get("project_root") or os.path.dirname(os.path.abspath(file_path))
-            
+            project_root = args.get("project_root") or os.path.dirname(
+                os.path.abspath(file_path)
+            )
+
             # 获取或创建LSP客户端
             client = self._get_or_create_client(project_root, file_path)
             if not client:
@@ -1284,7 +1316,7 @@ class LSPClientTool:
                     if ext in config.file_extensions:
                         language = lang
                         break
-                
+
                 if language:
                     server_name = LSP_SERVERS[language].name
                     error_msg = (
@@ -1294,22 +1326,18 @@ class LSPClientTool:
                     )
                 else:
                     error_msg = f"无法为文件 {file_path} 创建LSP客户端（不支持该语言或LSP服务器未安装）"
-                
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": error_msg
-                }
-            
+
+                return {"success": False, "stdout": "", "stderr": error_msg}
+
             # 确保文件已打开（仅对 LSP 客户端需要）
             if isinstance(client, LSPClient) and os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
                 client.notify_did_open(file_path, content)
-            
+
             # 执行操作（完全基于符号名称，无需行列号）
             symbol_name = args.get("symbol_name")
-            
+
             result = None
             if action == "get_symbol_info":
                 # 通过符号名获取完整信息
@@ -1317,22 +1345,22 @@ class LSPClientTool:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "get_symbol_info 操作需要提供 symbol_name 参数"
+                        "stderr": "get_symbol_info 操作需要提供 symbol_name 参数",
                     }
                 result = client.get_symbol_info(file_path, symbol_name)
                 if not result:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"未找到符号: {symbol_name}。请使用 document_symbols 操作查看文件中的所有符号。"
-                }
+                        "stderr": f"未找到符号: {symbol_name}。请使用 document_symbols 操作查看文件中的所有符号。",
+                    }
             elif action == "search_symbol":
                 # 搜索符号（支持模糊匹配）
                 if not symbol_name:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "search_symbol 操作需要提供 symbol_name 参数"
+                        "stderr": "search_symbol 操作需要提供 symbol_name 参数",
                     }
                 all_symbols = client.get_document_symbols(file_path)
                 symbol_name_lower = symbol_name.lower()
@@ -1344,29 +1372,26 @@ class LSPClientTool:
                 result = {
                     "symbols": matches[:20],  # 限制数量
                     "count": len(matches),
-                    "query": symbol_name
+                    "query": symbol_name,
                 }
             elif action == "document_symbols":
                 # 获取所有符号
                 symbols = client.get_document_symbols(file_path)
-                result = {
-                    "symbols": symbols,
-                    "count": len(symbols)
-                }
+                result = {"symbols": symbols, "count": len(symbols)}
             elif action == "definition":
                 # 查找定义位置（通过符号名）
                 if not symbol_name:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "definition 操作需要提供 symbol_name 参数"
+                        "stderr": "definition 操作需要提供 symbol_name 参数",
                     }
                 symbol = client.find_symbol_by_name(file_path, symbol_name)
                 if not symbol:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"未找到符号: {symbol_name}。请使用 document_symbols 操作查看文件中的所有符号。"
+                        "stderr": f"未找到符号: {symbol_name}。请使用 document_symbols 操作查看文件中的所有符号。",
                     }
                 range_info = symbol.get("range", {})
                 start = range_info.get("start", {})
@@ -1379,62 +1404,51 @@ class LSPClientTool:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "references 操作需要提供 symbol_name 参数"
+                        "stderr": "references 操作需要提供 symbol_name 参数",
                     }
                 symbol = client.find_symbol_by_name(file_path, symbol_name)
                 if not symbol:
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"未找到符号: {symbol_name}。请使用 document_symbols 操作查看文件中的所有符号。"
+                        "stderr": f"未找到符号: {symbol_name}。请使用 document_symbols 操作查看文件中的所有符号。",
                     }
                 range_info = symbol.get("range", {})
                 start = range_info.get("start", {})
                 line = start.get("line", 0)
                 character = start.get("character", 0)
                 refs = client.get_references(file_path, line, character)
-                result = {
-                    "references": refs,
-                    "count": len(refs) if refs else 0
-                }
+                result = {"references": refs, "count": len(refs) if refs else 0}
             else:
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"不支持的操作: {action}"
+                    "stderr": f"不支持的操作: {action}",
                 }
-            
+
             if result is None:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "LSP服务器未返回结果"
-                }
-            
+                return {"success": False, "stdout": "", "stderr": "LSP服务器未返回结果"}
+
             # 格式化输出
             output = self._format_result(action, result)
-            
-            return {
-                "success": True,
-                "stdout": output,
-                "stderr": ""
-            }
-            
+
+            return {"success": True, "stdout": output, "stderr": ""}
+
         except Exception as e:
             print(f"❌ LSP client tool error: {e}")
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"LSP客户端工具执行失败: {str(e)}"
+                "stderr": f"LSP客户端工具执行失败: {str(e)}",
             }
-    
+
     def _format_result(self, action: str, result: Dict) -> str:
         """格式化LSP结果。
-        
+
         Args:
             action: 操作类型
             result: 结果数据
-            
+
         Returns:
             格式化后的字符串
         """
@@ -1442,13 +1456,15 @@ class LSPClientTool:
             # 格式化符号完整信息
             if not result:
                 return "未找到符号信息"
-            
+
             lines = [f"符号: {result.get('name', '')} ({result.get('kind', '')})"]
-            
+
             location = result.get("location", {})
             if location:
-                lines.append(f"位置: {location.get('file', '')}:{location.get('line', 0)}")
-            
+                lines.append(
+                    f"位置: {location.get('file', '')}:{location.get('line', 0)}"
+                )
+
             hover = result.get("hover", {})
             if hover:
                 contents = hover.get("contents", {})
@@ -1457,10 +1473,13 @@ class LSPClientTool:
                     if value:
                         lines.append(f"信息: {value}")
                 elif isinstance(contents, list):
-                    values = [c.get("value", "") if isinstance(c, dict) else str(c) for c in contents]
+                    values = [
+                        c.get("value", "") if isinstance(c, dict) else str(c)
+                        for c in contents
+                    ]
                     if values:
                         lines.append(f"信息: {' '.join(values)}")
-            
+
             definition = result.get("definition", {})
             if definition:
                 if isinstance(definition, list):
@@ -1472,22 +1491,22 @@ class LSPClientTool:
                     start = range_info.get("start", {})
                     line = start.get("line", 0) + 1
                     lines.append(f"定义: {file_path}:{line}")
-            
+
             ref_count = result.get("reference_count", 0)
             if ref_count > 0:
                 lines.append(f"引用数量: {ref_count}")
-            
+
             return "\n".join(lines)
-        
+
         elif action == "search_symbol":
             # 格式化搜索结果
             symbols = result.get("symbols", [])
             query = result.get("query", "")
             count = result.get("count", 0)
-            
+
             if not symbols:
                 return f"未找到匹配 '{query}' 的符号"
-            
+
             lines = [f"找到 {count} 个匹配 '{query}' 的符号：\n"]
             for symbol in symbols[:10]:  # 只显示前10个
                 name = symbol.get("name", "")
@@ -1496,48 +1515,48 @@ class LSPClientTool:
                 start = range_info.get("start", {})
                 line = start.get("line", 0) + 1
                 lines.append(f"  - {name} ({kind}) at line {line}")
-            
+
             if count > 10:
                 lines.append(f"  ... 还有 {count - 10} 个结果")
-            
+
             return "\n".join(lines)
-        
+
         elif action == "definition":
             if not result:
                 return "未找到定义"
-            
+
             if isinstance(result, list):
                 result = result[0]
-            
+
             uri = result.get("uri", "")
             range = result.get("range", {})
             start = range.get("start", {})
             line = start.get("line", 0) + 1  # 转换为1-based
-            
+
             file_path = Path(uri).path if uri.startswith("file://") else uri
             return f"定义位置: {file_path}:{line}"
-        
+
         elif action == "references":
             refs = result.get("references", [])
             if not refs:
                 return "未找到引用"
-            
+
             lines = [f"找到 {result.get('count', 0)} 个引用：\n"]
             for ref in refs[:10]:  # 只显示前10个
                 uri = ref.get("uri", "")
                 range = ref.get("range", {})
                 start = range.get("start", {})
                 line = start.get("line", 0) + 1
-                
+
                 file_path = Path(uri).path if uri.startswith("file://") else uri
                 lines.append(f"  - {file_path}:{line}")
             return "\n".join(lines)
-        
+
         elif action == "document_symbols":
             symbols = result.get("symbols", [])
             if not symbols:
                 return "未找到符号"
-            
+
             lines = [f"找到 {result.get('count', 0)} 个符号：\n"]
             for symbol in symbols[:20]:  # 只显示前20个
                 name = symbol.get("name", "")
@@ -1545,8 +1564,8 @@ class LSPClientTool:
                 range = symbol.get("range", {})
                 start = range.get("start", {})
                 line = start.get("line", 0) + 1
-                
+
                 lines.append(f"  - {name} ({kind}) at line {line}")
             return "\n".join(lines)
-        
+
         return str(result)

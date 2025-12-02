@@ -5,7 +5,11 @@
 """
 
 from jarvis.jarvis_utils.globals import get_all_memory_tags
-from jarvis.jarvis_agent.events import TASK_STARTED, BEFORE_HISTORY_CLEAR, TASK_COMPLETED
+from jarvis.jarvis_agent.events import (
+    TASK_STARTED,
+    BEFORE_HISTORY_CLEAR,
+    TASK_COMPLETED,
+)
 
 
 class MemoryManager:

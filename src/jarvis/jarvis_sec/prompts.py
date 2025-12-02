@@ -265,4 +265,3 @@ def get_cluster_summary_prompt() -> str:
 ]
 </CLUSTERS>
     """.strip()
-

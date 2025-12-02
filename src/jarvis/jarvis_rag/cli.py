@@ -14,7 +14,11 @@ from langchain_community.document_loaders import (
 from langchain_core.document_loaders.base import BaseLoader
 from rich.markdown import Markdown
 
-from jarvis.jarvis_utils.utils import init_env, is_rag_installed, get_missing_rag_modules
+from jarvis.jarvis_utils.utils import (
+    init_env,
+    is_rag_installed,
+    get_missing_rag_modules,
+)
 from jarvis.jarvis_utils.config import (
     get_rag_embedding_model,
     get_rag_use_bm25,
@@ -86,9 +90,7 @@ def _create_custom_llm(platform_name: str, model_name: str) -> Optional[LLMInter
         registry = PlatformRegistry.get_global_platform_registry()
         platform_instance = registry.create_platform(platform_name)
         if not platform_instance:
-            print(
-                f"❌ 错误: 平台 '{platform_name}' 未找到。"
-            )
+            print(f"❌ 错误: 平台 '{platform_name}' 未找到。")
             return None
         platform_instance.set_model_name(model_name)
         platform_instance.set_suppress_output(True)
@@ -118,14 +120,10 @@ def _load_ragignore_spec() -> Tuple[Optional[pathspec.PathSpec], Optional[Path]]
             with open(ignore_file_to_use, "r", encoding="utf-8") as f:
                 patterns = f.read().splitlines()
             spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
-            print(
-                f"✅ 加载忽略规则: {ignore_file_to_use}"
-            )
+            print(f"✅ 加载忽略规则: {ignore_file_to_use}")
             return spec, project_root_path
         except Exception as e:
-            print(
-                f"⚠️ 加载 {ignore_file_to_use.name} 文件失败: {e}"
-            )
+            print(f"⚠️ 加载 {ignore_file_to_use.name} 文件失败: {e}")
 
     return None, None
 
@@ -184,9 +182,7 @@ def add_documents(
                 if is_likely_text_file(path):
                     files_to_process.add(path)
                 else:
-                    print(
-                        f"⚠️ 跳过可能的二进制文件: {path}"
-                    )
+                    print(f"⚠️ 跳过可能的二进制文件: {path}")
 
     if not files_to_process:
         print("⚠️ 在指定路径中未找到任何文本文件。")
@@ -210,20 +206,14 @@ def add_documents(
 
         ignored_count = initial_count - len(retained_files)
         if ignored_count > 0:
-            print(
-                f"ℹ️ 根据 .ragignore 规则过滤掉 {ignored_count} 个文件。"
-            )
+            print(f"ℹ️ 根据 .ragignore 规则过滤掉 {ignored_count} 个文件。")
         files_to_process = retained_files
 
     if not files_to_process:
-        print(
-            "⚠️ 所有找到的文本文件都被忽略规则过滤掉了。"
-        )
+        print("⚠️ 所有找到的文本文件都被忽略规则过滤掉了。")
         return
 
-    print(
-        f"ℹ️ 发现 {len(files_to_process)} 个独立文件待处理。"
-    )
+    print(f"ℹ️ 发现 {len(files_to_process)} 个独立文件待处理。")
 
     try:
         pipeline = JarvisRAGPipeline(
@@ -255,17 +245,13 @@ def add_documents(
             # 当批处理已满或是最后一个文件时处理批处理
             if docs_batch and (len(docs_batch) >= batch_size or (i + 1) == total_files):
                 if loaded_msgs:
-                    joined_msgs = '\n'.join(loaded_msgs)
+                    joined_msgs = "\n".join(loaded_msgs)
                     print(f"ℹ️ {joined_msgs}")
                     loaded_msgs = []
-                print(
-                    f"ℹ️ 正在处理批次，包含 {len(docs_batch)} 个文档..."
-                )
+                print(f"ℹ️ 正在处理批次，包含 {len(docs_batch)} 个文档...")
                 pipeline.add_documents(docs_batch)
                 total_docs_added += len(docs_batch)
-                print(
-                    f"✅ 成功添加 {len(docs_batch)} 个文档。"
-                )
+                print(f"✅ 成功添加 {len(docs_batch)} 个文档。")
                 docs_batch = []  # 清空批处理
 
         # 最后统一打印可能残留的"已加载"信息
@@ -320,16 +306,14 @@ def list_documents(
                     sources.add(source)
 
         if not sources:
-            print(
-                "ℹ️ 知识库中没有找到任何带有源信息的文档。"
-            )
+            print("ℹ️ 知识库中没有找到任何带有源信息的文档。")
             return
 
         # 避免在循环中逐条打印，先拼接后统一打印
         lines = [f"知识库 '{collection_name}' 中共有 {len(sources)} 个独立文档:"]
         for i, source in enumerate(sorted(list(sources)), 1):
             lines.append(f"  {i}. {source}")
-        joined_lines = '\n'.join(lines)
+        joined_lines = "\n".join(lines)
         print(f"ℹ️ {joined_lines}")
 
     except Exception as e:
@@ -386,9 +370,7 @@ def retrieve(
             print("ℹ️ 未找到相关文档。")
             return
 
-        print(
-            f"✅ 成功检索到 {len(retrieved_docs)} 个文档:"
-        )
+        print(f"✅ 成功检索到 {len(retrieved_docs)} 个文档:")
         from jarvis.jarvis_utils.globals import console
 
         for i, doc in enumerate(retrieved_docs, 1):
@@ -466,9 +448,6 @@ def query(
     except Exception as e:
         print(f"❌ 发生错误: {e}")
         raise typer.Exit(code=1)
-
-
-
 
 
 def _check_rag_dependencies():

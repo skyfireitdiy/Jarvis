@@ -9,6 +9,7 @@ Git工具模块
 - 获取最新提交的哈希值
 - 从Git差异中提取修改的行范围
 """
+
 import datetime
 import os
 import re
@@ -185,7 +186,7 @@ def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) ->
         if end_hash is None:
             # 如果end_hash为None，使用HEAD
             end_hash = "HEAD"
-        
+
         # 检查start_hash是否存在
         start_check = subprocess.run(
             ["git", "rev-parse", "--verify", start_hash],
@@ -194,7 +195,7 @@ def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) ->
         )
         if start_check.returncode != 0:
             return f"起始commit不存在: {start_hash}"
-        
+
         # 检查end_hash是否存在
         end_check = subprocess.run(
             ["git", "rev-parse", "--verify", end_hash],
@@ -203,7 +204,7 @@ def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) ->
         )
         if end_check.returncode != 0:
             return f"结束commit不存在: {end_hash}"
-        
+
         # 获取两个commit之间的差异
         result = subprocess.run(
             ["git", "diff", f"{start_hash}..{end_hash}"],
@@ -211,7 +212,7 @@ def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) ->
             text=False,
             check=True,
         )
-        
+
         try:
             return result.stdout.decode("utf-8")
         except UnicodeDecodeError:
@@ -269,10 +270,10 @@ def revert_change() -> None:
 
 def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
     """检测是否有大量代码删除
-    
+
     参数:
         threshold: 净删除行数阈值，默认200行
-        
+
     返回:
         Optional[Dict[str, int]]: 如果检测到大量删除，返回包含统计信息的字典：
             {
@@ -284,15 +285,20 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
     """
     try:
         # 临时暂存所有文件以便获取完整的diff统计
-        subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
+        subprocess.run(
+            ["git", "add", "-N", "."],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
         # 检查是否有HEAD
         head_check = subprocess.run(
             ["git", "rev-parse", "--verify", "HEAD"],
             stderr=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
         )
-        
+
         if head_check.returncode == 0:
             # 有HEAD，获取相对于HEAD的diff统计
             diff_result = subprocess.run(
@@ -313,28 +319,35 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
                 errors="replace",
                 check=False,
             )
-        
+
         # 重置暂存区
-        subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
+        subprocess.run(
+            ["git", "reset"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
         # 解析插入和删除行数
         if diff_result.returncode == 0 and diff_result.stdout:
             insertions = 0
             deletions = 0
-            insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_result.stdout)
+            insertions_match = re.search(
+                r"(\d+)\s+insertions?\(\+\)", diff_result.stdout
+            )
             deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_result.stdout)
             if insertions_match:
                 insertions = int(insertions_match.group(1))
             if deletions_match:
                 deletions = int(deletions_match.group(1))
-            
+
             # 检查是否有大量代码删除（净删除超过阈值）
             net_deletions = deletions - insertions
             if net_deletions > threshold:
                 return {
-                    'insertions': insertions,
-                    'deletions': deletions,
-                    'net_deletions': net_deletions
+                    "insertions": insertions,
+                    "deletions": deletions,
+                    "net_deletions": net_deletions,
                 }
         return None
     except Exception:
@@ -347,16 +360,16 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
 
 def check_large_code_deletion(threshold: int = 30) -> bool:
     """检查是否有大量代码删除
-    
+
     参数:
         threshold: 净删除行数阈值，默认200行
-        
+
     返回:
         bool: 始终返回True，由调用方统一处理大模型询问
     """
     # 检测功能现在由调用方统一处理
     return True
-    
+
     # 直接返回True，让调用方统一处理大模型询问
     return True
 
@@ -556,7 +569,9 @@ def check_and_update_git_repo(repo_path: str) -> bool:
             and remote_tag_result.returncode == 0
             and local_tag_result.stdout.strip() != remote_tag_result.stdout.strip()
         ):
-            print(f"ℹ️ 检测到新版本tag {remote_tag_result.stdout.strip()}，正在更新Jarvis...")
+            print(
+                f"ℹ️ 检测到新版本tag {remote_tag_result.stdout.strip()}，正在更新Jarvis..."
+            )
             subprocess.run(
                 ["git", "checkout", remote_tag_result.stdout.strip()],
                 cwd=git_root,
@@ -575,6 +590,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
 
                 # 检测 uv 可用性：优先虚拟环境内的 uv，其次 PATH 中的 uv
                 from shutil import which as _which
+
                 uv_executable = None
                 if sys.platform == "win32":
                     venv_uv = os.path.join(sys.prefix, "Scripts", "uv.exe")

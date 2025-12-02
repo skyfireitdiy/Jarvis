@@ -27,7 +27,7 @@ class TestTextFileProcessor:
         """测试识别文本文件"""
         test_file = temp_dir / "test.txt"
         test_file.write_text("Hello, World!", encoding="utf-8")
-        
+
         result = TextFileProcessor.can_handle(str(test_file))
         assert result is True
 
@@ -35,7 +35,7 @@ class TestTextFileProcessor:
         """测试识别二进制文件"""
         test_file = temp_dir / "test.bin"
         test_file.write_bytes(b"\x00\x01\x02\x03\x04\x05")
-        
+
         result = TextFileProcessor.can_handle(str(test_file))
         assert result is False
 
@@ -49,7 +49,7 @@ class TestTextFileProcessor:
         test_file = temp_dir / "test.txt"
         content = "Hello, World!"
         test_file.write_text(content, encoding="utf-8")
-        
+
         result = TextFileProcessor.extract_text(str(test_file))
         assert result == content
 
@@ -58,7 +58,7 @@ class TestTextFileProcessor:
         test_file = temp_dir / "test.txt"
         content = "Line 1\nLine 2\nLine 3"
         test_file.write_text(content, encoding="utf-8")
-        
+
         result = TextFileProcessor.extract_text(str(test_file))
         assert result == content
 
@@ -67,7 +67,7 @@ class TestTextFileProcessor:
         test_file = temp_dir / "test.txt"
         content = "你好世界 🌍"
         test_file.write_text(content, encoding="utf-8")
-        
+
         result = TextFileProcessor.extract_text(str(test_file))
         assert result == content
 
@@ -75,7 +75,7 @@ class TestTextFileProcessor:
         """测试提取空文件"""
         test_file = temp_dir / "empty.txt"
         test_file.write_text("", encoding="utf-8")
-        
+
         result = TextFileProcessor.extract_text(str(test_file))
         assert result == ""
 
@@ -84,7 +84,6 @@ class TestTextFileProcessor:
         test_file = temp_dir / "test_gbk.txt"
         content = "测试GBK编码"
         test_file.write_text(content, encoding="gbk")
-        
+
         result = TextFileProcessor.extract_text(str(test_file))
         assert result == content
-
