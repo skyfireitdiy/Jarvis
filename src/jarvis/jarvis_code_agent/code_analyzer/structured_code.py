@@ -123,55 +123,65 @@ class StructuredCodeExtractor:
         if not LANGUAGE_SUPPORT_AVAILABLE:
             return []
 
+        # 处理end_line为-1的情况（表示文件末尾）
+        if end_line == -1:
+            lines = content.split("\n")
+            end_line = len(lines)
+        
+        syntax_kinds = {
+            "function",
+            "method",
+            "class",
+            "struct",
+            "enum",
+            "union",
+            "interface",
+            "trait",
+            "impl",
+            "module",
+            "attribute",
+            "const",
+            "static",
+            "type",
+            "extern",
+            "macro",
+            "typedef",
+            "template",
+            "namespace",
+            "var",
+            "constructor",
+            "field",
+            "annotation",
+            "decorator",
+        }
+        
+        units = []
+        lines = content.split("\n")
+        
+        # 尝试提取符号，即使有语法错误也尽量提取部分结果
+        symbols = []
+        language = None
+        extractor = None
+        
         try:
             # 检测语言
             language = detect_language(filepath)
-            if not language:
-                return []
-
-            # 获取符号提取器
-            extractor = get_symbol_extractor(language)
-            if not extractor:
-                return []
-
-            # 提取符号
-            symbols = extractor.extract_symbols(filepath, content)
-            if not symbols:
-                return []
-
+            if language:
+                # 获取符号提取器
+                extractor = get_symbol_extractor(language)
+                if extractor:
+                    # 提取符号（即使有语法错误，tree-sitter也能部分解析）
+                    symbols = extractor.extract_symbols(filepath, content)
+        except Exception as e:
+            # 即使检测语言或获取提取器失败，也继续尝试（可能是部分语法错误）
+            import os
+            if os.getenv("DEBUG_TREE_SITTER", "").lower() in ("1", "true", "yes"):
+                print(f"Warning: Failed to detect language or get extractor for {filepath}: {e}")
+        
+        # 如果成功提取到符号，使用它们作为切分点
+        if symbols:
             # 过滤符号：返回与请求范围有重叠的所有语法单元（包括边界上的）
             # 重叠条件：symbol.line_start <= end_line AND symbol.line_end >= start_line
-            syntax_kinds = {
-                "function",
-                "method",
-                "class",
-                "struct",
-                "enum",
-                "union",
-                "interface",
-                "trait",
-                "impl",
-                "module",
-                "attribute",
-                "const",
-                "static",
-                "type",
-                "extern",
-                "macro",
-                "typedef",
-                "template",
-                "namespace",
-                "var",
-                "constructor",
-                "field",
-                "annotation",
-                "decorator",
-            }
-            # 处理end_line为-1的情况（表示文件末尾）
-            if end_line == -1:
-                lines = content.split("\n")
-                end_line = len(lines)
-            
             filtered_symbols = [
                 s
                 for s in symbols
@@ -184,52 +194,60 @@ class StructuredCodeExtractor:
             filtered_symbols.sort(key=lambda s: s.line_start)
 
             # 返回原始语法单元（不进行切分，切分统一在read_code.py的_merge_and_split_by_points中处理）
-            units = []
-            lines = content.split("\n")
-
             for symbol in filtered_symbols:
-                # 获取完整的定义范围（不截断，返回完整语法单元）
-                unit_start, unit_end = (
-                    StructuredCodeExtractor.get_full_definition_range(
-                        symbol, content, language
+                try:
+                    # 获取完整的定义范围（不截断，返回完整语法单元）
+                    unit_start, unit_end = (
+                        StructuredCodeExtractor.get_full_definition_range(
+                            symbol, content, language
+                        )
                     )
-                )
-                
-                # 确保在请求范围内
-                unit_start = max(unit_start, start_line)
-                unit_end = min(unit_end, end_line)
+                    
+                    # 确保在请求范围内
+                    unit_start = max(unit_start, start_line)
+                    unit_end = min(unit_end, end_line)
+                    
+                    # 确保范围有效
+                    if unit_start > unit_end:
+                        continue
 
-                # 提取该符号的完整内容（不截断到请求范围）
-                symbol_start_idx = max(0, unit_start - 1)  # 转为0-based索引
-                # unit_end 是包含的（inclusive），所以需要 +1 来包含最后一行
-                symbol_end_idx = min(len(lines), unit_end + 1)
+                    # 提取该符号的完整内容（不截断到请求范围）
+                    symbol_start_idx = max(0, unit_start - 1)  # 转为0-based索引
+                    # unit_end 是包含的（inclusive），所以需要 +1 来包含最后一行
+                    symbol_end_idx = min(len(lines), unit_end)
 
-                symbol_content = "\n".join(lines[symbol_start_idx:symbol_end_idx])
+                    # 确保索引有效
+                    if symbol_start_idx >= len(lines) or symbol_end_idx < symbol_start_idx:
+                        continue
 
-                # 生成id：体现作用域（如果有parent，使用 parent.name 格式）
-                if symbol.parent:
-                    unit_id = f"{symbol.parent}.{symbol.name}"
-                else:
-                    unit_id = symbol.name
+                    symbol_content = "\n".join(lines[symbol_start_idx:symbol_end_idx + 1])
 
-                # 重复id处理
-                if any(u["id"] == unit_id for u in units):
+                    # 生成id：体现作用域（如果有parent，使用 parent.name 格式）
                     if symbol.parent:
-                        unit_id = f"{symbol.parent}.{symbol.name}_{unit_start}"
+                        unit_id = f"{symbol.parent}.{symbol.name}"
                     else:
-                        unit_id = f"{symbol.name}_{unit_start}"
+                        unit_id = symbol.name
 
-                units.append({
-                    "id": unit_id,
-                    "start_line": unit_start,
-                    "end_line": unit_end,
-                    "content": symbol_content,
-                })
+                    # 重复id处理
+                    if any(u["id"] == unit_id for u in units):
+                        if symbol.parent:
+                            unit_id = f"{symbol.parent}.{symbol.name}_{unit_start}"
+                        else:
+                            unit_id = f"{symbol.name}_{unit_start}"
 
-            return units
-        except Exception:
-            # 如果提取失败，返回空列表，将使用行号分组
-            return []
+                    units.append({
+                        "id": unit_id,
+                        "start_line": unit_start,
+                        "end_line": unit_end,
+                        "content": symbol_content,
+                    })
+                except Exception:
+                    # 单个符号处理失败，继续处理其他符号
+                    continue
+        
+        # 即使没有提取到符号，或者提取失败，也返回空列表
+        # 这样上层可以使用空白行或固定行数切分作为fallback
+        return units
 
     @staticmethod
     def extract_blank_line_groups(
