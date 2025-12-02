@@ -36,71 +36,38 @@ class ContextRecommender:
             context_manager: 上下文管理器
             parent_model: 父Agent的模型实例，用于获取模型配置（平台名称、模型名称、模型组等）
 
-        Raises:
-            ValueError: 如果无法创建LLM模型
+        Note:
+            LLM 模型实例不会在初始化时创建，而是在每次调用时重新创建，
+            以避免上下文窗口累积导致的问题。
         """
         self.context_manager = context_manager
 
-        # 自己创建LLM模型实例，使用父Agent的配置
-        try:
-            registry = PlatformRegistry.get_global_platform_registry()
+        # 保存配置信息，用于后续创建 LLM 实例
+        self._platform_name = None
+        self._model_name = None
+        self._model_group = None
 
-            # 从父Agent的model获取配置
-            platform_name = None
-            model_name = None
-            model_group = None
+        # 从父Agent的model获取配置
+        if parent_model:
+            try:
+                # 优先获取 model_group，因为它包含了完整的配置信息
+                self._model_group = getattr(parent_model, "model_group", None)
+                self._platform_name = parent_model.platform_name()
+                self._model_name = parent_model.name()
+            except Exception:
+                # 如果获取失败，使用默认配置
+                pass
 
-            if parent_model:
-                try:
-                    # 优先获取 model_group，因为它包含了完整的配置信息
-                    model_group = getattr(parent_model, "model_group", None)
-                    platform_name = parent_model.platform_name()
-                    model_name = parent_model.name()
-                except Exception:
-                    # 如果获取失败，使用默认配置
-                    pass
-
-            # 优先根据 model_group 获取配置（确保配置一致性）
-            # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
-            # 使用cheap平台，上下文推荐可以降低成本
-            if model_group:
-                try:
-                    platform_name = get_normal_platform_name(model_group)
-                    model_name = get_normal_model_name(model_group)
-                except Exception:
-                    # 如果从 model_group 解析失败，回退到从 parent_model 获取的值
-                    pass
-
-            # 创建平台实例
-            if platform_name:
-                self.llm_model = registry.create_platform(platform_name)
-                if self.llm_model is None:
-                    # 如果创建失败，使用cheap平台
-                    self.llm_model = registry.get_cheap_platform()
-            else:
-                self.llm_model = registry.get_cheap_platform()
-
-            # 先设置模型组（如果从父Agent获取到），因为 model_group 可能会影响模型名称的解析
-            if model_group and self.llm_model:
-                try:
-                    self.llm_model.set_model_group(model_group)
-                except Exception:
-                    pass
-
-            # 然后设置模型名称（如果从父Agent或model_group获取到）
-            if model_name and self.llm_model:
-                try:
-                    self.llm_model.set_model_name(model_name)
-                except Exception:
-                    pass
-
-            # 设置抑制输出，因为这是后台任务
-            if self.llm_model:
-                self.llm_model.set_suppress_output(True)
-            else:
-                raise ValueError("无法创建LLM模型实例")
-        except Exception as e:
-            raise ValueError(f"无法创建LLM模型: {e}")
+        # 优先根据 model_group 获取配置（确保配置一致性）
+        # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
+        # 使用cheap平台，上下文推荐可以降低成本
+        if self._model_group:
+            try:
+                self._platform_name = get_normal_platform_name(self._model_group)
+                self._model_name = get_normal_model_name(self._model_group)
+            except Exception:
+                # 如果从 model_group 解析失败，回退到从 parent_model 获取的值
+                pass
 
     def recommend_context(
         self,
@@ -129,7 +96,7 @@ class ContextRecommender:
             return ContextRecommendation(recommended_symbols=[])
 
         # 1. 使用LLM生成相关符号名
-        model_name = self.llm_model.name() if self.llm_model else "LLM"
+        model_name = self._model_name or "LLM"
         print(f"📝 正在使用{model_name}生成相关符号名...")
         symbol_names = self._extract_symbol_names_with_llm(user_input)
         if symbol_names:
@@ -155,7 +122,7 @@ class ContextRecommender:
 
             # 3.2 使用LLM从候选符号中挑选关联度高的条目
             if candidate_symbols_list:
-                model_name = self.llm_model.name() if self.llm_model else "LLM"
+                model_name = self._model_name or "LLM"
                 print(
                     f"🤖 正在使用{model_name}从 {len(candidate_symbols_list)} 个候选符号中筛选最相关的条目..."
                 )
@@ -624,8 +591,57 @@ class ContextRecommender:
             print(f"❌ LLM符号筛选失败: {e}")
             return []
 
+    def _create_llm_model(self):
+        """创建新的 LLM 模型实例
+
+        每次调用都创建新的实例，避免上下文窗口累积。
+
+        Returns:
+            LLM 模型实例
+
+        Raises:
+            ValueError: 如果无法创建LLM模型
+        """
+        try:
+            registry = PlatformRegistry.get_global_platform_registry()
+
+            # 创建平台实例
+            if self._platform_name:
+                llm_model = registry.create_platform(self._platform_name)
+                if llm_model is None:
+                    # 如果创建失败，使用cheap平台
+                    llm_model = registry.get_cheap_platform()
+            else:
+                llm_model = registry.get_cheap_platform()
+
+            if not llm_model:
+                raise ValueError("无法创建LLM模型实例")
+
+            # 先设置模型组（如果从父Agent获取到），因为 model_group 可能会影响模型名称的解析
+            if self._model_group:
+                try:
+                    llm_model.set_model_group(self._model_group)
+                except Exception:
+                    pass
+
+            # 然后设置模型名称（如果从父Agent或model_group获取到）
+            if self._model_name:
+                try:
+                    llm_model.set_model_name(self._model_name)
+                except Exception:
+                    pass
+
+            # 设置抑制输出，因为这是后台任务
+            llm_model.set_suppress_output(True)
+
+            return llm_model
+        except Exception as e:
+            raise ValueError(f"无法创建LLM模型: {e}")
+
     def _call_llm(self, prompt: str) -> str:
         """调用LLM生成响应
+
+        每次调用都创建新的 LLM 实例，避免上下文窗口累积。
 
         Args:
             prompt: 提示词
@@ -633,13 +649,13 @@ class ContextRecommender:
         Returns:
             LLM生成的响应文本
         """
-        if not self.llm_model:
-            raise ValueError("LLM model not available")
+        # 每次调用都创建新的 LLM 实例，避免上下文窗口累积
+        llm_model = self._create_llm_model()
 
         try:
             # 使用chat_until_success方法（BasePlatform的标准接口）
-            if hasattr(self.llm_model, "chat_until_success"):
-                response = self.llm_model.chat_until_success(prompt)
+            if hasattr(llm_model, "chat_until_success"):
+                response = llm_model.chat_until_success(prompt)
                 response_str = str(response)
                 if response_str:
                     response_length = len(response_str)
