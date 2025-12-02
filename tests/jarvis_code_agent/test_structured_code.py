@@ -150,13 +150,16 @@ class TestExtractSyntaxUnits:
         assert "Foo.method" in ids or "Foo.method_2" in ids  # 唯一性可能有后缀
         assert any(id_.startswith("bar") for id_ in ids)
 
-        # 找到 Foo 对应的单元，确认它只包含未被 method 覆盖的行（class 声明行）
+        # 找到 Foo 对应的单元，确认它包含完整的类定义（包括子方法）
         foo_unit = next(u for u in units if u["id"] == "Foo")
-        foo_lines = foo_unit["content"].split("\n")
         assert foo_unit["start_line"] == 1
-        # Foo 的内容应该不包含第 2、3 行（被 method 覆盖），只剩第 1 行
-        assert foo_unit["end_line"] == 1
-        assert foo_lines == ["class Foo:"]
+        # Foo 的内容包含完整的类定义（第 1-3 行），子符号会单独提取
+        assert foo_unit["end_line"] == 3
+        # 应该包含3行有效内容（split("\n") 可能在末尾产生空字符串，需要过滤）
+        non_empty_lines = [
+            line for line in foo_unit["content"].split("\n") if line.strip()
+        ]
+        assert len(non_empty_lines) == 3
 
     @patch(
         "jarvis.jarvis_code_agent.code_analyzer.structured_code.get_symbol_extractor"
