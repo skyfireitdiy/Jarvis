@@ -21,12 +21,21 @@ from jarvis.jarvis_code_agent.lint import (
     group_commands_by_tool,
     get_format_commands_for_files,
 )
-from jarvis.jarvis_code_agent.code_analyzer.build_validator import BuildValidator, BuildResult, FallbackBuildValidator
+from jarvis.jarvis_code_agent.code_analyzer.build_validator import (
+    BuildValidator,
+    BuildResult,
+    FallbackBuildValidator,
+)
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
-from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import ContextRecommender
-from jarvis.jarvis_code_agent.code_analyzer import ImpactAnalyzer, parse_git_diff_to_edits
+from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
+    ContextRecommender,
+)
+from jarvis.jarvis_code_agent.code_analyzer import (
+    ImpactAnalyzer,
+    parse_git_diff_to_edits,
+)
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_static_analysis,
@@ -121,17 +130,17 @@ class CodeAgent(Agent):
 
         combined_parts: List[str] = []
         loaded_rule_names: List[str] = []  # 记录加载的规则名称
-        
+
         if global_rules:
             combined_parts.append(global_rules)
             loaded_rule_names.append("global_rule")
         if project_rules:
             combined_parts.append(project_rules)
             loaded_rule_names.append("project_rule")
-        
+
         # 如果指定了 rule_names，从 rules.yaml 文件中读取并添加多个规则
         if rule_names:
-            rule_list = [name.strip() for name in rule_names.split(',') if name.strip()]
+            rule_list = [name.strip() for name in rule_names.split(",") if name.strip()]
             for rule_name in rule_list:
                 named_rule = self._get_named_rule(rule_name)
                 if named_rule:
@@ -141,21 +150,20 @@ class CodeAgent(Agent):
         if combined_parts:
             merged_rules = "\n\n".join(combined_parts)
             code_system_prompt = (
-                f"{code_system_prompt}\n\n"
-                f"<rules>\n{merged_rules}\n</rules>"
+                f"{code_system_prompt}\n\n<rules>\n{merged_rules}\n</rules>"
             )
             # 显示加载的规则名称
             if loaded_rule_names:
                 rules_display = ", ".join(loaded_rule_names)
                 print(f"ℹ️ 已加载规则: {rules_display}")
-        
+
         # 调用父类 Agent 的初始化
         # 默认禁用方法论和分析，但允许通过 kwargs 覆盖
         use_methodology = kwargs.pop("use_methodology", False)
         use_analysis = kwargs.pop("use_analysis", False)
         # name 使用传入的值，如果没有传入则使用默认值 "CodeAgent"
         name = kwargs.pop("name", "CodeAgent")
-        
+
         # 准备显式传递给 super().__init__ 的参数
         # 注意：这些参数如果也在 kwargs 中，需要先移除，避免重复传递错误
         explicit_params = {
@@ -169,12 +177,12 @@ class CodeAgent(Agent):
             "non_interactive": non_interactive,
             "use_tools": base_tools,
         }
-        
+
         # 自动移除所有显式传递的参数，避免重复传递错误
         # 这样以后添加新参数时，只要在 explicit_params 中声明，就会自动处理
         for key in explicit_params:
             kwargs.pop(key, None)
-        
+
         super().__init__(
             **explicit_params,
             **kwargs,
@@ -191,20 +199,22 @@ class CodeAgent(Agent):
             parent_model = None
             if self.model:
                 parent_model = self.model
-            
+
             self.context_recommender = ContextRecommender(
-                self.context_manager,
-                parent_model=parent_model
+                self.context_manager, parent_model=parent_model
             )
         except Exception as e:
             # LLM推荐器初始化失败
             print(f"⚠️ 上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
 
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
-        
+
         # 打印语言功能支持表格
         try:
-            from jarvis.jarvis_agent.language_support_info import print_language_support_table
+            from jarvis.jarvis_agent.language_support_info import (
+                print_language_support_table,
+            )
+
             print_language_support_table()
         except Exception:
             pass
@@ -501,10 +511,10 @@ class CodeAgent(Agent):
 
     def _get_named_rule(self, rule_name: str) -> Optional[str]:
         """从 rules.yaml 文件中获取指定名称的规则
-        
+
         参数:
             rule_name: 规则名称
-            
+
         返回:
             str: 规则内容，如果未找到则返回 None
         """
@@ -512,20 +522,28 @@ class CodeAgent(Agent):
             # 读取全局数据目录下的 rules.yaml
             global_rules_yaml_path = os.path.join(get_data_dir(), "rules.yaml")
             global_rules = {}
-            if os.path.exists(global_rules_yaml_path) and os.path.isfile(global_rules_yaml_path):
-                with open(global_rules_yaml_path, "r", encoding="utf-8", errors="replace") as f:
+            if os.path.exists(global_rules_yaml_path) and os.path.isfile(
+                global_rules_yaml_path
+            ):
+                with open(
+                    global_rules_yaml_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
                     global_rules = yaml.safe_load(f) or {}
-            
+
             # 读取 git 根目录下的 rules.yaml
             project_rules_yaml_path = os.path.join(self.root_dir, "rules.yaml")
             project_rules = {}
-            if os.path.exists(project_rules_yaml_path) and os.path.isfile(project_rules_yaml_path):
-                with open(project_rules_yaml_path, "r", encoding="utf-8", errors="replace") as f:
+            if os.path.exists(project_rules_yaml_path) and os.path.isfile(
+                project_rules_yaml_path
+            ):
+                with open(
+                    project_rules_yaml_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
                     project_rules = yaml.safe_load(f) or {}
-            
+
             # 合并配置：项目配置覆盖全局配置
             merged_rules = {**global_rules, **project_rules}
-            
+
             # 查找指定的规则
             if rule_name in merged_rules:
                 rule_value = merged_rules[rule_name]
@@ -534,7 +552,7 @@ class CodeAgent(Agent):
                     return rule_value.strip() if rule_value.strip() else None
                 # 如果值是其他类型，转换为字符串
                 return str(rule_value).strip() if str(rule_value).strip() else None
-            
+
             return None
         except Exception as e:
             # 读取规则失败时忽略，不影响主流程
@@ -748,9 +766,15 @@ class CodeAgent(Agent):
         """处理git仓库中的未提交修改"""
 
         if has_uncommitted_changes():
-
             git_commiter = GitCommitTool()
-            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self, "model_group": getattr(self.model, "model_group", None)})
+            git_commiter.execute(
+                {
+                    "prefix": prefix,
+                    "suffix": suffix,
+                    "agent": self,
+                    "model_group": getattr(self.model, "model_group", None),
+                }
+            )
 
     def _init_env(self, prefix: str, suffix: str) -> None:
         """初始化环境，组合以下功能：
@@ -790,7 +814,6 @@ class CodeAgent(Agent):
                 need_change = True
 
         if not need_change:
-
             return
 
         print("⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式")
@@ -799,7 +822,7 @@ class CodeAgent(Agent):
         for key, value in target_settings.items():
             current = current_settings.get(key, "未设置")
             lines.append(f"{key}: {current} -> {value}")
-        joined_lines = '\n'.join(lines)
+        joined_lines = "\n".join(lines)
         print(f"ℹ️ {joined_lines}")
 
         # 直接执行设置，不需要用户确认
@@ -847,7 +870,9 @@ class CodeAgent(Agent):
                 print("✅ 已创建最小化的 .gitattributes 文件")
             else:
                 print("ℹ️ 将以下内容追加到现有 .gitattributes 文件：")
-                PrettyOutput.print(minimal_content, OutputType.CODE, lang="text")  # 保留语法高亮
+                PrettyOutput.print(
+                    minimal_content, OutputType.CODE, lang="text"
+                )  # 保留语法高亮
                 if user_confirm("是否追加到现有文件？", True):
                     with open(
                         gitattributes_path, "a", encoding="utf-8", newline="\n"
@@ -975,31 +1000,32 @@ class CodeAgent(Agent):
             print(f"ℹ️ {commit_messages}")
         return commits
 
-    def _format_modified_files(self, modified_files: List[str]) -> None:
-        """格式化修改的文件
-        
+    def _post_process_modified_files(self, modified_files: List[str]) -> None:
+        """文件后处理（包括格式化、自动修复等）
+
         Args:
             modified_files: 修改的文件列表
         """
-        if not modified_files:
-            return
-        
         # 获取格式化命令
         format_commands = get_format_commands_for_files(modified_files, self.root_dir)
         if not format_commands:
             return
-        
+
         print("🔧 正在格式化代码...")
-        
+
         # 执行格式化命令
         formatted_files = set()
         for tool_name, file_path, command in format_commands:
             try:
                 # 检查文件是否存在
-                abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
+                abs_file_path = (
+                    os.path.join(self.root_dir, file_path)
+                    if not os.path.isabs(file_path)
+                    else file_path
+                )
                 if not os.path.exists(abs_file_path):
                     continue
-                
+
                 # 执行格式化命令
                 result = subprocess.run(
                     command,
@@ -1011,7 +1037,7 @@ class CodeAgent(Agent):
                     errors="replace",
                     timeout=300,  # 300秒超时
                 )
-                
+
                 if result.returncode == 0:
                     formatted_files.add(file_path)
                     print(f"✅ 已格式化: {os.path.basename(file_path)} ({tool_name})")
@@ -1019,7 +1045,9 @@ class CodeAgent(Agent):
                     # 格式化失败，记录但不中断流程
                     error_msg = (result.stderr or result.stdout or "").strip()
                     if error_msg:
-                        print(f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {error_msg[:200]}")
+                        print(
+                            f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {error_msg[:200]}"
+                        )
             except subprocess.TimeoutExpired:
                 print(f"⚠️ 格式化超时: {os.path.basename(file_path)} ({tool_name})")
             except FileNotFoundError:
@@ -1027,15 +1055,21 @@ class CodeAgent(Agent):
                 continue
             except Exception as e:
                 # 其他错误，记录但继续
-                print(f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {str(e)[:100]}")
+                print(
+                    f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {str(e)[:100]}"
+                )
                 continue
-        
+
         if formatted_files:
             print(f"✅ 已格式化 {len(formatted_files)} 个文件")
             # 暂存格式化后的文件
             try:
                 for file_path in formatted_files:
-                    abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
+                    abs_file_path = (
+                        os.path.join(self.root_dir, file_path)
+                        if not os.path.isabs(file_path)
+                        else file_path
+                    )
                     if os.path.exists(abs_file_path):
                         subprocess.run(
                             ["git", "add", file_path],
@@ -1067,14 +1101,21 @@ class CodeAgent(Agent):
                 stderr=subprocess.DEVNULL,
                 check=True,
             )
-            
+
             # 检测变更文件并格式化
             modified_files = get_diff_file_list()
             if modified_files:
-                self._format_modified_files(modified_files)
-            
+                self._post_process_modified_files(modified_files)
+
             git_commiter = GitCommitTool()
-            git_commiter.execute({"prefix": prefix, "suffix": suffix, "agent": self, "model_group": getattr(self.model, "model_group", None)})
+            git_commiter.execute(
+                {
+                    "prefix": prefix,
+                    "suffix": suffix,
+                    "agent": self,
+                    "model_group": getattr(self.model, "model_group", None),
+                }
+            )
 
             # 在用户接受commit后，根据配置决定是否保存记忆
             if self.force_save_memory:
@@ -1085,7 +1126,7 @@ class CodeAgent(Agent):
                 print("ℹ️ 已重置到初始提交")
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
-        """使用给定的用户输入运行代码代理。
+        """使用给定的用户输入运行代码代理.
 
         参数:
             user_input: 用户的需求/请求
@@ -1116,19 +1157,21 @@ class CodeAgent(Agent):
                 # 在意图识别和上下文推荐期间抑制模型输出
                 was_suppressed = False
                 if self.model:
-                    was_suppressed = getattr(self.model, '_suppress_output', False)
+                    was_suppressed = getattr(self.model, "_suppress_output", False)
                     self.model.set_suppress_output(True)
                 try:
                     print("🔍 正在进行智能上下文推荐....")
-                    
+
                     # 生成上下文推荐（基于关键词和项目上下文）
                     recommendation = self.context_recommender.recommend_context(
                         user_input=user_input,
                     )
-                    
+
                     # 格式化推荐结果
-                    context_recommendation_text = self.context_recommender.format_recommendation(recommendation)
-                    
+                    context_recommendation_text = (
+                        self.context_recommender.format_recommendation(recommendation)
+                    )
+
                     # 打印推荐的上下文
                     if context_recommendation_text:
                         print(f"ℹ️ {context_recommendation_text}")
@@ -1150,7 +1193,12 @@ class CodeAgent(Agent):
                     + user_input
                 )
             else:
-                enhanced_input = first_tip + context_recommendation_text + "\n\n任务描述：\n" + user_input
+                enhanced_input = (
+                    first_tip
+                    + context_recommendation_text
+                    + "\n\n任务描述：\n"
+                    + user_input
+                )
 
             try:
                 if self.model:
@@ -1159,8 +1207,6 @@ class CodeAgent(Agent):
             except RuntimeError as e:
                 print(f"⚠️ 执行失败: {str(e)}")
                 return str(e)
-
-
 
             self._handle_uncommitted_changes()
             end_commit = get_latest_commit_hash()
@@ -1183,7 +1229,12 @@ class CodeAgent(Agent):
         try:
             head_exists = bool(get_latest_commit_hash())
             # 临时 -N 以包含未跟踪文件的差异检测
-            subprocess.run(["git", "add", "-N", "."], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ["git", "add", "-N", "."],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
             cmd = ["git", "diff", "--name-status"] + (["HEAD"] if head_exists else [])
             res = subprocess.run(
                 cmd,
@@ -1194,7 +1245,12 @@ class CodeAgent(Agent):
                 check=False,
             )
         finally:
-            subprocess.run(["git", "reset"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ["git", "reset"],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
         if res.returncode == 0 and res.stdout:
             for line in res.stdout.splitlines():
@@ -1223,8 +1279,15 @@ class CodeAgent(Agent):
         head_exists = bool(get_latest_commit_hash())
         try:
             # 为了让未跟踪文件也能展示diff，临时 -N 该文件
-            subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            cmd = ["git", "diff"] + (["HEAD"] if head_exists else []) + ["--", file_path]
+            subprocess.run(
+                ["git", "add", "-N", "--", file_path],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            cmd = (
+                ["git", "diff"] + (["HEAD"] if head_exists else []) + ["--", file_path]
+            )
             res = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -1237,7 +1300,12 @@ class CodeAgent(Agent):
                 return res.stdout or ""
             return ""
         finally:
-            subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ["git", "reset", "--", file_path],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
 
     def _build_per_file_patch_preview(self, modified_files: List[str]) -> str:
         """构建按文件的补丁预览"""
@@ -1249,8 +1317,17 @@ class CodeAgent(Agent):
             head_exists = bool(get_latest_commit_hash())
             try:
                 # 让未跟踪文件也能统计到新增行数
-                subprocess.run(["git", "add", "-N", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                cmd = ["git", "diff", "--numstat"] + (["HEAD"] if head_exists else []) + ["--", file_path]
+                subprocess.run(
+                    ["git", "add", "-N", "--", file_path],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                cmd = (
+                    ["git", "diff", "--numstat"]
+                    + (["HEAD"] if head_exists else [])
+                    + ["--", file_path]
+                )
                 res = subprocess.run(
                     cmd,
                     capture_output=True,
@@ -1274,7 +1351,12 @@ class CodeAgent(Agent):
 
                             return to_int(add_s), to_int(del_s)
             finally:
-                subprocess.run(["git", "reset", "--", file_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(
+                    ["git", "reset", "--", file_path],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             return (0, 0)
 
         for f in modified_files:
@@ -1312,7 +1394,7 @@ class CodeAgent(Agent):
         for file_path in modified_files:
             if os.path.exists(file_path):
                 try:
-                    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                         content = f.read()
                     self.context_manager.update_context_for_file(file_path, content)
                 except Exception:
@@ -1321,13 +1403,13 @@ class CodeAgent(Agent):
 
     def _analyze_edit_impact(self, modified_files: List[str]) -> Optional[Any]:
         """进行影响范围分析（如果启用）
-        
+
         Returns:
             ImpactReport: 影响分析报告，如果未启用或失败则返回None
         """
         if not is_enable_impact_analysis():
             return None
-        
+
         print("🔍 正在进行变更影响分析...")
         try:
             impact_analyzer = ImpactAnalyzer(self.context_manager)
@@ -1336,17 +1418,17 @@ class CodeAgent(Agent):
                 if os.path.exists(file_path):
                     edits = parse_git_diff_to_edits(file_path, self.root_dir)
                     all_edits.extend(edits)
-            
+
             if not all_edits:
                 return None
-            
+
             # 按文件分组编辑
             edits_by_file = {}
             for edit in all_edits:
                 if edit.file_path not in edits_by_file:
                     edits_by_file[edit.file_path] = []
                 edits_by_file[edit.file_path].append(edit)
-            
+
             # 对每个文件进行影响分析
             impact_report = None
             for file_path, edits in edits_by_file.items():
@@ -1357,62 +1439,85 @@ class CodeAgent(Agent):
                         impact_report = report
                     else:
                         # 合并多个报告，去重
-                        impact_report.affected_files = list(set(impact_report.affected_files + report.affected_files))
-                        
+                        impact_report.affected_files = list(
+                            set(impact_report.affected_files + report.affected_files)
+                        )
+
                         # 合并符号（基于文件路径和名称去重）
                         symbol_map = {}
-                        for symbol in impact_report.affected_symbols + report.affected_symbols:
+                        for symbol in (
+                            impact_report.affected_symbols + report.affected_symbols
+                        ):
                             key = (symbol.file_path, symbol.name, symbol.line_start)
                             if key not in symbol_map:
                                 symbol_map[key] = symbol
                         impact_report.affected_symbols = list(symbol_map.values())
-                        
-                        impact_report.affected_tests = list(set(impact_report.affected_tests + report.affected_tests))
-                        
+
+                        impact_report.affected_tests = list(
+                            set(impact_report.affected_tests + report.affected_tests)
+                        )
+
                         # 合并接口变更（基于符号名和文件路径去重）
                         interface_map = {}
-                        for change in impact_report.interface_changes + report.interface_changes:
-                            key = (change.file_path, change.symbol_name, change.change_type)
+                        for change in (
+                            impact_report.interface_changes + report.interface_changes
+                        ):
+                            key = (
+                                change.file_path,
+                                change.symbol_name,
+                                change.change_type,
+                            )
                             if key not in interface_map:
                                 interface_map[key] = change
                         impact_report.interface_changes = list(interface_map.values())
-                        
+
                         impact_report.impacts.extend(report.impacts)
-                        
+
                         # 合并建议
-                        impact_report.recommendations = list(set(impact_report.recommendations + report.recommendations))
-                        
+                        impact_report.recommendations = list(
+                            set(impact_report.recommendations + report.recommendations)
+                        )
+
                         # 使用更高的风险等级
-                        if report.risk_level.value == 'high' or impact_report.risk_level.value == 'high':
-                            impact_report.risk_level = report.risk_level if report.risk_level.value == 'high' else impact_report.risk_level
-                        elif report.risk_level.value == 'medium':
+                        if (
+                            report.risk_level.value == "high"
+                            or impact_report.risk_level.value == "high"
+                        ):
+                            impact_report.risk_level = (
+                                report.risk_level
+                                if report.risk_level.value == "high"
+                                else impact_report.risk_level
+                            )
+                        elif report.risk_level.value == "medium":
                             impact_report.risk_level = report.risk_level
-            
+
             return impact_report
         except Exception as e:
             # 影响分析失败不应该影响主流程，仅记录日志
             print(f"⚠️ 影响范围分析失败: {e}")
             return None
 
-    def _handle_impact_report(self, impact_report: Optional[Any], agent: Agent, final_ret: str) -> str:
+    def _handle_impact_report(
+        self, impact_report: Optional[Any], agent: Agent, final_ret: str
+    ) -> str:
         """处理影响范围分析报告
-        
+
         Args:
             impact_report: 影响分析报告
             agent: Agent实例
             final_ret: 当前的结果字符串
-            
+
         Returns:
             更新后的结果字符串
         """
         if not impact_report:
             return final_ret
-        
+
         impact_summary = impact_report.to_string(self.root_dir)
         final_ret += f"\n\n{impact_summary}\n"
-        
+
         # 如果是高风险，在提示词中提醒
-        if impact_report.risk_level.value == 'high':
+        if impact_report.risk_level.value == "high":
             agent.set_addon_prompt(
                 f"{agent.get_addon_prompt() or ''}\n\n"
                 f"⚠️ 高风险编辑警告：\n"
@@ -1422,27 +1527,31 @@ class CodeAgent(Agent):
                 f"- 相关测试: {len(impact_report.affected_tests)} 个\n"
                 f"建议运行相关测试并检查所有受影响文件。"
             )
-        
+
         return final_ret
 
-    def _handle_build_validation_disabled(self, modified_files: List[str], config: Any, agent: Agent, final_ret: str) -> str:
+    def _handle_build_validation_disabled(
+        self, modified_files: List[str], config: Any, agent: Agent, final_ret: str
+    ) -> str:
         """处理构建验证已禁用的情况
-        
+
         Returns:
             更新后的结果字符串
         """
         reason = config.get_disable_reason()
         reason_text = f"（原因: {reason}）" if reason else ""
         final_ret += f"\n\nℹ️ 构建验证已禁用{reason_text}，仅进行基础静态检查\n"
-        
+
         # 输出基础静态检查日志
         file_count = len(modified_files)
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
         if file_count > 3:
             files_str += f" 等{file_count}个文件"
-        
+
         # 使用兜底验证器进行基础静态检查
-        fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
+        fallback_validator = FallbackBuildValidator(
+            self.root_dir, timeout=get_build_validation_timeout()
+        )
         static_check_result = fallback_validator.validate(modified_files)
         if not static_check_result.success:
             final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
@@ -1450,13 +1559,22 @@ class CodeAgent(Agent):
                 f"基础静态检查失败，请根据以下错误信息修复代码:\n{static_check_result.error_message or static_check_result.output}\n"
             )
         else:
-            final_ret += f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
-        
+            final_ret += (
+                f"\n✅ 基础静态检查通过（耗时 {static_check_result.duration:.2f}秒）\n"
+            )
+
         return final_ret
 
-    def _handle_build_validation_failure(self, build_validation_result: Any, config: Any, modified_files: List[str], agent: Agent, final_ret: str) -> str:
+    def _handle_build_validation_failure(
+        self,
+        build_validation_result: Any,
+        config: Any,
+        modified_files: List[str],
+        agent: Agent,
+        final_ret: str,
+    ) -> str:
         """处理构建验证失败的情况
-        
+
         Returns:
             更新后的结果字符串
         """
@@ -1464,9 +1582,11 @@ class CodeAgent(Agent):
             # 首次失败，询问用户
             error_preview = _format_build_error(build_validation_result)
             print(f"\n⚠️ 构建验证失败:\n{error_preview}\n")
-            print("ℹ️ 提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
-                "可以选择禁用构建验证，后续将仅进行基础静态检查。")
-            
+            print(
+                "ℹ️ 提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
+                "可以选择禁用构建验证，后续将仅进行基础静态检查。"
+            )
+
             if user_confirm(
                 "是否要禁用构建验证，后续仅进行基础静态检查？",
                 default=False,
@@ -1477,15 +1597,17 @@ class CodeAgent(Agent):
                 )
                 config.mark_as_asked()
                 final_ret += "\n\nℹ️ 已禁用构建验证，后续将仅进行基础静态检查\n"
-                
+
                 # 输出基础静态检查日志
                 file_count = len(modified_files)
                 files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
                 if file_count > 3:
                     files_str += f" 等{file_count}个文件"
-                
+
                 # 立即进行基础静态检查
-                fallback_validator = FallbackBuildValidator(self.root_dir, timeout=get_build_validation_timeout())
+                fallback_validator = FallbackBuildValidator(
+                    self.root_dir, timeout=get_build_validation_timeout()
+                )
                 static_check_result = fallback_validator.validate(modified_files)
                 if not static_check_result.success:
                     final_ret += f"\n⚠️ 基础静态检查失败:\n{static_check_result.error_message or static_check_result.output}\n"
@@ -1505,31 +1627,37 @@ class CodeAgent(Agent):
                 )
         else:
             # 已经询问过，直接显示错误
-            final_ret += f"\n\n⚠️ 构建验证失败:\n{_format_build_error(build_validation_result)}\n"
+            final_ret += (
+                f"\n\n⚠️ 构建验证失败:\n{_format_build_error(build_validation_result)}\n"
+            )
             # 如果构建失败，添加修复提示
             agent.set_addon_prompt(
                 f"构建验证失败，请根据以下错误信息修复代码:\n{_format_build_error(build_validation_result)}\n"
                 "请仔细检查错误信息，修复编译/构建错误后重新提交。"
             )
-        
+
         return final_ret
 
-    def _handle_build_validation(self, modified_files: List[str], agent: Agent, final_ret: str) -> Tuple[Optional[Any], str]:
+    def _handle_build_validation(
+        self, modified_files: List[str], agent: Agent, final_ret: str
+    ) -> Tuple[Optional[Any], str]:
         """处理构建验证
-        
+
         Returns:
             (build_validation_result, updated_final_ret)
         """
         if not is_enable_build_validation():
             return None, final_ret
-        
+
         config = BuildValidationConfig(self.root_dir)
-        
+
         # 检查是否已禁用构建验证
         if config.is_build_validation_disabled():
-            final_ret = self._handle_build_validation_disabled(modified_files, config, agent, final_ret)
+            final_ret = self._handle_build_validation_disabled(
+                modified_files, config, agent, final_ret
+            )
             return None, final_ret
-        
+
         # 未禁用，进行构建验证
         build_validation_result = self._validate_build_after_edit(modified_files)
         if build_validation_result:
@@ -1538,14 +1666,25 @@ class CodeAgent(Agent):
                     build_validation_result, config, modified_files, agent, final_ret
                 )
             else:
-                build_system_info = f" ({build_validation_result.build_system.value})" if build_validation_result.build_system else ""
+                build_system_info = (
+                    f" ({build_validation_result.build_system.value})"
+                    if build_validation_result.build_system
+                    else ""
+                )
                 final_ret += f"\n\n✅ 构建验证通过{build_system_info}（耗时 {build_validation_result.duration:.2f}秒）\n"
-        
+
         return build_validation_result, final_ret
 
-    def _handle_static_analysis(self, modified_files: List[str], build_validation_result: Optional[Any], config: Any, agent: Agent, final_ret: str) -> str:
+    def _handle_static_analysis(
+        self,
+        modified_files: List[str],
+        build_validation_result: Optional[Any],
+        config: Any,
+        agent: Agent,
+        final_ret: str,
+    ) -> str:
         """处理静态分析
-        
+
         Returns:
             更新后的结果字符串
         """
@@ -1553,30 +1692,30 @@ class CodeAgent(Agent):
         if not is_enable_static_analysis():
             print("ℹ️ 静态分析已禁用，跳过静态检查")
             return final_ret
-        
+
         # 检查是否有可用的lint工具
         lint_tools_info = "\n".join(
             f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
             for file in modified_files
             if get_lint_tools(file)
         )
-        
+
         if not lint_tools_info:
             print("ℹ️ 未找到可用的静态检查工具，跳过静态检查")
             return final_ret
-        
+
         # 如果构建验证失败且未禁用，不进行静态分析（避免重复错误）
         # 如果构建验证已禁用，则进行静态分析（因为只做了基础静态检查）
         should_skip_static = (
-            build_validation_result 
-            and not build_validation_result.success 
+            build_validation_result
+            and not build_validation_result.success
             and not config.is_build_validation_disabled()
         )
-        
+
         if should_skip_static:
             print("ℹ️ 构建验证失败，跳过静态分析（避免重复错误）")
             return final_ret
-        
+
         # 直接执行静态扫描
         lint_results = self._run_static_analysis(modified_files)
         if lint_results:
@@ -1595,27 +1734,29 @@ class CodeAgent(Agent):
             final_ret += "\n\n⚠️ 静态扫描发现问题，已提示修复\n"
         else:
             final_ret += "\n\n✅ 静态扫描通过\n"
-        
+
         return final_ret
 
-    def _ask_llm_about_large_deletion(self, detection_result: Dict[str, int], preview: str) -> bool:
+    def _ask_llm_about_large_deletion(
+        self, detection_result: Dict[str, int], preview: str
+    ) -> bool:
         """询问大模型大量代码删除是否合理
-        
+
         参数:
             detection_result: 检测结果字典，包含 'insertions', 'deletions', 'net_deletions'
             preview: 补丁预览内容
-            
+
         返回:
             bool: 如果大模型认为合理返回True，否则返回False
         """
         if not self.model:
             # 如果没有模型，默认认为合理
             return True
-        
-        insertions = detection_result['insertions']
-        deletions = detection_result['deletions']
-        net_deletions = detection_result['net_deletions']
-        
+
+        insertions = detection_result["insertions"]
+        deletions = detection_result["deletions"]
+        net_deletions = detection_result["net_deletions"]
+
         prompt = f"""检测到大量代码删除，请判断是否合理：
 
 统计信息：
@@ -1638,11 +1779,11 @@ class CodeAgent(Agent):
 
 请严格按照协议格式回答，不要添加其他内容。
 """
-        
+
         try:
             print("🤖 正在询问大模型判断大量代码删除是否合理...")
             response = self.model.chat_until_success(prompt)  # type: ignore
-            
+
             # 使用确定的协议标记解析回答
             if "<!!!YES!!!>" in response:
                 print("✅ 大模型确认：代码删除合理")
@@ -1659,7 +1800,14 @@ class CodeAgent(Agent):
             print(f"⚠️ 询问大模型失败: {str(e)}，默认认为不合理")
             return False
 
-    def _on_after_tool_call(self, agent: Agent, current_response=None, need_return=None, tool_prompt=None, **kwargs) -> None:
+    def _on_after_tool_call(
+        self,
+        agent: Agent,
+        current_response=None,
+        need_return=None,
+        tool_prompt=None,
+        **kwargs,
+    ) -> None:
         """工具调用后回调函数。"""
         final_ret = ""
         diff = get_diff()
@@ -1668,30 +1816,36 @@ class CodeAgent(Agent):
             start_hash = get_latest_commit_hash()
             PrettyOutput.print(diff, OutputType.CODE, lang="diff")  # 保留语法高亮
             modified_files = get_diff_file_list()
-            
+
             # 更新上下文管理器
             self._update_context_for_modified_files(modified_files)
-            
+
             # 进行影响范围分析
             impact_report = self._analyze_edit_impact(modified_files)
-            
+
             per_file_preview = self._build_per_file_patch_preview(modified_files)
-            
+
             # 所有模式下，在提交前检测大量代码删除并询问大模型
             detection_result = detect_large_code_deletion()
             if detection_result is not None:
                 # 检测到大量代码删除，询问大模型是否合理
-                is_reasonable = self._ask_llm_about_large_deletion(detection_result, per_file_preview)
+                is_reasonable = self._ask_llm_about_large_deletion(
+                    detection_result, per_file_preview
+                )
                 if not is_reasonable:
                     # 大模型认为不合理，撤销修改
                     print("ℹ️ 已撤销修改（大模型认为代码删除不合理）")
                     revert_change()
-                    final_ret += "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
+                    final_ret += (
+                        "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
+                    )
                     final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
-                    PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")  # 保留语法高亮
+                    PrettyOutput.print(
+                        final_ret, OutputType.USER, lang="markdown"
+                    )  # 保留语法高亮
                     self.session.prompt += final_ret
                     return
-            
+
             commited = handle_commit_workflow()
             if commited:
                 # 统计代码行数变化
@@ -1723,8 +1877,12 @@ class CodeAgent(Agent):
                 if commits:
                     # 获取最新的提交信息（commits列表按时间倒序，第一个是最新的）
                     latest_commit_hash, latest_commit_message = commits[0]
-                    commit_short_hash = latest_commit_hash[:7] if len(latest_commit_hash) >= 7 else latest_commit_hash
-                    
+                    commit_short_hash = (
+                        latest_commit_hash[:7]
+                        if len(latest_commit_hash) >= 7
+                        else latest_commit_hash
+                    )
+
                     final_ret += (
                         f"\n\n代码已修改完成\n"
                         f"✅ 已自动提交\n"
@@ -1732,16 +1890,22 @@ class CodeAgent(Agent):
                         f"   提交信息: {latest_commit_message}\n"
                         f"\n补丁内容（按文件）:\n{per_file_preview}\n"
                     )
-                    
+
                     # 添加影响范围分析报告
-                    final_ret = self._handle_impact_report(impact_report, self, final_ret)
-                    
+                    final_ret = self._handle_impact_report(
+                        impact_report, self, final_ret
+                    )
+
                     # 构建验证
                     config = BuildValidationConfig(self.root_dir)
-                    build_validation_result, final_ret = self._handle_build_validation(modified_files, self, final_ret)
-                    
+                    build_validation_result, final_ret = self._handle_build_validation(
+                        modified_files, self, final_ret
+                    )
+
                     # 静态分析
-                    final_ret = self._handle_static_analysis(modified_files, build_validation_result, config, self, final_ret)
+                    final_ret = self._handle_static_analysis(
+                        modified_files, build_validation_result, config, self, final_ret
+                    )
                 else:
                     # 如果没有获取到commits，尝试直接从end_hash获取commit信息
                     commit_info = ""
@@ -1755,9 +1919,19 @@ class CodeAgent(Agent):
                                 errors="replace",
                                 check=False,
                             )
-                            if result.returncode == 0 and result.stdout and "|" in result.stdout:
-                                commit_hash, commit_message = result.stdout.strip().split("|", 1)
-                                commit_short_hash = commit_hash[:7] if len(commit_hash) >= 7 else commit_hash
+                            if (
+                                result.returncode == 0
+                                and result.stdout
+                                and "|" in result.stdout
+                            ):
+                                commit_hash, commit_message = (
+                                    result.stdout.strip().split("|", 1)
+                                )
+                                commit_short_hash = (
+                                    commit_hash[:7]
+                                    if len(commit_hash) >= 7
+                                    else commit_hash
+                                )
                                 commit_info = (
                                     f"\n✅ 已自动提交\n"
                                     f"   Commit ID: {commit_short_hash} ({commit_hash})\n"
@@ -1765,7 +1939,7 @@ class CodeAgent(Agent):
                                 )
                         except Exception:
                             pass
-                    
+
                     if commit_info:
                         final_ret += f"\n\n代码已修改完成{commit_info}\n"
                     else:
@@ -1792,24 +1966,26 @@ class CodeAgent(Agent):
         self.session.prompt += final_ret
         return
 
-    def _run_static_analysis(self, modified_files: List[str]) -> List[Tuple[str, str, str, int, str]]:
+    def _run_static_analysis(
+        self, modified_files: List[str]
+    ) -> List[Tuple[str, str, str, int, str]]:
         """执行静态分析
-        
+
         Args:
             modified_files: 修改的文件列表
-        
+
         Returns:
             [(tool_name, file_path, command, returncode, output), ...] 格式的结果列表
             只返回有错误或警告的结果（returncode != 0）
         """
         if not modified_files:
             return []
-        
+
         # 获取所有lint命令
         commands = get_lint_commands_for_files(modified_files, self.root_dir)
         if not commands:
             return []
-        
+
         # 输出静态检查日志
         file_count = len(modified_files)
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
@@ -1820,27 +1996,33 @@ class CodeAgent(Agent):
         if len(tool_names) > 3:
             tools_str += f" 等{len(tool_names)}个工具"
         print("🔍 静态检查中...")
-        
+
         results = []
         # 记录每个文件的检查结果
         file_results = []  # [(file_path, tool_name, status, message), ...]
-        
+
         # 按工具分组，相同工具可以批量执行
         grouped = group_commands_by_tool(commands)
-        
+
         for tool_name, file_commands in grouped.items():
             for file_path, command in file_commands:
                 file_name = os.path.basename(file_path)
                 try:
                     # 检查文件是否存在
-                    abs_file_path = os.path.join(self.root_dir, file_path) if not os.path.isabs(file_path) else file_path
+                    abs_file_path = (
+                        os.path.join(self.root_dir, file_path)
+                        if not os.path.isabs(file_path)
+                        else file_path
+                    )
                     if not os.path.exists(abs_file_path):
-                        file_results.append((file_name, tool_name, "跳过", "文件不存在"))
+                        file_results.append(
+                            (file_name, tool_name, "跳过", "文件不存在")
+                        )
                         continue
-                    
+
                     # 打印执行的命令
                     print(f"ℹ️ 执行: {command}")
-                    
+
                     # 执行命令
                     result = subprocess.run(
                         command,
@@ -1852,15 +2034,27 @@ class CodeAgent(Agent):
                         errors="replace",
                         timeout=600,  # 600秒超时
                     )
-                    
+
                     # 只记录有错误或警告的结果
                     if result.returncode != 0:
                         output = result.stdout + result.stderr
                         if output.strip():  # 有输出才记录
-                            results.append((tool_name, file_path, command, result.returncode, output))
-                            file_results.append((file_name, tool_name, "失败", "发现问题"))
+                            results.append(
+                                (
+                                    tool_name,
+                                    file_path,
+                                    command,
+                                    result.returncode,
+                                    output,
+                                )
+                            )
+                            file_results.append(
+                                (file_name, tool_name, "失败", "发现问题")
+                            )
                             # 失败时打印检查结果
-                            output_preview = output[:2000] if len(output) > 2000 else output
+                            output_preview = (
+                                output[:2000] if len(output) > 2000 else output
+                            )
                             print(f"⚠️ 检查失败 ({file_name}):\n{output_preview}")
                             if len(output) > 2000:
                                 print(f"⚠️ ... (输出已截断，共 {len(output)} 字符)")
@@ -1868,10 +2062,14 @@ class CodeAgent(Agent):
                             file_results.append((file_name, tool_name, "通过", ""))
                     else:
                         file_results.append((file_name, tool_name, "通过", ""))
-                
+
                 except subprocess.TimeoutExpired:
-                    results.append((tool_name, file_path, command, -1, "执行超时（600秒）"))
-                    file_results.append((file_name, tool_name, "超时", "执行超时（600秒）"))
+                    results.append(
+                        (tool_name, file_path, command, -1, "执行超时（600秒）")
+                    )
+                    file_results.append(
+                        (file_name, tool_name, "超时", "执行超时（600秒）")
+                    )
                     print(f"⚠️ 检查超时 ({file_name}): 执行超时（600秒）")
                 except FileNotFoundError:
                     # 工具未安装，跳过
@@ -1880,17 +2078,25 @@ class CodeAgent(Agent):
                 except Exception as e:
                     # 其他错误，记录但继续
                     print(f"⚠️ 执行lint命令失败: {command}, 错误: {e}")
-                    file_results.append((file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}"))
+                    file_results.append(
+                        (file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}")
+                    )
                     continue
-        
+
         # 一次性打印所有检查结果
         if file_results:
             total_files = len(file_results)
-            passed_count = sum(1 for _, _, status, _ in file_results if status == "通过")
-            failed_count = sum(1 for _, _, status, _ in file_results if status == "失败")
-            timeout_count = sum(1 for _, _, status, _ in file_results if status == "超时")
+            passed_count = sum(
+                1 for _, _, status, _ in file_results if status == "通过"
+            )
+            failed_count = sum(
+                1 for _, _, status, _ in file_results if status == "失败"
+            )
+            timeout_count = sum(
+                1 for _, _, status, _ in file_results if status == "超时"
+            )
             sum(1 for _, _, status, _ in file_results if status == "跳过")
-            
+
             # 收缩为一行的结果摘要
             summary = f"🔍 静态检查: {total_files}个文件"
             if failed_count > 0:
@@ -1899,28 +2105,30 @@ class CodeAgent(Agent):
                 summary += f", {timeout_count}超时"
             if passed_count == total_files:
                 summary += " ✅全部通过"
-            
+
             if failed_count > 0 or timeout_count > 0:
                 print(f"⚠️ {summary}")
             else:
                 print(f"✅ {summary}")
         else:
             print("✅ 静态检查完成")
-        
+
         return results
-    
-    def _format_lint_results(self, results: List[Tuple[str, str, str, int, str]]) -> str:
+
+    def _format_lint_results(
+        self, results: List[Tuple[str, str, str, int, str]]
+    ) -> str:
         """格式化lint结果
-        
+
         Args:
             results: [(tool_name, file_path, command, returncode, output), ...]
-        
+
         Returns:
             格式化的错误信息字符串
         """
         if not results:
             return ""
-        
+
         lines = []
         for tool_name, file_path, command, returncode, output in results:
             lines.append(f"工具: {tool_name}")
@@ -1935,34 +2143,36 @@ class CodeAgent(Agent):
                 if len(output) > 1000:
                     lines.append(f"... (输出已截断，共 {len(output)} 字符)")
             lines.append("")  # 空行分隔
-        
+
         return "\n".join(lines)
 
-    def _validate_build_after_edit(self, modified_files: List[str]) -> Optional[BuildResult]:
+    def _validate_build_after_edit(
+        self, modified_files: List[str]
+    ) -> Optional[BuildResult]:
         """编辑后验证构建
-        
+
         Args:
             modified_files: 修改的文件列表
-        
+
         Returns:
             BuildResult: 验证结果，如果验证被禁用或出错则返回None
         """
         if not is_enable_build_validation():
             return None
-        
+
         # 检查项目配置，看是否已禁用构建验证
         config = BuildValidationConfig(self.root_dir)
         if config.is_build_validation_disabled():
             # 已禁用，返回None，由调用方处理基础静态检查
             return None
-        
+
         # 输出编译检查日志
         file_count = len(modified_files)
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
         if file_count > 3:
             files_str += f" 等{file_count}个文件"
         print(f"🔨 正在进行编译检查 ({files_str})...")
-        
+
         try:
             timeout = get_build_validation_timeout()
             validator = BuildValidator(self.root_dir, timeout=timeout)
@@ -2007,10 +2217,15 @@ def cli(
         help="提交信息后缀（用换行分隔）",
     ),
     non_interactive: bool = typer.Option(
-        False, "-n", "--non-interactive", help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟"
+        False,
+        "-n",
+        "--non-interactive",
+        help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟",
     ),
     rule_names: Optional[str] = typer.Option(
-        None, "--rule-names", help="指定规则名称列表，用逗号分隔，从 rules.yaml 文件中读取对应的规则内容"
+        None,
+        "--rule-names",
+        help="指定规则名称列表，用逗号分隔，从 rules.yaml 文件中读取对应的规则内容",
     ),
 ) -> None:
     """Jarvis主入口点。"""
@@ -2023,7 +2238,9 @@ def cli(
         # 注意：全局配置同步放在 init_env 之后执行，避免被 init_env 覆盖
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (requirement and str(requirement).strip()):
-        print("❌ 非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。")
+        print(
+            "❌ 非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。"
+        )
         raise typer.Exit(code=2)
     init_env(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
@@ -2056,8 +2273,12 @@ def cli(
     except (subprocess.CalledProcessError, FileNotFoundError):
         curr_dir_path = os.getcwd()
         print(f"⚠️ 警告：当前目录 '{curr_dir_path}' 不是一个git仓库。")
-        init_git = True if non_interactive else user_confirm(
-            f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True
+        init_git = (
+            True
+            if non_interactive
+            else user_confirm(
+                f"是否要在 '{curr_dir_path}' 中初始化一个新的git仓库？", default=True
+            )
         )
         if init_git:
             try:
@@ -2082,13 +2303,14 @@ def cli(
     # 在定位到 git 根目录后，按仓库维度加锁，避免跨仓库互斥
     try:
         repo_root = os.getcwd()
-        lock_name = f"code_agent_{hashlib.md5(repo_root.encode('utf-8')).hexdigest()}.lock"
+        lock_name = (
+            f"code_agent_{hashlib.md5(repo_root.encode('utf-8')).hexdigest()}.lock"
+        )
         _acquire_single_instance_lock(lock_name=lock_name)
     except Exception:
         # 回退到全局锁，确保至少有互斥保护
         _acquire_single_instance_lock(lock_name="code_agent.lock")
     try:
-        
         agent = CodeAgent(
             model_group=model_group,
             need_summary=False,
