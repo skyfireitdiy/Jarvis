@@ -388,9 +388,14 @@ class ReviewManager:
                 '    "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。"\n'
                 '    "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。"\n'
                 '    "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，且无法通过简单适配解决，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。注意：如果调用方已经适配了新签名，或可以通过简单的类型转换解决，则不应视为破坏性变更。"\n'
+                '    "[breaking] 测试函数重复定义：在 src/common/buffer.rs 第 111-112 行处，新增的测试函数 test_write_buf_1_byte 被同时标记了两次 #[test]，导致重复定义。修复建议：删除其中一个 #[test] 标记，确保每个测试函数只有一个 #[test] 属性。"\n'
                 '    "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。"\n'
                 "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
-                '<SUMMARY>\n{\n  "ok": true,\n  "function_issues": [],\n  "critical_issues": [],\n  "breaking_issues": [],\n  "structure_issues": []\n}\n</SUMMARY>'
+                "**示例1：审查通过（无问题）**\n"
+                '<SUMMARY>\n{\n  "ok": true,\n  "function_issues": [],\n  "critical_issues": [],\n  "breaking_issues": [],\n  "structure_issues": []\n}\n</SUMMARY>\n'
+                "**示例2：发现问题（必须报告问题）**\n"
+                '<SUMMARY>\n{\n  "ok": false,\n  "function_issues": [],\n  "critical_issues": [],\n  "breaking_issues": [\n    "[breaking] 测试函数重复定义：在 src/common/buffer.rs 第 111-112 行处，新增的测试函数 test_write_buf_1_byte 被同时标记了两次 #[test]，导致重复定义。修复建议：删除其中一个 #[test] 标记，确保每个测试函数只有一个 #[test] 属性。"\n  ],\n  "structure_issues": []\n}\n</SUMMARY>\n'
+                "**重要**：如果发现问题，ok 必须为 false，并在相应的问题数组中报告问题。不要因为只有小问题就设置 ok 为 true。"
             )
             # 在 usr_p 和 sum_p 中追加附加说明（sys_p 通常不需要）
             usr_p = self.append_additional_notes(usr_p)
@@ -439,6 +444,9 @@ class ReviewManager:
         use_direct_model_review = False  # 标记是否使用直接模型调用
         parse_failed = False  # 标记上一次解析是否失败
         parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
+        previous_issues: Dict[
+            str, List[str]
+        ] = {}  # 保存上一次审查发现的问题，用于验证是否已修复
         while max_iterations == 0 or i < max_iterations:
             agent = self._current_agents[review_key]
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
@@ -448,7 +456,61 @@ class ReviewManager:
             _, usr_p_current, _ = build_review_prompts()  # 重新构建，获取最新的 diff
 
             if i > 0:
-                # 修复后的审查，添加代码已更新的提示
+                # 修复后的审查，添加代码已更新的提示和之前问题的验证要求
+                previous_issues_text = ""
+                if previous_issues:
+                    previous_issues_lines = []
+                    if previous_issues.get("function_issues"):
+                        previous_issues_lines.append("功能一致性问题：")
+                        previous_issues_lines.extend(
+                            [
+                                f"  - {issue}"
+                                for issue in previous_issues["function_issues"]
+                            ]
+                        )
+                    if previous_issues.get("critical_issues"):
+                        previous_issues_lines.append("严重问题：")
+                        previous_issues_lines.extend(
+                            [
+                                f"  - {issue}"
+                                for issue in previous_issues["critical_issues"]
+                            ]
+                        )
+                    if previous_issues.get("breaking_issues"):
+                        previous_issues_lines.append("破坏性变更问题：")
+                        previous_issues_lines.extend(
+                            [
+                                f"  - {issue}"
+                                for issue in previous_issues["breaking_issues"]
+                            ]
+                        )
+                    if previous_issues.get("structure_issues"):
+                        previous_issues_lines.append("文件结构问题：")
+                        previous_issues_lines.extend(
+                            [
+                                f"  - {issue}"
+                                for issue in previous_issues["structure_issues"]
+                            ]
+                        )
+                    if previous_issues_lines:
+                        previous_issues_text = "\n".join(
+                            [
+                                "",
+                                "【重要：需要验证之前发现的问题是否已修复】",
+                                f"在第 {i} 次审查中，发现了以下问题：",
+                                "<PREVIOUS_ISSUES>",
+                                "\n".join(previous_issues_lines),
+                                "</PREVIOUS_ISSUES>",
+                                "",
+                                "**必须验证：**",
+                                "- 请仔细检查上述每个问题是否已经在代码修复中得到解决",
+                                "- 如果问题仍然存在，必须再次报告为相应类型的问题",
+                                "- 如果问题已经修复，则不应再报告",
+                                "- **必须使用 read_code 工具或 git diff 来验证问题是否已修复，不能仅凭假设**",
+                                "",
+                            ]
+                        )
+
                 code_changed_notice = "\n".join(
                     [
                         "",
@@ -470,7 +532,9 @@ class ReviewManager:
                         "",
                     ]
                 )
-                usr_p_with_notice = usr_p_current + code_changed_notice
+                usr_p_with_notice = (
+                    usr_p_current + previous_issues_text + code_changed_notice
+                )
                 composed_prompt = self.compose_prompt_with_context(usr_p_with_notice)
                 # 修复后必须使用 Agent.run()，不能使用直接模型调用（因为需要工具调用）
                 use_direct_model_review = False
@@ -595,6 +659,21 @@ class ReviewManager:
                 f"[c2rust-transpiler][review][iter={i + 1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}, breaking_issues={len(breaking_issues)}, structure_issues={len(structure_issues)}",
                 fg=typer.colors.CYAN,
             )
+
+            # 保存本次审查发现的问题，供下次审查时验证（仅在发现问题时保存）
+            if (
+                not ok
+                or function_issues
+                or critical_issues
+                or breaking_issues
+                or structure_issues
+            ):
+                previous_issues = {
+                    "function_issues": list(function_issues),
+                    "critical_issues": list(critical_issues),
+                    "breaking_issues": list(breaking_issues),
+                    "structure_issues": list(structure_issues),
+                }
 
             # 如果 ok 为 true，表示审查通过（功能一致且无严重问题、无破坏性变更、文件结构合理），直接返回，不触发修复
             if ok:
