@@ -504,6 +504,30 @@ class LSPClient:
 
         return Path(abs_path).as_uri()
 
+    def _to_relative_path(self, file_path: str) -> str:
+        """将文件路径转换为相对于项目根目录的相对路径。
+
+        Args:
+            file_path: 文件路径（可以是绝对路径或相对路径）
+
+        Returns:
+            相对于 project_root 的相对路径
+        """
+        # 如果是绝对路径，转换为相对路径
+        if os.path.isabs(file_path):
+            try:
+                rel_path = os.path.relpath(file_path, self.project_root)
+                # 如果转换失败（不在同一驱动器等），返回原路径
+                if rel_path.startswith(".."):
+                    return file_path
+                return rel_path
+            except ValueError:
+                # 跨驱动器等情况，返回原路径
+                return file_path
+        else:
+            # 已经是相对路径，直接返回
+            return file_path
+
     def _send_notification(self, method: str, params: Dict):
         """发送LSP通知（无响应）。
 
