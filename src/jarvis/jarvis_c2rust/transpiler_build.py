@@ -32,7 +32,7 @@ class BuildManager:
         save_progress_func,
         extract_compile_flags_func,
         get_current_function_context_func,
-        get_code_agent_func,
+        get_fix_agent_func,
         compose_prompt_with_context_func,
         check_and_handle_test_deletion_func,
         get_crate_commit_hash_func,
@@ -53,7 +53,7 @@ class BuildManager:
         self.save_progress = save_progress_func
         self.extract_compile_flags = extract_compile_flags_func
         self.get_current_function_context = get_current_function_context_func
-        self.get_code_agent = get_code_agent_func
+        self.get_fix_agent = get_fix_agent_func
         self.compose_prompt_with_context = compose_prompt_with_context_func
         self.check_and_handle_test_deletion = check_and_handle_test_deletion_func
         self.get_crate_commit_hash = get_crate_commit_hash_func
@@ -354,7 +354,8 @@ class BuildManager:
                 if git_diff and git_diff.strip():
                     # 限制 git diff 长度，避免上下文过大
                     # 使用较小的比例（30%）因为修复提示词本身已经很长
-                    agent = self.get_code_agent()
+                    # 创建一个临时 Agent 用于 truncate（不保存）
+                    agent = self.get_fix_agent(c_code)
                     git_diff = truncate_git_diff_with_context_limit(
                         git_diff, agent=agent, token_ratio=0.3
                     )
@@ -682,9 +683,10 @@ class BuildManager:
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         # 记录运行前的 commit
         before_commit = self.get_crate_commit_hash()
-        agent = self.get_code_agent()
+        # 使用修复 Agent，每次重新创建，并传入 C 代码
+        agent = self.get_fix_agent(c_code)
         agent.run(
-            self.compose_prompt_with_context(repair_prompt),
+            self.compose_prompt_with_context(repair_prompt, for_fix=True),
             prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]",
             suffix="",
         )
@@ -697,8 +699,10 @@ class BuildManager:
                 fg=typer.colors.YELLOW,
             )
             before_commit = self.get_crate_commit_hash()
+            # 重新创建修复 Agent
+            agent = self.get_fix_agent(c_code)
             agent.run(
-                self.compose_prompt_with_context(repair_prompt),
+                self.compose_prompt_with_context(repair_prompt, for_fix=True),
                 prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test][retry]",
                 suffix="",
             )

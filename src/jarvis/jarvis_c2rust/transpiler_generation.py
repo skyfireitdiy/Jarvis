@@ -25,7 +25,7 @@ class GenerationManager:
         extract_compile_flags_func,
         append_additional_notes_func,
         is_root_symbol_func,
-        get_code_agent_func,
+        get_generation_agent_func,
         compose_prompt_with_context_func,
         check_and_handle_test_deletion_func,
         get_crate_commit_hash_func,
@@ -38,7 +38,7 @@ class GenerationManager:
         self.extract_compile_flags = extract_compile_flags_func
         self.append_additional_notes = append_additional_notes_func
         self.is_root_symbol = is_root_symbol_func
-        self.get_code_agent = get_code_agent_func
+        self.get_generation_agent = get_generation_agent_func
         self.compose_prompt_with_context = compose_prompt_with_context_func
         self.check_and_handle_test_deletion = check_and_handle_test_deletion_func
         self.get_crate_commit_hash = get_crate_commit_hash_func
@@ -217,7 +217,8 @@ class GenerationManager:
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         # 记录运行前的 commit
         before_commit = self.get_crate_commit_hash()
-        agent = self.get_code_agent()
+        # 使用生成 Agent（可以复用）
+        agent = self.get_generation_agent()
         agent.run(
             self.compose_prompt_with_context(prompt),
             prefix="[c2rust-transpiler][gen]",
