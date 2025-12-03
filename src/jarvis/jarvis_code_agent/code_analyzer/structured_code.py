@@ -127,7 +127,7 @@ class StructuredCodeExtractor:
         if end_line == -1:
             lines = content.split("\n")
             end_line = len(lines)
-        
+
         syntax_kinds = {
             "function",
             "method",
@@ -154,15 +154,15 @@ class StructuredCodeExtractor:
             "annotation",
             "decorator",
         }
-        
+
         units = []
         lines = content.split("\n")
-        
+
         # 尝试提取符号，即使有语法错误也尽量提取部分结果
         symbols = []
         language = None
         extractor = None
-        
+
         try:
             # 检测语言
             language = detect_language(filepath)
@@ -175,9 +175,12 @@ class StructuredCodeExtractor:
         except Exception as e:
             # 即使检测语言或获取提取器失败，也继续尝试（可能是部分语法错误）
             import os
+
             if os.getenv("DEBUG_TREE_SITTER", "").lower() in ("1", "true", "yes"):
-                print(f"Warning: Failed to detect language or get extractor for {filepath}: {e}")
-        
+                print(
+                    f"Warning: Failed to detect language or get extractor for {filepath}: {e}"
+                )
+
         # 如果成功提取到符号，使用它们作为切分点
         if symbols:
             # 过滤符号：返回与请求范围有重叠的所有语法单元（包括边界上的）
@@ -202,11 +205,11 @@ class StructuredCodeExtractor:
                             symbol, content, language
                         )
                     )
-                    
+
                     # 确保在请求范围内
                     unit_start = max(unit_start, start_line)
                     unit_end = min(unit_end, end_line)
-                    
+
                     # 确保范围有效
                     if unit_start > unit_end:
                         continue
@@ -217,10 +220,15 @@ class StructuredCodeExtractor:
                     symbol_end_idx = min(len(lines), unit_end)
 
                     # 确保索引有效
-                    if symbol_start_idx >= len(lines) or symbol_end_idx < symbol_start_idx:
+                    if (
+                        symbol_start_idx >= len(lines)
+                        or symbol_end_idx < symbol_start_idx
+                    ):
                         continue
 
-                    symbol_content = "\n".join(lines[symbol_start_idx:symbol_end_idx + 1])
+                    symbol_content = "\n".join(
+                        lines[symbol_start_idx : symbol_end_idx + 1]
+                    )
 
                     # 生成id：体现作用域（如果有parent，使用 parent.name 格式）
                     if symbol.parent:
@@ -235,16 +243,18 @@ class StructuredCodeExtractor:
                         else:
                             unit_id = f"{symbol.name}_{unit_start}"
 
-                    units.append({
-                        "id": unit_id,
-                        "start_line": unit_start,
-                        "end_line": unit_end,
-                        "content": symbol_content,
-                    })
+                    units.append(
+                        {
+                            "id": unit_id,
+                            "start_line": unit_start,
+                            "end_line": unit_end,
+                            "content": symbol_content,
+                        }
+                    )
                 except Exception:
                     # 单个符号处理失败，继续处理其他符号
                     continue
-        
+
         # 即使没有提取到符号，或者提取失败，也返回空列表
         # 这样上层可以使用空白行或固定行数切分作为fallback
         return units

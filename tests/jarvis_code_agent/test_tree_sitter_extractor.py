@@ -39,6 +39,7 @@ class TestTreeSitterExtractorSyntaxErrors:
         """尝试获取真实的 Rust Language 对象"""
         try:
             import tree_sitter_rust
+
             return tree_sitter_rust.language()
         except (ImportError, Exception):
             pytest.skip("tree-sitter-rust not available")
@@ -166,12 +167,14 @@ class TestTreeSitterExtractorSyntaxErrors:
     def test_query_construction_error(self, extractor):
         """测试查询构造错误"""
         # 创建一个使用无效查询的提取器来测试查询构造错误
-        from jarvis.jarvis_code_agent.code_analyzer.tree_sitter_extractor import TreeSitterExtractor
-        
+        from jarvis.jarvis_code_agent.code_analyzer.tree_sitter_extractor import (
+            TreeSitterExtractor,
+        )
+
         class InvalidQueryExtractor(TreeSitterExtractor):
             def _create_symbol_from_capture(self, node, name: str, file_path: str):
                 return None
-        
+
         # 使用无效的查询语法
         invalid_query = "(invalid_syntax @function.name"
         try:
@@ -239,16 +242,16 @@ class TestTreeSitterExtractorSyntaxErrors:
         # 即使有多个语法错误，也应该能提取有效的符号
         symbols = extractor.extract_symbols("test.rs", content)
         assert isinstance(symbols, list)
-        
+
         # 应该至少提取到一些有效的函数符号
         # 注意：具体能提取多少取决于 tree-sitter 的解析能力
         # 但至少应该不会崩溃，并且应该返回一个列表
         if symbols:
             # 验证返回的符号都是有效的
             for symbol in symbols:
-                assert hasattr(symbol, 'name')
-                assert hasattr(symbol, 'line_start')
-                assert hasattr(symbol, 'line_end')
+                assert hasattr(symbol, "name")
+                assert hasattr(symbol, "line_start")
+                assert hasattr(symbol, "line_end")
 
     def test_nested_syntax_errors(self, extractor):
         """测试嵌套的语法错误"""
@@ -268,14 +271,14 @@ class TestTreeSitterExtractorSyntaxErrors:
     def test_debug_mode_output(self, extractor, monkeypatch):
         """测试调试模式下的输出"""
         monkeypatch.setenv("DEBUG_TREE_SITTER", "1")
-        
+
         # 使用会导致解析失败的内容
         content = """
         fn test() {
             invalid syntax here
         }
         """
-        
+
         # 在调试模式下，应该能够处理错误而不崩溃
         try:
             with patch("builtins.print") as mock_print:
@@ -304,10 +307,10 @@ class TestTreeSitterExtractorSyntaxErrors:
         # 即使有语法错误，也应该跳过错误节点，提取有效符号
         symbols = extractor.extract_symbols("test.rs", content)
         assert isinstance(symbols, list)
-        
+
         # 验证返回的符号都是有效的（不应该包含错误节点）
         for symbol in symbols:
-            assert hasattr(symbol, 'name')
+            assert hasattr(symbol, "name")
             assert symbol.name is not None
             assert symbol.line_start > 0
             assert symbol.line_end >= symbol.line_start
@@ -342,20 +345,21 @@ class TestTreeSitterExtractorSyntaxErrors:
         # 即使有多个语法错误，也应该能提取有效的符号
         symbols = extractor.extract_symbols("test.rs", content)
         assert isinstance(symbols, list)
-        
+
         # 应该至少提取到一些有效的函数符号
         # 具体能提取多少取决于 tree-sitter 的解析能力
-        valid_function_names = [s.name for s in symbols if hasattr(s, 'name') and s.name]
+        valid_function_names = [
+            s.name for s in symbols if hasattr(s, "name") and s.name
+        ]
         assert len(valid_function_names) >= 0  # 至少应该返回一个列表（可能为空）
 
     def test_graceful_degradation_on_parse_failure(self, extractor):
         """测试解析完全失败时的优雅降级"""
         # 使用完全无效的内容
         content = "{{{[[[invalid syntax]]]}}}"
-        
+
         # 即使解析完全失败，也不应该崩溃
         symbols = extractor.extract_symbols("test.rs", content)
         assert isinstance(symbols, list)
         # 应该返回空列表或部分符号
         assert len(symbols) >= 0
-

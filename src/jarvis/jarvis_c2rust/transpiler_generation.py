@@ -62,11 +62,16 @@ class GenerationManager:
         # 获取 C 源文件位置信息
         c_file_location = ""
         if hasattr(rec, "file") and rec.file:
-            if hasattr(rec, "start_line") and hasattr(rec, "end_line") and rec.start_line and rec.end_line:
+            if (
+                hasattr(rec, "start_line")
+                and hasattr(rec, "end_line")
+                and rec.start_line
+                and rec.end_line
+            ):
                 c_file_location = f"{rec.file}:{rec.start_line}-{rec.end_line}"
             else:
                 c_file_location = str(rec.file)
-        
+
         requirement_lines = [
             f"目标：在 {module} 中，使用 TDD 方法为 C 函数 {rec.qname or rec.name} 生成 Rust 实现。",
             f"函数签名：{rust_sig}",

@@ -639,12 +639,14 @@ class Transpiler:
             self._init_build_manager()
         result = self.build_manager.cargo_build_loop()
         # 保存修复标记，供调用方检查
-        self._build_loop_has_fixes = getattr(self.build_manager, '_build_loop_has_fixes', False)
+        self._build_loop_has_fixes = getattr(
+            self.build_manager, "_build_loop_has_fixes", False
+        )
         return result
-    
+
     def _get_build_loop_has_fixes(self) -> bool:
         """获取构建循环中是否进行了修复"""
-        return getattr(self, '_build_loop_has_fixes', False)
+        return getattr(self, "_build_loop_has_fixes", False)
 
     def _review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """审查生成的实现（委托给 ReviewManager）"""

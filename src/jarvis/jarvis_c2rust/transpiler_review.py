@@ -679,11 +679,16 @@ class ReviewManager:
             # 获取 C 源文件位置信息
             c_file_location = ""
             if hasattr(rec, "file") and rec.file:
-                if hasattr(rec, "start_line") and hasattr(rec, "end_line") and rec.start_line and rec.end_line:
+                if (
+                    hasattr(rec, "start_line")
+                    and hasattr(rec, "end_line")
+                    and rec.start_line
+                    and rec.end_line
+                ):
                     c_file_location = f"{rec.file}:{rec.start_line}-{rec.end_line}"
                 else:
                     c_file_location = str(rec.file)
-            
+
             fix_prompt = "\n".join(
                 [
                     "请根据以下审查结论对目标函数进行最小优化（保留结构与意图，不进行大范围重构）：",
@@ -697,7 +702,11 @@ class ReviewManager:
                     f"- crate_dir: {self.crate_dir.resolve()}",
                     f"- 目标模块文件: {module}",
                     f"- 建议/当前 Rust 签名: {rust_sig}",
-                    *([f"- C 源文件位置：{c_file_location}"] if c_file_location else []),
+                    *(
+                        [f"- C 源文件位置：{c_file_location}"]
+                        if c_file_location
+                        else []
+                    ),
                     "crate 目录结构（部分）：",
                     crate_tree,
                     "",
@@ -786,12 +795,16 @@ class ReviewManager:
 
             # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
             self.cargo_build_loop()
-            
+
             # 检查构建修复过程中是否进行了修复
-            build_has_fixes = self.get_build_loop_has_fixes() if hasattr(self, 'get_build_loop_has_fixes') else False
+            build_has_fixes = (
+                self.get_build_loop_has_fixes()
+                if hasattr(self, "get_build_loop_has_fixes")
+                else False
+            )
             if build_has_fixes:
                 typer.secho(
-                    f"[c2rust-transpiler][review-fix] 构建修复过程中进行了修复，将在下一轮审查中重新检查",
+                    "[c2rust-transpiler][review-fix] 构建修复过程中进行了修复，将在下一轮审查中重新检查",
                     fg=typer.colors.YELLOW,
                 )
 
