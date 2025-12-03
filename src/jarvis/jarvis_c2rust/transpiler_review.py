@@ -404,19 +404,24 @@ class ReviewManager:
 
         i = 0
         max_iterations = self.review_max_iterations
-        # 复用 Review Agent（仅在本函数生命周期内构建一次）
         # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-        review_key = f"review::{rec.id}"
-        sys_p_init, _, sum_p_init = (
-            build_review_prompts()
-        )  # 只获取一次 sys_p 和 sum_p，usr_p 每次重新构建
 
         # 获取函数信息用于 Agent name
         fn_name = rec.qname or rec.name or f"fn_{rec.id}"
         agent_name = f"C2Rust-Review-Agent({fn_name})"
 
-        if self._current_agents.get(review_key) is None:
+        # 0表示无限重试，否则限制迭代次数
+        use_direct_model_review = False  # 标记是否使用直接模型调用
+        parse_failed = False  # 标记上一次解析是否失败
+        parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
+        previous_issues: Dict[
+            str, List[str]
+        ] = {}  # 保存上一次审查发现的问题，用于验证是否已修复
+        while max_iterations == 0 or i < max_iterations:
+            # 每次迭代都创建新的 Agent，避免历史记忆干扰
+            # 但会在提示词中包含 previous_issues
+            sys_p_init, _, sum_p_init = build_review_prompts()
             review_agent = Agent(
                 system_prompt=sys_p_init,
                 name=agent_name,
@@ -438,17 +443,8 @@ class ReviewManager:
             initial_commit = self.get_crate_commit_hash()
             if initial_commit:
                 self.agent_before_commits[agent_key] = initial_commit
-            self._current_agents[review_key] = review_agent
 
-        # 0表示无限重试，否则限制迭代次数
-        use_direct_model_review = False  # 标记是否使用直接模型调用
-        parse_failed = False  # 标记上一次解析是否失败
-        parse_error_msg: Optional[str] = None  # 保存上一次的YAML解析错误信息
-        previous_issues: Dict[
-            str, List[str]
-        ] = {}  # 保存上一次审查发现的问题，用于验证是否已修复
-        while max_iterations == 0 or i < max_iterations:
-            agent = self._current_agents[review_key]
+            agent = review_agent
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
 
             # 每次迭代都重新获取最新的 diff（从保存的 commit 到当前的 HEAD）
