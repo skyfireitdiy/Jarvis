@@ -184,6 +184,9 @@ class LSPClient:
         self.server_config = server_config
         self.process: Optional[subprocess.Popen] = None
         self.request_id = 0
+        self.work_dir: Optional[str] = (
+            None  # LSP服务器的工作目录（可能不同于project_root）
+        )
 
         # 验证LSP服务器是否可用
         if not self._check_server_available():
@@ -241,6 +244,7 @@ class LSPClient:
                     break
 
             work_dir = _find_lsp_work_dir(self.project_root, language or "")
+            self.work_dir = os.path.abspath(work_dir)  # 保存LSP工作目录
 
             # 启动LSP服务器进程
             self.process = subprocess.Popen(
@@ -496,8 +500,9 @@ class LSPClient:
         """
         # 确保路径是绝对路径
         if not os.path.isabs(file_path):
-            # 如果是相对路径，尝试相对于项目根目录解析
-            abs_path = os.path.join(self.project_root, file_path)
+            # 如果是相对路径，优先相对于 LSP 工作目录解析，否则相对于项目根目录
+            base_dir = self.work_dir if self.work_dir else self.project_root
+            abs_path = os.path.join(base_dir, file_path)
             abs_path = os.path.abspath(abs_path)
         else:
             abs_path = os.path.abspath(file_path)
@@ -505,18 +510,21 @@ class LSPClient:
         return Path(abs_path).as_uri()
 
     def _to_relative_path(self, file_path: str) -> str:
-        """将文件路径转换为相对于项目根目录的相对路径。
+        """将文件路径转换为相对于LSP工作目录的相对路径。
 
         Args:
             file_path: 文件路径（可以是绝对路径或相对路径）
 
         Returns:
-            相对于 project_root 的相对路径
+            相对于 LSP 工作目录的相对路径（如果 work_dir 存在），否则相对于 project_root
         """
+        # 确定基准目录：优先使用 LSP 工作目录，否则使用项目根目录
+        base_dir = self.work_dir if self.work_dir else self.project_root
+
         # 如果是绝对路径，转换为相对路径
         if os.path.isabs(file_path):
             try:
-                rel_path = os.path.relpath(file_path, self.project_root)
+                rel_path = os.path.relpath(file_path, base_dir)
                 # 如果转换失败（不在同一驱动器等），返回原路径
                 if rel_path.startswith(".."):
                     return file_path
@@ -525,7 +533,18 @@ class LSPClient:
                 # 跨驱动器等情况，返回原路径
                 return file_path
         else:
-            # 已经是相对路径，直接返回
+            # 已经是相对路径，检查是否需要调整
+            # 如果 file_path 是相对于 project_root 的，但 work_dir 不同，需要转换
+            if self.work_dir and self.work_dir != self.project_root:
+                # 尝试将相对路径转换为绝对路径，再转换为相对于 work_dir 的路径
+                abs_path = os.path.abspath(os.path.join(self.project_root, file_path))
+                try:
+                    rel_path = os.path.relpath(abs_path, self.work_dir)
+                    if not rel_path.startswith(".."):
+                        return rel_path
+                except ValueError:
+                    pass
+            # 如果无法转换或 work_dir 不存在，直接返回原路径
             return file_path
 
     def _send_notification(self, method: str, params: Dict):
@@ -1398,7 +1417,18 @@ class LSPClientTool:
             if isinstance(client, LSPClient) and os.path.exists(abs_file_path):
                 with open(abs_file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
-                # 使用相对路径通知 LSP
+                # 将路径转换为相对于 LSP 工作目录的路径
+                # 如果 client 有 work_dir，需要将 rel_file_path 转换为相对于 work_dir 的路径
+                if client.work_dir and client.work_dir != project_root:
+                    try:
+                        # 将绝对路径转换为相对于 LSP 工作目录的相对路径
+                        lsp_rel_path = os.path.relpath(abs_file_path, client.work_dir)
+                        if not lsp_rel_path.startswith(".."):
+                            rel_file_path = lsp_rel_path
+                    except ValueError:
+                        # 转换失败，使用原路径
+                        pass
+                # 使用相对路径通知 LSP（相对于 LSP 工作目录）
                 client.notify_did_open(rel_file_path, content)
 
             # 执行操作（完全基于符号名称，无需行列号）
