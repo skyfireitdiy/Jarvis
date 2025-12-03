@@ -350,6 +350,7 @@ class TranspilerExecutor:
         # 使用循环来处理函数，支持失败回退后重新开始
         function_retry_count = 0
         max_function_retries = MAX_FUNCTION_RETRIES
+        build_has_fixes = False  # 在循环外定义，确保在 break 后仍可使用
         while function_retry_count <= max_function_retries:
             if function_retry_count > 0:
                 typer.secho(
@@ -394,12 +395,14 @@ class TranspilerExecutor:
             )
             ok = self.cargo_build_loop()
 
-            # 检查构建循环中是否进行了修复
-            build_has_fixes = (
+            # 检查构建循环中是否进行了修复（累积修复标记，不要重置）
+            current_build_has_fixes = (
                 self.get_build_loop_has_fixes()
                 if hasattr(self, "get_build_loop_has_fixes")
                 else False
             )
+            # 累积修复标记：如果本次或之前有修复，都标记为有修复
+            build_has_fixes = build_has_fixes or current_build_has_fixes
 
             # 检查是否需要重新开始（回退后）
             if ok is None:
