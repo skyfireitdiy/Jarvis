@@ -239,6 +239,7 @@ class Transpiler:
             self._check_and_handle_test_deletion,
             self._append_additional_notes,
             self._cargo_build_loop,
+            self._get_build_loop_has_fixes,
             self._on_before_tool_call,
             self._on_after_tool_call,
             self._agent_before_commits,

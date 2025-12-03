@@ -45,6 +45,7 @@ class ReviewManager:
         check_and_handle_test_deletion_func: Callable[[Optional[str], Any], bool],
         append_additional_notes_func: Callable[[str], str],
         cargo_build_loop_func: Callable[[], Optional[bool]],
+        get_build_loop_has_fixes_func: Callable[[], bool],
         on_before_tool_call_func: Callable[[Any, Any], None],
         on_after_tool_call_func: Callable[[Any, Any, Any, Any], None],
         agent_before_commits: Dict[str, Optional[str]],
@@ -69,6 +70,7 @@ class ReviewManager:
         self.check_and_handle_test_deletion = check_and_handle_test_deletion_func
         self.append_additional_notes = append_additional_notes_func
         self.cargo_build_loop = cargo_build_loop_func
+        self.get_build_loop_has_fixes = get_build_loop_has_fixes_func
         self.on_before_tool_call = on_before_tool_call_func
         self.on_after_tool_call = on_after_tool_call_func
         self.agent_before_commits = agent_before_commits
@@ -784,6 +786,14 @@ class ReviewManager:
 
             # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
             self.cargo_build_loop()
+            
+            # 检查构建修复过程中是否进行了修复
+            build_has_fixes = self.get_build_loop_has_fixes() if hasattr(self, 'get_build_loop_has_fixes') else False
+            if build_has_fixes:
+                typer.secho(
+                    f"[c2rust-transpiler][review-fix] 构建修复过程中进行了修复，将在下一轮审查中重新检查",
+                    fg=typer.colors.YELLOW,
+                )
 
             # 记录本次审查结果
             try:
