@@ -544,14 +544,16 @@ class LSPClient:
         """获取代码补全。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             line: 行号（0-based）
             character: 列号（0-based）
 
         Returns:
             补全项列表
         """
-        uri = self._path_to_uri(file_path)
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
+        uri = self._path_to_uri(rel_path)
         result = self._send_request(
             "textDocument/completion",
             {
@@ -568,14 +570,16 @@ class LSPClient:
         """获取悬停信息。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             line: 行号（0-based）
             character: 列号（0-based）
 
         Returns:
             悬停信息
         """
-        uri = self._path_to_uri(file_path)
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
+        uri = self._path_to_uri(rel_path)
         return self._send_request(
             "textDocument/hover",
             {
@@ -590,14 +594,16 @@ class LSPClient:
         """获取定义位置。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             line: 行号（0-based）
             character: 列号（0-based）
 
         Returns:
             定义位置
         """
-        uri = self._path_to_uri(file_path)
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
+        uri = self._path_to_uri(rel_path)
         return self._send_request(
             "textDocument/definition",
             {
@@ -610,14 +616,16 @@ class LSPClient:
         """获取引用位置。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             line: 行号（0-based）
             character: 列号（0-based）
 
         Returns:
             引用位置列表
         """
-        uri = self._path_to_uri(file_path)
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
+        uri = self._path_to_uri(rel_path)
         result = self._send_request(
             "textDocument/references",
             {
@@ -635,12 +643,14 @@ class LSPClient:
         """获取文档符号。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
 
         Returns:
             符号列表
         """
-        uri = self._path_to_uri(file_path)
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
+        uri = self._path_to_uri(rel_path)
         result = self._send_request(
             "textDocument/documentSymbol", {"textDocument": {"uri": uri}}
         )
@@ -653,14 +663,16 @@ class LSPClient:
         """通过符号名称查找符号位置（适合大模型使用）。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             symbol_name: 符号名称（函数名、类名等）
 
         Returns:
             符号信息，包含位置和详细信息，如果未找到返回None
         """
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
         # 先获取文件中的所有符号
-        symbols = self.get_document_symbols(file_path)
+        symbols = self.get_document_symbols(rel_path)
         if not symbols:
             return None
 
@@ -687,14 +699,16 @@ class LSPClient:
         """获取符号的完整信息（定义、悬停、引用等，适合大模型使用）。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             symbol_name: 符号名称
 
         Returns:
             包含符号完整信息的字典，如果未找到返回None
         """
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
         # 查找符号位置
-        symbol = self.find_symbol_by_name(file_path, symbol_name)
+        symbol = self.find_symbol_by_name(rel_path, symbol_name)
         if not symbol:
             return None
 
@@ -705,19 +719,19 @@ class LSPClient:
         character = start.get("character", 0)
 
         # 获取悬停信息
-        hover_info = self.get_hover(file_path, line, character)
+        hover_info = self.get_hover(rel_path, line, character)
 
         # 获取定义位置
-        definition = self.get_definition(file_path, line, character)
+        definition = self.get_definition(rel_path, line, character)
 
         # 获取引用
-        references = self.get_references(file_path, line, character)
+        references = self.get_references(rel_path, line, character)
 
         return {
             "name": symbol.get("name"),
             "kind": symbol.get("kind"),
             "location": {
-                "file": file_path,
+                "file": rel_path,  # 使用相对路径
                 "line": line + 1,  # 转换为1-based
                 "character": character + 1,
             },
@@ -732,10 +746,12 @@ class LSPClient:
         """通知文档打开。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             content: 文件内容
         """
-        uri = self._path_to_uri(file_path)
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
+        uri = self._path_to_uri(rel_path)
         self._send_notification(
             "textDocument/didOpen",
             {
@@ -752,10 +768,12 @@ class LSPClient:
         """通知文档变更。
 
         Args:
-            file_path: 文件路径
+            file_path: 文件路径（相对路径，相对于 project_root）
             content: 文件内容
         """
-        uri = self._path_to_uri(file_path)
+        # 转换为相对路径
+        rel_path = self._to_relative_path(file_path)
+        uri = self._path_to_uri(rel_path)
         self._send_notification(
             "textDocument/didChange",
             {
@@ -1306,8 +1324,25 @@ class LSPClientTool:
                 os.path.abspath(file_path)
             )
 
-            # 获取或创建LSP客户端
-            client = self._get_or_create_client(project_root, file_path)
+            # 确保 project_root 是绝对路径
+            project_root = os.path.abspath(project_root)
+
+            # 将 file_path 转换为相对于 project_root 的相对路径
+            if os.path.isabs(file_path):
+                try:
+                    rel_file_path = os.path.relpath(file_path, project_root)
+                    # 如果转换失败（不在同一驱动器等），使用绝对路径
+                    if rel_file_path.startswith(".."):
+                        rel_file_path = file_path
+                except ValueError:
+                    # 跨驱动器等情况，使用绝对路径
+                    rel_file_path = file_path
+            else:
+                # 已经是相对路径，直接使用
+                rel_file_path = file_path
+
+            # 获取或创建LSP客户端（使用绝对路径的 project_root）
+            client = self._get_or_create_client(project_root, rel_file_path)
             if not client:
                 # 检测语言以提供更详细的错误信息
                 ext = Path(file_path).suffix.lower()
@@ -1330,10 +1365,17 @@ class LSPClientTool:
                 return {"success": False, "stdout": "", "stderr": error_msg}
 
             # 确保文件已打开（仅对 LSP 客户端需要）
-            if isinstance(client, LSPClient) and os.path.exists(file_path):
-                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            # 使用绝对路径读取文件内容
+            abs_file_path = (
+                os.path.join(project_root, rel_file_path)
+                if not os.path.isabs(rel_file_path)
+                else rel_file_path
+            )
+            if isinstance(client, LSPClient) and os.path.exists(abs_file_path):
+                with open(abs_file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read()
-                client.notify_did_open(file_path, content)
+                # 使用相对路径通知 LSP
+                client.notify_did_open(rel_file_path, content)
 
             # 执行操作（完全基于符号名称，无需行列号）
             symbol_name = args.get("symbol_name")
@@ -1347,7 +1389,7 @@ class LSPClientTool:
                         "stdout": "",
                         "stderr": "get_symbol_info 操作需要提供 symbol_name 参数",
                     }
-                result = client.get_symbol_info(file_path, symbol_name)
+                result = client.get_symbol_info(rel_file_path, symbol_name)
                 if not result:
                     return {
                         "success": False,
@@ -1362,7 +1404,7 @@ class LSPClientTool:
                         "stdout": "",
                         "stderr": "search_symbol 操作需要提供 symbol_name 参数",
                     }
-                all_symbols = client.get_document_symbols(file_path)
+                all_symbols = client.get_document_symbols(rel_file_path)
                 symbol_name_lower = symbol_name.lower()
                 matches = []
                 for sym in all_symbols:
@@ -1376,7 +1418,7 @@ class LSPClientTool:
                 }
             elif action == "document_symbols":
                 # 获取所有符号
-                symbols = client.get_document_symbols(file_path)
+                symbols = client.get_document_symbols(rel_file_path)
                 result = {"symbols": symbols, "count": len(symbols)}
             elif action == "definition":
                 # 查找定义位置（通过符号名）
@@ -1386,7 +1428,7 @@ class LSPClientTool:
                         "stdout": "",
                         "stderr": "definition 操作需要提供 symbol_name 参数",
                     }
-                symbol = client.find_symbol_by_name(file_path, symbol_name)
+                symbol = client.find_symbol_by_name(rel_file_path, symbol_name)
                 if not symbol:
                     return {
                         "success": False,
@@ -1397,7 +1439,7 @@ class LSPClientTool:
                 start = range_info.get("start", {})
                 line = start.get("line", 0)
                 character = start.get("character", 0)
-                result = client.get_definition(file_path, line, character)
+                result = client.get_definition(rel_file_path, line, character)
             elif action == "references":
                 # 查找所有引用（通过符号名）
                 if not symbol_name:
@@ -1406,7 +1448,7 @@ class LSPClientTool:
                         "stdout": "",
                         "stderr": "references 操作需要提供 symbol_name 参数",
                     }
-                symbol = client.find_symbol_by_name(file_path, symbol_name)
+                symbol = client.find_symbol_by_name(rel_file_path, symbol_name)
                 if not symbol:
                     return {
                         "success": False,
@@ -1417,7 +1459,7 @@ class LSPClientTool:
                 start = range_info.get("start", {})
                 line = start.get("line", 0)
                 character = start.get("character", 0)
-                refs = client.get_references(file_path, line, character)
+                refs = client.get_references(rel_file_path, line, character)
                 result = {"references": refs, "count": len(refs) if refs else 0}
             else:
                 return {
