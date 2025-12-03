@@ -197,10 +197,30 @@ class BuildManager:
         """
         # 检查是否为根符号
         is_root = sym_name in (self.root_symbols or [])
+        # 获取 C 源文件位置信息（如果 src_loc 包含文件路径和行号）
+        c_file_location = ""
+        if src_loc:
+            # src_loc 格式可能是 "file:start-end" 或 "file"
+            if ":" in src_loc and "-" in src_loc:
+                c_file_location = src_loc
+            elif src_loc:
+                # 如果只有文件路径，尝试从 curr 获取行号信息
+                if curr.get("file"):
+                    file_path = curr.get("file", "")
+                    start_line = curr.get("start_line")
+                    end_line = curr.get("end_line")
+                    if start_line and end_line:
+                        c_file_location = f"{file_path}:{start_line}-{end_line}"
+                    else:
+                        c_file_location = file_path
+                else:
+                    c_file_location = src_loc
+        
         base_lines = [
             f"目标：以最小的改动修复问题，使 `{stage}` 命令可以通过。",
             f"阶段：{stage}",
             f"错误分类标签: {tags}",
+            *([f"C 源文件位置：{c_file_location}"] if c_file_location else []),
             "允许的修复：修正入口/模块声明/依赖；对入口文件与必要mod.rs进行轻微调整；在缺失/未实现的被调函数导致错误时，一并补齐这些依赖的Rust实现（可新增合理模块/函数）；避免大范围改动。",
             "- 保持最小改动，避免与错误无关的重构或格式化；",
             "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
