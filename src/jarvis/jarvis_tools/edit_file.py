@@ -22,7 +22,7 @@ class EditFileTool:
     """文件编辑工具，用于对文件进行结构化编辑"""
 
     name = "edit_file"
-    description = "对文件进行结构化编辑（通过块id），支持同时修改多个文件。\n\n    💡 使用步骤：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换、编辑）\n    3. 避免手动计算行号，减少错误风险\n    4. 可以在一次调用中同时修改多个文件\n\n    📝 支持的操作类型：\n    - delete: 删除块\n    - insert_before: 在块前插入内容\n    - insert_after: 在块后插入内容\n    - replace: 替换整个块\n    - edit: 在块内进行search/replace（需要提供search和replace参数）\n\n    ⚠️ 重要提示：\n    - 不要一次修改太多内容，建议分多次进行，避免超过LLM的上下文窗口大小\n    - 如果修改内容较长（超过2048字符），建议拆分为多个较小的编辑操作"
+    description = "对文件进行结构化编辑（通过块id），支持同时修改多个文件。\n\n    💡 使用步骤：\n    1. 先使用read_code工具获取文件的结构化块id\n    2. 通过块id进行精确的代码块操作（删除、插入、替换、编辑）\n    3. 避免手动计算行号，减少错误风险\n    4. 可以在一次调用中同时修改多个文件\n\n    📝 支持的操作类型：\n    - delete: 删除块\n    - insert_before: 在块前插入内容\n    - insert_after: 在块后插入内容\n    - replace: 替换整个块\n    - edit: 在块内进行search/replace（需要提供search和replace参数）\n\n    ⚠️ 重要提示：\n    - 不要一次修改太多内容，建议分多次进行，避免超过LLM的上下文窗口大小\n    - 如果修改内容较长（超过2048字符），建议拆分为多个较小的编辑操作\n    - insert_before 和 insert_after 操作是在当前块内部操作，不会修改已存在的块索引：\n      * insert_before: 在块内容的前面插入新内容，插入的内容成为块的一部分\n      * insert_after: 在块内容的后面插入新内容，插入的内容成为块的一部分\n      * 这意味着插入的内容会合并到当前块中，不会创建新的块或改变其他块的索引"
 
     parameters = {
         "type": "object",
