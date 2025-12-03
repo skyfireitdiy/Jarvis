@@ -62,6 +62,7 @@ class BuildManager:
         self._current_function_start_commit_getter = (
             current_function_start_commit_getter
         )
+        self._build_loop_has_fixes = False  # 标记构建循环中是否进行了修复
 
     def classify_rust_error(self, text: str) -> List[str]:
         """
@@ -781,7 +782,14 @@ class BuildManager:
             return (False, False)  # 需要继续循环
 
     def cargo_build_loop(self) -> Optional[bool]:
-        """在 crate 目录执行构建与测试：直接运行 cargo test（运行所有测试，不区分项目结构）。失败则最小化修复直到通过或达到上限。"""
+        """在 crate 目录执行构建与测试：直接运行 cargo test（运行所有测试，不区分项目结构）。失败则最小化修复直到通过或达到上限。
+        
+        Returns:
+            Optional[bool]: 
+                - True: 测试通过（可能进行了修复）
+                - False: 测试失败（达到重试上限）
+                - None: 需要回退重新开始
+        """
         workspace_root = str(self.crate_dir)
         test_limit = f"最大重试: {self.test_max_retries if self.test_max_retries > 0 else '无限'}"
         typer.secho(
@@ -789,6 +797,7 @@ class BuildManager:
             fg=typer.colors.MAGENTA,
         )
         test_iter = 0
+        has_fixes = False  # 标记是否进行了修复
         while True:
             # 运行所有测试（不区分项目结构）
             # cargo test 会自动编译并运行所有类型的测试：lib tests、bin tests、integration tests、doc tests 等
@@ -797,6 +806,15 @@ class BuildManager:
                 workspace_root, test_iter
             )
             if need_restart is None:
+                self._build_loop_has_fixes = False  # 回退时重置标记
                 return None  # 需要回退重新开始
             if test_success:
+                # 如果进行了修复（test_iter > 1），标记需要重新 review
+                if test_iter > 1:
+                    has_fixes = True
+                # 将修复标记保存到实例变量，供调用方检查
+                self._build_loop_has_fixes = has_fixes
                 return True  # 测试通过
+            # 如果测试失败，说明进行了修复尝试
+            if test_iter > 1:
+                has_fixes = True

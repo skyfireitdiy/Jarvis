@@ -214,6 +214,7 @@ class Transpiler:
 
         # 构建管理器将在需要时延迟初始化（因为需要访问其他管理器的方法）
         self.build_manager: Optional[Any] = None
+        self._build_loop_has_fixes = False  # 标记构建循环中是否进行了修复
 
         # 初始化审查管理器（需要在其他管理器之后，因为需要访问它们的方法）
         from jarvis.jarvis_c2rust.transpiler_review import ReviewManager
@@ -635,7 +636,14 @@ class Transpiler:
         """在 crate 目录执行构建与测试（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        return self.build_manager.cargo_build_loop()
+        result = self.build_manager.cargo_build_loop()
+        # 保存修复标记，供调用方检查
+        self._build_loop_has_fixes = getattr(self.build_manager, '_build_loop_has_fixes', False)
+        return result
+    
+    def _get_build_loop_has_fixes(self) -> bool:
+        """获取构建循环中是否进行了修复"""
+        return getattr(self, '_build_loop_has_fixes', False)
 
     def _review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
         """审查生成的实现（委托给 ReviewManager）"""
@@ -681,6 +689,7 @@ class Transpiler:
             current_function_start_commit_setter=lambda v: setattr(
                 self, "_current_function_start_commit", v
             ),
+            get_build_loop_has_fixes_func=self._get_build_loop_has_fixes,
         )
         executor.execute()
 

@@ -88,6 +88,7 @@ class TranspilerExecutor:
         self.consecutive_fix_failures_setter = consecutive_fix_failures_setter
         self.current_function_start_commit_getter = current_function_start_commit_getter
         self.current_function_start_commit_setter = current_function_start_commit_setter
+        self.get_build_loop_has_fixes = get_build_loop_has_fixes_func
 
     def execute(self) -> None:
         """执行转译主流程"""
@@ -391,6 +392,9 @@ class TranspilerExecutor:
                 fg=typer.colors.MAGENTA,
             )
             ok = self.cargo_build_loop()
+            
+            # 检查构建循环中是否进行了修复
+            build_has_fixes = self.get_build_loop_has_fixes() if hasattr(self, 'get_build_loop_has_fixes') else False
 
             # 检查是否需要重新开始（回退后）
             if ok is None:
@@ -421,13 +425,26 @@ class TranspilerExecutor:
                 return False
 
             # 构建成功，跳出循环继续后续流程
+            # 如果构建过程中进行了修复，需要重新进行 review
+            if build_has_fixes:
+                typer.secho(
+                    "[c2rust-transpiler][build] 构建过程中进行了修复，需要重新进行代码审查",
+                    fg=typer.colors.YELLOW,
+                )
             break
 
         # 4) 审查与优化（复用 Review Agent）
-        typer.secho(
-            f"[c2rust-transpiler][review] {progress_info} 开始代码审查: {rec.qname or rec.name}",
-            fg=typer.colors.MAGENTA,
-        )
+        # 如果构建过程中进行了修复，需要重新进行 review 以确保修复没有引入新问题
+        if build_has_fixes:
+            typer.secho(
+                f"[c2rust-transpiler][review] {progress_info} 构建修复后重新开始代码审查: {rec.qname or rec.name}",
+                fg=typer.colors.MAGENTA,
+            )
+        else:
+            typer.secho(
+                f"[c2rust-transpiler][review] {progress_info} 开始代码审查: {rec.qname or rec.name}",
+                fg=typer.colors.MAGENTA,
+            )
         self.review_and_optimize(rec, module, rust_sig)
         typer.secho("[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
 
