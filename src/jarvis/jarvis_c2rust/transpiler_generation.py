@@ -59,11 +59,20 @@ class GenerationManager:
         """
         symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
         is_root = self.is_root_symbol(rec)
+        # 获取 C 源文件位置信息
+        c_file_location = ""
+        if hasattr(rec, "file") and rec.file:
+            if hasattr(rec, "start_line") and hasattr(rec, "end_line") and rec.start_line and rec.end_line:
+                c_file_location = f"{rec.file}:{rec.start_line}-{rec.end_line}"
+            else:
+                c_file_location = str(rec.file)
+        
         requirement_lines = [
             f"目标：在 {module} 中，使用 TDD 方法为 C 函数 {rec.qname or rec.name} 生成 Rust 实现。",
             f"函数签名：{rust_sig}",
             f"crate 目录：{self.crate_dir.resolve()}",
             f"C 工程目录：{self.project_root.resolve()}",
+            *([f"C 源文件位置：{c_file_location}"] if c_file_location else []),
             *(
                 ["根符号要求：必须使用 `pub` 关键字，模块必须在 src/lib.rs 中导出"]
                 if is_root
@@ -74,9 +83,11 @@ class GenerationManager:
             "1. Red：先写测试（#[cfg(test)] mod tests），基于 C 函数行为设计测试用例",
             "2. Green：编写实现使测试通过，确保与 C 语义等价",
             "3. Refactor：优化代码，保持测试通过",
+            "   - 如果发现现有测试用例有错误，优先修复测试用例而不是删除",
             "",
             "【核心要求】",
             "- 先写测试再写实现，测试必须可编译通过",
+            "- ⚠️ 重要：如果发现现有测试用例有错误（如测试逻辑错误、断言不正确、测试用例设计不当等），应该修复测试用例而不是删除它们。只有在测试用例完全重复、过时或确实不需要时才能删除。",
             "- 禁止使用 todo!/unimplemented!，必须实现完整功能",
             "- 使用 Rust 原生类型（i32/u32、&str/String、&[T]/&mut [T]、Result<T,E>），避免 C 风格类型",
             '- 禁止使用 extern "C"，使用标准 Rust 调用约定',
@@ -133,7 +144,9 @@ class GenerationManager:
                 ]
             )
         # 添加编译参数（如果存在）
-        compile_flags = self.extract_compile_flags(rec.file)
+        compile_flags = None
+        if hasattr(rec, "file") and rec.file:
+            compile_flags = self.extract_compile_flags(rec.file)
         if compile_flags:
             requirement_lines.extend(
                 [
@@ -213,6 +226,7 @@ class GenerationManager:
                 fg=typer.colors.YELLOW,
             )
             before_commit = self.get_crate_commit_hash()
+            # 重试时使用相同的 prompt（已包含 C 源文件位置信息）
             agent.run(
                 self.compose_prompt_with_context(prompt),
                 prefix="[c2rust-transpiler][gen][retry]",
