@@ -205,7 +205,7 @@ class Transpiler:
             self._extract_compile_flags,
             self._append_additional_notes,
             self._is_root_symbol,
-            self._get_code_agent,
+            self._get_generation_agent,
             self._compose_prompt_with_context,
             self._check_and_handle_test_deletion,
             self._get_crate_commit_hash,
@@ -235,7 +235,7 @@ class Transpiler:
             self._get_crate_commit_hash,
             lambda: self._current_function_start_commit,
             self._compose_prompt_with_context,
-            self._get_code_agent,
+            self._get_fix_agent,
             self._check_and_handle_test_deletion,
             self._append_additional_notes,
             self._cargo_build_loop,
@@ -343,9 +343,9 @@ class Transpiler:
 
     # ========= Agent 复用与上下文拼接辅助 =========
 
-    def _compose_prompt_with_context(self, prompt: str) -> str:
+    def _compose_prompt_with_context(self, prompt: str, for_fix: bool = False) -> str:
         """在复用Agent时，将此前构建的函数上下文头部拼接到当前提示词前（委托给 AgentManager）"""
-        return self.agent_manager.compose_prompt_with_context(prompt)
+        return self.agent_manager.compose_prompt_with_context(prompt, for_fix)
 
     def _reset_function_context(
         self, rec: FnRecord, module: str, rust_sig: str, c_code: str
@@ -380,8 +380,16 @@ class Transpiler:
         )
 
     def _get_code_agent(self) -> CodeAgent:
-        """获取代码生成/修复Agent（委托给 AgentManager）"""
+        """获取代码生成/修复Agent（委托给 AgentManager，保持向后兼容）"""
         return self.agent_manager.get_code_agent()
+
+    def _get_generation_agent(self) -> CodeAgent:
+        """获取代码生成Agent（委托给 AgentManager）"""
+        return self.agent_manager.get_generation_agent()
+
+    def _get_fix_agent(self, c_code: Optional[str] = None) -> CodeAgent:
+        """获取修复Agent（委托给 AgentManager，每次重新创建）"""
+        return self.agent_manager.get_fix_agent(c_code)
 
     def _refresh_compact_context(
         self, rec: FnRecord, module: str, rust_sig: str
@@ -448,14 +456,15 @@ class Transpiler:
         self, symbol: str, callee_module: str, callee_rust_fn: str, callee_rust_sig: str
     ) -> None:
         """解析待处理的 todo 占位（委托给 SymbolMapper）"""
+        # 使用修复 Agent（传入 None，因为该方法不需要 C 代码）
         self.symbol_mapper.resolve_pending_todos_for_symbol(
             symbol,
             callee_module,
             callee_rust_fn,
             callee_rust_sig,
             self.crate_dir,
-            self._get_code_agent,
-            self._compose_prompt_with_context,
+            lambda: self._get_fix_agent(None),
+            lambda prompt: self._compose_prompt_with_context(prompt, for_fix=True),
             self._check_and_handle_test_deletion,
         )
 
@@ -475,7 +484,7 @@ class Transpiler:
                 self._save_progress,
                 self._extract_compile_flags,
                 self._get_current_function_context,
-                self._get_code_agent,
+                self._get_fix_agent,
                 self._compose_prompt_with_context,
                 self._check_and_handle_test_deletion,
                 self._get_crate_commit_hash,

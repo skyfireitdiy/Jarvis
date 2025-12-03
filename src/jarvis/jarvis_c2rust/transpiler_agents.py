@@ -41,6 +41,111 @@ class AgentManager:
         self._current_context_full_header: str = ""
         self._current_context_compact_header: str = ""
         self._current_context_full_sent: bool = False
+        # 存储当前函数的 C 代码，供修复 Agent 使用
+        self._current_c_code: str = ""
+
+    def get_generation_agent(self) -> CodeAgent:
+        """
+        获取代码生成Agent（CodeAgent）。若未初始化，则按当前函数id创建。
+        用于代码生成，可以复用。
+        注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表。
+        提示：代码生成遵循 TDD（测试驱动开发）方法，通过提示词指导 Agent 先写测试再写实现。
+        """
+        fid = self._current_function_id
+        key = (
+            f"generation_agent::{fid}"
+            if fid is not None
+            else "generation_agent::default"
+        )
+        agent = self._current_agents.get(key)
+        if agent is None:
+            # 注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表
+            # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+            # 统一启用方法论和分析功能，提供更好的代码生成能力
+            # 获取函数信息用于 Agent name
+            fn_name = ""
+            if fid is not None:
+                rec = self.fn_index_by_id.get(fid)
+                if rec:
+                    fn_name = rec.qname or rec.name or f"fn_{fid}"
+            agent_name = "C2Rust-GenerationAgent" + (f"({fn_name})" if fn_name else "")
+            agent = CodeAgent(
+                name=agent_name,
+                need_summary=False,
+                non_interactive=self.non_interactive,
+                model_group=self.llm_group,
+                append_tools="read_symbols,methodology",
+                use_methodology=True,
+                use_analysis=True,
+                force_save_memory=False,
+            )
+            # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
+            agent.event_bus.subscribe(BEFORE_TOOL_CALL, self.on_before_tool_call)
+            agent.event_bus.subscribe(AFTER_TOOL_CALL, self.on_after_tool_call)
+            # 记录 Agent 创建时的 commit id（作为初始值）
+            agent_id = id(agent)
+            agent_key = f"agent_{agent_id}"
+            initial_commit = self.get_crate_commit_hash()
+            if initial_commit:
+                self.agent_before_commits[agent_key] = initial_commit
+            self._current_agents[key] = agent
+        return agent
+
+    def get_fix_agent(self, c_code: Optional[str] = None) -> CodeAgent:
+        """
+        获取修复Agent（CodeAgent）。每次调用都重新创建，不复用。
+        用于修复构建错误和测试失败，启用方法论和分析功能以提供更好的修复能力。
+        注意：Agent 必须在 crate 根目录下创建，以确保工具（如 read_symbols）能正确获取符号表。
+
+        参数:
+            c_code: 原 C 实现的代码，将添加到 Agent 的上下文中
+        """
+        # 每次重新创建，不复用
+        # 获取函数信息用于 Agent name
+        fn_name = ""
+        if self._current_function_id is not None:
+            rec = self.fn_index_by_id.get(self._current_function_id)
+            if rec:
+                fn_name = rec.qname or rec.name or f"fn_{self._current_function_id}"
+
+        # 使用当前 C 代码（如果提供了参数则使用参数，否则使用缓存的）
+        current_c_code = c_code if c_code is not None else self._current_c_code
+
+        agent_name = "C2Rust-FixAgent" + (f"({fn_name})" if fn_name else "")
+        agent = CodeAgent(
+            name=agent_name,
+            need_summary=False,
+            non_interactive=self.non_interactive,
+            model_group=self.llm_group,
+            append_tools="read_symbols,methodology",
+            use_methodology=True,
+            use_analysis=True,
+            force_save_memory=False,
+        )
+        # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
+        agent.event_bus.subscribe(BEFORE_TOOL_CALL, self.on_before_tool_call)
+        agent.event_bus.subscribe(AFTER_TOOL_CALL, self.on_after_tool_call)
+        # 记录 Agent 创建时的 commit id（作为初始值）
+        agent_id = id(agent)
+        agent_key = f"agent_{agent_id}"
+        initial_commit = self.get_crate_commit_hash()
+        if initial_commit:
+            self.agent_before_commits[agent_key] = initial_commit
+
+        # 为修复 Agent 添加包含原 C 代码的上下文
+        if current_c_code:
+            # 在 Agent 的 session 中添加 C 代码上下文
+            if hasattr(agent, "session") and hasattr(agent.session, "prompt"):
+                c_code_context = (
+                    "\n\n【原始 C 实现代码（修复参考）】\n"
+                    "以下是当前函数对应的原始 C 实现代码，修复时请参考：\n"
+                    "<C_SOURCE>\n"
+                    f"{current_c_code}\n"
+                    "</C_SOURCE>\n"
+                )
+                agent.session.prompt = c_code_context + agent.session.prompt
+
+        return agent
 
     def get_code_agent(self) -> CodeAgent:
         """
@@ -85,14 +190,44 @@ class AgentManager:
             self._current_agents[key] = agent
         return agent
 
-    def compose_prompt_with_context(self, prompt: str) -> str:
+    def compose_prompt_with_context(self, prompt: str, for_fix: bool = False) -> str:
         """
         在复用Agent时，将此前构建的函数上下文头部拼接到当前提示词前，确保连续性。
         策略：
         - 每个函数生命周期内，首次调用拼接"全量头部"；
         - 后续调用仅拼接"精简头部"；
         - 如头部缺失则直接返回原提示。
+
+        参数:
+            for_fix: 如果为 True，表示这是用于修复 Agent 的提示词，会在上下文中添加原 C 代码
         """
+        # 如果是修复 Agent，添加原 C 代码上下文
+        if for_fix and self._current_c_code:
+            c_code_header = (
+                "\n【原始 C 实现代码（修复参考）】\n"
+                "以下是当前函数对应的原始 C 实现代码，修复时请参考：\n"
+                "<C_SOURCE>\n"
+                f"{self._current_c_code}\n"
+                "</C_SOURCE>\n"
+            )
+            # 首次发送全量上下文
+            if (
+                not self._current_context_full_sent
+            ) and self._current_context_full_header:
+                self._current_context_full_sent = True
+                return (
+                    self._current_context_full_header + c_code_header + "\n\n" + prompt
+                )
+            # 后续拼接精简上下文
+            if self._current_context_compact_header:
+                return (
+                    self._current_context_compact_header
+                    + c_code_header
+                    + "\n\n"
+                    + prompt
+                )
+            return c_code_header + "\n\n" + prompt
+
         # 首次发送全量上下文
         if (not self._current_context_full_sent) and self._current_context_full_header:
             self._current_context_full_sent = True
@@ -113,10 +248,18 @@ class AgentManager:
     ) -> None:
         """
         初始化当前函数的上下文与复用Agent缓存。
-        在单个函数实现开始时调用一次，之后复用代码编写与修复Agent/Review等Agent。
+        在单个函数实现开始时调用一次，之后复用代码生成Agent。
+        注意：修复Agent每次重新创建，不在此处缓存。
         """
-        self._current_agents = {}
+        # 只清除生成Agent的缓存，修复Agent每次重新创建
+        generation_keys = [
+            k for k in self._current_agents.keys() if k.startswith("generation_agent::")
+        ]
+        for key in generation_keys:
+            del self._current_agents[key]
         self._current_function_id = rec.id
+        # 保存当前函数的 C 代码，供修复 Agent 使用
+        self._current_c_code = c_code or ""
 
         # 汇总上下文头部，供后续复用时拼接
         callees_ctx = collect_callees_context_func(rec)

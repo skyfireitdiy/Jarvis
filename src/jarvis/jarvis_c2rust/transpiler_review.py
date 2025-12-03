@@ -39,8 +39,8 @@ class ReviewManager:
         is_root_symbol_func: Callable[[FnRecord], bool],
         get_crate_commit_hash_func: Callable[[], Optional[str]],
         current_function_start_commit_getter: Callable[[], Optional[str]],
-        compose_prompt_with_context_func: Callable[[str], str],
-        get_code_agent_func: Callable[[], Any],
+        compose_prompt_with_context_func: Callable[[str, bool], str],
+        get_fix_agent_func: Callable[[Optional[str]], Any],
         check_and_handle_test_deletion_func: Callable[[Optional[str], Any], bool],
         append_additional_notes_func: Callable[[str], str],
         cargo_build_loop_func: Callable[[], Optional[bool]],
@@ -66,7 +66,7 @@ class ReviewManager:
         self.get_crate_commit_hash = get_crate_commit_hash_func
         self.current_function_start_commit_getter = current_function_start_commit_getter
         self.compose_prompt_with_context = compose_prompt_with_context_func
-        self.get_code_agent = get_code_agent_func
+        self.get_fix_agent = get_fix_agent_func
         self.check_and_handle_test_deletion = check_and_handle_test_deletion_func
         self.append_additional_notes = append_additional_notes_func
         self.cargo_build_loop = cargo_build_loop_func
@@ -803,6 +803,9 @@ class ReviewManager:
                 ]
             )
 
+            # 获取 C 代码用于修复 Agent
+            c_code = self.read_source_span(rec)
+
             # 添加 git 变更信息作为上下文
             if self.get_git_diff:
                 try:
@@ -811,7 +814,8 @@ class ReviewManager:
                     if git_diff and git_diff.strip():
                         # 限制 git diff 长度，避免上下文过大
                         # 使用较小的比例（30%）因为修复提示词本身已经很长
-                        agent = self.get_code_agent()
+                        # 创建一个临时 Agent 用于 truncate（不保存）
+                        agent = self.get_fix_agent(c_code)
                         git_diff = truncate_git_diff_with_context_limit(
                             git_diff,
                             agent=agent,
@@ -843,11 +847,12 @@ class ReviewManager:
             # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
             # 记录运行前的 commit
             before_commit = self.get_crate_commit_hash()
-            ca = self.get_code_agent()
+            # 使用修复 Agent，每次重新创建，并传入 C 代码
+            ca = self.get_fix_agent(c_code)
             limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
             fix_prompt_with_notes = self.append_additional_notes(fix_prompt)
             ca.run(
-                self.compose_prompt_with_context(fix_prompt_with_notes),
+                self.compose_prompt_with_context(fix_prompt_with_notes, for_fix=True),
                 prefix=f"[c2rust-transpiler][review-fix iter={i + 1}{limit_info}]",
                 suffix="",
             )
@@ -860,8 +865,12 @@ class ReviewManager:
                     fg=typer.colors.YELLOW,
                 )
                 before_commit = self.get_crate_commit_hash()
+                # 重新创建修复 Agent
+                ca = self.get_fix_agent(c_code)
                 ca.run(
-                    self.compose_prompt_with_context(fix_prompt_with_notes),
+                    self.compose_prompt_with_context(
+                        fix_prompt_with_notes, for_fix=True
+                    ),
                     prefix=f"[c2rust-transpiler][review-fix iter={i + 1}{limit_info}][retry]",
                     suffix="",
                 )
