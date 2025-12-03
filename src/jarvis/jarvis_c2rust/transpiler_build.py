@@ -216,7 +216,7 @@ class BuildManager:
                         c_file_location = file_path
                 else:
                     c_file_location = src_loc
-        
+
         base_lines = [
             f"目标：以最小的改动修复问题，使 `{stage}` 命令可以通过。",
             f"阶段：{stage}",
@@ -783,9 +783,9 @@ class BuildManager:
 
     def cargo_build_loop(self) -> Optional[bool]:
         """在 crate 目录执行构建与测试：直接运行 cargo test（运行所有测试，不区分项目结构）。失败则最小化修复直到通过或达到上限。
-        
+
         Returns:
-            Optional[bool]: 
+            Optional[bool]:
                 - True: 测试通过（可能进行了修复）
                 - False: 测试失败（达到重试上限）
                 - None: 需要回退重新开始

@@ -56,6 +56,7 @@ class TranspilerExecutor:
         consecutive_fix_failures_setter,
         current_function_start_commit_getter,
         current_function_start_commit_setter,
+        get_build_loop_has_fixes_func,
     ) -> None:
         self.project_root = project_root
         self.crate_dir = crate_dir
@@ -392,9 +393,13 @@ class TranspilerExecutor:
                 fg=typer.colors.MAGENTA,
             )
             ok = self.cargo_build_loop()
-            
+
             # 检查构建循环中是否进行了修复
-            build_has_fixes = self.get_build_loop_has_fixes() if hasattr(self, 'get_build_loop_has_fixes') else False
+            build_has_fixes = (
+                self.get_build_loop_has_fixes()
+                if hasattr(self, "get_build_loop_has_fixes")
+                else False
+            )
 
             # 检查是否需要重新开始（回退后）
             if ok is None:

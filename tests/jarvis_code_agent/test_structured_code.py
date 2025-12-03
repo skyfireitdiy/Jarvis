@@ -434,15 +434,15 @@ class TestExtractSyntaxUnitsWithSyntaxErrors:
         """
         file_path = tmp_path / "test.rs"
         file_path.write_text(content, encoding="utf-8")
-        
+
         # 尝试提取语法单元
         units = StructuredCodeExtractor.extract_syntax_units(
             str(file_path), content, 1, -1
         )
-        
+
         # 应该返回一个列表（可能为空或包含部分符号）
         assert isinstance(units, list)
-        
+
         # 如果提取到了符号，验证它们的格式
         for unit in units:
             assert "id" in unit
@@ -457,12 +457,12 @@ class TestExtractSyntaxUnitsWithSyntaxErrors:
         content = "some random content without language"
         file_path = tmp_path / "test.unknown"
         file_path.write_text(content, encoding="utf-8")
-        
+
         # 即使语言检测失败，也不应该崩溃
         units = StructuredCodeExtractor.extract_syntax_units(
             str(file_path), content, 1, -1
         )
-        
+
         # 应该返回空列表
         assert isinstance(units, list)
 
@@ -475,18 +475,18 @@ class TestExtractSyntaxUnitsWithSyntaxErrors:
         """
         file_path = tmp_path / "test.rs"
         file_path.write_text(content, encoding="utf-8")
-        
+
         # 即使提取器失败，也不应该崩溃
         with patch(
             "jarvis.jarvis_code_agent.code_analyzer.structured_code.get_symbol_extractor"
         ) as mock_get_extractor:
             # 模拟提取器返回 None
             mock_get_extractor.return_value = None
-            
+
             units = StructuredCodeExtractor.extract_syntax_units(
                 str(file_path), content, 1, -1
             )
-            
+
             # 应该返回空列表
             assert isinstance(units, list)
             assert len(units) == 0
@@ -500,7 +500,7 @@ class TestExtractSyntaxUnitsWithSyntaxErrors:
         """
         file_path = tmp_path / "test.rs"
         file_path.write_text(content, encoding="utf-8")
-        
+
         # 即使符号提取抛出异常，也不应该崩溃
         with patch(
             "jarvis.jarvis_code_agent.code_analyzer.structured_code.get_symbol_extractor"
@@ -509,11 +509,11 @@ class TestExtractSyntaxUnitsWithSyntaxErrors:
             mock_extractor = MagicMock()
             mock_extractor.extract_symbols.side_effect = Exception("Extraction failed")
             mock_get_extractor.return_value = mock_extractor
-            
+
             units = StructuredCodeExtractor.extract_syntax_units(
                 str(file_path), content, 1, -1
             )
-            
+
             # 应该返回空列表，而不是崩溃
             assert isinstance(units, list)
 
@@ -530,15 +530,15 @@ class TestExtractSyntaxUnitsWithSyntaxErrors:
         """
         file_path = tmp_path / "test.rs"
         file_path.write_text(content, encoding="utf-8")
-        
+
         # 即使单个符号处理失败，也不应该影响其他符号
         units = StructuredCodeExtractor.extract_syntax_units(
             str(file_path), content, 1, -1
         )
-        
+
         # 应该返回一个列表
         assert isinstance(units, list)
-        
+
         # 如果提取到了符号，验证它们的格式
         for unit in units:
             assert "id" in unit
@@ -572,15 +572,15 @@ class TestExtractSyntaxUnitsWithSyntaxErrors:
         """
         file_path = tmp_path / "test.rs"
         file_path.write_text(content, encoding="utf-8")
-        
+
         # 即使有多个语法错误，也应该能提取部分有效的符号
         units = StructuredCodeExtractor.extract_syntax_units(
             str(file_path), content, 1, -1
         )
-        
+
         # 应该返回一个列表
         assert isinstance(units, list)
-        
+
         # 如果提取到了符号，验证它们的格式
         for unit in units:
             assert "id" in unit
