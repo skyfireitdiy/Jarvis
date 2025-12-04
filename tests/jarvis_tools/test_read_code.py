@@ -1832,8 +1832,12 @@ def func2():
             restored = "\n".join(restored_lines)
 
             # 端到端：所有非空代码行的内容与顺序应与原始文件一致（空白行可能在结构化输出中被省略）
-            original_code_lines = [l for l in content.splitlines() if l.strip()]
-            restored_code_lines = [l for l in restored.splitlines() if l.strip()]
+            original_code_lines = [
+                line for line in content.splitlines() if line.strip()
+            ]
+            restored_code_lines = [
+                line for line in restored.splitlines() if line.strip()
+            ]
             assert restored_code_lines == original_code_lines, (
                 "read_code 在语法模式下切分/重组后输出的非空代码行与原始文件不一致\n"
                 f"原始非空行数: {len(original_code_lines)}, 还原非空行数: {len(restored_code_lines)}"

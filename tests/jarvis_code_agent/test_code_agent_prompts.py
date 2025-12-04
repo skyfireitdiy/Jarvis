@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """code_agent_prompts.py 单元测试"""
 
-import pytest
-
 from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
 
 

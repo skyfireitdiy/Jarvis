@@ -5,7 +5,6 @@ from pathlib import Path
 from textwrap import dedent
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from jarvis.jarvis_code_agent.code_analyzer.structured_code import (
     StructuredCodeExtractor,

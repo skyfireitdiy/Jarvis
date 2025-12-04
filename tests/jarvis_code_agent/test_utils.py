@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 """utils.py 单元测试"""
 
-import os
-import tempfile
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from jarvis.jarvis_code_agent.utils import (
     get_git_tracked_files_info,

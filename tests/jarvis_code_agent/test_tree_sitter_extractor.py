@@ -8,8 +8,7 @@
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from tree_sitter import Language, Node
+from unittest.mock import patch
 
 from jarvis.jarvis_code_agent.code_analyzer.tree_sitter_extractor import (
     TreeSitterExtractor,
@@ -187,7 +186,7 @@ class TestTreeSitterExtractorSyntaxErrors:
             # 即使查询构造失败，也不应该崩溃
             symbols = invalid_extractor.extract_symbols("test.rs", content)
             assert isinstance(symbols, list)
-        except Exception as e:
+        except Exception:
             # 如果查询构造失败，应该返回空列表而不是崩溃
             # 但某些情况下可能会抛出异常，这也是可以接受的
             pass
@@ -281,7 +280,7 @@ class TestTreeSitterExtractorSyntaxErrors:
 
         # 在调试模式下，应该能够处理错误而不崩溃
         try:
-            with patch("builtins.print") as mock_print:
+            with patch("builtins.print"):
                 symbols = extractor.extract_symbols("test.rs", content)
                 # 应该返回空列表或部分符号
                 assert isinstance(symbols, list)
