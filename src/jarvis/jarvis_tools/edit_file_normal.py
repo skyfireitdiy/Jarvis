@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """普通文件编辑工具（基于 search/replace 的非结构化编辑）"""
 
+import difflib
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,11 +17,12 @@ class EditFileNormalTool:
         "💡 使用方式：\n"
         "1. 直接指定要编辑的文件路径\n"
         "2. 为每个文件提供一组 search/replace 操作\n"
-        "3. 所有匹配将被替换为新文本（等价于 Python 的 str.replace，默认替换全部匹配）\n\n"
+        "3. 使用模糊匹配查找 search 文本，相似度阈值 0.85，找到匹配后替换为新文本\n\n"
         "⚠️ 提示：\n"
-        "- search 为普通字符串匹配，不支持正则表达式\n"
+        "- search 使用模糊匹配（相似度 >= 0.85），不支持正则表达式\n"
         "- search 不能为空字符串\n"
-        "- 如果某个 search 在文件中完全找不到，将导致该文件的编辑失败，文件内容会回滚到原始状态"
+        "- 如果某个 search 在文件中找不到相似度 >= 0.85 的匹配，将导致该文件的编辑失败，文件内容会回滚到原始状态\n"
+        "- 匹配时会查找最相似的位置，如果存在多个相似位置，会替换第一个找到的匹配"
     )
 
     parameters = {
@@ -158,35 +160,170 @@ class EditFileNormalTool:
         )
 
     @staticmethod
+    def _find_best_match_position(
+        content: str, search_text: str, min_similarity: float = 0.85
+    ) -> Tuple[Optional[Tuple[int, int, float]], Optional[str]]:
+        """在文件中查找最佳匹配位置（使用相似度匹配）
+
+        Args:
+            content: 文件内容
+            search_text: 要搜索的文本
+            min_similarity: 最小相似度阈值（默认 0.85）
+
+        Returns:
+            ((start_pos, end_pos, similarity), error_msg) 或 (None, error_msg)
+        """
+        if not search_text.strip():
+            return None, "search 文本不能为空或只包含空白字符"
+
+        content_lines = content.splitlines(keepends=True)
+        search_lines = search_text.splitlines(keepends=True)
+
+        if len(search_lines) == 0:
+            return None, "search 文本不能为空"
+
+        # 提取核心搜索文本（去除前后空白行）
+        search_core_lines = []
+        for line in search_lines:
+            if line.strip():
+                search_core_lines.append(line)
+        if not search_core_lines:
+            return None, "search 文本不能只包含空白行"
+
+        search_core = "".join(search_core_lines)
+        core_line_count = len(search_core_lines)
+
+        best_match: Optional[Tuple[int, int, float]] = None
+        best_similarity = 0.0
+
+        # 在文件中滑动窗口查找最相似的片段
+        for start_line in range(len(content_lines)):
+            # 尝试匹配不同长度的代码块
+            for line_diff in [-2, -1, 0, 1, 2]:
+                end_line = start_line + core_line_count + line_diff
+                if end_line <= start_line or end_line > len(content_lines):
+                    continue
+
+                window_lines = content_lines[start_line:end_line]
+                window_content = "".join(window_lines)
+
+                # 跳过空内容或过短的内容
+                if (
+                    not window_content.strip()
+                    or len(window_content.strip()) < len(search_core.strip()) * 0.3
+                ):
+                    continue
+
+                # 计算相似度
+                similarity = difflib.SequenceMatcher(
+                    None, search_core, window_content, autojunk=False
+                ).ratio()
+
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    # 计算字符位置
+                    start_pos = sum(len(content_lines[i]) for i in range(start_line))
+                    end_pos = start_pos + len(window_content)
+                    best_match = (start_pos, end_pos, similarity)
+
+                # 如果找到很好的匹配，提前退出
+                if similarity >= 0.95:
+                    break
+
+            # 如果已经找到很好的匹配，可以提前退出
+            if best_similarity >= 0.95:
+                break
+
+        # 只有当相似度足够高时才返回匹配（阈值 0.85）
+        if best_match is not None and best_similarity >= min_similarity:
+            return best_match, None
+
+        # 如果找不到匹配，返回错误信息
+        return (
+            None,
+            f"未找到相似度 >= {min_similarity:.2%} 的匹配（最佳相似度: {best_similarity:.2%}）",
+        )
+
+    @staticmethod
     def _apply_normal_edits_to_content(
         original_content: str, diffs: List[Dict[str, Any]]
     ) -> Tuple[bool, str]:
-        """对文件内容按顺序应用普通 search/replace 编辑
+        """对文件内容按顺序应用普通 search/replace 编辑（使用相似度匹配）
 
         返回:
             (是否成功, 新内容或错误信息)
         """
         content = original_content
+        min_similarity = 0.85  # 相似度阈值
 
         for idx, diff in enumerate(diffs, start=1):
             search = diff["search"]
             replace = diff["replace"]
             count = diff.get("count", -1)
 
-            match_count = content.count(search)
-            if match_count == 0:
-                # 任意一个 search 找不到就视为失败，避免静默不生效
-                error_msg = f"第 {idx} 个diff失败：在文件内容中未找到要搜索的文本: {search[:100]}..."
-                return False, error_msg
+            # 使用相似度匹配查找位置
+            match_result, error_msg = EditFileNormalTool._find_best_match_position(
+                content, search, min_similarity
+            )
 
-            # 应用替换
+            if match_result is None:
+                # 找不到匹配则失败
+                error_info = f"第 {idx} 个diff失败：{error_msg}"
+                if search:
+                    error_info += f"\n搜索文本: {search[:200]}..."
+                return False, error_info
+
+            start_pos, end_pos, similarity = match_result
+
+            # 执行替换
+            content[start_pos:end_pos]
+            new_content = content[:start_pos] + replace + content[end_pos:]
+
+            # 处理 count 参数
             if count is None or count < 0:
-                content = content.replace(search, replace)
+                # 替换全部匹配（继续查找并替换所有匹配）
+                content = new_content
+                search_start_pos = end_pos + len(replace)
+                while True:
+                    remaining_content = content[search_start_pos:]
+                    next_match, _ = EditFileNormalTool._find_best_match_position(
+                        remaining_content, search, min_similarity
+                    )
+                    if next_match is None:
+                        break
+                    next_start, next_end, _ = next_match
+                    # 调整位置（相对于原始 content）
+                    actual_start = search_start_pos + next_start
+                    actual_end = search_start_pos + next_end
+                    content = content[:actual_start] + replace + content[actual_end:]
+                    # 更新搜索起始位置（跳过已替换的内容）
+                    search_start_pos = actual_start + len(replace)
             elif count == 0:
                 # 0 次替换，相当于跳过
                 continue
+            elif count == 1:
+                # 只替换第一次匹配
+                content = new_content
             else:
-                content = content.replace(search, replace, count)
+                # 替换指定次数
+                content = new_content
+                remaining_count = count - 1
+                search_start_pos = end_pos + len(replace)
+                while remaining_count > 0:
+                    remaining_content = content[search_start_pos:]
+                    next_match, _ = EditFileNormalTool._find_best_match_position(
+                        remaining_content, search, min_similarity
+                    )
+                    if next_match is None:
+                        break
+                    next_start, next_end, _ = next_match
+                    # 调整位置（相对于原始 content）
+                    actual_start = search_start_pos + next_start
+                    actual_end = search_start_pos + next_end
+                    content = content[:actual_start] + replace + content[actual_end:]
+                    # 更新搜索起始位置（跳过已替换的内容）
+                    search_start_pos = actual_start + len(replace)
+                    remaining_count -= 1
 
         return True, content
 
