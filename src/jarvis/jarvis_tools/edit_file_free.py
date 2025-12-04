@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""自由文件编辑工具（仅需新代码片段）"""
+"""自由文件编辑工具（支持 diff 格式）"""
 
 import difflib
 import os
@@ -10,24 +10,28 @@ from jarvis.jarvis_tools.edit_file_structed import EditFileTool
 
 
 class EditFileFreeTool:
-    """自由文件编辑工具，仅需提供新代码片段，自动定位插入位置"""
+    """自由文件编辑工具，支持 diff 格式（+/-/空格）自动识别"""
 
     name = "edit_file_free"
     description = (
-        "基于新代码片段自动定位并编辑文件的工具，支持同时修改多个文件。\n\n"
+        "基于 diff 格式自动定位并编辑文件的工具，支持同时修改多个文件。\n\n"
         "💡 使用方式：\n"
         "1. 提供要修改的文件路径\n"
-        "2. 提供新代码片段（包含部分上下文，如前后3行）\n"
-        "3. 工具会自动在文件中查找最匹配的位置并进行替换或插入\n\n"
+        "2. 提供 diff 格式的内容（+表示新增、-表示删除、空格表示不变）\n"
+        "3. 工具会自动识别 diff 格式，查找匹配位置并进行编辑\n\n"
+        "📝 Diff 格式说明：\n"
+        "- 以 `+` 开头的行：新增的代码\n"
+        "- 以 `-` 开头的行：删除的代码\n"
+        "- 以空格开头的行：不变的代码（用于上下文匹配）\n"
+        "- 工具会自动识别是否为 diff 格式，如果不是则按普通代码处理\n\n"
         "📝 工作原理：\n"
-        "- 工具会分析新代码片段，提取关键特征（函数名、类名、代码结构等）\n"
-        "- 在文件中查找相似或相关的代码位置\n"
-        "- 如果找到相似代码，进行替换；如果找不到，在文件末尾追加\n"
-        "- 支持模糊匹配，即使代码有轻微差异也能找到匹配位置\n\n"
+        "- 如果内容包含 diff 格式（有 `+` 或 `-` 前缀），工具会解析出旧代码和新代码\n"
+        "- 使用旧代码在文件中查找匹配位置（模糊匹配）\n"
+        "- 找到匹配后，用新代码替换匹配的旧代码\n"
+        "- 如果找不到匹配，新代码会追加到文件末尾\n\n"
         "⚠️ 提示：\n"
-        "- 建议在新代码中包含足够的上下文（前后各3行）以提高匹配准确性\n"
-        "- 如果代码片段包含函数定义或类定义，工具会尝试找到对应的位置进行替换\n"
-        "- 如果找不到匹配位置，代码会在文件末尾追加"
+        "- 建议在 diff 中包含足够的上下文（空格开头的行）以提高匹配准确性\n"
+        "- 如果内容不包含 diff 格式，工具会按普通代码片段处理（查找相似代码并替换）"
     )
 
     parameters = {
@@ -47,14 +51,14 @@ class EditFileFreeTool:
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "new_code": {
+                                    "content": {
                                         "type": "string",
-                                        "description": "新代码片段（建议包含前后3行上下文以提高匹配准确性）",
+                                        "description": "代码内容，支持 diff 格式（+/-/空格）或普通代码片段",
                                     },
                                 },
-                                "required": ["new_code"],
+                                "required": ["content"],
                             },
-                            "description": "编辑操作列表，每个操作包含新代码片段",
+                            "description": "编辑操作列表，每个操作包含代码内容（支持 diff 格式）",
                         },
                     },
                     "required": ["file_path", "diffs"],
@@ -75,6 +79,74 @@ class EditFileFreeTool:
         return EditFileTool._validate_basic_args(args)
 
     @staticmethod
+    def _is_diff_format(content: str) -> bool:
+        """判断内容是否为 diff 格式
+
+        Args:
+            content: 代码内容
+
+        Returns:
+            True 如果是 diff 格式，False 否则
+        """
+        lines = content.splitlines()
+        if not lines:
+            return False
+
+        # 检查是否有以 + 或 - 开头的行（排除以 +++ 或 --- 开头的，这些可能是其他格式）
+        has_plus = False
+        has_minus = False
+        for line in lines:
+            if line.startswith("+") and not line.startswith("+++"):
+                has_plus = True
+            if line.startswith("-") and not line.startswith("---"):
+                has_minus = True
+            if has_plus or has_minus:
+                break
+
+        return has_plus or has_minus
+
+    @staticmethod
+    def _parse_diff_content(content: str) -> Tuple[str, str]:
+        """解析 diff 格式内容，提取旧代码和新代码
+
+        Args:
+            content: diff 格式的内容
+
+        Returns:
+            (旧代码, 新代码)
+        """
+        lines = content.splitlines(keepends=True)
+        old_lines = []
+        new_lines = []
+
+        for line in lines:
+            if line.startswith(" "):
+                # 空格开头：不变的代码，同时出现在旧代码和新代码中
+                # 去掉前缀空格
+                code_line = line[1:] if len(line) > 1 else line
+                old_lines.append(code_line)
+                new_lines.append(code_line)
+            elif line.startswith("-"):
+                # - 开头：删除的代码，只出现在旧代码中
+                # 去掉前缀 -
+                code_line = line[1:] if len(line) > 1 else line
+                old_lines.append(code_line)
+            elif line.startswith("+"):
+                # + 开头：新增的代码，只出现在新代码中
+                # 去掉前缀 +
+                code_line = line[1:] if len(line) > 1 else line
+                new_lines.append(code_line)
+            else:
+                # 其他情况：按空格处理（不变）
+                old_lines.append(line)
+                new_lines.append(line)
+
+        old_code = "".join(old_lines)
+        new_code = "".join(new_lines)
+
+        return old_code, new_code
+
+    @staticmethod
     def _validate_free_diff(
         diff: Dict[str, Any], idx: int
     ) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
@@ -83,42 +155,62 @@ class EditFileFreeTool:
         Returns:
             (错误响应或None, 规范化后的diff或None)
         """
-        new_code = diff.get("new_code")
+        content = diff.get("content")
 
-        if new_code is None:
+        if content is None:
             return (
                 {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"第 {idx} 个diff缺少new_code参数",
+                    "stderr": f"第 {idx} 个diff缺少content参数",
                 },
                 None,
             )
-        if not isinstance(new_code, str):
+        if not isinstance(content, str):
             return (
                 {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"第 {idx} 个diff的new_code参数必须是字符串",
+                    "stderr": f"第 {idx} 个diff的content参数必须是字符串",
                 },
                 None,
             )
-        if new_code.strip() == "":
+        if content.strip() == "":
             return (
                 {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"第 {idx} 个diff的new_code参数不能为空",
+                    "stderr": f"第 {idx} 个diff的content参数不能为空",
                 },
                 None,
             )
 
-        return (
-            None,
-            {
-                "new_code": new_code,
-            },
-        )
+        # 判断是否为 diff 格式
+        is_diff = EditFileFreeTool._is_diff_format(content)
+
+        if is_diff:
+            # 解析 diff 格式
+            old_code, new_code = EditFileFreeTool._parse_diff_content(content)
+            return (
+                None,
+                {
+                    "content": content,
+                    "is_diff": True,
+                    "old_code": old_code,
+                    "new_code": new_code,
+                },
+            )
+        else:
+            # 普通代码格式
+            return (
+                None,
+                {
+                    "content": content,
+                    "is_diff": False,
+                    "old_code": content,  # 普通代码时，旧代码和新代码相同
+                    "new_code": content,
+                },
+            )
 
     @staticmethod
     def _extract_code_features(code: str) -> Dict[str, Any]:
@@ -191,85 +283,38 @@ class EditFileFreeTool:
 
     @staticmethod
     def _find_best_match_position(
-        content: str, new_code: str
+        content: str, old_code: str
     ) -> Tuple[Optional[Tuple[int, int, float]], Optional[str]]:
         """在文件中查找最佳匹配位置
 
         Args:
             content: 文件内容
-            new_code: 新代码片段
+            old_code: 要匹配的旧代码片段
 
         Returns:
             ((start_pos, end_pos, similarity), error_msg) 或 (None, error_msg)
         """
         content_lines = content.splitlines(keepends=True)
-        new_code_lines = new_code.splitlines(keepends=True)
+        old_code_lines = old_code.splitlines(keepends=True)
 
-        if len(new_code_lines) == 0:
-            return None, "new_code 不能为空"
+        if len(old_code_lines) == 0:
+            return None, "old_code 不能为空"
 
-        # 提取新代码的特征
-        new_features = EditFileFreeTool._extract_code_features(new_code)
-
-        # 策略1: 如果有函数名或类名，尝试精确匹配
-        if new_features["function_names"] or new_features["class_names"]:
-            # 查找函数或类定义
-            for name in new_features["function_names"] + new_features["class_names"]:
-                # 构建匹配模式
-                if name in new_features["function_names"]:
-                    pattern = rf"def\s+{re.escape(name)}\s*\("
-                else:
-                    pattern = rf"class\s+{re.escape(name)}"
-
-                # 在文件中查找
-                for match in re.finditer(pattern, content):
-                    # 找到匹配位置，尝试匹配整个代码块
-                    match_start = match.start()
-                    match_line = content[:match_start].count("\n")
-
-                    # 尝试匹配后续的代码（基于行数）
-                    # 计算新代码的行数
-                    new_code_line_count = len(
-                        [line for line in new_code_lines if line.strip()]
-                    )
-
-                    # 尝试匹配从匹配行开始的代码
-                    if match_line + new_code_line_count <= len(content_lines):
-                        # 提取匹配区域的代码
-                        matched_lines = content_lines[
-                            match_line : match_line + new_code_line_count
-                        ]
-                        matched_code = "".join(matched_lines)
-
-                        # 计算相似度
-                        similarity = difflib.SequenceMatcher(
-                            None, new_code.strip(), matched_code.strip(), autojunk=False
-                        ).ratio()
-
-                        # 使用默认相似度阈值 0.6
-                        if similarity >= 0.6:
-                            # 计算精确位置
-                            start_pos = sum(
-                                len(content_lines[i]) for i in range(match_line)
-                            )
-                            end_pos = start_pos + len(matched_code)
-                            return (start_pos, end_pos, similarity), None
-
-        # 策略2: 使用代码片段进行模糊匹配
-        new_code_stripped = new_code.strip()
-        if not new_code_stripped:
-            return None, "new_code 不能只包含空白字符"
+        # 使用代码片段进行模糊匹配（不依赖特定编程语言特性）
+        old_code_stripped = old_code.strip()
+        if not old_code_stripped:
+            return None, "old_code 不能只包含空白字符"
 
         # 提取核心代码（去除前后空白行）
-        new_code_core_lines = []
-        for line in new_code_lines:
+        old_code_core_lines = []
+        for line in old_code_lines:
             if line.strip():
-                new_code_core_lines.append(line)
-        if not new_code_core_lines:
-            return None, "new_code 不能只包含空白行"
+                old_code_core_lines.append(line)
+        if not old_code_core_lines:
+            return None, "old_code 不能只包含空白行"
 
-        new_code_core = "".join(new_code_core_lines)
-        core_line_count = len(new_code_core_lines)
+        old_code_core = "".join(old_code_core_lines)
+        core_line_count = len(old_code_core_lines)
 
         best_match: Optional[Tuple[int, int, float]] = None
         best_similarity = 0.0
@@ -289,13 +334,13 @@ class EditFileFreeTool:
                 # 跳过空内容或过短的内容
                 if (
                     not window_content.strip()
-                    or len(window_content.strip()) < len(new_code_core.strip()) * 0.3
+                    or len(window_content.strip()) < len(old_code_core.strip()) * 0.3
                 ):
                     continue
 
                 # 计算相似度
                 similarity = difflib.SequenceMatcher(
-                    None, new_code_core, window_content, autojunk=False
+                    None, old_code_core, window_content, autojunk=False
                 ).ratio()
 
                 if similarity > best_similarity:
@@ -313,7 +358,7 @@ class EditFileFreeTool:
             if best_similarity >= 0.95:
                 break
 
-        # 只有当相似度足够高时才返回匹配（默认阈值 0.6）
+        # 只有当相似度足够高时才返回匹配（阈值 0.6，但调用者会根据情况进一步过滤）
         if best_match is not None and best_similarity >= 0.6:
             return best_match, None
 
@@ -329,11 +374,31 @@ class EditFileFreeTool:
         Returns:
             (是否成功, 新内容或错误信息, 警告信息)
         """
-        new_code = diff["new_code"]
+        is_diff = diff.get("is_diff", False)
+        old_code = diff.get("old_code", "")
+        new_code = diff.get("new_code", "")
+
+        # 如果是 diff 格式且旧代码为空（只有新增），直接追加
+        if is_diff and not old_code.strip():
+            if content and not content.endswith("\n"):
+                new_content = content + "\n" + new_code
+            else:
+                new_content = content + new_code
+            return True, new_content, None
+
+        # 确定用于匹配的代码和相似度阈值
+        # 如果是 diff 格式，使用 old_code 来匹配
+        # 如果不是 diff 格式，使用 new_code 来匹配
+        # 相似度阈值统一设置为 0.7
+        if is_diff:
+            match_code = old_code
+        else:
+            match_code = new_code
+        min_similarity = 0.7
 
         # 尝试查找匹配位置
         match_result, error_msg = EditFileFreeTool._find_best_match_position(
-            content, new_code
+            content, match_code
         )
 
         if match_result is None:
@@ -345,6 +410,14 @@ class EditFileFreeTool:
             return True, new_content, "未找到匹配位置，代码已追加到文件末尾"
 
         start_pos, end_pos, similarity = match_result
+
+        # 如果相似度太低，视为未找到匹配，追加到末尾
+        if similarity < min_similarity:
+            if content and not content.endswith("\n"):
+                new_content = content + "\n" + new_code
+            else:
+                new_content = content + new_code
+            return True, new_content, "匹配相似度较低，代码已追加到文件末尾"
 
         # 检查相似度
         warning = None
