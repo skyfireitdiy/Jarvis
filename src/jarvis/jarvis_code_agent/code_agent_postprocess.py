@@ -5,7 +5,7 @@ import os
 import subprocess
 from typing import List
 
-from jarvis.jarvis_code_agent.lint import get_post_commands_for_files
+from jarvis.jarvis_code_agent.after_change import get_after_change_commands_for_files
 
 
 class PostProcessManager:
@@ -20,16 +20,20 @@ class PostProcessManager:
         Args:
             modified_files: 修改的文件列表
         """
-        # 获取格式化命令
-        format_commands = get_post_commands_for_files(modified_files, self.root_dir)
-        if not format_commands:
+        # 获取变更后处理命令
+        after_change_commands = get_after_change_commands_for_files(
+            modified_files, self.root_dir
+        )
+        if not after_change_commands:
             return
 
-        print("🔧 正在格式化代码...")
+        print("🔧 正在执行变更后处理...")
 
-        # 执行格式化命令
-        formatted_files = set()
-        for tool_name, file_path, command in format_commands:
+        # 执行变更后处理命令
+        processed_files = set()
+        for file_path, command in after_change_commands:
+            # 从命令中提取工具名（第一个单词）用于日志
+            tool_name = command.split()[0] if command.split() else "unknown"
             try:
                 # 检查文件是否存在
                 abs_file_path = (
@@ -40,7 +44,7 @@ class PostProcessManager:
                 if not os.path.exists(abs_file_path):
                     continue
 
-                # 执行格式化命令
+                # 执行变更后处理命令
                 result = subprocess.run(
                     command,
                     shell=True,
@@ -53,32 +57,32 @@ class PostProcessManager:
                 )
 
                 if result.returncode == 0:
-                    formatted_files.add(file_path)
-                    print(f"✅ 已格式化: {os.path.basename(file_path)} ({tool_name})")
+                    processed_files.add(file_path)
+                    print(f"✅ 已处理: {os.path.basename(file_path)} ({tool_name})")
                 else:
-                    # 格式化失败，记录但不中断流程
+                    # 处理失败，记录但不中断流程
                     error_msg = (result.stderr or result.stdout or "").strip()
                     if error_msg:
                         print(
-                            f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {error_msg[:200]}"
+                            f"⚠️ 处理失败 ({os.path.basename(file_path)}, {tool_name}): {error_msg[:200]}"
                         )
             except subprocess.TimeoutExpired:
-                print(f"⚠️ 格式化超时: {os.path.basename(file_path)} ({tool_name})")
+                print(f"⚠️ 处理超时: {os.path.basename(file_path)} ({tool_name})")
             except FileNotFoundError:
                 # 工具未安装，跳过
                 continue
             except Exception as e:
                 # 其他错误，记录但继续
                 print(
-                    f"⚠️ 格式化失败 ({os.path.basename(file_path)}, {tool_name}): {str(e)[:100]}"
+                    f"⚠️ 处理失败 ({os.path.basename(file_path)}, {tool_name}): {str(e)[:100]}"
                 )
                 continue
 
-        if formatted_files:
-            print(f"✅ 已格式化 {len(formatted_files)} 个文件")
-            # 暂存格式化后的文件
+        if processed_files:
+            print(f"✅ 已处理 {len(processed_files)} 个文件")
+            # 暂存处理后的文件
             try:
-                for file_path in formatted_files:
+                for file_path in processed_files:
                     abs_file_path = (
                         os.path.join(self.root_dir, file_path)
                         if not os.path.isabs(file_path)
