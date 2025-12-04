@@ -533,6 +533,12 @@ class EditFileFreeTool:
                     abs_path, current_content, backup_path
                 )
                 if write_success:
+                    # 写入成功，删除备份文件
+                    if backup_path and os.path.exists(backup_path):
+                        try:
+                            os.remove(backup_path)
+                        except Exception:
+                            pass
                     result_msg = f"✅ {file_path}: 修改成功"
                     if file_warnings:
                         result_msg += "\n" + "\n".join(f"  {w}" for w in file_warnings)

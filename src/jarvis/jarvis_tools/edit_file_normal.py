@@ -277,6 +277,12 @@ class EditFileNormalTool:
                     abs_path, result_or_error, backup_path
                 )
                 if write_success:
+                    # 写入成功，删除备份文件
+                    if backup_path and os.path.exists(backup_path):
+                        try:
+                            os.remove(backup_path)
+                        except Exception:
+                            pass
                     all_results.append(f"✅ {file_path}: 修改成功")
                     successful_files.append(file_path)
                 else:
