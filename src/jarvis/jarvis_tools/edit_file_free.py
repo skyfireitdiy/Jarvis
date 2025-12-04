@@ -26,11 +26,12 @@ class EditFileFreeTool:
         "- 工具会自动识别是否为 diff 格式，如果不是则按普通代码处理\n\n"
         "📝 工作原理：\n"
         "- 如果内容包含 diff 格式（有 `+` 或 `-` 前缀），工具会解析出旧代码和新代码\n"
-        "- 使用旧代码在文件中查找匹配位置（模糊匹配）\n"
+        "- 使用旧代码在文件中查找匹配位置（模糊匹配，相似度阈值 0.7）\n"
         "- 找到匹配后，用新代码替换匹配的旧代码\n"
-        "- 如果找不到匹配，新代码会追加到文件末尾\n\n"
-        "⚠️ 提示：\n"
-        "- 建议在 diff 中包含足够的上下文（空格开头的行）以提高匹配准确性\n"
+        "- 如果找不到匹配或相似度低于阈值，操作会失败\n\n"
+        "⚠️ 重要提示：\n"
+        "- 必须提供足够的上下文（空格开头的行）以确保能够准确匹配\n"
+        "- 如果匹配失败，请检查代码上下文是否正确，或增加更多上下文行\n"
         "- 如果内容不包含 diff 格式，工具会按普通代码片段处理（查找相似代码并替换）"
     )
 
@@ -283,13 +284,14 @@ class EditFileFreeTool:
 
     @staticmethod
     def _find_best_match_position(
-        content: str, old_code: str
+        content: str, old_code: str, use_context_lines: bool = False
     ) -> Tuple[Optional[Tuple[int, int, float]], Optional[str]]:
         """在文件中查找最佳匹配位置
 
         Args:
             content: 文件内容
             old_code: 要匹配的旧代码片段
+            use_context_lines: 如果为 True，使用前几行和后几行分别匹配（用于非 diff 格式）
 
         Returns:
             ((start_pos, end_pos, similarity), error_msg) 或 (None, error_msg)
@@ -319,44 +321,151 @@ class EditFileFreeTool:
         best_match: Optional[Tuple[int, int, float]] = None
         best_similarity = 0.0
 
-        # 在文件中滑动窗口查找最相似的片段
-        # 限制搜索范围，避免匹配到空内容或过短的内容
-        for start_line in range(len(content_lines)):
-            # 尝试匹配不同长度的代码块
-            for line_diff in [-2, -1, 0, 1, 2]:
-                end_line = start_line + core_line_count + line_diff
-                if end_line <= start_line or end_line > len(content_lines):
-                    continue
+        if use_context_lines:
+            # 非 diff 格式：使用前几行和后几行分别匹配
+            # 使用前 3 行和后 3 行作为上下文（如果代码足够长）
+            context_lines = 3
+            if core_line_count <= context_lines * 2:
+                # 如果代码太短，使用全部代码匹配
+                prefix_code = old_code_core
+                suffix_code = old_code_core
+            else:
+                # 提取前几行和后几行
+                prefix_lines = old_code_core_lines[:context_lines]
+                suffix_lines = old_code_core_lines[-context_lines:]
+                prefix_code = "".join(prefix_lines)
+                suffix_code = "".join(suffix_lines)
 
-                window_lines = content_lines[start_line:end_line]
-                window_content = "".join(window_lines)
+            # 先匹配前缀（前几行）
+            prefix_match: Optional[Tuple[int, float]] = None
+            prefix_similarity = 0.0
+            for start_line in range(len(content_lines)):
+                for line_diff in [-1, 0, 1]:
+                    end_line = start_line + len(prefix_lines) + line_diff
+                    if end_line <= start_line or end_line > len(content_lines):
+                        continue
 
-                # 跳过空内容或过短的内容
-                if (
-                    not window_content.strip()
-                    or len(window_content.strip()) < len(old_code_core.strip()) * 0.3
-                ):
-                    continue
+                    window_lines = content_lines[start_line:end_line]
+                    window_content = "".join(window_lines)
 
-                # 计算相似度
-                similarity = difflib.SequenceMatcher(
-                    None, old_code_core, window_content, autojunk=False
-                ).ratio()
+                    if not window_content.strip():
+                        continue
 
-                if similarity > best_similarity:
-                    best_similarity = similarity
-                    # 计算字符位置
-                    start_pos = sum(len(content_lines[i]) for i in range(start_line))
-                    end_pos = start_pos + len(window_content)
-                    best_match = (start_pos, end_pos, similarity)
+                    similarity = difflib.SequenceMatcher(
+                        None, prefix_code, window_content, autojunk=False
+                    ).ratio()
 
-                # 如果找到很好的匹配，提前退出
-                if similarity >= 0.95:
+                    if similarity > prefix_similarity:
+                        prefix_similarity = similarity
+                        start_pos = sum(
+                            len(content_lines[i]) for i in range(start_line)
+                        )
+                        prefix_match = (start_pos, similarity)
+
+                    if similarity >= 0.95:
+                        break
+                if prefix_similarity >= 0.95:
                     break
 
-            # 如果已经找到很好的匹配，可以提前退出
-            if best_similarity >= 0.95:
-                break
+            # 如果前缀匹配成功（相似度 >= 0.7），继续匹配后缀
+            if prefix_match and prefix_similarity >= 0.7:
+                prefix_start_pos, _ = prefix_match
+                # 在前缀匹配位置之后查找后缀
+                prefix_start_line = 0
+                for i, line in enumerate(content_lines):
+                    if sum(len(content_lines[j]) for j in range(i)) >= prefix_start_pos:
+                        prefix_start_line = i
+                        break
+
+                suffix_match: Optional[Tuple[int, float]] = None
+                suffix_similarity = 0.0
+                # 在前缀之后查找后缀（最多向后搜索 50 行）
+                search_end = min(len(content_lines), prefix_start_line + 50)
+                for start_line in range(prefix_start_line, search_end):
+                    for line_diff in [-1, 0, 1]:
+                        end_line = start_line + len(suffix_lines) + line_diff
+                        if end_line <= start_line or end_line > len(content_lines):
+                            continue
+
+                        window_lines = content_lines[start_line:end_line]
+                        window_content = "".join(window_lines)
+
+                        if not window_content.strip():
+                            continue
+
+                        similarity = difflib.SequenceMatcher(
+                            None, suffix_code, window_content, autojunk=False
+                        ).ratio()
+
+                        if similarity > suffix_similarity:
+                            suffix_similarity = similarity
+                            suffix_start_pos = sum(
+                                len(content_lines[i]) for i in range(start_line)
+                            )
+                            suffix_match = (suffix_start_pos, similarity)
+
+                        if similarity >= 0.95:
+                            break
+                    if suffix_similarity >= 0.95:
+                        break
+
+                # 如果前后缀都匹配成功，计算综合相似度
+                if suffix_match and suffix_similarity >= 0.7:
+                    suffix_start_pos, _ = suffix_match
+                    # 综合相似度取平均值
+                    combined_similarity = (prefix_similarity + suffix_similarity) / 2.0
+                    # 返回插入位置（前缀位置）
+                    return (
+                        prefix_start_pos,
+                        prefix_start_pos,
+                        combined_similarity,
+                    ), None
+
+            # 如果前后缀匹配失败，回退到使用全部代码匹配
+            use_context_lines = False
+
+        if not use_context_lines:
+            # 在文件中滑动窗口查找最相似的片段
+            # 限制搜索范围，避免匹配到空内容或过短的内容
+            for start_line in range(len(content_lines)):
+                # 尝试匹配不同长度的代码块
+                for line_diff in [-2, -1, 0, 1, 2]:
+                    end_line = start_line + core_line_count + line_diff
+                    if end_line <= start_line or end_line > len(content_lines):
+                        continue
+
+                    window_lines = content_lines[start_line:end_line]
+                    window_content = "".join(window_lines)
+
+                    # 跳过空内容或过短的内容
+                    if (
+                        not window_content.strip()
+                        or len(window_content.strip())
+                        < len(old_code_core.strip()) * 0.3
+                    ):
+                        continue
+
+                    # 计算相似度
+                    similarity = difflib.SequenceMatcher(
+                        None, old_code_core, window_content, autojunk=False
+                    ).ratio()
+
+                    if similarity > best_similarity:
+                        best_similarity = similarity
+                        # 计算字符位置
+                        start_pos = sum(
+                            len(content_lines[i]) for i in range(start_line)
+                        )
+                        end_pos = start_pos + len(window_content)
+                        best_match = (start_pos, end_pos, similarity)
+
+                    # 如果找到很好的匹配，提前退出
+                    if similarity >= 0.95:
+                        break
+
+                # 如果已经找到很好的匹配，可以提前退出
+                if best_similarity >= 0.95:
+                    break
 
         # 只有当相似度足够高时才返回匹配（阈值 0.6，但调用者会根据情况进一步过滤）
         if best_match is not None and best_similarity >= 0.6:
@@ -378,46 +487,43 @@ class EditFileFreeTool:
         old_code = diff.get("old_code", "")
         new_code = diff.get("new_code", "")
 
-        # 如果是 diff 格式且旧代码为空（只有新增），直接追加
+        # 如果是 diff 格式且旧代码为空（只有新增），直接失败
         if is_diff and not old_code.strip():
-            if content and not content.endswith("\n"):
-                new_content = content + "\n" + new_code
-            else:
-                new_content = content + new_code
-            return True, new_content, None
+            return False, "diff 格式中旧代码为空，无法确定插入位置", None
 
         # 确定用于匹配的代码和相似度阈值
         # 如果是 diff 格式，使用 old_code 来匹配
-        # 如果不是 diff 格式，使用 new_code 来匹配
+        # 如果不是 diff 格式，使用 new_code 的前几行和后几行分别匹配
         # 相似度阈值统一设置为 0.7
         if is_diff:
             match_code = old_code
+            use_context_lines = False
         else:
             match_code = new_code
+            use_context_lines = True  # 非 diff 格式使用前后几行分别匹配
         min_similarity = 0.7
 
         # 尝试查找匹配位置
         match_result, error_msg = EditFileFreeTool._find_best_match_position(
-            content, match_code
+            content, match_code, use_context_lines=use_context_lines
         )
 
         if match_result is None:
-            # 找不到匹配则追加到文件末尾
-            if content and not content.endswith("\n"):
-                new_content = content + "\n" + new_code
+            # 找不到匹配则直接失败
+            if error_msg:
+                return False, f"未找到匹配位置: {error_msg}", None
             else:
-                new_content = content + new_code
-            return True, new_content, "未找到匹配位置，代码已追加到文件末尾"
+                return False, "未找到匹配位置，请检查代码上下文是否正确", None
 
         start_pos, end_pos, similarity = match_result
 
-        # 如果相似度太低，视为未找到匹配，追加到末尾
+        # 如果相似度太低，视为未找到匹配，直接失败
         if similarity < min_similarity:
-            if content and not content.endswith("\n"):
-                new_content = content + "\n" + new_code
-            else:
-                new_content = content + new_code
-            return True, new_content, "匹配相似度较低，代码已追加到文件末尾"
+            return (
+                False,
+                f"匹配相似度较低 ({similarity:.2%})，低于阈值 ({min_similarity:.2%})，请检查代码上下文是否正确",
+                None,
+            )
 
         # 检查相似度
         warning = None
@@ -427,8 +533,18 @@ class EditFileFreeTool:
                 f"请确认替换位置是否正确。匹配位置: 字符 {start_pos}-{end_pos}"
             )
 
-        # 执行替换
-        new_content = content[:start_pos] + new_code + content[end_pos:]
+        # 执行替换或插入
+        if is_diff:
+            # diff 格式：替换匹配的旧代码
+            new_content = content[:start_pos] + new_code + content[end_pos:]
+        else:
+            # 非 diff 格式：在匹配位置插入新代码
+            # 如果匹配位置是同一个位置（前后缀匹配），则在该位置插入
+            if start_pos == end_pos:
+                new_content = content[:start_pos] + new_code + content[start_pos:]
+            else:
+                # 如果匹配到了代码块，替换它
+                new_content = content[:start_pos] + new_code + content[end_pos:]
 
         return True, new_content, warning
 
