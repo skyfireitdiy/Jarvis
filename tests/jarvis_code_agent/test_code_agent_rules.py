@@ -1,12 +1,9 @@
 # -*- coding: utf-8 -*-
 """code_agent_rules.py 单元测试"""
 
-import os
-import tempfile
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import patch
 
-import pytest
 
 from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
 

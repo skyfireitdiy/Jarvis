@@ -1,12 +1,6 @@
 # -*- coding: utf-8 -*-
 """build_validation_config.py 单元测试"""
 
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 import yaml
 
 from jarvis.jarvis_code_agent.build_validation_config import (

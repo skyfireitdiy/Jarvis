@@ -4,7 +4,6 @@
 import json
 from pathlib import Path
 
-import pytest
 
 from jarvis.jarvis_c2rust.llm_module_agent_utils import (
     entries_to_json,

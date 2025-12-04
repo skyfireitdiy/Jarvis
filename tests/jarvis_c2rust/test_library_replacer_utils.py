@@ -2,10 +2,8 @@
 """jarvis_c2rust.library_replacer_utils 模块单元测试"""
 
 import json
-import os
 from pathlib import Path
 
-import pytest
 
 from jarvis.jarvis_c2rust.library_replacer_utils import (
     is_entry_function,

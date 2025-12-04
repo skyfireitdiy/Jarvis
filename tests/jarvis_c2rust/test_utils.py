@@ -2,10 +2,8 @@
 """jarvis_c2rust.utils 模块单元测试"""
 
 import json
-import tempfile
 from pathlib import Path
 
-import pytest
 
 from jarvis.jarvis_c2rust.utils import (
     default_crate_dir,

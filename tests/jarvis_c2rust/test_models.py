@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """jarvis_c2rust.models 模块单元测试"""
 
-import pytest
-
 from jarvis.jarvis_c2rust.models import FnRecord
 
 
