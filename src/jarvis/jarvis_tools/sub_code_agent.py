@@ -118,8 +118,7 @@ class SubCodeAgentTool:
                 base_tools = [
                     "execute_script",
                     "read_code",
-                    "edit_file_normal",
-                    "edit_file_free",
+                    "edit_file",
                     "rewrite_file",
                     "lsp_client",
                 ]

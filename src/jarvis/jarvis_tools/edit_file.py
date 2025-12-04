@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 class EditFileNormalTool:
     """普通文件编辑工具，完全基于 search/replace 进行文件编辑"""
 
-    name = "edit_file_normal"
+    name = "edit_file"
     description = (
         "使用 search/replace 对文件进行普通文本编辑（不依赖块id），支持同时修改多个文件。\n\n"
         "💡 使用方式：\n"
