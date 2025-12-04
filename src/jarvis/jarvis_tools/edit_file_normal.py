@@ -3,9 +3,8 @@
 
 import difflib
 import os
+import shutil
 from typing import Any, Dict, List, Optional, Tuple
-
-from jarvis.jarvis_tools.edit_file_structed import EditFileTool
 
 
 class EditFileNormalTool:
@@ -75,8 +74,126 @@ class EditFileNormalTool:
 
     @staticmethod
     def _validate_basic_args(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """验证基本参数（与结构化编辑保持一致的 files 验证逻辑）"""
-        return EditFileTool._validate_basic_args(args)
+        """验证基本参数
+
+        Returns:
+            如果验证失败，返回错误响应；否则返回None
+        """
+        files = args.get("files")
+
+        if not files:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少必需参数：files",
+            }
+
+        if not isinstance(files, list):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "files参数必须是数组类型",
+            }
+
+        if len(files) == 0:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "files数组不能为空",
+            }
+
+        # 验证每个文件项
+        for idx, file_item in enumerate(files):
+            if not isinstance(file_item, dict):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项必须是字典类型",
+                }
+
+            file_path = file_item.get("file_path")
+            diffs = file_item.get("diffs", [])
+
+            if not file_path:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项缺少必需参数：file_path",
+                }
+
+            if not diffs:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项缺少必需参数：diffs",
+                }
+
+            if not isinstance(diffs, list):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项的diffs参数必须是数组类型",
+                }
+
+        return None
+
+    @staticmethod
+    def _read_file_with_backup(file_path: str) -> Tuple[str, Optional[str]]:
+        """读取文件并创建备份
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            (文件内容, 备份文件路径或None)
+        """
+        abs_path = os.path.abspath(file_path)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+        file_content = ""
+        backup_path = None
+        if os.path.exists(abs_path):
+            with open(abs_path, "r", encoding="utf-8") as f:
+                file_content = f.read()
+            # 创建备份文件
+            backup_path = abs_path + ".bak"
+            try:
+                shutil.copy2(abs_path, backup_path)
+            except Exception:
+                # 备份失败不影响主流程
+                backup_path = None
+
+        return file_content, backup_path
+
+    @staticmethod
+    def _write_file_with_rollback(
+        abs_path: str, content: str, backup_path: Optional[str]
+    ) -> Tuple[bool, Optional[str]]:
+        """写入文件，失败时回滚
+
+        Args:
+            abs_path: 文件绝对路径
+            content: 要写入的内容
+            backup_path: 备份文件路径或None
+
+        Returns:
+            (是否成功, 错误信息或None)
+        """
+        try:
+            with open(abs_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return (True, None)
+        except Exception as write_error:
+            # 写入失败，尝试回滚
+            if backup_path and os.path.exists(backup_path):
+                try:
+                    shutil.copy2(backup_path, abs_path)
+                    os.remove(backup_path)
+                except Exception:
+                    pass
+            error_msg = f"文件写入失败: {str(write_error)}"
+            print(f"❌ {error_msg}")
+            return (False, error_msg)
 
     @staticmethod
     def _validate_normal_diff(
@@ -385,8 +502,8 @@ class EditFileNormalTool:
                     continue
 
                 # 读取原始内容并创建备份
-                original_content, backup_path = EditFileTool._read_file_with_backup(
-                    file_path
+                original_content, backup_path = (
+                    EditFileNormalTool._read_file_with_backup(file_path)
                 )
 
                 # 应用所有普通编辑
@@ -410,8 +527,10 @@ class EditFileNormalTool:
 
                 # 写入文件（失败时回滚）
                 abs_path = os.path.abspath(file_path)
-                write_success, write_error = EditFileTool._write_file_with_rollback(
-                    abs_path, result_or_error, backup_path
+                write_success, write_error = (
+                    EditFileNormalTool._write_file_with_rollback(
+                        abs_path, result_or_error, backup_path
+                    )
                 )
                 if write_success:
                     # 写入成功，删除备份文件
