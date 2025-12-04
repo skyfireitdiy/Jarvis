@@ -236,6 +236,7 @@ class BuildManager:
             "- 如构建失败源于缺失或未实现的被调函数/依赖，请阅读其 C 源码并在本次一并补齐等价的 Rust 实现；必要时可在合理的模块中新建函数；",
             "- 禁止使用 todo!/unimplemented! 作为占位；",
             "- 可使用工具 read_symbols/read_code 获取依赖符号的 C 源码与位置以辅助实现；仅精确导入所需符号，避免通配；",
+            "- **编译警告消除**：修复时必须同时消除所有编译警告（compiler warnings）。修复后应运行 `cargo check --message-format=short` 验证没有警告；",
             "- **Clippy 警告消除**：修复时必须同时消除所有 clippy 警告。修复后应运行 `cargo clippy -- -D warnings` 验证没有警告；",
             "- **🔍 调试辅助：如果遇到难以定位的问题，可以使用以下方法辅助调试**：",
             "  * 添加临时调试输出：使用 `println!()` 或 `dbg!()` 宏输出关键变量的值、函数调用路径、中间状态等",
@@ -406,7 +407,63 @@ class BuildManager:
         返回阶段特定的行列表。
         """
         section_lines: List[str] = []
-        if stage == "clippy":
+        if stage == "compiler_warning":
+            section_lines.extend(
+                [
+                    "",
+                    "【⚠️ 重要：编译警告 - 必须消除】",
+                    "以下输出来自 `cargo check --message-format=short` 命令，包含编译警告详情：",
+                    "- **编译警告当前状态：有警告** - 必须消除所有警告才能继续",
+                    "- 编译警告通常表示代码存在潜在问题或可以改进的地方",
+                    "- **请仔细阅读警告信息**，包括：",
+                    "  * 警告类型（如 `unused_variable`、`dead_code`、`unused_import` 等）",
+                    "  * 警告位置（文件路径和行号）",
+                    "  * 警告说明和建议的修复方法",
+                    "",
+                    "**关键要求：**",
+                    "- 必须分析每个警告的根本原因，并按照编译器的建议进行修复",
+                    "- 必须实际修复导致警告的代码，而不是忽略警告",
+                    "- 修复后必须确保 `cargo check --message-format=short` 能够通过（返回码为 0 且无警告输出）",
+                    "",
+                ]
+            )
+            if command:
+                section_lines.append(f"执行的命令：{command}")
+                section_lines.append(
+                    "提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。"
+                )
+            section_lines.extend(
+                [
+                    "",
+                    "【编译警告详细信息 - 必须仔细阅读并修复】",
+                    "以下是从 `cargo check --message-format=short` 命令获取的完整输出，包含所有警告的具体信息：",
+                    "<COMPILER_WARNINGS>",
+                    output,
+                    "</COMPILER_WARNINGS>",
+                    "",
+                    "**修复要求：**",
+                    "1. 仔细分析上述编译警告信息，找出每个警告的根本原因",
+                    "2. 定位到具体的代码位置（文件路径和行号）",
+                    "3. 按照编译器的建议进行修复：",
+                    "   - 如果警告建议移除未使用的代码，请移除或使用 `#[allow(...)]` 注解（仅在必要时）",
+                    "   - 如果警告建议使用更安全的 API，请使用建议的 API",
+                    "   - 如果警告建议改进代码结构，请按照建议优化代码",
+                    "4. 修复所有警告，确保 `cargo check --message-format=short` 能够通过（无警告输出）",
+                    "5. 如果某些警告确实无法修复或需要特殊处理，可以使用 `#[allow(warning_name)]` 注解，但必须添加注释说明原因",
+                    "",
+                    "**⚠️ 重要：修复后必须验证**",
+                    "- 修复完成后，**必须使用 `execute_script` 工具执行以下命令验证修复效果**：",
+                    f"  - 命令：`{command or 'cargo check --message-format=short'}`",
+                    "- 验证要求：",
+                    "  * 如果命令执行成功（返回码为 0）且无警告输出，说明修复成功",
+                    "  * 如果命令执行失败（返回码非 0）或有警告输出，说明仍有警告，需要继续修复",
+                    "  * **不要假设修复成功，必须实际执行命令验证**",
+                    "- 如果验证失败，请分析失败原因并继续修复，直到验证通过",
+                    "",
+                    "修复后请再次执行 `cargo check --message-format=short` 进行验证。",
+                ]
+            )
+        elif stage == "clippy":
             section_lines.extend(
                 [
                     "",
@@ -659,67 +716,105 @@ class BuildManager:
             )
 
         if returncode == 0:
-            # 测试通过，检查 clippy 警告
-            clippy_has_warnings = False
-            clippy_output = ""
+            # 测试通过，先检查编译警告，再检查 clippy 警告
+            compiler_has_warnings = False
+            compiler_output = ""
             try:
-                res_clippy = subprocess.run(
-                    ["cargo", "clippy", "--", "-D", "warnings"],
+                res_compiler = subprocess.run(
+                    ["cargo", "check", "--message-format=short"],
                     capture_output=True,
                     text=True,
                     timeout=30,
                     check=False,
                     cwd=workspace_root,
                 )
-                if res_clippy.returncode != 0:
-                    clippy_has_warnings = True
-                    clippy_output = (
-                        (res_clippy.stdout or "") + "\n" + (res_clippy.stderr or "")
-                    )
+                # 检查是否有警告输出（即使返回码为0，也可能有警告）
+                combined_output = (
+                    (res_compiler.stdout or "") + "\n" + (res_compiler.stderr or "")
+                )
+                # 检查输出中是否包含警告（warning: 关键字）
+                if (
+                    "warning:" in combined_output.lower()
+                    or res_compiler.returncode != 0
+                ):
+                    compiler_has_warnings = True
+                    compiler_output = combined_output
             except subprocess.TimeoutExpired:
-                # clippy 超时，视为有警告
-                clippy_has_warnings = True
-                clippy_output = "Clippy 检查超时（30秒）"
+                # 编译检查超时，视为有警告
+                compiler_has_warnings = True
+                compiler_output = "编译检查超时（30秒）"
             except Exception as e:
-                # clippy 执行异常，视为有警告
-                clippy_has_warnings = True
-                clippy_output = f"执行 clippy 时发生异常: {str(e)}"
+                # 编译检查执行异常，视为有警告
+                compiler_has_warnings = True
+                compiler_output = f"执行编译检查时发生异常: {str(e)}"
 
-            if clippy_has_warnings:
+            if compiler_has_warnings:
                 typer.secho(
-                    "[c2rust-transpiler][build] Cargo 测试通过，但存在 clippy 警告，需要修复。",
+                    "[c2rust-transpiler][build] Cargo 测试通过，但存在编译警告，需要修复。",
                     fg=typer.colors.YELLOW,
                 )
-                typer.secho(clippy_output, fg=typer.colors.YELLOW)
-                # 将 clippy 警告作为修复目标，继续修复流程
-                # 不返回成功，而是继续修复循环
+                typer.secho(compiler_output, fg=typer.colors.YELLOW)
+                # 将编译警告作为修复目标，继续修复流程
+                warning_type = "compiler"  # type: str
+                output = compiler_output
             else:
-                typer.secho(
-                    "[c2rust-transpiler][build] Cargo 测试通过，clippy 无警告。",
-                    fg=typer.colors.GREEN,
-                )
-                # 测试通过且无 clippy 警告，重置连续失败计数
-                self._consecutive_fix_failures_setter(0)
+                # 无编译警告，检查 clippy 警告
+                clippy_has_warnings = False
+                clippy_output = ""
                 try:
-                    cur = self.progress.get("current") or {}
-                    metrics = cur.get("metrics") or {}
-                    metrics["test_attempts"] = int(test_iter)
-                    cur["metrics"] = metrics
-                    cur["impl_verified"] = True
-                    cur["failed_stage"] = None
-                    self.progress["current"] = cur
-                    self.save_progress()
-                except Exception:
-                    pass
-                return (True, False)
+                    res_clippy = subprocess.run(
+                        ["cargo", "clippy", "--", "-D", "warnings"],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        check=False,
+                        cwd=workspace_root,
+                    )
+                    if res_clippy.returncode != 0:
+                        clippy_has_warnings = True
+                        clippy_output = (
+                            (res_clippy.stdout or "") + "\n" + (res_clippy.stderr or "")
+                        )
+                except subprocess.TimeoutExpired:
+                    # clippy 超时，视为有警告
+                    clippy_has_warnings = True
+                    clippy_output = "Clippy 检查超时（30秒）"
+                except Exception as e:
+                    # clippy 执行异常，视为有警告
+                    clippy_has_warnings = True
+                    clippy_output = f"执行 clippy 时发生异常: {str(e)}"
 
-            # 如果有 clippy 警告，继续修复流程
-            # 将 clippy 输出作为修复目标
-            is_clippy_warning = True
-            output = clippy_output
+                if clippy_has_warnings:
+                    typer.secho(
+                        "[c2rust-transpiler][build] Cargo 测试通过，无编译警告，但存在 clippy 警告，需要修复。",
+                        fg=typer.colors.YELLOW,
+                    )
+                    typer.secho(clippy_output, fg=typer.colors.YELLOW)
+                    # 将 clippy 警告作为修复目标，继续修复流程
+                    warning_type = "clippy"
+                    output = clippy_output
+                else:
+                    typer.secho(
+                        "[c2rust-transpiler][build] Cargo 测试通过，无编译警告，clippy 无警告。",
+                        fg=typer.colors.GREEN,
+                    )
+                    # 测试通过且无编译警告和 clippy 警告，重置连续失败计数
+                    self._consecutive_fix_failures_setter(0)
+                    try:
+                        cur = self.progress.get("current") or {}
+                        metrics = cur.get("metrics") or {}
+                        metrics["test_attempts"] = int(test_iter)
+                        cur["metrics"] = metrics
+                        cur["impl_verified"] = True
+                        cur["failed_stage"] = None
+                        self.progress["current"] = cur
+                        self.save_progress()
+                    except Exception:
+                        pass
+                    return (True, False)
         else:
             # 测试失败
-            is_clippy_warning = False
+            warning_type = None
             output = stdout + "\n" + stderr
             limit_info = (
                 f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})"
@@ -756,8 +851,13 @@ class BuildManager:
                     pass
                 return (False, False)
 
-        # 构建失败（测试阶段）修复或 clippy 警告修复
-        if is_clippy_warning:
+        # 构建失败（测试阶段）修复、编译警告修复或 clippy 警告修复
+        if warning_type == "compiler":
+            # 编译警告修复
+            tags = ["compiler_warning"]
+            stage_name = "compiler_warning"
+            command_str = "cargo check --message-format=short"
+        elif warning_type == "clippy":
             # clippy 警告修复
             tags = ["clippy_warning"]
             stage_name = "clippy"
@@ -772,7 +872,7 @@ class BuildManager:
         curr, sym_name, src_loc, c_code = self.get_current_function_context()
 
         # 调试输出：确认错误信息是否正确传递
-        if not is_clippy_warning:
+        if warning_type is None:
             typer.secho(
                 f"[c2rust-transpiler][debug] 测试失败信息长度: {len(output)} 字符",
                 fg=typer.colors.CYAN,
@@ -918,48 +1018,88 @@ class BuildManager:
             )
 
         if verify_returncode == 0:
-            # 测试通过，检查 clippy 警告
-            clippy_has_warnings_after_fix = False
-            clippy_output_after_fix = ""
+            # 测试通过，先检查编译警告，再检查 clippy 警告
+            compiler_has_warnings_after_fix = False
+            compiler_output_after_fix = ""
             try:
-                res_clippy_verify = subprocess.run(
-                    ["cargo", "clippy", "--", "-D", "warnings"],
+                res_compiler_verify = subprocess.run(
+                    ["cargo", "check", "--message-format=short"],
                     capture_output=True,
                     text=True,
                     timeout=30,
                     check=False,
                     cwd=workspace_root,
                 )
-                if res_clippy_verify.returncode != 0:
-                    clippy_has_warnings_after_fix = True
-                    clippy_output_after_fix = (
-                        (res_clippy_verify.stdout or "")
-                        + "\n"
-                        + (res_clippy_verify.stderr or "")
-                    )
+                # 检查是否有警告输出
+                combined_output = (
+                    (res_compiler_verify.stdout or "")
+                    + "\n"
+                    + (res_compiler_verify.stderr or "")
+                )
+                if (
+                    "warning:" in combined_output.lower()
+                    or res_compiler_verify.returncode != 0
+                ):
+                    compiler_has_warnings_after_fix = True
+                    compiler_output_after_fix = combined_output
             except subprocess.TimeoutExpired:
-                clippy_has_warnings_after_fix = True
-                clippy_output_after_fix = "Clippy 检查超时（30秒）"
+                compiler_has_warnings_after_fix = True
+                compiler_output_after_fix = "编译检查超时（30秒）"
             except Exception as e:
-                clippy_has_warnings_after_fix = True
-                clippy_output_after_fix = f"执行 clippy 时发生异常: {str(e)}"
+                compiler_has_warnings_after_fix = True
+                compiler_output_after_fix = f"执行编译检查时发生异常: {str(e)}"
 
-            if clippy_has_warnings_after_fix:
+            if compiler_has_warnings_after_fix:
                 typer.secho(
-                    "[c2rust-transpiler][build] 修复后测试通过，但存在 clippy 警告，将在下一轮循环中处理",
+                    "[c2rust-transpiler][build] 修复后测试通过，但存在编译警告，将在下一轮循环中处理",
                     fg=typer.colors.YELLOW,
                 )
-                typer.secho(clippy_output_after_fix, fg=typer.colors.YELLOW)
-                # 有 clippy 警告，继续循环修复
+                typer.secho(compiler_output_after_fix, fg=typer.colors.YELLOW)
+                # 有编译警告，继续循环修复
                 return (False, False)
             else:
-                typer.secho(
-                    "[c2rust-transpiler][build] 修复后测试通过，clippy 无警告，继续构建循环",
-                    fg=typer.colors.GREEN,
-                )
-                # 测试真正通过且无 clippy 警告，重置连续失败计数
-                self._consecutive_fix_failures_setter(0)
-                return (False, False)  # 需要继续循环（但下次应该会通过）
+                # 无编译警告，检查 clippy 警告
+                clippy_has_warnings_after_fix = False
+                clippy_output_after_fix = ""
+                try:
+                    res_clippy_verify = subprocess.run(
+                        ["cargo", "clippy", "--", "-D", "warnings"],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        check=False,
+                        cwd=workspace_root,
+                    )
+                    if res_clippy_verify.returncode != 0:
+                        clippy_has_warnings_after_fix = True
+                        clippy_output_after_fix = (
+                            (res_clippy_verify.stdout or "")
+                            + "\n"
+                            + (res_clippy_verify.stderr or "")
+                        )
+                except subprocess.TimeoutExpired:
+                    clippy_has_warnings_after_fix = True
+                    clippy_output_after_fix = "Clippy 检查超时（30秒）"
+                except Exception as e:
+                    clippy_has_warnings_after_fix = True
+                    clippy_output_after_fix = f"执行 clippy 时发生异常: {str(e)}"
+
+                if clippy_has_warnings_after_fix:
+                    typer.secho(
+                        "[c2rust-transpiler][build] 修复后测试通过，无编译警告，但存在 clippy 警告，将在下一轮循环中处理",
+                        fg=typer.colors.YELLOW,
+                    )
+                    typer.secho(clippy_output_after_fix, fg=typer.colors.YELLOW)
+                    # 有 clippy 警告，继续循环修复
+                    return (False, False)
+                else:
+                    typer.secho(
+                        "[c2rust-transpiler][build] 修复后测试通过，无编译警告，clippy 无警告，继续构建循环",
+                        fg=typer.colors.GREEN,
+                    )
+                    # 测试真正通过且无编译警告和 clippy 警告，重置连续失败计数
+                    self._consecutive_fix_failures_setter(0)
+                    return (False, False)  # 需要继续循环（但下次应该会通过）
         else:
             # 编译通过但测试仍然失败，说明修复没有解决测试逻辑问题
             typer.secho(
