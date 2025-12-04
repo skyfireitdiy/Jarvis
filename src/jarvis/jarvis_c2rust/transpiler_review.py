@@ -48,7 +48,6 @@ class ReviewManager:
         on_before_tool_call_func: Callable[[Any, Any], None],
         on_after_tool_call_func: Callable[[Any, Any, Any, Any], None],
         agent_before_commits: Dict[str, Optional[str]],
-        current_agents: Dict[str, Any],
         get_git_diff_func: Optional[Callable[[Optional[str]], str]] = None,
     ) -> None:
         self.crate_dir = crate_dir
@@ -74,7 +73,6 @@ class ReviewManager:
         self.on_before_tool_call = on_before_tool_call_func
         self.on_after_tool_call = on_after_tool_call_func
         self.agent_before_commits = agent_before_commits
-        self._current_agents = current_agents
         self.get_git_diff = get_git_diff_func
 
     def review_and_optimize(self, rec: FnRecord, module: str, rust_sig: str) -> None:
@@ -173,11 +171,8 @@ class ReviewManager:
                     if commit_diff and commit_diff.strip():
                         # 成功获取diff，限制长度避免上下文过大
                         # 使用50%的比例，因为review阶段需要更多的上下文信息
-                        review_key = f"review::{rec.id}"
-                        agent = self._current_agents.get(review_key)
                         commit_diff = truncate_git_diff_with_context_limit(
                             commit_diff,
-                            agent=agent,
                             llm_group=self.llm_group,
                             token_ratio=0.5,
                         )
@@ -875,7 +870,7 @@ class ReviewManager:
                     if git_diff and git_diff.strip():
                         # 限制 git diff 长度，避免上下文过大
                         # 使用较小的比例（30%）因为修复提示词本身已经很长
-                        # 复用已创建的修复 Agent 用于 truncate
+                        # 使用已创建的修复 Agent 获取更准确的剩余 token
                         git_diff = truncate_git_diff_with_context_limit(
                             git_diff,
                             agent=ca,

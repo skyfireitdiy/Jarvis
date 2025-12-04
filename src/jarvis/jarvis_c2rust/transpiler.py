@@ -243,7 +243,6 @@ class Transpiler:
             self._on_before_tool_call,
             self._on_after_tool_call,
             self._agent_before_commits,
-            self.agent_manager._current_agents,
             self._get_git_diff,
         )
 

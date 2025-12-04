@@ -370,9 +370,7 @@ class BuildManager:
                 if git_diff and git_diff.strip():
                     # 限制 git diff 长度，避免上下文过大
                     # 使用较小的比例（30%）因为修复提示词本身已经很长
-                    # 如果提供了 agent 则复用，否则创建临时 Agent 用于 truncate
-                    if agent is None:
-                        agent = self.get_fix_agent(c_code)
+                    # 如果提供了 agent 则使用它获取更准确的剩余 token，否则使用回退方案
                     git_diff = truncate_git_diff_with_context_limit(
                         git_diff, agent=agent, token_ratio=0.3
                     )
