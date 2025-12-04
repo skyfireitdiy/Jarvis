@@ -2,6 +2,7 @@
 """jarvis_tools.lsp_client 模块单元测试"""
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -194,7 +195,10 @@ def test_lsp_client_tool_get_symbol_info(language, tool, temp_project_dir):
     assert "success" in result
     # 如果成功，应该包含 stdout 或相关信息
     if result.get("success"):
-        assert "stdout" in result or "stderr" in result
+        assert "stdout" in result
+        stdout = result.get("stdout", "")
+        # 校验返回内容中包含符号名
+        assert "hello" in stdout.lower() or "符号" in stdout
 
 
 @pytest.mark.parametrize("language", list(LSP_SERVERS.keys()))
@@ -284,7 +288,18 @@ class MyClass {
 
     assert "success" in result
     if result.get("success"):
-        assert "stdout" in result or "stderr" in result
+        assert "stdout" in result
+        stdout = result.get("stdout", "")
+        # 校验返回内容中包含预期的符号
+        # 根据语言不同，应该包含 func1, func2, 以及类/结构体/类型名
+        assert "func1" in stdout.lower() or "找到" in stdout or "符号" in stdout
+        # 如果包含符号列表，应该至少有几个符号
+        if "找到" in stdout and "个符号" in stdout:
+            # 提取符号数量
+            match = re.search(r"找到\s*(\d+)\s*个符号", stdout)
+            if match:
+                count = int(match.group(1))
+                assert count > 0
 
 
 @pytest.mark.parametrize("language", list(LSP_SERVERS.keys()))
@@ -325,6 +340,16 @@ def test_lsp_client_tool_search_symbol(language, tool, temp_project_dir):
     )
 
     assert "success" in result
+    if result.get("success"):
+        assert "stdout" in result
+        stdout = result.get("stdout", "")
+        # 校验返回内容中包含搜索的符号（可能是 hello_world 或 hello）
+        assert (
+            "hello" in stdout.lower()
+            or "找到" in stdout
+            or "匹配" in stdout
+            or "未找到" in stdout
+        )
 
 
 @pytest.mark.parametrize("language", list(LSP_SERVERS.keys()))
@@ -365,6 +390,16 @@ def test_lsp_client_tool_definition(language, tool, temp_project_dir):
     )
 
     assert "success" in result
+    if result.get("success"):
+        assert "stdout" in result
+        stdout = result.get("stdout", "")
+        # 校验返回了定义位置（应该包含文件路径或行号）
+        assert (
+            "定义" in stdout
+            or "位置" in stdout
+            or ":" in stdout
+            or "未找到定义" in stdout
+        )
 
 
 @pytest.mark.parametrize("language", list(LSP_SERVERS.keys()))
@@ -451,6 +486,18 @@ function main() {
     )
 
     assert "success" in result
+    if result.get("success"):
+        assert "stdout" in result
+        stdout = result.get("stdout", "")
+        # 校验返回了引用信息
+        assert "引用" in stdout or "未找到引用" in stdout
+        # 如果找到了引用，应该至少包含2个（因为代码中调用了2次 hello）
+        if "找到" in stdout and "个引用" in stdout:
+            match = re.search(r"找到\s*(\d+)\s*个引用", stdout)
+            if match:
+                count = int(match.group(1))
+                # 应该至少找到2个引用（main 函数中调用了2次）
+                assert count >= 2
 
 
 def test_lsp_client_tool_unsupported_language(tool, temp_project_dir):
@@ -525,3 +572,8 @@ def test_lsp_client_tool_client_caching(tool, temp_project_dir):
     # 两次调用都应该有结果（可能成功或失败，取决于 LSP 是否可用）
     assert "success" in result1
     assert "success" in result2
+    # 校验缓存机制：两次调用的结果应该一致（都成功或都失败）
+    assert result1.get("success") == result2.get("success")
+    # 如果都成功，输出应该相同（说明使用了同一个客户端）
+    if result1.get("success") and result2.get("success"):
+        assert result1.get("stdout") == result2.get("stdout")
