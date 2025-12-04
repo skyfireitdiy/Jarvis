@@ -1739,7 +1739,7 @@ class Calculator:
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code, "min_similarity": 0.9}],
+                    "diffs": [{"new_code": new_code}],
                 }
             ]
         }
@@ -1778,7 +1778,7 @@ def new_function():
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code, "min_similarity": 0.5}],
+                    "diffs": [{"new_code": new_code}],
                 }
             ]
         }
@@ -1804,45 +1804,8 @@ class Calculator:
             actual_content = f.read()
         assert actual_content == expected_content
 
-    def test_append_action(self, tool, sample_file):
-        """测试：明确指定 append 操作"""
-        new_code = """def appended_function():
-    return "appended"
-"""
-        args = {
-            "files": [
-                {
-                    "file_path": sample_file,
-                    "diffs": [{"new_code": new_code, "action": "append"}],
-                }
-            ]
-        }
-
-        result = tool.execute(args)
-        assert result["success"] is True
-
-        # 验证完整文件内容（新代码应该追加到末尾）
-        expected_content = """def hello():
-    print("Hello, World!")
-
-def add(a, b):
-    return a + b
-
-class Calculator:
-    def __init__(self):
-        self.value = 0
-    
-    def multiply(self, a, b):
-        return a * b
-def appended_function():
-    return "appended"
-"""
-        with open(sample_file, "r", encoding="utf-8") as f:
-            actual_content = f.read()
-        assert actual_content == expected_content
-
-    def test_replace_action_with_match(self, tool, sample_file):
-        """测试：明确指定 replace 操作且找到匹配"""
+    def test_replace_when_match_found(self, tool, sample_file):
+        """测试：找到匹配时进行替换"""
         new_code = """def add(a, b):
     return a + b + 10
 """
@@ -1850,7 +1813,7 @@ def appended_function():
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code, "action": "replace"}],
+                    "diffs": [{"new_code": new_code}],
                 }
             ]
         }
@@ -1876,24 +1839,6 @@ class Calculator:
             actual_content = f.read()
         assert actual_content == expected_content
 
-    def test_replace_action_without_match(self, tool, sample_file):
-        """测试：明确指定 replace 操作但找不到匹配"""
-        new_code = """def nonexistent_function():
-    return None
-"""
-        args = {
-            "files": [
-                {
-                    "file_path": sample_file,
-                    "diffs": [{"new_code": new_code, "action": "replace"}],
-                }
-            ]
-        }
-
-        result = tool.execute(args)
-        assert result["success"] is False
-        assert "未找到匹配" in result["stderr"] or "未找到匹配" in result["stdout"]
-
     def test_multiple_diffs(self, tool, sample_file):
         """测试：多个编辑操作"""
         args = {
@@ -1902,7 +1847,7 @@ class Calculator:
                     "file_path": sample_file,
                     "diffs": [
                         {"new_code": "def hello():\n    print('Updated Hello')\n"},
-                        {"new_code": "def new_func():\n    pass\n", "action": "append"},
+                        {"new_code": "def new_func():\n    pass\n"},
                     ],
                 }
             ]
@@ -2014,44 +1959,6 @@ def new_func():
         error_msg = result.get("stderr", "") + " " + result.get("stdout", "")
         assert "不能为空" in error_msg or "empty" in error_msg.lower()
 
-    def test_validate_action_enum(self, tool, sample_file):
-        """测试：验证 action 参数枚举值"""
-        args = {
-            "files": [
-                {
-                    "file_path": sample_file,
-                    "diffs": [
-                        {"new_code": "def test():\n    pass\n", "action": "invalid"}
-                    ],
-                }
-            ]
-        }
-
-        result = tool.execute(args)
-        assert result["success"] is False
-        # 错误信息可能在 stdout 或 stderr 中
-        error_msg = (result.get("stderr", "") + " " + result.get("stdout", "")).lower()
-        assert "action" in error_msg
-
-    def test_validate_min_similarity_range(self, tool, sample_file):
-        """测试：验证 min_similarity 范围"""
-        args = {
-            "files": [
-                {
-                    "file_path": sample_file,
-                    "diffs": [
-                        {"new_code": "def test():\n    pass\n", "min_similarity": 1.5}
-                    ],
-                }
-            ]
-        }
-
-        result = tool.execute(args)
-        assert result["success"] is False
-        # 错误信息可能在 stdout 或 stderr 中
-        error_msg = result.get("stderr", "") + " " + result.get("stdout", "")
-        assert "min_similarity" in error_msg.lower() or "0-1" in error_msg
-
     def test_extract_code_features(self, tool):
         """测试：提取代码特征"""
         code = """def my_function(x, y):
@@ -2078,12 +1985,12 @@ def add(a, b):
     return a + b + 1
 """
         match_result, error_msg = EditFileFreeTool._find_best_match_position(
-            content, new_code, min_similarity=0.5
+            content, new_code
         )
 
         assert match_result is not None
         start_pos, end_pos, similarity = match_result
-        assert similarity >= 0.5
+        assert similarity >= 0.6  # 默认阈值
         assert start_pos < end_pos
 
     def test_find_best_match_position_no_match(self, tool):
@@ -2095,7 +2002,7 @@ def add(a, b):
     return None
 """
         match_result, error_msg = EditFileFreeTool._find_best_match_position(
-            content, new_code, min_similarity=0.9
+            content, new_code
         )
 
         assert match_result is None
@@ -2109,16 +2016,16 @@ def add(a, b):
             "new_code": """def hello():
     print("Updated")
 """,
-            "action": "replace",
-            "min_similarity": 0.5,
         }
 
         success, result, warning = EditFileFreeTool._apply_free_edit_to_content(
             content, diff
         )
         assert success is True
-        assert 'print("Updated")' in result
-        assert 'print("Hello")' not in result
+        expected_content = """def hello():
+    print("Updated")
+"""
+        assert result == expected_content
 
     def test_apply_free_edit_append(self, tool):
         """测试：应用追加编辑"""
@@ -2129,8 +2036,6 @@ def add(a, b):
             "new_code": """def new_func():
     pass
 """,
-            "action": "append",
-            "min_similarity": 0.5,
         }
 
         success, result, warning = EditFileFreeTool._apply_free_edit_to_content(
@@ -2141,30 +2046,6 @@ def add(a, b):
     print("Hello")
 def new_func():
     pass
-"""
-        assert result == expected_content
-
-    def test_apply_free_edit_auto_append(self, tool):
-        """测试：自动模式找不到匹配时追加"""
-        content = """def hello():
-    print("Hello")
-"""
-        diff = {
-            "new_code": """def completely_new():
-    return None
-""",
-            "action": "auto",
-            "min_similarity": 0.9,
-        }
-
-        success, result, warning = EditFileFreeTool._apply_free_edit_to_content(
-            content, diff
-        )
-        assert success is True
-        expected_content = """def hello():
-    print("Hello")
-def completely_new():
-    return None
 """
         assert result == expected_content
         assert warning is not None

@@ -51,17 +51,6 @@ class EditFileFreeTool:
                                         "type": "string",
                                         "description": "新代码片段（建议包含前后3行上下文以提高匹配准确性）",
                                     },
-                                    "action": {
-                                        "type": "string",
-                                        "enum": ["replace", "append"],
-                                        "description": "操作类型：replace（替换匹配的代码）、append（在文件末尾追加），默认自动推断",
-                                        "default": "auto",
-                                    },
-                                    "min_similarity": {
-                                        "type": "number",
-                                        "description": "最小相似度阈值（0-1），用于匹配判断，默认0.6",
-                                        "default": 0.6,
-                                    },
                                 },
                                 "required": ["new_code"],
                             },
@@ -95,8 +84,6 @@ class EditFileFreeTool:
             (错误响应或None, 规范化后的diff或None)
         """
         new_code = diff.get("new_code")
-        action = diff.get("action", "auto")
-        min_similarity = diff.get("min_similarity", 0.6)
 
         if new_code is None:
             return (
@@ -126,36 +113,10 @@ class EditFileFreeTool:
                 None,
             )
 
-        # 验证操作类型
-        if action not in ["replace", "append", "auto"]:
-            return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff的action参数必须是 replace、append 或 auto",
-                },
-                None,
-            )
-
-        # 验证相似度阈值
-        if not isinstance(min_similarity, (int, float)) or not (
-            0 <= min_similarity <= 1
-        ):
-            return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff的min_similarity参数必须是0-1之间的数字",
-                },
-                None,
-            )
-
         return (
             None,
             {
                 "new_code": new_code,
-                "action": action,
-                "min_similarity": min_similarity,
             },
         )
 
@@ -230,14 +191,13 @@ class EditFileFreeTool:
 
     @staticmethod
     def _find_best_match_position(
-        content: str, new_code: str, min_similarity: float = 0.6
+        content: str, new_code: str
     ) -> Tuple[Optional[Tuple[int, int, float]], Optional[str]]:
         """在文件中查找最佳匹配位置
 
         Args:
             content: 文件内容
             new_code: 新代码片段
-            min_similarity: 最小相似度阈值
 
         Returns:
             ((start_pos, end_pos, similarity), error_msg) 或 (None, error_msg)
@@ -286,7 +246,8 @@ class EditFileFreeTool:
                             None, new_code.strip(), matched_code.strip(), autojunk=False
                         ).ratio()
 
-                        if similarity >= min_similarity:
+                        # 使用默认相似度阈值 0.6
+                        if similarity >= 0.6:
                             # 计算精确位置
                             start_pos = sum(
                                 len(content_lines[i]) for i in range(match_line)
@@ -352,8 +313,8 @@ class EditFileFreeTool:
             if best_similarity >= 0.95:
                 break
 
-        # 只有当相似度足够高时才返回匹配
-        if best_match is not None and best_similarity >= min_similarity:
+        # 只有当相似度足够高时才返回匹配（默认阈值 0.6）
+        if best_match is not None and best_similarity >= 0.6:
             return best_match, None
 
         # 如果找不到匹配，返回 None（表示需要追加）
@@ -369,38 +330,19 @@ class EditFileFreeTool:
             (是否成功, 新内容或错误信息, 警告信息)
         """
         new_code = diff["new_code"]
-        action = diff.get("action", "auto")
-        min_similarity = diff.get("min_similarity", 0.6)
 
-        # 如果明确指定为 append，直接追加
-        if action == "append":
-            # 确保文件末尾有换行符
+        # 尝试查找匹配位置
+        match_result, error_msg = EditFileFreeTool._find_best_match_position(
+            content, new_code
+        )
+
+        if match_result is None:
+            # 找不到匹配则追加到文件末尾
             if content and not content.endswith("\n"):
                 new_content = content + "\n" + new_code
             else:
                 new_content = content + new_code
-            return True, new_content, None
-
-        # 尝试查找匹配位置
-        match_result, error_msg = EditFileFreeTool._find_best_match_position(
-            content, new_code, min_similarity
-        )
-
-        if match_result is None:
-            # 如果找不到匹配且不是强制替换，则追加
-            if action == "replace":
-                return (
-                    False,
-                    error_msg or "未找到匹配的代码位置，无法执行替换操作",
-                    None,
-                )
-            else:
-                # 自动模式：找不到匹配则追加
-                if content and not content.endswith("\n"):
-                    new_content = content + "\n" + new_code
-                else:
-                    new_content = content + new_code
-                return True, new_content, "未找到匹配位置，代码已追加到文件末尾"
+            return True, new_content, "未找到匹配位置，代码已追加到文件末尾"
 
         start_pos, end_pos, similarity = match_result
 
