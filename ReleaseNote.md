@@ -1,3 +1,162 @@
+### Release Note - v0.8.2 2025-12-04
+
+#### **🚀 新功能 (Features)**
+
+- **文件编辑工具重大升级**
+  - **多处匹配智能确认与预览**：当 search 文本在文件中存在多处匹配时，工具会自动检测并生成匹配位置预览（包含行号、列号及前后各3行上下文），要求 Agent 确认是否继续替换所有匹配，避免误替换
+  - **移除 count 参数**：不再支持通过 count 参数控制替换次数，改为通过多处匹配检测和确认机制来确保替换的准确性
+  - **增强的错误提示**：当搜索失败时，提供详细的错误信息和修复建议，包括建议使用 `read_code` 工具重新读取文件、提示文件可能已被更新、建议在 search 中包含足够的上下文等
+  - **重要提示**：search 必须提供足够的上下文来唯一定位目标位置，建议包含目标代码的前后几行上下文、函数签名或唯一标识符，避免匹配到错误的位置
+  - **统一编辑工具**：移除 `edit_file_free` 和 `edit_file_structured`，统一为 `edit_file` 工具，简化使用方式
+
+- **规则系统增强**
+  - **中心规则仓库**：引入中心规则仓库功能（`JARVIS_CENTRAL_RULES_REPO`），支持通过 Git 仓库共享团队规则
+    - 支持本地目录路径或 Git 仓库 URL
+    - 首次运行时自动克隆到 `{get_data_dir()}/central_rules_repo`
+    - 每日自动更新（通过 `daily_check_git_updates` 机制）
+    - 中心规则仓库中的规则优先级最高，会覆盖同名规则
+  - **规则分享功能**：新增 `RuleShareManager`，支持将本地规则分享到中心规则仓库
+    - 只能分享默认数据目录（`{get_data_dir()}/rules`）中的规则
+    - 分享时会将规则文件移动到中心仓库（而非复制），原文件会被删除
+    - 自动检测并排除已存在于中心仓库的规则
+  - **多目录规则加载**：支持从多个 rules 目录按优先级加载规则（全局规则 → 配置目录 → 项目规则 → 中心规则仓库）
+
+- **jarvis-c2rust 转译工具链重大增强**
+  - **Cargo Test 编译警告检测**：在 `cargo test` 通过后，自动检查编译和测试过程中的警告输出（如 `unused_mut`、`unused_variables`、`dead_code`、`unused_import` 等），进入警告修复阶段
+  - **自动修复步骤**：
+    - **编译警告修复**：优先使用 `cargo fix --allow-dirty --allow-staged` 自动修复可以自动修复的编译警告
+    - **Clippy 警告修复**：优先使用 `cargo clippy --fix --allow-dirty --allow-staged -- -D warnings` 自动修复可以自动修复的 clippy 警告
+    - 如果自动修复后仍有警告，继续手动修复剩余的警告
+  - **修复范围要求**：明确要求不仅要修复当前问题，如果修复过程中导致其他测试用例失败，也必须一并修复，确保修复后所有测试用例都能通过
+  - **Git 变更上下文支持**：
+    - 为构建修复与代码审查阶段引入 Git 变更上下文支持
+    - 修复提示词自动包含从函数开始处理到当前的 git diff 信息
+    - 使用 `truncate_git_diff_with_context_limit` 限制 git diff 长度（修复阶段30%，审查阶段50%）
+    - 帮助修复 Agent 了解当前代码状态和已做的修改，识别之前修改引入的问题
+  - **并发问题排查指南**：新增并发问题排查指南，帮助识别和解决测试中的竞态条件、共享资源并发访问等问题
+  - **构建修复阶段总结**：支持生成构建修复阶段的总结并在审查阶段展示，便于审查 Agent 了解修复过程
+  - **审查报告增强**：为审查报告增加修复代码示例要求，提升审查质量
+  - **差异截断功能增强**：为差异截断功能添加文件列表输出，便于了解被截断的文件
+
+- **代码架构大规模重构**
+  - **Transpiler 模块化重构**：将 Transpiler 类拆分为多个专门的管理模块（`transpiler_agents.py`、`transpiler_build.py`、`transpiler_codegen.py`、`transpiler_compile.py`、`transpiler_config.py`、`transpiler_context.py`、`transpiler_executor.py`、`transpiler_generation.py`、`transpiler_git.py`、`transpiler_mod_utils.py`、`transpiler_modules.py`、`transpiler_planning.py`、`transpiler_review.py`、`transpiler_symbols.py`），提升代码可维护性
+  - **Optimizer 模块化重构**：将优化器模块拆分为多个功能模块（`optimizer_build_fix.py`、`optimizer_clippy.py`、`optimizer_config.py`、`optimizer_docs.py`、`optimizer_options.py`、`optimizer_progress.py`、`optimizer_report.py`、`optimizer_unsafe.py`、`optimizer_utils.py`、`optimizer_visibility.py`），职责更清晰
+  - **Library Replacer 模块化重构**：将库替换器拆分为多个模块（`library_replacer_checkpoint.py`、`library_replacer_llm.py`、`library_replacer_loader.py`、`library_replacer_output.py`、`library_replacer_prompts.py`、`library_replacer_utils.py`）
+  - **LLM Module Agent 模块化重构**：将单体模块拆分为多个职责单一的子模块（`llm_module_agent_apply.py`、`llm_module_agent_executor.py`、`llm_module_agent_loader.py`、`llm_module_agent_prompts.py`、`llm_module_agent_types.py`、`llm_module_agent_utils.py`、`llm_module_agent_validator.py`）
+  - **CodeAgent 重构**：重构 CodeAgent 类，拆分为多个专门的管理器（`code_agent_build.py`、`code_agent_diff.py`、`code_agent_git.py`、`code_agent_impact.py`、`code_agent_lint.py`、`code_agent_llm.py`、`code_agent_postprocess.py`、`code_agent_prompts.py`、`code_agent_rules.py`），提升代码组织性
+
+- **LSP 客户端优化**
+  - **符号搜索匹配逻辑优化**：优化符号搜索匹配逻辑与展示格式，提升搜索准确性
+  - **路径处理改进**：使用独立 LSP 工作目录处理相对和绝对路径，统一使用相对路径提升跨平台兼容性
+  - **新增工具方法**：新增将绝对路径转为项目相对路径的工具方法
+
+- **非交互模式支持**
+  - **RIPER-5 协议支持**：引入 RIPER-5 协议与模式声明机制，支持非交互模式自动执行
+  - **系统提示注入**：为非交互模式注入系统提示，实现无用户确认自动执行
+  - **提示优化**：优化非交互模式提示语表述，精简提示文案
+
+- **构建系统检测增强**
+  - **LLM 智能构建系统检测**：引入 LLM 智能构建系统检测与确认机制，提升检测准确性
+  - **文件统计重构**：重构构建系统检测器的文件统计实现，提升性能
+
+- **其他功能增强**
+  - **代码行数统计工具集成**：在 Docker 镜像中集成 `loc` 代码行数统计工具
+  - **语法错误容忍度增强**：增强语法错误容忍度，支持部分符号提取，即使存在语法错误也能提取部分符号
+  - **文档测试验证**：启用文档测试验证以增强自检能力
+  - **常量统一管理**：统一提取公共常量并集中管理（`constants.py`）
+
+#### **📌 修复 (Fixes)**
+
+- **文件编辑工具修复**
+  - 修复编译检查异常捕获的缩进错误
+  - 修复修改成功后备份文件未删除的问题
+  - 统一并强化文件编辑匹配逻辑，将模糊匹配改为精确匹配以提升编辑稳定性
+
+- **转译工具链修复**
+  - 修复审查迭代结束后资源泄漏问题
+  - 修正构建修复标记在重试循环中被重置的问题
+  - 修复工具注册时对 want 字段的强制校验问题，放宽工具调用格式校验
+
+- **其他修复**
+  - 修复无工具调用提示触发阈值过高的问题，降低阈值并改用专用方法设置提示
+  - 修复 LSP 客户端路径处理问题，使用独立工作目录处理相对和绝对路径
+
+#### **🔧 优化与重构 (Refactors & Improvements)**
+
+- **Agent 管理优化**
+  - **移除 Agent 缓存机制**：移除 Agent 缓存机制改为每次新建，避免上下文累积和记忆干扰
+  - **延迟创建 LLM 实例**：在 `llm_context_recommender` 中延迟创建 LLM 实例，每次调用都重新创建，避免上下文窗口累积导致的问题
+  - **拆分 Agent 职责**：拆分代码生成与修复 Agent 职责，修复 Agent 每次重新创建，确保每次修复都有独立的上下文和状态
+
+- **代码质量提升**
+  - **代码格式化重构**：重构代码格式化与静态检查流程，重命名格式化相关函数和变量以支持更通用后置命令
+  - **构建验证器增强**：增强 cargo 错误日志提取能力，提升错误信息准确性
+  - **符号提取器优化**：增强语法错误容忍度，支持部分符号提取
+
+- **工具系统优化**
+  - **工具调用格式放宽**：放宽工具调用格式校验，移除对 want 字段的强制要求
+  - **LSP 客户端重构**：统一使用相对路径提升跨平台兼容性，使用独立 LSP 工作目录处理路径问题
+
+- **测试系统优化**
+  - **测试统一**：将 `--doc` 测试统一改为完整 `cargo test`，确保测试完整性
+  - **测试逻辑调整**：调整语法单元提取与代码还原的测试逻辑，增强测试准确性
+
+#### **📚 文档更新 (Documentation)**
+
+- **技术报告全面更新**
+  - 完善代码编辑工具和测试修复流程说明
+  - 统一文件编辑工具命名并更新匹配策略描述
+  - 更新规则系统说明，添加中心规则仓库和规则分享功能说明
+  - 更新 C2Rust 转译工具链说明，添加 cargo test 警告检测、自动修复步骤、修复范围要求、并发问题排查指南等
+  - 完善 Git 变更上下文支持说明
+
+- **使用指南更新**
+  - 补充 sed 命令删除大量代码的使用指引
+  - 新增 Git 历史恢复机制说明
+  - 补充测试用例编写规范要求
+  - 补充开发过程中必须清理临时文件的指引
+  - 完善搜索文本的使用提示与错误信息
+  - 在警告修复指引中增加自动修复步骤
+  - 增加并发问题排查指南
+
+- **其他文档更新**
+  - 更新 Docker Compose 使用说明
+  - 统一并强化 crate 根目录路径说明
+  - 补充 edit_file 工具中 insert_before/insert_after 的块索引行为说明
+
+#### **🧪 测试增强**
+
+- **LSP 客户端测试增强**
+  - 增强 LSP 客户端测试的断言逻辑，添加对返回内容的详细校验
+  - 校验返回的符号信息、定义位置、引用数量等，提升测试质量
+
+- **代码代理测试增强**
+  - 添加代码代理核心模块单元测试
+  - 添加代码代理规则管理测试（`test_code_agent_rules.py`）
+  - 添加代码代理提示词测试（`test_code_agent_prompts.py`）
+
+- **转译工具链测试增强**
+  - 添加库替换器工具函数测试（`test_library_replacer_utils.py`）
+  - 添加 LLM 模块 Agent 工具函数测试（`test_llm_module_agent_utils.py`）
+  - 添加模型测试（`test_models.py`）
+  - 添加工具函数测试（`test_utils.py`）
+
+- **代码分析器测试增强**
+  - 添加构建验证配置测试（`test_build_validation_config.py`）
+  - 添加 Tree-sitter 提取器测试（`test_tree_sitter_extractor.py`），增加语法错误处理测试用例
+  - 添加工具函数测试（`test_utils.py`）
+
+本次更新是一次**重大功能增强和架构优化**版本。核心亮点是**文件编辑工具的智能化升级**，通过多处匹配确认机制显著提升了编辑的准确性和安全性。**规则系统的中心化**为团队协作提供了强大的规则共享能力。**C2Rust 转译工具链的全面增强**，特别是自动修复、Git 上下文支持和并发问题排查，大幅提升了转译的可靠性和效率。**大规模架构重构**将原本的单体模块拆分为多个职责单一的子模块，显著提升了代码的可维护性和可扩展性。
+
+**技术亮点**：
+
+- **智能文件编辑**：多处匹配智能确认与预览，避免误替换，增强错误提示，提升编辑准确性
+- **中心规则仓库**：支持团队规则共享，自动更新，优先级管理，规则分享功能
+- **自动修复流程**：Cargo Test 警告检测、自动修复步骤（cargo fix、cargo clippy --fix）、修复范围要求
+- **Git 上下文支持**：构建修复和审查阶段自动包含 Git 变更信息，帮助 Agent 理解代码状态
+- **模块化架构**：大规模重构，将单体模块拆分为多个职责单一的子模块，提升可维护性
+- **非交互模式**：RIPER-5 协议支持，自动执行，无需用户确认
+
 ### Release Note - v0.8.0 2025-11-30
 
 #### **🚀 新功能 (Features)**
