@@ -175,6 +175,8 @@ class ReviewManager:
                             commit_diff,
                             llm_group=self.llm_group,
                             token_ratio=0.5,
+                            base_commit=base_commit,
+                            crate_dir=self.crate_dir,
                         )
                         diff_status = "success"
                     else:
@@ -876,6 +878,8 @@ class ReviewManager:
                             agent=ca,
                             llm_group=self.llm_group,
                             token_ratio=0.3,
+                            base_commit=base_commit,
+                            crate_dir=self.crate_dir,
                         )
 
                         fix_prompt += "\n\n"
