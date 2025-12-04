@@ -26,7 +26,6 @@ from .impact_analyzer import (
     TestDiscoverer,
     parse_git_diff_to_edits,
 )
-from .structured_code import StructuredCodeExtractor
 
 __all__ = [
     # Symbol extraction
@@ -63,6 +62,4 @@ __all__ = [
     "Edit",
     "TestDiscoverer",
     "parse_git_diff_to_edits",
-    # Structured code extraction
-    "StructuredCodeExtractor",
 ]

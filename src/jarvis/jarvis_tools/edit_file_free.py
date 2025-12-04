@@ -4,9 +4,8 @@
 import difflib
 import os
 import re
+import shutil
 from typing import Any, Dict, List, Optional, Tuple
-
-from jarvis.jarvis_tools.edit_file_structed import EditFileTool
 
 
 class EditFileFreeTool:
@@ -76,8 +75,126 @@ class EditFileFreeTool:
 
     @staticmethod
     def _validate_basic_args(args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """验证基本参数（与结构化编辑保持一致的 files 验证逻辑）"""
-        return EditFileTool._validate_basic_args(args)
+        """验证基本参数
+
+        Returns:
+            如果验证失败，返回错误响应；否则返回None
+        """
+        files = args.get("files")
+
+        if not files:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少必需参数：files",
+            }
+
+        if not isinstance(files, list):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "files参数必须是数组类型",
+            }
+
+        if len(files) == 0:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "files数组不能为空",
+            }
+
+        # 验证每个文件项
+        for idx, file_item in enumerate(files):
+            if not isinstance(file_item, dict):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项必须是字典类型",
+                }
+
+            file_path = file_item.get("file_path")
+            diffs = file_item.get("diffs", [])
+
+            if not file_path:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项缺少必需参数：file_path",
+                }
+
+            if not diffs:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项缺少必需参数：diffs",
+                }
+
+            if not isinstance(diffs, list):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"files数组第 {idx + 1} 项的diffs参数必须是数组类型",
+                }
+
+        return None
+
+    @staticmethod
+    def _read_file_with_backup(file_path: str) -> Tuple[str, Optional[str]]:
+        """读取文件并创建备份
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            (文件内容, 备份文件路径或None)
+        """
+        abs_path = os.path.abspath(file_path)
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+
+        file_content = ""
+        backup_path = None
+        if os.path.exists(abs_path):
+            with open(abs_path, "r", encoding="utf-8") as f:
+                file_content = f.read()
+            # 创建备份文件
+            backup_path = abs_path + ".bak"
+            try:
+                shutil.copy2(abs_path, backup_path)
+            except Exception:
+                # 备份失败不影响主流程
+                backup_path = None
+
+        return file_content, backup_path
+
+    @staticmethod
+    def _write_file_with_rollback(
+        abs_path: str, content: str, backup_path: Optional[str]
+    ) -> Tuple[bool, Optional[str]]:
+        """写入文件，失败时回滚
+
+        Args:
+            abs_path: 文件绝对路径
+            content: 要写入的内容
+            backup_path: 备份文件路径或None
+
+        Returns:
+            (是否成功, 错误信息或None)
+        """
+        try:
+            with open(abs_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return (True, None)
+        except Exception as write_error:
+            # 写入失败，尝试回滚
+            if backup_path and os.path.exists(backup_path):
+                try:
+                    shutil.copy2(backup_path, abs_path)
+                    os.remove(backup_path)
+                except Exception:
+                    pass
+            error_msg = f"文件写入失败: {str(write_error)}"
+            print(f"❌ {error_msg}")
+            return (False, error_msg)
 
     @staticmethod
     def _is_diff_format(content: str) -> bool:
@@ -327,6 +444,8 @@ class EditFileFreeTool:
             context_lines = 3
             if core_line_count <= context_lines * 2:
                 # 如果代码太短，使用全部代码匹配
+                prefix_lines = old_code_core_lines
+                suffix_lines = old_code_core_lines
                 prefix_code = old_code_core
                 suffix_code = old_code_core
             else:
@@ -377,7 +496,9 @@ class EditFileFreeTool:
                         prefix_start_line = i
                         break
 
-                suffix_match: Optional[Tuple[int, float]] = None
+                suffix_match: Optional[Tuple[int, int, float]] = (
+                    None  # (start_pos, end_pos, similarity)
+                )
                 suffix_similarity = 0.0
                 # 在前缀之后查找后缀（最多向后搜索 50 行）
                 search_end = min(len(content_lines), prefix_start_line + 50)
@@ -402,7 +523,14 @@ class EditFileFreeTool:
                             suffix_start_pos = sum(
                                 len(content_lines[i]) for i in range(start_line)
                             )
-                            suffix_match = (suffix_start_pos, similarity)
+                            suffix_end_pos = sum(
+                                len(content_lines[i]) for i in range(end_line)
+                            )
+                            suffix_match = (
+                                suffix_start_pos,
+                                suffix_end_pos,
+                                similarity,
+                            )
 
                         if similarity >= 0.95:
                             break
@@ -411,13 +539,13 @@ class EditFileFreeTool:
 
                 # 如果前后缀都匹配成功，计算综合相似度
                 if suffix_match and suffix_similarity >= 0.7:
-                    suffix_start_pos, _ = suffix_match
+                    _, suffix_end_pos, _ = suffix_match
                     # 综合相似度取平均值
                     combined_similarity = (prefix_similarity + suffix_similarity) / 2.0
-                    # 返回插入位置（前缀位置）
+                    # 返回匹配的代码块范围（从前缀开始到后缀结束）
                     return (
                         prefix_start_pos,
-                        prefix_start_pos,
+                        suffix_end_pos,
                         combined_similarity,
                     ), None
 
@@ -487,10 +615,6 @@ class EditFileFreeTool:
         old_code = diff.get("old_code", "")
         new_code = diff.get("new_code", "")
 
-        # 如果是 diff 格式且旧代码为空（只有新增），直接失败
-        if is_diff and not old_code.strip():
-            return False, "diff 格式中旧代码为空，无法确定插入位置", None
-
         # 确定用于匹配的代码和相似度阈值
         # 如果是 diff 格式，使用 old_code 来匹配
         # 如果不是 diff 格式，使用 new_code 的前几行和后几行分别匹配
@@ -503,26 +627,42 @@ class EditFileFreeTool:
             use_context_lines = True  # 非 diff 格式使用前后几行分别匹配
         min_similarity = 0.7
 
+        # 如果是 diff 格式且旧代码为空（只有新增），直接追加到文件末尾
+        if is_diff and not old_code.strip():
+            # 确保文件末尾有换行符
+            if content and not content.endswith("\n"):
+                new_content = content + "\n" + new_code
+            else:
+                new_content = content + new_code
+            return True, new_content, "追加到文件末尾（diff格式只有新增）"
+
         # 尝试查找匹配位置
         match_result, error_msg = EditFileFreeTool._find_best_match_position(
             content, match_code, use_context_lines=use_context_lines
         )
 
         if match_result is None:
-            # 找不到匹配则直接失败
-            if error_msg:
-                return False, f"未找到匹配位置: {error_msg}", None
+            # 找不到匹配则追加到文件末尾
+            # 确保文件末尾有换行符
+            if content and not content.endswith("\n"):
+                new_content = content + "\n" + new_code
             else:
-                return False, "未找到匹配位置，请检查代码上下文是否正确", None
+                new_content = content + new_code
+            return True, new_content, "追加到文件末尾（未找到匹配位置）"
 
         start_pos, end_pos, similarity = match_result
 
-        # 如果相似度太低，视为未找到匹配，直接失败
+        # 如果相似度太低，视为未找到匹配，追加到文件末尾
         if similarity < min_similarity:
+            # 确保文件末尾有换行符
+            if content and not content.endswith("\n"):
+                new_content = content + "\n" + new_code
+            else:
+                new_content = content + new_code
             return (
-                False,
-                f"匹配相似度较低 ({similarity:.2%})，低于阈值 ({min_similarity:.2%})，请检查代码上下文是否正确",
-                None,
+                True,
+                new_content,
+                f"追加到文件末尾（匹配相似度较低 {similarity:.2%}，低于阈值 {min_similarity:.2%}）",
             )
 
         # 检查相似度
@@ -533,18 +673,9 @@ class EditFileFreeTool:
                 f"请确认替换位置是否正确。匹配位置: 字符 {start_pos}-{end_pos}"
             )
 
-        # 执行替换或插入
-        if is_diff:
-            # diff 格式：替换匹配的旧代码
-            new_content = content[:start_pos] + new_code + content[end_pos:]
-        else:
-            # 非 diff 格式：在匹配位置插入新代码
-            # 如果匹配位置是同一个位置（前后缀匹配），则在该位置插入
-            if start_pos == end_pos:
-                new_content = content[:start_pos] + new_code + content[start_pos:]
-            else:
-                # 如果匹配到了代码块，替换它
-                new_content = content[:start_pos] + new_code + content[end_pos:]
+        # 执行替换
+        # 无论是 diff 格式还是非 diff 格式，都替换匹配的代码块
+        new_content = content[:start_pos] + new_code + content[end_pos:]
 
         return True, new_content, warning
 
@@ -605,7 +736,7 @@ class EditFileFreeTool:
                     continue
 
                 # 读取原始内容并创建备份
-                original_content, backup_path = EditFileTool._read_file_with_backup(
+                original_content, backup_path = EditFileFreeTool._read_file_with_backup(
                     file_path
                 )
 
@@ -645,7 +776,7 @@ class EditFileFreeTool:
 
                 # 写入文件（失败时回滚）
                 abs_path = os.path.abspath(file_path)
-                write_success, write_error = EditFileTool._write_file_with_rollback(
+                write_success, write_error = EditFileFreeTool._write_file_with_rollback(
                     abs_path, current_content, backup_path
                 )
                 if write_success:
