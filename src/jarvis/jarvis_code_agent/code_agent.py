@@ -97,6 +97,7 @@ class CodeAgent(Agent):
             "read_code",
             "edit_file_structed",  # 基于块id的结构化编辑
             "edit_file_normal",  # 普通 search/replace 编辑
+            "edit_file_free",  # 基于上下文的模糊匹配编辑
             "rewrite_file",
             "lsp_client",  # LSP客户端工具，用于获取代码补全、悬停等信息
         ]

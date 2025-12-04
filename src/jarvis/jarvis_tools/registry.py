@@ -595,7 +595,7 @@ class ToolRegistry(OutputHandlerProtocol):
         if len(content) > 2048:
             return (
                 "\n\n⚠️ 提示：响应内容较长（超过2048字符），可能是上下文溢出导致工具调用解析失败。"
-                "如果是修改文件（edit_file_structed/edit_file_normal）或重写文件（rewrite_file）操作，"
+                "如果是修改文件（edit_file_structed/edit_file_normal/edit_file_free）或重写文件（rewrite_file）操作，"
                 "建议分多次进行，每次处理文件的一部分。"
             )
         return ""
