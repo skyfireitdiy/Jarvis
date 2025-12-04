@@ -193,6 +193,7 @@ class BuildManager:
         curr: Dict[str, Any],
         symbols_path: str,
         include_output_patch_hint: bool = False,
+        agent: Optional[Any] = None,
     ) -> List[str]:
         """
         构建修复提示词的基础部分。
@@ -354,8 +355,9 @@ class BuildManager:
                 if git_diff and git_diff.strip():
                     # 限制 git diff 长度，避免上下文过大
                     # 使用较小的比例（30%）因为修复提示词本身已经很长
-                    # 创建一个临时 Agent 用于 truncate（不保存）
-                    agent = self.get_fix_agent(c_code)
+                    # 如果提供了 agent 则复用，否则创建临时 Agent 用于 truncate
+                    if agent is None:
+                        agent = self.get_fix_agent(c_code)
                     git_diff = truncate_git_diff_with_context_limit(
                         git_diff, agent=agent, token_ratio=0.3
                     )
@@ -510,6 +512,7 @@ class BuildManager:
         symbols_path: str,
         include_output_patch_hint: bool = False,
         command: Optional[str] = None,
+        agent: Optional[Any] = None,
     ) -> str:
         """
         构建修复提示词。
@@ -535,6 +538,7 @@ class BuildManager:
             curr,
             symbols_path,
             include_output_patch_hint,
+            agent=agent,
         )
         stage_lines = self.build_repair_prompt_stage_section(stage, output, command)
         prompt = "\n".join(base_lines + stage_lines)
@@ -668,6 +672,13 @@ class BuildManager:
                 for i, line in enumerate(key_errors[:5], 1):
                     typer.secho(f"  {i}. {line[:100]}", fg=typer.colors.CYAN)
 
+        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
+        # 记录运行前的 commit
+        before_commit = self.get_crate_commit_hash()
+        # 先创建修复 Agent（后续会复用）
+        # 使用修复 Agent，每次重新创建，并传入 C 代码
+        agent = self.get_fix_agent(c_code)
+
         repair_prompt = self.build_repair_prompt(
             stage="cargo test",
             output=output,
@@ -679,12 +690,8 @@ class BuildManager:
             symbols_path=symbols_path,
             include_output_patch_hint=True,
             command="cargo test -- --nocapture",
+            agent=agent,
         )
-        # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-        # 记录运行前的 commit
-        before_commit = self.get_crate_commit_hash()
-        # 使用修复 Agent，每次重新创建，并传入 C 代码
-        agent = self.get_fix_agent(c_code)
         agent.run(
             self.compose_prompt_with_context(repair_prompt, for_fix=True),
             prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]",
