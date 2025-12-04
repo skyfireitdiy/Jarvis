@@ -1663,7 +1663,7 @@ class Calculator:
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code}],
+                    "diffs": [{"content": new_code}],
                 }
             ]
         }
@@ -1703,7 +1703,7 @@ class Calculator:
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code}],
+                    "diffs": [{"content": new_code}],
                 }
             ]
         }
@@ -1739,7 +1739,7 @@ class Calculator:
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code}],
+                    "diffs": [{"content": new_code}],
                 }
             ]
         }
@@ -1778,7 +1778,7 @@ def new_function():
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code}],
+                    "diffs": [{"content": new_code}],
                 }
             ]
         }
@@ -1813,7 +1813,7 @@ class Calculator:
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": new_code}],
+                    "diffs": [{"content": new_code}],
                 }
             ]
         }
@@ -1846,8 +1846,8 @@ class Calculator:
                 {
                     "file_path": sample_file,
                     "diffs": [
-                        {"new_code": "def hello():\n    print('Updated Hello')\n"},
-                        {"new_code": "def new_func():\n    pass\n"},
+                        {"content": 'def hello():\n    print("Updated Hello")\n'},
+                        {"content": "def new_func():\n    pass\n"},
                     ],
                 }
             ]
@@ -1858,7 +1858,7 @@ class Calculator:
 
         # 验证完整文件内容
         expected_content = """def hello():
-    print('Updated Hello')
+    print("Updated Hello")
 
 def add(a, b):
     return a + b
@@ -1895,11 +1895,11 @@ def new_func():
                 "files": [
                     {
                         "file_path": filepath1,
-                        "diffs": [{"new_code": "def func1():\n    return 1\n"}],
+                        "diffs": [{"content": "def func1():\n    return 1\n"}],
                     },
                     {
                         "file_path": filepath2,
-                        "diffs": [{"new_code": "def func2():\n    return 2\n"}],
+                        "diffs": [{"content": "def func2():\n    return 2\n"}],
                     },
                 ]
             }
@@ -1940,7 +1940,7 @@ def new_func():
         assert result["success"] is False
         # 错误信息可能在 stdout 或 stderr 中
         error_msg = (result.get("stderr", "") + " " + result.get("stdout", "")).lower()
-        assert "new_code" in error_msg
+        assert "content" in error_msg
 
     def test_validate_new_code_not_empty(self, tool, sample_file):
         """测试：验证 new_code 不能为空"""
@@ -1948,7 +1948,7 @@ def new_func():
             "files": [
                 {
                     "file_path": sample_file,
-                    "diffs": [{"new_code": ""}],
+                    "diffs": [{"content": ""}],
                 }
             ]
         }
@@ -1998,11 +1998,11 @@ def add(a, b):
         content = """def hello():
     print("Hello")
 """
-        new_code = """def completely_different():
+        old_code = """def completely_different():
     return None
 """
         match_result, error_msg = EditFileFreeTool._find_best_match_position(
-            content, new_code
+            content, old_code
         )
 
         assert match_result is None
@@ -2013,6 +2013,13 @@ def add(a, b):
     print("Hello")
 """
         diff = {
+            "content": """def hello():
+    print("Updated")
+""",
+            "is_diff": False,
+            "old_code": """def hello():
+    print("Updated")
+""",
             "new_code": """def hello():
     print("Updated")
 """,
@@ -2033,6 +2040,13 @@ def add(a, b):
     print("Hello")
 """
         diff = {
+            "content": """def new_func():
+    pass
+""",
+            "is_diff": False,
+            "old_code": """def new_func():
+    pass
+""",
             "new_code": """def new_func():
     pass
 """,
@@ -2070,7 +2084,7 @@ def new_func():
                 "files": [
                     {
                         "file_path": filepath,
-                        "diffs": [{"new_code": new_code}],
+                        "diffs": [{"content": new_code}],
                     }
                 ]
             }
@@ -2092,3 +2106,166 @@ def new_func():
                 os.unlink(filepath)
             if os.path.exists(filepath + ".bak"):
                 os.unlink(filepath + ".bak")
+
+    def test_diff_format_add_line(self, tool, sample_file):
+        """测试：diff 格式 - 添加一行"""
+        diff_content = """ def add(a, b):
+-    return a + b
++    result = a + b
++    return result
+"""
+        args = {
+            "files": [
+                {
+                    "file_path": sample_file,
+                    "diffs": [{"content": diff_content}],
+                }
+            ]
+        }
+
+        result = tool.execute(args)
+        assert result["success"] is True
+
+        # 验证完整文件内容
+        expected_content = """def hello():
+    print("Hello, World!")
+def add(a, b):
+    result = a + b
+    return result
+
+class Calculator:
+    def __init__(self):
+        self.value = 0
+    
+    def multiply(self, a, b):
+        return a * b
+"""
+        with open(sample_file, "r", encoding="utf-8") as f:
+            actual_content = f.read()
+        assert actual_content == expected_content
+
+    def test_diff_format_delete_line(self, tool, sample_file):
+        """测试：diff 格式 - 删除一行"""
+        diff_content = """ def hello():
+-    print("Hello, World!")
++    print("Updated Hello")
+"""
+        args = {
+            "files": [
+                {
+                    "file_path": sample_file,
+                    "diffs": [{"content": diff_content}],
+                }
+            ]
+        }
+
+        result = tool.execute(args)
+        assert result["success"] is True
+
+        # 验证完整文件内容
+        expected_content = """def hello():
+    print("Updated Hello")
+
+def add(a, b):
+    return a + b
+
+class Calculator:
+    def __init__(self):
+        self.value = 0
+    
+    def multiply(self, a, b):
+        return a * b
+"""
+        with open(sample_file, "r", encoding="utf-8") as f:
+            actual_content = f.read()
+        assert actual_content == expected_content
+
+    def test_diff_format_replace_function(self, tool, sample_file):
+        """测试：diff 格式 - 替换整个函数"""
+        diff_content = """ def add(a, b):
+-    return a + b
++    return a + b + 1
+"""
+        args = {
+            "files": [
+                {
+                    "file_path": sample_file,
+                    "diffs": [{"content": diff_content}],
+                }
+            ]
+        }
+
+        result = tool.execute(args)
+        assert result["success"] is True
+
+        # 验证完整文件内容
+        expected_content = """def hello():
+    print("Hello, World!")
+def add(a, b):
+    return a + b + 1
+
+class Calculator:
+    def __init__(self):
+        self.value = 0
+    
+    def multiply(self, a, b):
+        return a * b
+"""
+        with open(sample_file, "r", encoding="utf-8") as f:
+            actual_content = f.read()
+        assert actual_content == expected_content
+
+    def test_diff_format_add_only(self, tool, sample_file):
+        """测试：diff 格式 - 只有新增（没有旧代码）"""
+        diff_content = """+def new_function():
++    print("New function")
+"""
+        args = {
+            "files": [
+                {
+                    "file_path": sample_file,
+                    "diffs": [{"content": diff_content}],
+                }
+            ]
+        }
+
+        result = tool.execute(args)
+        assert result["success"] is True
+
+        # 验证完整文件内容（应该追加到末尾）
+        with open(sample_file, "r", encoding="utf-8") as f:
+            actual_content = f.read()
+        assert "def new_function():" in actual_content
+        assert 'print("New function")' in actual_content
+
+    def test_is_diff_format(self, tool):
+        """测试：判断是否为 diff 格式"""
+        # diff 格式
+        assert EditFileFreeTool._is_diff_format("+new line\n")
+        assert EditFileFreeTool._is_diff_format("-old line\n")
+        assert EditFileFreeTool._is_diff_format(" unchanged\n+new\n")
+        assert EditFileFreeTool._is_diff_format(" unchanged\n-old\n")
+
+        # 不是 diff 格式
+        assert not EditFileFreeTool._is_diff_format("normal code\n")
+        assert not EditFileFreeTool._is_diff_format("")
+        assert not EditFileFreeTool._is_diff_format("+++file header\n")
+        assert not EditFileFreeTool._is_diff_format("---file header\n")
+
+    def test_parse_diff_content(self, tool):
+        """测试：解析 diff 格式内容"""
+        diff_content = """ def hello():
+-    print("Old")
++    print("New")
+     return True
+"""
+        old_code, new_code = EditFileFreeTool._parse_diff_content(diff_content)
+
+        assert 'print("Old")' in old_code
+        assert 'print("Old")' not in new_code
+        assert 'print("New")' in new_code
+        assert 'print("New")' not in old_code
+        assert "def hello():" in old_code
+        assert "def hello():" in new_code
+        assert "return True" in old_code
+        assert "return True" in new_code
