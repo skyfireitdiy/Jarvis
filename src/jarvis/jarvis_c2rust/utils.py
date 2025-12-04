@@ -447,8 +447,8 @@ def truncate_git_diff_with_context_limit(
 
     参数:
         git_diff: 原始的 git diff 内容
-        agent: 可选的 agent 实例，用于获取剩余 token 数量（更准确）
-        llm_group: 可选的 LLM 组名称，用于获取输入窗口限制
+        agent: 可选的 agent 实例，用于获取剩余 token 数量（更准确，考虑对话历史）
+        llm_group: 可选的 LLM 组名称，用于获取输入窗口限制（当 agent 不可用时使用）
         token_ratio: token 使用比例（默认 0.3，即 30%）
 
     返回:
@@ -465,7 +465,6 @@ def truncate_git_diff_with_context_limit(
             remaining_tokens = agent.get_remaining_token_count()
             if remaining_tokens > 0:
                 # 使用剩余 token 的指定比例作为字符限制（1 token ≈ 4字符）
-                # 所以 remaining_tokens * token_ratio * 4 = remaining_tokens * token_ratio * 4
                 max_diff_chars = int(remaining_tokens * token_ratio * 4)
                 if max_diff_chars <= 0:
                     max_diff_chars = None
