@@ -373,8 +373,7 @@ class AgentManager:
 
             # 只关注可能修改代码的工具
             edit_tools = {
-                "edit_file_normal",
-                "edit_file_free",
+                "edit_file",
                 "rewrite_file",
                 "apply_patch",
             }
