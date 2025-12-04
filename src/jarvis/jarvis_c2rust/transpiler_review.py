@@ -724,6 +724,19 @@ class ReviewManager:
                     f"[c2rust-transpiler][review] 代码审查通过{limit_info} (共 {i + 1} 次迭代)。",
                     fg=typer.colors.GREEN,
                 )
+                # 清理当前 agent 的事件订阅和记录
+                try:
+                    review_agent.event_bus.unsubscribe(
+                        BEFORE_TOOL_CALL, self.on_before_tool_call
+                    )
+                    review_agent.event_bus.unsubscribe(
+                        AFTER_TOOL_CALL, self.on_after_tool_call
+                    )
+                    # 清理 agent_before_commits 中的记录
+                    if agent_key in self.agent_before_commits:
+                        del self.agent_before_commits[agent_key]
+                except Exception:
+                    pass
                 # 记录审查结果到进度
                 try:
                     cur = self.progress.get("current") or {}
@@ -972,10 +985,25 @@ class ReviewManager:
             except Exception:
                 pass
 
+            # 清理当前迭代的 agent 事件订阅和记录（为下一次迭代做准备）
+            # 取消事件订阅，避免事件总线持有对 agent 的引用，导致 agent 无法被垃圾回收
+            try:
+                review_agent.event_bus.unsubscribe(
+                    BEFORE_TOOL_CALL, self.on_before_tool_call
+                )
+                review_agent.event_bus.unsubscribe(
+                    AFTER_TOOL_CALL, self.on_after_tool_call
+                )
+                # 清理 agent_before_commits 中的记录
+                if agent_key in self.agent_before_commits:
+                    del self.agent_before_commits[agent_key]
+            except Exception:
+                pass
+
             i += 1
 
-        # 达到迭代上限（仅当设置了上限时）
-        if max_iterations > 0 and i >= max_iterations:
+            # 达到迭代上限（仅当设置了上限时）
+            # 注意：最后一次迭代的 agent 已经在循环内部清理过了，这里不需要额外清理
             typer.secho(
                 f"[c2rust-transpiler][review] 已达到最大迭代次数上限({max_iterations})，停止审查优化。",
                 fg=typer.colors.YELLOW,
