@@ -394,6 +394,7 @@ class ProgressManager:
             edit_tools = {
                 "edit_file_structed",
                 "edit_file_normal",
+                "edit_file_free",
                 "rewrite_file",
                 "apply_patch",
             }

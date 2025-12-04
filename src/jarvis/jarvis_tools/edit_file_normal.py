@@ -176,9 +176,7 @@ class EditFileNormalTool:
             match_count = content.count(search)
             if match_count == 0:
                 # 任意一个 search 找不到就视为失败，避免静默不生效
-                error_msg = (
-                    f"第 {idx} 个diff失败：在文件内容中未找到要搜索的文本: {search[:100]}..."
-                )
+                error_msg = f"第 {idx} 个diff失败：在文件内容中未找到要搜索的文本: {search[:100]}..."
                 return False, error_msg
 
             # 应用替换
@@ -321,5 +319,3 @@ class EditFileNormalTool:
 
 
 __all__ = ["EditFileNormalTool"]
-
-

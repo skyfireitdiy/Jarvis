@@ -1241,5 +1241,3 @@ class EditFileTool:
 
 
 __all__ = ["EditFileTool", "EditErrorType"]
-
-
