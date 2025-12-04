@@ -2027,18 +2027,12 @@ def func2():
 
         result = tool._extract_syntax_units_with_split("dummy.py", content, 1, 120)
 
-        # _extract_syntax_units_with_split 不进行切分，直接返回原始语法单元
-        # 切分逻辑统一在 _merge_and_split_by_points 中处理
+        # _extract_syntax_units_with_split 不进行切分，直接返回原始语法单元；
+        # 空白分组与固定大小切分逻辑统一在 _merge_and_split_by_points 中处理。
         assert len(result) == 1
         assert result[0]["id"] == "unit"
         assert result[0]["start_line"] == 1
         assert result[0]["end_line"] == 120
-        assert result[0]["id"] == "g1"
-        assert result[0]["start_line"] == 1 and result[0]["end_line"] == 40
-        assert result[1]["id"] == "sub1"
-        assert result[1]["start_line"] == 41 and result[1]["end_line"] == 90
-        assert result[2]["id"] == "sub2"
-        assert result[2]["start_line"] == 91 and result[2]["end_line"] == 120
 
     def test_cache_restore_various_file_structures(self, tool, mock_agent):
         """测试不同文件结构在read_code读取后从cache恢复与原文件内容的一致性"""

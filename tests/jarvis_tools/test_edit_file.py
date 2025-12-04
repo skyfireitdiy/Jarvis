@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""jarvis_tools.edit_file 模块单元测试"""
+"""jarvis_tools.edit_file_structed 模块单元测试"""
 
 import os
 import tempfile
@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from jarvis.jarvis_tools.edit_file import EditFileTool
+from jarvis.jarvis_tools.edit_file_structed import EditFileTool
 
 
 class TestEditFileTool:

@@ -391,7 +391,12 @@ class ProgressManager:
                 return
 
             # 只关注可能修改代码的工具
-            edit_tools = {"edit_file", "rewrite_file", "apply_patch"}
+            edit_tools = {
+                "edit_file_structed",
+                "edit_file_normal",
+                "rewrite_file",
+                "apply_patch",
+            }
             if last_tool not in edit_tools:
                 return
 
