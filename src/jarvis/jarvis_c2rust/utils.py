@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -436,11 +437,86 @@ def check_and_handle_test_deletion(
     return False
 
 
+def extract_files_from_git_diff(git_diff: str) -> List[str]:
+    """
+    从 git diff 字符串中提取所有修改的文件列表。
+
+    参数:
+        git_diff: git diff 内容
+
+    返回:
+        List[str]: 修改的文件路径列表（去重）
+    """
+    if not git_diff or not git_diff.strip():
+        return []
+
+    files = set()
+    # 匹配 "diff --git a/path b/path" 格式
+    # git diff 标准格式：diff --git a/path b/path
+    pattern = r"^diff --git a/([^\s]+) b/([^\s]+)$"
+    for line in git_diff.split("\n"):
+        match = re.match(pattern, line)
+        if match:
+            # 通常 a/path 和 b/path 相同，但处理重命名时可能不同
+            file_a = match.group(1)
+            file_b = match.group(2)
+            # 优先使用 b 路径（新路径），如果不同则都添加
+            files.add(file_b)
+            if file_a != file_b:
+                files.add(file_a)
+
+    return sorted(list(files))
+
+
+def get_modified_files_from_git(
+    base_commit: Optional[str], crate_dir: Optional[Path]
+) -> List[str]:
+    """
+    使用 git 命令获取修改的文件列表。
+
+    参数:
+        base_commit: 基准 commit（如果为 None，则与 HEAD 比较）
+        crate_dir: crate 根目录（如果为 None，则使用当前目录）
+
+    返回:
+        List[str]: 修改的文件路径列表
+    """
+    if not crate_dir:
+        return []
+
+    try:
+        # 构建 git diff 命令
+        if base_commit:
+            cmd = ["git", "diff", "--name-only", base_commit]
+        else:
+            cmd = ["git", "diff", "--name-only", "HEAD"]
+
+        result = subprocess.run(
+            cmd,
+            cwd=crate_dir,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode == 0:
+            files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
+            return sorted(files)
+        else:
+            # 如果命令失败，返回空列表
+            return []
+    except Exception:
+        # 如果出现任何异常，返回空列表
+        return []
+
+
 def truncate_git_diff_with_context_limit(
     git_diff: str,
     agent: Optional[Any] = None,
     llm_group: Optional[str] = None,
     token_ratio: float = 0.3,
+    base_commit: Optional[str] = None,
+    crate_dir: Optional[Path] = None,
 ) -> str:
     """
     限制 git diff 的长度，避免上下文过大。
@@ -450,9 +526,11 @@ def truncate_git_diff_with_context_limit(
         agent: 可选的 agent 实例，用于获取剩余 token 数量（更准确，考虑对话历史）
         llm_group: 可选的 LLM 组名称，用于获取输入窗口限制（当 agent 不可用时使用）
         token_ratio: token 使用比例（默认 0.3，即 30%）
+        base_commit: 可选的基准 commit，如果提供则使用 git 命令获取文件列表
+        crate_dir: 可选的 crate 根目录，如果提供则使用 git 命令获取文件列表
 
     返回:
-        str: 限制长度后的 git diff（如果超出限制则截断并添加提示）
+        str: 限制长度后的 git diff（如果超出限制则截断并添加提示和文件列表）
     """
     if not git_diff or not git_diff.strip():
         return git_diff
@@ -482,6 +560,23 @@ def truncate_git_diff_with_context_limit(
 
     # 应用长度限制
     if len(git_diff) > max_diff_chars:
-        return git_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
+        # 优先使用 git 命令获取文件列表（更可靠）
+        if base_commit is not None and crate_dir:
+            modified_files = get_modified_files_from_git(base_commit, crate_dir)
+        else:
+            # 回退到从 diff 内容中提取
+            modified_files = extract_files_from_git_diff(git_diff)
+
+        truncated_diff = git_diff[:max_diff_chars] + "\n... (差异内容过长，已截断)"
+
+        # 如果有修改的文件，添加文件列表
+        if modified_files:
+            truncated_diff += "\n\n**修改的文件列表（共 {} 个文件）：**\n".format(
+                len(modified_files)
+            )
+            for file_path in modified_files:
+                truncated_diff += f"  - {file_path}\n"
+
+        return truncated_diff
 
     return git_diff
