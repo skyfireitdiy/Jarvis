@@ -95,7 +95,8 @@ class CodeAgent(Agent):
         base_tools = [
             "execute_script",
             "read_code",
-            "edit_file",
+            "edit_file_structed",  # 基于块id的结构化编辑
+            "edit_file_normal",  # 普通 search/replace 编辑
             "rewrite_file",
             "lsp_client",  # LSP客户端工具，用于获取代码补全、悬停等信息
         ]
