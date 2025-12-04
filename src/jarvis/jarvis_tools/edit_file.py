@@ -19,8 +19,13 @@ class EditFileNormalTool:
         "⚠️ 提示：\n"
         "- search 使用精确字符串匹配，不支持正则表达式\n"
         "- search 不能为空字符串\n"
+        "- **重要：search 必须提供足够的上下文来唯一定位目标位置**，避免匹配到错误的位置。建议包含：\n"
+        "  * 目标代码的前后几行上下文（至少包含目标代码所在函数的签名或关键标识）\n"
+        "  * 目标代码附近的唯一标识符（如函数名、变量名、注释等）\n"
+        "  * 避免使用过短的 search 文本（如单个单词、短字符串），除非能确保唯一性\n"
         "- 如果某个 search 在文件中找不到精确匹配，将导致该文件的编辑失败，文件内容会回滚到原始状态\n"
-        "- 如果存在多个匹配，可以通过 count 参数控制替换次数（-1 表示替换全部，1 表示只替换第一次）"
+        "- 如果存在多个匹配，可以通过 count 参数控制替换次数（-1 表示替换全部，1 表示只替换第一次）\n"
+        "- 建议在 search 中包含足够的上下文，确保能唯一匹配到目标位置，避免误匹配"
     )
 
     parameters = {
@@ -42,7 +47,7 @@ class EditFileNormalTool:
                                 "properties": {
                                     "search": {
                                         "type": "string",
-                                        "description": "要搜索的原始文本（不支持正则表达式，不能为空）",
+                                        "description": "要搜索的原始文本（不支持正则表达式，不能为空）。**重要：必须提供足够的上下文来唯一定位目标位置**，建议包含目标代码的前后几行上下文、函数签名或唯一标识符，避免匹配到错误的位置。",
                                     },
                                     "replace": {
                                         "type": "string",
@@ -325,6 +330,16 @@ class EditFileNormalTool:
                 error_info = f"第 {idx} 个diff失败：{error_msg}"
                 if search:
                     error_info += f"\n搜索文本: {search[:200]}..."
+                    error_info += (
+                        "\n💡 提示：如果搜索文本在文件中存在但未找到匹配，可能是因为："
+                    )
+                    error_info += (
+                        "\n   1. 搜索文本不够唯一，存在多个匹配（建议增加上下文）"
+                    )
+                    error_info += "\n   2. 搜索文本包含不可见字符或格式不匹配（建议检查空格、换行等）"
+                    error_info += (
+                        "\n   3. 搜索文本需要包含足够的上下文来唯一定位目标位置"
+                    )
                 return False, error_info
 
             start_pos, end_pos = match_result
