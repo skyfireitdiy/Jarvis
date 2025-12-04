@@ -7,8 +7,8 @@ from typing import Any, List, Optional, Tuple
 
 from jarvis.jarvis_code_agent.lint import (
     get_lint_commands_for_files,
-    get_lint_tools,
-    group_commands_by_tool,
+    group_commands_by_template,
+    LINT_COMMAND_TEMPLATES_BY_FILE,
 )
 from jarvis.jarvis_utils.config import is_enable_static_analysis
 
@@ -21,14 +21,14 @@ class LintManager:
 
     def run_static_analysis(
         self, modified_files: List[str]
-    ) -> List[Tuple[str, str, str, int, str]]:
+    ) -> List[Tuple[str, str, int, str]]:
         """执行静态分析
 
         Args:
             modified_files: 修改的文件列表
 
         Returns:
-            [(tool_name, file_path, command, returncode, output), ...] 格式的结果列表
+            [(file_path, command, returncode, output), ...] 格式的结果列表
             只返回有错误或警告的结果（returncode != 0）
         """
         if not modified_files:
@@ -44,7 +44,8 @@ class LintManager:
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
         if file_count > 3:
             files_str += f" 等{file_count}个文件"
-        tool_names = list(set(cmd[0] for cmd in commands))
+        # 从命令中提取工具名（第一个单词）
+        tool_names = list(set(cmd[1].split()[0] for cmd in commands if cmd[1].split()))
         tools_str = ", ".join(tool_names[:3])
         if len(tool_names) > 3:
             tools_str += f" 等{len(tool_names)}个工具"
@@ -52,12 +53,12 @@ class LintManager:
 
         results = []
         # 记录每个文件的检查结果
-        file_results = []  # [(file_path, tool_name, status, message), ...]
+        file_results = []  # [(file_name, command, status, message), ...]
 
-        # 按工具分组，相同工具可以批量执行
-        grouped = group_commands_by_tool(commands)
+        # 按命令模板分组，相同工具可以批量执行
+        grouped = group_commands_by_template(commands)
 
-        for tool_name, file_commands in grouped.items():
+        for template_key, file_commands in grouped.items():
             for file_path, command in file_commands:
                 file_name = os.path.basename(file_path)
                 try:
@@ -68,9 +69,7 @@ class LintManager:
                         else file_path
                     )
                     if not os.path.exists(abs_file_path):
-                        file_results.append(
-                            (file_name, tool_name, "跳过", "文件不存在")
-                        )
+                        file_results.append((file_name, command, "跳过", "文件不存在"))
                         continue
 
                     # 打印执行的命令
@@ -94,7 +93,6 @@ class LintManager:
                         if output.strip():  # 有输出才记录
                             results.append(
                                 (
-                                    tool_name,
                                     file_path,
                                     command,
                                     result.returncode,
@@ -102,7 +100,7 @@ class LintManager:
                                 )
                             )
                             file_results.append(
-                                (file_name, tool_name, "失败", "发现问题")
+                                (file_name, command, "失败", "发现问题")
                             )
                             # 失败时打印检查结果
                             output_preview = (
@@ -112,27 +110,25 @@ class LintManager:
                             if len(output) > 2000:
                                 print(f"⚠️ ... (输出已截断，共 {len(output)} 字符)")
                         else:
-                            file_results.append((file_name, tool_name, "通过", ""))
+                            file_results.append((file_name, command, "通过", ""))
                     else:
-                        file_results.append((file_name, tool_name, "通过", ""))
+                        file_results.append((file_name, command, "通过", ""))
 
                 except subprocess.TimeoutExpired:
-                    results.append(
-                        (tool_name, file_path, command, -1, "执行超时（600秒）")
-                    )
+                    results.append((file_path, command, -1, "执行超时（600秒）"))
                     file_results.append(
-                        (file_name, tool_name, "超时", "执行超时（600秒）")
+                        (file_name, command, "超时", "执行超时（600秒）")
                     )
                     print(f"⚠️ 检查超时 ({file_name}): 执行超时（600秒）")
                 except FileNotFoundError:
                     # 工具未安装，跳过
-                    file_results.append((file_name, tool_name, "跳过", "工具未安装"))
+                    file_results.append((file_name, command, "跳过", "工具未安装"))
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
                     print(f"⚠️ 执行lint命令失败: {command}, 错误: {e}")
                     file_results.append(
-                        (file_name, tool_name, "失败", f"执行失败: {str(e)[:50]}")
+                        (file_name, command, "失败", f"执行失败: {str(e)[:50]}")
                     )
                     continue
 
@@ -168,11 +164,11 @@ class LintManager:
 
         return results
 
-    def format_lint_results(self, results: List[Tuple[str, str, str, int, str]]) -> str:
+    def format_lint_results(self, results: List[Tuple[str, str, int, str]]) -> str:
         """格式化lint结果
 
         Args:
-            results: [(tool_name, file_path, command, returncode, output), ...]
+            results: [(file_path, command, returncode, output), ...]
 
         Returns:
             格式化的错误信息字符串
@@ -181,7 +177,9 @@ class LintManager:
             return ""
 
         lines = []
-        for tool_name, file_path, command, returncode, output in results:
+        for file_path, command, returncode, output in results:
+            # 从命令中提取工具名（第一个单词）
+            tool_name = command.split()[0] if command.split() else "unknown"
             lines.append(f"工具: {tool_name}")
             lines.append(f"文件: {file_path}")
             lines.append(f"命令: {command}")
@@ -216,10 +214,25 @@ class LintManager:
             return final_ret
 
         # 检查是否有可用的lint工具
+        def get_lint_tool_names(file_path: str) -> List[str]:
+            """获取文件的lint工具名称列表"""
+            filename = os.path.basename(file_path)
+            filename_lower = filename.lower()
+            templates = LINT_COMMAND_TEMPLATES_BY_FILE.get(filename_lower, [])
+            if not templates:
+                ext = os.path.splitext(filename)[1]
+                if ext:
+                    templates = LINT_COMMAND_TEMPLATES_BY_FILE.get(ext.lower(), [])
+            # 提取工具名（命令模板的第一个单词）
+            return [
+                template.split()[0] if template.split() else "unknown"
+                for template in templates
+            ]
+
         lint_tools_info = "\n".join(
-            f"   - {file}: 使用 {'、'.join(get_lint_tools(file))}"
+            f"   - {file}: 使用 {'、'.join(get_lint_tool_names(file))}"
             for file in modified_files
-            if get_lint_tools(file)
+            if get_lint_tool_names(file)
         )
 
         if not lint_tools_info:

@@ -174,7 +174,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
 
     # 检查静态检查支持（从 lint.py 获取）
     try:
-        from jarvis.jarvis_code_agent.lint import LINT_TOOLS
+        from jarvis.jarvis_code_agent.lint import LINT_COMMAND_TEMPLATES_BY_FILE
 
         # 扩展名到语言名称的映射
         ext_to_lang_for_lint = {
@@ -205,7 +205,10 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
         for ext, lang_name in ext_to_lang_for_lint.items():
             if lang_name not in info:
                 info[lang_name] = {}
-            if ext in LINT_TOOLS and LINT_TOOLS[ext]:
+            if (
+                ext in LINT_COMMAND_TEMPLATES_BY_FILE
+                and LINT_COMMAND_TEMPLATES_BY_FILE.get(ext)
+            ):
                 info[lang_name]["静态检查"] = True
     except Exception:
         pass
