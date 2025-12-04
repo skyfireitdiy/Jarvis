@@ -146,8 +146,9 @@ class ReviewManager:
                 "**重要要求：在总结阶段，对于发现的每个问题，必须提供：**\n"
                 "1. 详细的问题描述：明确指出问题所在的位置（文件、函数、行号等）、问题的具体表现、为什么这是一个问题\n"
                 "2. 具体的修复建议：提供详细的修复方案，包括需要修改的代码位置、修改方式、预期效果等\n"
-                "3. 问题分类：使用 [function] 标记功能一致性问题（包括测试用例完备性问题），使用 [critical] 标记严重问题，使用 [breaking] 标记破坏性变更，使用 [structure] 标记文件结构问题\n"
-                "请在总结阶段详细指出问题和修改建议，但不要尝试修复或修改任何代码，不要输出补丁。"
+                "3. **修复代码示例（如果适用）**：对于可以明确修复的问题，提供具体的修复代码示例，包括修改前后的代码对比，帮助修复阶段快速定位和修复问题\n"
+                "4. 问题分类：使用 [function] 标记功能一致性问题（包括测试用例完备性问题），使用 [critical] 标记严重问题，使用 [breaking] 标记破坏性变更，使用 [structure] 标记文件结构问题\n"
+                "请在总结阶段详细指出问题、修改建议和修复代码示例，但不要尝试修复或修改任何代码，不要输出补丁。"
             )
             # 附加原始C函数源码片段，供审查作为只读参考
             c_code = self.read_source_span(rec) or ""
@@ -276,16 +277,97 @@ class ReviewManager:
                 "对于发现的每个问题，必须在总结中提供：",
                 "1. 详细的问题描述：明确指出问题所在的位置（文件、函数、行号等）、问题的具体表现、为什么这是一个问题",
                 "2. 具体的修复建议：提供详细的修复方案，包括需要修改的代码位置、修改方式、预期效果等",
-                "3. 问题分类：使用 [function] 标记功能一致性问题，使用 [critical] 标记严重问题，使用 [breaking] 标记破坏性变更，使用 [structure] 标记文件结构问题",
-                "示例：",
-                '  "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。"',
-                '  "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。"',
-                '  "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，且无法通过简单适配解决，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。注意：如果调用方已经适配了新签名，或可以通过简单的类型转换解决，则不应视为破坏性变更。"',
-                '  "[breaking] 测试用例被错误删除：在 diff 中发现删除了测试用例标记 `#[test]` 或 `#[cfg(test)]`（如 src/foo.rs:42），但没有看到对应的添加或移动，这可能导致测试无法运行。修复建议：恢复被删除的测试用例标记，或如果确实需要删除，请说明原因（如测试用例已移动到其他位置、测试用例是重复的等）。"',
-                '  "[function] 测试用例缺失：函数 foo 没有对应的测试用例，无法验证 Rust 实现是否与 C 实现一致。修复建议：在目标模块的 #[cfg(test)] mod tests { ... } 块中添加测试用例，覆盖函数的主要功能、边界情况和错误情况。"',
-                '  "[function] 测试用例覆盖不完整：函数 bar 的测试用例只覆盖了正常情况，缺少边界情况（如空输入、极值输入）和错误情况的测试。修复建议：补充边界情况和错误情况的测试用例，确保测试用例能够全面验证函数的行为。"',
-                '  "[function] 测试用例预期结果与 C 实现不一致：函数 baz 的测试用例 test_baz_normal 中，期望返回值是 42，但根据 C 实现，当输入为 10 时应该返回 100。修复建议：修正测试用例的预期结果，使其与 C 实现的行为一致。"',
-                '  "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。"',
+                "3. **修复代码示例（如果适用）**：对于可以明确修复的问题，必须提供具体的修复代码示例，包括修改前后的代码对比。格式要求：",
+                "   - 修改前：显示有问题的代码片段（包含足够的上下文，如函数签名、前后几行代码）",
+                "   - 修改后：显示修复后的代码片段",
+                "   - 使用代码块格式（```rust ... ```）展示代码",
+                "   - 如果问题涉及多个位置，提供所有相关位置的修复代码示例",
+                "4. 问题分类：使用 [function] 标记功能一致性问题，使用 [critical] 标记严重问题，使用 [breaking] 标记破坏性变更，使用 [structure] 标记文件结构问题",
+                "示例（必须包含修复代码示例）：",
+                '  "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。修复代码示例：\n'
+                '    修改前：\n'
+                '    ```rust\n'
+                '    pub fn foo(x: i32) -> i32 {\n'
+                '        // 缺少参数验证\n'
+                '        x * 2\n'
+                '    }\n'
+                '    ```\n'
+                '    修改后：\n'
+                '    ```rust\n'
+                '    pub fn foo(x: i32) -> Result<i32, Error> {\n'
+                '        if x < 0 {\n'
+                '            return Err(Error::InvalidInput);\n'
+                '        }\n'
+                '        Ok(x * 2)\n'
+                '    }\n'
+                '    ```"',
+                '  "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。修复代码示例：\n'
+                '    修改前：\n'
+                '    ```rust\n'
+                '    pub fn bar(ptr: *const i32) -> i32 {\n'
+                '        unsafe { *ptr }\n'
+                '    }\n'
+                '    ```\n'
+                '    修改后：\n'
+                '    ```rust\n'
+                '    pub fn bar(ptr: Option<&i32>) -> Option<i32> {\n'
+                '        ptr.map(|p| *p)\n'
+                '    }\n'
+                '    ```"',
+                '  "[breaking] 测试函数重复定义：在 src/common/buffer.rs 第 111-112 行处，新增的测试函数 test_write_buf_1_byte 被同时标记了两次 #[test]，导致重复定义。修复建议：删除其中一个 #[test] 标记，确保每个测试函数只有一个 #[test] 属性。修复代码示例：\n'
+                '    修改前：\n'
+                '    ```rust\n'
+                '    #[test]\n'
+                '    #[test]  // 重复的标记\n'
+                '    fn test_write_buf_1_byte() {\n'
+                '        // ...\n'
+                '    }\n'
+                '    ```\n'
+                '    修改后：\n'
+                '    ```rust\n'
+                '    #[test]\n'
+                '    fn test_write_buf_1_byte() {\n'
+                '        // ...\n'
+                '    }\n'
+                '    ```"',
+                '  "[function] 测试用例缺失：函数 foo 没有对应的测试用例，无法验证 Rust 实现是否与 C 实现一致。修复建议：在目标模块的 #[cfg(test)] mod tests { ... } 块中添加测试用例，覆盖函数的主要功能、边界情况和错误情况。修复代码示例：\n'
+                '    修改前（src/foo.rs）：\n'
+                '    ```rust\n'
+                '    pub fn foo(x: i32) -> i32 {\n'
+                '        x * 2\n'
+                '    }\n'
+                '    // 缺少测试用例\n'
+                '    ```\n'
+                '    修改后（src/foo.rs）：\n'
+                '    ```rust\n'
+                '    pub fn foo(x: i32) -> i32 {\n'
+                '        x * 2\n'
+                '    }\n'
+                '    \n'
+                '    #[cfg(test)]\n'
+                '    mod tests {\n'
+                '        use super::*;\n'
+                '        \n'
+                '        #[test]\n'
+                '        fn test_foo_normal() {\n'
+                '            assert_eq!(foo(5), 10);\n'
+                '        }\n'
+                '        \n'
+                '        #[test]\n'
+                '        fn test_foo_zero() {\n'
+                '            assert_eq!(foo(0), 0);\n'
+                '        }\n'
+                '    }\n'
+                '    ```"',
+                '  "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。修复代码示例：\n'
+                '    修改前（src/lib.rs）：\n'
+                '    ```rust\n'
+                '    // 缺少 pub mod utils;\n'
+                '    ```\n'
+                '    修改后（src/lib.rs）：\n'
+                '    ```rust\n'
+                '    pub mod utils;\n'
+                '    ```"',
                 "",
                 "被引用符号上下文（如已转译则包含Rust模块信息）：",
                 json.dumps(callees_ctx, ensure_ascii=False, indent=2),
@@ -427,13 +509,67 @@ class ReviewManager:
                 "- **重要：每个问题描述必须包含以下内容：**\n"
                 "  1. 问题的详细描述：明确指出问题所在的位置（文件、函数、行号等）、问题的具体表现、为什么这是一个问题\n"
                 "  2. 修复建议：提供具体的修复方案，包括需要修改的代码位置、修改方式、预期效果等\n"
-                "  3. 问题格式：[function]、[critical]、[breaking] 或 [structure] 开头，后跟详细的问题描述和修复建议\n"
+                "  3. **修复代码示例（如果适用）**：对于可以明确修复的问题，提供具体的修复代码示例，包括修改前后的代码对比。格式：\n"
+                "     - 修改前：显示有问题的代码片段（包含足够的上下文，如函数签名、前后几行代码）\n"
+                "     - 修改后：显示修复后的代码片段\n"
+                "     - 如果问题涉及多个位置，提供所有相关位置的修复代码示例\n"
+                "  4. 问题格式：[function]、[critical]、[breaking] 或 [structure] 开头，后跟详细的问题描述、修复建议和修复代码示例\n"
                 "  示例格式：\n"
-                '    "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。"\n'
-                '    "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。"\n'
-                '    "[breaking] 函数签名变更导致调用方无法编译：函数 baz 的签名从 `fn baz(x: i32) -> i32` 变更为 `fn baz(x: i64) -> i64`，但调用方代码（src/other.rs:15）仍使用 i32 类型调用，且无法通过简单适配解决，会导致类型不匹配错误。修复建议：保持函数签名与调用方兼容，或同时更新所有调用方代码。注意：如果调用方已经适配了新签名，或可以通过简单的类型转换解决，则不应视为破坏性变更。"\n'
-                '    "[breaking] 测试函数重复定义：在 src/common/buffer.rs 第 111-112 行处，新增的测试函数 test_write_buf_1_byte 被同时标记了两次 #[test]，导致重复定义。修复建议：删除其中一个 #[test] 标记，确保每个测试函数只有一个 #[test] 属性。"\n'
-                '    "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。"\n'
+                '    "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。修复代码示例：\n'
+                '    修改前：\n'
+                '    ```rust\n'
+                '    pub fn foo(x: i32) -> i32 {\n'
+                '        // 缺少参数验证\n'
+                '        x * 2\n'
+                '    }\n'
+                '    ```\n'
+                '    修改后：\n'
+                '    ```rust\n'
+                '    pub fn foo(x: i32) -> Result<i32, Error> {\n'
+                '        if x < 0 {\n'
+                '            return Err(Error::InvalidInput);\n'
+                '        }\n'
+                '        Ok(x * 2)\n'
+                '    }\n'
+                '    ```"\n'
+                '    "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。修复代码示例：\n'
+                '    修改前：\n'
+                '    ```rust\n'
+                '    pub fn bar(ptr: *const i32) -> i32 {\n'
+                '        unsafe { *ptr }\n'
+                '    }\n'
+                '    ```\n'
+                '    修改后：\n'
+                '    ```rust\n'
+                '    pub fn bar(ptr: Option<&i32>) -> Option<i32> {\n'
+                '        ptr.map(|p| *p)\n'
+                '    }\n'
+                '    ```"\n'
+                '    "[breaking] 测试函数重复定义：在 src/common/buffer.rs 第 111-112 行处，新增的测试函数 test_write_buf_1_byte 被同时标记了两次 #[test]，导致重复定义。修复建议：删除其中一个 #[test] 标记，确保每个测试函数只有一个 #[test] 属性。修复代码示例：\n'
+                '    修改前：\n'
+                '    ```rust\n'
+                '    #[test]\n'
+                '    #[test]  // 重复的标记\n'
+                '    fn test_write_buf_1_byte() {\n'
+                '        // ...\n'
+                '    }\n'
+                '    ```\n'
+                '    修改后：\n'
+                '    ```rust\n'
+                '    #[test]\n'
+                '    fn test_write_buf_1_byte() {\n'
+                '        // ...\n'
+                '    }\n'
+                '    ```"\n'
+                '    "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。修复代码示例：\n'
+                '    修改前（src/lib.rs）：\n'
+                '    ```rust\n'
+                '    // 缺少 pub mod utils;\n'
+                '    ```\n'
+                '    修改后（src/lib.rs）：\n'
+                '    ```rust\n'
+                '    pub mod utils;\n'
+                '    ```"\n'
                 "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
                 "**示例1：审查通过（无问题）**\n"
                 '<SUMMARY>\n{\n  "ok": true,\n  "function_issues": [],\n  "critical_issues": [],\n  "breaking_issues": [],\n  "structure_issues": []\n}\n</SUMMARY>\n'
