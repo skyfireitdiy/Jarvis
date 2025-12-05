@@ -200,10 +200,33 @@ def apply_library_replacement(
             sr_list = []
             for it in loaded_ckpt.get("selected_roots") or []:
                 if isinstance(it, dict) and "fid" in it and "res" in it:
-                    sr_list.append((int(it["fid"]), it["res"]))
+                    try:
+                        fid_val = int(it["fid"])
+                        res_val = it["res"]
+                        if isinstance(res_val, dict):
+                            sr_list.append((fid_val, res_val))
+                    except (ValueError, TypeError, KeyError):
+                        continue
             selected_roots = sr_list
-        except Exception:
+            if selected_roots:
+                typer.secho(
+                    f"[c2rust-library] 从断点恢复 selected_roots: {len(selected_roots)} 个替代根",
+                    fg=typer.colors.BLUE,
+                    err=True,
+                )
+            else:
+                typer.secho(
+                    "[c2rust-library] 警告: 从断点恢复时 selected_roots 为空，可能导致 library_replacements.jsonl 为空",
+                    fg=typer.colors.YELLOW,
+                    err=True,
+                )
+        except Exception as e:
             selected_roots = []
+            typer.secho(
+                f"[c2rust-library] 从断点恢复 selected_roots 时出错: {e}，将使用空列表",
+                fg=typer.colors.RED,
+                err=True,
+            )
         # 恢复已处理的初始根函数集合（从 processed_roots 中筛选出在 root_funcs 中的）
         try:
             root_funcs_processed = {fid for fid in processed_roots if fid in root_funcs}
@@ -335,52 +358,63 @@ def apply_library_replacement(
                 typer.secho(msg, fg=typer.colors.GREEN, err=True)
 
                 # 如果节点可替代，无论是否最终替代（如入口函数保护），都不评估其子节点
-                # 入口函数保护：不替代 main（保留进行转译），但不评估其子节点
+                # 入口函数保护：不替代 main（保留进行转译），但需要剪除其子节点（因为功能可由库实现）
+                # 即时剪枝（不含根）：无论是否为入口函数，只要可替代就剪除子节点
+                to_prune = set(desc)
+                to_prune.discard(fid)
+
+                newly = len(to_prune - pruned_dynamic)
+                pruned_dynamic.update(to_prune)
+
                 if is_entry_function(rec_meta):
                     typer.secho(
-                        "[c2rust-library] 入口函数保护：跳过对 main 的库替代，不评估其子节点。",
+                        f"[c2rust-library] 入口函数保护：跳过对 {label} 的库替代，但剪除其子节点（功能可由库实现）。"
+                        f"注意：这可能导致 library_replacements.jsonl 为空（入口函数不会被替代）。",
                         fg=typer.colors.YELLOW,
                         err=True,
                     )
-                    # 不评估子节点，也不添加到 selected_roots（因为入口函数不会被替代）
+                    # 不添加到 selected_roots（因为入口函数不会被替代），但子节点已被剪除
                 else:
-                    # 即时剪枝（不含根）
-                    to_prune = set(desc)
-                    to_prune.discard(fid)
-
-                    newly = len(to_prune - pruned_dynamic)
-                    pruned_dynamic.update(to_prune)
+                    # 非入口函数：添加到 selected_roots
                     selected_roots.append((fid, res))
 
-                    # 更新检查点
-                    checkpoint_state = create_checkpoint_state(
-                        checkpoint_key,
-                        eval_counter,
-                        processed_roots,
-                        pruned_dynamic,
-                        selected_roots,
-                    )
-                    last_ckpt_saved = periodic_checkpoint_save(
-                        ckpt_path,
-                        checkpoint_state,
-                        eval_counter,
-                        last_ckpt_saved,
-                        checkpoint_interval,
-                        resume,
-                    )
+                # 更新检查点
+                checkpoint_state = create_checkpoint_state(
+                    checkpoint_key,
+                    eval_counter,
+                    processed_roots,
+                    pruned_dynamic,
+                    selected_roots,
+                )
+                last_ckpt_saved = periodic_checkpoint_save(
+                    ckpt_path,
+                    checkpoint_state,
+                    eval_counter,
+                    last_ckpt_saved,
+                    checkpoint_interval,
+                    resume,
+                )
 
-                    typer.secho(
-                        f"[c2rust-library] 即时标记剪除子节点(本次新增): +{newly} 个 (累计={len(pruned_dynamic)})",
-                        fg=typer.colors.MAGENTA,
-                        err=True,
-                    )
+                typer.secho(
+                    f"[c2rust-library] 即时标记剪除子节点(本次新增): +{newly} 个 (累计={len(pruned_dynamic)})",
+                    fg=typer.colors.MAGENTA,
+                    err=True,
+                )
                 # 注意：无论是否入口函数，只要 replaceable 为 True，都不评估子节点
             else:
                 # 若不可替代，继续评估其子节点（深度优先）
                 for ch in adj_func.get(fid, []):
                     evaluate_node(ch, is_root_func=False)
-        except Exception:
-            pass
+        except Exception as e:
+            typer.secho(
+                f"[c2rust-library] 评估节点 {fid} ({label}) 时出错: {e}",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            # 即使出错，也标记为已处理，避免无限循环
+            processed_roots.add(fid)
+            if is_root_func:
+                root_funcs_processed.add(fid)
 
     # 对每个候选根进行评估；若根不可替代将递归评估其子节点
     for fid in root_funcs:
@@ -405,8 +439,27 @@ def apply_library_replacement(
 
     # 写出替代映射
     with open(out_mapping_path, "w", encoding="utf-8") as fm:
-        for m in replacements:
-            fm.write(json.dumps(m, ensure_ascii=False) + "\n")
+        if replacements:
+            for m in replacements:
+                fm.write(json.dumps(m, ensure_ascii=False) + "\n")
+        else:
+            # 即使没有替代项，也记录统计信息，帮助调试
+            summary = {
+                "summary": {
+                    "total_evaluated": eval_counter,
+                    "total_processed_roots": len(processed_roots),
+                    "total_selected_roots": len(selected_roots),
+                    "total_pruned_funcs": len(pruned_funcs),
+                    "note": "没有找到可替代的函数。可能原因：1) 所有函数都不可替代；2) 所有可替代的函数都是入口函数（被保护）；3) 从断点恢复时 selected_roots 为空。",
+                }
+            }
+            fm.write(json.dumps(summary, ensure_ascii=False) + "\n")
+            typer.secho(
+                f"[c2rust-library] 警告: 没有找到可替代的函数，library_replacements.jsonl 仅包含统计信息。"
+                f"已评估={eval_counter}, 已处理根={len(processed_roots)}, 已选中替代根={len(selected_roots)}",
+                fg=typer.colors.YELLOW,
+                err=True,
+            )
 
     # 生成转译顺序（剪枝阶段与别名）
     order_path = None
