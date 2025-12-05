@@ -80,7 +80,7 @@ def get_max_input_token_count(model_group_override: Optional[str] = None) -> int
         int: 模型能处理的最大输入token数量。
     """
     config = _get_resolved_model_config(model_group_override)
-    return int(config.get("JARVIS_MAX_INPUT_TOKEN_COUNT", "32000"))
+    return int(config.get("JARVIS_MAX_INPUT_TOKEN_COUNT", "128000"))
 
 
 def get_shell_name() -> str:

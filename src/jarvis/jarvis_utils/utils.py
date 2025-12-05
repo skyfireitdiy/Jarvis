@@ -1544,8 +1544,8 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
             config_data,
             ask_all,
             "JARVIS_MAX_INPUT_TOKEN_COUNT",
-            "自定义最大输入Token数量（留空使用默认: 32000）",
-            32000,
+            "自定义最大输入Token数量（留空使用默认: 128000）",
+            128000,
         )
         or changed
     )
