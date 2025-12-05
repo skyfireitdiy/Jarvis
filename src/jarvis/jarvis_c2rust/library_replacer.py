@@ -366,17 +366,21 @@ def apply_library_replacement(
                 newly = len(to_prune - pruned_dynamic)
                 pruned_dynamic.update(to_prune)
 
-                if is_entry_function(rec_meta):
+                # 标记是否为入口函数，用于后续输出阶段判断是否修改 ref 字段
+                is_entry = is_entry_function(rec_meta)
+                if is_entry:
+                    res["is_entry_function"] = True
                     typer.secho(
-                        f"[c2rust-library] 入口函数保护：跳过对 {label} 的库替代，但剪除其子节点（功能可由库实现）。"
-                        f"注意：这可能导致 library_replacements.jsonl 为空（入口函数不会被替代）。",
+                        f"[c2rust-library] 入口函数保护：{label} 保留转译（不修改 ref），但剪除其子节点（功能可由库实现）。"
+                        f"替代信息将记录到 library_replacements.jsonl 供转译参考。",
                         fg=typer.colors.YELLOW,
                         err=True,
                     )
-                    # 不添加到 selected_roots（因为入口函数不会被替代），但子节点已被剪除
                 else:
-                    # 非入口函数：添加到 selected_roots
-                    selected_roots.append((fid, res))
+                    res["is_entry_function"] = False
+                
+                # 无论是否为入口函数，都添加到 selected_roots（入口函数的替代信息需要记录供转译参考）
+                selected_roots.append((fid, res))
 
                 # 更新检查点
                 checkpoint_state = create_checkpoint_state(
