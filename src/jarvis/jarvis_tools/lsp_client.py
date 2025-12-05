@@ -1462,8 +1462,27 @@ class LSPClientTool:
                 symbol_name_lower = symbol_name.lower()
                 matches = []
                 for sym in all_symbols:
-                    name = sym.get("name", "").lower()
-                    if symbol_name_lower in name or name in symbol_name_lower:
+                    # 获取符号名称，优先使用 name，如果没有则使用 detail
+                    name = sym.get("name", "") or sym.get("detail", "")
+                    if not name:
+                        continue
+                    name_lower = name.lower()
+                    # 优先精确匹配，然后是包含匹配（但要求匹配长度至少为查询长度的一半，避免匹配太短的符号）
+                    if symbol_name_lower == name_lower:
+                        # 精确匹配，优先级最高
+                        matches.insert(0, sym)  # 插入到开头
+                    elif (
+                        symbol_name_lower in name_lower
+                        and len(symbol_name_lower) >= 3  # 至少3个字符才做包含匹配
+                    ):
+                        # 包含匹配
+                        matches.append(sym)
+                    elif (
+                        name_lower in symbol_name_lower
+                        and len(name_lower)
+                        >= len(symbol_name_lower) * 0.5  # 符号名至少是查询的一半长度
+                    ):
+                        # 反向包含匹配（符号名包含在查询中）
                         matches.append(sym)
                 result = {
                     "symbols": matches[:20],  # 限制数量
@@ -1538,6 +1557,46 @@ class LSPClientTool:
                 "stderr": f"LSP客户端工具执行失败: {str(e)}",
             }
 
+    @staticmethod
+    def _map_lsp_kind_to_name(kind: int) -> str:
+        """将 LSP SymbolKind 数字转换为可读的字符串名称。
+
+        Args:
+            kind: LSP SymbolKind 枚举值（数字）
+
+        Returns:
+            可读的符号类型名称
+        """
+        kind_map = {
+            1: "File",
+            2: "Module",
+            3: "Namespace",
+            4: "Package",
+            5: "Class",
+            6: "Method",
+            7: "Property",
+            8: "Field",
+            9: "Constructor",
+            10: "Enum",
+            11: "Interface",
+            12: "Function",
+            13: "Variable",
+            14: "Constant",
+            15: "String",
+            16: "Number",
+            17: "Boolean",
+            18: "Array",
+            19: "Object",
+            20: "Key",
+            21: "Null",
+            22: "EnumMember",
+            23: "Struct",
+            24: "Event",
+            25: "Operator",
+            26: "TypeParameter",
+        }
+        return kind_map.get(kind, f"Unknown({kind})")
+
     def _format_result(self, action: str, result: Dict) -> str:
         """格式化LSP结果。
 
@@ -1606,11 +1665,61 @@ class LSPClientTool:
             lines = [f"找到 {count} 个匹配 '{query}' 的符号：\n"]
             for symbol in symbols[:10]:  # 只显示前10个
                 name = symbol.get("name", "")
-                kind = symbol.get("kind", "")
-                range_info = symbol.get("range", {})
-                start = range_info.get("start", {})
-                line = start.get("line", 0) + 1
-                lines.append(f"  - {name} ({kind}) at line {line}")
+                kind_num = symbol.get("kind", 0)
+                # 将 LSP SymbolKind 数字转换为可读的字符串
+                kind_name = (
+                    self._map_lsp_kind_to_name(kind_num)
+                    if isinstance(kind_num, int)
+                    else str(kind_num)
+                )
+
+                # 获取行号，支持多种可能的数据结构
+                line = 0
+                range_info = symbol.get("range")
+                if range_info:
+                    if isinstance(range_info, dict):
+                        start = range_info.get("start")
+                        if start and isinstance(start, dict):
+                            line = (
+                                start.get("line", 0) + 1
+                            )  # LSP 使用 0-based，转换为 1-based
+                        elif isinstance(start, (list, tuple)) and len(start) >= 1:
+                            # 某些 LSP 服务器可能使用列表格式 [line, character]
+                            line = int(start[0]) + 1
+                    elif isinstance(range_info, (list, tuple)) and len(range_info) >= 2:
+                        # 某些 LSP 服务器可能使用列表格式 [[start_line, start_char], [end_line, end_char]]
+                        line = int(range_info[0][0]) + 1
+
+                # 如果仍然没有获取到行号，尝试直接从 symbol 获取
+                if line == 0 or line == 1:
+                    # 检查是否有其他字段包含行号信息
+                    location = symbol.get("location")
+                    if location:
+                        if isinstance(location, dict):
+                            line = (
+                                location.get("range", {})
+                                .get("start", {})
+                                .get("line", 0)
+                                + 1
+                            )
+                        elif isinstance(location, (list, tuple)) and len(location) >= 1:
+                            line = int(location[0].get("line", 0)) + 1
+
+                # 如果 name 为空，尝试使用 detail 或其他字段
+                if not name:
+                    name = (
+                        symbol.get("detail", "")
+                        or symbol.get("containerName", "")
+                        or "<unnamed>"
+                    )
+
+                # 如果行号仍然无效，显示为未知
+                if line == 0 or line == 1:
+                    lines.append(
+                        f"  - {name} ({kind_name}) at line ? (range: {range_info})"
+                    )
+                else:
+                    lines.append(f"  - {name} ({kind_name}) at line {line}")
 
             if count > 10:
                 lines.append(f"  ... 还有 {count - 10} 个结果")
@@ -1656,12 +1765,61 @@ class LSPClientTool:
             lines = [f"找到 {result.get('count', 0)} 个符号：\n"]
             for symbol in symbols[:20]:  # 只显示前20个
                 name = symbol.get("name", "")
-                kind = symbol.get("kind", "")
-                range = symbol.get("range", {})
-                start = range.get("start", {})
-                line = start.get("line", 0) + 1
+                kind_num = symbol.get("kind", 0)
+                # 将 LSP SymbolKind 数字转换为可读的字符串
+                kind_name = (
+                    self._map_lsp_kind_to_name(kind_num)
+                    if isinstance(kind_num, int)
+                    else str(kind_num)
+                )
 
-                lines.append(f"  - {name} ({kind}) at line {line}")
+                # 获取行号，支持多种可能的数据结构
+                line = 0
+                range_info = symbol.get("range")
+                if range_info:
+                    if isinstance(range_info, dict):
+                        start = range_info.get("start")
+                        if start and isinstance(start, dict):
+                            line = (
+                                start.get("line", 0) + 1
+                            )  # LSP 使用 0-based，转换为 1-based
+                        elif isinstance(start, (list, tuple)) and len(start) >= 1:
+                            # 某些 LSP 服务器可能使用列表格式 [line, character]
+                            line = int(start[0]) + 1
+                    elif isinstance(range_info, (list, tuple)) and len(range_info) >= 2:
+                        # 某些 LSP 服务器可能使用列表格式 [[start_line, start_char], [end_line, end_char]]
+                        line = int(range_info[0][0]) + 1
+
+                # 如果仍然没有获取到行号，尝试直接从 symbol 获取
+                if line == 0 or line == 1:
+                    # 检查是否有其他字段包含行号信息
+                    location = symbol.get("location")
+                    if location:
+                        if isinstance(location, dict):
+                            line = (
+                                location.get("range", {})
+                                .get("start", {})
+                                .get("line", 0)
+                                + 1
+                            )
+                        elif isinstance(location, (list, tuple)) and len(location) >= 1:
+                            line = int(location[0].get("line", 0)) + 1
+
+                # 如果 name 为空，尝试使用 detail 或其他字段
+                if not name:
+                    name = (
+                        symbol.get("detail", "")
+                        or symbol.get("containerName", "")
+                        or "<unnamed>"
+                    )
+
+                # 如果行号仍然无效，显示为未知
+                if line == 0 or line == 1:
+                    lines.append(
+                        f"  - {name} ({kind_name}) at line ? (range: {range_info})"
+                    )
+                else:
+                    lines.append(f"  - {name} ({kind_name}) at line {line}")
             return "\n".join(lines)
 
         return str(result)
