@@ -703,38 +703,31 @@ def _print_available_rules(
             has_any_rules = True
             builtin_text = Text()
             builtin_text.append("📚 内置规则 ", style="bold cyan")
-            builtin_text.append(f"({len(builtin_rules)} 个)", style="dim")
-            builtin_text.append(": ", style="dim")
+            builtin_text.append(f"({len(builtin_rules)} 个): ", style="dim")
             for i, rule in enumerate(builtin_rules):
                 if i > 0:
                     builtin_text.append(", ", style="dim")
                 builtin_text.append(rule, style="yellow")
             content_parts.append(builtin_text)
-
+        
         # 文件规则
         if file_rules:
             has_any_rules = True
-            if content_parts:
-                content_parts.append("")
             file_text = Text()
             file_text.append("📄 文件规则 ", style="bold blue")
-            file_text.append(f"({len(file_rules)} 个)", style="dim")
-            file_text.append(": ", style="dim")
+            file_text.append(f"({len(file_rules)} 个): ", style="dim")
             for i, rule in enumerate(file_rules):
                 if i > 0:
                     file_text.append(", ", style="dim")
                 file_text.append(rule, style="cyan")
             content_parts.append(file_text)
-
+        
         # YAML 规则
         if yaml_rules:
             has_any_rules = True
-            if content_parts:
-                content_parts.append("")
             yaml_text = Text()
             yaml_text.append("📝 YAML规则 ", style="bold magenta")
-            yaml_text.append(f"({len(yaml_rules)} 个)", style="dim")
-            yaml_text.append(": ", style="dim")
+            yaml_text.append(f"({len(yaml_rules)} 个): ", style="dim")
             for i, rule in enumerate(yaml_rules):
                 if i > 0:
                     yaml_text.append(", ", style="dim")
@@ -749,7 +742,6 @@ def _print_available_rules(
 
         # 提示信息
         if has_any_rules:
-            content_parts.append("")
             tip_text = Text()
             tip_text.append("💡 提示: ", style="bold green")
             tip_text.append("使用 ", style="dim")
@@ -757,11 +749,9 @@ def _print_available_rules(
             tip_text.append(" 参数加载规则，例如: ", style="dim")
             tip_text.append("--rule-names tdd,clean_code", style="bold yellow")
             content_parts.append(tip_text)
-
+        
         # 显示已加载的规则
         if loaded_rules:
-            if content_parts:
-                content_parts.append("")
             loaded_text = Text()
             loaded_text.append("✅ 已加载规则: ", style="bold green")
             for i, rule in enumerate(loaded_rules):
@@ -769,21 +759,19 @@ def _print_available_rules(
                     loaded_text.append(", ", style="dim")
                 loaded_text.append(rule, style="bold yellow")
             content_parts.append(loaded_text)
-
+        
         # 显示项目规则和全局规则
         if has_project_rule or has_global_rule:
-            if content_parts:
-                content_parts.append("")
+            rule_files_text = Text()
             if has_project_rule:
-                project_text = Text()
-                project_text.append("📁 项目规则: ", style="bold blue")
-                project_text.append(".jarvis/rule", style="dim")
-                content_parts.append(project_text)
+                rule_files_text.append("📁 项目规则: ", style="bold blue")
+                rule_files_text.append(".jarvis/rule", style="dim")
+                if has_global_rule:
+                    rule_files_text.append(" | ", style="dim")
             if has_global_rule:
-                global_text = Text()
-                global_text.append("🌐 全局规则: ", style="bold magenta")
-                global_text.append("~/.jarvis/rule", style="dim")
-                content_parts.append(global_text)
+                rule_files_text.append("🌐 全局规则: ", style="bold magenta")
+                rule_files_text.append("~/.jarvis/rule", style="dim")
+            content_parts.append(rule_files_text)
 
         # 如果有规则信息，使用 Panel 打印
         if content_parts:
@@ -798,7 +786,7 @@ def _print_available_rules(
                 title="📋 规则信息",
                 title_align="center",
                 border_style="cyan",
-                padding=(1, 2),
+                padding=(0, 1),
             )
 
             console.print(panel)
