@@ -28,7 +28,6 @@ from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_code_agent.code_agent_llm import LLMManager
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
-from jarvis.jarvis_agent.task_list import TaskListManager
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_intent_recognition,
@@ -89,8 +88,6 @@ class CodeAgent(Agent):
         self.build_validation_manager = BuildValidationManager(self.root_dir)
         self.lint_manager = LintManager(self.root_dir)
         self.post_process_manager = PostProcessManager(self.root_dir)
-        # 任务列表管理器
-        self.task_list_manager = TaskListManager(self.root_dir)
         # LLM管理器将在模型初始化后创建
 
         # 检测 git username 和 email 是否已设置

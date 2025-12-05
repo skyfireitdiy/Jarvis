@@ -26,6 +26,7 @@ from jarvis.jarvis_agent.memory_manager import MemoryManager
 from jarvis.jarvis_memory_organizer.memory_organizer import MemoryOrganizer
 from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
 from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
+from jarvis.jarvis_agent.task_list import TaskListManager
 from jarvis.jarvis_agent.prompts import (
     DEFAULT_SUMMARY_PROMPT,
     SUMMARY_REQUEST_PROMPT,
@@ -670,6 +671,9 @@ class Agent:
         self.task_analyzer = TaskAnalyzer(self)
         self.file_methodology_manager = FileMethodologyManager(self)
         self.prompt_manager = PromptManager(self)
+        # 初始化任务列表管理器（使用当前工作目录作为 root_dir，如果子类已设置 root_dir 则使用子类的）
+        root_dir = getattr(self, "root_dir", None) or os.getcwd()
+        self.task_list_manager = TaskListManager(root_dir)
 
         # 如果配置了强制保存记忆，确保 save_memory 工具可用
         if self.force_save_memory:
