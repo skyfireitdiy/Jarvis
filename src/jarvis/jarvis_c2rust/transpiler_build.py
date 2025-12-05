@@ -832,14 +832,14 @@ class BuildManager:
                     ):
                         compiler_has_warnings = True
                         compiler_output = combined_output
-            except subprocess.TimeoutExpired:
-                # 编译检查超时，视为有警告
-                compiler_has_warnings = True
-                compiler_output = "编译检查超时（30秒）"
-            except Exception as e:
-                # 编译检查执行异常，视为有警告
-                compiler_has_warnings = True
-                compiler_output = f"执行编译检查时发生异常: {str(e)}"
+                except subprocess.TimeoutExpired:
+                    # 编译检查超时，视为有警告
+                    compiler_has_warnings = True
+                    compiler_output = "编译检查超时（30秒）"
+                except Exception as e:
+                    # 编译检查执行异常，视为有警告
+                    compiler_has_warnings = True
+                    compiler_output = f"执行编译检查时发生异常: {str(e)}"
 
                 if compiler_has_warnings:
                     typer.secho(
@@ -851,60 +851,62 @@ class BuildManager:
                     warning_type = "compiler"  # type: str
                     output = compiler_output
                 else:
-                # 无编译警告，检查 clippy 警告
-                clippy_has_warnings = False
-                clippy_output = ""
-                try:
-                    res_clippy = subprocess.run(
-                        ["cargo", "clippy", "--", "-D", "warnings"],
-                        capture_output=True,
-                        text=True,
-                        timeout=30,
-                        check=False,
-                        cwd=workspace_root,
-                    )
-                    if res_clippy.returncode != 0:
-                        clippy_has_warnings = True
-                        clippy_output = (
-                            (res_clippy.stdout or "") + "\n" + (res_clippy.stderr or "")
-                        )
-                except subprocess.TimeoutExpired:
-                    # clippy 超时，视为有警告
-                    clippy_has_warnings = True
-                    clippy_output = "Clippy 检查超时（30秒）"
-                except Exception as e:
-                    # clippy 执行异常，视为有警告
-                    clippy_has_warnings = True
-                    clippy_output = f"执行 clippy 时发生异常: {str(e)}"
-
-                if clippy_has_warnings:
-                    typer.secho(
-                        "[c2rust-transpiler][build] Cargo 测试通过，无编译警告，但存在 clippy 警告，需要修复。",
-                        fg=typer.colors.YELLOW,
-                    )
-                    typer.secho(clippy_output, fg=typer.colors.YELLOW)
-                    # 将 clippy 警告作为修复目标，继续修复流程
-                    warning_type = "clippy"
-                    output = clippy_output
-                else:
-                    typer.secho(
-                        "[c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，无编译警告，clippy 无警告。",
-                        fg=typer.colors.GREEN,
-                    )
-                    # 测试通过且无编译警告和 clippy 警告，重置连续失败计数
-                    self._consecutive_fix_failures_setter(0)
+                    # 无编译警告，检查 clippy 警告
+                    clippy_has_warnings = False
+                    clippy_output = ""
                     try:
-                        cur = self.progress.get("current") or {}
-                        metrics = cur.get("metrics") or {}
-                        metrics["test_attempts"] = int(test_iter)
-                        cur["metrics"] = metrics
-                        cur["impl_verified"] = True
-                        cur["failed_stage"] = None
-                        self.progress["current"] = cur
-                        self.save_progress()
-                    except Exception:
-                        pass
-                    return (True, False)
+                        res_clippy = subprocess.run(
+                            ["cargo", "clippy", "--", "-D", "warnings"],
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                            check=False,
+                            cwd=workspace_root,
+                        )
+                        if res_clippy.returncode != 0:
+                            clippy_has_warnings = True
+                            clippy_output = (
+                                (res_clippy.stdout or "")
+                                + "\n"
+                                + (res_clippy.stderr or "")
+                            )
+                    except subprocess.TimeoutExpired:
+                        # clippy 超时，视为有警告
+                        clippy_has_warnings = True
+                        clippy_output = "Clippy 检查超时（30秒）"
+                    except Exception as e:
+                        # clippy 执行异常，视为有警告
+                        clippy_has_warnings = True
+                        clippy_output = f"执行 clippy 时发生异常: {str(e)}"
+
+                    if clippy_has_warnings:
+                        typer.secho(
+                            "[c2rust-transpiler][build] Cargo 测试通过，无编译警告，但存在 clippy 警告，需要修复。",
+                            fg=typer.colors.YELLOW,
+                        )
+                        typer.secho(clippy_output, fg=typer.colors.YELLOW)
+                        # 将 clippy 警告作为修复目标，继续修复流程
+                        warning_type = "clippy"
+                        output = clippy_output
+                    else:
+                        typer.secho(
+                            "[c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，无编译警告，clippy 无警告。",
+                            fg=typer.colors.GREEN,
+                        )
+                        # 测试通过且无编译警告和 clippy 警告，重置连续失败计数
+                        self._consecutive_fix_failures_setter(0)
+                        try:
+                            cur = self.progress.get("current") or {}
+                            metrics = cur.get("metrics") or {}
+                            metrics["test_attempts"] = int(test_iter)
+                            cur["metrics"] = metrics
+                            cur["impl_verified"] = True
+                            cur["failed_stage"] = None
+                            self.progress["current"] = cur
+                            self.save_progress()
+                        except Exception:
+                            pass
+                        return (True, False)
         else:
             # 测试失败
             # 检查测试失败输出中是否也包含警告（可能需要一并修复）
