@@ -605,6 +605,10 @@ class EditFileNormalTool:
                         error_info += (
                             "\n   3. 搜索文本需要包含足够的上下文来唯一定位目标位置"
                         )
+                        error_info += "\n   4. **文件可能已被更新**：如果文件在其他地方被修改了，搜索文本可能已经不存在或已改变"
+                        if file_path:
+                            error_info += f"\n   💡 建议：使用 `read_code` 工具重新读取文件 `{file_path}` 查看当前内容，"
+                            error_info += "\n      确认文件是否已被更新，然后根据实际内容调整 search 文本"
                     return False, error_info, None, None
 
             start_pos, end_pos = match_result
