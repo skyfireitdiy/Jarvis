@@ -82,7 +82,9 @@ class AgentManager:
             self.agent_before_commits[agent_key] = initial_commit
         return agent
 
-    def get_fix_agent(self, c_code: Optional[str] = None) -> CodeAgent:
+    def get_fix_agent(
+        self, c_code: Optional[str] = None, need_summary: bool = False
+    ) -> CodeAgent:
         """
         获取修复Agent（CodeAgent）。每次调用都重新创建，不复用。
         用于修复构建错误和测试失败，启用方法论和分析功能以提供更好的修复能力。
@@ -90,6 +92,7 @@ class AgentManager:
 
         参数:
             c_code: 原 C 实现的代码，将添加到 Agent 的上下文中
+            need_summary: 是否需要生成总结，默认为 False（构建修复阶段不需要总结）
         """
         # 每次重新创建，不复用
         # 获取函数信息用于 Agent name
@@ -103,9 +106,33 @@ class AgentManager:
         current_c_code = c_code if c_code is not None else self._current_c_code
 
         agent_name = "C2Rust-FixAgent" + (f"({fn_name})" if fn_name else "")
+
+        # 只有在需要总结时才设置 summary_prompt
+        summary_prompt = None
+        if need_summary:
+            summary_prompt = """请总结本次修复的流程和结果。总结应包含以下内容：
+1. **修复流程**：
+   - 遇到的问题类型（编译错误、测试失败、警告等）
+   - 问题定位过程（如何找到问题根源）
+   - 修复步骤（具体做了哪些修改）
+   - 使用的工具和方法
+2. **修复结果**：
+   - 修复是否成功
+   - 修复了哪些问题
+   - 修改了哪些文件
+   - 是否引入了新的问题
+   - 验证结果（编译、测试是否通过）
+3. **注意事项**：
+   - 如果修复过程中遇到困难，说明原因
+   - 如果修复不完整，说明遗留问题
+   - 如果修复可能影响其他代码，说明影响范围
+
+请使用清晰的结构和简洁的语言，确保总结信息完整且易于理解。"""
+
         agent = CodeAgent(
             name=agent_name,
-            need_summary=False,
+            need_summary=need_summary,
+            summary_prompt=summary_prompt,
             non_interactive=self.non_interactive,
             model_group=self.llm_group,
             append_tools="read_symbols,methodology",
