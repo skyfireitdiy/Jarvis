@@ -1,0 +1,724 @@
+# -*- coding: utf-8 -*-
+"""任务列表模块。
+
+该模块提供任务列表管理功能，支持多任务动态管理、上下文分层共享、Agent权限隔离。
+"""
+
+import json
+import os
+import time
+import uuid
+from collections import OrderedDict
+from enum import Enum
+from typing import Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass, asdict, field
+from threading import Lock
+
+# 任务输出长度限制常量
+DEFAULT_MAX_TASK_OUTPUT_LENGTH = 10000  # 默认最大任务输出长度（字符数）
+DEFAULT_TASK_OUTPUT_PREFIX_LENGTH = 8000  # 截断时保留的前缀长度
+DEFAULT_TASK_OUTPUT_SUFFIX_LENGTH = 2000  # 截断时保留的后缀长度
+
+
+class TaskStatus(Enum):
+    """任务状态枚举。"""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    ABANDONED = "abandoned"
+
+
+class AgentType(Enum):
+    """Agent类型枚举。"""
+
+    MAIN = "main"
+    SUB = "sub"
+    TOOL = "tool"
+
+
+@dataclass
+class Task:
+    """任务实体。
+
+    任务实体为最小数据单元，采用结构化字典存储。
+    """
+
+    task_id: str
+    task_name: str
+    task_desc: str
+    priority: int
+    status: TaskStatus
+    expected_output: str
+    agent_type: AgentType
+    create_time: int
+    update_time: int
+    dependencies: List[str] = field(default_factory=list)
+    actual_output: Optional[str] = None
+    timeout: int = 300
+    retry_count: int = 0
+    retry_limit: int = 3
+
+    def __post_init__(self):
+        """验证字段约束。"""
+        # 验证 task_id 格式
+        if not self.task_id.startswith("task-") or len(self.task_id) != 21:
+            raise ValueError(f"task_id 格式错误: {self.task_id}")
+
+        # 验证 task_name 长度
+        if not (10 <= len(self.task_name) <= 50):
+            raise ValueError(
+                f"task_name 长度必须在 10-50 字符之间: {len(self.task_name)}"
+            )
+
+        # 验证 task_desc 长度
+        if not (50 <= len(self.task_desc) <= 200):
+            raise ValueError(
+                f"task_desc 长度必须在 50-200 字符之间: {len(self.task_desc)}"
+            )
+
+        # 验证 priority
+        if not (1 <= self.priority <= 5):
+            raise ValueError(f"priority 必须在 1-5 之间: {self.priority}")
+
+        # 验证 timeout
+        if self.timeout < 60:
+            raise ValueError(f"timeout 必须 >= 60 秒: {self.timeout}")
+
+        # 验证 retry_limit
+        if not (1 <= self.retry_limit <= 5):
+            raise ValueError(f"retry_limit 必须在 1-5 之间: {self.retry_limit}")
+
+    def to_dict(self) -> Dict:
+        """转换为字典。"""
+        result = asdict(self)
+        result["status"] = self.status.value
+        result["agent_type"] = self.agent_type.value
+        return result
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "Task":
+        """从字典创建任务。"""
+        data = data.copy()
+        data["status"] = TaskStatus(data["status"])
+        data["agent_type"] = AgentType(data["agent_type"])
+        return cls(**data)
+
+    def can_transition_to(self, new_status: TaskStatus) -> bool:
+        """检查是否可以转换到新状态。"""
+        valid_transitions = {
+            TaskStatus.PENDING: {TaskStatus.RUNNING, TaskStatus.ABANDONED},
+            TaskStatus.RUNNING: {
+                TaskStatus.COMPLETED,
+                TaskStatus.FAILED,
+                TaskStatus.ABANDONED,
+            },
+        }
+        return new_status in valid_transitions.get(self.status, set())
+
+    def update_status(
+        self, new_status: TaskStatus, actual_output: Optional[str] = None
+    ) -> bool:
+        """更新任务状态。"""
+        if not self.can_transition_to(new_status):
+            return False
+        self.status = new_status
+        self.update_time = int(time.time() * 1000)
+        if actual_output is not None:
+            self.actual_output = actual_output
+        return True
+
+
+class TaskList:
+    """任务列表容器。
+
+    用于管理多个任务实体，采用有序字典存储。
+    """
+
+    def __init__(
+        self,
+        main_goal: str,
+        max_active_tasks: int = 10,
+        version: int = 1,
+    ):
+        """初始化任务列表。
+
+        参数:
+            main_goal: 用户核心需求
+            max_active_tasks: 最大活跃任务数
+            version: 版本号
+        """
+        if not (50 <= len(main_goal) <= 200):
+            raise ValueError(f"main_goal 长度必须在 50-200 字符之间: {len(main_goal)}")
+        if not (5 <= max_active_tasks <= 20):
+            raise ValueError(f"max_active_tasks 必须在 5-20 之间: {max_active_tasks}")
+
+        self.main_goal = main_goal
+        self.tasks: Dict[str, Task] = OrderedDict()
+        self.max_active_tasks = max_active_tasks
+        self.version = version
+        self._lock = Lock()
+
+    def _update_active_and_completed_lists(self):
+        """更新活跃任务和已完成任务列表。"""
+        # 这个方法主要用于内部维护，实际使用时通过属性访问
+        pass
+
+    @property
+    def active_task_ids(self) -> List[str]:
+        """获取活跃任务 ID 列表。"""
+        return [
+            task_id
+            for task_id, task in self.tasks.items()
+            if task.status in (TaskStatus.PENDING, TaskStatus.RUNNING)
+        ]
+
+    @property
+    def completed_task_ids(self) -> List[str]:
+        """获取已完成任务 ID 列表。"""
+        return [
+            task_id
+            for task_id, task in self.tasks.items()
+            if task.status == TaskStatus.COMPLETED
+        ]
+
+    def add_task(self, task: Task) -> bool:
+        """添加任务。"""
+        with self._lock:
+            if task.task_id in self.tasks:
+                return False
+            # 验证依赖关系
+            for dep_id in task.dependencies:
+                if dep_id not in self.tasks:
+                    return False
+            self.tasks[task.task_id] = task
+            self.version += 1
+            return True
+
+    def get_task(self, task_id: str) -> Optional[Task]:
+        """获取任务。"""
+        return self.tasks.get(task_id)
+
+    def update_task(self, task_id: str, **kwargs) -> bool:
+        """更新任务。"""
+        with self._lock:
+            if task_id not in self.tasks:
+                return False
+            task = self.tasks[task_id]
+            for key, value in kwargs.items():
+                if hasattr(task, key):
+                    setattr(task, key, value)
+            task.update_time = int(time.time() * 1000)
+            self.version += 1
+            return True
+
+    def to_dict(self) -> Dict:
+        """转换为字典。"""
+        return {
+            "main_goal": self.main_goal,
+            "tasks": {task_id: task.to_dict() for task_id, task in self.tasks.items()},
+            "max_active_tasks": self.max_active_tasks,
+            "version": self.version,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "TaskList":
+        """从字典创建任务列表。"""
+        task_list = cls(
+            main_goal=data["main_goal"],
+            max_active_tasks=data.get("max_active_tasks", 10),
+            version=data.get("version", 1),
+        )
+        for task_id, task_data in data.get("tasks", {}).items():
+            task = Task.from_dict(task_data)
+            task_list.tasks[task_id] = task
+        return task_list
+
+
+class TaskListManager:
+    """任务列表管理器。
+
+    实现三层架构：数据层、核心逻辑层、接口层。
+    """
+
+    def __init__(self, root_dir: str, persist_dir: Optional[str] = None):
+        """初始化任务列表管理器。
+
+        参数:
+            root_dir: 项目根目录
+            persist_dir: 持久化目录，默认为 .jarvis/task_lists
+        """
+        self.root_dir = root_dir
+        self.persist_dir = persist_dir or os.path.join(
+            root_dir, ".jarvis", "task_lists"
+        )
+        os.makedirs(self.persist_dir, exist_ok=True)
+
+        # 内存存储：task_list_id -> TaskList
+        self.task_lists: Dict[str, TaskList] = {}
+
+        # 权限隔离：agent_id -> Set[task_id]
+        self.agent_task_mapping: Dict[str, Set[str]] = {}
+
+        # 版本快照：task_list_id -> List[Dict] (按版本号排序)
+        self.version_snapshots: Dict[str, List[Dict]] = {}
+
+        self._lock = Lock()
+
+        # 加载持久化数据
+        self._load_persisted_data()
+
+    def _load_persisted_data(self):
+        """从磁盘加载持久化数据。"""
+        snapshot_file = os.path.join(self.persist_dir, "snapshots.json")
+        if os.path.exists(snapshot_file):
+            try:
+                with open(snapshot_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.version_snapshots = data.get("snapshots", {})
+            except Exception as e:
+                print(f"⚠️ 加载快照数据失败: {e}")
+
+    def _save_snapshot(self, task_list_id: str, task_list: TaskList):
+        """保存版本快照。"""
+        snapshot_file = os.path.join(self.persist_dir, "snapshots.json")
+        try:
+            snapshot_data = task_list.to_dict()
+            if task_list_id not in self.version_snapshots:
+                self.version_snapshots[task_list_id] = []
+            self.version_snapshots[task_list_id].append(snapshot_data)
+            # 只保留最近 10 个版本
+            if len(self.version_snapshots[task_list_id]) > 10:
+                self.version_snapshots[task_list_id] = self.version_snapshots[
+                    task_list_id
+                ][-10:]
+
+            # 保存到磁盘
+            with open(snapshot_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"snapshots": self.version_snapshots},
+                    f,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+        except Exception as e:
+            print(f"⚠️ 保存快照失败: {e}")
+
+    def _check_agent_permission(
+        self, agent_id: str, task_id: str, is_main_agent: bool
+    ) -> bool:
+        """检查 Agent 权限。
+
+        参数:
+            agent_id: Agent ID
+            task_id: 任务 ID
+            is_main_agent: 是否为主 Agent
+
+        返回:
+            bool: 是否有权限
+        """
+        if is_main_agent:
+            return True
+        # 子 Agent 只能访问关联的任务
+        return task_id in self.agent_task_mapping.get(agent_id, set())
+
+    # ========== 接口层：主 Agent 专属接口 ==========
+
+    def create_task_list(
+        self, main_goal: str, agent_id: str
+    ) -> Tuple[Optional[str], bool, Optional[str]]:
+        """创建任务列表容器。
+
+        参数:
+            main_goal: 用户核心需求
+            agent_id: 主 Agent ID
+
+        返回:
+            Tuple[task_list_id, status, error_msg]
+        """
+        try:
+            if not (50 <= len(main_goal) <= 200):
+                return None, False, "main_goal 长度必须在 50-200 字符之间"
+
+            task_list_id = f"tasklist-{uuid.uuid4().hex[:12]}"
+            task_list = TaskList(main_goal=main_goal)
+
+            with self._lock:
+                self.task_lists[task_list_id] = task_list
+                # 主 Agent 拥有所有权限
+                self.agent_task_mapping[agent_id] = set()
+
+            # 保存快照
+            self._save_snapshot(task_list_id, task_list)
+
+            return task_list_id, True, None
+        except Exception as e:
+            return None, False, str(e)
+
+    def add_task(
+        self, task_list_id: str, task_info: Dict, agent_id: str
+    ) -> Tuple[Optional[str], bool, Optional[str]]:
+        """添加任务至任务列表。
+
+        参数:
+            task_list_id: 任务列表 ID
+            task_info: 任务信息字典（含 Task 必选字段）
+            agent_id: 主 Agent ID
+
+        返回:
+            Tuple[task_id, status, error_msg]
+        """
+        try:
+            with self._lock:
+                if task_list_id not in self.task_lists:
+                    return None, False, "任务列表不存在"
+
+                task_list = self.task_lists[task_list_id]
+
+                # 验证必选字段
+                required_fields = [
+                    "task_name",
+                    "task_desc",
+                    "priority",
+                    "expected_output",
+                    "agent_type",
+                ]
+                missing_fields = [
+                    field for field in required_fields if field not in task_info
+                ]
+                if missing_fields:
+                    return None, False, f"缺少必选字段: {', '.join(missing_fields)}"
+
+                # 创建任务
+                task_id = f"task-{uuid.uuid4().hex[:16]}"
+                current_time = int(time.time() * 1000)
+
+                task = Task(
+                    task_id=task_id,
+                    task_name=task_info["task_name"],
+                    task_desc=task_info["task_desc"],
+                    priority=task_info["priority"],
+                    status=TaskStatus.PENDING,
+                    expected_output=task_info["expected_output"],
+                    agent_type=AgentType(task_info["agent_type"]),
+                    create_time=current_time,
+                    update_time=current_time,
+                    dependencies=task_info.get("dependencies", []),
+                    timeout=task_info.get("timeout", 300),
+                    retry_limit=task_info.get("retry_limit", 3),
+                )
+
+                # 验证依赖关系（检查循环依赖）
+                if not self._validate_dependencies(task_list, task):
+                    return None, False, "依赖关系验证失败：存在循环依赖或无效依赖"
+
+                if not task_list.add_task(task):
+                    return None, False, "添加任务失败：任务ID已存在或依赖无效"
+
+                # 保存快照
+                self._save_snapshot(task_list_id, task_list)
+
+                return task_id, True, None
+        except ValueError as e:
+            return None, False, f"字段格式错误: {str(e)}"
+        except Exception as e:
+            return None, False, str(e)
+
+    def _validate_dependencies(self, task_list: TaskList, task: Task) -> bool:
+        """验证依赖关系，检查循环依赖。"""
+        visited = set()
+
+        def has_cycle(current_id: str) -> bool:
+            if current_id in visited:
+                return True
+            visited.add(current_id)
+            current_task = task_list.get_task(current_id)
+            if current_task:
+                for dep_id in current_task.dependencies:
+                    if has_cycle(dep_id):
+                        return True
+            visited.remove(current_id)
+            return False
+
+        # 检查新任务的依赖是否会导致循环
+        visited.add(task.task_id)
+        for dep_id in task.dependencies:
+            dep_task = task_list.get_task(dep_id)
+            if not dep_task:
+                return False  # 依赖的任务不存在
+            if has_cycle(dep_id):
+                return False  # 存在循环依赖
+        return True
+
+    def get_next_task(
+        self, task_list_id: str, agent_id: str
+    ) -> Tuple[Optional[Task], Optional[str]]:
+        """获取优先级最高的待执行任务。
+
+        参数:
+            task_list_id: 任务列表 ID
+            agent_id: 主 Agent ID
+
+        返回:
+            Tuple[task, msg]
+        """
+        with self._lock:
+            if task_list_id not in self.task_lists:
+                return None, "任务列表不存在"
+
+            task_list = self.task_lists[task_list_id]
+
+            # 获取所有待执行任务（pending 状态）
+            pending_tasks = [
+                task
+                for task in task_list.tasks.values()
+                if task.status == TaskStatus.PENDING
+            ]
+
+            if not pending_tasks:
+                return None, "暂无待执行任务"
+
+            # 检查活跃任务数限制
+            active_count = len(task_list.active_task_ids)
+            if active_count >= task_list.max_active_tasks:
+                return None, f"活跃任务数已达上限 ({task_list.max_active_tasks})"
+
+            # 过滤出依赖已满足的任务
+            ready_tasks = []
+            completed_ids = set(task_list.completed_task_ids)
+
+            for task in pending_tasks:
+                if all(dep_id in completed_ids for dep_id in task.dependencies):
+                    ready_tasks.append(task)
+
+            if not ready_tasks:
+                return None, "暂无满足依赖条件的待执行任务"
+
+            # 按优先级排序（优先级高的在前），相同优先级按创建时间排序
+            ready_tasks.sort(key=lambda t: (-t.priority, t.create_time))
+
+            return ready_tasks[0], None
+
+    def rollback_task_list(
+        self, task_list_id: str, version: int, agent_id: str
+    ) -> Tuple[bool, Optional[str]]:
+        """回滚任务列表至指定版本。
+
+        参数:
+            task_list_id: 任务列表 ID
+            version: 目标版本号
+            agent_id: 主 Agent ID
+
+        返回:
+            Tuple[status, msg]
+        """
+        with self._lock:
+            if task_list_id not in self.version_snapshots:
+                return False, "任务列表不存在"
+
+            snapshots = self.version_snapshots[task_list_id]
+            target_snapshot = None
+            for snapshot in snapshots:
+                if snapshot.get("version") == version:
+                    target_snapshot = snapshot
+                    break
+
+            if not target_snapshot:
+                return False, "版本无效"
+
+            try:
+                task_list = TaskList.from_dict(target_snapshot)
+                self.task_lists[task_list_id] = task_list
+                return True, None
+            except Exception as e:
+                return False, f"回滚失败: {str(e)}"
+
+    # ========== 接口层：主 Agent / 子 Agent 共享接口 ==========
+
+    def update_task_status(
+        self,
+        task_list_id: str,
+        task_id: str,
+        status: str,
+        agent_id: str,
+        is_main_agent: bool,
+        actual_output: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """更新任务状态与执行结果。
+
+        参数:
+            task_list_id: 任务列表 ID
+            task_id: 任务 ID
+            status: 新状态
+            agent_id: Agent ID
+            is_main_agent: 是否为主 Agent
+            actual_output: 实际输出（可选）
+
+        返回:
+            Tuple[status, msg]
+        """
+        try:
+            new_status = TaskStatus(status)
+        except ValueError:
+            return False, f"无效的状态值: {status}"
+
+        try:
+            with self._lock:
+                if task_list_id not in self.task_lists:
+                    return False, "任务列表不存在"
+
+                # 权限检查
+                if not self._check_agent_permission(agent_id, task_id, is_main_agent):
+                    return False, "权限不足：无法访问该任务"
+
+                task_list = self.task_lists[task_list_id]
+                task = task_list.get_task(task_id)
+                if not task:
+                    return False, "任务不存在"
+
+                # 状态转换
+                if not task.update_status(new_status, actual_output):
+                    return False, f"无效的状态转换: {task.status.value} -> {status}"
+
+                # 如果任务失败且未达到重试上限，增加重试次数
+                if new_status == TaskStatus.FAILED:
+                    if task.retry_count < task.retry_limit:
+                        task.retry_count += 1
+                        task.status = TaskStatus.PENDING
+                        task.update_time = int(time.time() * 1000)
+                    else:
+                        # 达到重试上限，标记为放弃
+                        task.status = TaskStatus.ABANDONED
+                        task.update_time = int(time.time() * 1000)
+
+                task_list.version += 1
+
+                # 保存快照
+                self._save_snapshot(task_list_id, task_list)
+
+                return True, None
+        except Exception as e:
+            return False, str(e)
+
+    def get_task_detail(
+        self, task_list_id: str, task_id: str, agent_id: str, is_main_agent: bool
+    ) -> Tuple[Optional[Task], bool, Optional[str]]:
+        """获取任务详细信息。
+
+        参数:
+            task_list_id: 任务列表 ID
+            task_id: 任务 ID
+            agent_id: Agent ID
+            is_main_agent: 是否为主 Agent
+
+        返回:
+            Tuple[task, status, error_msg]
+        """
+        with self._lock:
+            if task_list_id not in self.task_lists:
+                return None, False, "任务列表不存在"
+
+            # 权限检查
+            if not self._check_agent_permission(agent_id, task_id, is_main_agent):
+                return None, False, "权限不足：无法访问该任务"
+
+            task_list = self.task_lists[task_list_id]
+            task = task_list.get_task(task_id)
+            if not task:
+                return None, False, "任务不存在"
+
+            return task, True, None
+
+    def register_sub_agent(
+        self, agent_id: str, task_ids: List[str], main_agent_id: str
+    ) -> bool:
+        """注册子 Agent 与任务的关联关系。
+
+        参数:
+            agent_id: 子 Agent ID
+            task_ids: 关联的任务 ID 列表
+            main_agent_id: 主 Agent ID（用于权限验证）
+
+        返回:
+            bool: 是否成功
+        """
+        with self._lock:
+            # 验证主 Agent 权限（简化实现，实际可以更严格）
+            if main_agent_id not in self.agent_task_mapping:
+                return False
+
+            self.agent_task_mapping[agent_id] = set(task_ids)
+            return True
+
+    def get_task_list(self, task_list_id: str) -> Optional[TaskList]:
+        """获取任务列表（内部方法）。"""
+        return self.task_lists.get(task_list_id)
+
+    def check_timeout_tasks(self) -> int:
+        """检查并处理超时任务。
+
+        每 5 秒扫描一次，自动标记超时任务为 failed。
+
+        返回:
+            int: 处理的超时任务数量
+        """
+        current_time = int(time.time() * 1000)
+        timeout_count = 0
+
+        with self._lock:
+            for task_list_id, task_list in self.task_lists.items():
+                for task in task_list.tasks.values():
+                    if task.status == TaskStatus.RUNNING:
+                        # 计算任务运行时间（毫秒）
+                        running_time = (
+                            current_time - task.update_time
+                        ) / 1000  # 转换为秒
+                        if running_time > task.timeout:
+                            # 标记为失败
+                            task.status = TaskStatus.FAILED
+                            task.update_time = current_time
+                            timeout_count += 1
+
+                            # 处理重试逻辑
+                            if task.retry_count < task.retry_limit:
+                                task.retry_count += 1
+                                task.status = TaskStatus.PENDING
+                            else:
+                                task.status = TaskStatus.ABANDONED
+
+                            task_list.version += 1
+                            # 保存快照
+                            self._save_snapshot(task_list_id, task_list)
+
+        return timeout_count
+
+    def get_task_list_summary(self, task_list_id: str) -> Optional[Dict]:
+        """获取任务列表摘要信息。
+
+        返回:
+            Dict: 包含任务统计信息的字典
+        """
+        with self._lock:
+            if task_list_id not in self.task_lists:
+                return None
+
+            task_list = self.task_lists[task_list_id]
+            tasks = list(task_list.tasks.values())
+
+            summary = {
+                "task_list_id": task_list_id,
+                "main_goal": task_list.main_goal,
+                "version": task_list.version,
+                "total_tasks": len(tasks),
+                "pending": len([t for t in tasks if t.status == TaskStatus.PENDING]),
+                "running": len([t for t in tasks if t.status == TaskStatus.RUNNING]),
+                "completed": len(
+                    [t for t in tasks if t.status == TaskStatus.COMPLETED]
+                ),
+                "failed": len([t for t in tasks if t.status == TaskStatus.FAILED]),
+                "abandoned": len(
+                    [t for t in tasks if t.status == TaskStatus.ABANDONED]
+                ),
+            }
+            return summary
