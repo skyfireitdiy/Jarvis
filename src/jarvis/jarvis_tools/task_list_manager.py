@@ -119,7 +119,6 @@ class task_list_manager:
                 table.add_column("优先级", justify="center", width=8)
                 table.add_column("Agent类型", width=10)
                 table.add_column("依赖", width=20)
-                table.add_column("重试", justify="center", width=8)
 
                 # 按优先级和创建时间排序
                 sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
@@ -144,9 +143,6 @@ class task_list_manager:
                     if len(task.dependencies) > 3:
                         deps_text += f" (+{len(task.dependencies) - 3})"
 
-                    # 格式化重试信息
-                    retry_text = f"{task.retry_count}/{task.retry_limit}"
-
                     table.add_row(
                         task.task_id,
                         task.task_name[:28] + "..."
@@ -156,7 +152,6 @@ class task_list_manager:
                         str(task.priority),
                         task.agent_type.value,
                         deps_text if task.dependencies else "-",
-                        retry_text,
                     )
 
                 console.print(table)
@@ -190,14 +185,14 @@ class task_list_manager:
     
     任务执行说明：
     - agent_type 为 "main": 由主 Agent 直接执行，不创建子 Agent
-    - agent_type 为 "sub": 自动创建 CodeAgent 子 Agent 执行任务
-    - agent_type 为 "tool": 自动创建通用 Agent 子 Agent 执行任务
+    - agent_type 为 "code_agent": 自动创建 CodeAgent 子 Agent 执行任务（适用于代码相关任务）
+    - agent_type 为 "agent": 自动创建通用 Agent 子 Agent 执行任务（适用于一般任务）
     - 执行时会自动处理任务状态转换（pending -> running -> completed/failed）
     - 执行结果会自动保存到任务的 actual_output 字段
     
     更新功能说明：
     - update_task_list: 更新任务列表属性（main_goal、max_active_tasks）
-    - update_task: 更新任务属性（task_name、task_desc、priority、expected_output、dependencies、timeout、retry_limit）
+    - update_task: 更新任务属性（task_name、task_desc、priority、expected_output、dependencies）
     """
 
     parameters = {
@@ -246,21 +241,13 @@ class task_list_manager:
                     "expected_output": {"type": "string", "description": "预期输出"},
                     "agent_type": {
                         "type": "string",
-                        "enum": ["main", "sub", "tool"],
-                        "description": "Agent类型",
+                        "enum": ["main", "code_agent", "agent"],
+                        "description": "Agent类型：main（主Agent执行）、code_agent（代码Agent执行）、agent（通用Agent执行）",
                     },
                     "dependencies": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "依赖的任务ID列表（可选）",
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "超时时间（秒，默认300）",
-                    },
-                    "retry_limit": {
-                        "type": "integer",
-                        "description": "最大重试次数（默认3）",
                     },
                 },
                 "required": [
@@ -326,14 +313,6 @@ class task_list_manager:
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "更新后的依赖任务ID列表（可选）",
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "更新后的超时时间（可选，秒）",
-                    },
-                    "retry_limit": {
-                        "type": "integer",
-                        "description": "更新后的最大重试次数（可选，1-5）",
                     },
                 },
             },
@@ -857,8 +836,8 @@ class task_list_manager:
                     "stderr": "",
                 }
 
-            elif task.agent_type.value == "sub":
-                # 子 Agent 执行：使用 sub_code_agent 工具
+            elif task.agent_type.value == "code_agent":
+                # 代码 Agent 执行：使用 sub_code_agent 工具
                 try:
                     # 获取 sub_code_agent 工具
                     tool_registry = parent_agent.get_tool_registry()
@@ -869,11 +848,15 @@ class task_list_manager:
                     if not sub_code_agent_tool:
                         raise Exception("sub_code_agent 工具不可用")
 
+                    # 构建子Agent名称：使用任务名称和ID，便于识别
+                    agent_name = f"{task.task_name} (task_{task_id})"
+
                     # 调用 sub_code_agent 执行任务
                     tool_result = sub_code_agent_tool.func(
                         {
                             "task": task_content,
                             "background": background,
+                            "name": agent_name,
                             "agent": parent_agent,
                         }
                     )
@@ -913,8 +896,8 @@ class task_list_manager:
                         "stderr": f"创建子 Agent 执行任务失败: {str(e)}",
                     }
 
-            elif task.agent_type.value == "tool":
-                # 工具类型：使用 sub_agent 工具（通用 Agent）
+            elif task.agent_type.value == "agent":
+                # 通用 Agent 执行：使用 sub_agent 工具
                 try:
                     # 获取 sub_agent 工具
                     tool_registry = parent_agent.get_tool_registry()
@@ -939,12 +922,15 @@ class task_list_manager:
 
                     summary_prompt = f"总结任务 [{task.task_name}] 的执行结果，包括完成的工作和输出内容。"
 
+                    # 构建子Agent名称：使用任务名称和ID，便于识别
+                    agent_name = f"{task.task_name} (task_{task_id})"
+
                     # 调用 sub_agent 执行任务
                     tool_result = sub_agent_tool.func(
                         {
                             "task": task_content,
                             "background": background,
-                            "name": f"task_{task_id}",
+                            "name": agent_name,
                             "system_prompt": system_prompt,
                             "summary_prompt": summary_prompt,
                             "agent": parent_agent,
@@ -1246,26 +1232,6 @@ class task_list_manager:
                             "stderr": f"依赖任务 {dep_id} 不存在",
                         }
                 update_kwargs["dependencies"] = new_deps
-
-            if "timeout" in task_update_info:
-                new_timeout = task_update_info["timeout"]
-                if new_timeout < 60:
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "timeout 必须 >= 60 秒",
-                    }
-                update_kwargs["timeout"] = new_timeout
-
-            if "retry_limit" in task_update_info:
-                new_retry_limit = task_update_info["retry_limit"]
-                if not (1 <= new_retry_limit <= 5):
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "retry_limit 必须在 1-5 之间",
-                    }
-                update_kwargs["retry_limit"] = new_retry_limit
 
             # 执行更新
             if not task_list.update_task(task_id, **update_kwargs):
