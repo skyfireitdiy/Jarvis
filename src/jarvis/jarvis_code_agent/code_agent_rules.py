@@ -41,8 +41,35 @@ class RulesManager:
             pass
         return None
 
+    def _read_rule_from_dir(self, rules_dir: str, rule_name: str) -> Optional[str]:
+        """从 rules 目录中读取指定名称的规则文件
+
+        参数:
+            rules_dir: rules 目录路径
+            rule_name: 规则名称（文件名）
+
+        返回:
+            str: 规则内容，如果未找到则返回 None
+        """
+        try:
+            rule_file_path = os.path.join(rules_dir, rule_name)
+            if os.path.exists(rule_file_path) and os.path.isfile(rule_file_path):
+                with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read().strip()
+                return content if content else None
+        except Exception:
+            # 读取规则失败时忽略，不影响主流程
+            pass
+        return None
+
     def get_named_rule(self, rule_name: str) -> Optional[str]:
-        """从 rules.yaml 文件中获取指定名称的规则
+        """从 rules.yaml 文件和 rules 目录中获取指定名称的规则
+
+        查找优先级（从高到低）:
+        1. 项目 rules 目录中的文件
+        2. 项目 rules.yaml 文件
+        3. 全局 rules 目录中的文件
+        4. 全局 rules.yaml 文件
 
         参数:
             rule_name: 规则名称
@@ -51,18 +78,14 @@ class RulesManager:
             str: 规则内容，如果未找到则返回 None
         """
         try:
-            # 读取全局数据目录下的 rules.yaml
-            global_rules_yaml_path = os.path.join(get_data_dir(), "rules.yaml")
-            global_rules = {}
-            if os.path.exists(global_rules_yaml_path) and os.path.isfile(
-                global_rules_yaml_path
-            ):
-                with open(
-                    global_rules_yaml_path, "r", encoding="utf-8", errors="replace"
-                ) as f:
-                    global_rules = yaml.safe_load(f) or {}
+            # 优先级 1: 从项目 rules 目录读取
+            project_rules_dir = os.path.join(self.root_dir, "rules")
+            if os.path.exists(project_rules_dir) and os.path.isdir(project_rules_dir):
+                rule_content = self._read_rule_from_dir(project_rules_dir, rule_name)
+                if rule_content:
+                    return rule_content
 
-            # 读取 git 根目录下的 rules.yaml
+            # 优先级 2: 从项目 rules.yaml 读取
             project_rules_yaml_path = os.path.join(self.root_dir, "rules.yaml")
             project_rules = {}
             if os.path.exists(project_rules_yaml_path) and os.path.isfile(
@@ -72,23 +95,45 @@ class RulesManager:
                     project_rules_yaml_path, "r", encoding="utf-8", errors="replace"
                 ) as f:
                     project_rules = yaml.safe_load(f) or {}
+                if rule_name in project_rules:
+                    rule_value = project_rules[rule_name]
+                    if isinstance(rule_value, str):
+                        content = rule_value.strip()
+                    else:
+                        content = str(rule_value).strip()
+                    if content:
+                        return content
 
-            # 合并配置：项目配置覆盖全局配置
-            merged_rules = {**global_rules, **project_rules}
+            # 优先级 3: 从全局 rules 目录读取
+            global_rules_dir = os.path.join(get_data_dir(), "rules")
+            if os.path.exists(global_rules_dir) and os.path.isdir(global_rules_dir):
+                rule_content = self._read_rule_from_dir(global_rules_dir, rule_name)
+                if rule_content:
+                    return rule_content
 
-            # 查找指定的规则
-            if rule_name in merged_rules:
-                rule_value = merged_rules[rule_name]
-                # 如果值是字符串，直接返回
-                if isinstance(rule_value, str):
-                    return rule_value.strip() if rule_value.strip() else None
-                # 如果值是其他类型，转换为字符串
-                return str(rule_value).strip() if str(rule_value).strip() else None
+            # 优先级 4: 从全局 rules.yaml 读取
+            global_rules_yaml_path = os.path.join(get_data_dir(), "rules.yaml")
+            global_rules = {}
+            if os.path.exists(global_rules_yaml_path) and os.path.isfile(
+                global_rules_yaml_path
+            ):
+                with open(
+                    global_rules_yaml_path, "r", encoding="utf-8", errors="replace"
+                ) as f:
+                    global_rules = yaml.safe_load(f) or {}
+                if rule_name in global_rules:
+                    rule_value = global_rules[rule_name]
+                    if isinstance(rule_value, str):
+                        content = rule_value.strip()
+                    else:
+                        content = str(rule_value).strip()
+                    if content:
+                        return content
 
             return None
         except Exception as e:
             # 读取规则失败时忽略，不影响主流程
-            print(f"⚠️ 读取 rules.yaml 失败: {e}")
+            print(f"⚠️ 读取规则失败: {e}")
             return None
 
     def load_all_rules(self, rule_names: Optional[str] = None) -> tuple[str, List[str]]:
