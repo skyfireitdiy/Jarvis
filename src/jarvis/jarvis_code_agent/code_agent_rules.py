@@ -13,6 +13,7 @@ from jarvis.jarvis_utils.config import (
     get_central_rules_repo,
 )
 from jarvis.jarvis_utils.utils import daily_check_git_updates
+from jarvis.jarvis_code_agent.builtin_rules import get_builtin_rule
 
 
 class RulesManager:
@@ -171,6 +172,7 @@ class RulesManager:
         3. 项目 rules.yaml 文件
         4. 配置的规则目录中的文件（按配置顺序，不包括中心库）
         5. 全局 rules.yaml 文件
+        6. 内置规则（最低优先级，作为后备）
 
         参数:
             rule_name: 规则名称
@@ -205,6 +207,11 @@ class RulesManager:
                     except Exception:
                         # 单个文件读取失败不影响其他文件
                         continue
+
+            # 优先级 3: 从内置规则中查找（最低优先级，作为后备）
+            builtin_rule = get_builtin_rule(rule_name)
+            if builtin_rule:
+                return builtin_rule
 
             return None
         except Exception as e:
