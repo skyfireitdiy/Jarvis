@@ -2,11 +2,17 @@
 """CodeAgent 规则管理模块"""
 
 import os
+import subprocess
 from typing import List, Optional
 
 import yaml
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    get_rules_load_dirs,
+    get_central_rules_repo,
+)
+from jarvis.jarvis_utils.utils import daily_check_git_updates
 
 
 class RulesManager:
@@ -14,6 +20,48 @@ class RulesManager:
 
     def __init__(self, root_dir: str):
         self.root_dir = root_dir
+        # 初始化规则目录列表
+        self._init_rules_dirs()
+
+    def _init_rules_dirs(self) -> None:
+        """初始化规则目录列表，包括配置的目录和中心库"""
+        # 基础目录：全局数据目录下的 rules 目录
+        self.rules_dirs: List[str] = [os.path.join(get_data_dir(), "rules")]
+
+        # 添加配置的规则加载目录
+        self.rules_dirs.extend(get_rules_load_dirs())
+
+        # 中心规则仓库路径（单独存储，优先级最高）
+        self.central_repo_path: Optional[str] = None
+        central_repo = get_central_rules_repo()
+        if central_repo:
+            # 支持本地目录路径或Git仓库URL
+            expanded = os.path.expanduser(os.path.expandvars(central_repo))
+            if os.path.isdir(expanded):
+                # 直接使用本地目录（支持Git仓库的子目录）
+                self.central_repo_path = expanded
+            else:
+                # 中心规则仓库存储在数据目录下的特定位置
+                self.central_repo_path = os.path.join(
+                    get_data_dir(), "central_rules_repo"
+                )
+
+                # 确保中心规则仓库被克隆/更新
+                if not os.path.exists(self.central_repo_path):
+                    try:
+                        print(f"ℹ️ 正在克隆中心规则仓库: {central_repo}")
+                        subprocess.run(
+                            ["git", "clone", central_repo, self.central_repo_path],
+                            check=True,
+                        )
+                    except Exception as e:
+                        print(f"❌ 克隆中心规则仓库失败: {str(e)}")
+
+        # 执行每日更新检查（包括中心库）
+        all_dirs_for_update = self.rules_dirs.copy()
+        if self.central_repo_path:
+            all_dirs_for_update.append(self.central_repo_path)
+        daily_check_git_updates(all_dirs_for_update, "rules")
 
     def read_project_rules(self) -> Optional[str]:
         """读取 .jarvis/rules 内容，如果存在则返回字符串，否则返回 None"""
@@ -62,14 +110,67 @@ class RulesManager:
             pass
         return None
 
+    def _get_all_rules_dirs(self) -> List[str]:
+        """获取所有规则目录（包括项目目录和配置的目录）
+
+        返回:
+            List[str]: 规则目录列表，按优先级排序（中心库 > 项目 > 配置目录）
+        """
+        all_dirs = []
+        # 优先级 1: 中心规则仓库（如果有同名规则，以中心仓库为准）
+        if (
+            self.central_repo_path
+            and os.path.exists(self.central_repo_path)
+            and os.path.isdir(self.central_repo_path)
+        ):
+            # 检查中心仓库中是否有 rules 子目录
+            central_rules_dir = os.path.join(self.central_repo_path, "rules")
+            if os.path.exists(central_rules_dir) and os.path.isdir(central_rules_dir):
+                all_dirs.append(central_rules_dir)
+            else:
+                # 如果没有 rules 子目录，直接使用中心仓库根目录
+                all_dirs.append(self.central_repo_path)
+        # 优先级 2: 项目 rules 目录
+        project_rules_dir = os.path.join(self.root_dir, "rules")
+        if os.path.exists(project_rules_dir) and os.path.isdir(project_rules_dir):
+            all_dirs.append(project_rules_dir)
+        # 优先级 3-N: 配置的规则目录（不包括中心库）
+        all_dirs.extend(self.rules_dirs)
+        return all_dirs
+
+    def _get_all_rules_yaml_files(self) -> List[tuple[str, str]]:
+        """获取所有 rules.yaml 文件路径（描述，文件路径）
+
+        返回:
+            List[tuple[str, str]]: (描述, 文件路径) 列表，按优先级排序（中心库 > 项目 > 全局）
+        """
+        yaml_files = []
+        # 优先级 1: 中心规则仓库的 rules.yaml（如果有同名规则，以中心仓库为准）
+        if self.central_repo_path and os.path.exists(self.central_repo_path):
+            central_rules_yaml = os.path.join(self.central_repo_path, "rules.yaml")
+            if os.path.exists(central_rules_yaml) and os.path.isfile(
+                central_rules_yaml
+            ):
+                yaml_files.append(("中心库", central_rules_yaml))
+        # 优先级 2: 项目 rules.yaml
+        project_rules_yaml = os.path.join(self.root_dir, "rules.yaml")
+        if os.path.exists(project_rules_yaml) and os.path.isfile(project_rules_yaml):
+            yaml_files.append(("项目", project_rules_yaml))
+        # 优先级 3: 全局 rules.yaml
+        global_rules_yaml = os.path.join(get_data_dir(), "rules.yaml")
+        if os.path.exists(global_rules_yaml) and os.path.isfile(global_rules_yaml):
+            yaml_files.append(("全局", global_rules_yaml))
+        return yaml_files
+
     def get_named_rule(self, rule_name: str) -> Optional[str]:
         """从 rules.yaml 文件和 rules 目录中获取指定名称的规则
 
         查找优先级（从高到低）:
-        1. 项目 rules 目录中的文件
-        2. 项目 rules.yaml 文件
-        3. 全局 rules 目录中的文件
-        4. 全局 rules.yaml 文件
+        1. 中心规则仓库中的文件（如果有同名规则，以中心仓库为准）
+        2. 项目 rules 目录中的文件
+        3. 项目 rules.yaml 文件
+        4. 配置的规则目录中的文件（按配置顺序，不包括中心库）
+        5. 全局 rules.yaml 文件
 
         参数:
             rule_name: 规则名称
@@ -78,57 +179,32 @@ class RulesManager:
             str: 规则内容，如果未找到则返回 None
         """
         try:
-            # 优先级 1: 从项目 rules 目录读取
-            project_rules_dir = os.path.join(self.root_dir, "rules")
-            if os.path.exists(project_rules_dir) and os.path.isdir(project_rules_dir):
-                rule_content = self._read_rule_from_dir(project_rules_dir, rule_name)
-                if rule_content:
-                    return rule_content
+            # 优先级 1: 从所有规则目录读取（中心库 > 项目 > 配置目录）
+            for rules_dir in self._get_all_rules_dirs():
+                if os.path.exists(rules_dir) and os.path.isdir(rules_dir):
+                    rule_content = self._read_rule_from_dir(rules_dir, rule_name)
+                    if rule_content:
+                        return rule_content
 
-            # 优先级 2: 从项目 rules.yaml 读取
-            project_rules_yaml_path = os.path.join(self.root_dir, "rules.yaml")
-            project_rules = {}
-            if os.path.exists(project_rules_yaml_path) and os.path.isfile(
-                project_rules_yaml_path
-            ):
-                with open(
-                    project_rules_yaml_path, "r", encoding="utf-8", errors="replace"
-                ) as f:
-                    project_rules = yaml.safe_load(f) or {}
-                if rule_name in project_rules:
-                    rule_value = project_rules[rule_name]
-                    if isinstance(rule_value, str):
-                        content = rule_value.strip()
-                    else:
-                        content = str(rule_value).strip()
-                    if content:
-                        return content
-
-            # 优先级 3: 从全局 rules 目录读取
-            global_rules_dir = os.path.join(get_data_dir(), "rules")
-            if os.path.exists(global_rules_dir) and os.path.isdir(global_rules_dir):
-                rule_content = self._read_rule_from_dir(global_rules_dir, rule_name)
-                if rule_content:
-                    return rule_content
-
-            # 优先级 4: 从全局 rules.yaml 读取
-            global_rules_yaml_path = os.path.join(get_data_dir(), "rules.yaml")
-            global_rules = {}
-            if os.path.exists(global_rules_yaml_path) and os.path.isfile(
-                global_rules_yaml_path
-            ):
-                with open(
-                    global_rules_yaml_path, "r", encoding="utf-8", errors="replace"
-                ) as f:
-                    global_rules = yaml.safe_load(f) or {}
-                if rule_name in global_rules:
-                    rule_value = global_rules[rule_name]
-                    if isinstance(rule_value, str):
-                        content = rule_value.strip()
-                    else:
-                        content = str(rule_value).strip()
-                    if content:
-                        return content
+            # 优先级 2: 从所有 rules.yaml 文件读取（中心库 > 项目 > 全局）
+            for desc, yaml_path in self._get_all_rules_yaml_files():
+                if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
+                    try:
+                        with open(
+                            yaml_path, "r", encoding="utf-8", errors="replace"
+                        ) as f:
+                            rules = yaml.safe_load(f) or {}
+                        if rule_name in rules:
+                            rule_value = rules[rule_name]
+                            if isinstance(rule_value, str):
+                                content = rule_value.strip()
+                            else:
+                                content = str(rule_value).strip()
+                            if content:
+                                return content
+                    except Exception:
+                        # 单个文件读取失败不影响其他文件
+                        continue
 
             return None
         except Exception as e:

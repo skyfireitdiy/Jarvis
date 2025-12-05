@@ -478,6 +478,30 @@ def get_central_tool_repo() -> str:
     return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_TOOL_REPO", ""))
 
 
+def get_rules_load_dirs() -> List[str]:
+    """
+    获取规则加载目录。
+
+    返回:
+        List[str]: 规则加载目录列表
+    """
+    return [
+        os.path.expanduser(os.path.expandvars(str(p)))
+        for p in GLOBAL_CONFIG_DATA.get("JARVIS_RULES_LOAD_DIRS", [])
+        if p
+    ]
+
+
+def get_central_rules_repo() -> str:
+    """
+    获取中心规则Git仓库地址。
+
+    返回:
+        str: 中心规则Git仓库地址，如果未配置则返回空字符串
+    """
+    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_RULES_REPO", ""))
+
+
 def is_print_prompt() -> bool:
     """
     获取是否打印提示。
