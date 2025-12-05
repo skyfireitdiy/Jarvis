@@ -281,37 +281,297 @@ class EditFileNormalTool:
         )
 
     @staticmethod
-    def _find_best_match_position(
+    def _find_all_match_positions(
         content: str, search_text: str
-    ) -> Tuple[Optional[Tuple[int, int]], Optional[str]]:
-        """在文件中查找精确匹配位置
+    ) -> List[Tuple[int, int]]:
+        """在文件中查找所有精确匹配位置
 
         Args:
             content: 文件内容
             search_text: 要搜索的文本
 
         Returns:
-            ((start_pos, end_pos), error_msg) 或 (None, error_msg)
+            所有匹配位置的列表 [(start_pos, end_pos), ...]
+        """
+        matches = []
+        start_pos = 0
+        while True:
+            pos = content.find(search_text, start_pos)
+            if pos == -1:
+                break
+            matches.append((pos, pos + len(search_text)))
+            start_pos = pos + 1
+        return matches
+
+    @staticmethod
+    def _generate_match_preview(
+        content: str, matches: List[Tuple[int, int]], max_preview: int = 3
+    ) -> str:
+        """生成匹配位置的预览信息
+
+        Args:
+            content: 文件内容
+            matches: 匹配位置列表
+            max_preview: 最多预览的匹配数量
+
+        Returns:
+            预览信息字符串
+        """
+        lines = content.split("\n")
+        preview_lines = [
+            f"⚠️ 发现 {len(matches)} 处匹配，需要确认：",
+            "",
+        ]
+
+        for idx, (start_pos, end_pos) in enumerate(matches[:max_preview], 1):
+            # 计算匹配位置所在的行号
+            line_num = content[:start_pos].count("\n") + 1
+            col_num = start_pos - content.rfind("\n", 0, start_pos) - 1
+
+            # 获取匹配位置的上下文（前后各3行）
+            context_start = max(0, line_num - 4)
+            context_end = min(len(lines), line_num + 3)
+
+            preview_lines.append(f"匹配 #{idx} (行 {line_num}, 列 {col_num}):")
+            preview_lines.append("```")
+            for i in range(context_start, context_end):
+                prefix = ">>> " if i == line_num - 1 else "    "
+                preview_lines.append(f"{prefix}{i + 1:4d} | {lines[i]}")
+            preview_lines.append("```")
+            preview_lines.append("")
+
+        if len(matches) > max_preview:
+            preview_lines.append(f"... 还有 {len(matches) - max_preview} 处匹配未显示")
+            preview_lines.append("")
+
+        preview_lines.append("💡 建议：如果这不是预期的结果，请：")
+        preview_lines.append("   1. 增加 search 文本的上下文，使其能唯一定位目标位置")
+        preview_lines.append(
+            "   2. 使用 count 参数明确指定要替换的匹配位置（1 表示只替换第一次）"
+        )
+
+        return "\n".join(preview_lines)
+
+    @staticmethod
+    def _find_best_match_position(
+        content: str, search_text: str, require_unique: bool = True
+    ) -> Tuple[Optional[Tuple[int, int]], Optional[str], Optional[str]]:
+        """在文件中查找精确匹配位置
+
+        Args:
+            content: 文件内容
+            search_text: 要搜索的文本
+            require_unique: 是否要求唯一匹配（如果为 True，多个匹配时返回预览信息）
+
+        Returns:
+            ((start_pos, end_pos), error_msg, preview_info) 或 (None, error_msg, preview_info)
         """
         if not search_text.strip():
-            return None, "search 文本不能为空或只包含空白字符"
+            return None, "search 文本不能为空或只包含空白字符", None
 
-        # 使用精确字符串匹配
-        start_pos = content.find(search_text)
-        if start_pos == -1:
-            return None, "未找到精确匹配的文本"
+        # 查找所有匹配位置
+        matches = EditFileNormalTool._find_all_match_positions(content, search_text)
 
-        end_pos = start_pos + len(search_text)
-        return (start_pos, end_pos), None
+        if len(matches) == 0:
+            return None, "未找到精确匹配的文本", None
+
+        if len(matches) == 1:
+            # 唯一匹配，直接返回
+            return matches[0], None, None
+
+        # 多个匹配
+        if require_unique:
+            # 需要唯一匹配，生成预览信息
+            preview = EditFileNormalTool._generate_match_preview(content, matches)
+            return (
+                None,
+                f"发现 {len(matches)} 处匹配，需要确认后再修改",
+                preview,
+            )
+
+        # 不要求唯一，返回第一个匹配
+        return matches[0], None, None
+
+    @staticmethod
+    def _generate_diff_preview(
+        original_content: str,
+        modified_content: str,
+        file_path: str,
+        matches: List[Tuple[int, int]],
+        search_text: str,
+        replace_text: str,
+        agent: Optional[Any] = None,
+        token_ratio: float = 0.3,
+    ) -> str:
+        """生成修改后的预览diff
+
+        Args:
+            original_content: 原始文件内容
+            modified_content: 修改后的文件内容
+            file_path: 文件路径
+            matches: 匹配位置列表
+            search_text: 搜索文本
+            replace_text: 替换文本
+            agent: 可选的 agent 实例，用于获取剩余 token 数量
+            token_ratio: token 使用比例（默认 0.3，即 30%）
+
+        Returns:
+            预览diff字符串
+        """
+        import difflib
+
+        # 生成统一的diff格式
+        original_lines = original_content.splitlines(keepends=True)
+        modified_lines = modified_content.splitlines(keepends=True)
+
+        # 使用difflib生成统一的diff
+        diff = list(
+            difflib.unified_diff(
+                original_lines,
+                modified_lines,
+                fromfile=f"a/{file_path}",
+                tofile=f"b/{file_path}",
+                lineterm="",
+            )
+        )
+
+        diff_preview = "".join(diff)
+
+        # 根据剩余token计算最大字符数
+        max_diff_chars = None
+
+        # 优先尝试使用 agent 获取剩余 token（更准确，包含对话历史）
+        if agent:
+            try:
+                remaining_tokens = agent.get_remaining_token_count()
+                if remaining_tokens > 0:
+                    # 使用剩余 token 的指定比例作为字符限制（1 token ≈ 4字符）
+                    max_diff_chars = int(remaining_tokens * token_ratio * 4)
+                    if max_diff_chars <= 0:
+                        max_diff_chars = None
+            except Exception:
+                pass
+
+        # 回退方案：使用输入窗口的指定比例转换为字符数
+        if max_diff_chars is None:
+            try:
+                from jarvis.jarvis_utils.config import get_max_input_token_count
+
+                max_input_tokens = get_max_input_token_count()
+                max_diff_chars = int(max_input_tokens * token_ratio * 4)
+            except Exception:
+                # 如果获取失败，使用默认值（约 10000 字符）
+                max_diff_chars = 10000
+
+        # 限制diff长度
+        if len(diff_preview) > max_diff_chars:
+            diff_preview = (
+                diff_preview[:max_diff_chars] + "\n... (diff 内容过长，已截断)"
+            )
+
+        return diff_preview
+
+    @staticmethod
+    def _confirm_multiple_matches(
+        agent: Any,
+        file_path: str,
+        original_content: str,
+        modified_content: str,
+        matches: List[Tuple[int, int]],
+        search_text: str,
+        replace_text: str,
+    ) -> bool:
+        """使用 agent 确认多个匹配是否应该继续
+
+        Args:
+            agent: Agent 实例
+            file_path: 文件路径
+            original_content: 原始文件内容
+            modified_content: 修改后的文件内容
+            matches: 匹配位置列表
+            search_text: 搜索文本
+            replace_text: 替换文本
+
+        Returns:
+            True 表示确认继续，False 表示取消
+        """
+        try:
+            from jarvis.jarvis_agent import Agent
+
+            agent_instance: Agent = agent
+            if not agent_instance or not agent_instance.model:
+                # 如果没有 agent 或 model，默认不继续
+                return False
+
+            # 生成预览diff
+            diff_preview = EditFileNormalTool._generate_diff_preview(
+                original_content,
+                modified_content,
+                file_path,
+                matches,
+                search_text,
+                replace_text,
+                agent=agent_instance,
+                token_ratio=0.3,  # 使用30%的剩余token用于diff预览
+            )
+
+            prompt = f"""检测到文件编辑操作中，search 文本在文件中存在多处匹配，需要您确认是否继续修改：
+
+文件路径：{file_path}
+
+匹配统计：
+- 匹配数量: {len(matches)}
+- 搜索文本长度: {len(search_text)} 字符
+- 替换文本长度: {len(replace_text)} 字符
+
+修改预览（diff）：
+{diff_preview}
+
+请仔细分析以上代码变更，判断这些修改是否合理。可能的情况包括：
+1. 这些匹配位置都是您想要修改的，修改是正确的
+2. 这些匹配位置不是您想要的，或者需要更精确的定位
+3. 修改可能影响其他不相关的代码
+
+请使用以下协议回答（必须包含且仅包含以下标记之一）：
+- 如果认为这些修改是合理的，回答: <!!!YES!!!>
+- 如果认为这些修改不合理或存在风险，回答: <!!!NO!!!>
+
+请严格按照协议格式回答，不要添加其他内容。"""
+
+            print("🤖 正在询问大模型确认多处匹配的修改是否合理...")
+            response = agent_instance.model.chat_until_success(prompt)  # type: ignore
+            response_str = str(response or "")
+
+            # 使用确定的协议标记解析回答
+            if "<!!!YES!!!>" in response_str:
+                print("✅ 大模型确认：修改合理，继续执行")
+                return True
+            elif "<!!!NO!!!>" in response_str:
+                print("⚠️ 大模型确认：修改不合理，取消操作")
+                return False
+            else:
+                # 如果无法找到协议标记，默认认为不合理（保守策略）
+                print(
+                    f"⚠️ 无法找到协议标记，默认认为不合理。回答内容: {response_str[:200]}"
+                )
+                return False
+        except Exception as e:
+            # 确认过程出错，默认不继续
+            print(f"⚠️ 确认过程出错: {e}，默认取消操作")
+            return False
 
     @staticmethod
     def _apply_normal_edits_to_content(
-        original_content: str, diffs: List[Dict[str, Any]]
-    ) -> Tuple[bool, str]:
+        original_content: str,
+        diffs: List[Dict[str, Any]],
+        agent: Optional[Any] = None,
+        file_path: Optional[str] = None,
+    ) -> Tuple[bool, str, Optional[Dict[str, Any]], Optional[int]]:
         """对文件内容按顺序应用普通 search/replace 编辑（使用精确匹配）
 
         返回:
-            (是否成功, 新内容或错误信息)
+            (是否成功, 新内容或错误信息, 确认信息字典或None, 需要确认的diff索引或None)
+            确认信息字典包含: matches, search_text, replace_text, modified_content
         """
         content = original_content
 
@@ -320,27 +580,57 @@ class EditFileNormalTool:
             replace = diff["replace"]
             count = diff.get("count", -1)
 
+            # 检查是否明确指定了 count
+            # 如果 count == 1，表示用户明确只想替换第一次匹配，允许多个匹配
+            require_unique = count != 1
+
             # 使用精确匹配查找位置
-            match_result, error_msg = EditFileNormalTool._find_best_match_position(
-                content, search
+            match_result, error_msg, preview_info = (
+                EditFileNormalTool._find_best_match_position(
+                    content, search, require_unique=require_unique
+                )
             )
 
             if match_result is None:
-                # 找不到匹配则失败
-                error_info = f"第 {idx} 个diff失败：{error_msg}"
-                if search:
-                    error_info += f"\n搜索文本: {search[:200]}..."
-                    error_info += (
-                        "\n💡 提示：如果搜索文本在文件中存在但未找到匹配，可能是因为："
+                # 找不到匹配或需要确认
+                if preview_info:
+                    # 有预览信息，说明有多个匹配，需要生成修改后的预览
+                    # 查找所有匹配位置
+                    matches = EditFileNormalTool._find_all_match_positions(
+                        content, search
                     )
-                    error_info += (
-                        "\n   1. 搜索文本不够唯一，存在多个匹配（建议增加上下文）"
-                    )
-                    error_info += "\n   2. 搜索文本包含不可见字符或格式不匹配（建议检查空格、换行等）"
-                    error_info += (
-                        "\n   3. 搜索文本需要包含足够的上下文来唯一定位目标位置"
-                    )
-                return False, error_info
+                    # 生成修改后的内容（替换所有匹配）
+                    modified_content = content
+                    # 从后往前替换，避免位置偏移
+                    for start_pos, end_pos in reversed(matches):
+                        modified_content = (
+                            modified_content[:start_pos]
+                            + replace
+                            + modified_content[end_pos:]
+                        )
+                    # 返回确认信息
+                    confirm_info = {
+                        "matches": matches,
+                        "search_text": search,
+                        "replace_text": replace,
+                        "modified_content": modified_content,
+                    }
+                    error_info = f"第 {idx} 个diff失败：{error_msg}"
+                    return False, error_info, confirm_info, idx
+                else:
+                    # 没有预览信息，说明是找不到匹配
+                    error_info = f"第 {idx} 个diff失败：{error_msg}"
+                    if search:
+                        error_info += f"\n搜索文本: {search[:200]}..."
+                        error_info += "\n💡 提示：如果搜索文本在文件中存在但未找到匹配，可能是因为："
+                        error_info += (
+                            "\n   1. 搜索文本不够唯一，存在多个匹配（建议增加上下文）"
+                        )
+                        error_info += "\n   2. 搜索文本包含不可见字符或格式不匹配（建议检查空格、换行等）"
+                        error_info += (
+                            "\n   3. 搜索文本需要包含足够的上下文来唯一定位目标位置"
+                        )
+                    return False, error_info, None, None
 
             start_pos, end_pos = match_result
 
@@ -355,8 +645,8 @@ class EditFileNormalTool:
                 search_start_pos = start_pos + len(replace)
                 while True:
                     remaining_content = content[search_start_pos:]
-                    next_match, _ = EditFileNormalTool._find_best_match_position(
-                        remaining_content, search
+                    next_match, _, _ = EditFileNormalTool._find_best_match_position(
+                        remaining_content, search, require_unique=False
                     )
                     if next_match is None:
                         break
@@ -380,8 +670,8 @@ class EditFileNormalTool:
                 search_start_pos = start_pos + len(replace)
                 while remaining_count > 0:
                     remaining_content = content[search_start_pos:]
-                    next_match, _ = EditFileNormalTool._find_best_match_position(
-                        remaining_content, search
+                    next_match, _, _ = EditFileNormalTool._find_best_match_position(
+                        remaining_content, search, require_unique=False
                     )
                     if next_match is None:
                         break
@@ -394,7 +684,7 @@ class EditFileNormalTool:
                     search_start_pos = actual_start + len(replace)
                     remaining_count -= 1
 
-        return True, content
+        return True, content, None, None
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行普通 search/replace 文件编辑操作（支持同时修改多个文件）"""
@@ -405,6 +695,8 @@ class EditFileNormalTool:
                 return error_response
 
             files = args.get("files", [])
+            # 获取 agent 实例（v1.0 协议中 agent 在 args 中）
+            agent = args.get("agent")
 
             # 记录 PATCH 操作调用统计
             try:
@@ -459,23 +751,79 @@ class EditFileNormalTool:
                 )
 
                 # 应用所有普通编辑
-                success, result_or_error = (
+                success, result_or_error, confirm_info, confirm_diff_idx = (
                     EditFileNormalTool._apply_normal_edits_to_content(
-                        original_content, normalized_diffs
+                        original_content,
+                        normalized_diffs,
+                        agent=agent,
+                        file_path=file_path,
                     )
                 )
 
                 if not success:
-                    # 不写入文件，删除备份文件
-                    if backup_path and os.path.exists(backup_path):
-                        try:
-                            os.remove(backup_path)
-                        except Exception:
-                            pass
-                    all_results.append(f"❌ {file_path}: {result_or_error}")
-                    failed_files.append(file_path)
-                    overall_success = False
-                    continue
+                    # 如果有确认信息且有 agent，尝试确认
+                    if confirm_info and agent and confirm_diff_idx is not None:
+                        # 确认是否继续
+                        confirmed = EditFileNormalTool._confirm_multiple_matches(
+                            agent,
+                            file_path,
+                            original_content,
+                            confirm_info["modified_content"],
+                            confirm_info["matches"],
+                            confirm_info["search_text"],
+                            confirm_info["replace_text"],
+                        )
+                        if confirmed:
+                            # 确认继续，对需要确认的 diff 使用 count=1 只替换第一次匹配
+                            # 重新应用编辑，这次允许多个匹配但只替换第一次
+                            normalized_diffs[confirm_diff_idx - 1]["count"] = 1
+                            success, result_or_error, _, _ = (
+                                EditFileNormalTool._apply_normal_edits_to_content(
+                                    original_content,
+                                    normalized_diffs,
+                                    agent=agent,
+                                    file_path=file_path,
+                                )
+                            )
+                            if not success:
+                                # 确认后仍然失败
+                                if backup_path and os.path.exists(backup_path):
+                                    try:
+                                        os.remove(backup_path)
+                                    except Exception:
+                                        pass
+                                all_results.append(f"❌ {file_path}: {result_or_error}")
+                                failed_files.append(file_path)
+                                overall_success = False
+                                continue
+                            # 确认后成功，继续写入文件
+                        else:
+                            # 确认取消
+                            if backup_path and os.path.exists(backup_path):
+                                try:
+                                    os.remove(backup_path)
+                                except Exception:
+                                    pass
+                            all_results.append(
+                                f"❌ {file_path}: 操作已取消（发现多处匹配，已确认不继续）"
+                            )
+                            failed_files.append(file_path)
+                            overall_success = False
+                            continue
+                    else:
+                        # 没有确认信息或没有 agent，直接失败
+                        if backup_path and os.path.exists(backup_path):
+                            try:
+                                os.remove(backup_path)
+                            except Exception:
+                                pass
+                        all_results.append(f"❌ {file_path}: {result_or_error}")
+                        failed_files.append(file_path)
+                        overall_success = False
+                        continue
+
+                # 编辑成功，继续写入文件
+                result_or_error = result_or_error  # 此时 result_or_error 是新内容
 
                 # 写入文件（失败时回滚）
                 abs_path = os.path.abspath(file_path)
