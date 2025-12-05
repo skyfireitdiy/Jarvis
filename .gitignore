@@ -117,3 +117,36 @@ cmake-build-*/
 # .NET
 bin/
 obj/
+# Python
+/env/
+/venv/
+/.venv/
+/build/
+/dist/
+
+# Rust
+/target/
+
+# Node
+/node_modules/
+/dist/
+/.turbo/
+/.next/
+/.nuxt/
+/out/
+
+# Go
+/vendor/
+
+# Java
+/target/
+/.gradle/
+/build/
+/out/
+
+# C/C++
+/build/
+/cmake-build-*/
+
+# .NET
+/obj/
