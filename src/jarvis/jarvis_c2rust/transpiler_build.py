@@ -411,7 +411,68 @@ class BuildManager:
         返回阶段特定的行列表。
         """
         section_lines: List[str] = []
-        if stage == "compiler_warning":
+        if stage == "cargo_test_warning":
+            section_lines.extend(
+                [
+                    "",
+                    "【⚠️ 重要：Cargo Test 编译警告 - 必须消除】",
+                    "以下输出来自 `cargo test -- --nocapture` 命令，包含编译和测试过程中的警告详情：",
+                    "- **Cargo Test 警告当前状态：有警告** - 必须消除所有警告才能继续",
+                    "- 这些警告是在 `cargo test` 编译阶段产生的（如 `unused_mut`、`unused_variables`、`dead_code` 等）",
+                    "- Cargo Test 警告通常表示代码存在潜在问题或可以改进的地方",
+                    "- **请仔细阅读警告信息**，包括：",
+                    "  * 警告类型（如 `unused_mut`、`unused_variables`、`dead_code`、`unused_import` 等）",
+                    "  * 警告位置（文件路径和行号）",
+                    "  * 警告说明和建议的修复方法",
+                    "",
+                    "**关键要求：**",
+                    "- 必须分析每个警告的根本原因，并按照编译器的建议进行修复",
+                    "- 必须实际修复导致警告的代码，而不是忽略警告",
+                    "- 修复后必须确保 `cargo test -- --nocapture` 能够通过（返回码为 0 且无警告输出）",
+                    "- 注意：`cargo test` 会自动编译代码，编译阶段的警告会显示在输出中",
+                    "",
+                ]
+            )
+            if command:
+                section_lines.append(f"执行的命令：{command}")
+                section_lines.append(
+                    "提示：如果不相信上述命令执行结果，可以使用 execute_script 工具自己执行一次该命令进行验证。"
+                )
+            section_lines.extend(
+                [
+                    "",
+                    "【Cargo Test 警告详细信息 - 必须仔细阅读并修复】",
+                    "以下是从 `cargo test -- --nocapture` 命令获取的完整输出，包含所有警告的具体信息：",
+                    "<CARGO_TEST_WARNINGS>",
+                    output,
+                    "</CARGO_TEST_WARNINGS>",
+                    "",
+                    "**修复要求：**",
+                    "1. 仔细分析上述警告信息，找出每个警告的根本原因",
+                    "2. 定位到具体的代码位置（文件路径和行号）",
+                    "3. 按照编译器的建议进行修复：",
+                    "   - 如果警告建议移除 `mut`，请移除不必要的 `mut` 关键字",
+                    "   - 如果警告建议使用下划线前缀，请将未使用的变量改为 `_变量名`",
+                    "   - 如果警告是 `dead_code`（未使用的函数/变量），请移除未使用的代码或使用 `#[allow(dead_code)]` 注解（仅在必要时）",
+                    "   - 如果警告建议移除未使用的导入，请移除或使用 `#[allow(unused_imports)]` 注解（仅在必要时）",
+                    "   - 如果警告建议使用更安全的 API，请使用建议的 API",
+                    "   - 如果警告建议改进代码结构，请按照建议优化代码",
+                    "4. 修复所有警告，确保 `cargo test -- --nocapture` 能够通过（返回码为 0 且无警告输出）",
+                    "5. 如果某些警告确实无法修复或需要特殊处理，可以使用 `#[allow(warning_name)]` 注解，但必须添加注释说明原因",
+                    "",
+                    "**⚠️ 重要：修复后必须验证**",
+                    "- 修复完成后，**必须使用 `execute_script` 工具执行以下命令验证修复效果**：",
+                    f"  - 命令：`{command or 'cargo test -- --nocapture'}`",
+                    "- 验证要求：",
+                    "  * 如果命令执行成功（返回码为 0）且无警告输出，说明修复成功",
+                    "  * 如果命令执行失败（返回码非 0）或有警告输出，说明仍有警告，需要继续修复",
+                    "  * **不要假设修复成功，必须实际执行命令验证**",
+                    "- 如果验证失败，请分析失败原因并继续修复，直到验证通过",
+                    "",
+                    "修复后请再次执行 `cargo test -- --nocapture` 进行验证。",
+                ]
+            )
+        elif stage == "compiler_warning":
             section_lines.extend(
                 [
                     "",
@@ -731,30 +792,46 @@ class BuildManager:
                 fg=typer.colors.YELLOW,
             )
 
+        # 检查 cargo test 输出中是否包含警告（即使测试通过也可能有警告）
+        test_output_combined = stdout + "\n" + stderr
+        test_has_warnings = "warning:" in test_output_combined.lower()
+
         if returncode == 0:
-            # 测试通过，先检查编译警告，再检查 clippy 警告
-            compiler_has_warnings = False
-            compiler_output = ""
-            try:
-                res_compiler = subprocess.run(
-                    ["cargo", "check", "--message-format=short"],
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    check=False,
-                    cwd=workspace_root,
+            # 测试通过，先检查 cargo test 输出中的警告，再检查编译警告，最后检查 clippy 警告
+            if test_has_warnings:
+                # cargo test 输出中有警告，提取并修复
+                typer.secho(
+                    "[c2rust-transpiler][build] Cargo 测试通过，但输出中存在警告，需要修复。",
+                    fg=typer.colors.YELLOW,
                 )
-                # 检查是否有警告输出（即使返回码为0，也可能有警告）
-                combined_output = (
-                    (res_compiler.stdout or "") + "\n" + (res_compiler.stderr or "")
-                )
-                # 检查输出中是否包含警告（warning: 关键字）
-                if (
-                    "warning:" in combined_output.lower()
-                    or res_compiler.returncode != 0
-                ):
-                    compiler_has_warnings = True
-                    compiler_output = combined_output
+                typer.secho(test_output_combined, fg=typer.colors.YELLOW)
+                # 将 cargo test 输出中的警告作为修复目标
+                warning_type = "cargo_test_warning"
+                output = test_output_combined
+            else:
+                # cargo test 输出中无警告，检查编译警告
+                compiler_has_warnings = False
+                compiler_output = ""
+                try:
+                    res_compiler = subprocess.run(
+                        ["cargo", "check", "--message-format=short"],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        check=False,
+                        cwd=workspace_root,
+                    )
+                    # 检查是否有警告输出（即使返回码为0，也可能有警告）
+                    combined_output = (
+                        (res_compiler.stdout or "") + "\n" + (res_compiler.stderr or "")
+                    )
+                    # 检查输出中是否包含警告（warning: 关键字）
+                    if (
+                        "warning:" in combined_output.lower()
+                        or res_compiler.returncode != 0
+                    ):
+                        compiler_has_warnings = True
+                        compiler_output = combined_output
             except subprocess.TimeoutExpired:
                 # 编译检查超时，视为有警告
                 compiler_has_warnings = True
@@ -764,16 +841,16 @@ class BuildManager:
                 compiler_has_warnings = True
                 compiler_output = f"执行编译检查时发生异常: {str(e)}"
 
-            if compiler_has_warnings:
-                typer.secho(
-                    "[c2rust-transpiler][build] Cargo 测试通过，但存在编译警告，需要修复。",
-                    fg=typer.colors.YELLOW,
-                )
-                typer.secho(compiler_output, fg=typer.colors.YELLOW)
-                # 将编译警告作为修复目标，继续修复流程
-                warning_type = "compiler"  # type: str
-                output = compiler_output
-            else:
+                if compiler_has_warnings:
+                    typer.secho(
+                        "[c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，但存在编译警告，需要修复。",
+                        fg=typer.colors.YELLOW,
+                    )
+                    typer.secho(compiler_output, fg=typer.colors.YELLOW)
+                    # 将编译警告作为修复目标，继续修复流程
+                    warning_type = "compiler"  # type: str
+                    output = compiler_output
+                else:
                 # 无编译警告，检查 clippy 警告
                 clippy_has_warnings = False
                 clippy_output = ""
@@ -811,7 +888,7 @@ class BuildManager:
                     output = clippy_output
                 else:
                     typer.secho(
-                        "[c2rust-transpiler][build] Cargo 测试通过，无编译警告，clippy 无警告。",
+                        "[c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，无编译警告，clippy 无警告。",
                         fg=typer.colors.GREEN,
                     )
                     # 测试通过且无编译警告和 clippy 警告，重置连续失败计数
@@ -830,8 +907,19 @@ class BuildManager:
                     return (True, False)
         else:
             # 测试失败
-            warning_type = None
-            output = stdout + "\n" + stderr
+            # 检查测试失败输出中是否也包含警告（可能需要一并修复）
+            if test_has_warnings:
+                # 测试失败且输出中有警告，优先修复警告（因为警告可能导致测试失败）
+                typer.secho(
+                    "[c2rust-transpiler][build] Cargo 测试失败，且输出中存在警告，将优先修复警告。",
+                    fg=typer.colors.YELLOW,
+                )
+                warning_type = "cargo_test_warning"
+                output = test_output_combined
+            else:
+                # 测试失败但无警告，按测试失败处理
+                warning_type = None
+                output = test_output_combined
             limit_info = (
                 f" (上限: {self.test_max_retries if self.test_max_retries > 0 else '无限'})"
                 if test_iter % 10 == 0 or test_iter == 1
@@ -867,8 +955,13 @@ class BuildManager:
                     pass
                 return (False, False)
 
-        # 构建失败（测试阶段）修复、编译警告修复或 clippy 警告修复
-        if warning_type == "compiler":
+        # 构建失败（测试阶段）修复、编译警告修复、clippy 警告修复或 cargo test 警告修复
+        if warning_type == "cargo_test_warning":
+            # cargo test 输出中的警告修复
+            tags = ["cargo_test_warning"]
+            stage_name = "cargo_test_warning"
+            command_str = "cargo test -- --nocapture"
+        elif warning_type == "compiler":
             # 编译警告修复
             tags = ["compiler_warning"]
             stage_name = "compiler_warning"
@@ -1018,9 +1111,15 @@ class BuildManager:
                 cwd=workspace_root,
             )
             verify_returncode = res_test_verify.returncode
+            verify_stdout = res_test_verify.stdout or ""
+            verify_stderr = res_test_verify.stderr or ""
+            verify_output_combined = verify_stdout + "\n" + verify_stderr
+            verify_has_warnings = "warning:" in verify_output_combined.lower()
         except subprocess.TimeoutExpired:
             # 超时视为测试失败
             verify_returncode = -1
+            verify_has_warnings = False
+            verify_output_combined = ""
             typer.secho(
                 "[c2rust-transpiler][build] 修复后验证测试超时（30秒），视为失败",
                 fg=typer.colors.YELLOW,
@@ -1028,12 +1127,23 @@ class BuildManager:
         except Exception as e:
             # 其他异常也视为测试失败
             verify_returncode = -1
+            verify_has_warnings = False
+            verify_output_combined = ""
             typer.secho(
                 f"[c2rust-transpiler][build] 修复后验证测试执行异常: {e}，视为失败",
                 fg=typer.colors.YELLOW,
             )
 
         if verify_returncode == 0:
+            # 测试通过，检查是否有警告
+            if verify_has_warnings:
+                typer.secho(
+                    "[c2rust-transpiler][build] 修复后测试通过，但输出中存在警告，将在下一轮循环中处理",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.secho(verify_output_combined, fg=typer.colors.YELLOW)
+                # 有警告，继续循环修复
+                return (False, False)
             # 测试通过，先检查编译警告，再检查 clippy 警告
             compiler_has_warnings_after_fix = False
             compiler_output_after_fix = ""
@@ -1110,7 +1220,7 @@ class BuildManager:
                     return (False, False)
                 else:
                     typer.secho(
-                        "[c2rust-transpiler][build] 修复后测试通过，无编译警告，clippy 无警告，继续构建循环",
+                        "[c2rust-transpiler][build] 修复后测试通过，无 cargo test 警告，无编译警告，clippy 无警告，继续构建循环",
                         fg=typer.colors.GREEN,
                     )
                     # 测试真正通过且无编译警告和 clippy 警告，重置连续失败计数
