@@ -378,7 +378,7 @@ def apply_library_replacement(
                     )
                 else:
                     res["is_entry_function"] = False
-                
+
                 # 无论是否为入口函数，都添加到 selected_roots（入口函数的替代信息需要记录供转译参考）
                 selected_roots.append((fid, res))
 
