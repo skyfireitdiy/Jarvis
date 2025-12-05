@@ -28,6 +28,7 @@ from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_code_agent.code_agent_llm import LLMManager
 from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
+from jarvis.jarvis_agent.task_list import TaskListManager
 from jarvis.jarvis_utils.config import (
     is_confirm_before_apply_patch,
     is_enable_intent_recognition,
@@ -88,6 +89,8 @@ class CodeAgent(Agent):
         self.build_validation_manager = BuildValidationManager(self.root_dir)
         self.lint_manager = LintManager(self.root_dir)
         self.post_process_manager = PostProcessManager(self.root_dir)
+        # 任务列表管理器
+        self.task_list_manager = TaskListManager(self.root_dir)
         # LLM管理器将在模型初始化后创建
 
         # 检测 git username 和 email 是否已设置
@@ -98,6 +101,7 @@ class CodeAgent(Agent):
             "edit_file",  # 普通 search/replace 编辑
             "rewrite_file",
             "lsp_client",  # LSP客户端工具，用于获取代码补全、悬停等信息
+            "task_list_manager",  # 任务列表管理工具
         ]
 
         if append_tools:
@@ -334,6 +338,15 @@ class CodeAgent(Agent):
         **kwargs,
     ) -> None:
         """工具调用后回调函数。"""
+        # 检查超时任务（每 5 秒扫描一次，简化实现：每次工具调用后检查）
+        try:
+            timeout_count = self.task_list_manager.check_timeout_tasks()
+            if timeout_count > 0:
+                print(f"⚠️ 检测到 {timeout_count} 个超时任务，已自动标记为失败")
+        except Exception:
+            # 静默失败，不影响主流程
+            pass
+
         final_ret = ""
         diff = get_diff()
 
@@ -709,7 +722,7 @@ def _print_available_rules(
                     builtin_text.append(", ", style="dim")
                 builtin_text.append(rule, style="yellow")
             content_parts.append(builtin_text)
-        
+
         # 文件规则
         if file_rules:
             has_any_rules = True
@@ -721,7 +734,7 @@ def _print_available_rules(
                     file_text.append(", ", style="dim")
                 file_text.append(rule, style="cyan")
             content_parts.append(file_text)
-        
+
         # YAML 规则
         if yaml_rules:
             has_any_rules = True
@@ -749,7 +762,7 @@ def _print_available_rules(
             tip_text.append(" 参数加载规则，例如: ", style="dim")
             tip_text.append("--rule-names tdd,clean_code", style="bold yellow")
             content_parts.append(tip_text)
-        
+
         # 显示已加载的规则
         if loaded_rules:
             loaded_text = Text()
@@ -759,7 +772,7 @@ def _print_available_rules(
                     loaded_text.append(", ", style="dim")
                 loaded_text.append(rule, style="bold yellow")
             content_parts.append(loaded_text)
-        
+
         # 显示项目规则和全局规则
         if has_project_rule or has_global_rule:
             rule_files_text = Text()
