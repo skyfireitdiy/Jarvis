@@ -108,7 +108,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     tools_prompt += f"      <name>名称: {tool['name']}</name>\n"
                     tools_prompt += f"      <description>描述: {tool['description']}</description>\n"
                     tools_prompt += "      <parameters>\n"
-                    tools_prompt += "        <json>|\n"
+                    tools_prompt += "        <json>\n"
 
                     # 生成格式化的JSON参数
                     json_params = json.dumps(
