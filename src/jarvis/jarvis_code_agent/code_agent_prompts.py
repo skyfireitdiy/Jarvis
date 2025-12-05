@@ -205,7 +205,7 @@ def get_system_prompt() -> str:
      - **精准单行或范围编辑（优先使用 sed）**：对于精准的单行修改或指定行号范围的编辑（如修改第N行、替换第M-N行），优先使用 `execute_script` 工具执行 `sed` 命令，比 `edit_file` 更高效精准，例如：
        * 替换指定行：`sed -i 'N s/old/new/' file_path`（如 `sed -i '42 s/foo/bar/' src/main.rs` 替换第42行的foo为bar）
        * 替换行号范围：`sed -i 'start_line,end_line s/old/new/g' file_path`（如 `sed -i '10,20 s/old/new/g' src/main.rs` 替换10-20行中的所有old为new）
-       * 在指定行后插入：`sed -i 'N a\插入内容' file_path`（如 `sed -i '10 a\    new_line_content' src/main.rs` 在第10行后插入新行）
+       * 在指定行后插入：`sed -i 'N a\\插入内容' file_path`（如 `sed -i '10 a\\    new_line_content' src/main.rs` 在第10行后插入新行）
        * 使用 `sed` 前建议先用 `read_code` 确认要修改的内容和行号，并备份文件，确保修改范围准确。
      - **内容移动或复制（使用 sed）**：如果要将一个文件内的指定内容移动或复制到另一个文件的指定位置，使用 `sed` 命令即可，没必要使用 `edit_file` 或 `rewrite_file`，例如：
        * 提取源文件指定行并追加到目标文件：`sed -n 'start_line,end_line p' source_file >> target_file`（如 `sed -n '10,20p' src/a.rs >> src/b.rs` 将a.rs的10-20行追加到b.rs末尾）
