@@ -20,7 +20,6 @@ from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
 )
 from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
 from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
-from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
 from jarvis.jarvis_code_agent.code_agent_git import GitManager
 from jarvis.jarvis_code_agent.code_agent_diff import DiffManager
 from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
@@ -659,7 +658,9 @@ def cli(
         sys.exit(1)
 
 
-def _print_available_rules(rules_manager: RulesManager, rule_names: Optional[str] = None) -> None:
+def _print_available_rules(
+    rules_manager: RulesManager, rule_names: Optional[str] = None
+) -> None:
     """打印可用的规则信息
 
     参数:
@@ -670,13 +671,15 @@ def _print_available_rules(rules_manager: RulesManager, rule_names: Optional[str
         from rich.panel import Panel
         from rich.text import Text
         from rich.console import Console
-        from rich.align import Align
-        
+
         console = Console()
-        
-        # 获取内置规则列表
-        builtin_rules = list_builtin_rules()
-        
+
+        # 获取所有可用规则
+        all_rules = rules_manager.get_all_available_rule_names()
+        builtin_rules = all_rules.get("builtin", [])
+        file_rules = all_rules.get("files", [])
+        yaml_rules = all_rules.get("yaml", [])
+
         # 获取已加载的规则
         loaded_rules = []
         if rule_names:
@@ -684,51 +687,93 @@ def _print_available_rules(rules_manager: RulesManager, rule_names: Optional[str
             for rule_name in rule_list:
                 if rules_manager.get_named_rule(rule_name):
                     loaded_rules.append(rule_name)
-        
+
         # 检查项目规则和全局规则
         has_project_rule = rules_manager.read_project_rules() is not None
         has_global_rule = rules_manager.read_global_rules() is not None
-        
+
         # 构建规则信息内容
         content_parts = []
-        
-        # 显示内置规则（始终显示）
+
+        # 显示所有规则（按来源分类）
+        has_any_rules = False
+
+        # 内置规则
         if builtin_rules:
+            has_any_rules = True
             builtin_text = Text()
             builtin_text.append("📚 内置规则 ", style="bold cyan")
             builtin_text.append(f"({len(builtin_rules)} 个)", style="dim")
             builtin_text.append(": ", style="dim")
-            # 规则名称用不同颜色显示
             for i, rule in enumerate(builtin_rules):
                 if i > 0:
                     builtin_text.append(", ", style="dim")
                 builtin_text.append(rule, style="yellow")
             content_parts.append(builtin_text)
-            
-            # 提示信息
+
+        # 文件规则
+        if file_rules:
+            has_any_rules = True
+            if content_parts:
+                content_parts.append("")
+            file_text = Text()
+            file_text.append("📄 文件规则 ", style="bold blue")
+            file_text.append(f"({len(file_rules)} 个)", style="dim")
+            file_text.append(": ", style="dim")
+            for i, rule in enumerate(file_rules):
+                if i > 0:
+                    file_text.append(", ", style="dim")
+                file_text.append(rule, style="cyan")
+            content_parts.append(file_text)
+
+        # YAML 规则
+        if yaml_rules:
+            has_any_rules = True
+            if content_parts:
+                content_parts.append("")
+            yaml_text = Text()
+            yaml_text.append("📝 YAML规则 ", style="bold magenta")
+            yaml_text.append(f"({len(yaml_rules)} 个)", style="dim")
+            yaml_text.append(": ", style="dim")
+            for i, rule in enumerate(yaml_rules):
+                if i > 0:
+                    yaml_text.append(", ", style="dim")
+                yaml_text.append(rule, style="magenta")
+            content_parts.append(yaml_text)
+
+        # 如果没有规则，显示提示
+        if not has_any_rules:
+            no_rules_text = Text()
+            no_rules_text.append("ℹ️ 当前没有可用的规则", style="dim")
+            content_parts.append(no_rules_text)
+
+        # 提示信息
+        if has_any_rules:
+            content_parts.append("")
             tip_text = Text()
             tip_text.append("💡 提示: ", style="bold green")
             tip_text.append("使用 ", style="dim")
             tip_text.append("--rule-names", style="bold yellow")
             tip_text.append(" 参数加载规则，例如: ", style="dim")
             tip_text.append("--rule-names tdd,clean_code", style="bold yellow")
-            content_parts.append("")
             content_parts.append(tip_text)
-        
+
         # 显示已加载的规则
         if loaded_rules:
+            if content_parts:
+                content_parts.append("")
             loaded_text = Text()
             loaded_text.append("✅ 已加载规则: ", style="bold green")
             for i, rule in enumerate(loaded_rules):
                 if i > 0:
                     loaded_text.append(", ", style="dim")
                 loaded_text.append(rule, style="bold yellow")
-            content_parts.append("")
             content_parts.append(loaded_text)
-        
+
         # 显示项目规则和全局规则
         if has_project_rule or has_global_rule:
-            content_parts.append("")
+            if content_parts:
+                content_parts.append("")
             if has_project_rule:
                 project_text = Text()
                 project_text.append("📁 项目规则: ", style="bold blue")
@@ -739,14 +784,14 @@ def _print_available_rules(rules_manager: RulesManager, rule_names: Optional[str
                 global_text.append("🌐 全局规则: ", style="bold magenta")
                 global_text.append("~/.jarvis/rule", style="dim")
                 content_parts.append(global_text)
-        
+
         # 如果有规则信息，使用 Panel 打印
         if content_parts:
             from rich.console import Group
-            
+
             # 创建内容组
             content_group = Group(*content_parts)
-            
+
             # 创建 Panel
             panel = Panel(
                 content_group,
@@ -755,7 +800,7 @@ def _print_available_rules(rules_manager: RulesManager, rule_names: Optional[str
                 border_style="cyan",
                 padding=(1, 2),
             )
-            
+
             console.print(panel)
     except Exception:
         # 静默失败，不影响主流程

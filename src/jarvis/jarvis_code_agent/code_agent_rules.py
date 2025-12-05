@@ -219,6 +219,51 @@ class RulesManager:
             print(f"⚠️ 读取规则失败: {e}")
             return None
 
+    def get_all_available_rule_names(self) -> dict[str, List[str]]:
+        """获取所有可用的规则名称，按来源分类
+
+        返回:
+            dict[str, List[str]]: 按来源分类的规则名称字典
+                - "builtin": 内置规则列表
+                - "files": 规则目录中的文件规则列表
+                - "yaml": rules.yaml 文件中的规则列表
+        """
+        from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+
+        result = {
+            "builtin": list_builtin_rules(),
+            "files": [],
+            "yaml": [],
+        }
+
+        # 收集规则目录中的文件规则
+        for rules_dir in self._get_all_rules_dirs():
+            if os.path.exists(rules_dir) and os.path.isdir(rules_dir):
+                try:
+                    for filename in os.listdir(rules_dir):
+                        file_path = os.path.join(rules_dir, filename)
+                        if os.path.isfile(file_path):
+                            # 规则名称就是文件名
+                            if filename not in result["files"]:
+                                result["files"].append(filename)
+                except Exception:
+                    continue
+
+        # 收集 rules.yaml 文件中的规则
+        for desc, yaml_path in self._get_all_rules_yaml_files():
+            if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
+                try:
+                    with open(yaml_path, "r", encoding="utf-8", errors="replace") as f:
+                        rules = yaml.safe_load(f) or {}
+                        if isinstance(rules, dict):
+                            for rule_name in rules.keys():
+                                if rule_name not in result["yaml"]:
+                                    result["yaml"].append(rule_name)
+                except Exception:
+                    continue
+
+        return result
+
     def load_all_rules(self, rule_names: Optional[str] = None) -> tuple[str, List[str]]:
         """加载所有规则并合并
 
