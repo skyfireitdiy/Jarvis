@@ -20,6 +20,7 @@ from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
 )
 from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
 from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
 from jarvis.jarvis_code_agent.code_agent_git import GitManager
 from jarvis.jarvis_code_agent.code_agent_diff import DiffManager
 from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
@@ -632,6 +633,9 @@ def cli(
             rule_names=rule_names,
         )
 
+        # 显示可用的规则信息
+        _print_available_rules(agent.rules_manager, rule_names)
+
         # 尝试恢复会话
         if restore_session:
             if agent.restore_session():
@@ -653,6 +657,109 @@ def cli(
     except RuntimeError as e:
         print(f"❌ 错误: {str(e)}")
         sys.exit(1)
+
+
+def _print_available_rules(rules_manager: RulesManager, rule_names: Optional[str] = None) -> None:
+    """打印可用的规则信息
+
+    参数:
+        rules_manager: 规则管理器实例
+        rule_names: 用户指定的规则名称列表（逗号分隔）
+    """
+    try:
+        from rich.panel import Panel
+        from rich.text import Text
+        from rich.console import Console
+        from rich.align import Align
+        
+        console = Console()
+        
+        # 获取内置规则列表
+        builtin_rules = list_builtin_rules()
+        
+        # 获取已加载的规则
+        loaded_rules = []
+        if rule_names:
+            rule_list = [name.strip() for name in rule_names.split(",") if name.strip()]
+            for rule_name in rule_list:
+                if rules_manager.get_named_rule(rule_name):
+                    loaded_rules.append(rule_name)
+        
+        # 检查项目规则和全局规则
+        has_project_rule = rules_manager.read_project_rules() is not None
+        has_global_rule = rules_manager.read_global_rules() is not None
+        
+        # 构建规则信息内容
+        content_parts = []
+        
+        # 显示内置规则（始终显示）
+        if builtin_rules:
+            builtin_text = Text()
+            builtin_text.append("📚 内置规则 ", style="bold cyan")
+            builtin_text.append(f"({len(builtin_rules)} 个)", style="dim")
+            builtin_text.append(": ", style="dim")
+            # 规则名称用不同颜色显示
+            for i, rule in enumerate(builtin_rules):
+                if i > 0:
+                    builtin_text.append(", ", style="dim")
+                builtin_text.append(rule, style="yellow")
+            content_parts.append(builtin_text)
+            
+            # 提示信息
+            tip_text = Text()
+            tip_text.append("💡 提示: ", style="bold green")
+            tip_text.append("使用 ", style="dim")
+            tip_text.append("--rule-names", style="bold yellow")
+            tip_text.append(" 参数加载规则，例如: ", style="dim")
+            tip_text.append("--rule-names tdd,clean_code", style="bold yellow")
+            content_parts.append("")
+            content_parts.append(tip_text)
+        
+        # 显示已加载的规则
+        if loaded_rules:
+            loaded_text = Text()
+            loaded_text.append("✅ 已加载规则: ", style="bold green")
+            for i, rule in enumerate(loaded_rules):
+                if i > 0:
+                    loaded_text.append(", ", style="dim")
+                loaded_text.append(rule, style="bold yellow")
+            content_parts.append("")
+            content_parts.append(loaded_text)
+        
+        # 显示项目规则和全局规则
+        if has_project_rule or has_global_rule:
+            content_parts.append("")
+            if has_project_rule:
+                project_text = Text()
+                project_text.append("📁 项目规则: ", style="bold blue")
+                project_text.append(".jarvis/rule", style="dim")
+                content_parts.append(project_text)
+            if has_global_rule:
+                global_text = Text()
+                global_text.append("🌐 全局规则: ", style="bold magenta")
+                global_text.append("~/.jarvis/rule", style="dim")
+                content_parts.append(global_text)
+        
+        # 如果有规则信息，使用 Panel 打印
+        if content_parts:
+            from rich.console import Group
+            
+            # 创建内容组
+            content_group = Group(*content_parts)
+            
+            # 创建 Panel
+            panel = Panel(
+                content_group,
+                title="📋 规则信息",
+                title_align="center",
+                border_style="cyan",
+                padding=(1, 2),
+            )
+            
+            console.print(panel)
+    except Exception:
+        # 静默失败，不影响主流程
+        pass
 
 
 def main() -> None:
