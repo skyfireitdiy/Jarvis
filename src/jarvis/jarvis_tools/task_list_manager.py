@@ -5,11 +5,12 @@
 """
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_agent.task_list import (
     DEFAULT_MAX_TASK_OUTPUT_LENGTH,
+    TaskStatus,
 )
 
 
@@ -70,6 +71,113 @@ class task_list_manager:
         prefix_length = int(max_length * 0.8)
         suffix_length = int(max_length * 0.2)
         return prefix_length, suffix_length
+
+    def _print_task_list_status(
+        self, task_list_manager: Any, task_list_id: Optional[str] = None
+    ):
+        """打印任务列表状态（所有任务）
+
+        参数:
+            task_list_manager: 任务列表管理器实例
+            task_list_id: 任务列表ID（如果为None，则打印所有任务列表）
+        """
+        try:
+            from rich.table import Table
+            from rich.console import Console
+
+            console = Console()
+
+            # 确定要打印的任务列表
+            task_lists_to_print = {}
+            if task_list_id:
+                task_list = task_list_manager.get_task_list(task_list_id)
+                if task_list:
+                    task_lists_to_print[task_list_id] = task_list
+            else:
+                # 打印所有任务列表
+                with task_list_manager._lock:
+                    task_lists_to_print = task_list_manager.task_lists.copy()
+
+            if not task_lists_to_print:
+                return
+
+            for tlist_id, task_list in task_lists_to_print.items():
+                tasks = list(task_list.tasks.values())
+                if not tasks:
+                    continue
+
+                # 创建表格
+                table = Table(
+                    title=f"任务列表状态: {tlist_id}",
+                    show_header=True,
+                    header_style="bold magenta",
+                    title_style="bold cyan",
+                )
+                table.add_column("任务ID", style="cyan", width=25)
+                table.add_column("任务名称", style="yellow", width=30)
+                table.add_column("状态", style="bold", width=12)
+                table.add_column("优先级", justify="center", width=8)
+                table.add_column("Agent类型", width=10)
+                table.add_column("依赖", width=20)
+                table.add_column("重试", justify="center", width=8)
+
+                # 按优先级和创建时间排序
+                sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
+
+                # 状态颜色映射
+                status_colors = {
+                    TaskStatus.PENDING: "yellow",
+                    TaskStatus.RUNNING: "blue",
+                    TaskStatus.COMPLETED: "green",
+                    TaskStatus.FAILED: "red",
+                    TaskStatus.ABANDONED: "dim",
+                }
+
+                for task in sorted_tasks:
+                    status_color = status_colors.get(task.status, "white")
+                    status_text = (
+                        f"[{status_color}]{task.status.value}[/{status_color}]"
+                    )
+
+                    # 格式化依赖
+                    deps_text = ", ".join(task.dependencies[:3])
+                    if len(task.dependencies) > 3:
+                        deps_text += f" (+{len(task.dependencies) - 3})"
+
+                    # 格式化重试信息
+                    retry_text = f"{task.retry_count}/{task.retry_limit}"
+
+                    table.add_row(
+                        task.task_id,
+                        task.task_name[:28] + "..."
+                        if len(task.task_name) > 30
+                        else task.task_name,
+                        status_text,
+                        str(task.priority),
+                        task.agent_type.value,
+                        deps_text if task.dependencies else "-",
+                        retry_text,
+                    )
+
+                console.print(table)
+
+                # 打印统计信息
+                summary = task_list_manager.get_task_list_summary(tlist_id)
+                if summary:
+                    stats_text = (
+                        f"📊 总计: {summary['total_tasks']} | "
+                        f"⏳ 待执行: {summary['pending']} | "
+                        f"🔄 执行中: {summary['running']} | "
+                        f"✅ 已完成: {summary['completed']} | "
+                        f"❌ 失败: {summary['failed']} | "
+                        f"🚫 已放弃: {summary['abandoned']}"
+                    )
+                    console.print(f"[dim]{stats_text}[/dim]")
+                    console.print()  # 空行
+
+        except Exception as e:
+            # 静默失败，不影响主流程
+            print(f"⚠️ 打印任务状态失败: {e}")
 
     description = """管理任务列表的工具。支持创建任务列表、添加任务、获取任务、更新任务状态、更新任务列表、更新任务、获取任务列表摘要、执行任务等功能。
     
@@ -244,17 +352,8 @@ class task_list_manager:
                     "stderr": "无法获取 Agent 实例",
                 }
 
-            # 获取 CodeAgent 实例
-            code_agent = getattr(agent, "_code_agent", None)
-            if not code_agent:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "无法获取 CodeAgent 实例，任务列表功能仅在 CodeAgent 中可用",
-                }
-
             # 获取任务列表管理器
-            task_list_manager = getattr(code_agent, "task_list_manager", None)
+            task_list_manager = getattr(agent, "task_list_manager", None)
             if not task_list_manager:
                 return {
                     "success": False,
@@ -275,52 +374,82 @@ class task_list_manager:
                 }
 
             # 根据 action 执行相应操作
+            result = None
+            task_list_id_for_status = None
+
             if action == "create_task_list":
-                return self._handle_create_task_list(args, task_list_manager, agent_id)
-
-            elif action == "add_task":
-                return self._handle_add_task(args, task_list_manager, agent_id)
-
-            elif action == "get_next_task":
-                return self._handle_get_next_task(args, task_list_manager, agent_id)
-
-            elif action == "update_task_status":
-                return self._handle_update_task_status(
-                    args, task_list_manager, agent_id, is_main_agent
-                )
-
-            elif action == "get_task_detail":
-                return self._handle_get_task_detail(
-                    args, task_list_manager, agent_id, is_main_agent
-                )
-
-            elif action == "get_task_list_summary":
-                return self._handle_get_task_list_summary(args, task_list_manager)
-
-            elif action == "rollback_task_list":
-                return self._handle_rollback_task_list(
+                result = self._handle_create_task_list(
                     args, task_list_manager, agent_id
                 )
+                # 从结果中提取 task_list_id
+                if result.get("success"):
+                    try:
+                        result_data = json.loads(result.get("stdout", "{}"))
+                        task_list_id_for_status = result_data.get("task_list_id")
+                    except Exception:
+                        pass
 
-            elif action == "execute_task":
-                return self._handle_execute_task(
-                    args, task_list_manager, agent_id, is_main_agent, agent
-                )
+            elif action == "add_task":
+                result = self._handle_add_task(args, task_list_manager, agent_id)
+                task_list_id_for_status = args.get("task_list_id")
 
-            elif action == "update_task_list":
-                return self._handle_update_task_list(args, task_list_manager, agent_id)
+            elif action == "get_next_task":
+                result = self._handle_get_next_task(args, task_list_manager, agent_id)
+                task_list_id_for_status = args.get("task_list_id")
 
-            elif action == "update_task":
-                return self._handle_update_task(
+            elif action == "update_task_status":
+                result = self._handle_update_task_status(
                     args, task_list_manager, agent_id, is_main_agent
                 )
+                task_list_id_for_status = args.get("task_list_id")
+
+            elif action == "get_task_detail":
+                result = self._handle_get_task_detail(
+                    args, task_list_manager, agent_id, is_main_agent
+                )
+                task_list_id_for_status = args.get("task_list_id")
+
+            elif action == "get_task_list_summary":
+                result = self._handle_get_task_list_summary(args, task_list_manager)
+                task_list_id_for_status = args.get("task_list_id")
+
+            elif action == "rollback_task_list":
+                result = self._handle_rollback_task_list(
+                    args, task_list_manager, agent_id
+                )
+                task_list_id_for_status = args.get("task_list_id")
+
+            elif action == "execute_task":
+                result = self._handle_execute_task(
+                    args, task_list_manager, agent_id, is_main_agent, agent
+                )
+                task_list_id_for_status = args.get("task_list_id")
+
+            elif action == "update_task_list":
+                result = self._handle_update_task_list(
+                    args, task_list_manager, agent_id
+                )
+                task_list_id_for_status = args.get("task_list_id")
+
+            elif action == "update_task":
+                result = self._handle_update_task(
+                    args, task_list_manager, agent_id, is_main_agent
+                )
+                task_list_id_for_status = args.get("task_list_id")
 
             else:
-                return {
+                result = {
                     "success": False,
                     "stdout": "",
                     "stderr": f"未知的操作: {action}",
                 }
+
+            # 打印任务状态（如果操作成功）
+            if result and result.get("success"):
+                # 如果有 task_list_id，只打印该任务列表；否则打印所有任务列表
+                self._print_task_list_status(task_list_manager, task_list_id_for_status)
+
+            return result
 
         except Exception as e:
             return {
