@@ -89,6 +89,7 @@ class GitManager:
         gitignore_path = os.path.join(git_dir, ".gitignore")
 
         # 常用忽略规则（按语言/场景分组）
+        # 注意：以 / 开头的路径表示只在根目录匹配，避免误忽略子目录中的源码
         sections = {
             "General": [
                 ".jarvis",
@@ -102,21 +103,20 @@ class GitManager:
                 ".vscode/",
             ],
             "Python": [
-                "__pycache__/",
-                "*.py[cod]",
+                "__pycache__/",  # 任何目录下的 __pycache__
+                "*.py[cod]",  # 任何目录下的编译文件
                 "*$py.class",
                 ".Python",
-                "env/",
-                "venv/",
-                ".venv/",
-                "build/",
-                "dist/",
+                "/env/",  # 只在根目录
+                "/venv/",  # 只在根目录
+                "/.venv/",  # 只在根目录
+                "/build/",  # 只在根目录
+                "/dist/",  # 只在根目录
                 "develop-eggs/",
                 "downloads/",
                 "eggs/",
                 ".eggs/",
-                "lib/",
-                "lib64/",
+                # 注意：不忽略 lib/ 和 lib64/，因为这些目录可能存放源码
                 "parts/",
                 "sdist/",
                 "var/",
@@ -140,38 +140,38 @@ class GitManager:
                 ".pytype/",
             ],
             "Rust": [
-                "target/",
+                "/target/",  # 只在根目录
             ],
             "Node": [
-                "node_modules/",
+                "/node_modules/",  # 只在根目录
                 "npm-debug.log*",
                 "yarn-debug.log*",
                 "yarn-error.log*",
                 "pnpm-debug.log*",
                 "lerna-debug.log*",
-                "dist/",
+                "/dist/",  # 只在根目录
                 "coverage/",
-                ".turbo/",
-                ".next/",
-                ".nuxt/",
-                "out/",
+                "/.turbo/",  # 只在根目录
+                "/.next/",  # 只在根目录
+                "/.nuxt/",  # 只在根目录
+                "/out/",  # 只在根目录
             ],
             "Go": [
-                "bin/",
-                "vendor/",
+                # 注意：不忽略 bin/，因为这个目录可能存放源码
+                "/vendor/",  # 只在根目录
                 "coverage.out",
             ],
             "Java": [
-                "target/",
-                "*.class",
-                ".gradle/",
-                "build/",
-                "out/",
+                "/target/",  # 只在根目录
+                "*.class",  # 任何目录下的编译文件
+                "/.gradle/",  # 只在根目录
+                "/build/",  # 只在根目录
+                "/out/",  # 只在根目录
             ],
             "C/C++": [
-                "build/",
-                "cmake-build-*/",
-                "*.o",
+                "/build/",  # 只在根目录
+                "/cmake-build-*/",  # 只在根目录
+                "*.o",  # 任何目录下的编译文件
                 "*.a",
                 "*.so",
                 "*.obj",
@@ -181,8 +181,8 @@ class GitManager:
                 "*.pdb",
             ],
             ".NET": [
-                "bin/",
-                "obj/",
+                # 注意：不忽略 bin/，因为这个目录可能存放源码
+                "/obj/",  # 只在根目录
             ],
         }
 
