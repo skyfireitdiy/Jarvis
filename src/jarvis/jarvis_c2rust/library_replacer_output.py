@@ -48,6 +48,7 @@ def write_output_symbols(
                 libraries_out: List[str] = []
                 notes_out: str = ""
                 lib_single: str = ""
+                is_entry = False
                 for rf, rres in selected_roots:
                     if rf == fid:
                         api = str(rres.get("api") or rres.get("function") or "")
@@ -63,15 +64,19 @@ def write_output_symbols(
                         notes_val = rres.get("notes")
                         if isinstance(notes_val, str):
                             notes_out = notes_val
+                        is_entry = bool(rres.get("is_entry_function", False))
                         break
-                # 若 libraries 存在则使用多库占位；否则若存在单个 library 字段则使用之；否则置空
-                if libraries_out:
-                    lib_markers = [f"lib::{lb}" for lb in libraries_out]
-                elif lib_single:
-                    lib_markers = [f"lib::{lib_single}"]
-                else:
-                    lib_markers = []
-                rec_out["ref"] = lib_markers
+                # 入口函数保护：不修改 ref 字段（保留原值，需要转译），但保留替代信息供转译参考
+                if not is_entry:
+                    # 非入口函数：修改 ref 为库占位符
+                    if libraries_out:
+                        lib_markers = [f"lib::{lb}" for lb in libraries_out]
+                    elif lib_single:
+                        lib_markers = [f"lib::{lib_single}"]
+                    else:
+                        lib_markers = []
+                    rec_out["ref"] = lib_markers
+                # 入口函数：保持 ref 不变（不修改），但后续仍会保存 lib_replacement 元数据
                 try:
                     rec_out["updated_at"] = now_ts
                 except Exception:
@@ -92,6 +97,7 @@ def write_output_symbols(
                         else 0.0,
                         "notes": notes_out,
                         "mode": "llm",
+                        "is_entry_function": is_entry,
                         "updated_at": now_ts,
                     }
                 except Exception:
@@ -106,6 +112,7 @@ def write_output_symbols(
                     "function": api,
                     "confidence": conf,
                     "mode": "llm",
+                    "is_entry_function": is_entry,
                 }
                 if isinstance(apis, list):
                     rep_obj["apis"] = apis
