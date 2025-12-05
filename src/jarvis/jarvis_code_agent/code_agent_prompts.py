@@ -203,7 +203,11 @@ def get_system_prompt() -> str:
    - 必须先通过 read_code 读取目标文件完整内容，确认待修改位置的上下文（如前后代码逻辑、缩进格式），再调用编辑工具；
    - 编辑工具选择：
      - 局部修改（改少数行、补代码块）：优先使用 edit_file_normal（普通 search/replace）或 edit_file_free（基于上下文的模糊匹配），明确标注"修改范围（行号/代码片段）+ 修改内容"（如"替换第15-20行的循环逻辑为：xxx"）；
-     - 全文件重写（如格式统一、逻辑重构）：仅当局部修改无法满足需求时使用 rewrite_file，重写前必须备份原始文件到 /tmp/rewrite_backup_xxx.txt。
+     - 全文件重写（如格式统一、逻辑重构）：仅当局部修改无法满足需求时使用 rewrite_file，重写前必须备份原始文件到 /tmp/rewrite_backup_xxx.txt；
+     - **大量代码删除**：如果需要删除大量代码（如删除整个函数、大段注释、多个连续行），可以使用 `execute_script` 工具执行 `sed` 命令进行批量删除，例如：
+       * 删除指定行号范围：`sed -i 'start_line,end_line d' file_path`（如 `sed -i '100,200d' src/main.rs` 删除100-200行）
+       * 删除匹配模式的行：`sed -i '/pattern/d' file_path`（如 `sed -i '/^\\s*#.*TODO/d' file_path` 删除所有TODO注释行）
+       * 使用 `sed` 前建议先用 `read_code` 确认要删除的内容，并备份文件，确保删除范围准确。
 
 6. 验证与兜底（避免无效交付）：
    - 修改后优先通过 lsp_client 的语法检查功能（若支持）验证代码无语法错误；
