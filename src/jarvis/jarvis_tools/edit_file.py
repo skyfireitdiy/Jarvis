@@ -24,7 +24,6 @@ class EditFileNormalTool:
         "  * 目标代码附近的唯一标识符（如函数名、变量名、注释等）\n"
         "  * 避免使用过短的 search 文本（如单个单词、短字符串），除非能确保唯一性\n"
         "- 如果某个 search 在文件中找不到精确匹配，将导致该文件的编辑失败，文件内容会回滚到原始状态\n"
-        "- 如果存在多个匹配，可以通过 count 参数控制替换次数（-1 表示替换全部，1 表示只替换第一次）\n"
         "- 建议在 search 中包含足够的上下文，确保能唯一匹配到目标位置，避免误匹配"
     )
 
@@ -52,11 +51,6 @@ class EditFileNormalTool:
                                     "replace": {
                                         "type": "string",
                                         "description": "替换后的文本（可以为空字符串）",
-                                    },
-                                    "count": {
-                                        "type": "integer",
-                                        "description": "替换次数，-1 或缺省表示替换全部匹配，1 表示只替换第一次匹配",
-                                        "default": -1,
                                     },
                                 },
                                 "required": ["search", "replace"],
@@ -210,7 +204,6 @@ class EditFileNormalTool:
         """
         search = diff.get("search")
         replace = diff.get("replace")
-        count = diff.get("count", -1)
 
         if search is None:
             return (
@@ -259,24 +252,11 @@ class EditFileNormalTool:
                 None,
             )
 
-        if count is None:
-            count = -1
-        if not isinstance(count, int):
-            return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff的count参数必须是整数",
-                },
-                None,
-            )
-
         return (
             None,
             {
                 "search": search,
                 "replace": replace,
-                "count": count,
             },
         )
 
@@ -346,9 +326,6 @@ class EditFileNormalTool:
 
         preview_lines.append("💡 建议：如果这不是预期的结果，请：")
         preview_lines.append("   1. 增加 search 文本的上下文，使其能唯一定位目标位置")
-        preview_lines.append(
-            "   2. 使用 count 参数明确指定要替换的匹配位置（1 表示只替换第一次）"
-        )
 
         return "\n".join(preview_lines)
 
@@ -578,11 +555,9 @@ class EditFileNormalTool:
         for idx, diff in enumerate(diffs, start=1):
             search = diff["search"]
             replace = diff["replace"]
-            count = diff.get("count", -1)
 
-            # 检查是否明确指定了 count
-            # 如果 count == 1，表示用户明确只想替换第一次匹配，允许多个匹配
-            require_unique = count != 1
+            # 使用精确匹配查找位置，如果有多处匹配需要确认
+            require_unique = True
 
             # 使用精确匹配查找位置
             match_result, error_msg, preview_info = (
@@ -634,55 +609,8 @@ class EditFileNormalTool:
 
             start_pos, end_pos = match_result
 
-            # 执行替换
-            new_content = content[:start_pos] + replace + content[end_pos:]
-
-            # 处理 count 参数
-            if count is None or count < 0:
-                # 替换全部匹配
-                content = new_content
-                # 继续查找并替换剩余的所有匹配
-                search_start_pos = start_pos + len(replace)
-                while True:
-                    remaining_content = content[search_start_pos:]
-                    next_match, _, _ = EditFileNormalTool._find_best_match_position(
-                        remaining_content, search, require_unique=False
-                    )
-                    if next_match is None:
-                        break
-                    next_start, next_end = next_match
-                    # 调整位置（相对于原始 content）
-                    actual_start = search_start_pos + next_start
-                    actual_end = search_start_pos + next_end
-                    content = content[:actual_start] + replace + content[actual_end:]
-                    # 更新搜索起始位置（跳过已替换的内容）
-                    search_start_pos = actual_start + len(replace)
-            elif count == 0:
-                # 0 次替换，相当于跳过
-                continue
-            elif count == 1:
-                # 只替换第一次匹配
-                content = new_content
-            else:
-                # 替换指定次数
-                content = new_content
-                remaining_count = count - 1
-                search_start_pos = start_pos + len(replace)
-                while remaining_count > 0:
-                    remaining_content = content[search_start_pos:]
-                    next_match, _, _ = EditFileNormalTool._find_best_match_position(
-                        remaining_content, search, require_unique=False
-                    )
-                    if next_match is None:
-                        break
-                    next_start, next_end = next_match
-                    # 调整位置（相对于原始 content）
-                    actual_start = search_start_pos + next_start
-                    actual_end = search_start_pos + next_end
-                    content = content[:actual_start] + replace + content[actual_end:]
-                    # 更新搜索起始位置（跳过已替换的内容）
-                    search_start_pos = actual_start + len(replace)
-                    remaining_count -= 1
+            # 执行替换（唯一匹配，直接替换）
+            content = content[:start_pos] + replace + content[end_pos:]
 
         return True, content, None, None
 
@@ -774,28 +702,10 @@ class EditFileNormalTool:
                             confirm_info["replace_text"],
                         )
                         if confirmed:
-                            # 确认继续，对需要确认的 diff 使用 count=1 只替换第一次匹配
-                            # 重新应用编辑，这次允许多个匹配但只替换第一次
-                            normalized_diffs[confirm_diff_idx - 1]["count"] = 1
-                            success, result_or_error, _, _ = (
-                                EditFileNormalTool._apply_normal_edits_to_content(
-                                    original_content,
-                                    normalized_diffs,
-                                    agent=agent,
-                                    file_path=file_path,
-                                )
-                            )
-                            if not success:
-                                # 确认后仍然失败
-                                if backup_path and os.path.exists(backup_path):
-                                    try:
-                                        os.remove(backup_path)
-                                    except Exception:
-                                        pass
-                                all_results.append(f"❌ {file_path}: {result_or_error}")
-                                failed_files.append(file_path)
-                                overall_success = False
-                                continue
+                            # 确认继续，用户确认了要替换所有匹配
+                            # 直接使用 confirm_info 中已生成的 modified_content（已包含所有匹配的替换）
+                            result_or_error = confirm_info["modified_content"]
+                            success = True
                             # 确认后成功，继续写入文件
                         else:
                             # 确认取消
