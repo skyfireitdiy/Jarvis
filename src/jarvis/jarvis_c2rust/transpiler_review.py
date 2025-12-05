@@ -285,88 +285,88 @@ class ReviewManager:
                 "4. 问题分类：使用 [function] 标记功能一致性问题，使用 [critical] 标记严重问题，使用 [breaking] 标记破坏性变更，使用 [structure] 标记文件结构问题",
                 "示例（必须包含修复代码示例）：",
                 '  "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。修复代码示例：\n'
-                '    修改前：\n'
-                '    ```rust\n'
-                '    pub fn foo(x: i32) -> i32 {\n'
-                '        // 缺少参数验证\n'
-                '        x * 2\n'
-                '    }\n'
-                '    ```\n'
-                '    修改后：\n'
-                '    ```rust\n'
-                '    pub fn foo(x: i32) -> Result<i32, Error> {\n'
-                '        if x < 0 {\n'
-                '            return Err(Error::InvalidInput);\n'
-                '        }\n'
-                '        Ok(x * 2)\n'
-                '    }\n'
+                "    修改前：\n"
+                "    ```rust\n"
+                "    pub fn foo(x: i32) -> i32 {\n"
+                "        // 缺少参数验证\n"
+                "        x * 2\n"
+                "    }\n"
+                "    ```\n"
+                "    修改后：\n"
+                "    ```rust\n"
+                "    pub fn foo(x: i32) -> Result<i32, Error> {\n"
+                "        if x < 0 {\n"
+                "            return Err(Error::InvalidInput);\n"
+                "        }\n"
+                "        Ok(x * 2)\n"
+                "    }\n"
                 '    ```"',
                 '  "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。修复代码示例：\n'
-                '    修改前：\n'
-                '    ```rust\n'
-                '    pub fn bar(ptr: *const i32) -> i32 {\n'
-                '        unsafe { *ptr }\n'
-                '    }\n'
-                '    ```\n'
-                '    修改后：\n'
-                '    ```rust\n'
-                '    pub fn bar(ptr: Option<&i32>) -> Option<i32> {\n'
-                '        ptr.map(|p| *p)\n'
-                '    }\n'
+                "    修改前：\n"
+                "    ```rust\n"
+                "    pub fn bar(ptr: *const i32) -> i32 {\n"
+                "        unsafe { *ptr }\n"
+                "    }\n"
+                "    ```\n"
+                "    修改后：\n"
+                "    ```rust\n"
+                "    pub fn bar(ptr: Option<&i32>) -> Option<i32> {\n"
+                "        ptr.map(|p| *p)\n"
+                "    }\n"
                 '    ```"',
                 '  "[breaking] 测试函数重复定义：在 src/common/buffer.rs 第 111-112 行处，新增的测试函数 test_write_buf_1_byte 被同时标记了两次 #[test]，导致重复定义。修复建议：删除其中一个 #[test] 标记，确保每个测试函数只有一个 #[test] 属性。修复代码示例：\n'
-                '    修改前：\n'
-                '    ```rust\n'
-                '    #[test]\n'
-                '    #[test]  // 重复的标记\n'
-                '    fn test_write_buf_1_byte() {\n'
-                '        // ...\n'
-                '    }\n'
-                '    ```\n'
-                '    修改后：\n'
-                '    ```rust\n'
-                '    #[test]\n'
-                '    fn test_write_buf_1_byte() {\n'
-                '        // ...\n'
-                '    }\n'
+                "    修改前：\n"
+                "    ```rust\n"
+                "    #[test]\n"
+                "    #[test]  // 重复的标记\n"
+                "    fn test_write_buf_1_byte() {\n"
+                "        // ...\n"
+                "    }\n"
+                "    ```\n"
+                "    修改后：\n"
+                "    ```rust\n"
+                "    #[test]\n"
+                "    fn test_write_buf_1_byte() {\n"
+                "        // ...\n"
+                "    }\n"
                 '    ```"',
                 '  "[function] 测试用例缺失：函数 foo 没有对应的测试用例，无法验证 Rust 实现是否与 C 实现一致。修复建议：在目标模块的 #[cfg(test)] mod tests { ... } 块中添加测试用例，覆盖函数的主要功能、边界情况和错误情况。修复代码示例：\n'
-                '    修改前（src/foo.rs）：\n'
-                '    ```rust\n'
-                '    pub fn foo(x: i32) -> i32 {\n'
-                '        x * 2\n'
-                '    }\n'
-                '    // 缺少测试用例\n'
-                '    ```\n'
-                '    修改后（src/foo.rs）：\n'
-                '    ```rust\n'
-                '    pub fn foo(x: i32) -> i32 {\n'
-                '        x * 2\n'
-                '    }\n'
-                '    \n'
-                '    #[cfg(test)]\n'
-                '    mod tests {\n'
-                '        use super::*;\n'
-                '        \n'
-                '        #[test]\n'
-                '        fn test_foo_normal() {\n'
-                '            assert_eq!(foo(5), 10);\n'
-                '        }\n'
-                '        \n'
-                '        #[test]\n'
-                '        fn test_foo_zero() {\n'
-                '            assert_eq!(foo(0), 0);\n'
-                '        }\n'
-                '    }\n'
+                "    修改前（src/foo.rs）：\n"
+                "    ```rust\n"
+                "    pub fn foo(x: i32) -> i32 {\n"
+                "        x * 2\n"
+                "    }\n"
+                "    // 缺少测试用例\n"
+                "    ```\n"
+                "    修改后（src/foo.rs）：\n"
+                "    ```rust\n"
+                "    pub fn foo(x: i32) -> i32 {\n"
+                "        x * 2\n"
+                "    }\n"
+                "    \n"
+                "    #[cfg(test)]\n"
+                "    mod tests {\n"
+                "        use super::*;\n"
+                "        \n"
+                "        #[test]\n"
+                "        fn test_foo_normal() {\n"
+                "            assert_eq!(foo(5), 10);\n"
+                "        }\n"
+                "        \n"
+                "        #[test]\n"
+                "        fn test_foo_zero() {\n"
+                "            assert_eq!(foo(0), 0);\n"
+                "        }\n"
+                "    }\n"
                 '    ```"',
                 '  "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。修复代码示例：\n'
-                '    修改前（src/lib.rs）：\n'
-                '    ```rust\n'
-                '    // 缺少 pub mod utils;\n'
-                '    ```\n'
-                '    修改后（src/lib.rs）：\n'
-                '    ```rust\n'
-                '    pub mod utils;\n'
+                "    修改前（src/lib.rs）：\n"
+                "    ```rust\n"
+                "    // 缺少 pub mod utils;\n"
+                "    ```\n"
+                "    修改后（src/lib.rs）：\n"
+                "    ```rust\n"
+                "    pub mod utils;\n"
                 '    ```"',
                 "",
                 "被引用符号上下文（如已转译则包含Rust模块信息）：",
@@ -516,59 +516,59 @@ class ReviewManager:
                 "  4. 问题格式：[function]、[critical]、[breaking] 或 [structure] 开头，后跟详细的问题描述、修复建议和修复代码示例\n"
                 "  示例格式：\n"
                 '    "[function] 返回值处理缺失：在函数 foo 的第 42 行，当输入参数为负数时，函数没有返回错误码，但 C 实现中会返回 -1。修复建议：在函数开始处添加参数验证，当参数为负数时返回 Result::Err(Error::InvalidInput)。修复代码示例：\n'
-                '    修改前：\n'
-                '    ```rust\n'
-                '    pub fn foo(x: i32) -> i32 {\n'
-                '        // 缺少参数验证\n'
-                '        x * 2\n'
-                '    }\n'
-                '    ```\n'
-                '    修改后：\n'
-                '    ```rust\n'
-                '    pub fn foo(x: i32) -> Result<i32, Error> {\n'
-                '        if x < 0 {\n'
-                '            return Err(Error::InvalidInput);\n'
-                '        }\n'
-                '        Ok(x * 2)\n'
-                '    }\n'
+                "    修改前：\n"
+                "    ```rust\n"
+                "    pub fn foo(x: i32) -> i32 {\n"
+                "        // 缺少参数验证\n"
+                "        x * 2\n"
+                "    }\n"
+                "    ```\n"
+                "    修改后：\n"
+                "    ```rust\n"
+                "    pub fn foo(x: i32) -> Result<i32, Error> {\n"
+                "        if x < 0 {\n"
+                "            return Err(Error::InvalidInput);\n"
+                "        }\n"
+                "        Ok(x * 2)\n"
+                "    }\n"
                 '    ```"\n'
                 '    "[critical] 空指针解引用风险：在函数 bar 的第 58 行，直接解引用指针 ptr 而没有检查其是否为 null，可能导致 panic。修复建议：使用 if let Some(value) = ptr.as_ref() 进行空指针检查，或使用 Option<&T> 类型。修复代码示例：\n'
-                '    修改前：\n'
-                '    ```rust\n'
-                '    pub fn bar(ptr: *const i32) -> i32 {\n'
-                '        unsafe { *ptr }\n'
-                '    }\n'
-                '    ```\n'
-                '    修改后：\n'
-                '    ```rust\n'
-                '    pub fn bar(ptr: Option<&i32>) -> Option<i32> {\n'
-                '        ptr.map(|p| *p)\n'
-                '    }\n'
+                "    修改前：\n"
+                "    ```rust\n"
+                "    pub fn bar(ptr: *const i32) -> i32 {\n"
+                "        unsafe { *ptr }\n"
+                "    }\n"
+                "    ```\n"
+                "    修改后：\n"
+                "    ```rust\n"
+                "    pub fn bar(ptr: Option<&i32>) -> Option<i32> {\n"
+                "        ptr.map(|p| *p)\n"
+                "    }\n"
                 '    ```"\n'
                 '    "[breaking] 测试函数重复定义：在 src/common/buffer.rs 第 111-112 行处，新增的测试函数 test_write_buf_1_byte 被同时标记了两次 #[test]，导致重复定义。修复建议：删除其中一个 #[test] 标记，确保每个测试函数只有一个 #[test] 属性。修复代码示例：\n'
-                '    修改前：\n'
-                '    ```rust\n'
-                '    #[test]\n'
-                '    #[test]  // 重复的标记\n'
-                '    fn test_write_buf_1_byte() {\n'
-                '        // ...\n'
-                '    }\n'
-                '    ```\n'
-                '    修改后：\n'
-                '    ```rust\n'
-                '    #[test]\n'
-                '    fn test_write_buf_1_byte() {\n'
-                '        // ...\n'
-                '    }\n'
+                "    修改前：\n"
+                "    ```rust\n"
+                "    #[test]\n"
+                "    #[test]  // 重复的标记\n"
+                "    fn test_write_buf_1_byte() {\n"
+                "        // ...\n"
+                "    }\n"
+                "    ```\n"
+                "    修改后：\n"
+                "    ```rust\n"
+                "    #[test]\n"
+                "    fn test_write_buf_1_byte() {\n"
+                "        // ...\n"
+                "    }\n"
                 '    ```"\n'
                 '    "[structure] 模块导出缺失：函数 qux 所在的模块 utils 未在 src/lib.rs 中导出，导致无法从 crate 外部访问。修复建议：在 src/lib.rs 中添加 `pub mod utils;` 声明。修复代码示例：\n'
-                '    修改前（src/lib.rs）：\n'
-                '    ```rust\n'
-                '    // 缺少 pub mod utils;\n'
-                '    ```\n'
-                '    修改后（src/lib.rs）：\n'
-                '    ```rust\n'
-                '    pub mod utils;\n'
+                "    修改前（src/lib.rs）：\n"
+                "    ```rust\n"
+                "    // 缺少 pub mod utils;\n"
+                "    ```\n"
+                "    修改后（src/lib.rs）：\n"
+                "    ```rust\n"
+                "    pub mod utils;\n"
                 '    ```"\n'
                 "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
                 "**示例1：审查通过（无问题）**\n"
