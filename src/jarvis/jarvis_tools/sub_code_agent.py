@@ -38,6 +38,10 @@ class SubCodeAgentTool:
                 "type": "string",
                 "description": "任务背景与已知信息（可选，将与任务一并提供给子Agent）",
             },
+            "name": {
+                "type": "string",
+                "description": "子Agent的名称（可选，用于标识和区分不同的子Agent）",
+            },
         },
         "required": ["task"],
     }
@@ -64,6 +68,9 @@ class SubCodeAgentTool:
             enhanced_task = (
                 f"背景信息:\n{background}\n\n任务:\n{task}" if background else task
             )
+
+            # 读取子Agent名称（可选）
+            agent_name: str = str(args.get("name", "")).strip()
 
             # 继承父Agent的模型组与工具使用集（用于覆盖默认值）
             parent_agent = args.get("agent")
@@ -135,13 +142,17 @@ class SubCodeAgentTool:
 
             # 创建 CodeAgent，捕获 SystemExit 异常（如 git 配置不完整）
             try:
-                code_agent = CodeAgent(
-                    model_group=model_group,
-                    need_summary=True,
-                    append_tools=append_tools,
-                    tool_group=tool_group,
-                    non_interactive=parent_non_interactive,
-                )
+                code_agent_kwargs = {
+                    "model_group": model_group,
+                    "need_summary": True,
+                    "append_tools": append_tools,
+                    "tool_group": tool_group,
+                    "non_interactive": parent_non_interactive,
+                }
+                # 如果提供了名称，则使用该名称
+                if agent_name:
+                    code_agent_kwargs["name"] = agent_name
+                code_agent = CodeAgent(**code_agent_kwargs)
             except SystemExit as se:
                 # 将底层 sys.exit 转换为工具错误，避免终止进程
                 return {

@@ -34,8 +34,8 @@ class AgentType(Enum):
     """Agent类型枚举。"""
 
     MAIN = "main"
-    SUB = "sub"
-    TOOL = "tool"
+    CODE_AGENT = "code_agent"  # 代码Agent，用于代码相关任务
+    AGENT = "agent"  # 通用Agent，用于一般任务
 
 
 @dataclass
@@ -56,9 +56,6 @@ class Task:
     update_time: int
     dependencies: List[str] = field(default_factory=list)
     actual_output: Optional[str] = None
-    timeout: int = 300
-    retry_count: int = 0
-    retry_limit: int = 3
 
     def __post_init__(self):
         """验证字段约束。"""
@@ -81,14 +78,6 @@ class Task:
         # 验证 priority
         if not (1 <= self.priority <= 5):
             raise ValueError(f"priority 必须在 1-5 之间: {self.priority}")
-
-        # 验证 timeout
-        if self.timeout < 60:
-            raise ValueError(f"timeout 必须 >= 60 秒: {self.timeout}")
-
-        # 验证 retry_limit
-        if not (1 <= self.retry_limit <= 5):
-            raise ValueError(f"retry_limit 必须在 1-5 之间: {self.retry_limit}")
 
     def to_dict(self) -> Dict:
         """转换为字典。"""
@@ -405,8 +394,6 @@ class TaskListManager:
                     create_time=current_time,
                     update_time=current_time,
                     dependencies=task_info.get("dependencies", []),
-                    timeout=task_info.get("timeout", 300),
-                    retry_limit=task_info.get("retry_limit", 3),
                 )
 
                 # 验证依赖关系（检查循环依赖）
@@ -581,17 +568,6 @@ class TaskListManager:
                 if not task.update_status(new_status, actual_output):
                     return False, f"无效的状态转换: {task.status.value} -> {status}"
 
-                # 如果任务失败且未达到重试上限，增加重试次数
-                if new_status == TaskStatus.FAILED:
-                    if task.retry_count < task.retry_limit:
-                        task.retry_count += 1
-                        task.status = TaskStatus.PENDING
-                        task.update_time = int(time.time() * 1000)
-                    else:
-                        # 达到重试上限，标记为放弃
-                        task.status = TaskStatus.ABANDONED
-                        task.update_time = int(time.time() * 1000)
-
                 task_list.version += 1
 
                 # 保存快照
@@ -654,44 +630,6 @@ class TaskListManager:
     def get_task_list(self, task_list_id: str) -> Optional[TaskList]:
         """获取任务列表（内部方法）。"""
         return self.task_lists.get(task_list_id)
-
-    def check_timeout_tasks(self) -> int:
-        """检查并处理超时任务。
-
-        每 5 秒扫描一次，自动标记超时任务为 failed。
-
-        返回:
-            int: 处理的超时任务数量
-        """
-        current_time = int(time.time() * 1000)
-        timeout_count = 0
-
-        with self._lock:
-            for task_list_id, task_list in self.task_lists.items():
-                for task in task_list.tasks.values():
-                    if task.status == TaskStatus.RUNNING:
-                        # 计算任务运行时间（毫秒）
-                        running_time = (
-                            current_time - task.update_time
-                        ) / 1000  # 转换为秒
-                        if running_time > task.timeout:
-                            # 标记为失败
-                            task.status = TaskStatus.FAILED
-                            task.update_time = current_time
-                            timeout_count += 1
-
-                            # 处理重试逻辑
-                            if task.retry_count < task.retry_limit:
-                                task.retry_count += 1
-                                task.status = TaskStatus.PENDING
-                            else:
-                                task.status = TaskStatus.ABANDONED
-
-                            task_list.version += 1
-                            # 保存快照
-                            self._save_snapshot(task_list_id, task_list)
-
-        return timeout_count
 
     def get_task_list_summary(self, task_list_id: str) -> Optional[Dict]:
         """获取任务列表摘要信息。

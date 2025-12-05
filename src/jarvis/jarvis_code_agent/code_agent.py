@@ -335,14 +335,6 @@ class CodeAgent(Agent):
         **kwargs,
     ) -> None:
         """工具调用后回调函数。"""
-        # 检查超时任务（每 5 秒扫描一次，简化实现：每次工具调用后检查）
-        try:
-            timeout_count = self.task_list_manager.check_timeout_tasks()
-            if timeout_count > 0:
-                print(f"⚠️ 检测到 {timeout_count} 个超时任务，已自动标记为失败")
-        except Exception:
-            # 静默失败，不影响主流程
-            pass
 
         final_ret = ""
         diff = get_diff()
