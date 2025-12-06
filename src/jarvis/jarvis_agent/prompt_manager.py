@@ -35,10 +35,36 @@ class PromptManager:
         构建系统提示词，复用现有的工具使用提示生成逻辑，保持行为一致。
         """
         action_prompt = self.agent.get_tool_usage_prompt()
+
+        # 检查 task_list_manager 工具是否可用
+        task_list_manager_note = ""
+        tool_registry = self.agent.get_tool_registry()
+        if isinstance(tool_registry, ToolRegistry):
+            task_list_tool = tool_registry.get_tool("task_list_manager")
+            if task_list_tool:
+                task_list_manager_note = """
+
+<task_list_manager_guide>
+# 任务列表管理工具使用指南
+在 **PLAN（规划）模式**中，你可以使用 `task_list_manager` 工具来：
+- 创建任务列表：将复杂任务分解为多个子任务，建立清晰的任务结构
+- 批量添加任务：使用 `add_tasks` 操作一次性添加多个任务（推荐在 PLAN 阶段使用）
+- 添加单个任务：使用 `add_task` 操作逐个添加任务（适用于后续补充任务）
+- 管理任务状态：跟踪任务执行进度，确保任务按计划完成
+
+使用建议：
+- 当任务较为复杂，需要分解为多个步骤时，建议在 PLAN 模式中使用 task_list_manager 创建任务列表
+- **推荐使用 `add_tasks` 批量添加任务**：在 PLAN 阶段一次性拆分并创建所有子任务，而不是逐个添加
+- 批量添加时，任务之间的依赖关系可以引用本次批次中的任务ID
+- 通过任务列表可以更好地组织和管理任务执行流程
+- 任务列表支持依赖关系，确保任务按正确顺序执行
+</task_list_manager_guide>
+"""
+
         return f"""
 {self.agent.system_prompt}
 
-{action_prompt}
+{action_prompt}{task_list_manager_note}
 """
 
     # ----------------------------
