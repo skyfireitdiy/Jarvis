@@ -177,8 +177,8 @@ class task_list_manager:
     description = """任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
 
 **基本使用流程：**
-1. `create_task_list`: 创建任务列表（提供 main_goal）
-2. `add_tasks`: 添加任务（支持单个或多个任务，推荐一次性添加所有子任务）
+1. `create_task_list`: 创建任务列表（提供 main_goal，可同时提供 tasks_info 一次性创建并添加所有任务）
+2. `add_tasks`: 添加任务（如果创建时未添加，可后续补充）
 3. `execute_task`: 执行任务（自动创建子 Agent 执行）
 4. `get_task_list_summary`: 查看任务列表状态
 
@@ -197,17 +197,11 @@ class task_list_manager:
 - 在 `add_tasks` 时，任务的 `dependencies` 可以引用本次批次中的任务名称（系统会自动匹配）
 - 或者引用已存在的任务ID
 
-**简化使用示例：**
+**简化使用示例（推荐）：**
 ```json
 {
   "action": "create_task_list",
-  "main_goal": "实现用户登录功能"
-}
-```
-```json
-{
-  "action": "add_tasks",
-  "task_list_id": "tasklist-xxx",
+  "main_goal": "实现用户登录功能",
   "tasks_info": [
     {
       "task_name": "设计数据库表结构",
@@ -225,6 +219,21 @@ class task_list_manager:
       "dependencies": ["设计数据库表结构"]
     }
   ]
+}
+```
+
+**分步使用（可选）：**
+```json
+{
+  "action": "create_task_list",
+  "main_goal": "实现用户登录功能"
+}
+```
+```json
+{
+  "action": "add_tasks",
+  "task_list_id": "tasklist-xxx",
+  "tasks_info": [...]
 }
 ```
 """
@@ -254,11 +263,11 @@ class task_list_manager:
             },
             "main_goal": {
                 "type": "string",
-                "description": "用户核心需求（仅 create_task_list 需要）",
+                "description": "用户核心需求（create_task_list 需要）",
             },
             "tasks_info": {
                 "type": "array",
-                "description": "任务信息列表（仅 add_tasks 需要，推荐使用）",
+                "description": "任务信息列表（create_task_list 和 add_tasks 可用，推荐在 create_task_list 时同时提供）",
                 "items": {
                     "type": "object",
                     "properties": {
@@ -401,6 +410,8 @@ class task_list_manager:
                         task_list_id_for_status = result_data.get("task_list_id")
                     except Exception:
                         pass
+                else:
+                    task_list_id_for_status = None
 
             elif action == "add_tasks":
                 result = self._handle_add_tasks(args, task_list_manager, agent_id)
@@ -474,7 +485,7 @@ class task_list_manager:
     def _handle_create_task_list(
         self, args: Dict, task_list_manager: Any, agent_id: str
     ) -> Dict[str, Any]:
-        """处理创建任务列表"""
+        """处理创建任务列表（支持同时添加任务）"""
         main_goal = args.get("main_goal")
         if not main_goal:
             return {
@@ -487,23 +498,66 @@ class task_list_manager:
             main_goal=main_goal, agent_id=agent_id
         )
 
-        if success:
-            result = {
-                "task_list_id": task_list_id,
-                "main_goal": main_goal,
-                "message": "任务列表创建成功",
-            }
-            return {
-                "success": True,
-                "stdout": json.dumps(result, ensure_ascii=False, indent=2),
-                "stderr": "",
-            }
-        else:
+        if not success:
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": f"创建任务列表失败: {error_msg}",
             }
+
+        # 如果提供了 tasks_info，自动添加任务
+        tasks_info = args.get("tasks_info")
+        if tasks_info:
+            if not isinstance(tasks_info, list):
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "tasks_info 必须是数组",
+                }
+
+            # 批量添加任务
+            task_ids, add_success, add_error_msg = task_list_manager.add_tasks(
+                task_list_id=task_list_id, tasks_info=tasks_info, agent_id=agent_id
+            )
+
+            if add_success:
+                result = {
+                    "task_list_id": task_list_id,
+                    "main_goal": main_goal,
+                    "task_count": len(task_ids),
+                    "task_ids": task_ids,
+                    "message": f"任务列表创建成功，并已添加 {len(task_ids)} 个任务",
+                }
+                return {
+                    "success": True,
+                    "stdout": json.dumps(result, ensure_ascii=False, indent=2),
+                    "stderr": "",
+                }
+            else:
+                # 创建成功但添加任务失败，返回部分成功的结果
+                result = {
+                    "task_list_id": task_list_id,
+                    "main_goal": main_goal,
+                    "message": "任务列表创建成功，但添加任务失败",
+                    "error": add_error_msg,
+                }
+                return {
+                    "success": False,
+                    "stdout": json.dumps(result, ensure_ascii=False, indent=2),
+                    "stderr": f"添加任务失败: {add_error_msg}",
+                }
+
+        # 没有提供 tasks_info，只创建任务列表
+        result = {
+            "task_list_id": task_list_id,
+            "main_goal": main_goal,
+            "message": "任务列表创建成功",
+        }
+        return {
+            "success": True,
+            "stdout": json.dumps(result, ensure_ascii=False, indent=2),
+            "stderr": "",
+        }
 
     def _handle_add_tasks(
         self, args: Dict, task_list_manager: Any, agent_id: str
