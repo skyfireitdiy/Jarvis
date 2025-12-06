@@ -174,26 +174,60 @@ class task_list_manager:
             # 静默失败，不影响主流程
             print(f"⚠️ 打印任务状态失败: {e}")
 
-    description = """管理任务列表的工具。支持创建任务列表、添加任务、获取任务、更新任务状态、更新任务列表、更新任务、获取任务列表摘要、执行任务等功能。
-    
-    使用场景：
-    1. 当用户提出复杂需求时，可以创建任务列表并拆解为多个子任务
-    2. 通过任务列表管理任务的执行顺序和依赖关系
-    3. 跟踪任务执行状态和结果
-    4. 自动为每个任务创建独立的 Agent 执行（根据任务的 agent_type）
-    5. 动态更新任务列表和任务属性（如调整优先级、修改描述等）
-    
-    任务执行说明：
-    - agent_type 为 "main": 由主 Agent 直接执行，不创建子 Agent
-    - agent_type 为 "code_agent": 自动创建 CodeAgent 子 Agent 执行任务（适用于代码相关任务）
-    - agent_type 为 "agent": 自动创建通用 Agent 子 Agent 执行任务（适用于一般任务）
-    - 执行时会自动处理任务状态转换（pending -> running -> completed/failed）
-    - 执行结果会自动保存到任务的 actual_output 字段
-    
-    更新功能说明：
-    - update_task_list: 更新任务列表属性（main_goal、max_active_tasks）
-    - update_task: 更新任务属性（task_name、task_desc、priority、expected_output、dependencies）
-    """
+    description = """任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
+
+**基本使用流程：**
+1. `create_task_list`: 创建任务列表（提供 main_goal）
+2. `add_tasks`: 添加任务（支持单个或多个任务，推荐一次性添加所有子任务）
+3. `execute_task`: 执行任务（自动创建子 Agent 执行）
+4. `get_task_list_summary`: 查看任务列表状态
+
+**核心操作：**
+- `create_task_list`: 创建任务列表
+- `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务）
+- `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent）
+- `get_task_list_summary`: 获取任务列表摘要
+
+**任务类型（agent_type）：**
+- `code_agent`: 代码相关任务，自动创建 CodeAgent 执行
+- `agent`: 一般任务，自动创建通用 Agent 执行
+- `main`: 由主 Agent 直接执行（不常用）
+
+**依赖关系：**
+- 在 `add_tasks` 时，任务的 `dependencies` 可以引用本次批次中的任务名称（系统会自动匹配）
+- 或者引用已存在的任务ID
+
+**简化使用示例：**
+```json
+{
+  "action": "create_task_list",
+  "main_goal": "实现用户登录功能"
+}
+```
+```json
+{
+  "action": "add_tasks",
+  "task_list_id": "tasklist-xxx",
+  "tasks_info": [
+    {
+      "task_name": "设计数据库表结构",
+      "task_desc": "创建用户表和会话表",
+      "priority": 5,
+      "expected_output": "数据库表结构设计文档",
+      "agent_type": "code_agent"
+    },
+    {
+      "task_name": "实现登录接口",
+      "task_desc": "实现用户登录API",
+      "priority": 4,
+      "expected_output": "登录接口代码",
+      "agent_type": "code_agent",
+      "dependencies": ["设计数据库表结构"]
+    }
+  ]
+}
+```
+"""
 
     parameters = {
         "type": "object",
@@ -202,7 +236,7 @@ class task_list_manager:
                 "type": "string",
                 "enum": [
                     "create_task_list",
-                    "add_task",
+                    "add_tasks",
                     "get_next_task",
                     "update_task_status",
                     "get_task_detail",
@@ -222,41 +256,41 @@ class task_list_manager:
                 "type": "string",
                 "description": "用户核心需求（仅 create_task_list 需要）",
             },
-            "task_info": {
-                "type": "object",
-                "description": "任务信息（仅 add_task 需要）",
-                "properties": {
-                    "task_name": {
-                        "type": "string",
-                        "description": "任务名称（10-50字符）",
+            "tasks_info": {
+                "type": "array",
+                "description": "任务信息列表（仅 add_tasks 需要，推荐使用）",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "task_name": {"type": "string", "description": "任务名称"},
+                        "task_desc": {"type": "string", "description": "任务描述"},
+                        "priority": {
+                            "type": "integer",
+                            "description": "优先级（1-5，5为最高）",
+                        },
+                        "expected_output": {
+                            "type": "string",
+                            "description": "预期输出",
+                        },
+                        "agent_type": {
+                            "type": "string",
+                            "enum": ["main", "code_agent", "agent"],
+                            "description": "Agent类型：code_agent（代码任务，推荐）、agent（一般任务）、main（主Agent执行）",
+                        },
+                        "dependencies": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "依赖的任务名称或任务ID列表（可选，可以引用本次批次中的任务名称）",
+                        },
                     },
-                    "task_desc": {
-                        "type": "string",
-                        "description": "任务描述（50-200字符）",
-                    },
-                    "priority": {
-                        "type": "integer",
-                        "description": "优先级（1-5，5为最高）",
-                    },
-                    "expected_output": {"type": "string", "description": "预期输出"},
-                    "agent_type": {
-                        "type": "string",
-                        "enum": ["main", "code_agent", "agent"],
-                        "description": "Agent类型：main（主Agent执行）、code_agent（代码Agent执行）、agent（通用Agent执行）",
-                    },
-                    "dependencies": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "依赖的任务ID列表（可选）",
-                    },
+                    "required": [
+                        "task_name",
+                        "task_desc",
+                        "priority",
+                        "expected_output",
+                        "agent_type",
+                    ],
                 },
-                "required": [
-                    "task_name",
-                    "task_desc",
-                    "priority",
-                    "expected_output",
-                    "agent_type",
-                ],
             },
             "task_id": {
                 "type": "string",
@@ -265,15 +299,15 @@ class task_list_manager:
             "status": {
                 "type": "string",
                 "enum": ["pending", "running", "completed", "failed", "abandoned"],
-                "description": "任务状态（update_task_status 需要）",
+                "description": "任务状态（update_task_status 需要，通常不需要手动调用）",
             },
             "actual_output": {
                 "type": "string",
-                "description": "实际输出（update_task_status 可选）",
+                "description": "实际输出（update_task_status 可选，通常不需要手动调用）",
             },
             "version": {
                 "type": "integer",
-                "description": "版本号（rollback_task_list 需要）",
+                "description": "版本号（rollback_task_list 需要，高级功能）",
             },
             "task_list_info": {
                 "type": "object",
@@ -368,8 +402,8 @@ class task_list_manager:
                     except Exception:
                         pass
 
-            elif action == "add_task":
-                result = self._handle_add_task(args, task_list_manager, agent_id)
+            elif action == "add_tasks":
+                result = self._handle_add_tasks(args, task_list_manager, agent_id)
                 task_list_id_for_status = args.get("task_list_id")
 
             elif action == "get_next_task":
@@ -471,10 +505,10 @@ class task_list_manager:
                 "stderr": f"创建任务列表失败: {error_msg}",
             }
 
-    def _handle_add_task(
+    def _handle_add_tasks(
         self, args: Dict, task_list_manager: Any, agent_id: str
     ) -> Dict[str, Any]:
-        """处理添加任务"""
+        """处理批量添加任务（支持通过任务名称匹配依赖关系）"""
         task_list_id = args.get("task_list_id")
         if not task_list_id:
             return {
@@ -483,23 +517,32 @@ class task_list_manager:
                 "stderr": "缺少 task_list_id 参数",
             }
 
-        task_info = args.get("task_info")
-        if not task_info:
+        tasks_info = args.get("tasks_info")
+        if not tasks_info:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_info 参数",
+                "stderr": "缺少 tasks_info 参数",
             }
 
-        task_id, success, error_msg = task_list_manager.add_task(
-            task_list_id=task_list_id, task_info=task_info, agent_id=agent_id
+        if not isinstance(tasks_info, list):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "tasks_info 必须是数组",
+            }
+
+        # add_tasks 方法已经支持通过任务名称匹配依赖关系
+        task_ids, success, error_msg = task_list_manager.add_tasks(
+            task_list_id=task_list_id, tasks_info=tasks_info, agent_id=agent_id
         )
 
         if success:
             result = {
-                "task_id": task_id,
+                "task_ids": task_ids,
+                "task_count": len(task_ids),
                 "task_list_id": task_list_id,
-                "message": "任务添加成功",
+                "message": f"成功批量添加 {len(task_ids)} 个任务",
             }
             return {
                 "success": True,
@@ -510,7 +553,7 @@ class task_list_manager:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"添加任务失败: {error_msg}",
+                "stderr": f"批量添加任务失败: {error_msg}",
             }
 
     def _handle_get_next_task(

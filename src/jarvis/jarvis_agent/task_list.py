@@ -14,11 +14,6 @@ from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass, asdict, field
 from threading import Lock
 
-# 任务输出长度限制常量
-DEFAULT_MAX_TASK_OUTPUT_LENGTH = 10000  # 默认最大任务输出长度（字符数）
-DEFAULT_TASK_OUTPUT_PREFIX_LENGTH = 8000  # 截断时保留的前缀长度
-DEFAULT_TASK_OUTPUT_SUFFIX_LENGTH = 2000  # 截断时保留的后缀长度
-
 
 class TaskStatus(Enum):
     """任务状态枚举。"""
@@ -392,6 +387,165 @@ class TaskListManager:
         except Exception as e:
             return None, False, str(e)
 
+    def add_tasks(
+        self, task_list_id: str, tasks_info: List[Dict], agent_id: str
+    ) -> Tuple[List[str], bool, Optional[str]]:
+        """批量添加任务至任务列表。
+
+        参数:
+            task_list_id: 任务列表 ID
+            tasks_info: 任务信息字典列表（每个字典含 Task 必选字段）
+            agent_id: 主 Agent ID
+
+        返回:
+            Tuple[task_ids, status, error_msg]
+        """
+        try:
+            with self._lock:
+                if task_list_id not in self.task_lists:
+                    return [], False, "任务列表不存在"
+
+                task_list = self.task_lists[task_list_id]
+
+                if not tasks_info:
+                    return [], False, "任务列表为空"
+
+                # 验证必选字段
+                required_fields = [
+                    "task_name",
+                    "task_desc",
+                    "priority",
+                    "expected_output",
+                    "agent_type",
+                ]
+
+                # 先验证所有任务的基本字段
+                for idx, task_info in enumerate(tasks_info):
+                    missing_fields = [
+                        field for field in required_fields if field not in task_info
+                    ]
+                    if missing_fields:
+                        return (
+                            [],
+                            False,
+                            f"第 {idx + 1} 个任务缺少必选字段: {', '.join(missing_fields)}",
+                        )
+
+                # 创建所有任务对象（先不添加到列表，用于验证依赖关系）
+                current_time = int(time.time() * 1000)
+                tasks_to_add = []
+                task_ids = []
+                # 创建任务名称到任务ID的映射（用于依赖关系匹配）
+                name_to_id_map = {}
+
+                # 第一遍：创建所有任务对象，建立名称到ID的映射
+                for task_info in tasks_info:
+                    task_id = f"task-{uuid.uuid4().hex[:16]}"
+                    task_ids.append(task_id)
+                    task_name = task_info["task_name"]
+                    name_to_id_map[task_name] = task_id
+
+                    task = Task(
+                        task_id=task_id,
+                        task_name=task_name,
+                        task_desc=task_info["task_desc"],
+                        priority=task_info["priority"],
+                        status=TaskStatus.PENDING,
+                        expected_output=task_info["expected_output"],
+                        agent_type=AgentType(task_info["agent_type"]),
+                        create_time=current_time,
+                        update_time=current_time,
+                        dependencies=[],  # 先不设置依赖，后续处理
+                    )
+                    tasks_to_add.append(task)
+
+                # 第二遍：处理依赖关系，将任务名称转换为任务ID
+                for idx, task_info in enumerate(tasks_info):
+                    dependencies = task_info.get("dependencies", [])
+                    if dependencies:
+                        processed_deps = []
+                        for dep in dependencies:
+                            # 如果是任务名称，转换为任务ID
+                            if dep in name_to_id_map:
+                                processed_deps.append(name_to_id_map[dep])
+                            else:
+                                # 可能是任务ID，直接使用（也可能是已存在的任务名称）
+                                # 检查是否是已存在的任务名称
+                                found = False
+                                for existing_task in task_list.tasks.values():
+                                    if existing_task.task_name == dep:
+                                        processed_deps.append(existing_task.task_id)
+                                        found = True
+                                        break
+                                if not found:
+                                    # 假设是任务ID，直接使用
+                                    processed_deps.append(dep)
+                        tasks_to_add[idx].dependencies = processed_deps
+
+                # 验证所有任务的依赖关系（检查循环依赖和无效依赖）
+                # 先检查依赖的任务是否都在本次批量添加的任务中，或者已经在任务列表中
+                task_id_map = {t.task_id: t for t in tasks_to_add}
+                for task in tasks_to_add:
+                    for dep_id in task.dependencies:
+                        # 检查依赖是否在本次要添加的任务中
+                        dep_in_batch = dep_id in task_id_map
+                        # 检查依赖是否已经在任务列表中
+                        dep_in_list = task_list.get_task(dep_id) is not None
+                        if not (dep_in_batch or dep_in_list):
+                            return (
+                                [],
+                                False,
+                                f"任务 {task.task_name} 的依赖 {dep_id} 不存在",
+                            )
+
+                # 临时添加所有任务到任务列表（用于循环依赖检查）
+                temp_tasks = {}
+                for task in tasks_to_add:
+                    temp_tasks[task.task_id] = task
+                    task_list.tasks[task.task_id] = task
+
+                # 验证循环依赖
+                try:
+                    for task in tasks_to_add:
+                        if not self._validate_dependencies_batch(
+                            task_list, task, task_id_map
+                        ):
+                            return (
+                                [],
+                                False,
+                                f"任务 {task.task_name} 的依赖关系验证失败：存在循环依赖",
+                            )
+                finally:
+                    # 移除临时添加的任务
+                    for task_id in temp_tasks:
+                        if task_id in task_list.tasks:
+                            del task_list.tasks[task_id]
+
+                # 所有验证通过，批量添加任务
+                added_task_ids = []
+                for task in tasks_to_add:
+                    if task_list.add_task(task):
+                        added_task_ids.append(task.task_id)
+                    else:
+                        # 如果某个任务添加失败，回滚已添加的任务
+                        for added_id in added_task_ids:
+                            if added_id in task_list.tasks:
+                                del task_list.tasks[added_id]
+                        return (
+                            [],
+                            False,
+                            f"添加任务 {task.task_id} 失败：任务ID已存在或依赖无效",
+                        )
+
+                # 保存快照
+                self._save_snapshot(task_list_id, task_list)
+
+                return added_task_ids, True, None
+        except ValueError as e:
+            return [], False, f"字段格式错误: {str(e)}"
+        except Exception as e:
+            return [], False, str(e)
+
     def _validate_dependencies(self, task_list: TaskList, task: Task) -> bool:
         """验证依赖关系，检查循环依赖。"""
         visited = set()
@@ -413,9 +567,43 @@ class TaskListManager:
         for dep_id in task.dependencies:
             dep_task = task_list.get_task(dep_id)
             if not dep_task:
-                return False  # 依赖的任务不存在
+                # 依赖的任务不存在（可能在批量添加时，依赖的任务在本次批次中）
+                # 这种情况下，在批量添加时会单独检查，这里先返回 True
+                continue
             if has_cycle(dep_id):
+                visited.remove(task.task_id)
                 return False  # 存在循环依赖
+        visited.remove(task.task_id)
+        return True
+
+    def _validate_dependencies_batch(
+        self, task_list: TaskList, task: Task, batch_task_map: Dict[str, Task]
+    ) -> bool:
+        """验证批量添加时的依赖关系，检查循环依赖。"""
+        visited = set()
+
+        def has_cycle(current_id: str) -> bool:
+            if current_id in visited:
+                return True
+            visited.add(current_id)
+            # 先从批次中查找，再从任务列表中查找
+            current_task = batch_task_map.get(current_id) or task_list.get_task(
+                current_id
+            )
+            if current_task:
+                for dep_id in current_task.dependencies:
+                    if has_cycle(dep_id):
+                        return True
+            visited.remove(current_id)
+            return False
+
+        # 检查新任务的依赖是否会导致循环
+        visited.add(task.task_id)
+        for dep_id in task.dependencies:
+            if has_cycle(dep_id):
+                visited.remove(task.task_id)
+                return False  # 存在循环依赖
+        visited.remove(task.task_id)
         return True
 
     def get_next_task(
