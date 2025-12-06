@@ -8,10 +8,10 @@ import json
 from typing import Any, Dict, Optional
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
-from jarvis.jarvis_agent.task_list import (
-    DEFAULT_MAX_TASK_OUTPUT_LENGTH,
-    TaskStatus,
-)
+from jarvis.jarvis_agent.task_list import TaskStatus
+
+# 任务输出长度限制常量
+DEFAULT_MAX_TASK_OUTPUT_LENGTH = 10000  # 默认最大任务输出长度（字符数）
 
 
 class task_list_manager:
