@@ -741,6 +741,59 @@ class ToolRegistry(OutputHandlerProtocol):
             return None
 
     @staticmethod
+    def _check_and_handle_multiple_tool_calls(
+        content: str, blocks: List[str]
+    ) -> Tuple[Optional[str], bool]:
+        """检测并处理多个工具调用的情况
+
+        参数:
+            content: 包含工具调用的内容
+            blocks: 工具调用块列表
+
+        返回:
+            Tuple[Optional[str], bool]:
+                - 第一个元素：如果检测到多个工具调用，返回错误消息；否则返回None
+                - 第二个元素：是否检测到多个工具调用
+        """
+        if len(blocks) <= 1:
+            return None, False
+
+        # 尝试解析每个块，收集所有成功解析的工具调用
+        parsed_tools = []
+        for item in blocks:
+            try:
+                cleaned_item = ToolRegistry._clean_extra_markers(item)
+                msg = json_loads(cleaned_item)
+                if "name" in msg and "arguments" in msg:
+                    parsed_tools.append(msg)
+            except Exception:
+                # 如果某个块解析失败，可能是格式问题，继续检查其他块
+                pass
+
+        # 如果成功解析了多个工具调用，返回明确的错误信息
+        if len(parsed_tools) > 1:
+            tool_names = [
+                tool_call.get("name", "未知工具") for tool_call in parsed_tools
+            ]
+            error_msg = f"""检测到多个工具调用（共 {len(parsed_tools)} 个），请一次只处理一个工具调用。
+
+检测到的工具调用：
+{chr(10).join(f"  - {i + 1}. {name}" for i, name in enumerate(tool_names))}
+
+失败原因：
+系统要求每次只能执行一个工具调用，等待结果后再进行下一步操作。同时调用多个工具会导致：
+1. 无法确定工具执行的顺序和依赖关系
+2. 无法正确处理工具之间的交互
+3. 可能导致资源竞争和状态不一致
+
+请修改工具调用，确保每次只包含一个 {ot("TOOL_CALL")}...{ct("TOOL_CALL")} 块。
+
+{tool_call_help}"""
+            return error_msg, True
+
+        return None, False
+
+    @staticmethod
     def _extract_tool_calls(
         content: str,
         agent: Optional[Any] = None,
@@ -777,6 +830,16 @@ class ToolRegistry(OutputHandlerProtocol):
         data = re.findall(pattern, content)
         auto_completed = False
 
+        # 如果检测到多个工具调用块，先检查是否是多个独立的工具调用
+        if len(data) > 1:
+            error_msg, has_multiple = (
+                ToolRegistry._check_and_handle_multiple_tool_calls(content, data)
+            )
+            if has_multiple:
+                return {}, error_msg, False
+            # 如果解析失败，可能是多个工具调用被当作一个 JSON 来解析了
+            # 继续执行后续的宽松提取逻辑
+
         # 如果标准提取失败，尝试更宽松的提取方式
         if not data:
             # can_handle 确保 ot("TOOL_CALL") 在内容中（行首）。
@@ -810,6 +873,19 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 如果仍然没有数据，尝试更宽松的提取：直接从开始标签后提取JSON
             if not data:
+                # 先检查是否有多个工具调用块（可能被当作一个 JSON 来解析导致失败）
+                multiple_blocks = re.findall(
+                    rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}",
+                    content,
+                )
+                error_msg, has_multiple = (
+                    ToolRegistry._check_and_handle_multiple_tool_calls(
+                        content, multiple_blocks
+                    )
+                )
+                if has_multiple:
+                    return {}, error_msg, False
+
                 # 找到开始标签的位置
                 open_tag_match = re.search(
                     rf"(?i){re.escape(ot('TOOL_CALL'))}", content
@@ -862,6 +938,23 @@ class ToolRegistry(OutputHandlerProtocol):
                 cleaned_item = ToolRegistry._clean_extra_markers(item)
                 msg = json_loads(cleaned_item)
             except Exception as e:
+                # 如果解析失败，先检查是否是因为有多个工具调用
+                # 检查错误信息中是否包含 "expected a comma" 或类似的多对象错误
+                error_str = str(e).lower()
+                if "expected a comma" in error_str or "multiple" in error_str:
+                    # 尝试检测是否有多个工具调用块
+                    multiple_blocks = re.findall(
+                        rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}",
+                        content,
+                    )
+                    error_msg, has_multiple = (
+                        ToolRegistry._check_and_handle_multiple_tool_calls(
+                            content, multiple_blocks
+                        )
+                    )
+                    if has_multiple:
+                        return {}, error_msg, False
+
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 error_msg = f"""Jsonnet 解析失败：{e}
 
