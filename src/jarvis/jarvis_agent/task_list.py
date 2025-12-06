@@ -63,18 +63,6 @@ class Task:
         if not self.task_id.startswith("task-") or len(self.task_id) != 21:
             raise ValueError(f"task_id 格式错误: {self.task_id}")
 
-        # 验证 task_name 长度
-        if not (10 <= len(self.task_name) <= 50):
-            raise ValueError(
-                f"task_name 长度必须在 10-50 字符之间: {len(self.task_name)}"
-            )
-
-        # 验证 task_desc 长度
-        if not (50 <= len(self.task_desc) <= 200):
-            raise ValueError(
-                f"task_desc 长度必须在 50-200 字符之间: {len(self.task_desc)}"
-            )
-
         # 验证 priority
         if not (1 <= self.priority <= 5):
             raise ValueError(f"priority 必须在 1-5 之间: {self.priority}")
@@ -138,11 +126,6 @@ class TaskList:
             max_active_tasks: 最大活跃任务数
             version: 版本号
         """
-        if not (50 <= len(main_goal) <= 200):
-            raise ValueError(f"main_goal 长度必须在 50-200 字符之间: {len(main_goal)}")
-        if not (5 <= max_active_tasks <= 20):
-            raise ValueError(f"max_active_tasks 必须在 5-20 之间: {max_active_tasks}")
-
         self.main_goal = main_goal
         self.tasks: Dict[str, Task] = OrderedDict()
         self.max_active_tasks = max_active_tasks
@@ -327,9 +310,6 @@ class TaskListManager:
             Tuple[task_list_id, status, error_msg]
         """
         try:
-            if not (50 <= len(main_goal) <= 200):
-                return None, False, "main_goal 长度必须在 50-200 字符之间"
-
             task_list_id = f"tasklist-{uuid.uuid4().hex[:12]}"
             task_list = TaskList(main_goal=main_goal)
 
