@@ -179,13 +179,19 @@ class task_list_manager:
 **基本使用流程：**
 1. `create_task_list`: 创建任务列表（提供 main_goal，可同时提供 tasks_info 一次性创建并添加所有任务）
 2. `add_tasks`: 添加任务（如果创建时未添加，可后续补充）
-3. `execute_task`: 执行任务（自动创建子 Agent 执行）
+3. `execute_task`: 执行任务（自动创建子 Agent 执行，**执行完成后会自动更新任务状态为 completed 或 failed**）
 4. `get_task_list_summary`: 查看任务列表状态
+
+**任务状态自动管理：**
+- 执行开始时：任务状态自动更新为 `running`
+- 执行完成时：任务状态自动更新为 `completed`，执行结果保存到 `actual_output`
+- 执行失败时：任务状态自动更新为 `failed`，错误信息保存到 `actual_output`
+- 无需手动调用 `update_task_status`，系统会自动管理任务状态
 
 **核心操作：**
 - `create_task_list`: 创建任务列表
 - `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务）
-- `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent）
+- `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent，**执行完成后会自动更新任务状态**）
 - `get_task_list_summary`: 获取任务列表摘要
 
 **任务类型（agent_type）：**
@@ -891,9 +897,17 @@ class task_list_manager:
 {task.expected_output}
 """
 
-            # 如果有依赖任务，获取依赖任务的输出作为背景信息
+            # 构建背景信息
             background_parts = []
+
+            # 1. 获取任务列表的 main_goal 作为全局上下文
+            task_list = task_list_manager.get_task_list(task_list_id)
+            if task_list:
+                background_parts.append(f"全局目标: {task_list.main_goal}")
+
+            # 2. 获取依赖任务的输出作为背景信息
             if task.dependencies:
+                dep_outputs = []
                 for dep_id in task.dependencies:
                     dep_task, dep_success, _ = task_list_manager.get_task_detail(
                         task_list_id=task_list_id,
@@ -901,15 +915,49 @@ class task_list_manager:
                         agent_id=agent_id,
                         is_main_agent=is_main_agent,
                     )
-                    if dep_success and dep_task and dep_task.actual_output:
-                        background_parts.append(
-                            f"依赖任务 [{dep_task.task_name}] 的输出:\n{dep_task.actual_output}"
-                        )
+                    if dep_success and dep_task:
+                        if dep_task.actual_output:
+                            dep_outputs.append(
+                                f"依赖任务 [{dep_task.task_name}] 的输出:\n{dep_task.actual_output}"
+                            )
+                        elif dep_task.status == TaskStatus.COMPLETED:
+                            # 即使没有输出，也说明依赖任务已完成
+                            dep_outputs.append(
+                                f"依赖任务 [{dep_task.task_name}] 已完成（状态: {dep_task.status.value}）"
+                            )
 
-            # 获取任务列表的 main_goal 作为全局上下文
-            task_list = task_list_manager.get_task_list(task_list_id)
+                if dep_outputs:
+                    background_parts.append(
+                        "依赖任务信息:\n" + "\n\n".join(dep_outputs)
+                    )
+
+            # 3. 获取其他已完成任务的摘要信息（作为额外上下文，帮助理解整体进度）
             if task_list:
-                background_parts.insert(0, f"全局目标: {task_list.main_goal}")
+                completed_tasks = [
+                    t
+                    for t in task_list.tasks.values()
+                    if t.status == TaskStatus.COMPLETED
+                    and t.task_id != task_id
+                    and t.task_id not in (task.dependencies or [])
+                ]
+                if completed_tasks:
+                    # 只包含前3个已完成任务的简要信息，避免上下文过长
+                    completed_summary = []
+                    for completed_task in completed_tasks[:3]:
+                        summary = f"- [{completed_task.task_name}]: {completed_task.task_desc}"
+                        if completed_task.actual_output:
+                            # 只取输出的前200字符作为摘要
+                            output_preview = completed_task.actual_output[:200]
+                            if len(completed_task.actual_output) > 200:
+                                output_preview += "..."
+                            summary += f"\n  输出摘要: {output_preview}"
+                        completed_summary.append(summary)
+
+                    if completed_summary:
+                        background_parts.append(
+                            "其他已完成任务（参考信息）:\n"
+                            + "\n".join(completed_summary)
+                        )
 
             background = "\n\n".join(background_parts) if background_parts else ""
 
@@ -917,7 +965,7 @@ class task_list_manager:
             execution_result = None
             if task.agent_type.value == "main":
                 # 主 Agent 执行：直接在当前 Agent 中执行（不创建子 Agent）
-                # 这里返回任务信息，让主 Agent 自己处理
+                # 注意：主 Agent 类型的任务需要主 Agent 自行执行，执行完成后需要手动调用 update_task_status 更新状态
                 result = {
                     "task_id": task_id,
                     "task_name": task.task_name,
@@ -925,7 +973,8 @@ class task_list_manager:
                     "expected_output": task.expected_output,
                     "background": background,
                     "message": "任务已标记为 running，请主 Agent 自行执行",
-                    "note": "主 Agent 类型的任务应由当前 Agent 直接执行，而不是创建子 Agent",
+                    "note": "主 Agent 类型的任务应由当前 Agent 直接执行，执行完成后请调用 update_task_status 更新任务状态为 completed 或 failed",
+                    "warning": "请务必在执行完成后更新任务状态，否则任务将一直保持 running 状态",
                 }
                 return {
                     "success": True,
