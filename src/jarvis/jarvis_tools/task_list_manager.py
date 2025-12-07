@@ -8,6 +8,7 @@ import json
 from typing import Any, Dict, Optional
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_agent.task_list import TaskStatus
 
 # 任务输出长度限制常量
@@ -45,9 +46,8 @@ class task_list_manager:
                     pass
 
             # 回退方案：使用输入窗口的2/3
-            model_group = None
-            if agent:
-                model_group = getattr(agent, "model_group", None)
+            # 使用全局模型组（不再从 agent 继承）
+            model_group = get_global_model_group()
 
             max_input_tokens = get_max_input_token_count(model_group)
             # 计算2/3限制的token数，然后转换为字符数

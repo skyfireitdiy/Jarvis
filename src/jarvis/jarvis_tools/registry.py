@@ -18,6 +18,7 @@ from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_data_dir, get_tool_load_dirs
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
+from jarvis.jarvis_utils.globals import get_global_model_group
 
 _multiline_example = """  {
     "multiline_str": |||
@@ -1221,11 +1222,9 @@ class ToolRegistry(OutputHandlerProtocol):
             )
 
             # 检查内容是否过大
-            model_group = None
-            platform = None
-            if agent_instance.model:
-                model_group = agent_instance.model.model_group
-                platform = agent_instance.model
+            # 使用全局模型组（不再从 agent 继承）
+            model_group = get_global_model_group()
+            platform = agent_instance.model if agent_instance.model else None
             is_large_content = is_context_overflow(output, model_group, platform)
 
             if is_large_content:

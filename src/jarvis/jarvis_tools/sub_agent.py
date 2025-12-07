@@ -15,7 +15,7 @@ from typing import Any, Dict
 import json
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_utils.globals import delete_agent
+from jarvis.jarvis_utils.globals import delete_agent, get_global_model_group
 
 
 class SubAgentTool:
@@ -116,7 +116,8 @@ class SubAgentTool:
 
             # 基于父Agent（如有）继承部分配置后创建子Agent
             parent_agent = args.get("agent", None)
-            parent_model_group = None
+            # 使用全局模型组（不再从 parent_agent 继承）
+            parent_model_group = get_global_model_group()
             parent_execute_tool_confirm = None
             parent_multiline_inputer = None
             parent_non_interactive = None
@@ -124,10 +125,6 @@ class SubAgentTool:
             parent_use_analysis = None
             try:
                 if parent_agent is not None:
-                    if getattr(parent_agent, "model", None):
-                        parent_model_group = getattr(
-                            parent_agent.model, "model_group", None
-                        )
                     parent_execute_tool_confirm = getattr(
                         parent_agent, "execute_tool_confirm", None
                     )

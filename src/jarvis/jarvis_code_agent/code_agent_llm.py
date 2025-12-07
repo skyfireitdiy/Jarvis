@@ -5,37 +5,28 @@ from typing import Any, Dict, Optional
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
+from jarvis.jarvis_utils.globals import get_global_model_group
 
 
 class LLMManager:
     """LLM 询问管理器"""
 
-    def __init__(self, parent_model: Optional[Any] = None, model_group: Optional[str] = None):
+    def __init__(
+        self, parent_model: Optional[Any] = None, model_group: Optional[str] = None
+    ):
         """初始化LLM管理器
 
         Args:
-            parent_model: 父Agent的模型实例，用于获取模型配置（平台名称、模型名称、模型组等）
-            model_group: 模型组名称，如果提供则优先使用
+            parent_model: 父Agent的模型实例（已废弃，保留参数兼容性）
+            model_group: 模型组名称，如果提供则优先使用，否则使用全局模型组
         """
         # 保存配置信息，用于后续创建 LLM 实例
         self._platform_name = None
         self._model_name = None
-        self._model_group = model_group
+        # 优先使用传入的model_group，否则使用全局模型组
+        self._model_group = model_group or get_global_model_group()
 
-        # 从父Agent的model获取配置
-        if parent_model:
-            try:
-                # 优先获取 model_group，因为它包含了完整的配置信息
-                if not self._model_group:
-                    self._model_group = getattr(parent_model, "model_group", None)
-                self._platform_name = parent_model.platform_name()
-                self._model_name = parent_model.name()
-            except Exception:
-                # 如果获取失败，使用默认配置
-                pass
-
-        # 优先根据 model_group 获取配置（确保配置一致性）
-        # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
+        # 根据 model_group 获取配置（不再从 parent_model 继承）
         # 使用普通模型，LLM询问可以降低成本
         if self._model_group:
             try:

@@ -15,6 +15,7 @@ from jarvis.jarvis_utils.git_utils import (
 )
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.globals import get_global_model_group
 
 
 class GitManager:
@@ -233,7 +234,8 @@ class GitManager:
                     "prefix": prefix,
                     "suffix": suffix,
                     "agent": agent,
-                    "model_group": getattr(agent.model, "model_group", None),
+                    # 使用全局模型组（不再从 agent 继承）
+                    "model_group": get_global_model_group(),
                 }
             )
 
@@ -496,7 +498,8 @@ class GitManager:
                     "prefix": prefix,
                     "suffix": suffix,
                     "agent": agent,
-                    "model_group": getattr(agent.model, "model_group", None),
+                    # 使用全局模型组（不再从 agent 继承）
+                    "model_group": get_global_model_group(),
                 }
             )
 

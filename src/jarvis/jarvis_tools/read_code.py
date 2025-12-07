@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.globals import get_global_model_group
 
 
 class ReadCodeTool:
@@ -52,9 +53,8 @@ class ReadCodeTool:
                     pass
 
             # 回退方案：使用输入窗口的2/3
-            model_group = None
-            if agent:
-                model_group = getattr(agent, "model_group", None)
+            # 使用全局模型组（不再从 agent 继承）
+            model_group = get_global_model_group()
 
             max_input_tokens = get_max_input_token_count(model_group)
             # 计算2/3限制的token数
