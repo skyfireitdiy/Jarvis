@@ -173,6 +173,8 @@ class ToolRegistry(OutputHandlerProtocol):
         self.tools: Dict[str, Tool] = {}
         # 记录内置工具名称，用于区分内置工具和用户自定义工具
         self._builtin_tool_names: set = set()
+        # 定义必选工具列表（这些工具将始终可用）
+        self._required_tools: List[str] = ["task_list_manager", "execute_script"]
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
@@ -241,13 +243,26 @@ class ToolRegistry(OutputHandlerProtocol):
         参数:
             names: 要移除的工具名称列表
         """
+        # 过滤掉必选工具，确保它们不会被移除
+        filtered_names = [name for name in names if name not in self._required_tools]
+        if filtered_names != names:
+            removed_required = [name for name in names if name in self._required_tools]
+            print(f"⚠️ 警告: 无法移除必选工具: {', '.join(removed_required)}")
         self.tools = {
-            name: tool for name, tool in self.tools.items() if name not in names
+            name: tool
+            for name, tool in self.tools.items()
+            if name not in filtered_names
         }
 
     def _apply_tool_config_filter(self) -> None:
         """应用工具配置组的过滤规则"""
         from jarvis.jarvis_utils.config import get_tool_use_list, get_tool_dont_use_list
+
+        # 在过滤前保存必选工具的引用
+        required_tools_backup: Dict[str, Tool] = {}
+        for tool_name in self._required_tools:
+            if tool_name in self.tools:
+                required_tools_backup[tool_name] = self.tools[tool_name]
 
         use_list = get_tool_use_list()
         dont_use_list = get_tool_dont_use_list()
@@ -268,11 +283,18 @@ class ToolRegistry(OutputHandlerProtocol):
                 )
             self.tools = filtered_tools
 
-        # 如果配置了 dont_use 列表，排除列表中的工具
+        # 如果配置了 dont_use 列表，排除列表中的工具（但必选工具除外）
         if dont_use_list:
             for tool_name in dont_use_list:
-                if tool_name in self.tools:
+                if tool_name in self.tools and tool_name not in self._required_tools:
                     del self.tools[tool_name]
+
+        # 确保必选工具始终被包含（如果它们之前被加载过）
+        for tool_name in self._required_tools:
+            if tool_name in required_tools_backup:
+                self.tools[tool_name] = required_tools_backup[tool_name]
+            elif tool_name not in self.tools:
+                print(f"⚠️ 警告: 必选工具 '{tool_name}' 未加载，可能无法正常工作")
 
     def _load_mcp_tools(self) -> None:
         """加载MCP工具，优先从配置获取，其次从目录扫描"""
