@@ -203,8 +203,8 @@ class CodeAgent(Agent):
         self.model.set_model_group(model_group)
         self.model.set_suppress_output(False)
 
-        # 初始化LLM管理器
-        self.llm_manager = LLMManager(self.model)
+        # 初始化LLM管理器（使用普通模型，不使用smart模型）
+        self.llm_manager = LLMManager(parent_model=self.model, model_group=model_group)
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理.
