@@ -88,7 +88,7 @@ class TaskAnalyzer:
     def _process_analysis_loop(self):
         """处理分析循环"""
         while True:
-            response = self.agent.model.chat_until_success(self.agent.session.prompt)  # type: ignore
+            response = self.agent.model.chat_until_success(self.agent.session.prompt)
             self.agent.session.prompt = ""
 
             # 处理用户中断
@@ -197,7 +197,7 @@ class TaskAnalyzer:
     # 事件订阅与处理（旁路）
     # -----------------------
     def _subscribe_events(self) -> None:
-        bus = self.agent.get_event_bus()  # type: ignore[attr-defined]
+        bus = self.agent.get_event_bus()
         # 在生成总结前触发（保持与原顺序一致）
         bus.subscribe(BEFORE_SUMMARY, self._on_before_summary)
         # 当无需总结时，作为兜底触发分析

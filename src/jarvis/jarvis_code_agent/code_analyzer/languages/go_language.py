@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import List, Optional, Set
+from typing import List, Optional, Set, cast
 
 from tree_sitter import Language, Node
 
@@ -43,7 +43,9 @@ GO_SYMBOL_QUERY = """
 try:
     import tree_sitter_go
 
-    GO_LANGUAGE: Optional[Language] = tree_sitter_go.language()
+    GO_LANGUAGE: Optional[Language] = cast(
+        Optional[Language], tree_sitter_go.language()
+    )
 except (ImportError, Exception):
     GO_LANGUAGE = None
 
@@ -80,6 +82,8 @@ class GoSymbolExtractor(TreeSitterExtractor):
         # For const/var/struct, extract the first identifier as name
         if symbol_kind in ("const", "var", "struct"):
             # Try to find the first identifier in the declaration
+            if node.text is None:
+                return None
             node_text = node.text.decode("utf8").strip()
             # Extract first identifier after const/var/struct keyword
             if symbol_kind == "const":
@@ -96,6 +100,8 @@ class GoSymbolExtractor(TreeSitterExtractor):
                 # Fallback: use the kind as name
                 symbol_name = symbol_kind
         else:
+            if node.text is None:
+                return None
             symbol_name = node.text.decode("utf8")
 
         return Symbol(

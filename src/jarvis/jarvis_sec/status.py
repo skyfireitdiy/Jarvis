@@ -9,7 +9,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, cast
 
 
 class StatusManager:
@@ -41,7 +41,7 @@ class StatusManager:
             return {}
         try:
             with self.status_path.open("r", encoding="utf-8") as f:
-                return json.load(f)
+                return cast(Dict[str, Any], json.load(f))
         except Exception:
             return {}
 
@@ -142,7 +142,7 @@ class StatusManager:
         message: Optional[str] = None,
     ):
         """更新聚类阶段状态"""
-        details = {}
+        details: Dict[str, Any] = {}
         if file_name:
             details["current_file"] = file_name
         if current_batch is not None:
@@ -171,7 +171,7 @@ class StatusManager:
         message: Optional[str] = None,
     ):
         """更新复核阶段状态"""
-        details = {}
+        details: Dict[str, Any] = {}
 
         # 计算总体进度
         progress = None
@@ -203,7 +203,7 @@ class StatusManager:
         message: Optional[str] = None,
     ):
         """更新验证阶段状态"""
-        details = {}
+        details: Dict[str, Any] = {}
         if batch_id:
             details["batch_id"] = batch_id
         if file_name:

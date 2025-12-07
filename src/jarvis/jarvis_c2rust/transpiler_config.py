@@ -119,7 +119,10 @@ class ConfigManager:
                             continue
                         # 构建 FnRecord
                         try:
-                            fid = int(r.get("id"))
+                            rec_id = r.get("id")
+                            if rec_id is None:
+                                continue
+                            fid = int(rec_id)
                         except Exception:
                             continue
                         if fid in fn_index_by_id:

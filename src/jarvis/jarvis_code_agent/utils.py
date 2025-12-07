@@ -5,7 +5,7 @@
 """
 
 import subprocess
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from jarvis.jarvis_utils.git_utils import get_recent_commits_with_files
 from jarvis.jarvis_utils.utils import get_loc_stats
@@ -61,7 +61,7 @@ def get_git_tracked_files_info(
                         dirs.add(dir_path)
 
             # 构建树形目录结构
-            dir_tree = {}
+            dir_tree: Dict[str, Any] = {}
             for dir_path in sorted(dirs):
                 parts = dir_path.split("/")
                 current = dir_tree

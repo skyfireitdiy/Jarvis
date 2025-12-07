@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-from typing import Dict, Generator, List, Tuple
+from typing import Dict, Generator, List, Tuple, cast
 
 from openai import OpenAI
 
@@ -204,7 +204,7 @@ class OpenAIModel(BasePlatform):
         返回:
             str: 当前配置的模型名称
         """
-        return self.model_name
+        return cast(str, self.model_name)
 
     @classmethod
     def platform_name(cls) -> str:

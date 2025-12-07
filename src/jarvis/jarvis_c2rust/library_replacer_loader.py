@@ -163,7 +163,9 @@ def process_candidate_scope(
         qn = rec.get("qualified_name") or ""
         if nm in key_set or qn in key_set:
             try:
-                cand_ids.add(int(rec.get("id")))
+                rec_id = rec.get("id")
+                if rec_id is not None:
+                    cand_ids.add(int(rec_id))
             except Exception:
                 continue
 

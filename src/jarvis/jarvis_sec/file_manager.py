@@ -8,7 +8,7 @@
 3. analysis.jsonl - 分析结果文件：包括所有聚类，聚类中哪些问题是问题，哪些问题是误报
 """
 
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Any
 from pathlib import Path
 import json
 import typer
@@ -418,7 +418,7 @@ def get_false_positive_gids(sec_dir: Path) -> Set[int]:
 # ==================== 断点恢复状态检查 ====================
 
 
-def get_resume_status(sec_dir: Path) -> Dict[str, any]:
+def get_resume_status(sec_dir: Path) -> Dict[str, Any]:
     """
     根据3个配置文件的存在性和状态，推断断点恢复状态
 

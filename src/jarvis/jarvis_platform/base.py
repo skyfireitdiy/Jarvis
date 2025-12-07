@@ -8,11 +8,11 @@ from typing import Dict, Generator, List, Optional, Tuple, Type
 
 from typing_extensions import Self
 
-from rich import box  # type: ignore
-from rich.live import Live  # type: ignore
-from rich.panel import Panel  # type: ignore
-from rich.status import Status  # type: ignore
-from rich.text import Text  # type: ignore
+from rich import box
+from rich.live import Live
+from rich.panel import Panel
+from rich.status import Status
+from rich.text import Text
 
 from jarvis.jarvis_utils.config import (
     get_pretty_output,

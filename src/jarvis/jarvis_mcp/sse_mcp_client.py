@@ -2,7 +2,7 @@
 import json
 import threading
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, cast
 from urllib.parse import parse_qs, urlencode, urljoin
 
 import requests  # type: ignore[import-untyped]
@@ -490,7 +490,7 @@ class SSEMcpClient(McpClient):
         try:
             response = self._send_request("resources/list", {})
             if "result" in response and "resources" in response["result"]:
-                return response["result"]["resources"]
+                return cast(List[Dict[str, Any]], response["result"]["resources"])
             else:
                 error_msg = "获取资源列表失败"
                 if "error" in response:

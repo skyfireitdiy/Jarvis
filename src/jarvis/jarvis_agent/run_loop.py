@@ -151,8 +151,10 @@ class AgentRunLoop:
                 try:
                     # 获取所有订阅了 AFTER_TOOL_CALL 事件的回调
                     listeners = ag.event_bus._listeners.get(AFTER_TOOL_CALL, [])
-                    for callback in listeners:
+                    for listener_tuple in listeners:
                         try:
+                            # listener_tuple 是 (priority, order, callback)
+                            _, _, callback = listener_tuple
                             callback(
                                 agent=ag,
                                 current_response=current_response,

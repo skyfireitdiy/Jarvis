@@ -330,7 +330,7 @@ def group_commands_by_template(
         {template_key: [(file_path, command), ...]} 格式的字典
         template_key 是命令的第一个单词
     """
-    grouped = {}
+    grouped: Dict[str, List[Tuple[str, str]]] = {}
     for file_path, command in commands:
         # 使用命令的第一个单词作为分组键
         template_key = command.split()[0] if command.split() else "unknown"

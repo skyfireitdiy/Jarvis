@@ -1,7 +1,7 @@
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .dependency_analyzer import DependencyGraph
 from .file_ignore import filter_walk_dirs
@@ -322,7 +322,7 @@ class ContextManager:
         try:
             from jarvis.jarvis_tools.lsp_client import LSPClientTool
 
-            lsp_client = LSPClientTool.get_client_for_file(file_path, self.project_root)
+            lsp_client = LSPClientTool.get_client_for_file(file_path, self.project_root)  # type: ignore[attr-defined]
         except Exception:
             pass
 
@@ -341,7 +341,9 @@ class ContextManager:
             pass
 
         # 用于跟踪已处理的符号，避免重复
-        processed_symbols = {}  # {symbol_name: (symbol, is_definition, definition_location)}
+        processed_symbols: Dict[
+            str, Tuple[Symbol, bool, Optional[Symbol]]
+        ] = {}  # {symbol_name: (symbol, is_definition, definition_location)}
 
         # Simple pattern matching to find symbol usage
         for symbol in all_symbols:

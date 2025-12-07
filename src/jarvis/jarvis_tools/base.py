@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, cast
 
 
 class Tool:
@@ -49,7 +49,7 @@ class Tool:
             Dict[str, Any]: 工具执行结果
         """
         try:
-            return self.func(arguments)
+            return cast(Dict[str, Any], self.func(arguments))
         except Exception as e:
             return {
                 "success": False,

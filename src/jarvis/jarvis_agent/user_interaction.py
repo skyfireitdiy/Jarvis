@@ -31,9 +31,9 @@ class UserInteractionHandler:
         2) func(tip)
         """
         try:
-            return self._multiline_inputer(tip, print_on_empty=print_on_empty)  # type: ignore[call-arg]
+            return self._multiline_inputer(tip, print_on_empty=print_on_empty)
         except TypeError:
-            return self._multiline_inputer(tip)  # type: ignore[misc]
+            return self._multiline_inputer(tip)
 
     def confirm(self, tip: str, default: bool = True) -> bool:
         """

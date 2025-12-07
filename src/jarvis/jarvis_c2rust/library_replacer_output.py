@@ -18,7 +18,10 @@ def write_output_symbols(
     now_ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime())
     kept_ids: Set[int] = set()
     for rec in all_records:
-        fid = int(rec.get("id"))
+        rec_id = rec.get("id")
+        if rec_id is None:
+            continue
+        fid = int(rec_id)
         cat = rec.get("category") or ""
         if cat == "function":
             if fid in pruned_funcs:
@@ -35,7 +38,10 @@ def write_output_symbols(
         open(out_symbols_prune_path, "w", encoding="utf-8") as fo2,
     ):
         for rec in all_records:
-            fid = int(rec.get("id"))
+            rec_id = rec.get("id")
+            if rec_id is None:
+                continue
+            fid = int(rec_id)
             if fid not in kept_ids:
                 continue
 

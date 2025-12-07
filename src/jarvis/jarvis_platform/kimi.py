@@ -5,7 +5,7 @@ import json
 import mimetypes
 import os
 import time
-from typing import Dict, Generator, List, Tuple
+from typing import Dict, Generator, List, Tuple, Any, cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
@@ -69,7 +69,7 @@ class KimiModel(BasePlatform):
             if response.status_code != 200:
                 print(f"❌ 错误：创建会话失败：{response.json()}")
                 return False
-            self.chat_id = response.json()["id"]
+            self.chat_id = cast(str, cast(Dict[str, Any], response.json())["id"])
             return True
         except Exception as e:
             print(f"❌ 错误：创建会话失败：{e}")
@@ -89,7 +89,7 @@ class KimiModel(BasePlatform):
         }
 
         response = while_success(lambda: http.post(url, headers=headers, data=payload))
-        return response.json()
+        return cast(Dict[str, Any], response.json())
 
     def support_upload_files(self) -> bool:
         """Check if platform supports upload files"""
@@ -101,7 +101,7 @@ class KimiModel(BasePlatform):
             with open(file_path, "rb") as f:
                 content = f.read()
                 response = while_success(lambda: http.put(presigned_url, data=content))
-                return response.status_code == 200
+                return bool(response.status_code == 200)
         except Exception as e:
             print(f"❌ 错误：上传文件失败：{e}")
             return False
@@ -126,7 +126,7 @@ class KimiModel(BasePlatform):
         }
 
         response = while_success(lambda: http.post(url, headers=headers, data=payload))
-        return response.json()
+        return cast(Dict[str, Any], response.json())
 
     def _wait_for_parse(self, file_id: str) -> bool:
         """Wait for file parsing to complete"""
@@ -379,7 +379,7 @@ class KimiModel(BasePlatform):
 
     def name(self) -> str:
         """Model name"""
-        return self.model_name
+        return cast(str, self.model_name)
 
     @classmethod
     def platform_name(cls) -> str:

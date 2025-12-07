@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import List, Optional, Set
+from typing import List, Optional, Set, cast
 
 from tree_sitter import Language, Node
 
@@ -70,14 +70,16 @@ CPP_SYMBOL_QUERY = """
 try:
     import tree_sitter_c
 
-    C_LANGUAGE: Optional[Language] = tree_sitter_c.language()
+    C_LANGUAGE: Optional[Language] = cast(Optional[Language], tree_sitter_c.language())
 except (ImportError, Exception):
     C_LANGUAGE = None
 
 try:
     import tree_sitter_cpp
 
-    CPP_LANGUAGE: Optional[Language] = tree_sitter_cpp.language()
+    CPP_LANGUAGE: Optional[Language] = cast(
+        Optional[Language], tree_sitter_cpp.language()
+    )
 except (ImportError, Exception):
     CPP_LANGUAGE = None
 
@@ -106,6 +108,9 @@ class CSymbolExtractor(TreeSitterExtractor):
         }
         symbol_kind = kind_map.get(name)
         if not symbol_kind:
+            return None
+
+        if node.text is None:
             return None
 
         return Symbol(
@@ -151,6 +156,8 @@ class CppSymbolExtractor(TreeSitterExtractor):
         elif name == "template":
             # For template declarations, extract the template name or use a generic name
             # Try to find the function/class name after template
+            if node.text is None:
+                return None
             template_text = node.text.decode("utf8").strip()
             # Extract template parameters and the following declaration
             # This is a simplified extraction - in practice, you might want more sophisticated parsing
@@ -169,6 +176,8 @@ class CppSymbolExtractor(TreeSitterExtractor):
             else:
                 symbol_name = "template"
         else:
+            if node.text is None:
+                return None
             symbol_name = node.text.decode("utf8")
 
         if not symbol_name:

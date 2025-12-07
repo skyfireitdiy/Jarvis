@@ -9,7 +9,7 @@ import os
 import subprocess
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 from dataclasses import dataclass
 
 
@@ -382,8 +382,10 @@ class LSPClient:
                 f"Content-Length: {content_length}\r\n\r\n".encode("utf-8")
                 + request_bytes
             )
-            self.process.stdin.buffer.write(message)
-            self.process.stdin.buffer.flush()
+            if self.process.stdin is not None:
+                stdin_buffer = self.process.stdin.buffer  # type: ignore[attr-defined]
+                stdin_buffer.write(message)
+                stdin_buffer.flush()
 
             # 读取响应（简化实现，实际应该使用异步或线程）
             # 这里使用超时读取
@@ -391,7 +393,7 @@ class LSPClient:
             import queue
 
             # 使用队列在线程中读取响应
-            response_queue = queue.Queue()
+            response_queue: queue.Queue[Optional[Dict[str, Any]]] = queue.Queue()
 
             def read_response():
                 try:
@@ -472,7 +474,7 @@ class LSPClient:
                         print(f"⚠️ LSP服务器返回错误 ({method}): {error_msg}")
                         return None
                     if "result" in response:
-                        return response["result"]
+                        return cast(Optional[Dict[str, Any]], response["result"])
             except queue.Empty:
                 # 超时，检查进程是否还在运行
                 if self.process.poll() is not None:
@@ -575,8 +577,10 @@ class LSPClient:
                 f"Content-Length: {content_length}\r\n\r\n".encode("utf-8")
                 + notification_bytes
             )
-            self.process.stdin.buffer.write(message)
-            self.process.stdin.buffer.flush()
+            if self.process.stdin is not None:
+                stdin_buffer = self.process.stdin.buffer  # type: ignore[attr-defined]
+                stdin_buffer.write(message)
+                stdin_buffer.flush()
         except BrokenPipeError:
             # LSP服务器连接已断开，静默处理
             print(f"⚠️ LSP服务器连接已断开，无法发送通知: {method}")
@@ -606,7 +610,7 @@ class LSPClient:
         )
 
         if result and "items" in result:
-            return result["items"]
+            return cast(List[Dict[str, Any]], result["items"])
         return []
 
     def get_hover(self, file_path: str, line: int, character: int) -> Optional[Dict]:
@@ -679,7 +683,7 @@ class LSPClient:
         )
 
         if result:
-            return result
+            return cast(List[Dict[str, Any]], result)
         return []
 
     def get_document_symbols(self, file_path: str) -> List[Dict]:
@@ -699,7 +703,7 @@ class LSPClient:
         )
 
         if result:
-            return result
+            return cast(List[Dict[str, Any]], result)
         return []
 
     def find_symbol_by_name(self, file_path: str, symbol_name: str) -> Optional[Dict]:
@@ -1460,7 +1464,7 @@ class LSPClientTool:
                     }
                 all_symbols = client.get_document_symbols(rel_file_path)
                 symbol_name_lower = symbol_name.lower()
-                matches = []
+                matches: List[Dict[str, Any]] = []
                 for sym in all_symbols:
                     # 获取符号名称，优先使用 name，如果没有则使用 detail
                     name = sym.get("name", "") or sym.get("detail", "")
@@ -1641,7 +1645,13 @@ class LSPClientTool:
                     definition = definition[0] if definition else {}
                 uri = definition.get("uri", "")
                 if uri:
-                    file_path = Path(uri).path if uri.startswith("file://") else uri
+                    if uri.startswith("file://"):
+                        from urllib.parse import urlparse
+
+                        parsed = urlparse(uri)
+                        file_path = parsed.path
+                    else:
+                        file_path = uri
                     range_info = definition.get("range", {})
                     start = range_info.get("start", {})
                     line = start.get("line", 0) + 1
@@ -1738,7 +1748,13 @@ class LSPClientTool:
             start = range.get("start", {})
             line = start.get("line", 0) + 1  # 转换为1-based
 
-            file_path = Path(uri).path if uri.startswith("file://") else uri
+            if uri.startswith("file://"):
+                from urllib.parse import urlparse
+
+                parsed = urlparse(uri)
+                file_path = parsed.path
+            else:
+                file_path = uri
             return f"定义位置: {file_path}:{line}"
 
         elif action == "references":
@@ -1753,7 +1769,13 @@ class LSPClientTool:
                 start = range.get("start", {})
                 line = start.get("line", 0) + 1
 
-                file_path = Path(uri).path if uri.startswith("file://") else uri
+                if uri.startswith("file://"):
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(uri)
+                    file_path = parsed.path
+                else:
+                    file_path = uri
                 lines.append(f"  - {file_path}:{line}")
             return "\n".join(lines)
 

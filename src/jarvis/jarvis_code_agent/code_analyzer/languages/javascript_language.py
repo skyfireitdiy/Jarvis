@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import List, Optional, Set
+from typing import List, Optional, Set, cast
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
@@ -14,7 +14,9 @@ try:
     from tree_sitter import Language, Node
     import tree_sitter_javascript
 
-    JS_LANGUAGE: Optional[Language] = tree_sitter_javascript.language()
+    JS_LANGUAGE: Optional[Language] = cast(
+        Optional[Language], tree_sitter_javascript.language()
+    )
 except (ImportError, Exception):
     JS_LANGUAGE = None
 
@@ -86,8 +88,12 @@ class JavaScriptSymbolExtractor(TreeSitterExtractor):
             symbol_name = "<anonymous_arrow_function>"
         elif name == "generator.name":
             # Generator functions are also functions
+            if node.text is None:
+                return None
             symbol_name = node.text.decode("utf8")
         else:
+            if node.text is None:
+                return None
             symbol_name = node.text.decode("utf8")
 
         if not symbol_name:

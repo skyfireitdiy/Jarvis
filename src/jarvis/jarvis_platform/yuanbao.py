@@ -5,7 +5,7 @@ import json
 import os
 import time
 import urllib.parse
-from typing import Dict, Generator, List, Tuple
+from typing import Dict, Generator, List, Tuple, Any, cast
 
 from PIL import Image  # type: ignore
 
@@ -267,7 +267,7 @@ class YuanbaoPlatform(BasePlatform):
                 return {}
 
             upload_info = response.json()
-            return upload_info
+            return cast(Dict[str, Any], upload_info)
 
         except Exception as e:
             print(f"❌ 获取上传信息时出错: {str(e)}")
@@ -605,7 +605,7 @@ class YuanbaoPlatform(BasePlatform):
 
     def name(self) -> str:
         """模型名称"""
-        return self.model_name
+        return cast(str, self.model_name)
 
     @classmethod
     def platform_name(cls) -> str:

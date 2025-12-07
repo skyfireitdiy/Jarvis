@@ -228,7 +228,7 @@ def llm_evaluate_subtree(
                 libraries = [s.strip() for s in libs_raw.split(",") if s.strip()]
             conf = parsed.get("confidence")
             try:
-                conf = float(conf)
+                conf = float(conf) if conf is not None else 0.0
             except Exception:
                 conf = 0.0
             # 不强制要求具体 API 或特定库名；若缺省且存在 library 字段，则纳入 libraries

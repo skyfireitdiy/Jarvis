@@ -469,7 +469,7 @@ class GitManager:
         prefix: str,
         suffix: str,
         agent: Any,
-        post_process_func: callable,
+        post_process_func: Any,
     ) -> None:
         """处理提交确认和可能的重置"""
         if commits and user_confirm("是否接受以上提交记录？", True):

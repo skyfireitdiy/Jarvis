@@ -6,7 +6,7 @@
 import json
 import re
 from pathlib import Path
-from typing import List
+from typing import List, cast
 
 import typer
 
@@ -170,7 +170,7 @@ class GenerationManager:
                 ]
             )
         prompt = "\n".join(requirement_lines)
-        return self.append_additional_notes(prompt)
+        return cast(str, self.append_additional_notes(prompt))
 
     def extract_rust_fn_name_from_sig(self, rust_sig: str) -> str:
         """

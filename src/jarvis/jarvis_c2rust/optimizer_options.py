@@ -40,7 +40,7 @@ class OptimizeStats:
     visibility_downgraded: int = 0
     docs_added: int = 0
     cargo_checks: int = 0
-    errors: List[str] = None
+    errors: Optional[List[str]] = None
 
     def __post_init__(self):
         if self.errors is None:

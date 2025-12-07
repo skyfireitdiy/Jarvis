@@ -3,7 +3,7 @@ import json
 import os
 import time
 import uuid
-from typing import Any, Dict, Generator, List, Tuple
+from typing import Any, Dict, Generator, List, Tuple, cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
@@ -254,7 +254,7 @@ class TongyiPlatform(BasePlatform):
             if not result.get("success"):
                 raise Exception(f"Failed to get upload token: {result.get('errorMsg')}")
 
-            return result.get("data", {})
+            return cast(Dict[str, Any], result.get("data", {}))
 
         except Exception as e:
             raise Exception(f"Failed to get upload token: {str(e)}")
@@ -452,7 +452,7 @@ class TongyiPlatform(BasePlatform):
         Returns:
             str: Platform name
         """
-        return self.model_name
+        return cast(str, self.model_name)
 
     @classmethod
     def platform_name(cls) -> str:
