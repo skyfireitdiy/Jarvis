@@ -1553,6 +1553,26 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
+            "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT",
+            "廉价模型的最大输入Token数量（留空或0表示使用JARVIS_MAX_INPUT_TOKEN_COUNT的值）",
+            0,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT",
+            "智能模型的最大输入Token数量（留空或0表示使用JARVIS_MAX_INPUT_TOKEN_COUNT的值）",
+            0,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
             "JARVIS_TOOL_FILTER_THRESHOLD",
             "设置AI工具筛选阈值 (当可用工具数超过此值时触发AI筛选, 默认30)",
             30,
