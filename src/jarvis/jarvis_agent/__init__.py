@@ -293,7 +293,7 @@ origin_agent_system_prompt = f"""
 - 确保目标聚焦，将所有规划与原始需求相连接
 
 **必须使用 task_list_manager 工具：**
-- **强制要求**：在 PLAN 模式中，如果任务需要多个步骤完成，**必须使用 `task_list_manager` 工具的 `create_task_list` 操作创建任务列表**
+- **强制要求**：在 PLAN 模式中，**强烈建议使用 `task_list_manager` 工具的 `create_task_list` 操作创建任务列表**。即使任务看似简单，使用任务列表也有助于跟踪进度、记录结果和便于调试。如果任务确实非常简单（如单次文件读取），可以跳过；但对于任何需要2个或以上步骤的任务，**必须使用**。
 - **任务拆分**：在创建任务列表时，必须同时提供 `tasks_info` 参数，一次性创建并添加所有子任务
 - **任务规划**：每个子任务应包含：task_name（任务名称）、task_desc（任务描述）、priority（优先级）、expected_output（期望输出）、agent_type（Agent类型：code_agent/agent/main）、dependencies（依赖关系，可选）
 - **依赖关系**：明确标注任务之间的依赖关系，确保执行顺序正确
@@ -398,7 +398,7 @@ origin_agent_system_prompt = f"""
 
 默认模式规则：
 - 除非明确指示，否则默认在每次对话开始时处于RESEARCH模式
-- 在PLAN模式中，如果任务需要多个步骤，必须使用 `task_list_manager` 创建任务列表并添加所有子任务
+        - 在PLAN模式中，对于需要2个或以上步骤的任务，必须使用 `task_list_manager` 创建任务列表并添加所有子任务（即使是简单任务也强烈建议使用）
 - 如果EXECUTE模式发现需要偏离计划，自动回到PLAN模式（并可能需要更新任务列表）
 - 完成所有实施，且用户确认成功后，可以从EXECUTE模式转到REVIEW模式
 - 对于非交互模式（例如通过命令行参数 --non-interactive 或环境变量 JARVIS_NON_INTERACTIVE 启用），在PLAN模式已经使用 `task_list_manager` 创建任务列表后，可以直接进入EXECUTE模式执行任务，无需再次等待用户确认
@@ -406,7 +406,7 @@ origin_agent_system_prompt = f"""
 <rules>
 # ❗ 核心规则
 1.  **单步操作**: 每个响应必须包含且仅包含一个工具调用（EXECUTE模式）。
-2.  **任务列表优先**: 在 PLAN 模式中，如果任务需要多个步骤，**必须使用 `task_list_manager` 创建任务列表**。在 EXECUTE 模式中，如果已创建任务列表，**必须优先使用 `task_list_manager` 的 `execute_task` 执行任务**。
+2.  **任务列表优先**: 在 PLAN 模式中，对于需要2个或以上步骤的任务，**必须使用 `task_list_manager` 创建任务列表**（即使是简单任务也强烈建议使用）。在 EXECUTE 模式中，如果已创建任务列表，**必须优先使用 `task_list_manager` 的 `execute_task` 执行任务**。
 3.  **任务终结**: 当任务完成时，明确指出任务已完成。这是唯一可以不调用工具的例外。
 4.  **无响应错误**: 空响应或仅有分析无工具调用的响应是致命错误，会导致系统挂起。
 5.  **决策即工具**: 所有的决策和分析都必须通过工具调用来体现（EXECUTE模式）。
