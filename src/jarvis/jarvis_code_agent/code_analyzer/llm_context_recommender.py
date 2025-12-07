@@ -12,7 +12,10 @@ from typing import List, Optional, Any
 
 from rich.console import Console
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
+from jarvis.jarvis_utils.config import (
+    get_cheap_platform_name,
+    get_cheap_model_name,
+)
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_code_agent.utils import get_project_overview
 
@@ -51,11 +54,11 @@ class ContextRecommender:
         self._model_group = get_global_model_group()
 
         # 根据 model_group 获取配置
-        # 使用普通平台，上下文推荐可以降低成本
+        # 使用cheap平台，筛选操作可以降低成本
         if self._model_group:
             try:
-                self._platform_name = get_normal_platform_name(self._model_group)
-                self._model_name = get_normal_model_name(self._model_group)
+                self._platform_name = get_cheap_platform_name(self._model_group)
+                self._model_name = get_cheap_model_name(self._model_group)
             except Exception:
                 # 如果从 model_group 解析失败，使用默认配置
                 pass
@@ -596,13 +599,14 @@ class ContextRecommender:
         try:
             registry = PlatformRegistry.get_global_platform_registry()
 
-            # 创建平台实例
+            # 创建平台实例（筛选操作始终使用cheap平台以降低成本）
             if self._platform_name:
                 llm_model = registry.create_platform(self._platform_name)
                 if llm_model is None:
                     # 如果创建失败，使用cheap平台
                     llm_model = registry.get_cheap_platform()
             else:
+                # 如果没有指定平台，使用cheap平台
                 llm_model = registry.get_cheap_platform()
 
             if not llm_model:

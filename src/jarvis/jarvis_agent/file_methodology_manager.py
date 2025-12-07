@@ -9,6 +9,10 @@ import tempfile
 
 from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_agent.utils import join_prompts
+from jarvis.jarvis_utils.config import (
+    get_normal_platform_name,
+    get_normal_model_name,
+)
 
 
 class FileMethodologyManager:
@@ -90,11 +94,12 @@ class FileMethodologyManager:
         from jarvis.jarvis_agent.memory_manager import MemoryManager
 
         MemoryManager(self.agent)
+        # 使用normal模型加载方法论
         methodology = load_methodology(
             msg,
             self.agent.get_tool_registry(),
-            platform_name=self.agent.model.platform_name(),
-            model_name=self.agent.model.name(),
+            platform_name=get_normal_platform_name(None),
+            model_name=get_normal_model_name(None),
         )
         self.agent.session.prompt = join_prompts(
             [

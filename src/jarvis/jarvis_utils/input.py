@@ -579,7 +579,7 @@ def _get_multiline_input_internal(
         使用 @ 触发 fzf（当 fzf 存在）；否则仅插入 @ 以启用内置补全
         逻辑：
         - 若检测到系统存在 fzf，则先插入 '@'，随后请求外层运行 fzf 并在返回后进行替换/插入
-        - 若不存在 fzf 或发生异常，则直接插入 '@'
+        - 若不存在 fzf 或发生异常，则直接插入 '@' 并触发补全
         """
         try:
             import shutil
@@ -587,6 +587,8 @@ def _get_multiline_input_internal(
             buf = event.current_buffer
             if shutil.which("fzf") is None:
                 buf.insert_text("@")
+                # 手动触发补全，以便显示 rule 和其他补全选项
+                buf.start_completion(select_first=False)
                 return
             # 先插入 '@'，以便外层根据最后一个 '@' 进行片段替换
             buf.insert_text("@")
@@ -600,7 +602,10 @@ def _get_multiline_input_internal(
             return
         except Exception:
             try:
-                event.current_buffer.insert_text("@")
+                buf = event.current_buffer
+                buf.insert_text("@")
+                # 即使发生异常，也尝试触发补全
+                buf.start_completion(select_first=False)
             except Exception:
                 pass
 
@@ -615,6 +620,8 @@ def _get_multiline_input_internal(
             buf = event.current_buffer
             if shutil.which("fzf") is None:
                 buf.insert_text("#")
+                # 手动触发补全，以便显示 rule 和其他补全选项
+                buf.start_completion(select_first=False)
                 return
             # 先插入 '#'
             buf.insert_text("#")
@@ -628,7 +635,10 @@ def _get_multiline_input_internal(
             return
         except Exception:
             try:
-                event.current_buffer.insert_text("#")
+                buf = event.current_buffer
+                buf.insert_text("#")
+                # 即使发生异常，也尝试触发补全
+                buf.start_completion(select_first=False)
             except Exception:
                 pass
 
@@ -842,9 +852,21 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             ]
                         except Exception:
                             builtin_tags = []
+                        try:
+                            from jarvis.jarvis_code_agent.builtin_rules import (
+                                list_builtin_rules,
+                            )
+
+                            builtin_rules = [
+                                f"<rule:{rule_name}>"
+                                for rule_name in list_builtin_rules()
+                            ]
+                        except Exception:
+                            builtin_rules = []
                         items = (
                             [s for s in specials if isinstance(s, str) and s.strip()]
                             + builtin_tags
+                            + builtin_rules
                             + files
                         )
                         proc = subprocess.run(
@@ -965,9 +987,21 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             ]
                         except Exception:
                             builtin_tags = []
+                        try:
+                            from jarvis.jarvis_code_agent.builtin_rules import (
+                                list_builtin_rules,
+                            )
+
+                            builtin_rules = [
+                                f"<rule:{rule_name}>"
+                                for rule_name in list_builtin_rules()
+                            ]
+                        except Exception:
+                            builtin_rules = []
                         items = (
                             [s for s in specials if isinstance(s, str) and s.strip()]
                             + builtin_tags
+                            + builtin_rules
                             + files
                         )
                         proc = subprocess.run(

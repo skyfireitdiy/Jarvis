@@ -1641,14 +1641,24 @@ class Agent:
         self.first = False
 
     def _create_temp_model(self, system_prompt: str) -> BasePlatform:
-        """创建一个用于执行一次性任务的临时模型实例，以避免污染主会话。"""
-        temp_model = PlatformRegistry().create_platform(
-            self.model.platform_name()  # type: ignore
+        """创建一个用于执行一次性任务的临时模型实例，以避免污染主会话。
+
+        筛选操作使用cheap模型以降低成本。
+        """
+        from jarvis.jarvis_utils.config import (
+            get_cheap_platform_name,
+            get_cheap_model_name,
         )
+
+        # 筛选操作使用cheap模型
+        platform_name = get_cheap_platform_name(None)
+        model_name = get_cheap_model_name(None)
+
+        temp_model = PlatformRegistry().create_platform(platform_name)
         if not temp_model:
             raise RuntimeError("创建临时模型失败。")
 
-        temp_model.set_model_name(self.model.name())  # type: ignore
+        temp_model.set_model_name(model_name)
         temp_model.set_system_prompt(system_prompt)
         return temp_model
 
