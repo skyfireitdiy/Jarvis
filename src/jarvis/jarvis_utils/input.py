@@ -235,7 +235,7 @@ class FileCompleter(Completer):
 
     def __init__(self):
         self.path_completer = PathCompleter()
-        self.max_suggestions = 10
+        self.max_suggestions = 30
         self.min_score = 10
         self.replace_map = get_replace_map()
         # Caches for file lists to avoid repeated expensive scans
@@ -287,7 +287,7 @@ class FileCompleter(Completer):
             from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
 
             all_completions.extend(
-                [(ot(rule_name), "Rule") for rule_name in list_builtin_rules()]
+                [(f"<rule:{rule_name}>", "Rule") for rule_name in list_builtin_rules()]
             )
         except ImportError:
             pass

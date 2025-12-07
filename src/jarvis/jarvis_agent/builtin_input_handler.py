@@ -95,9 +95,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 user_input = user_input.replace(
                     f"'<{tag}>'", replace_map[tag]["template"]
                 )
-        else:
-            # 尝试作为规则名称处理
-            rule_content = _get_rule_content(tag)
+        elif tag.startswith("rule:"):
+            # 处理 rule:xxx 格式的规则标记
+            rule_name = tag[5:]  # 去掉 "rule:" 前缀
+            rule_content = _get_rule_content(rule_name)
             if rule_content:
                 user_input = user_input.replace(f"'<{tag}>'", rule_content)
 

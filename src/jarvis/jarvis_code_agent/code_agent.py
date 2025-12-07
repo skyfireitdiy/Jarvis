@@ -374,7 +374,7 @@ class CodeAgent(Agent):
             impact_report = self.impact_manager.analyze_edit_impact(modified_files)
 
             per_file_preview = self.diff_manager.build_per_file_patch_preview(
-                modified_files
+                modified_files, use_enhanced_visualization=False
             )
 
             # 所有模式下，在提交前检测大量代码删除并询问大模型
