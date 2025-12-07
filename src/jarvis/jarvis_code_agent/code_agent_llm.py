@@ -1,14 +1,102 @@
 # -*- coding: utf-8 -*-
 """CodeAgent LLM 询问模块"""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
 
 
 class LLMManager:
     """LLM 询问管理器"""
 
-    def __init__(self, model: Any):
-        self.model = model
+    def __init__(self, parent_model: Optional[Any] = None, model_group: Optional[str] = None):
+        """初始化LLM管理器
+
+        Args:
+            parent_model: 父Agent的模型实例，用于获取模型配置（平台名称、模型名称、模型组等）
+            model_group: 模型组名称，如果提供则优先使用
+        """
+        # 保存配置信息，用于后续创建 LLM 实例
+        self._platform_name = None
+        self._model_name = None
+        self._model_group = model_group
+
+        # 从父Agent的model获取配置
+        if parent_model:
+            try:
+                # 优先获取 model_group，因为它包含了完整的配置信息
+                if not self._model_group:
+                    self._model_group = getattr(parent_model, "model_group", None)
+                self._platform_name = parent_model.platform_name()
+                self._model_name = parent_model.name()
+            except Exception:
+                # 如果获取失败，使用默认配置
+                pass
+
+        # 优先根据 model_group 获取配置（确保配置一致性）
+        # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
+        # 使用普通模型，LLM询问可以降低成本
+        if self._model_group:
+            try:
+                self._platform_name = get_normal_platform_name(self._model_group)
+                self._model_name = get_normal_model_name(self._model_group)
+            except Exception:
+                # 如果从 model_group 解析失败，回退到从 parent_model 获取的值
+                pass
+
+        # 如果仍未获取到，使用默认配置
+        if not self._platform_name:
+            self._platform_name = get_normal_platform_name(None)
+        if not self._model_name:
+            self._model_name = get_normal_model_name(None)
+
+    def _create_llm_model(self):
+        """创建新的 LLM 模型实例
+
+        每次调用都创建新的实例，避免上下文窗口累积。
+
+        Returns:
+            LLM 模型实例
+
+        Raises:
+            ValueError: 如果无法创建LLM模型
+        """
+        try:
+            registry = PlatformRegistry.get_global_platform_registry()
+
+            # 创建平台实例
+            if self._platform_name:
+                llm_model = registry.create_platform(self._platform_name)
+                if llm_model is None:
+                    # 如果创建失败，使用普通平台
+                    llm_model = registry.get_normal_platform()
+            else:
+                llm_model = registry.get_normal_platform()
+
+            if not llm_model:
+                raise ValueError("无法创建LLM模型实例")
+
+            # 先设置模型组（如果从父Agent获取到），因为 model_group 可能会影响模型名称的解析
+            if self._model_group:
+                try:
+                    llm_model.set_model_group(self._model_group)
+                except Exception:
+                    pass
+
+            # 然后设置模型名称（如果从父Agent或model_group获取到）
+            if self._model_name:
+                try:
+                    llm_model.set_model_name(self._model_name)
+                except Exception:
+                    pass
+
+            # 设置抑制输出，因为这是后台任务
+            llm_model.set_suppress_output(True)
+
+            return llm_model
+        except Exception as e:
+            raise ValueError(f"无法创建LLM模型: {e}")
 
     def ask_llm_about_large_deletion(
         self, detection_result: Dict[str, int], preview: str
@@ -22,10 +110,6 @@ class LLMManager:
         返回:
             bool: 如果大模型认为合理返回True，否则返回False
         """
-        if not self.model:
-            # 如果没有模型，默认认为合理
-            return True
-
         insertions = detection_result["insertions"]
         deletions = detection_result["deletions"]
         net_deletions = detection_result["net_deletions"]
@@ -55,7 +139,9 @@ class LLMManager:
 
         try:
             print("🤖 正在询问大模型判断大量代码删除是否合理...")
-            response = self.model.chat_until_success(prompt)  # type: ignore
+            # 每次调用都创建新的 LLM 实例，避免上下文窗口累积
+            llm_model = self._create_llm_model()
+            response = llm_model.chat_until_success(prompt)  # type: ignore
 
             # 使用确定的协议标记解析回答
             if "<!!!YES!!!>" in response:
