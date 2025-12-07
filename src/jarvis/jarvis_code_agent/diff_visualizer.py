@@ -46,17 +46,17 @@ class DiffVisualizer:
 
         # 创建表格显示
         table = Table(
-            show_header=True,
+            show_header=False,
             header_style="bold magenta",
             box=None,  # 无边框，更简洁
             padding=(0, 1),
         )
 
         if show_line_numbers:
-            table.add_column("旧行号", style="dim red", width=8, justify="right")
-            table.add_column("新行号", style="dim green", width=8, justify="right")
-        table.add_column("类型", width=4, justify="center")
-        table.add_column("内容", style="white", overflow="fold")
+            table.add_column("", style="dim red", width=8, justify="right")
+            table.add_column("", style="dim green", width=8, justify="right")
+        table.add_column("", width=4, justify="center")
+        table.add_column("", style="white", overflow="fold")
 
         old_line_num = 0
         new_line_num = 0
