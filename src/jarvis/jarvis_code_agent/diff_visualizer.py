@@ -400,9 +400,9 @@ class DiffVisualizer:
             padding=(0, 1),
         )
         table.add_column("", style="dim", width=6, justify="right")
-        table.add_column("", style="red", overflow="fold", ratio=1)
+        table.add_column("", style="dim", overflow="fold", ratio=1)
         table.add_column("", style="dim", width=6, justify="right")
-        table.add_column("", style="green", overflow="fold", ratio=1)
+        table.add_column("", style="dim", overflow="fold", ratio=1)
 
         additions = 0
         deletions = 0
