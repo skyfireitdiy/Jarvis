@@ -315,10 +315,10 @@ class DiffVisualizer:
             box=None,
             padding=(0, 1),
         )
-        table.add_column("行号", style="dim", width=6, justify="right")
-        table.add_column("删除 (-)", style="red", overflow="fold", ratio=1)
-        table.add_column("行号", style="dim", width=6, justify="right")
-        table.add_column("新增 (+)", style="green", overflow="fold", ratio=1)
+        table.add_column("", style="dim", width=6, justify="right")
+        table.add_column("", style="red", overflow="fold", ratio=1)
+        table.add_column("", style="dim", width=6, justify="right")
+        table.add_column("", style="green", overflow="fold", ratio=1)
 
         additions = 0
         deletions = 0
