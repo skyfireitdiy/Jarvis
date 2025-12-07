@@ -85,6 +85,7 @@ from jarvis.jarvis_utils.globals import (
     make_agent_name,
     set_agent,
     set_interrupt,
+    set_global_model_group,
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.tag import ot
@@ -748,6 +749,9 @@ class Agent:
 
         self.model.set_model_group(model_group)
         self.model.set_suppress_output(False)
+
+        # 设置全局模型组，供工具和其他组件使用
+        set_global_model_group(model_group)
 
     def _init_session(self):
         """初始化会话管理器"""

@@ -13,6 +13,7 @@ from typing import List, Optional, Any
 from rich.console import Console
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
+from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_code_agent.utils import get_project_overview
 
 from .context_recommender import ContextRecommendation
@@ -34,39 +35,29 @@ class ContextRecommender:
 
         Args:
             context_manager: 上下文管理器
-            parent_model: 父Agent的模型实例，用于获取模型配置（平台名称、模型名称、模型组等）
+            parent_model: 父Agent的模型实例（已废弃，保留参数兼容性）
 
         Note:
             LLM 模型实例不会在初始化时创建，而是在每次调用时重新创建，
             以避免上下文窗口累积导致的问题。
+            模型配置从全局模型组获取，不再从parent_model继承。
         """
         self.context_manager = context_manager
 
         # 保存配置信息，用于后续创建 LLM 实例
         self._platform_name = None
         self._model_name = None
-        self._model_group = None
+        # 使用全局模型组（不再从 parent_model 继承）
+        self._model_group = get_global_model_group()
 
-        # 从父Agent的model获取配置
-        if parent_model:
-            try:
-                # 优先获取 model_group，因为它包含了完整的配置信息
-                self._model_group = getattr(parent_model, "model_group", None)
-                self._platform_name = parent_model.platform_name()
-                self._model_name = parent_model.name()
-            except Exception:
-                # 如果获取失败，使用默认配置
-                pass
-
-        # 优先根据 model_group 获取配置（确保配置一致性）
-        # 如果 model_group 存在，强制使用它来解析，避免使用 parent_model 中可能不一致的值
-        # 使用cheap平台，上下文推荐可以降低成本
+        # 根据 model_group 获取配置
+        # 使用普通平台，上下文推荐可以降低成本
         if self._model_group:
             try:
                 self._platform_name = get_normal_platform_name(self._model_group)
                 self._model_name = get_normal_model_name(self._model_group)
             except Exception:
-                # 如果从 model_group 解析失败，回退到从 parent_model 获取的值
+                # 如果从 model_group 解析失败，使用默认配置
                 pass
 
     def recommend_context(

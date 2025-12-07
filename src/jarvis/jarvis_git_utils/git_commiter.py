@@ -15,7 +15,11 @@ from jarvis.jarvis_utils.git_utils import (
     find_git_root_and_cd,
     has_uncommitted_changes,
 )
-from jarvis.jarvis_utils.globals import get_agent, current_agent_name
+from jarvis.jarvis_utils.globals import (
+    get_agent,
+    current_agent_name,
+    get_global_model_group,
+)
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
@@ -130,8 +134,8 @@ class GitCommitTool:
             try:
                 temp_diff_file_path = None
 
-                # Get model_group from args
-                model_group = args.get("model_group")
+                # 优先使用args中的model_group，否则使用全局模型组（不再从agent继承）
+                model_group = args.get("model_group") or get_global_model_group()
 
                 # Get platform and model based on model_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import (
