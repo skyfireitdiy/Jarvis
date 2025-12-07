@@ -169,38 +169,7 @@ class SubCodeAgentTool:
                     filtered_tools = [t for t in use_tools if t not in forbidden_tools]
                     if filtered_tools:
                         code_agent.set_use_tools(filtered_tools)
-                # 同步父Agent的模型名称（如可用），以尽量保持平台与模型一致
-                if (
-                    parent_agent is not None
-                    and getattr(parent_agent, "model", None)
-                    and getattr(code_agent, "model", None)
-                ):
-                    try:
-                        parent_model_name = parent_agent.model.name()  # type: ignore[attr-defined]
-                        if parent_model_name:
-                            from typing import Any
-
-                            model_obj: Any = getattr(code_agent, "model", None)
-                            if model_obj is not None:
-                                model_obj.set_model_name(parent_model_name)
-                                # 模型有效性校验与回退，确保父Agent模型在子Agent平台上可用
-                                try:
-                                    available_models = model_obj.get_model_list()
-                                    if available_models:
-                                        available_names = [
-                                            m for m, _ in available_models
-                                        ]
-                                        current_model_name = model_obj.name()
-                                        if current_model_name not in available_names:
-                                            print(
-                                                f"⚠️ 检测到子CodeAgent模型 {current_model_name} 不存在于平台 {model_obj.platform_name()} 的可用模型列表，将回退到 {available_names[0]}"
-                                            )
-                                            model_obj.set_model_name(available_names[0])
-                                except Exception:
-                                    # 获取模型列表或设置模型失败时，保持原设置并继续，交由底层报错处理
-                                    pass
-                    except Exception:
-                        pass
+                # 不再从父Agent获取模型名，使用系统默认配置（符合"不依赖父 Agent"的约定）
             except Exception:
                 pass
 

@@ -14,6 +14,8 @@ from ddgs import DDGS  # type: ignore[import-not-found]
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import (
+    get_normal_platform_name,
+    get_normal_model_name,
     get_web_search_platform_name,
     get_web_search_model_name,
 )
@@ -77,15 +79,9 @@ class SearchWebTool:
 
             summary_prompt = f"请为查询“{query}”总结以下内容：\n\n{full_content}"
 
-            if not agent.model:
-                return {
-                    "stdout": "",
-                    "stderr": "用于总结的Agent模型未找到。",
-                    "success": False,
-                }
-
-            platform_name = agent.model.platform_name()
-            model_name = agent.model.name()
+            # 使用normal模型进行总结
+            platform_name = get_normal_platform_name(None)
+            model_name = get_normal_model_name(None)
 
             model = PlatformRegistry().create_platform(platform_name)
             if not model:
@@ -149,12 +145,14 @@ class SearchWebTool:
                             "success": True,
                         }
 
-        # 否则使用现有的模型选择流程
-        if agent.model.support_web():
-            model = PlatformRegistry().create_platform(agent.model.platform_name())
-            if not model:
-                return {"stdout": "", "stderr": "无法创建模型。", "success": False}
-            model.set_model_name(agent.model.name())
+        # 否则使用normal模型进行web搜索（正常操作）
+        normal_platform = get_normal_platform_name(None)
+        normal_model = get_normal_model_name(None)
+        model = PlatformRegistry().create_platform(normal_platform)
+        if not model:
+            return {"stdout": "", "stderr": "无法创建模型。", "success": False}
+        model.set_model_name(normal_model)
+        if model.support_web():
             model.set_web(True)
             model.set_suppress_output(False)
             response = model.chat_until_success(query)

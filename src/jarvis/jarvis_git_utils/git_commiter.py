@@ -16,8 +16,6 @@ from jarvis.jarvis_utils.git_utils import (
     has_uncommitted_changes,
 )
 from jarvis.jarvis_utils.globals import (
-    get_agent,
-    current_agent_name,
     get_global_model_group,
 )
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -143,57 +141,15 @@ class GitCommitTool:
                     get_normal_model_name,
                 )
 
-                platform_name = None
-                model_name = None
-
+                # 始终使用normal模型生成提交信息，不从agent.model获取（避免使用smart模型）
                 # 优先根据 model_group 获取（确保配置一致性）
-                # 如果 model_group 存在，强制使用它来解析，避免使用 agent.model 中可能不一致的值
                 if model_group:
                     platform_name = get_normal_platform_name(model_group)
                     model_name = get_normal_model_name(model_group)
                 else:
-                    # 如果没有提供 model_group，尝试从传入的 agent 获取
-                    agent_from_args = args.get("agent")
-                    if (
-                        agent_from_args
-                        and hasattr(agent_from_args, "model")
-                        and getattr(agent_from_args, "model", None)
-                    ):
-                        try:
-                            platform_name = agent_from_args.model.platform_name()
-                            model_name = agent_from_args.model.name()
-                            if hasattr(agent_from_args.model, "model_group"):
-                                model_group = agent_from_args.model.model_group
-                        except Exception:
-                            # 安全回退到后续逻辑
-                            platform_name = None
-                            model_name = None
-
-                    # 如果仍未获取到，使用配置文件中的默认值（传入 None 会读取默认配置）
-                    if not platform_name:
-                        platform_name = get_normal_platform_name(None)
-                    if not model_name:
-                        model_name = get_normal_model_name(None)
-
-                # 最后的回退：尝试从全局 agent 获取（仅当仍未获取到时）
-                if not platform_name:
-                    agent = get_agent(current_agent_name)
-                    if (
-                        agent
-                        and hasattr(agent, "model")
-                        and getattr(agent, "model", None)
-                    ):
-                        try:
-                            platform_name = agent.model.platform_name()
-                            model_name = agent.model.name()
-                            if not model_group and hasattr(agent.model, "model_group"):
-                                model_group = agent.model.model_group
-                        except Exception:
-                            # 如果全局 agent 也无法获取，使用配置文件默认值
-                            if not platform_name:
-                                platform_name = get_normal_platform_name(None)
-                            if not model_name:
-                                model_name = get_normal_model_name(None)
+                    # 如果没有提供 model_group，直接使用配置文件中的默认normal模型
+                    platform_name = get_normal_platform_name(None)
+                    model_name = get_normal_model_name(None)
 
                 # Create a new platform instance
                 if platform_name:
