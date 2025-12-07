@@ -959,11 +959,11 @@ def get_diff_visualization_mode() -> str:
     获取 diff 可视化模式
 
     返回:
-        str: diff 可视化模式，可选值: "unified", "syntax", "compact", "default"
+        str: diff 可视化模式，可选值: "unified", "syntax", "compact", "side_by_side", "default"
         默认为 "unified"
     """
     return cast(
-        str, GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_VISUALIZATION_MODE", "unified")
+        str, GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_VISUALIZATION_MODE", "side_by_side")
     )
 
 

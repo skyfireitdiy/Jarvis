@@ -1368,6 +1368,24 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
         )
         or changed
     )
+
+    # Diff 可视化模式配置
+    if ask_all or "JARVIS_DIFF_VISUALIZATION_MODE" not in config_data:
+        from jarvis.jarvis_utils.input import get_choice
+
+        current_mode = config_data.get("JARVIS_DIFF_VISUALIZATION_MODE", "side_by_side")
+        diff_mode_choices = [
+            f"side_by_side - 左右分栏对比显示{'（当前）' if current_mode == 'side_by_side' else ''}",
+            f"unified - 统一diff格式{'（当前）' if current_mode == 'unified' else ''}",
+            f"syntax - 语法高亮模式{'（当前）' if current_mode == 'syntax' else ''}",
+            f"compact - 紧凑模式{'（当前）' if current_mode == 'compact' else ''}",
+        ]
+        selected_display = get_choice("选择 Diff 可视化模式", diff_mode_choices)
+        selected_mode = selected_display.split(" - ")[0]
+        if selected_mode != current_mode:
+            config_data["JARVIS_DIFF_VISUALIZATION_MODE"] = selected_mode
+            changed = True
+
     return changed
 
 

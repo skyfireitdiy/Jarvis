@@ -13,17 +13,11 @@
         "oneOf": [
           {
             "type": "object",
-            "required": [
-              "type",
-              "base_url"
-            ],
+            "required": ["type", "base_url"],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": [
-                  "sse",
-                  "streamable"
-                ],
+                "enum": ["sse", "streamable"],
                 "description": "MCP客户端类型"
               },
               "base_url": {
@@ -55,16 +49,11 @@
           },
           {
             "type": "object",
-            "required": [
-              "type",
-              "command"
-            ],
+            "required": ["type", "command"],
             "properties": {
               "type": {
                 "type": "string",
-                "enum": [
-                  "stdio"
-                ],
+                "enum": ["stdio"],
                 "description": "MCP客户端类型"
               },
               "command": {
@@ -225,10 +214,7 @@
               }
             }
           },
-          "required": [
-            "JARVIS_PLATFORM",
-            "JARVIS_MODEL"
-          ]
+          "required": ["JARVIS_PLATFORM", "JARVIS_MODEL"]
         }
       }
     },
@@ -538,9 +524,7 @@
             "description": "Description of the replacement"
           }
         },
-        "required": [
-          "template"
-        ]
+        "required": ["template"]
       },
       "default": {}
     },
@@ -579,6 +563,12 @@
       "default": 50,
       "minimum": 1,
       "maximum": 1000
+    },
+    "JARVIS_DIFF_VISUALIZATION_MODE": {
+      "type": "string",
+      "description": "Diff可视化模式。side_by_side: 左右分栏对比显示；unified: 统一diff格式；syntax: 语法高亮模式；compact: 紧凑模式",
+      "enum": ["side_by_side", "unified", "syntax", "compact"],
+      "default": "side_by_side"
     }
   },
   "additionalProperties": true

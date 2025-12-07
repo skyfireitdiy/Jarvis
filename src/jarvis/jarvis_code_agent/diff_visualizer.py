@@ -168,14 +168,11 @@ class DiffVisualizer:
                     else:
                         table.add_row("", "", "[dim]\\ No newline at end of file[/dim]")
 
-        # 显示文件信息
-        if file_path:
-            header = Text(f"📝 {file_path}", style="bold cyan")
-            self.console.print(header)
-
-        # 显示 diff 表格
+        # 显示 diff 表格（包裹在 Panel 中）
         if table.rows:
-            self.console.print(table)
+            title = f"📝 {file_path}" if file_path else "Diff"
+            panel = Panel(table, title=title, border_style="cyan", padding=(0, 1))
+            self.console.print(panel)
 
     def visualize_statistics(
         self, file_path: str, additions: int, deletions: int, total_changes: int = 0
@@ -273,21 +270,7 @@ class DiffVisualizer:
             if line.startswith("-") and not line.startswith("---")
         )
 
-        # 显示文件信息
-        if file_path:
-            header = Text(f"📝 {file_path}", style="bold cyan")
-            self.console.print(header)
-
-        # 显示统计
-        if additions > 0 or deletions > 0:
-            stats = Text()
-            stats.append("  ", style="dim")
-            stats.append(f"+{additions}", style="green")
-            stats.append(" / ", style="dim")
-            stats.append(f"-{deletions}", style="red")
-            self.console.print(stats)
-
-        # 显示 diff（使用语法高亮）
+        # 显示 diff（使用语法高亮，包裹在 Panel 中）
         if len(lines) > max_lines:
             remaining = len(lines) - max_lines
             display_text = "\n".join(display_lines)
@@ -302,7 +285,14 @@ class DiffVisualizer:
             line_numbers=False,
             word_wrap=True,
         )
-        self.console.print(syntax)
+
+        # 构建标题（包含统计信息）
+        title = f"📝 {file_path}" if file_path else "Diff"
+        if additions > 0 or deletions > 0:
+            title += f"  [green]+{additions}[/green] / [red]-{deletions}[/red]"
+
+        panel = Panel(syntax, title=title, border_style="cyan", padding=(0, 1))
+        self.console.print(panel)
 
     def visualize_side_by_side_summary(
         self, old_lines: List[str], new_lines: List[str], file_path: str = ""
@@ -357,6 +347,46 @@ class DiffVisualizer:
         self.console.print(table)
 
 
+def _parse_diff_to_lines(diff_text: str) -> tuple:
+    """从 git diff 文本中解析出旧文件和新文件的行列表
+
+    参数:
+        diff_text: git diff 输出的文本
+
+    返回:
+        (old_lines, new_lines): 旧文件行列表和新文件行列表
+    """
+    old_lines = []
+    new_lines = []
+
+    for line in diff_text.splitlines():
+        if line.startswith("@@"):
+            # 跳过 hunk 头
+            continue
+        elif line.startswith("---") or line.startswith("+++"):
+            # 跳过文件头
+            continue
+        elif line.startswith("diff ") or line.startswith("index "):
+            # 跳过 diff 元信息
+            continue
+        elif line.startswith("-"):
+            # 删除的行
+            old_lines.append(line[1:])
+        elif line.startswith("+"):
+            # 新增的行
+            new_lines.append(line[1:])
+        elif line.startswith(" "):
+            # 未更改的行
+            old_lines.append(line[1:])
+            new_lines.append(line[1:])
+        else:
+            # 其他行（如空行）
+            old_lines.append(line)
+            new_lines.append(line)
+
+    return old_lines, new_lines
+
+
 def visualize_diff_enhanced(
     diff_text: str,
     file_path: str = "",
@@ -368,7 +398,7 @@ def visualize_diff_enhanced(
     参数:
         diff_text: git diff 输出的文本
         file_path: 文件路径
-        mode: 可视化模式 ("unified" | "syntax" | "compact" | "statistics")
+        mode: 可视化模式 ("unified" | "syntax" | "compact" | "side_by_side" | "statistics")
         show_line_numbers: 是否显示行号
     """
     visualizer = DiffVisualizer()
@@ -381,6 +411,9 @@ def visualize_diff_enhanced(
         visualizer.visualize_syntax_highlighted(diff_text, file_path)
     elif mode == "compact":
         visualizer.visualize_compact(diff_text, file_path)
+    elif mode == "side_by_side":
+        old_lines, new_lines = _parse_diff_to_lines(diff_text)
+        visualizer.visualize_side_by_side_summary(old_lines, new_lines, file_path)
     else:
         # 默认使用语法高亮
         visualizer.visualize_syntax_highlighted(diff_text, file_path)
