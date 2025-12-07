@@ -282,6 +282,15 @@ class FileCompleter(Completer):
                 (ot("SaveSession"), "保存当前会话"),
             ]
         )
+        # 添加内置规则到补全列表
+        try:
+            from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+
+            all_completions.extend(
+                [(ot(rule_name), "Rule") for rule_name in list_builtin_rules()]
+            )
+        except ImportError:
+            pass
 
         # File path candidates
         try:

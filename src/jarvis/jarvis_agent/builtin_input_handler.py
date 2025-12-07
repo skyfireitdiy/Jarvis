@@ -6,6 +6,23 @@ from typing import Any, Tuple
 from jarvis.jarvis_utils.config import get_replace_map
 
 
+def _get_rule_content(rule_name: str) -> str | None:
+    """获取规则内容
+
+    参数:
+        rule_name: 规则名称
+
+    返回:
+        str | None: 规则内容，如果未找到则返回 None
+    """
+    try:
+        from jarvis.jarvis_code_agent.builtin_rules import get_builtin_rule
+
+        return get_builtin_rule(rule_name)
+    except ImportError:
+        return None
+
+
 def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
     处理内置的特殊输入标记，并追加相应的提示词
@@ -78,6 +95,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 user_input = user_input.replace(
                     f"'<{tag}>'", replace_map[tag]["template"]
                 )
+        else:
+            # 尝试作为规则名称处理
+            rule_content = _get_rule_content(tag)
+            if rule_content:
+                user_input = user_input.replace(f"'<{tag}>'", rule_content)
 
         agent.set_addon_prompt(add_on_prompt)
 
