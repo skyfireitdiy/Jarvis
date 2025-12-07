@@ -1,4 +1,4 @@
-### Release Note - v0.8.3 2025-12-XX
+### Release Note - v0.8.3 2025-12-07
 
 #### **🚀 新功能 (Features)**
 

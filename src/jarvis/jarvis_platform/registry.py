@@ -195,6 +195,7 @@ class PlatformRegistry:
         model_name = get_cheap_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name)  # type: ignore
+        platform.set_platform_type("cheap")  # type: ignore
         return platform  # type: ignore
 
     def get_smart_platform(self) -> BasePlatform:
@@ -203,6 +204,7 @@ class PlatformRegistry:
         model_name = get_smart_model_name()
         platform = self.create_platform(platform_name)
         platform.set_model_name(model_name)  # type: ignore
+        platform.set_platform_type("smart")  # type: ignore
         return platform  # type: ignore
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:

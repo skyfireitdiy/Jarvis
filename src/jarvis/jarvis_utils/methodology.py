@@ -19,7 +19,7 @@ from jarvis.jarvis_utils.config import (
     get_data_dir,
     get_methodology_dirs,
     get_central_methodology_repo,
-    get_max_input_token_count,
+    get_cheap_max_input_token_count,
 )
 from jarvis.jarvis_utils.utils import daily_check_git_updates
 from jarvis.jarvis_utils.embedding import get_context_token_count
@@ -309,9 +309,9 @@ def load_methodology(
         except Exception:
             pass
 
-        # 回退方案：使用输入窗口的2/3
+        # 回退方案：使用输入窗口的2/3（方法论使用cheap模型）
         if methodology_token_limit is None:
-            max_input_tokens = get_max_input_token_count()
+            max_input_tokens = get_cheap_max_input_token_count()
             methodology_token_limit = int(max_input_tokens * 2 / 3)
 
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤

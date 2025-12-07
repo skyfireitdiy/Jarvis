@@ -83,6 +83,34 @@ def get_max_input_token_count(model_group_override: Optional[str] = None) -> int
     return int(config.get("JARVIS_MAX_INPUT_TOKEN_COUNT", "128000"))
 
 
+def get_cheap_max_input_token_count(model_group_override: Optional[str] = None) -> int:
+    """
+    获取廉价模型允许的最大输入token数量。
+
+    返回:
+        int: 模型能处理的最大输入token数量，如果未配置则回退到正常配置
+    """
+    config = _get_resolved_model_config(model_group_override)
+    cheap_max_token = config.get("JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT")
+    if cheap_max_token:
+        return int(cheap_max_token)
+    return get_max_input_token_count(model_group_override)
+
+
+def get_smart_max_input_token_count(model_group_override: Optional[str] = None) -> int:
+    """
+    获取智能模型允许的最大输入token数量。
+
+    返回:
+        int: 模型能处理的最大输入token数量，如果未配置则回退到正常配置
+    """
+    config = _get_resolved_model_config(model_group_override)
+    smart_max_token = config.get("JARVIS_SMART_MAX_INPUT_TOKEN_COUNT")
+    if smart_max_token:
+        return int(smart_max_token)
+    return get_max_input_token_count(model_group_override)
+
+
 def get_shell_name() -> str:
     """
     获取系统shell名称。
@@ -174,8 +202,10 @@ def _get_resolved_model_config(
         "JARVIS_MAX_INPUT_TOKEN_COUNT",
         "JARVIS_CHEAP_PLATFORM",
         "JARVIS_CHEAP_MODEL",
+        "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT",
         "JARVIS_SMART_PLATFORM",
         "JARVIS_SMART_MODEL",
+        "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:

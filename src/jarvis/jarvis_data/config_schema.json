@@ -137,6 +137,11 @@
       "description": "廉价操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值",
       "default": ""
     },
+    "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT": {
+      "type": "number",
+      "description": "廉价模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值",
+      "default": 0
+    },
     "JARVIS_SMART_PLATFORM": {
       "type": "string",
       "description": "智能操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值",
@@ -146,6 +151,11 @@
       "type": "string",
       "description": "智能操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值",
       "default": ""
+    },
+    "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT": {
+      "type": "number",
+      "description": "智能模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值",
+      "default": 0
     },
     "JARVIS_WEB_SEARCH_PLATFORM": {
       "type": "string",
@@ -191,6 +201,10 @@
               "type": "string",
               "description": "廉价操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值"
             },
+            "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT": {
+              "type": "number",
+              "description": "廉价模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值"
+            },
             "JARVIS_SMART_PLATFORM": {
               "type": "string",
               "description": "智能操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值"
@@ -198,6 +212,10 @@
             "JARVIS_SMART_MODEL": {
               "type": "string",
               "description": "智能操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值"
+            },
+            "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT": {
+              "type": "number",
+              "description": "智能模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值"
             },
             "ENV": {
               "type": "object",

@@ -21,6 +21,8 @@ from jarvis.jarvis_utils.config import (
     is_save_session_history,
     get_data_dir,
     get_max_input_token_count,
+    get_cheap_max_input_token_count,
+    get_smart_max_input_token_count,
     get_conversation_turn_threshold,
 )
 from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
@@ -42,6 +44,7 @@ class BasePlatform(ABC):
         self.model_group: Optional[str] = None
         self._session_history_file: Optional[str] = None
         self._conversation_turn = 0  # 对话轮次计数器
+        self.platform_type: str = "normal"  # 平台类型：normal/cheap/smart
 
     def __enter__(self) -> Self:
         """进入上下文管理器"""
@@ -127,7 +130,7 @@ class BasePlatform(ABC):
             history_tokens = self.get_used_token_count()
             current_response_tokens = get_context_token_count(current_response)
             total_tokens = history_tokens + current_response_tokens
-            max_tokens = get_max_input_token_count(self.model_group)
+            max_tokens = self._get_platform_max_input_token_count()
 
             if max_tokens > 0:
                 usage_percent = (total_tokens / max_tokens) * 100
@@ -165,7 +168,7 @@ class BasePlatform(ABC):
             usage_percent, percent_color, progress_bar = self._get_token_usage_info(
                 response
             )
-            max_tokens = get_max_input_token_count(self.model_group)
+            max_tokens = self._get_platform_max_input_token_count()
             total_tokens = self.get_used_token_count() + get_context_token_count(
                 response
             )
@@ -541,6 +544,27 @@ class BasePlatform(ABC):
         """设置网页标志"""
         self.web = web
 
+    def set_platform_type(self, platform_type: str):
+        """设置平台类型
+
+        参数:
+            platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
+        """
+        self.platform_type = platform_type
+
+    def _get_platform_max_input_token_count(self) -> int:
+        """根据平台类型获取对应的最大输入token数量
+
+        返回:
+            int: 模型能处理的最大输入token数量
+        """
+        if self.platform_type == "cheap":
+            return get_cheap_max_input_token_count(self.model_group)
+        elif self.platform_type == "smart":
+            return get_smart_max_input_token_count(self.model_group)
+        else:
+            return get_max_input_token_count(self.model_group)
+
     def _append_session_history(self, user_input: str, model_output: str) -> None:
         """
         Append the user input and model output to a session history file if enabled.
@@ -627,7 +651,7 @@ class BasePlatform(ABC):
         返回:
             int: 剩余可用的token数量（输入窗口限制 - 当前使用的token数量）
         """
-        max_tokens = get_max_input_token_count(self.model_group)
+        max_tokens = self._get_platform_max_input_token_count()
         used_tokens = self.get_used_token_count()
         remaining = max_tokens - used_tokens
         return max(0, remaining)  # 确保返回值不为负数
