@@ -322,7 +322,7 @@ def apply_library_replacement(
                 notes = str(res.get("notes") or "")
                 conf = res.get("confidence")
                 try:
-                    conf = float(conf)
+                    conf = float(conf) if conf is not None else 0.0
                 except Exception:
                     conf = 0.0
                 libs_str = ", ".join(libs) if libs else "(未指定库)"

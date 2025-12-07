@@ -8,8 +8,8 @@
 """
 
 import os
-import yaml
-from typing import Optional, Dict, Any
+import yaml  # type: ignore[import-untyped]
+from typing import Optional, Dict, Any, cast
 from pathlib import Path
 
 
@@ -65,7 +65,7 @@ class BuildValidationConfig:
     def is_build_validation_disabled(self) -> bool:
         """检查是否已禁用构建验证"""
         config = self._load_config()
-        return config.get("disable_build_validation", False)
+        return cast(bool, config.get("disable_build_validation", False))
 
     def disable_build_validation(self, reason: Optional[str] = None) -> bool:
         """禁用构建验证
@@ -100,7 +100,7 @@ class BuildValidationConfig:
     def has_been_asked(self) -> bool:
         """检查是否已经询问过用户"""
         config = self._load_config()
-        return config.get("has_been_asked", False)
+        return cast(bool, config.get("has_been_asked", False))
 
     def mark_as_asked(self) -> bool:
         """标记为已询问"""

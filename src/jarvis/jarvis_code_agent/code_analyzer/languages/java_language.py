@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import List, Optional, Set
+from typing import List, Optional, Set, cast
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
@@ -14,7 +14,9 @@ try:
     from tree_sitter import Language, Node
     import tree_sitter_java
 
-    JAVA_LANGUAGE: Optional[Language] = tree_sitter_java.language()
+    JAVA_LANGUAGE: Optional[Language] = cast(
+        Optional[Language], tree_sitter_java.language()
+    )
 except (ImportError, Exception):
     JAVA_LANGUAGE = None
 
@@ -75,6 +77,9 @@ class JavaSymbolExtractor(TreeSitterExtractor):
 
         symbol_kind = kind_map.get(name)
         if not symbol_kind:
+            return None
+
+        if node.text is None:
             return None
 
         return Symbol(

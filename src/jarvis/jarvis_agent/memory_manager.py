@@ -99,7 +99,7 @@ class MemoryManager:
             except Exception:
                 pass
 
-            response = self.agent.model.chat_until_success(prompt)  # type: ignore
+            response = self.agent.model.chat_until_success(prompt)
 
             # 执行工具调用（如果有）
             need_return, result = self.agent._call_tools(response)
@@ -153,7 +153,7 @@ class MemoryManager:
     # 事件订阅与处理（旁路）
     # -----------------------
     def _subscribe_events(self) -> None:
-        bus = self.agent.get_event_bus()  # type: ignore[attr-defined]
+        bus = self.agent.get_event_bus()
         # 任务开始时重置去重标记
         bus.subscribe(TASK_STARTED, self._on_task_started)
         # 在清理历史前尝试保存记忆（若开启强制保存且尚未处理）

@@ -6,7 +6,7 @@
 
 import os
 import io
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, cast
 from collections import OrderedDict
 import plotext as plt
 from rich.console import Console
@@ -70,7 +70,7 @@ class StatsVisualizer:
         if unit:
             plt.ylabel(unit)
 
-        chart = plt.build()
+        chart = cast(str, plt.build())
 
         if show_values and values:
             min_val = min(values)
@@ -125,7 +125,7 @@ class StatsVisualizer:
         if unit:
             plt.ylabel(unit)
 
-        return plt.build()
+        return cast(str, plt.build())
 
     def show_summary(
         self,

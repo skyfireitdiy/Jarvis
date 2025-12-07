@@ -370,7 +370,7 @@ def load_role_config(config_path: str) -> Dict[str, Any]:
     返回:
         dict: 角色配置字典
     """
-    import yaml
+    import yaml  # type: ignore[import-untyped]
 
     if not os.path.exists(config_path):
         print(f"❌ 角色配置文件 {config_path} 不存在")

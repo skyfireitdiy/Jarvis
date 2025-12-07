@@ -312,7 +312,7 @@ class PrettyOutput:
         """
         try:
             lexer = guess_lexer(text)
-            detected_lang = lexer.name  # type: ignore[attr-defined]
+            detected_lang = lexer.name
             return PrettyOutput._lang_map.get(detected_lang, default_lang)
         except (ClassNotFound, Exception):
             return default_lang

@@ -6,7 +6,7 @@ import re
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, cast
 
 import yaml  # type: ignore[import-untyped]
 
@@ -148,8 +148,8 @@ class ToolRegistry(OutputHandlerProtocol):
                 try:
                     from jarvis.jarvis_agent import Agent
 
-                    agent: Agent = agent_
-                    tool_usage = agent.get_tool_usage_prompt()
+                    agent_obj: Agent = agent_
+                    tool_usage = agent_obj.get_tool_usage_prompt()
                     return False, f"{err_msg}\n\n{tool_usage}"
                 except Exception:
                     # 兼容处理：无法获取Agent或ToolUsage时，至少返回工具系统帮助信息
@@ -163,10 +163,10 @@ class ToolRegistry(OutputHandlerProtocol):
             print(f"❌ 工具调用处理失败: {str(e)}")
             from jarvis.jarvis_agent import Agent
 
-            agent: Agent = agent_
+            agent_final: Agent = agent_
             return (
                 False,
-                f"工具调用处理失败: {str(e)}\n\n{agent.get_tool_usage_prompt()}",
+                f"工具调用处理失败: {str(e)}\n\n{agent_final.get_tool_usage_prompt()}",
             )
 
     def __init__(self) -> None:
@@ -859,7 +859,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 ToolRegistry._check_and_handle_multiple_tool_calls(content, data)
             )
             if has_multiple:
-                return {}, error_msg, False
+                return cast(Dict[str, Dict[str, Any]], {}), error_msg, False
             # 如果解析失败，可能是多个工具调用被当作一个 JSON 来解析了
             # 继续执行后续的宽松提取逻辑
 
@@ -907,7 +907,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     )
                 )
                 if has_multiple:
-                    return {}, error_msg, False
+                    return cast(Dict[str, Dict[str, Any]], {}), error_msg, False
 
                 # 找到开始标签的位置
                 open_tag_match = re.search(
@@ -942,10 +942,12 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
-                    fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
-                    if fixed_content:
+                    fixed_content_2: Optional[str] = ToolRegistry._try_llm_fix(
+                        content, agent, error_msg
+                    )
+                    if fixed_content_2 is not None:
                         # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(fixed_content, None)
+                        return ToolRegistry._extract_tool_calls(fixed_content_2, None)
 
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
@@ -976,7 +978,7 @@ class ToolRegistry(OutputHandlerProtocol):
                         )
                     )
                     if has_multiple:
-                        return {}, error_msg, False
+                        return cast(Dict[str, Dict[str, Any]], {}), error_msg, False
 
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 error_msg = f"""Jsonnet 解析失败：{e}
@@ -987,10 +989,12 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
-                    fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
-                    if fixed_content:
+                    fixed_content_2: Optional[str] = ToolRegistry._try_llm_fix(
+                        content, agent, error_msg
+                    )
+                    if fixed_content_2 is not None:
                         # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(fixed_content, None)
+                        return ToolRegistry._extract_tool_calls(fixed_content_2, None)
 
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
@@ -1009,10 +1013,12 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
-                    fixed_content = ToolRegistry._try_llm_fix(content, agent, error_msg)
-                    if fixed_content:
+                    fixed_content_3: Optional[str] = ToolRegistry._try_llm_fix(
+                        content, agent, error_msg
+                    )
+                    if fixed_content_3 is not None:
                         # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(fixed_content, None)
+                        return ToolRegistry._extract_tool_calls(fixed_content_3, None)
 
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
@@ -1103,7 +1109,7 @@ class ToolRegistry(OutputHandlerProtocol):
         try:
             if getattr(tool, "protocol_version", "1.0") == "2.0":
                 # v2.0: agent与参数分离传递
-                return tool.func(arguments, agent)  # type: ignore[misc]
+                return cast(Dict[str, Any], tool.func(arguments, agent))
             else:
                 # v1.0: 兼容旧实现，将agent注入到arguments（如果提供）
                 args_to_call = arguments.copy() if isinstance(arguments, dict) else {}

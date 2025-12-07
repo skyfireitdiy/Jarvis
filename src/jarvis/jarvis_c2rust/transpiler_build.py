@@ -6,7 +6,7 @@
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import typer
 
@@ -767,7 +767,7 @@ class BuildManager:
         )
         stage_lines = self.build_repair_prompt_stage_section(stage, output, command)
         prompt = "\n".join(base_lines + stage_lines)
-        return self.append_additional_notes(prompt)
+        return cast(str, self.append_additional_notes(prompt))
 
     def run_cargo_test_and_fix(
         self, workspace_root: str, test_iter: int
@@ -816,6 +816,8 @@ class BuildManager:
         test_output_combined = stdout + "\n" + stderr
         test_has_warnings = "warning:" in test_output_combined.lower()
 
+        warning_type: Optional[str] = None
+        output: str = ""
         if returncode == 0:
             # 测试通过，先检查 cargo test 输出中的警告，再检查编译警告，最后检查 clippy 警告
             if test_has_warnings:
@@ -868,7 +870,7 @@ class BuildManager:
                     )
                     typer.secho(compiler_output, fg=typer.colors.YELLOW)
                     # 将编译警告作为修复目标，继续修复流程
-                    warning_type = "compiler"  # type: str
+                    warning_type = "compiler"
                     output = compiler_output
                 else:
                     # 无编译警告，检查 clippy 警告

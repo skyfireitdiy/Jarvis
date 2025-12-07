@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import sys
 import threading
+from typing import Optional
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
 
@@ -97,8 +98,8 @@ def enable_web_stdio_redirect() -> None:
         if _redirect_enabled:
             return
         try:
-            sys.stdout = _WebStreamWrapper("stdout")  # type: ignore[assignment]
-            sys.stderr = _WebStreamWrapper("stderr")  # type: ignore[assignment]
+            sys.stdout = _WebStreamWrapper("stdout")
+            sys.stderr = _WebStreamWrapper("stderr")
             _redirect_enabled = True
         except Exception:
             # 回退：保持原始输出
@@ -131,7 +132,7 @@ from queue import Queue  # noqa: E402
 
 _original_stdin = sys.stdin
 _stdin_enabled = False
-_stdin_wrapper = None  # type: ignore[assignment]
+_stdin_wrapper: Optional[_WebInputWrapper] = None
 
 
 class _WebInputWrapper:
@@ -142,7 +143,7 @@ class _WebInputWrapper:
         self._buffer: str = ""
         self._lock = threading.Lock()
         try:
-            self._encoding = getattr(_original_stdin, "encoding", "utf-8")  # type: ignore[name-defined]
+            self._encoding = getattr(_original_stdin, "encoding", "utf-8")
         except Exception:
             self._encoding = "utf-8"
 
@@ -266,14 +267,14 @@ def enable_web_stdin_redirect() -> None:
         try:
             # 记录原始 stdin（若尚未记录）
             if "_original_stdin" not in globals() or _original_stdin is None:
-                _original_stdin = sys.stdin  # type: ignore[assignment]
+                _original_stdin = sys.stdin
             _stdin_wrapper = _WebInputWrapper()
-            sys.stdin = _stdin_wrapper  # type: ignore[assignment]
+            sys.stdin = _stdin_wrapper
             _stdin_enabled = True
         except Exception:
             # 回退：保持原始输入
             try:
-                sys.stdin = _original_stdin  # type: ignore[assignment]
+                sys.stdin = _original_stdin
             except Exception:
                 pass
             _stdin_enabled = False
@@ -284,7 +285,7 @@ def disable_web_stdin_redirect() -> None:
     global _stdin_enabled, _stdin_wrapper
     with _lock:
         try:
-            sys.stdin = _original_stdin  # type: ignore[assignment]
+            sys.stdin = _original_stdin
         except Exception:
             pass
         _stdin_wrapper = None
@@ -295,7 +296,7 @@ def feed_web_stdin(data: str) -> None:
     """向 Web STDIN 注入数据（由 WebSocket /stdio 端点调用）。"""
     try:
         if _stdin_enabled and _stdin_wrapper is not None:
-            _stdin_wrapper.feed(data)  # type: ignore[attr-defined]
+            _stdin_wrapper.feed(data)
     except Exception:
         # 注入失败不影响主流程
         pass

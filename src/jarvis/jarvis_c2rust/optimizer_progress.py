@@ -3,7 +3,7 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
 import typer
 
@@ -48,8 +48,10 @@ class ProgressManager:
             except Exception:
                 pass
             self.processed = set()
-            self.steps_completed: Set[str] = set()
-            self._step_commits = {}
+            if not hasattr(self, "steps_completed"):
+                self.steps_completed = set()
+            if not hasattr(self, "_step_commits"):
+                self._step_commits = {}
             return
         try:
             if self.progress_path.exists():
@@ -202,7 +204,7 @@ class ProgressManager:
             # 获取当前 commit id 并记录
             current_commit = self.get_crate_commit_hash()
 
-            data = {
+            data: Dict[str, Any] = {
                 "processed": sorted(self.processed),
                 "steps_completed": sorted(self.steps_completed),
             }
@@ -311,7 +313,7 @@ class ProgressManager:
             current_commit = self.get_crate_commit_hash()
 
             # 保存进度
-            data = {
+            data: Dict[str, Any] = {
                 "processed": sorted(self.processed),
                 "steps_completed": sorted(self.steps_completed),
             }
@@ -320,7 +322,7 @@ class ProgressManager:
                 step_commits = getattr(self, "_step_commits", {})
                 step_commits[step_name] = current_commit
                 self._step_commits = step_commits
-                data["step_commits"] = step_commits
+                data["step_commits"] = cast(Dict[str, str], step_commits)
                 data["last_commit"] = current_commit
                 typer.secho(
                     f"[c2rust-optimizer][progress] 已记录步骤 '{step_name}' 的 commit: {current_commit}",

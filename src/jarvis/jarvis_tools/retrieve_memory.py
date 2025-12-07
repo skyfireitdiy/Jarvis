@@ -52,9 +52,9 @@ class RetrieveMemoryTool:
     def _get_memory_dir(self, memory_type: str) -> Path:
         """根据记忆类型获取存储目录"""
         if memory_type == "project_long_term":
-            return self.project_memory_dir
+            return Path(self.project_memory_dir)
         elif memory_type in ["global_long_term", "short_term"]:
-            return self.global_memory_dir / memory_type
+            return Path(self.global_memory_dir) / memory_type
         else:
             raise ValueError(f"未知的记忆类型: {memory_type}")
 

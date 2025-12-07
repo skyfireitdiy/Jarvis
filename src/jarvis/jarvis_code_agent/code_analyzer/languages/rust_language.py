@@ -2,7 +2,7 @@
 
 import os
 import re
-from typing import List, Optional, Set
+from typing import List, Optional, Set, cast
 
 from tree_sitter import Language, Node
 
@@ -57,7 +57,9 @@ RUST_SYMBOL_QUERY = """
 try:
     import tree_sitter_rust
 
-    RUST_LANGUAGE: Optional[Language] = tree_sitter_rust.language()
+    RUST_LANGUAGE: Optional[Language] = cast(
+        Optional[Language], tree_sitter_rust.language()
+    )
 except (ImportError, Exception):
     RUST_LANGUAGE = None
 
@@ -100,6 +102,8 @@ class RustSymbolExtractor(TreeSitterExtractor):
         # 对于 attribute，提取属性内容作为名称
         if symbol_kind == "attribute":
             # 提取属性文本
+            if node.text is None:
+                return None
             attr_text = node.text.decode("utf8").strip()
             # 移除开头的 # 或 #!
             if attr_text.startswith("#!"):
@@ -130,6 +134,8 @@ class RustSymbolExtractor(TreeSitterExtractor):
                 symbol_name = attr_name
         elif symbol_kind == "extern":
             # 对于 extern 块，提取 extern 关键字后的内容作为名称
+            if node.text is None:
+                return None
             extern_text = node.text.decode("utf8").strip()
             # 提取 extern "C" 或 extern "Rust" 等
             if '"' in extern_text:
@@ -143,6 +149,8 @@ class RustSymbolExtractor(TreeSitterExtractor):
             else:
                 symbol_name = "extern"
         else:
+            if node.text is None:
+                return None
             symbol_name = node.text.decode("utf8")
 
         return Symbol(

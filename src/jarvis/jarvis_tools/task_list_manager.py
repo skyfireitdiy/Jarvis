@@ -1137,8 +1137,11 @@ class task_list_manager:
                     + processed_result[-suffix_length:]
                 )
                 processed_result = truncated_result
+                execution_result_len = (
+                    len(execution_result) if execution_result is not None else 0
+                )
                 print(
-                    f"⚠️ 任务 {task_id} 的执行结果过长（{len(execution_result)} 字符），"
+                    f"⚠️ 任务 {task_id} 的执行结果过长（{execution_result_len} 字符），"
                     f"已截断为 {len(truncated_result)} 字符（基于剩余token限制：{max_output_length} 字符）"
                 )
 

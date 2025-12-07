@@ -7,7 +7,7 @@ from jarvis.jarvis_utils.config import (
     get_web_search_model_name,
 )
 from jarvis.jarvis_utils.http import get as http_get
-from markdownify import markdownify as md  # type: ignore
+from markdownify import markdownify as md  # type: ignore[import-untyped]
 import requests  # type: ignore[import-untyped]
 
 
@@ -48,14 +48,14 @@ class WebpageTool:
                     model.set_model_name(web_search_model)
                     if model.support_web():
                         model.set_web(True)
-                        model.set_suppress_output(False)  # type: ignore
+                        model.set_suppress_output(False)
                         prompt = f"""请帮我处理这个网页：{url}
 用户的具体需求是：{want}
 请按照以下要求输出结果：
 1. 使用Markdown格式
 2. 包含网页标题
 3. 根据用户需求提供准确、完整的信息"""
-                        response = model.chat_until_success(prompt)  # type: ignore
+                        response = model.chat_until_success(prompt)
                         if response and response.strip():
                             return {"success": True, "stdout": response, "stderr": ""}
 
@@ -63,14 +63,14 @@ class WebpageTool:
             model = PlatformRegistry().get_cheap_platform()
             if model.support_web():
                 model.set_web(True)
-                model.set_suppress_output(False)  # type: ignore
+                model.set_suppress_output(False)
                 prompt = f"""请帮我处理这个网页：{url}
 用户的具体需求是：{want}
 请按照以下要求输出结果：
 1. 使用Markdown格式
 2. 包含网页标题
 3. 根据用户需求提供准确、完整的信息"""
-                response = model.chat_until_success(prompt)  # type: ignore
+                response = model.chat_until_success(prompt)
                 if response and response.strip():
                     return {"success": True, "stdout": response, "stderr": ""}
 
@@ -108,8 +108,8 @@ class WebpageTool:
 
             # 使用cheap平台进行网页内容总结（简单任务）
             model = PlatformRegistry().get_cheap_platform()
-            model.set_suppress_output(False)  # type: ignore
-            summary = model.chat_until_success(summary_prompt)  # type: ignore
+            model.set_suppress_output(False)
+            summary = model.chat_until_success(summary_prompt)
 
             return {"success": True, "stdout": summary, "stderr": ""}
 

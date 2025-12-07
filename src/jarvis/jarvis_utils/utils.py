@@ -1743,31 +1743,43 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
             get_rag_embedding_model as _get_rag_embedding_model,
             get_rag_rerank_model as _get_rag_rerank_model,
         )
-        from jarvis.jarvis_utils.input import user_confirm as get_yes_no
-        from jarvis.jarvis_utils.input import get_single_line_input
+        from jarvis.jarvis_utils.input import user_confirm as get_yes_no_func
+        from jarvis.jarvis_utils.input import (
+            get_single_line_input as get_single_line_input_func,
+        )
 
         rag_default_embed = _get_rag_embedding_model()
         rag_default_rerank = _get_rag_rerank_model()
+        get_yes_no_var: Optional[Any] = get_yes_no_func
+        get_single_line_input_var: Optional[Any] = get_single_line_input_func
     except Exception:
         rag_default_embed = "BAAI/bge-m3"
         rag_default_rerank = "BAAI/bge-reranker-v2-m3"
-        get_yes_no = None
-        get_single_line_input = None
+        get_yes_no_var = None
+        get_single_line_input_var = None
 
     try:
-        if "JARVIS_RAG" not in config_data and get_yes_no:
-            if get_yes_no("是否配置 RAG 检索增强参数？", default=False):
+        if (
+            "JARVIS_RAG" not in config_data
+            and get_yes_no_var is not None
+            and get_single_line_input_var is not None
+        ):
+            if get_yes_no_var("是否配置 RAG 检索增强参数？", default=False):
                 rag_conf: Dict[str, Any] = {}
-                emb = get_single_line_input(
+                emb = get_single_line_input_var(
                     f"RAG 嵌入模型（留空使用默认: {rag_default_embed}）：",
                     default="",
                 ).strip()
-                rerank = get_single_line_input(
+                rerank = get_single_line_input_var(
                     f"RAG rerank 模型（留空使用默认: {rag_default_rerank}）：",
                     default="",
                 ).strip()
-                use_bm25 = get_yes_no("RAG 是否使用 BM25？", default=True)
-                use_rerank = get_yes_no("RAG 是否使用 rerank？", default=True)
+                if get_yes_no_var is not None:
+                    use_bm25 = get_yes_no_var("RAG 是否使用 BM25？", default=True)
+                    use_rerank = get_yes_no_var("RAG 是否使用 rerank？", default=True)
+                else:
+                    use_bm25 = True
+                    use_rerank = True
                 if emb:
                     rag_conf["embedding_model"] = emb
                 else:
@@ -2091,7 +2103,7 @@ def _get_retry_count() -> int:
     """获取当前线程的重试计数"""
     if not hasattr(_retry_context, "count"):
         _retry_context.count = 0
-    return _retry_context.count
+    return int(_retry_context.count)
 
 
 def _increment_retry_count() -> int:
@@ -2099,7 +2111,7 @@ def _increment_retry_count() -> int:
     if not hasattr(_retry_context, "count"):
         _retry_context.count = 0
     _retry_context.count += 1
-    return _retry_context.count
+    return int(_retry_context.count)
 
 
 def _reset_retry_count():

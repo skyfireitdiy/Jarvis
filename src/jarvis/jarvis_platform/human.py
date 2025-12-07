@@ -7,7 +7,7 @@
 import json
 import random
 import string
-from typing import Generator, List, Tuple
+from typing import Generator, List, Tuple, cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
@@ -116,7 +116,7 @@ class HumanPlatform(BasePlatform):
 
     def name(self) -> str:
         """平台名称"""
-        return self.model_name
+        return cast(str, self.model_name)
 
     @classmethod
     def platform_name(cls) -> str:

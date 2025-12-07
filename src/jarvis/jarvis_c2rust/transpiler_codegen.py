@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
+from typing import List, cast
 
 import json
 import typer
@@ -107,7 +107,7 @@ def build_generate_impl_prompt(
             ]
         )
     prompt = "\n".join(requirement_lines)
-    return self._append_additional_notes(prompt)
+    return cast(str, self._append_additional_notes(prompt))
 
 
 def codeagent_generate_impl(

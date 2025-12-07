@@ -2,7 +2,7 @@
 import json
 import os
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from jarvis.jarvis_mcp import McpClient
 
@@ -104,7 +104,7 @@ class StdioMcpClient(McpClient):
 
             # 读取响应
             response = self.process.stdout.readline()  # type: ignore
-            return json.loads(response)
+            return cast(Dict[str, Any], json.loads(response))
 
         except Exception as e:
             print(f"❌ 发送请求失败: {str(e)}")
@@ -229,7 +229,7 @@ class StdioMcpClient(McpClient):
         try:
             response = self._send_request("resources/list", {})
             if "result" in response and "resources" in response["result"]:
-                return response["result"]["resources"]
+                return cast(List[Dict[str, Any]], response["result"]["resources"])
             else:
                 error_msg = "获取资源列表失败"
                 if "error" in response:

@@ -12,7 +12,7 @@
 import os
 import sys
 import base64
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, cast
 import wcwidth
 from colorama import Fore
 from colorama import Style as ColoramaStyle
@@ -129,7 +129,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
         {"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"}
     )
     prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
-    return session.prompt(prompt, default=default, style=style)
+    return cast(str, session.prompt(prompt, default=default, style=style))
 
 
 def get_choice(tip: str, choices: List[str]) -> str:
@@ -706,13 +706,14 @@ def _get_multiline_input_internal(
             pass
 
     try:
-        return session.prompt(
+        result = session.prompt(
             prompt,
             style=style,
             pre_run=_pre_run,
             bottom_toolbar=_bottom_toolbar,
             default=(preset or ""),
-        ).strip()
+        )
+        return cast(str, result).strip() if result else ""
     except (KeyboardInterrupt, EOFError):
         return ""
 

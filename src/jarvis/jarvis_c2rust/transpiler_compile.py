@@ -121,7 +121,9 @@ class CompileCommandsManager:
             try:
                 entry_path = Path(entry_file)
                 if not entry_path.is_absolute() and entry.get("directory"):
-                    entry_path = (Path(entry.get("directory")) / entry_path).resolve()
+                    directory = entry.get("directory")
+                    if directory is not None:
+                        entry_path = (Path(directory) / entry_path).resolve()
                 entry_path = entry_path.resolve()
 
                 # 路径匹配（支持相对路径和绝对路径）

@@ -162,7 +162,7 @@ class BuildSystemDetector:
             try:
                 saved_enum = BuildSystem(saved_system)
                 print(f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}")
-                return [saved_enum]
+                return [(saved_enum, 1.0)]
             except ValueError:
                 # 配置文件中保存的构建系统无效，继续检测
                 pass
@@ -230,7 +230,7 @@ Git根目录文件列表（前30项）：
             platform = PlatformRegistry().get_cheap_platform()
 
             print("🤖 正在使用LLM判断构建系统...")
-            response = platform.chat_until_success(context)  # type: ignore
+            response = platform.chat_until_success(context)
 
             # 解析响应
             detected_systems_with_prob: List[Tuple[BuildSystem, float]] = []
@@ -519,10 +519,10 @@ Git根目录文件列表（前30项）：
         # 非交互模式：直接选择第一个构建系统（或unknown）
         if _is_non_interactive():
             if detected_systems and detected_systems[0] != BuildSystem.UNKNOWN:
-                selected = detected_systems[0]
-                print(f"ℹ️ 非交互模式：自动选择构建系统: {selected.value}")
-                config.set_selected_build_system(selected.value)
-                return [selected]
+                selected_system = detected_systems[0]
+                print(f"ℹ️ 非交互模式：自动选择构建系统: {selected_system.value}")
+                config.set_selected_build_system(selected_system.value)
+                return [selected_system]
             else:
                 print("ℹ️ 非交互模式：未检测到构建系统，使用unknown")
                 config.set_selected_build_system("unknown")
@@ -539,11 +539,11 @@ Git根目录文件列表（前30项）：
                 choice_num = int(choice)
 
                 if 1 <= choice_num <= len(detected_systems):
-                    selected = detected_systems[choice_num - 1]
+                    selected_system = detected_systems[choice_num - 1]
                     # 保存用户选择
-                    config.set_selected_build_system(selected.value)
-                    print(f"ℹ️ 用户选择构建系统: {selected.value}")
-                    return [selected]
+                    config.set_selected_build_system(selected_system.value)
+                    print(f"ℹ️ 用户选择构建系统: {selected_system.value}")
+                    return [selected_system]
                 elif choice_num == len(detected_systems) + 1:
                     print("ℹ️ 用户取消选择，使用unknown")
                     config.set_selected_build_system("unknown")

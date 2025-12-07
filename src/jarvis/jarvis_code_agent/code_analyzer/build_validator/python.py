@@ -98,8 +98,8 @@ class PythonBuildValidator(BuildValidatorBase):
                         timeout=5,
                     )
                     if returncode != 0:
-                        error_msg = f"{file_path}: {stderr}".strip()
-                        errors.append(error_msg)
+                        file_error_msg = f"{file_path}: {stderr}".strip()
+                        errors.append(file_error_msg)
                         error_outputs.append(stdout + stderr)
 
             if errors:
@@ -142,6 +142,7 @@ class PythonBuildValidator(BuildValidatorBase):
         output = stdout + stderr
 
         # 如果失败，提取关键错误信息（包括编译错误和测试失败）
+        error_msg: Optional[str] = None
         if not success:
             error_msg = self._extract_python_errors(output)
             if not error_msg:
@@ -168,7 +169,6 @@ class PythonBuildValidator(BuildValidatorBase):
             else:
                 print(f"输出：\n{output[:500]}")
         else:
-            error_msg = None
             print(f"✅ Python 构建验证成功（耗时 {duration:.2f} 秒）")
 
         return BuildResult(

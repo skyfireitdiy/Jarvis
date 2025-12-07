@@ -8,7 +8,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Any, Set, cast
 from collections import defaultdict
 import sys
 import time
@@ -70,7 +70,7 @@ class StatsStorage:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return data
+                    return cast(Dict[Any, Any], data)
             except Exception:
                 if attempt < max_retries - 1:
                     time.sleep(0.1 * (attempt + 1))  # 递增延迟
@@ -400,7 +400,7 @@ class StatsStorage:
             if info and isinstance(info, dict):
                 grp = info.get("group")
                 if grp:
-                    return grp
+                    return cast(str, grp)
 
             # 扫描历史记录以推断
             group_counts: Dict[str, int] = {}
@@ -448,10 +448,10 @@ class StatsStorage:
         except Exception:
             return None
 
-    def get_metric_info(self, metric_name: str) -> Optional[Dict]:
+    def get_metric_info(self, metric_name: str) -> Optional[Dict[Any, Any]]:
         """获取指标元信息"""
         meta = self._load_json(self.meta_file)
-        return meta.get("metrics", {}).get(metric_name)
+        return cast(Optional[Dict[Any, Any]], meta.get("metrics", {}).get(metric_name))
 
     def list_metrics(self) -> List[str]:
         """列出所有指标"""
