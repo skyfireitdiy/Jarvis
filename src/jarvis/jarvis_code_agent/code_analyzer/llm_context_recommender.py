@@ -89,27 +89,27 @@ class ContextRecommender:
             print("⚠️ 符号表为空，无法进行上下文推荐")
             return ContextRecommendation(recommended_symbols=[])
 
-        # 1. 使用LLM生成相关符号名
+        # 1. 使用LLM生成相关关键词
         model_name = self._model_name or get_cheap_model_name(self._model_group)
-        print(f"📝 正在使用{model_name}生成相关符号名...")
-        symbol_names = self._extract_symbol_names_with_llm(user_input)
-        if symbol_names:
+        print(f"📝 正在使用{model_name}生成相关关键词...")
+        keywords = self._extract_keywords_with_llm(user_input)
+        if keywords:
             print(
-                f"✅ 生成 {len(symbol_names)} 个符号名: {', '.join(symbol_names[:5])}{'...' if len(symbol_names) > 5 else ''}"
+                f"✅ 生成 {len(keywords)} 个关键词: {', '.join(keywords[:5])}{'...' if len(keywords) > 5 else ''}"
             )
         else:
-            print("⚠️ 未能生成符号名，将使用基础搜索策略")
+            print("⚠️ 未能生成关键词，将使用基础搜索策略")
 
         # 2. 初始化推荐结果
         recommended_symbols: List[Symbol] = []
 
-        # 3. 基于符号名进行符号查找，然后使用LLM挑选关联度高的条目（主要推荐方式）
-        if symbol_names:
-            # 3.1 使用符号名进行精确查找，找到所有候选符号及其位置
-            print("🔎 正在基于符号名搜索相关符号...")
-            candidate_symbols = self._search_symbols_by_names(symbol_names)
+        # 3. 基于关键词进行符号查找，然后使用LLM挑选关联度高的条目（主要推荐方式）
+        if keywords:
+            # 3.1 使用关键词进行模糊查找，找到所有候选符号及其位置
+            print("🔎 正在基于关键词搜索相关符号...")
+            candidate_symbols = self._search_symbols_by_keywords(keywords)
 
-            print(f"📊 符号名匹配: {len(candidate_symbols)} 个候选")
+            print(f"📊 关键词匹配: {len(candidate_symbols)} 个候选")
 
             candidate_symbols_list = candidate_symbols
             print(f"📦 共 {len(candidate_symbols_list)} 个候选符号")
@@ -121,7 +121,7 @@ class ContextRecommender:
                     f"🤖 正在使用{model_name}从 {len(candidate_symbols_list)} 个候选符号中筛选最相关的条目..."
                 )
                 selected_symbols = self._select_relevant_symbols_with_llm(
-                    user_input, symbol_names, candidate_symbols_list
+                    user_input, keywords, candidate_symbols_list
                 )
                 recommended_symbols.extend(selected_symbols)
                 print(
@@ -130,7 +130,7 @@ class ContextRecommender:
             else:
                 print("⚠️ 没有找到候选符号")
         else:
-            print("⚠️ 无符号名可用，跳过符号推荐")
+            print("⚠️ 无关键词可用，跳过符号推荐")
 
         # 4. 对推荐符号去重（基于 name + file_path + line_start）
         seen = set()
@@ -361,14 +361,14 @@ class ContextRecommender:
             style="green",
         )
 
-    def _extract_symbol_names_with_llm(self, user_input: str) -> List[str]:
-        """使用LLM生成相关符号名
+    def _extract_keywords_with_llm(self, user_input: str) -> List[str]:
+        """使用LLM生成相关关键词
 
         Args:
             user_input: 用户输入
 
         Returns:
-            符号名列表
+            关键词列表（用于模糊匹配符号名）
         """
         # 获取项目概况和符号表信息
         project_overview = self._get_project_overview()
@@ -379,28 +379,32 @@ class ContextRecommender:
         )
         symbol_names_sample = sorted(all_symbol_names)[:50]  # 取前50个作为示例
 
-        prompt = f"""分析代码编辑任务，生成5-15个可能相关的符号名（函数名、类名、变量名等）。
+        prompt = f"""分析代码编辑任务，生成5-15个搜索关键词，用于在代码库中查找相关符号。
 
 {project_overview}
 
 任务描述：{user_input}
 
-符号名示例：{", ".join(symbol_names_sample[:30])}{"..." if len(symbol_names_sample) > 30 else ""}
+现有符号名示例：{", ".join(symbol_names_sample[:30])}{"..." if len(symbol_names_sample) > 30 else ""}
 
-要求：与任务直接相关，符合命名规范，尽量具体。
+要求：
+1. 关键词应该是符号名中可能包含的单词或词根（如 "user", "login", "validate", "config"）
+2. 不需要完整的符号名，只需要关键词片段
+3. 关键词应与任务直接相关
+4. 可以是单词、缩写或常见的命名片段
 
-以Jsonnet数组格式返回，用<SYMBOL_NAMES>标签包裹。示例：
-<SYMBOL_NAMES>
-["processData", "validateInput", "handleError"]
-</SYMBOL_NAMES>
+以Jsonnet数组格式返回，用<KEYWORDS>标签包裹。示例：
+<KEYWORDS>
+["user", "login", "auth", "validate", "session"]
+</KEYWORDS>
 """
 
         try:
             response = self._call_llm(prompt)
-            # 从<SYMBOL_NAMES>标签中提取内容
+            # 从<KEYWORDS>标签中提取内容
             response = response.strip()
             json_match = re.search(
-                r"<SYMBOL_NAMES>\s*(.*?)\s*</SYMBOL_NAMES>", response, re.DOTALL
+                r"<KEYWORDS>\s*(.*?)\s*</KEYWORDS>", response, re.DOTALL
             )
             if json_match:
                 json_content = json_match.group(1).strip()
@@ -414,55 +418,55 @@ class ContextRecommender:
                     response = response[:-3]
                 json_content = response.strip()
 
-            symbol_names = json_loads(json_content)
-            if not isinstance(symbol_names, list):
-                print("⚠️ LLM返回的符号名格式不正确，期望 Jsonnet 数组格式")
+            keywords = json_loads(json_content)
+            if not isinstance(keywords, list):
+                print("⚠️ LLM返回的关键词格式不正确，期望 Jsonnet 数组格式")
                 return []
 
-            # 过滤空字符串和过短的符号名
-            original_count = len(symbol_names)
-            symbol_names = [
-                name.strip()
-                for name in symbol_names
-                if name and isinstance(name, str) and len(name.strip()) > 0
+            # 过滤空字符串和过短的关键词（至少2个字符）
+            original_count = len(keywords)
+            keywords = [
+                kw.strip().lower()
+                for kw in keywords
+                if kw and isinstance(kw, str) and len(kw.strip()) >= 2
             ]
-            if original_count != len(symbol_names):
+            if original_count != len(keywords):
                 print(
-                    f"📋 过滤后保留 {len(symbol_names)} 个有效符号名（原始 {original_count} 个）"
+                    f"📋 过滤后保留 {len(keywords)} 个有效关键词（原始 {original_count} 个）"
                 )
-            return symbol_names
+            return keywords
         except Exception as e:
             # 解析失败，返回空列表
-            print(f"❌ LLM符号名生成失败: {e}")
+            print(f"❌ LLM关键词生成失败: {e}")
             return []
 
-    def _search_symbols_by_names(self, symbol_names: List[str]) -> List[Symbol]:
-        """基于符号名在符号表中精确查找相关符号
+    def _search_symbols_by_keywords(self, keywords: List[str]) -> List[Symbol]:
+        """基于关键词在符号表中模糊查找相关符号
 
         Args:
-            symbol_names: 符号名列表
+            keywords: 关键词列表（用于模糊匹配符号名）
 
         Returns:
             候选符号列表
         """
-        if not symbol_names:
+        if not keywords:
             return []
 
         found_symbols: List[Symbol] = []
-        found_symbol_keys = set()  # 用于去重，使用 (file_path, name, line_start) 作为键
+        found_symbol_keys: set[tuple[str, str, int]] = set()  # 用于去重
 
-        # 创建符号名映射（支持大小写不敏感匹配）
-        symbol_names_lower = {name.lower(): name for name in symbol_names}
+        # 将关键词转为小写用于匹配
+        keywords_lower = [kw.lower() for kw in keywords]
 
-        # 遍历所有符号，精确匹配符号名
+        # 遍历所有符号，模糊匹配符号名
         for (
             symbol_name,
             symbols,
         ) in self.context_manager.symbol_table.symbols_by_name.items():
             symbol_name_lower = symbol_name.lower()
 
-            # 精确匹配：检查符号名是否在目标列表中（大小写不敏感）
-            if symbol_name_lower in symbol_names_lower:
+            # 模糊匹配：检查任一关键词是否是符号名的子串（大小写不敏感）
+            if any(kw in symbol_name_lower for kw in keywords_lower):
                 # 找到匹配的符号，添加所有同名符号（可能有重载）
                 for symbol in symbols:
                     key = (symbol.file_path, symbol.name, symbol.line_start)
@@ -473,13 +477,13 @@ class ContextRecommender:
         return found_symbols
 
     def _select_relevant_symbols_with_llm(
-        self, user_input: str, symbol_names: List[str], candidate_symbols: List[Symbol]
+        self, user_input: str, keywords: List[str], candidate_symbols: List[Symbol]
     ) -> List[Symbol]:
         """使用LLM从候选符号中挑选关联度高的条目
 
         Args:
             user_input: 用户输入/任务描述
-            symbol_names: 符号名列表
+            keywords: 搜索关键词列表
             candidate_symbols: 候选符号列表（包含位置信息）
 
         Returns:
@@ -513,12 +517,12 @@ class ContextRecommender:
         # 获取项目概况
         project_overview = self._get_project_overview()
 
-        prompt = f"""根据任务描述和生成的符号名，从候选符号列表中选择最相关的10-20个符号。
+        prompt = f"""根据任务描述和搜索关键词，从候选符号列表中选择最相关的10-20个符号。
 
 {project_overview}
 
 任务描述：{user_input}
-生成的符号名：{", ".join(symbol_names)}
+搜索关键词：{", ".join(keywords)}
 候选符号列表（已编号）：{json.dumps(symbol_info_list, ensure_ascii=False, indent=2)}
 
 返回最相关符号的序号（Jsonnet数组），按相关性排序，用<SELECTED_INDICES>标签包裹。示例：
@@ -571,7 +575,7 @@ class ContextRecommender:
 
             if selected_symbols:
                 # 统计选中的符号类型分布
-                kind_count = {}
+                kind_count: dict[str, int] = {}
                 for symbol in selected_symbols:
                     kind_count[symbol.kind] = kind_count.get(symbol.kind, 0) + 1
                 kind_summary = ", ".join(
