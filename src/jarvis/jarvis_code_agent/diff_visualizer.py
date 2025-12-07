@@ -297,54 +297,84 @@ class DiffVisualizer:
     def visualize_side_by_side_summary(
         self, old_lines: List[str], new_lines: List[str], file_path: str = ""
     ) -> None:
-        """并排显示摘要（显示主要变更）
+        """并排显示摘要（仅显示变更部分，智能配对）
 
         参数:
             old_lines: 旧文件行列表
             new_lines: 新文件行列表
             file_path: 文件路径
         """
-        # 使用 difflib 生成差异
-        differ = difflib.Differ()
-        diff = list(differ.compare(old_lines, new_lines))
+        # 使用 difflib.SequenceMatcher 进行更精确的匹配
+        matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+        opcodes = matcher.get_opcodes()
 
         # 创建并排表格
-        table = Table(show_header=True, header_style="bold magenta", box=None)
-        table.add_column("旧代码", style="red", width=45, overflow="fold")
-        table.add_column("新代码", style="green", width=45, overflow="fold")
+        table = Table(
+            show_header=True,
+            header_style="bold magenta",
+            box=None,
+            padding=(0, 1),
+        )
+        table.add_column("行号", style="dim", width=6, justify="right")
+        table.add_column("删除 (-)", style="red", overflow="fold", ratio=1)
+        table.add_column("行号", style="dim", width=6, justify="right")
+        table.add_column("新增 (+)", style="green", overflow="fold", ratio=1)
 
-        old_content = []
-        new_content = []
+        additions = 0
+        deletions = 0
+        has_changes = False
 
-        for line in diff:
-            if line.startswith("  "):
-                # 未更改的行
-                content = line[2:]
-                old_content.append(content)
-                new_content.append(content)
-            elif line.startswith("- "):
-                # 删除的行
-                content = line[2:]
-                old_content.append(f"[red]{content}[/red]")
-                new_content.append("")
-            elif line.startswith("+ "):
-                # 新增的行
-                content = line[2:]
-                old_content.append("")
-                new_content.append(f"[green]{content}[/green]")
+        for tag, i1, i2, j1, j2 in opcodes:
+            if tag == "equal":
+                # 跳过未更改的行（可选：显示省略提示）
+                continue
+            elif tag == "replace":
+                # 替换：删除的行和新增的行配对显示
+                old_chunk = old_lines[i1:i2]
+                new_chunk = new_lines[j1:j2]
+                deletions += len(old_chunk)
+                additions += len(new_chunk)
+                has_changes = True
 
-        # 填充表格（确保行数一致）
-        max_len = max(len(old_content), len(new_content))
-        for i in range(max_len):
-            old = old_content[i] if i < len(old_content) else ""
-            new = new_content[i] if i < len(new_content) else ""
-            table.add_row(old, new)
+                # 配对显示
+                max_len = max(len(old_chunk), len(new_chunk))
+                for k in range(max_len):
+                    old_line_num = str(i1 + k + 1) if k < len(old_chunk) else ""
+                    old_content = (
+                        f"[red]{old_chunk[k]}[/red]" if k < len(old_chunk) else ""
+                    )
+                    new_line_num = str(j1 + k + 1) if k < len(new_chunk) else ""
+                    new_content = (
+                        f"[green]{new_chunk[k]}[/green]" if k < len(new_chunk) else ""
+                    )
+                    table.add_row(old_line_num, old_content, new_line_num, new_content)
+            elif tag == "delete":
+                # 仅删除
+                old_chunk = old_lines[i1:i2]
+                deletions += len(old_chunk)
+                has_changes = True
+                for k, line in enumerate(old_chunk):
+                    table.add_row(str(i1 + k + 1), f"[red]{line}[/red]", "", "")
+            elif tag == "insert":
+                # 仅新增
+                new_chunk = new_lines[j1:j2]
+                additions += len(new_chunk)
+                has_changes = True
+                for k, line in enumerate(new_chunk):
+                    table.add_row("", "", str(j1 + k + 1), f"[green]{line}[/green]")
 
-        if file_path:
-            header = Text(f"📝 {file_path}", style="bold cyan")
-            self.console.print(header)
+        # 如果没有变更，显示提示
+        if not has_changes:
+            self.console.print("[dim]（无变更）[/dim]")
+            return
 
-        self.console.print(table)
+        # 构建标题（包含统计信息）
+        title = f"📝 {file_path}" if file_path else "Side-by-Side Diff"
+        title += f"  [green]+{additions}[/green] / [red]-{deletions}[/red]"
+
+        # 包裹在 Panel 中显示
+        panel = Panel(table, title=title, border_style="cyan", padding=(0, 1))
+        self.console.print(panel)
 
 
 def _parse_diff_to_lines(diff_text: str) -> tuple:

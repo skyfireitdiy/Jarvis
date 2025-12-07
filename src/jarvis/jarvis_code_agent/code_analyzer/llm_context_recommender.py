@@ -90,7 +90,7 @@ class ContextRecommender:
             return ContextRecommendation(recommended_symbols=[])
 
         # 1. 使用LLM生成相关符号名
-        model_name = self._model_name or "LLM"
+        model_name = self._model_name or get_cheap_model_name(self._model_group)
         print(f"📝 正在使用{model_name}生成相关符号名...")
         symbol_names = self._extract_symbol_names_with_llm(user_input)
         if symbol_names:
@@ -116,7 +116,7 @@ class ContextRecommender:
 
             # 3.2 使用LLM从候选符号中挑选关联度高的条目
             if candidate_symbols_list:
-                model_name = self._model_name or "LLM"
+                model_name = self._model_name or get_cheap_model_name(self._model_group)
                 print(
                     f"🤖 正在使用{model_name}从 {len(candidate_symbols_list)} 个候选符号中筛选最相关的条目..."
                 )
