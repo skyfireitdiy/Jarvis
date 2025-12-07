@@ -326,7 +326,16 @@ class DiffVisualizer:
 
         for tag, i1, i2, j1, j2 in opcodes:
             if tag == "equal":
-                # 跳过未更改的行（可选：显示省略提示）
+                # 显示未更改的行（灰色/dim样式）
+                equal_chunk = old_lines[i1:i2]
+                for k, line in enumerate(equal_chunk):
+                    line_num = str(i1 + k + 1)
+                    table.add_row(
+                        f"[dim]{line_num}[/dim]",
+                        f"[dim]{line}[/dim]",
+                        f"[dim]{line_num}[/dim]",
+                        f"[dim]{line}[/dim]",
+                    )
                 continue
             elif tag == "replace":
                 # 替换：删除的行和新增的行配对显示

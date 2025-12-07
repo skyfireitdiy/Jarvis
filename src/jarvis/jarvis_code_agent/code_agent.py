@@ -356,8 +356,13 @@ class CodeAgent(Agent):
                 # 显示整体 diff（使用增强可视化）
                 visualization_mode = get_diff_visualization_mode()
                 show_line_numbers = get_diff_show_line_numbers()
+                # 构建文件路径显示（多文件时显示所有文件名）
+                file_path_display = ", ".join(modified_files) if modified_files else ""
                 visualize_diff_enhanced(
-                    diff, mode=visualization_mode, show_line_numbers=show_line_numbers
+                    diff,
+                    file_path=file_path_display,
+                    mode=visualization_mode,
+                    show_line_numbers=show_line_numbers,
                 )
             except ImportError:
                 # 如果导入失败，回退到原有方式
