@@ -1,4 +1,4 @@
 # -*- coding: utf-8 -*-
 """Jarvis AI Assistant"""
 
-__version__ = "0.8.2"
+__version__ = "0.8.3"
