@@ -61,6 +61,100 @@ class DiffVisualizer:
         old_line_num = 0
         new_line_num = 0
         in_hunk = False
+        hunk_lines = []  # 存储当前 hunk 中的所有行（包括上下文和变更）
+
+        def flush_hunk_context():
+            """刷新当前 hunk，只显示 context_lines 数量的上下文"""
+            nonlocal hunk_lines
+            if not hunk_lines:
+                return
+
+            # 找到所有变更行的索引
+            change_indices = []
+            for idx, (line_type, _, _, _) in enumerate(hunk_lines):
+                if line_type in ("-", "+"):
+                    change_indices.append(idx)
+
+            if not change_indices:
+                # 没有变更，只显示最后 context_lines 行上下文
+                for line_type, old_ln, new_ln, content in hunk_lines[-context_lines:]:
+                    if show_line_numbers:
+                        table.add_row(
+                            str(old_ln),
+                            str(new_ln),
+                            " ",
+                            f"[dim]{content}[/dim]",
+                        )
+                    else:
+                        table.add_row("", " ", f"[dim]{content}[/dim]")
+            else:
+                # 有变更，只显示变更前后的上下文
+                first_change_idx = change_indices[0]
+                last_change_idx = change_indices[-1]
+
+                # 显示变更前的上下文（最多 context_lines 行）
+                pre_context_start = max(0, first_change_idx - context_lines)
+                for idx in range(pre_context_start, first_change_idx):
+                    _, old_ln, new_ln, content = hunk_lines[idx]
+                    if show_line_numbers:
+                        table.add_row(
+                            str(old_ln),
+                            str(new_ln),
+                            " ",
+                            f"[dim]{content}[/dim]",
+                        )
+                    else:
+                        table.add_row("", " ", f"[dim]{content}[/dim]")
+
+                # 显示所有变更行
+                for idx in range(first_change_idx, last_change_idx + 1):
+                    line_type, old_ln, new_ln, content = hunk_lines[idx]
+                    if line_type == "-":
+                        if show_line_numbers:
+                            table.add_row(
+                                str(old_ln) if old_ln else "",
+                                "",
+                                "[bold red]-[/bold red]",
+                                f"[red]{content}[/red]",
+                            )
+                        else:
+                            table.add_row(
+                                "",
+                                "[bold red]-[/bold red]",
+                                f"[red]{content}[/red]",
+                            )
+                    elif line_type == "+":
+                        if show_line_numbers:
+                            table.add_row(
+                                "",
+                                str(new_ln) if new_ln else "",
+                                "[bold green]+[/bold green]",
+                                f"[green]{content}[/green]",
+                            )
+                        else:
+                            table.add_row(
+                                "",
+                                "[bold green]+[/bold green]",
+                                f"[green]{content}[/green]",
+                            )
+
+                # 显示变更后的上下文（最多 context_lines 行）
+                post_context_end = min(
+                    len(hunk_lines), last_change_idx + 1 + context_lines
+                )
+                for idx in range(last_change_idx + 1, post_context_end):
+                    _, old_ln, new_ln, content = hunk_lines[idx]
+                    if show_line_numbers:
+                        table.add_row(
+                            str(old_ln),
+                            str(new_ln),
+                            " ",
+                            f"[dim]{content}[/dim]",
+                        )
+                    else:
+                        table.add_row("", " ", f"[dim]{content}[/dim]")
+
+            hunk_lines = []
 
         for line in lines:
             if line.startswith("diff --git") or line.startswith("index"):
@@ -77,7 +171,10 @@ class DiffVisualizer:
                 if new_path != "/dev/null":
                     file_path = new_path
             elif line.startswith("@@"):
-                # Hunk 头部
+                # Hunk 头部 - 刷新上一个 hunk
+                if in_hunk:
+                    flush_hunk_context()
+
                 in_hunk = True
                 # 解析行号信息
                 parts = line.split("@@")
@@ -114,49 +211,17 @@ class DiffVisualizer:
                 if line.startswith("-"):
                     # 删除的行
                     content = line[1:] if len(line) > 1 else ""
-                    if show_line_numbers:
-                        table.add_row(
-                            str(old_line_num),
-                            "",
-                            "[bold red]-[/bold red]",
-                            f"[red]{content}[/red]",
-                        )
-                    else:
-                        table.add_row(
-                            "",
-                            "[bold red]-[/bold red]",
-                            f"[red]{content}[/red]",
-                        )
+                    hunk_lines.append(("-", old_line_num, None, content))
                     old_line_num += 1
                 elif line.startswith("+"):
                     # 新增的行
                     content = line[1:] if len(line) > 1 else ""
-                    if show_line_numbers:
-                        table.add_row(
-                            "",
-                            str(new_line_num),
-                            "[bold green]+[/bold green]",
-                            f"[green]{content}[/green]",
-                        )
-                    else:
-                        table.add_row(
-                            "",
-                            "[bold green]+[/bold green]",
-                            f"[green]{content}[/green]",
-                        )
+                    hunk_lines.append(("+", None, new_line_num, content))
                     new_line_num += 1
                 elif line.startswith(" "):
                     # 未更改的行（上下文）
                     content = line[1:] if len(line) > 1 else ""
-                    if show_line_numbers:
-                        table.add_row(
-                            str(old_line_num),
-                            str(new_line_num),
-                            " ",
-                            f"[dim]{content}[/dim]",
-                        )
-                    else:
-                        table.add_row("", " ", f"[dim]{content}[/dim]")
+                    hunk_lines.append((" ", old_line_num, new_line_num, content))
                     old_line_num += 1
                     new_line_num += 1
                 elif line.strip() == "\\":
@@ -167,6 +232,10 @@ class DiffVisualizer:
                         )
                     else:
                         table.add_row("", "", "[dim]\\ No newline at end of file[/dim]")
+
+        # 刷新最后一个 hunk
+        if in_hunk:
+            flush_hunk_context()
 
         # 显示 diff 表格（包裹在 Panel 中）
         if table.rows:
@@ -295,7 +364,13 @@ class DiffVisualizer:
         self.console.print(panel)
 
     def visualize_side_by_side_summary(
-        self, old_lines: List[str], new_lines: List[str], file_path: str = ""
+        self,
+        old_lines: List[str],
+        new_lines: List[str],
+        file_path: str = "",
+        context_lines: int = 3,
+        old_line_map: Optional[List[int]] = None,
+        new_line_map: Optional[List[int]] = None,
     ) -> None:
         """并排显示摘要（仅显示变更部分，智能配对）
 
@@ -303,10 +378,19 @@ class DiffVisualizer:
             old_lines: 旧文件行列表
             new_lines: 新文件行列表
             file_path: 文件路径
+            context_lines: 上下文行数
+            old_line_map: 旧文件行号映射（索引对应 old_lines 索引，值为文件中的绝对行号）
+            new_line_map: 新文件行号映射（索引对应 new_lines 索引，值为文件中的绝对行号）
         """
         # 使用 difflib.SequenceMatcher 进行更精确的匹配
         matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
         opcodes = matcher.get_opcodes()
+
+        # 如果没有提供行号映射，使用索引+1作为行号（向后兼容）
+        if old_line_map is None:
+            old_line_map = [i + 1 for i in range(len(old_lines))]
+        if new_line_map is None:
+            new_line_map = [i + 1 for i in range(len(new_lines))]
 
         # 创建并排表格
         table = Table(
@@ -324,18 +408,101 @@ class DiffVisualizer:
         deletions = 0
         has_changes = False
 
-        for tag, i1, i2, j1, j2 in opcodes:
+        for idx, (tag, i1, i2, j1, j2) in enumerate(opcodes):
             if tag == "equal":
-                # 显示未更改的行（灰色/dim样式）
+                # 显示未更改的行（灰色/dim样式），但只显示上下文行数
                 equal_chunk = old_lines[i1:i2]
-                for k, line in enumerate(equal_chunk):
-                    line_num = str(i1 + k + 1)
-                    table.add_row(
-                        f"[dim]{line_num}[/dim]",
-                        f"[dim]{line}[/dim]",
-                        f"[dim]{line_num}[/dim]",
-                        f"[dim]{line}[/dim]",
-                    )
+                equal_len = len(equal_chunk)
+
+                # 只显示最后 context_lines 行作为上下文
+                if equal_len > context_lines * 2:
+                    # 如果 equal 块太长，只显示开头和结尾的上下文
+                    if idx > 0:  # 不是第一个块
+                        # 显示开头的 context_lines 行
+                        for k in range(min(context_lines, equal_len)):
+                            old_line_num = (
+                                old_line_map[i1 + k]
+                                if i1 + k < len(old_line_map)
+                                else i1 + k + 1
+                            )
+                            new_line_num = (
+                                new_line_map[j1 + k]
+                                if j1 + k < len(new_line_map)
+                                else j1 + k + 1
+                            )
+                            table.add_row(
+                                f"[dim]{old_line_num}[/dim]",
+                                f"[dim]{equal_chunk[k]}[/dim]",
+                                f"[dim]{new_line_num}[/dim]",
+                                f"[dim]{equal_chunk[k]}[/dim]",
+                            )
+                        # 如果有省略，显示省略标记
+                        if equal_len > context_lines * 2:
+                            table.add_row(
+                                "",
+                                "[dim]... ({0} lines omitted) ...[/dim]".format(
+                                    equal_len - context_lines * 2
+                                ),
+                                "",
+                                "",
+                            )
+                        # 显示结尾的 context_lines 行
+                        for k in range(max(0, equal_len - context_lines), equal_len):
+                            old_line_num = (
+                                old_line_map[i1 + k]
+                                if i1 + k < len(old_line_map)
+                                else i1 + k + 1
+                            )
+                            new_line_num = (
+                                new_line_map[j1 + k]
+                                if j1 + k < len(new_line_map)
+                                else j1 + k + 1
+                            )
+                            table.add_row(
+                                f"[dim]{old_line_num}[/dim]",
+                                f"[dim]{equal_chunk[k]}[/dim]",
+                                f"[dim]{new_line_num}[/dim]",
+                                f"[dim]{equal_chunk[k]}[/dim]",
+                            )
+                    else:
+                        # 第一个块，只显示结尾的上下文
+                        start_idx = max(0, equal_len - context_lines)
+                        for k in range(start_idx, equal_len):
+                            old_line_num = (
+                                old_line_map[i1 + k]
+                                if i1 + k < len(old_line_map)
+                                else i1 + k + 1
+                            )
+                            new_line_num = (
+                                new_line_map[j1 + k]
+                                if j1 + k < len(new_line_map)
+                                else j1 + k + 1
+                            )
+                            table.add_row(
+                                f"[dim]{old_line_num}[/dim]",
+                                f"[dim]{equal_chunk[k]}[/dim]",
+                                f"[dim]{new_line_num}[/dim]",
+                                f"[dim]{equal_chunk[k]}[/dim]",
+                            )
+                else:
+                    # 如果 equal 块不长，显示所有行
+                    for k, line in enumerate(equal_chunk):
+                        old_line_num = (
+                            old_line_map[i1 + k]
+                            if i1 + k < len(old_line_map)
+                            else i1 + k + 1
+                        )
+                        new_line_num = (
+                            new_line_map[j1 + k]
+                            if j1 + k < len(new_line_map)
+                            else j1 + k + 1
+                        )
+                        table.add_row(
+                            f"[dim]{old_line_num}[/dim]",
+                            f"[dim]{line}[/dim]",
+                            f"[dim]{new_line_num}[/dim]",
+                            f"[dim]{line}[/dim]",
+                        )
                 continue
             elif tag == "replace":
                 # 替换：删除的行和新增的行配对显示
@@ -348,14 +515,31 @@ class DiffVisualizer:
                 # 配对显示
                 max_len = max(len(old_chunk), len(new_chunk))
                 for k in range(max_len):
-                    old_line_num = str(i1 + k + 1) if k < len(old_chunk) else ""
-                    old_content = (
-                        f"[red]{old_chunk[k]}[/red]" if k < len(old_chunk) else ""
-                    )
-                    new_line_num = str(j1 + k + 1) if k < len(new_chunk) else ""
-                    new_content = (
-                        f"[green]{new_chunk[k]}[/green]" if k < len(new_chunk) else ""
-                    )
+                    # 文件中的绝对行号
+                    if k < len(old_chunk):
+                        old_line_num = (
+                            old_line_map[i1 + k]
+                            if i1 + k < len(old_line_map)
+                            else i1 + k + 1
+                        )
+                        old_line_num = str(old_line_num)
+                        old_content = f"[red]{old_chunk[k]}[/red]"
+                    else:
+                        old_line_num = ""
+                        old_content = ""
+
+                    if k < len(new_chunk):
+                        new_line_num = (
+                            new_line_map[j1 + k]
+                            if j1 + k < len(new_line_map)
+                            else j1 + k + 1
+                        )
+                        new_line_num = str(new_line_num)
+                        new_content = f"[green]{new_chunk[k]}[/green]"
+                    else:
+                        new_line_num = ""
+                        new_content = ""
+
                     table.add_row(old_line_num, old_content, new_line_num, new_content)
             elif tag == "delete":
                 # 仅删除
@@ -363,14 +547,26 @@ class DiffVisualizer:
                 deletions += len(old_chunk)
                 has_changes = True
                 for k, line in enumerate(old_chunk):
-                    table.add_row(str(i1 + k + 1), f"[red]{line}[/red]", "", "")
+                    # 文件中的绝对行号
+                    old_line_num = (
+                        old_line_map[i1 + k]
+                        if i1 + k < len(old_line_map)
+                        else i1 + k + 1
+                    )
+                    table.add_row(str(old_line_num), f"[red]{line}[/red]", "", "")
             elif tag == "insert":
                 # 仅新增
                 new_chunk = new_lines[j1:j2]
                 additions += len(new_chunk)
                 has_changes = True
                 for k, line in enumerate(new_chunk):
-                    table.add_row("", "", str(j1 + k + 1), f"[green]{line}[/green]")
+                    # 文件中的绝对行号
+                    new_line_num = (
+                        new_line_map[j1 + k]
+                        if j1 + k < len(new_line_map)
+                        else j1 + k + 1
+                    )
+                    table.add_row("", "", str(new_line_num), f"[green]{line}[/green]")
 
         # 如果没有变更，显示提示
         if not has_changes:
@@ -387,20 +583,42 @@ class DiffVisualizer:
 
 
 def _parse_diff_to_lines(diff_text: str) -> tuple:
-    """从 git diff 文本中解析出旧文件和新文件的行列表
+    """从 git diff 文本中解析出旧文件和新文件的行列表（带行号信息）
 
     参数:
         diff_text: git diff 输出的文本
 
     返回:
-        (old_lines, new_lines): 旧文件行列表和新文件行列表
+        (old_lines, new_lines, old_line_map, new_line_map):
+        旧文件行列表、新文件行列表、旧文件行号映射、新文件行号映射
+        行号映射是一个列表，索引对应行列表的索引，值是该行在文件中的绝对行号
     """
     old_lines = []
     new_lines = []
+    old_line_map = []  # 映射 old_lines 索引到文件中的绝对行号
+    new_line_map = []  # 映射 new_lines 索引到文件中的绝对行号
+
+    old_line_num = 0
+    new_line_num = 0
 
     for line in diff_text.splitlines():
         if line.startswith("@@"):
-            # 跳过 hunk 头
+            # 解析 hunk 头，获取起始行号
+            parts = line.split("@@")
+            if len(parts) >= 2:
+                hunk_info = parts[1].strip()
+                if hunk_info:
+                    for token in hunk_info.split():
+                        if token.startswith("-"):
+                            try:
+                                old_line_num = int(token[1:].split(",")[0])
+                            except ValueError:
+                                pass
+                        elif token.startswith("+"):
+                            try:
+                                new_line_num = int(token[1:].split(",")[0])
+                            except ValueError:
+                                pass
             continue
         elif line.startswith("---") or line.startswith("+++"):
             # 跳过文件头
@@ -411,19 +629,29 @@ def _parse_diff_to_lines(diff_text: str) -> tuple:
         elif line.startswith("-"):
             # 删除的行
             old_lines.append(line[1:])
+            old_line_map.append(old_line_num)
+            old_line_num += 1
         elif line.startswith("+"):
             # 新增的行
             new_lines.append(line[1:])
+            new_line_map.append(new_line_num)
+            new_line_num += 1
         elif line.startswith(" "):
             # 未更改的行
             old_lines.append(line[1:])
             new_lines.append(line[1:])
+            old_line_map.append(old_line_num)
+            new_line_map.append(new_line_num)
+            old_line_num += 1
+            new_line_num += 1
         else:
             # 其他行（如空行）
             old_lines.append(line)
             new_lines.append(line)
+            old_line_map.append(old_line_num if old_line_num > 0 else 0)
+            new_line_map.append(new_line_num if new_line_num > 0 else 0)
 
-    return old_lines, new_lines
+    return old_lines, new_lines, old_line_map, new_line_map
 
 
 def visualize_diff_enhanced(
@@ -431,6 +659,7 @@ def visualize_diff_enhanced(
     file_path: str = "",
     mode: str = "unified",
     show_line_numbers: bool = True,
+    context_lines: int = 3,
 ) -> None:
     """增强的 diff 可视化函数（便捷接口）
 
@@ -439,20 +668,33 @@ def visualize_diff_enhanced(
         file_path: 文件路径
         mode: 可视化模式 ("unified" | "syntax" | "compact" | "side_by_side" | "statistics")
         show_line_numbers: 是否显示行号
+        context_lines: 上下文行数
     """
     visualizer = DiffVisualizer()
 
     if mode == "unified":
         visualizer.visualize_unified_diff(
-            diff_text, file_path, show_line_numbers=show_line_numbers
+            diff_text,
+            file_path,
+            show_line_numbers=show_line_numbers,
+            context_lines=context_lines,
         )
     elif mode == "syntax":
         visualizer.visualize_syntax_highlighted(diff_text, file_path)
     elif mode == "compact":
         visualizer.visualize_compact(diff_text, file_path)
     elif mode == "side_by_side":
-        old_lines, new_lines = _parse_diff_to_lines(diff_text)
-        visualizer.visualize_side_by_side_summary(old_lines, new_lines, file_path)
+        old_lines, new_lines, old_line_map, new_line_map = _parse_diff_to_lines(
+            diff_text
+        )
+        visualizer.visualize_side_by_side_summary(
+            old_lines,
+            new_lines,
+            file_path,
+            context_lines=context_lines,
+            old_line_map=old_line_map,
+            new_line_map=new_line_map,
+        )
     else:
         # 默认使用语法高亮
         visualizer.visualize_syntax_highlighted(diff_text, file_path)
