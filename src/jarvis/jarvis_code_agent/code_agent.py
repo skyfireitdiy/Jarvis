@@ -341,8 +341,31 @@ class CodeAgent(Agent):
 
         if diff:
             start_hash = get_latest_commit_hash()
-            PrettyOutput.print(diff, OutputType.CODE, lang="diff")  # 保留语法高亮
             modified_files = get_diff_file_list()
+
+            # 使用增强的 diff 可视化（如果可用）
+            try:
+                from jarvis.jarvis_code_agent.diff_visualizer import (
+                    visualize_diff_enhanced,
+                )
+                from jarvis.jarvis_utils.config import (
+                    get_diff_visualization_mode,
+                    get_diff_show_line_numbers,
+                )
+
+                # 显示整体 diff（使用增强可视化）
+                visualization_mode = get_diff_visualization_mode()
+                show_line_numbers = get_diff_show_line_numbers()
+                visualize_diff_enhanced(
+                    diff, mode=visualization_mode, show_line_numbers=show_line_numbers
+                )
+            except ImportError:
+                # 如果导入失败，回退到原有方式
+                PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+            except Exception as e:
+                # 如果可视化失败，回退到原有方式
+                print(f"⚠️ Diff 可视化失败，使用默认方式: {e}")
+                PrettyOutput.print(diff, OutputType.CODE, lang="diff")
 
             # 更新上下文管理器
             self.impact_manager.update_context_for_modified_files(modified_files)

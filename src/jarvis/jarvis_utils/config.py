@@ -952,3 +952,36 @@ def get_conversation_turn_threshold() -> int:
         int: 对话轮次阈值，默认为50
     """
     return int(GLOBAL_CONFIG_DATA.get("JARVIS_CONVERSATION_TURN_THRESHOLD", 50))
+
+
+def get_diff_visualization_mode() -> str:
+    """
+    获取 diff 可视化模式
+
+    返回:
+        str: diff 可视化模式，可选值: "unified", "syntax", "compact", "default"
+        默认为 "unified"
+    """
+    return cast(
+        str, GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_VISUALIZATION_MODE", "unified")
+    )
+
+
+def get_diff_show_line_numbers() -> bool:
+    """
+    获取是否在 diff 中显示行号
+
+    返回:
+        bool: 是否显示行号，默认为 True
+    """
+    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_SHOW_LINE_NUMBERS", True))
+
+
+def get_diff_large_file_threshold() -> int:
+    """
+    获取大文件阈值（超过此行数只显示统计）
+
+    返回:
+        int: 大文件阈值，默认为 300
+    """
+    return int(GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_LARGE_FILE_THRESHOLD", 300))
