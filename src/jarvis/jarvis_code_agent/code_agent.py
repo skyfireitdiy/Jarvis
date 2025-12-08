@@ -778,6 +778,10 @@ def _print_available_rules(
             tip_text.append("--rule-names", style="bold yellow")
             tip_text.append(" 参数加载规则，例如: ", style="dim")
             tip_text.append("--rule-names tdd,clean_code", style="bold yellow")
+            tip_text.append("\n   或使用 ", style="dim")
+            tip_text.append("@", style="bold yellow")
+            tip_text.append(" 触发规则加载，例如: ", style="dim")
+            tip_text.append("@tdd @clean_code", style="bold yellow")
             content_parts.append(tip_text)
 
         # 显示已加载的规则
