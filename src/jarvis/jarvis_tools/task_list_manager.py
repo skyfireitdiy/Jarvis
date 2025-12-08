@@ -171,8 +171,11 @@ class task_list_manager:
                     console.print()  # 空行
 
         except Exception as e:
-            # 静默失败，不影响主流程
+            # 打印详细错误信息，帮助调试
+            import traceback
+
             print(f"⚠️ 打印任务状态失败: {e}")
+            print(f"   错误详情: {traceback.format_exc()}")
 
     description = """任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
 
