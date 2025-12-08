@@ -1318,12 +1318,6 @@ class task_list_manager:
                 # 更新 main_goal
                 if "main_goal" in task_list_info:
                     new_main_goal = task_list_info["main_goal"]
-                    if not (50 <= len(new_main_goal) <= 200):
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "main_goal 长度必须在 50-200 字符之间",
-                        }
                     task_list.main_goal = new_main_goal
 
                 # 更新 max_active_tasks
@@ -1429,22 +1423,10 @@ class task_list_manager:
 
             if "task_name" in task_update_info:
                 new_name = task_update_info["task_name"]
-                if not (10 <= len(new_name) <= 50):
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "task_name 长度必须在 10-50 字符之间",
-                    }
                 update_kwargs["task_name"] = new_name
 
             if "task_desc" in task_update_info:
                 new_desc = task_update_info["task_desc"]
-                if not (50 <= len(new_desc) <= 200):
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "task_desc 长度必须在 50-200 字符之间",
-                    }
                 update_kwargs["task_desc"] = new_desc
 
             if "priority" in task_update_info:
