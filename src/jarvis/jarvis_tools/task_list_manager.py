@@ -194,10 +194,12 @@ class task_list_manager:
 - `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent，**执行完成后会自动更新任务状态**）
 - `get_task_list_summary`: 获取任务列表摘要
 
-**任务类型（agent_type）：**
-- `code_agent`: 代码相关任务，自动创建 CodeAgent 执行
-- `agent`: 一般任务，自动创建通用 Agent 执行
-- `main`: 由主 Agent 直接执行（不常用）
+**任务类型（agent_type）选择规则：**
+- **简单任务使用 `main`**：对于简单、直接的任务（如单次文件读取、简单的单步操作、单一工具调用等），**必须使用 `main`**，由主 Agent 直接执行，**不要拆分为 `code_agent` 或 `agent`**。避免对简单任务进行不必要的拆分，防止出现无限拆分的问题。
+- **复杂任务才使用 `code_agent` 或 `agent`**：只有对于**真正复杂**的任务（需要多个步骤、涉及多个文件、需要协调多个子任务、有明确的依赖关系等），才考虑使用 `code_agent` 或 `agent`。
+  - `code_agent`: 代码相关任务，自动创建 CodeAgent 执行
+  - `agent`: 一般任务，自动创建通用 Agent 执行
+  - `main`: 由主 Agent 直接执行（**简单任务必须使用此类型**）
 
 **依赖关系：**
 - 在 `add_tasks` 时，任务的 `dependencies` 可以引用本次批次中的任务名称（系统会自动匹配）
@@ -227,6 +229,11 @@ class task_list_manager:
   ]
 }
 ```
+
+**重要提醒：简单任务必须使用 `main` 类型**
+- 对于简单任务（如单次文件读取、简单的单步操作、单一工具调用等），**必须使用 `agent_type: "main"`**，由主 Agent 直接执行
+- **不要将简单任务拆分为 `code_agent` 或 `agent`**，避免不必要的复杂化和无限拆分
+- 只有真正复杂的任务（需要多个步骤、涉及多个文件、需要协调多个子任务等）才使用 `code_agent` 或 `agent`
 
 **分步使用（可选）：**
 ```json
@@ -290,7 +297,7 @@ class task_list_manager:
                         "agent_type": {
                             "type": "string",
                             "enum": ["main", "code_agent", "agent"],
-                            "description": "Agent类型：code_agent（代码任务，推荐）、agent（一般任务）、main（主Agent执行）",
+                            "description": "Agent类型：**简单任务必须使用 `main`**（由主Agent直接执行，不要拆分为code_agent或agent）；只有复杂任务才使用 `code_agent`（代码任务）或 `agent`（一般任务）",
                         },
                         "dependencies": {
                             "type": "array",
