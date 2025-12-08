@@ -594,7 +594,7 @@ class DiffVisualizer:
 
         # 构建标题（包含统计信息）
         title = f"📝 {file_path}" if file_path else "Side-by-Side Diff"
-        title += f"  [green]+{additions}[/green] / [red]-{deletions}[/red]"
+        title += f"  [bright_green]+{additions}[/bright_green] / [bright_red]-{deletions}[/bright_red]"
 
         # 包裹在 Panel 中显示
         panel = Panel(table, title=title, border_style="bright_cyan", padding=(0, 1))
