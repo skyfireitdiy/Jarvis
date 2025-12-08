@@ -985,20 +985,16 @@ class task_list_manager:
             elif task.agent_type.value == "code_agent":
                 # 代码 Agent 执行：使用 sub_code_agent 工具
                 try:
-                    # 获取 sub_code_agent 工具
-                    tool_registry = parent_agent.get_tool_registry()
-                    if not tool_registry:
-                        raise Exception("无法获取工具注册表")
+                    # 直接导入 SubCodeAgentTool 类
+                    from jarvis.jarvis_tools.sub_code_agent import SubCodeAgentTool
 
-                    sub_code_agent_tool = tool_registry.get_tool("sub_code_agent")
-                    if not sub_code_agent_tool:
-                        raise Exception("sub_code_agent 工具不可用")
+                    sub_code_agent_tool = SubCodeAgentTool()
 
                     # 构建子Agent名称：使用任务名称和ID，便于识别
                     agent_name = f"{task.task_name} (task_{task_id})"
 
                     # 调用 sub_code_agent 执行任务
-                    tool_result = sub_code_agent_tool.func(
+                    tool_result = sub_code_agent_tool.execute(
                         {
                             "task": task_content,
                             "background": background,
@@ -1045,14 +1041,10 @@ class task_list_manager:
             elif task.agent_type.value == "agent":
                 # 通用 Agent 执行：使用 sub_agent 工具
                 try:
-                    # 获取 sub_agent 工具
-                    tool_registry = parent_agent.get_tool_registry()
-                    if not tool_registry:
-                        raise Exception("无法获取工具注册表")
+                    # 直接导入 SubAgentTool 类
+                    from jarvis.jarvis_tools.sub_agent import SubAgentTool
 
-                    sub_agent_tool = tool_registry.get_tool("sub_agent")
-                    if not sub_agent_tool:
-                        raise Exception("sub_agent 工具不可用")
+                    sub_agent_tool = SubAgentTool()
 
                     # 构建系统提示词和总结提示词
                     system_prompt = f"""你是一个专业的任务执行助手。
@@ -1072,7 +1064,7 @@ class task_list_manager:
                     agent_name = f"{task.task_name} (task_{task_id})"
 
                     # 调用 sub_agent 执行任务
-                    tool_result = sub_agent_tool.func(
+                    tool_result = sub_agent_tool.execute(
                         {
                             "task": task_content,
                             "background": background,
