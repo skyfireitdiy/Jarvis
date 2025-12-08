@@ -72,14 +72,44 @@ class task_list_manager:
         suffix_length = int(max_length * 0.2)
         return prefix_length, suffix_length
 
+    def _get_task_list_id(self, agent: Any) -> Optional[str]:
+        """从 Agent 的 user_data 中获取 task_list_id
+
+        参数:
+            agent: Agent 实例
+
+        返回:
+            Optional[str]: task_list_id，如果不存在则返回 None
+        """
+        if not agent:
+            return None
+        try:
+            return agent.get_user_data("__task_list_id__")
+        except Exception:
+            return None
+
+    def _set_task_list_id(self, agent: Any, task_list_id: str) -> None:
+        """将 task_list_id 保存到 Agent 的 user_data 中
+
+        参数:
+            agent: Agent 实例
+            task_list_id: 任务列表 ID
+        """
+        if not agent:
+            return
+        try:
+            agent.set_user_data("__task_list_id__", task_list_id)
+        except Exception:
+            pass
+
     def _print_task_list_status(
         self, task_list_manager: Any, task_list_id: Optional[str] = None
     ):
-        """打印任务列表状态（所有任务）
+        """打印任务列表状态
 
         参数:
             task_list_manager: 任务列表管理器实例
-            task_list_id: 任务列表ID（如果为None，则打印所有任务列表）
+            task_list_id: 任务列表ID（如果为None，则不打印）
         """
         try:
             from rich.table import Table
@@ -93,10 +123,6 @@ class task_list_manager:
                 task_list = task_list_manager.get_task_list(task_list_id)
                 if task_list:
                     task_lists_to_print[task_list_id] = task_list
-            else:
-                # 打印所有任务列表
-                with task_list_manager._lock:
-                    task_lists_to_print = task_list_manager.task_lists.copy()
 
             if not task_lists_to_print:
                 return
@@ -185,6 +211,11 @@ class task_list_manager:
 3. `execute_task`: 执行任务（自动创建子 Agent 执行，**执行完成后会自动更新任务状态为 completed 或 failed**）
 4. `get_task_list_summary`: 查看任务列表状态
 
+**重要说明：每个 Agent 只有一个任务列表**
+- 每个 Agent 只能拥有一个任务列表，系统会自动管理
+- **不需要提供 `task_list_id` 参数**，系统会自动从 Agent 的上下文中获取
+- 如果 Agent 还没有任务列表，需要先调用 `create_task_list` 创建
+
 **任务状态自动管理：**
 - 执行开始时：任务状态自动更新为 `running`
 - 执行完成时：任务状态自动更新为 `completed`，执行结果保存到 `actual_output`
@@ -192,7 +223,7 @@ class task_list_manager:
 - 无需手动调用 `update_task_status`，系统会自动管理任务状态
 
 **核心操作：**
-- `create_task_list`: 创建任务列表
+- `create_task_list`: 创建任务列表（每个 Agent 只能创建一个）
 - `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务）
 - `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent，**执行完成后会自动更新任务状态**）
 - `get_task_list_summary`: 获取任务列表摘要
@@ -248,7 +279,6 @@ class task_list_manager:
 ```json
 {
   "action": "add_tasks",
-  "task_list_id": "tasklist-xxx",
   "tasks_info": [...]
 }
 ```
@@ -272,10 +302,6 @@ class task_list_manager:
                     "update_task",
                 ],
                 "description": "要执行的操作",
-            },
-            "task_list_id": {
-                "type": "string",
-                "description": "任务列表ID（create_task_list 操作不需要此参数）",
             },
             "main_goal": {
                 "type": "string",
@@ -417,7 +443,7 @@ class task_list_manager:
 
             if action == "create_task_list":
                 result = self._handle_create_task_list(
-                    args, task_list_manager, agent_id
+                    args, task_list_manager, agent_id, agent
                 )
                 # 从结果中提取 task_list_id
                 if result.get("success"):
@@ -430,52 +456,58 @@ class task_list_manager:
                     task_list_id_for_status = None
 
             elif action == "add_tasks":
-                result = self._handle_add_tasks(args, task_list_manager, agent_id)
-                task_list_id_for_status = args.get("task_list_id")
+                result = self._handle_add_tasks(
+                    args, task_list_manager, agent_id, agent
+                )
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "get_next_task":
-                result = self._handle_get_next_task(args, task_list_manager, agent_id)
-                task_list_id_for_status = args.get("task_list_id")
+                result = self._handle_get_next_task(
+                    args, task_list_manager, agent_id, agent
+                )
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "update_task_status":
                 result = self._handle_update_task_status(
-                    args, task_list_manager, agent_id, is_main_agent
+                    args, task_list_manager, agent_id, is_main_agent, agent
                 )
-                task_list_id_for_status = args.get("task_list_id")
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "get_task_detail":
                 result = self._handle_get_task_detail(
-                    args, task_list_manager, agent_id, is_main_agent
+                    args, task_list_manager, agent_id, is_main_agent, agent
                 )
-                task_list_id_for_status = args.get("task_list_id")
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "get_task_list_summary":
-                result = self._handle_get_task_list_summary(args, task_list_manager)
-                task_list_id_for_status = args.get("task_list_id")
+                result = self._handle_get_task_list_summary(
+                    args, task_list_manager, agent
+                )
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "rollback_task_list":
                 result = self._handle_rollback_task_list(
-                    args, task_list_manager, agent_id
+                    args, task_list_manager, agent_id, agent
                 )
-                task_list_id_for_status = args.get("task_list_id")
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "execute_task":
                 result = self._handle_execute_task(
                     args, task_list_manager, agent_id, is_main_agent, agent
                 )
-                task_list_id_for_status = args.get("task_list_id")
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "update_task_list":
                 result = self._handle_update_task_list(
-                    args, task_list_manager, agent_id
+                    args, task_list_manager, agent_id, agent
                 )
-                task_list_id_for_status = args.get("task_list_id")
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             elif action == "update_task":
                 result = self._handle_update_task(
-                    args, task_list_manager, agent_id, is_main_agent
+                    args, task_list_manager, agent_id, is_main_agent, agent
                 )
-                task_list_id_for_status = args.get("task_list_id")
+                task_list_id_for_status = self._get_task_list_id(agent)
 
             else:
                 result = {
@@ -499,9 +531,21 @@ class task_list_manager:
             }
 
     def _handle_create_task_list(
-        self, args: Dict, task_list_manager: Any, agent_id: str
+        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
     ) -> Dict[str, Any]:
         """处理创建任务列表（支持同时添加任务）"""
+        # 检查是否已有任务列表
+        existing_task_list_id = self._get_task_list_id(agent)
+        if existing_task_list_id:
+            # 检查任务列表是否还存在
+            existing_task_list = task_list_manager.get_task_list(existing_task_list_id)
+            if existing_task_list:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Agent 已存在任务列表（ID: {existing_task_list_id}），每个 Agent 只能有一个任务列表。如需创建新列表，请先完成或放弃当前任务列表。",
+                }
+
         main_goal = args.get("main_goal")
         if not main_goal:
             return {
@@ -520,6 +564,9 @@ class task_list_manager:
                 "stdout": "",
                 "stderr": f"创建任务列表失败: {error_msg}",
             }
+
+        # 保存 task_list_id 到 Agent 的 user_data
+        self._set_task_list_id(agent, task_list_id)
 
         # 如果提供了 tasks_info，自动添加任务
         tasks_info = args.get("tasks_info")
@@ -576,15 +623,15 @@ class task_list_manager:
         }
 
     def _handle_add_tasks(
-        self, args: Dict, task_list_manager: Any, agent_id: str
+        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
     ) -> Dict[str, Any]:
         """处理批量添加任务（支持通过任务名称匹配依赖关系）"""
-        task_list_id = args.get("task_list_id")
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
 
         tasks_info = args.get("tasks_info")
@@ -627,15 +674,15 @@ class task_list_manager:
             }
 
     def _handle_get_next_task(
-        self, args: Dict, task_list_manager: Any, agent_id: str
+        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
     ) -> Dict[str, Any]:
         """处理获取下一个任务"""
-        task_list_id = args.get("task_list_id")
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
 
         task, msg = task_list_manager.get_next_task(
@@ -660,20 +707,24 @@ class task_list_manager:
             }
 
     def _handle_update_task_status(
-        self, args: Dict, task_list_manager: Any, agent_id: str, is_main_agent: bool
+        self,
+        args: Dict,
+        task_list_manager: Any,
+        agent_id: str,
+        is_main_agent: bool,
+        agent: Any,
     ) -> Dict[str, Any]:
         """处理更新任务状态"""
-        task_list_id = args.get("task_list_id")
-        task_id = args.get("task_id")
-        status = args.get("status")
-        actual_output = args.get("actual_output")
-
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
+        task_id = args.get("task_id")
+        status = args.get("status")
+        actual_output = args.get("actual_output")
 
         if not task_id:
             return {
@@ -717,18 +768,22 @@ class task_list_manager:
             }
 
     def _handle_get_task_detail(
-        self, args: Dict, task_list_manager: Any, agent_id: str, is_main_agent: bool
+        self,
+        args: Dict,
+        task_list_manager: Any,
+        agent_id: str,
+        is_main_agent: bool,
+        agent: Any,
     ) -> Dict[str, Any]:
         """处理获取任务详情"""
-        task_list_id = args.get("task_list_id")
-        task_id = args.get("task_id")
-
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
+        task_id = args.get("task_id")
 
         if not task_id:
             return {
@@ -762,15 +817,15 @@ class task_list_manager:
             }
 
     def _handle_get_task_list_summary(
-        self, args: Dict, task_list_manager: Any
+        self, args: Dict, task_list_manager: Any, agent: Any
     ) -> Dict[str, Any]:
         """处理获取任务列表摘要"""
-        task_list_id = args.get("task_list_id")
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
 
         summary = task_list_manager.get_task_list_summary(task_list_id=task_list_id)
@@ -789,18 +844,17 @@ class task_list_manager:
             }
 
     def _handle_rollback_task_list(
-        self, args: Dict, task_list_manager: Any, agent_id: str
+        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
     ) -> Dict[str, Any]:
         """处理回滚任务列表"""
-        task_list_id = args.get("task_list_id")
-        version = args.get("version")
-
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
+        version = args.get("version")
 
         if version is None:
             return {
@@ -840,15 +894,14 @@ class task_list_manager:
         parent_agent: Any,
     ) -> Dict[str, Any]:
         """处理执行任务（自动创建子 Agent 执行）"""
-        task_list_id = args.get("task_list_id")
-        task_id = args.get("task_id")
-
+        task_list_id = self._get_task_list_id(parent_agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
+        task_id = args.get("task_id")
 
         if not task_id:
             return {
@@ -1200,18 +1253,17 @@ class task_list_manager:
             }
 
     def _handle_update_task_list(
-        self, args: Dict, task_list_manager: Any, agent_id: str
+        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
     ) -> Dict[str, Any]:
         """处理更新任务列表属性"""
-        task_list_id = args.get("task_list_id")
-        task_list_info = args.get("task_list_info", {})
-
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
+        task_list_info = args.get("task_list_info", {})
 
         if not task_list_info:
             return {
@@ -1279,19 +1331,23 @@ class task_list_manager:
             }
 
     def _handle_update_task(
-        self, args: Dict, task_list_manager: Any, agent_id: str, is_main_agent: bool
+        self,
+        args: Dict,
+        task_list_manager: Any,
+        agent_id: str,
+        is_main_agent: bool,
+        agent: Any,
     ) -> Dict[str, Any]:
         """处理更新任务属性"""
-        task_list_id = args.get("task_list_id")
-        task_id = args.get("task_id")
-        task_update_info = args.get("task_update_info", {})
-
+        task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": "缺少 task_list_id 参数",
+                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
             }
+        task_id = args.get("task_id")
+        task_update_info = args.get("task_update_info", {})
 
         if not task_id:
             return {
