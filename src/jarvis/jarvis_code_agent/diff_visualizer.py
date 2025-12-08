@@ -53,8 +53,8 @@ class DiffVisualizer:
         )
 
         if show_line_numbers:
-            table.add_column("", style="dim red", width=8, justify="right")
-            table.add_column("", style="dim green", width=8, justify="right")
+            table.add_column("", style="red", width=8, justify="right")
+            table.add_column("", style="green", width=8, justify="right")
         table.add_column("", width=4, justify="center")
         table.add_column("", style="white", overflow="fold")
 
@@ -83,10 +83,10 @@ class DiffVisualizer:
                             str(old_ln),
                             str(new_ln),
                             " ",
-                            f"[dim]{content}[/dim]",
+                            f"{content}",
                         )
                     else:
-                        table.add_row("", " ", f"[dim]{content}[/dim]")
+                        table.add_row("", " ", f"{content}")
             else:
                 # 有变更，只显示变更前后的上下文
                 first_change_idx = change_indices[0]
@@ -101,10 +101,10 @@ class DiffVisualizer:
                             str(old_ln),
                             str(new_ln),
                             " ",
-                            f"[dim]{content}[/dim]",
+                            f"{content}",
                         )
                     else:
-                        table.add_row("", " ", f"[dim]{content}[/dim]")
+                        table.add_row("", " ", f"{content}")
 
                 # 显示所有变更行
                 for idx in range(first_change_idx, last_change_idx + 1):
@@ -115,13 +115,13 @@ class DiffVisualizer:
                                 str(old_ln) if old_ln else "",
                                 "",
                                 "[bold red]-[/bold red]",
-                                f"[red]{content}[/red]",
+                                f"[bright_red]{content}[/bright_red]",
                             )
                         else:
                             table.add_row(
                                 "",
                                 "[bold red]-[/bold red]",
-                                f"[red]{content}[/red]",
+                                f"[bright_red]{content}[/bright_red]",
                             )
                     elif line_type == "+":
                         if show_line_numbers:
@@ -129,13 +129,13 @@ class DiffVisualizer:
                                 "",
                                 str(new_ln) if new_ln else "",
                                 "[bold green]+[/bold green]",
-                                f"[green]{content}[/green]",
+                                f"[bright_green]{content}[/bright_green]",
                             )
                         else:
                             table.add_row(
                                 "",
                                 "[bold green]+[/bold green]",
-                                f"[green]{content}[/green]",
+                                f"[bright_green]{content}[/bright_green]",
                             )
 
                 # 显示变更后的上下文（最多 context_lines 行）
@@ -149,10 +149,10 @@ class DiffVisualizer:
                             str(old_ln),
                             str(new_ln),
                             " ",
-                            f"[dim]{content}[/dim]",
+                            f"{content}",
                         )
                     else:
-                        table.add_row("", " ", f"[dim]{content}[/dim]")
+                        table.add_row("", " ", f"{content}")
 
             hunk_lines = []
 
