@@ -1276,11 +1276,39 @@ class Agent:
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
 
+        # 获取任务列表信息（用于历史记录）
+        task_list_info = ""
+        try:
+            # 获取所有任务列表的摘要信息
+            task_lists_summary = []
+            for task_list_id, task_list in self.task_list_manager.task_lists.items():
+                summary = self.task_list_manager.get_task_list_summary(task_list_id)
+                if summary:
+                    task_lists_summary.append(summary)
+
+            if task_lists_summary:
+                task_list_info = "\\n\\n## 任务列表状态\\n"
+                for summary in task_lists_summary:
+                    task_list_info += f"\\n- 目标: {summary['main_goal']}"
+                    task_list_info += f"\\n- 总任务数: {summary['total_tasks']}"
+                    task_list_info += f"\\n- 待执行: {summary['pending']}"
+                    task_list_info += f"\\n- 执行中: {summary['running']}"
+                    task_list_info += f"\\n- 已完成: {summary['completed']}"
+                    task_list_info += f"\\n- 失败: {summary['failed']}"
+                    task_list_info += f"\\n- 已放弃: {summary['abandoned']}\\n"
+        except Exception:
+            # 非关键流程，失败时不影响主要功能
+            pass
+
         # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
             self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
         except Exception:
             pass
+
+        # 将任务列表信息添加到摘要中
+        if task_list_info:
+            formatted_summary += task_list_info
 
         return formatted_summary
 
@@ -1313,7 +1341,10 @@ class Agent:
 
     def _format_summary_message(self, summary: str) -> str:
         """格式化摘要消息"""
-        return f"""
+        # 获取任务列表信息
+        task_list_info = self._get_task_list_info()
+
+        formatted_message = f"""
 以下是之前对话的关键信息总结：
 
 <content>
@@ -1322,6 +1353,61 @@ class Agent:
 
 请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。
         """
+
+        # 如果有任务列表信息，添加到消息后面
+        if task_list_info:
+            formatted_message += f"\n\n{task_list_info}"
+
+        return formatted_message
+
+    def _get_task_list_info(self) -> str:
+        """获取并格式化当前任务列表信息
+
+        返回:
+            str: 格式化的任务列表信息，如果没有任务列表则返回空字符串
+        """
+        try:
+            # 使用当前Agent的任务列表管理器获取所有任务列表信息
+            if (
+                not hasattr(self, "task_list_manager")
+                or not self.task_list_manager.task_lists
+            ):
+                return ""
+
+            all_task_lists_info = []
+
+            # 遍历所有任务列表
+            for task_list_id, task_list in self.task_list_manager.task_lists.items():
+                summary = self.task_list_manager.get_task_list_summary(task_list_id)
+                if not summary:
+                    continue
+
+                # 构建任务列表摘要信息
+                info_parts = []
+                info_parts.append(f"📋 任务列表: {summary['main_goal']}")
+                info_parts.append(
+                    f"   总任务: {summary['total_tasks']} | 待执行: {summary['pending']} | 执行中: {summary['running']} | 已完成: {summary['completed']}"
+                )
+
+                # 如果有失败或放弃的任务，也显示
+                if summary["failed"] > 0 or summary["abandoned"] > 0:
+                    status_parts = []
+                    if summary["failed"] > 0:
+                        status_parts.append(f"失败: {summary['failed']}")
+                    if summary["abandoned"] > 0:
+                        status_parts.append(f"放弃: {summary['abandoned']}")
+                    info_parts[-1] += f" | {' | '.join(status_parts)}"
+
+                all_task_lists_info.append("\n".join(info_parts))
+
+            if not all_task_lists_info:
+                return ""
+
+            return "\n\n".join(all_task_lists_info)
+
+        except Exception:
+            # 静默失败，不干扰主流程
+            return ""
 
     def _call_tools(self, response: str) -> Tuple[bool, Any]:
         """
