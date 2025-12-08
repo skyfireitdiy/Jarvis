@@ -931,14 +931,44 @@ class ToolRegistry(OutputHandlerProtocol):
                             if "name" in parsed and "arguments" in parsed:
                                 data = [json_str]
                                 auto_completed = True
+                            else:
+                                # 记录缺少必要字段的错误
+                                missing_fields = []
+                                if "name" not in parsed:
+                                    missing_fields.append("name")
+                                if "arguments" not in parsed:
+                                    missing_fields.append("arguments")
+                                # 不立即返回错误，继续尝试其他方法，但记录信息用于后续错误提示
+                                pass
                         except Exception:
-                            # JSON解析失败，继续尝试其他方法
+                            # JSON解析失败，记录错误信息用于后续错误提示
+                            # 不立即返回错误，继续尝试其他方法（如大模型修复）
                             pass
+                    else:
+                        # JSON提取失败：没有找到有效的JSON对象
+                        # 不立即返回错误，继续尝试其他方法（如大模型修复）
+                        pass
 
             # 如果仍然没有数据，尝试使用大模型修复
             if not data:
                 long_hint = ToolRegistry._get_long_response_hint(content)
-                error_msg = f"只有{ot('TOOL_CALL')}标签，未找到{ct('TOOL_CALL')}标签，调用格式错误，请检查工具调用格式。\n{tool_call_help}{long_hint}"
+                # 检查是否有开始和结束标签，生成更准确的错误消息
+                has_open = (
+                    re.search(rf"(?i){re.escape(ot('TOOL_CALL'))}", content) is not None
+                )
+                has_close = (
+                    re.search(rf"(?i){re.escape(ct('TOOL_CALL'))}", content) is not None
+                )
+
+                if has_open and has_close:
+                    # 有开始和结束标签，但JSON解析失败
+                    error_msg = f"工具调用格式错误：检测到{ot('TOOL_CALL')}和{ct('TOOL_CALL')}标签，但JSON解析失败。请检查JSON格式是否正确，确保包含name和arguments字段。\n{tool_call_help}{long_hint}"
+                elif has_open and not has_close:
+                    # 只有开始标签，没有结束标签
+                    error_msg = f"工具调用格式错误：检测到{ot('TOOL_CALL')}标签，但未找到{ct('TOOL_CALL')}标签。请确保工具调用包含完整的开始和结束标签。\n{tool_call_help}{long_hint}"
+                else:
+                    # 其他情况
+                    error_msg = f"工具调用格式错误：无法解析工具调用内容。请检查工具调用格式。\n{tool_call_help}{long_hint}"
 
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
@@ -1189,7 +1219,12 @@ class ToolRegistry(OutputHandlerProtocol):
             if result.get("success", False):
                 print(f"✅ 执行工具调用 {name} 成功")
             else:
+                # 获取失败原因
+                stderr = result.get("stderr", "")
+                stdout = result.get("stdout", "")
+                error_msg = stderr if stderr else (stdout if stdout else "未知错误")
                 print(f"❌ 执行工具调用 {name} 失败")
+                print(f"   失败原因: {error_msg}")
 
             # 记录本轮实际执行的工具，供上层逻辑（如记忆保存判定）使用
             try:
