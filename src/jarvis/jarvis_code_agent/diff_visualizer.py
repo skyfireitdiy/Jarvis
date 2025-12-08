@@ -523,7 +523,9 @@ class DiffVisualizer:
                             else i1 + k + 1
                         )
                         old_line_num = str(old_line_num)
-                        old_content = f"[red]{old_chunk[k]}[/red]"
+                        old_content = (
+                            f"[bold bright_red]{old_chunk[k]}[/bold bright_red]"
+                        )
                     else:
                         old_line_num = ""
                         old_content = ""
@@ -535,7 +537,9 @@ class DiffVisualizer:
                             else j1 + k + 1
                         )
                         new_line_num = str(new_line_num)
-                        new_content = f"[green]{new_chunk[k]}[/green]"
+                        new_content = (
+                            f"[bold bright_green]{new_chunk[k]}[/bold bright_green]"
+                        )
                     else:
                         new_line_num = ""
                         new_content = ""
@@ -553,7 +557,12 @@ class DiffVisualizer:
                         if i1 + k < len(old_line_map)
                         else i1 + k + 1
                     )
-                    table.add_row(str(old_line_num), f"[red]{line}[/red]", "", "")
+                    table.add_row(
+                        str(old_line_num),
+                        f"[bold bright_red]{line}[/bold bright_red]",
+                        "",
+                        "",
+                    )
             elif tag == "insert":
                 # 仅新增
                 new_chunk = new_lines[j1:j2]
@@ -566,7 +575,12 @@ class DiffVisualizer:
                         if j1 + k < len(new_line_map)
                         else j1 + k + 1
                     )
-                    table.add_row("", "", str(new_line_num), f"[green]{line}[/green]")
+                    table.add_row(
+                        "",
+                        "",
+                        str(new_line_num),
+                        f"[bold bright_green]{line}[/bold bright_green]",
+                    )
 
         # 如果没有变更，显示提示
         if not has_changes:
