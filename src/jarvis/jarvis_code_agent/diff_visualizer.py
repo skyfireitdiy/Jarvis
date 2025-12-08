@@ -4,7 +4,7 @@
 提供多种 diff 可视化方式，改善代码变更的可读性。
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.panel import Panel
@@ -61,7 +61,7 @@ class DiffVisualizer:
         old_line_num = 0
         new_line_num = 0
         in_hunk = False
-        hunk_lines = []  # 存储当前 hunk 中的所有行（包括上下文和变更）
+        hunk_lines: list = []  # 存储当前 hunk 中的所有行（包括上下文和变更）
 
         def flush_hunk_context():
             """刷新当前 hunk，只显示 context_lines 数量的上下文"""
@@ -517,34 +517,39 @@ class DiffVisualizer:
                 for k in range(max_len):
                     # 文件中的绝对行号
                     if k < len(old_chunk):
-                        old_line_num = (
+                        old_line_num_actual: Union[int, str] = (
                             old_line_map[i1 + k]
                             if i1 + k < len(old_line_map)
                             else i1 + k + 1
                         )
-                        old_line_num = str(old_line_num)
                         old_content = (
                             f"[bold bright_red]{old_chunk[k]}[/bold bright_red]"
                         )
                     else:
-                        old_line_num = ""
+                        old_line_num_actual = ""
+                        old_content = ""
                         old_content = ""
 
                     if k < len(new_chunk):
-                        new_line_num = (
+                        new_line_num_actual: Union[int, str] = (
                             new_line_map[j1 + k]
                             if j1 + k < len(new_line_map)
                             else j1 + k + 1
                         )
-                        new_line_num = str(new_line_num)
                         new_content = (
                             f"[bold bright_green]{new_chunk[k]}[/bold bright_green]"
                         )
                     else:
-                        new_line_num = ""
+                        new_line_num_actual = ""
+                        new_content = ""
                         new_content = ""
 
-                    table.add_row(old_line_num, old_content, new_line_num, new_content)
+                    table.add_row(
+                        str(old_line_num_actual),
+                        old_content,
+                        str(new_line_num_actual),
+                        new_content,
+                    )
             elif tag == "delete":
                 # 仅删除
                 old_chunk = old_lines[i1:i2]
@@ -592,7 +597,7 @@ class DiffVisualizer:
         title += f"  [green]+{additions}[/green] / [red]-{deletions}[/red]"
 
         # 包裹在 Panel 中显示
-        panel = Panel(table, title=title, border_style="cyan", padding=(0, 1))
+        panel = Panel(table, title=title, border_style="bright_cyan", padding=(0, 1))
         self.console.print(panel)
 
 
