@@ -689,11 +689,40 @@ class task_list_manager:
         """处理批量添加任务（支持通过任务名称匹配依赖关系）"""
         task_list_id = self._get_task_list_id(agent)
         if not task_list_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Agent 还没有任务列表，请先使用 create_task_list 创建任务列表",
-            }
+            # 自动创建任务列表
+            tasks_info = args.get("tasks_info")
+            if not tasks_info:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "缺少 tasks_info 参数",
+                }
+
+            # 生成默认的 main_goal
+            if isinstance(tasks_info, list) and len(tasks_info) > 0:
+                first_task = tasks_info[0]
+                main_goal = (
+                    f"自动创建的任务列表：{first_task.get('task_name', '未知任务')}"
+                )
+            else:
+                main_goal = "自动创建的任务列表"
+
+            # 创建任务列表
+            create_result = self._handle_create_task_list(
+                {"main_goal": main_goal}, task_list_manager, agent_id, agent
+            )
+
+            if not create_result.get("success"):
+                return create_result
+
+            # 重新获取 task_list_id
+            task_list_id = self._get_task_list_id(agent)
+            if not task_list_id:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "自动创建任务列表失败",
+                }
 
         tasks_info = args.get("tasks_info")
         if not tasks_info:
