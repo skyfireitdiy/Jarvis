@@ -60,4 +60,11 @@ arguments:
 """,
         "description": "执行静态代码检查",
     },
+    "Quite": {
+        "append": False,
+        "template": """
+切换当前Agent到非交互模式（静默模式），执行完成后自动退出。
+""",
+        "description": "切换Agent到静默模式",
+    },
 }
