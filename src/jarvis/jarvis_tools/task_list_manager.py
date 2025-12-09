@@ -963,6 +963,11 @@ class task_list_manager:
             # 构建背景信息
             background_parts = []
 
+            # 获取额外的背景信息（如果提供）
+            additional_background = args.get("additional_background")
+            if additional_background:
+                background_parts.append(f"额外背景信息: {additional_background}")
+
             # 1. 获取任务列表的 main_goal 作为全局上下文
             task_list = task_list_manager.get_task_list(task_list_id)
             if task_list:
