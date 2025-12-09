@@ -77,10 +77,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             else:
                 print("❌ 保存会话失败。")
             return "", True
-        elif tag == "Quite":
+        elif tag == "Quiet":
             agent.non_interactive = True
             print("🔇 已切换到静默模式（非交互模式）")
-            return "", True
+            return user_input.replace(f"'<Quiet>'", ""), False
 
         processed_tag = set()
         add_on_prompt = ""
