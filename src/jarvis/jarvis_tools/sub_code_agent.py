@@ -146,7 +146,7 @@ class SubCodeAgentTool:
                     "need_summary": True,
                     "append_tools": append_tools,
                     "tool_group": tool_group,
-                    "non_interactive": parent_non_interactive,
+                    "non_interactive": True,  # 强制设置为非交互模式
                 }
                 # 如果提供了名称，则使用该名称
                 if agent_name:

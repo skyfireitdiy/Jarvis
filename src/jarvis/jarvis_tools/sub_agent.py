@@ -142,10 +142,8 @@ class SubAgentTool:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
 
-            # 可选参数：允许显式覆盖无交互模式
-            explicit_non_interactive = args.get("non_interactive", None)
-            if explicit_non_interactive is not None:
-                parent_non_interactive = bool(explicit_non_interactive)
+            # 强制设置为非交互模式，无论父agent如何设置
+            parent_non_interactive = True
 
             agent = Agent(
                 system_prompt=system_prompt,
