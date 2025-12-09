@@ -120,7 +120,6 @@ class SubAgentTool:
             parent_model_group = get_global_model_group()
             parent_execute_tool_confirm = None
             parent_multiline_inputer = None
-            parent_non_interactive = None
             parent_use_methodology = None
             parent_use_analysis = None
             try:
@@ -131,9 +130,6 @@ class SubAgentTool:
                     parent_multiline_inputer = getattr(
                         parent_agent, "multiline_inputer", None
                     )
-                    parent_non_interactive = getattr(
-                        parent_agent, "non_interactive", None
-                    )
                     parent_use_methodology = getattr(
                         parent_agent, "use_methodology", None
                     )
@@ -141,9 +137,6 @@ class SubAgentTool:
             except Exception:
                 # 安全兜底：无法从父Agent获取配置则保持为None，使用系统默认
                 pass
-
-            # 强制设置为非交互模式，无论父agent如何设置
-            parent_non_interactive = True
 
             agent = Agent(
                 system_prompt=system_prompt,
@@ -160,7 +153,7 @@ class SubAgentTool:
                 use_analysis=parent_use_analysis,
                 force_save_memory=None,
                 files=None,
-                non_interactive=parent_non_interactive,
+                non_interactive=True,
             )
 
             # 禁用 sub_agent 和 sub_code_agent，避免无限递归

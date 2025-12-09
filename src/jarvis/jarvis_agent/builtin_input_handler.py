@@ -78,7 +78,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 print("❌ 保存会话失败。")
             return "", True
         elif tag == "Quiet":
-            agent.non_interactive = True
+            agent.set_non_interactive(True)
             print("🔇 已切换到静默模式（非交互模式）")
             return user_input.replace("'<Quiet>'", ""), False
 
