@@ -506,7 +506,7 @@ class GitManager:
             # 在用户接受commit后，根据配置决定是否保存记忆
             if getattr(agent, "force_save_memory", False):
                 agent.memory_manager.prompt_memory_save()
-        elif start_commit:
+        elif start_commit and commits:
             if user_confirm("是否要重置到初始提交？", True):
                 os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
                 print("ℹ️ 已重置到初始提交")
