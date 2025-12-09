@@ -670,7 +670,19 @@ class CodeAgent(Agent):
 
         while iteration < max_iterations:
             iteration += 1
-            print(f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查...")
+
+            # 每轮审查开始前显示清晰的提示信息
+            if not self.non_interactive:
+                print(f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮")
+                print("💡 终止提示：")
+                print("   • 输入 'n' 或 'no' 可终止整个审查循环")
+                print("   • 输入 'y' 或 'yes' 继续本轮审查")
+                print("   • 达到最大迭代次数后将自动停止")
+                if not user_confirm(f"是否开始本轮代码审查？", default=True):
+                    print("ℹ️ 用户终止了代码审查")
+                    return
+            else:
+                print(f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查...")
 
             # 获取从开始到当前的 git diff
             current_commit = get_latest_commit_hash()
