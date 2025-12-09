@@ -435,7 +435,13 @@
         {
           "text": {
             "embedding_model": "BAAI/bge-m3",
+            "embedding_type": "LocalEmbeddingModel",
+            "embedding_max_length": 512,
+            "embedding_config": {},
             "rerank_model": "BAAI/bge-reranker-v2-m3",
+            "reranker_type": "LocalReranker",
+            "reranker_max_length": 512,
+            "reranker_config": {},
             "use_bm25": true,
             "use_rerank": true
           }
@@ -443,6 +449,9 @@
         {
           "code": {
             "embedding_model": "Qodo/Qodo-Embed-1-1.5B",
+            "embedding_type": "LocalEmbeddingModel",
+            "embedding_max_length": 512,
+            "embedding_config": {},
             "use_bm25": false,
             "use_rerank": false
           }
@@ -455,19 +464,55 @@
           "properties": {
             "embedding_model": {
               "type": "string",
-              "default": "BAAI/bge-m3"
+              "default": "BAAI/bge-m3",
+              "description": "嵌入模型的名称"
+            },
+            "embedding_type": {
+              "type": "string",
+              "default": "LocalEmbeddingModel",
+              "description": "嵌入模型的实现类型，如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel', 'CohereEmbeddingModel', 'EdgeFnEmbeddingModel' 等"
+            },
+            "embedding_max_length": {
+              "type": "number",
+              "default": 512,
+              "description": "嵌入模型的最大输入长度（token数），用于文档分割"
+            },
+            "embedding_config": {
+              "type": "object",
+              "description": "嵌入模型的额外配置参数，会传递给模型的构造函数",
+              "additionalProperties": true,
+              "default": {}
             },
             "rerank_model": {
               "type": "string",
-              "default": "BAAI/bge-reranker-v2-m3"
+              "default": "BAAI/bge-reranker-v2-m3",
+              "description": "重排模型的名称"
+            },
+            "reranker_type": {
+              "type": "string",
+              "default": "LocalReranker",
+              "description": "重排模型的实现类型，如 'LocalReranker', 'CohereReranker', 'JinaReranker', 'EdgeFnReranker' 等"
+            },
+            "reranker_max_length": {
+              "type": "number",
+              "default": 512,
+              "description": "重排模型的最大输入长度（token数）"
+            },
+            "reranker_config": {
+              "type": "object",
+              "description": "重排模型的额外配置参数，会传递给模型的构造函数",
+              "additionalProperties": true,
+              "default": {}
             },
             "use_bm25": {
               "type": "boolean",
-              "default": true
+              "default": true,
+              "description": "是否使用BM25进行检索"
             },
             "use_rerank": {
               "type": "boolean",
-              "default": true
+              "default": true,
+              "description": "是否使用重排模型"
             }
           }
         }
@@ -482,10 +527,42 @@
           "default": "BAAI/bge-m3",
           "description": "用于RAG的嵌入模型的名称, 默认为 'BAAI/bge-m3'"
         },
+        "embedding_type": {
+          "type": "string",
+          "default": "LocalEmbeddingModel",
+          "description": "嵌入模型的实现类型，如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel', 'CohereEmbeddingModel', 'EdgeFnEmbeddingModel' 等，默认为 'LocalEmbeddingModel'"
+        },
+        "embedding_max_length": {
+          "type": "number",
+          "default": 512,
+          "description": "嵌入模型的最大输入长度（token数），用于文档分割，默认为 512"
+        },
+        "embedding_config": {
+          "type": "object",
+          "description": "嵌入模型的额外配置参数，会传递给模型的构造函数。对于在线模型，可包含 api_key 等参数",
+          "additionalProperties": true,
+          "default": {}
+        },
         "rerank_model": {
           "type": "string",
           "default": "BAAI/bge-reranker-v2-m3",
           "description": "用于RAG的rerank模型的名称, 默认为 'BAAI/bge-reranker-v2-m3'"
+        },
+        "reranker_type": {
+          "type": "string",
+          "default": "LocalReranker",
+          "description": "重排模型的实现类型，如 'LocalReranker', 'CohereReranker', 'JinaReranker', 'EdgeFnReranker' 等，默认为 'LocalReranker'"
+        },
+        "reranker_max_length": {
+          "type": "number",
+          "default": 512,
+          "description": "重排模型的最大输入长度（token数），默认为 512"
+        },
+        "reranker_config": {
+          "type": "object",
+          "description": "重排模型的额外配置参数，会传递给模型的构造函数。对于在线模型，可包含 api_key 等参数",
+          "additionalProperties": true,
+          "default": {}
         },
         "use_bm25": {
           "type": "boolean",
@@ -500,7 +577,13 @@
       },
       "default": {
         "embedding_model": "BAAI/bge-m3",
+        "embedding_type": "LocalEmbeddingModel",
+        "embedding_max_length": 512,
+        "embedding_config": {},
         "rerank_model": "BAAI/bge-reranker-v2-m3",
+        "reranker_type": "LocalReranker",
+        "reranker_max_length": 512,
+        "reranker_config": {},
         "use_bm25": true,
         "use_rerank": true
       }

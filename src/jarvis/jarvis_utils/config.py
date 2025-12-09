@@ -621,7 +621,11 @@ DEFAULT_RAG_GROUPS = [
     {
         "text": {
             "embedding_model": "BAAI/bge-m3",
+            "embedding_type": "LocalEmbeddingModel",  # 模型实现类型
+            "embedding_max_length": 512,  # 嵌入模型最大输入长度（token数）
             "rerank_model": "BAAI/bge-reranker-v2-m3",
+            "reranker_type": "LocalReranker",  # 模型实现类型
+            "reranker_max_length": 512,  # 重排模型最大输入长度（token数）
             "use_bm25": True,
             "use_rerank": True,
         }
@@ -629,6 +633,8 @@ DEFAULT_RAG_GROUPS = [
     {
         "code": {
             "embedding_model": "Qodo/Qodo-Embed-1-1.5B",
+            "embedding_type": "LocalEmbeddingModel",
+            "embedding_max_length": 512,
             "use_bm25": False,
             "use_rerank": False,
         }
@@ -668,7 +674,13 @@ def _get_resolved_rag_config(
     if isinstance(top_level_rag_config, dict):
         for key in [
             "embedding_model",
+            "embedding_type",
+            "embedding_max_length",  # 嵌入模型最大输入长度
+            "embedding_config",  # 额外的嵌入模型配置参数
             "rerank_model",
+            "reranker_type",
+            "reranker_max_length",  # 重排模型最大输入长度
+            "reranker_config",  # 额外的重排模型配置参数
             "use_bm25",
             "use_rerank",
         ]:
@@ -740,6 +752,72 @@ def get_rag_use_rerank() -> bool:
     """
     config = _get_resolved_rag_config()
     return config.get("use_rerank", True) is True
+
+
+def get_rag_embedding_type() -> str:
+    """
+    获取RAG嵌入模型的实现类型。
+
+    返回:
+        str: 嵌入模型类型（如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel' 等），默认为 'LocalEmbeddingModel'
+    """
+    config = _get_resolved_rag_config()
+    return cast(str, config.get("embedding_type", "LocalEmbeddingModel"))
+
+
+def get_rag_reranker_type() -> str:
+    """
+    获取RAG重排模型的实现类型。
+
+    返回:
+        str: 重排模型类型（如 'LocalReranker', 'CohereReranker' 等），默认为 'LocalReranker'
+    """
+    config = _get_resolved_rag_config()
+    return cast(str, config.get("reranker_type", "LocalReranker"))
+
+
+def get_rag_embedding_config() -> Dict[str, Any]:
+    """
+    获取RAG嵌入模型的额外配置参数。
+
+    返回:
+        Dict[str, Any]: 嵌入模型的配置参数字典，如果未配置则返回空字典
+    """
+    config = _get_resolved_rag_config()
+    return config.get("embedding_config", {})
+
+
+def get_rag_reranker_config() -> Dict[str, Any]:
+    """
+    获取RAG重排模型的额外配置参数。
+
+    返回:
+        Dict[str, Any]: 重排模型的配置参数字典，如果未配置则返回空字典
+    """
+    config = _get_resolved_rag_config()
+    return config.get("reranker_config", {})
+
+
+def get_rag_embedding_max_length() -> int:
+    """
+    获取RAG嵌入模型的最大输入长度（token数）。
+
+    返回:
+        int: 嵌入模型的最大输入token数，默认为512
+    """
+    config = _get_resolved_rag_config()
+    return int(config.get("embedding_max_length", 512))
+
+
+def get_rag_reranker_max_length() -> int:
+    """
+    获取RAG重排模型的最大输入长度（token数）。
+
+    返回:
+        int: 重排模型的最大输入token数，默认为512
+    """
+    config = _get_resolved_rag_config()
+    return int(config.get("reranker_max_length", 512))
 
 
 # ==============================================================================

@@ -3,10 +3,12 @@ from typing import List, Optional
 
 from langchain.docstore.document import Document
 
-from .embedding_manager import EmbeddingManager
+from .embedding_interface import EmbeddingInterface
+from .embeddings import EmbeddingManager, EmbeddingRegistry
 from .llm_interface import JarvisPlatform_LLM, LLMInterface, ToolAgent_LLM
 from .query_rewriter import QueryRewriter
-from .reranker import Reranker
+from .reranker_interface import RerankerInterface
+from .rerankers import Reranker, RerankerRegistry
 from .retriever import ChromaRetriever
 from jarvis.jarvis_utils.config import (
     get_rag_embedding_model,
@@ -73,25 +75,31 @@ class JarvisRAGPipeline:
         self.use_query_rewrite = use_query_rewrite
 
         # 延迟加载的组件
-        self._embedding_manager: Optional[EmbeddingManager] = None
+        self._embedding_manager: Optional[EmbeddingInterface] = None
         self._retriever: Optional[ChromaRetriever] = None
-        self._reranker: Optional[Reranker] = None
+        self._reranker: Optional[RerankerInterface] = None
         self._query_rewriter: Optional[QueryRewriter] = None
 
         print("✅ JarvisRAGPipeline 初始化成功 (模型按需加载).")
 
-    def _get_embedding_manager(self) -> EmbeddingManager:
+    def _get_embedding_manager(self) -> EmbeddingInterface:
         if self._embedding_manager is None:
-            sanitized_model_name = self.embedding_model_name.replace("/", "_").replace(
-                "\\", "_"
-            )
-            _final_cache_path = os.path.join(
-                get_rag_embedding_cache_path(), sanitized_model_name
-            )
-            self._embedding_manager = EmbeddingManager(
-                model_name=self.embedding_model_name,
-                cache_dir=_final_cache_path,
-            )
+            # 尝试从配置创建模型
+            embedding_from_config = EmbeddingRegistry.create_from_config()
+            if embedding_from_config:
+                self._embedding_manager = embedding_from_config
+            else:
+                # 回退到传统方式（向后兼容）
+                sanitized_model_name = self.embedding_model_name.replace(
+                    "/", "_"
+                ).replace("\\", "_")
+                _final_cache_path = os.path.join(
+                    get_rag_embedding_cache_path(), sanitized_model_name
+                )
+                self._embedding_manager = EmbeddingManager(
+                    model_name=self.embedding_model_name,
+                    cache_dir=_final_cache_path,
+                )
         return self._embedding_manager
 
     def _get_retriever(self) -> ChromaRetriever:
@@ -135,9 +143,15 @@ class JarvisRAGPipeline:
         chroma_client = chromadb.PersistentClient(path=_final_db_path)
         return chroma_client.get_collection(name=self.collection_name)
 
-    def _get_reranker(self) -> Reranker:
+    def _get_reranker(self) -> RerankerInterface:
         if self._reranker is None:
-            self._reranker = Reranker(model_name=get_rag_rerank_model())
+            # 尝试从配置创建模型
+            reranker_from_config = RerankerRegistry.create_from_config()
+            if reranker_from_config:
+                self._reranker = reranker_from_config
+            else:
+                # 回退到传统方式（向后兼容）
+                self._reranker = Reranker(model_name=get_rag_rerank_model())
         return self._reranker
 
     def _get_query_rewriter(self) -> QueryRewriter:
