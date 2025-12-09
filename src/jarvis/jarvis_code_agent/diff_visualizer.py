@@ -431,10 +431,10 @@ class DiffVisualizer:
                                 else j1 + k + 1
                             )
                             table.add_row(
-                                f"[dim]{old_line_num}[/dim]",
-                                f"[dim]{equal_chunk[k]}[/dim]",
-                                f"[dim]{new_line_num}[/dim]",
-                                f"[dim]{equal_chunk[k]}[/dim]",
+                                f"[bright_cyan]{old_line_num}[/bright_cyan]",
+                                f"[bright_white]{equal_chunk[k]}[/bright_white]",
+                                f"[bright_cyan]{new_line_num}[/bright_cyan]",
+                                f"[bright_white]{equal_chunk[k]}[/bright_white]",
                             )
                         # 如果有省略，显示省略标记
                         if equal_len > context_lines * 2:
@@ -459,10 +459,10 @@ class DiffVisualizer:
                                 else j1 + k + 1
                             )
                             table.add_row(
-                                f"[dim]{old_line_num}[/dim]",
-                                f"[dim]{equal_chunk[k]}[/dim]",
-                                f"[dim]{new_line_num}[/dim]",
-                                f"[dim]{equal_chunk[k]}[/dim]",
+                                f"[bright_cyan]{old_line_num}[/bright_cyan]",
+                                f"[bright_white]{equal_chunk[k]}[/bright_white]",
+                                f"[bright_cyan]{new_line_num}[/bright_cyan]",
+                                f"[bright_white]{equal_chunk[k]}[/bright_white]",
                             )
                     else:
                         # 第一个块，只显示结尾的上下文
@@ -479,10 +479,10 @@ class DiffVisualizer:
                                 else j1 + k + 1
                             )
                             table.add_row(
-                                f"[dim]{old_line_num}[/dim]",
-                                f"[dim]{equal_chunk[k]}[/dim]",
-                                f"[dim]{new_line_num}[/dim]",
-                                f"[dim]{equal_chunk[k]}[/dim]",
+                                f"[bright_cyan]{old_line_num}[/bright_cyan]",
+                                f"[bright_white]{equal_chunk[k]}[/bright_white]",
+                                f"[bright_cyan]{new_line_num}[/bright_cyan]",
+                                f"[bright_white]{equal_chunk[k]}[/bright_white]",
                             )
                 else:
                     # 如果 equal 块不长，显示所有行
@@ -522,9 +522,7 @@ class DiffVisualizer:
                             if i1 + k < len(old_line_map)
                             else i1 + k + 1
                         )
-                        old_content = (
-                            f"[bold bright_red]{old_chunk[k]}[/bold bright_red]"
-                        )
+                        old_content = f"[bold red1]{old_chunk[k]}[/bold red1]"
                     else:
                         old_line_num_actual = ""
                         old_content = ""
@@ -536,9 +534,7 @@ class DiffVisualizer:
                             if j1 + k < len(new_line_map)
                             else j1 + k + 1
                         )
-                        new_content = (
-                            f"[bold bright_green]{new_chunk[k]}[/bold bright_green]"
-                        )
+                        new_content = f"[bold green1]{new_chunk[k]}[/bold green1]"
                     else:
                         new_line_num_actual = ""
                         new_content = ""
@@ -564,7 +560,7 @@ class DiffVisualizer:
                     )
                     table.add_row(
                         str(old_line_num),
-                        f"[bold bright_red]{line}[/bold bright_red]",
+                        f"[bold red1]{line}[/bold red1]",
                         "",
                         "",
                     )
@@ -584,7 +580,7 @@ class DiffVisualizer:
                         "",
                         "",
                         str(new_line_num),
-                        f"[bold bright_green]{line}[/bold bright_green]",
+                        f"[bold green1]{line}[/bold green1]",
                     )
 
         # 如果没有变更，显示提示
