@@ -4,7 +4,6 @@
 提供语言功能支持情况的收集和展示功能。
 """
 
-import subprocess
 from typing import Dict, Any, List
 
 
@@ -46,7 +45,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     info[lang_name]["依赖分析"] = analyzer is not None
                 except Exception:
                     info[lang_name]["依赖分析"] = False
-
 
     except Exception:
         pass
@@ -207,32 +205,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
     except Exception:
         pass
 
-    # 检查LSP支持（从 lsp_client.py 获取，并验证实际可用性）
-    from jarvis.jarvis_tools.lsp_client import LSP_SERVERS
-
-    # LSP服务器配置中的语言名称到标准语言名称的映射
-    lsp_lang_map = {
-        "python": "python",
-        "typescript": "typescript",
-        "javascript": "javascript",
-        "c": "c",
-        "cpp": "cpp",
-        "rust": "rust",
-        "go": "go",
-        "java": "java",
-    }
-
-    # 检查每种语言是否有对应的 LSP 服务器配置，并验证实际可用性
-    for lsp_lang, lang_name in lsp_lang_map.items():
-        if lang_name not in info:
-            info[lang_name] = {}
-
-        if lsp_lang in LSP_SERVERS:
-            config = LSP_SERVERS[lsp_lang]
-            # 检查服务器是否实际可用
-            is_available = _check_lsp_server_available(config)
-            info[lang_name]["LSP支持"] = is_available
-
     # 确保所有已知语言都在 info 中（即使某些功能不支持）
     # 这样表格会显示所有语言，即使某些功能不支持
     known_languages = [
@@ -255,7 +227,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
             "上下文提取",
             "构建验证",
             "静态检查",
-            "LSP支持",
         ]:
             if feature not in info[lang_name]:
                 # 对于上下文提取，检查是否有对应的提取器
@@ -333,9 +304,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     if feature not in info[lang_name]:
                         info[lang_name][feature] = False
                 elif feature == "静态检查":
-                    # 默认 False，已在上面检查过
-                    info[lang_name][feature] = info[lang_name].get(feature, False)
-                elif feature == "LSP支持":
                     # 默认 False，已在上面检查过
                     info[lang_name][feature] = info[lang_name].get(feature, False)
                 else:
@@ -363,7 +331,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
             "上下文提取",
             "构建验证",
             "静态检查",
-            "LSP支持",
         ]:
             if feature not in info[lang_name]:
                 # 对于上下文提取，检查是否有对应的提取器
@@ -441,45 +408,12 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     if feature not in info[lang_name]:
                         info[lang_name][feature] = False
                 elif feature == "静态检查":
-                    # 默认 False，已在上面检查过
-                    info[lang_name][feature] = info[lang_name].get(feature, False)
-                elif feature == "LSP支持":
                     # 默认 False，已在上面检查过
                     info[lang_name][feature] = info[lang_name].get(feature, False)
                 else:
                     info[lang_name][feature] = False
 
     return info
-
-
-def _check_lsp_server_available(config) -> bool:
-    """检查LSP服务器是否实际可用。
-
-    Args:
-        config: LSPServerConfig 配置对象
-
-    Returns:
-        bool: 如果服务器可用返回True，否则返回False
-    """
-    # 使用检测命令或主命令来验证
-    check_cmd = config.check_command or config.command
-
-    try:
-        # 尝试运行检测命令
-        subprocess.run(
-            check_cmd, capture_output=True, text=True, timeout=5, check=False
-        )
-
-        # 只要命令能执行（不是FileNotFoundError），就认为可用
-        # 某些LSP服务器即使返回非零退出码也可能可用
-        return True
-
-    except FileNotFoundError:
-        return False
-    except subprocess.TimeoutExpired:
-        return False
-    except Exception:
-        return False
 
 
 def print_language_support_table() -> None:
@@ -500,7 +434,6 @@ def print_language_support_table() -> None:
         "上下文提取",
         "构建验证",
         "静态检查",
-        "LSP支持",
     ]
 
     # 定义语言显示名称映射
