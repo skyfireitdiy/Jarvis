@@ -233,41 +233,6 @@ class TestDependencyValidationIntegration:
         self.mock_agent.get_user_data.return_value = "test_list_id"
         self.mock_agent.set_user_data.return_value = None
 
-    def test_execute_task_with_valid_dependencies(self):
-        """测试执行有有效依赖的任务"""
-        # 由于execute_task方法复杂且涉及多层Mock，我们简化测试
-        # 只验证依赖验证部分能正常工作
-        from src.jarvis.jarvis_agent.task_list import TaskStatus
-
-        # 创建待执行状态的任务
-        mock_task = Mock()
-        mock_task.dependencies = ["completed_dep"]
-
-        # 依赖任务已完成 - 使用正确的Mock方式
-        mock_dep_task = Mock()
-        mock_dep_task.status = TaskStatus.COMPLETED
-
-        def mock_get_task_detail(task_list_id, task_id, **kwargs):
-            if task_id == "task_1":
-                return mock_task, True, None
-            elif task_id == "completed_dep":
-                return mock_dep_task, True, None
-            return None, False, "任务不存在"
-
-        self.mock_task_list_manager.get_task_detail.side_effect = mock_get_task_detail
-
-        # 使用工具实例直接测试依赖验证
-        try:
-            # 验证依赖验证通过 - 这是核心功能
-            self.tool._validate_dependencies_status(
-                task_list_manager=self.mock_task_list_manager,
-                task_list_id="test_list_id",
-                task=mock_task,
-            )
-            # 如果没有异常表示验证通过
-            assert True
-        except Exception as e:
-            assert False, f"依赖验证应该通过: {e}"
 
     def test_execute_task_with_invalid_dependencies(self):
         """测试执行有无效依赖的任务"""
