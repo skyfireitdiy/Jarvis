@@ -60,5 +60,4 @@ arguments:
 """,
         "description": "执行静态代码检查",
     },
-
 }

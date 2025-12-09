@@ -736,13 +736,7 @@ def run_cli(
     # 使用 rich 输出命令与快捷方式总览
     print_commands_overview()
 
-    # CLI 标志：非交互模式（不依赖配置文件）
-    if non_interactive:
-        try:
-            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
-        except Exception:
-            pass
-        # 注意：全局配置同步在 init_env 之后执行，避免被覆盖
+    # CLI 标志：非交互模式（不依赖配置文件，仅作为 Agent 实例属性）
 
     # 同步其他 CLI 选项到全局配置，确保后续模块读取一致
     try:
@@ -1061,9 +1055,6 @@ def run_cli(
             set_config("JARVIS_USE_ANALYSIS", False)
         if restore_session:
             set_config("JARVIS_RESTORE_SESSION", True)
-        if non_interactive:
-            # 保持运行期非交互标志
-            set_config("JARVIS_NON_INTERACTIVE", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass

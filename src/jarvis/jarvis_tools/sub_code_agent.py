@@ -89,7 +89,7 @@ class SubCodeAgentTool:
                             parent_agent = None
                 except Exception:
                     parent_agent = None
-            parent_non_interactive = (
+            (
                 getattr(parent_agent, "non_interactive", None)
                 if parent_agent is not None
                 else None

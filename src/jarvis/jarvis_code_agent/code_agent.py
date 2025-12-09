@@ -571,13 +571,6 @@ def cli(
     ),
 ) -> None:
     """Jarvis主入口点。"""
-    # CLI 标志：非交互模式（不依赖配置文件）
-    if non_interactive:
-        try:
-            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
-        except Exception:
-            pass
-        # 注意：全局配置同步放在 init_env 之后执行，避免被 init_env 覆盖
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (requirement and str(requirement).strip()):
         print(
@@ -599,8 +592,6 @@ def cli(
             set_config("JARVIS_TOOL_GROUP", str(tool_group))
         if restore_session:
             set_config("JARVIS_RESTORE_SESSION", True)
-        if non_interactive:
-            set_config("JARVIS_NON_INTERACTIVE", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass

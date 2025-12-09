@@ -3,7 +3,6 @@ from typing import Optional
 
 import typer
 import yaml  # type: ignore[import-untyped]
-import os
 
 from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -30,13 +29,6 @@ def cli(
     ),
 ):
     """从YAML配置文件初始化并运行多智能体系统"""
-    # CLI 标志：非交互模式（不依赖配置文件）
-    if non_interactive:
-        try:
-            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
-        except Exception:
-            pass
-        # 注意：全局配置同步在 init_env 之后执行，避免被覆盖
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (user_input and str(user_input).strip()):
         print("❌ 非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。")
@@ -45,8 +37,6 @@ def cli(
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
-        if non_interactive:
-            set_config("JARVIS_NON_INTERACTIVE", True)
         if model_group:
             set_config("JARVIS_LLM_GROUP", str(model_group))
     except Exception:
@@ -69,6 +59,7 @@ def cli(
             agents_config,
             main_agent_name,
             common_system_prompt=str(config_data.get("common_system_prompt", "") or ""),
+            non_interactive=non_interactive if non_interactive else None,
         )
         final_input = (
             user_input

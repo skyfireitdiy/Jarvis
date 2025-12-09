@@ -80,7 +80,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "Quiet":
             agent.non_interactive = True
             print("🔇 已切换到静默模式（非交互模式）")
-            return user_input.replace(f"'<Quiet>'", ""), False
+            return user_input.replace("'<Quiet>'", ""), False
 
         processed_tag = set()
         add_on_prompt = ""
