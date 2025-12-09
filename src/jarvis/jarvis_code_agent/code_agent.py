@@ -725,6 +725,12 @@ class CodeAgent(Agent):
                 print(f"      位置: {location}")
                 print(f"      建议: {suggestion}")
 
+            # 在每轮审查后给用户一个终止选择
+            if not self.non_interactive:
+                if not user_confirm("是否继续修复这些问题？", default=True):
+                    print("ℹ️ 用户选择终止审查，保持当前代码状态")
+                    return
+
             if iteration >= max_iterations:
                 print(f"\n⚠️ 已达到最大审查次数 ({max_iterations})，停止审查")
                 # 在非交互模式下直接返回，交互模式下询问用户
