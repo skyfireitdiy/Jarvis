@@ -5,11 +5,36 @@
 """
 
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_agent.task_list import TaskStatus
+
+
+class DependencyValidationError(Exception):
+    """依赖验证错误的基类"""
+
+    pass
+
+
+class DependencyNotFoundError(DependencyValidationError):
+    """依赖任务不存在错误"""
+
+    pass
+
+
+class DependencyNotCompletedError(DependencyValidationError):
+    """依赖任务未完成错误"""
+
+    pass
+
+
+class DependencyFailedError(DependencyValidationError):
+    """依赖任务失败错误"""
+
+    pass
+
 
 # 任务输出长度限制常量
 DEFAULT_MAX_TASK_OUTPUT_LENGTH = 10000  # 默认最大任务输出长度（字符数）
@@ -84,7 +109,8 @@ class task_list_manager:
         if not agent:
             return None
         try:
-            return agent.get_user_data("__task_list_id__")
+            result = agent.get_user_data("__task_list_id__")
+            return str(result) if result is not None else None
         except Exception:
             return None
 
@@ -920,6 +946,61 @@ class task_list_manager:
                 "stderr": msg or "回滚任务列表失败",
             }
 
+    def _validate_dependencies_status(
+        self,
+        task_list_manager: Any,
+        task_list_id: str,
+        task: Any,
+    ) -> None:
+        """验证任务的所有依赖是否都已completed
+
+        参数:
+            task_list_manager: 任务列表管理器
+            task_list_id: 任务列表ID
+            task: 要验证的任务对象
+
+        抛出:
+            DependencyNotFoundError: 依赖任务不存在
+            DependencyNotCompletedError: 依赖任务未完成
+            DependencyFailedError: 依赖任务失败
+        """
+        if not task.dependencies:
+            return  # 无依赖，直接返回
+
+        for dep_id in task.dependencies:
+            dep_task, success, error_msg = task_list_manager.get_task_detail(
+                task_list_id=task_list_id,
+                task_id=dep_id,
+            )
+
+            if not success:
+                raise DependencyNotFoundError(f"依赖任务 '{dep_id}' 不存在")
+
+            if dep_task.status == TaskStatus.FAILED:
+                raise DependencyFailedError(
+                    f"依赖任务 '{dep_id}' 执行失败，无法执行当前任务"
+                )
+
+            if dep_task.status == TaskStatus.ABANDONED:
+                raise DependencyFailedError(
+                    f"依赖任务 '{dep_id}' 已被放弃，无法执行当前任务"
+                )
+
+            if dep_task.status == TaskStatus.PENDING:
+                raise DependencyNotCompletedError(
+                    f"依赖任务 '{dep_id}' 尚未开始执行，无法执行当前任务"
+                )
+
+            if dep_task.status == TaskStatus.RUNNING:
+                raise DependencyNotCompletedError(
+                    f"依赖任务 '{dep_id}' 正在执行中，无法执行当前任务"
+                )
+
+            if dep_task.status != TaskStatus.COMPLETED:
+                raise DependencyNotCompletedError(
+                    f"依赖任务 '{dep_id}' 状态为 '{dep_task.status.value}'，不满足执行条件"
+                )
+
     def _handle_execute_task(
         self,
         args: Dict,
@@ -958,6 +1039,20 @@ class task_list_manager:
                 "success": False,
                 "stdout": "",
                 "stderr": error_msg or "获取任务详情失败",
+            }
+
+        # 验证依赖状态
+        try:
+            self._validate_dependencies_status(
+                task_list_manager=task_list_manager,
+                task_list_id=task_list_id,
+                task=task,
+            )
+        except DependencyValidationError as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": str(e),
             }
 
         # 检查任务状态
@@ -1363,6 +1458,82 @@ class task_list_manager:
                 "stdout": "",
                 "stderr": f"更新任务列表失败: {str(e)}",
             }
+
+    def _check_dependencies_completed(
+        self,
+        task_list_manager: Any,
+        task_list_id: str,
+        dependencies: List[str],
+        agent_id: str,
+        is_main_agent: bool,
+    ) -> Dict[str, Any]:
+        """验证依赖任务状态。
+
+        参数:
+            task_list_manager: 任务列表管理器
+            task_list_id: 任务列表 ID
+            dependencies: 依赖任务 ID 列表
+            agent_id: Agent ID
+            is_main_agent: 是否为主 Agent
+
+        返回:
+            Dict: 验证结果，包含 success 状态和错误信息
+        """
+        if not dependencies:
+            return {"success": True, "stdout": "", "stderr": ""}
+
+        incomplete_deps = []
+        failed_deps = []
+        not_found_deps = []
+
+        for dep_id in dependencies:
+            dep_task, dep_success, error_msg = task_list_manager.get_task_detail(
+                task_list_id=task_list_id,
+                task_id=dep_id,
+                agent_id=agent_id,
+                is_main_agent=is_main_agent,
+            )
+
+            if not dep_success or not dep_task:
+                not_found_deps.append(dep_id)
+                continue
+
+            if dep_task.status == TaskStatus.COMPLETED:
+                continue  # 依赖已完成，继续检查下一个
+            elif dep_task.status in (TaskStatus.FAILED, TaskStatus.ABANDONED):
+                failed_deps.append((dep_id, dep_task.task_name, dep_task.status.value))
+            else:  # PENDING 或 RUNNING
+                incomplete_deps.append(
+                    (dep_id, dep_task.task_name, dep_task.status.value)
+                )
+
+        # 构建错误信息
+        error_messages = []
+
+        if not_found_deps:
+            error_messages.append(f"依赖任务不存在: {', '.join(not_found_deps)}")
+
+        if failed_deps:
+            for dep_id, task_name, status in failed_deps:
+                error_messages.append(
+                    f"依赖任务 [{task_name}] 状态为 {status}，无法执行"
+                )
+
+        if incomplete_deps:
+            for dep_id, task_name, status in incomplete_deps:
+                error_messages.append(
+                    f"依赖任务 [{task_name}] 状态为 {status}，需要为 completed"
+                )
+
+        if error_messages:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "任务执行失败：依赖验证未通过\n"
+                + "\n".join(f"- {msg}" for msg in error_messages),
+            }
+
+        return {"success": True, "stdout": "", "stderr": ""}
 
     def _handle_update_task(
         self,
