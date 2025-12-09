@@ -233,7 +233,6 @@ class TestDependencyValidationIntegration:
         self.mock_agent.get_user_data.return_value = "test_list_id"
         self.mock_agent.set_user_data.return_value = None
 
-
     def test_execute_task_with_invalid_dependencies(self):
         """测试执行有无效依赖的任务"""
         # 创建待执行状态的任务

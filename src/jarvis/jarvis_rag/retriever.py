@@ -9,7 +9,7 @@ from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from rank_bm25 import BM25Okapi  # type: ignore
 
-from .embedding_manager import EmbeddingManager
+from .embedding_interface import EmbeddingInterface
 
 
 class ChromaRetriever:
@@ -20,7 +20,7 @@ class ChromaRetriever:
 
     def __init__(
         self,
-        embedding_manager: EmbeddingManager,
+        embedding_manager: EmbeddingInterface,
         db_path: str,
         collection_name: str = "jarvis_rag_collection",
     ):
@@ -28,7 +28,7 @@ class ChromaRetriever:
         初始化ChromaRetriever。
 
         参数:
-            embedding_manager: EmbeddingManager的实例。
+            embedding_manager: EmbeddingInterface的实例（可以是本地或在线模型）。
             db_path: ChromaDB持久化存储的文件路径。
             collection_name: ChromaDB中集合的名称。
         """
@@ -301,11 +301,28 @@ class ChromaRetriever:
         print(f"✅ 索引已更新：变更 {len(changed)} 个，删除 {len(deleted)} 个。")
 
     def add_documents(
-        self, documents: List[Document], chunk_size=1000, chunk_overlap=100
+        self, documents: List[Document], chunk_size=None, chunk_overlap=100
     ):
         """
         将文档拆分、嵌入，并添加到ChromaDB和BM25索引中。
+
+        参数:
+            documents: 要添加的文档列表
+            chunk_size: 块大小（字符数）。如果为None，将从embedding_manager的max_length自动计算。
+            chunk_overlap: 块之间的重叠大小（字符数）
         """
+        # 如果没有指定chunk_size，尝试从embedding_manager获取max_length
+        if chunk_size is None:
+            # 尝试从embedding_manager获取max_length
+            max_length = getattr(self.embedding_manager, "max_length", None)
+            if max_length:
+                # 将token数转换为字符数（粗略估算：1 token ≈ 4 字符）
+                # 留一些余量，使用80%的max_length
+                chunk_size = int(max_length * 4 * 0.8)
+            else:
+                # 默认值
+                chunk_size = 1000
+
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
