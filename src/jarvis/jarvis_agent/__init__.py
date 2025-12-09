@@ -1631,6 +1631,32 @@ class Agent:
         loop = AgentRunLoop(self)
         return loop.run()
 
+    def set_non_interactive(self, value: bool) -> None:
+        """设置非交互模式并管理自动完成状态。
+
+        当进入非交互模式时，自动启用自动完成；
+        当退出非交互模式时，恢复自动完成的原始值。
+
+        参数:
+            value: 是否启用非交互模式
+        """
+        # 保存auto_complete的原始值（如果是首次设置）
+        if not hasattr(self, "_auto_complete_backup"):
+            self._auto_complete_backup = self.auto_complete
+
+        # 设置非交互模式环境变量
+        self.non_interactive = value
+        os.environ["JARVIS_NON_INTERACTIVE"] = "true" if value else "false"
+
+        # 根据non_interactive的值调整auto_complete
+        if value:  # 进入非交互模式
+            self.auto_complete = True
+        else:  # 退出非交互模式
+            # 恢复auto_complete的原始值
+            self.auto_complete = self._auto_complete_backup
+            # 清理备份，避免状态污染
+            delattr(self, "_auto_complete_backup")
+
     def _handle_run_interrupt(
         self, current_response: str
     ) -> Optional[Union[Any, "LoopAction"]]:
@@ -1648,10 +1674,7 @@ class Agent:
 
         # 被中断时，如果当前是非交互模式，立即切换到交互模式（在获取用户输入前）
         if self.non_interactive:
-            self.non_interactive = False
-            os.environ["JARVIS_NON_INTERACTIVE"] = "false"
-            # 重置自动完成标志，确保用户可以进行交互
-            self.auto_complete = False
+            self.set_non_interactive(False)
 
         user_input = self._multiline_input(
             "模型交互期间被中断，请输入用户干预信息：", False
