@@ -412,10 +412,7 @@ def _is_auto_complete_for_current_agent() -> bool:
                 return bool(getattr(ag, "auto_complete", False))
             except Exception:
                 pass
-        env_v = os.getenv("JARVIS_AUTO_COMPLETE")
-        if env_v is not None:
-            return str(env_v).strip().lower() in ("1", "true", "yes", "on")
-        return bool(GLOBAL_CONFIG_DATA.get("JARVIS_AUTO_COMPLETE", False))
+        return False
     except Exception:
         return False
 
