@@ -132,11 +132,11 @@ class ContextRecommender:
         else:
             print("⚠️ 无关键词可用，跳过符号推荐")
 
-        # 4. 对推荐符号去重（基于 name + file_path + line_start）
+        # 4. 对推荐符号去重（基于符号名称）
         seen = set()
         unique_symbols = []
         for symbol in recommended_symbols:
-            key = (symbol.name, symbol.file_path, symbol.line_start)
+            key = (symbol.name,)
             if key not in seen:
                 seen.add(key)
                 unique_symbols.append(symbol)
