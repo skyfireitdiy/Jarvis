@@ -202,7 +202,7 @@ class DiffVisualizer:
                                 pass
 
                 # 显示 hunk 头部
-                hunk_text = Text(f"[dim]{line}[/dim]", style="cyan")
+                hunk_text = Text(f"[bright_cyan]{line}[/bright_cyan]", style="cyan")
                 if show_line_numbers:
                     table.add_row("", "", "", hunk_text)
                 else:
@@ -228,10 +228,17 @@ class DiffVisualizer:
                     # 文件末尾换行符差异
                     if show_line_numbers:
                         table.add_row(
-                            "", "", "", "[dim]\\ No newline at end of file[/dim]"
+                            "",
+                            "",
+                            "",
+                            "[bright_yellow]\\ No newline at end of file[/bright_yellow]",
                         )
                     else:
-                        table.add_row("", "", "[dim]\\ No newline at end of file[/dim]")
+                        table.add_row(
+                            "",
+                            "",
+                            "[bright_yellow]\\ No newline at end of file[/bright_yellow]",
+                        )
 
         # 刷新最后一个 hunk
         if in_hunk:
@@ -260,14 +267,14 @@ class DiffVisualizer:
         # 创建统计文本
         stats_text = Text()
         stats_text.append(f"📊 {file_path}\n", style="bold cyan")
-        stats_text.append("  ", style="dim")
+        stats_text.append("  ", style="bright_white")
         stats_text.append("➕ 新增: ", style="green")
         stats_text.append(f"{additions} 行", style="bold green")
-        stats_text.append("  |  ", style="dim")
+        stats_text.append("  |  ", style="bright_white")
         stats_text.append("➖ 删除: ", style="red")
         stats_text.append(f"{deletions} 行", style="bold red")
         if total_changes > 0:
-            stats_text.append("  |  ", style="dim")
+            stats_text.append("  |  ", style="bright_white")
             stats_text.append("📈 总计: ", style="cyan")
             stats_text.append(f"{total_changes} 行", style="bold cyan")
 
@@ -399,10 +406,10 @@ class DiffVisualizer:
             box=None,
             padding=(0, 1),
         )
-        table.add_column("", style="dim", width=6, justify="right")
-        table.add_column("", style="dim", overflow="fold", ratio=1)
-        table.add_column("", style="dim", width=6, justify="right")
-        table.add_column("", style="dim", overflow="fold", ratio=1)
+        table.add_column("", style="bright_cyan", width=6, justify="right")
+        table.add_column("", style="bright_white", overflow="fold", ratio=1)
+        table.add_column("", style="bright_cyan", width=6, justify="right")
+        table.add_column("", style="bright_white", overflow="fold", ratio=1)
 
         additions = 0
         deletions = 0
@@ -440,7 +447,7 @@ class DiffVisualizer:
                         if equal_len > context_lines * 2:
                             table.add_row(
                                 "",
-                                "[dim]... ({0} lines omitted) ...[/dim]".format(
+                                "[bright_yellow]... ({0} lines omitted) ...[/bright_yellow]".format(
                                     equal_len - context_lines * 2
                                 ),
                                 "",
@@ -498,10 +505,10 @@ class DiffVisualizer:
                             else j1 + k + 1
                         )
                         table.add_row(
-                            f"[dim]{old_line_num}[/dim]",
-                            f"[dim]{line}[/dim]",
-                            f"[dim]{new_line_num}[/dim]",
-                            f"[dim]{line}[/dim]",
+                            f"[bright_cyan]{old_line_num}[/bright_cyan]",
+                            f"[bright_white]{line}[/bright_white]",
+                            f"[bright_cyan]{new_line_num}[/bright_cyan]",
+                            f"[bright_white]{line}[/bright_white]",
                         )
                 continue
             elif tag == "replace":
