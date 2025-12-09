@@ -68,12 +68,17 @@ class CodeAgent(Agent):
         tool_group: Optional[str] = None,
         non_interactive: Optional[bool] = None,
         rule_names: Optional[str] = None,
+        enable_review: bool = False,
+        review_max_iterations: int = 3,
         **kwargs,
     ):
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
         # 记录当前是否为非交互模式，便于在提示词/输入中动态调整行为说明
         self.non_interactive: bool = bool(non_interactive)
+        # Review 相关配置
+        self.enable_review = enable_review
+        self.review_max_iterations = review_max_iterations
 
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
@@ -304,7 +309,19 @@ class CodeAgent(Agent):
                 print(f"⚠️ 执行失败: {str(e)}")
                 return str(e)
 
+            # 处理未提交的更改（在 review 之前先提交）
             self.git_manager.handle_uncommitted_changes()
+
+            # 如果启用了 review，执行 review 和修复循环
+            if self.enable_review:
+                self._review_and_fix(
+                    user_input=user_input,
+                    start_commit=start_commit,
+                    enhanced_input=enhanced_input,
+                    prefix=prefix,
+                    suffix=suffix,
+                )
+
             end_commit = get_latest_commit_hash()
             commits = self.git_manager.show_commit_history(start_commit, end_commit)
             self.git_manager.handle_commit_confirmation(
@@ -525,6 +542,229 @@ class CodeAgent(Agent):
         self.session.prompt += final_ret
         return
 
+    def _build_review_prompts(self, user_input: str, git_diff: str) -> tuple:
+        """构建 review Agent 的 prompts
+
+        参数:
+            user_input: 用户原始需求
+            git_diff: 代码修改的 git diff
+
+        返回:
+            tuple: (system_prompt, user_prompt, summary_prompt)
+        """
+        system_prompt = """你是代码审查专家。你的任务是审查代码修改是否正确完成了用户需求。
+
+审查标准：
+1. 功能完整性：代码修改是否完整实现了用户需求的所有功能点？
+2. 代码正确性：修改的代码逻辑是否正确，有无明显的 bug 或错误？
+3. 代码质量：代码是否符合最佳实践，有无明显的代码异味？
+4. 潜在风险：修改是否可能引入新的问题或破坏现有功能？
+
+审查要求：
+- 仔细阅读用户需求和代码修改（git diff）
+- 如需了解更多上下文，可使用 read_code 工具读取相关文件
+- 基于实际代码进行审查，不要凭空假设
+- 只关注本次修改相关的问题，不要审查无关代码
+
+**重要**：在总结阶段，必须输出 JSON 格式的审查结果。"""
+
+        user_prompt = f"""请审查以下代码修改是否正确完成了用户需求。
+
+【用户需求】
+{user_input}
+
+【代码修改（Git Diff）】
+```diff
+{git_diff}
+```
+
+请仔细审查代码修改，如需要可使用 read_code 工具查看更多上下文。
+审查完成后，输出 JSON 格式的审查结果。"""
+
+        summary_prompt = """请输出 JSON 格式的审查结果，格式如下：
+
+```json
+{
+  "ok": true/false,  // 审查是否通过
+  "issues": [        // 发现的问题列表（如果 ok 为 true，可以为空数组）
+    {
+      "type": "问题类型",  // 如：功能缺失、逻辑错误、代码质量、潜在风险
+      "description": "问题描述",
+      "location": "问题位置（文件:行号）",
+      "suggestion": "修复建议"
+    }
+  ],
+  "summary": "审查总结"  // 简要说明审查结论
+}
+```
+
+注意：
+- 如果代码修改完全满足用户需求且无明显问题，设置 ok 为 true
+- 如果存在需要修复的问题，设置 ok 为 false，并在 issues 中列出所有问题
+- 每个问题都要提供具体的修复建议"""
+
+        return system_prompt, user_prompt, summary_prompt
+
+    def _parse_review_result(self, summary: str) -> dict:
+        """解析 review 结果
+
+        参数:
+            summary: review Agent 的输出
+
+        返回:
+            dict: 解析后的审查结果，包含 ok 和 issues 字段
+        """
+        import json
+        import re
+
+        # 尝试从输出中提取 JSON
+        # 首先尝试匹配 ```json ... ``` 代码块
+        json_match = re.search(r"```json\s*([\s\S]*?)\s*```", summary)
+        if json_match:
+            json_str = json_match.group(1).strip()
+        else:
+            # 尝试匹配裸 JSON 对象
+            json_match = re.search(r'\{[\s\S]*"ok"[\s\S]*\}', summary)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                # 无法解析，返回默认通过（避免无限循环）
+                print("⚠️ 无法解析 review 结果，默认通过")
+                return {"ok": True, "issues": [], "summary": "无法解析审查结果"}
+
+        try:
+            result = json.loads(json_str)
+            if not isinstance(result, dict):
+                return {"ok": True, "issues": [], "summary": "解析结果不是有效的字典"}
+            return {
+                "ok": result.get("ok", True),
+                "issues": result.get("issues", []),
+                "summary": result.get("summary", ""),
+            }
+        except json.JSONDecodeError as e:
+            print(f"⚠️ JSON 解析失败: {e}")
+            return {"ok": True, "issues": [], "summary": f"JSON 解析失败: {e}"}
+
+    def _review_and_fix(
+        self,
+        user_input: str,
+        start_commit: str,
+        enhanced_input: str,
+        prefix: str = "",
+        suffix: str = "",
+    ) -> None:
+        """执行 review 和修复循环
+
+        参数:
+            user_input: 用户原始需求
+            start_commit: 开始时的 commit hash
+            enhanced_input: 增强后的用户输入（用于修复）
+            prefix: 前缀
+            suffix: 后缀
+        """
+        from jarvis.jarvis_agent import Agent
+
+        iteration = 0
+        max_iterations = self.review_max_iterations
+
+        while iteration < max_iterations:
+            iteration += 1
+            print(f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查...")
+
+            # 获取从开始到当前的 git diff
+            current_commit = get_latest_commit_hash()
+            if current_commit == start_commit:
+                git_diff = get_diff()  # 获取未提交的更改
+            else:
+                git_diff = get_diff(start_commit)
+
+            if not git_diff or not git_diff.strip():
+                print("ℹ️ 没有代码修改，跳过审查")
+                return
+
+            # 构建 review prompts
+            sys_prompt, usr_prompt, sum_prompt = self._build_review_prompts(
+                user_input, git_diff
+            )
+
+            # 创建 review Agent
+            review_agent = Agent(
+                system_prompt=sys_prompt,
+                name=f"CodeReview-Agent-{iteration}",
+                model_group=self.model.get_model_group() if self.model else None,
+                summary_prompt=sum_prompt,
+                need_summary=True,
+                auto_complete=True,
+                use_tools=["execute_script", "read_code"],
+                non_interactive=self.non_interactive,
+                use_methodology=False,
+                use_analysis=False,
+            )
+
+            # 运行 review
+            summary = review_agent.run(usr_prompt)
+
+            # 解析审查结果
+            result = self._parse_review_result(str(summary) if summary else "")
+
+            if result["ok"]:
+                print(f"\n✅ 代码审查通过（第 {iteration} 轮）")
+                if result.get("summary"):
+                    print(f"   {result['summary']}")
+                return
+
+            # 审查未通过，需要修复
+            print(f"\n⚠️ 代码审查发现问题（第 {iteration} 轮）：")
+            for i, issue in enumerate(result.get("issues", []), 1):
+                issue_type = issue.get("type", "未知")
+                description = issue.get("description", "无描述")
+                location = issue.get("location", "未知位置")
+                suggestion = issue.get("suggestion", "无建议")
+                print(f"   {i}. [{issue_type}] {description}")
+                print(f"      位置: {location}")
+                print(f"      建议: {suggestion}")
+
+            if iteration >= max_iterations:
+                print(f"\n⚠️ 已达到最大审查次数 ({max_iterations})，停止审查")
+                # 在非交互模式下直接返回，交互模式下询问用户
+                if not self.non_interactive:
+                    if not user_confirm("是否继续修复？", default=False):
+                        return
+                    # 用户选择继续，重置迭代次数
+                    iteration = 0
+                    max_iterations = self.review_max_iterations
+                else:
+                    return
+
+            # 构建修复 prompt
+            fix_prompt = f"""代码审查发现以下问题，请修复：
+
+【审查结果】
+{result.get("summary", "")}
+
+【问题列表】
+"""
+            for i, issue in enumerate(result.get("issues", []), 1):
+                fix_prompt += f"{i}. [{issue.get('type', '未知')}] {issue.get('description', '')}\n"
+                fix_prompt += f"   位置: {issue.get('location', '')}\n"
+                fix_prompt += f"   建议: {issue.get('suggestion', '')}\n\n"
+
+            fix_prompt += "\n请根据上述问题进行修复，确保代码正确实现用户需求。"
+
+            print(f"\n🔧 开始修复问题...")
+
+            # 调用 super().run() 进行修复
+            try:
+                if self.model:
+                    self.model.set_suppress_output(False)
+                super().run(fix_prompt)
+            except RuntimeError as e:
+                print(f"⚠️ 修复失败: {str(e)}")
+                return
+
+            # 处理未提交的更改
+            self.git_manager.handle_uncommitted_changes()
+
 
 @app.command()
 def cli(
@@ -568,6 +808,16 @@ def cli(
         None,
         "--rule-names",
         help="指定规则名称列表，用逗号分隔，从 rules.yaml 文件中读取对应的规则内容",
+    ),
+    enable_review: bool = typer.Option(
+        False,
+        "--enable-review",
+        help="启用代码审查：在代码修改完成后自动进行代码审查，发现问题则自动修复",
+    ),
+    review_max_iterations: int = typer.Option(
+        3,
+        "--review-max-iterations",
+        help="代码审查最大迭代次数，达到上限后停止审查（默认3次）",
     ),
 ) -> None:
     """Jarvis主入口点。"""
@@ -651,6 +901,8 @@ def cli(
             tool_group=tool_group,
             non_interactive=non_interactive,
             rule_names=rule_names,
+            enable_review=enable_review,
+            review_max_iterations=review_max_iterations,
         )
 
         # 显示可用的规则信息
