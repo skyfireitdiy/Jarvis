@@ -88,7 +88,7 @@ from jarvis.jarvis_utils.globals import (
     set_global_model_group,
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
-from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.tag import ot, ct
 
 
 def show_agent_startup_stats(
@@ -617,20 +617,12 @@ class Agent:
         # 将确认函数指向封装后的 confirm，保持既有调用不变
         self.confirm_callback = self.user_interaction.confirm  # type: ignore[assignment]
         # 非交互模式参数支持：允许通过构造参数显式控制，便于其他Agent调用时设置
+        # 仅作为 Agent 实例属性，不写入环境变量或全局配置，避免跨 Agent 污染
         try:
-            # 优先使用构造参数，其次回退到环境变量
+            # 优先使用构造参数，若未提供则默认为 False
             self.non_interactive = (
-                bool(non_interactive)
-                if non_interactive is not None
-                else str(os.environ.get("JARVIS_NON_INTERACTIVE", "")).lower()
-                in ("1", "true", "yes")
+                bool(non_interactive) if non_interactive is not None else False
             )
-            # 如果构造参数显式提供，则同步到环境变量与全局配置，供下游组件读取
-            if non_interactive is not None:
-                os.environ["JARVIS_NON_INTERACTIVE"] = (
-                    "true" if self.non_interactive else "false"
-                )
-
         except Exception:
             # 防御式回退
             self.non_interactive = False
@@ -1644,9 +1636,8 @@ class Agent:
         if not hasattr(self, "_auto_complete_backup"):
             self._auto_complete_backup = self.auto_complete
 
-        # 设置非交互模式环境变量
+        # 设置非交互模式（仅作为 Agent 实例属性，不写入环境变量或全局配置）
         self.non_interactive = value
-        os.environ["JARVIS_NON_INTERACTIVE"] = "true" if value else "false"
 
         # 根据non_interactive的值调整auto_complete
         if value:  # 进入非交互模式

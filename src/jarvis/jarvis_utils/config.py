@@ -882,21 +882,23 @@ def is_non_interactive() -> bool:
     返回：
         bool: 如果启用非交互模式则返回True，默认为False
     """
-    # 优先读取环境变量，确保 CLI 标志生效且不被配置覆盖
     try:
-        import os
+        # 优先基于当前激活的 Agent 状态判断，避免跨 Agent 互相污染
+        from jarvis.jarvis_utils import globals as _g
 
-        v = os.getenv("JARVIS_NON_INTERACTIVE")
-        if v is not None:
-            val = str(v).strip().lower()
-            if val in ("1", "true", "yes", "on"):
-                return True
-            if val in ("0", "false", "no", "off"):
-                return False
+        current_agent_name = getattr(_g, "current_agent_name", "")
+        if current_agent_name:
+            agent = _g.get_agent(current_agent_name)
+            if agent is not None and hasattr(agent, "non_interactive"):
+                try:
+                    return bool(getattr(agent, "non_interactive"))
+                except Exception:
+                    return False
     except Exception:
-        # 忽略环境变量解析异常，回退到配置
-        pass
-    return GLOBAL_CONFIG_DATA.get("JARVIS_NON_INTERACTIVE", False) is True
+        # 防御式兜底，保持返回 False 不影响主流程
+        return False
+    # 无当前 Agent 时默认返回 False，避免依赖全局配置或环境变量
+    return False
 
 
 def is_skip_predefined_tasks() -> bool:

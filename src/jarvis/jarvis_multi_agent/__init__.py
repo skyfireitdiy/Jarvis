@@ -15,6 +15,7 @@ class MultiAgent(OutputHandler):
         agents_config: List[Dict],
         main_agent_name: str,
         common_system_prompt: str = "",
+        non_interactive: Optional[bool] = None,
     ):
         self.agents_config = agents_config
         self.agents_config_map = {c["name"]: c for c in agents_config}
@@ -22,6 +23,7 @@ class MultiAgent(OutputHandler):
         self.main_agent_name = main_agent_name
         self.original_question: Optional[str] = None
         self.common_system_prompt: str = common_system_prompt
+        self.non_interactive = non_interactive
 
     def prompt(self) -> str:
         _multiline_example_msg = """  {
@@ -328,6 +330,9 @@ class MultiAgent(OutputHandler):
         # 非主智能体统一禁用自动补全，防止多智能体并行时误触发自动交互
         if name != self.main_agent_name:
             config["auto_complete"] = False
+        # 继承 MultiAgent 的 non_interactive 设置（如果配置中未显式指定）
+        if self.non_interactive is not None and "non_interactive" not in config:
+            config["non_interactive"] = self.non_interactive
 
         # Prepend common system prompt if configured
         common_sp = getattr(self, "common_system_prompt", "")

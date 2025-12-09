@@ -404,8 +404,6 @@ def _is_non_interactive_for_current_agent() -> bool:
 
 def _is_auto_complete_for_current_agent() -> bool:
     try:
-        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
-
         ag = _get_current_agent_for_input()
         if ag is not None and hasattr(ag, "auto_complete"):
             try:

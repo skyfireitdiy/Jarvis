@@ -55,16 +55,6 @@ def cli(
     ),
 ):
     """Main entry point for Jarvis agent"""
-    # CLI 标志：非交互模式（不依赖配置文件）
-    if non_interactive:
-        try:
-            os.environ["JARVIS_NON_INTERACTIVE"] = "true"
-        except Exception:
-            pass
-        try:
-            set_config("JARVIS_NON_INTERACTIVE", True)
-        except Exception:
-            pass
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (task and str(task).strip()):
         print("❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。")
@@ -77,8 +67,6 @@ def cli(
     try:
         if model_group:
             set_config("JARVIS_LLM_GROUP", str(model_group))
-        if non_interactive:
-            set_config("JARVIS_NON_INTERACTIVE", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
@@ -93,6 +81,9 @@ def cli(
 
     # Create and run agent
     try:
+        # 将 non_interactive 标志传递给 Agent，确保仅在该 Agent 实例内生效
+        if non_interactive:
+            config["non_interactive"] = True
         agent = Agent(**config)
 
         # Run agent with initial task if specified
