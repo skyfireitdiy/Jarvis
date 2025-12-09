@@ -841,6 +841,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                                 ot("ToolUsage"),
                                 ot("ReloadConfig"),
                                 ot("SaveSession"),
+                                ot("Quiet"),
                             ]
                         except Exception:
                             specials = []
