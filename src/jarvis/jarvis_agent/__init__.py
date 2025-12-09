@@ -1558,7 +1558,7 @@ class Agent:
     - 工具调用必须使用{ot("TOOL_CALL")}和{ct("TOOL_CALL")}标签
     - 操作列表：{action_handlers}{memory_prompts}
     
-    注意：如果当前部分任务已完成，之前的上下文价值不大，可以输出{ot('!!!SUMMARY!!!')}标记来触发总结并清空历史，以便开始新的任务阶段。
+    注意：如果当前部分任务已完成，之前的上下文价值不大，可以输出{ot("!!!SUMMARY!!!")}标记来触发总结并清空历史，以便开始新的任务阶段。
 </system_prompt>
 
 请继续。
@@ -1645,6 +1645,14 @@ class Agent:
             return None
 
         set_interrupt(False)
+
+        # 被中断时，如果当前是非交互模式，立即切换到交互模式（在获取用户输入前）
+        if self.non_interactive:
+            self.non_interactive = False
+            os.environ["JARVIS_NON_INTERACTIVE"] = "false"
+            # 重置自动完成标志，确保用户可以进行交互
+            self.auto_complete = False
+
         user_input = self._multiline_input(
             "模型交互期间被中断，请输入用户干预信息：", False
         )
