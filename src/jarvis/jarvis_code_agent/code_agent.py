@@ -103,7 +103,6 @@ class CodeAgent(Agent):
             "read_code",
             "edit_file",  # 普通 search/replace 编辑
             "rewrite_file",
-            "lsp_client",  # LSP客户端工具，用于获取代码补全、悬停等信息
             "task_list_manager",  # 任务列表管理工具
         ]
 
@@ -671,7 +670,7 @@ class CodeAgent(Agent):
             # 每轮审查开始前显示清晰的提示信息
             if not self.non_interactive:
                 print(f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮")
-                if not user_confirm(f"是否开始本轮代码审查？", default=True):
+                if not user_confirm("是否开始本轮代码审查？", default=True):
                     print("ℹ️ 用户终止了代码审查")
                     return
             else:
@@ -763,7 +762,7 @@ class CodeAgent(Agent):
 
             fix_prompt += "\n请根据上述问题进行修复，确保代码正确实现用户需求。"
 
-            print(f"\n🔧 开始修复问题...")
+            print("\n🔧 开始修复问题...")
 
             # 调用 super().run() 进行修复
             try:

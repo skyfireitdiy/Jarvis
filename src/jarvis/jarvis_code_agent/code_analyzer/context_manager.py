@@ -303,7 +303,7 @@ class ContextManager:
 
         改进版本：
         1. 区分定义和调用：检查符号是否在当前行范围内定义
-        2. 获取定义位置：优先使用 LSP，如果不支持则使用 tree-sitter
+        2. 获取定义位置：使用 tree-sitter 符号提取器
         3. 为每个使用的符号添加定义位置信息
         """
         # Check if file is stale and update if needed
@@ -317,16 +317,7 @@ class ContextManager:
         used_symbols: List[Symbol] = []
         all_symbols = self.symbol_table.get_file_symbols(file_path)
 
-        # 尝试获取 LSP 客户端（优先使用）
-        lsp_client = None
-        try:
-            from jarvis.jarvis_tools.lsp_client import LSPClientTool
-
-            lsp_client = LSPClientTool.get_client_for_file(file_path, self.project_root)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-
-        # 尝试获取 tree-sitter 提取器（作为后备）
+        # 尝试获取 tree-sitter 提取器
         treesitter_extractor = None
         try:
             from jarvis.jarvis_code_agent.code_analyzer.language_support import (
@@ -401,7 +392,6 @@ class ContextManager:
                             file_path,
                             call_line or line_start,
                             call_column or 0,
-                            lsp_client,
                             treesitter_extractor,
                             content,
                         )
@@ -452,7 +442,6 @@ class ContextManager:
                         file_path,
                         call_line or line_start,
                         call_column or 0,
-                        lsp_client,
                         treesitter_extractor,
                         content,
                     )
@@ -495,66 +484,25 @@ class ContextManager:
         file_path: str,
         line: int,
         column: int,
-        lsp_client: Optional[Any],
         treesitter_extractor: Optional[Any],
         content: str,
     ) -> Optional[Symbol]:
         """查找符号的定义位置。
 
-        优先使用 LSP，如果不支持则使用 tree-sitter。
+        使用 tree-sitter 符号提取器。
 
         Args:
             symbol_name: 符号名称
             file_path: 文件路径
             line: 行号（1-based）
             column: 列号（0-based）
-            lsp_client: LSP 客户端（可选）
             treesitter_extractor: tree-sitter 提取器（可选）
             content: 文件内容
 
         Returns:
             定义位置的 Symbol 对象，如果找不到则返回 None
         """
-        # 优先使用 LSP
-        if lsp_client:
-            try:
-                # LSP 使用 0-based 行号
-                definition = lsp_client.get_definition(file_path, line - 1, column)
-                if definition:
-                    # 处理 LSP 返回的定义（可能是单个对象或列表）
-                    if isinstance(definition, list):
-                        if definition:
-                            definition = definition[0]
-                        else:
-                            return None
-
-                    # 解析 LSP 返回的定义位置
-                    uri = definition.get("uri", "")
-                    if uri.startswith("file://"):
-                        def_file_path = uri[7:]  # 移除 "file://" 前缀
-                    else:
-                        def_file_path = uri
-
-                    range_info = definition.get("range", {})
-                    start = range_info.get("start", {})
-                    end = range_info.get("end", {})
-
-                    # LSP 使用 0-based 行号，转换为 1-based
-                    def_line_start = start.get("line", 0) + 1
-                    def_line_end = end.get("line", 0) + 1
-
-                    return Symbol(
-                        name=symbol_name,
-                        kind="",  # LSP 可能不提供类型信息
-                        file_path=def_file_path,
-                        line_start=def_line_start,
-                        line_end=def_line_end,
-                    )
-            except Exception:
-                # LSP 失败，继续尝试 tree-sitter
-                pass
-
-        # 后备：使用 tree-sitter
+        # 使用 tree-sitter
         if treesitter_extractor:
             try:
                 # 从符号表中查找定义（tree-sitter 已经提取了符号）

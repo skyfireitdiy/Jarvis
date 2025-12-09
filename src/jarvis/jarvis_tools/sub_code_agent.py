@@ -126,7 +126,6 @@ class SubCodeAgentTool:
                     "read_code",
                     "edit_file",
                     "rewrite_file",
-                    "lsp_client",
                 ]
                 if use_tools:
                     # 过滤掉基础工具和禁止的工具
