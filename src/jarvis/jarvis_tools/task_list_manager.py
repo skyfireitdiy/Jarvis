@@ -203,7 +203,7 @@ class task_list_manager:
             print(f"⚠️ 打印任务状态失败: {e}")
             print(f"   错误详情: {traceback.format_exc()}")
 
-    description = """任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
+    description = f"""任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
 
 **基本使用流程：**
 1. `create_task_list`: 创建任务列表（提供 main_goal，可同时提供 tasks_info 一次性创建并添加所有任务）
@@ -240,29 +240,33 @@ class task_list_manager:
 - 或者引用已存在的任务ID
 
 **简化使用示例（推荐）：**
-```json
-{
-  "action": "create_task_list",
-  "main_goal": "实现用户登录功能",
-  "tasks_info": [
-    {
-      "task_name": "设计数据库表结构",
-      "task_desc": "创建用户表和会话表",
-      "priority": 5,
-      "expected_output": "数据库表结构设计文档",
-      "agent_type": "code_agent"
-    },
-    {
-      "task_name": "实现登录接口",
-      "task_desc": "实现用户登录API",
-      "priority": 4,
-      "expected_output": "登录接口代码",
-      "agent_type": "code_agent",
-      "dependencies": ["设计数据库表结构"]
-    }
-  ]
-}
-```
+{ot("TOOL_CALL")}
+{{
+  "want": "创建任务列表并添加用户登录功能相关任务",
+  "name": "task_list_manager",
+  "arguments": {{
+    "action": "create_task_list",
+    "main_goal": "实现用户登录功能",
+    "tasks_info": [
+      {{
+        "task_name": "设计数据库表结构",
+        "task_desc": "创建用户表和会话表",
+        "priority": 5,
+        "expected_output": "数据库表结构设计文档",
+        "agent_type": "code_agent"
+      }},
+      {{
+        "task_name": "实现登录接口",
+        "task_desc": "实现用户登录API",
+        "priority": 4,
+        "expected_output": "登录接口代码",
+        "agent_type": "code_agent",
+        "dependencies": ["设计数据库表结构"]
+      }}
+    ]
+  }}
+}}
+{ct("TOOL_CALL")}
 
 **重要提醒：简单任务必须使用 `main` 类型**
 - 对于简单任务（如单次文件读取、简单的单步操作、单一工具调用等），**必须使用 `agent_type: "main"`**，由主 Agent 直接执行
@@ -270,19 +274,42 @@ class task_list_manager:
 - 只有真正复杂的任务（需要多个步骤、涉及多个文件、需要协调多个子任务等）才使用 `code_agent` 或 `agent`
 
 **分步使用（可选）：**
-```json
-{
-  "action": "create_task_list",
-  "main_goal": "实现用户登录功能"
-}
-```
-```json
-{
-  "action": "add_tasks",
-  "tasks_info": [...]
-}
-```
-"""
+{ot("TOOL_CALL")}
+{{
+  "want": "创建空的任务列表",
+  "name": "task_list_manager",
+  "arguments": {{
+    "action": "create_task_list",
+    "main_goal": "实现用户登录功能"
+  }}
+}}
+{ct("TOOL_CALL")}
+{ot("TOOL_CALL")}
+{{
+  "want": "向任务列表添加具体任务",
+  "name": "task_list_manager",
+  "arguments": {{
+    "action": "add_tasks",
+    "tasks_info": [
+      {{
+        "task_name": "设计数据库表结构",
+        "task_desc": "创建用户表和会话表",
+        "priority": 5,
+        "expected_output": "数据库表结构设计文档",
+        "agent_type": "code_agent"
+      }},
+      {{
+        "task_name": "实现登录接口",
+        "task_desc": "实现用户登录API",
+        "priority": 4,
+        "expected_output": "登录接口代码",
+        "agent_type": "code_agent",
+        "dependencies": ["设计数据库表结构"]
+      }}
+    ]
+  }}
+}}
+{ct("TOOL_CALL")}"""
 
     parameters = {
         "type": "object",
