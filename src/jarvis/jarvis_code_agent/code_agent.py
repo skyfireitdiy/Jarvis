@@ -676,7 +676,7 @@ class CodeAgent(Agent):
             if current_commit == start_commit:
                 git_diff = get_diff()  # 获取未提交的更改
             else:
-                git_diff = get_diff(start_commit)
+                git_diff = get_diff_between_commits(start_commit)
 
             if not git_diff or not git_diff.strip():
                 print("ℹ️ 没有代码修改，跳过审查")

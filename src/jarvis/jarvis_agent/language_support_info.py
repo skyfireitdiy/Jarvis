@@ -47,13 +47,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                 except Exception:
                     info[lang_name]["依赖分析"] = False
 
-                # 检查结构化编辑支持（基于符号提取器）
-                try:
-                    # 结构化编辑需要符号提取器支持
-                    extractor = lang_support.create_symbol_extractor()
-                    info[lang_name]["结构化编辑"] = extractor is not None
-                except Exception:
-                    info[lang_name]["结构化编辑"] = False
+
     except Exception:
         pass
 
@@ -262,7 +256,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
             "构建验证",
             "静态检查",
             "LSP支持",
-            "结构化编辑",
         ]:
             if feature not in info[lang_name]:
                 # 对于上下文提取，检查是否有对应的提取器
@@ -371,7 +364,6 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
             "构建验证",
             "静态检查",
             "LSP支持",
-            "结构化编辑",
         ]:
             if feature not in info[lang_name]:
                 # 对于上下文提取，检查是否有对应的提取器
@@ -509,7 +501,6 @@ def print_language_support_table() -> None:
         "构建验证",
         "静态检查",
         "LSP支持",
-        "结构化编辑",
     ]
 
     # 定义语言显示名称映射
