@@ -674,6 +674,8 @@ def _get_multiline_input_internal(
                 ("class:bt.key", "Ctrl+T"),
                 ("class:bt.label", " 终端(!SHELL) "),
                 ("class:bt.sep", " • "),
+                ("class:bt.label", " '<Quiet>' 静默模式 "),
+                ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+C/D"),
                 ("class:bt.label", " 取消 "),
             ]
