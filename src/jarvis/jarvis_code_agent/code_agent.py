@@ -42,6 +42,7 @@ from jarvis.jarvis_utils.git_utils import (
     find_git_root_and_cd,
     get_commits_between,
     get_diff,
+    get_diff_between_commits,
     get_diff_file_list,
     get_latest_commit_hash,
     handle_commit_workflow,
@@ -676,7 +677,7 @@ class CodeAgent(Agent):
             if current_commit == start_commit:
                 git_diff = get_diff()  # 获取未提交的更改
             else:
-                git_diff = get_diff_between_commits(start_commit)
+                git_diff = get_diff_between_commits(start_commit, current_commit)
 
             if not git_diff or not git_diff.strip():
                 print("ℹ️ 没有代码修改，跳过审查")
