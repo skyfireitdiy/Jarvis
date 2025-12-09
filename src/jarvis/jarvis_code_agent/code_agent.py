@@ -704,7 +704,7 @@ class CodeAgent(Agent):
             review_agent = Agent(
                 system_prompt=sys_prompt,
                 name=f"CodeReview-Agent-{iteration}",
-                model_group=self.model.get_model_group() if self.model else None,
+                model_group=self.model.model_group if self.model else None,
                 summary_prompt=sum_prompt,
                 need_summary=True,
                 auto_complete=True,
