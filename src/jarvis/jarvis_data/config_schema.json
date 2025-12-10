@@ -190,6 +190,70 @@
       },
       "default": {}
     },
+    "embeddings": {
+      "type": "object",
+      "description": "可复用的嵌入模型配置定义，可以在rag_groups中通过引用名称来使用",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "embedding_model": {
+            "type": "string",
+            "description": "嵌入模型的名称"
+          },
+          "embedding_type": {
+            "type": "string",
+            "description": "嵌入模型的实现类型，如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel', 'CohereEmbeddingModel', 'EdgeFnEmbeddingModel' 等"
+          },
+          "embedding_max_length": {
+            "type": "number",
+            "description": "嵌入模型的最大输入长度（token数），用于文档分割"
+          },
+          "embedding_config": {
+            "type": "object",
+            "description": "嵌入模型的额外配置参数，会传递给模型的构造函数",
+            "additionalProperties": true,
+            "default": {}
+          }
+        },
+        "required": [
+          "embedding_model",
+          "embedding_type"
+        ]
+      },
+      "default": {}
+    },
+    "rerankers": {
+      "type": "object",
+      "description": "可复用的重排模型配置定义，可以在rag_groups中通过引用名称来使用",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "rerank_model": {
+            "type": "string",
+            "description": "重排模型的名称"
+          },
+          "reranker_type": {
+            "type": "string",
+            "description": "重排模型的实现类型，如 'LocalReranker', 'CohereReranker', 'JinaReranker', 'EdgeFnReranker' 等"
+          },
+          "reranker_max_length": {
+            "type": "number",
+            "description": "重排模型的最大输入长度（token数）"
+          },
+          "reranker_config": {
+            "type": "object",
+            "description": "重排模型的额外配置参数，会传递给模型的构造函数",
+            "additionalProperties": true,
+            "default": {}
+          }
+        },
+        "required": [
+          "rerank_model",
+          "reranker_type"
+        ]
+      },
+      "default": {}
+    },
     "llm_group": {
       "type": "string",
       "description": "选择一个预定义的模型组",
@@ -510,45 +574,53 @@
         "additionalProperties": {
           "type": "object",
           "properties": {
+            "embedding": {
+              "type": "string",
+              "description": "引用 embeddings 中定义的嵌入模型配置名称（已弃用：建议直接使用 embedding_model, embedding_type 等字段）"
+            },
             "embedding_model": {
               "type": "string",
               "default": "BAAI/bge-m3",
-              "description": "嵌入模型的名称"
+              "description": "嵌入模型的名称（已弃用：建议使用 embedding 引用 embeddings 配置）"
             },
             "embedding_type": {
               "type": "string",
               "default": "LocalEmbeddingModel",
-              "description": "嵌入模型的实现类型，如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel', 'CohereEmbeddingModel', 'EdgeFnEmbeddingModel' 等"
+              "description": "嵌入模型的实现类型，如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel', 'CohereEmbeddingModel', 'EdgeFnEmbeddingModel' 等（已弃用：建议使用 embedding 引用 embeddings 配置）"
             },
             "embedding_max_length": {
               "type": "number",
               "default": 512,
-              "description": "嵌入模型的最大输入长度（token数），用于文档分割"
+              "description": "嵌入模型的最大输入长度（token数），用于文档分割（已弃用：建议使用 embedding 引用 embeddings 配置）"
             },
             "embedding_config": {
               "type": "object",
-              "description": "嵌入模型的额外配置参数，会传递给模型的构造函数",
+              "description": "嵌入模型的额外配置参数，会传递给模型的构造函数（已弃用：建议使用 embedding 引用 embeddings 配置）",
               "additionalProperties": true,
               "default": {}
+            },
+            "reranker": {
+              "type": "string",
+              "description": "引用 rerankers 中定义的重排模型配置名称（已弃用：建议直接使用 rerank_model, reranker_type 等字段）"
             },
             "rerank_model": {
               "type": "string",
               "default": "BAAI/bge-reranker-v2-m3",
-              "description": "重排模型的名称"
+              "description": "重排模型的名称（已弃用：建议使用 reranker 引用 rerankers 配置）"
             },
             "reranker_type": {
               "type": "string",
               "default": "LocalReranker",
-              "description": "重排模型的实现类型，如 'LocalReranker', 'CohereReranker', 'JinaReranker', 'EdgeFnReranker' 等"
+              "description": "重排模型的实现类型，如 'LocalReranker', 'CohereReranker', 'JinaReranker', 'EdgeFnReranker' 等（已弃用：建议使用 reranker 引用 rerankers 配置）"
             },
             "reranker_max_length": {
               "type": "number",
               "default": 512,
-              "description": "重排模型的最大输入长度（token数）"
+              "description": "重排模型的最大输入长度（token数）（已弃用：建议使用 reranker 引用 rerankers 配置）"
             },
             "reranker_config": {
               "type": "object",
-              "description": "重排模型的额外配置参数，会传递给模型的构造函数",
+              "description": "重排模型的额外配置参数，会传递给模型的构造函数（已弃用：建议使用 reranker 引用 rerankers 配置）",
               "additionalProperties": true,
               "default": {}
             },
