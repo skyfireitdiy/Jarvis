@@ -6,16 +6,17 @@ from typing import Any, Dict, List, Optional, cast
 import yaml  # type: ignore[import-untyped]
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
+from jarvis.jarvis_utils.collections import CaseInsensitiveDict
 
 # 全局环境变量存储
 
-GLOBAL_CONFIG_DATA: Dict[str, Any] = {}
+GLOBAL_CONFIG_DATA: CaseInsensitiveDict = CaseInsensitiveDict()
 
 
 def set_global_env_data(env_data: Dict[str, Any]) -> None:
     """设置全局环境变量数据"""
     global GLOBAL_CONFIG_DATA
-    GLOBAL_CONFIG_DATA = env_data
+    GLOBAL_CONFIG_DATA = CaseInsensitiveDict(env_data)
 
 
 def set_config(key: str, value: Any) -> None:
