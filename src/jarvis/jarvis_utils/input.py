@@ -377,7 +377,7 @@ def _get_current_agent_for_input():
     try:
         import jarvis.jarvis_utils.globals as g
 
-        current_name = getattr(g, "current_agent_name", "")
+        current_name = g.get_current_agent_name()
         if current_name:
             return g.get_agent(current_name)
     except Exception:

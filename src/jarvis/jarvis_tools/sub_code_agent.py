@@ -79,7 +79,7 @@ class SubCodeAgentTool:
                 try:
                     from jarvis.jarvis_utils import globals as G  # 延迟导入避免循环
 
-                    curr = getattr(G, "current_agent_name", "")
+                    curr = G.get_current_agent_name()
                     if curr:
                         parent_agent = getattr(G, "global_agents", {}).get(curr)
                     if parent_agent is None and getattr(G, "global_agents", {}):

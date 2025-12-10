@@ -215,7 +215,7 @@ class BasePlatform(ABC):
         first_chunk = None
 
         with Status(
-            f"🤔 {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()} 正在思考中...",
+            f"🤔 {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()} 正在思考中...",
             spinner="dots",
             console=console,
         ):
@@ -231,7 +231,7 @@ class BasePlatform(ABC):
         text_content = Text(overflow="fold")
         panel = Panel(
             text_content,
-            title=f"[bold cyan]{(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}[/bold cyan]",
+            title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}[/bold cyan]",
             subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
             border_style="bright_blue",
             box=box.ROUNDED,
@@ -357,7 +357,7 @@ class BasePlatform(ABC):
         import time
 
         console.print(
-            f"🤖 模型输出 - {(G.current_agent_name + ' · ') if G.current_agent_name else ''}{self.name()}  (按 Ctrl+C 中断)",
+            f"🤖 模型输出 - {(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}  (按 Ctrl+C 中断)",
             soft_wrap=False,
         )
         response = ""
