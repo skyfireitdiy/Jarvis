@@ -1116,7 +1116,7 @@ class BuildManager:
                         fg=typer.colors.YELLOW,
                     )
                     # 返回特殊值，表示需要重新开始
-                    return (False, None)  # type: ignore
+                    return (False, None)
                 else:
                     typer.secho(
                         "[c2rust-transpiler][build] 回退失败，继续尝试修复",
@@ -1275,7 +1275,7 @@ class BuildManager:
                         fg=typer.colors.YELLOW,
                     )
                     # 返回特殊值，表示需要重新开始
-                    return (False, None)  # type: ignore
+                    return (False, None)
                 else:
                     typer.secho(
                         "[c2rust-transpiler][build] 回退失败，继续尝试修复",

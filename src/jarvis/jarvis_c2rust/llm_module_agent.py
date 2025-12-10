@@ -201,14 +201,14 @@ class LLMRustCratePlannerAgent:
 
                 full_prompt = f"{user_prompt}{error_guidance}\n\n{summary_prompt}"
                 try:
-                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                    response = agent.model.chat_until_success(full_prompt)
                     summary_output = response
                 except Exception as e:
                     print(f"[c2rust-llm-planner] 直接模型调用失败: {e}，回退到 run()")
-                    summary_output = agent.run(user_prompt)  # type: ignore
+                    summary_output = agent.run(user_prompt)
             else:
                 # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
-                summary_output = agent.run(user_prompt)  # type: ignore
+                summary_output = agent.run(user_prompt)
 
             project_text = str(summary_output) if summary_output is not None else ""
             json_text = self.validator.extract_json_from_project(project_text)

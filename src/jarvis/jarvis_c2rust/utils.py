@@ -359,7 +359,7 @@ def ask_llm_about_test_deletion(
             f"{log_prefix}[test-detection] 正在询问 LLM 判断测试代码删除是否合理...",
             fg=typer.colors.YELLOW,
         )
-        response = agent.model.chat_until_success(prompt)  # type: ignore
+        response = agent.model.chat_until_success(prompt)
         response_str = str(response or "")
 
         # 使用确定的协议标记解析回答
