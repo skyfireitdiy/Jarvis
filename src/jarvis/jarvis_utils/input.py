@@ -280,6 +280,7 @@ class FileCompleter(Completer):
                 (ot("ToolUsage"), "工具使用说明"),
                 (ot("ReloadConfig"), "重新加载配置"),
                 (ot("SaveSession"), "保存当前会话"),
+                (ot("Quiet"), "静默模式"),
             ]
         )
         # 添加内置规则到补全列表
