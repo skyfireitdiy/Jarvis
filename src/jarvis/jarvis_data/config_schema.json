@@ -342,7 +342,7 @@
     "build_validation_timeout": {
       "type": "number",
       "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
-      "default": 600
+      "default": 30
     },
     "enable_impact_analysis": {
       "type": "boolean",
@@ -614,30 +614,6 @@
       },
       "default": {}
     },
-    "OPENAI_API_KEY": {
-      "type": "string",
-      "description": "OpenAI API Key"
-    },
-    "OPENAI_API_BASE": {
-      "type": "string",
-      "description": "OpenAI API Base URL"
-    },
-    "KIMI_API_KEY": {
-      "type": "string",
-      "description": "Kimi API Key"
-    },
-    "TONGYI_COOKIES": {
-      "type": "string",
-      "description": "Tongyi Cookies"
-    },
-    "YUANBAO_COOKIES": {
-      "type": "string",
-      "description": "Yuanbao Cookies"
-    },
-    "AI8_API_KEY": {
-      "type": "string",
-      "description": "AI8 API Key"
-    },
     "SHELL": {
       "type": "string",
       "description": "系统Shell路径，用于获取当前使用的shell类型",
@@ -655,6 +631,16 @@
       "description": "Diff可视化模式。side_by_side: 左右分栏对比显示；unified: 统一diff格式；syntax: 语法高亮模式；compact: 紧凑模式",
       "enum": ["side_by_side", "unified", "syntax", "compact"],
       "default": "side_by_side"
+    },
+    "diff_show_line_numbers": {
+      "type": "boolean",
+      "description": "是否在 diff 中显示行号",
+      "default": true
+    },
+    "diff_large_file_threshold": {
+      "type": "number",
+      "description": "大文件阈值（超过此行数只显示统计）",
+      "default": 300
     }
   },
   "additionalProperties": true
