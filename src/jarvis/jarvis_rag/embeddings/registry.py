@@ -246,6 +246,37 @@ class EmbeddingRegistry:
         create_kwargs = {"model_name": model_name}
         create_kwargs.update(embedding_config)
 
+        # 将配置中的键名映射到 api_key 参数
+        # 支持的键名：openai_api_key, cohere_api_key, edgefn_api_key, jina_api_key
+        api_key_mapping = {
+            "openai_api_key": "api_key",
+            "cohere_api_key": "api_key",
+            "edgefn_api_key": "api_key",
+            "jina_api_key": "api_key",
+        }
+        for config_key, param_key in api_key_mapping.items():
+            if config_key in create_kwargs:
+                # 如果还没有设置 api_key，则使用配置中的值
+                if param_key not in create_kwargs:
+                    create_kwargs[param_key] = create_kwargs.pop(config_key)
+                else:
+                    # 如果已经设置了 api_key，移除配置中的键
+                    create_kwargs.pop(config_key)
+
+        # 同样处理 base_url
+        base_url_mapping = {
+            "openai_api_base": "base_url",
+            "cohere_api_base": "base_url",
+            "edgefn_api_base": "base_url",
+            "jina_api_base": "base_url",
+        }
+        for config_key, param_key in base_url_mapping.items():
+            if config_key in create_kwargs:
+                if param_key not in create_kwargs:
+                    create_kwargs[param_key] = create_kwargs.pop(config_key)
+                else:
+                    create_kwargs.pop(config_key)
+
         # 添加max_length（如果配置中没有指定，使用配置系统的默认值）
         if "max_length" not in create_kwargs:
             create_kwargs["max_length"] = get_rag_embedding_max_length()
