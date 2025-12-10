@@ -48,6 +48,7 @@ class ReviewManager:
         on_before_tool_call_func: Callable[[Any, Any], None],
         on_after_tool_call_func: Callable[[Any, Any, Any, Any], None],
         agent_before_commits: Dict[str, Optional[str]],
+        get_git_diff: Optional[Callable[[str], str]] = None,
         get_git_diff_func: Optional[Callable[[Optional[str]], str]] = None,
     ) -> None:
         self.crate_dir = crate_dir
@@ -64,7 +65,9 @@ class ReviewManager:
         self.is_root_symbol = is_root_symbol_func
         self.get_crate_commit_hash = get_crate_commit_hash_func
         self.current_function_start_commit_getter = current_function_start_commit_getter
-        self.compose_prompt_with_context = compose_prompt_with_context_func
+        self.compose_prompt_with_context: Callable[[str, bool], str] = (
+            compose_prompt_with_context_func
+        )
         self.get_fix_agent = get_fix_agent_func
         self.check_and_handle_test_deletion = check_and_handle_test_deletion_func
         self.append_additional_notes = append_additional_notes_func
@@ -748,11 +751,13 @@ class ReviewManager:
                 usr_p_with_notice = (
                     usr_p_current + previous_issues_text + code_changed_notice
                 )
-                composed_prompt = self.compose_prompt_with_context(usr_p_with_notice)
+                composed_prompt = self.compose_prompt_with_context(
+                    usr_p_with_notice, False
+                )
                 # 修复后必须使用 Agent.run()，不能使用直接模型调用（因为需要工具调用）
                 use_direct_model_review = False
             else:
-                composed_prompt = self.compose_prompt_with_context(usr_p_current)
+                composed_prompt = self.compose_prompt_with_context(usr_p_current, False)
 
             if use_direct_model_review:
                 # 格式解析失败后，直接调用模型接口
@@ -779,7 +784,7 @@ class ReviewManager:
                     fg=typer.colors.YELLOW,
                 )
                 try:
-                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                    response = agent.model.chat_until_success(full_prompt)
                     summary = str(response or "")
                 except Exception as e:
                     typer.secho(
@@ -847,24 +852,28 @@ class ReviewManager:
                     continue
 
             ok = bool(verdict.get("ok") is True)
-            function_issues = (
-                verdict.get("function_issues")
-                if isinstance(verdict.get("function_issues"), list)
+            raw_function_issues = verdict.get("function_issues")
+            function_issues: list[str] = (
+                [str(item) for item in raw_function_issues]
+                if isinstance(raw_function_issues, list)
                 else []
             )
-            critical_issues = (
-                verdict.get("critical_issues")
-                if isinstance(verdict.get("critical_issues"), list)
+            raw_critical_issues = verdict.get("critical_issues")
+            critical_issues: list[str] = (
+                [str(item) for item in raw_critical_issues]
+                if isinstance(raw_critical_issues, list)
                 else []
             )
-            breaking_issues = (
-                verdict.get("breaking_issues")
-                if isinstance(verdict.get("breaking_issues"), list)
+            raw_breaking_issues = verdict.get("breaking_issues")
+            breaking_issues: list[str] = (
+                [str(item) for item in raw_breaking_issues]
+                if isinstance(raw_breaking_issues, list)
                 else []
             )
-            structure_issues = (
-                verdict.get("structure_issues")
-                if isinstance(verdict.get("structure_issues"), list)
+            raw_structure_issues = verdict.get("structure_issues")
+            structure_issues: list[str] = (
+                [str(item) for item in raw_structure_issues]
+                if isinstance(raw_structure_issues, list)
                 else []
             )
 
@@ -1097,7 +1106,7 @@ class ReviewManager:
             limit_info = f"/{max_iterations}" if max_iterations > 0 else "/∞"
             fix_prompt_with_notes = self.append_additional_notes(fix_prompt)
             ca.run(
-                self.compose_prompt_with_context(fix_prompt_with_notes, for_fix=True),
+                self.compose_prompt_with_context(fix_prompt_with_notes, True),
                 prefix=f"[c2rust-transpiler][review-fix iter={i + 1}{limit_info}]",
                 suffix="",
             )
@@ -1113,9 +1122,7 @@ class ReviewManager:
                 # 重新创建修复 Agent
                 ca = self.get_fix_agent(c_code)
                 ca.run(
-                    self.compose_prompt_with_context(
-                        fix_prompt_with_notes, for_fix=True
-                    ),
+                    self.compose_prompt_with_context(fix_prompt_with_notes, True),
                     prefix=f"[c2rust-transpiler][review-fix iter={i + 1}{limit_info}][retry]",
                     suffix="",
                 )

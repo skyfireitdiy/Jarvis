@@ -342,7 +342,7 @@ class Transpiler:
 
     # ========= Agent 复用与上下文拼接辅助 =========
 
-    def _compose_prompt_with_context(self, prompt: str, for_fix: bool = False) -> str:
+    def _compose_prompt_with_context(self, prompt: str, for_fix: bool = False) -> str:  # type: ignore[no-untyped-def]
         """在复用Agent时，将此前构建的函数上下文头部拼接到当前提示词前（委托给 AgentManager）"""
         return self.agent_manager.compose_prompt_with_context(prompt, for_fix)
 

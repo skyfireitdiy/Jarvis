@@ -14,11 +14,11 @@ def check_llm_availability() -> tuple[bool, Any, Any, Any]:
     使用smart平台，适用于代码生成等复杂场景
     """
     try:
-        from jarvis.jarvis_platform.registry import PlatformRegistry  # type: ignore
+        from jarvis.jarvis_platform.registry import PlatformRegistry
         from jarvis.jarvis_utils.config import (
             get_smart_platform_name,
             get_smart_model_name,
-        )  # type: ignore
+        )
 
         return True, PlatformRegistry, get_smart_platform_name, get_smart_model_name
     except Exception:
@@ -37,29 +37,29 @@ def create_llm_model(
     if not model_available:
         return None
     try:
-        registry = PlatformRegistry.get_global_platform_registry()  # type: ignore
+        registry = PlatformRegistry.get_global_platform_registry()
         model = None
         if llm_group:
             try:
-                platform_name = get_smart_platform_name(llm_group)  # type: ignore
+                platform_name = get_smart_platform_name(llm_group)
                 if platform_name:
-                    model = registry.create_platform(platform_name)  # type: ignore
+                    model = registry.create_platform(platform_name)
             except Exception:
                 model = None
         if model is None:
-            model = registry.get_smart_platform()  # type: ignore
+            model = registry.get_smart_platform()
         try:
-            model.set_model_group(llm_group)  # type: ignore
+            model.set_model_group(llm_group)
         except Exception:
             pass
         if llm_group:
             try:
-                mn = get_smart_model_name(llm_group)  # type: ignore
+                mn = get_smart_model_name(llm_group)
                 if mn:
-                    model.set_model_name(mn)  # type: ignore
+                    model.set_model_name(mn)
             except Exception:
                 pass
-        model.set_system_prompt(  # type: ignore
+        model.set_system_prompt(
             "你是资深 C→Rust 迁移专家。任务：给定一个函数及其调用子树（依赖图摘要、函数签名、源码片段），"
             "判断是否可以使用一个或多个成熟的 Rust 库整体替代该子树的功能（允许库内多个 API 协同，允许多个库组合；不允许使用不成熟/不常见库）。"
             "如可替代，请给出 libraries 列表（库名），可选给出代表性 API/模块与实现备注 notes（如何用这些库协作实现）。"
@@ -146,7 +146,7 @@ def llm_evaluate_subtree(
                 prompt = base_prompt + error_hint
 
             # 调用LLM
-            result = model.chat_until_success(prompt)  # type: ignore
+            result = model.chat_until_success(prompt)
             parsed, parse_error = parse_agent_json_summary(result or "")
 
             if parse_error:

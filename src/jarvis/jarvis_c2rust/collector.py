@@ -179,7 +179,7 @@ def collect_function_names(
     # 准备libclang
     cindex = _try_import_libclang()
     if cindex is None:
-        from clang import cindex as _ci  # type: ignore[import-untyped,no-redef]
+        from clang import cindex as _ci
 
         cindex = _ci
 
