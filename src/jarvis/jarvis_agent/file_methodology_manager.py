@@ -43,7 +43,7 @@ class FileMethodologyManager:
 
     def _handle_methodology_upload(self):
         """处理方法论上传"""
-        if not upload_methodology(self.agent.model, other_files=self.agent.files):  # type: ignore
+        if not upload_methodology(self.agent.model, other_files=self.agent.files):
             if self.agent.files:
                 print("⚠️ 文件上传失败，将忽略文件列表")
             # 上传失败则回退到本地加载
@@ -68,7 +68,7 @@ class FileMethodologyManager:
 
     def _handle_files_upload(self):
         """处理普通文件上传"""
-        if not self.agent.model.upload_files(self.agent.files):  # type: ignore
+        if not self.agent.model.upload_files(self.agent.files):
             print("⚠️ 文件上传失败，将忽略文件列表")
         else:
             self.agent.session.prompt = join_prompts(

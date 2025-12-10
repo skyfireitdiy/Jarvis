@@ -508,7 +508,7 @@ class Agent:
 
     def get_tool_usage_prompt(self) -> str:
         """获取工具使用提示"""
-        return build_action_prompt(self.output_handler)  # type: ignore
+        return build_action_prompt(self.output_handler)
 
     def __new__(cls, *args, **kwargs):
         if kwargs.get("agent_type") == "code":
@@ -591,15 +591,15 @@ class Agent:
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
         # 记录连续未添加 addon_prompt 的轮数
-        self._addon_prompt_skip_rounds: int = 0
+        self._addon_prompt_skip_rounds = 0
         # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
-        self._no_tool_call_count: int = 0
+        self._no_tool_call_count = 0
 
         self._agent_type = "normal"
 
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
         self.confirm_callback: Callable[[str, bool], bool] = (
-            confirm_callback or user_confirm  # type: ignore[assignment]
+            confirm_callback or user_confirm
         )
 
         # 初始化模型和会话
@@ -617,7 +617,7 @@ class Agent:
             self.multiline_inputer, self.confirm_callback
         )
         # 将确认函数指向封装后的 confirm，保持既有调用不变
-        self.confirm_callback = self.user_interaction.confirm  # type: ignore[assignment]
+        self.confirm_callback = self.user_interaction.confirm
         # 非交互模式参数支持：允许通过构造参数显式控制，便于其他Agent调用时设置
         # 仅作为 Agent 实例属性，不写入环境变量或全局配置，避免跨 Agent 污染
         try:
@@ -712,8 +712,8 @@ class Agent:
         show_agent_startup_stats(
             name,
             self.model.name(),
-            self.get_tool_registry(),  # type: ignore
-            platform_name=self.model.platform_name(),  # type: ignore
+            self.get_tool_registry(),
+            platform_name=self.model.platform_name(),
         )
 
         # 动态加载工具调用后回调
@@ -743,7 +743,7 @@ class Agent:
 
     def _init_session(self):
         """初始化会话管理器"""
-        self.session = SessionManager(model=self.model, agent_name=self.name)  # type: ignore
+        self.session = SessionManager(model=self.model, agent_name=self.name)
 
     def _init_handlers(
         self,
@@ -767,11 +767,11 @@ class Agent:
         """设置系统提示词"""
         try:
             prompt_text = self.prompt_manager.build_system_prompt()
-            self.model.set_system_prompt(prompt_text)  # type: ignore
+            self.model.set_system_prompt(prompt_text)
         except Exception:
             # 回退到原始行为，确保兼容性
             action_prompt = self.get_tool_usage_prompt()
-            self.model.set_system_prompt(  # type: ignore
+            self.model.set_system_prompt(
                 f"""
 {self.system_prompt}
 
@@ -829,10 +829,12 @@ class Agent:
             pass
         try:
             # Try to pass the keyword for enhanced input handler
-            return self.multiline_inputer(tip, print_on_empty=print_on_empty)  # type: ignore
+            return self.multiline_inputer(
+                tip,
+            )
         except TypeError:
             # Fallback for custom handlers that only accept one argument
-            return self.multiline_inputer(tip)  # type: ignore
+            return self.multiline_inputer(tip)
 
     def _load_after_tool_callbacks(self) -> None:
         """
@@ -867,7 +869,7 @@ class Agent:
                         if hasattr(module, "after_tool_call_cb"):
                             obj = getattr(module, "after_tool_call_cb")
                             if callable(obj):
-                                candidates.append(obj)  # type: ignore[arg-type]
+                                candidates.append(obj)
 
                         # 2) 工厂方法：get_after_tool_call_cb()
                         if hasattr(module, "get_after_tool_call_cb"):
@@ -1131,7 +1133,7 @@ class Agent:
         except Exception:
             pass
 
-        response = self.model.chat_until_success(message)  # type: ignore
+        response = self.model.chat_until_success(message)
         # 防御: 模型可能返回空响应(None或空字符串)，统一为空字符串并告警
         if not response:
             try:
@@ -1189,7 +1191,7 @@ class Agent:
                 else:
                     prompt_to_use = DEFAULT_SUMMARY_PROMPT
 
-            summary = self.model.chat_until_success(prompt_to_use)  # type: ignore
+            summary = self.model.chat_until_success(prompt_to_use)
             # 防御: 可能返回空响应(None或空字符串)，统一为空字符串并告警
             if not summary:
                 try:
@@ -1267,22 +1269,30 @@ class Agent:
         task_list_info = ""
         try:
             # 获取所有任务列表的摘要信息
-            task_lists_summary = []
+            task_lists_summary: List[Dict[str, Any]] = []
             for task_list_id, task_list in self.task_list_manager.task_lists.items():
-                summary = self.task_list_manager.get_task_list_summary(task_list_id)
-                if summary:
-                    task_lists_summary.append(summary)
+                summary_dict = self.task_list_manager.get_task_list_summary(
+                    task_list_id
+                )
+                if summary_dict and isinstance(summary_dict, dict):
+                    task_lists_summary.append(summary_dict)
 
             if task_lists_summary:
                 task_list_info = "\\n\\n## 任务列表状态\\n"
-                for summary in task_lists_summary:
-                    task_list_info += f"\\n- 目标: {summary['main_goal']}"
-                    task_list_info += f"\\n- 总任务数: {summary['total_tasks']}"
-                    task_list_info += f"\\n- 待执行: {summary['pending']}"
-                    task_list_info += f"\\n- 执行中: {summary['running']}"
-                    task_list_info += f"\\n- 已完成: {summary['completed']}"
-                    task_list_info += f"\\n- 失败: {summary['failed']}"
-                    task_list_info += f"\\n- 已放弃: {summary['abandoned']}\\n"
+                for summary_dict in task_lists_summary:
+                    task_list_info += (
+                        f"\\n- 目标: {summary_dict.get('main_goal', '未知')}"
+                    )
+                    task_list_info += (
+                        f"\\n- 总任务数: {summary_dict.get('total_tasks', 0)}"
+                    )
+                    task_list_info += f"\\n- 待执行: {summary_dict.get('pending', 0)}"
+                    task_list_info += f"\\n- 执行中: {summary_dict.get('running', 0)}"
+                    task_list_info += f"\\n- 已完成: {summary_dict.get('completed', 0)}"
+                    task_list_info += f"\\n- 失败: {summary_dict.get('failed', 0)}"
+                    task_list_info += (
+                        f"\\n- 已放弃: {summary_dict.get('abandoned', 0)}\\n"
+                    )
         except Exception:
             # 非关键流程，失败时不影响主要功能
             pass
@@ -1459,7 +1469,7 @@ class Agent:
             if not self.model:
                 raise RuntimeError("Model not initialized")
             # 直接使用本地变量，避免受事件回调影响
-            ret = self.model.chat_until_success(safe_summary_prompt)  # type: ignore
+            ret = self.model.chat_until_success(safe_summary_prompt)
             # 防御: 总结阶段模型可能返回空响应(None或空字符串)，统一为空字符串并告警
             if not ret:
                 try:
@@ -1730,9 +1740,9 @@ class Agent:
         if user_input:
             self.session.prompt = user_input
             # 使用显式动作信号，保留返回类型注释以保持兼容
-            return LoopAction.CONTINUE  # type: ignore[return-value]
+            return LoopAction.CONTINUE
         else:
-            return LoopAction.COMPLETE  # type: ignore[return-value]
+            return LoopAction.COMPLETE
 
     def _first_run(self):
         """首次运行初始化"""
@@ -1862,7 +1872,7 @@ class Agent:
         # 使用临时模型实例调用模型，以避免污染历史记录
         try:
             temp_model = self._create_temp_model("你是一个帮助筛选工具的助手。")
-            selected_tools_str = temp_model.chat_until_success(selection_prompt)  # type: ignore
+            selected_tools_str = temp_model.chat_until_success(selection_prompt)
 
             # 解析响应并筛选工具
             selected_indices = [
