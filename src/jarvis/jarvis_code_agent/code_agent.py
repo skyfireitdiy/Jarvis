@@ -928,12 +928,16 @@ def cli(
 
         if requirement:
             agent.run(requirement, prefix=prefix, suffix=suffix)
+            if agent.non_interactive:
+                raise typer.Exit(code=0)
         else:
             while True:
                 user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
                 if not user_input:
                     raise typer.Exit(code=0)
                 agent.run(user_input, prefix=prefix, suffix=suffix)
+                if agent.non_interactive:
+                    raise typer.Exit(code=0)
 
     except typer.Exit:
         raise
