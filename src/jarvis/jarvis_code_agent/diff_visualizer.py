@@ -11,6 +11,40 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
 import difflib
+import os
+
+try:
+    from jarvis.jarvis_code_agent.code_analyzer.language_support import (
+        detect_language as detect_language_from_path,
+    )
+except ImportError:
+    # 如果导入失败，使用简单的文件扩展名检测
+    def detect_language_from_path(file_path: str) -> Optional[str]:
+        ext = os.path.splitext(file_path)[1].lower()
+        ext_to_lang = {
+            ".py": "python",
+            ".js": "javascript",
+            ".ts": "typescript",
+            ".java": "java",
+            ".cpp": "cpp",
+            ".cc": "cpp",
+            ".cxx": "cpp",
+            ".c": "c",
+            ".rs": "rust",
+            ".go": "go",
+            ".rb": "ruby",
+            ".php": "php",
+            ".sh": "bash",
+            ".html": "html",
+            ".css": "css",
+            ".sql": "sql",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".json": "json",
+            ".xml": "xml",
+            ".md": "markdown",
+        }
+        return ext_to_lang.get(ext)
 
 
 class DiffVisualizer:
@@ -23,6 +57,97 @@ class DiffVisualizer:
             console: Rich Console 实例，如果为 None 则创建新实例
         """
         self.console = console or Console()
+
+    def _highlight_line(
+        self,
+        line: str,
+        language: Optional[str] = None,
+        background: Optional[str] = None,
+    ) -> Text:
+        """对单行代码进行语法高亮并转换为 Text 对象
+
+        参数:
+            line: 要高亮的代码行
+            language: 编程语言（如果为 None 则使用 "text"）
+            background: 背景色样式（如 "on red", "on green"）
+
+        返回:
+            Text: 高亮后的 Text 对象
+        """
+        if language is None:
+            language = "text"
+
+        # 使用 Syntax 对象进行语法高亮，然后转换为 Text
+        try:
+            from pygments import lex
+            from pygments.lexers import get_lexer_by_name
+            from pygments.util import ClassNotFound
+            from pygments.token import Token
+
+            # 尝试获取 lexer
+            try:
+                lexer = get_lexer_by_name(language)
+                tokens = list(lex(line, lexer))
+            except ClassNotFound:
+                tokens = [(Token.Text, line)]
+
+            # 构建 Text 对象，应用语法高亮样式
+            text = Text()
+            for token_type, token_value in tokens:
+                # 根据 token 类型应用样式
+                style = self._get_token_style(token_type)
+                text.append(token_value, style=style)
+        except Exception:
+            # 如果高亮失败，使用普通文本
+            text = Text(line)
+
+        # 应用背景色
+        if background:
+            # 为整个文本应用背景色
+            text.stylize(background, 0, len(text))
+
+        return text
+
+    def _get_token_style(self, token_type) -> Optional[str]:
+        """根据 pygments token 类型返回 Rich 样式
+
+        参数:
+            token_type: pygments token 类型
+
+        返回:
+            Rich 样式字符串
+        """
+        from pygments.token import (
+            Keyword,
+            Name,
+            String,
+            Number,
+            Comment,
+            Operator,
+            Punctuation,
+        )
+
+        # 映射 pygments token 类型到 Rich 样式
+        if token_type in Keyword:
+            return "bold cyan"
+        elif token_type in Name.Class:
+            return "bold yellow"
+        elif token_type in Name.Function:
+            return "bold green"
+        elif token_type in Name:
+            return "white"
+        elif token_type in String:
+            return "green"
+        elif token_type in Number:
+            return "yellow"
+        elif token_type in Comment:
+            return "bright_black italic"
+        elif token_type in Operator:
+            return "bright_white"
+        elif token_type in Punctuation:
+            return "white"
+        else:
+            return None
 
     def visualize_unified_diff(
         self,
@@ -389,6 +514,60 @@ class DiffVisualizer:
             old_line_map: 旧文件行号映射（索引对应 old_lines 索引，值为文件中的绝对行号）
             new_line_map: 新文件行号映射（索引对应 new_lines 索引，值为文件中的绝对行号）
         """
+        # 检测文件的语言类型（用于语法高亮）
+        language = None
+        if file_path:
+            language = detect_language_from_path(file_path)
+        # 如果无法从路径检测，尝试从代码内容推断
+        if language is None and old_lines:
+            try:
+                from pygments.lexers import guess_lexer
+
+                sample_text = "\n".join(old_lines[:10])  # 使用前10行作为样本
+                lexer = guess_lexer(sample_text)
+                # 将 pygments 语言名称映射到 Rich 支持的语言名称
+                lang_name = lexer.name.lower()
+                if "python" in lang_name:
+                    language = "python"
+                elif "javascript" in lang_name or "js" in lang_name:
+                    language = "javascript"
+                elif "typescript" in lang_name or "ts" in lang_name:
+                    language = "typescript"
+                elif "java" in lang_name:
+                    language = "java"
+                elif "c++" in lang_name or "cpp" in lang_name:
+                    language = "cpp"
+                elif "c#" in lang_name or "csharp" in lang_name:
+                    language = "csharp"
+                elif "rust" in lang_name:
+                    language = "rust"
+                elif "go" in lang_name:
+                    language = "go"
+                elif "ruby" in lang_name:
+                    language = "ruby"
+                elif "php" in lang_name:
+                    language = "php"
+                elif "bash" in lang_name or "shell" in lang_name:
+                    language = "bash"
+                elif "html" in lang_name:
+                    language = "html"
+                elif "css" in lang_name:
+                    language = "css"
+                elif "sql" in lang_name:
+                    language = "sql"
+                elif "yaml" in lang_name:
+                    language = "yaml"
+                elif "json" in lang_name:
+                    language = "json"
+                elif "xml" in lang_name:
+                    language = "xml"
+                elif "markdown" in lang_name or "md" in lang_name:
+                    language = "markdown"
+                else:
+                    language = "text"
+            except Exception:
+                language = "text"
+
         # 使用 difflib.SequenceMatcher 进行更精确的匹配
         matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
         opcodes = matcher.get_opcodes()
@@ -437,11 +616,14 @@ class DiffVisualizer:
                                 if j1 + k < len(new_line_map)
                                 else j1 + k + 1
                             )
+                            # 对未更改的行使用语法高亮（无背景色）
+                            old_text = self._highlight_line(equal_chunk[k], language)
+                            new_text = self._highlight_line(equal_chunk[k], language)
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                old_text,
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                new_text,
                             )
                         # 如果有省略，显示省略标记
                         if equal_len > context_lines * 2:
@@ -465,11 +647,14 @@ class DiffVisualizer:
                                 if j1 + k < len(new_line_map)
                                 else j1 + k + 1
                             )
+                            # 对未更改的行使用语法高亮（无背景色）
+                            old_text = self._highlight_line(equal_chunk[k], language)
+                            new_text = self._highlight_line(equal_chunk[k], language)
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                old_text,
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                new_text,
                             )
                     else:
                         # 第一个块，只显示结尾的上下文
@@ -485,11 +670,14 @@ class DiffVisualizer:
                                 if j1 + k < len(new_line_map)
                                 else j1 + k + 1
                             )
+                            # 对未更改的行使用语法高亮（无背景色）
+                            old_text = self._highlight_line(equal_chunk[k], language)
+                            new_text = self._highlight_line(equal_chunk[k], language)
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                old_text,
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                new_text,
                             )
                 else:
                     # 如果 equal 块不长，显示所有行
@@ -504,11 +692,14 @@ class DiffVisualizer:
                             if j1 + k < len(new_line_map)
                             else j1 + k + 1
                         )
+                        # 对未更改的行使用语法高亮（无背景色）
+                        old_text = self._highlight_line(line, language)
+                        new_text = self._highlight_line(line, language)
                         table.add_row(
                             f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                            f"[bright_black]{line}[/bright_black]",
+                            old_text,
                             f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                            f"[bright_black]{line}[/bright_black]",
+                            new_text,
                         )
                 continue
             elif tag == "replace":
@@ -529,11 +720,13 @@ class DiffVisualizer:
                             if i1 + k < len(old_line_map)
                             else i1 + k + 1
                         )
-                        old_content = f"[red3]{old_chunk[k]}[/red3]"
+                        # 使用语法高亮，并添加红色背景
+                        old_content = self._highlight_line(
+                            old_chunk[k], language, "on red"
+                        )
                     else:
                         old_line_num_actual = ""
-                        old_content = ""
-                        old_content = ""
+                        old_content = Text("")
 
                     if k < len(new_chunk):
                         new_line_num_actual: Union[int, str] = (
@@ -541,11 +734,13 @@ class DiffVisualizer:
                             if j1 + k < len(new_line_map)
                             else j1 + k + 1
                         )
-                        new_content = f"[green3]{new_chunk[k]}[/green3]"
+                        # 使用语法高亮，并添加绿色背景
+                        new_content = self._highlight_line(
+                            new_chunk[k], language, "on green"
+                        )
                     else:
                         new_line_num_actual = ""
-                        new_content = ""
-                        new_content = ""
+                        new_content = Text("")
 
                     table.add_row(
                         str(old_line_num_actual),
@@ -565,11 +760,13 @@ class DiffVisualizer:
                         if i1 + k < len(old_line_map)
                         else i1 + k + 1
                     )
+                    # 使用语法高亮，并添加红色背景
+                    old_content = self._highlight_line(line, language, "on red")
                     table.add_row(
                         str(old_line_num),
-                        f"[red3]{line}[/red3]",
+                        old_content,
                         "",
-                        "",
+                        Text(""),
                     )
             elif tag == "insert":
                 # 仅新增
@@ -583,11 +780,13 @@ class DiffVisualizer:
                         if j1 + k < len(new_line_map)
                         else j1 + k + 1
                     )
+                    # 使用语法高亮，并添加绿色背景
+                    new_content = self._highlight_line(line, language, "on green")
                     table.add_row(
                         "",
-                        "",
+                        Text(""),
                         str(new_line_num),
-                        f"[green3]{line}[/green3]",
+                        new_content,
                     )
 
         # 如果没有变更，显示提示
