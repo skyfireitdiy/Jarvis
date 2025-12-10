@@ -342,7 +342,7 @@ class Transpiler:
 
     # ========= Agent 复用与上下文拼接辅助 =========
 
-    def _compose_prompt_with_context(self, prompt: str, for_fix: bool = False) -> str:  # type: ignore[no-untyped-def]
+    def _compose_prompt_with_context(self, prompt: str, for_fix: bool = False) -> str:
         """在复用Agent时，将此前构建的函数上下文头部拼接到当前提示词前（委托给 AgentManager）"""
         return self.agent_manager.compose_prompt_with_context(prompt, for_fix)
 
@@ -499,7 +499,11 @@ class Transpiler:
         """朴素错误分类（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        return self.build_manager.classify_rust_error(text)
+        return (
+            self.build_manager.classify_rust_error(text)
+            if self.build_manager is not None
+            else []
+        )
 
     def _get_current_function_context(self) -> Tuple[Dict[str, Any], str, str, str]:
         """
@@ -548,15 +552,19 @@ class Transpiler:
         """构建修复提示词的基础部分（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        return self.build_manager.build_repair_prompt_base(
-            stage,
-            tags,
-            sym_name,
-            src_loc,
-            c_code,
-            curr,
-            symbols_path,
-            include_output_patch_hint,
+        return (
+            self.build_manager.build_repair_prompt_base(
+                stage,
+                tags,
+                sym_name,
+                src_loc,
+                c_code,
+                curr,
+                symbols_path,
+                include_output_patch_hint,
+            )
+            if self.build_manager is not None
+            else []
         )
 
     def _build_repair_prompt_stage_section(
@@ -565,8 +573,10 @@ class Transpiler:
         """构建修复提示词的阶段特定部分（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        return self.build_manager.build_repair_prompt_stage_section(
-            stage, output, command
+        return (
+            self.build_manager.build_repair_prompt_stage_section(stage, output, command)
+            if self.build_manager is not None
+            else []
         )
 
     def _build_repair_prompt(
@@ -585,30 +595,39 @@ class Transpiler:
         """构建修复提示词（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        return self.build_manager.build_repair_prompt(
-            stage,
-            output,
-            tags,
-            sym_name,
-            src_loc,
-            c_code,
-            curr,
-            symbols_path,
-            include_output_patch_hint,
-            command,
+        return (
+            self.build_manager.build_repair_prompt(
+                stage,
+                output,
+                tags,
+                sym_name,
+                src_loc,
+                c_code,
+                curr,
+                symbols_path,
+                include_output_patch_hint,
+                command,
+            )
+            if self.build_manager is not None
+            else ""
         )
 
     def _detect_crate_kind(self) -> str:
         """检测 crate 类型（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        return self.build_manager.detect_crate_kind()
+        return (
+            self.build_manager.detect_crate_kind()
+            if self.build_manager is not None
+            else ""
+        )
 
     def _run_cargo_fmt(self, workspace_root: str) -> None:
         """执行 cargo fmt 格式化代码（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        self.build_manager.run_cargo_fmt(workspace_root)
+        if self.build_manager is not None:
+            self.build_manager.run_cargo_fmt(workspace_root)
 
     def _get_crate_commit_hash(self) -> Optional[str]:
         """获取 crate 目录的当前 commit id（委托给 GitManager）"""
@@ -645,13 +664,21 @@ class Transpiler:
         """运行 cargo test 并在失败时修复（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        return self.build_manager.run_cargo_test_and_fix(workspace_root, test_iter)
+        return (
+            self.build_manager.run_cargo_test_and_fix(workspace_root, test_iter)
+            if self.build_manager is not None
+            else (False, None)
+        )
 
     def _cargo_build_loop(self) -> Optional[bool]:
         """在 crate 目录执行构建与测试（委托给 BuildManager）"""
         if self.build_manager is None:
             self._init_build_manager()
-        result = self.build_manager.cargo_build_loop()
+        result = (
+            self.build_manager.cargo_build_loop()
+            if self.build_manager is not None
+            else None
+        )
         # 保存修复标记，供调用方检查
         self._build_loop_has_fixes = getattr(
             self.build_manager, "_build_loop_has_fixes", False

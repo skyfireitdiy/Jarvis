@@ -109,7 +109,9 @@ class UnsafeOptimizer:
 
                 # 获取该文件的所有告警（一次处理一个文件的所有告警）
                 warnings_to_fix = target_warnings
-                warning_count = len(warnings_to_fix)
+                warning_count = (
+                    len(warnings_to_fix) if warnings_to_fix is not None else 0
+                )
 
                 typer.secho(
                     f"[c2rust-optimizer][codeagent][unsafe-cleanup] 第 {iteration} 次迭代：修复文件 {target_file_path} 的 {warning_count} 个 missing_safety_doc 告警",
@@ -118,7 +120,7 @@ class UnsafeOptimizer:
 
                 # 格式化告警信息
                 formatted_warnings = self.format_warnings_for_prompt(
-                    warnings_to_fix, max_count=len(warnings_to_fix)
+                    warnings_to_fix or [], warning_count
                 )
 
                 # 构建提示词，修复该文件的所有 missing_safety_doc 告警
@@ -249,16 +251,18 @@ class UnsafeOptimizer:
                 if ok:
                     # 修复成功，保存进度和 commit id
                     try:
-                        file_path = (
-                            crate / target_file_path
-                            if not Path(target_file_path).is_absolute()
-                            else Path(target_file_path)
+                        # 确保 target_file_path 是 Path 对象
+                        target_file_path_obj = Path(target_file_path)
+                        file_path_to_save: Path = (
+                            crate / target_file_path_obj
+                            if not target_file_path_obj.is_absolute()
+                            else target_file_path_obj
                         )
-                        if file_path.exists():
+                        if file_path_to_save.exists():
                             self.progress_manager.save_fix_progress(
                                 "unsafe_cleanup",
                                 f"{target_file_path}-iter{iteration}",
-                                [file_path],
+                                [file_path_to_save],
                             )
                         else:
                             self.progress_manager.save_fix_progress(

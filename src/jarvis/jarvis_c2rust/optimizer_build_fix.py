@@ -283,7 +283,8 @@ class BuildFixOptimizer:
                     if isinstance(diag_full, str) and diag_full
                     else "failed"
                 )
-                self.stats.errors.append(f"test after {step_name} failed: {first}")
+                if self.stats.errors is not None:
+                    self.stats.errors.append(f"test after {step_name} failed: {first}")
                 try:
                     self.progress_manager.reset_to_snapshot()
                 finally:
