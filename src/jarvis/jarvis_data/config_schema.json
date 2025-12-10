@@ -4,7 +4,7 @@
   "description": "Jarvis系统配置模式",
   "type": "object",
   "properties": {
-    "JARVIS_MCP": {
+    "mcp": {
       "type": "array",
       "description": "MCP工具配置列表",
       "default": [],
@@ -96,72 +96,72 @@
       },
       "default": {}
     },
-    "JARVIS_GIT_COMMIT_PROMPT": {
+    "git_commit_prompt": {
       "type": "string",
       "description": "Git提交信息生成提示模板",
       "default": ""
     },
-    "JARVIS_MAX_INPUT_TOKEN_COUNT": {
+    "max_input_token_count": {
       "type": "number",
       "description": "模型能处理的最大输入token数量。其他token限制基于此值计算：最大token数量=此值×100，最大大内容尺寸=此值×5",
       "default": 32000
     },
-    "JARVIS_PLATFORM": {
+    "platform": {
       "type": "string",
       "description": "常规操作平台名称",
       "default": "openai"
     },
-    "JARVIS_MODEL": {
+    "model": {
       "type": "string",
       "description": "常规操作模型名称",
       "default": "gpt-5"
     },
-    "JARVIS_CHEAP_PLATFORM": {
+    "cheap_platform": {
       "type": "string",
-      "description": "廉价操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值",
+      "description": "廉价操作的平台名称。如未配置，则使用 platform 的值",
       "default": ""
     },
-    "JARVIS_CHEAP_MODEL": {
+    "cheap_model": {
       "type": "string",
-      "description": "廉价操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值",
+      "description": "廉价操作的模型名称。如未配置，则使用 model 的值",
       "default": ""
     },
-    "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT": {
+    "cheap_max_input_token_count": {
       "type": "number",
-      "description": "廉价模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值",
+      "description": "廉价模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值",
       "default": 0
     },
-    "JARVIS_SMART_PLATFORM": {
+    "smart_platform": {
       "type": "string",
-      "description": "智能操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值",
+      "description": "智能操作的平台名称。如未配置，则使用 platform 的值",
       "default": ""
     },
-    "JARVIS_SMART_MODEL": {
+    "smart_model": {
       "type": "string",
-      "description": "智能操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值",
+      "description": "智能操作的模型名称。如未配置，则使用 model 的值",
       "default": ""
     },
-    "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT": {
+    "smart_max_input_token_count": {
       "type": "number",
-      "description": "智能模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值",
+      "description": "智能模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值",
       "default": 0
     },
-    "JARVIS_WEB_SEARCH_PLATFORM": {
+    "web_search_platform": {
       "type": "string",
       "description": "Web搜索使用的平台名称",
       "default": ""
     },
-    "JARVIS_WEB_SEARCH_MODEL": {
+    "web_search_model": {
       "type": "string",
       "description": "Web搜索使用的模型名称",
       "default": ""
     },
-    "JARVIS_LLM_GROUP": {
+    "llm_group": {
       "type": "string",
       "description": "选择一个预定义的模型组",
       "default": ""
     },
-    "JARVIS_LLM_GROUPS": {
+    "llm_groups": {
       "type": "array",
       "description": "预定义的模型配置组",
       "default": [],
@@ -170,41 +170,41 @@
         "additionalProperties": {
           "type": "object",
           "properties": {
-            "JARVIS_PLATFORM": {
+            "platform": {
               "type": "string",
               "default": "openai"
             },
-            "JARVIS_MODEL": {
+            "model": {
               "type": "string",
               "default": "gpt-5"
             },
-            "JARVIS_MAX_INPUT_TOKEN_COUNT": {
+            "max_input_token_count": {
               "type": "number",
               "default": 32000
             },
-            "JARVIS_CHEAP_PLATFORM": {
+            "cheap_platform": {
               "type": "string",
-              "description": "廉价操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值"
+              "description": "廉价操作的平台名称。如未配置，则使用 platform 的值"
             },
-            "JARVIS_CHEAP_MODEL": {
+            "cheap_model": {
               "type": "string",
-              "description": "廉价操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值"
+              "description": "廉价操作的模型名称。如未配置，则使用 model 的值"
             },
-            "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT": {
+            "cheap_max_input_token_count": {
               "type": "number",
-              "description": "廉价模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值"
+              "description": "廉价模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值"
             },
-            "JARVIS_SMART_PLATFORM": {
+            "smart_platform": {
               "type": "string",
-              "description": "智能操作的平台名称。如未配置，则使用 JARVIS_PLATFORM 的值"
+              "description": "智能操作的平台名称。如未配置，则使用 platform 的值"
             },
-            "JARVIS_SMART_MODEL": {
+            "smart_model": {
               "type": "string",
-              "description": "智能操作的模型名称。如未配置，则使用 JARVIS_MODEL 的值"
+              "description": "智能操作的模型名称。如未配置，则使用 model 的值"
             },
-            "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT": {
+            "smart_max_input_token_count": {
               "type": "number",
-              "description": "智能模型允许的最大输入token数量。如未配置，则使用 JARVIS_MAX_INPUT_TOKEN_COUNT 的值"
+              "description": "智能模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值"
             },
             "ENV": {
               "type": "object",
@@ -214,51 +214,54 @@
               }
             }
           },
-          "required": ["JARVIS_PLATFORM", "JARVIS_MODEL"]
+          "required": [
+            "platform",
+            "model"
+          ]
         }
       }
     },
-    "JARVIS_EXECUTE_TOOL_CONFIRM": {
+    "execute_tool_confirm": {
       "type": "boolean",
       "description": "执行工具前是否需要确认",
       "default": false
     },
-    "JARVIS_TOOL_FILTER_THRESHOLD": {
+    "tool_filter_threshold": {
       "type": "number",
       "description": "AI工具筛选阈值：当可用工具数量超过此值时触发AI筛选",
       "default": 30
     },
-    "JARVIS_SCRIPT_EXECUTION_TIMEOUT": {
+    "script_execution_timeout": {
       "type": "number",
       "description": "脚本执行的超时时间（秒），仅在非交互模式下生效。",
       "default": 300
     },
-    "JARVIS_CONFIRM_BEFORE_APPLY_PATCH": {
+    "confirm_before_apply_patch": {
       "type": "boolean",
       "description": "应用补丁前是否需要确认",
       "default": false
     },
-    "JARVIS_DATA_PATH": {
+    "data_path": {
       "type": "string",
       "description": "Jarvis数据存储目录路径",
       "default": "~/.jarvis"
     },
-    "JARVIS_PRETTY_OUTPUT": {
+    "pretty_output": {
       "type": "boolean",
       "description": "是否启用美化输出",
       "default": true
     },
-    "JARVIS_USE_METHODOLOGY": {
+    "use_methodology": {
       "type": "boolean",
       "description": "是否启用方法论",
       "default": true
     },
-    "JARVIS_USE_ANALYSIS": {
+    "use_analysis": {
       "type": "boolean",
       "description": "是否启用任务分析",
       "default": true
     },
-    "JARVIS_TOOL_LOAD_DIRS": {
+    "tool_load_dirs": {
       "type": "array",
       "description": "自定义工具加载目录",
       "items": {
@@ -266,7 +269,7 @@
       },
       "default": []
     },
-    "JARVIS_METHODOLOGY_DIRS": {
+    "methodology_dirs": {
       "type": "array",
       "description": "方法论加载目录",
       "items": {
@@ -274,7 +277,7 @@
       },
       "default": []
     },
-    "JARVIS_AGENT_DEFINITION_DIRS": {
+    "agent_definition_dirs": {
       "type": "array",
       "description": "agent 定义加载目录",
       "items": {
@@ -282,7 +285,7 @@
       },
       "default": []
     },
-    "JARVIS_MULTI_AGENT_DIRS": {
+    "multi_agent_dirs": {
       "type": "array",
       "description": "multi_agent 加载目录",
       "items": {
@@ -290,7 +293,7 @@
       },
       "default": []
     },
-    "JARVIS_ROLES_DIRS": {
+    "roles_dirs": {
       "type": "array",
       "description": "roles 加载目录",
       "items": {
@@ -298,7 +301,7 @@
       },
       "default": []
     },
-    "JARVIS_AFTER_TOOL_CALL_CB_DIRS": {
+    "after_tool_call_cb_dirs": {
       "type": "array",
       "description": "工具调用后回调函数实现目录",
       "items": {
@@ -306,97 +309,97 @@
       },
       "default": []
     },
-    "JARVIS_CENTRAL_METHODOLOGY_REPO": {
+    "central_methodology_repo": {
       "type": "string",
       "description": "中心方法论仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入方法论加载路径；若为Git URL则会克隆到数据目录后加载。",
       "default": ""
     },
-    "JARVIS_CENTRAL_TOOL_REPO": {
+    "central_tool_repo": {
       "type": "string",
       "description": "中心工具仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加载其中的工具；若为Git URL则会克隆到数据目录并加载。",
       "default": ""
     },
-    "JARVIS_PRINT_PROMPT": {
+    "print_prompt": {
       "type": "boolean",
       "description": "是否打印提示",
       "default": false
     },
-    "JARVIS_PRINT_ERROR_TRACEBACK": {
+    "print_error_traceback": {
       "type": "boolean",
       "description": "是否在错误输出时打印回溯调用链",
       "default": false
     },
-    "JARVIS_ENABLE_STATIC_ANALYSIS": {
+    "enable_static_analysis": {
       "type": "boolean",
       "description": "是否启用静态代码分析",
       "default": true
     },
-    "JARVIS_ENABLE_BUILD_VALIDATION": {
+    "enable_build_validation": {
       "type": "boolean",
       "description": "是否启用构建验证。在代码编辑后自动验证代码能否成功编译/构建，确保编辑不会破坏项目构建。",
       "default": true
     },
-    "JARVIS_BUILD_VALIDATION_TIMEOUT": {
+    "build_validation_timeout": {
       "type": "number",
       "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
       "default": 600
     },
-    "JARVIS_ENABLE_IMPACT_ANALYSIS": {
+    "enable_impact_analysis": {
       "type": "boolean",
       "description": "是否启用编辑影响范围分析。分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等，帮助评估编辑风险。",
       "default": true
     },
-    "JARVIS_FORCE_SAVE_MEMORY": {
+    "force_save_memory": {
       "type": "boolean",
       "description": "是否强制保存记忆",
       "default": false
     },
-    "JARVIS_ENABLE_GIT_JCA_SWITCH": {
+    "enable_git_jca_switch": {
       "type": "boolean",
       "description": "在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）",
       "default": true
     },
-    "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR": {
+    "enable_startup_config_selector": {
       "type": "boolean",
       "description": "在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择",
       "default": true
     },
-    "JARVIS_IMMEDIATE_ABORT": {
+    "immediate_abort": {
       "type": "boolean",
       "description": "是否启用立即中断：在对话迭代中检测到中断信号时立即返回",
       "default": false
     },
-    "JARVIS_SAVE_SESSION_HISTORY": {
+    "save_session_history": {
       "type": "boolean",
       "description": "是否保存会话记录",
       "default": false
     },
-    "JARVIS_SKIP_PREDEFINED_TASKS": {
+    "skip_predefined_tasks": {
       "type": "boolean",
       "description": "是否跳过预定义任务加载（不读取 pre-command 列表）",
       "default": false
     },
-    "JARVIS_ADDON_PROMPT_THRESHOLD": {
+    "addon_prompt_threshold": {
       "type": "number",
       "description": "附加提示的触发阈值（字符数）。当消息长度超过此值时，会自动添加默认的附加提示",
       "default": 1024
     },
-    "JARVIS_ENABLE_INTENT_RECOGNITION": {
+    "enable_intent_recognition": {
       "type": "boolean",
       "description": "是否启用意图识别功能。用于智能上下文推荐中的LLM意图提取和语义分析",
       "default": true
     },
-    "JARVIS_ENABLE_MEMORY_ORGANIZER": {
+    "enable_memory_organizer": {
       "type": "boolean",
       "description": "是否启用自动记忆整理功能。在任务完成后自动检测记忆库状态，当记忆数量超过200条且存在重叠时提示用户整理",
       "default": false
     },
-    "JARVIS_TOOL_GROUP": {
+    "tool_group": {
       "type": "string",
       "description": "选择一个预定义的工具配置组",
       "default": ""
     },
-    "JARVIS_TOOL_GROUPS": {
+    "tool_groups": {
       "type": "array",
       "description": "预定义的工具配置组",
       "default": [],
@@ -423,12 +426,12 @@
         }
       }
     },
-    "JARVIS_RAG_GROUP": {
+    "rag_group": {
       "type": "string",
       "description": "选择一个预定义的RAG配置组",
       "default": ""
     },
-    "JARVIS_RAG_GROUPS": {
+    "rag_groups": {
       "type": "array",
       "description": "预定义的RAG配置组",
       "default": [
@@ -518,9 +521,9 @@
         }
       }
     },
-    "JARVIS_RAG": {
+    "rag": {
       "type": "object",
-      "description": "RAG框架的顶层配置。注意：此处的设置将覆盖任何由JARVIS_RAG_GROUP选择的组配置。",
+      "description": "RAG框架的顶层配置。注意：此处的设置将覆盖任何由rag_group选择的组配置。",
       "properties": {
         "embedding_model": {
           "type": "string",
@@ -588,7 +591,7 @@
         "use_rerank": true
       }
     },
-    "JARVIS_REPLACE_MAP": {
+    "replace_map": {
       "type": "object",
       "description": "自定义替换映射表配置",
       "additionalProperties": {
@@ -640,14 +643,14 @@
       "description": "系统Shell路径，用于获取当前使用的shell类型",
       "default": "/bin/bash"
     },
-    "JARVIS_CONVERSATION_TURN_THRESHOLD": {
+    "conversation_turn_threshold": {
       "type": "number",
       "description": "对话轮次阈值，用于触发总结。当对话轮次超过此值时，系统会自动触发对话总结",
       "default": 50,
       "minimum": 1,
       "maximum": 1000
     },
-    "JARVIS_DIFF_VISUALIZATION_MODE": {
+    "diff_visualization_mode": {
       "type": "string",
       "description": "Diff可视化模式。side_by_side: 左右分栏对比显示；unified: 统一diff格式；syntax: 语法高亮模式；compact: 紧凑模式",
       "enum": ["side_by_side", "unified", "syntax", "compact"],
