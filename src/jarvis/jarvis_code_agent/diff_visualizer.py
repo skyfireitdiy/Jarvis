@@ -604,6 +604,87 @@ class DiffVisualizer:
         self.console.print(panel)
 
 
+def _split_diff_by_files(diff_text: str) -> List[tuple]:
+    """将包含多个文件的 diff 文本分割成单个文件的 diff
+
+    参数:
+        diff_text: git diff 输出的文本（可能包含多个文件）
+
+    返回:
+        List[tuple]: [(file_path, single_file_diff), ...] 列表
+    """
+    files = []
+    lines = diff_text.splitlines()
+    current_file_path = ""
+    current_file_lines = []
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+
+        if line.startswith("diff --git"):
+            # 如果已经有文件在处理，先保存它
+            if current_file_lines:
+                files.append((current_file_path, "\n".join(current_file_lines)))
+
+            # 开始新文件
+            current_file_lines = [line]
+            # 尝试从 diff --git 行提取文件路径
+            # 格式: diff --git a/path b/path
+            parts = line.split()
+            if len(parts) >= 4:
+                # 取 b/path 部分，去掉 b/ 前缀
+                path_part = parts[3]
+                if path_part.startswith("b/"):
+                    current_file_path = path_part[2:]
+                else:
+                    current_file_path = path_part
+            else:
+                current_file_path = ""
+        elif line.startswith("---") or line.startswith("+++"):
+            # 更新文件路径（优先使用 +++ 行的路径）
+            current_file_lines.append(line)
+            if line.startswith("+++"):
+                path_part = line[4:].strip()
+                if path_part != "/dev/null":
+                    # 去掉 a/ 或 b/ 前缀
+                    if path_part.startswith("b/"):
+                        current_file_path = path_part[2:]
+                    elif path_part.startswith("a/"):
+                        current_file_path = path_part[2:]
+                    else:
+                        current_file_path = path_part
+        else:
+            # 其他行添加到当前文件
+            current_file_lines.append(line)
+
+        i += 1
+
+    # 保存最后一个文件
+    if current_file_lines:
+        files.append((current_file_path, "\n".join(current_file_lines)))
+
+    # 如果没有找到任何文件分隔符，整个 diff 作为一个文件处理
+    if not files:
+        # 尝试从 --- 或 +++ 行提取文件路径
+        file_path = ""
+        for line in lines:
+            if line.startswith("+++"):
+                path_part = line[4:].strip()
+                if path_part != "/dev/null":
+                    if path_part.startswith("b/"):
+                        file_path = path_part[2:]
+                    elif path_part.startswith("a/"):
+                        file_path = path_part[2:]
+                    else:
+                        file_path = path_part
+                    break
+
+        files.append((file_path, diff_text))
+
+    return files
+
+
 def _parse_diff_to_lines(diff_text: str) -> tuple:
     """从 git diff 文本中解析出旧文件和新文件的行列表（带行号信息）
 
@@ -706,17 +787,36 @@ def visualize_diff_enhanced(
     elif mode == "compact":
         visualizer.visualize_compact(diff_text, file_path)
     elif mode == "side_by_side":
-        old_lines, new_lines, old_line_map, new_line_map = _parse_diff_to_lines(
-            diff_text
-        )
-        visualizer.visualize_side_by_side_summary(
-            old_lines,
-            new_lines,
-            file_path,
-            context_lines=context_lines,
-            old_line_map=old_line_map,
-            new_line_map=new_line_map,
-        )
+        # 检查是否有多个文件
+        file_diffs = _split_diff_by_files(diff_text)
+
+        if len(file_diffs) > 1:
+            # 多个文件，为每个文件显示独立的 table
+            for single_file_path, single_file_diff in file_diffs:
+                old_lines, new_lines, old_line_map, new_line_map = _parse_diff_to_lines(
+                    single_file_diff
+                )
+                visualizer.visualize_side_by_side_summary(
+                    old_lines,
+                    new_lines,
+                    single_file_path if single_file_path else file_path,
+                    context_lines=context_lines,
+                    old_line_map=old_line_map,
+                    new_line_map=new_line_map,
+                )
+        else:
+            # 单个文件，使用原有逻辑
+            old_lines, new_lines, old_line_map, new_line_map = _parse_diff_to_lines(
+                diff_text
+            )
+            visualizer.visualize_side_by_side_summary(
+                old_lines,
+                new_lines,
+                file_path,
+                context_lines=context_lines,
+                old_line_map=old_line_map,
+                new_line_map=new_line_map,
+            )
     else:
         # 默认使用语法高亮
         visualizer.visualize_syntax_highlighted(diff_text, file_path)
