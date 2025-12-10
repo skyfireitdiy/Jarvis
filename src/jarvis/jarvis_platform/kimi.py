@@ -5,7 +5,7 @@ import json
 import mimetypes
 import os
 import time
-from typing import Dict, Generator, List, Tuple, Any, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
@@ -28,13 +28,19 @@ class KimiModel(BasePlatform):
             ("k2", "基于网页的 Kimi，深度思考模型 K2"),
         ]
 
-    def __init__(self):
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
         """
         Initialize Kimi model
+
+        参数:
+            llm_config: LLM配置字典，包含 kimi_api_key 等
         """
         super().__init__()
         self.chat_id = ""  # 当前会话ID
-        self.api_key = os.getenv("KIMI_API_KEY")  # 从环境变量获取API密钥
+        llm_config = llm_config or {}
+
+        # 从 llm_config 获取配置，如果没有则从环境变量获取（向后兼容）
+        self.api_key = llm_config.get("kimi_api_key") or os.getenv("KIMI_API_KEY")
         if not self.api_key:
             print("⚠️ KIMI_API_KEY 未设置")
         self.auth_header = f"Bearer {self.api_key}"  # 认证头信息
@@ -393,20 +399,20 @@ class KimiModel(BasePlatform):
     @classmethod
     def get_required_env_keys(cls) -> List[str]:
         """
-        获取Kimi平台所需的环境变量键列表
+        获取Kimi平台所需的配置键列表（已弃用：建议使用 llm_config 配置）
 
         返回:
-            List[str]: 环境变量键的列表
+            List[str]: 配置键的列表（对应 llm_config 中的 kimi_api_key）
         """
         return ["KIMI_API_KEY"]
 
     @classmethod
     def get_env_config_guide(cls) -> Dict[str, str]:
         """
-        获取环境变量配置指导
+        获取配置指导（已弃用：建议使用 llm_config 配置）
 
         返回:
-            Dict[str, str]: 环境变量名到配置指导的映射
+            Dict[str, str]: 配置键名到配置指导的映射
         """
         return {
             "KIMI_API_KEY": (

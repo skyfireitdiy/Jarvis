@@ -3,7 +3,7 @@ import json
 import os
 import time
 import uuid
-from typing import Any, Dict, Generator, List, Tuple, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
@@ -17,11 +17,21 @@ class TongyiPlatform(BasePlatform):
     # Supported image formats
     IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff"}
 
-    def __init__(self):
-        """Initialize Tongyi platform"""
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
+        """
+        Initialize Tongyi platform
+
+        参数:
+            llm_config: LLM配置字典，包含 tongyi_cookies 等
+        """
         super().__init__()
         self.session_id = ""
-        self.cookies = os.getenv("TONGYI_COOKIES", "")
+        llm_config = llm_config or {}
+
+        # 从 llm_config 获取配置，如果没有则从环境变量获取（向后兼容）
+        self.cookies = llm_config.get("tongyi_cookies") or os.getenv(
+            "TONGYI_COOKIES", ""
+        )
         self.request_id = ""
         self.msg_id = ""
         self.model_name = ""
@@ -574,20 +584,20 @@ class TongyiPlatform(BasePlatform):
     @classmethod
     def get_required_env_keys(cls) -> List[str]:
         """
-        获取通义平台所需的环境变量键列表
+        获取通义平台所需的配置键列表（已弃用：建议使用 llm_config 配置）
 
         返回:
-            List[str]: 环境变量键的列表
+            List[str]: 配置键的列表（对应 llm_config 中的 tongyi_cookies）
         """
         return ["TONGYI_COOKIES"]
 
     @classmethod
     def get_env_config_guide(cls) -> Dict[str, str]:
         """
-        获取环境变量配置指导
+        获取配置指导（已弃用：建议使用 llm_config 配置）
 
         返回:
-            Dict[str, str]: 环境变量名到配置指导的映射
+            Dict[str, str]: 配置键名到配置指导的映射
         """
         return {
             "TONGYI_COOKIES": (

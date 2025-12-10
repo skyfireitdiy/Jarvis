@@ -3,13 +3,14 @@ import importlib
 import inspect
 import os
 import sys
-from typing import Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import (
     get_cheap_model_name,
     get_cheap_platform_name,
     get_data_dir,
+    get_llm_config,
     get_normal_model_name,
     get_normal_platform_name,
     get_smart_model_name,
@@ -181,28 +182,37 @@ class PlatformRegistry:
             ) in PlatformRegistry.load_platform_from_dir(platform_dir).items():
                 self.register_platform(platform_name, platform_class)
 
-    def get_normal_platform(self) -> BasePlatform:
+    def get_normal_platform(
+        self, model_group_override: Optional[str] = None
+    ) -> BasePlatform:
         """获取正常操作的平台实例"""
-        platform_name = get_normal_platform_name()
-        model_name = get_normal_model_name()
-        platform = self.create_platform(platform_name)
+        platform_name = get_normal_platform_name(model_group_override)
+        model_name = get_normal_model_name(model_group_override)
+        llm_config = get_llm_config("normal", model_group_override)
+        platform = self.create_platform(platform_name, llm_config)
         platform.set_model_name(model_name)  # type: ignore
         return platform  # type: ignore
 
-    def get_cheap_platform(self) -> BasePlatform:
+    def get_cheap_platform(
+        self, model_group_override: Optional[str] = None
+    ) -> BasePlatform:
         """获取廉价操作的平台实例"""
-        platform_name = get_cheap_platform_name()
-        model_name = get_cheap_model_name()
-        platform = self.create_platform(platform_name)
+        platform_name = get_cheap_platform_name(model_group_override)
+        model_name = get_cheap_model_name(model_group_override)
+        llm_config = get_llm_config("cheap", model_group_override)
+        platform = self.create_platform(platform_name, llm_config)
         platform.set_model_name(model_name)  # type: ignore
         platform.set_platform_type("cheap")  # type: ignore
         return platform  # type: ignore
 
-    def get_smart_platform(self) -> BasePlatform:
+    def get_smart_platform(
+        self, model_group_override: Optional[str] = None
+    ) -> BasePlatform:
         """获取智能操作的平台实例"""
-        platform_name = get_smart_platform_name()
-        model_name = get_smart_model_name()
-        platform = self.create_platform(platform_name)
+        platform_name = get_smart_platform_name(model_group_override)
+        model_name = get_smart_model_name(model_group_override)
+        llm_config = get_llm_config("smart", model_group_override)
+        platform = self.create_platform(platform_name, llm_config)
         platform.set_model_name(model_name)  # type: ignore
         platform.set_platform_type("smart")  # type: ignore
         return platform  # type: ignore
@@ -216,12 +226,14 @@ class PlatformRegistry:
         """
         self.platforms[name] = platform_class
 
-    def create_platform(self, name: str) -> Optional[BasePlatform]:
-        """Create platform instance"""
+    def create_platform(
+        self, name: str, llm_config: Optional[Dict[str, Any]] = None
+    ) -> Optional[BasePlatform]:
         """Create platform instance
 
         Args:
             name: Platform name
+            llm_config: LLM配置字典，包含平台特定的配置参数（如 api_key, base_url 等）
 
         Returns:
             BasePlatform: Platform instance
@@ -231,7 +243,7 @@ class PlatformRegistry:
             return None
 
         try:
-            platform = self.platforms[name]()
+            platform = self.platforms[name](llm_config=llm_config or {})
             return platform
         except Exception as e:
             print(f"❌ 创建平台失败: {str(e)}")
