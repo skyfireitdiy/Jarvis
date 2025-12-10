@@ -821,6 +821,119 @@ DEFAULT_RAG_GROUPS = [
 ]
 
 
+def _resolve_embedding_reference(embedding_name: str) -> Dict[str, Any]:
+    """
+    从 embeddings 配置中解析引用的嵌入模型配置。
+
+    参数:
+        embedding_name: embeddings 中定义的嵌入模型配置名称
+
+    返回:
+        Dict[str, Any]: 解析后的嵌入模型配置字典，包含 embedding_model, embedding_type, embedding_max_length, embedding_config
+    """
+    embeddings = GLOBAL_CONFIG_DATA.get("embeddings", {})
+    if not isinstance(embeddings, dict):
+        return {}
+
+    embedding_config = embeddings.get(embedding_name)
+    if not isinstance(embedding_config, dict):
+        print(f"⚠️ 警告：embeddings 中未找到名为 '{embedding_name}' 的配置")
+        return {}
+
+    return embedding_config.copy()
+
+
+def _resolve_reranker_reference(reranker_name: str) -> Dict[str, Any]:
+    """
+    从 rerankers 配置中解析引用的重排模型配置。
+
+    参数:
+        reranker_name: rerankers 中定义的重排模型配置名称
+
+    返回:
+        Dict[str, Any]: 解析后的重排模型配置字典，包含 rerank_model, reranker_type, reranker_max_length, reranker_config
+    """
+    rerankers = GLOBAL_CONFIG_DATA.get("rerankers", {})
+    if not isinstance(rerankers, dict):
+        return {}
+
+    reranker_config = rerankers.get(reranker_name)
+    if not isinstance(reranker_config, dict):
+        print(f"⚠️ 警告：rerankers 中未找到名为 '{reranker_name}' 的配置")
+        return {}
+
+    return reranker_config.copy()
+
+
+def _expand_rag_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    展开 rag_groups 中的 embedding 和 reranker 引用到对应的配置字段。
+
+    参数:
+        group_config: RAG组配置字典
+
+    返回:
+        Dict[str, Any]: 展开后的配置字典
+    """
+    expanded_config = group_config.copy()
+
+    # 处理 embedding 引用
+    if "embedding" in expanded_config:
+        embedding_ref = _resolve_embedding_reference(expanded_config["embedding"])
+        if embedding_ref:
+            # 展开到 embedding_model, embedding_type, embedding_max_length, embedding_config
+            if "embedding_model" not in expanded_config:
+                expanded_config["embedding_model"] = embedding_ref.get(
+                    "embedding_model", "BAAI/bge-m3"
+                )
+            if "embedding_type" not in expanded_config:
+                expanded_config["embedding_type"] = embedding_ref.get(
+                    "embedding_type", "LocalEmbeddingModel"
+                )
+            if "embedding_max_length" not in expanded_config:
+                expanded_config["embedding_max_length"] = embedding_ref.get(
+                    "embedding_max_length", 512
+                )
+            # 合并 embedding_config
+            if "embedding_config" in embedding_ref:
+                if "embedding_config" not in expanded_config:
+                    expanded_config["embedding_config"] = {}
+                expanded_config["embedding_config"].update(
+                    embedding_ref["embedding_config"]
+                )
+        # 移除引用键
+        expanded_config.pop("embedding", None)
+
+    # 处理 reranker 引用
+    if "reranker" in expanded_config:
+        reranker_ref = _resolve_reranker_reference(expanded_config["reranker"])
+        if reranker_ref:
+            # 展开到 rerank_model, reranker_type, reranker_max_length, reranker_config
+            if "rerank_model" not in expanded_config:
+                expanded_config["rerank_model"] = reranker_ref.get(
+                    "rerank_model", "BAAI/bge-reranker-v2-m3"
+                )
+            if "reranker_type" not in expanded_config:
+                expanded_config["reranker_type"] = reranker_ref.get(
+                    "reranker_type", "LocalReranker"
+                )
+            if "reranker_max_length" not in expanded_config:
+                expanded_config["reranker_max_length"] = reranker_ref.get(
+                    "reranker_max_length", 512
+                )
+            # 合并 reranker_config
+            if "reranker_config" in reranker_ref:
+                if "reranker_config" not in expanded_config:
+                    expanded_config["reranker_config"] = {}
+                expanded_config["reranker_config"].update(
+                    reranker_ref["reranker_config"]
+                )
+        # 移除引用键
+        expanded_config.pop("reranker", None)
+
+    return expanded_config
+
+
 def _get_resolved_rag_config(
     rag_group_override: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -844,6 +957,9 @@ def _get_resolved_rag_config(
             if isinstance(group_item, dict) and rag_group_name in group_item:
                 group_config = group_item[rag_group_name]
                 break
+
+    # 展开 embedding 和 reranker 引用
+    group_config = _expand_rag_references(group_config)
 
     # Start with group config
     resolved_config = group_config.copy()
