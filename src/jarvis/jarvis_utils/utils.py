@@ -1369,7 +1369,7 @@ def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
             ask_all,
             "JARVIS_ENABLE_GIT_JCA_SWITCH",
             "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
-            False,
+            True,
         )
         or changed
     )
@@ -1379,7 +1379,7 @@ def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
             ask_all,
             "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
             "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
-            False,
+            True,
         )
         or changed
     )
