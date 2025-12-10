@@ -254,43 +254,47 @@ class Optimizer:
                 step_num = 1
 
                 if self.options.enable_unsafe_cleanup:
-                    step_num = self._run_optimization_step(
+                    result_step_num = self._run_optimization_step(
                         "unsafe_cleanup",
                         "unsafe 清理",
                         step_num,
                         targets,
                         self.unsafe_optimizer.codeagent_opt_unsafe_cleanup,
                     )
-                    if step_num is None:  # 步骤失败，已回滚
+                    if result_step_num is None:  # 步骤失败，已回滚
                         return self.stats
+                    step_num = result_step_num
 
                 if self.options.enable_visibility_opt:
-                    step_num = self._run_optimization_step(
+                    result_step_num = self._run_optimization_step(
                         "visibility_opt",
                         "可见性优化",
                         step_num,
                         targets,
                         self.visibility_optimizer.codeagent_opt_visibility,
                     )
-                    if step_num is None:  # 步骤失败，已回滚
+                    if result_step_num is None:  # 步骤失败，已回滚
                         return self.stats
+                    step_num = result_step_num
 
                 if self.options.enable_doc_opt:
-                    step_num = self._run_optimization_step(
+                    result_step_num = self._run_optimization_step(
                         "doc_opt",
                         "文档补充",
                         step_num,
                         targets,
                         self.docs_optimizer.codeagent_opt_docs,
                     )
-                    if step_num is None:  # 步骤失败，已回滚
+                    if result_step_num is None:  # 步骤失败，已回滚
                         return self.stats
+                    step_num = result_step_num
 
                 # 最终保存进度（确保所有步骤的进度都已记录）
                 self.progress_manager.save_progress_for_batch(targets)
 
         except Exception as e:
-            self.stats.errors.append(f"fatal: {e}")
+            if self.stats.errors is not None:
+                self.stats.errors.append(f"fatal: {e}")
         finally:
             # 写出简要报告
             report_display = get_report_display_path(

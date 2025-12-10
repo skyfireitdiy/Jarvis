@@ -295,9 +295,13 @@ class ClippyOptimizer:
                     target_warnings = warnings_by_file[target_file_path]
 
                 # 获取该文件的前10个告警（不足10个就全部给出）
-                warnings_to_fix = target_warnings[:10]
+                warnings_to_fix = (
+                    target_warnings[:10] if target_warnings is not None else []
+                )
                 warning_count = len(warnings_to_fix)
-                total_warnings_in_file = len(target_warnings)
+                total_warnings_in_file = (
+                    len(target_warnings) if target_warnings is not None else 0
+                )
 
                 typer.secho(
                     f"[c2rust-optimizer][codeagent][clippy] 第 {iteration} 次迭代：修复文件 {target_file_path} 的前 {warning_count} 个告警（共 {total_warnings_in_file} 个）",
@@ -423,16 +427,18 @@ class ClippyOptimizer:
                 if ok:
                     # 修复成功，保存进度和 commit id
                     try:
-                        file_path = (
-                            crate / target_file_path
-                            if not Path(target_file_path).is_absolute()
-                            else Path(target_file_path)
+                        # 确保 target_file_path 是 Path 对象
+                        target_file_path_obj = Path(target_file_path)
+                        file_path_to_save: Path = (
+                            crate / target_file_path_obj
+                            if not target_file_path_obj.is_absolute()
+                            else target_file_path_obj
                         )
-                        if file_path.exists():
+                        if file_path_to_save.exists():
                             self.progress_manager.save_fix_progress(
                                 "clippy_elimination",
                                 f"{target_file_path}-iter{iteration}",
-                                [file_path],
+                                [file_path_to_save],
                             )
                         else:
                             self.progress_manager.save_fix_progress(

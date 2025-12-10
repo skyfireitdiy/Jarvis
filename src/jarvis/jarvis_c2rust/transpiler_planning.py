@@ -326,7 +326,7 @@ class PlanningManager:
 
                 full_prompt = f"{usr_p}{error_guidance}\n\n{sum_p}"
                 try:
-                    response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                    response = agent.model.chat_until_success(full_prompt)
                     summary = response
                 except Exception as e:
                     typer.secho(
