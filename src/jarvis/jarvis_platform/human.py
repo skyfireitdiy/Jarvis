@@ -7,7 +7,7 @@
 import json
 import random
 import string
-from typing import Generator, List, Tuple, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
@@ -21,8 +21,13 @@ class HumanPlatform(BasePlatform):
         """获取支持的模型列表"""
         return [("human", "Human Interaction")]
 
-    def __init__(self):
-        """初始化人类交互平台"""
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
+        """
+        初始化人类交互平台
+
+        参数:
+            llm_config: LLM配置字典（人类平台不使用此配置，但为保持接口一致而接受）
+        """
         super().__init__()
         self.conversation_id = ""  # 会话ID，用于标识当前对话
         self.model_name = "human"  # 默认模型名称

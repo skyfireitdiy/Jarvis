@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-from typing import Dict, Generator, List, Tuple, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 
 from openai import OpenAI
 
@@ -9,35 +9,56 @@ from jarvis.jarvis_platform.base import BasePlatform
 
 
 class OpenAIModel(BasePlatform):
-    def __init__(self):
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
         """
         Initialize OpenAI model
+
+        参数:
+            llm_config: LLM配置字典，包含 openai_api_key, openai_api_base, openai_extra_headers 等
         """
         super().__init__()
         self.system_message = ""
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        llm_config = llm_config or {}
+
+        # 从 llm_config 获取配置，如果没有则从环境变量获取（向后兼容）
+        self.api_key = llm_config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             print("⚠️ OPENAI_API_KEY 未设置")
 
-        self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+        self.base_url = llm_config.get("openai_api_base") or os.getenv(
+            "OPENAI_API_BASE", "https://api.openai.com/v1"
+        )
         self.model_name = os.getenv("JARVIS_MODEL") or "gpt-4o"
 
-        # Optional: Inject extra HTTP headers via environment variable
-        # Expected format: OPENAI_EXTRA_HEADERS='{"Header-Name": "value", "X-Trace": "abc"}'
-        headers_str = os.getenv("OPENAI_EXTRA_HEADERS")
+        # Optional: Inject extra HTTP headers via llm_config or environment variable
+        # Expected format: openai_extra_headers='{"Header-Name": "value", "X-Trace": "abc"}'
+        headers_value = llm_config.get("openai_extra_headers")
+        if headers_value is None:
+            headers_str = os.getenv("OPENAI_EXTRA_HEADERS")
+        else:
+            headers_str = (
+                headers_value
+                if isinstance(headers_value, str)
+                else json.dumps(headers_value)
+            )
+
         self.extra_headers: Dict[str, str] = {}
         if headers_str:
             try:
-                parsed = json.loads(headers_str)
+                parsed = (
+                    json.loads(headers_str)
+                    if isinstance(headers_str, str)
+                    else headers_str
+                )
                 if isinstance(parsed, dict):
                     # Ensure all header keys/values are strings
                     self.extra_headers = {str(k): str(v) for k, v in parsed.items()}
                 else:
                     print(
-                        "⚠️ OPENAI_EXTRA_HEADERS 应为 JSON 对象，如 {'X-Source':'jarvis'}"
+                        "⚠️ openai_extra_headers 应为 JSON 对象，如 {'X-Source':'jarvis'}"
                     )
             except Exception as e:
-                print(f"⚠️ 解析 OPENAI_EXTRA_HEADERS 失败: {e}")
+                print(f"⚠️ 解析 openai_extra_headers 失败: {e}")
 
         # Initialize OpenAI client, try to pass default headers if SDK supports it
         try:
@@ -290,20 +311,20 @@ class OpenAIModel(BasePlatform):
     @classmethod
     def get_required_env_keys(cls) -> List[str]:
         """
-        获取OpenAI平台所需的环境变量键列表
+        获取OpenAI平台所需的配置键列表（已弃用：建议使用 llm_config 配置）
 
         返回:
-            List[str]: 环境变量键的列表
+            List[str]: 配置键的列表（对应 llm_config 中的 openai_api_key, openai_api_base）
         """
         return ["OPENAI_API_KEY", "OPENAI_API_BASE"]
 
     @classmethod
     def get_env_config_guide(cls) -> Dict[str, str]:
         """
-        获取环境变量配置指导
+        获取配置指导（已弃用：建议使用 llm_config 配置）
 
         返回:
-            Dict[str, str]: 环境变量名到配置指导的映射
+            Dict[str, str]: 配置键名到配置指导的映射
         """
         return {
             "OPENAI_API_KEY": (

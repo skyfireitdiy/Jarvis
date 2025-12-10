@@ -378,6 +378,29 @@ def _get_resolved_model_config(
     return resolved_config
 
 
+def get_llm_config(
+    platform_type: str = "normal", model_group_override: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    获取指定平台类型的 llm_config 配置。
+
+    参数:
+        platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
+        model_group_override: 模型组覆盖
+
+    返回:
+        Dict[str, Any]: llm_config 配置字典
+    """
+    config = _get_resolved_model_config(model_group_override)
+
+    if platform_type == "cheap":
+        return config.get("cheap_llm_config", {})
+    elif platform_type == "smart":
+        return config.get("smart_llm_config", {})
+    else:
+        return config.get("llm_config", {})
+
+
 def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
     """
     获取正常操作的平台名称。

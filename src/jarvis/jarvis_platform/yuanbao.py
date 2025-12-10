@@ -5,7 +5,7 @@ import json
 import os
 import time
 import urllib.parse
-from typing import Dict, Generator, List, Tuple, Any, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 
 from PIL import Image  # type: ignore
 
@@ -27,19 +27,24 @@ class YuanbaoPlatform(BasePlatform):
             ("hunyuan_t1", "Tencent Hunyuan-T1"),
         ]
 
-    def __init__(self):
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
         """
         初始化Hunyuan模型
+
+        参数:
+            llm_config: LLM配置字典，包含 yuanbao_cookies 等
         """
         super().__init__()
         self.conversation_id = ""  # 会话ID，用于标识当前对话
-        # 从环境变量中获取必要参数
-        self.cookies = os.getenv("YUANBAO_COOKIES")  # 认证cookies
+        llm_config = llm_config or {}
+
+        # 从 llm_config 获取配置，如果没有则从环境变量获取（向后兼容）
+        self.cookies = llm_config.get("yuanbao_cookies") or os.getenv("YUANBAO_COOKIES")
         self.agent_id = "naQivTmsDa"
 
         if not self.cookies:
             raise ValueError(
-                "YUANBAO_COOKIES environment variable not set. Please provide your cookies to use the Yuanbao platform."
+                "yuanbao_cookies 未设置。请在 llm_config 中配置 yuanbao_cookies 或设置 YUANBAO_COOKIES 环境变量。"
             )
 
         self.system_message = ""  # 系统消息，用于初始化对话
@@ -121,7 +126,7 @@ class YuanbaoPlatform(BasePlatform):
             用于聊天消息的文件元数据字典列表
         """
         if not self.cookies:
-            print("❌ 未设置YUANBAO_COOKIES，无法上传文件")
+            print("❌ 未设置yuanbao_cookies，无法上传文件")
             return False
 
         uploaded_files = []
@@ -619,20 +624,20 @@ class YuanbaoPlatform(BasePlatform):
     @classmethod
     def get_required_env_keys(cls) -> List[str]:
         """
-        获取元宝平台所需的环境变量键列表
+        获取元宝平台所需的配置键列表（已弃用：建议使用 llm_config 配置）
 
         返回:
-            List[str]: 环境变量键的列表
+            List[str]: 配置键的列表（对应 llm_config 中的 yuanbao_cookies）
         """
         return ["YUANBAO_COOKIES"]
 
     @classmethod
     def get_env_config_guide(cls) -> Dict[str, str]:
         """
-        获取环境变量配置指导
+        获取配置指导（已弃用：建议使用 llm_config 配置）
 
         返回:
-            Dict[str, str]: 环境变量名到配置指导的映射
+            Dict[str, str]: 配置键名到配置指导的映射
         """
         return {
             "YUANBAO_COOKIES": (
