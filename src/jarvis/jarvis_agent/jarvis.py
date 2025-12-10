@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Jarvis AI 助手主入口模块"""
 
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 import shutil
 from datetime import datetime
 
@@ -392,7 +392,7 @@ def handle_builtin_config_selector(
                     _unique.append(d)
             builtin_dirs = _unique
             # 向后兼容：保留第一个候选作为 builtin_root
-            builtin_root = builtin_dirs[0] if builtin_dirs else None  # type: ignore[assignment]
+            builtin_root = builtin_dirs[0] if builtin_dirs else None
 
             categories = [
                 ("agent", "jarvis-agent", "*.yaml"),
@@ -800,8 +800,8 @@ def run_cli(
                             / f"jarvis_web_{web_port}.pid"
                         )
                     except Exception:
-                        pf_alt = None  # type: ignore[assignment]
-                    if pf_alt and pf_alt.exists():  # type: ignore[truthy-bool]
+                        pf_alt = None
+                    if pf_alt and pf_alt.exists():
                         pf = pf_alt
                 if not pf.exists():
                     # 进一步回退：尝试按端口查找并停止（无 PID 文件）
@@ -1062,7 +1062,7 @@ def run_cli(
     # 运行主流程
     try:
         # 在 Web 模式下注入基于 WebSocket 的输入/确认回调
-        extra_kwargs = {}
+        extra_kwargs: Dict[str, Any] = {}
         if web:
             # 纯 xterm 交互模式：不注入 WebBridge 的输入/确认回调，避免阻塞等待浏览器响应
             # （交互由 /terminal PTY 会话中的 jvs 进程处理）

@@ -37,7 +37,7 @@ def create_java_extractor() -> Optional[Any]:
                 name: (identifier) @field.name))
             """
 
-            class JavaSymbolExtractor:
+            class TreeSitterJavaSymbolExtractor:
                 def __init__(self):
                     # 如果传入的是 PyCapsule，需要转换为 Language 对象
                     if not isinstance(JAVA_LANGUAGE, Language):
@@ -78,7 +78,7 @@ def create_java_extractor() -> Optional[Any]:
                     except Exception:
                         return []
 
-            return JavaSymbolExtractor()
+            return TreeSitterJavaSymbolExtractor()
         except (ImportError, Exception):
             return None
 
