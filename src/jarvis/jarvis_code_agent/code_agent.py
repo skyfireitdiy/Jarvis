@@ -210,6 +210,14 @@ class CodeAgent(Agent):
 
         # 初始化LLM管理器（使用普通模型，不使用smart模型）
         self.llm_manager = LLMManager(parent_model=self.model, model_group=model_group)
+        # 同步模型组到全局，便于后续工具（如提交信息生成）获取一致的模型配置
+        try:
+            from jarvis.jarvis_utils.globals import set_global_model_group
+
+            set_global_model_group(model_group)
+        except Exception:
+            # 若全局同步失败，不影响主流程
+            pass
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理.
