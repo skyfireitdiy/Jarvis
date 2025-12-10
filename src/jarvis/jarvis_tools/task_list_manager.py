@@ -1374,25 +1374,46 @@ class task_list_manager:
                 actual_output=processed_result,
             )
 
-            # 构建返回结果（包含摘要信息）
+            # 构建格式化的任务完成通知
+            import datetime
+
+            # 获取当前时间作为完成时间
+            completion_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
             # 预览长度：基于最大输出长度的10%，但不超过500字符
             preview_length = min(int(max_output_length * 0.1), 500)
-            result = {
-                "task_id": task_id,
-                "task_name": task.task_name,
-                "status": "completed",
-                "output_length": len(processed_result),
-                "output_preview": (
-                    processed_result[:preview_length] + "..."
-                    if len(processed_result) > preview_length
-                    else processed_result
-                ),
-                "message": "任务执行成功，结果已保存到任务的 actual_output 字段",
-                "note": "完整结果可通过 get_task_detail 获取",
-            }
+
+            # 创建格式化的完成通知
+            formatted_notification = f"""
+✅ **任务完成通知**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 **任务信息**
+   任务ID: {task_id}
+   任务名称: {task.task_name}
+   优先级: {task.priority}/5
+   完成时间: {completion_time}
+
+📊 **执行结果**
+   状态: ✅ 已完成
+   输出长度: {len(processed_result)} 字符
+   
+📝 **执行摘要**
+{processed_result[:preview_length]}{"..." if len(processed_result) > preview_length else ""}
+
+📋 **后续操作**
+   • 完整结果已保存到任务的 actual_output 字段
+   • 可通过 get_task_detail 获取完整详情
+   • 依赖此任务的其他任务现在可以开始执行
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+任务 [{task.task_name}] 已成功完成！
+"""
+
+            # 直接返回格式化的任务完成通知
             return {
                 "success": True,
-                "stdout": json.dumps(result, ensure_ascii=False, indent=2),
+                "stdout": formatted_notification.strip(),
                 "stderr": "",
             }
 
