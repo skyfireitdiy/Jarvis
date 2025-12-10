@@ -1381,7 +1381,7 @@ class task_list_manager:
             completion_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # 预览长度：基于最大输出长度的10%，但不超过500字符
-            preview_length = min(int(max_output_length * 0.1), 500)
+            preview_length = max_output_length * 0.5
 
             # 创建格式化的完成通知
             formatted_notification = f"""
