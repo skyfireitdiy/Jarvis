@@ -1128,13 +1128,11 @@ def _interactive_config_setup(config_file_path: Path):
                 "llm_config": llm_config if llm_config else {},
             }
         },
-        "llm_groups": [
-            {
-                "default": {
-                    "normal_llm": llm_name,
-                }
+        "llm_groups": {
+            "default": {
+                "normal_llm": llm_name,
             }
-        ],
+        },
         "llm_group": "default",
     }
 
@@ -1793,7 +1791,7 @@ def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
 
 
 def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
-    """收集RAG配置"""
+    """收集RAG配置（使用新的引用方式）"""
     changed = False
     try:
         from jarvis.jarvis_utils.config import (
@@ -1817,16 +1815,36 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
 
     try:
         if (
-            "JARVIS_RAG" not in config_data
+            "rag_groups" not in config_data
             and get_yes_no_var is not None
             and get_single_line_input_var is not None
         ):
             if get_yes_no_var("是否配置 RAG 检索增强参数？", default=False):
-                rag_conf: Dict[str, Any] = {}
+                # 初始化 embeddings 和 rerankers（如果不存在）
+                if "embeddings" not in config_data:
+                    config_data["embeddings"] = {}
+                if "rerankers" not in config_data:
+                    config_data["rerankers"] = {}
+                if "rag_groups" not in config_data:
+                    config_data["rag_groups"] = {}
+
+                # 收集嵌入模型配置
                 emb = get_single_line_input_var(
                     f"RAG 嵌入模型（留空使用默认: {rag_default_embed}）：",
                     default="",
                 ).strip()
+                if not emb:
+                    emb = rag_default_embed
+
+                # 创建嵌入模型配置
+                embedding_name = "default-rag-embedding"
+                config_data["embeddings"][embedding_name] = {
+                    "embedding_model": emb,
+                    "embedding_type": "LocalEmbeddingModel",
+                    "embedding_max_length": 512,
+                }
+
+                # 收集重排模型配置
                 rerank = get_single_line_input_var(
                     f"RAG rerank 模型（留空使用默认: {rag_default_rerank}）：",
                     default="",
@@ -1837,17 +1855,28 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
                 else:
                     use_bm25 = True
                     use_rerank = True
-                if emb:
-                    rag_conf["embedding_model"] = emb
-                else:
-                    rag_conf["embedding_model"] = rag_default_embed
-                if rerank:
-                    rag_conf["rerank_model"] = rerank
-                else:
-                    rag_conf["rerank_model"] = rag_default_rerank
-                rag_conf["use_bm25"] = bool(use_bm25)
-                rag_conf["use_rerank"] = bool(use_rerank)
-                config_data["JARVIS_RAG"] = rag_conf
+
+                # 创建重排模型配置（如果使用 rerank）
+                rag_group_config = {
+                    "embedding": embedding_name,
+                    "use_bm25": bool(use_bm25),
+                    "use_rerank": bool(use_rerank),
+                }
+
+                if use_rerank:
+                    if not rerank:
+                        rerank = rag_default_rerank
+                    reranker_name = "default-rag-reranker"
+                    config_data["rerankers"][reranker_name] = {
+                        "rerank_model": rerank,
+                        "reranker_type": "LocalReranker",
+                        "reranker_max_length": 512,
+                    }
+                    rag_group_config["reranker"] = reranker_name
+
+                # 创建 rag_groups 配置（对象格式）
+                config_data["rag_groups"]["default"] = rag_group_config
+                config_data["rag_group"] = "default"
                 changed = True
     except Exception:
         pass

@@ -260,75 +260,34 @@
       "default": ""
     },
     "llm_groups": {
-      "type": "array",
-      "description": "预定义的模型配置组",
-      "default": [],
-      "items": {
+      "type": "object",
+      "description": "预定义的模型配置组，使用组名作为 key。每个组必须通过 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置，不再支持直接定义 platform、model 等参数",
+      "additionalProperties": {
         "type": "object",
-        "additionalProperties": {
-          "type": "object",
-          "properties": {
-            "platform": {
-              "type": "string",
-              "default": "openai",
-              "description": "常规操作的平台名称（已弃用：建议使用 normal_llm 引用 llms 配置）"
-            },
-            "model": {
-              "type": "string",
-              "default": "gpt-5",
-              "description": "常规操作的模型名称（已弃用：建议使用 normal_llm 引用 llms 配置）"
-            },
-            "max_input_token_count": {
-              "type": "number",
-              "default": 32000,
-              "description": "常规操作的最大输入token数量（已弃用：建议使用 normal_llm 引用 llms 配置）"
-            },
-            "normal_llm": {
-              "type": "string",
-              "description": "引用 llms 中定义的常规操作LLM配置名称"
-            },
-            "cheap_llm": {
-              "type": "string",
-              "description": "引用 llms 中定义的廉价操作LLM配置名称"
-            },
-            "smart_llm": {
-              "type": "string",
-              "description": "引用 llms 中定义的智能操作LLM配置名称"
-            },
-            "cheap_platform": {
-              "type": "string",
-              "description": "廉价操作的平台名称。如未配置，则使用 platform 的值（已弃用：建议使用 cheap_llm 引用 llms 配置）"
-            },
-            "cheap_model": {
-              "type": "string",
-              "description": "廉价操作的模型名称。如未配置，则使用 model 的值（已弃用：建议使用 cheap_llm 引用 llms 配置）"
-            },
-            "cheap_max_input_token_count": {
-              "type": "number",
-              "description": "廉价模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值（已弃用：建议使用 cheap_llm 引用 llms 配置）"
-            },
-            "smart_platform": {
-              "type": "string",
-              "description": "智能操作的平台名称。如未配置，则使用 platform 的值（已弃用：建议使用 smart_llm 引用 llms 配置）"
-            },
-            "smart_model": {
-              "type": "string",
-              "description": "智能操作的模型名称。如未配置，则使用 model 的值（已弃用：建议使用 smart_llm 引用 llms 配置）"
-            },
-            "smart_max_input_token_count": {
-              "type": "number",
-              "description": "智能模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值（已弃用：建议使用 smart_llm 引用 llms 配置）"
-            },
-            "ENV": {
-              "type": "object",
-              "description": "该模型组特定的环境变量，会覆盖全局 ENV 配置",
-              "additionalProperties": {
-                "type": "string"
-              }
+        "properties": {
+          "normal_llm": {
+            "type": "string",
+            "description": "引用 llms 中定义的常规操作LLM配置名称（必需）"
+          },
+          "cheap_llm": {
+            "type": "string",
+            "description": "引用 llms 中定义的廉价操作LLM配置名称（可选）"
+          },
+          "smart_llm": {
+            "type": "string",
+            "description": "引用 llms 中定义的智能操作LLM配置名称（可选）"
+          },
+          "ENV": {
+            "type": "object",
+            "description": "该模型组特定的环境变量，会覆盖全局 ENV 配置",
+            "additionalProperties": {
+              "type": "string"
             }
           }
-        }
-      }
+        },
+        "required": ["normal_llm"]
+      },
+      "default": {}
     },
     "execute_tool_confirm": {
       "type": "boolean",
@@ -541,100 +500,43 @@
       "default": ""
     },
     "rag_groups": {
-      "type": "array",
-      "description": "预定义的RAG配置组",
-      "default": [
-        {
-          "text": {
-            "embedding_model": "BAAI/bge-m3",
-            "embedding_type": "LocalEmbeddingModel",
-            "embedding_max_length": 512,
-            "embedding_config": {},
-            "rerank_model": "BAAI/bge-reranker-v2-m3",
-            "reranker_type": "LocalReranker",
-            "reranker_max_length": 512,
-            "reranker_config": {},
-            "use_bm25": true,
-            "use_rerank": true
+      "type": "object",
+      "description": "预定义的RAG配置组，使用组名作为 key。每个组必须通过 embedding 引用 embeddings 中定义的配置，可选通过 reranker 引用 rerankers 中定义的配置，不再支持直接定义 embedding_model、embedding_type 等参数",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "embedding": {
+            "type": "string",
+            "description": "引用 embeddings 中定义的嵌入模型配置名称（必需）"
+          },
+          "reranker": {
+            "type": "string",
+            "description": "引用 rerankers 中定义的重排模型配置名称（可选）"
+          },
+          "use_bm25": {
+            "type": "boolean",
+            "default": true,
+            "description": "是否使用BM25进行检索"
+          },
+          "use_rerank": {
+            "type": "boolean",
+            "default": true,
+            "description": "是否使用重排模型"
           }
         },
-        {
-          "code": {
-            "embedding_model": "Qodo/Qodo-Embed-1-1.5B",
-            "embedding_type": "LocalEmbeddingModel",
-            "embedding_max_length": 512,
-            "embedding_config": {},
-            "use_bm25": false,
-            "use_rerank": false
-          }
-        }
-      ],
-      "items": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "object",
-          "properties": {
-            "embedding": {
-              "type": "string",
-              "description": "引用 embeddings 中定义的嵌入模型配置名称（已弃用：建议直接使用 embedding_model, embedding_type 等字段）"
-            },
-            "embedding_model": {
-              "type": "string",
-              "default": "BAAI/bge-m3",
-              "description": "嵌入模型的名称（已弃用：建议使用 embedding 引用 embeddings 配置）"
-            },
-            "embedding_type": {
-              "type": "string",
-              "default": "LocalEmbeddingModel",
-              "description": "嵌入模型的实现类型，如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel', 'CohereEmbeddingModel', 'EdgeFnEmbeddingModel' 等（已弃用：建议使用 embedding 引用 embeddings 配置）"
-            },
-            "embedding_max_length": {
-              "type": "number",
-              "default": 512,
-              "description": "嵌入模型的最大输入长度（token数），用于文档分割（已弃用：建议使用 embedding 引用 embeddings 配置）"
-            },
-            "embedding_config": {
-              "type": "object",
-              "description": "嵌入模型的额外配置参数，会传递给模型的构造函数（已弃用：建议使用 embedding 引用 embeddings 配置）",
-              "additionalProperties": true,
-              "default": {}
-            },
-            "reranker": {
-              "type": "string",
-              "description": "引用 rerankers 中定义的重排模型配置名称（已弃用：建议直接使用 rerank_model, reranker_type 等字段）"
-            },
-            "rerank_model": {
-              "type": "string",
-              "default": "BAAI/bge-reranker-v2-m3",
-              "description": "重排模型的名称（已弃用：建议使用 reranker 引用 rerankers 配置）"
-            },
-            "reranker_type": {
-              "type": "string",
-              "default": "LocalReranker",
-              "description": "重排模型的实现类型，如 'LocalReranker', 'CohereReranker', 'JinaReranker', 'EdgeFnReranker' 等（已弃用：建议使用 reranker 引用 rerankers 配置）"
-            },
-            "reranker_max_length": {
-              "type": "number",
-              "default": 512,
-              "description": "重排模型的最大输入长度（token数）（已弃用：建议使用 reranker 引用 rerankers 配置）"
-            },
-            "reranker_config": {
-              "type": "object",
-              "description": "重排模型的额外配置参数，会传递给模型的构造函数（已弃用：建议使用 reranker 引用 rerankers 配置）",
-              "additionalProperties": true,
-              "default": {}
-            },
-            "use_bm25": {
-              "type": "boolean",
-              "default": true,
-              "description": "是否使用BM25进行检索"
-            },
-            "use_rerank": {
-              "type": "boolean",
-              "default": true,
-              "description": "是否使用重排模型"
-            }
-          }
+        "required": ["embedding"]
+      },
+      "default": {
+        "text": {
+          "embedding": "default-text-embedding",
+          "reranker": "default-text-reranker",
+          "use_bm25": true,
+          "use_rerank": true
+        },
+        "code": {
+          "embedding": "default-code-embedding",
+          "use_bm25": false,
+          "use_rerank": false
         }
       }
     },
