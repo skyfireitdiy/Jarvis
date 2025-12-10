@@ -57,29 +57,29 @@ def test_config_functions_case_insensitive():
     GLOBAL_CONFIG_DATA.clear()
 
     try:
-        # 测试平台配置
-        set_config("JARVIS_PLATFORM", "test_platform")
+        # 测试平台配置（使用新的键名，不带JARVIS_前缀）
+        set_config("platform", "test_platform")
         assert get_normal_platform_name() == "test_platform"
 
         # 测试模型配置
-        set_config("JARVIS_MODEL", "test_model")
+        set_config("model", "test_model")
         assert get_normal_model_name() == "test_model"
 
         # 测试数据路径配置
-        set_config("JARVIS_DATA_PATH", "/test/path")
+        set_config("data_path", "/test/path")
         assert get_data_dir() == "/test/path"
 
         # 测试打印提示配置
-        set_config("JARVIS_PRINT_PROMPT", True)
+        set_config("print_prompt", True)
         assert is_print_prompt() is True
 
         # 测试shell配置
         set_config("SHELL", "/bin/zsh")
         assert get_shell_name() == "zsh"
 
-        # 验证小写形式也能工作
-        set_config("jarvis_platform", "lower_platform")
-        assert get_normal_platform_name() == "lower_platform"
+        # 验证大小写不敏感访问
+        set_config("PLATFORM", "upper_platform")
+        assert get_normal_platform_name() == "upper_platform"
 
     finally:
         # 恢复原始数据

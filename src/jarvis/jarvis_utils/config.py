@@ -3,8 +3,6 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, cast
 
-import yaml
-
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 from jarvis.jarvis_utils.collections import CaseInsensitiveDict
 
@@ -14,30 +12,9 @@ GLOBAL_CONFIG_DATA: CaseInsensitiveDict = CaseInsensitiveDict()
 
 
 def set_global_env_data(env_data: Dict[str, Any]) -> None:
-    """设置全局环境变量数据
-
-    如果配置中有以 JARVIS_ 开头的键，会自动创建去掉前缀的小写键。
-    例如：JARVIS_PLATFORM 会自动创建 platform 键（如果不存在）。
-    """
+    """设置全局环境变量数据"""
     global GLOBAL_CONFIG_DATA
-    # 创建配置字典的副本，避免修改原始数据
-    processed_data = dict(env_data)
-
-    # 遍历所有键，为 JARVIS_ 开头的键创建去掉前缀的小写副本
-    for key in list(processed_data.keys()):
-        key_upper = key.upper()
-        if key_upper.startswith("JARVIS_"):
-            # 去掉 JARVIS_ 前缀，转换为小写
-            short_key = key_upper[7:].lower()  # 去掉 "JARVIS_" (7个字符) 并转为小写
-            # 只有当短键不存在时才创建，避免覆盖用户显式设置的配置
-            # 使用大小写不敏感检查
-            short_key_exists = any(
-                k.upper() == short_key.upper() for k in processed_data.keys()
-            )
-            if not short_key_exists:
-                processed_data[short_key] = processed_data[key]
-
-    GLOBAL_CONFIG_DATA = CaseInsensitiveDict(processed_data)
+    GLOBAL_CONFIG_DATA = CaseInsensitiveDict(env_data)
 
 
 def set_config(key: str, value: Any) -> None:
@@ -72,26 +49,15 @@ def get_replace_map() -> dict:
     获取替换映射表。
 
     优先使用GLOBAL_CONFIG_DATA['replace_map']的配置，
-    如果没有则从数据目录下的replace_map.yaml文件中读取替换映射表，
-    如果文件不存在则返回内置替换映射表。
+    如果未配置则返回内置替换映射表。
 
     返回:
-        dict: 合并后的替换映射表字典(内置+文件中的映射表)
+        dict: 合并后的替换映射表字典(内置+配置中的映射表)
     """
     if "replace_map" in GLOBAL_CONFIG_DATA:
         return {**BUILTIN_REPLACE_MAP, **GLOBAL_CONFIG_DATA["replace_map"]}
 
-    replace_map_path = os.path.join(get_data_dir(), "replace_map.yaml")
-    if not os.path.exists(replace_map_path):
-        return BUILTIN_REPLACE_MAP.copy()
-
-    print(
-        "⚠️ 警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。请迁移到使用GLOBAL_CONFIG_DATA中的replace_map配置。"
-    )
-
-    with open(replace_map_path, "r", encoding="utf-8", errors="ignore") as file:
-        file_map = yaml.safe_load(file) or {}
-        return {**BUILTIN_REPLACE_MAP, **file_map}
+    return BUILTIN_REPLACE_MAP.copy()
 
 
 def get_max_input_token_count(model_group_override: Optional[str] = None) -> int:
@@ -220,71 +186,97 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     展开 llm_groups 中的 llm 引用（normal_llm, cheap_llm, smart_llm）到对应的配置字段。
 
+    注意：llm_groups 中不再支持直接定义 platform、model 等参数，只能通过引用 llms 中的配置。
+
     参数:
         group_config: 模型组配置字典
 
     返回:
         Dict[str, Any]: 展开后的配置字典
+
+    异常:
+        如果组配置中直接定义了 platform、model 等参数，会抛出 ValueError
     """
     expanded_config = group_config.copy()
 
+    # 检查是否直接定义了不允许的参数
+    forbidden_keys = [
+        "platform",
+        "model",
+        "max_input_token_count",
+        "cheap_platform",
+        "cheap_model",
+        "cheap_max_input_token_count",
+        "smart_platform",
+        "smart_model",
+        "smart_max_input_token_count",
+    ]
+    found_forbidden = [key for key in forbidden_keys if key in expanded_config]
+    if found_forbidden:
+        raise ValueError(
+            f"❌ 错误：llm_groups 中不再支持直接定义以下参数: {', '.join(found_forbidden)}。"
+            f"请使用 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置。"
+        )
+
+    # 验证至少需要 normal_llm 引用
+    if "normal_llm" not in expanded_config:
+        raise ValueError(
+            "❌ 错误：llm_groups 中必须至少定义 normal_llm 引用。"
+            "请使用 normal_llm 引用 llms 中定义的配置。"
+        )
+
     # 处理 normal_llm 引用
-    if "normal_llm" in expanded_config:
-        llm_ref = _resolve_llm_reference(expanded_config["normal_llm"])
-        if llm_ref:
-            # 展开到 platform, model, max_input_token_count
-            if "platform" not in expanded_config:
-                expanded_config["platform"] = llm_ref.get("platform", "openai")
-            if "model" not in expanded_config:
-                expanded_config["model"] = llm_ref.get("model", "gpt-5")
-            if "max_input_token_count" not in expanded_config:
-                expanded_config["max_input_token_count"] = llm_ref.get(
-                    "max_input_token_count", 32000
-                )
-            # 合并 llm_config
-            if "llm_config" in llm_ref:
-                if "llm_config" not in expanded_config:
-                    expanded_config["llm_config"] = {}
-                expanded_config["llm_config"].update(llm_ref["llm_config"])
-        # 移除引用键
-        expanded_config.pop("normal_llm", None)
+    llm_ref = _resolve_llm_reference(expanded_config["normal_llm"])
+    if not llm_ref:
+        raise ValueError(
+            f"❌ 错误：normal_llm 引用的 '{expanded_config['normal_llm']}' 在 llms 中不存在。"
+        )
+    # 直接使用引用的值，不再检查是否已存在
+    expanded_config["platform"] = llm_ref.get("platform", "openai")
+    expanded_config["model"] = llm_ref.get("model", "gpt-5")
+    expanded_config["max_input_token_count"] = llm_ref.get(
+        "max_input_token_count", 32000
+    )
+    # 合并 llm_config
+    if "llm_config" in llm_ref:
+        expanded_config["llm_config"] = llm_ref["llm_config"].copy()
+    # 移除引用键
+    expanded_config.pop("normal_llm", None)
 
     # 处理 cheap_llm 引用
     if "cheap_llm" in expanded_config:
         llm_ref = _resolve_llm_reference(expanded_config["cheap_llm"])
-        if llm_ref:
-            if "cheap_platform" not in expanded_config:
-                expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
-            if "cheap_model" not in expanded_config:
-                expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
-            if "cheap_max_input_token_count" not in expanded_config:
-                expanded_config["cheap_max_input_token_count"] = llm_ref.get(
-                    "max_input_token_count", 32000
-                )
-            # 合并 llm_config（如果 cheap_llm 有独立的 llm_config 需求，可以扩展）
-            if "llm_config" in llm_ref:
-                if "cheap_llm_config" not in expanded_config:
-                    expanded_config["cheap_llm_config"] = {}
-                expanded_config["cheap_llm_config"].update(llm_ref["llm_config"])
+        if not llm_ref:
+            raise ValueError(
+                f"❌ 错误：cheap_llm 引用的 '{expanded_config['cheap_llm']}' 在 llms 中不存在。"
+            )
+        # 直接使用引用的值
+        expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
+        expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
+        expanded_config["cheap_max_input_token_count"] = llm_ref.get(
+            "max_input_token_count", 32000
+        )
+        # 合并 llm_config
+        if "llm_config" in llm_ref:
+            expanded_config["cheap_llm_config"] = llm_ref["llm_config"].copy()
         expanded_config.pop("cheap_llm", None)
 
     # 处理 smart_llm 引用
     if "smart_llm" in expanded_config:
         llm_ref = _resolve_llm_reference(expanded_config["smart_llm"])
-        if llm_ref:
-            if "smart_platform" not in expanded_config:
-                expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
-            if "smart_model" not in expanded_config:
-                expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
-            if "smart_max_input_token_count" not in expanded_config:
-                expanded_config["smart_max_input_token_count"] = llm_ref.get(
-                    "max_input_token_count", 32000
-                )
-            # 合并 llm_config
-            if "llm_config" in llm_ref:
-                if "smart_llm_config" not in expanded_config:
-                    expanded_config["smart_llm_config"] = {}
-                expanded_config["smart_llm_config"].update(llm_ref["llm_config"])
+        if not llm_ref:
+            raise ValueError(
+                f"❌ 错误：smart_llm 引用的 '{expanded_config['smart_llm']}' 在 llms 中不存在。"
+            )
+        # 直接使用引用的值
+        expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
+        expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
+        expanded_config["smart_max_input_token_count"] = llm_ref.get(
+            "max_input_token_count", 32000
+        )
+        # 合并 llm_config
+        if "llm_config" in llm_ref:
+            expanded_config["smart_llm_config"] = llm_ref["llm_config"].copy()
         expanded_config.pop("smart_llm", None)
 
     return expanded_config
@@ -296,42 +288,39 @@ def _get_resolved_model_config(
     """
     解析并合并模型配置，处理模型组。
 
+    注意：
+    - llm_groups 格式为对象：{'group_name': {...}, ...}，使用组名作为 key
+    - llm_groups 中不再支持直接定义 platform、model 等参数，只能通过 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置
+
     优先级顺序:
     - 当通过 model_group_override（例如命令行 -g/--llm-group）指定组时：
-        1. llm_group 中定义的组配置
+        1. llm_group 中通过引用展开的配置
         2. 仅当组未提供对应键时，回退到顶层环境变量 (platform, model, max_input_token_count)
         3. 代码中的默认值
     - 当未显式指定组时（使用默认组或未设置）：
         1. 顶层环境变量 (platform, model, max_input_token_count)
-        2. llm_group 中定义的组配置
+        2. llm_group 中通过引用展开的配置
         3. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的模型配置字典
+
+    异常:
+        如果 llm_groups 中直接定义了 platform、model 等参数，或缺少必需的引用，会抛出 ValueError
     """
     group_config = {}
     model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("llm_group")
-    # The format is a list of single-key dicts: [{'group_name': {...}}, ...]
-    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", [])
+    # The format is an object: {'group_name': {...}, ...}
+    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
 
-    if model_group_name and isinstance(model_groups, list):
-        found = False
-        for group_item in model_groups:
-            if isinstance(group_item, dict) and model_group_name in group_item:
-                group_config = group_item[model_group_name]
-                found = True
-                break
-
-        # 当显式指定了模型组但未找到时，报错并退出
-        if model_group_override and not found:
+    if model_group_name and isinstance(model_groups, dict):
+        if model_group_name in model_groups:
+            group_config = model_groups[model_group_name]
+        elif model_group_override:
+            # 当显式指定了模型组但未找到时，报错并退出
             print(f"❌ 错误：指定的模型组 '{model_group_name}' 不存在于配置中。")
             print(
-                "ℹ️ 可用的模型组: "
-                + ", ".join(
-                    list(group.keys())[0]
-                    for group in model_groups
-                    if isinstance(group, dict)
-                )
+                "ℹ️ 可用的模型组: " + ", ".join(model_groups.keys())
                 if model_groups
                 else "无可用模型组"
             )
@@ -340,7 +329,9 @@ def _get_resolved_model_config(
             sys.exit(1)
 
     # 展开 llm 引用（normal_llm, cheap_llm, smart_llm）
-    group_config = _expand_llm_references(group_config)
+    # 只有当 group_config 不为空时才展开引用（说明使用了 llm_groups）
+    if group_config:
+        group_config = _expand_llm_references(group_config)
 
     _apply_llm_group_env_override(group_config)
 
@@ -421,30 +412,6 @@ def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
     """
     config = _get_resolved_model_config(model_group_override)
     return cast(str, config.get("model", "gpt-5"))
-
-
-def _deprecated_platform_name_v1(model_group_override: Optional[str] = None) -> str:
-    """
-    获取思考操作的平台名称。
-
-    返回：
-        str: 平台名称，默认为正常操作平台
-    """
-    _get_resolved_model_config(model_group_override)
-    # Fallback to normal platform if thinking platform is not specified
-    return get_normal_platform_name(model_group_override)
-
-
-def _deprecated_model_name_v1(model_group_override: Optional[str] = None) -> str:
-    """
-    获取思考操作的模型名称。
-
-    返回：
-        str: 模型名称，默认为正常操作模型
-    """
-    _get_resolved_model_config(model_group_override)
-    # Fallback to normal model if thinking model is not specified
-    return get_normal_model_name(model_group_override)
 
 
 def get_cheap_platform_name(model_group_override: Optional[str] = None) -> str:
@@ -796,29 +763,42 @@ def get_mcp_config() -> List[Dict[str, Any]]:
 # ==============================================================================
 
 
-DEFAULT_RAG_GROUPS = [
-    {
-        "text": {
-            "embedding_model": "BAAI/bge-m3",
-            "embedding_type": "LocalEmbeddingModel",  # 模型实现类型
-            "embedding_max_length": 512,  # 嵌入模型最大输入长度（token数）
-            "rerank_model": "BAAI/bge-reranker-v2-m3",
-            "reranker_type": "LocalReranker",  # 模型实现类型
-            "reranker_max_length": 512,  # 重排模型最大输入长度（token数）
-            "use_bm25": True,
-            "use_rerank": True,
-        }
+DEFAULT_RAG_GROUPS = {
+    "text": {
+        "embedding": "default-text-embedding",
+        "reranker": "default-text-reranker",
+        "use_bm25": True,
+        "use_rerank": True,
     },
-    {
-        "code": {
-            "embedding_model": "Qodo/Qodo-Embed-1-1.5B",
-            "embedding_type": "LocalEmbeddingModel",
-            "embedding_max_length": 512,
-            "use_bm25": False,
-            "use_rerank": False,
-        }
+    "code": {
+        "embedding": "default-code-embedding",
+        "use_bm25": False,
+        "use_rerank": False,
     },
-]
+}
+
+# 默认的 embeddings 配置（如果用户未定义）
+DEFAULT_EMBEDDINGS = {
+    "default-text-embedding": {
+        "embedding_model": "BAAI/bge-m3",
+        "embedding_type": "LocalEmbeddingModel",
+        "embedding_max_length": 512,
+    },
+    "default-code-embedding": {
+        "embedding_model": "Qodo/Qodo-Embed-1-1.5B",
+        "embedding_type": "LocalEmbeddingModel",
+        "embedding_max_length": 512,
+    },
+}
+
+# 默认的 rerankers 配置（如果用户未定义）
+DEFAULT_RERANKERS = {
+    "default-text-reranker": {
+        "rerank_model": "BAAI/bge-reranker-v2-m3",
+        "reranker_type": "LocalReranker",
+        "reranker_max_length": 512,
+    },
+}
 
 
 def _resolve_embedding_reference(embedding_name: str) -> Dict[str, Any]:
@@ -833,7 +813,11 @@ def _resolve_embedding_reference(embedding_name: str) -> Dict[str, Any]:
     """
     embeddings = GLOBAL_CONFIG_DATA.get("embeddings", {})
     if not isinstance(embeddings, dict):
-        return {}
+        embeddings = {}
+
+    # 如果用户配置中没有，尝试使用默认配置
+    if embedding_name not in embeddings:
+        embeddings = {**DEFAULT_EMBEDDINGS, **embeddings}
 
     embedding_config = embeddings.get(embedding_name)
     if not isinstance(embedding_config, dict):
@@ -855,7 +839,11 @@ def _resolve_reranker_reference(reranker_name: str) -> Dict[str, Any]:
     """
     rerankers = GLOBAL_CONFIG_DATA.get("rerankers", {})
     if not isinstance(rerankers, dict):
-        return {}
+        rerankers = {}
+
+    # 如果用户配置中没有，尝试使用默认配置
+    if reranker_name not in rerankers:
+        rerankers = {**DEFAULT_RERANKERS, **rerankers}
 
     reranker_config = rerankers.get(reranker_name)
     if not isinstance(reranker_config, dict):
@@ -869,65 +857,85 @@ def _expand_rag_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     展开 rag_groups 中的 embedding 和 reranker 引用到对应的配置字段。
 
+    注意：rag_groups 中不再支持直接定义 embedding_model、embedding_type 等参数，只能通过引用 embeddings 和 rerankers 中的配置。
+
     参数:
         group_config: RAG组配置字典
 
     返回:
         Dict[str, Any]: 展开后的配置字典
+
+    异常:
+        如果组配置中直接定义了 embedding_model、embedding_type 等参数，会抛出 ValueError
     """
     expanded_config = group_config.copy()
 
-    # 处理 embedding 引用
-    if "embedding" in expanded_config:
-        embedding_ref = _resolve_embedding_reference(expanded_config["embedding"])
-        if embedding_ref:
-            # 展开到 embedding_model, embedding_type, embedding_max_length, embedding_config
-            if "embedding_model" not in expanded_config:
-                expanded_config["embedding_model"] = embedding_ref.get(
-                    "embedding_model", "BAAI/bge-m3"
-                )
-            if "embedding_type" not in expanded_config:
-                expanded_config["embedding_type"] = embedding_ref.get(
-                    "embedding_type", "LocalEmbeddingModel"
-                )
-            if "embedding_max_length" not in expanded_config:
-                expanded_config["embedding_max_length"] = embedding_ref.get(
-                    "embedding_max_length", 512
-                )
-            # 合并 embedding_config
-            if "embedding_config" in embedding_ref:
-                if "embedding_config" not in expanded_config:
-                    expanded_config["embedding_config"] = {}
-                expanded_config["embedding_config"].update(
-                    embedding_ref["embedding_config"]
-                )
-        # 移除引用键
-        expanded_config.pop("embedding", None)
+    # 检查是否直接定义了不允许的参数
+    forbidden_keys = [
+        "embedding_model",
+        "embedding_type",
+        "embedding_max_length",
+        "embedding_config",
+        "rerank_model",
+        "reranker_type",
+        "reranker_max_length",
+        "reranker_config",
+    ]
+    found_forbidden = [key for key in forbidden_keys if key in expanded_config]
+    if found_forbidden:
+        raise ValueError(
+            f"❌ 错误：rag_groups 中不再支持直接定义以下参数: {', '.join(found_forbidden)}。"
+            f"请使用 embedding 和 reranker 引用 embeddings 和 rerankers 中定义的配置。"
+        )
 
-    # 处理 reranker 引用
+    # 处理 embedding 引用（必需）
+    if "embedding" not in expanded_config:
+        raise ValueError(
+            "❌ 错误：rag_groups 中必须定义 embedding 引用。"
+            "请使用 embedding 引用 embeddings 中定义的配置。"
+        )
+
+    embedding_ref = _resolve_embedding_reference(expanded_config["embedding"])
+    if not embedding_ref:
+        raise ValueError(
+            f"❌ 错误：embedding 引用的 '{expanded_config['embedding']}' 在 embeddings 中不存在。"
+        )
+    # 直接使用引用的值
+    expanded_config["embedding_model"] = embedding_ref.get(
+        "embedding_model", "BAAI/bge-m3"
+    )
+    expanded_config["embedding_type"] = embedding_ref.get(
+        "embedding_type", "LocalEmbeddingModel"
+    )
+    expanded_config["embedding_max_length"] = embedding_ref.get(
+        "embedding_max_length", 512
+    )
+    # 合并 embedding_config
+    if "embedding_config" in embedding_ref:
+        expanded_config["embedding_config"] = embedding_ref["embedding_config"].copy()
+    # 移除引用键
+    expanded_config.pop("embedding", None)
+
+    # 处理 reranker 引用（可选）
     if "reranker" in expanded_config:
         reranker_ref = _resolve_reranker_reference(expanded_config["reranker"])
-        if reranker_ref:
-            # 展开到 rerank_model, reranker_type, reranker_max_length, reranker_config
-            if "rerank_model" not in expanded_config:
-                expanded_config["rerank_model"] = reranker_ref.get(
-                    "rerank_model", "BAAI/bge-reranker-v2-m3"
-                )
-            if "reranker_type" not in expanded_config:
-                expanded_config["reranker_type"] = reranker_ref.get(
-                    "reranker_type", "LocalReranker"
-                )
-            if "reranker_max_length" not in expanded_config:
-                expanded_config["reranker_max_length"] = reranker_ref.get(
-                    "reranker_max_length", 512
-                )
-            # 合并 reranker_config
-            if "reranker_config" in reranker_ref:
-                if "reranker_config" not in expanded_config:
-                    expanded_config["reranker_config"] = {}
-                expanded_config["reranker_config"].update(
-                    reranker_ref["reranker_config"]
-                )
+        if not reranker_ref:
+            raise ValueError(
+                f"❌ 错误：reranker 引用的 '{expanded_config['reranker']}' 在 rerankers 中不存在。"
+            )
+        # 直接使用引用的值
+        expanded_config["rerank_model"] = reranker_ref.get(
+            "rerank_model", "BAAI/bge-reranker-v2-m3"
+        )
+        expanded_config["reranker_type"] = reranker_ref.get(
+            "reranker_type", "LocalReranker"
+        )
+        expanded_config["reranker_max_length"] = reranker_ref.get(
+            "reranker_max_length", 512
+        )
+        # 合并 reranker_config
+        if "reranker_config" in reranker_ref:
+            expanded_config["reranker_config"] = reranker_ref["reranker_config"].copy()
         # 移除引用键
         expanded_config.pop("reranker", None)
 
@@ -940,26 +948,45 @@ def _get_resolved_rag_config(
     """
     解析并合并RAG配置，处理RAG组。
 
+    注意：
+    - rag_groups 格式为对象：{'group_name': {...}, ...}，使用组名作为 key
+    - rag_groups 中不再支持直接定义 embedding_model、embedding_type 等参数，只能通过 embedding 和 reranker 引用 embeddings 和 rerankers 中定义的配置
+
     优先级顺序:
     1. rag 中的顶级设置 (embedding_model, etc.)
-    2. rag_group 中定义的组配置
+    2. rag_group 中通过引用展开的组配置
     3. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的RAG配置字典
+
+    异常:
+        如果 rag_groups 中直接定义了 embedding_model、embedding_type 等参数，或缺少必需的引用，会抛出 ValueError
     """
     group_config = {}
     rag_group_name = rag_group_override or GLOBAL_CONFIG_DATA.get("rag_group")
+    # The format is an object: {'group_name': {...}, ...}
     rag_groups = GLOBAL_CONFIG_DATA.get("rag_groups", DEFAULT_RAG_GROUPS)
 
-    if rag_group_name and isinstance(rag_groups, list):
+    # 兼容旧格式：如果是列表，转换为对象格式
+    if isinstance(rag_groups, list):
+        converted_groups = {}
         for group_item in rag_groups:
-            if isinstance(group_item, dict) and rag_group_name in group_item:
-                group_config = group_item[rag_group_name]
-                break
+            if isinstance(group_item, dict):
+                for group_name, group_config_item in group_item.items():
+                    converted_groups[group_name] = group_config_item
+        rag_groups = converted_groups
+        # 更新全局配置（仅用于兼容，不持久化）
+        GLOBAL_CONFIG_DATA["rag_groups"] = converted_groups
+
+    if rag_group_name and isinstance(rag_groups, dict):
+        if rag_group_name in rag_groups:
+            group_config = rag_groups[rag_group_name]
 
     # 展开 embedding 和 reranker 引用
-    group_config = _expand_rag_references(group_config)
+    # 只有当 group_config 不为空时才展开引用（说明使用了 rag_groups）
+    if group_config:
+        group_config = _expand_rag_references(group_config)
 
     # Start with group config
     resolved_config = group_config.copy()
