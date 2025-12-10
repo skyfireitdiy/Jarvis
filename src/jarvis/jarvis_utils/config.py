@@ -14,9 +14,30 @@ GLOBAL_CONFIG_DATA: CaseInsensitiveDict = CaseInsensitiveDict()
 
 
 def set_global_env_data(env_data: Dict[str, Any]) -> None:
-    """设置全局环境变量数据"""
+    """设置全局环境变量数据
+
+    如果配置中有以 JARVIS_ 开头的键，会自动创建去掉前缀的小写键。
+    例如：JARVIS_PLATFORM 会自动创建 platform 键（如果不存在）。
+    """
     global GLOBAL_CONFIG_DATA
-    GLOBAL_CONFIG_DATA = CaseInsensitiveDict(env_data)
+    # 创建配置字典的副本，避免修改原始数据
+    processed_data = dict(env_data)
+
+    # 遍历所有键，为 JARVIS_ 开头的键创建去掉前缀的小写副本
+    for key in list(processed_data.keys()):
+        key_upper = key.upper()
+        if key_upper.startswith("JARVIS_"):
+            # 去掉 JARVIS_ 前缀，转换为小写
+            short_key = key_upper[7:].lower()  # 去掉 "JARVIS_" (7个字符) 并转为小写
+            # 只有当短键不存在时才创建，避免覆盖用户显式设置的配置
+            # 使用大小写不敏感检查
+            short_key_exists = any(
+                k.upper() == short_key.upper() for k in processed_data.keys()
+            )
+            if not short_key_exists:
+                processed_data[short_key] = processed_data[key]
+
+    GLOBAL_CONFIG_DATA = CaseInsensitiveDict(processed_data)
 
 
 def set_config(key: str, value: Any) -> None:
@@ -38,7 +59,7 @@ def get_git_commit_prompt() -> str:
     返回:
         str: Git提交信息生成提示模板，如果未配置则返回空字符串
     """
-    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_GIT_COMMIT_PROMPT", ""))
+    return cast(str, GLOBAL_CONFIG_DATA.get("git_commit_prompt", ""))
 
 
 # 输出窗口预留大小
@@ -50,22 +71,22 @@ def get_replace_map() -> dict:
     """
     获取替换映射表。
 
-    优先使用GLOBAL_CONFIG_DATA['JARVIS_REPLACE_MAP']的配置，
+    优先使用GLOBAL_CONFIG_DATA['replace_map']的配置，
     如果没有则从数据目录下的replace_map.yaml文件中读取替换映射表，
     如果文件不存在则返回内置替换映射表。
 
     返回:
         dict: 合并后的替换映射表字典(内置+文件中的映射表)
     """
-    if "JARVIS_REPLACE_MAP" in GLOBAL_CONFIG_DATA:
-        return {**BUILTIN_REPLACE_MAP, **GLOBAL_CONFIG_DATA["JARVIS_REPLACE_MAP"]}
+    if "replace_map" in GLOBAL_CONFIG_DATA:
+        return {**BUILTIN_REPLACE_MAP, **GLOBAL_CONFIG_DATA["replace_map"]}
 
     replace_map_path = os.path.join(get_data_dir(), "replace_map.yaml")
     if not os.path.exists(replace_map_path):
         return BUILTIN_REPLACE_MAP.copy()
 
     print(
-        "⚠️ 警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。请迁移到使用GLOBAL_CONFIG_DATA中的JARVIS_REPLACE_MAP配置。"
+        "⚠️ 警告：使用replace_map.yaml进行配置的方式已被弃用，将在未来版本中移除。请迁移到使用GLOBAL_CONFIG_DATA中的replace_map配置。"
     )
 
     with open(replace_map_path, "r", encoding="utf-8", errors="ignore") as file:
@@ -81,7 +102,7 @@ def get_max_input_token_count(model_group_override: Optional[str] = None) -> int
         int: 模型能处理的最大输入token数量。
     """
     config = _get_resolved_model_config(model_group_override)
-    return int(config.get("JARVIS_MAX_INPUT_TOKEN_COUNT", "128000"))
+    return int(config.get("max_input_token_count", "128000"))
 
 
 def get_cheap_max_input_token_count(model_group_override: Optional[str] = None) -> int:
@@ -92,7 +113,7 @@ def get_cheap_max_input_token_count(model_group_override: Optional[str] = None) 
         int: 模型能处理的最大输入token数量，如果未配置则回退到正常配置
     """
     config = _get_resolved_model_config(model_group_override)
-    cheap_max_token = config.get("JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT")
+    cheap_max_token = config.get("cheap_max_input_token_count")
     if cheap_max_token:
         return int(cheap_max_token)
     return get_max_input_token_count(model_group_override)
@@ -106,7 +127,7 @@ def get_smart_max_input_token_count(model_group_override: Optional[str] = None) 
         int: 模型能处理的最大输入token数量，如果未配置则回退到正常配置
     """
     config = _get_resolved_model_config(model_group_override)
-    smart_max_token = config.get("JARVIS_SMART_MAX_INPUT_TOKEN_COUNT")
+    smart_max_token = config.get("smart_max_input_token_count")
     if smart_max_token:
         return int(smart_max_token)
     return get_max_input_token_count(model_group_override)
@@ -120,7 +141,7 @@ def get_shell_name() -> str:
         str: Shell名称（例如bash, zsh, fish），默认为bash
 
     获取顺序：
-    1. 先从GLOBAL_CONFIG_DATA中获取JARVIS_SHELL配置
+    1. 先从GLOBAL_CONFIG_DATA中获取shell配置
     2. 再从GLOBAL_CONFIG_DATA中获取SHELL配置
     3. 最后从环境变量SHELL获取
     4. 如果都未配置，则默认返回bash
@@ -145,23 +166,21 @@ def _get_resolved_model_config(
 
     优先级顺序:
     - 当通过 model_group_override（例如命令行 -g/--llm-group）指定组时：
-        1. JARVIS_LLM_GROUP 中定义的组配置
-        2. 仅当组未提供对应键时，回退到顶层环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, JARVIS_MAX_INPUT_TOKEN_COUNT)
+        1. llm_group 中定义的组配置
+        2. 仅当组未提供对应键时，回退到顶层环境变量 (platform, model, max_input_token_count)
         3. 代码中的默认值
     - 当未显式指定组时（使用默认组或未设置）：
-        1. 顶层环境变量 (JARVIS_PLATFORM, JARVIS_MODEL, JARVIS_MAX_INPUT_TOKEN_COUNT)
-        2. JARVIS_LLM_GROUP 中定义的组配置
+        1. 顶层环境变量 (platform, model, max_input_token_count)
+        2. llm_group 中定义的组配置
         3. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的模型配置字典
     """
     group_config = {}
-    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get(
-        "JARVIS_LLM_GROUP"
-    )
+    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("llm_group")
     # The format is a list of single-key dicts: [{'group_name': {...}}, ...]
-    model_groups = GLOBAL_CONFIG_DATA.get("JARVIS_LLM_GROUPS", [])
+    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", [])
 
     if model_group_name and isinstance(model_groups, list):
         found = False
@@ -198,15 +217,15 @@ def _get_resolved_model_config(
     #   仅当组未提供对应键时，才回落到顶层 GLOBAL_CONFIG_DATA。
     # - 若未传入 override（即使用默认组），保持原有行为：由顶层键覆盖组配置。
     override_keys = [
-        "JARVIS_PLATFORM",
-        "JARVIS_MODEL",
-        "JARVIS_MAX_INPUT_TOKEN_COUNT",
-        "JARVIS_CHEAP_PLATFORM",
-        "JARVIS_CHEAP_MODEL",
-        "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT",
-        "JARVIS_SMART_PLATFORM",
-        "JARVIS_SMART_MODEL",
-        "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT",
+        "platform",
+        "model",
+        "max_input_token_count",
+        "cheap_platform",
+        "cheap_model",
+        "cheap_max_input_token_count",
+        "smart_platform",
+        "smart_model",
+        "smart_max_input_token_count",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:
@@ -229,7 +248,7 @@ def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
         str: 平台名称，默认为'openai'
     """
     config = _get_resolved_model_config(model_group_override)
-    return cast(str, config.get("JARVIS_PLATFORM", "openai"))
+    return cast(str, config.get("platform", "openai"))
 
 
 def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
@@ -240,7 +259,7 @@ def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
         str: 模型名称，默认为'gpt-5'
     """
     config = _get_resolved_model_config(model_group_override)
-    return cast(str, config.get("JARVIS_MODEL", "gpt-5"))
+    return cast(str, config.get("model", "gpt-5"))
 
 
 def _deprecated_platform_name_v1(model_group_override: Optional[str] = None) -> str:
@@ -275,7 +294,7 @@ def get_cheap_platform_name(model_group_override: Optional[str] = None) -> str:
         str: 平台名称，如果未配置则回退到正常操作平台
     """
     config = _get_resolved_model_config(model_group_override)
-    cheap_platform = config.get("JARVIS_CHEAP_PLATFORM")
+    cheap_platform = config.get("cheap_platform")
     if cheap_platform:
         return cast(str, cheap_platform)
     return get_normal_platform_name(model_group_override)
@@ -289,7 +308,7 @@ def get_cheap_model_name(model_group_override: Optional[str] = None) -> str:
         str: 模型名称，如果未配置则回退到正常操作模型
     """
     config = _get_resolved_model_config(model_group_override)
-    cheap_model = config.get("JARVIS_CHEAP_MODEL")
+    cheap_model = config.get("cheap_model")
     if cheap_model:
         return cast(str, cheap_model)
     return get_normal_model_name(model_group_override)
@@ -303,7 +322,7 @@ def get_smart_platform_name(model_group_override: Optional[str] = None) -> str:
         str: 平台名称，如果未配置则回退到正常操作平台
     """
     config = _get_resolved_model_config(model_group_override)
-    smart_platform = config.get("JARVIS_SMART_PLATFORM")
+    smart_platform = config.get("smart_platform")
     if smart_platform:
         return cast(str, smart_platform)
     return get_normal_platform_name(model_group_override)
@@ -317,7 +336,7 @@ def get_smart_model_name(model_group_override: Optional[str] = None) -> str:
         str: 模型名称，如果未配置则回退到正常操作模型
     """
     config = _get_resolved_model_config(model_group_override)
-    smart_model = config.get("JARVIS_SMART_MODEL")
+    smart_model = config.get("smart_model")
     if smart_model:
         return cast(str, smart_model)
     return get_normal_model_name(model_group_override)
@@ -330,7 +349,7 @@ def is_execute_tool_confirm() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_EXECUTE_TOOL_CONFIRM", False))
+    return cast(bool, GLOBAL_CONFIG_DATA.get("execute_tool_confirm", False))
 
 
 def is_confirm_before_apply_patch() -> bool:
@@ -340,9 +359,7 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return cast(
-        bool, GLOBAL_CONFIG_DATA.get("JARVIS_CONFIRM_BEFORE_APPLY_PATCH", False)
-    )
+    return cast(bool, GLOBAL_CONFIG_DATA.get("confirm_before_apply_patch", False))
 
 
 def get_data_dir() -> str:
@@ -350,11 +367,11 @@ def get_data_dir() -> str:
     获取Jarvis数据存储目录路径。
 
     返回:
-        str: 数据目录路径，优先从JARVIS_DATA_PATH环境变量获取，
+        str: 数据目录路径，优先从data_path环境变量获取，
              如果未设置或为空，则使用~/.jarvis作为默认值
     """
     return os.path.expanduser(
-        cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_DATA_PATH", "~/.jarvis")).strip()
+        cast(str, GLOBAL_CONFIG_DATA.get("data_path", "~/.jarvis")).strip()
     )
 
 
@@ -382,7 +399,7 @@ def get_pretty_output() -> bool:
     if platform.system() == "Windows":
         return False
 
-    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_PRETTY_OUTPUT", True))
+    return cast(bool, GLOBAL_CONFIG_DATA.get("pretty_output", True))
 
 
 def is_use_methodology() -> bool:
@@ -392,7 +409,7 @@ def is_use_methodology() -> bool:
     返回：
         bool: 如果启用方法论则返回True，默认为True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_USE_METHODOLOGY", True))
+    return cast(bool, GLOBAL_CONFIG_DATA.get("use_methodology", True))
 
 
 def is_use_analysis() -> bool:
@@ -402,7 +419,7 @@ def is_use_analysis() -> bool:
     返回：
         bool: 如果启用任务分析则返回True，默认为True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_USE_ANALYSIS", True))
+    return cast(bool, GLOBAL_CONFIG_DATA.get("use_analysis", True))
 
 
 def get_tool_load_dirs() -> List[str]:
@@ -414,7 +431,7 @@ def get_tool_load_dirs() -> List[str]:
     """
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_LOAD_DIRS", [])
+        for p in GLOBAL_CONFIG_DATA.get("tool_load_dirs", [])
         if p
     ]
 
@@ -428,7 +445,7 @@ def get_methodology_dirs() -> List[str]:
     """
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("JARVIS_METHODOLOGY_DIRS", [])
+        for p in GLOBAL_CONFIG_DATA.get("methodology_dirs", [])
         if p
     ]
 
@@ -442,7 +459,7 @@ def get_agent_definition_dirs() -> List[str]:
     """
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("JARVIS_AGENT_DEFINITION_DIRS", [])
+        for p in GLOBAL_CONFIG_DATA.get("agent_definition_dirs", [])
         if p
     ]
 
@@ -456,7 +473,7 @@ def get_multi_agent_dirs() -> List[str]:
     """
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("JARVIS_MULTI_AGENT_DIRS", [])
+        for p in GLOBAL_CONFIG_DATA.get("multi_agent_dirs", [])
         if p
     ]
 
@@ -470,7 +487,7 @@ def get_roles_dirs() -> List[str]:
     """
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("JARVIS_ROLES_DIRS", [])
+        for p in GLOBAL_CONFIG_DATA.get("roles_dirs", [])
         if p
     ]
 
@@ -484,7 +501,7 @@ def get_after_tool_call_cb_dirs() -> List[str]:
     """
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("JARVIS_AFTER_TOOL_CALL_CB_DIRS", [])
+        for p in GLOBAL_CONFIG_DATA.get("after_tool_call_cb_dirs", [])
         if p
     ]
 
@@ -496,7 +513,7 @@ def get_central_methodology_repo() -> str:
     返回:
         str: 中心方法论Git仓库地址，如果未配置则返回空字符串
     """
-    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_METHODOLOGY_REPO", ""))
+    return cast(str, GLOBAL_CONFIG_DATA.get("central_methodology_repo", ""))
 
 
 def get_central_tool_repo() -> str:
@@ -506,7 +523,7 @@ def get_central_tool_repo() -> str:
     返回:
         str: 中心工具Git仓库地址，如果未配置则返回空字符串
     """
-    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_TOOL_REPO", ""))
+    return cast(str, GLOBAL_CONFIG_DATA.get("central_tool_repo", ""))
 
 
 def get_rules_load_dirs() -> List[str]:
@@ -518,7 +535,7 @@ def get_rules_load_dirs() -> List[str]:
     """
     return [
         os.path.expanduser(os.path.expandvars(str(p)))
-        for p in GLOBAL_CONFIG_DATA.get("JARVIS_RULES_LOAD_DIRS", [])
+        for p in GLOBAL_CONFIG_DATA.get("rules_load_dirs", [])
         if p
     ]
 
@@ -530,7 +547,7 @@ def get_central_rules_repo() -> str:
     返回:
         str: 中心规则Git仓库地址，如果未配置则返回空字符串
     """
-    return cast(str, GLOBAL_CONFIG_DATA.get("JARVIS_CENTRAL_RULES_REPO", ""))
+    return cast(str, GLOBAL_CONFIG_DATA.get("central_rules_repo", ""))
 
 
 def is_print_prompt() -> bool:
@@ -540,7 +557,7 @@ def is_print_prompt() -> bool:
     返回：
         bool: 如果打印提示则返回True，默认为True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_PROMPT", False))
+    return cast(bool, GLOBAL_CONFIG_DATA.get("print_prompt", False))
 
 
 def is_print_error_traceback() -> bool:
@@ -550,7 +567,7 @@ def is_print_error_traceback() -> bool:
     返回：
         bool: 如果打印回溯则返回True，默认为False（不打印）
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_PRINT_ERROR_TRACEBACK", False) is True
+    return GLOBAL_CONFIG_DATA.get("print_error_traceback", False) is True
 
 
 def is_force_save_memory() -> bool:
@@ -560,7 +577,7 @@ def is_force_save_memory() -> bool:
     返回：
         bool: 如果强制保存记忆则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_FORCE_SAVE_MEMORY", False) is True
+    return GLOBAL_CONFIG_DATA.get("force_save_memory", False) is True
 
 
 def is_enable_static_analysis() -> bool:
@@ -570,7 +587,7 @@ def is_enable_static_analysis() -> bool:
     返回：
         bool: 如果启用静态代码分析则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STATIC_ANALYSIS", True) is True
+    return GLOBAL_CONFIG_DATA.get("enable_static_analysis", True) is True
 
 
 def is_enable_build_validation() -> bool:
@@ -580,7 +597,7 @@ def is_enable_build_validation() -> bool:
     返回：
         bool: 如果启用构建验证则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_BUILD_VALIDATION", True) is True
+    return GLOBAL_CONFIG_DATA.get("enable_build_validation", True) is True
 
 
 def is_enable_impact_analysis() -> bool:
@@ -590,7 +607,7 @@ def is_enable_impact_analysis() -> bool:
     返回：
         bool: 如果启用影响范围分析则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_IMPACT_ANALYSIS", True) is True
+    return GLOBAL_CONFIG_DATA.get("enable_impact_analysis", True) is True
 
 
 def get_build_validation_timeout() -> int:
@@ -600,7 +617,7 @@ def get_build_validation_timeout() -> int:
     返回：
         int: 超时时间，默认为30秒
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_BUILD_VALIDATION_TIMEOUT", 30))
+    return int(GLOBAL_CONFIG_DATA.get("build_validation_timeout", 30))
 
 
 def get_mcp_config() -> List[Dict[str, Any]]:
@@ -610,7 +627,7 @@ def get_mcp_config() -> List[Dict[str, Any]]:
     返回:
         List[Dict[str, Any]]: MCP配置项列表，如果未配置则返回空列表
     """
-    return cast(List[Dict[str, Any]], GLOBAL_CONFIG_DATA.get("JARVIS_MCP", []))
+    return cast(List[Dict[str, Any]], GLOBAL_CONFIG_DATA.get("mcp", []))
 
 
 # ==============================================================================
@@ -650,16 +667,16 @@ def _get_resolved_rag_config(
     解析并合并RAG配置，处理RAG组。
 
     优先级顺序:
-    1. JARVIS_RAG 中的顶级设置 (embedding_model, etc.)
-    2. JARVIS_RAG_GROUP 中定义的组配置
+    1. rag 中的顶级设置 (embedding_model, etc.)
+    2. rag_group 中定义的组配置
     3. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的RAG配置字典
     """
     group_config = {}
-    rag_group_name = rag_group_override or GLOBAL_CONFIG_DATA.get("JARVIS_RAG_GROUP")
-    rag_groups = GLOBAL_CONFIG_DATA.get("JARVIS_RAG_GROUPS", DEFAULT_RAG_GROUPS)
+    rag_group_name = rag_group_override or GLOBAL_CONFIG_DATA.get("rag_group")
+    rag_groups = GLOBAL_CONFIG_DATA.get("rag_groups", DEFAULT_RAG_GROUPS)
 
     if rag_group_name and isinstance(rag_groups, list):
         for group_item in rag_groups:
@@ -670,8 +687,8 @@ def _get_resolved_rag_config(
     # Start with group config
     resolved_config = group_config.copy()
 
-    # Override with specific settings from the top-level JARVIS_RAG dict
-    top_level_rag_config = GLOBAL_CONFIG_DATA.get("JARVIS_RAG", {})
+    # Override with specific settings from the top-level rag dict
+    top_level_rag_config = GLOBAL_CONFIG_DATA.get("rag", {})
     if isinstance(top_level_rag_config, dict):
         for key in [
             "embedding_model",
@@ -833,7 +850,7 @@ def get_web_search_platform_name() -> Optional[str]:
     返回:
         Optional[str]: 平台名称，如果未配置则返回None
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_WEB_SEARCH_PLATFORM")
+    return GLOBAL_CONFIG_DATA.get("web_search_platform")
 
 
 def get_web_search_model_name() -> Optional[str]:
@@ -843,7 +860,7 @@ def get_web_search_model_name() -> Optional[str]:
     返回:
         Optional[str]: 模型名称，如果未配置则返回None
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_WEB_SEARCH_MODEL")
+    return GLOBAL_CONFIG_DATA.get("web_search_model")
 
 
 # ==============================================================================
@@ -858,15 +875,15 @@ def _get_resolved_tool_config(
     解析并合并工具配置，处理工具组。
 
     优先级顺序:
-    1. JARVIS_TOOL_GROUP 中定义的组配置
+    1. tool_group 中定义的组配置
     2. 默认配置（所有工具都启用）
 
     返回:
         Dict[str, Any]: 解析后的工具配置字典，包含 'use' 和 'dont_use' 列表
     """
     group_config = {}
-    tool_group_name = tool_group_override or GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_GROUP")
-    tool_groups = GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_GROUPS", [])
+    tool_group_name = tool_group_override or GLOBAL_CONFIG_DATA.get("tool_group")
+    tool_groups = GLOBAL_CONFIG_DATA.get("tool_groups", [])
 
     if tool_group_name and isinstance(tool_groups, list):
         for group_item in tool_groups:
@@ -907,7 +924,7 @@ def get_tool_filter_threshold() -> int:
     返回:
         int: 当工具数量超过此阈值时，触发AI筛选。默认为30
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_TOOL_FILTER_THRESHOLD", 30))
+    return int(GLOBAL_CONFIG_DATA.get("tool_filter_threshold", 30))
 
 
 def get_script_execution_timeout() -> int:
@@ -917,7 +934,7 @@ def get_script_execution_timeout() -> int:
     返回:
         int: 超时时间，默认为300秒（5分钟）
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_SCRIPT_EXECUTION_TIMEOUT", 300))
+    return int(GLOBAL_CONFIG_DATA.get("script_execution_timeout", 300))
 
 
 def is_enable_git_repo_jca_switch() -> bool:
@@ -925,7 +942,7 @@ def is_enable_git_repo_jca_switch() -> bool:
     是否启用：在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）
     默认开启
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_GIT_JCA_SWITCH", True) is True
+    return GLOBAL_CONFIG_DATA.get("enable_git_jca_switch", True) is True
 
 
 def is_enable_builtin_config_selector() -> bool:
@@ -933,7 +950,7 @@ def is_enable_builtin_config_selector() -> bool:
     是否启用：在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择
     默认开启
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR", True) is True
+    return GLOBAL_CONFIG_DATA.get("enable_startup_config_selector", True) is True
 
 
 def is_save_session_history() -> bool:
@@ -943,7 +960,7 @@ def is_save_session_history() -> bool:
     返回:
         bool: 如果要保存会话记录则返回True, 默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_SAVE_SESSION_HISTORY", False) is True
+    return GLOBAL_CONFIG_DATA.get("save_session_history", False) is True
 
 
 def is_immediate_abort() -> bool:
@@ -951,7 +968,7 @@ def is_immediate_abort() -> bool:
     是否启用立即中断：当在对话过程中检测到用户中断信号时，立即停止输出并返回。
     默认关闭
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_IMMEDIATE_ABORT", False) is True
+    return GLOBAL_CONFIG_DATA.get("immediate_abort", False) is True
 
 
 def is_non_interactive() -> bool:
@@ -987,7 +1004,7 @@ def is_skip_predefined_tasks() -> bool:
     返回：
         bool: 如果跳过预定义任务加载则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_SKIP_PREDEFINED_TASKS", False) is True
+    return GLOBAL_CONFIG_DATA.get("skip_predefined_tasks", False) is True
 
 
 def get_addon_prompt_threshold() -> int:
@@ -1000,7 +1017,7 @@ def get_addon_prompt_threshold() -> int:
         int: 触发阈值，默认为1024
     """
     try:
-        return int(GLOBAL_CONFIG_DATA.get("JARVIS_ADDON_PROMPT_THRESHOLD", 1024))
+        return int(GLOBAL_CONFIG_DATA.get("addon_prompt_threshold", 1024))
     except Exception:
         return 1024
 
@@ -1010,9 +1027,9 @@ def is_enable_intent_recognition() -> bool:
     获取是否启用意图识别功能。
 
     返回:
-        bool: 是否启用意图识别，默认为True（可通过 GLOBAL_CONFIG_DATA['JARVIS_ENABLE_INTENT_RECOGNITION'] 配置）
+        bool: 是否启用意图识别，默认为True（可通过 GLOBAL_CONFIG_DATA['enable_intent_recognition'] 配置）
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_INTENT_RECOGNITION", True) is True
+    return GLOBAL_CONFIG_DATA.get("enable_intent_recognition", True) is True
 
 
 def is_enable_memory_organizer() -> bool:
@@ -1020,9 +1037,9 @@ def is_enable_memory_organizer() -> bool:
     获取是否启用自动记忆整理功能。
 
     返回:
-        bool: 是否启用自动记忆整理，默认为False（可通过 GLOBAL_CONFIG_DATA['JARVIS_ENABLE_MEMORY_ORGANIZER'] 配置）
+        bool: 是否启用自动记忆整理，默认为False（可通过 GLOBAL_CONFIG_DATA['enable_memory_organizer'] 配置）
     """
-    return GLOBAL_CONFIG_DATA.get("JARVIS_ENABLE_MEMORY_ORGANIZER", False) is True
+    return GLOBAL_CONFIG_DATA.get("enable_memory_organizer", False) is True
 
 
 def get_conversation_turn_threshold() -> int:
@@ -1032,7 +1049,7 @@ def get_conversation_turn_threshold() -> int:
     返回:
         int: 对话轮次阈值，默认为50
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_CONVERSATION_TURN_THRESHOLD", 50))
+    return int(GLOBAL_CONFIG_DATA.get("conversation_turn_threshold", 50))
 
 
 def get_diff_visualization_mode() -> str:
@@ -1043,9 +1060,7 @@ def get_diff_visualization_mode() -> str:
         str: diff 可视化模式，可选值: "unified", "syntax", "compact", "side_by_side", "default"
         默认为 "unified"
     """
-    return cast(
-        str, GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_VISUALIZATION_MODE", "side_by_side")
-    )
+    return cast(str, GLOBAL_CONFIG_DATA.get("diff_visualization_mode", "side_by_side"))
 
 
 def get_diff_show_line_numbers() -> bool:
@@ -1055,7 +1070,7 @@ def get_diff_show_line_numbers() -> bool:
     返回:
         bool: 是否显示行号，默认为 True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_SHOW_LINE_NUMBERS", True))
+    return cast(bool, GLOBAL_CONFIG_DATA.get("diff_show_line_numbers", True))
 
 
 def get_diff_large_file_threshold() -> int:
@@ -1065,4 +1080,4 @@ def get_diff_large_file_threshold() -> int:
     返回:
         int: 大文件阈值，默认为 300
     """
-    return int(GLOBAL_CONFIG_DATA.get("JARVIS_DIFF_LARGE_FILE_THRESHOLD", 300))
+    return int(GLOBAL_CONFIG_DATA.get("diff_large_file_threshold", 300))
