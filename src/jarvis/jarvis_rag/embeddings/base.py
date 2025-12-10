@@ -24,6 +24,7 @@ class OnlineEmbeddingModel(EmbeddingInterface):
         model_name: Optional[str] = None,
         batch_size: int = 100,
         max_length: Optional[int] = None,
+        **kwargs,
     ):
         """
         初始化在线嵌入模型。
@@ -35,14 +36,27 @@ class OnlineEmbeddingModel(EmbeddingInterface):
             model_name: 要使用的模型名称。
             batch_size: 批量处理时的批次大小。
             max_length: 模型的最大输入长度（token数），用于文档分割。
+            **kwargs: 其他配置参数（可能包含从 embedding_config 传入的配置）。
         """
-        self.api_key = api_key or (os.getenv(api_key_env) if api_key_env else None)
+        # 优先从 kwargs 中读取 api_key（可能来自 embedding_config）
+        # 如果没有，则使用传入的 api_key 参数
+        # 最后才从环境变量读取（向后兼容）
+        self.api_key = (
+            kwargs.get("api_key")
+            or api_key
+            or (os.getenv(api_key_env) if api_key_env else None)
+        )
         if not self.api_key:
             raise ValueError(
-                f"API密钥未提供。请通过api_key参数或环境变量{api_key_env}提供。"
+                f"API密钥未提供。请通过api_key参数、embedding_config配置或环境变量{api_key_env}提供。"
             )
 
-        self.base_url = base_url
+        # 如果 base_url 在 kwargs 中，优先使用
+        if "base_url" in kwargs and kwargs["base_url"]:
+            self.base_url = kwargs["base_url"]
+        else:
+            self.base_url = base_url
+
         self.model_name = model_name
         self.batch_size = batch_size
         self.max_length = max_length

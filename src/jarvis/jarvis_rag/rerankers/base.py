@@ -26,6 +26,7 @@ class OnlineReranker(RerankerInterface):
         model_name: Optional[str] = None,
         top_n: int = 5,
         max_length: Optional[int] = None,
+        **kwargs,
     ):
         """
         初始化在线重排模型。
@@ -37,14 +38,27 @@ class OnlineReranker(RerankerInterface):
             model_name: 要使用的模型名称。
             top_n: 默认返回的顶部文档数。
             max_length: 模型的最大输入长度（token数），用于文档处理。
+            **kwargs: 其他配置参数（可能包含从 reranker_config 传入的配置）。
         """
-        self.api_key = api_key or (os.getenv(api_key_env) if api_key_env else None)
+        # 优先从 kwargs 中读取 api_key（可能来自 reranker_config）
+        # 如果没有，则使用传入的 api_key 参数
+        # 最后才从环境变量读取（向后兼容）
+        self.api_key = (
+            kwargs.get("api_key")
+            or api_key
+            or (os.getenv(api_key_env) if api_key_env else None)
+        )
         if not self.api_key:
             raise ValueError(
-                f"API密钥未提供。请通过api_key参数或环境变量{api_key_env}提供。"
+                f"API密钥未提供。请通过api_key参数、reranker_config配置或环境变量{api_key_env}提供。"
             )
 
-        self.base_url = base_url
+        # 如果 base_url 在 kwargs 中，优先使用
+        if "base_url" in kwargs and kwargs["base_url"]:
+            self.base_url = kwargs["base_url"]
+        else:
+            self.base_url = base_url
+
         self.model_name = model_name
         self.default_top_n = top_n
         self.max_length = max_length
