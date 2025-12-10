@@ -156,6 +156,40 @@
       "description": "Web搜索使用的模型名称",
       "default": ""
     },
+    "llms": {
+      "type": "object",
+      "description": "可复用的LLM配置定义，可以在llm_groups中通过引用名称来使用",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "description": "平台名称",
+            "default": "openai"
+          },
+          "model": {
+            "type": "string",
+            "description": "模型名称"
+          },
+          "max_input_token_count": {
+            "type": "number",
+            "description": "最大输入token数量",
+            "default": 32000
+          },
+          "llm_config": {
+            "type": "object",
+            "description": "LLM特定的配置参数，会传递给LLM客户端",
+            "additionalProperties": true,
+            "default": {}
+          }
+        },
+        "required": [
+          "platform",
+          "model"
+        ]
+      },
+      "default": {}
+    },
     "llm_group": {
       "type": "string",
       "description": "选择一个预定义的模型组",
@@ -172,39 +206,54 @@
           "properties": {
             "platform": {
               "type": "string",
-              "default": "openai"
+              "default": "openai",
+              "description": "常规操作的平台名称（已弃用：建议使用 normal_llm 引用 llms 配置）"
             },
             "model": {
               "type": "string",
-              "default": "gpt-5"
+              "default": "gpt-5",
+              "description": "常规操作的模型名称（已弃用：建议使用 normal_llm 引用 llms 配置）"
             },
             "max_input_token_count": {
               "type": "number",
-              "default": 32000
+              "default": 32000,
+              "description": "常规操作的最大输入token数量（已弃用：建议使用 normal_llm 引用 llms 配置）"
+            },
+            "normal_llm": {
+              "type": "string",
+              "description": "引用 llms 中定义的常规操作LLM配置名称"
+            },
+            "cheap_llm": {
+              "type": "string",
+              "description": "引用 llms 中定义的廉价操作LLM配置名称"
+            },
+            "smart_llm": {
+              "type": "string",
+              "description": "引用 llms 中定义的智能操作LLM配置名称"
             },
             "cheap_platform": {
               "type": "string",
-              "description": "廉价操作的平台名称。如未配置，则使用 platform 的值"
+              "description": "廉价操作的平台名称。如未配置，则使用 platform 的值（已弃用：建议使用 cheap_llm 引用 llms 配置）"
             },
             "cheap_model": {
               "type": "string",
-              "description": "廉价操作的模型名称。如未配置，则使用 model 的值"
+              "description": "廉价操作的模型名称。如未配置，则使用 model 的值（已弃用：建议使用 cheap_llm 引用 llms 配置）"
             },
             "cheap_max_input_token_count": {
               "type": "number",
-              "description": "廉价模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值"
+              "description": "廉价模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值（已弃用：建议使用 cheap_llm 引用 llms 配置）"
             },
             "smart_platform": {
               "type": "string",
-              "description": "智能操作的平台名称。如未配置，则使用 platform 的值"
+              "description": "智能操作的平台名称。如未配置，则使用 platform 的值（已弃用：建议使用 smart_llm 引用 llms 配置）"
             },
             "smart_model": {
               "type": "string",
-              "description": "智能操作的模型名称。如未配置，则使用 model 的值"
+              "description": "智能操作的模型名称。如未配置，则使用 model 的值（已弃用：建议使用 smart_llm 引用 llms 配置）"
             },
             "smart_max_input_token_count": {
               "type": "number",
-              "description": "智能模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值"
+              "description": "智能模型允许的最大输入token数量。如未配置，则使用 max_input_token_count 的值（已弃用：建议使用 smart_llm 引用 llms 配置）"
             },
             "ENV": {
               "type": "object",
@@ -213,11 +262,7 @@
                 "type": "string"
               }
             }
-          },
-          "required": [
-            "platform",
-            "model"
-          ]
+          }
         }
       }
     },

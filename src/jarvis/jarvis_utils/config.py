@@ -158,6 +158,138 @@ def _apply_llm_group_env_override(group_config: Dict[str, Any]) -> None:
         )
 
 
+def _apply_llm_config_to_env(resolved_config: Dict[str, Any]) -> None:
+    """
+    将 resolved_config 中的 llm_config 应用到环境变量。
+
+    参数:
+        resolved_config: 解析后的模型配置字典
+    """
+    # 处理 normal_llm 的 llm_config
+    if "llm_config" in resolved_config and isinstance(
+        resolved_config["llm_config"], dict
+    ):
+        for key, value in resolved_config["llm_config"].items():
+            if value is not None:
+                # 将配置键转换为环境变量格式（大写，下划线分隔）
+                env_key = str(key).upper()
+                os.environ[env_key] = str(value)
+
+    # 处理 cheap_llm 的 llm_config
+    if "cheap_llm_config" in resolved_config and isinstance(
+        resolved_config["cheap_llm_config"], dict
+    ):
+        for key, value in resolved_config["cheap_llm_config"].items():
+            if value is not None:
+                env_key = str(key).upper()
+                os.environ[env_key] = str(value)
+
+    # 处理 smart_llm 的 llm_config
+    if "smart_llm_config" in resolved_config and isinstance(
+        resolved_config["smart_llm_config"], dict
+    ):
+        for key, value in resolved_config["smart_llm_config"].items():
+            if value is not None:
+                env_key = str(key).upper()
+                os.environ[env_key] = str(value)
+
+
+def _resolve_llm_reference(llm_name: str) -> Dict[str, Any]:
+    """
+    从 llms 配置中解析引用的LLM配置。
+
+    参数:
+        llm_name: llms 中定义的LLM配置名称
+
+    返回:
+        Dict[str, Any]: 解析后的LLM配置字典，包含 platform, model, max_input_token_count, llm_config
+    """
+    llms = GLOBAL_CONFIG_DATA.get("llms", {})
+    if not isinstance(llms, dict):
+        return {}
+
+    llm_config = llms.get(llm_name)
+    if not isinstance(llm_config, dict):
+        print(f"⚠️ 警告：llms 中未找到名为 '{llm_name}' 的配置")
+        return {}
+
+    return llm_config.copy()
+
+
+def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    展开 llm_groups 中的 llm 引用（normal_llm, cheap_llm, smart_llm）到对应的配置字段。
+
+    参数:
+        group_config: 模型组配置字典
+
+    返回:
+        Dict[str, Any]: 展开后的配置字典
+    """
+    expanded_config = group_config.copy()
+
+    # 处理 normal_llm 引用
+    if "normal_llm" in expanded_config:
+        llm_ref = _resolve_llm_reference(expanded_config["normal_llm"])
+        if llm_ref:
+            # 展开到 platform, model, max_input_token_count
+            if "platform" not in expanded_config:
+                expanded_config["platform"] = llm_ref.get("platform", "openai")
+            if "model" not in expanded_config:
+                expanded_config["model"] = llm_ref.get("model", "gpt-5")
+            if "max_input_token_count" not in expanded_config:
+                expanded_config["max_input_token_count"] = llm_ref.get(
+                    "max_input_token_count", 32000
+                )
+            # 合并 llm_config
+            if "llm_config" in llm_ref:
+                if "llm_config" not in expanded_config:
+                    expanded_config["llm_config"] = {}
+                expanded_config["llm_config"].update(llm_ref["llm_config"])
+        # 移除引用键
+        expanded_config.pop("normal_llm", None)
+
+    # 处理 cheap_llm 引用
+    if "cheap_llm" in expanded_config:
+        llm_ref = _resolve_llm_reference(expanded_config["cheap_llm"])
+        if llm_ref:
+            if "cheap_platform" not in expanded_config:
+                expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
+            if "cheap_model" not in expanded_config:
+                expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
+            if "cheap_max_input_token_count" not in expanded_config:
+                expanded_config["cheap_max_input_token_count"] = llm_ref.get(
+                    "max_input_token_count", 32000
+                )
+            # 合并 llm_config（如果 cheap_llm 有独立的 llm_config 需求，可以扩展）
+            if "llm_config" in llm_ref:
+                if "cheap_llm_config" not in expanded_config:
+                    expanded_config["cheap_llm_config"] = {}
+                expanded_config["cheap_llm_config"].update(llm_ref["llm_config"])
+        expanded_config.pop("cheap_llm", None)
+
+    # 处理 smart_llm 引用
+    if "smart_llm" in expanded_config:
+        llm_ref = _resolve_llm_reference(expanded_config["smart_llm"])
+        if llm_ref:
+            if "smart_platform" not in expanded_config:
+                expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
+            if "smart_model" not in expanded_config:
+                expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
+            if "smart_max_input_token_count" not in expanded_config:
+                expanded_config["smart_max_input_token_count"] = llm_ref.get(
+                    "max_input_token_count", 32000
+                )
+            # 合并 llm_config
+            if "llm_config" in llm_ref:
+                if "smart_llm_config" not in expanded_config:
+                    expanded_config["smart_llm_config"] = {}
+                expanded_config["smart_llm_config"].update(llm_ref["llm_config"])
+        expanded_config.pop("smart_llm", None)
+
+    return expanded_config
+
+
 def _get_resolved_model_config(
     model_group_override: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -207,6 +339,9 @@ def _get_resolved_model_config(
 
             sys.exit(1)
 
+    # 展开 llm 引用（normal_llm, cheap_llm, smart_llm）
+    group_config = _expand_llm_references(group_config)
+
     _apply_llm_group_env_override(group_config)
 
     # Start with group config
@@ -236,6 +371,9 @@ def _get_resolved_model_config(
                 # 显式指定组：仅在组未定义该键时回退到顶层
                 if key not in resolved_config:
                     resolved_config[key] = GLOBAL_CONFIG_DATA[key]
+
+    # 应用 llm_config 到环境变量
+    _apply_llm_config_to_env(resolved_config)
 
     return resolved_config
 
