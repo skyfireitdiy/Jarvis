@@ -994,16 +994,28 @@ def _interactive_config_setup(config_file_path: Path):
     platforms = registry.get_available_platforms()
     platform_name = get_choice("请选择您要使用的AI平台", platforms)
 
-    # 2. 配置环境变量
+    # 2. 配置 API 密钥等信息（用于 llm_config）
     platform_class = registry.platforms.get(platform_name)
     if not platform_class:
         print(f"❌ 平台 '{platform_name}' 加载失败。")
         sys.exit(1)
 
     env_vars = {}
+    llm_config = {}
     required_keys = platform_class.get_required_env_keys()
     defaults = platform_class.get_env_defaults()
     config_guide = platform_class.get_env_config_guide()
+
+    # 环境变量到 llm_config 键名的映射
+    env_to_llm_config_map = {
+        "OPENAI_API_KEY": "openai_api_key",
+        "OPENAI_API_BASE": "openai_api_base",
+        "OPENAI_EXTRA_HEADERS": "openai_extra_headers",
+        "KIMI_API_KEY": "kimi_api_key",
+        "TONGYI_COOKIES": "tongyi_cookies",
+        "YUANBAO_COOKIES": "yuanbao_cookies",
+    }
+
     if required_keys:
         print(f"ℹ️ 请输入 {platform_name} 平台所需的配置信息:")
 
@@ -1034,9 +1046,17 @@ def _interactive_config_setup(config_file_path: Path):
             env_vars[key] = value
             os.environ[key] = value  # 立即设置环境变量以便后续测试
 
+            # 同时添加到 llm_config（如果存在映射）
+            llm_config_key = env_to_llm_config_map.get(key)
+            if llm_config_key:
+                llm_config[llm_config_key] = value
+
     # 3. 选择模型
     try:
-        platform_instance = registry.create_platform(platform_name)
+        # 创建平台实例时传递 llm_config（如果已收集）
+        platform_instance = registry.create_platform(
+            platform_name, llm_config=llm_config if llm_config else None
+        )
         if not platform_instance:
             print(f"❌ 无法创建平台 '{platform_name}'。")
             sys.exit(1)
@@ -1059,7 +1079,10 @@ def _interactive_config_setup(config_file_path: Path):
     print("ℹ️ 正在测试配置...")
     test_passed = False
     try:
-        platform_instance = registry.create_platform(platform_name)
+        # 创建平台实例时传递 llm_config（如果已收集）
+        platform_instance = registry.create_platform(
+            platform_name, llm_config=llm_config if llm_config else None
+        )
         if platform_instance:
             platform_instance.set_model_name(model_name)
             response_generator = platform_instance.chat("hello")
@@ -1074,11 +1097,46 @@ def _interactive_config_setup(config_file_path: Path):
     except Exception:
         print("❌ 测试失败")
 
-    # 5. 交互式确认并应用配置（不直接生成配置文件）
+    # 5. 询问最大输入 token 数量
+    max_input_token_count = 32000
+    try:
+        max_input_token_str = get_input(
+            "请输入最大输入 token 数量（留空使用默认: 32000）:",
+            default="32000",
+        )
+        if max_input_token_str and max_input_token_str.strip():
+            max_input_token_count = int(max_input_token_str.strip())
+    except Exception:
+        pass
+
+    # 6. 生成 LLM 配置名称
+    llm_name = f"{platform_name}-{model_name}".replace(" ", "-").lower()
+    # 清理名称，只保留字母、数字和连字符
+    import re
+
+    llm_name = re.sub(r"[^a-z0-9-]", "", llm_name)
+    if not llm_name:
+        llm_name = "default-llm"
+
+    # 7. 交互式确认并应用配置（使用新的引用方式）
     config_data = {
         "ENV": env_vars,
-        "JARVIS_PLATFORM": platform_name,
-        "JARVIS_MODEL": model_name,
+        "llms": {
+            llm_name: {
+                "platform": platform_name,
+                "model": model_name,
+                "max_input_token_count": max_input_token_count,
+                "llm_config": llm_config if llm_config else {},
+            }
+        },
+        "llm_groups": [
+            {
+                "default": {
+                    "normal_llm": llm_name,
+                }
+            }
+        ],
+        "llm_group": "default",
     }
 
     if not test_passed:
@@ -1086,7 +1144,7 @@ def _interactive_config_setup(config_file_path: Path):
             print("ℹ️ 已取消配置。")
             sys.exit(0)
 
-    # 6. 选择其他功能开关与可选项（复用统一逻辑）
+    # 8. 选择其他功能开关与可选项（复用统一逻辑）
     _collect_optional_config_interactively(config_data)
 
     # 7. 应用到当前会话并写入配置文件（基于交互结果，不从默认值生成）
