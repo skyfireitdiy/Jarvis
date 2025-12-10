@@ -273,10 +273,14 @@ def _strip_markdown_code_blocks(s: str) -> str:
         s: 输入字符串
 
     返回:
-        清理后的字符串
+        清理后的字符串（如果输入不是字符串，则原样返回）
     """
 
     import re
+
+    # 如果输入不是字符串，直接返回
+    if not isinstance(s, str):
+        return s
 
     # 先去除首尾空白，但保留内部结构
     block = s.strip()

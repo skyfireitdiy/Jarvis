@@ -38,6 +38,8 @@ class TestDependencyValidation:
             task_list_manager=self.mock_task_list_manager,
             task_list_id="test_list_id",
             task=mock_task,
+            agent_id="test_agent",
+            is_main_agent=True,
         )
 
     def test_validate_dependencies_status_completed_dependency(self):
@@ -60,6 +62,8 @@ class TestDependencyValidation:
             task_list_manager=self.mock_task_list_manager,
             task_list_id="test_list_id",
             task=mock_task,
+            agent_id="test_agent",
+            is_main_agent=True,
         )
 
     def test_validate_dependencies_status_dependency_not_found(self):
@@ -79,6 +83,8 @@ class TestDependencyValidation:
                 task_list_manager=self.mock_task_list_manager,
                 task_list_id="test_list_id",
                 task=mock_task,
+                agent_id="test_agent",
+                is_main_agent=True,
             )
 
         assert "依赖任务 'non_existent_task' 不存在" in str(exc_info.value)
@@ -104,6 +110,8 @@ class TestDependencyValidation:
                 task_list_manager=self.mock_task_list_manager,
                 task_list_id="test_list_id",
                 task=mock_task,
+                agent_id="test_agent",
+                is_main_agent=True,
             )
 
         assert "依赖任务 'failed_task' 执行失败" in str(exc_info.value)
@@ -129,6 +137,8 @@ class TestDependencyValidation:
                 task_list_manager=self.mock_task_list_manager,
                 task_list_id="test_list_id",
                 task=mock_task,
+                agent_id="test_agent",
+                is_main_agent=True,
             )
 
         assert "依赖任务 'abandoned_task' 已被放弃" in str(exc_info.value)
@@ -154,6 +164,8 @@ class TestDependencyValidation:
                 task_list_manager=self.mock_task_list_manager,
                 task_list_id="test_list_id",
                 task=mock_task,
+                agent_id="test_agent",
+                is_main_agent=True,
             )
 
         assert "依赖任务 'pending_task' 尚未开始执行" in str(exc_info.value)
@@ -179,6 +191,8 @@ class TestDependencyValidation:
                 task_list_manager=self.mock_task_list_manager,
                 task_list_id="test_list_id",
                 task=mock_task,
+                agent_id="test_agent",
+                is_main_agent=True,
             )
 
         assert "依赖任务 'running_task' 正在执行中" in str(exc_info.value)
@@ -212,6 +226,8 @@ class TestDependencyValidation:
                 task_list_manager=self.mock_task_list_manager,
                 task_list_id="test_list_id",
                 task=mock_task,
+                agent_id="test_agent",
+                is_main_agent=True,
             )
 
         # 应该发现第一个失败的依赖

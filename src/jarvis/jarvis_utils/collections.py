@@ -83,7 +83,9 @@ class CaseInsensitiveDict(Mapping[str, Any]):
             raise TypeError(f"键必须是字符串类型，得到 {type(key).__name__}")
 
         lower_key = key.lower()
-        self._case_map[lower_key] = key  # 保留原始键名
+        # 如果键已存在，保持原有的原始键名；否则使用新的键名
+        if lower_key not in self._case_map:
+            self._case_map[lower_key] = key  # 保留原始键名
         self._data[lower_key] = value
 
     def __delitem__(self, key: str) -> None:
@@ -290,7 +292,7 @@ class CaseInsensitiveDict(Mapping[str, Any]):
 
         Args:
             *args: 可以是另一个字典或键值对的可迭代对象
-            **kwargs: 关键字参数形式的键值对
+            **kwargs: 关键字参数形式的键值对（下划线会被转换为连字符）
         """
         if args:
             other = args[0]
@@ -302,7 +304,9 @@ class CaseInsensitiveDict(Mapping[str, Any]):
                     self[key] = value
 
         for key, value in kwargs.items():
-            self[key] = value
+            # 将关键字参数中的下划线转换为连字符（用于HTTP头部等场景）
+            normalized_key = key.replace("_", "-")
+            self[normalized_key] = value
 
     def clear(self) -> None:
         """
