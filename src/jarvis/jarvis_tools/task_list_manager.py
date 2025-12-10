@@ -980,6 +980,8 @@ class task_list_manager:
         task_list_manager: Any,
         task_list_id: str,
         task: Any,
+        agent_id: str,
+        is_main_agent: bool,
     ) -> None:
         """验证任务的所有依赖是否都已completed
 
@@ -987,6 +989,8 @@ class task_list_manager:
             task_list_manager: 任务列表管理器
             task_list_id: 任务列表ID
             task: 要验证的任务对象
+            agent_id: Agent ID
+            is_main_agent: 是否为主 Agent
 
         抛出:
             DependencyNotFoundError: 依赖任务不存在
@@ -1000,6 +1004,8 @@ class task_list_manager:
             dep_task, success, error_msg = task_list_manager.get_task_detail(
                 task_list_id=task_list_id,
                 task_id=dep_id,
+                agent_id=agent_id,
+                is_main_agent=is_main_agent,
             )
 
             if not success:
@@ -1076,6 +1082,8 @@ class task_list_manager:
                 task_list_manager=task_list_manager,
                 task_list_id=task_list_id,
                 task=task,
+                agent_id=agent_id,
+                is_main_agent=is_main_agent,
             )
         except DependencyValidationError as e:
             return {
@@ -1380,8 +1388,8 @@ class task_list_manager:
             # 获取当前时间作为完成时间
             completion_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # 预览长度：基于最大输出长度的10%，但不超过500字符
-            preview_length = max_output_length * 0.5
+            # 预览长度：基于最大输出长度的50%
+            preview_length = int(max_output_length * 0.5)
 
             # 创建格式化的完成通知
             formatted_notification = f"""
