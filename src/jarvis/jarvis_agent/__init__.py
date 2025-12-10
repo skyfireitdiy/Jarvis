@@ -86,6 +86,8 @@ from jarvis.jarvis_utils.globals import (
     set_agent,
     set_interrupt,
     set_global_model_group,
+    set_running_agent,
+    clear_running_agent,
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
 from jarvis.jarvis_utils.tag import ot, ct
@@ -1589,6 +1591,7 @@ class Agent:
         self.session.prompt = enhanced_input
         try:
             set_agent(self.name, self)
+            set_running_agent(self.name)  # 标记agent开始运行
 
             # 关键流程：直接调用 memory_manager 重置任务状态
             try:
@@ -1612,8 +1615,14 @@ class Agent:
                 )
             except Exception:
                 pass
-            return self._main_loop()
+            try:
+                return self._main_loop()
+            finally:
+                # 确保在运行结束时清除运行状态
+                clear_running_agent(self.name)
         except Exception as e:
+            # 确保即使出现异常也清除运行状态
+            clear_running_agent(self.name)
             print(f"❌ 任务失败: {str(e)}")
             return f"Task failed: {str(e)}"
 

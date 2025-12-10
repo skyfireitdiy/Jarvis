@@ -964,7 +964,7 @@ def is_non_interactive() -> bool:
         # 优先基于当前激活的 Agent 状态判断，避免跨 Agent 互相污染
         from jarvis.jarvis_utils import globals as _g
 
-        current_agent_name = getattr(_g, "current_agent_name", "")
+        current_agent_name = _g.get_current_agent_name()
         if current_agent_name:
             agent = _g.get_agent(current_agent_name)
             if agent is not None and hasattr(agent, "non_interactive"):

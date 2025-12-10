@@ -33,7 +33,9 @@ colorama.init()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 # 全局代理管理
 global_agents: Dict[str, Any] = {}
-current_agent_name: str = ""
+current_agent_name: str = ""  # 最后开始运行的agent（可能已完成）
+# 使用栈结构跟踪嵌套的agent运行状态，支持agent调用其他agent的场景
+running_agent_stack: List[str] = []  # 正在运行的agent栈（最顶层是当前正在运行的agent）
 # 表示与大模型交互的深度(>0表示正在交互)
 g_in_chat: int = 0
 # 表示是否接收到中断信号
@@ -89,6 +91,150 @@ def get_agent(agent_name: str) -> Any:
     return global_agents.get(agent_name)
 
 
+def get_current_agent() -> Any:
+    """
+    获取当前正在运行的代理实例。
+
+    重要：只返回正在运行的agent，确保不会返回已完成的agent。
+    这保证返回的agent一定是正在运行中的，可以安全地修改其内部状态。
+
+    如果没有正在运行的agent，返回None（可以为空，但一定不能错）。
+
+    返回：
+        Any: 正在运行的代理实例，如果没有正在运行的agent则返回None
+    """
+    # 只返回正在运行的agent，确保不会返回已完成的agent
+    return get_running_agent()
+
+
+def get_current_agent_name() -> str:
+    """
+    获取当前代理名称（最后开始运行的agent，可能已完成）。
+    注意：这返回的是"最后开始运行的agent"，可能已经完成运行。
+    如果需要获取正在运行的agent名称，请使用 get_running_agent_name()。
+
+    返回：
+        str: 当前代理名称，如果不存在则返回空字符串
+    """
+    global current_agent_name
+    # 如果current_agent_name指向的agent不存在，修复它
+    if current_agent_name and current_agent_name not in global_agents:
+        if global_agents:
+            current_agent_name = next(iter(global_agents.keys()))
+        else:
+            current_agent_name = ""
+    return current_agent_name
+
+
+def set_running_agent(agent_name: str) -> None:
+    """
+    设置当前正在运行的代理名称（推入栈）。
+    应该在agent开始运行时调用。
+    支持嵌套调用：当agent调用其他agent时，状态会被正确保存。
+
+    注意：同一个agent可以多次运行（非嵌套），每次运行都会独立推入栈。
+
+    参数：
+        agent_name: 代理名称
+    """
+    global running_agent_stack
+    if agent_name in global_agents:
+        running_agent_stack.append(agent_name)
+    # 如果agent不存在，不推入栈（避免无效状态）
+
+
+def clear_running_agent(agent_name: str) -> None:
+    """
+    清除正在运行的代理名称（从栈中弹出）。
+    应该在agent运行结束时调用。
+    支持嵌套调用：当子agent结束时，会恢复父agent的运行状态。
+
+    重要：只从栈顶移除agent，确保嵌套调用的正确性。
+    如果agent不在栈顶，说明状态不一致（可能是重复调用或异常），
+    会记录警告但不会修改栈，避免破坏嵌套结构。
+
+    参数：
+        agent_name: 要清除的代理名称（用于验证，确保清除的是正确的agent）
+    """
+    global running_agent_stack
+    if not running_agent_stack:
+        # 栈为空，可能是重复调用clear或状态不一致
+        return
+    # 只从栈顶移除，确保嵌套调用的正确性
+    if running_agent_stack[-1] == agent_name:
+        running_agent_stack.pop()
+    elif agent_name in running_agent_stack:
+        # 如果不在栈顶，说明状态不一致（可能是重复调用clear_running_agent）
+        # 这种情况下，我们不应该修改栈，因为可能会破坏嵌套结构
+        # 例如：栈是 ["a", "b", "a"]，如果清除中间的 "a"，会破坏结构
+        # 这种情况通常不应该发生，但如果发生了，我们只记录警告，不修改栈
+        import warnings
+
+        warnings.warn(
+            f"尝试清除不在栈顶的agent '{agent_name}'。"
+            f"当前栈: {running_agent_stack}。"
+            f"这可能是重复调用clear_running_agent或状态不一致导致的。",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
+
+def get_running_agent() -> Any:
+    """
+    获取当前正在运行的代理实例（栈顶的agent）。
+    这保证返回的agent一定正在运行中。
+    支持嵌套调用：返回最顶层的（当前正在执行的）agent。
+
+    返回：
+        Any: 正在运行的代理实例，如果没有正在运行的agent则返回None
+    """
+    global running_agent_stack
+    if running_agent_stack:
+        top_agent_name = running_agent_stack[-1]
+        if top_agent_name in global_agents:
+            return global_agents.get(top_agent_name)
+    return None
+
+
+def get_running_agent_name() -> str:
+    """
+    获取当前正在运行的代理名称（栈顶的agent名称）。
+
+    返回：
+        str: 正在运行的代理名称，如果没有正在运行的agent则返回空字符串
+    """
+    global running_agent_stack
+    if running_agent_stack:
+        return running_agent_stack[-1]
+    return ""
+
+
+def is_agent_running(agent_name: str) -> bool:
+    """
+    检查指定的agent是否正在运行（在栈中）。
+
+    参数：
+        agent_name: 代理名称
+
+    返回：
+        bool: 如果agent正在运行则返回True
+    """
+    global running_agent_stack
+    return agent_name in running_agent_stack and agent_name in global_agents
+
+
+def get_running_agent_stack() -> List[str]:
+    """
+    获取当前正在运行的agent栈（用于调试）。
+    栈底是第一个开始运行的agent，栈顶是当前正在执行的agent。
+
+    返回：
+        List[str]: agent名称列表，从栈底到栈顶
+    """
+    global running_agent_stack
+    return running_agent_stack.copy()
+
+
 def set_agent(agent_name: str, agent: Any) -> None:
     """
     设置当前代理并将其添加到全局代理集合中。
@@ -109,11 +255,14 @@ def get_agent_list() -> str:
     返回：
         str: 包含代理数量和当前代理名称的格式化字符串
     """
-    return (
-        "[" + str(len(global_agents)) + "]" + current_agent_name
-        if global_agents
-        else ""
-    )
+    if not global_agents:
+        return ""
+    # 使用函数获取current_agent_name，确保有效性
+    current_name = get_current_agent_name()
+    if current_name and current_name in global_agents:
+        return "[" + str(len(global_agents)) + "]" + current_name
+    # 如果current_agent_name无效，只返回数量
+    return "[" + str(len(global_agents)) + "]"
 
 
 def delete_agent(agent_name: str) -> None:
@@ -125,8 +274,28 @@ def delete_agent(agent_name: str) -> None:
     """
     if agent_name in global_agents:
         del global_agents[agent_name]
-        global current_agent_name
-        current_agent_name = ""
+        global current_agent_name, running_agent_stack
+        # 从运行栈中移除被删除的agent（如果存在）
+        if agent_name in running_agent_stack:
+            running_agent_stack = [
+                name for name in running_agent_stack if name != agent_name
+            ]
+        # 使用函数获取current_agent_name，然后更新
+        current_name = get_current_agent_name()
+        # 只有当删除的是当前agent时，才需要更新current_agent_name
+        if current_name == agent_name:
+            # 如果还有其他agent，设置为第一个，否则清空
+            if global_agents:
+                # 设置为剩余的第一个agent
+                current_agent_name = next(iter(global_agents.keys()))
+            else:
+                current_agent_name = ""
+        # 如果current_agent_name指向的agent不在global_agents中（异常情况），修复它
+        elif current_name and current_name not in global_agents:
+            if global_agents:
+                current_agent_name = next(iter(global_agents.keys()))
+            else:
+                current_agent_name = ""
 
 
 def set_in_chat(status: bool) -> None:

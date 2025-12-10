@@ -7,7 +7,7 @@ import typer
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.globals import get_agent, current_agent_name
+from jarvis.jarvis_utils.globals import get_agent, get_current_agent_name
 
 app = typer.Typer(help="Git压缩工具")
 
@@ -46,7 +46,7 @@ class GitSquashTool:
 
             # Use existing GitCommitTool for new commit
             commit_tool = GitCommitTool()
-            agent = get_agent(current_agent_name)
+            agent = get_agent(get_current_agent_name())
             exec_args = {"lang": args.get("lang", "Chinese")}
             if agent:
                 exec_args["agent"] = agent
