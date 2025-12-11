@@ -24,6 +24,46 @@ class DiffVisualizer:
         """
         self.console = console or Console()
 
+    def _get_language_by_extension(self, file_path: str) -> str:
+        """根据文件扩展名推断编程语言
+
+        参数:
+            file_path: 文件路径
+
+        返回:
+            编程语言名称（用于 Syntax 高亮）
+        """
+        if not file_path:
+            return "text"
+
+        ext = file_path.lower().split(".")[-1] if "." in file_path else ""
+        mapping = {
+            "py": "python",
+            "js": "javascript",
+            "ts": "typescript",
+            "java": "java",
+            "cpp": "cpp",
+            "cc": "cpp",
+            "cxx": "cpp",
+            "c": "c",
+            "h": "c",
+            "hpp": "cpp",
+            "rs": "rust",
+            "go": "go",
+            "sh": "bash",
+            "bash": "bash",
+            "zsh": "zsh",
+            "html": "html",
+            "css": "css",
+            "json": "json",
+            "yaml": "yaml",
+            "yml": "yaml",
+            "xml": "xml",
+            "md": "markdown",
+            "markdown": "markdown",
+        }
+        return mapping.get(ext, "text")
+
     def visualize_unified_diff(
         self,
         diff_text: str,
@@ -399,6 +439,9 @@ class DiffVisualizer:
         if new_line_map is None:
             new_line_map = [i + 1 for i in range(len(new_lines))]
 
+        # 获取语言类型用于语法高亮
+        language = self._get_language_by_extension(file_path)
+
         # 创建并排表格
         table = Table(
             show_header=True,
@@ -437,11 +480,23 @@ class DiffVisualizer:
                                 if j1 + k < len(new_line_map)
                                 else j1 + k + 1
                             )
+                            old_syntax = Syntax(
+                                equal_chunk[k],
+                                language,
+                                theme="monokai",
+                                background_color="default",
+                            )
+                            new_syntax = Syntax(
+                                equal_chunk[k],
+                                language,
+                                theme="monokai",
+                                background_color="default",
+                            )
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                old_syntax,
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                new_syntax,
                             )
                         # 如果有省略，显示省略标记
                         if equal_len > context_lines * 2:
@@ -465,11 +520,23 @@ class DiffVisualizer:
                                 if j1 + k < len(new_line_map)
                                 else j1 + k + 1
                             )
+                            old_syntax = Syntax(
+                                equal_chunk[k],
+                                language,
+                                theme="monokai",
+                                background_color="default",
+                            )
+                            new_syntax = Syntax(
+                                equal_chunk[k],
+                                language,
+                                theme="monokai",
+                                background_color="default",
+                            )
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                old_syntax,
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                new_syntax,
                             )
                     else:
                         # 第一个块，只显示结尾的上下文
@@ -485,11 +552,23 @@ class DiffVisualizer:
                                 if j1 + k < len(new_line_map)
                                 else j1 + k + 1
                             )
+                            old_syntax = Syntax(
+                                equal_chunk[k],
+                                language,
+                                theme="monokai",
+                                background_color="default",
+                            )
+                            new_syntax = Syntax(
+                                equal_chunk[k],
+                                language,
+                                theme="monokai",
+                                background_color="default",
+                            )
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                old_syntax,
                                 f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                                f"[bright_black]{equal_chunk[k]}[/bright_black]",
+                                new_syntax,
                             )
                 else:
                     # 如果 equal 块不长，显示所有行
@@ -529,11 +608,15 @@ class DiffVisualizer:
                             if i1 + k < len(old_line_map)
                             else i1 + k + 1
                         )
-                        old_content = f"[red3]{old_chunk[k]}[/red3]"
+                        old_replace_syntax: Union[Syntax, str] = Syntax(
+                            old_chunk[k],
+                            language,
+                            theme="monokai",
+                            background_color="red",
+                        )
                     else:
                         old_line_num_actual = ""
-                        old_content = ""
-                        old_content = ""
+                        old_replace_syntax = ""
 
                     if k < len(new_chunk):
                         new_line_num_actual: Union[int, str] = (
@@ -541,17 +624,21 @@ class DiffVisualizer:
                             if j1 + k < len(new_line_map)
                             else j1 + k + 1
                         )
-                        new_content = f"[green3]{new_chunk[k]}[/green3]"
+                        new_replace_syntax: Union[Syntax, str] = Syntax(
+                            new_chunk[k],
+                            language,
+                            theme="monokai",
+                            background_color="green",
+                        )
                     else:
                         new_line_num_actual = ""
-                        new_content = ""
-                        new_content = ""
+                        new_replace_syntax = ""
 
                     table.add_row(
                         str(old_line_num_actual),
-                        old_content,
+                        old_replace_syntax,
                         str(new_line_num_actual),
-                        new_content,
+                        new_replace_syntax,
                     )
             elif tag == "delete":
                 # 仅删除
@@ -565,9 +652,12 @@ class DiffVisualizer:
                         if i1 + k < len(old_line_map)
                         else i1 + k + 1
                     )
+                    old_delete_syntax: Union[Syntax, str] = Syntax(
+                        line, language, theme="monokai", background_color="red"
+                    )
                     table.add_row(
                         str(old_line_num),
-                        f"[red3]{line}[/red3]",
+                        old_delete_syntax,
                         "",
                         "",
                     )
@@ -583,11 +673,14 @@ class DiffVisualizer:
                         if j1 + k < len(new_line_map)
                         else j1 + k + 1
                     )
+                    new_insert_syntax: Union[Syntax, str] = Syntax(
+                        line, language, theme="monokai", background_color="green"
+                    )
                     table.add_row(
                         "",
                         "",
                         str(new_line_num),
-                        f"[green3]{line}[/green3]",
+                        new_insert_syntax,
                     )
 
         # 如果没有变更，显示提示
@@ -616,7 +709,7 @@ def _split_diff_by_files(diff_text: str) -> List[tuple]:
     files = []
     lines = diff_text.splitlines()
     current_file_path = ""
-    current_file_lines = []
+    current_file_lines: list = []
 
     i = 0
     while i < len(lines):
