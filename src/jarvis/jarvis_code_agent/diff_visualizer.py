@@ -13,6 +13,39 @@ from rich.table import Table
 import difflib
 
 
+LANGUAGE_EXTENSION_MAPPING = {
+    "py": "python",
+    "js": "javascript",
+    "ts": "typescript",
+    "java": "java",
+    "cpp": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "c": "c",
+    "h": "c",
+    "hpp": "cpp",
+    "rs": "rust",
+    "go": "go",
+    "sh": "bash",
+    "bash": "bash",
+    "zsh": "zsh",
+    "html": "html",
+    "css": "css",
+    "json": "json",
+    "yaml": "yaml",
+    "yml": "yaml",
+    "xml": "xml",
+    "md": "markdown",
+    "markdown": "markdown",
+    "toml": "toml",
+    "dockerfile": "dockerfile",
+    "ps1": "powershell",
+    "ini": "ini",
+    "make": "makefile",
+    "mk": "makefile",
+}
+
+
 class DiffVisualizer:
     """改进的 Diff 可视化工具"""
 
@@ -37,32 +70,7 @@ class DiffVisualizer:
             return "text"
 
         ext = file_path.lower().split(".")[-1] if "." in file_path else ""
-        mapping = {
-            "py": "python",
-            "js": "javascript",
-            "ts": "typescript",
-            "java": "java",
-            "cpp": "cpp",
-            "cc": "cpp",
-            "cxx": "cpp",
-            "c": "c",
-            "h": "c",
-            "hpp": "cpp",
-            "rs": "rust",
-            "go": "go",
-            "sh": "bash",
-            "bash": "bash",
-            "zsh": "zsh",
-            "html": "html",
-            "css": "css",
-            "json": "json",
-            "yaml": "yaml",
-            "yml": "yaml",
-            "xml": "xml",
-            "md": "markdown",
-            "markdown": "markdown",
-        }
-        return mapping.get(ext, "text")
+        return LANGUAGE_EXTENSION_MAPPING.get(ext, "text")
 
     def visualize_unified_diff(
         self,
@@ -612,7 +620,7 @@ class DiffVisualizer:
                             old_chunk[k],
                             language,
                             theme="monokai",
-                            background_color="red",
+                            background_color="lightcoral",
                         )
                     else:
                         old_line_num_actual = ""
@@ -653,7 +661,7 @@ class DiffVisualizer:
                         else i1 + k + 1
                     )
                     old_delete_syntax: Union[Syntax, str] = Syntax(
-                        line, language, theme="monokai", background_color="red"
+                        line, language, theme="monokai", background_color="lightcoral"
                     )
                     table.add_row(
                         str(old_line_num),
