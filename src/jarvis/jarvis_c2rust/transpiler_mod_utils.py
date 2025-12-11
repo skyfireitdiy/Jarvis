@@ -39,11 +39,8 @@ def ensure_top_level_pub_mod(crate_dir: Path, mod_name: str) -> None:
             # 升级为 pub mod（保留原缩进）
             def _repl(m):
                 line = m.group(0)
-                ws = (
-                    re.match(r"^(\s*)", line).group(1)
-                    if re.match(r"^(\s*)", line)
-                    else ""
-                )
+                match = re.match(r"^(\s*)", line)
+                ws = match.group(1) if match is not None else ""
                 return f"{ws}pub mod {mod_name};"
 
             new_txt = mod_pat.sub(_repl, txt, count=1)
@@ -91,11 +88,8 @@ def ensure_mod_rs_decl(dir_path: Path, child_mod: str) -> None:
             # 升级为 pub mod（保留原缩进）
             def _repl(m):
                 line = m.group(0)
-                ws = (
-                    re.match(r"^(\s*)", line).group(1)
-                    if re.match(r"^(\s*)", line)
-                    else ""
-                )
+                match = re.match(r"^(\s*)", line)
+                ws = match.group(1) if match is not None else ""
                 return f"{ws}pub mod {child_mod};"
 
             new_txt = mod_pat.sub(_repl, txt, count=1)
