@@ -1430,6 +1430,25 @@ class task_list_manager:
                     "stderr": "任务不存在",
                 }
 
+            # 新增：检查并更新任务状态
+            if "status" in task_update_info or "actual_output" in task_update_info:
+                status = task_update_info.get("status")
+                actual_output = task_update_info.get("actual_output")
+                update_success, update_msg = task_list_manager.update_task_status(
+                    task_list_id=task_list_id,
+                    task_id=task_id,
+                    status=status,
+                    agent_id=agent_id,
+                    is_main_agent=is_main_agent,
+                    actual_output=actual_output,
+                )
+                if not update_success:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"更新任务状态失败: {update_msg}",
+                    }
+
             # 验证并更新任务属性
             update_kwargs = {}
 
