@@ -636,7 +636,7 @@ class DiffVisualizer:
                             new_chunk[k],
                             language,
                             theme="monokai",
-                            background_color="green",
+                            background_color="#004d00",
                         )
                     else:
                         new_line_num_actual = ""
@@ -682,7 +682,7 @@ class DiffVisualizer:
                         else j1 + k + 1
                     )
                     new_insert_syntax: Union[Syntax, str] = Syntax(
-                        line, language, theme="monokai", background_color="green"
+                        line, language, theme="monokai", background_color="#004d00"
                     )
                     table.add_row(
                         "",
