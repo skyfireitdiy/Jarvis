@@ -232,7 +232,7 @@ class task_list_manager:
     description = f"""任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
 
 **基本使用流程：**
-1. `add_tasks`: 添加任务（如果 Agent 还没有任务列表，会自动创建；推荐在 PLAN 阶段使用，一次性添加所有子任务）
+1. `add_tasks`: 添加任务（如果 Agent 还没有任务列表，会自动创建；推荐在 PLAN 阶段使用，一次性添加所有子任务。创建任务列表时必须提供 main_goal 参数）
 2. `execute_task`: 执行任务（自动创建子 Agent 执行，**执行完成后会自动更新任务状态为 completed 或 failed**）
 3. `get_task_list_summary`: 查看任务列表状态
 
@@ -276,7 +276,7 @@ class task_list_manager:
   "name": "task_list_manager",
   "arguments": {{
     "action": "add_tasks",
-    "main_goal": "实现完整的用户登录功能模块",
+    "main_goal": "实现完整的用户登录功能模块",  // ⚠️ 必填：任务列表的核心目标
     "tasks_info": [
       {{
         "task_name": "设计数据库表结构",
@@ -324,7 +324,7 @@ class task_list_manager:
             },
             "main_goal": {
                 "type": "string",
-                "description": "任务列表的核心目标（可选，仅在首次创建任务列表时使用）。如果未提供，将使用第一个任务的名称作为默认值",
+                "description": "任务列表的核心目标（必填，仅在首次创建任务列表时使用）。创建新任务列表时必须提供此参数。",
             },
             "tasks_info": {
                 "type": "array",
@@ -549,16 +549,14 @@ class task_list_manager:
                     "stderr": "缺少 tasks_info 参数",
                 }
 
-            # 优先使用用户提供的 main_goal，否则生成默认的
+            # 验证 main_goal 是否为必填参数
             main_goal = args.get("main_goal")
             if not main_goal:
-                if isinstance(tasks_info, list) and len(tasks_info) > 0:
-                    first_task = tasks_info[0]
-                    main_goal = (
-                        f"自动创建的任务列表：{first_task.get('task_name', '未知任务')}"
-                    )
-                else:
-                    main_goal = "自动创建的任务列表"
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "缺少 main_goal 参数：创建任务列表时必须提供 main_goal",
+                }
 
             # 检查是否已有任务列表
             existing_task_list_id = self._get_task_list_id(agent)
