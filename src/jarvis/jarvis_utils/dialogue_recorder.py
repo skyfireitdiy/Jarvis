@@ -126,10 +126,8 @@ class DialogueRecorder:
                             messages.append(message)
                         except json.JSONDecodeError:
                             continue
-        except Exception as e:
-            print(f"Error reading session {session_id}: {e}")
-            return []
-
+        except Exception:
+            pass
         return messages
 
     def cleanup_session(self, session_id: Optional[str] = None) -> None:
@@ -144,32 +142,23 @@ class DialogueRecorder:
         if file_path.exists():
             try:
                 file_path.unlink()
-                print(f"Cleaned up session: {session_to_cleanup}")
-                print(f"会话文件已从 {self.data_dir} 中删除")
-                print(f"如需检索历史会话，请检查目录: {self.data_dir}")
-            except Exception as e:
-                print(f"Error cleaning up session {session_to_cleanup}: {e}")
+            except Exception:
+                pass
 
     def cleanup_all_sessions(self) -> None:
         """清理所有会话文件"""
         if not self.data_dir.exists():
-            print("没有找到会话文件需要清理")
             return
 
         session_files = list(self.data_dir.glob("*.jsonl"))
         if not session_files:
-            print(f"在 {self.data_dir} 目录下没有找到会话文件")
             return
 
         for file_path in session_files:
             try:
                 file_path.unlink()
-            except Exception as e:
-                print(f"Error removing file {file_path}: {e}")
-
-        print(f"已成功清理 {len(session_files)} 个会话文件")
-        print(f"会话文件已从 {self.data_dir} 中全部删除")
-        print(f"如需检索历史会话，请检查目录: {self.data_dir}")
+            except Exception:
+                pass
 
     def get_session_count(self) -> int:
         """获取总会话数量
@@ -183,8 +172,8 @@ class DialogueRecorder:
         """确保数据目录存在"""
         try:
             self.data_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            print(f"Error creating data directory: {e}")
+        except Exception:
+            pass
 
     def _get_current_session_id(self) -> str:
         """获取当前会话ID"""
@@ -214,8 +203,8 @@ class DialogueRecorder:
             with open(file_path, "a", encoding="utf-8") as f:
                 json.dump(record, f, ensure_ascii=False)
                 f.write("\n")
-        except Exception as e:
-            print(f"Error writing record: {e}")
+        except Exception:
+            pass
 
     def _get_session_path(self, session_id: str) -> Path:
         """获取会话文件路径"""
@@ -245,9 +234,9 @@ class DialogueRecorder:
         try:
             # 只清理当前会话，避免影响其他会话
             self.cleanup_session()
-        except Exception as e:
+        except Exception:
             # 清理失败时不抛出异常，避免影响进程退出
-            print(f"Error during cleanup: {e}")
+            pass
 
 
 def get_global_recorder() -> DialogueRecorder:
