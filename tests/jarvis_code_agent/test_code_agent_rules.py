@@ -19,7 +19,7 @@ class TestRulesManager:
         rules_path.write_text("Project rule content", encoding="utf-8")
 
         manager = RulesManager(root_dir)
-        result = manager.read_project_rules()
+        result = manager.read_project_rule()
 
         assert result == "Project rule content"
 
@@ -27,7 +27,7 @@ class TestRulesManager:
         """测试项目规则文件不存在的情况"""
         root_dir = str(tmp_path)
         manager = RulesManager(root_dir)
-        result = manager.read_project_rules()
+        result = manager.read_project_rule()
 
         assert result is None
 
@@ -39,7 +39,7 @@ class TestRulesManager:
         rules_path.write_text("   \n\n  ", encoding="utf-8")
 
         manager = RulesManager(root_dir)
-        result = manager.read_project_rules()
+        result = manager.read_project_rule()
 
         assert result is None
 
@@ -49,7 +49,7 @@ class TestRulesManager:
         manager = RulesManager(root_dir)
 
         with patch("builtins.open", side_effect=IOError("Permission denied")):
-            result = manager.read_project_rules()
+            result = manager.read_project_rule()
 
         assert result is None
 
@@ -110,7 +110,8 @@ class TestRulesManager:
         mock_get_data_dir.return_value = data_dir
         project_root = tmp_path / "project"
         project_root.mkdir()
-        project_rules_yaml = project_root / "rules.yaml"
+        project_rules_yaml = project_root / ".jarvis" / "rules.yaml"
+        project_rules_yaml.parent.mkdir(parents=True, exist_ok=True)
         project_rules_yaml.write_text(
             "rule1: Project rule 1\nrule2: Project rule 2", encoding="utf-8"
         )
@@ -130,7 +131,8 @@ class TestRulesManager:
 
         project_root = tmp_path / "project"
         project_root.mkdir()
-        project_rules_yaml = project_root / "rules.yaml"
+        project_rules_yaml = project_root / ".jarvis" / "rules.yaml"
+        project_rules_yaml.parent.mkdir(parents=True, exist_ok=True)
         project_rules_yaml.write_text("rule1: Project rule", encoding="utf-8")
 
         manager = RulesManager(str(project_root))
