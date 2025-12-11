@@ -120,7 +120,7 @@ def is_editable_install() -> bool:
 
     def _check_direct_url() -> Optional[bool]:
         if metadata is None:
-            return None
+            return None  # type: ignore[unreachable]
         candidates = ["jarvis-ai-assistant", "jarvis_ai_assistant"]
         for name in candidates:
             try:
@@ -1295,7 +1295,7 @@ def _ask_config_optional_str(
         cur = str(config_data.get(_key, _default or ""))
         val = get_single_line_input(f"{_tip}", default=cur)
         if val is None:
-            return False
+            return False  # type: ignore[unreachable]
         s = str(val).strip()
         if s == "" or s == cur:
             return False
@@ -1345,7 +1345,7 @@ def _ask_config_list(config_data: dict, ask_all: bool, _key: str, _tip: str) -> 
             cur_display = str(cur_val or "")
         val = get_single_line_input(f"{_tip}", default=cur_display)
         if val is None:
-            return False
+            return False  # type: ignore[unreachable]
         s = str(val).strip()
         if s == cur_display.strip():
             return False
@@ -2122,30 +2122,36 @@ def _read_old_config_file(config_file):
             if "=" in line and not line.startswith((" ", "\t")):
                 # 处理之前收集的多行值
                 if current_key is not None:
-                    value = "\n".join(current_value).strip().strip("'").strip('"')
+                    processed_value = (
+                        "\n".join(current_value).strip().strip("'").strip('"')
+                    )
                     # 将字符串"true"/"false"转换为bool类型
-                    if value.lower() == "true":
-                        value = True
-                    elif value.lower() == "false":
-                        value = False
-                    config_data[current_key] = value
+                    if processed_value.lower() == "true":
+                        final_value = True
+                    elif processed_value.lower() == "false":
+                        final_value = False
+                    else:
+                        final_value = processed_value  # type: ignore[assignment]
+                    config_data[current_key] = final_value
                     current_value = []
                     # 解析新的键值对
-                key, value = line.split("=", 1)
-                current_key = key.strip()
-                current_value.append(value.strip())
+                key_part, value_part = line.split("=", 1)
+                current_key = key_part.strip()
+                current_value.append(value_part.strip())
             elif current_key is not None:
                 # 多行值的后续行
                 current_value.append(line.strip())
                 # 处理最后一个键值对
         if current_key is not None:
-            value = "\n".join(current_value).strip().strip("'").strip('"')
+            processed_value = "\n".join(current_value).strip().strip("'").strip('"')
             # 将字符串"true"/"false"转换为bool类型
-            if value.lower() == "true":
-                value = True
-            elif value.lower() == "false":
-                value = False
-            config_data[current_key] = value
+            if processed_value.lower() == "true":
+                final_value = True
+            elif processed_value.lower() == "false":
+                final_value = False
+            else:
+                final_value = processed_value  # type: ignore[assignment]
+            config_data[current_key] = final_value
         os.environ.update(
             {str(k): str(v) for k, v in config_data.items() if v is not None}
         )

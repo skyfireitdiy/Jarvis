@@ -56,7 +56,7 @@ class JavaSymbolExtractor(TreeSitterExtractor):
             raise RuntimeError("Java tree-sitter grammar not available.")
         # 如果传入的是 PyCapsule，需要转换为 Language 对象
         if not isinstance(JAVA_LANGUAGE, Language):
-            lang = Language(JAVA_LANGUAGE)
+            lang = Language(JAVA_LANGUAGE)  # type: ignore[unreachable]
         else:
             lang = JAVA_LANGUAGE
         super().__init__(lang, JAVA_SYMBOL_QUERY)
