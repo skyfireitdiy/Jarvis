@@ -584,6 +584,8 @@ class DiffVisualizer:
             header_style="bold magenta",
             box=None,
             padding=(0, 0),
+            show_lines=False,
+            collapse_padding=True,
         )
         table.add_column("", style="bright_cyan", width=6, justify="right")
         table.add_column("", style="bright_white", overflow="fold", ratio=1)
@@ -720,9 +722,9 @@ class DiffVisualizer:
                             if i1 + k < len(old_line_map)
                             else i1 + k + 1
                         )
-                        # 使用语法高亮，并添加红色背景
+                        # 使用语法高亮，并添加淡红色背景
                         old_content = self._highlight_line(
-                            old_chunk[k], language, "on red"
+                            old_chunk[k], language, "on #ffcccc"
                         )
                     else:
                         old_line_num_actual = ""
@@ -734,9 +736,9 @@ class DiffVisualizer:
                             if j1 + k < len(new_line_map)
                             else j1 + k + 1
                         )
-                        # 使用语法高亮，并添加绿色背景
+                        # 使用语法高亮，并添加淡绿色背景
                         new_content = self._highlight_line(
-                            new_chunk[k], language, "on green"
+                            new_chunk[k], language, "on #ccffcc"
                         )
                     else:
                         new_line_num_actual = ""
@@ -760,8 +762,8 @@ class DiffVisualizer:
                         if i1 + k < len(old_line_map)
                         else i1 + k + 1
                     )
-                    # 使用语法高亮，并添加红色背景
-                    old_content = self._highlight_line(line, language, "on red")
+                    # 使用语法高亮，并添加淡红色背景
+                    old_content = self._highlight_line(line, language, "on #ffcccc")
                     table.add_row(
                         str(old_line_num),
                         old_content,
@@ -780,8 +782,8 @@ class DiffVisualizer:
                         if j1 + k < len(new_line_map)
                         else j1 + k + 1
                     )
-                    # 使用语法高亮，并添加绿色背景
-                    new_content = self._highlight_line(line, language, "on green")
+                    # 使用语法高亮，并添加淡绿色背景
+                    new_content = self._highlight_line(line, language, "on #ccffcc")
                     table.add_row(
                         "",
                         Text(""),
@@ -799,7 +801,9 @@ class DiffVisualizer:
         title += f"  [bright_green]+{additions}[/bright_green] / [bright_red]-{deletions}[/bright_red]"
 
         # 包裹在 Panel 中显示
-        panel = Panel(table, title=title, border_style="bright_cyan", padding=(0, 1))
+        panel = Panel(
+            table, title=title, border_style="bright_cyan", padding=(0, 1), expand=False
+        )
         self.console.print(panel)
 
 
