@@ -41,8 +41,6 @@ class AgentRunLoop:
         max_input_tokens = get_max_input_token_count(self.agent.model_group)
         self.summary_remaining_token_threshold = int(max_input_tokens * 0.2)
         self.conversation_turn_threshold = get_conversation_turn_threshold()
-        # diff内容的token阈值（10%的输入窗口大小）
-        self.diff_token_threshold = int(max_input_tokens * 0.1)
 
         # Git diff相关属性
         self._git_diff: Optional[str] = None  # 缓存git diff内容
@@ -324,8 +322,8 @@ class AgentRunLoop:
 
         # 检查token数量限制
         max_input_tokens = get_max_input_token_count(model_group)
-        # 预留一部分token用于其他内容，使用80%作为diff的限制
-        max_diff_tokens = int(max_input_tokens * 0.8)
+        # 预留一部分token用于其他内容，使用10%作为diff的限制
+        max_diff_tokens = int(max_input_tokens * 0.1)
 
         diff_token_count = get_context_token_count(diff_content)
 
