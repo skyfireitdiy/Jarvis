@@ -622,11 +622,23 @@ class DiffVisualizer:
                             if j1 + k < len(new_line_map)
                             else j1 + k + 1
                         )
+                        old_syntax = Syntax(
+                            line,
+                            language,
+                            theme="monokai",
+                            background_color="default",
+                        )
+                        new_syntax = Syntax(
+                            line,
+                            language,
+                            theme="monokai",
+                            background_color="default",
+                        )
                         table.add_row(
                             f"[bright_cyan]{old_line_num}[/bright_cyan]",
-                            f"[bright_black]{line}[/bright_black]",
+                            old_syntax,
                             f"[bright_cyan]{new_line_num}[/bright_cyan]",
-                            f"[bright_black]{line}[/bright_black]",
+                            new_syntax,
                         )
                 continue
             elif tag == "replace":
