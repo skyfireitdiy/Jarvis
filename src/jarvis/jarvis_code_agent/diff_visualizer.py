@@ -466,7 +466,33 @@ class DiffVisualizer:
         deletions = 0
         has_changes = False
 
+        # 用于跟踪前一个变更块的结束位置
+        prev_change_end_old = 0
+        prev_change_end_new = 0
+
         for idx, (tag, i1, i2, j1, j2) in enumerate(opcodes):
+            # 检测是否需要在变更块之间插入分隔符
+            if idx > 0 and tag in ("replace", "delete", "insert"):
+                # 检查与前一个变更块之间是否有间隔
+                if i1 > prev_change_end_old or j1 > prev_change_end_new:
+                    # 动态计算分隔符宽度（基于终端宽度，限制在合理范围）
+                    terminal_width = self.console.width or 120
+                    # 表格有两列内容区域（每列约占总宽度的45%，减去行号列）
+                    separator_width = max(20, min(50, int(terminal_width * 0.4)))
+                    separator_text = "─" * separator_width
+                    separator = Text(separator_text, style="bright_black dim")
+                    table.add_row(
+                        "",
+                        separator,
+                        "",
+                        separator,
+                    )
+
+            # 只有在处理变更块时才更新结束位置
+            if tag in ("replace", "delete", "insert"):
+                prev_change_end_old = i2
+                prev_change_end_new = j2
+
             if tag == "equal":
                 # 显示未更改的行（灰色/dim样式），但只显示上下文行数
                 equal_chunk = old_lines[i1:i2]
