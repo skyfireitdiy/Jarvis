@@ -29,11 +29,11 @@ class TreeSitterExtractor(SymbolExtractor):
             try:
                 from tree_sitter import Language as LangClass
 
-                if not isinstance(language, LangClass):
-                    lang_obj = LangClass(language)  # type: ignore[unreachable]
+                try:
+                    lang_obj = LangClass(language)
                     self.parser.language = lang_obj
                     self.language = lang_obj
-                else:
+                except Exception:
                     self.parser.language = language
             except Exception:
                 # 最后的fallback：直接赋值
@@ -56,7 +56,7 @@ class TreeSitterExtractor(SymbolExtractor):
 
             # 检查解析是否成功（tree.root_node 应该存在）
             if not tree or not tree.root_node:
-                return []  # type: ignore[unreachable]
+                return []
 
             # 尝试构造查询
             query = None

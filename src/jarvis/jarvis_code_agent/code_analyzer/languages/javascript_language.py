@@ -60,10 +60,7 @@ class JavaScriptSymbolExtractor(TreeSitterExtractor):
         if not JS_LANGUAGE:
             raise RuntimeError("JavaScript tree-sitter grammar not available.")
         # 如果传入的是 PyCapsule，需要转换为 Language 对象
-        if not isinstance(JS_LANGUAGE, Language):
-            lang = Language(JS_LANGUAGE)  # type: ignore[unreachable]
-        else:
-            lang = JS_LANGUAGE
+        lang = Language(JS_LANGUAGE)
         super().__init__(lang, JS_SYMBOL_QUERY)
 
     def _create_symbol_from_capture(

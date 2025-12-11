@@ -116,11 +116,10 @@ def is_editable_install() -> bool:
     try:
         import importlib.metadata as metadata  # Python 3.8+
     except Exception:
-        metadata = None  # type: ignore
+        # 如果importlib.metadata不可用，直接返回None，表示无法检查
+        return False
 
     def _check_direct_url() -> Optional[bool]:
-        if metadata is None:
-            return None  # type: ignore[unreachable]
         candidates = ["jarvis-ai-assistant", "jarvis_ai_assistant"]
         for name in candidates:
             try:
@@ -1294,8 +1293,8 @@ def _ask_config_optional_str(
 
         cur = str(config_data.get(_key, _default or ""))
         val = get_single_line_input(f"{_tip}", default=cur)
-        if val is None:
-            return False  # type: ignore[unreachable]
+        if not val:
+            return False
         s = str(val).strip()
         if s == "" or s == cur:
             return False
@@ -1344,8 +1343,8 @@ def _ask_config_list(config_data: dict, ask_all: bool, _key: str, _tip: str) -> 
         else:
             cur_display = str(cur_val or "")
         val = get_single_line_input(f"{_tip}", default=cur_display)
-        if val is None:
-            return False  # type: ignore[unreachable]
+        if not val:
+            return False
         s = str(val).strip()
         if s == cur_display.strip():
             return False
