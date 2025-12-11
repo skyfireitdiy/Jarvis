@@ -443,6 +443,11 @@ class BasePlatform(ABC):
             if not self.suppress_output and is_print_prompt():
                 PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
 
+            # 记录用户输入（模型输入）
+            from jarvis.jarvis_utils.dialogue_recorder import record_user_message
+
+            record_user_message(message)
+
             result: str = ""
             result = while_true(lambda: while_success(lambda: self._chat(message)))
 
@@ -450,6 +455,11 @@ class BasePlatform(ABC):
             # Convert False to empty string for type safety
             if result is False or result == "":
                 raise ValueError("返回结果为空")
+
+            # 记录模型输出
+            from jarvis.jarvis_utils.dialogue_recorder import record_assistant_message
+
+            record_assistant_message(result)
 
             from jarvis.jarvis_utils.globals import set_last_message
 
