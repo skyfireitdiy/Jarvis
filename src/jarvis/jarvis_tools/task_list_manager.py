@@ -245,11 +245,13 @@ class task_list_manager:
 - 执行开始时：任务状态自动更新为 `running`
 - 执行完成时：任务状态自动更新为 `completed`，执行结果保存到 `actual_output`
 - 执行失败时：任务状态自动更新为 `failed`，错误信息保存到 `actual_output`
-- 无需手动调用 `update_task_status`，系统会自动管理任务状态
+- 可通过 `update_task` 手动更新任务状态和其他属性
 
 **核心操作：**
 - `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务；如果任务列表不存在会自动创建，可使用 main_goal 指定核心目标）
 - `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent，**执行完成后会自动更新任务状态**）
+- `update_task`: 更新任务属性（包括任务名称、描述、优先级、预期输出、依赖关系、状态和实际输出）
+- `get_task_detail`: 获取任务详情
 - `get_task_list_summary`: 获取任务列表摘要
 
 **任务类型（agent_type）选择规则：**
@@ -312,12 +314,9 @@ class task_list_manager:
                 "type": "string",
                 "enum": [
                     "add_tasks",
-                    "get_next_task",
-                    "update_task_status",
                     "get_task_detail",
                     "get_task_list_summary",
                     "execute_task",
-                    "update_task_list",
                     "update_task",
                 ],
                 "description": "要执行的操作",
@@ -364,26 +363,7 @@ class task_list_manager:
             },
             "task_id": {
                 "type": "string",
-                "description": "任务ID（execute_task/update_task/update_task_status/get_task_detail 需要）",
-            },
-            "status": {
-                "type": "string",
-                "enum": ["pending", "running", "completed", "failed", "abandoned"],
-                "description": "任务状态（update_task_status 需要，通常不需要手动调用）",
-            },
-            "actual_output": {
-                "type": "string",
-                "description": "实际输出（update_task_status 可选，通常不需要手动调用）",
-            },
-            "task_list_info": {
-                "type": "object",
-                "description": "任务列表更新信息（update_task_list 需要）",
-                "properties": {
-                    "main_goal": {
-                        "type": "string",
-                        "description": "更新后的全局目标（可选）",
-                    },
-                },
+                "description": "任务ID（execute_task/update_task/get_task_detail 需要）",
             },
             "task_update_info": {
                 "type": "object",
@@ -409,6 +389,21 @@ class task_list_manager:
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "更新后的依赖任务ID列表（可选）",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "running",
+                            "completed",
+                            "failed",
+                            "abandoned",
+                        ],
+                        "description": "更新后的任务状态（可选，通常不需要手动调用）",
+                    },
+                    "actual_output": {
+                        "type": "string",
+                        "description": "更新后的实际输出（可选，通常不需要手动调用）",
                     },
                 },
             },
@@ -458,18 +453,6 @@ class task_list_manager:
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
 
-            elif action == "get_next_task":
-                result = self._handle_get_next_task(
-                    args, task_list_manager, agent_id, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
-            elif action == "update_task_status":
-                result = self._handle_update_task_status(
-                    args, task_list_manager, agent_id, is_main_agent, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
             elif action == "get_task_detail":
                 result = self._handle_get_task_detail(
                     args, task_list_manager, agent_id, is_main_agent, agent
@@ -485,12 +468,6 @@ class task_list_manager:
             elif action == "execute_task":
                 result = self._handle_execute_task(
                     args, task_list_manager, agent_id, is_main_agent, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
-            elif action == "update_task_list":
-                result = self._handle_update_task_list(
-                    args, task_list_manager, agent_id, agent
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
 
@@ -624,100 +601,6 @@ class task_list_manager:
                 "success": False,
                 "stdout": "",
                 "stderr": f"批量添加任务失败: {error_msg}",
-            }
-
-    def _handle_get_next_task(
-        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
-    ) -> Dict[str, Any]:
-        """处理获取下一个任务"""
-        task_list_id = self._get_task_list_id(agent)
-        if not task_list_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
-            }
-
-        task, msg = task_list_manager.get_next_task(
-            task_list_id=task_list_id, agent_id=agent_id
-        )
-
-        if task:
-            result = {
-                "task": task.to_dict(),
-                "message": "获取任务成功",
-            }
-            return {
-                "success": True,
-                "stdout": json.dumps(result, ensure_ascii=False, indent=2),
-                "stderr": "",
-            }
-        else:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": msg or "获取任务失败",
-            }
-
-    def _handle_update_task_status(
-        self,
-        args: Dict,
-        task_list_manager: Any,
-        agent_id: str,
-        is_main_agent: bool,
-        agent: Any,
-    ) -> Dict[str, Any]:
-        """处理更新任务状态"""
-        task_list_id = self._get_task_list_id(agent)
-        if not task_list_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
-            }
-        task_id = args.get("task_id")
-        status = args.get("status")
-        actual_output = args.get("actual_output")
-
-        if not task_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "缺少 task_id 参数",
-            }
-
-        if not status:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "缺少 status 参数",
-            }
-
-        success, msg = task_list_manager.update_task_status(
-            task_list_id=task_list_id,
-            task_id=task_id,
-            status=status,
-            agent_id=agent_id,
-            is_main_agent=is_main_agent,
-            actual_output=actual_output,
-        )
-
-        if success:
-            result = {
-                "task_id": task_id,
-                "status": status,
-                "message": msg or "任务状态更新成功",
-            }
-            return {
-                "success": True,
-                "stdout": json.dumps(result, ensure_ascii=False, indent=2),
-                "stderr": "",
-            }
-        else:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": msg or "更新任务状态失败",
             }
 
     def _handle_get_task_detail(
@@ -1029,7 +912,7 @@ class task_list_manager:
                     "expected_output": task.expected_output,
                     "background": background,
                     "message": "任务已标记为 running，请主 Agent 自行执行",
-                    "note": "主 Agent 类型的任务应由当前 Agent 直接执行，执行完成后请调用 update_task_status 更新任务状态为 completed 或 failed",
+                    "note": "主 Agent 类型的任务应由当前 Agent 直接执行，执行完成后请调用 update_task 更新任务状态为 completed 或 failed",
                     "warning": "请务必在执行完成后更新任务状态，否则任务将一直保持 running 状态",
                 }
                 return {
@@ -1266,59 +1149,6 @@ class task_list_manager:
                 "stderr": f"执行任务失败: {str(e)}",
             }
 
-    def _handle_update_task_list(
-        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
-    ) -> Dict[str, Any]:
-        """处理更新任务列表属性"""
-        task_list_id = self._get_task_list_id(agent)
-        if not task_list_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
-            }
-        task_list_info = args.get("task_list_info", {})
-
-        if not task_list_info:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "缺少 task_list_info 参数",
-            }
-
-        try:
-            with task_list_manager._lock:
-                if task_list_id not in task_list_manager.task_lists:
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "任务列表不存在",
-                    }
-
-                task_list = task_list_manager.task_lists[task_list_id]
-
-                # 更新 main_goal
-                if "main_goal" in task_list_info:
-                    new_main_goal = task_list_info["main_goal"]
-                    task_list.main_goal = new_main_goal
-
-                result = {
-                    "task_list_id": task_list_id,
-                    "main_goal": task_list.main_goal,
-                    "message": "任务列表更新成功",
-                }
-                return {
-                    "success": True,
-                    "stdout": json.dumps(result, ensure_ascii=False, indent=2),
-                    "stderr": "",
-                }
-        except Exception as e:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"更新任务列表失败: {str(e)}",
-            }
-
     def _check_dependencies_completed(
         self,
         task_list_manager: Any,
@@ -1493,13 +1323,35 @@ class task_list_manager:
                         }
                 update_kwargs["dependencies"] = new_deps
 
-            # 执行更新
-            if not task_list.update_task(task_id, **update_kwargs):
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "更新任务失败",
-                }
+            # 处理状态更新（如果提供）
+            status = task_update_info.get("status")
+            actual_output = task_update_info.get("actual_output")
+
+            if status is not None:
+                # 使用 update_task_status 方法更新状态
+                status_success, status_msg = task_list_manager.update_task_status(
+                    task_list_id=task_list_id,
+                    task_id=task_id,
+                    status=status,
+                    agent_id=agent_id,
+                    is_main_agent=is_main_agent,
+                    actual_output=actual_output,
+                )
+                if not status_success:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"更新任务状态失败: {status_msg}",
+                    }
+
+            # 执行其他属性更新（如果有）
+            if update_kwargs:
+                if not task_list.update_task(task_id, **update_kwargs):
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "更新任务属性失败",
+                    }
 
             # 保存快照
             task_list_manager._save_snapshot(task_list_id, task_list)
