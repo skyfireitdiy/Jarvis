@@ -55,7 +55,7 @@ class TreeSitterExtractor(SymbolExtractor):
             tree = self.parser.parse(bytes(content, "utf8"))
 
             # 检查解析是否成功（tree.root_node 应该存在）
-            if not tree or not tree.root_node:
+            if tree is None or tree.root_node is None:
                 return []
 
             # 尝试构造查询
