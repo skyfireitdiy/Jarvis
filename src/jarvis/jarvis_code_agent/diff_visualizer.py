@@ -450,17 +450,22 @@ class DiffVisualizer:
         # 获取语言类型用于语法高亮
         language = self._get_language_by_extension(file_path)
 
-        # 创建并排表格
+        # 创建并排表格 - 使用最大可用宽度
         table = Table(
             show_header=True,
             header_style="bold magenta",
             box=None,
-            padding=(0, 1),
+            padding=(0, 0),  # 移除内部padding让内容更紧凑
+            expand=True,  # 让表格占满可用宽度
         )
         table.add_column("", style="bright_cyan", width=6, justify="right")
-        table.add_column("", style="bright_white", overflow="fold", ratio=1)
+        table.add_column(
+            "", style="bright_white", overflow="fold", ratio=10
+        )  # 增加ratio值获得更多空间
         table.add_column("", style="bright_cyan", width=6, justify="right")
-        table.add_column("", style="bright_white", overflow="fold", ratio=1)
+        table.add_column(
+            "", style="bright_white", overflow="fold", ratio=10
+        )  # 增加ratio值获得更多空间
 
         additions = 0
         deletions = 0
@@ -726,8 +731,8 @@ class DiffVisualizer:
         title = f"📝 {file_path}" if file_path else "Side-by-Side Diff"
         title += f"  [bright_green]+{additions}[/bright_green] / [bright_red]-{deletions}[/bright_red]"
 
-        # 包裹在 Panel 中显示
-        panel = Panel(table, title=title, border_style="bright_cyan", padding=(0, 1))
+        # 包裹在 Panel 中显示 - 最小化padding以最大化内容区域
+        panel = Panel(table, title=title, border_style="bright_cyan", padding=(0, 0))
         self.console.print(panel)
 
 
