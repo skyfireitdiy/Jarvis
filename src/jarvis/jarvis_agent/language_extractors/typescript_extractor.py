@@ -49,7 +49,7 @@ def create_typescript_extractor() -> Optional[Any]:
                 try:
                     tree = self.parser.parse(bytes(content, "utf8"))
                     query = self.language.query(self.symbol_query)
-                    captures = query.captures(tree.root_node)
+                    captures = query.captures(tree.root_node)  # type: ignore[attr-defined]
 
                     symbols = []
                     for node, name in captures:
