@@ -583,7 +583,7 @@ class DiffVisualizer:
             show_header=True,
             header_style="bold magenta",
             box=None,
-            padding=(0, 1),
+            padding=(0, 0),
         )
         table.add_column("", style="bright_cyan", width=6, justify="right")
         table.add_column("", style="bright_white", overflow="fold", ratio=1)
