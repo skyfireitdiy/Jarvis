@@ -75,7 +75,7 @@ class TypeScriptSymbolExtractor(TreeSitterExtractor):
             raise RuntimeError("TypeScript tree-sitter grammar not available.")
         # 如果传入的是 PyCapsule，需要转换为 Language 对象
         if not isinstance(TS_LANGUAGE, Language):
-            lang = Language(TS_LANGUAGE)
+            lang = Language(TS_LANGUAGE)  # type: ignore[unreachable]
         else:
             lang = TS_LANGUAGE
         super().__init__(lang, TS_SYMBOL_QUERY)

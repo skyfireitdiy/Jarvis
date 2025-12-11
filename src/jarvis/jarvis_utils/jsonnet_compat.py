@@ -25,7 +25,7 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
         值是第一行的原始缩进级别（如果第一行原本有缩进但后续行没有）
     """
     if not isinstance(s, str):
-        return s
+        return str(s), {}  # type: ignore[unreachable]
 
     import re
 
@@ -238,7 +238,7 @@ def _convert_backtick_multiline_strings(s: str) -> str:
         转换后的字符串（``` 转换为 |||）
     """
     if not isinstance(s, str):
-        return s
+        return str(s)  # type: ignore[unreachable]
 
     import re
 
@@ -280,7 +280,7 @@ def _strip_markdown_code_blocks(s: str) -> str:
         清理后的字符串
     """
     if not isinstance(s, str):
-        return s
+        return str(s)  # type: ignore[unreachable]
 
     import re
 
