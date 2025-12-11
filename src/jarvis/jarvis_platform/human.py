@@ -7,7 +7,7 @@
 import json
 import random
 import string
-from typing import Any, Dict, Generator, List, Optional, Tuple, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard

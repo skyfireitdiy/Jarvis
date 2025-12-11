@@ -179,7 +179,7 @@ class _WebInputWrapper:
             except Exception:
                 chunk = ""
             if not isinstance(chunk, str):
-                chunk = str(chunk)
+                chunk = str(chunk)  # type: ignore
             with self._lock:
                 self._buffer += chunk
 
@@ -207,7 +207,7 @@ class _WebInputWrapper:
             except Exception:
                 chunk = ""
             if not isinstance(chunk, str):
-                chunk = str(chunk)
+                chunk = str(chunk)  # type: ignore
             with self._lock:
                 self._buffer += chunk
 

@@ -112,7 +112,7 @@ class CompileCommandsManager:
         # 查找匹配的编译命令
         for entry in compile_commands:
             if not isinstance(entry, dict):
-                continue
+                continue  # type: ignore
 
             entry_file = entry.get("file")
             if not entry_file:

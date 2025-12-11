@@ -81,7 +81,7 @@ def _calc_prompt_rows(prev_text: str) -> int:
     prefix_w = _display_width(prefix)
 
     if prev_text is None:
-        return 1
+        return 1  # type: ignore
 
     lines = prev_text.splitlines()
     if not lines:
