@@ -3,7 +3,7 @@ import os
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, cast
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 from jarvis.jarvis_utils.collections import CaseInsensitiveDict
@@ -394,11 +394,11 @@ def get_llm_config(
     config = _get_resolved_model_config(model_group_override)
 
     if platform_type == "cheap":
-        return config.get("cheap_llm_config", {})
+        return dict(config.get("cheap_llm_config", {}))
     elif platform_type == "smart":
-        return config.get("smart_llm_config", {})
+        return dict(config.get("smart_llm_config", {}))
     else:
-        return config.get("llm_config", {})
+        return dict(config.get("llm_config", {}))
 
 
 def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
@@ -1079,7 +1079,7 @@ def get_rag_embedding_config() -> Dict[str, Any]:
         Dict[str, Any]: 嵌入模型的配置参数字典，如果未配置则返回空字典
     """
     config = _get_resolved_rag_config()
-    return config.get("embedding_config", {})
+    return dict(config.get("embedding_config", {}))
 
 
 def get_rag_reranker_config() -> Dict[str, Any]:
@@ -1090,7 +1090,7 @@ def get_rag_reranker_config() -> Dict[str, Any]:
         Dict[str, Any]: 重排模型的配置参数字典，如果未配置则返回空字典
     """
     config = _get_resolved_rag_config()
-    return config.get("reranker_config", {})
+    return dict(config.get("reranker_config", {}))
 
 
 def get_rag_embedding_max_length() -> int:
@@ -1127,7 +1127,11 @@ def get_web_search_platform_name() -> Optional[str]:
     返回:
         Optional[str]: 平台名称，如果未配置则返回None
     """
-    return GLOBAL_CONFIG_DATA.get("web_search_platform")
+    return (
+        str(GLOBAL_CONFIG_DATA.get("web_search_platform"))
+        if GLOBAL_CONFIG_DATA.get("web_search_platform") is not None
+        else None
+    )
 
 
 def get_web_search_model_name() -> Optional[str]:
@@ -1137,7 +1141,11 @@ def get_web_search_model_name() -> Optional[str]:
     返回:
         Optional[str]: 模型名称，如果未配置则返回None
     """
-    return GLOBAL_CONFIG_DATA.get("web_search_model")
+    return (
+        str(GLOBAL_CONFIG_DATA.get("web_search_model"))
+        if GLOBAL_CONFIG_DATA.get("web_search_model") is not None
+        else None
+    )
 
 
 # ==============================================================================

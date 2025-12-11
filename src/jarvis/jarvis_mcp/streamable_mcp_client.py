@@ -4,7 +4,7 @@ import threading
 from typing import Any, Callable, Dict, List, cast
 from urllib.parse import urljoin
 
-import requests  # type: ignore[import-untyped]
+import requests
 
 from jarvis.jarvis_mcp import McpClient
 

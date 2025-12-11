@@ -4,7 +4,7 @@
 import os
 from typing import Dict
 
-import yaml  # type: ignore
+import yaml
 from prompt_toolkit import prompt
 from rich.table import Table
 from rich.console import Console

@@ -392,7 +392,7 @@ class MultiAgent(OutputHandler):
 - 仅输出纯文本，不包含任何指令或工具调用
 - 使用简洁的要点式表述
 """.strip()
-                    summary_any: Any = agent.model.chat_until_success(  # type: ignore[attr-defined]
+                    summary_any: Any = agent.model.chat_until_success(
                         f"{agent.session.prompt}\n{multi_agent_summary_prompt}"
                     )
                     summary_text = (

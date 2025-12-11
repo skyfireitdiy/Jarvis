@@ -187,7 +187,7 @@ def run_analysis_agent_with_retry(
             )
             full_prompt = f"{per_task}{error_guidance}\n\n{summary_prompt_text}"
             try:
-                response = agent.model.chat_until_success(full_prompt)  # type: ignore
+                response = agent.model.chat_until_success(full_prompt)
                 summary_container["text"] = response
             except Exception as e:
                 try:

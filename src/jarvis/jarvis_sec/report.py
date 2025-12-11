@@ -50,13 +50,13 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 
 # 依赖 Issue 结构，但本模块不直接导入 dataclass，接受 dict/Issue 两种形态
 try:
     from jarvis.jarvis_sec.types import Issue  # 类型提示用，避免循环依赖
 except Exception:
-    Issue = dict  # type: ignore
+    Issue = Dict[str, Any]  # type: ignore
 
 
 # ---------------------------

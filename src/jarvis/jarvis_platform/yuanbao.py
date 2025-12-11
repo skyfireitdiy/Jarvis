@@ -7,7 +7,7 @@ import time
 import urllib.parse
 from typing import Any, Dict, Generator, List, Optional, Tuple, cast
 
-from PIL import Image  # type: ignore
+from PIL import Image
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
@@ -50,7 +50,7 @@ class YuanbaoPlatform(BasePlatform):
         self.system_message = ""  # 系统消息，用于初始化对话
         self.first_chat = True  # 标识是否为第一次对话
         self.model_name = "deep_seek_v3"  # 默认模型名称，使用下划线保持一致
-        self.multimedia = []
+        self.multimedia: List[Dict[str, Any]] = []
 
     def set_system_prompt(self, message: str):
         """设置系统消息"""
@@ -610,7 +610,7 @@ class YuanbaoPlatform(BasePlatform):
 
     def name(self) -> str:
         """模型名称"""
-        return cast(str, self.model_name)
+        return self.model_name
 
     @classmethod
     def platform_name(cls) -> str:

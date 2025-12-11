@@ -6,7 +6,7 @@
 
 import builtins
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Set
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -197,7 +197,7 @@ def list():
             count = len(records)
 
             # 收集所有唯一的标签
-            all_tags = {}
+            all_tags: Dict[str, Set[str]] = {}
             for record in records:
                 tags = record.get("tags", {})
                 for k, v in tags.items():

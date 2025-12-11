@@ -516,7 +516,7 @@ class EditFileNormalTool:
 请严格按照协议格式回答，不要添加其他内容。"""
 
             print("🤖 正在询问大模型确认多处匹配的修改是否合理...")
-            response = agent_instance.model.chat_until_success(prompt)  # type: ignore
+            response = agent_instance.model.chat_until_success(prompt)
             response_str = str(response or "")
 
             # 使用确定的协议标记解析回答
@@ -671,7 +671,8 @@ class EditFileNormalTool:
                         normalized_diffs = []
                         break
 
-                    normalized_diffs.append(normalized)
+                    if normalized is not None:
+                        normalized_diffs.append(normalized)
 
                 if not normalized_diffs:
                     # 该文件的diffs有问题，已记录错误，跳过

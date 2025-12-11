@@ -6,7 +6,7 @@ import tempfile
 from typing import Any, Dict, Optional
 
 import typer
-import yaml  # type: ignore
+import yaml
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
@@ -161,7 +161,7 @@ class GitCommitTool:
                             platform.set_model_group(model_group)
                         except Exception:
                             # 兼容早期实现
-                            platform.model_group = model_group  # type: ignore
+                            platform.model_group = model_group
                 else:
                     platform = PlatformRegistry().get_normal_platform()
 

@@ -225,7 +225,7 @@ def run_verification_agent_with_retry(
             try:
                 verify_response = verification_agent.model.chat_until_success(
                     full_verify_prompt
-                )  # type: ignore
+                )
                 verification_summary_container["text"] = verify_response
             except Exception as e:
                 try:

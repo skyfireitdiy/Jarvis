@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Dict, Generator, List, Optional, Tuple, Type
+from typing import Dict, Generator, List, Optional, Tuple, Type, Any
 
 from typing_extensions import Self
 
@@ -36,7 +36,7 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 class BasePlatform(ABC):
     """大语言模型基类"""
 
-    def __init__(self):
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
         """初始化模型"""
         self.suppress_output = True  # 添加输出控制标志
         self.web = False  # 添加web属性，默认false

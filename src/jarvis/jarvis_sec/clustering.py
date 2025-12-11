@@ -203,6 +203,8 @@ def restore_clusters_from_checkpoint(
                     cluster_gids_int = set()
                     for gid_val in cluster_gids:
                         try:
+                            if gid_val is None:
+                                continue
                             gid_int = int(gid_val)
                             if gid_int >= 1:
                                 cluster_gids_int.add(gid_int)
@@ -727,7 +729,7 @@ def run_cluster_agent_direct_model(
     error_guidance = build_cluster_error_guidance(error_details, missing_gids)
     full_prompt = f"{retry_task}{error_guidance}\n\n{cluster_summary_prompt}"
     try:
-        response = cluster_agent.model.chat_until_success(full_prompt)  # type: ignore
+        response = cluster_agent.model.chat_until_success(full_prompt)
         _cluster_summary["text"] = response
     except Exception as e:
         try:
@@ -751,7 +753,7 @@ def validate_cluster_result(
         typer.secho(f"[jarvis-sec] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
         return False, error_details
     else:
-        valid, error_details = validate_cluster_format(cluster_items)
+        valid, error_details = validate_cluster_format(cluster_items or [])
         if not valid:
             typer.secho(
                 f"[jarvis-sec] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {attempt} 次（使用直接模型调用）",
@@ -800,7 +802,7 @@ def run_cluster_agent_with_retry(
     _attempt = 0
     use_direct_model = False
     error_details: List[str] = []
-    missing_gids = set()
+    missing_gids: set[str] = set()
     consecutive_failures = 0  # 连续失败次数
 
     while True:
@@ -917,10 +919,10 @@ def process_cluster_results(
 
         members: List[Dict] = []
         for k in norm_keys:
-            it = gid_to_item.get(k)
-            if it:
-                it["verify"] = verification
-                members.append(it)
+            item = gid_to_item.get(k)
+            if item is not None:
+                item["verify"] = verification
+                members.append(item)
 
         # 如果标记为无效，收集到复核列表
         if is_invalid:

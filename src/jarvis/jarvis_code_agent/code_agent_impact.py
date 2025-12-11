@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """CodeAgent 影响分析模块"""
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict, Tuple
 
 from jarvis.jarvis_code_agent.code_analyzer import (
     ImpactAnalyzer,
     parse_git_diff_to_edits,
 )
+from jarvis.jarvis_code_agent.code_analyzer.impact_analyzer import Edit
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_utils.config import is_enable_impact_analysis
 
@@ -59,7 +60,7 @@ class ImpactManager:
                 return None
 
             # 按文件分组编辑
-            edits_by_file = {}
+            edits_by_file: Dict[str, List[Edit]] = {}
             for edit in all_edits:
                 if edit.file_path not in edits_by_file:
                     edits_by_file[edit.file_path] = []
@@ -80,11 +81,15 @@ class ImpactManager:
                         )
 
                         # 合并符号（基于文件路径和名称去重）
-                        symbol_map = {}
+                        symbol_map: Dict[Tuple[str, str, str], Any] = {}
                         for symbol in (
                             impact_report.affected_symbols + report.affected_symbols
                         ):
-                            key = (symbol.file_path, symbol.name, symbol.line_start)
+                            key = (
+                                symbol.file_path,
+                                symbol.name,
+                                str(symbol.line_start),
+                            )
                             if key not in symbol_map:
                                 symbol_map[key] = symbol
                         impact_report.affected_symbols = list(symbol_map.values())
@@ -94,14 +99,14 @@ class ImpactManager:
                         )
 
                         # 合并接口变更（基于符号名和文件路径去重）
-                        interface_map = {}
+                        interface_map: Dict[Tuple[str, str, str], Any] = {}
                         for change in (
                             impact_report.interface_changes + report.interface_changes
                         ):
                             key = (
                                 change.file_path,
                                 change.symbol_name,
-                                change.change_type,
+                                str(change.change_type),
                             )
                             if key not in interface_map:
                                 interface_map[key] = change

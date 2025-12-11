@@ -13,7 +13,7 @@ import json
 import os
 
 import typer
-import yaml  # type: ignore
+import yaml
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.methodology import (

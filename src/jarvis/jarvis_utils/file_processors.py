@@ -76,8 +76,12 @@ class TextFileProcessor(FileProcessor):
 
             if not detected_encoding:
                 raise UnicodeDecodeError(
-                    f"Failed to decode file with supported encodings: {file_path}"
-                )  # type: ignore
+                    "utf-8",
+                    b"",
+                    0,
+                    0,
+                    f"Failed to decode file with supported encodings: {file_path}",
+                )
 
             # Use the detected encoding to read the file
             with open(file_path, "r", encoding=detected_encoding, errors="ignore") as f:

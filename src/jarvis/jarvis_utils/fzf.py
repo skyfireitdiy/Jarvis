@@ -31,8 +31,7 @@ def fzf_select(
     if isinstance(options[0], dict):
         if key is None:
             raise ValueError("A key must be provided for a list of dicts.")
-        options_dict = cast(List[Dict[str, Any]], options)
-        input_lines = [str(item.get(key, "")) for item in options_dict]
+        input_lines = [str(cast(Dict[str, Any], item).get(key, "")) for item in options]
     else:
         input_lines = [str(item) for item in options]
 

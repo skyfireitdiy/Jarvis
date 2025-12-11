@@ -121,7 +121,7 @@ class HumanPlatform(BasePlatform):
 
     def name(self) -> str:
         """平台名称"""
-        return cast(str, self.model_name)
+        return self.model_name
 
     @classmethod
     def platform_name(cls) -> str:

@@ -19,7 +19,7 @@ def subscribe_summary_event(agent: Agent) -> Dict[str, str]:
     try:
         from jarvis.jarvis_agent.events import AFTER_SUMMARY as _AFTER_SUMMARY
     except Exception:
-        _AFTER_SUMMARY = None
+        _AFTER_SUMMARY = None  # type: ignore
 
     if _AFTER_SUMMARY:
 

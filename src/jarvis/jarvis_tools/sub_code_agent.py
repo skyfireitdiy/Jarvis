@@ -150,7 +150,7 @@ class SubCodeAgentTool:
                 # 如果提供了名称，则使用该名称
                 if agent_name:
                     code_agent_kwargs["name"] = agent_name
-                code_agent = CodeAgent(**code_agent_kwargs)
+                code_agent = CodeAgent(**code_agent_kwargs)  # type: ignore[arg-type]
             except SystemExit as se:
                 # 将底层 sys.exit 转换为工具错误，避免终止进程
                 return {

@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-from typing import Any, Dict, Generator, List, Optional, Tuple, cast
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
 
@@ -75,7 +76,7 @@ class OpenAIModel(BasePlatform):
             self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
             if self.extra_headers:
                 print("⚠️ 当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头")
-        self.messages: List[Dict[str, str]] = []
+        self.messages: List[ChatCompletionMessageParam] = []
         self.system_message = ""
 
     def upload_files(self, file_list: List[str]) -> bool:
@@ -157,9 +158,9 @@ class OpenAIModel(BasePlatform):
             while True:
                 response = self.client.chat.completions.create(
                     model=self.model_name,  # Use the configured model name
-                    messages=self.messages,  # type: ignore
+                    messages=self.messages,
                     stream=True,
-                )  # type: ignore
+                )
 
                 full_response = ""
                 finish_reason = None
@@ -184,7 +185,14 @@ class OpenAIModel(BasePlatform):
                     # 将已获取的内容追加到消息历史中，以便下次请求时模型知道已生成的内容
                     if self.messages and self.messages[-1].get("role") == "assistant":
                         # 追加到现有的 assistant 消息
-                        self.messages[-1]["content"] += full_response
+                        last_content = self.messages[-1]["content"]
+                        if isinstance(last_content, str):
+                            self.messages[-1]["content"] = last_content + full_response
+                        else:
+                            # 如果content不是字符串，创建新的消息
+                            self.messages.append(
+                                {"role": "assistant", "content": full_response}
+                            )
                     else:
                         # 创建新的 assistant 消息
                         self.messages.append(
@@ -204,7 +212,19 @@ class OpenAIModel(BasePlatform):
                             and self.messages[-1].get("role") == "assistant"
                         ):
                             # 如果最后一条是 assistant 消息，追加本次的内容
-                            self.messages[-1]["content"] += full_response
+                            last_content = self.messages[-1]["content"]
+                            if isinstance(last_content, str):
+                                self.messages[-1]["content"] = (
+                                    last_content + full_response
+                                )
+                            else:
+                                # 如果content不是字符串，创建新的消息
+                                self.messages.append(
+                                    {
+                                        "role": "assistant",
+                                        "content": accumulated_response,
+                                    }
+                                )
                         else:
                             # 创建新的 assistant 消息，使用累计的完整响应
                             self.messages.append(
@@ -225,7 +245,7 @@ class OpenAIModel(BasePlatform):
         返回:
             str: 当前配置的模型名称
         """
-        return cast(str, self.model_name)
+        return self.model_name
 
     @classmethod
     def platform_name(cls) -> str:

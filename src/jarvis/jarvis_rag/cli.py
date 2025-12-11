@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, List, Tuple
 import mimetypes
 
-import pathspec  # type: ignore
+import pathspec
 import typer
 from langchain.docstore.document import Document
 from langchain_community.document_loaders import (

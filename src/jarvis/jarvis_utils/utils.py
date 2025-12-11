@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from datetime import datetime, date
 
-import yaml  # type: ignore
+import yaml
 from rich.align import Align
 from rich.console import RenderableType
 

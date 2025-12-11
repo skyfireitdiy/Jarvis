@@ -7,8 +7,8 @@ from jarvis.jarvis_utils.config import (
     get_web_search_model_name,
 )
 from jarvis.jarvis_utils.http import get as http_get
-from markdownify import markdownify as md  # type: ignore[import-untyped]
-import requests  # type: ignore[import-untyped]
+from markdownify import markdownify as md
+import requests
 
 
 class WebpageTool:

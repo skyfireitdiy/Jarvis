@@ -3,12 +3,12 @@
 
 from typing import Any, Dict
 
-import requests  # type: ignore[import-untyped]
-from markdownify import markdownify as md  # type: ignore
+import requests
+from markdownify import markdownify as md
 
 # pylint: disable=import-error,missing-module-docstring
 # fmt: off
-from ddgs import DDGS  # type: ignore[import-not-found]
+from ddgs import DDGS
 # fmt: on
 
 from jarvis.jarvis_agent import Agent

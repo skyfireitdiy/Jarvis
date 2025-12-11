@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import requests  # type: ignore[import-untyped]
+import requests
 from typing import Any, Dict, Optional, Generator
 
 

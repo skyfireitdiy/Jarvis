@@ -274,7 +274,7 @@ def run_security_analysis(
         from jarvis.jarvis_sec.report import build_json_and_markdown
 
         result = build_json_and_markdown(
-            all_issues,
+            all_issues,  # type: ignore[arg-type]
             scanned_root=summary.get("scanned_root"),
             scanned_files=summary.get("scanned_files"),
             meta=meta_records or None,

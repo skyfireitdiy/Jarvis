@@ -5,7 +5,7 @@ import os
 import subprocess
 from typing import List, Optional
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from jarvis.jarvis_utils.config import (
     get_data_dir,
