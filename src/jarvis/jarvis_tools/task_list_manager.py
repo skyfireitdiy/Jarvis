@@ -248,7 +248,7 @@ class task_list_manager:
 - 无需手动调用 `update_task_status`，系统会自动管理任务状态
 
 **核心操作：**
-- `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务；如果任务列表不存在会自动创建）
+- `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务；如果任务列表不存在会自动创建，可使用 main_goal 指定核心目标）
 - `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent，**执行完成后会自动更新任务状态**）
 - `get_task_list_summary`: 获取任务列表摘要
 
@@ -276,6 +276,7 @@ class task_list_manager:
   "name": "task_list_manager",
   "arguments": {{
     "action": "add_tasks",
+    "main_goal": "实现完整的用户登录功能模块",
     "tasks_info": [
       {{
         "task_name": "设计数据库表结构",
@@ -315,12 +316,15 @@ class task_list_manager:
                     "update_task_status",
                     "get_task_detail",
                     "get_task_list_summary",
-                    "rollback_task_list",
                     "execute_task",
                     "update_task_list",
                     "update_task",
                 ],
                 "description": "要执行的操作",
+            },
+            "main_goal": {
+                "type": "string",
+                "description": "任务列表的核心目标（可选，仅在首次创建任务列表时使用）。如果未提供，将使用第一个任务的名称作为默认值",
             },
             "tasks_info": {
                 "type": "array",
@@ -371,10 +375,6 @@ class task_list_manager:
                 "type": "string",
                 "description": "实际输出（update_task_status 可选，通常不需要手动调用）",
             },
-            "version": {
-                "type": "integer",
-                "description": "版本号（rollback_task_list 需要，高级功能）",
-            },
             "task_list_info": {
                 "type": "object",
                 "description": "任务列表更新信息（update_task_list 需要）",
@@ -382,10 +382,6 @@ class task_list_manager:
                     "main_goal": {
                         "type": "string",
                         "description": "更新后的全局目标（可选）",
-                    },
-                    "max_active_tasks": {
-                        "type": "integer",
-                        "description": "更新后的最大活跃任务数（可选，5-20）",
                     },
                 },
             },
@@ -486,12 +482,6 @@ class task_list_manager:
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
 
-            elif action == "rollback_task_list":
-                result = self._handle_rollback_task_list(
-                    args, task_list_manager, agent_id, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
             elif action == "execute_task":
                 result = self._handle_execute_task(
                     args, task_list_manager, agent_id, is_main_agent, agent
@@ -546,14 +536,16 @@ class task_list_manager:
                     "stderr": "缺少 tasks_info 参数",
                 }
 
-            # 生成默认的 main_goal
-            if isinstance(tasks_info, list) and len(tasks_info) > 0:
-                first_task = tasks_info[0]
-                main_goal = (
-                    f"自动创建的任务列表：{first_task.get('task_name', '未知任务')}"
-                )
-            else:
-                main_goal = "自动创建的任务列表"
+            # 优先使用用户提供的 main_goal，否则生成默认的
+            main_goal = args.get("main_goal")
+            if not main_goal:
+                if isinstance(tasks_info, list) and len(tasks_info) > 0:
+                    first_task = tasks_info[0]
+                    main_goal = (
+                        f"自动创建的任务列表：{first_task.get('task_name', '未知任务')}"
+                    )
+                else:
+                    main_goal = "自动创建的任务列表"
 
             # 检查是否已有任务列表
             existing_task_list_id = self._get_task_list_id(agent)
@@ -791,48 +783,6 @@ class task_list_manager:
                 "success": False,
                 "stdout": "",
                 "stderr": "任务列表不存在",
-            }
-
-    def _handle_rollback_task_list(
-        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
-    ) -> Dict[str, Any]:
-        """处理回滚任务列表"""
-        task_list_id = self._get_task_list_id(agent)
-        if not task_list_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
-            }
-        version = args.get("version")
-
-        if version is None:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "缺少 version 参数",
-            }
-
-        success, msg = task_list_manager.rollback_task_list(
-            task_list_id=task_list_id, version=version, agent_id=agent_id
-        )
-
-        if success:
-            result = {
-                "task_list_id": task_list_id,
-                "version": version,
-                "message": msg or "任务列表回滚成功",
-            }
-            return {
-                "success": True,
-                "stdout": json.dumps(result, ensure_ascii=False, indent=2),
-                "stderr": "",
-            }
-        else:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": msg or "回滚任务列表失败",
             }
 
     def _validate_dependencies_status(
@@ -1341,28 +1291,9 @@ class task_list_manager:
                     new_main_goal = task_list_info["main_goal"]
                     task_list.main_goal = new_main_goal
 
-                # 更新 max_active_tasks
-                if "max_active_tasks" in task_list_info:
-                    new_max_active = task_list_info["max_active_tasks"]
-                    if not (5 <= new_max_active <= 20):
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "max_active_tasks 必须在 5-20 之间",
-                        }
-                    task_list.max_active_tasks = new_max_active
-
-                # 更新版本号
-                task_list.version += 1
-
-                # 保存快照
-                task_list_manager._save_snapshot(task_list_id, task_list)
-
                 result = {
                     "task_list_id": task_list_id,
-                    "version": task_list.version,
                     "main_goal": task_list.main_goal,
-                    "max_active_tasks": task_list.max_active_tasks,
                     "message": "任务列表更新成功",
                 }
                 return {
