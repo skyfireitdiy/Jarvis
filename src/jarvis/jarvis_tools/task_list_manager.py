@@ -526,9 +526,22 @@ class task_list_manager:
     ) -> Dict[str, Any]:
         """处理批量添加任务（支持通过任务名称匹配依赖关系）"""
         task_list_id = self._get_task_list_id(agent)
+        tasks_info = args.get("tasks_info")
+
         if not task_list_id:
+            # 验证：如果没有task_list且只有一个任务且agent不是main，则拒绝
+            if tasks_info and isinstance(tasks_info, list) and len(tasks_info) == 1:
+                # 获取第一个任务的agent_type
+                first_task = tasks_info[0]
+                agent_type = first_task.get("agent_type")
+                if agent_type != "main":
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "拒绝添加单个非main类型任务：对于简单任务，agent_type应为main，由主Agent直接执行。如需创建复杂任务，请添加多个任务或修改agent_type为main。",
+                    }
+
             # 自动创建任务列表
-            tasks_info = args.get("tasks_info")
             if not tasks_info:
                 return {
                     "success": False,
