@@ -52,6 +52,7 @@ from jarvis.jarvis_agent.events import (
     TOOL_FILTERED,
     AFTER_TOOL_CALL,
 )
+
 from jarvis.jarvis_agent.user_interaction import UserInteractionHandler
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
@@ -500,6 +501,12 @@ class Agent:
         Clears the current conversation history by delegating to the session manager.
         直接调用关键流程函数，事件总线仅用于非关键流程（如日志、监控等）。
         """
+        # 获取当前会话文件路径用于提示
+        from jarvis.jarvis_utils.dialogue_recorder import get_global_recorder
+
+        recorder = get_global_recorder()
+        session_file_path = recorder.get_session_file_path()
+
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
             self.memory_manager._ensure_memory_prompt(agent=self)
@@ -518,6 +525,11 @@ class Agent:
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
+
+        # 提示用户会话文件位置
+        if Path(session_file_path).exists():
+            print(f"💾 当前会话记录已保存到: {session_file_path}")
+            print("🤖 大模型可以读取此文件了解完整对话历史")
 
         # 重置后重新设置系统提示词，确保系统约束仍然生效
         try:
@@ -1633,6 +1645,9 @@ class Agent:
         # 将非交互模式说明添加到用户输入中
         enhanced_input = user_input + non_interactive_note
         self.session.prompt = enhanced_input
+
+        # 记录用户输入
+
         try:
             set_agent(self.name, self)
             set_running_agent(self.name)  # 标记agent开始运行
