@@ -111,10 +111,10 @@ class DiffManager:
             try:
                 from jarvis.jarvis_code_agent.diff_visualizer import DiffVisualizer
 
-                self._visualizer = DiffVisualizer()
+                self._visualizer = DiffVisualizer()  # type: ignore
             except ImportError:
                 # 如果导入失败，返回 None
-                self._visualizer = False
+                self._visualizer = False  # type: ignore
         return self._visualizer if self._visualizer is not False else None
 
     def build_per_file_patch_preview(
