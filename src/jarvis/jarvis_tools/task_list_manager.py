@@ -251,6 +251,7 @@ class task_list_manager:
 - `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务；如果任务列表不存在会自动创建，可使用 main_goal 指定核心目标）
 - `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent，**执行完成后会自动更新任务状态**）
 - `get_task_list_summary`: 获取任务列表摘要
+- `update_task`: 更新任务属性（包括状态、描述、优先级等）
 
 **任务类型（agent_type）选择规则：**
 - **简单任务使用 `main`**：对于简单、直接的任务（如单次文件读取、简单的单步操作、单一工具调用等），**必须使用 `main`**，由主 Agent 直接执行，**不要将简单任务拆分为 `code_agent` 或 `agent`**。避免对简单任务进行不必要的拆分，防止出现无限拆分的问题。
@@ -312,12 +313,8 @@ class task_list_manager:
                 "type": "string",
                 "enum": [
                     "add_tasks",
-                    "get_next_task",
-                    "update_task_status",
-                    "get_task_detail",
                     "get_task_list_summary",
                     "execute_task",
-                    "update_task_list",
                     "update_task",
                 ],
                 "description": "要执行的操作",
@@ -458,24 +455,6 @@ class task_list_manager:
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
 
-            elif action == "get_next_task":
-                result = self._handle_get_next_task(
-                    args, task_list_manager, agent_id, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
-            elif action == "update_task_status":
-                result = self._handle_update_task_status(
-                    args, task_list_manager, agent_id, is_main_agent, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
-            elif action == "get_task_detail":
-                result = self._handle_get_task_detail(
-                    args, task_list_manager, agent_id, is_main_agent, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
             elif action == "get_task_list_summary":
                 result = self._handle_get_task_list_summary(
                     args, task_list_manager, agent
@@ -485,12 +464,6 @@ class task_list_manager:
             elif action == "execute_task":
                 result = self._handle_execute_task(
                     args, task_list_manager, agent_id, is_main_agent, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
-            elif action == "update_task_list":
-                result = self._handle_update_task_list(
-                    args, task_list_manager, agent_id, agent
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
 
