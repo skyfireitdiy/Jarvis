@@ -815,7 +815,7 @@ def _split_diff_by_files(diff_text: str) -> List[tuple]:
     files = []
     lines = diff_text.splitlines()
     current_file_path = ""
-    current_file_lines = []
+    current_file_lines: List[str] = []
 
     i = 0
     while i < len(lines):
@@ -930,26 +930,26 @@ def _parse_diff_to_lines(diff_text: str) -> tuple:
             continue
         elif line.startswith("-"):
             # 删除的行
-            old_lines.append(line[1:])
+            old_lines.append(line[1:].rstrip("\r\n"))
             old_line_map.append(old_line_num)
             old_line_num += 1
         elif line.startswith("+"):
             # 新增的行
-            new_lines.append(line[1:])
+            new_lines.append(line[1:].rstrip("\r\n"))
             new_line_map.append(new_line_num)
             new_line_num += 1
         elif line.startswith(" "):
             # 未更改的行
-            old_lines.append(line[1:])
-            new_lines.append(line[1:])
+            old_lines.append(line[1:].rstrip("\r\n"))
+            new_lines.append(line[1:].rstrip("\r\n"))
             old_line_map.append(old_line_num)
             new_line_map.append(new_line_num)
             old_line_num += 1
             new_line_num += 1
         else:
             # 其他行（如空行）
-            old_lines.append(line)
-            new_lines.append(line)
+            old_lines.append(line.rstrip("\r\n"))
+            new_lines.append(line.rstrip("\r\n"))
             old_line_map.append(old_line_num if old_line_num > 0 else 0)
             new_line_map.append(new_line_num if new_line_num > 0 else 0)
 
