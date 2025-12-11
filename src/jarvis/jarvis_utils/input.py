@@ -12,7 +12,7 @@
 import os
 import sys
 import base64
-from typing import Iterable, List, Optional, cast
+from typing import Iterable, List, Optional
 import wcwidth
 from colorama import Fore
 from colorama import Style as ColoramaStyle
@@ -129,7 +129,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
         {"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"}
     )
     prompt = FormattedText([("class:prompt", f"👤 > {tip}")])
-    return cast(str, session.prompt(prompt, default=default, style=style))
+    return str(session.prompt(prompt, default=default, style=style))
 
 
 def get_choice(tip: str, choices: List[str]) -> str:
@@ -538,7 +538,7 @@ def _get_multiline_input_internal(
     def _(event):
         """Return a shell command like '!bash' for upper input_handler to execute."""
 
-        def _gen_shell_cmd() -> str:  # type: ignore
+        def _gen_shell_cmd() -> str:
             try:
                 import os
                 import shutil
@@ -565,6 +565,8 @@ def _get_multiline_input_internal(
                     return "!env JARVIS_TERMINAL=1 bash"
             except Exception:
                 return "!env JARVIS_TERMINAL=1 bash"
+            # Fallback for all cases
+            return "!env JARVIS_TERMINAL=1 bash"
 
         # Append a special marker to indicate no-confirm execution in shell_input_handler
         event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
@@ -711,7 +713,7 @@ def _get_multiline_input_internal(
             bottom_toolbar=_bottom_toolbar,
             default=(preset or ""),
         )
-        return cast(str, result).strip() if result else ""
+        return str(result).strip() if result else ""
     except (KeyboardInterrupt, EOFError):
         return ""
 

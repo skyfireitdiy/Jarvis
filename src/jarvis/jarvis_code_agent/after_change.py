@@ -10,7 +10,7 @@
 import os
 from typing import Dict, List, Tuple, Optional
 
-import yaml  # type: ignore
+import yaml
 
 from jarvis.jarvis_utils.config import get_data_dir
 

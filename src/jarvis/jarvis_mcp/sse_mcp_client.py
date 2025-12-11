@@ -5,7 +5,7 @@ import time
 from typing import Any, Callable, Dict, List, Optional, cast
 from urllib.parse import parse_qs, urlencode, urljoin
 
-import requests  # type: ignore[import-untyped]
+import requests
 
 from jarvis.jarvis_mcp import McpClient
 

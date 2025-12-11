@@ -2,7 +2,7 @@
 Cohere 嵌入模型实现。
 """
 
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from .base import OnlineEmbeddingModel
 
@@ -55,7 +55,7 @@ class CohereEmbeddingModel(OnlineEmbeddingModel):
                 input_type=input_type,
             )
 
-            return response.embeddings
+            return cast(List[List[float]], response.embeddings)
         except ImportError:
             raise ImportError(
                 "使用 CohereEmbeddingModel 需要安装 cohere 包: pip install cohere"

@@ -35,7 +35,7 @@ class TongyiPlatform(BasePlatform):
         self.request_id = ""
         self.msg_id = ""
         self.model_name = ""
-        self.uploaded_file_info = []
+        self.uploaded_file_info: List[Dict[str, Any]] = []
         self.system_message = ""  # System message for initialization
         self.first_chat = True  # Flag for first chat
 
@@ -462,7 +462,7 @@ class TongyiPlatform(BasePlatform):
         Returns:
             str: Platform name
         """
-        return cast(str, self.model_name)
+        return self.model_name
 
     @classmethod
     def platform_name(cls) -> str:

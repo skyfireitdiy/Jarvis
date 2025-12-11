@@ -235,7 +235,7 @@ def start_service(
         if stream:
             # Return streaming response
             return StreamingResponse(
-                stream_chat_response(platform, message_text, model),  # type: ignore
+                stream_chat_response(platform, message_text, model),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
             )

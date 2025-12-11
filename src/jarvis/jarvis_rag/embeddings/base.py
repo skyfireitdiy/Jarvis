@@ -21,7 +21,7 @@ class OnlineEmbeddingModel(EmbeddingInterface):
         api_key: Optional[str] = None,
         api_key_env: Optional[str] = None,
         base_url: Optional[str] = None,
-        model_name: Optional[str] = None,
+        model_name: str = "text-embedding-3-small",
         batch_size: int = 100,
         max_length: Optional[int] = None,
         **kwargs,

@@ -8,7 +8,7 @@
 """
 
 import os
-import yaml  # type: ignore[import-untyped]
+import yaml
 from typing import Optional, Dict, Any, cast
 from pathlib import Path
 

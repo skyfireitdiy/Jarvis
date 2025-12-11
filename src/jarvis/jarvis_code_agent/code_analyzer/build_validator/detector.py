@@ -519,7 +519,7 @@ Git根目录文件列表（前30项）：
         # 非交互模式：直接选择第一个构建系统（或unknown）
         if _is_non_interactive():
             if detected_systems and detected_systems[0] != BuildSystem.UNKNOWN:
-                selected_system = detected_systems[0]
+                selected_system: BuildSystem = detected_systems[0]
                 print(f"ℹ️ 非交互模式：自动选择构建系统: {selected_system.value}")
                 config.set_selected_build_system(selected_system.value)
                 return [selected_system]
@@ -539,11 +539,13 @@ Git根目录文件列表（前30项）：
                 choice_num = int(choice)
 
                 if 1 <= choice_num <= len(detected_systems):
-                    selected_system = detected_systems[choice_num - 1]
+                    selected_build_system: BuildSystem = detected_systems[
+                        choice_num - 1
+                    ]
                     # 保存用户选择
-                    config.set_selected_build_system(selected_system.value)
-                    print(f"ℹ️ 用户选择构建系统: {selected_system.value}")
-                    return [selected_system]
+                    config.set_selected_build_system(selected_build_system.value)
+                    print(f"ℹ️ 用户选择构建系统: {selected_build_system.value}")
+                    return [selected_build_system]
                 elif choice_num == len(detected_systems) + 1:
                     print("ℹ️ 用户取消选择，使用unknown")
                     config.set_selected_build_system("unknown")

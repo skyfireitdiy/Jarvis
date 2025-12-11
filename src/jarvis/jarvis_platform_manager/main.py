@@ -122,7 +122,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
             # Check if it is a clear session command
             if command == "/clear":
                 try:
-                    platform.reset()  # type: ignore[no-untyped-call]  # type: ignore[no-untyped-call]  # type: ignore[no-untyped-call]
+                    platform.reset()
                     platform.set_model_name(model_name)  # Reinitialize session
                     conversation_history = []  # 重置对话记录
                     print("✅ 会话已清除")
@@ -370,7 +370,7 @@ def load_role_config(config_path: str) -> Dict[str, Any]:
     返回:
         dict: 角色配置字典
     """
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     if not os.path.exists(config_path):
         print(f"❌ 角色配置文件 {config_path} 不存在")
@@ -421,7 +421,7 @@ def role_command(
     print(f"ℹ️ {output_str}")
 
     # 让用户选择角色（优先 fzf，回退编号输入）
-    selected_role = None  # type: ignore[var-annotated]
+    selected_role = None
     fzf_options = [
         f"{i:>3} | {role['name']} - {role.get('description', '')}"
         for i, role in enumerate(config["roles"], 1)

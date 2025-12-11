@@ -44,7 +44,7 @@ class KimiModel(BasePlatform):
         if not self.api_key:
             print("⚠️ KIMI_API_KEY 未设置")
         self.auth_header = f"Bearer {self.api_key}"  # 认证头信息
-        self.uploaded_files = []  # 存储已上传文件的信息
+        self.uploaded_files: List[Dict[str, Any]] = []  # 存储已上传文件的信息
         self.chat_id = ""  # 当前会话ID
         self.first_chat = True  # 标记是否是第一次对话
         self.system_message = ""  # 系统提示消息
@@ -385,7 +385,7 @@ class KimiModel(BasePlatform):
 
     def name(self) -> str:
         """Model name"""
-        return cast(str, self.model_name)
+        return self.model_name
 
     @classmethod
     def platform_name(cls) -> str:

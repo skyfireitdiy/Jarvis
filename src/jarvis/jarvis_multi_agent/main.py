@@ -2,7 +2,7 @@
 from typing import Optional
 
 import typer
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from jarvis.jarvis_multi_agent import MultiAgent
 from jarvis.jarvis_utils.input import get_multiline_input

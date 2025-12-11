@@ -283,6 +283,6 @@ class RerankerRegistry:
 
         # 添加max_length（如果配置中没有指定，使用配置系统的默认值）
         if "max_length" not in create_kwargs:
-            create_kwargs["max_length"] = get_rag_reranker_max_length()
+            create_kwargs["max_length"] = str(get_rag_reranker_max_length())
 
         return registry.create_reranker(reranker_type, **create_kwargs)

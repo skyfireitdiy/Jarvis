@@ -99,11 +99,13 @@ class StdioMcpClient(McpClient):
             request = {"jsonrpc": "2.0", "method": method, "params": params, "id": 1}
 
             # 发送请求
-            self.process.stdin.write(json.dumps(request) + "\n")  # type: ignore
-            self.process.stdin.flush()  # type: ignore
+            assert self.process.stdin is not None
+            assert self.process.stdout is not None
+            self.process.stdin.write(json.dumps(request) + "\n")
+            self.process.stdin.flush()
 
             # 读取响应
-            response = self.process.stdout.readline()  # type: ignore
+            response = self.process.stdout.readline()
             return cast(Dict[str, Any], json.loads(response))
 
         except Exception as e:
@@ -124,8 +126,9 @@ class StdioMcpClient(McpClient):
             # 构建通知
             notification = {"jsonrpc": "2.0", "method": method, "params": params}
             # 发送通知
-            self.process.stdin.write(json.dumps(notification) + "\n")  # type: ignore
-            self.process.stdin.flush()  # type: ignore
+            assert self.process.stdin is not None
+            self.process.stdin.write(json.dumps(notification) + "\n")
+            self.process.stdin.flush()
 
         except Exception as e:
             print(f"❌ 发送通知失败: {str(e)}")

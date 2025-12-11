@@ -29,7 +29,7 @@ import os
 import subprocess
 from pathlib import Path
 import signal
-import yaml  # type: ignore
+import yaml
 from rich.table import Table
 from rich.console import Console
 

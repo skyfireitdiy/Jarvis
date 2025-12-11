@@ -132,7 +132,7 @@ class LLMManager:
             print("🤖 正在询问大模型判断大量代码删除是否合理...")
             # 每次调用都创建新的 LLM 实例，避免上下文窗口累积
             llm_model = self._create_llm_model()
-            response = llm_model.chat_until_success(prompt)  # type: ignore
+            response = llm_model.chat_until_success(prompt)
 
             # 使用确定的协议标记解析回答
             if "<!!!YES!!!>" in response:

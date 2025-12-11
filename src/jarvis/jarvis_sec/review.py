@@ -310,7 +310,7 @@ def run_review_agent_with_retry(
             try:
                 review_response = review_agent.model.chat_until_success(
                     full_review_prompt
-                )  # type: ignore
+                )
                 review_summary_container["text"] = review_response
             except Exception as e:
                 try:

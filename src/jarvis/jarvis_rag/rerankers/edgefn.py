@@ -106,6 +106,8 @@ class EdgeFnReranker(OnlineReranker):
                             "score",
                             item.get("relevance_score", item.get("relevance", 0.0)),
                         )
+                        if score is None:
+                            score = 0.0
                         results.append((index, float(score)))
                     elif isinstance(item, (int, float)):
                         # 如果直接是分数列表，使用索引作为位置

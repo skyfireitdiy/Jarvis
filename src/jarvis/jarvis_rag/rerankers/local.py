@@ -6,7 +6,7 @@ from typing import List, Optional
 import os
 
 from langchain.docstore.document import Document
-from sentence_transformers.cross_encoder import (  # type: ignore
+from sentence_transformers.cross_encoder import (
     CrossEncoder,
 )
 from huggingface_hub import snapshot_download
@@ -80,7 +80,7 @@ class LocalReranker(RerankerInterface):
 
         # 将文档与它们的分数结合并排序
         doc_with_scores = list(zip(documents, scores))
-        doc_with_scores.sort(key=lambda x: x[1], reverse=True)  # type: ignore
+        doc_with_scores.sort(key=lambda x: x[1], reverse=True)
 
         # 返回前N个文档
         reranked_docs = [doc for doc, score in doc_with_scores[:top_n]]

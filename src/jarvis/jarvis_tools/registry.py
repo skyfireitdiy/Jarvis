@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, cast
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
@@ -750,7 +750,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 调用大模型修复
             print("🤖 尝试使用大模型修复工具调用格式...")
-            fixed_content = agent_instance.model.chat_until_success(fix_prompt)  # type: ignore
+            fixed_content = agent_instance.model.chat_until_success(fix_prompt)
 
             if fixed_content:
                 print("✅ 大模型修复完成")
@@ -859,7 +859,11 @@ class ToolRegistry(OutputHandlerProtocol):
                 ToolRegistry._check_and_handle_multiple_tool_calls(content, data)
             )
             if has_multiple:
-                return cast(Dict[str, Dict[str, Any]], {}), error_msg, False
+                return (
+                    cast(Dict[str, Dict[str, Any]], {}),
+                    error_msg if error_msg else "",
+                    False,
+                )
             # 如果解析失败，可能是多个工具调用被当作一个 JSON 来解析了
             # 继续执行后续的宽松提取逻辑
 
@@ -907,7 +911,11 @@ class ToolRegistry(OutputHandlerProtocol):
                     )
                 )
                 if has_multiple:
-                    return cast(Dict[str, Dict[str, Any]], {}), error_msg, False
+                    return (
+                        cast(Dict[str, Dict[str, Any]], {}),
+                        error_msg if error_msg else "",
+                        False,
+                    )
 
                 # 找到开始标签的位置
                 open_tag_match = re.search(
@@ -972,12 +980,12 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
-                    fixed_content_2: Optional[str] = ToolRegistry._try_llm_fix(
+                    llm_fixed_content: Optional[str] = ToolRegistry._try_llm_fix(
                         content, agent, error_msg
                     )
-                    if fixed_content_2 is not None:
+                    if llm_fixed_content is not None:
                         # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(fixed_content_2, None)
+                        return ToolRegistry._extract_tool_calls(fixed_content, None)
 
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
@@ -1008,7 +1016,11 @@ class ToolRegistry(OutputHandlerProtocol):
                         )
                     )
                     if has_multiple:
-                        return cast(Dict[str, Dict[str, Any]], {}), error_msg, False
+                        return (
+                            cast(Dict[str, Dict[str, Any]], {}),
+                            error_msg if error_msg else "",
+                            False,
+                        )
 
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 error_msg = f"""Jsonnet 解析失败：{e}
@@ -1019,12 +1031,14 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 # 如果提供了agent且long_hint为空，尝试使用大模型修复
                 if agent is not None and not long_hint:
-                    fixed_content_2: Optional[str] = ToolRegistry._try_llm_fix(
+                    retry_fixed_content: Optional[str] = ToolRegistry._try_llm_fix(
                         content, agent, error_msg
                     )
-                    if fixed_content_2 is not None:
+                    if retry_fixed_content is not None:
                         # 递归调用自身，尝试解析修复后的内容
-                        return ToolRegistry._extract_tool_calls(fixed_content_2, None)
+                        return ToolRegistry._extract_tool_calls(
+                            retry_fixed_content, None
+                        )
 
                 # 如果大模型修复失败或未提供agent或long_hint不为空，返回错误
                 return (
@@ -1232,17 +1246,17 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 agent_instance_for_record: Agent = agent_instance
                 # 记录最后一次执行的工具
-                agent_instance_for_record.set_user_data("__last_executed_tool__", name)  # type: ignore
+                agent_instance_for_record.set_user_data("__last_executed_tool__", name)
                 # 记录本轮累计执行的工具列表
                 executed_list = agent_instance_for_record.get_user_data(
                     "__executed_tools__"
-                )  # type: ignore
+                )
                 if not isinstance(executed_list, list):
                     executed_list = []
                 executed_list.append(name)
                 agent_instance_for_record.set_user_data(
                     "__executed_tools__", executed_list
-                )  # type: ignore
+                )
             except Exception:
                 pass
 
@@ -1330,7 +1344,7 @@ class ToolRegistry(OutputHandlerProtocol):
             try:
                 from jarvis.jarvis_agent import Agent  # 延迟导入避免循环依赖
 
-                agent_instance_for_prompt: Agent = agent  # type: ignore
+                agent_instance_for_prompt: Agent = agent
                 usage_prompt = agent_instance_for_prompt.get_tool_usage_prompt()
             except Exception:
                 usage_prompt = tool_call_help

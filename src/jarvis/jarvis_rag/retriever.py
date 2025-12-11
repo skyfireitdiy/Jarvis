@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, cast
 import chromadb
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from rank_bm25 import BM25Okapi  # type: ignore
+from rank_bm25 import BM25Okapi
 
 from .embedding_interface import EmbeddingInterface
 
@@ -82,7 +82,7 @@ class ChromaRetriever:
                 with open(self.manifest_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 if isinstance(data, dict):
-                    return data  # type: ignore[return-value]
+                    return data
             except Exception:
                 pass
         return {}
@@ -126,7 +126,7 @@ class ChromaRetriever:
                     md5sum = self._compute_md5(src)
                     if md5sum:
                         entry["md5"] = md5sum
-                    manifest[src] = entry  # type: ignore[dict-item]
+                    manifest[src] = entry
                     updated += 1
             except Exception:
                 continue
@@ -243,7 +243,7 @@ class ChromaRetriever:
         delete_errors: List[str] = []
         for src in deleted:
             try:
-                self.collection.delete(where={"source": src})  # type: ignore[arg-type]
+                self.collection.delete(where={"source": src})
             except Exception as e:
                 delete_errors.append(f"删除源 '{src}' 时出错: {e}")
         if delete_errors:
@@ -257,7 +257,7 @@ class ChromaRetriever:
             try:
                 # 删除旧条目
                 try:
-                    self.collection.delete(where={"source": src})  # type: ignore[arg-type]
+                    self.collection.delete(where={"source": src})
                 except Exception:
                     pass
                 # 读取源文件内容（作为单文档载入，由 add_documents 进行拆分与嵌入）
@@ -403,7 +403,7 @@ class ChromaRetriever:
                 ]
 
             # 按分数排序并取最高结果
-            bm25_results_with_docs.sort(key=lambda x: x[2], reverse=True)  # type: ignore
+            bm25_results_with_docs.sort(key=lambda x: x[2], reverse=True)
 
             for doc_text, metadata, _ in bm25_results_with_docs[: n_results * 2]:
                 bm25_docs.append(Document(page_content=doc_text, metadata=metadata))
@@ -452,9 +452,7 @@ class ChromaRetriever:
                 for doc_text, metadata in zip(final_documents, final_metadatas):
                     if doc_text is not None and metadata is not None:
                         retrieved_docs.append(
-                            Document(
-                                page_content=cast(str, doc_text), metadata=metadata
-                            )
+                            Document(page_content=doc_text, metadata=metadata)
                         )
 
         return retrieved_docs

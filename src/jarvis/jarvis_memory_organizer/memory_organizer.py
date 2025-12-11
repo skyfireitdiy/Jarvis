@@ -193,9 +193,12 @@ class MemoryOrganizer:
 """
 
         try:
+            if self.platform is None:
+                raise ValueError("Platform is not initialized")
+
             # 调用大模型 - 收集完整响应
             response_parts = []
-            for chunk in self.platform.chat(prompt):  # type: ignore
+            for chunk in self.platform.chat(prompt):
                 response_parts.append(chunk)
             response = "".join(response_parts)
 
