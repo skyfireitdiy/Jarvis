@@ -227,10 +227,8 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             symbols = extract_symbols_from_file(abs_path)
 
             if symbols:
-                # Remove all original path tokens that map to this absolute path to avoid redundancy
-                for _raw in abs_to_raws.get(abs_path, []):
-                    user_input = user_input.replace(f"'{_raw}'", "")
-                # Append the formatted symbols output
+                # Keep the original path tokens and append symbol information as supplementary context
+                # This preserves the user's original reference to the file while adding symbol details
                 added_context += format_symbols_output(abs_path, symbols)
 
     if added_context:
