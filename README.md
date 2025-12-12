@@ -333,8 +333,8 @@ Jarvis 的主要配置文件位于 `~/.jarvis/config.yaml`。您可以在此文�
 # ~/.jarvis/config.yaml
 
 # 使用的模型平台
-JARVIS_PLATFORM: yuanbao
-JARVIS_MODEL: deep_seek_v3
+platform: yuanbao
+model: deep_seek_v3
 
 # 用于“思考”步骤的模型，通常选择能力更强的模型
 
@@ -350,7 +350,7 @@ ENV:
 * 如需全局启用错误回溯，请在配置中设置：
 
 ```yaml
-JARVIS_PRINT_ERROR_TRACEBACK: true
+print_error_traceback: true
 ```
 
 * 也可以在单次调用时通过传入 `traceback=True` 临时开启回溯打印。
@@ -362,7 +362,7 @@ JARVIS_PRINT_ERROR_TRACEBACK: true
 
 ```yaml
 # ~/.jarvis/config.yaml
-JARVIS_TOOL_FILTER_THRESHOLD: 30
+tool_filter_threshold: 30
 ```
 
 Jarvis 支持多种平台，包括 **Kimi**, **通义千问**, **OpenAI** 等。详细的配置选项、模型组设置以及所有可用参数，请参阅 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
