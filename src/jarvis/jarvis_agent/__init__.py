@@ -352,14 +352,24 @@ origin_agent_system_prompt = f"""
 - 应用系统思维确保操作的完整性
 - 使用批判性思维验证每个步骤
 
-**优先使用 task_list_manager 工具：**
-- **如果已创建任务列表**：必须优先使用 `task_list_manager` 工具的 `execute_task` 操作来执行任务
-- **任务执行流程**：
-  1. 使用 `get_task_list_summary` 查看任务列表状态，获取下一个待执行的任务
-  2. 使用 `execute_task` 执行任务，系统会自动创建子 Agent 并执行（需要提供additional_info参数）
-  3. 等待任务执行完成后，继续执行下一个任务
-- **任务状态管理**：系统会自动管理任务状态（running → completed/failed），无需手动更新
-- **依赖处理**：系统会自动处理任务依赖关系，确保按正确顺序执行
+🚨 **优先使用 task_list_manager 工具 - 关键强制执行**
+
+## ❗ **execute_task 调用必须包含 additional_info - 零容忍**
+
+**⚠️ 强制要求：任何 execute_task 调用如果缺少 additional_info 参数将立即失败**
+
+### 📋 强制任务执行流程：
+1. **检查任务状态**：使用 `get_task_list_summary` 查看任务列表状态，获取下一个待执行的任务
+2. **准备additional_info**：必须为每个任务提供详细上下文，不能为空
+3. **执行验证**：使用 `execute_task` 执行任务，系统自动创建子 Agent
+4. **状态管理**：系统自动管理任务状态（running → completed/failed）
+5. **依赖处理**：系统自动处理任务依赖关系，确保按正确顺序执行
+
+### 🔒 additional_info 强制规范：
+- **绝对必要**：每次 execute_task 调用必须提供
+- **不能空值**：空字符串、null或纯空格将导致执行失败
+- **必须详细**：需包含任务背景、关键信息、约束条件、预期结果
+- **格式标准**：建议使用结构化描述，便于子 Agent 理解
 
 **如果没有任务列表**：
 - 可以直接调用其他工具执行操作
