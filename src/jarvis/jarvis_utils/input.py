@@ -12,7 +12,7 @@
 import os
 import sys
 import base64
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Tuple
 import wcwidth
 from colorama import Fore
 from colorama import Style as ColoramaStyle
@@ -242,6 +242,61 @@ class FileCompleter(Completer):
         self._git_files_cache = None
         self._all_files_cache = None
         self._max_walk_files = 10000
+        # Cache for rules to avoid repeated loading
+        self._rules_cache = None
+
+    def _get_all_rules(self) -> List[Tuple[str, str]]:
+        """获取所有可用的规则，包括内置规则、文件规则和YAML规则
+
+        返回:
+            List[Tuple[str, str]]: (规则名称, 规则描述) 列表
+        """
+        if self._rules_cache is not None:
+            return self._rules_cache  # type: ignore
+
+        all_rules = []
+
+        try:
+            # 导入必要的模块
+            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+            import os
+
+            # 创建RulesManager实例
+            rules_manager = RulesManager(os.getcwd())
+
+            # 获取所有可用规则
+            available_rules = rules_manager.get_all_available_rule_names()
+
+            # 添加内置规则
+            if available_rules.get("builtin"):
+                for rule_name in available_rules["builtin"]:
+                    all_rules.append((rule_name, f"📚 内置规则: {rule_name}"))
+
+            # 添加文件规则
+            if available_rules.get("files"):
+                for rule_name in available_rules["files"]:
+                    all_rules.append((rule_name, f"📄 文件规则: {rule_name}"))
+
+            # 添加YAML规则
+            if available_rules.get("yaml"):
+                for rule_name in available_rules["yaml"]:
+                    all_rules.append((rule_name, f"📝 YAML规则: {rule_name}"))
+
+        except ImportError:
+            # 如果无法导入，只使用内置规则
+            try:
+                from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+
+                for rule_name in list_builtin_rules():
+                    all_rules.append((rule_name, f"📚 内置规则: {rule_name}"))
+            except ImportError:
+                pass
+        except Exception:
+            # 任何错误都静默处理
+            pass
+
+        self._rules_cache = all_rules
+        return all_rules
 
     def get_completions(
         self, document: Document, _: CompleteEvent
@@ -283,15 +338,10 @@ class FileCompleter(Completer):
                 (ot("Quiet"), "静默模式"),
             ]
         )
-        # 添加内置规则到补全列表
-        try:
-            from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
-
-            all_completions.extend(
-                [(f"<rule:{rule_name}>", "Rule") for rule_name in list_builtin_rules()]
-            )
-        except ImportError:
-            pass
+        # 添加所有规则（包括内置规则、文件规则、YAML规则）到补全列表
+        rules = self._get_all_rules()
+        for rule_name, rule_desc in rules:
+            all_completions.append((f"<rule:{rule_name}>", rule_desc))
 
         # File path candidates
         try:

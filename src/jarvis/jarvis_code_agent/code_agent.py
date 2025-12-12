@@ -969,6 +969,7 @@ def _print_available_rules(
         from rich.console import Console
 
         console = Console()
+        print("🔍 正在加载规则信息...")  # 调试信息
 
         # 获取所有可用规则
         all_rules = rules_manager.get_all_available_rule_names()
@@ -985,7 +986,7 @@ def _print_available_rules(
                     loaded_rules.append(rule_name)
 
         # 检查项目规则和全局规则
-        has_project_rule = rules_manager.read_project_rules() is not None
+        has_project_rule = rules_manager.read_project_rule() is not None
         has_global_rule = rules_manager.read_global_rules() is not None
 
         # 构建规则信息内容
@@ -1125,9 +1126,12 @@ def _print_available_rules(
             )
 
             console.print(panel)
-    except Exception:
-        # 静默失败，不影响主流程
-        pass
+    except Exception as e:
+        # 显示错误信息而不是静默失败
+        print(f"⚠️ 规则信息显示失败: {e}")
+        import traceback
+
+        traceback.print_exc()
 
 
 def main() -> None:
