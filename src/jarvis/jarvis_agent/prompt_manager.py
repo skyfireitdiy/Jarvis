@@ -62,7 +62,7 @@ class PromptManager:
 **使用流程：**
 1. **第一步：识别是否需要拆分** - 如果任务符合上述类型，立即使用 `add_tasks` 创建任务列表
 2. **同时拆分任务** - 在 `add_tasks` 时同时提供 `main_goal` 和 `tasks_info`，一次性创建并添加所有子任务
-3. **执行任务** - 使用 `execute_task` 逐个执行任务，系统会自动创建子 Agent
+3. **执行任务** - 使用 `execute_task` 逐个执行任务，系统会自动创建子 Agent（需要提供additional_info参数）
 
 **核心功能：**
 - 创建任务列表并添加任务：使用 `add_tasks` 操作，可同时提供 `tasks_info` 一次性创建并添加所有任务

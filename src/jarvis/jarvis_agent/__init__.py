@@ -356,7 +356,7 @@ origin_agent_system_prompt = f"""
 - **如果已创建任务列表**：必须优先使用 `task_list_manager` 工具的 `execute_task` 操作来执行任务
 - **任务执行流程**：
   1. 使用 `get_task_list_summary` 查看任务列表状态，获取下一个待执行的任务
-  2. 使用 `execute_task` 执行任务，系统会自动创建子 Agent 并执行
+  2. 使用 `execute_task` 执行任务，系统会自动创建子 Agent 并执行（需要提供additional_info参数）
   3. 等待任务执行完成后，继续执行下一个任务
 - **任务状态管理**：系统会自动管理任务状态（running → completed/failed），无需手动更新
 - **依赖处理**：系统会自动处理任务依赖关系，确保按正确顺序执行

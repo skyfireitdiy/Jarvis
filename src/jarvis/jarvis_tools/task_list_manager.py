@@ -171,6 +171,7 @@ class task_list_manager:
                 table.add_column("优先级", justify="center", width=8)
                 table.add_column("Agent类型", width=10)
                 table.add_column("依赖", width=20)
+                table.add_column("任务描述", style="dim", width=40)
 
                 # 按优先级和创建时间排序
                 sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
@@ -195,6 +196,13 @@ class task_list_manager:
                     if len(task.dependencies) > 3:
                         deps_text += f" (+{len(task.dependencies) - 3})"
 
+                    # 格式化任务描述
+                    desc_text = task.task_desc
+                    if len(desc_text) > 37:
+                        desc_text = desc_text[:34] + "..."
+                    elif not desc_text:
+                        desc_text = "-"
+
                     table.add_row(
                         task.task_id,
                         task.task_name[:28] + "..."
@@ -204,6 +212,7 @@ class task_list_manager:
                         str(task.priority),
                         task.agent_type.value,
                         deps_text if task.dependencies else "-",
+                        desc_text,
                     )
 
                 console.print(table)
@@ -620,12 +629,27 @@ class task_list_manager:
                 "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
             }
         task_id = args.get("task_id")
+        additional_info = args.get("additional_info")
 
         if not task_id:
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少 task_id 参数",
+            }
+
+        if additional_info is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 additional_info 参数",
+            }
+
+        if not additional_info or not str(additional_info).strip():
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "additional_info 参数不能为空",
             }
 
         task, success, error_msg = task_list_manager.get_task_detail(
@@ -757,12 +781,27 @@ class task_list_manager:
                 "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
             }
         task_id = args.get("task_id")
+        additional_info = args.get("additional_info")
 
         if not task_id:
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少 task_id 参数",
+            }
+
+        if additional_info is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 additional_info 参数",
+            }
+
+        if not additional_info or not str(additional_info).strip():
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "additional_info 参数不能为空",
             }
 
         # 获取任务详情
@@ -821,15 +860,26 @@ class task_list_manager:
             }
 
         try:
+            # 合并任务描述和附加信息
+            merged_description = task.task_desc
+            if additional_info and str(additional_info).strip():
+                # 使用清晰的分隔符合并原有描述和附加信息
+                separator = "\n" + "=" * 50 + "\n"
+                merged_description = (
+                    f"{task.task_desc}{separator}附加信息:\n{additional_info}"
+                )
+
+                # 实际更新任务的desc字段，使打印时可见
+                task.task_desc = merged_description
+
             # 构建任务执行内容
             task_content = f"""任务名称: {task.task_name}
 
 任务描述:
-{task.task_desc}
+{merged_description}
 
 预期输出:
-{task.expected_output}
-"""
+{task.expected_output}"""
 
             # 构建背景信息
             background_parts = []
