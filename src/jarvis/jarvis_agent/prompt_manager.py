@@ -8,6 +8,7 @@ PromptManager: 统一管理 Agent 的系统提示词与附加提示词的构建�
 - 保持与现有工具/记忆系统兼容
 """
 
+import shutil
 from typing import TYPE_CHECKING
 
 from jarvis.jarvis_tools.registry import ToolRegistry
@@ -81,11 +82,45 @@ class PromptManager:
 </task_list_manager_guide>
 """
 
+        system_tools_info = self._get_system_tools_info()
+
         return f"""
 {self.agent.system_prompt}
 
-{action_prompt}{task_list_manager_note}
+{action_prompt}{task_list_manager_note}{system_tools_info}
 """
+
+    # ----------------------------
+    # 系统工具信息
+    # ----------------------------
+    def _get_system_tools_info(self) -> str:
+        """
+        检测并返回rg和fd命令的安装状态信息。
+
+        返回:
+            str: 格式化的系统工具信息字符串，供AI助手了解可用工具
+        """
+        tools = []
+
+        # 检测rg命令
+        rg_installed = shutil.which("rg") is not None
+        tools.append(f"rg_available: {rg_installed}")
+
+        # 检测fd命令
+        fd_installed = shutil.which("fd") is not None
+        tools.append(f"fd_available: {fd_installed}")
+
+        return (
+            """
+<system_info>
+可用工具:
+"""
+            + "\n".join(f"- {tool}" for tool in tools)
+            + """
+- rg: 递归快速搜索文件内容（ripgrep）
+- fd: 快速查找文件（fd-find）
+</system_info>"""
+        )
 
     # ----------------------------
     # 附加提示词构建
