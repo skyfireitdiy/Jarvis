@@ -59,10 +59,11 @@ class PromptManager:
 - **需要不同Agent类型的任务**：部分任务需要代码Agent，部分需要通用Agent（如：代码实现 + 文档编写）
 - **需要分阶段验证的任务**：每个阶段完成后需要验证，再继续下一步（如：先实现基础功能，测试通过后再添加高级特性）
 
-**使用流程：**
+**🚨 强制使用流程：**
 1. **第一步：识别是否需要拆分** - 如果任务符合上述类型，立即使用 `add_tasks` 创建任务列表
 2. **同时拆分任务** - 在 `add_tasks` 时同时提供 `main_goal` 和 `tasks_info`，一次性创建并添加所有子任务
-3. **执行任务** - 使用 `execute_task` 逐个执行任务，系统会自动创建子 Agent（需要提供additional_info参数）
+3. **强制准备additional_info** - 每次使用 `execute_task` 前必须准备详细的 additional_info 参数
+4. **执行任务** - 使用 `execute_task` 逐个执行任务，系统会自动创建子 Agent
 
 **核心功能：**
 - 创建任务列表并添加任务：使用 `add_tasks` 操作，可同时提供 `tasks_info` 一次性创建并添加所有任务
