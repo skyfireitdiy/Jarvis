@@ -10,7 +10,7 @@ AgentRunLoop: 承载 Agent 的主运行循环逻辑。
 
 import os
 from enum import Enum
-from typing import Any, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
 from jarvis.jarvis_agent.utils import (
@@ -41,6 +41,11 @@ class AgentRunLoop:
         max_input_tokens = get_max_input_token_count(self.agent.model_group)
         self.summary_remaining_token_threshold = int(max_input_tokens * 0.2)
         self.conversation_turn_threshold = get_conversation_turn_threshold()
+        # diff内容的token阈值（10%的输入窗口大小）
+        self.diff_token_threshold = int(max_input_tokens * 0.1)
+
+        # Git diff相关属性
+        self._git_diff: Optional[str] = None  # 缓存git diff内容
 
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
@@ -63,6 +68,19 @@ class AgentRunLoop:
                     or self.conversation_rounds > self.conversation_turn_threshold
                 )
                 if should_summarize:
+                    # 在总结前获取git diff（仅对CodeAgent类型）
+                    try:
+                        if (
+                            hasattr(self.agent, "start_commit")
+                            and self.agent.start_commit
+                        ):
+                            self._git_diff = self.get_git_diff()
+                        else:
+                            self._git_diff = None
+                    except Exception as e:
+                        print(f"⚠️ 获取git diff失败: {str(e)}")
+                        self._git_diff = f"获取git diff失败: {str(e)}"
+
                     summary_text = self.agent._summarize_and_clear_history()
                     if summary_text:
                         # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
@@ -100,6 +118,15 @@ class AgentRunLoop:
                     current_response = current_response.replace(
                         ot("!!!SUMMARY!!!"), ""
                     ).strip()
+                    # 在总结前获取git diff（仅对CodeAgent类型）
+                    try:
+                        if hasattr(ag, "start_commit") and ag.start_commit:
+                            self._git_diff = self.get_git_diff()
+                        else:
+                            self._git_diff = None
+                    except Exception as e:
+                        print(f"⚠️ 获取git diff失败: {str(e)}")
+                        self._git_diff = f"获取git diff失败: {str(e)}"
                     # 触发总结并清空历史
                     summary_text = ag._summarize_and_clear_history()
                     if summary_text:
@@ -221,8 +248,116 @@ class AgentRunLoop:
                     run_input_handlers = True
                     continue
                 elif action == "complete":
+                    # 获取git diff信息
+                    try:
+                        self._git_diff = self.get_git_diff()
+                    except Exception as e:
+                        print(f"⚠️ 获取git diff失败: {str(e)}")
+                        self._git_diff = f"获取git diff失败: {str(e)}"
                     return ag._complete_task(auto_completed=False)
 
             except Exception as e:
                 print(f"❌ 任务失败: {str(e)}")
                 return f"Task failed: {str(e)}"
+
+    def get_git_diff(self) -> str:
+        """获取从起始commit到当前commit的git diff
+
+        返回:
+            str: git diff内容，如果无法获取则返回错误信息
+        """
+        try:
+            from jarvis.jarvis_utils.git_utils import (
+                get_diff_between_commits,
+                get_latest_commit_hash,
+            )
+
+            # 获取agent实例
+            agent = self.agent
+
+            # 检查agent是否有start_commit属性
+            if not hasattr(agent, "start_commit") or not agent.start_commit:
+                return "无法获取起始commit哈希值"
+
+            start_commit = agent.start_commit
+            current_commit = get_latest_commit_hash()
+
+            if not current_commit:
+                return "无法获取当前commit哈希值"
+
+            if start_commit == current_commit:
+                return (
+                    "# 没有检测到代码变更\n\n起始commit和当前commit相同，没有代码变更。"
+                )
+
+            # 获取diff
+            diff_content = get_diff_between_commits(start_commit, current_commit)
+
+            # 检查并处理token数量限制
+            model_group = agent.model_group or "default"
+            return self._check_diff_token_limit(diff_content, model_group)
+
+        except Exception as e:
+            return f"获取git diff失败: {str(e)}"
+
+    def get_cached_git_diff(self) -> Optional[str]:
+        """获取已缓存的git diff信息
+
+        返回:
+            Optional[str]: 已缓存的git diff内容，如果尚未获取则返回None
+        """
+        return self._git_diff
+
+    def has_git_diff(self) -> bool:
+        """检查是否有可用的git diff信息
+
+        返回:
+            bool: 如果有可用的git diff信息返回True，否则返回False
+        """
+        return self._git_diff is not None and bool(self._git_diff.strip())
+
+    def _check_diff_token_limit(self, diff_content: str, model_group: str) -> str:
+        """检查diff内容的token限制并返回适当的diff内容
+
+        参数:
+            diff_content: 原始的diff内容
+            model_group: 模型组名称
+
+        返回:
+            str: 处理后的diff内容（可能是原始内容或截断后的内容）
+        """
+        from jarvis.jarvis_utils.embedding import get_context_token_count
+
+        # 检查token数量限制
+        max_input_tokens = get_max_input_token_count(model_group)
+        # 预留一部分token用于其他内容，使用80%作为diff的限制
+        max_diff_tokens = int(max_input_tokens * 0.8)
+
+        diff_token_count = get_context_token_count(diff_content)
+
+        if diff_token_count <= max_diff_tokens:
+            return diff_content
+
+        # 如果diff内容太大，进行截断
+        lines = diff_content.split("\n")
+        truncated_lines = []
+        current_tokens = 0
+
+        for line in lines:
+            line_tokens = get_context_token_count(line)
+            if current_tokens + line_tokens > max_diff_tokens:
+                # 添加截断提示
+                truncated_lines.append("")
+                truncated_lines.append("# ⚠️ diff内容过大，已截断显示")
+                truncated_lines.append(
+                    f"# 原始diff共 {len(lines)} 行，{diff_token_count} tokens"
+                )
+                truncated_lines.append(
+                    f"# 显示前 {len(truncated_lines)} 行，约 {current_tokens} tokens"
+                )
+                break
+
+            truncated_lines.append(line)
+            current_tokens += line_tokens
+
+        return "\n".join(truncated_lines)

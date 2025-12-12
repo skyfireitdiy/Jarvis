@@ -1282,10 +1282,38 @@ class Agent:
         # token限制触发的summary，使用SUMMARY_REQUEST_PROMPT
         summary = self.generate_summary(for_token_limit=True)
 
+        # 获取git diff信息
+        git_diff_info = ""
+        try:
+            # 尝试从 AgentRunLoop 获取已缓存的 git diff
+            from jarvis.jarvis_agent.run_loop import AgentRunLoop
+
+            if hasattr(self, "_agent_run_loop") and isinstance(
+                self._agent_run_loop, AgentRunLoop
+            ):
+                agent_run_loop = self._agent_run_loop
+            else:
+                # 创建临时 AgentRunLoop 实例来获取 git diff
+                agent_run_loop = AgentRunLoop(self)
+
+            if agent_run_loop.has_git_diff():
+                cached_diff = agent_run_loop.get_cached_git_diff()
+                git_diff_info = cached_diff or ""
+            else:
+                # 如果还没有缓存，直接获取
+                git_diff_info = agent_run_loop.get_git_diff()
+        except Exception as e:
+            git_diff_info = f"获取git diff失败: {str(e)}"
+
         # 先获取格式化的摘要消息
         formatted_summary = ""
         if summary:
             formatted_summary = self._format_summary_message(summary)
+
+        # 添加git diff信息到摘要中
+        if git_diff_info and git_diff_info.strip():
+            diff_section = f"\n\n## 代码变更摘要\n```\n{git_diff_info}\n```"
+            formatted_summary += diff_section
 
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
@@ -1689,6 +1717,7 @@ class Agent:
         """主运行循环"""
         # 委派至独立的运行循环类，保持行为一致
         loop = AgentRunLoop(self)
+        self._agent_run_loop = loop  # 存储引用以便其他方法访问
         return loop.run()
 
     def set_non_interactive(self, value: bool) -> None:
