@@ -245,6 +245,49 @@ class FileCompleter(Completer):
         # Cache for rules to avoid repeated loading
         self._rules_cache = None
 
+    def _get_all_rule_completions(self) -> List[str]:
+        """获取所有规则补全项的统一接口
+
+        返回:
+            List[str]: 格式为"<rule:{rule_name}>"的规则列表
+        """
+        all_rules = []
+        try:
+            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+            import os
+
+            rules_manager = RulesManager(os.getcwd())
+            available_rules = rules_manager.get_all_available_rule_names()
+
+            # 添加内置规则
+            if available_rules.get("builtin"):
+                for rule_name in available_rules["builtin"]:
+                    all_rules.append(f"<rule:{rule_name}>")
+
+            # 添加文件规则
+            if available_rules.get("files"):
+                for rule_name in available_rules["files"]:
+                    all_rules.append(f"<rule:{rule_name}>")
+
+            # 添加YAML规则
+            if available_rules.get("yaml"):
+                for rule_name in available_rules["yaml"]:
+                    all_rules.append(f"<rule:{rule_name}>")
+        except ImportError:
+            # 如果无法导入，只使用内置规则
+            try:
+                from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+
+                for rule_name in list_builtin_rules():
+                    all_rules.append(f"<rule:{rule_name}>")
+            except ImportError:
+                pass
+        except Exception:
+            # 任何错误都静默处理
+            pass
+
+        return all_rules
+
     def _get_all_rules(self) -> List[Tuple[str, str]]:
         """获取所有可用的规则，包括内置规则、文件规则和YAML规则
 
@@ -421,7 +464,107 @@ class FileCompleter(Completer):
         return tag
 
 
-# ---------------------
+def get_all_rules_formatted() -> List[str]:
+    """
+    获取所有可用规则的格式化列表，包括内置、文件和YAML规则。
+
+    返回:
+        List[str]: 格式化的规则列表，每个规则以"<rule:规则名>"格式返回
+
+    异常处理:
+        - 处理RulesManager导入失败的情况
+        - 处理内置规则导入失败的情况
+        - 在任何错误情况下返回空列表而不是抛出异常
+    """
+    all_rules = []
+    try:
+        try:
+            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+            import os
+
+            rules_manager = RulesManager(os.getcwd())
+            available_rules = rules_manager.get_all_available_rule_names()
+
+            # 添加内置规则
+            if available_rules.get("builtin"):
+                for rule_name in available_rules["builtin"]:
+                    all_rules.append(f"<rule:{rule_name}>")
+
+            # 添加文件规则
+            if available_rules.get("files"):
+                for rule_name in available_rules["files"]:
+                    all_rules.append(f"<rule:{rule_name}>")
+
+            # 添加YAML规则
+            if available_rules.get("yaml"):
+                for rule_name in available_rules["yaml"]:
+                    all_rules.append(f"<rule:{rule_name}>")
+        except ImportError:
+            # 如果无法导入RulesManager，只使用内置规则
+            try:
+                from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+
+                for rule_name in list_builtin_rules():
+                    all_rules.append(f"<rule:{rule_name}>")
+            except ImportError:
+                pass
+    except Exception:
+        # 任何异常都返回空列表
+        all_rules = []
+
+    return all_rules
+
+
+def _get_fzf_completion_items(specials: List[str], files: List[str]) -> List[str]:
+    """
+    获取fzf补全所需的完整项目列表。
+
+    该函数统一处理fzf补全所需的各类项目，包括特殊符号、内置标签、规则、文件等，
+    消除了两处fzf补全代码中的重复逻辑。
+
+    参数:
+        specials: 特殊符号列表
+        files: 文件列表
+
+    返回:
+        List[str]: 合并后的完整项目列表，按特定顺序排列
+    """
+    items = []
+
+    # 添加特殊符号（过滤空字符串）
+    items.extend([s for s in specials if isinstance(s, str) and s.strip()])
+
+    # 添加内置标签
+    try:
+        from jarvis.jarvis_utils.config import get_replace_map
+        from jarvis.jarvis_utils.tag import ot
+
+        replace_map = get_replace_map()
+        builtin_tags = [
+            ot(tag)
+            for tag in replace_map.keys()
+            if isinstance(tag, str) and tag.strip()
+        ]
+        items.extend(builtin_tags)
+    except Exception:
+        # 标签获取失败时跳过
+        pass
+
+    # 添加规则
+    try:
+        builtin_rules = get_all_rules_formatted()
+        items.extend(builtin_rules)
+    except Exception:
+        # 规则获取失败时跳过
+        pass
+
+    # 添加文件
+    items.extend(files)
+
+    return items
+
+
+# -+
 # 公共判定辅助函数（按当前Agent优先）
 # ---------------------
 def _get_current_agent_for_input():
@@ -895,32 +1038,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             ]
                         except Exception:
                             specials = []
-                        try:
-                            replace_map = get_replace_map()
-                            builtin_tags = [
-                                ot(tag)
-                                for tag in replace_map.keys()
-                                if isinstance(tag, str) and tag.strip()
-                            ]
-                        except Exception:
-                            builtin_tags = []
-                        try:
-                            from jarvis.jarvis_code_agent.builtin_rules import (
-                                list_builtin_rules,
-                            )
-
-                            builtin_rules = [
-                                f"<rule:{rule_name}>"
-                                for rule_name in list_builtin_rules()
-                            ]
-                        except Exception:
-                            builtin_rules = []
-                        items = (
-                            [s for s in specials if isinstance(s, str) and s.strip()]
-                            + builtin_tags
-                            + builtin_rules
-                            + files
-                        )
+                        items = _get_fzf_completion_items(specials, files)
                         proc = subprocess.run(
                             [
                                 "fzf",
@@ -1030,32 +1148,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             ]
                         except Exception:
                             specials = []
-                        try:
-                            replace_map = get_replace_map()
-                            builtin_tags = [
-                                ot(tag)
-                                for tag in replace_map.keys()
-                                if isinstance(tag, str) and tag.strip()
-                            ]
-                        except Exception:
-                            builtin_tags = []
-                        try:
-                            from jarvis.jarvis_code_agent.builtin_rules import (
-                                list_builtin_rules,
-                            )
-
-                            builtin_rules = [
-                                f"<rule:{rule_name}>"
-                                for rule_name in list_builtin_rules()
-                            ]
-                        except Exception:
-                            builtin_rules = []
-                        items = (
-                            [s for s in specials if isinstance(s, str) and s.strip()]
-                            + builtin_tags
-                            + builtin_rules
-                            + files
-                        )
+                        items = _get_fzf_completion_items(specials, files)
                         proc = subprocess.run(
                             [
                                 "fzf",
