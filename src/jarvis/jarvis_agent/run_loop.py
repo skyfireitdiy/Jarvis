@@ -248,12 +248,6 @@ class AgentRunLoop:
                     run_input_handlers = True
                     continue
                 elif action == "complete":
-                    # 获取git diff信息
-                    try:
-                        self._git_diff = self.get_git_diff()
-                    except Exception as e:
-                        print(f"⚠️ 获取git diff失败: {str(e)}")
-                        self._git_diff = f"获取git diff失败: {str(e)}"
                     return ag._complete_task(auto_completed=False)
 
             except Exception as e:
