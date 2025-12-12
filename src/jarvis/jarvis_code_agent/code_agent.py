@@ -1006,11 +1006,47 @@ def _print_available_rules(
                 builtin_text.append(rule, style="yellow")
             content_parts.append(builtin_text)
 
-        # 文件规则
+        # 用户自定义规则
+        user_custom_rules = file_rules + yaml_rules
+        if user_custom_rules:
+            has_any_rules = True
+            user_text = Text()
+            user_text.append("👤 用户自定义规则 ", style="bold green")
+            user_text.append(f"({len(user_custom_rules)} 个): ", style="dim")
+
+            # 分别显示文件规则和YAML规则
+            custom_rules_parts = []
+            if file_rules:
+                file_part = Text()
+                file_part.append("文件规则: ", style="blue")
+                for i, rule in enumerate(file_rules):
+                    if i > 0:
+                        file_part.append(", ", style="dim")
+                    file_part.append(rule, style="cyan")
+                custom_rules_parts.append(file_part)
+
+            if yaml_rules:
+                yaml_part = Text()
+                yaml_part.append("YAML规则: ", style="magenta")
+                for i, rule in enumerate(yaml_rules):
+                    if i > 0:
+                        yaml_part.append(", ", style="dim")
+                    yaml_part.append(rule, style="magenta")
+                custom_rules_parts.append(yaml_part)
+
+            # 合并显示自定义规则
+            for i, part in enumerate(custom_rules_parts):
+                if i > 0:
+                    user_text.append(" | ", style="dim")
+                user_text.append(part)
+
+            content_parts.append(user_text)
+
+        # 分别显示详细的文件规则和YAML规则（保留原有详细信息）
         if file_rules:
             has_any_rules = True
             file_text = Text()
-            file_text.append("📄 文件规则 ", style="bold blue")
+            file_text.append("📄 详细文件规则 ", style="bold blue")
             file_text.append(f"({len(file_rules)} 个): ", style="dim")
             for i, rule in enumerate(file_rules):
                 if i > 0:
@@ -1018,11 +1054,10 @@ def _print_available_rules(
                 file_text.append(rule, style="cyan")
             content_parts.append(file_text)
 
-        # YAML 规则
         if yaml_rules:
             has_any_rules = True
             yaml_text = Text()
-            yaml_text.append("📝 YAML规则 ", style="bold magenta")
+            yaml_text.append("📝 详细YAML规则 ", style="bold magenta")
             yaml_text.append(f"({len(yaml_rules)} 个): ", style="dim")
             for i, rule in enumerate(yaml_rules):
                 if i > 0:
