@@ -64,8 +64,8 @@ class RulesManager:
             all_dirs_for_update.append(self.central_repo_path)
         daily_check_git_updates(all_dirs_for_update, "rules")
 
-    def read_project_rules(self) -> Optional[str]:
-        """读取 .jarvis/rules 内容，如果存在则返回字符串，否则返回 None"""
+    def read_project_rule(self) -> Optional[str]:
+        """读取 .jarvis/rule 文件内容，如果存在则返回字符串，否则返回 None"""
         try:
             rules_path = os.path.join(self.root_dir, ".jarvis", "rule")
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
@@ -132,7 +132,7 @@ class RulesManager:
                 # 如果没有 rules 子目录，直接使用中心仓库根目录
                 all_dirs.append(self.central_repo_path)
         # 优先级 2: 项目 rules 目录
-        project_rules_dir = os.path.join(self.root_dir, "rules")
+        project_rules_dir = os.path.join(self.root_dir, ".jarvis", "rules")
         if os.path.exists(project_rules_dir) and os.path.isdir(project_rules_dir):
             all_dirs.append(project_rules_dir)
         # 优先级 3-N: 配置的规则目录（不包括中心库）
@@ -154,7 +154,7 @@ class RulesManager:
             ):
                 yaml_files.append(("中心库", central_rules_yaml))
         # 优先级 2: 项目 rules.yaml
-        project_rules_yaml = os.path.join(self.root_dir, "rules.yaml")
+        project_rules_yaml = os.path.join(self.root_dir, ".jarvis", "rules.yaml")
         if os.path.exists(project_rules_yaml) and os.path.isfile(project_rules_yaml):
             yaml_files.append(("项目", project_rules_yaml))
         # 优先级 3: 全局 rules.yaml
@@ -277,7 +277,7 @@ class RulesManager:
         loaded_rule_names: List[str] = []
 
         global_rules = self.read_global_rules()
-        project_rules = self.read_project_rules()
+        project_rules = self.read_project_rule()
 
         if global_rules:
             combined_parts.append(global_rules)
