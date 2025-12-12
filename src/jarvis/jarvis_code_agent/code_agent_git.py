@@ -108,11 +108,11 @@ class GitManager:
                 "*.py[cod]",  # 任何目录下的编译文件
                 "*$py.class",
                 ".Python",
-                "/env/",  # 只在根目录
-                "/venv/",  # 只在根目录
-                "/.venv/",  # 只在根目录
-                "/build/",  # 只在根目录
-                "/dist/",  # 只在根目录
+                "env/",  # 只在根目录
+                "venv/",  # 只在根目录
+                ".venv/",  # 只在根目录
+                "build/",  # 只在根目录
+                "dist/",  # 只在根目录
                 "develop-eggs/",
                 "downloads/",
                 "eggs/",
@@ -141,37 +141,37 @@ class GitManager:
                 ".pytype/",
             ],
             "Rust": [
-                "/target/",  # 只在根目录
+                "target/",  # 只在根目录
             ],
             "Node": [
-                "/node_modules/",  # 只在根目录
+                "node_modules/",  # 只在根目录
                 "npm-debug.log*",
                 "yarn-debug.log*",
                 "yarn-error.log*",
                 "pnpm-debug.log*",
                 "lerna-debug.log*",
-                "/dist/",  # 只在根目录
+                "dist/",  # 只在根目录
                 "coverage/",
-                "/.turbo/",  # 只在根目录
-                "/.next/",  # 只在根目录
-                "/.nuxt/",  # 只在根目录
-                "/out/",  # 只在根目录
+                ".turbo/",  # 只在根目录
+                ".next/",  # 只在根目录
+                ".nuxt/",  # 只在根目录
+                "out/",  # 只在根目录
             ],
             "Go": [
                 # 注意：不忽略 bin/，因为这个目录可能存放源码
-                "/vendor/",  # 只在根目录
+                "vendor/",  # 只在根目录
                 "coverage.out",
             ],
             "Java": [
-                "/target/",  # 只在根目录
+                "target/",  # 只在根目录
                 "*.class",  # 任何目录下的编译文件
-                "/.gradle/",  # 只在根目录
-                "/build/",  # 只在根目录
-                "/out/",  # 只在根目录
+                ".gradle/",  # 只在根目录
+                "build/",  # 只在根目录
+                "out/",  # 只在根目录
             ],
             "C/C++": [
-                "/build/",  # 只在根目录
-                "/cmake-build-*/",  # 只在根目录
+                "build/",  # 只在根目录
+                "cmake-build-*/",  # 只在根目录
                 "*.o",  # 任何目录下的编译文件
                 "*.a",
                 "*.so",
@@ -183,7 +183,7 @@ class GitManager:
             ],
             ".NET": [
                 # 注意：不忽略 bin/，因为这个目录可能存放源码
-                "/obj/",  # 只在根目录
+                "obj/",  # 只在根目录
             ],
         }
 
