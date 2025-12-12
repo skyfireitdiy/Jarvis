@@ -44,8 +44,8 @@ class ReadCodeTool:
             if agent and hasattr(agent, "model"):
                 try:
                     remaining_tokens = agent.model.get_remaining_token_count()
-                    # 使用剩余token的2/3作为限制，保留1/3作为安全余量
-                    limit_tokens = int(remaining_tokens * 2 / 3)
+                    # 使用剩余token的1/2作为限制，保留1/2作为安全余量
+                    limit_tokens = int(remaining_tokens * 1 / 2)
                     # 确保至少返回一个合理的值
                     if limit_tokens > 0:
                         return limit_tokens
@@ -57,8 +57,8 @@ class ReadCodeTool:
             model_group = get_global_model_group()
 
             max_input_tokens = get_max_input_token_count(model_group)
-            # 计算2/3限制的token数
-            limit_tokens = int(max_input_tokens * 2 / 3)
+            # 计算1/2限制的token数
+            limit_tokens = int(max_input_tokens * 1 / 2)
             return limit_tokens
         except Exception:
             # 如果获取失败，使用默认值（假设128000 token，2/3是85333）
