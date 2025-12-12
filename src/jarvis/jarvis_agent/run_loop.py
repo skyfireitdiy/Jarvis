@@ -23,6 +23,8 @@ from jarvis.jarvis_utils.config import (
     get_conversation_turn_threshold,
 )
 
+from jarvis.jarvis_utils.tag import ot
+
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
     from . import Agent  # noqa: F401
@@ -90,12 +92,13 @@ class AgentRunLoop:
                 ag.session.prompt = ""
                 run_input_handlers = False
 
-                # 检查是否包含 <!!!SUMMARY!!!> 标记，触发总结并清空历史
-                if "<!!!SUMMARY!!!>" in current_response:
-                    print("ℹ️ 检测到 <!!!SUMMARY!!!> 标记，正在触发总结并清空历史...")
+                if ot("!!!SUMMARY!!!") in current_response:
+                    print(
+                        f"ℹ️ 检测到 {ot('!!!SUMMARY!!!')} 标记，正在触发总结并清空历史..."
+                    )
                     # 移除标记，避免在后续处理中出现
                     current_response = current_response.replace(
-                        "<!!!SUMMARY!!!>", ""
+                        ot("!!!SUMMARY!!!"), ""
                     ).strip()
                     # 触发总结并清空历史
                     summary_text = ag._summarize_and_clear_history()
