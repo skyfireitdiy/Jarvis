@@ -1320,8 +1320,24 @@ class Agent:
         if summary:
             formatted_summary = self._format_summary_message(summary)
 
-        # 添加git diff信息到摘要中
-        if git_diff_info and git_diff_info.strip():
+        # 添加git diff信息到摘要中 - 只显示有效的代码变更
+        is_valid_git_diff = (
+            git_diff_info
+            and git_diff_info.strip()
+            and
+            # 过滤错误信息（获取失败等）
+            not git_diff_info.startswith("获取git diff失败")
+            and not git_diff_info.startswith("Failed to get git diff")
+            and
+            # 过滤无变更提示
+            "没有检测到代码变更" not in git_diff_info
+            and "No code changes detected" not in git_diff_info
+            and
+            # 确保包含实际代码变更（diff格式）
+            "diff --git" in git_diff_info
+        )
+
+        if is_valid_git_diff:
             diff_section = f"\n\n## 代码变更摘要\n```\n{git_diff_info}\n```"
             formatted_summary += diff_section
 
