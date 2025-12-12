@@ -171,7 +171,7 @@ class task_list_manager:
                 table.add_column("优先级", justify="center", width=8)
                 table.add_column("Agent类型", width=10)
                 table.add_column("依赖", width=20)
-                table.add_column("任务描述", style="dim", width=40)
+                table.add_column("任务描述", style="dim", width=40, no_wrap=False)
 
                 # 按优先级和创建时间排序
                 sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
@@ -198,8 +198,8 @@ class task_list_manager:
 
                     # 格式化任务描述
                     desc_text = task.task_desc
-                    if len(desc_text) > 37:
-                        desc_text = desc_text[:34] + "..."
+                    if len(desc_text) > 150:
+                        desc_text = desc_text[:147] + "..."
                     elif not desc_text:
                         desc_text = "-"
 
