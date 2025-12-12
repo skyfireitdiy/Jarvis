@@ -7,7 +7,6 @@
 import json
 import os
 import time
-import uuid
 from collections import OrderedDict
 from enum import Enum
 from typing import Dict, List, Optional, Set, Tuple
@@ -54,8 +53,14 @@ class Task:
 
     def __post_init__(self):
         """验证字段约束。"""
-        # 验证 task_id 格式
-        if not self.task_id.startswith("task-") or len(self.task_id) != 21:
+        # 验证 task_id 格式（支持数字ID格式：task-数字）
+        if not self.task_id.startswith("task-"):
+            raise ValueError(f"task_id 格式错误: {self.task_id}")
+
+        # 验证数字部分是否为有效数字
+        try:
+            int(self.task_id[5:])  # 提取task-后面的数字部分
+        except ValueError:
             raise ValueError(f"task_id 格式错误: {self.task_id}")
 
         # 验证 priority
@@ -209,6 +214,11 @@ class TaskListManager:
     实现三层架构：数据层、核心逻辑层、接口层。
     """
 
+    # 全局任务计数器，用于生成连续的数字任务ID
+    _global_task_counter = 0
+    _global_tasklist_counter = 0
+    _counter_lock = Lock()
+
     def __init__(self, root_dir: str, persist_dir: Optional[str] = None):
         """初始化任务列表管理器。
 
@@ -235,6 +245,28 @@ class TaskListManager:
 
         # 加载持久化数据
         self._load_persisted_data()
+
+    @classmethod
+    def _get_next_task_id(cls) -> str:
+        """获取下一个连续的数字任务ID。
+
+        返回:
+            str: 格式为 "task-数字" 的任务ID
+        """
+        with cls._counter_lock:
+            cls._global_task_counter += 1
+            return f"task-{cls._global_task_counter}"
+
+    @classmethod
+    def _get_next_tasklist_id(cls) -> str:
+        """获取下一个连续的数字任务列表ID。
+
+        返回:
+            str: 格式为 "tasklist-数字" 的任务列表ID
+        """
+        with cls._counter_lock:
+            cls._global_tasklist_counter += 1
+            return f"tasklist-{cls._global_tasklist_counter}"
 
     def _load_persisted_data(self):
         """从磁盘加载持久化数据。"""
@@ -305,7 +337,7 @@ class TaskListManager:
             Tuple[task_list_id, status, error_msg]
         """
         try:
-            task_list_id = f"tasklist-{uuid.uuid4().hex[:12]}"
+            task_list_id = self._get_next_tasklist_id()
             task_list = TaskList(main_goal=main_goal)
 
             with self._lock:
@@ -354,8 +386,8 @@ class TaskListManager:
                 if missing_fields:
                     return None, False, f"缺少必选字段: {', '.join(missing_fields)}"
 
-                # 创建任务
-                task_id = f"task-{uuid.uuid4().hex[:16]}"
+                # 创建任务（使用连续数字ID替代UUID）
+                task_id = self._get_next_task_id()
                 current_time = int(time.time() * 1000)
 
                 task = Task(
@@ -440,7 +472,7 @@ class TaskListManager:
 
                 # 第一遍：创建所有任务对象，建立名称到ID的映射
                 for task_info in tasks_info:
-                    task_id = f"task-{uuid.uuid4().hex[:16]}"
+                    task_id = self._get_next_task_id()
                     task_ids.append(task_id)
                     task_name = task_info["task_name"]
                     name_to_id_map[task_name] = task_id

@@ -275,7 +275,12 @@ class TestDependencyValidationIntegration:
 
         self.mock_task_list_manager.get_task_detail.side_effect = mock_get_task_detail
 
-        args = {"action": "execute_task", "task_id": "task_1", "agent": self.mock_agent}
+        args = {
+            "action": "execute_task",
+            "task_id": "task_1",
+            "additional_info": "测试执行有无效依赖的任务",
+            "agent": self.mock_agent,
+        }
 
         result = self.tool.execute(args)
 
