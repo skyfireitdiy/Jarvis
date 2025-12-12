@@ -286,7 +286,7 @@ class AgentRunLoop:
             diff_content = get_diff_between_commits(start_commit, current_commit)
 
             # 检查并处理token数量限制
-            model_group = agent.model_group or "default"
+            model_group = agent.model_group
             return self._check_diff_token_limit(diff_content, model_group)
 
         except Exception as e:
@@ -308,12 +308,14 @@ class AgentRunLoop:
         """
         return self._git_diff is not None and bool(self._git_diff.strip())
 
-    def _check_diff_token_limit(self, diff_content: str, model_group: str) -> str:
+    def _check_diff_token_limit(
+        self, diff_content: str, model_group: Optional[str]
+    ) -> str:
         """检查diff内容的token限制并返回适当的diff内容
 
         参数:
             diff_content: 原始的diff内容
-            model_group: 模型组名称
+            model_group: 模型组名称，可为空
 
         返回:
             str: 处理后的diff内容（可能是原始内容或截断后的内容）
