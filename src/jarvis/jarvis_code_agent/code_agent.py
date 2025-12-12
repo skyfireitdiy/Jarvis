@@ -81,6 +81,9 @@ class CodeAgent(Agent):
         self.enable_review = enable_review
         self.review_max_iterations = review_max_iterations
 
+        # 存储开始时的commit hash，用于后续git diff获取
+        self.start_commit: Optional[str] = None
+
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
         # 上下文推荐器将在Agent创建后初始化（需要LLM模型）
@@ -243,6 +246,7 @@ class CodeAgent(Agent):
 
             self.git_manager.init_env(prefix, suffix, self)
             start_commit = get_latest_commit_hash()
+            self.start_commit = start_commit
 
             # 获取项目概况信息
             project_overview = get_project_overview(self.root_dir)
@@ -324,17 +328,18 @@ class CodeAgent(Agent):
             if self.enable_review:
                 self._review_and_fix(
                     user_input=user_input,
-                    start_commit=start_commit,
                     enhanced_input=enhanced_input,
                     prefix=prefix,
                     suffix=suffix,
                 )
 
             end_commit = get_latest_commit_hash()
-            commits = self.git_manager.show_commit_history(start_commit, end_commit)
+            commits = self.git_manager.show_commit_history(
+                self.start_commit, end_commit
+            )
             self.git_manager.handle_commit_confirmation(
                 commits,
-                start_commit,
+                self.start_commit,
                 prefix,
                 suffix,
                 self,
@@ -653,7 +658,6 @@ class CodeAgent(Agent):
     def _review_and_fix(
         self,
         user_input: str,
-        start_commit: str,
         enhanced_input: str,
         prefix: str = "",
         suffix: str = "",
@@ -662,7 +666,6 @@ class CodeAgent(Agent):
 
         参数:
             user_input: 用户原始需求
-            start_commit: 开始时的 commit hash
             enhanced_input: 增强后的用户输入（用于修复）
             prefix: 前缀
             suffix: 后缀
@@ -686,10 +689,10 @@ class CodeAgent(Agent):
 
             # 获取从开始到当前的 git diff
             current_commit = get_latest_commit_hash()
-            if current_commit == start_commit:
+            if self.start_commit is None or current_commit == self.start_commit:
                 git_diff = get_diff()  # 获取未提交的更改
             else:
-                git_diff = get_diff_between_commits(start_commit, current_commit)
+                git_diff = get_diff_between_commits(self.start_commit, current_commit)
 
             if not git_diff or not git_diff.strip():
                 print("ℹ️ 没有代码修改，跳过审查")
