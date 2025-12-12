@@ -82,24 +82,11 @@ class Task:
         data["agent_type"] = AgentType(data["agent_type"])
         return cls(**data)
 
-    def can_transition_to(self, new_status: TaskStatus) -> bool:
-        """检查是否可以转换到新状态。"""
-        valid_transitions = {
-            TaskStatus.PENDING: {TaskStatus.RUNNING, TaskStatus.ABANDONED},
-            TaskStatus.RUNNING: {
-                TaskStatus.COMPLETED,
-                TaskStatus.FAILED,
-                TaskStatus.ABANDONED,
-            },
-        }
-        return new_status in valid_transitions.get(self.status, set())
-
     def update_status(
         self, new_status: TaskStatus, actual_output: Optional[str] = None
     ) -> bool:
         """更新任务状态。"""
-        if not self.can_transition_to(new_status):
-            return False
+        # 移除状态转换验证，允许任意状态转换
         self.status = new_status
         self.update_time = int(time.time() * 1000)
         if actual_output is not None:
