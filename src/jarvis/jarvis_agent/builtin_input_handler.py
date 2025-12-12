@@ -16,9 +16,12 @@ def _get_rule_content(rule_name: str) -> str | None:
         str | None: 规则内容，如果未找到则返回 None
     """
     try:
-        from jarvis.jarvis_code_agent.builtin_rules import get_builtin_rule
+        from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+        import os
 
-        return get_builtin_rule(rule_name)
+        # 使用当前工作目录作为root_dir
+        rules_manager = RulesManager(root_dir=os.getcwd())
+        return rules_manager.get_named_rule(rule_name)
     except ImportError:
         return None
 
