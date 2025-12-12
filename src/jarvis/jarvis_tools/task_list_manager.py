@@ -364,35 +364,35 @@ class task_list_manager:
 
 ### ✅ 正确示例（任务执行）：
 ```json
-{
+{{
         "action": "execute_task",
   "task_id": "task_123",
   "additional_info": "任务背景：修复用户登录功能的JWT token验证问题. 关键信息：目标文件src/auth/jwt_handler.py第45-67行, 功能需求是修复token过期后未正确刷新的bug, 约束条件必须兼容Python3.8+且不能修改API接口, 预期结果token过期时自动刷新并重定向到首页. 特殊要求：保留现有token格式不变, 添加适当的单元测试"
-}
+}}
 ```
 
 ### ❌ 错误示例（会导致失败）：
 ```json
-{
+{{
         "action": "execute_task",
   "task_id": "task_123",
   "additional_info": ""  // ❌ 空字符串，立即失败
-}
+}}
 
-{
+{{
         "action": "execute_task",
   "task_id": "task_123",
   "additional_info": "修复bug"  // ❌ 过于简单，缺乏上下文
-}
+}}
 ```
 
 ### ✅ 正确示例（获取详情）：
 ```json
-{
+{{
         "action": "get_task_detail",
   "task_id": "task_123",
   "additional_info": "需要查看任务详情以了解当前进度，重点关注任务状态和预期输出，计划基于状态决定后续执行策略"
-}
+}}
 ```
 
 ---
