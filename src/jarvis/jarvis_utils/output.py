@@ -195,7 +195,23 @@ class ConsoleOutputSink(OutputSink):
             else PrettyOutput._detect_language(event.text, default_lang="markdown")
         )
 
-        # 与原实现保持一致的样式定义
+        # 文字颜色映射 - 使用柔和的暗色调
+        text_colors = {
+            OutputType.SYSTEM: "dark_cyan",
+            OutputType.CODE: "dark_green",
+            OutputType.RESULT: "dark_blue",
+            OutputType.ERROR: "dark_red",
+            OutputType.INFO: "slate_blue",
+            OutputType.PLANNING: "purple",
+            OutputType.PROGRESS: "dim",
+            OutputType.SUCCESS: "green",
+            OutputType.WARNING: "orange3",
+            OutputType.DEBUG: "grey50",
+            OutputType.USER: "dark_sea_green",
+            OutputType.TOOL: "dark_olive_green",
+        }
+
+        # 背景色映射（保持原有定义）
         styles: Dict[OutputType, Dict[str, Any]] = {
             OutputType.SYSTEM: dict(bgcolor="#1e2b3c"),
             OutputType.CODE: dict(bgcolor="#1c2b1c"),
@@ -294,11 +310,14 @@ class ConsoleOutputSink(OutputSink):
             style=RichStyle(color="grey58"),
         )
         if get_pretty_output():
-            # 合并header和content在同一行显示
+            # 合并header和content在同一行显示，应用文字颜色
             combined_text = Text()
             combined_text.append(header_text)
             combined_text.append(" ")  # 添加空格分隔
-            combined_text.append(event.text)
+            colored_content = Text(
+                event.text, style=RichStyle(color=text_colors[event.output_type])
+            )
+            combined_text.append(colored_content)
             console.print(combined_text)
         else:
             console.print(content)
