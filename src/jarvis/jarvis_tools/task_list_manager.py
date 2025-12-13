@@ -173,7 +173,7 @@ class task_list_manager:
                     header_style="bold magenta",
                     title_style="bold cyan",
                 )
-                table.add_column("任务ID", style="cyan", width=25)
+                table.add_column("任务ID", style="cyan", width=18)
                 table.add_column("任务名称", style="yellow", width=30)
                 table.add_column("状态", style="bold", width=12)
                 table.add_column("优先级", justify="center", width=8)
