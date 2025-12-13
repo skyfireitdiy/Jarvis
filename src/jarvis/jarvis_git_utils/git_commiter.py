@@ -9,6 +9,8 @@ from typing import Optional
 
 import typer
 import yaml
+from rich.console import Console
+from rich.panel import Panel
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
@@ -16,7 +18,6 @@ from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
 from jarvis.jarvis_utils.globals import get_global_model_group
-from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
@@ -27,6 +28,7 @@ app = typer.Typer(help="Git提交工具")
 
 
 class GitCommitTool:
+    console = Console()
     name = "git_commit_agent"
     description = "根据代码变更自动生成并执行Git提交"
     labels = ["git", "version_control"]
@@ -343,9 +345,14 @@ commit信息
                     except Exception as e:
                         PrettyOutput.auto_print(f"⚠️ 无法删除临时文件: {str(e)}")
 
-            PrettyOutput.print(
-                f"提交哈希: {commit_hash}\n提交消息: {commit_message}",
-                OutputType.SUCCESS,
+            self.console.print(
+                Panel(
+                    f"[bold green]✅ 提交成功[/bold green]\n\n"
+                    f"[bold]提交哈希:[/bold] {commit_hash}\n"
+                    f"[bold]提交消息:[/bold]\n{commit_message}",
+                    title="Git Commit Result",
+                    border_style="green",
+                )
             )
 
             return {
@@ -357,7 +364,13 @@ commit信息
                 "stderr": "",
             }
         except Exception as e:
-            PrettyOutput.auto_print(f"❌ 提交失败: {str(e)}")
+            self.console.print(
+                Panel(
+                    f"[bold red]❌ 提交失败[/bold red]\n\n{str(e)}",
+                    title="Git Commit Error",
+                    border_style="red",
+                )
+            )
             return {
                 "success": False,
                 "stdout": "",
