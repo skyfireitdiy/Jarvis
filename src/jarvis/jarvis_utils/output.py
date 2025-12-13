@@ -15,8 +15,6 @@ from typing import Dict, Optional, Tuple, Any, List
 
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
-from rich.box import SIMPLE
-from rich.panel import Panel
 from rich.style import Style as RichStyle
 from rich.syntax import Syntax
 from rich.text import Text
@@ -98,12 +96,24 @@ class ConsoleOutputSink(OutputSink):
     def emit(self, event: OutputEvent) -> None:
         # 章节输出
         if event.section is not None:
-            text = Text(event.section, style=event.output_type.value, justify="center")
-            panel = Panel(text, border_style=event.output_type.value)
-            if get_pretty_output():
-                console.print(panel)
-            else:
-                console.print(text)
+            # 根据输出类型设置颜色
+            color_styles = {
+                OutputType.SYSTEM: "bright_cyan",
+                OutputType.CODE: "green",
+                OutputType.RESULT: "bright_blue",
+                OutputType.ERROR: "red",
+                OutputType.INFO: "bright_cyan",
+                OutputType.PLANNING: "purple",
+                OutputType.PROGRESS: "white",
+                OutputType.SUCCESS: "bright_green",
+                OutputType.WARNING: "yellow",
+                OutputType.DEBUG: "grey58",
+                OutputType.USER: "spring_green2",
+                OutputType.TOOL: "dark_sea_green4",
+            }
+            color = color_styles.get(event.output_type, "white")
+            text = Text(f"\n{event.section}\n", style=color, justify="center")
+            console.print(text)
             return
 
         # 普通内容输出
@@ -113,21 +123,7 @@ class ConsoleOutputSink(OutputSink):
             else PrettyOutput._detect_language(event.text, default_lang="markdown")
         )
 
-        # 与原实现保持一致的样式定义
-        styles: Dict[OutputType, Dict[str, Any]] = {
-            OutputType.SYSTEM: dict(bgcolor="#1e2b3c"),
-            OutputType.CODE: dict(bgcolor="#1c2b1c"),
-            OutputType.RESULT: dict(bgcolor="#1c1c2b"),
-            OutputType.ERROR: dict(bgcolor="#2b1c1c"),
-            OutputType.INFO: dict(bgcolor="#2b2b1c", meta={"icon": "ℹ️"}),
-            OutputType.PLANNING: dict(bgcolor="#2b1c2b"),
-            OutputType.PROGRESS: dict(bgcolor="#1c1c1c"),
-            OutputType.SUCCESS: dict(bgcolor="#1c2b1c"),
-            OutputType.WARNING: dict(bgcolor="#2b2b1c"),
-            OutputType.DEBUG: dict(bgcolor="#1c1c1c"),
-            OutputType.USER: dict(bgcolor="#1c2b2b"),
-            OutputType.TOOL: dict(bgcolor="#1c2b2b"),
-        }
+        # 样式定义已整合到header_styles中，无需单独的styles变量
 
         header_styles = {
             OutputType.SYSTEM: RichStyle(
@@ -194,27 +190,26 @@ class ConsoleOutputSink(OutputSink):
             ),
         }
 
-        Text(
+        # 构建头部信息
+        header = Text(
             PrettyOutput._format(event.output_type, event.timestamp),
             style=header_styles[event.output_type],
         )
+        console.print(header)
+
+        # 使用颜色样式输出内容，不使用Panel
         content = Syntax(
             event.text,
             lang,
             theme="monokai",
             word_wrap=True,
-            background_color=styles[event.output_type]["bgcolor"],
         )
-        panel = Panel(
-            content,
-            border_style=header_styles[event.output_type],
-            padding=(0, 0),
-            highlight=True,
-        )
+
         if get_pretty_output():
-            console.print(panel)
-        else:
             console.print(content)
+        else:
+            console.print(event.text)
+
         if event.traceback or (
             event.output_type == OutputType.ERROR and is_print_error_traceback()
         ):
@@ -421,8 +416,5 @@ class PrettyOutput:
 
             # 使用ANSI转义序列设置颜色
             colored_lines.append(f"\033[38;2;{r};{g};{b}m{line}\033[0m")
-        colored_text = Text(
-            "\n".join(colored_lines), style=OutputType.TOOL.value, justify="center"
-        )
-        panel = Panel(colored_text, box=SIMPLE)
-        console.print(panel)
+        colored_text = Text("\n".join(colored_lines), justify="center")
+        console.print(colored_text)
