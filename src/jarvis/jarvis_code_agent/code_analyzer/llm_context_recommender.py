@@ -605,22 +605,4 @@ class ContextRecommender:
         Returns:
             格式化的文本
         """
-        if not recommendation.recommended_symbols:
-            return ""
-
-        lines = ["\n💡 智能上下文推荐:"]
-        lines.append("─" * 60)
-
-        # 输出：符号在文件中的位置
-        symbols_str = "\n   ".join(
-            f"• 符号 `{s.name}` ({s.kind}) 位于文件 {os.path.relpath(s.file_path, self.context_manager.project_root)} 第 {s.line_start} 行"
-            for s in recommendation.recommended_symbols
-        )
-        lines.append(
-            f"🔗 推荐符号位置 ({len(recommendation.recommended_symbols)}个):\n   {symbols_str}"
-        )
-
-        lines.append("─" * 60)
-        lines.append("")  # 空行
-
-        return "\n".join(lines)
+        return ""
