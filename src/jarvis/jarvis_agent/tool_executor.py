@@ -45,7 +45,6 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
     ):
         try:
             result = tool_to_execute.handle(response, agent)
-            PrettyOutput.auto_print(f"✅ {tool_to_execute.name()}执行完成")
             return result
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 工具执行失败: {str(e)}")

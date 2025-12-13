@@ -282,7 +282,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                     PrettyOutput.auto_print(f"ℹ️ 执行命令: {shell_command}")
                     return_code = os.system(shell_command)
                     if return_code == 0:
-                        PrettyOutput.auto_print("✅ 命令执行完成")
+                        pass  # 命令执行成功，不显示提示
                     else:
                         PrettyOutput.auto_print(
                             f"❌ 命令执行失败(返回码: {return_code})"
