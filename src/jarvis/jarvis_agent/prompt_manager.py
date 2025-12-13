@@ -16,7 +16,7 @@ from jarvis.jarvis_utils.tag import ot
 
 if TYPE_CHECKING:
     # 避免运行时循环依赖，仅用于类型标注
-    from . import Agent  # noqa: F401
+    from . import Agent
 
 
 class PromptManager:
