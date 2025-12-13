@@ -136,6 +136,82 @@ class task_list_manager:
         except Exception:
             pass
 
+    def _determine_agent_type(
+        self, task: Any, task_content: str, background: str
+    ) -> bool:
+        """智能识别任务类型，判断是否为代码相关任务
+
+        参数:
+            task: 任务对象
+            task_content: 任务内容
+            background: 背景信息
+
+        返回:
+            bool: True 表示代码相关任务，False 表示通用任务
+        """
+        # 代码相关关键词列表
+        code_keywords = [
+            "代码",
+            "code",
+            "函数",
+            "function",
+            "类",
+            "class",
+            "文件",
+            "file",
+            "重构",
+            "refactor",
+            "修复",
+            "fix",
+            "bug",
+            "错误",
+            "debug",
+            "实现",
+            "implement",
+            "开发",
+            "develop",
+            "编写",
+            "write",
+            "脚本",
+            "script",
+            "程序",
+            "program",
+            "应用",
+            "app",
+            "模块",
+            "module",
+            "Python",
+            "JavaScript",
+            "Java",
+            "C++",
+            "Rust",
+            "Go",
+            "TypeScript",
+            ".py",
+            ".js",
+            ".java",
+            ".cpp",
+            ".rs",
+            ".go",
+            ".ts",
+            ".json",
+            ".yaml",
+            ".yml",
+        ]
+
+        # 待分析的文本内容
+        text_to_analyze = (
+            f"{task.task_name} {task.task_desc} {task_content} {background}".lower()
+        )
+
+        # 检查是否包含代码相关关键词
+        for keyword in code_keywords:
+            if keyword.lower() in text_to_analyze:
+                return True
+
+        # 默认使用通用 Agent
+        return False
+
     def _print_task_list_status(
         self, task_list_manager: Any, task_list_id: Optional[str] = None
     ):
@@ -314,14 +390,14 @@ class task_list_manager:
         "task_desc": "创建用户表和会话表",
         "priority": 5,
         "expected_output": "数据库表结构设计文档",
-        "agent_type": "code_agent"
+        "agent_type": "sub"
       }},
       {{
         "task_name": "实现登录接口",
         "task_desc": "实现用户登录API",
         "priority": 4,
         "expected_output": "登录接口代码",
-        "agent_type": "code_agent",
+        "agent_type": "sub",
         "dependencies": ["设计数据库表结构"]
       }}
     ]
@@ -485,7 +561,7 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                         },
                         "agent_type": {
                             "type": "string",
-                            "enum": ["main", "code_agent", "agent"],
+                            "enum": ["main", "sub"],
                             "description": "Agent类型：**简单任务必须使用 `main`**（由主Agent直接执行，不要拆分为code_agent或agent）；只有复杂任务才使用 `code_agent`（代码任务）或 `agent`（一般任务）",
                         },
                         "dependencies": {
@@ -1104,26 +1180,65 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                     "stderr": "",
                 }
 
-            elif task.agent_type.value == "code_agent":
-                # 代码 Agent 执行：使用 sub_code_agent 工具
+            elif task.agent_type.value == "sub":
+                # 子 Agent 执行：自动识别使用合适的子 Agent 工具
                 try:
-                    # 直接导入 SubCodeAgentTool 类
-                    from jarvis.jarvis_tools.sub_code_agent import SubCodeAgentTool
-
-                    sub_code_agent_tool = SubCodeAgentTool()
-
-                    # 构建子Agent名称：使用任务名称和ID，便于识别
-                    agent_name = f"{task.task_name} (task_{task_id})"
-
-                    # 调用 sub_code_agent 执行任务
-                    tool_result = sub_code_agent_tool.execute(
-                        {
-                            "task": task_content,
-                            "background": background,
-                            "name": agent_name,
-                            "agent": parent_agent,
-                        }
+                    # 智能识别逻辑：根据任务内容自动选择最合适的 Agent 类型
+                    is_code_task = self._determine_agent_type(
+                        task, task_content, background
                     )
+
+                    if is_code_task:
+                        # 代码相关任务：使用 sub_code_agent 工具
+                        from jarvis.jarvis_tools.sub_code_agent import SubCodeAgentTool
+
+                        sub_code_agent_tool = SubCodeAgentTool()
+
+                        # 构建子Agent名称：使用任务名称和ID，便于识别
+                        agent_name = f"{task.task_name} (task_{task_id})"
+
+                        # 调用 sub_code_agent 执行任务
+                        tool_result = sub_code_agent_tool.execute(
+                            {
+                                "task": task_content,
+                                "background": background,
+                                "name": agent_name,
+                                "agent": parent_agent,
+                            }
+                        )
+                    else:
+                        # 通用任务：使用 sub_agent 工具
+                        from jarvis.jarvis_tools.sub_agent import SubAgentTool
+
+                        sub_general_agent_tool = SubAgentTool()
+
+                        # 构建系统提示词和总结提示词
+                        system_prompt = f"""你是一个专业的任务执行助手。
+
+当前任务: {task.task_name}
+
+任务描述: {task.task_desc}
+
+预期输出: {task.expected_output}
+
+请专注于完成这个任务，完成后提供清晰的输出结果。
+"""
+                        summary_prompt = f"总结任务 [{task.task_name}] 的执行结果，包括完成的工作和输出内容。"
+
+                        # 构建子Agent名称：使用任务名称和ID，便于识别
+                        agent_name = f"{task.task_name} (task_{task_id})"
+
+                        # 调用 sub_agent 执行任务
+                        tool_result = sub_general_agent_tool.execute(
+                            {
+                                "task": task_content,
+                                "background": background,
+                                "name": agent_name,
+                                "system_prompt": system_prompt,
+                                "summary_prompt": summary_prompt,
+                                "agent": parent_agent,
+                            }
+                        )
 
                     execution_result = tool_result.get("stdout", "")
                     execution_success = tool_result.get("success", False)
@@ -1158,78 +1273,6 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                         "success": False,
                         "stdout": "",
                         "stderr": f"创建子 Agent 执行任务失败: {str(e)}",
-                    }
-
-            elif task.agent_type.value == "agent":
-                # 通用 Agent 执行：使用 sub_agent 工具
-                try:
-                    # 直接导入 SubAgentTool 类
-                    from jarvis.jarvis_tools.sub_agent import SubAgentTool
-
-                    sub_agent_tool = SubAgentTool()
-
-                    # 构建系统提示词和总结提示词
-                    system_prompt = f"""你是一个专业的任务执行助手。
-
-当前任务: {task.task_name}
-
-任务描述: {task.task_desc}
-
-预期输出: {task.expected_output}
-
-请专注于完成这个任务，完成后提供清晰的输出结果。
-"""
-
-                    summary_prompt = f"总结任务 [{task.task_name}] 的执行结果，包括完成的工作和输出内容。"
-
-                    # 构建子Agent名称：使用任务名称和ID，便于识别
-                    agent_name = f"{task.task_name} (task_{task_id})"
-
-                    # 调用 sub_agent 执行任务
-                    tool_result = sub_agent_tool.execute(
-                        {
-                            "task": task_content,
-                            "background": background,
-                            "name": agent_name,
-                            "system_prompt": system_prompt,
-                            "summary_prompt": summary_prompt,
-                            "agent": parent_agent,
-                        }
-                    )
-
-                    execution_result = tool_result.get("stdout", "")
-                    execution_success = tool_result.get("success", False)
-
-                    if not execution_success:
-                        # 执行失败，更新任务状态为 failed
-                        task_list_manager.update_task_status(
-                            task_list_id=task_list_id,
-                            task_id=task_id,
-                            status="failed",
-                            agent_id=agent_id,
-                            is_main_agent=is_main_agent,
-                            actual_output=f"执行失败: {tool_result.get('stderr', '未知错误')}",
-                        )
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": f"工具 Agent 执行失败: {tool_result.get('stderr', '未知错误')}",
-                        }
-
-                except Exception as e:
-                    # 执行异常，更新任务状态为 failed
-                    task_list_manager.update_task_status(
-                        task_list_id=task_list_id,
-                        task_id=task_id,
-                        status="failed",
-                        agent_id=agent_id,
-                        is_main_agent=is_main_agent,
-                        actual_output=f"执行异常: {str(e)}",
-                    )
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"创建工具 Agent 执行任务失败: {str(e)}",
                     }
 
             # 处理执行结果：如果结果太长，进行截断并添加提示
