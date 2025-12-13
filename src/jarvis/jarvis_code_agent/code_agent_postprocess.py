@@ -30,8 +30,6 @@ class PostProcessManager:
         if not after_change_commands:
             return
 
-        PrettyOutput.auto_print("🔧 正在执行变更后处理...")
-
         # 执行变更后处理命令
         processed_files = set()
         for file_path, command in after_change_commands:
