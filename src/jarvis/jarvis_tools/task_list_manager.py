@@ -170,7 +170,7 @@ class task_list_manager:
                 table.add_column("状态", style="bold", width=12)
                 table.add_column("优先级", justify="center", width=8)
                 table.add_column("Agent类型", width=10)
-                table.add_column("依赖", width=20)
+                table.add_column("依赖", width=12)
                 table.add_column("任务描述", style="dim", width=40, no_wrap=False)
                 table.add_column("实际输出", style="green", width=50, no_wrap=False)
 
