@@ -960,7 +960,10 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
         is_main_agent: bool,
         parent_agent: Any,
     ) -> Dict[str, Any]:
-        """处理执行任务（自动创建子 Agent 执行）"""
+        """处理执行任务（自动创建子 Agent 执行）
+
+        重要提醒：执行一个任务前，系统会自动验证其所有依赖任务是否已完成（completed状态）。
+        如果有任何依赖任务未完成或失败，任务执行将被拒绝并返回相应的错误信息。"""
         task_list_id = self._get_task_list_id(parent_agent)
         if not task_list_id:
             return {
