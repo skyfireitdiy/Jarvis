@@ -1,6 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """
 方法论导入导出命令行工具
 
@@ -12,16 +9,18 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 import hashlib
 import json
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import os
 
 import typer
 import yaml
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.methodology import (
-    _get_methodology_directory,
-    _load_all_methodologies,
-)
+from jarvis.jarvis_utils.methodology import _get_methodology_directory
+from jarvis.jarvis_utils.methodology import _load_all_methodologies
 
 app = typer.Typer(help="方法论管理工具")
 

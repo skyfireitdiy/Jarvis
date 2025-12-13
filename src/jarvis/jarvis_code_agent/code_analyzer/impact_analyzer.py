@@ -3,13 +3,17 @@
 提供代码编辑影响范围分析功能，识别可能受影响的文件、函数、测试等。
 """
 
+import ast
 import os
 import re
-import ast
 import subprocess
-from dataclasses import dataclass, field
-from typing import List, Optional, Set, Dict
+from dataclasses import dataclass
+from dataclasses import field
 from enum import Enum
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
 
 from .context_manager import ContextManager
 from .file_ignore import filter_walk_dirs

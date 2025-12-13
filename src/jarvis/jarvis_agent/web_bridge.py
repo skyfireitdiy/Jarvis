@@ -17,8 +17,13 @@ from __future__ import annotations
 
 import threading
 import uuid
-from queue import Queue, Empty
-from typing import Callable, Dict, Optional, Set, Any
+from queue import Empty
+from queue import Queue
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import Optional
+from typing import Set
 
 DEFAULT_WAIT_TIMEOUT = None  # 阻塞等待直到收到响应（可按需改为秒数）
 

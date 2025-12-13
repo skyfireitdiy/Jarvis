@@ -1,14 +1,19 @@
-from jarvis.jarvis_utils.output import PrettyOutput
+import hashlib
+import json
 import os
 import pickle
-import json
-import hashlib
-from typing import Any, Dict, List, Optional, cast
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import cast
 
 import chromadb
 from langchain.docstore.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from rank_bm25 import BM25Okapi
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from .embedding_interface import EmbeddingInterface
 

@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 """工具函数模块"""
 
-from typing import Dict, List, Optional
-from pathlib import Path
 import json
+from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import Optional
+
 import typer
 
 from jarvis.jarvis_sec.workflow import direct_scan
@@ -91,7 +94,8 @@ def load_or_run_heuristic_scan(
     summary: Dict = {}
 
     # 优先使用新的 candidates.jsonl 文件
-    from jarvis.jarvis_sec.file_manager import load_candidates, get_candidates_file
+    from jarvis.jarvis_sec.file_manager import get_candidates_file
+    from jarvis.jarvis_sec.file_manager import load_candidates
 
     candidates = load_candidates(sec_dir)
 
@@ -272,7 +276,8 @@ def group_candidates_by_file(candidates: List[Dict]) -> Dict[str, List[Dict]]:
 
 def create_report_writer(sec_dir: Path, report_file: Optional[str]):
     """创建报告写入函数"""
-    from jarvis.jarvis_sec.file_manager import save_analysis_result, load_clusters
+    from jarvis.jarvis_sec.file_manager import load_clusters
+    from jarvis.jarvis_sec.file_manager import save_analysis_result
 
     def _append_report(items, source: str, task_id: str, cand: Dict):
         """

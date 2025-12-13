@@ -1,18 +1,23 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """
 重排模型注册表，支持动态加载自定义重排模型实现。
 """
 
 import importlib
 import inspect
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import os
 import sys
-from typing import Dict, List, Optional, Type
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Type
+
+from jarvis.jarvis_utils.config import get_data_dir
 
 from ..reranker_interface import RerankerInterface
-from jarvis.jarvis_utils.config import get_data_dir
 
 
 class RerankerRegistry:
@@ -236,11 +241,9 @@ class RerankerRegistry:
         返回:
             Optional[RerankerInterface]: 重排模型实例，如果创建失败则返回None
         """
-        from jarvis.jarvis_utils.config import (
-            get_rag_reranker_type,
-            get_rag_rerank_model,
-            get_rag_reranker_config,
-        )
+        from jarvis.jarvis_utils.config import get_rag_rerank_model
+        from jarvis.jarvis_utils.config import get_rag_reranker_config
+        from jarvis.jarvis_utils.config import get_rag_reranker_type
 
         reranker_type = get_rag_reranker_type()
         model_name = get_rag_rerank_model()

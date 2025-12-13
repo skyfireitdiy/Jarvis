@@ -1,23 +1,24 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import importlib
 import inspect
 import os
 import sys
-from typing import Any, Dict, List, Optional, Type
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Type
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import (
-    get_cheap_model_name,
-    get_cheap_platform_name,
-    get_data_dir,
-    get_llm_config,
-    get_normal_model_name,
-    get_normal_platform_name,
-    get_smart_model_name,
-    get_smart_platform_name,
-)
+from jarvis.jarvis_utils.config import get_cheap_model_name
+from jarvis.jarvis_utils.config import get_cheap_platform_name
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_llm_config
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_platform_name
+from jarvis.jarvis_utils.config import get_smart_model_name
+from jarvis.jarvis_utils.config import get_smart_platform_name
+from jarvis.jarvis_utils.output import PrettyOutput
 
 REQUIRED_METHODS = [
     ("chat", ["message"]),  # 方法名和参数列表

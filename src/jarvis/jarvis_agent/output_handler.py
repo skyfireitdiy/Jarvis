@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-from abc import ABC, abstractmethod
-from typing import Any, Tuple
+from abc import ABC
+from abc import abstractmethod
+from typing import Any
+from typing import Tuple
 
 
 class OutputHandler(ABC):

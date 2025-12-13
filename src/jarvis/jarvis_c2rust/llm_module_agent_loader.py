@@ -2,11 +2,14 @@
 """LLM 模块规划 Agent 的图加载器。"""
 
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
-
-from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Set
+from typing import Tuple
 
 from jarvis.jarvis_c2rust.llm_module_agent_types import FnMeta
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
 
 class GraphLoader:

@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """Agent创建和订阅模块"""
 
-from typing import Dict, Optional
+from typing import Dict
+from typing import Optional
+
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_sec.prompts import build_summary_prompt
+from jarvis.jarvis_sec.prompts import get_cluster_summary_prompt
+from jarvis.jarvis_sec.prompts import get_cluster_system_prompt
+from jarvis.jarvis_sec.prompts import get_review_summary_prompt
+from jarvis.jarvis_sec.prompts import get_review_system_prompt
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_sec.prompts import (
-    build_summary_prompt,
-    get_review_system_prompt,
-    get_review_summary_prompt,
-    get_cluster_system_prompt,
-    get_cluster_summary_prompt,
-)
 
 
 def subscribe_summary_event(agent: Agent) -> Dict[str, str]:

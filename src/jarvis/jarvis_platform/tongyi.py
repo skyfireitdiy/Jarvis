@@ -1,15 +1,21 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import json
 import os
 import time
 import uuid
-from typing import Any, Dict, Generator, List, Optional, Tuple, cast
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
-from jarvis.jarvis_utils.tag import ot, ct
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import while_success
 
 

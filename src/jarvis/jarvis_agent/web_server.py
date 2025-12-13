@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """
 基于 FastAPI 的 Web 服务：
@@ -15,21 +13,23 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 from __future__ import annotations
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 import asyncio
+import atexit
 import json
 import os
 import signal
-import atexit
 from pathlib import Path
-from typing import Any, Dict, Callable, Optional, List
+from typing import Any, Callable, Dict, List, Optional
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
-from jarvis.jarvis_utils.globals import set_interrupt, console
+from jarvis.jarvis_utils.globals import console, set_interrupt
 
 
 # ---------------------------
@@ -469,11 +469,11 @@ def start_web_server(
         import os as _os
 
         try:
-            import pty as _pty
             import fcntl as _fcntl
+            import pty as _pty
             import select as _select
-            import termios as _termios
             import struct as _struct
+            import termios as _termios
         except Exception:
             try:
                 await ws.send_text(

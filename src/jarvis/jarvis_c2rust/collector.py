@@ -24,16 +24,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import Dict
+from typing import List
+from typing import Optional
 
-
-from jarvis.jarvis_c2rust.scanner import (
-    _try_import_libclang,
-    find_compile_commands,
-    load_compile_commands,
-    scan_file,
-)
 from jarvis.jarvis_c2rust.constants import HEADER_EXTS
+from jarvis.jarvis_c2rust.scanner import _try_import_libclang
+from jarvis.jarvis_c2rust.scanner import find_compile_commands
+from jarvis.jarvis_c2rust.scanner import load_compile_commands
+from jarvis.jarvis_c2rust.scanner import scan_file
 
 
 def _guess_lang_header_flag(file: Path) -> List[str]:

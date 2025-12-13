@@ -8,7 +8,10 @@ Lint工具配置模块
 """
 
 import os
-from typing import Dict, List, Tuple, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import yaml
 

@@ -11,7 +11,10 @@
 import os
 
 # 全局变量：保存消息历史
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 message_history: List[str] = []
 
@@ -465,9 +468,10 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
     返回:
         Dict[str, List[str]]: 按记忆类型分组的标签列表
     """
-    from pathlib import Path
     import json
     import random
+    from pathlib import Path
+
     from jarvis.jarvis_utils.config import get_data_dir
 
     tags_by_type: Dict[str, List[str]] = {

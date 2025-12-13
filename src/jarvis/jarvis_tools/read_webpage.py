@@ -1,16 +1,15 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
+
+import requests
+from markdownify import markdownify as md
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import (
-    get_web_search_platform_name,
-    get_web_search_model_name,
-)
+from jarvis.jarvis_utils.config import get_web_search_model_name
+from jarvis.jarvis_utils.config import get_web_search_platform_name
 from jarvis.jarvis_utils.http import get as http_get
-from markdownify import markdownify as md
-import requests
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class WebpageTool:

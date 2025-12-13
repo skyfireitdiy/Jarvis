@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 """复核相关模块"""
 
-from typing import Dict, List, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
+
 import typer
 
-from jarvis.jarvis_sec.prompts import (
-    get_review_system_prompt,
-    get_review_summary_prompt,
-    build_verification_summary_prompt,
-)
+from jarvis.jarvis_sec.agents import create_review_agent
+from jarvis.jarvis_sec.agents import subscribe_summary_event
 from jarvis.jarvis_sec.parsers import try_parse_summary_report
-from jarvis.jarvis_sec.agents import create_review_agent, subscribe_summary_event
+from jarvis.jarvis_sec.prompts import build_verification_summary_prompt
+from jarvis.jarvis_sec.prompts import get_review_summary_prompt
+from jarvis.jarvis_sec.prompts import get_review_system_prompt
 from jarvis.jarvis_sec.utils import git_restore_if_dirty
 
 
@@ -169,9 +171,10 @@ def process_review_batch(
                 # 将确认无效的gids保存到analysis.jsonl的false_positive_gids中，以便断点恢复时能正确识别已复核的无效聚类
                 if sec_dir:
                     try:
-                        from pathlib import Path
-                        from jarvis.jarvis_sec.file_manager import save_analysis_result
                         from datetime import datetime
+                        from pathlib import Path
+
+                        from jarvis.jarvis_sec.file_manager import save_analysis_result
 
                         # 构建cluster_id
                         file_name = invalid_cluster.get("file", "")

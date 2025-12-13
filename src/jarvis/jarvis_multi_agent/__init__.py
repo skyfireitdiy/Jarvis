@@ -1,14 +1,20 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
-from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.output_handler import OutputHandler
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.tag import ct, ot
+
+# -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
 
 
 class MultiAgent(OutputHandler):

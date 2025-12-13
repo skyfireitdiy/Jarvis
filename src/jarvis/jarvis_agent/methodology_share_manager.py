@@ -1,22 +1,21 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """方法论分享管理模块"""
 
-import os
 import glob
 import json
+import os
 import shutil
-from typing import List, Dict, Any
+from typing import Any
+from typing import Dict
+from typing import List
 
 import typer
 
 from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_agent.share_manager import ShareManager
-from jarvis.jarvis_utils.config import (
-    get_central_methodology_repo,
-    get_methodology_dirs,
-)
+from jarvis.jarvis_utils.config import get_central_methodology_repo
+from jarvis.jarvis_utils.config import get_methodology_dirs
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class MethodologyShareManager(ShareManager):

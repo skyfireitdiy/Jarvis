@@ -5,7 +5,10 @@
 """
 
 import subprocess
-from typing import List, Optional, Dict, Any
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from jarvis.jarvis_utils.git_utils import get_recent_commits_with_files
 from jarvis.jarvis_utils.utils import get_loc_stats

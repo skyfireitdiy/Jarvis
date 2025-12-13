@@ -1,41 +1,41 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """Jarvis AI 助手主入口模块"""
 
-from typing import Optional, List, Any, Dict
+import os
 import shutil
+import signal
+import subprocess
+import sys
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import typer
+import yaml
+from rich.console import Console
+from rich.table import Table
 
+import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_agent.agent_manager import AgentManager
 from jarvis.jarvis_agent.config_editor import ConfigEditor
 from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
-from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_utils.config import (
-    is_enable_git_repo_jca_switch,
-    is_enable_builtin_config_selector,
-    get_agent_definition_dirs,
-    get_multi_agent_dirs,
-    get_roles_dirs,
-    get_data_dir,
-    set_config,
-    is_non_interactive,
-)
-import jarvis.jarvis_utils.utils as jutils
-from jarvis.jarvis_utils.input import user_confirm, get_single_line_input
+from jarvis.jarvis_utils.config import get_agent_definition_dirs
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_multi_agent_dirs
+from jarvis.jarvis_utils.config import get_roles_dirs
+from jarvis.jarvis_utils.config import is_enable_builtin_config_selector
+from jarvis.jarvis_utils.config import is_enable_git_repo_jca_switch
+from jarvis.jarvis_utils.config import is_non_interactive
+from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.fzf import fzf_select
-import os
-import subprocess
-from pathlib import Path
-import signal
-import yaml
-from rich.table import Table
-from rich.console import Console
-
-import sys
+from jarvis.jarvis_utils.input import get_single_line_input
+from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 
 def _normalize_backup_data_argv(argv: List[str]) -> None:
@@ -1097,11 +1097,9 @@ def run_cli(
 
         if web:
             try:
+                from jarvis.jarvis_agent.stdio_redirect import enable_web_stdin_redirect
+                from jarvis.jarvis_agent.stdio_redirect import enable_web_stdio_redirect
                 from jarvis.jarvis_agent.web_server import start_web_server
-                from jarvis.jarvis_agent.stdio_redirect import (
-                    enable_web_stdio_redirect,
-                    enable_web_stdin_redirect,
-                )
 
                 # 在 Web 模式下固定TTY宽度为200，改善前端显示效果
                 try:
@@ -1152,8 +1150,8 @@ def run_cli(
                 else:
                     # 如果没有指定，则自动构建（移除 web 相关参数）
                     try:
-                        import sys as _sys
                         import os as _os
+                        import sys as _sys
 
                         _argv = list(_sys.argv)
                         # 去掉程序名（argv[0]），并过滤 --web 相关参数
@@ -1193,8 +1191,8 @@ def run_cli(
                 # 同时写入环境变量作为备选（向后兼容）
                 if launch_cmd:
                     try:
-                        import os as _os
                         import json as _json
+                        import os as _os
 
                         _os.environ["JARVIS_WEB_LAUNCH_JSON"] = _json.dumps(
                             launch_cmd, ensure_ascii=False

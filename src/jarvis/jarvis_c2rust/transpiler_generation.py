@@ -6,7 +6,8 @@
 import json
 import re
 from pathlib import Path
-from typing import List, cast
+from typing import List
+from typing import cast
 
 import typer
 

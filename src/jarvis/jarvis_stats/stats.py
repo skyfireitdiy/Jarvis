@@ -1,13 +1,18 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 """
 统计管理模块
 
 提供统计数据的增加、查看、分析等功能的主接口
 """
 
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union, Any
+from jarvis.jarvis_utils.output import PrettyOutput
+
+from datetime import datetime
+from datetime import timedelta
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Union
 
 from jarvis.jarvis_stats.storage import StatsStorage
 from jarvis.jarvis_stats.visualizer import StatsVisualizer
@@ -594,8 +599,8 @@ class StatsManager:
         PrettyOutput.print(chart, OutputType.CODE, lang="text")  # 保留用于语法高亮
 
         # 显示时间范围
-        from rich.panel import Panel
         from rich.console import Console
+        from rich.panel import Panel
 
         console = Console()
         console.print(
@@ -700,8 +705,8 @@ class StatsManager:
             PrettyOutput.auto_print(f"ℹ️ {summary}")
 
         # 显示时间范围
-        from rich.panel import Panel
         from rich.console import Console
+        from rich.panel import Panel
 
         console = Console()
         console.print(

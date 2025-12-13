@@ -1,10 +1,12 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class ScriptTool:
@@ -111,11 +113,10 @@ class ScriptTool:
                 )
 
                 # Execute command with optional timeout in non-interactive mode
-                from jarvis.jarvis_utils.config import (
-                    get_script_execution_timeout,
-                    is_non_interactive,
-                )
                 import subprocess
+
+                from jarvis.jarvis_utils.config import get_script_execution_timeout
+                from jarvis.jarvis_utils.config import is_non_interactive
 
                 timed_out = False
                 if is_non_interactive():

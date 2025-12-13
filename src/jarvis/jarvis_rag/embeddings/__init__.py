@@ -13,9 +13,9 @@ EmbeddingManager = LocalEmbeddingModel
 
 # 在线模型实现（可选导入）
 try:
-    from .openai import OpenAIEmbeddingModel  # noqa: F401
     from .cohere import CohereEmbeddingModel  # noqa: F401
     from .edgefn import EdgeFnEmbeddingModel  # noqa: F401
+    from .openai import OpenAIEmbeddingModel  # noqa: F401
 
     _base_exports = [
         "OnlineEmbeddingModel",

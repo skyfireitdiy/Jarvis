@@ -3,16 +3,19 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, cast
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import cast
 
 import typer
 
 from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions
-from jarvis.jarvis_c2rust.optimizer_utils import (
-    git_head_commit,
-    git_reset_hard,
-    git_toplevel,
-)
+from jarvis.jarvis_c2rust.optimizer_utils import git_head_commit
+from jarvis.jarvis_c2rust.optimizer_utils import git_reset_hard
+from jarvis.jarvis_c2rust.optimizer_utils import git_toplevel
 
 
 class ProgressManager:
@@ -411,10 +414,8 @@ class ProgressManager:
                 return
 
             # 检测测试代码删除
-            from jarvis.jarvis_c2rust.utils import (
-                detect_test_deletion,
-                ask_llm_about_test_deletion,
-            )
+            from jarvis.jarvis_c2rust.utils import ask_llm_about_test_deletion
+            from jarvis.jarvis_c2rust.utils import detect_test_deletion
 
             detection_result = detect_test_deletion("[c2rust-optimizer]")
             if not detection_result:

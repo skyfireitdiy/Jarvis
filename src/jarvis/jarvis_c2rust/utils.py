@@ -9,14 +9,21 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import typer
 
-from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME, ORDER_JSONL
+from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+from jarvis.jarvis_c2rust.constants import ORDER_JSONL
 from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
 from jarvis.jarvis_utils.config import get_max_input_token_count
-from jarvis.jarvis_utils.git_utils import get_diff, get_diff_file_list
+from jarvis.jarvis_utils.git_utils import get_diff
+from jarvis.jarvis_utils.git_utils import get_diff_file_list
 from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
 
 

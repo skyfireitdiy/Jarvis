@@ -1,7 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 使用 libclang 的 C/C++ 函数扫描器和调用图提取器。
 
@@ -49,17 +45,22 @@ JSONL 文件
 
 from __future__ import annotations
 
-
 import json
-import os
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import os
+import shutil
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set
+
 import typer
-import shutil
+
 from jarvis.jarvis_c2rust.constants import SOURCE_EXTS, TYPE_KINDS
 
 
@@ -92,8 +93,9 @@ def _try_import_libclang() -> Any:
     # Verify Python clang bindings major version (if available)
     py_major: Optional[int] = None
     try:
-        import clang as _clang
         import re as _re
+
+        import clang as _clang
 
         v = getattr(_clang, "__version__", None)
         if v:
@@ -1669,8 +1671,8 @@ def run_scan(
     # Helper: render a DOT file to PNG using Graphviz 'dot'
     def _render_dot_to_png(dot_file: Path, png_out: Optional[Path] = None) -> Path:
         try:
-            from shutil import which
             import subprocess
+            from shutil import which
         except Exception as _e:
             raise RuntimeError(f"准备 PNG 渲染时出现环境问题: {_e}")
         exe = which("dot")

@@ -1,6 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """Jarvis平台管理器主模块。
 
 该模块提供了Jarvis平台管理器的主要入口点。
@@ -8,19 +5,25 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 import os
 import sys
-from typing import Any, Dict, List, Optional
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import typer
-from jarvis.jarvis_utils.config import (
-    get_normal_platform_name,
-    get_normal_model_name,
-)
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.input import get_multiline_input, get_single_line_input
-from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_platform_manager.service import start_service
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.fzf import fzf_select
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.input import get_single_line_input
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Jarvis AI 平台")
 

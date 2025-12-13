@@ -4,15 +4,20 @@
 提供终端图形化展示功能
 """
 
-import os
 import io
-from typing import Dict, List, Optional, Any, cast
+import os
 from collections import OrderedDict
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import cast
+
 import plotext as plt
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 
 class StatsVisualizer:

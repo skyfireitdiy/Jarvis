@@ -5,13 +5,15 @@
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 import typer
 
 from jarvis.jarvis_c2rust.constants import CONFIG_JSON
 from jarvis.jarvis_c2rust.models import FnRecord
-from jarvis.jarvis_c2rust.utils import read_json, write_json
+from jarvis.jarvis_c2rust.utils import read_json
+from jarvis.jarvis_c2rust.utils import write_json
 
 
 class ConfigManager:

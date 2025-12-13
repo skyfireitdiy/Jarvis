@@ -5,22 +5,24 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable
+from typing import Dict
+from typing import List
 
 import typer
 
-from jarvis.jarvis_agent.events import AFTER_TOOL_CALL, BEFORE_TOOL_CALL
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions, OptimizeStats
+from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
+from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions
+from jarvis.jarvis_c2rust.optimizer_options import OptimizeStats
 from jarvis.jarvis_c2rust.optimizer_progress import ProgressManager
-from jarvis.jarvis_c2rust.optimizer_utils import (
-    cargo_check_full,
-    check_clippy_warnings,
-    git_toplevel,
-    iter_rust_files,
-    run_cargo_fmt,
-    run_cmd,
-)
+from jarvis.jarvis_c2rust.optimizer_utils import cargo_check_full
+from jarvis.jarvis_c2rust.optimizer_utils import check_clippy_warnings
+from jarvis.jarvis_c2rust.optimizer_utils import git_toplevel
+from jarvis.jarvis_c2rust.optimizer_utils import iter_rust_files
+from jarvis.jarvis_c2rust.optimizer_utils import run_cargo_fmt
+from jarvis.jarvis_c2rust.optimizer_utils import run_cmd
+from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
 
 class ClippyOptimizer:

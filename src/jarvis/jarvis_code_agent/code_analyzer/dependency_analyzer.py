@@ -5,7 +5,10 @@
 
 import os
 from dataclasses import dataclass
-from typing import Dict, List, Set, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
 
 from .file_ignore import filter_walk_dirs
 

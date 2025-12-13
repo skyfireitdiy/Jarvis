@@ -4,13 +4,15 @@
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from jarvis.jarvis_c2rust.constants import DEFAULT_CHECKPOINT_INTERVAL, JSON_INDENT
-from jarvis.jarvis_c2rust.library_replacer_utils import (
-    normalize_list,
-    normalize_list_lower,
-)
+from jarvis.jarvis_c2rust.constants import DEFAULT_CHECKPOINT_INTERVAL
+from jarvis.jarvis_c2rust.constants import JSON_INDENT
+from jarvis.jarvis_c2rust.library_replacer_utils import normalize_list
+from jarvis.jarvis_c2rust.library_replacer_utils import normalize_list_lower
 
 
 def make_checkpoint_key(

@@ -1,20 +1,21 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """LLM 模块规划 Agent 的执行器。"""
 
 import os
 import subprocess
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List
+from typing import Optional
+from typing import Union
 
 from jarvis.jarvis_c2rust.llm_module_agent_apply import (
     apply_project_structure_from_json,
 )
-from jarvis.jarvis_c2rust.llm_module_agent_utils import (
-    parse_project_json_entries,
-    resolve_created_dir,
-)
+from jarvis.jarvis_c2rust.llm_module_agent_utils import parse_project_json_entries
+from jarvis.jarvis_c2rust.llm_module_agent_utils import resolve_created_dir
 
 
 def execute_llm_plan(
@@ -147,10 +148,8 @@ def execute_llm_plan(
                 PrettyOutput.auto_print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
             try:
                 # 验证模型配置在切换目录后是否仍然有效
-                from jarvis.jarvis_utils.config import (
-                    get_normal_model_name,
-                    get_normal_platform_name,
-                )
+                from jarvis.jarvis_utils.config import get_normal_model_name
+                from jarvis.jarvis_utils.config import get_normal_platform_name
 
                 if llm_group:
                     resolved_model = get_normal_model_name(llm_group)
@@ -194,10 +193,8 @@ def execute_llm_plan(
                     )
                     # 尝试显示当前解析的模型配置
                     try:
-                        from jarvis.jarvis_utils.config import (
-                            get_normal_model_name,
-                            get_normal_platform_name,
-                        )
+                        from jarvis.jarvis_utils.config import get_normal_model_name
+                        from jarvis.jarvis_utils.config import get_normal_platform_name
 
                         if llm_group:
                             PrettyOutput.auto_print(

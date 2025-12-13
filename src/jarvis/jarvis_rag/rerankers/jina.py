@@ -2,7 +2,8 @@
 Jina 重排模型实现。
 """
 
-from typing import List, Optional
+from typing import List
+from typing import Optional
 
 from .base import OnlineReranker
 

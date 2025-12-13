@@ -20,15 +20,17 @@ from pathlib import Path
 from typing import Optional
 
 import typer
-from jarvis.jarvis_utils.utils import init_env
+
+from jarvis.jarvis_sec.report import aggregate_issues
+from jarvis.jarvis_sec.report import format_csv_report
 
 # removed: set_config import（避免全局覆盖模型组配置）
+from jarvis.jarvis_sec.workflow import direct_scan
 from jarvis.jarvis_sec.workflow import (
-    run_with_agent,
-    direct_scan,
     format_markdown_report as format_markdown_report_workflow,
 )
-from jarvis.jarvis_sec.report import format_csv_report, aggregate_issues
+from jarvis.jarvis_sec.workflow import run_with_agent
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(
     add_completion=False,

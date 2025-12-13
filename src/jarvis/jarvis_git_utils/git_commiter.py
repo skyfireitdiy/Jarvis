@@ -1,28 +1,27 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import os
 import re
 import subprocess
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any
+from typing import Dict
+from typing import Optional
 
 import typer
 import yaml
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_git_commit_prompt
-from jarvis.jarvis_utils.git_utils import (
-    confirm_add_new_files,
-    find_git_root_and_cd,
-    has_uncommitted_changes,
-)
-from jarvis.jarvis_utils.globals import (
-    get_global_model_group,
-)
+from jarvis.jarvis_utils.git_utils import confirm_add_new_files
+from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
+from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
+from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.output import OutputType
-from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import init_env, is_context_overflow
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import is_context_overflow
 
 app = typer.Typer(help="Git提交工具")
 
@@ -138,10 +137,8 @@ class GitCommitTool:
                 model_group = args.get("model_group") or get_global_model_group()
 
                 # Get platform and model based on model_group (thinking mode removed)
-                from jarvis.jarvis_utils.config import (
-                    get_normal_platform_name,
-                    get_normal_model_name,
-                )
+                from jarvis.jarvis_utils.config import get_normal_model_name
+                from jarvis.jarvis_utils.config import get_normal_platform_name
 
                 # 始终使用normal模型生成提交信息，不从agent.model获取（避免使用smart模型）
                 # 优先根据 model_group 获取（确保配置一致性）

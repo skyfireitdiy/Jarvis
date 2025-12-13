@@ -4,7 +4,9 @@
 """
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 from jarvis.jarvis_c2rust.models import FnRecord
 

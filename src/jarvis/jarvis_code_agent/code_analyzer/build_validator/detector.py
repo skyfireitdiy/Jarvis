@@ -1,7 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 构建系统检测器模块
 
@@ -11,7 +7,15 @@ from jarvis.jarvis_utils.output import PrettyOutput
 import os
 import re
 import subprocess
-from typing import List, Optional, Tuple
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 from .base import BuildSystem
 

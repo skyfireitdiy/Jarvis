@@ -4,23 +4,24 @@
 完全基于LLM实现，不依赖硬编码规则。
 """
 
-from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 import json
 import os
 import re
-from typing import List, Optional, Any
+from typing import Any
+from typing import List
+from typing import Optional
 
 from rich.console import Console
-from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import (
-    get_cheap_platform_name,
-    get_cheap_model_name,
-)
-from jarvis.jarvis_utils.globals import get_global_model_group
-from jarvis.jarvis_code_agent.utils import get_project_overview
 
-from .context_recommender import ContextRecommendation
+from jarvis.jarvis_code_agent.utils import get_project_overview
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_cheap_model_name
+from jarvis.jarvis_utils.config import get_cheap_platform_name
+from jarvis.jarvis_utils.globals import get_global_model_group
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+
 from .context_manager import ContextManager
+from .context_recommender import ContextRecommendation
 from .symbol_extractor import Symbol
 
 
@@ -146,8 +147,10 @@ class ContextRecommender:
         遍历项目目录，提取所有支持语言的符号。
         """
         import os
-        from .language_support import detect_language, get_symbol_extractor
+
         from .file_ignore import filter_walk_dirs
+        from .language_support import detect_language
+        from .language_support import get_symbol_extractor
 
         console = Console()
         project_root = self.context_manager.project_root

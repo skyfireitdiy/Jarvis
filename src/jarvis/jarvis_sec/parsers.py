@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """解析模块 - 用于解析Agent返回的JSON格式摘要"""
 
-from typing import List, Optional
+from typing import List
+from typing import Optional
+
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
 

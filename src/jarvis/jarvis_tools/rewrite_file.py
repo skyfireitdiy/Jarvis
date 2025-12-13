@@ -1,8 +1,9 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import os
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class RewriteFileTool:

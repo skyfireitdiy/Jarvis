@@ -1,20 +1,24 @@
 # -*- coding: utf-8 -*-
 """验证相关模块"""
 
-from typing import Dict, List, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
+
 import typer
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_sec.prompts import build_verification_summary_prompt
+from jarvis.jarvis_sec.agents import create_analysis_agent
+from jarvis.jarvis_sec.agents import subscribe_summary_event
+from jarvis.jarvis_sec.analysis import build_analysis_task_context
+from jarvis.jarvis_sec.analysis import expand_and_filter_analysis_results
+from jarvis.jarvis_sec.analysis import run_analysis_agent_with_retry
 from jarvis.jarvis_sec.parsers import try_parse_summary_report
-from jarvis.jarvis_sec.agents import create_analysis_agent, subscribe_summary_event
-from jarvis.jarvis_sec.utils import git_restore_if_dirty, sig_of, count_issues_from_file
-from jarvis.jarvis_sec.analysis import (
-    build_analysis_task_context,
-    run_analysis_agent_with_retry,
-    expand_and_filter_analysis_results,
-)
+from jarvis.jarvis_sec.prompts import build_verification_summary_prompt
+from jarvis.jarvis_sec.utils import count_issues_from_file
+from jarvis.jarvis_sec.utils import git_restore_if_dirty
+from jarvis.jarvis_sec.utils import sig_of
+from jarvis.jarvis_tools.registry import ToolRegistry
 
 
 def build_gid_to_verification_mapping(
@@ -628,15 +632,16 @@ def process_verification_batch(
                     verification_agent
                 )
 
-                verification_results, verification_parse_error = (
-                    run_verification_agent_with_retry(
-                        verification_agent,
-                        verification_task,
-                        build_verification_summary_prompt(),
-                        entry_path,
-                        verification_summary_container,
-                        bidx,
-                    )
+                (
+                    verification_results,
+                    verification_parse_error,
+                ) = run_verification_agent_with_retry(
+                    verification_agent,
+                    verification_task,
+                    build_verification_summary_prompt(),
+                    entry_path,
+                    verification_summary_container,
+                    bidx,
                 )
 
                 # 调试日志：显示验证结果
@@ -898,10 +903,8 @@ def process_verification_phase(
     force_save_memory: bool = False,
 ) -> List[Dict]:
     """处理验证阶段，返回所有已保存的告警"""
-    from jarvis.jarvis_sec.file_manager import (
-        load_analysis_results,
-        get_all_analyzed_gids,
-    )
+    from jarvis.jarvis_sec.file_manager import get_all_analyzed_gids
+    from jarvis.jarvis_sec.file_manager import load_analysis_results
 
     batches: List[List[Dict]] = cluster_batches
     total_batches = len(batches)
@@ -1108,7 +1111,8 @@ def process_verification_phase(
         )
 
     # 从 analysis.jsonl 读取所有已验证的问题
-    from jarvis.jarvis_sec.file_manager import get_verified_issue_gids, load_candidates
+    from jarvis.jarvis_sec.file_manager import get_verified_issue_gids
+    from jarvis.jarvis_sec.file_manager import load_candidates
 
     get_verified_issue_gids(sec_dir)
     load_candidates(sec_dir)

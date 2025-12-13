@@ -5,17 +5,23 @@
 """
 
 import builtins
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Set
+from datetime import datetime
+from datetime import timedelta
+from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
+
 import typer
+from rich import print as rprint
 from rich.console import Console
 from rich.table import Table
-from rich import print as rprint
-from pathlib import Path
+
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.utils import init_env
 
 from .stats import StatsManager
-from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_utils.config import get_data_dir
 
 app = typer.Typer(help="Jarvis 统计模块命令行工具")
 console = Console()
@@ -252,8 +258,8 @@ def export(
     ),
 ):
     """导出统计数据"""
-    import json
     import csv
+    import json
     import sys
 
     stats = StatsManager(_get_stats_dir())

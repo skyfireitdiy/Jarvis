@@ -1,27 +1,31 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 构建验证器主模块
 
 提供构建验证器的主类，负责协调各个语言的验证器。
 """
 
-from typing import Dict, List, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
+from jarvis.jarvis_utils.output import PrettyOutput
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 
-from .base import BuildSystem, BuildValidatorBase, BuildResult
-from .detector import BuildSystemDetector
-from .rust import RustBuildValidator
-from .python import PythonBuildValidator
-from .nodejs import NodeJSBuildValidator
-from .java_maven import JavaMavenBuildValidator
-from .java_gradle import JavaGradleBuildValidator
-from .go import GoBuildValidator
+from .base import BuildResult
+from .base import BuildSystem
+from .base import BuildValidatorBase
 from .cmake import CMakeBuildValidator
-from .makefile import MakefileBuildValidator
+from .detector import BuildSystemDetector
 from .fallback import FallbackBuildValidator
+from .go import GoBuildValidator
+from .java_gradle import JavaGradleBuildValidator
+from .java_maven import JavaMavenBuildValidator
+from .makefile import MakefileBuildValidator
+from .nodejs import NodeJSBuildValidator
+from .python import PythonBuildValidator
+from .rust import RustBuildValidator
 
 
 class BuildValidator:

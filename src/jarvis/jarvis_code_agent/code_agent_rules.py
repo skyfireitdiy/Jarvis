@@ -1,21 +1,21 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """CodeAgent 规则管理模块"""
 
 import os
 import subprocess
-from typing import List, Optional
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
+from typing import List
+from typing import Optional
 
 import yaml
 
-from jarvis.jarvis_utils.config import (
-    get_data_dir,
-    get_rules_load_dirs,
-    get_central_rules_repo,
-)
-from jarvis.jarvis_utils.utils import daily_check_git_updates
 from jarvis.jarvis_code_agent.builtin_rules import get_builtin_rule
+from jarvis.jarvis_utils.config import get_central_rules_repo
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_rules_load_dirs
+from jarvis.jarvis_utils.utils import daily_check_git_updates
 
 
 class RulesManager:

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """Java language symbol extractor."""
 
-from typing import Optional, Any
+from typing import Any
+from typing import Optional
 
 from jarvis.jarvis_agent.file_context_handler import register_language_extractor
 
@@ -17,8 +18,10 @@ def create_java_extractor() -> Optional[Any]:
     except (ImportError, RuntimeError, Exception):
         # 如果 code_analyzer 中没有 Java 支持，尝试直接使用 tree-sitter
         try:
-            from tree_sitter import Language, Parser
             import tree_sitter_java
+            from tree_sitter import Language
+            from tree_sitter import Parser
+
             from jarvis.jarvis_code_agent.code_analyzer.symbol_extractor import Symbol
 
             JAVA_LANGUAGE = tree_sitter_java.language()

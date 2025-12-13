@@ -1,11 +1,16 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """普通文件编辑工具（基于 search/replace 的非结构化编辑）"""
 
 import os
 import shutil
-from typing import Any, Dict, List, Optional, Tuple
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 
 class EditFileNormalTool:
@@ -562,10 +567,12 @@ class EditFileNormalTool:
             require_unique = True
 
             # 使用精确匹配查找位置
-            match_result, error_msg, preview_info = (
-                EditFileNormalTool._find_best_match_position(
-                    content, search, require_unique=require_unique
-                )
+            (
+                match_result,
+                error_msg,
+                preview_info,
+            ) = EditFileNormalTool._find_best_match_position(
+                content, search, require_unique=require_unique
             )
 
             if match_result is None:
@@ -681,18 +688,22 @@ class EditFileNormalTool:
                     continue
 
                 # 读取原始内容并创建备份
-                original_content, backup_path = (
-                    EditFileNormalTool._read_file_with_backup(file_path)
-                )
+                (
+                    original_content,
+                    backup_path,
+                ) = EditFileNormalTool._read_file_with_backup(file_path)
 
                 # 应用所有普通编辑
-                success, result_or_error, confirm_info, confirm_diff_idx = (
-                    EditFileNormalTool._apply_normal_edits_to_content(
-                        original_content,
-                        normalized_diffs,
-                        agent=agent,
-                        file_path=file_path,
-                    )
+                (
+                    success,
+                    result_or_error,
+                    confirm_info,
+                    confirm_diff_idx,
+                ) = EditFileNormalTool._apply_normal_edits_to_content(
+                    original_content,
+                    normalized_diffs,
+                    agent=agent,
+                    file_path=file_path,
                 )
 
                 if not success:
@@ -744,10 +755,11 @@ class EditFileNormalTool:
 
                 # 写入文件（失败时回滚）
                 abs_path = os.path.abspath(file_path)
-                write_success, write_error = (
-                    EditFileNormalTool._write_file_with_rollback(
-                        abs_path, result_or_error, backup_path
-                    )
+                (
+                    write_success,
+                    write_error,
+                ) = EditFileNormalTool._write_file_with_rollback(
+                    abs_path, result_or_error, backup_path
                 )
                 if write_success:
                     # 写入成功，删除备份文件

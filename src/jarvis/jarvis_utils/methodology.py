@@ -1,6 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """
 方法论管理模块
 该模块提供了加载和搜索方法论的实用工具。
@@ -12,19 +9,24 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 import json
 import os
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import (
-    get_data_dir,
-    get_methodology_dirs,
-    get_central_methodology_repo,
-    get_cheap_max_input_token_count,
-)
-from jarvis.jarvis_utils.utils import daily_check_git_updates
+from jarvis.jarvis_utils.config import get_central_methodology_repo
+from jarvis.jarvis_utils.config import get_cheap_max_input_token_count
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_methodology_dirs
 from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.utils import daily_check_git_updates
 
 
 def _get_methodology_directory() -> str:

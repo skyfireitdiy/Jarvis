@@ -1,14 +1,17 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
-from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 import json
 import os
 import re
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple, cast
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Protocol
+from typing import Tuple
+from typing import cast
 
 import yaml
 
@@ -17,10 +20,17 @@ from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
-from jarvis.jarvis_utils.config import get_data_dir, get_tool_load_dirs
-from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import is_context_overflow, daily_check_git_updates
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_tool_load_dirs
 from jarvis.jarvis_utils.globals import get_global_model_group
+
+# -*- coding: utf-8 -*-
+from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import daily_check_git_updates
+from jarvis.jarvis_utils.utils import is_context_overflow
 
 _multiline_example = """  {
     "multiline_str": |||
@@ -189,8 +199,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def _get_tool_stats(self) -> Dict[str, int]:
         """从数据目录获取工具调用统计"""
-        from jarvis.jarvis_stats.stats import StatsManager
         from datetime import datetime
+
+        from jarvis.jarvis_stats.stats import StatsManager
 
         # 获取所有工具的统计数据
         tool_stats = {}
@@ -263,7 +274,8 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def _apply_tool_config_filter(self) -> None:
         """应用工具配置组的过滤规则"""
-        from jarvis.jarvis_utils.config import get_tool_use_list, get_tool_dont_use_list
+        from jarvis.jarvis_utils.config import get_tool_dont_use_list
+        from jarvis.jarvis_utils.config import get_tool_use_list
 
         # 在过滤前保存必选工具的引用
         required_tools_backup: Dict[str, Tool] = {}
@@ -875,9 +887,10 @@ class ToolRegistry(OutputHandlerProtocol):
 
         # 如果检测到多个工具调用块，先检查是否是多个独立的工具调用
         if len(data) > 1:
-            error_msg, has_multiple = (
-                ToolRegistry._check_and_handle_multiple_tool_calls(content, data)
-            )
+            (
+                error_msg,
+                has_multiple,
+            ) = ToolRegistry._check_and_handle_multiple_tool_calls(content, data)
             if has_multiple:
                 return (
                     cast(Dict[str, Dict[str, Any]], {}),
@@ -925,10 +938,11 @@ class ToolRegistry(OutputHandlerProtocol):
                     rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}",
                     content,
                 )
-                error_msg, has_multiple = (
-                    ToolRegistry._check_and_handle_multiple_tool_calls(
-                        content, multiple_blocks
-                    )
+                (
+                    error_msg,
+                    has_multiple,
+                ) = ToolRegistry._check_and_handle_multiple_tool_calls(
+                    content, multiple_blocks
                 )
                 if has_multiple:
                     return (
@@ -1030,10 +1044,11 @@ class ToolRegistry(OutputHandlerProtocol):
                         rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}",
                         content,
                     )
-                    error_msg, has_multiple = (
-                        ToolRegistry._check_and_handle_multiple_tool_calls(
-                            content, multiple_blocks
-                        )
+                    (
+                        error_msg,
+                        has_multiple,
+                    ) = ToolRegistry._check_and_handle_multiple_tool_calls(
+                        content, multiple_blocks
                     )
                     if has_multiple:
                         return (

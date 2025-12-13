@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 """库替换器的 LLM 模型创建和评估模块。"""
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import typer
 
@@ -15,10 +20,8 @@ def check_llm_availability() -> tuple[bool, Any, Any, Any]:
     """
     try:
         from jarvis.jarvis_platform.registry import PlatformRegistry
-        from jarvis.jarvis_utils.config import (
-            get_smart_platform_name,
-            get_smart_model_name,
-        )
+        from jarvis.jarvis_utils.config import get_smart_model_name
+        from jarvis.jarvis_utils.config import get_smart_platform_name
 
         return True, PlatformRegistry, get_smart_platform_name, get_smart_model_name
     except Exception:
@@ -87,6 +90,7 @@ def parse_agent_json_summary(
     if not isinstance(text, str) or not text.strip():
         return None, "摘要文本为空"
     import re as _re
+
     from jarvis.jarvis_utils.jsonnet_compat import loads as _json_loads
 
     # 提取 <SUMMARY> 块

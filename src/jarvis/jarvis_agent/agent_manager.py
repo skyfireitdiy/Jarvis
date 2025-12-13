@@ -1,19 +1,18 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """Agent管理器模块，负责Agent的初始化和任务执行"""
 
-from typing import Optional, Callable
+from typing import Callable
+from typing import Optional
 
 import typer
 
-from jarvis.jarvis_agent import (
-    Agent,
-    get_multiline_input,
-    origin_agent_system_prompt,
-)
+from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_agent import get_multiline_input
+from jarvis.jarvis_agent import origin_agent_system_prompt
 from jarvis.jarvis_agent.task_manager import TaskManager
-from jarvis.jarvis_utils.config import is_non_interactive, is_skip_predefined_tasks
+from jarvis.jarvis_utils.config import is_non_interactive
+from jarvis.jarvis_utils.config import is_skip_predefined_tasks
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class AgentManager:

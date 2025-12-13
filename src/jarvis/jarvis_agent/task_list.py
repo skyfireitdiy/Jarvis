@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """任务列表模块。
 
@@ -10,10 +8,18 @@ import json
 import os
 import time
 from collections import OrderedDict
+from dataclasses import asdict
+from dataclasses import dataclass
+from dataclasses import field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
-from dataclasses import dataclass, asdict, field
 from threading import Lock
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import Tuple
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class TaskStatus(Enum):

@@ -1,21 +1,18 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """
 任务分析器模块
 负责处理任务分析和方法论生成功能
 """
 
-from jarvis.jarvis_utils.globals import get_interrupt, set_interrupt
-
+from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_agent.events import BEFORE_SUMMARY
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
+from jarvis.jarvis_agent.events import TASK_COMPLETED
 from jarvis.jarvis_agent.prompts import get_task_analysis_prompt
 from jarvis.jarvis_agent.utils import join_prompts
-from jarvis.jarvis_agent.events import (
-    BEFORE_TOOL_CALL,
-    AFTER_TOOL_CALL,
-    BEFORE_SUMMARY,
-    TASK_COMPLETED,
-)
+from jarvis.jarvis_utils.globals import get_interrupt
+from jarvis.jarvis_utils.globals import set_interrupt
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class TaskAnalyzer:

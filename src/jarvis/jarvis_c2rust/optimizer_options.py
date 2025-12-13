@@ -2,7 +2,8 @@
 """优化器选项和统计数据结构。"""
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List
+from typing import Optional
 
 
 @dataclass

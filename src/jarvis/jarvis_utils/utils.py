@@ -1,4 +1,5 @@
-from jarvis.jarvis_utils.output import PrettyOutput
+import atexit
+import errno
 
 # -*- coding: utf-8 -*-
 import hashlib
@@ -7,27 +8,32 @@ import os
 import signal
 import subprocess
 import sys
-import time
-import atexit
-import errno
 import threading
+import time
+from datetime import date
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
-from datetime import datetime, date
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import yaml
 from rich.align import Align
 from rich.console import RenderableType
 
 from jarvis import __version__
-from jarvis.jarvis_utils.config import (
-    get_data_dir,
-    get_max_big_content_size,
-    set_global_env_data,
-)
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_max_big_content_size
+from jarvis.jarvis_utils.config import set_global_env_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import get_in_chat, get_interrupt, set_interrupt
+from jarvis.jarvis_utils.globals import get_in_chat
+from jarvis.jarvis_utils.globals import get_interrupt
+from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput
 
 # 向后兼容：导出 get_yes_no 供外部模块引用
 get_yes_no = user_confirm
@@ -343,8 +349,9 @@ def _check_pip_updates() -> bool:
     返回:
         bool: 是否执行了更新（成功更新返回True以触发重启）
     """
-    import urllib.request
     import urllib.error
+    import urllib.request
+
     from packaging import version
 
     # 检查上次检查日期
@@ -490,7 +497,8 @@ def _check_jarvis_updates() -> bool:
 def _show_usage_stats(welcome_str: str) -> None:
     """显示Jarvis使用统计信息"""
     try:
-        from rich.console import Console, Group
+        from rich.console import Console
+        from rich.console import Group
         from rich.panel import Panel
         from rich.table import Table
         from rich.text import Text
@@ -994,11 +1002,9 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
 def _interactive_config_setup(config_file_path: Path):
     """交互式配置引导"""
     from jarvis.jarvis_platform.registry import PlatformRegistry
-    from jarvis.jarvis_utils.input import (
-        get_choice,
-        get_single_line_input as get_input,
-        user_confirm as get_yes_no,
-    )
+    from jarvis.jarvis_utils.input import get_choice
+    from jarvis.jarvis_utils.input import get_single_line_input as get_input
+    from jarvis.jarvis_utils.input import user_confirm as get_yes_no
 
     PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！未找到配置文件，现在开始引导配置。")
 
@@ -1810,12 +1816,14 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
     try:
         from jarvis.jarvis_utils.config import (
             get_rag_embedding_model as _get_rag_embedding_model,
+        )
+        from jarvis.jarvis_utils.config import (
             get_rag_rerank_model as _get_rag_rerank_model,
         )
-        from jarvis.jarvis_utils.input import user_confirm as get_yes_no_func
         from jarvis.jarvis_utils.input import (
             get_single_line_input as get_single_line_input_func,
         )
+        from jarvis.jarvis_utils.input import user_confirm as get_yes_no_func
 
         rag_default_embed = _get_rag_embedding_model()
         rag_default_rerank = _get_rag_rerank_model()
@@ -2364,8 +2372,9 @@ def get_file_line_count(filename: str) -> int:
 
 def count_cmd_usage() -> None:
     """统计当前命令的使用次数"""
-    import sys
     import os
+    import sys
+
     from jarvis.jarvis_stats.stats import StatsManager
 
     # 从完整路径中提取命令名称

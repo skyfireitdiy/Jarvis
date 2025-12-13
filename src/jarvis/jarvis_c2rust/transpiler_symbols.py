@@ -5,7 +5,9 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 import typer
 

@@ -1,10 +1,12 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import os
 import sys
 import time
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import Dict
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 # 为了类型检查，总是导入这些模块
 if TYPE_CHECKING:
@@ -180,8 +182,8 @@ class VirtualTTYTool:
                 self._close_tty(agent, tty_id)
 
             # 在Unix平台上导入需要的模块
-            import pty as _pty  # pylint: disable=import-outside-toplevel
             import fcntl as _fcntl  # pylint: disable=import-outside-toplevel
+            import pty as _pty  # pylint: disable=import-outside-toplevel
             import select as _select  # pylint: disable=import-outside-toplevel
 
             # 创建伪终端
@@ -235,9 +237,9 @@ class VirtualTTYTool:
                 self._close_tty(agent, tty_id)
 
             # 在Windows平台上导入需要的模块
+            import queue as _queue  # pylint: disable=import-outside-toplevel
             import subprocess as _subprocess  # pylint: disable=import-outside-toplevel
             import threading as _threading  # pylint: disable=import-outside-toplevel
-            import queue as _queue  # pylint: disable=import-outside-toplevel
 
             # 创建子进程
             process = _subprocess.Popen(

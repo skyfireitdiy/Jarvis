@@ -1,19 +1,17 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 """语言支持模块。
 
 提供语言检测和工厂函数，使用语言注册表管理所有语言支持。
 """
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 from typing import Optional
 
 from .dependency_analyzer import DependencyAnalyzer
-from .language_registry import (
-    detect_language as _detect_language,
-    get_dependency_analyzer as _get_dependency_analyzer,
-    get_symbol_extractor as _get_symbol_extractor,
-    register_language,
-)
+from .language_registry import detect_language as _detect_language
+from .language_registry import get_dependency_analyzer as _get_dependency_analyzer
+from .language_registry import get_symbol_extractor as _get_symbol_extractor
+from .language_registry import register_language
 from .symbol_extractor import SymbolExtractor
 
 # 自动注册所有语言支持

@@ -1,7 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 记忆整理工具 - 用于合并具有相似标签的记忆
 
@@ -11,16 +7,23 @@ from jarvis.jarvis_utils.output import PrettyOutput
 import json
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Set, Any, Optional
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
 
 import typer
 
-from jarvis.jarvis_utils.config import (
-    get_data_dir,
-    get_normal_platform_name,
-    get_normal_model_name,
-)
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.utils import init_env
 
 
@@ -206,6 +209,7 @@ class MemoryOrganizer:
 
             # 解析响应
             import re
+
             from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
 
             # 提取 <merged_memory> 标签内的内容

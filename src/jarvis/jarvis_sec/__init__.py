@@ -19,106 +19,192 @@ Jarvis 安全分析套件
 - 模块化重构：将功能拆分为多个模块（prompts, parsers, utils, agents, clustering, analysis, verification, review）
 """
 
-from typing import Dict, List, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import typer
 
 from jarvis.jarvis_agent import Agent  # noqa: F401
-from jarvis.jarvis_sec.workflow import direct_scan, run_with_agent
-
-# 导入模块化后的函数（用于触发模块加载）
-from jarvis.jarvis_sec.prompts import (  # noqa: F401
-    build_summary_prompt as _build_summary_prompt,
-    build_verification_summary_prompt as _build_verification_summary_prompt,
-    get_review_system_prompt as _get_review_system_prompt,
-    get_review_summary_prompt as _get_review_summary_prompt,
-    get_cluster_system_prompt as _get_cluster_system_prompt,
-    get_cluster_summary_prompt as _get_cluster_summary_prompt,
+from jarvis.jarvis_sec.agents import create_analysis_agent as _create_analysis_agent
+from jarvis.jarvis_sec.agents import create_cluster_agent as _create_cluster_agent
+from jarvis.jarvis_sec.agents import create_review_agent as _create_review_agent
+from jarvis.jarvis_sec.agents import subscribe_summary_event as _subscribe_summary_event  # noqa: F401
+from jarvis.jarvis_sec.analysis import (
+    build_analysis_task_context as _build_analysis_task_context,
+)  # noqa: F401
+from jarvis.jarvis_sec.analysis import (
+    build_validation_error_guidance as _build_validation_error_guidance,
 )
-from jarvis.jarvis_sec.parsers import (  # noqa: F401
-    parse_clusters_from_text as _parse_clusters_from_text,
-    try_parse_summary_report as _try_parse_summary_report,
+from jarvis.jarvis_sec.analysis import (
+    expand_and_filter_analysis_results as _expand_and_filter_analysis_results,
 )
-from jarvis.jarvis_sec.utils import (  # noqa: F401
-    git_restore_if_dirty as _git_restore_if_dirty,
-    get_sec_dir as _get_sec_dir,
-    initialize_analysis_context as _initialize_analysis_context,
-    load_or_run_heuristic_scan as _load_or_run_heuristic_scan,
-    compact_candidate as _compact_candidate,
-    prepare_candidates as _prepare_candidates,
-    group_candidates_by_file as _group_candidates_by_file,
-    create_report_writer as _create_report_writer,
-    sig_of as _sig_of,
-    load_processed_gids_from_issues as _load_processed_gids_from_issues,
-    count_issues_from_file as _count_issues_from_file,
-    load_all_issues_from_file as _load_all_issues_from_file,
-    load_processed_gids_from_agent_issues as _load_processed_gids_from_agent_issues,
+from jarvis.jarvis_sec.analysis import (
+    run_analysis_agent_with_retry as _run_analysis_agent_with_retry,
 )
-from jarvis.jarvis_sec.agents import (  # noqa: F401
-    subscribe_summary_event as _subscribe_summary_event,
-    create_analysis_agent as _create_analysis_agent,
-    create_review_agent as _create_review_agent,
-    create_cluster_agent as _create_cluster_agent,
-)
-from jarvis.jarvis_sec.clustering import (  # noqa: F401
-    load_existing_clusters as _load_existing_clusters,
-    restore_clusters_from_checkpoint as _restore_clusters_from_checkpoint,
-    create_cluster_snapshot_writer as _create_cluster_snapshot_writer,
-    collect_candidate_gids as _collect_candidate_gids,
-    collect_clustered_gids as _collect_clustered_gids,
-    # supplement_missing_gids_for_clustering已移除，不再需要
-    handle_single_alert_file as _handle_single_alert_file,
-    validate_cluster_format as _validate_cluster_format,
-    extract_classified_gids as _extract_classified_gids,
-    build_cluster_retry_task as _build_cluster_retry_task,
+from jarvis.jarvis_sec.analysis import valid_items as _valid_items
+from jarvis.jarvis_sec.clustering import (
     build_cluster_error_guidance as _build_cluster_error_guidance,
-    run_cluster_agent_direct_model as _run_cluster_agent_direct_model,
-    validate_cluster_result as _validate_cluster_result,
-    check_cluster_completeness as _check_cluster_completeness,
-    run_cluster_agent_with_retry as _run_cluster_agent_with_retry,
-    process_cluster_results as _process_cluster_results,
-    supplement_missing_gids as _supplement_missing_gids,
-    build_cluster_task as _build_cluster_task,
-    extract_input_gids as _extract_input_gids,
+)
+from jarvis.jarvis_sec.clustering import (
+    build_cluster_retry_task as _build_cluster_retry_task,
+)
+from jarvis.jarvis_sec.clustering import build_cluster_task as _build_cluster_task
+from jarvis.jarvis_sec.clustering import (
     build_gid_to_item_mapping as _build_gid_to_item_mapping,
-    process_cluster_chunk as _process_cluster_chunk,
-    filter_pending_items as _filter_pending_items,
-    process_file_clustering as _process_file_clustering,
-    # check_and_supplement_missing_gids已移除，完整性检查已移至process_clustering_phase中
-    initialize_clustering_context as _initialize_clustering_context,
+)
+from jarvis.jarvis_sec.clustering import (
+    check_cluster_completeness as _check_cluster_completeness,
+)
+from jarvis.jarvis_sec.clustering import (
     check_unclustered_gids as _check_unclustered_gids,
+)
+from jarvis.jarvis_sec.clustering import (
+    collect_candidate_gids as _collect_candidate_gids,
+)
+from jarvis.jarvis_sec.clustering import (
+    collect_clustered_gids as _collect_clustered_gids,
+)
+from jarvis.jarvis_sec.clustering import (
+    create_cluster_snapshot_writer as _create_cluster_snapshot_writer,
+)
+from jarvis.jarvis_sec.clustering import (
     execute_clustering_for_files as _execute_clustering_for_files,
-    record_clustering_completion as _record_clustering_completion,
+)
+from jarvis.jarvis_sec.clustering import (
+    extract_classified_gids as _extract_classified_gids,
+)
+from jarvis.jarvis_sec.clustering import extract_input_gids as _extract_input_gids
+from jarvis.jarvis_sec.clustering import (
     fallback_to_file_based_batches as _fallback_to_file_based_batches,
+)
+from jarvis.jarvis_sec.clustering import filter_pending_items as _filter_pending_items
+from jarvis.jarvis_sec.clustering import (
+    handle_single_alert_file as _handle_single_alert_file,
+)
+from jarvis.jarvis_sec.clustering import (
+    initialize_clustering_context as _initialize_clustering_context,
+)
+from jarvis.jarvis_sec.clustering import (
+    load_existing_clusters as _load_existing_clusters,
+)  # noqa: F401; supplement_missing_gids_for_clustering已移除，不再需要; check_and_supplement_missing_gids已移除，完整性检查已移至process_clustering_phase中
+from jarvis.jarvis_sec.clustering import process_cluster_chunk as _process_cluster_chunk
+from jarvis.jarvis_sec.clustering import (
+    process_cluster_results as _process_cluster_results,
+)
+from jarvis.jarvis_sec.clustering import (
     process_clustering_phase as _process_clustering_phase,
 )
-from jarvis.jarvis_sec.review import (  # noqa: F401
-    build_review_task as _build_review_task,
-    process_review_batch_items as _process_review_batch_items,
-    reinstated_candidates_to_cluster_batches as _reinstated_candidates_to_cluster_batches,
-    process_review_phase as _process_review_phase,
-    build_gid_to_review_mapping as _build_gid_to_review_mapping,
-    process_review_batch as _process_review_batch,
-    run_review_agent_with_retry as _run_review_agent_with_retry,
-    is_valid_review_item as _is_valid_review_item,
+from jarvis.jarvis_sec.clustering import (
+    process_file_clustering as _process_file_clustering,
 )
-from jarvis.jarvis_sec.analysis import (  # noqa: F401
-    build_analysis_task_context as _build_analysis_task_context,
-    build_validation_error_guidance as _build_validation_error_guidance,
-    run_analysis_agent_with_retry as _run_analysis_agent_with_retry,
-    expand_and_filter_analysis_results as _expand_and_filter_analysis_results,
-    valid_items as _valid_items,
+from jarvis.jarvis_sec.clustering import (
+    record_clustering_completion as _record_clustering_completion,
 )
-from jarvis.jarvis_sec.verification import (  # noqa: F401
-    build_gid_to_verification_mapping as _build_gid_to_verification_mapping,
-    merge_verified_items as _merge_verified_items,
-    merge_verified_items_without_verification as _merge_verified_items_without_verification,
-    process_verification_batch as _process_verification_batch,
-    is_valid_verification_item as _is_valid_verification_item,
-    run_verification_agent_with_retry as _run_verification_agent_with_retry,
-    process_verification_phase as _process_verification_phase,
+from jarvis.jarvis_sec.clustering import (
+    restore_clusters_from_checkpoint as _restore_clusters_from_checkpoint,
+)
+from jarvis.jarvis_sec.clustering import (
+    run_cluster_agent_direct_model as _run_cluster_agent_direct_model,
+)
+from jarvis.jarvis_sec.clustering import (
+    run_cluster_agent_with_retry as _run_cluster_agent_with_retry,
+)
+from jarvis.jarvis_sec.clustering import (
+    supplement_missing_gids as _supplement_missing_gids,
+)
+from jarvis.jarvis_sec.clustering import (
+    validate_cluster_format as _validate_cluster_format,
+)
+from jarvis.jarvis_sec.clustering import (
+    validate_cluster_result as _validate_cluster_result,
+)
+from jarvis.jarvis_sec.parsers import (
+    parse_clusters_from_text as _parse_clusters_from_text,
+)  # noqa: F401
+from jarvis.jarvis_sec.parsers import (
+    try_parse_summary_report as _try_parse_summary_report,
 )
 
+# 导入模块化后的函数（用于触发模块加载）
+from jarvis.jarvis_sec.prompts import build_summary_prompt as _build_summary_prompt  # noqa: F401
+from jarvis.jarvis_sec.prompts import (
+    build_verification_summary_prompt as _build_verification_summary_prompt,
+)
+from jarvis.jarvis_sec.prompts import (
+    get_cluster_summary_prompt as _get_cluster_summary_prompt,
+)
+from jarvis.jarvis_sec.prompts import (
+    get_cluster_system_prompt as _get_cluster_system_prompt,
+)
+from jarvis.jarvis_sec.prompts import (
+    get_review_summary_prompt as _get_review_summary_prompt,
+)
+from jarvis.jarvis_sec.prompts import (
+    get_review_system_prompt as _get_review_system_prompt,
+)
+from jarvis.jarvis_sec.review import (
+    build_gid_to_review_mapping as _build_gid_to_review_mapping,
+)
+from jarvis.jarvis_sec.review import build_review_task as _build_review_task  # noqa: F401
+from jarvis.jarvis_sec.review import is_valid_review_item as _is_valid_review_item
+from jarvis.jarvis_sec.review import process_review_batch as _process_review_batch
+from jarvis.jarvis_sec.review import (
+    process_review_batch_items as _process_review_batch_items,
+)
+from jarvis.jarvis_sec.review import process_review_phase as _process_review_phase
+from jarvis.jarvis_sec.review import (
+    reinstated_candidates_to_cluster_batches as _reinstated_candidates_to_cluster_batches,
+)
+from jarvis.jarvis_sec.review import (
+    run_review_agent_with_retry as _run_review_agent_with_retry,
+)
+from jarvis.jarvis_sec.utils import compact_candidate as _compact_candidate
+from jarvis.jarvis_sec.utils import count_issues_from_file as _count_issues_from_file
+from jarvis.jarvis_sec.utils import create_report_writer as _create_report_writer
+from jarvis.jarvis_sec.utils import get_sec_dir as _get_sec_dir
+from jarvis.jarvis_sec.utils import git_restore_if_dirty as _git_restore_if_dirty  # noqa: F401
+from jarvis.jarvis_sec.utils import (
+    group_candidates_by_file as _group_candidates_by_file,
+)
+from jarvis.jarvis_sec.utils import (
+    initialize_analysis_context as _initialize_analysis_context,
+)
+from jarvis.jarvis_sec.utils import (
+    load_all_issues_from_file as _load_all_issues_from_file,
+)
+from jarvis.jarvis_sec.utils import (
+    load_or_run_heuristic_scan as _load_or_run_heuristic_scan,
+)
+from jarvis.jarvis_sec.utils import (
+    load_processed_gids_from_agent_issues as _load_processed_gids_from_agent_issues,
+)
+from jarvis.jarvis_sec.utils import (
+    load_processed_gids_from_issues as _load_processed_gids_from_issues,
+)
+from jarvis.jarvis_sec.utils import prepare_candidates as _prepare_candidates
+from jarvis.jarvis_sec.utils import sig_of as _sig_of
+from jarvis.jarvis_sec.verification import (
+    build_gid_to_verification_mapping as _build_gid_to_verification_mapping,
+)  # noqa: F401
+from jarvis.jarvis_sec.verification import (
+    is_valid_verification_item as _is_valid_verification_item,
+)
+from jarvis.jarvis_sec.verification import merge_verified_items as _merge_verified_items
+from jarvis.jarvis_sec.verification import (
+    merge_verified_items_without_verification as _merge_verified_items_without_verification,
+)
+from jarvis.jarvis_sec.verification import (
+    process_verification_batch as _process_verification_batch,
+)
+from jarvis.jarvis_sec.verification import (
+    process_verification_phase as _process_verification_phase,
+)
+from jarvis.jarvis_sec.verification import (
+    run_verification_agent_with_retry as _run_verification_agent_with_retry,
+)
+from jarvis.jarvis_sec.workflow import direct_scan
+from jarvis.jarvis_sec.workflow import run_with_agent
 
 # 注：当前版本不使用 MultiAgent 编排，已移除默认多智能体配置与创建函数。
 # 请使用 run_security_analysis（单Agent逐条验证）或 workflow.direct_scan + format_markdown_report（直扫基线）。
@@ -201,7 +287,8 @@ def run_security_analysis(
     compact_candidates = _prepare_candidates(candidates)
 
     # 3) 保存候选到新的 candidates.jsonl 文件（包含gid）
-    from jarvis.jarvis_sec.file_manager import save_candidates, get_candidates_file
+    from jarvis.jarvis_sec.file_manager import get_candidates_file
+    from jarvis.jarvis_sec.file_manager import save_candidates
 
     try:
         save_candidates(sec_dir, compact_candidates)

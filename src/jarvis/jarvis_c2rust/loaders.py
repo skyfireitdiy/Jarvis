@@ -8,9 +8,14 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
-from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME, SYMBOLS_JSONL
+from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+from jarvis.jarvis_c2rust.constants import SYMBOLS_JSONL
 from jarvis.jarvis_c2rust.models import FnRecord
 
 

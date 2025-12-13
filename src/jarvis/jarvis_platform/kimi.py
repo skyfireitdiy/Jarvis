@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 # Kimi 平台实现模块
 # 提供与 Moonshot AI 的 Kimi 大模型交互功能
@@ -7,10 +5,17 @@ import json
 import mimetypes
 import os
 import time
-from typing import Any, Dict, Generator, List, Optional, Tuple, cast
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import while_success
 
 

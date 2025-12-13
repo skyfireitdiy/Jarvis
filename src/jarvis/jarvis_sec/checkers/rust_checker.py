@@ -19,10 +19,11 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List
+from typing import Sequence
+from typing import Tuple
 
 from ..types import Issue
-
 
 # ---------------------------
 # 规则库（正则表达式）

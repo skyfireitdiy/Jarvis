@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
 
 DEFAULT_SUMMARY_PROMPT = """<report>
 请生成任务执行的上下文结构化总结报告，作为后续对话的"无关键信息缺失"上下文支撑：

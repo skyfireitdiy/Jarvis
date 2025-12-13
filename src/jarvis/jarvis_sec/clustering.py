@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
 """聚类相关模块"""
 
-from typing import Dict, List, Optional
-from pathlib import Path
 import json
+from pathlib import Path
+from typing import Dict
+from typing import List
+from typing import Optional
+
 import typer
 
-from jarvis.jarvis_sec.prompts import get_cluster_summary_prompt
+from jarvis.jarvis_sec.agents import create_cluster_agent
+from jarvis.jarvis_sec.agents import subscribe_summary_event
+from jarvis.jarvis_sec.file_manager import get_all_clustered_gids
+from jarvis.jarvis_sec.file_manager import get_clusters_file
+from jarvis.jarvis_sec.file_manager import load_clusters
+from jarvis.jarvis_sec.file_manager import save_cluster
+from jarvis.jarvis_sec.file_manager import validate_clustering_completeness
 from jarvis.jarvis_sec.parsers import parse_clusters_from_text
-from jarvis.jarvis_sec.agents import create_cluster_agent, subscribe_summary_event
-from jarvis.jarvis_sec.utils import (
-    group_candidates_by_file,
-)
-from jarvis.jarvis_sec.file_manager import (
-    load_clusters,
-    save_cluster,
-    get_all_clustered_gids,
-    validate_clustering_completeness,
-    get_clusters_file,
-)
+from jarvis.jarvis_sec.prompts import get_cluster_summary_prompt
+from jarvis.jarvis_sec.utils import group_candidates_by_file
 
 
 def load_existing_clusters(
@@ -1324,22 +1324,28 @@ def initialize_clustering_context(
     invalid_clusters_for_review: List[Dict] = []
 
     # 读取已有聚类报告以支持断点
-    _existing_clusters, _completed_cluster_batches, _reviewed_invalid_gids = (
-        load_existing_clusters(sec_dir)
-    )
+    (
+        _existing_clusters,
+        _completed_cluster_batches,
+        _reviewed_invalid_gids,
+    ) = load_existing_clusters(sec_dir)
 
     # 创建快照写入函数
-    _write_cluster_batch_snapshot, _write_cluster_report_snapshot = (
-        create_cluster_snapshot_writer(
-            sec_dir, cluster_records, compact_candidates, _progress_append
-        )
+    (
+        _write_cluster_batch_snapshot,
+        _write_cluster_report_snapshot,
+    ) = create_cluster_snapshot_writer(
+        sec_dir, cluster_records, compact_candidates, _progress_append
     )
 
     # 从断点恢复聚类结果
-    cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids = (
-        restore_clusters_from_checkpoint(
-            _existing_clusters, _file_groups, _reviewed_invalid_gids
-        )
+    (
+        cluster_batches,
+        cluster_records,
+        invalid_clusters_for_review,
+        clustered_gids,
+    ) = restore_clusters_from_checkpoint(
+        _existing_clusters, _file_groups, _reviewed_invalid_gids
     )
 
     return (

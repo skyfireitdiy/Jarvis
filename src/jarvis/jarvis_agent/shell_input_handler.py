@@ -1,10 +1,10 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
-from typing import Any, Tuple
+from typing import Any
+from typing import Tuple
 
-from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_agent.utils import join_prompts
+from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:

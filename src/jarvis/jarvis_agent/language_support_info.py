@@ -4,7 +4,9 @@
 提供语言功能支持情况的收集和展示功能。
 """
 
-from typing import Dict, Any, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 
 def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
@@ -102,11 +104,11 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
 
     # 检查构建验证支持（自动发现所有构建验证器）
     try:
+        import jarvis.jarvis_code_agent.code_analyzer.build_validator as build_validator_module
         from jarvis.jarvis_code_agent.code_analyzer.build_validator import __all__
         from jarvis.jarvis_code_agent.code_analyzer.build_validator.base import (
             BuildValidatorBase,
         )
-        import jarvis.jarvis_code_agent.code_analyzer.build_validator as build_validator_module
 
         # 自动发现所有构建验证器类（排除基类和工具类）
         validator_classes = []
@@ -418,9 +420,9 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
 
 def print_language_support_table() -> None:
     """打印语言功能支持表格"""
+    from rich.align import Align
     from rich.console import Console
     from rich.table import Table
-    from rich.align import Align
 
     info = _collect_language_support_info()
 

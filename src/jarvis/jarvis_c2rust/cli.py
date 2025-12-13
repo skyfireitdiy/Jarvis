@@ -15,17 +15,17 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import List
+from typing import Optional
 
 import typer
-from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
+
 from jarvis.jarvis_c2rust.library_replacer import (
     apply_library_replacement as _apply_library_replacement,
 )
+from jarvis.jarvis_c2rust.llm_module_agent import execute_llm_plan as _execute_llm_plan
+from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
 from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_c2rust.llm_module_agent import (
-    execute_llm_plan as _execute_llm_plan,
-)
 
 
 def _check_optimize_completed(crate_dir: Path) -> bool:
@@ -35,6 +35,7 @@ def _check_optimize_completed(crate_dir: Path) -> bool:
     特别是 clippy_elimination：如果有告警，必须完成；如果没有告警，可以跳过。
     """
     import json
+
     from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
 
     progress_path = crate_dir / C2RUST_DIRNAME / "optimize_progress.json"
@@ -114,10 +115,9 @@ def _load_config() -> dict:
     返回包含 root_symbols、disabled_libraries 和 additional_notes 的字典。
     """
     import json
-    from jarvis.jarvis_c2rust.constants import (
-        CONFIG_JSON,
-        C2RUST_DIRNAME,
-    )
+
+    from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+    from jarvis.jarvis_c2rust.constants import CONFIG_JSON
 
     data_dir = Path(".") / C2RUST_DIRNAME
     config_path = data_dir / CONFIG_JSON
@@ -147,7 +147,8 @@ def _load_config() -> dict:
 
 def _get_run_state_path() -> Path:
     """获取 run 状态文件路径"""
-    from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME, RUN_STATE_JSON
+    from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+    from jarvis.jarvis_c2rust.constants import RUN_STATE_JSON
 
     data_dir = Path(".") / C2RUST_DIRNAME
     return data_dir / RUN_STATE_JSON
@@ -262,7 +263,9 @@ def config(
       jarvis-c2rust config --clear
     """
     import json
-    from jarvis.jarvis_c2rust.constants import CONFIG_JSON, C2RUST_DIRNAME
+
+    from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+    from jarvis.jarvis_c2rust.constants import CONFIG_JSON
 
     data_dir = Path(".") / C2RUST_DIRNAME
     config_path = data_dir / CONFIG_JSON
@@ -331,12 +334,12 @@ def config(
                         fg=typer.colors.BLUE,
                     )
                     try:
+                        # 使用临时文件存储提取的函数名
+                        import tempfile
+
                         from jarvis.jarvis_c2rust.collector import (
                             collect_function_names as _collect_fn_names,
                         )
-
-                        # 使用临时文件存储提取的函数名
-                        import tempfile
 
                         with tempfile.NamedTemporaryFile(
                             mode="w", suffix=".txt", delete=False, encoding="utf-8"

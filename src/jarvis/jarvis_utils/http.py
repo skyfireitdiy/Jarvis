@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import Optional
+
 import requests
-from typing import Any, Dict, Optional, Generator
 
 
 def get_requests_session() -> requests.Session:

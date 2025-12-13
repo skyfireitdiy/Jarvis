@@ -1,17 +1,16 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 """
 本地重排模型实现。
 """
 
-from typing import List, Optional
-import os
+from jarvis.jarvis_utils.output import PrettyOutput
 
-from langchain.docstore.document import Document
-from sentence_transformers.cross_encoder import (
-    CrossEncoder,
-)
+import os
+from typing import List
+from typing import Optional
+
 from huggingface_hub import snapshot_download
+from langchain.docstore.document import Document
+from sentence_transformers.cross_encoder import CrossEncoder
 
 from ..reranker_interface import RerankerInterface
 

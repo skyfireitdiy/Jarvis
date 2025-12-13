@@ -1,17 +1,19 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """CodeAgent 静态分析模块"""
 
 import os
 import subprocess
-from typing import Any, List, Optional, Tuple
 
-from jarvis.jarvis_code_agent.lint import (
-    get_lint_commands_for_files,
-    group_commands_by_template,
-    LINT_COMMAND_TEMPLATES_BY_FILE,
-)
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
+from typing import Any
+from typing import List
+from typing import Optional
+from typing import Tuple
+
+from jarvis.jarvis_code_agent.lint import LINT_COMMAND_TEMPLATES_BY_FILE
+from jarvis.jarvis_code_agent.lint import get_lint_commands_for_files
+from jarvis.jarvis_code_agent.lint import group_commands_by_template
 from jarvis.jarvis_utils.config import is_enable_static_analysis
 
 

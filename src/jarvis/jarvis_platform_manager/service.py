@@ -1,6 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """Jarvis Platform Manager Service Module.
 
 This module provides an OpenAI-compatible API service for the Jarvis platform.
@@ -8,19 +5,29 @@ This module provides an OpenAI-compatible API service for the Jarvis platform.
 
 import asyncio
 import json
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import os
-import time
 import threading
+import time
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-from starlette.responses import JSONResponse, Response
+from pydantic import BaseModel
+from pydantic import Field
+from starlette.responses import JSONResponse
+from starlette.responses import Response
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 

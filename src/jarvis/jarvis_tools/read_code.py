@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import os
 from typing import Any, Dict, List
@@ -7,6 +5,7 @@ from typing import Any, Dict, List
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class ReadCodeTool:
@@ -641,8 +640,8 @@ class ReadCodeTool:
 
 def main():
     """测试读取功能"""
-    import tempfile
     import os
+    import tempfile
 
     tool = ReadCodeTool()
 

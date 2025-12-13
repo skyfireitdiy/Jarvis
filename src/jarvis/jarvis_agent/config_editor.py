@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """配置编辑器模块，负责配置文件的编辑功能"""
 
@@ -11,6 +9,8 @@ from pathlib import Path
 from typing import Optional
 
 import typer
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class ConfigEditor:

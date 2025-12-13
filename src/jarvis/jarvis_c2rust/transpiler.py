@@ -21,39 +21,39 @@ C2Rust 转译器模块
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 import typer
 
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
-
-from jarvis.jarvis_c2rust.constants import (
-    C2RUST_DIRNAME,
-    CONFIG_JSON,
-    DEFAULT_CHECK_MAX_RETRIES,
-    DEFAULT_PLAN_MAX_RETRIES,
-    DEFAULT_PLAN_MAX_RETRIES_ENTRY,
-    DEFAULT_REVIEW_MAX_ITERATIONS,
-    DEFAULT_TEST_MAX_RETRIES,
-    PROGRESS_JSON,
-    SYMBOL_MAP_JSONL,
-)
+from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
+from jarvis.jarvis_c2rust.constants import CONFIG_JSON
+from jarvis.jarvis_c2rust.constants import DEFAULT_CHECK_MAX_RETRIES
+from jarvis.jarvis_c2rust.constants import DEFAULT_PLAN_MAX_RETRIES
+from jarvis.jarvis_c2rust.constants import DEFAULT_PLAN_MAX_RETRIES_ENTRY
+from jarvis.jarvis_c2rust.constants import DEFAULT_REVIEW_MAX_ITERATIONS
+from jarvis.jarvis_c2rust.constants import DEFAULT_TEST_MAX_RETRIES
+from jarvis.jarvis_c2rust.constants import PROGRESS_JSON
+from jarvis.jarvis_c2rust.constants import SYMBOL_MAP_JSONL
 from jarvis.jarvis_c2rust.loaders import _SymbolMapJsonl
 from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.transpiler_agents import AgentManager
-from jarvis.jarvis_c2rust.transpiler_config import ConfigManager
 from jarvis.jarvis_c2rust.transpiler_compile import CompileCommandsManager
+from jarvis.jarvis_c2rust.transpiler_config import ConfigManager
 from jarvis.jarvis_c2rust.transpiler_context import ContextCollector
+from jarvis.jarvis_c2rust.transpiler_executor import TranspilerExecutor
 from jarvis.jarvis_c2rust.transpiler_generation import GenerationManager
 from jarvis.jarvis_c2rust.transpiler_git import GitManager
 from jarvis.jarvis_c2rust.transpiler_modules import ModuleManager
 from jarvis.jarvis_c2rust.transpiler_planning import PlanningManager
 from jarvis.jarvis_c2rust.transpiler_symbols import SymbolMapper
-from jarvis.jarvis_c2rust.transpiler_executor import TranspilerExecutor
-from jarvis.jarvis_c2rust.utils import (
-    check_and_handle_test_deletion,
-    default_crate_dir,
-)
+from jarvis.jarvis_c2rust.utils import check_and_handle_test_deletion
+from jarvis.jarvis_c2rust.utils import default_crate_dir
+from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
 
 class Transpiler:
