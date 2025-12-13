@@ -982,7 +982,6 @@ def _print_available_rules(
         from rich.text import Text
 
         console = Console()
-        PrettyOutput.auto_print("🔍 正在加载规则信息...")  # 调试信息
 
         # 获取所有可用规则
         all_rules = rules_manager.get_all_available_rule_names()
