@@ -480,8 +480,34 @@ class DiffVisualizer:
         for idx, (tag, i1, i2, j1, j2) in enumerate(opcodes):
             # 检测是否需要在变更块之间插入分隔符
             if idx > 0 and tag in ("replace", "delete", "insert"):
-                # 检查与前一个变更块之间是否有间隔
-                if i1 > prev_change_end_old or j1 > prev_change_end_new:
+                # 使用实际行号检查连续性
+                prev_old_line = (
+                    old_line_map[prev_change_end_old - 1]
+                    if prev_change_end_old > 0
+                    else 0
+                )
+                curr_old_line = old_line_map[i1] if i1 < len(old_line_map) else 0
+                prev_new_line = (
+                    new_line_map[prev_change_end_new - 1]
+                    if prev_change_end_new > 0
+                    else 0
+                )
+                curr_new_line = new_line_map[j1] if j1 < len(new_line_map) else 0
+
+                # 检查实际行号是否连续
+                old_continuous = (
+                    curr_old_line == 0
+                    or prev_old_line == 0
+                    or curr_old_line == prev_old_line + 1
+                )
+                new_continuous = (
+                    curr_new_line == 0
+                    or prev_new_line == 0
+                    or curr_new_line == prev_new_line + 1
+                )
+
+                # 只有当实际行号不连续时才添加分割线
+                if not (old_continuous and new_continuous):
                     # 动态计算分隔符宽度（基于终端宽度，限制在合理范围）
                     terminal_width = self.console.width or 120
                     # 表格有两列内容区域（每列约占总宽度的45%，减去行号列）
