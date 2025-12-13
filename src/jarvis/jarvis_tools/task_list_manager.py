@@ -137,11 +137,12 @@ class task_list_manager:
             pass
 
     def _determine_agent_type(
-        self, task: Any, task_content: str, background: str
+        self, agent: Any, task: Any, task_content: str, background: str
     ) -> bool:
-        """智能识别任务类型，判断是否为代码相关任务
+        """直接根据agent实例判断是否为代码相关任务
 
         参数:
+            agent: 当前执行的agent实例
             task: 任务对象
             task_content: 任务内容
             background: 背景信息
@@ -149,68 +150,14 @@ class task_list_manager:
         返回:
             bool: True 表示代码相关任务，False 表示通用任务
         """
-        # 代码相关关键词列表
-        code_keywords = [
-            "代码",
-            "code",
-            "函数",
-            "function",
-            "类",
-            "class",
-            "文件",
-            "file",
-            "重构",
-            "refactor",
-            "修复",
-            "fix",
-            "bug",
-            "错误",
-            "debug",
-            "实现",
-            "implement",
-            "开发",
-            "develop",
-            "编写",
-            "write",
-            "脚本",
-            "script",
-            "程序",
-            "program",
-            "应用",
-            "app",
-            "模块",
-            "module",
-            "Python",
-            "JavaScript",
-            "Java",
-            "C++",
-            "Rust",
-            "Go",
-            "TypeScript",
-            ".py",
-            ".js",
-            ".java",
-            ".cpp",
-            ".rs",
-            ".go",
-            ".ts",
-            ".json",
-            ".yaml",
-            ".yml",
-        ]
+        try:
+            # 直接根据agent实例类型判断
+            from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
-        # 待分析的文本内容
-        text_to_analyze = (
-            f"{task.task_name} {task.task_desc} {task_content} {background}".lower()
-        )
-
-        # 检查是否包含代码相关关键词
-        for keyword in code_keywords:
-            if keyword.lower() in text_to_analyze:
-                return True
-
-        # 默认使用通用 Agent
-        return False
+            return isinstance(agent, CodeAgent)
+        except ImportError:
+            # 如果导入失败，回退到通用Agent
+            return False
 
     def _print_task_list_status(
         self, task_list_manager: Any, task_list_id: Optional[str] = None
@@ -1165,9 +1112,9 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
             elif task.agent_type.value == "sub":
                 # 子 Agent 执行：自动识别使用合适的子 Agent 工具
                 try:
-                    # 智能识别逻辑：根据任务内容自动选择最合适的 Agent 类型
+                    # 直接根据agent实例类型判断任务类型
                     is_code_task = self._determine_agent_type(
-                        task, task_content, background
+                        parent_agent, task, task_content, background
                     )
 
                     if is_code_task:
