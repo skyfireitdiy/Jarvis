@@ -423,7 +423,7 @@ class BasePlatform(ABC):
         # 计算响应时间并打印总结
         end_time = time.time()
         duration = end_time - start_time
-        print(f"✅ 响应完成: {duration:.2f}秒")
+        print(f"✅ {self.name()}模型响应完成: {duration:.2f}秒")
 
         # 增加对话轮次计数
         self._conversation_turn += 1
