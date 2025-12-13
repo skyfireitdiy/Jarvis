@@ -462,6 +462,14 @@ class BasePlatform(ABC):
         finally:
             set_in_chat(False)
 
+    def get_conversation_turn(self) -> int:
+        """获取当前对话轮次数
+
+        返回:
+            int: 当前对话轮次数
+        """
+        return self._conversation_turn
+
     @abstractmethod
     def name(self) -> str:
         """模型名称"""
