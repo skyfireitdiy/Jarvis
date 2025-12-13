@@ -250,15 +250,7 @@ class ReadCodeTool:
             if not context_manager:
                 return ""
 
-            # 输出上下文感知日志
-            file_name = os.path.basename(filepath)
-            if start_line == end_line:
-                line_info = f"第{start_line}行"
-            else:
-                line_info = f"第{start_line}-{end_line}行"
-            PrettyOutput.auto_print(
-                f"🧠 正在分析代码上下文 ({file_name}, {line_info})..."
-            )
+            # 上下文感知日志已移除
 
             # 确保文件已更新到上下文管理器
             # 如果文件内容已缓存，直接使用；否则读取并更新
@@ -363,10 +355,8 @@ class ReadCodeTool:
             context_lines.append("─" * 60)
             context_lines.append("")  # 空行
 
-            # 打印上下文感知结果到控制台
+            # 上下文感知结果已移除，不再打印到控制台
             context_output = "\n".join(context_lines)
-            PrettyOutput.auto_print(f"🧠 上下文感知结果:\n{context_output}")
-
             return context_output
 
         except Exception:
@@ -624,7 +614,7 @@ class ReadCodeTool:
             # 仅打印每个文件的读取状态，不打印具体内容
             try:
                 if status_lines:
-                    PrettyOutput.auto_print("\n".join(status_lines), end="\n")
+                    PrettyOutput.auto_print("\n".join(status_lines))
             except Exception:
                 pass
             return {
