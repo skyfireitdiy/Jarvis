@@ -106,72 +106,75 @@ class ConsoleOutputSink(OutputSink):
             # 使用带背景色和样式的Text替代Panel
             style_config = {
                 OutputType.SYSTEM: RichStyle(
-                    color="bright_cyan",
+                    color="cyan",
                     bgcolor="#1e2b3c",
                     frame=True,
                     meta={"icon": "🤖"},
                 ),
                 OutputType.CODE: RichStyle(
-                    color="green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}
+                    color="dark_green",
+                    bgcolor="#1c2b1c",
+                    frame=True,
+                    meta={"icon": "📝"},
                 ),
                 OutputType.RESULT: RichStyle(
-                    color="bright_blue",
+                    color="blue",
                     bgcolor="#1c1c2b",
                     frame=True,
                     meta={"icon": "✨"},
                 ),
                 OutputType.ERROR: RichStyle(
-                    color="red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
+                    color="dark_red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
                 ),
                 OutputType.INFO: RichStyle(
-                    color="bright_cyan",
+                    color="cyan",
                     frame=True,
                     bgcolor="#2b2b1c",
                     meta={"icon": "ℹ️"},
                 ),
                 OutputType.PLANNING: RichStyle(
-                    color="purple",
+                    color="dark_magenta",
                     bold=True,
                     frame=True,
                     bgcolor="#2b1c2b",
                     meta={"icon": "📋"},
                 ),
                 OutputType.PROGRESS: RichStyle(
-                    color="white",
+                    color="bright_black",
                     encircle=True,
                     frame=True,
                     bgcolor="#1c1c1c",
                     meta={"icon": "⏳"},
                 ),
                 OutputType.SUCCESS: RichStyle(
-                    color="bright_green",
+                    color="green",
                     bold=True,
                     strike=False,
                     bgcolor="#1c2b1c",
                     meta={"icon": "✅"},
                 ),
                 OutputType.WARNING: RichStyle(
-                    color="yellow",
+                    color="gold3",
                     bold=True,
                     blink2=True,
                     bgcolor="#2b2b1c",
                     meta={"icon": "⚠️"},
                 ),
                 OutputType.DEBUG: RichStyle(
-                    color="grey58",
+                    color="grey50",
                     dim=True,
                     conceal=True,
                     bgcolor="#1c1c1c",
                     meta={"icon": "🔍"},
                 ),
                 OutputType.USER: RichStyle(
-                    color="spring_green2",
+                    color="green4",
                     frame=True,
                     bgcolor="#1c2b2b",
                     meta={"icon": "👤"},
                 ),
                 OutputType.TOOL: RichStyle(
-                    color="dark_sea_green4",
+                    color="sea_green3",
                     bgcolor="#1c2b2b",
                     frame=True,
                     meta={"icon": "🔧"},
@@ -210,63 +213,63 @@ class ConsoleOutputSink(OutputSink):
 
         header_styles = {
             OutputType.SYSTEM: RichStyle(
-                color="bright_cyan", bgcolor="#1e2b3c", frame=True, meta={"icon": "🤖"}
+                color="cyan", bgcolor="#1e2b3c", frame=True, meta={"icon": "🤖"}
             ),
             OutputType.CODE: RichStyle(
-                color="green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}
+                color="dark_green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}
             ),
             OutputType.RESULT: RichStyle(
-                color="bright_blue", bgcolor="#1c1c2b", frame=True, meta={"icon": "✨"}
+                color="blue", bgcolor="#1c1c2b", frame=True, meta={"icon": "✨"}
             ),
             OutputType.ERROR: RichStyle(
-                color="red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
+                color="dark_red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
             ),
             OutputType.INFO: RichStyle(
-                color="bright_cyan", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}
+                color="cyan", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}
             ),
             OutputType.PLANNING: RichStyle(
-                color="purple",
+                color="dark_magenta",
                 bold=True,
                 frame=True,
                 bgcolor="#2b1c2b",
                 meta={"icon": "📋"},
             ),
             OutputType.PROGRESS: RichStyle(
-                color="white",
+                color="bright_black",
                 encircle=True,
                 frame=True,
                 bgcolor="#1c1c1c",
                 meta={"icon": "⏳"},
             ),
             OutputType.SUCCESS: RichStyle(
-                color="bright_green",
+                color="green",
                 bold=True,
                 strike=False,
                 bgcolor="#1c2b1c",
                 meta={"icon": "✅"},
             ),
             OutputType.WARNING: RichStyle(
-                color="yellow",
+                color="gold3",
                 bold=True,
                 blink2=True,
                 bgcolor="#2b2b1c",
                 meta={"icon": "⚠️"},
             ),
             OutputType.DEBUG: RichStyle(
-                color="grey58",
+                color="grey50",
                 dim=True,
                 conceal=True,
                 bgcolor="#1c1c1c",
                 meta={"icon": "🔍"},
             ),
             OutputType.USER: RichStyle(
-                color="spring_green2",
+                color="green4",
                 frame=True,
                 bgcolor="#1c2b2b",
                 meta={"icon": "👤"},
             ),
             OutputType.TOOL: RichStyle(
-                color="dark_sea_green4",
+                color="sea_green3",
                 bgcolor="#1c2b2b",
                 frame=True,
                 meta={"icon": "🔧"},
