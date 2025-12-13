@@ -36,8 +36,7 @@ class AgentType(Enum):
     """Agent类型枚举。"""
 
     MAIN = "main"
-    CODE_AGENT = "code_agent"  # 代码Agent，用于代码相关任务
-    AGENT = "agent"  # 通用Agent，用于一般任务
+    SUB = "sub"  # 子Agent，自动识别代码/通用任务类型
 
 
 @dataclass
