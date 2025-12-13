@@ -252,7 +252,7 @@ class BasePlatform(ABC):
                 update_count += 1
 
                 # Scrolling Logic - 只在内容超过一定行数时才应用滚动
-                max_text_height = min(console.height - 5, 5)
+                max_text_height = console.height - 5
                 if max_text_height <= 0:
                     max_text_height = 1
 
@@ -423,8 +423,7 @@ class BasePlatform(ABC):
         # 计算响应时间并打印总结
         end_time = time.time()
         duration = end_time - start_time
-        token_info = self._get_token_usage_info(response)
-        print(f"✓ 响应完成: {duration:.2f}秒 | {token_info}")
+        print(f"✅ 响应完成: {duration:.2f}秒")
 
         # 增加对话轮次计数
         self._conversation_turn += 1
