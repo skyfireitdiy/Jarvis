@@ -110,7 +110,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             rule_name = tag[5:]  # 去掉 "rule:" 前缀
             rule_content = _get_rule_content(rule_name)
             if rule_content:
-                user_input = user_input.replace(f"'<{tag}>'", rule_content)
+                separator = "\n" + "=" * 50 + "\n"
+                user_input = user_input.replace(
+                    f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
+                )
 
         agent.set_addon_prompt(add_on_prompt)
 
