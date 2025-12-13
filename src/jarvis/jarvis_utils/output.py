@@ -426,3 +426,52 @@ class PrettyOutput:
         )
         panel = Panel(colored_text, box=SIMPLE)
         console.print(panel)
+
+    @staticmethod
+    def auto_print(text: str, timestamp: bool = True) -> None:
+        """
+        自动根据打印信息的前缀emoji判断类型并着色输出。
+        
+        支持的emoji前缀映射：
+        - ⚠️ -> WARNING (黄色警告)
+        - ❌ -> ERROR (红色错误)
+        - ✅ -> SUCCESS (绿色成功)
+        - ℹ️ -> INFO (青色信息)
+        - 📋 -> PLANNING (紫色规划)
+        - ⏳ -> PROGRESS (白色进度)
+        - 🔍 -> DEBUG (灰色调试)
+        - 🤖 -> SYSTEM (青色系统)
+        - 📝 -> CODE (绿色代码)
+        - ✨ -> RESULT (蓝色结果)
+        - 👤 -> USER (绿色用户)
+        - 🔧 -> TOOL (绿色工具)
+        
+        参数：
+            text: 要打印的文本
+            timestamp: 是否显示时间戳
+        """
+        # 定义emoji到OutputType的映射
+        emoji_mapping = {
+            "⚠️": OutputType.WARNING,
+            "❌": OutputType.ERROR,
+            "✅": OutputType.SUCCESS,
+            "ℹ️": OutputType.INFO,
+            "📋": OutputType.PLANNING,
+            "⏳": OutputType.PROGRESS,
+            "🔍": OutputType.DEBUG,
+            "🤖": OutputType.SYSTEM,
+            "📝": OutputType.CODE,
+            "✨": OutputType.RESULT,
+            "👤": OutputType.USER,
+            "🔧": OutputType.TOOL,
+        }
+        
+        # 检测emoji前缀
+        output_type = OutputType.INFO  # 默认类型
+        for emoji, type_enum in emoji_mapping.items():
+            if text.startswith(emoji):
+                output_type = type_enum
+                break
+        
+        # 使用现有的print方法进行着色输出
+        PrettyOutput.print(text=text, output_type=output_type, timestamp=timestamp)
