@@ -11,27 +11,27 @@
 
 15个维度规则文件：
 
-- 01_encoding_standards.yaml - 编码规范
-- 02_project_structure.yaml - 工程结构规范  
-- 03_error_handling.yaml - 错误处理规范
-- 04_data_processing.yaml - 数据处理规范
-- 05_api_design.yaml - 接口设计规范
-- 06_performance.yaml - 性能与资源规范
-- 07_version_control.yaml - 版本控制规范
-- 08_documentation.yaml - 文档规范
-- 09_collaboration.yaml - 协作流程规范
-- 10_testing.yaml - 测试规范
-- 11_code_review.yaml - 代码评审规范
-- 12_security.yaml - 安全规范
-- 13_build_deploy.yaml - 构建部署规范
-- 14_logging_monitoring.yaml - 日志监控规范
-- 15_disaster_recovery.yaml - 容灾备份规范
+- 01_encoding_standards.md - 编码规范：定义代码风格、命名约定、格式化标准
+- 02_project_structure.md - 工程结构规范：定义目录布局、模块组织、文件放置规则
+- 03_error_handling.md - 错误处理规范：定义异常处理策略、错误日志记录、故障恢复机制
+- 04_data_processing.md - 数据处理规范：定义数据验证、清洗、转换和存储标准
+- 05_api_design.md - 接口设计规范：定义API命名、参数规范、响应格式、版本控制
+- 06_performance.md - 性能与资源规范：定义性能指标、资源限制、优化策略
+- 07_version_control.md - 版本控制规范：定义分支策略、提交规范、代码审查流程
+- 08_documentation.md - 文档规范：定义代码注释、API文档、README标准
+- 09_collaboration.md - 协作流程规范：定义分支管理、PR流程、代码审查标准
+- 10_testing.md - 测试规范：定义测试策略、测试覆盖率、测试用例编写标准
+- 11_code_review.md - 代码评审规范：定义审查标准、审查流程、质量门禁
+- 12_security.md - 安全规范：定义安全检查、漏洞扫描、敏感数据处理规则
+- 13_build_deploy.md - 构建部署规范：定义构建流程、部署策略、环境管理
+- 14_logging_monitoring.md - 日志监控规范：定义日志级别、监控指标、告警规则
+- 15_disaster_recovery.md - 容灾备份规范：定义备份策略、恢复流程、灾难应对预案
 
-输出格式：每个文件使用YAML格式，包含具体规则和检查项
+输出格式：每个文件使用Markdown格式，包含具体规则和检查项
 
 生成原则：
 
 - 根据项目实际特点，如果某些维度与项目无关，可以不生成对应规则文件
-- 例如：纯前端项目可以不生成"13_build_deploy.yaml"中的部署规范
-- 单文件脚本项目可以不生成"02_project_structure.yaml"中的工程结构规范
+- 例如：纯前端项目可以不生成"13_build_deploy.md"中的部署规范
+- 单文件脚本项目可以不生成"02_project_structure.md"中的工程结构规范
 - 每个生成的规则文件都应有明确的项目上下文关联
