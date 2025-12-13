@@ -284,9 +284,10 @@ class ConsoleOutputSink(OutputSink):
             background_color=styles[event.output_type]["bgcolor"],
         )
         # 直接输出带背景色的内容，不再使用Panel包装
+        agent_name = PrettyOutput._format(event.output_type, event.timestamp)
         header_text = Text(
-            PrettyOutput._format(event.output_type, event.timestamp),
-            style=header_styles[event.output_type],
+            agent_name,
+            style=RichStyle(color="grey58"),
         )
         if get_pretty_output():
             console.print(header_text)
