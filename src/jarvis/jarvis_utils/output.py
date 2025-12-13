@@ -291,7 +291,12 @@ class ConsoleOutputSink(OutputSink):
             style=RichStyle(color="grey58"),
         )
         if get_pretty_output():
-            console.print(header_text, content, sep="")
+            # 合并header和content在同一行显示
+            combined_text = Text()
+            combined_text.append(header_text)
+            combined_text.append(" ")  # 添加空格分隔
+            combined_text.append(event.text)
+            console.print(combined_text)
         else:
             console.print(content)
         if event.traceback or (
