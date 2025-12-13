@@ -43,7 +43,7 @@ class TestToolExecutor:
         """测试单个处理器的执行"""
         mock_agent.output_handler = [mock_handler]
 
-        with patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print") as mock_print:
+        with patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print"):
             result = execute_tool_call("test command", mock_agent)
 
         # 验证结果
@@ -53,8 +53,7 @@ class TestToolExecutor:
         mock_handler.can_handle.assert_called_once_with("test command")
         mock_handler.handle.assert_called_once_with("test command", mock_agent)
 
-        # 验证打印输出
-        mock_print.assert_called_once_with("✅ MockTool执行完成")
+        # 验证打印输出 - 执行完成提示已被移除，不再验证
 
     @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_multiple_handlers_error(self, mock_print, mock_agent):
