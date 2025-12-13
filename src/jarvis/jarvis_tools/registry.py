@@ -104,8 +104,6 @@ class ToolRegistry(OutputHandlerProtocol):
         has_tool_call = (
             re.search(rf"(?mi){re.escape(ot('TOOL_CALL'))}", response) is not None
         )
-        if has_tool_call:
-            PrettyOutput.auto_print("🛠️ 检测到工具调用")  # 增加工具emoji
         return has_tool_call
 
     def prompt(self) -> str:
