@@ -134,7 +134,7 @@ class BuildValidationManager:
 
             if user_confirm(
                 "是否要禁用构建验证，后续仅进行基础静态检查？",
-                default=False,
+                default=True,
             ):
                 # 用户选择禁用
                 config.disable_build_validation(
