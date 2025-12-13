@@ -291,7 +291,7 @@ class ConsoleOutputSink(OutputSink):
             style=RichStyle(color="grey58"),
         )
         if get_pretty_output():
-            console.print(header_text, content)
+            console.print(header_text, content, sep="")
         else:
             console.print(content)
         if event.traceback or (
