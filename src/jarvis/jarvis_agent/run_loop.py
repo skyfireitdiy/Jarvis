@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 class AgentRunLoop:
     def __init__(self, agent: "Agent") -> None:
         self.agent = agent
-        self.conversation_rounds = 0
         self.tool_reminder_rounds = int(
             os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20)
         )
@@ -54,8 +53,8 @@ class AgentRunLoop:
 
         while True:
             try:
-                self.conversation_rounds += 1
-                if self.conversation_rounds % self.tool_reminder_rounds == 0:
+                current_round = self.agent.model.get_conversation_turn()
+                if current_round % self.tool_reminder_rounds == 0:
                     self.agent.session.addon_prompt = join_prompts(
                         [
                             self.agent.session.addon_prompt,
@@ -66,7 +65,7 @@ class AgentRunLoop:
                 remaining_tokens = self.agent.model.get_remaining_token_count()
                 should_summarize = (
                     remaining_tokens <= self.summary_remaining_token_threshold
-                    or self.conversation_rounds > self.conversation_turn_threshold
+                    or current_round > self.conversation_turn_threshold
                 )
                 if should_summarize:
                     # 在总结前获取git diff（仅对CodeAgent类型）
@@ -88,8 +87,8 @@ class AgentRunLoop:
                         self.agent.session.addon_prompt = join_prompts(
                             [self.agent.session.addon_prompt, summary_text]
                         )
-                    # 重置轮次计数（用于工具提醒）与对话长度计数器（用于摘要触发），开始新一轮周期
-                    self.conversation_rounds = 0
+                    # 重置对话长度计数器（用于摘要触发），开始新一轮周期
+                    # 注意：对话轮次由模型内部管理，这里不需要重置
                     self.agent.session.conversation_length = 0
 
                 ag = self.agent
@@ -135,8 +134,8 @@ class AgentRunLoop:
                         ag.session.addon_prompt = join_prompts(
                             [ag.session.addon_prompt, summary_text]
                         )
-                    # 重置轮次计数（用于工具提醒）与对话长度计数器（用于摘要触发），开始新一轮周期
-                    self.conversation_rounds = 0
+                    # 重置对话长度计数器（用于摘要触发），开始新一轮周期
+                    # 注意：对话轮次由模型内部管理，这里不需要重置
                     ag.session.conversation_length = 0
                     # 如果响应中还有其他内容，继续处理；否则继续下一轮
                     if not current_response:
