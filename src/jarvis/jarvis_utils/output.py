@@ -201,7 +201,7 @@ class ConsoleOutputSink(OutputSink):
             OutputType.CODE: "dark_green",
             OutputType.RESULT: "dark_blue",
             OutputType.ERROR: "dark_red",
-            OutputType.INFO: "slate_blue",
+            OutputType.INFO: "blue",
             OutputType.PLANNING: "purple",
             OutputType.PROGRESS: "dim",
             OutputType.SUCCESS: "green",
