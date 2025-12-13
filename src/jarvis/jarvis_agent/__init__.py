@@ -1408,7 +1408,7 @@ class Agent:
         # 添加用户固定的重要内容
         if self.pin_content.strip():
             pin_section = (
-                f"\n\n## 用户强调的任务目标和关键信息\n{self.pin_content.strip()}"
+                f"\n\n## 用户的原始需求和要求\n{self.pin_content.strip()}"
             )
             formatted_summary += pin_section
 
@@ -1709,6 +1709,9 @@ class Agent:
                 "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问“是否继续”；\n"
                 "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
             )
+
+            # 如果是非交互模式，可以假设用户输入的是完整的需求
+            self.pin_content = user_input
 
         # 将非交互模式说明添加到用户输入中
         enhanced_input = user_input + non_interactive_note
