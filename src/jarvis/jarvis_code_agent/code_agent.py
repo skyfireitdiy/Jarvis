@@ -274,8 +274,6 @@ class CodeAgent(Agent):
                     was_suppressed = getattr(self.model, "_suppress_output", False)
                     self.model.set_suppress_output(True)
                 try:
-                    PrettyOutput.auto_print("🔍 正在进行智能上下文推荐....")
-
                     # 生成上下文推荐（基于关键词和项目上下文）
                     recommendation = self.context_recommender.recommend_context(
                         user_input=user_input,
@@ -285,13 +283,9 @@ class CodeAgent(Agent):
                     context_recommendation_text = (
                         self.context_recommender.format_recommendation(recommendation)
                     )
-
-                    # 打印推荐的上下文
-                    if context_recommendation_text:
-                        PrettyOutput.auto_print(f"ℹ️ {context_recommendation_text}")
-                except Exception as e:
+                except Exception:
                     # 上下文推荐失败不应该影响主流程
-                    PrettyOutput.auto_print(f"⚠️ 上下文推荐失败: {e}")
+                    pass
                 finally:
                     # 恢复模型输出设置
                     if self.model:
