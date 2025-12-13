@@ -94,7 +94,8 @@ def build_subtree_prompt(
 
     return (
         "请评估以下 C/C++ 函数子树是否可以由一个或多个成熟的 Rust 库整体替代（语义等价或更强）。"
-        "允许库内多个 API 协同，允许多个库组合；如果必须依赖尚不成熟/冷门库或非 Rust 库，则判定为不可替代。\n"
+        "允许库内多个 API 协同，允许多个库组合；如果必须依赖尚不成熟/冷门库或非 Rust 库，则判定为不可替代。"
+        "如果当前调用的函数无法使用 crate 直接提供的功能而需要封装或者改造，则认为不可替代。\n"
         f"{disabled_hint}"
         "输出格式：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段: replaceable(bool), libraries(list[str]), confidence(float 0..1)，"
         "可选字段: library(str,首选主库), api(str) 或 apis(list), notes(str: 简述如何由这些库协作实现的思路)。\n\n"
