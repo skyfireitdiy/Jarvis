@@ -332,7 +332,7 @@ class task_list_manager:
 
 🚨 **强制执行规范：additional_info 参数**
 
-## ❗ 绝对必要：每次 execute_task 和 get_task_detail 必须提供 additional_info
+## ❗ 绝对必要：execute_task 时必须提供 additional_info
 
 **⚠️ 警告：如果未提供有效的 additional_info 参数，任务执行将立即失败并返回错误**
 
@@ -347,7 +347,7 @@ class task_list_manager:
 - **必须包含实际内容**：最少10个有意义字符 ✅
 
 ### 2️⃣ 执行前强制检查清单
-在使用 `execute_task` 或 `get_task_detail` 前，必须确认：
+在使用 `execute_task` 前，必须确认：
 - ✅ `additional_info` 已定义为非空字符串
 - ✅ 内容包含任务的实际上下文信息
 - ✅ 长度在合理范围内（建议50-1000字符）
@@ -371,13 +371,6 @@ class task_list_manager:
 - [任何特殊的实现要求或注意事项]
 ```
 
-### 📖 get_task_detail 时的 additional_info 模板：
-```
-需要查看任务详情以了解：
-- 当前任务状态：[pending/running/completed/failed]
-- 预期输出内容：[任务应该产生的具体结果]
-- 下一步操作：[基于任务状态的后续计划]
-```
 
 ---
 
@@ -411,8 +404,7 @@ class task_list_manager:
 ```json
 {{
         "action": "get_task_detail",
-  "task_id": "task_123",
-  "additional_info": "需要查看任务详情以了解当前进度，重点关注任务状态和预期输出，计划基于状态决定后续执行策略"
+  "task_id": "task_123"
 }}
 ```
 
@@ -448,7 +440,7 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
 - 简单任务无需拆分：对于简单任务，绝对不要创建任务列表，直接使用 agent_type: "main" 由主 Agent 立即执行
 - 禁止过度拆分：简单任务创建子Agent会导致不必要的上下文切换和信息传递负担，大幅降低执行效率
 - 快速执行原则：简单任务应该立即执行，避免任何任务管理开销
-- 只有真正复杂的任务（需要多个步骤、涉及多个文件、需要协调多个子任务等）才使用 code_agent 或 agent"""
+- 只有真正复杂的任务（需要多个步骤、涉及多个文件、需要协调多个子任务等）才使用子Agent"""
 
     parameters = {
         "type": "object",
@@ -507,6 +499,10 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
             "task_id": {
                 "type": "string",
                 "description": "任务ID（execute_task/update_task/get_task_detail 需要）",
+            },
+            "additional_info": {
+                "type": "string",
+                "description": "附加信息（**仅在 execute_task 时必填**）。必须提供任务的详细上下文信息，包括任务背景、关键信息、约束条件、预期结果等。不能为空字符串或None。",
             },
             "task_update_info": {
                 "type": "object",
@@ -763,27 +759,12 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                 "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
             }
         task_id = args.get("task_id")
-        additional_info = args.get("additional_info")
 
         if not task_id:
             return {
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少 task_id 参数",
-            }
-
-        if additional_info is None:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "缺少 additional_info 参数",
-            }
-
-        if not additional_info or not str(additional_info).strip():
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "additional_info 参数不能为空",
             }
 
         task, success, error_msg = task_list_manager.get_task_detail(
