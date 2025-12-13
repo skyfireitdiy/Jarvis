@@ -18,6 +18,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from datetime import datetime
 
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
@@ -290,8 +291,7 @@ class ConsoleOutputSink(OutputSink):
             style=RichStyle(color="grey58"),
         )
         if get_pretty_output():
-            console.print(header_text)
-            console.print(content)
+            console.print(header_text, content)
         else:
             console.print(content)
         if event.traceback or (
@@ -399,17 +399,24 @@ class PrettyOutput:
     @staticmethod
     def _format(output_type: OutputType, timestamp: bool = True) -> str:
         """
-        只返回Agent名字的简化格式。
+        返回带时间戳前缀的Agent名字格式。
 
         参数：
             output_type: 输出类型（不再使用）
-            timestamp: 是否包含时间戳（不再使用）
+            timestamp: 是否包含时间戳
 
         返回：
-            str: 只包含Agent名字的字符串
+            str: 包含时间戳和Agent名字的字符串
         """
         agent_info = get_agent_list()
-        return agent_info if agent_info else ""
+        if not agent_info:
+            return ""
+
+        if timestamp:
+            current_time = datetime.now().strftime("%H:%M:%S")
+            return f"[{current_time}] {agent_info}"
+        else:
+            return agent_info
 
     @staticmethod
     def print(
