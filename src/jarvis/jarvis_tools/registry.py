@@ -1259,6 +1259,38 @@ class ToolRegistry(OutputHandlerProtocol):
                     return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。\n\n{usage_prompt}"
 
             PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name}")
+
+            # 生成参数摘要，过滤敏感信息
+            if isinstance(args, dict) and args:
+                # 敏感字段列表
+                sensitive_keys = {
+                    "password",
+                    "token",
+                    "key",
+                    "secret",
+                    "auth",
+                    "credential",
+                }
+                summary_parts = []
+
+                for key, value in args.items():
+                    if key.lower() in sensitive_keys:
+                        summary_parts.append(f"{key}='***'")
+                    elif isinstance(value, (dict, list)):
+                        # 复杂类型简化为类型信息
+                        summary_parts.append(
+                            f"{key}={type(value).__name__}({len(value)} items)"
+                        )
+                    elif isinstance(value, str) and len(value) > 50:
+                        # 长字符串截断
+                        summary_parts.append(f"{key}='{value[:47]}...'")
+                    else:
+                        summary_parts.append(f"{key}={repr(value)}")
+
+                if summary_parts:
+                    param_summary = " | ".join(summary_parts)
+                    PrettyOutput.auto_print(f"   参数摘要: {param_summary}")
+
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
             result = self.execute_tool(name, args, agent)
 
