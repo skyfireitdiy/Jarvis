@@ -244,7 +244,7 @@ class BasePlatform(ABC):
             3  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
         )
         update_count = 0  # 更新计数器，用于控制 subtitle 更新频率
-        with Live(panel, refresh_per_second=4, transient=False) as live:
+        with Live(panel, refresh_per_second=4, transient=True) as live:
 
             def _update_panel_content(content: str, update_subtitle: bool = False):
                 nonlocal response, last_subtitle_update_time, update_count
@@ -329,19 +329,6 @@ class BasePlatform(ABC):
 
             _flush_buffer()
             # 在结束前，将面板内容替换为完整响应，确保最后一次渲染的 panel 显示全部内容
-            if response:
-                text_content.plain = response
-            # 最后更新 subtitle 和 panel
-            end_time = time.time()
-            duration = end_time - start_time
-            self._update_panel_subtitle_with_token(
-                panel, response, is_completed=True, duration=duration
-            )
-            # 最后更新 panel，Live 上下文退出时会自动打印（transient=False）
-            live.update(panel)
-            # 注意：不要在这里调用 console.print()，因为 Live 退出时会自动打印 panel
-        # Live 退出后仅添加空行分隔，不再重复打印 panel，避免内容重复
-        console.print()
         return response
 
     def _chat_with_simple_output(self, message: str, start_time: float) -> str:
