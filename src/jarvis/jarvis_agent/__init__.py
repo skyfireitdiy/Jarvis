@@ -1814,7 +1814,7 @@ class Agent:
             return self._complete_task(auto_completed=False)
 
         if any(handler.can_handle(current_response) for handler in self.output_handler):
-            if self.confirm_callback("检测到有工具调用，是否继续处理工具调用？", True):
+            if self.confirm_callback("检测到有工具调用，是否继续处理工具调用？", False):
                 self.session.prompt = join_prompts(
                     [
                         f"被用户中断，用户补充信息为：{user_input}",

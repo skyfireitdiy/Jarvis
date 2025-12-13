@@ -154,7 +154,7 @@ class TaskAnalyzer:
     def _handle_interrupt_with_tool_calls(self, user_input: str) -> str:
         """处理有工具调用时的中断"""
         if self.agent.confirm_callback(
-            "检测到有工具调用，是否继续处理工具调用？", True
+            "检测到有工具调用，是否继续处理工具调用？", False
         ):
             return join_prompts(
                 [f"被用户中断，用户补充信息为：{user_input}", "用户同意继续工具调用。"]
