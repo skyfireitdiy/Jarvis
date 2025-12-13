@@ -823,28 +823,114 @@ def _show_usage_stats(welcome_str: str) -> None:
         )
         right_column_items.append(mission_panel)
 
+        # 创建左右两列的内容组
+        left_column_items = []
+        right_column_items = []
+
+        # 左侧：欢迎Logo和基本信息
+        if welcome_str:
+            jarvis_ascii_art_str = """
+  ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
+  ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
+  ██║███████║██████╔╝██║   ██║██║███████╗
+██╗██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
+╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
+ ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝"""
+
+            welcome_content = Group(
+                Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
+                Align.center(Text(welcome_str, style="bold")),
+                "",  # for a blank line
+                Align.center(Text(f"v{__version__}")),
+                Align.center(Text("https://github.com/skyfireitdiy/Jarvis")),
+            )
+
+            welcome_panel = Panel(
+                welcome_content,
+                title="🤖 Jarvis AI Assistant",
+                border_style="yellow",
+                expand=True,
+            )
+            left_column_items.append(welcome_panel)
+
+        # 右侧：总体表现、愿景和使命
+        # 总体表现 Panel
+        summary_panel = Panel(
+            Text(
+                "\n".join(summary_content) if summary_content else "暂无数据",
+                justify="left",
+            ),
+            title="✨ 总体表现 ✨",
+            title_align="center",
+            border_style="green",
+            expand=True,
+        )
+        right_column_items.append(summary_panel)
+
+        # 愿景 Panel
+        vision_text = Text(
+            "让开发者与AI成为共生伙伴",
+            justify="center",
+            style="italic",
+        )
+        vision_panel = Panel(
+            vision_text,
+            title="🔭 愿景 (Vision) 🔭",
+            title_align="center",
+            border_style="cyan",
+            expand=True,
+        )
+        right_column_items.append(vision_panel)
+
+        # 使命 Panel
+        mission_text = Text(
+            "让灵感高效落地为代码与行动",
+            justify="center",
+            style="italic",
+        )
+        mission_panel = Panel(
+            mission_text,
+            title="🎯 使命 (Mission) 🎯",
+            title_align="center",
+            border_style="magenta",
+            expand=True,
+        )
+        right_column_items.append(mission_panel)
+
+        left_column_group = Group(*left_column_items) if left_column_items else None
         right_column_group = Group(*right_column_items)
 
         layout_renderable: RenderableType
 
         if console.width < 200:
-            # 上下布局
+            # 上下布局（窄屏）
             layout_items: List[RenderableType] = []
+            if left_column_group:
+                layout_items.append(left_column_group)
             layout_items.append(right_column_group)
             layout_renderable = Group(*layout_items)
         else:
-            # 左右布局（当前）
+            # 左右布局（宽屏）
             layout_table = Table(
                 show_header=False,
                 box=None,
-                padding=0,
+                padding=(0, 2),  # 上下0，左右2字符的内边距
                 expand=True,
                 pad_edge=False,
             )
-            # 左右布局，总结信息占满
-            layout_table.add_column(ratio=5)  # 左侧
-            layout_table.add_column(ratio=5)  # 右侧
-            layout_table.add_row(right_column_group)
+            # 左右布局，优化比例：左侧更紧凑，右侧更宽敞
+            if left_column_group:
+                layout_table.add_column(
+                    ratio=35, min_width=40
+                )  # 左侧欢迎信息，最小宽度40
+                layout_table.add_column(
+                    ratio=65, min_width=80
+                )  # 右侧统计信息，最小宽度80
+                layout_table.add_row(left_column_group, right_column_group)
+            else:
+                # 如果没有欢迎信息，右侧占满
+                layout_table.add_column(ratio=100)
+                layout_table.add_row(right_column_group)
             layout_renderable = layout_table
 
         # 打印最终的布局
