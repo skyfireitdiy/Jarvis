@@ -10,7 +10,11 @@
 """
 
 from collections import defaultdict
-from typing import Callable, DefaultDict, List, Any, Tuple
+from typing import Any
+from typing import Callable
+from typing import DefaultDict
+from typing import List
+from typing import Tuple
 
 
 class EventBus:

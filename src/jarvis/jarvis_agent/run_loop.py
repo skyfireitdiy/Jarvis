@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """
 AgentRunLoop: 承载 Agent 的主运行循环逻辑。
@@ -12,22 +10,21 @@ AgentRunLoop: 承载 Agent 的主运行循环逻辑。
 
 import os
 from enum import Enum
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import Optional
 
 from rich import box
 from rich.panel import Panel
 
-from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
-from jarvis.jarvis_agent.utils import (
-    join_prompts,
-    is_auto_complete,
-    normalize_next_action,
-)
-from jarvis.jarvis_utils.config import (
-    get_max_input_token_count,
-    get_conversation_turn_threshold,
-)
-
+from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
+from jarvis.jarvis_agent.utils import is_auto_complete
+from jarvis.jarvis_agent.utils import join_prompts
+from jarvis.jarvis_agent.utils import normalize_next_action
+from jarvis.jarvis_utils.config import get_conversation_turn_threshold
+from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 
 if TYPE_CHECKING:
@@ -245,8 +242,8 @@ class AgentRunLoop:
 
                 # 如果没有工具调用，显示完整响应
                 if not has_tool_call and current_response and current_response.strip():
-                    from jarvis.jarvis_utils.globals import console
                     import jarvis.jarvis_utils.globals as G
+                    from jarvis.jarvis_utils.globals import console
 
                     agent_name = ag.name if hasattr(ag, "name") else None
                     panel = Panel(
@@ -278,10 +275,8 @@ class AgentRunLoop:
             str: git diff内容，如果无法获取则返回错误信息
         """
         try:
-            from jarvis.jarvis_utils.git_utils import (
-                get_diff_between_commits,
-                get_latest_commit_hash,
-            )
+            from jarvis.jarvis_utils.git_utils import get_diff_between_commits
+            from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 
             # 获取agent实例
             agent = self.agent

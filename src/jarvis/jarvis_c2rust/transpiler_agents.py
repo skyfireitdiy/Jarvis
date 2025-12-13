@@ -6,14 +6,17 @@ Agent 管理模块
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
+from typing import Dict
+from typing import Optional
 
 import typer
 
-from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL, AFTER_TOOL_CALL
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.utils import dir_tree
+from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
 
 class AgentManager:
@@ -417,10 +420,8 @@ class AgentManager:
                 return
 
             # 检测测试代码删除
-            from jarvis.jarvis_c2rust.utils import (
-                detect_test_deletion,
-                ask_llm_about_test_deletion,
-            )
+            from jarvis.jarvis_c2rust.utils import ask_llm_about_test_deletion
+            from jarvis.jarvis_c2rust.utils import detect_test_deletion
 
             detection_result = detect_test_deletion("[c2rust-transpiler]")
             if not detection_result:

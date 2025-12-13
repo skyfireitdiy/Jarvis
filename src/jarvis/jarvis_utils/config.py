@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 import os
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, cast
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import cast
 
 from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
 from jarvis.jarvis_utils.collections import CaseInsensitiveDict

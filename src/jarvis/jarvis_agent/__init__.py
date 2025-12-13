@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 # 标准库导入
 import datetime
@@ -7,10 +5,15 @@ import os
 import platform
 import re
 import sys
-from pathlib import Path
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
+from pathlib import Path
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 # 第三方库导入
 from rich.align import Align
@@ -18,82 +21,77 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_agent.event_bus import EventBus
+from jarvis.jarvis_agent.events import AFTER_ADDON_PROMPT
+from jarvis.jarvis_agent.events import AFTER_HISTORY_CLEAR
+from jarvis.jarvis_agent.events import AFTER_MODEL_CALL
+from jarvis.jarvis_agent.events import AFTER_SUMMARY
+from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_agent.events import BEFORE_ADDON_PROMPT
+from jarvis.jarvis_agent.events import BEFORE_HISTORY_CLEAR
+from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
+from jarvis.jarvis_agent.events import BEFORE_SUMMARY
+from jarvis.jarvis_agent.events import BEFORE_TOOL_FILTER
+from jarvis.jarvis_agent.events import INTERRUPT_TRIGGERED
+from jarvis.jarvis_agent.events import TASK_COMPLETED
+from jarvis.jarvis_agent.events import TASK_STARTED
+from jarvis.jarvis_agent.events import TOOL_FILTERED
+from jarvis.jarvis_agent.file_context_handler import file_context_handler
+from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
+from jarvis.jarvis_agent.memory_manager import MemoryManager
+
 # 本地库导入
 # jarvis_agent 相关
 from jarvis.jarvis_agent.prompt_builder import build_action_prompt
-from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
-from jarvis.jarvis_agent.session_manager import SessionManager
-from jarvis.jarvis_agent.tool_executor import execute_tool_call
-from jarvis.jarvis_agent.memory_manager import MemoryManager
-from jarvis.jarvis_memory_organizer.memory_organizer import MemoryOrganizer
-from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
-from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
-from jarvis.jarvis_agent.task_list import TaskListManager
-from jarvis.jarvis_agent.prompts import (
-    DEFAULT_SUMMARY_PROMPT,
-    SUMMARY_REQUEST_PROMPT,
-    TASK_ANALYSIS_PROMPT,  # noqa: F401
-)
-from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_agent.prompt_manager import PromptManager
-from jarvis.jarvis_agent.event_bus import EventBus
+from jarvis.jarvis_agent.prompts import DEFAULT_SUMMARY_PROMPT
+from jarvis.jarvis_agent.prompts import SUMMARY_REQUEST_PROMPT
+from jarvis.jarvis_agent.prompts import TASK_ANALYSIS_PROMPT  # noqa: F401
+from jarvis.jarvis_agent.protocols import OutputHandlerProtocol
 from jarvis.jarvis_agent.run_loop import AgentRunLoop
-from jarvis.jarvis_agent.events import (
-    BEFORE_SUMMARY,
-    AFTER_SUMMARY,
-    TASK_COMPLETED,
-    TASK_STARTED,
-    BEFORE_ADDON_PROMPT,
-    AFTER_ADDON_PROMPT,
-    BEFORE_HISTORY_CLEAR,
-    AFTER_HISTORY_CLEAR,
-    BEFORE_MODEL_CALL,
-    AFTER_MODEL_CALL,
-    INTERRUPT_TRIGGERED,
-    BEFORE_TOOL_FILTER,
-    TOOL_FILTERED,
-    AFTER_TOOL_CALL,
-)
-
+from jarvis.jarvis_agent.session_manager import SessionManager
+from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
+from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
+from jarvis.jarvis_agent.task_list import TaskListManager
+from jarvis.jarvis_agent.tool_executor import execute_tool_call
 from jarvis.jarvis_agent.user_interaction import UserInteractionHandler
 from jarvis.jarvis_agent.utils import join_prompts
-from jarvis.jarvis_utils.methodology import _load_all_methodologies
-from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
-from jarvis.jarvis_agent.file_context_handler import file_context_handler
-from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
+from jarvis.jarvis_memory_organizer.memory_organizer import MemoryOrganizer
 
 # jarvis_platform 相关
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_tools.registry import ToolRegistry
 
 # jarvis_utils 相关
-from jarvis.jarvis_utils.config import (
-    get_data_dir,
-    get_normal_model_name,
-    get_normal_platform_name,
-    is_execute_tool_confirm,
-    is_force_save_memory,
-    is_use_analysis,
-    is_use_methodology,
-    get_tool_filter_threshold,
-    get_after_tool_call_cb_dirs,
-    get_addon_prompt_threshold,
-    is_enable_memory_organizer,
-)
+from jarvis.jarvis_utils.config import get_addon_prompt_threshold
+from jarvis.jarvis_utils.config import get_after_tool_call_cb_dirs
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_platform_name
+from jarvis.jarvis_utils.config import get_tool_filter_threshold
+from jarvis.jarvis_utils.config import is_enable_memory_organizer
+from jarvis.jarvis_utils.config import is_execute_tool_confirm
+from jarvis.jarvis_utils.config import is_force_save_memory
+from jarvis.jarvis_utils.config import is_use_analysis
+from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import (
-    delete_agent,
-    get_interrupt,
-    get_short_term_memories,
-    make_agent_name,
-    set_agent,
-    set_interrupt,
-    set_global_model_group,
-    set_running_agent,
-    clear_running_agent,
-)
-from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
-from jarvis.jarvis_utils.tag import ot, ct
+from jarvis.jarvis_utils.globals import clear_running_agent
+from jarvis.jarvis_utils.globals import delete_agent
+from jarvis.jarvis_utils.globals import get_interrupt
+from jarvis.jarvis_utils.globals import get_short_term_memories
+from jarvis.jarvis_utils.globals import make_agent_name
+from jarvis.jarvis_utils.globals import set_agent
+from jarvis.jarvis_utils.globals import set_global_model_group
+from jarvis.jarvis_utils.globals import set_interrupt
+from jarvis.jarvis_utils.globals import set_running_agent
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.methodology import _load_all_methodologies
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
 
 
 def show_agent_startup_stats(
@@ -1877,10 +1875,8 @@ class Agent:
 
         筛选操作使用cheap模型以降低成本。
         """
-        from jarvis.jarvis_utils.config import (
-            get_cheap_platform_name,
-            get_cheap_model_name,
-        )
+        from jarvis.jarvis_utils.config import get_cheap_model_name
+        from jarvis.jarvis_utils.config import get_cheap_platform_name
 
         # 筛选操作使用cheap模型
         platform_name = get_cheap_platform_name(None)

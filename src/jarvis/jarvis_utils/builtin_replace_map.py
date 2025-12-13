@@ -5,7 +5,8 @@
 格式: {"标记名": {"template": "替换模板", "description": "描述信息"}}
 """
 
-from jarvis.jarvis_utils.tag import ct, ot
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
 
 BUILTIN_REPLACE_MAP = {
     "Web": {

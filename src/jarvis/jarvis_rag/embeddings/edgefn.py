@@ -2,7 +2,8 @@
 EdgeFn 嵌入模型实现。
 """
 
-from typing import List, Optional
+from typing import List
+from typing import Optional
 
 from .base import OnlineEmbeddingModel
 

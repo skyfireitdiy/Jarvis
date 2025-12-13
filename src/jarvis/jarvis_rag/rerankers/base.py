@@ -2,8 +2,9 @@
 在线重排模型的基类实现。
 """
 
-from typing import List, Optional
 import os
+from typing import List
+from typing import Optional
 
 from langchain.docstore.document import Document
 

@@ -6,11 +6,17 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import Tuple
 
 import typer
 
-from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions, OptimizeStats
+from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions
+from jarvis.jarvis_c2rust.optimizer_options import OptimizeStats
 
 
 def run_cmd(

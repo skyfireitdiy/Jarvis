@@ -36,34 +36,33 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import typer
 
-# 导入拆分后的模块
-from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions, OptimizeStats
-from jarvis.jarvis_c2rust.optimizer_utils import (
-    ensure_report_dir,
-    find_project_root,
-    detect_crate_dir,
-    iter_rust_files,
-    compute_target_files,
-)
-from jarvis.jarvis_c2rust.optimizer_progress import ProgressManager
+from jarvis.jarvis_c2rust.optimizer_build_fix import BuildFixOptimizer
+from jarvis.jarvis_c2rust.optimizer_clippy import ClippyOptimizer
 from jarvis.jarvis_c2rust.optimizer_config import (
-    load_additional_notes,
     append_additional_notes as append_notes,
 )
-from jarvis.jarvis_c2rust.optimizer_clippy import ClippyOptimizer
-from jarvis.jarvis_c2rust.optimizer_unsafe import UnsafeOptimizer
-from jarvis.jarvis_c2rust.optimizer_visibility import VisibilityOptimizer
+from jarvis.jarvis_c2rust.optimizer_config import load_additional_notes
 from jarvis.jarvis_c2rust.optimizer_docs import DocsOptimizer
-from jarvis.jarvis_c2rust.optimizer_build_fix import BuildFixOptimizer
-from jarvis.jarvis_c2rust.optimizer_report import (
-    get_report_display_path,
-    write_final_report,
-)
 
+# 导入拆分后的模块
+from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions
+from jarvis.jarvis_c2rust.optimizer_options import OptimizeStats
+from jarvis.jarvis_c2rust.optimizer_progress import ProgressManager
+from jarvis.jarvis_c2rust.optimizer_report import get_report_display_path
+from jarvis.jarvis_c2rust.optimizer_report import write_final_report
+from jarvis.jarvis_c2rust.optimizer_unsafe import UnsafeOptimizer
+from jarvis.jarvis_c2rust.optimizer_utils import compute_target_files
+from jarvis.jarvis_c2rust.optimizer_utils import detect_crate_dir
+from jarvis.jarvis_c2rust.optimizer_utils import ensure_report_dir
+from jarvis.jarvis_c2rust.optimizer_utils import find_project_root
+from jarvis.jarvis_c2rust.optimizer_utils import iter_rust_files
+from jarvis.jarvis_c2rust.optimizer_visibility import VisibilityOptimizer
 
 # 工具函数已迁移到 optimizer_utils.py
 

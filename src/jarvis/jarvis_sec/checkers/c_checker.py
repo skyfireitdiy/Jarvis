@@ -19,10 +19,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Sequence
+from typing import Tuple
 
 from jarvis.jarvis_sec.types import Issue
-
 
 # ---------------------------
 # 规则库（正则表达式）

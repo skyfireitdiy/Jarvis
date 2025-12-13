@@ -2,17 +2,24 @@
 
 import os
 import re
-from typing import List, Optional, Set, cast
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import cast
 
 from ..base_language import BaseLanguageSupport
-from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
+from ..dependency_analyzer import Dependency
+from ..dependency_analyzer import DependencyAnalyzer
+from ..dependency_analyzer import DependencyGraph
 from ..file_ignore import filter_walk_dirs
-from ..symbol_extractor import Symbol, SymbolExtractor
+from ..symbol_extractor import Symbol
+from ..symbol_extractor import SymbolExtractor
 from ..tree_sitter_extractor import TreeSitterExtractor
 
 try:
-    from tree_sitter import Language, Node
     import tree_sitter_javascript
+    from tree_sitter import Language
+    from tree_sitter import Node
 
     JS_LANGUAGE: Optional[Language] = cast(
         Optional[Language], tree_sitter_javascript.language()

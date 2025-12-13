@@ -1,11 +1,11 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import re
 import sys
-from typing import Any, Tuple
+from typing import Any
+from typing import Tuple
 
 from jarvis.jarvis_utils.config import get_replace_map
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 def _get_rule_content(rule_name: str) -> str | None:
@@ -18,8 +18,9 @@ def _get_rule_content(rule_name: str) -> str | None:
         str | None: 规则内容，如果未找到则返回 None
     """
     try:
-        from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
         import os
+
+        from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
 
         # 使用当前工作目录作为root_dir
         rules_manager = RulesManager(root_dir=os.getcwd())

@@ -1,7 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 Java Gradle构建验证器模块
 
@@ -10,9 +6,18 @@ Java Gradle构建验证器模块
 
 import os
 import time
-from typing import List, Optional
+from typing import List
 
-from .base import BuildValidatorBase, BuildResult, BuildSystem
+from jarvis.jarvis_utils.output import PrettyOutput
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from typing import Optional
+
+from .base import BuildResult
+from .base import BuildSystem
+from .base import BuildValidatorBase
 
 
 class JavaGradleBuildValidator(BuildValidatorBase):

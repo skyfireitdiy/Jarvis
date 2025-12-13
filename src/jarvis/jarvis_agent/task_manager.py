@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """任务管理模块，负责加载和选择预定义任务"""
 
@@ -8,16 +6,15 @@ from typing import Dict
 
 import yaml
 from prompt_toolkit import prompt
-from rich.table import Table
 from rich.console import Console
+from rich.table import Table
 
-from jarvis.jarvis_agent import (
-    get_multiline_input,
-    user_confirm,
-)
+from jarvis.jarvis_agent import get_multiline_input
+from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.fzf import fzf_select
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class TaskManager:

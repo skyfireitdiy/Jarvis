@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import List, cast
-
 import json
+from pathlib import Path
+from typing import List
+from typing import cast
+
 import typer
 
 from jarvis.jarvis_c2rust.models import FnRecord

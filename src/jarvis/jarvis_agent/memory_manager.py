@@ -1,17 +1,14 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """
 记忆管理器模块
 负责处理Agent的记忆保存和检索功能
 """
 
+from jarvis.jarvis_agent.events import BEFORE_HISTORY_CLEAR
+from jarvis.jarvis_agent.events import TASK_COMPLETED
+from jarvis.jarvis_agent.events import TASK_STARTED
 from jarvis.jarvis_utils.globals import get_all_memory_tags
-from jarvis.jarvis_agent.events import (
-    TASK_STARTED,
-    BEFORE_HISTORY_CLEAR,
-    TASK_COMPLETED,
-)
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class MemoryManager:

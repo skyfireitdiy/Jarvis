@@ -50,7 +50,11 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
-from typing import Dict, List, Optional, Union, Any
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Union
 
 # 依赖 Issue 结构，但本模块不直接导入 dataclass，接受 dict/Issue 两种形态
 try:

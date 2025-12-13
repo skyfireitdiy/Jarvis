@@ -1,18 +1,23 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """
 嵌入模型注册表，支持动态加载自定义嵌入模型实现。
 """
 
 import importlib
 import inspect
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import os
 import sys
-from typing import Dict, List, Optional, Type
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Type
+
+from jarvis.jarvis_utils.config import get_data_dir
 
 from ..embedding_interface import EmbeddingInterface
-from jarvis.jarvis_utils.config import get_data_dir
 
 
 class EmbeddingRegistry:
@@ -229,12 +234,10 @@ class EmbeddingRegistry:
         返回:
             Optional[EmbeddingInterface]: 嵌入模型实例，如果创建失败则返回None
         """
-        from jarvis.jarvis_utils.config import (
-            get_rag_embedding_type,
-            get_rag_embedding_model,
-            get_rag_embedding_config,
-            get_rag_embedding_cache_path,
-        )
+        from jarvis.jarvis_utils.config import get_rag_embedding_cache_path
+        from jarvis.jarvis_utils.config import get_rag_embedding_config
+        from jarvis.jarvis_utils.config import get_rag_embedding_model
+        from jarvis.jarvis_utils.config import get_rag_embedding_type
 
         embedding_type = get_rag_embedding_type()
         model_name = get_rag_embedding_model()

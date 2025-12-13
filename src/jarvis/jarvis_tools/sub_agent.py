@@ -1,6 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """
 sub_agent 工具
 将子任务交给通用 Agent 执行，并返回执行结果。
@@ -13,11 +10,17 @@ sub_agent 工具
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 
-from typing import Any, Dict
 import json
+from typing import Any
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
+from typing import Dict
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_utils.globals import delete_agent, get_global_model_group
+from jarvis.jarvis_utils.globals import delete_agent
+from jarvis.jarvis_utils.globals import get_global_model_group
 
 
 class SubAgentTool:

@@ -26,7 +26,6 @@ from typing import Optional
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
 
-
 _original_stdout = sys.stdout
 _original_stderr = sys.stderr
 _redirect_enabled = False
@@ -128,7 +127,6 @@ def disable_web_stdio_redirect() -> None:
 # - 使得 Python 层的 input()/sys.stdin.readline() 等可以从浏览器获得输入
 # - 仅适用于部分交互式场景（非真正 PTY 行为），可满足基础行缓冲输入
 from queue import Queue  # noqa: E402
-
 
 _original_stdin = sys.stdin
 _stdin_enabled = False

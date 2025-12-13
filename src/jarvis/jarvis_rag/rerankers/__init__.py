@@ -14,8 +14,8 @@ Reranker = LocalReranker
 # 在线模型实现（可选导入）
 try:
     from .cohere import CohereReranker  # noqa: F401
-    from .jina import JinaReranker  # noqa: F401
     from .edgefn import EdgeFnReranker  # noqa: F401
+    from .jina import JinaReranker  # noqa: F401
 
     _base_exports = [
         "OnlineReranker",

@@ -2,16 +2,22 @@
 
 import os
 import re
-from typing import List, Optional, Set, cast
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import cast
 
-from tree_sitter import Language, Node
+from tree_sitter import Language
+from tree_sitter import Node
 
 from ..base_language import BaseLanguageSupport
-from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
+from ..dependency_analyzer import Dependency
+from ..dependency_analyzer import DependencyAnalyzer
+from ..dependency_analyzer import DependencyGraph
 from ..file_ignore import filter_walk_dirs
-from ..symbol_extractor import Symbol, SymbolExtractor
+from ..symbol_extractor import Symbol
+from ..symbol_extractor import SymbolExtractor
 from ..tree_sitter_extractor import TreeSitterExtractor
-
 
 # --- Rust Symbol Query ---
 

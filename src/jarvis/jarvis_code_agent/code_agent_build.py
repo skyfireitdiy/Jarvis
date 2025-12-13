@@ -1,20 +1,22 @@
+"""CodeAgent 构建验证模块"""
+
+from typing import Any
+from typing import List
+
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-"""CodeAgent 构建验证模块"""
+from typing import Optional
+from typing import Tuple
 
-from typing import Any, List, Optional, Tuple
-
+from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
+from jarvis.jarvis_code_agent.code_analyzer.build_validator import BuildResult
+from jarvis.jarvis_code_agent.code_analyzer.build_validator import BuildValidator
 from jarvis.jarvis_code_agent.code_analyzer.build_validator import (
-    BuildResult,
-    BuildValidator,
     FallbackBuildValidator,
 )
-from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
-from jarvis.jarvis_utils.config import (
-    get_build_validation_timeout,
-    is_enable_build_validation,
-)
+from jarvis.jarvis_utils.config import get_build_validation_timeout
+from jarvis.jarvis_utils.config import is_enable_build_validation
 from jarvis.jarvis_utils.input import user_confirm
 
 

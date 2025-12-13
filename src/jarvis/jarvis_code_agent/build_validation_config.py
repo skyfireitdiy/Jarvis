@@ -1,7 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 构建验证配置管理模块
 
@@ -9,10 +5,19 @@ from jarvis.jarvis_utils.output import PrettyOutput
 """
 
 import os
-import yaml
-from typing import Optional, Dict, Any, cast
 from pathlib import Path
+from typing import Any
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from typing import Dict
+from typing import Optional
+from typing import cast
+
+import yaml
 
 CONFIG_FILE_NAME = "build_validation_config.yaml"
 

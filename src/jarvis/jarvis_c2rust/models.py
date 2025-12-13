@@ -6,7 +6,10 @@ C2Rust 转译器数据模型
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 
 @dataclass

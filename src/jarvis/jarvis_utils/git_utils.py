@@ -1,6 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """
 Git工具模块
 该模块提供了与Git仓库交互的工具。
@@ -14,12 +11,22 @@ Git工具模块
 
 import datetime
 import os
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import re
 import subprocess
 import sys
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import Tuple
 
-from jarvis.jarvis_utils.config import get_data_dir, is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.utils import is_rag_installed
 

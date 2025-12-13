@@ -3,8 +3,10 @@
 定义所有语言支持需要实现的接口，便于扩展新的语言支持。
 """
 
-from abc import ABC, abstractmethod
-from typing import Optional, Set
+from abc import ABC
+from abc import abstractmethod
+from typing import Optional
+from typing import Set
 
 from .dependency_analyzer import DependencyAnalyzer
 from .symbol_extractor import SymbolExtractor

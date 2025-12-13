@@ -1,23 +1,25 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """CodeAgent Git 操作模块"""
 
 import os
 import subprocess
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import sys
-from typing import Any, List, Optional, Tuple
+from typing import Any
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
-from jarvis.jarvis_utils.git_utils import (
-    confirm_add_new_files,
-    find_git_root_and_cd,
-    get_commits_between,
-    has_uncommitted_changes,
-)
+from jarvis.jarvis_utils.git_utils import confirm_add_new_files
+from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
+from jarvis.jarvis_utils.git_utils import get_commits_between
+from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
+from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType
-from jarvis.jarvis_utils.globals import get_global_model_group
 
 
 class GitManager:
@@ -360,8 +362,9 @@ class GitManager:
         Args:
             diff_text: git diff的文本输出
         """
-        from jarvis.jarvis_stats.stats import StatsManager
         import re
+
+        from jarvis.jarvis_stats.stats import StatsManager
 
         # 匹配插入行数
         insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_text)

@@ -4,7 +4,10 @@
 """
 
 from pathlib import Path
-from typing import List, Set, Optional, Callable
+from typing import Callable
+from typing import List
+from typing import Optional
+from typing import Set
 
 
 class FileIgnorePatterns:

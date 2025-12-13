@@ -25,10 +25,12 @@ WebSocketOutputSink: 将 PrettyOutput 的输出事件通过 WebBridge 广播给�
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
-from jarvis.jarvis_utils.output import OutputSink, OutputEvent
 from jarvis.jarvis_agent.web_bridge import WebBridge
+from jarvis.jarvis_utils.output import OutputEvent
+from jarvis.jarvis_utils.output import OutputSink
 
 
 class WebSocketOutputSink(OutputSink):

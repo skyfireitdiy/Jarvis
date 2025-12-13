@@ -1,14 +1,17 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 """
 本地嵌入模型实现。
 """
 
-import torch
+from jarvis.jarvis_utils.output import PrettyOutput
+
 import os
-from typing import List, Optional, cast
-from langchain_huggingface import HuggingFaceEmbeddings
+from typing import List
+from typing import Optional
+from typing import cast
+
+import torch
 from huggingface_hub import snapshot_download
+from langchain_huggingface import HuggingFaceEmbeddings
 
 from ..cache import EmbeddingCache
 from ..embedding_interface import EmbeddingInterface

@@ -1,10 +1,10 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class generate_new_tool:
@@ -161,9 +161,9 @@ class generate_new_tool:
                     try:
                         __import__(pkg)
                     except ImportError:
+                        import os
                         import subprocess
                         import sys
-                        import os
                         from shutil import which as _which
 
                         # 优先使用 uv 安装（先查 venv 内 uv，再查 PATH 中 uv），否则回退到 python -m pip

@@ -8,7 +8,9 @@
 - 本文件仅提供常量与类型定义，不改变现有行为
 """
 
-from typing import Any, TypedDict, List
+from typing import Any
+from typing import List
+from typing import TypedDict
 
 # 事件主题常量
 BEFORE_TOOL_CALL = "before_tool_call"

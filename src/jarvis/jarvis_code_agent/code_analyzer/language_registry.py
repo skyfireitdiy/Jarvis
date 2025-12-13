@@ -1,12 +1,14 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 """语言注册表。
 
 管理所有语言支持的注册和发现机制。
 """
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 import os
-from typing import Dict, Optional, Set
+from typing import Dict
+from typing import Optional
+from typing import Set
 
 from .base_language import BaseLanguageSupport
 from .dependency_analyzer import DependencyAnalyzer

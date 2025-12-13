@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """
 LLM 驱动的 Rust Crate 模块规划 Agent
@@ -28,15 +26,22 @@ from pathlib import Path
 from typing import Any, List, Optional, Union
 
 from jarvis.jarvis_agent import Agent  # 复用 LLM Agent 能力
-
+from jarvis.jarvis_c2rust.llm_module_agent_apply import (
+    apply_project_structure_from_json,
+)
+from jarvis.jarvis_c2rust.llm_module_agent_executor import (
+    execute_llm_plan,
+)
 from jarvis.jarvis_c2rust.llm_module_agent_loader import GraphLoader
 from jarvis.jarvis_c2rust.llm_module_agent_prompts import PromptBuilder
 from jarvis.jarvis_c2rust.llm_module_agent_types import sanitize_mod_name
 from jarvis.jarvis_c2rust.llm_module_agent_utils import (
+    entries_to_json,
     parse_project_json_entries,
     perform_pre_cleanup_for_planner,
 )
 from jarvis.jarvis_c2rust.llm_module_agent_validator import ProjectValidator
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class LLMRustCratePlannerAgent:
@@ -310,21 +315,6 @@ def plan_crate_json_llm(
     agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
     return agent.plan_crate_json_with_project()
 
-
-# 向后兼容：导出 execute_llm_plan
-from jarvis.jarvis_c2rust.llm_module_agent_executor import (  # noqa: E402
-    execute_llm_plan,
-)
-
-# 向后兼容：导出 entries_to_json
-from jarvis.jarvis_c2rust.llm_module_agent_utils import (  # noqa: E402
-    entries_to_json,
-)
-
-# 向后兼容：导出 apply_project_structure_from_json
-from jarvis.jarvis_c2rust.llm_module_agent_apply import (  # noqa: E402
-    apply_project_structure_from_json,
-)
 
 __all__ = [
     "LLMRustCratePlannerAgent",

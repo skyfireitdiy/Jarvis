@@ -9,9 +9,16 @@
 - 结构化输出的面板显示
 """
 
+from abc import ABC
+from abc import abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Optional, Tuple, Any, List
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
@@ -21,10 +28,10 @@ from rich.style import Style as RichStyle
 from rich.syntax import Syntax
 from rich.text import Text
 
-from jarvis.jarvis_utils.config import get_pretty_output, is_print_error_traceback
-from jarvis.jarvis_utils.globals import console, get_agent_list
-from dataclasses import dataclass
-from abc import ABC, abstractmethod
+from jarvis.jarvis_utils.config import get_pretty_output
+from jarvis.jarvis_utils.config import is_print_error_traceback
+from jarvis.jarvis_utils.globals import console
+from jarvis.jarvis_utils.globals import get_agent_list
 
 
 class OutputType(Enum):

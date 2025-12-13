@@ -1,12 +1,16 @@
+"""CodeAgent LLM 询问模块"""
+
+from typing import Any
+from typing import Dict
+
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-"""CodeAgent LLM 询问模块"""
-
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.globals import get_global_model_group
 
 

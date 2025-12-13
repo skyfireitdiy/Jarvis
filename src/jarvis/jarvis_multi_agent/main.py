@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 from typing import Optional
 
@@ -7,9 +5,10 @@ import typer
 import yaml
 
 from jarvis.jarvis_multi_agent import MultiAgent
-from jarvis.jarvis_utils.input import get_multiline_input
-from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.config import set_config
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="多智能体系统启动器")
 

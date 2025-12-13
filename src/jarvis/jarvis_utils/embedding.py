@@ -1,10 +1,9 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import os
 from pathlib import Path
 from typing import List
 
+from jarvis.jarvis_utils.output import PrettyOutput
 
 # 设置tiktoken缓存目录
 script_dir = Path(__file__).parent

@@ -1,16 +1,19 @@
+"""CodeAgent 影响分析模块"""
+
+from typing import Any
+from typing import Dict
+
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-"""CodeAgent 影响分析模块"""
+from typing import List
+from typing import Optional
+from typing import Tuple
 
-from typing import Any, List, Optional, Dict, Tuple
-
-from jarvis.jarvis_code_agent.code_analyzer import (
-    ImpactAnalyzer,
-    parse_git_diff_to_edits,
-)
-from jarvis.jarvis_code_agent.code_analyzer.impact_analyzer import Edit
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
+from jarvis.jarvis_code_agent.code_analyzer import ImpactAnalyzer
+from jarvis.jarvis_code_agent.code_analyzer import parse_git_diff_to_edits
+from jarvis.jarvis_code_agent.code_analyzer.impact_analyzer import Edit
 from jarvis.jarvis_utils.config import is_enable_impact_analysis
 
 

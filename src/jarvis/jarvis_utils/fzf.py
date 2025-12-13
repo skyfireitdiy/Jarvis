@@ -3,7 +3,12 @@
 
 import shutil
 import subprocess
-from typing import List, Optional, Union, Dict, Any, cast
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Union
+from typing import cast
 
 
 def fzf_select(

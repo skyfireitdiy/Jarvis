@@ -1,4 +1,7 @@
-from typing import Any, Protocol, Tuple, runtime_checkable
+from typing import Any
+from typing import Protocol
+from typing import Tuple
+from typing import runtime_checkable
 
 
 @runtime_checkable

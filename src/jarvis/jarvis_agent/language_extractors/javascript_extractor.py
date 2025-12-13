@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """JavaScript language symbol extractor."""
 
-from typing import Optional, Any, List
+from typing import Any
+from typing import List
+from typing import Optional
 
 from jarvis.jarvis_agent.file_context_handler import register_language_extractor
 
@@ -9,8 +11,10 @@ from jarvis.jarvis_agent.file_context_handler import register_language_extractor
 def create_javascript_extractor() -> Optional[Any]:
     """Create JavaScript symbol extractor using tree-sitter."""
     try:
-        from tree_sitter import Language, Parser
         import tree_sitter_javascript
+        from tree_sitter import Language
+        from tree_sitter import Parser
+
         from jarvis.jarvis_code_agent.code_analyzer.symbol_extractor import Symbol
 
         JS_LANGUAGE = tree_sitter_javascript.language()

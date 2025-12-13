@@ -3,29 +3,28 @@
 Utility module for loading language-specific code review checklists.
 """
 
-from typing import Dict, Optional
+from typing import Dict
+from typing import Optional
 
 # Import checklist modules
-from jarvis.jarvis_code_analysis.checklists import (
-    c_cpp,
-    csharp,
-    data_format,
-    devops,
-    docs,
-    go,
-    infrastructure,
-    java,
-    javascript,
-    kotlin,
-    php,
-    python,
-    ruby,
-    rust,
-    shell,
-    sql,
-    swift,
-    web,
-)
+from jarvis.jarvis_code_analysis.checklists import c_cpp
+from jarvis.jarvis_code_analysis.checklists import csharp
+from jarvis.jarvis_code_analysis.checklists import data_format
+from jarvis.jarvis_code_analysis.checklists import devops
+from jarvis.jarvis_code_analysis.checklists import docs
+from jarvis.jarvis_code_analysis.checklists import go
+from jarvis.jarvis_code_analysis.checklists import infrastructure
+from jarvis.jarvis_code_analysis.checklists import java
+from jarvis.jarvis_code_analysis.checklists import javascript
+from jarvis.jarvis_code_analysis.checklists import kotlin
+from jarvis.jarvis_code_analysis.checklists import php
+from jarvis.jarvis_code_analysis.checklists import python
+from jarvis.jarvis_code_analysis.checklists import ruby
+from jarvis.jarvis_code_analysis.checklists import rust
+from jarvis.jarvis_code_analysis.checklists import shell
+from jarvis.jarvis_code_analysis.checklists import sql
+from jarvis.jarvis_code_analysis.checklists import swift
+from jarvis.jarvis_code_analysis.checklists import web
 
 # Map of language identifiers to their checklist content
 CHECKLIST_MAP = {

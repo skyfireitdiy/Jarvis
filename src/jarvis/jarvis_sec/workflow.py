@@ -16,13 +16,18 @@ Jarvis 安全分析套件 —— Workflow（含可复现直扫基线）
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, cast
+from typing import Any
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import cast
 
 import typer
 
-from jarvis.jarvis_sec.checkers import analyze_c_files, analyze_rust_files
+from jarvis.jarvis_sec.checkers import analyze_c_files
+from jarvis.jarvis_sec.checkers import analyze_rust_files
 from jarvis.jarvis_sec.types import Issue
-
 
 # ---------------------------
 # 数据结构

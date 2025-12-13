@@ -3,14 +3,14 @@
 
 import os
 import subprocess
-from typing import Dict, List, Tuple
+from typing import Dict
+from typing import List
+from typing import Tuple
 
+from jarvis.jarvis_utils.config import get_diff_large_file_threshold
+from jarvis.jarvis_utils.config import get_diff_show_line_numbers
+from jarvis.jarvis_utils.config import get_diff_visualization_mode
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
-from jarvis.jarvis_utils.config import (
-    get_diff_visualization_mode,
-    get_diff_show_line_numbers,
-    get_diff_large_file_threshold,
-)
 
 
 class DiffManager:

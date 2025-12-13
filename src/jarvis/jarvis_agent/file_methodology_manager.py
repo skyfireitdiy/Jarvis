@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 """
 文件和方法论管理器模块
@@ -9,12 +7,12 @@ from jarvis.jarvis_utils.output import PrettyOutput
 import os
 import tempfile
 
-from jarvis.jarvis_utils.methodology import load_methodology, upload_methodology
 from jarvis.jarvis_agent.utils import join_prompts
-from jarvis.jarvis_utils.config import (
-    get_normal_platform_name,
-    get_normal_model_name,
-)
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_platform_name
+from jarvis.jarvis_utils.methodology import load_methodology
+from jarvis.jarvis_utils.methodology import upload_methodology
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class FileMethodologyManager:

@@ -1,16 +1,21 @@
 import os
 import re
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import Tuple
 
 from .dependency_analyzer import DependencyGraph
 from .file_ignore import filter_walk_dirs
-from .symbol_extractor import Symbol, SymbolTable
-from .language_support import (
-    detect_language,
-    get_symbol_extractor,
-    get_dependency_analyzer,
-)
+from .language_support import detect_language
+from .language_support import get_dependency_analyzer
+from .language_support import get_symbol_extractor
+from .symbol_extractor import Symbol
+from .symbol_extractor import SymbolTable
 
 
 @dataclass
@@ -322,6 +327,8 @@ class ContextManager:
         try:
             from jarvis.jarvis_code_agent.code_analyzer.language_support import (
                 detect_language,
+            )
+            from jarvis.jarvis_code_agent.code_analyzer.language_support import (
                 get_symbol_extractor,
             )
 
@@ -381,9 +388,11 @@ class ContextManager:
             if has_calls or not is_definition_in_range:
                 # 创建或更新引用符号
                 if symbol.name in processed_symbols:
-                    existing_symbol, existing_is_def, existing_def_loc = (
-                        processed_symbols[symbol.name]
-                    )
+                    (
+                        existing_symbol,
+                        existing_is_def,
+                        existing_def_loc,
+                    ) = processed_symbols[symbol.name]
                     # 如果已有定义，跳过；否则更新定义位置
                     if not existing_is_def and not existing_def_loc:
                         # 尝试获取定义位置

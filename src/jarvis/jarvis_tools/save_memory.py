@@ -1,14 +1,14 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import json
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.globals import add_short_term_memory
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class SaveMemoryTool:

@@ -26,7 +26,8 @@ except (ImportError, RuntimeError):
     pass
 
 try:
-    from .c_cpp_language import CLanguageSupport, CppLanguageSupport  # noqa: F401
+    from .c_cpp_language import CLanguageSupport  # noqa: F401
+    from .c_cpp_language import CppLanguageSupport
 
     __all__.extend(["CLanguageSupport", "CppLanguageSupport"])
 except (ImportError, RuntimeError):

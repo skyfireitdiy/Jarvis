@@ -1,10 +1,17 @@
-from jarvis.jarvis_utils.output import PrettyOutput
 from abc import abstractmethod
-from typing import List, Optional
+from typing import List
+from typing import Optional
 
-from tree_sitter import Language, Parser, Node, Query, QueryCursor
+from tree_sitter import Language
+from tree_sitter import Node
+from tree_sitter import Parser
+from tree_sitter import Query
+from tree_sitter import QueryCursor
 
-from .symbol_extractor import Symbol, SymbolExtractor
+from jarvis.jarvis_utils.output import PrettyOutput
+
+from .symbol_extractor import Symbol
+from .symbol_extractor import SymbolExtractor
 
 
 class TreeSitterExtractor(SymbolExtractor):

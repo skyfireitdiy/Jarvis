@@ -1,58 +1,57 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """Jarvis代码代理模块。
 
 该模块提供CodeAgent类，用于处理代码修改任务。
 """
 
+import hashlib
 import os
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
 import subprocess
 import sys
-import hashlib
 from typing import Optional
 
 import typer
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
+from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
+from jarvis.jarvis_code_agent.code_agent_build import BuildValidationManager
+from jarvis.jarvis_code_agent.code_agent_diff import DiffManager
+from jarvis.jarvis_code_agent.code_agent_git import GitManager
+from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
+from jarvis.jarvis_code_agent.code_agent_lint import LintManager
+from jarvis.jarvis_code_agent.code_agent_llm import LLMManager
+from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
+from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
+from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
     ContextRecommender,
 )
-from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
-from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
-from jarvis.jarvis_code_agent.code_agent_git import GitManager
-from jarvis.jarvis_code_agent.code_agent_diff import DiffManager
-from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
-from jarvis.jarvis_code_agent.code_agent_build import BuildValidationManager
-from jarvis.jarvis_code_agent.code_agent_lint import LintManager
-from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
-from jarvis.jarvis_code_agent.code_agent_llm import LLMManager
-from jarvis.jarvis_code_agent.build_validation_config import BuildValidationConfig
-from jarvis.jarvis_utils.config import (
-    is_confirm_before_apply_patch,
-    is_enable_intent_recognition,
-    set_config,
-    get_smart_platform_name,
-    get_smart_model_name,
-)
-from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_code_agent.utils import get_project_overview
-from jarvis.jarvis_utils.git_utils import (
-    detect_large_code_deletion,
-    find_git_root_and_cd,
-    get_commits_between,
-    get_diff,
-    get_diff_between_commits,
-    get_diff_file_list,
-    get_latest_commit_hash,
-    handle_commit_workflow,
-    revert_change,
-)
-from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
+from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_smart_model_name
+from jarvis.jarvis_utils.config import get_smart_platform_name
+from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
+from jarvis.jarvis_utils.config import is_enable_intent_recognition
+from jarvis.jarvis_utils.config import set_config
+from jarvis.jarvis_utils.git_utils import detect_large_code_deletion
+from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
+from jarvis.jarvis_utils.git_utils import get_commits_between
+from jarvis.jarvis_utils.git_utils import get_diff
+from jarvis.jarvis_utils.git_utils import get_diff_between_commits
+from jarvis.jarvis_utils.git_utils import get_diff_file_list
+from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+from jarvis.jarvis_utils.git_utils import handle_commit_workflow
+from jarvis.jarvis_utils.git_utils import revert_change
+from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
-from jarvis.jarvis_utils.utils import init_env, _acquire_single_instance_lock
+from jarvis.jarvis_utils.utils import _acquire_single_instance_lock
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -387,10 +386,8 @@ class CodeAgent(Agent):
                 from jarvis.jarvis_code_agent.diff_visualizer import (
                     visualize_diff_enhanced,
                 )
-                from jarvis.jarvis_utils.config import (
-                    get_diff_visualization_mode,
-                    get_diff_show_line_numbers,
-                )
+                from jarvis.jarvis_utils.config import get_diff_show_line_numbers
+                from jarvis.jarvis_utils.config import get_diff_visualization_mode
 
                 # 显示整体 diff（使用增强可视化）
                 visualization_mode = get_diff_visualization_mode()
@@ -494,10 +491,11 @@ class CodeAgent(Agent):
 
                     # 构建验证
                     config = BuildValidationConfig(self.root_dir)
-                    build_validation_result, final_ret = (
-                        self.build_validation_manager.handle_build_validation(
-                            modified_files, self, final_ret
-                        )
+                    (
+                        build_validation_result,
+                        final_ret,
+                    ) = self.build_validation_manager.handle_build_validation(
+                        modified_files, self, final_ret
                     )
 
                     # 静态分析
@@ -522,9 +520,10 @@ class CodeAgent(Agent):
                                 and result.stdout
                                 and "|" in result.stdout
                             ):
-                                commit_hash, commit_message = (
-                                    result.stdout.strip().split("|", 1)
-                                )
+                                (
+                                    commit_hash,
+                                    commit_message,
+                                ) = result.stdout.strip().split("|", 1)
                                 commit_short_hash = (
                                     commit_hash[:7]
                                     if len(commit_hash) >= 7
@@ -984,9 +983,9 @@ def _print_available_rules(
         rule_names: 用户指定的规则名称列表（逗号分隔）
     """
     try:
+        from rich.console import Console
         from rich.panel import Panel
         from rich.text import Text
-        from rich.console import Console
 
         console = Console()
         PrettyOutput.auto_print("🔍 正在加载规则信息...")  # 调试信息

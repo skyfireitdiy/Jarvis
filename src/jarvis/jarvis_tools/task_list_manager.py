@@ -1,17 +1,23 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """任务列表管理工具。
 
 该工具允许 LLM 管理任务列表，包括创建任务列表、添加任务、更新任务状态等。
 """
 
 import json
-from typing import Any, Dict, Optional, List
-from jarvis.jarvis_utils.tag import ot, ct
+from typing import Any
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
+from typing import Dict
+from typing import List
+from typing import Optional
+
+from jarvis.jarvis_agent.task_list import TaskStatus
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
-from jarvis.jarvis_agent.task_list import TaskStatus
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
 
 
 class DependencyValidationError(Exception):
@@ -140,8 +146,8 @@ class task_list_manager:
             task_list_id: 任务列表ID（如果为None，则不打印）
         """
         try:
-            from rich.table import Table
             from rich.console import Console
+            from rich.table import Table
 
             console = Console()
 

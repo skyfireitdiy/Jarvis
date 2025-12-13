@@ -1,6 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
-# -*- coding: utf-8 -*-
 """
 输入处理模块
 该模块提供了处理Jarvis系统中用户输入的实用工具。
@@ -11,34 +8,43 @@ from jarvis.jarvis_utils.output import PrettyOutput
 - 用于输入控制的自定义键绑定
 """
 
-import os
-import sys
 import base64
-from typing import Iterable, List, Optional, Tuple
+import os
+
+from jarvis.jarvis_utils.output import PrettyOutput
+
+# -*- coding: utf-8 -*-
+import sys
+from typing import Iterable
+from typing import List
+from typing import Optional
+from typing import Tuple
+
 import wcwidth
 from colorama import Fore
 from colorama import Style as ColoramaStyle
 from fuzzywuzzy import process
 from prompt_toolkit import PromptSession
-from prompt_toolkit.application import Application, run_in_terminal
+from prompt_toolkit.application import Application
+from prompt_toolkit.application import run_in_terminal
 from prompt_toolkit.completion import CompleteEvent
-from prompt_toolkit.completion import (
-    Completer,
-    Completion,
-    PathCompleter,
-)
+from prompt_toolkit.completion import Completer
+from prompt_toolkit.completion import Completion
+from prompt_toolkit.completion import PathCompleter
 from prompt_toolkit.document import Document
+from prompt_toolkit.enums import DEFAULT_BUFFER
+from prompt_toolkit.filters import has_focus
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.enums import DEFAULT_BUFFER
-from prompt_toolkit.filters import has_focus
 from prompt_toolkit.layout.containers import Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.styles import Style as PromptStyle
+
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
-from jarvis.jarvis_utils.config import get_data_dir, get_replace_map
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.globals import get_message_history
 from jarvis.jarvis_utils.tag import ot
 
@@ -255,8 +261,9 @@ class FileCompleter(Completer):
         """
         all_rules = []
         try:
-            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
             import os
+
+            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
 
             rules_manager = RulesManager(os.getcwd())
             available_rules = rules_manager.get_all_available_rule_names()
@@ -303,8 +310,9 @@ class FileCompleter(Completer):
 
         try:
             # 导入必要的模块
-            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
             import os
+
+            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
 
             # 创建RulesManager实例
             rules_manager = RulesManager(os.getcwd())
@@ -481,8 +489,9 @@ def get_all_rules_formatted() -> List[str]:
     all_rules = []
     try:
         try:
-            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
             import os
+
+            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
 
             rules_manager = RulesManager(os.getcwd())
             available_rules = rules_manager.get_all_available_rule_names()

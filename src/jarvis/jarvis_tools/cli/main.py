@@ -1,4 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
 import json
 from typing import Optional
 
@@ -7,6 +6,7 @@ from tabulate import tabulate
 
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.output import OutputType
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Jarvis 工具系统命令行界面")

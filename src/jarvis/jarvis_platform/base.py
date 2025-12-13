@@ -1,38 +1,46 @@
-from jarvis.jarvis_utils.output import PrettyOutput
+import os
 
 # -*- coding: utf-8 -*-
 import re
-import os
+from abc import ABC
+from abc import abstractmethod
 from datetime import datetime
-from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Dict, Generator, List, Optional, Tuple, Type, Any
-
-from typing_extensions import Self
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Type
 
 from rich import box
 from rich.live import Live
 from rich.panel import Panel
 from rich.status import Status
 from rich.text import Text
+from typing_extensions import Self
 
-from jarvis.jarvis_utils.config import (
-    get_pretty_output,
-    is_print_prompt,
-    is_immediate_abort,
-    is_save_session_history,
-    get_data_dir,
-    get_max_input_token_count,
-    get_cheap_max_input_token_count,
-    get_smart_max_input_token_count,
-    get_conversation_turn_threshold,
-)
-from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
 import jarvis.jarvis_utils.globals as G
-from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
-from jarvis.jarvis_utils.tag import ct, ot
-from jarvis.jarvis_utils.utils import while_success, while_true
+from jarvis.jarvis_utils.config import get_cheap_max_input_token_count
+from jarvis.jarvis_utils.config import get_conversation_turn_threshold
+from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import get_pretty_output
+from jarvis.jarvis_utils.config import get_smart_max_input_token_count
+from jarvis.jarvis_utils.config import is_immediate_abort
+from jarvis.jarvis_utils.config import is_print_prompt
+from jarvis.jarvis_utils.config import is_save_session_history
 from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.globals import console
+from jarvis.jarvis_utils.globals import get_interrupt
+from jarvis.jarvis_utils.globals import set_in_chat
+from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ct
+from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import while_success
+from jarvis.jarvis_utils.utils import while_true
 
 
 class BasePlatform(ABC):

@@ -1,9 +1,10 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-from abc import ABC, abstractmethod
+from abc import ABC
+from abc import abstractmethod
 
 from jarvis.jarvis_agent import Agent as JarvisAgent
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class LLMInterface(ABC):

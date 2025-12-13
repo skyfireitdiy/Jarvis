@@ -1,5 +1,7 @@
 import hashlib
-from typing import List, Optional, Any
+from typing import Any
+from typing import List
+from typing import Optional
 
 from diskcache import Cache
 

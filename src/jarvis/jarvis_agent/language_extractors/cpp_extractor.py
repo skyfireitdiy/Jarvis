@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """C++ language symbol extractor."""
 
-from typing import Optional, Any
+from typing import Any
+from typing import Optional
 
 from jarvis.jarvis_agent.file_context_handler import register_language_extractor
 

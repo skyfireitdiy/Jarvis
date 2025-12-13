@@ -1,18 +1,23 @@
+import json
+import random
+import string
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Optional
+from typing import Tuple
+
+from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils.clipboard import copy_to_clipboard
+from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 
 # 人类交互平台实现模块
 
 # 提供与真实人类交互的模拟接口
-
-import json
-import random
-import string
-from typing import Any, Dict, Generator, List, Optional, Tuple
-
-from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.clipboard import copy_to_clipboard
-from jarvis.jarvis_utils.input import get_multiline_input
 
 
 class HumanPlatform(BasePlatform):

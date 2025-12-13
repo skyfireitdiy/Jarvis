@@ -1,9 +1,10 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
-from typing import Any, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import Tuple
 
 from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.output import PrettyOutput
 
 if TYPE_CHECKING:
     from jarvis.jarvis_agent import Agent

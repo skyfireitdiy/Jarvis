@@ -2,7 +2,11 @@
 """LLM 模块规划 Agent 的验证器。"""
 
 import re
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any
+from typing import Callable
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 
 class ProjectValidator:

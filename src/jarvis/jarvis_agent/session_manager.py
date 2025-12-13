@@ -1,9 +1,11 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import os
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import Dict
+from typing import Optional
 
+from jarvis.jarvis_utils.output import PrettyOutput
 
 if TYPE_CHECKING:
     from jarvis.jarvis_platform.base import BasePlatform

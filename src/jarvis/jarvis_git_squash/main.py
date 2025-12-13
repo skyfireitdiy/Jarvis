@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import subprocess
 from typing import Dict
@@ -7,9 +5,11 @@ from typing import Dict
 import typer
 
 from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
-from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.globals import get_agent
+from jarvis.jarvis_utils.globals import get_current_agent_name
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.globals import get_agent, get_current_agent_name
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Git压缩工具")
 

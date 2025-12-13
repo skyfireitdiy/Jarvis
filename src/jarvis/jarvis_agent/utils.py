@@ -6,8 +6,11 @@
 - is_auto_complete: 统一的自动完成标记检测
 """
 
-from typing import Iterable, List, Any
 from enum import Enum
+from typing import Any
+from typing import Iterable
+from typing import List
+
 from jarvis.jarvis_utils.tag import ot
 
 

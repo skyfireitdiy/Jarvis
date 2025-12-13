@@ -3,11 +3,13 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Set, Union
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Set
+from typing import Union
 
-from jarvis.jarvis_c2rust.llm_module_agent_utils import (
-    parse_project_json_entries,
-)
+from jarvis.jarvis_c2rust.llm_module_agent_utils import parse_project_json_entries
 
 
 def ensure_pub_mod_declarations(existing_text: str, child_mods: List[str]) -> str:

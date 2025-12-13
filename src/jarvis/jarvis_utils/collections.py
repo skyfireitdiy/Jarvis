@@ -5,7 +5,13 @@
 确保无论在何种大小写形式下都能正确访问相同的键值。
 """
 
-from typing import Any, Dict, Iterator, Mapping, Optional, Tuple, Union
+from typing import Any
+from typing import Dict
+from typing import Iterator
+from typing import Mapping
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 
 class CaseInsensitiveDict(Mapping[str, Any]):

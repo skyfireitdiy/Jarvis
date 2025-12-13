@@ -2,12 +2,18 @@
 
 import ast
 import os
-from typing import List, Optional, Set, Union
+from typing import List
+from typing import Optional
+from typing import Set
+from typing import Union
 
 from ..base_language import BaseLanguageSupport
-from ..dependency_analyzer import Dependency, DependencyAnalyzer, DependencyGraph
+from ..dependency_analyzer import Dependency
+from ..dependency_analyzer import DependencyAnalyzer
+from ..dependency_analyzer import DependencyGraph
 from ..file_ignore import filter_walk_dirs
-from ..symbol_extractor import Symbol, SymbolExtractor
+from ..symbol_extractor import Symbol
+from ..symbol_extractor import SymbolExtractor
 
 
 class PythonSymbolExtractor(SymbolExtractor):

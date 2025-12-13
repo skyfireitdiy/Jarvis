@@ -1,30 +1,26 @@
-from jarvis.jarvis_utils.output import PrettyOutput
+import mimetypes
 import os
 import sys
 from pathlib import Path
-from typing import Optional, List, Tuple
-import mimetypes
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import pathspec
 import typer
 from langchain.docstore.document import Document
-from langchain_community.document_loaders import (
-    TextLoader,
-    UnstructuredMarkdownLoader,
-)
+from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
 from langchain_core.document_loaders.base import BaseLoader
 from rich.markdown import Markdown
 
-from jarvis.jarvis_utils.utils import (
-    init_env,
-    is_rag_installed,
-    get_missing_rag_modules,
-)
-from jarvis.jarvis_utils.config import (
-    get_rag_embedding_model,
-    get_rag_use_bm25,
-    get_rag_use_rerank,
-)
+from jarvis.jarvis_utils.config import get_rag_embedding_model
+from jarvis.jarvis_utils.config import get_rag_use_bm25
+from jarvis.jarvis_utils.config import get_rag_use_rerank
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import get_missing_rag_modules
+from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.utils import is_rag_installed
 
 
 def is_likely_text_file(file_path: Path) -> bool:

@@ -1,15 +1,16 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import os
-from typing import Optional, Tuple
+from typing import Optional
+from typing import Tuple
 
 import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_shell_name, set_config
+from jarvis.jarvis_utils.config import get_shell_name
+from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.input import get_multiline_input
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(

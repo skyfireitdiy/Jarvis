@@ -1,8 +1,8 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import platform
 import subprocess
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 def copy_to_clipboard(text: str) -> None:

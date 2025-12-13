@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-import re
 import os
-from typing import Any, Tuple, List, Dict, Optional, Callable
-
+import re
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 # 语言提取器注册表（导出供其他模块使用）
 _LANGUAGE_EXTRACTORS: Dict[str, Callable[[], Optional[Any]]] = {}

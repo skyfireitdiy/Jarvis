@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """库替换器的提示词构建模块。"""
 
-from typing import Any, Dict, List, Set
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Set
 
-from jarvis.jarvis_c2rust.constants import (
-    MAX_CHILD_SAMPLES,
-    MAX_DOT_EDGES,
-    MAX_SUBTREE_EDGES,
-    MAX_SUBTREE_NODES_META,
-    SUBTREE_SOURCE_SNIPPET_MAX_LINES,
-)
+from jarvis.jarvis_c2rust.constants import MAX_CHILD_SAMPLES
+from jarvis.jarvis_c2rust.constants import MAX_DOT_EDGES
+from jarvis.jarvis_c2rust.constants import MAX_SUBTREE_EDGES
+from jarvis.jarvis_c2rust.constants import MAX_SUBTREE_NODES_META
+from jarvis.jarvis_c2rust.constants import SUBTREE_SOURCE_SNIPPET_MAX_LINES
 from jarvis.jarvis_c2rust.library_replacer_utils import read_source_snippet
 
 

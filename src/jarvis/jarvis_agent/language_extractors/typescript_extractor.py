@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """TypeScript language symbol extractor."""
 
-from typing import Optional, Any, List
+from typing import Any
+from typing import List
+from typing import Optional
 
 from jarvis.jarvis_agent.file_context_handler import register_language_extractor
 
@@ -9,8 +11,10 @@ from jarvis.jarvis_agent.file_context_handler import register_language_extractor
 def create_typescript_extractor() -> Optional[Any]:
     """Create TypeScript symbol extractor using tree-sitter."""
     try:
-        from tree_sitter import Language, Parser
         import tree_sitter_typescript
+        from tree_sitter import Language
+        from tree_sitter import Parser
+
         from jarvis.jarvis_code_agent.code_analyzer.symbol_extractor import Symbol
 
         # tree-sitter-typescript 使用 language_typescript() 和 language_tsx()

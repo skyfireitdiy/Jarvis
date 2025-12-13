@@ -1,27 +1,27 @@
+"""网络搜索工具。"""
+
+from typing import Any
+from typing import Dict
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-"""网络搜索工具。"""
-
-from typing import Any, Dict
 
 import requests
-from markdownify import markdownify as md
 
 # pylint: disable=import-error,missing-module-docstring
 # fmt: off
 from ddgs import DDGS
-# fmt: on
+from markdownify import markdownify as md
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import (
-    get_normal_platform_name,
-    get_normal_model_name,
-    get_web_search_platform_name,
-    get_web_search_model_name,
-)
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_normal_platform_name
+from jarvis.jarvis_utils.config import get_web_search_model_name
+from jarvis.jarvis_utils.config import get_web_search_platform_name
 from jarvis.jarvis_utils.http import get as http_get
+
+# fmt: on
 
 
 class SearchWebTool:

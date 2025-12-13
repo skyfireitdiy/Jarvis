@@ -2,7 +2,9 @@
 Cohere 嵌入模型实现。
 """
 
-from typing import List, Optional, cast
+from typing import List
+from typing import Optional
+from typing import cast
 
 from .base import OnlineEmbeddingModel
 

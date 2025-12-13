@@ -1,7 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 Go构建验证器模块
 
@@ -9,9 +5,17 @@ Go构建验证器模块
 """
 
 import time
-from typing import List, Optional
+from typing import List
+from typing import Optional
+from jarvis.jarvis_utils.output import PrettyOutput
 
-from .base import BuildValidatorBase, BuildResult, BuildSystem
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+
+from .base import BuildResult
+from .base import BuildSystem
+from .base import BuildValidatorBase
 
 
 class GoBuildValidator(BuildValidatorBase):

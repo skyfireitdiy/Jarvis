@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import json
-from typing import Any, Callable, Dict, cast
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import cast
 
 
 class Tool:

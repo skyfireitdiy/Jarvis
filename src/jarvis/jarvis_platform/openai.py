@@ -1,14 +1,18 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 # -*- coding: utf-8 -*-
 import json
 import os
-from typing import Any, Dict, Generator, List, Optional, Tuple
+from typing import Any
+from typing import Dict
+from typing import Generator
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class OpenAIModel(BasePlatform):

@@ -4,14 +4,16 @@
 提供多种 diff 可视化方式，改善代码变更的可读性。
 """
 
-from typing import List, Optional, Union
-from rich.console import Console
-from rich.syntax import Syntax
-from rich.panel import Panel
-from rich.text import Text
-from rich.table import Table
 import difflib
+from typing import List
+from typing import Optional
+from typing import Union
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.table import Table
+from rich.text import Text
 
 LANGUAGE_EXTENSION_MAPPING = {
     "py": "python",
