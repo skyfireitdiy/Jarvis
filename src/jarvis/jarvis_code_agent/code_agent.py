@@ -316,7 +316,12 @@ class CodeAgent(Agent):
             try:
                 if self.model:
                     self.model.set_suppress_output(False)
-                super().run(enhanced_input)
+                result = super().run(enhanced_input)
+                # 确保返回值是 str 或 None
+                if result is None:
+                    result_str = None
+                else:
+                    result_str = str(result)
             except RuntimeError as e:
                 print(f"⚠️ 执行失败: {str(e)}")
                 return str(e)
@@ -345,7 +350,7 @@ class CodeAgent(Agent):
                 self,
                 self.post_process_manager.post_process_modified_files,
             )
-            return None
+            return result_str
 
         except RuntimeError as e:
             return f"Error during execution: {str(e)}"
