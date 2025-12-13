@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 AgentRunLoop: 承载 Agent 的主运行循环逻辑。
@@ -78,7 +80,7 @@ class AgentRunLoop:
                         else:
                             self._git_diff = None
                     except Exception as e:
-                        print(f"⚠️ 获取git diff失败: {str(e)}")
+                        PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
                         self._git_diff = f"获取git diff失败: {str(e)}"
 
                     summary_text = self.agent._summarize_and_clear_history()
@@ -111,7 +113,7 @@ class AgentRunLoop:
                 run_input_handlers = False
 
                 if ot("!!!SUMMARY!!!") in current_response:
-                    print(
+                    PrettyOutput.auto_print(
                         f"ℹ️ 检测到 {ot('!!!SUMMARY!!!')} 标记，正在触发总结并清空历史..."
                     )
                     # 移除标记，避免在后续处理中出现
@@ -125,7 +127,7 @@ class AgentRunLoop:
                         else:
                             self._git_diff = None
                     except Exception as e:
-                        print(f"⚠️ 获取git diff失败: {str(e)}")
+                        PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
                         self._git_diff = f"获取git diff失败: {str(e)}"
                     # 触发总结并清空历史
                     summary_text = ag._summarize_and_clear_history()
@@ -266,7 +268,7 @@ class AgentRunLoop:
                     return ag._complete_task(auto_completed=False)
 
             except Exception as e:
-                print(f"❌ 任务失败: {str(e)}")
+                PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
                 return f"Task failed: {str(e)}"
 
     def get_git_diff(self) -> str:

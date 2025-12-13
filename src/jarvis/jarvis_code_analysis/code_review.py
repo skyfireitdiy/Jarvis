@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import os
 import re
@@ -12,7 +14,7 @@ from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 
 from jarvis.jarvis_tools.read_code import ReadCodeTool
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
+from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 
@@ -636,7 +638,7 @@ def execute_code_review(
             max_diff_size = 100 * 1024 * 1024  # Limit to 100MB
 
             if len(diff_output) > max_diff_size:
-                print(
+                PrettyOutput.auto_print(
                     f"⚠️ 代码差异内容总大小超过限制 ({len(diff_output)} > {max_diff_size} 字节)，将截断内容"
                 )
                 diff_output = (
@@ -718,7 +720,7 @@ def execute_code_review(
                     try:
                         os.unlink(temp_file_path)
                     except Exception:
-                        print(f"⚠️ 临时文件 {temp_file_path} 未能删除")
+                        PrettyOutput.auto_print(f"⚠️ 临时文件 {temp_file_path} 未能删除")
 
             return {"success": True, "stdout": result, "stderr": ""}
         finally:
@@ -761,11 +763,11 @@ def review_commit(
     }
     result = execute_code_review(tool_args)
     if result["success"]:
-        print("✅ 自动代码审查结果:")
+        PrettyOutput.auto_print("✅ 自动代码审查结果:")
         report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")  # 保留语法高亮
     else:
-        print(f"⚠️ {result['stderr']}")
+        PrettyOutput.auto_print(f"⚠️ {result['stderr']}")
 
 
 @app.command("current")
@@ -787,11 +789,11 @@ def review_current(
     }
     result = execute_code_review(tool_args)
     if result["success"]:
-        print("✅ 自动代码审查结果:")
+        PrettyOutput.auto_print("✅ 自动代码审查结果:")
         report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")  # 保留语法高亮
     else:
-        print(f"⚠️ {result['stderr']}")
+        PrettyOutput.auto_print(f"⚠️ {result['stderr']}")
 
 
 @app.command("range")
@@ -817,11 +819,11 @@ def review_range(
     }
     result = execute_code_review(tool_args)
     if result["success"]:
-        print("✅ 自动代码审查结果:")
+        PrettyOutput.auto_print("✅ 自动代码审查结果:")
         report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")  # 保留语法高亮
     else:
-        print(f"⚠️ {result['stderr']}")
+        PrettyOutput.auto_print(f"⚠️ {result['stderr']}")
 
 
 @app.command("file")
@@ -845,11 +847,11 @@ def review_file(
     }
     result = execute_code_review(tool_args)
     if result["success"]:
-        print("✅ 自动代码审查结果:")
+        PrettyOutput.auto_print("✅ 自动代码审查结果:")
         report = extract_code_report(result["stdout"])
         PrettyOutput.print(report, OutputType.SUCCESS, lang="markdown")  # 保留语法高亮
     else:
-        print(f"⚠️ {result['stderr']}")
+        PrettyOutput.auto_print(f"⚠️ {result['stderr']}")
 
 
 def cli():

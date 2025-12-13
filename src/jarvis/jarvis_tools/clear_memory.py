@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import json
 from pathlib import Path
@@ -145,7 +147,9 @@ class ClearMemoryTool:
                     removed_count += 1
 
             except Exception as e:
-                print(f"⚠️ 处理记忆文件 {memory_file} 时出错: {str(e)}")
+                PrettyOutput.auto_print(
+                    f"⚠️ 处理记忆文件 {memory_file} 时出错: {str(e)}"
+                )
 
         # 如果目录为空，可以删除目录
         if not any(memory_dir.iterdir()) and memory_dir != self.project_memory_dir:
@@ -218,5 +222,5 @@ class ClearMemoryTool:
 
         except Exception as e:
             error_msg = f"清除记忆失败: {str(e)}"
-            print(f"❌ {error_msg}")
+            PrettyOutput.auto_print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}

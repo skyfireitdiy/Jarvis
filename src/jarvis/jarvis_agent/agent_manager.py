@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """Agent管理器模块，负责Agent的初始化和任务执行"""
 
@@ -61,9 +63,9 @@ class AgentManager:
         # 尝试恢复会话
         if self.restore_session:
             if self.agent.restore_session():
-                print("✅ 会话已成功恢复。")
+                PrettyOutput.auto_print("✅ 会话已成功恢复。")
             else:
-                print("⚠️ 无法恢复会话。")
+                PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
         return self.agent
 
@@ -87,7 +89,7 @@ class AgentManager:
             task_manager = TaskManager()
             tasks = task_manager.load_tasks()
             if tasks and (selected_task := task_manager.select_task(tasks)):
-                print(f"ℹ️ 开始执行任务: \n{selected_task}")
+                PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
                 self.agent.run(selected_task)
                 raise typer.Exit(code=0)
 

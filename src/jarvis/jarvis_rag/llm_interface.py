@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 from abc import ABC, abstractmethod
 
 from jarvis.jarvis_agent import Agent as JarvisAgent
@@ -38,7 +39,7 @@ class ToolAgent_LLM(LLMInterface):
         """
         初始化工具-代理 LLM 包装器。
         """
-        print("ℹ️ 已初始化工具 Agent 作为最终应答者。")
+        PrettyOutput.auto_print("ℹ️ 已初始化工具 Agent 作为最终应答者。")
         self.allowed_tools = ["read_code", "execute_script"]
         # 为代理提供一个通用的系统提示
         self.system_prompt = "You are a helpful assistant. Please answer the user's question based on the provided context. You can use tools to find more information if needed."
@@ -78,7 +79,7 @@ class ToolAgent_LLM(LLMInterface):
             return str(final_answer)
 
         except Exception as e:
-            print(f"❌ Agent 在执行过程中发生错误: {e}")
+            PrettyOutput.auto_print(f"❌ Agent 在执行过程中发生错误: {e}")
             return "错误: Agent 未能成功生成回答。"
 
 
@@ -98,9 +99,11 @@ class JarvisPlatform_LLM(LLMInterface):
             self.registry = PlatformRegistry.get_global_platform_registry()
             self.platform: BasePlatform = self.registry.get_cheap_platform()
             self.platform.set_suppress_output(False)  # 确保模型没有控制台输出
-            print(f"ℹ️ 已初始化 Jarvis 平台 LLM（cheap），模型: {self.platform.name()}")
+            PrettyOutput.auto_print(
+                f"ℹ️ 已初始化 Jarvis 平台 LLM（cheap），模型: {self.platform.name()}"
+            )
         except Exception as e:
-            print(f"❌ 初始化 Jarvis 平台 LLM 失败: {e}")
+            PrettyOutput.auto_print(f"❌ 初始化 Jarvis 平台 LLM 失败: {e}")
             raise
 
     def generate(self, prompt: str, **kwargs) -> str:
@@ -118,5 +121,5 @@ class JarvisPlatform_LLM(LLMInterface):
             # 使用健壮的chat_until_success方法
             return self.platform.chat_until_success(prompt)
         except Exception as e:
-            print(f"❌ 调用 Jarvis 平台模型时发生错误: {e}")
+            PrettyOutput.auto_print(f"❌ 调用 Jarvis 平台模型时发生错误: {e}")
             return "错误: 无法从本地LLM获取响应。"

@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 """语言注册表。
 
 管理所有语言支持的注册和发现机制。
@@ -34,7 +36,7 @@ class LanguageRegistry:
         for ext in language_support.file_extensions:
             # 如果扩展名已存在，记录警告但不覆盖（保留第一个注册的）
             if ext in self._extension_map and self._extension_map[ext] != lang_name:
-                print(
+                PrettyOutput.auto_print(
                     f"Warning: Extension {ext} already registered for "
                     f"{self._extension_map[ext]}, ignoring registration for {lang_name}"
                 )

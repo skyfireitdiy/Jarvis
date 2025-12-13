@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 """
 统计管理模块
 
@@ -9,7 +11,7 @@ from typing import Dict, List, Optional, Union, Any
 
 from jarvis.jarvis_stats.storage import StatsStorage
 from jarvis.jarvis_stats.visualizer import StatsVisualizer
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
+from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 
 
 class StatsManager:
@@ -555,7 +557,7 @@ class StatsManager:
         )
 
         if not aggregated:
-            print(f"⚠️ 没有找到指标 '{metric_name}' 的数据")
+            PrettyOutput.auto_print(f"⚠️ 没有找到指标 '{metric_name}' 的数据")
             return
 
         # 获取指标信息
@@ -685,7 +687,7 @@ class StatsManager:
         )
 
         if not aggregated:
-            print(f"⚠️ 没有找到指标 '{metric_name}' 的数据")
+            PrettyOutput.auto_print(f"⚠️ 没有找到指标 '{metric_name}' 的数据")
             return
 
         # 获取指标信息
@@ -695,7 +697,7 @@ class StatsManager:
         # 显示汇总
         summary = visualizer.show_summary(aggregated, metric_name, unit, tags)
         if summary:  # 如果返回了内容才打印（兼容性）
-            print(f"ℹ️ {summary}")
+            PrettyOutput.auto_print(f"ℹ️ {summary}")
 
         # 显示时间范围
         from rich.panel import Panel

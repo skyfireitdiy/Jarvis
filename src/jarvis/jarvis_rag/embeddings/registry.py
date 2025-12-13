@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 嵌入模型注册表，支持动态加载自定义嵌入模型实现。
@@ -31,7 +33,7 @@ class EmbeddingRegistry:
                 ):
                     pass
             except Exception as e:
-                print(f"❌ 创建嵌入模型目录失败: {str(e)}")
+                PrettyOutput.auto_print(f"❌ 创建嵌入模型目录失败: {str(e)}")
                 return ""
         return embedding_dir
 
@@ -71,7 +73,7 @@ class EmbeddingRegistry:
                 missing_methods.append(f"{method_name}(parameter mismatch)")
 
         if missing_methods:
-            print(
+            PrettyOutput.auto_print(
                 f"⚠️ 嵌入模型 {embedding_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}"
             )
             return False
@@ -94,7 +96,7 @@ class EmbeddingRegistry:
 
         # 确保目录存在
         if not os.path.exists(directory):
-            print(f"⚠️ 嵌入模型目录不存在: {directory}")
+            PrettyOutput.auto_print(f"⚠️ 嵌入模型目录不存在: {directory}")
             return embeddings
 
         # 获取目录的包名
@@ -146,7 +148,7 @@ class EmbeddingRegistry:
 
         if error_lines:
             joined_errors = "\n".join(error_lines)
-            print(f"❌ {joined_errors}")
+            PrettyOutput.auto_print(f"❌ {joined_errors}")
         return embeddings
 
     @staticmethod
@@ -203,14 +205,14 @@ class EmbeddingRegistry:
             EmbeddingInterface: 嵌入模型实例
         """
         if name not in self.embeddings:
-            print(f"⚠️ 未找到嵌入模型: {name}")
+            PrettyOutput.auto_print(f"⚠️ 未找到嵌入模型: {name}")
             return None
 
         try:
             embedding = self.embeddings[name](*args, **kwargs)
             return embedding
         except Exception as e:
-            print(f"❌ 创建嵌入模型失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 创建嵌入模型失败: {str(e)}")
             return None
 
     def get_available_embeddings(self) -> List[str]:

@@ -45,7 +45,7 @@ class TestReadCodeTool:
     def sample_file(self):
         """创建示例文件"""
         content = """def hello():
-    print("Hello, World!")
+    PrettyOutput.auto_print("Hello, World!")
 
 def add(a, b):
     return a + b
@@ -192,19 +192,19 @@ class Calculator:
         """测试同一文件多个重叠范围读取时的去重功能"""
         content = """class MyClass:
     def method1(self):
-        print("method1")
+        PrettyOutput.auto_print("method1")
         return 1
     
     def method2(self):
-        print("method2")
+        PrettyOutput.auto_print("method2")
         return 2
     
     def method3(self):
-        print("method3")
+        PrettyOutput.auto_print("method3")
         return 3
     
     def method4(self):
-        print("method4")
+        PrettyOutput.auto_print("method4")
         return 4
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:

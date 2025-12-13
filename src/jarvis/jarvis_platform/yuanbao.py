@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import hashlib
 import hmac
@@ -63,7 +65,7 @@ class YuanbaoPlatform(BasePlatform):
         if model_name in model_mapping:
             self.model_name = model_name
         else:
-            print(f"❌ 错误：不支持的模型: {model_name}")
+            PrettyOutput.auto_print(f"❌ 错误：不支持的模型: {model_name}")
 
     def _get_base_headers(self):
         """获取API请求的基础头部信息"""
@@ -106,10 +108,10 @@ class YuanbaoPlatform(BasePlatform):
                 self.conversation_id = response_json["id"]
                 return True
             else:
-                print(f"❌ 错误：创建会话失败，响应: {response_json}")
+                PrettyOutput.auto_print(f"❌ 错误：创建会话失败，响应: {response_json}")
                 return False
         except Exception as e:
-            print(f"❌ 错误：创建会话失败：{e}")
+            PrettyOutput.auto_print(f"❌ 错误：创建会话失败：{e}")
             return False
 
     def support_upload_files(self) -> bool:
@@ -126,7 +128,7 @@ class YuanbaoPlatform(BasePlatform):
             用于聊天消息的文件元数据字典列表
         """
         if not self.cookies:
-            print("❌ 未设置yuanbao_cookies，无法上传文件")
+            PrettyOutput.auto_print("❌ 未设置yuanbao_cookies，无法上传文件")
             return False
 
         uploaded_files = []
@@ -197,7 +199,7 @@ class YuanbaoPlatform(BasePlatform):
                 if not upload_info:
                     log_lines.append(f"无法获取文件 {file_name} 的上传信息")
                     joined_logs = "\n".join(log_lines)
-                    print(f"❌ {joined_logs}")
+                    PrettyOutput.auto_print(f"❌ {joined_logs}")
                     return False
 
                 # 3. Upload the file to COS
@@ -206,7 +208,7 @@ class YuanbaoPlatform(BasePlatform):
                 if not upload_success:
                     log_lines.append(f"上传文件 {file_name} 失败")
                     joined_logs = "\n".join(log_lines)
-                    print(f"❌ {joined_logs}")
+                    PrettyOutput.auto_print(f"❌ {joined_logs}")
                     return False
 
                 # 4. Create file metadata for chat
@@ -233,13 +235,13 @@ class YuanbaoPlatform(BasePlatform):
                 uploaded_files.append(file_metadata)
                 log_lines.append(f"文件 {file_name} 上传成功")
                 joined_logs = "\n".join(log_lines)
-                print(f"ℹ️ {joined_logs}")
+                PrettyOutput.auto_print(f"ℹ️ {joined_logs}")
                 time.sleep(3)  # 上传成功后等待3秒
 
             except Exception as e:
                 log_lines.append(f"上传文件 {file_path} 时出错: {str(e)}")
                 joined_logs = "\n".join(log_lines)
-                print(f"❌ {joined_logs}")
+                PrettyOutput.auto_print(f"❌ {joined_logs}")
                 return False
 
         self.multimedia = uploaded_files
@@ -266,16 +268,18 @@ class YuanbaoPlatform(BasePlatform):
             )
 
             if response.status_code != 200:
-                print(f"❌ 获取上传信息失败，状态码: {response.status_code}")
+                PrettyOutput.auto_print(
+                    f"❌ 获取上传信息失败，状态码: {response.status_code}"
+                )
                 if hasattr(response, "text"):
-                    print(f"❌ 响应: {response.text}")
+                    PrettyOutput.auto_print(f"❌ 响应: {response.text}")
                 return {}
 
             upload_info = response.json()
             return cast(Dict[str, Any], upload_info)
 
         except Exception as e:
-            print(f"❌ 获取上传信息时出错: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 获取上传信息时出错: {str(e)}")
             return {}
 
     def _upload_file_to_cos(self, file_path: str, upload_info: Dict) -> bool:
@@ -306,7 +310,7 @@ class YuanbaoPlatform(BasePlatform):
             with open(file_path, "rb") as file:
                 file_content = file.read()
 
-            print(f"ℹ️ 上传文件大小: {len(file_content)}")
+            PrettyOutput.auto_print(f"ℹ️ 上传文件大小: {len(file_content)}")
 
             # Prepare headers for PUT request
             host = f"{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"
@@ -338,15 +342,17 @@ class YuanbaoPlatform(BasePlatform):
             response = http.put(url, headers=headers, data=file_content)
 
             if response.status_code not in [200, 204]:
-                print(f"❌ 文件上传到COS失败，状态码: {response.status_code}")
+                PrettyOutput.auto_print(
+                    f"❌ 文件上传到COS失败，状态码: {response.status_code}"
+                )
                 if hasattr(response, "text"):
-                    print(f"❌ 响应: {response.text}")
+                    PrettyOutput.auto_print(f"❌ 响应: {response.text}")
                 return False
 
             return True
 
         except Exception as e:
-            print(f"❌ 上传文件到COS时出错: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 上传文件到COS时出错: {str(e)}")
             return False
 
     def _generate_cos_signature(
@@ -408,7 +414,7 @@ class YuanbaoPlatform(BasePlatform):
             return signature
 
         except Exception as e:
-            print(f"❌ 生成签名时出错: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 生成签名时出错: {str(e)}")
             raise e
 
     def chat(self, message: str) -> Generator[str, None, None]:
@@ -554,18 +560,18 @@ class YuanbaoPlatform(BasePlatform):
                 self.first_chat = True
                 return True
             else:
-                print(f"⚠️ 删除会话失败: HTTP {response.status_code}")
+                PrettyOutput.auto_print(f"⚠️ 删除会话失败: HTTP {response.status_code}")
                 if hasattr(response, "text"):
-                    print(f"⚠️ 响应: {response.text}")
+                    PrettyOutput.auto_print(f"⚠️ 响应: {response.text}")
                 return False
         except Exception as e:
-            print(f"❌ 删除会话时发生错误: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 删除会话时发生错误: {str(e)}")
             return False
 
     def save(self, file_path: str) -> bool:
         """Save chat session to a file."""
         if not self.conversation_id:
-            print("⚠️ 没有活动的会话可供保存")
+            PrettyOutput.auto_print("⚠️ 没有活动的会话可供保存")
             return False
 
         state = {
@@ -580,10 +586,10 @@ class YuanbaoPlatform(BasePlatform):
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(state, f, ensure_ascii=False, indent=4)
             self._saved = True
-            print(f"✅ 会话已成功保存到 {file_path}")
+            PrettyOutput.auto_print(f"✅ 会话已成功保存到 {file_path}")
             return True
         except Exception as e:
-            print(f"❌ 保存会话失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 保存会话失败: {str(e)}")
             return False
 
     def restore(self, file_path: str) -> bool:
@@ -599,13 +605,13 @@ class YuanbaoPlatform(BasePlatform):
             self.multimedia = state.get("multimedia", [])
             self._saved = True
 
-            print(f"✅ 从 {file_path} 成功恢复会话")
+            PrettyOutput.auto_print(f"✅ 从 {file_path} 成功恢复会话")
             return True
         except FileNotFoundError:
-            print(f"❌ 会话文件未找到: {file_path}")
+            PrettyOutput.auto_print(f"❌ 会话文件未找到: {file_path}")
             return False
         except Exception as e:
-            print(f"❌ 恢复会话失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 恢复会话失败: {str(e)}")
             return False
 
     def name(self) -> str:

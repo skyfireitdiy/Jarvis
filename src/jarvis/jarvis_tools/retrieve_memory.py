@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import json
 from pathlib import Path
@@ -88,7 +90,9 @@ class RetrieveMemoryTool:
 
                     memories.append(memory_data)
                 except Exception as e:
-                    print(f"⚠️ 读取记忆文件 {memory_file} 失败: {str(e)}")
+                    PrettyOutput.auto_print(
+                        f"⚠️ 读取记忆文件 {memory_file} 失败: {str(e)}"
+                    )
 
         return memories
 
@@ -222,5 +226,5 @@ class RetrieveMemoryTool:
 
         except Exception as e:
             error_msg = f"检索记忆失败: {str(e)}"
-            print(f"❌ {error_msg}")
+            PrettyOutput.auto_print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}

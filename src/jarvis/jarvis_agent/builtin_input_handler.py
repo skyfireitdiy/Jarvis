@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import re
 import sys
@@ -75,14 +77,14 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "SaveSession":
             if agent.save_session():
-                print("✅ 会话已成功保存。正在退出...")
+                PrettyOutput.auto_print("✅ 会话已成功保存。正在退出...")
                 sys.exit(0)
             else:
-                print("❌ 保存会话失败。")
+                PrettyOutput.auto_print("❌ 保存会话失败。")
             return "", True
         elif tag == "Quiet":
             agent.set_non_interactive(True)
-            print("🔇 已切换到静默模式（非交互模式）")
+            PrettyOutput.auto_print("🔇 已切换到静默模式（非交互模式）")
             return user_input.replace("'<Quiet>'", ""), False
 
         processed_tag = set()

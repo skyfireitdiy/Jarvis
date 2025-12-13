@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 import os
 from typing import List, Optional
 
@@ -80,7 +81,7 @@ class JarvisRAGPipeline:
         self._reranker: Optional[RerankerInterface] = None
         self._query_rewriter: Optional[QueryRewriter] = None
 
-        print("✅ JarvisRAGPipeline 初始化成功 (模型按需加载).")
+        PrettyOutput.auto_print("✅ JarvisRAGPipeline 初始化成功 (模型按需加载).")
 
     def _get_embedding_manager(self) -> EmbeddingInterface:
         if self._embedding_manager is None:
@@ -184,16 +185,18 @@ class JarvisRAGPipeline:
             if deleted:
                 lines.extend([f"  删除: {p}" for p in deleted[:3]])
             joined_lines = "\n".join(lines)
-            print(f"⚠️ {joined_lines}")
+            PrettyOutput.auto_print(f"⚠️ {joined_lines}")
             # 询问用户
             if get_yes_no(
                 "检测到索引变更，是否现在更新索引后再开始检索？", default=True
             ):
                 retriever.update_index_for_changes(changed, deleted)
             else:
-                print("ℹ️ 已跳过索引更新，将直接使用当前索引进行检索。")
+                PrettyOutput.auto_print(
+                    "ℹ️ 已跳过索引更新，将直接使用当前索引进行检索。"
+                )
         except Exception as e:
-            print(f"⚠️ 检索前索引检查失败：{e}")
+            PrettyOutput.auto_print(f"⚠️ 检索前索引检查失败：{e}")
 
     def add_documents(self, documents: List[Document]):
         """
@@ -246,12 +249,12 @@ class JarvisRAGPipeline:
         if self.use_query_rewrite:
             rewritten_queries = self._get_query_rewriter().rewrite(query_text)
         else:
-            print("ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。")
+            PrettyOutput.auto_print("ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。")
             rewritten_queries = [query_text]
 
         # 2. 为每个重写的查询检索初始候选文档
         query_lines = "\n".join([f"  - {q}" for q in rewritten_queries])
-        print(f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}")
+        PrettyOutput.auto_print(f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}")
         all_candidate_docs = []
         for q in rewritten_queries:
             candidates = self._get_retriever().retrieve(
@@ -268,7 +271,7 @@ class JarvisRAGPipeline:
 
         # 3. 根据*原始*查询对统一的候选池进行重排
         if self.use_rerank:
-            print(
+            PrettyOutput.auto_print(
                 f"ℹ️ 正在对 {len(unique_candidate_docs)} 个候选文档进行重排（基于原始问题）..."
             )
             retrieved_docs = self._get_reranker().rerank(
@@ -294,13 +297,13 @@ class JarvisRAGPipeline:
             # 合并来源列表后一次性打印，避免多次加框
             lines = ["根据以下文档回答:"] + [f"  - {source}" for source in sources]
             joined_lines = "\n".join(lines)
-            print(f"ℹ️ {joined_lines}")
+            PrettyOutput.auto_print(f"ℹ️ {joined_lines}")
 
         # 4. 创建最终提示并生成答案
         # 我们使用原始的query_text作为给LLM的最终提示
         prompt = self._create_prompt(query_text, retrieved_docs)
 
-        print("ℹ️ 正在从LLM生成答案...")
+        PrettyOutput.auto_print("ℹ️ 正在从LLM生成答案...")
         answer = self.llm.generate(prompt)
 
         return answer
@@ -322,12 +325,12 @@ class JarvisRAGPipeline:
         if self.use_query_rewrite:
             rewritten_queries = self._get_query_rewriter().rewrite(query_text)
         else:
-            print("ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。")
+            PrettyOutput.auto_print("ℹ️ 已关闭查询重写，将直接使用原始查询进行检索。")
             rewritten_queries = [query_text]
 
         # 2. 检索候选文档
         query_lines = "\n".join([f"  - {q}" for q in rewritten_queries])
-        print(f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}")
+        PrettyOutput.auto_print(f"ℹ️ 将为以下查询变体进行混合检索:\n{query_lines}")
         all_candidate_docs = []
         for q in rewritten_queries:
             candidates = self._get_retriever().retrieve(
@@ -343,7 +346,9 @@ class JarvisRAGPipeline:
 
         # 3. 重排
         if self.use_rerank:
-            print(f"ℹ️ 正在对 {len(unique_candidate_docs)} 个候选文档进行重排...")
+            PrettyOutput.auto_print(
+                f"ℹ️ 正在对 {len(unique_candidate_docs)} 个候选文档进行重排..."
+            )
             retrieved_docs = self._get_reranker().rerank(
                 query_text, unique_candidate_docs, top_n=n_results
             )

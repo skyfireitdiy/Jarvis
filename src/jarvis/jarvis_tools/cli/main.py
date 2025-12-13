@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 import json
 from typing import Optional
 
@@ -5,7 +6,7 @@ import typer
 from tabulate import tabulate
 
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_utils.utils import init_env
 
 app = typer.Typer(help="Jarvis 工具系统命令行界面")
@@ -37,7 +38,7 @@ def list_tools(
                 lang="json",
             )
     else:
-        print("📋 可用工具列表")
+        PrettyOutput.auto_print("📋 可用工具列表")
         # 为避免 PrettyOutput 对每行加框造成信息稀疏，先拼接字符串再统一打印
         lines = []
         import json as _json  # local import to ensure available
@@ -92,7 +93,7 @@ def stat_tools(
             )
         else:
             time_desc = f"最近{last_days}天" if last_days else "所有历史"
-            print(f"📊 工具调用统计 ({time_desc})")
+            PrettyOutput.auto_print(f"📊 工具调用统计 ({time_desc})")
             if table_data:
                 PrettyOutput.print(
                     tabulate(
@@ -101,14 +102,14 @@ def stat_tools(
                     OutputType.CODE,
                     lang="text",
                 )
-                print(
+                PrettyOutput.auto_print(
                     f"ℹ️ 总计: {len(table_data)} 个工具被使用，共 {sum(x[1] for x in table_data)} 次调用"
                 )
             else:
-                print("ℹ️ 暂无工具调用记录")
+                PrettyOutput.auto_print("ℹ️ 暂无工具调用记录")
     else:
         # 使用 stats 系统的高级功能
-        print("📊 工具组统计")
+        PrettyOutput.auto_print("📊 工具组统计")
         # 显示所有标记为 tool 组的指标
         metrics = StatsManager.list_metrics()
         tool_metrics = []
@@ -167,7 +168,7 @@ def stat_tools(
                             tags={"group": "tool"},
                         )
         else:
-            print("ℹ️ 暂无工具调用记录")
+            PrettyOutput.auto_print("ℹ️ 暂无工具调用记录")
 
 
 @app.command("call")
@@ -183,9 +184,9 @@ def call_tool(
     tool_obj = registry.get_tool(tool_name)
 
     if not tool_obj:
-        print(f"❌ 错误: 工具 '{tool_name}' 不存在")
+        PrettyOutput.auto_print(f"❌ 错误: 工具 '{tool_name}' 不存在")
         available_tools = ", ".join([t["name"] for t in registry.get_all_tools()])
-        print(f"ℹ️ 可用工具: {available_tools}")
+        PrettyOutput.auto_print(f"ℹ️ 可用工具: {available_tools}")
         raise typer.Exit(code=1)
 
     tool_args = {}
@@ -193,14 +194,14 @@ def call_tool(
         try:
             tool_args = json.loads(args)
         except Exception:
-            print("❌ 错误: 参数必须是有效的JSON格式")
+            PrettyOutput.auto_print("❌ 错误: 参数必须是有效的JSON格式")
             raise typer.Exit(code=1)
     elif args_file:
         try:
             with open(args_file, "r", encoding="utf-8") as f:
                 tool_args = json.load(f)
         except (Exception, FileNotFoundError) as e:
-            print(f"❌ 错误: 无法从文件加载参数: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 错误: 无法从文件加载参数: {str(e)}")
             raise typer.Exit(code=1)
 
     required_params = tool_obj.parameters.get("required", [])
@@ -218,22 +219,22 @@ def call_tool(
             param_info = params.get(param_name, {})
             desc = param_info.get("description", "无描述")
             lines.append(f"  - {param_name}: {desc}")
-        print("❌ " + "\n❌ ".join(lines))
+        PrettyOutput.auto_print("❌ " + "\n❌ ".join(lines))
         raise typer.Exit(code=1)
 
     result = registry.execute_tool(tool_name, tool_args)
 
     if result["success"]:
-        print(f"✅ 工具 {tool_name} 执行成功")
+        PrettyOutput.auto_print(f"✅ 工具 {tool_name} 执行成功")
     else:
-        print(f"❌ 工具 {tool_name} 执行失败")
+        PrettyOutput.auto_print(f"❌ 工具 {tool_name} 执行失败")
 
     if result.get("stdout"):
-        print("\n📤 输出:")
+        PrettyOutput.auto_print("\n📤 输出:")
         PrettyOutput.print(result["stdout"], OutputType.CODE, lang="text")
 
     if result.get("stderr"):
-        print("\n❌ 错误:")
+        PrettyOutput.auto_print("\n❌ 错误:")
         PrettyOutput.print(result["stderr"], OutputType.CODE, lang="text")
 
     if not result["success"]:

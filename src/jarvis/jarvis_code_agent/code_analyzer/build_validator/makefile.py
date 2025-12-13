@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -27,8 +28,10 @@ class MakefileBuildValidator(BuildValidatorBase):
         makefile = os.path.join(self.project_root, "Makefile")
         if not os.path.exists(makefile):
             duration = time.time() - start_time
-            print(f"❌ Makefile 构建验证失败（耗时 {duration:.2f} 秒）")
-            print("错误信息：Makefile不存在")
+            PrettyOutput.auto_print(
+                f"❌ Makefile 构建验证失败（耗时 {duration:.2f} 秒）"
+            )
+            PrettyOutput.auto_print("错误信息：Makefile不存在")
             return BuildResult(
                 success=False,
                 output="Makefile不存在",
@@ -47,10 +50,14 @@ class MakefileBuildValidator(BuildValidatorBase):
         success = returncode == 0
         output = stdout + stderr
         if success:
-            print(f"✅ Makefile 构建验证成功（耗时 {duration:.2f} 秒）")
+            PrettyOutput.auto_print(
+                f"✅ Makefile 构建验证成功（耗时 {duration:.2f} 秒）"
+            )
         else:
-            print(f"❌ Makefile 构建验证失败（耗时 {duration:.2f} 秒）")
-            print(f"错误信息：Makefile语法检查失败\n{output[:500]}")
+            PrettyOutput.auto_print(
+                f"❌ Makefile 构建验证失败（耗时 {duration:.2f} 秒）"
+            )
+            PrettyOutput.auto_print(f"错误信息：Makefile语法检查失败\n{output[:500]}")
         return BuildResult(
             success=success,
             output=output,

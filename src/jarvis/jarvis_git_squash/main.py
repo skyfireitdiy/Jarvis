@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import subprocess
 from typing import Dict
@@ -37,11 +39,11 @@ class GitSquashTool:
         """Execute the squash operation"""
         try:
             if not self._confirm_squash():
-                print("⚠️ 操作已取消")
+                PrettyOutput.auto_print("⚠️ 操作已取消")
                 return
 
             if not self._reset_to_commit(args["commit_hash"]):
-                print("⚠️ 重置到指定提交失败")
+                PrettyOutput.auto_print("⚠️ 重置到指定提交失败")
                 return
 
             # Use existing GitCommitTool for new commit
@@ -52,7 +54,7 @@ class GitSquashTool:
                 exec_args["agent"] = agent
             commit_tool.execute(exec_args)
         except Exception as e:
-            print(f"⚠️ 压缩提交失败: {str(e)}")
+            PrettyOutput.auto_print(f"⚠️ 压缩提交失败: {str(e)}")
 
 
 @app.command()

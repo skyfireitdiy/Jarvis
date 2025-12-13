@@ -232,17 +232,17 @@ class 工具名称:
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         try:
             # 使用print显示执行过程
-            print("ℹ️ 开始执行操作...")
+            PrettyOutput.auto_print("ℹ️ 开始执行操作...")
             # 实现逻辑
             # ...
-            print("✅ 操作已完成")
+            PrettyOutput.auto_print("✅ 操作已完成")
             return {{
                 "success": True,
                 "stdout": "结果输出",
                 "stderr": ""
             }}
         except Exception as e:
-            print(f"❌ 操作失败: {{str(e)}}")
+            PrettyOutput.auto_print(f"❌ 操作失败: {{str(e)}}")
             return {{
                 "success": False,
                 "stdout": "",

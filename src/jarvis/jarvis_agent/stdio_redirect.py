@@ -2,7 +2,7 @@
 """
 Web STDIO 重定向模块：
 - 在 Web 模式下，将 Python 层的标准输出/错误（sys.stdout/sys.stderr）重定向到 WebSocket，通过 WebBridge 广播。
-- 适用于工具或第三方库直接使用 print()/stdout/stderr 的输出，从而不经过 PrettyOutput Sink 的场景。
+- 适用于工具或第三方库直接使用 PrettyOutput.auto_print()/stdout/stderr 的输出，从而不经过 PrettyOutput Sink 的场景。
 
 注意：
 - 这是进程级重定向，可能带来重复输出（PrettyOutput 已通过 Sink 广播一次，console.print 也会走到 stdout）。若需要避免重复，可在前端针对 'stdio' 类型进行独立显示或折叠。

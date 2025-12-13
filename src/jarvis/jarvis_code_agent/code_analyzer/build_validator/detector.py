@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -47,11 +48,11 @@ class BuildSystemDetector:
                 return ""
         except FileNotFoundError:
             # loc工具未安装，返回空字符串
-            print("⚠️ loc工具未安装，无法获取文件统计信息")
+            PrettyOutput.auto_print("⚠️ loc工具未安装，无法获取文件统计信息")
             return ""
         except Exception as e:
             # 其他错误，返回空字符串
-            print(f"⚠️ 调用loc工具失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 调用loc工具失败: {e}")
             return ""
 
     def _get_git_root_file_list(self, max_files: int = 100) -> str:
@@ -123,7 +124,7 @@ class BuildSystemDetector:
                 return ""
         except Exception as e:
             # 发生错误时返回空字符串
-            print(f"⚠️ 获取git根目录文件列表失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 获取git根目录文件列表失败: {e}")
             return ""
 
     def _get_supported_build_systems(self) -> List[str]:
@@ -161,7 +162,9 @@ class BuildSystemDetector:
         if saved_system:
             try:
                 saved_enum = BuildSystem(saved_system)
-                print(f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}")
+                PrettyOutput.auto_print(
+                    f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}"
+                )
                 return [(saved_enum, 1.0)]
             except ValueError:
                 # 配置文件中保存的构建系统无效，继续检测
@@ -229,7 +232,7 @@ Git根目录文件列表（前30项）：
 
             platform = PlatformRegistry().get_cheap_platform()
 
-            print("🤖 正在使用LLM判断构建系统...")
+            PrettyOutput.auto_print("🤖 正在使用LLM判断构建系统...")
             response = platform.chat_until_success(context)
 
             # 解析响应
@@ -315,7 +318,7 @@ Git根目录文件列表（前30项）：
                 return [(BuildSystem.UNKNOWN, 0.5)]
 
         except Exception as e:
-            print(f"⚠️ LLM判断构建系统失败: {e}，使用unknown")
+            PrettyOutput.auto_print(f"⚠️ LLM判断构建系统失败: {e}，使用unknown")
             return [(BuildSystem.UNKNOWN, 0.5)]
 
     def detect_with_llm_and_confirm(self) -> Optional[List[BuildSystem]]:
@@ -345,7 +348,7 @@ Git根目录文件列表（前30项）：
         # 非交互模式：直接选择概率最高的构建系统
         if _is_non_interactive():
             system, prob = detected_systems_with_prob[0]
-            print(
+            PrettyOutput.auto_print(
                 f"ℹ️ 非交互模式：自动选择概率最高的构建系统: {system.value} (概率: {prob:.2%})"
             )
             from jarvis.jarvis_code_agent.build_validation_config import (
@@ -359,7 +362,7 @@ Git根目录文件列表（前30项）：
         # 如果检测到unknown，直接使用，不询问用户
         if len(detected_systems) == 1 and detected_systems[0] == BuildSystem.UNKNOWN:
             prob = detected_systems_with_prob[0][1]
-            print(
+            PrettyOutput.auto_print(
                 f"ℹ️ LLM判断：无法确定构建系统（unknown，概率: {prob:.2%}），直接使用unknown"
             )
             from jarvis.jarvis_code_agent.build_validation_config import (
@@ -371,9 +374,9 @@ Git根目录文件列表（前30项）：
             return detected_systems
 
         # 显示检测结果（按概率从大到小排序）
-        print("\n🤖 LLM判断结果（按概率从大到小排序）：")
+        PrettyOutput.auto_print("\n🤖 LLM判断结果（按概率从大到小排序）：")
         for idx, (system, prob) in enumerate(detected_systems_with_prob, start=1):
-            print(f"  {idx}. {system.value} (概率: {prob:.2%})")
+            PrettyOutput.auto_print(f"  {idx}. {system.value} (概率: {prob:.2%})")
 
         # 显示检测结果
         if len(detected_systems) == 1:
@@ -433,20 +436,22 @@ Git根目录文件列表（前30项）：
         if _is_non_interactive():
             if detected_systems_with_prob:
                 selected, prob = detected_systems_with_prob[0]
-                print(
+                PrettyOutput.auto_print(
                     f"ℹ️ 非交互模式：自动选择概率最高的构建系统: {selected.value} (概率: {prob:.2%})"
                 )
                 config.set_selected_build_system(selected.value)
                 return [selected]
             else:
-                print("ℹ️ 非交互模式：未检测到构建系统，使用unknown")
+                PrettyOutput.auto_print("ℹ️ 非交互模式：未检测到构建系统，使用unknown")
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]
 
-        print("\n请选择构建系统（按概率从大到小排序）：")
+        PrettyOutput.auto_print("\n请选择构建系统（按概率从大到小排序）：")
         for idx, (system, prob) in enumerate(detected_systems_with_prob, start=1):
-            print(f"  {idx}. {system.value} (概率: {prob:.2%})")
-        print(f"  {len(detected_systems_with_prob) + 1}. 取消（使用unknown）")
+            PrettyOutput.auto_print(f"  {idx}. {system.value} (概率: {prob:.2%})")
+        PrettyOutput.auto_print(
+            f"  {len(detected_systems_with_prob) + 1}. 取消（使用unknown）"
+        )
 
         while True:
             try:
@@ -459,18 +464,22 @@ Git根目录文件列表（前30项）：
                     selected, prob = detected_systems_with_prob[choice_num - 1]
                     # 保存用户选择
                     config.set_selected_build_system(selected.value)
-                    print(f"ℹ️ 用户选择构建系统: {selected.value} (概率: {prob:.2%})")
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 用户选择构建系统: {selected.value} (概率: {prob:.2%})"
+                    )
                     return [selected]
                 elif choice_num == len(detected_systems_with_prob) + 1:
-                    print("ℹ️ 用户取消选择，使用unknown")
+                    PrettyOutput.auto_print("ℹ️ 用户取消选择，使用unknown")
                     config.set_selected_build_system("unknown")
                     return [BuildSystem.UNKNOWN]
                 else:
-                    print(f"无效选择，请输入 1-{len(detected_systems_with_prob) + 1}")
+                    PrettyOutput.auto_print(
+                        f"无效选择，请输入 1-{len(detected_systems_with_prob) + 1}"
+                    )
             except ValueError:
-                print("请输入有效的数字")
+                PrettyOutput.auto_print("请输入有效的数字")
             except (KeyboardInterrupt, EOFError):
-                print("\n用户取消，使用unknown")
+                PrettyOutput.auto_print("\n用户取消，使用unknown")
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]
 
@@ -520,18 +529,20 @@ Git根目录文件列表（前30项）：
         if _is_non_interactive():
             if detected_systems and detected_systems[0] != BuildSystem.UNKNOWN:
                 selected_system: BuildSystem = detected_systems[0]
-                print(f"ℹ️ 非交互模式：自动选择构建系统: {selected_system.value}")
+                PrettyOutput.auto_print(
+                    f"ℹ️ 非交互模式：自动选择构建系统: {selected_system.value}"
+                )
                 config.set_selected_build_system(selected_system.value)
                 return [selected_system]
             else:
-                print("ℹ️ 非交互模式：未检测到构建系统，使用unknown")
+                PrettyOutput.auto_print("ℹ️ 非交互模式：未检测到构建系统，使用unknown")
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]
 
-        print("\n请选择构建系统：")
+        PrettyOutput.auto_print("\n请选择构建系统：")
         for idx, system in enumerate(detected_systems, start=1):
-            print(f"  {idx}. {system.value}")
-        print(f"  {len(detected_systems) + 1}. 取消（使用unknown）")
+            PrettyOutput.auto_print(f"  {idx}. {system.value}")
+        PrettyOutput.auto_print(f"  {len(detected_systems) + 1}. 取消（使用unknown）")
 
         while True:
             try:
@@ -544,17 +555,21 @@ Git根目录文件列表（前30项）：
                     ]
                     # 保存用户选择
                     config.set_selected_build_system(selected_build_system.value)
-                    print(f"ℹ️ 用户选择构建系统: {selected_build_system.value}")
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 用户选择构建系统: {selected_build_system.value}"
+                    )
                     return [selected_build_system]
                 elif choice_num == len(detected_systems) + 1:
-                    print("ℹ️ 用户取消选择，使用unknown")
+                    PrettyOutput.auto_print("ℹ️ 用户取消选择，使用unknown")
                     config.set_selected_build_system("unknown")
                     return [BuildSystem.UNKNOWN]
                 else:
-                    print(f"无效选择，请输入 1-{len(detected_systems) + 1}")
+                    PrettyOutput.auto_print(
+                        f"无效选择，请输入 1-{len(detected_systems) + 1}"
+                    )
             except ValueError:
-                print("请输入有效的数字")
+                PrettyOutput.auto_print("请输入有效的数字")
             except (KeyboardInterrupt, EOFError):
-                print("\n用户取消，使用unknown")
+                PrettyOutput.auto_print("\n用户取消，使用unknown")
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]

@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import os
 from pathlib import Path
@@ -30,7 +32,7 @@ def get_context_token_count(text: str) -> int:
         # 调整token计算为原来的10/7倍
         return int(len(encoding.encode(text)) * 10 / 7)
     except Exception as e:
-        print(f"⚠️ 计算token失败: {str(e)}")
+        PrettyOutput.auto_print(f"⚠️ 计算token失败: {str(e)}")
         return int(
             len(text) // 4 * 10 / 7
         )  # 每个token大约4个字符的粗略估计，调整为10/7倍
@@ -82,6 +84,6 @@ def split_text_into_chunks(
         return chunks
 
     except Exception as e:
-        print(f"⚠️ 文本分割失败: {str(e)}")
+        PrettyOutput.auto_print(f"⚠️ 文本分割失败: {str(e)}")
         # 发生错误时回退到简单的字符分割
         return [text[i : i + max_length] for i in range(0, len(text), max_length)]

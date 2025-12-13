@@ -170,13 +170,15 @@ def _resolve_llm_reference(llm_name: str) -> Dict[str, Any]:
     返回:
         Dict[str, Any]: 解析后的LLM配置字典，包含 platform, model, max_input_token_count, llm_config
     """
+    from jarvis.jarvis_utils.output import PrettyOutput
+
     llms = GLOBAL_CONFIG_DATA.get("llms", {})
     if not isinstance(llms, dict):
         return {}
 
     llm_config = llms.get(llm_name)
     if not isinstance(llm_config, dict):
-        print(f"⚠️ 警告：llms 中未找到名为 '{llm_name}' 的配置")
+        PrettyOutput.auto_print(f"⚠️ 警告：llms 中未找到名为 '{llm_name}' 的配置")
         return {}
 
     return llm_config.copy()
@@ -308,6 +310,8 @@ def _get_resolved_model_config(
     异常:
         如果 llm_groups 中直接定义了 platform、model 等参数，或缺少必需的引用，会抛出 ValueError
     """
+    from jarvis.jarvis_utils.output import PrettyOutput
+
     group_config = {}
     model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("llm_group")
     # The format is an object: {'group_name': {...}, ...}
@@ -318,8 +322,10 @@ def _get_resolved_model_config(
             group_config = model_groups[model_group_name]
         elif model_group_override:
             # 当显式指定了模型组但未找到时，报错并退出
-            print(f"❌ 错误：指定的模型组 '{model_group_name}' 不存在于配置中。")
-            print(
+            PrettyOutput.auto_print(
+                f"❌ 错误：指定的模型组 '{model_group_name}' 不存在于配置中。"
+            )
+            PrettyOutput.auto_print(
                 "ℹ️ 可用的模型组: " + ", ".join(model_groups.keys())
                 if model_groups
                 else "无可用模型组"
@@ -811,6 +817,8 @@ def _resolve_embedding_reference(embedding_name: str) -> Dict[str, Any]:
     返回:
         Dict[str, Any]: 解析后的嵌入模型配置字典，包含 embedding_model, embedding_type, embedding_max_length, embedding_config
     """
+    from jarvis.jarvis_utils.output import PrettyOutput
+
     embeddings = GLOBAL_CONFIG_DATA.get("embeddings", {})
     if not isinstance(embeddings, dict):
         embeddings = {}
@@ -821,7 +829,9 @@ def _resolve_embedding_reference(embedding_name: str) -> Dict[str, Any]:
 
     embedding_config = embeddings.get(embedding_name)
     if not isinstance(embedding_config, dict):
-        print(f"⚠️ 警告：embeddings 中未找到名为 '{embedding_name}' 的配置")
+        PrettyOutput.auto_print(
+            f"⚠️ 警告：embeddings 中未找到名为 '{embedding_name}' 的配置"
+        )
         return {}
 
     return embedding_config.copy()
@@ -837,6 +847,8 @@ def _resolve_reranker_reference(reranker_name: str) -> Dict[str, Any]:
     返回:
         Dict[str, Any]: 解析后的重排模型配置字典，包含 rerank_model, reranker_type, reranker_max_length, reranker_config
     """
+    from jarvis.jarvis_utils.output import PrettyOutput
+
     rerankers = GLOBAL_CONFIG_DATA.get("rerankers", {})
     if not isinstance(rerankers, dict):
         rerankers = {}
@@ -847,7 +859,9 @@ def _resolve_reranker_reference(reranker_name: str) -> Dict[str, Any]:
 
     reranker_config = rerankers.get(reranker_name)
     if not isinstance(reranker_config, dict):
-        print(f"⚠️ 警告：rerankers 中未找到名为 '{reranker_name}' 的配置")
+        PrettyOutput.auto_print(
+            f"⚠️ 警告：rerankers 中未找到名为 '{reranker_name}' 的配置"
+        )
         return {}
 
     return reranker_config.copy()

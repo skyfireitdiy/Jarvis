@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 from abc import abstractmethod
 from typing import List, Optional
 
@@ -67,7 +68,9 @@ class TreeSitterExtractor(SymbolExtractor):
                 import os
 
                 if os.getenv("DEBUG_TREE_SITTER", "").lower() in ("1", "true", "yes"):
-                    print(f"Error creating query for {file_path}: {query_error}")
+                    PrettyOutput.auto_print(
+                        f"Error creating query for {file_path}: {query_error}"
+                    )
                 return []
 
             # 使用 QueryCursor 执行查询
@@ -103,7 +106,7 @@ class TreeSitterExtractor(SymbolExtractor):
             import os
 
             if os.getenv("DEBUG_TREE_SITTER", "").lower() in ("1", "true", "yes"):
-                print(
+                PrettyOutput.auto_print(
                     f"Error extracting symbols from {file_path} with tree-sitter: {e}"
                 )
             # 即使解析失败，也返回已提取的符号（如果有的话）

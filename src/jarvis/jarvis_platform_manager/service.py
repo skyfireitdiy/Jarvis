@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """Jarvis Platform Manager Service Module.
 
@@ -97,11 +99,13 @@ def start_service(
 
     registry = PlatformRegistry.get_global_platform_registry()
 
-    print(f"✅ Starting Jarvis API server on {host}:{port}")
-    print("ℹ️ 本服务提供与 OpenAI 兼容的 API")
+    PrettyOutput.auto_print(f"✅ Starting Jarvis API server on {host}:{port}")
+    PrettyOutput.auto_print("ℹ️ 本服务提供与 OpenAI 兼容的 API")
 
     if default_platform and default_model:
-        print(f"ℹ️ Default platform: {default_platform}, model: {default_model}")
+        PrettyOutput.auto_print(
+            f"ℹ️ Default platform: {default_platform}, model: {default_model}"
+        )
 
     # Platform and model cache
     platform_instances: Dict[str, Any] = {}
@@ -146,7 +150,7 @@ def start_service(
             if response:
                 f.write(f"\nResponse:\n{response}\n")
 
-        print(f"ℹ️ 会话已记录到 {log_file}")
+        PrettyOutput.auto_print(f"ℹ️ 会话已记录到 {log_file}")
 
     @app.get("/v1/models")
     async def list_models() -> Dict[str, Any]:
@@ -171,7 +175,9 @@ def start_service(
                                 }
                             )
             except Exception as exc:
-                print(f"❌ Error getting models for {default_platform}: {str(exc)}")
+                PrettyOutput.auto_print(
+                    f"❌ Error getting models for {default_platform}: {str(exc)}"
+                )
 
         # Return model list
         return {"object": "list", "data": model_list}
@@ -336,7 +342,7 @@ def start_service(
 
             if isinstance(item, dict) and "__error__" in item:
                 error_msg = f"Error during streaming: {item['__error__']}"
-                print(f"❌ {error_msg}")
+                PrettyOutput.auto_print(f"❌ {error_msg}")
 
                 # Send error information in the stream
                 error_chunk = {

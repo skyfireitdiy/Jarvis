@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 """
 本地重排模型实现。
 """
@@ -31,13 +33,13 @@ class LocalReranker(RerankerInterface):
             max_length: 模型的最大输入长度（token数），用于文档处理。
         """
         self.max_length = max_length
-        print(f"ℹ️ 正在初始化重排模型: {model_name}...")
+        PrettyOutput.auto_print(f"ℹ️ 正在初始化重排模型: {model_name}...")
         try:
             local_dir = None
 
             if os.path.isdir(model_name):
                 self.model = CrossEncoder(model_name)
-                print("✅ 重排模型初始化成功。")
+                PrettyOutput.auto_print("✅ 重排模型初始化成功。")
                 return
             try:
                 # Prefer local cache; avoid any network access
@@ -50,9 +52,9 @@ class LocalReranker(RerankerInterface):
             else:
                 self.model = CrossEncoder(model_name)
 
-            print("✅ 重排模型初始化成功。")
+            PrettyOutput.auto_print("✅ 重排模型初始化成功。")
         except Exception as e:
-            print(f"❌ 初始化重排模型失败: {e}")
+            PrettyOutput.auto_print(f"❌ 初始化重排模型失败: {e}")
             raise
 
     def rerank(

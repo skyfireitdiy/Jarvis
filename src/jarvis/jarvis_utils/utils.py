@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import hashlib
 import json
@@ -289,7 +291,7 @@ def _acquire_single_instance_lock(lock_name: str = "instance.lock") -> None:
     if lock_path.exists():
         pid = _read_lock_owner_pid(lock_path)
         if pid and _is_process_alive(pid):
-            print(
+            PrettyOutput.auto_print(
                 f"⚠️ 检测到已有一个 Jarvis 实例正在运行 (PID: {pid})。\n如果确认不存在正在运行的实例，请删除锁文件后重试：{lock_path}"
             )
             sys.exit(0)
@@ -297,7 +299,9 @@ def _acquire_single_instance_lock(lock_name: str = "instance.lock") -> None:
         try:
             lock_path.unlink()
         except Exception:
-            print(f"❌ 无法删除旧锁文件：{lock_path}，请手动清理后重试。")
+            PrettyOutput.auto_print(
+                f"❌ 无法删除旧锁文件：{lock_path}，请手动清理后重试。"
+            )
             sys.exit(1)
 
     # 原子创建锁文件，避免并发竞争
@@ -320,12 +324,16 @@ def _acquire_single_instance_lock(lock_name: str = "instance.lock") -> None:
         # 极端并发下再次校验
         pid = _read_lock_owner_pid(lock_path)
         if pid and _is_process_alive(pid):
-            print(f"⚠️ 检测到已有一个 Jarvis 实例正在运行 (PID: {pid})。")
+            PrettyOutput.auto_print(
+                f"⚠️ 检测到已有一个 Jarvis 实例正在运行 (PID: {pid})。"
+            )
             sys.exit(0)
-        print(f"❌ 锁文件已存在但可能为陈旧状态：{lock_path}，请手动删除后重试。")
+        PrettyOutput.auto_print(
+            f"❌ 锁文件已存在但可能为陈旧状态：{lock_path}，请手动删除后重试。"
+        )
         sys.exit(1)
     except Exception as e:
-        print(f"❌ 创建实例锁失败: {e}")
+        PrettyOutput.auto_print(f"❌ 创建实例锁失败: {e}")
         sys.exit(1)
 
 
@@ -366,7 +374,9 @@ def _check_pip_updates() -> bool:
         latest_ver = version.parse(latest_version)
 
         if latest_ver > current_ver:
-            print(f"ℹ️ 检测到新版本 v{latest_version} (当前版本: v{__version__})")
+            PrettyOutput.auto_print(
+                f"ℹ️ 检测到新版本 v{latest_version} (当前版本: v{__version__})"
+            )
 
             # 检测是否在虚拟环境中
             hasattr(sys, "real_prefix") or (
@@ -415,7 +425,7 @@ def _check_pip_updates() -> bool:
 
             # 自动尝试升级（失败时提供手动命令）
             try:
-                print("ℹ️ 正在自动更新 Jarvis，请稍候...")
+                PrettyOutput.auto_print("ℹ️ 正在自动更新 Jarvis，请稍候...")
                 result = subprocess.run(
                     cmd_list,
                     capture_output=True,
@@ -425,18 +435,20 @@ def _check_pip_updates() -> bool:
                     timeout=600,
                 )
                 if result.returncode == 0:
-                    print("✅ 更新成功，正在重启以应用新版本...")
+                    PrettyOutput.auto_print("✅ 更新成功，正在重启以应用新版本...")
                     # 更新检查日期，避免重复触发
                     last_check_file.write_text(today_str)
                     return True
                 else:
                     err = (result.stderr or result.stdout or "").strip()
                     if err:
-                        print(f"⚠️ 自动更新失败，错误信息（已截断）: {err[:500]}")
-                    print(f"ℹ️ 请手动执行以下命令更新: {update_cmd}")
+                        PrettyOutput.auto_print(
+                            f"⚠️ 自动更新失败，错误信息（已截断）: {err[:500]}"
+                        )
+                    PrettyOutput.auto_print(f"ℹ️ 请手动执行以下命令更新: {update_cmd}")
             except Exception:
-                print("⚠️ 自动更新出现异常，已切换为手动更新方式。")
-                print(f"ℹ️ 请手动执行以下命令更新: {update_cmd}")
+                PrettyOutput.auto_print("⚠️ 自动更新出现异常，已切换为手动更新方式。")
+                PrettyOutput.auto_print(f"ℹ️ 请手动执行以下命令更新: {update_cmd}")
 
         # 更新检查日期
         last_check_file.write_text(today_str)
@@ -905,8 +917,8 @@ def _show_usage_stats(welcome_str: str) -> None:
         # 输出错误信息以便调试
         import traceback
 
-        print(f"❌ 统计显示出错: {str(e)}")
-        print(f"❌ {traceback.format_exc()}")
+        PrettyOutput.auto_print(f"❌ 统计显示出错: {str(e)}")
+        PrettyOutput.auto_print(f"❌ {traceback.format_exc()}")
 
 
 def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
@@ -919,9 +931,11 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
     try:
         if os.environ.get("JARVIS_TERMINAL") == "1":
-            print("⚠️ 检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。")
+            PrettyOutput.auto_print(
+                "⚠️ 检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。"
+            )
             if not user_confirm("是否仍要继续启动 Jarvis？", default=False):
-                print("ℹ️ 已取消启动以避免终端嵌套。")
+                PrettyOutput.auto_print("ℹ️ 已取消启动以避免终端嵌套。")
                 sys.exit(0)
     except Exception:
         pass
@@ -986,7 +1000,7 @@ def _interactive_config_setup(config_file_path: Path):
         user_confirm as get_yes_no,
     )
 
-    print("ℹ️ 欢迎使用 Jarvis！未找到配置文件，现在开始引导配置。")
+    PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！未找到配置文件，现在开始引导配置。")
 
     # 1. 选择平台
     registry = PlatformRegistry.get_global_platform_registry()
@@ -996,7 +1010,7 @@ def _interactive_config_setup(config_file_path: Path):
     # 2. 配置 API 密钥等信息（用于 llm_config）
     platform_class = registry.platforms.get(platform_name)
     if not platform_class:
-        print(f"❌ 平台 '{platform_name}' 加载失败。")
+        PrettyOutput.auto_print(f"❌ 平台 '{platform_name}' 加载失败。")
         sys.exit(1)
 
     env_vars = {}
@@ -1016,7 +1030,7 @@ def _interactive_config_setup(config_file_path: Path):
     }
 
     if required_keys:
-        print(f"ℹ️ 请输入 {platform_name} 平台所需的配置信息:")
+        PrettyOutput.auto_print(f"ℹ️ 请输入 {platform_name} 平台所需的配置信息:")
 
         # 如果有配置指导，先显示总体说明
         if config_guide:
@@ -1027,7 +1041,7 @@ def _interactive_config_setup(config_file_path: Path):
                     guide_lines.append("")
                     guide_lines.append(f"{key} 获取方法:")
                     guide_lines.append(str(config_guide[key]))
-            print("ℹ️ " + "\n".join(guide_lines))
+            PrettyOutput.auto_print("ℹ️ " + "\n".join(guide_lines))
         else:
             # 若无指导，仍需遍历以保持后续逻辑一致
             pass
@@ -1057,7 +1071,7 @@ def _interactive_config_setup(config_file_path: Path):
             platform_name, llm_config=llm_config if llm_config else None
         )
         if not platform_instance:
-            print(f"❌ 无法创建平台 '{platform_name}'。")
+            PrettyOutput.auto_print(f"❌ 无法创建平台 '{platform_name}'。")
             sys.exit(1)
 
         model_list_tuples = platform_instance.get_model_list()
@@ -1069,13 +1083,13 @@ def _interactive_config_setup(config_file_path: Path):
         model_name, _ = model_list_tuples[selected_index]
 
     except Exception:
-        print("❌ 获取模型列表失败")
+        PrettyOutput.auto_print("❌ 获取模型列表失败")
         if not get_yes_no("无法获取模型列表，是否继续配置？"):
             sys.exit(1)
         model_name = get_input("请输入模型名称:")
 
     # 4. 测试配置
-    print("ℹ️ 正在测试配置...")
+    PrettyOutput.auto_print("ℹ️ 正在测试配置...")
     test_passed = False
     try:
         # 创建平台实例时传递 llm_config（如果已收集）
@@ -1087,14 +1101,14 @@ def _interactive_config_setup(config_file_path: Path):
             response_generator = platform_instance.chat("hello")
             response = "".join(response_generator)
             if response:
-                print(f"✅ 测试成功，模型响应: {response}")
+                PrettyOutput.auto_print(f"✅ 测试成功，模型响应: {response}")
                 test_passed = True
             else:
-                print("❌ 测试失败，模型没有响应。")
+                PrettyOutput.auto_print("❌ 测试失败，模型没有响应。")
         else:
-            print("❌ 测试失败，无法创建平台实例。")
+            PrettyOutput.auto_print("❌ 测试失败，无法创建平台实例。")
     except Exception:
-        print("❌ 测试失败")
+        PrettyOutput.auto_print("❌ 测试失败")
 
     # 5. 询问最大输入 token 数量
     max_input_token_count = 32000
@@ -1138,7 +1152,7 @@ def _interactive_config_setup(config_file_path: Path):
 
     if not test_passed:
         if not get_yes_no("配置测试失败，是否仍要应用该配置并继续？", default=False):
-            print("ℹ️ 已取消配置。")
+            PrettyOutput.auto_print("ℹ️ 已取消配置。")
             sys.exit(0)
 
     # 8. 选择其他功能开关与可选项（复用统一逻辑）
@@ -1161,11 +1175,11 @@ def _interactive_config_setup(config_file_path: Path):
             if header:
                 f.write(header)
             f.write(yaml_str)
-        print(f"✅ 配置文件已生成: {config_file_path}")
-        print("ℹ️ 配置完成，请重新启动Jarvis。")
+        PrettyOutput.auto_print(f"✅ 配置文件已生成: {config_file_path}")
+        PrettyOutput.auto_print("ℹ️ 配置完成，请重新启动Jarvis。")
         sys.exit(0)
     except Exception:
-        print("❌ 写入配置文件失败")
+        PrettyOutput.auto_print("❌ 写入配置文件失败")
         sys.exit(1)
 
 
@@ -2015,13 +2029,15 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
             # 更新全局配置
             set_global_env_data(config_data)
     except Exception:
-        print("❌ 加载配置文件失败")
+        PrettyOutput.auto_print("❌ 加载配置文件失败")
         if get_yes_no("配置文件格式错误，是否删除并重新配置？"):
             try:
                 os.remove(config_file)
-                print("✅ 已删除损坏的配置文件，请重启Jarvis以重新配置。")
+                PrettyOutput.auto_print(
+                    "✅ 已删除损坏的配置文件，请重启Jarvis以重新配置。"
+                )
             except Exception:
-                print("❌ 删除配置文件失败")
+                PrettyOutput.auto_print("❌ 删除配置文件失败")
         sys.exit(1)
 
 
@@ -2184,7 +2200,9 @@ def _read_old_config_file(config_file):
             {str(k): str(v) for k, v in config_data.items() if v is not None}
         )
         set_global_env_data(config_data)
-    print("⚠️ 检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式")
+    PrettyOutput.auto_print(
+        "⚠️ 检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式"
+    )
 
 
 # 线程本地存储，用于共享重试计数器
@@ -2237,12 +2255,12 @@ def while_success(func: Callable[[], Any]) -> Any:
                 # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
                 sleep_time = 2 ** (retry_count - 1)
                 if retry_count < MAX_RETRIES:
-                    print(
+                    PrettyOutput.auto_print(
                         f"⚠️ 发生异常:\n{e}\n重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s..."
                     )
                     time.sleep(sleep_time)
                 else:
-                    print(
+                    PrettyOutput.auto_print(
                         f"⚠️ 发生异常:\n{e}\n已达到最大重试次数 ({retry_count}/{MAX_RETRIES})"
                     )
                     _reset_retry_count()
@@ -2286,12 +2304,14 @@ def while_true(func: Callable[[], bool]) -> Any:
             # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
             sleep_time = 2 ** (retry_count - 1)
             if retry_count < MAX_RETRIES:
-                print(
+                PrettyOutput.auto_print(
                     f"⚠️ 返回空值，重试中 ({retry_count}/{MAX_RETRIES})，等待 {sleep_time}s..."
                 )
                 time.sleep(sleep_time)
             else:
-                print(f"⚠️ 返回空值，已达到最大重试次数 ({retry_count}/{MAX_RETRIES})")
+                PrettyOutput.auto_print(
+                    f"⚠️ 返回空值，已达到最大重试次数 ({retry_count}/{MAX_RETRIES})"
+                )
                 _reset_retry_count()
                 break
         else:
@@ -2478,10 +2498,14 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
                     subprocess.TimeoutExpired,
                     FileNotFoundError,
                 ) as e:
-                    print(f"❌ 放弃 '{repo_path.name}' 的更改失败: {str(e)}")
+                    PrettyOutput.auto_print(
+                        f"❌ 放弃 '{repo_path.name}' 的更改失败: {str(e)}"
+                    )
                     return
             else:
-                print(f"ℹ️ 跳过更新 '{repo_path.name}' 以保留未提交的更改。")
+                PrettyOutput.auto_print(
+                    f"ℹ️ 跳过更新 '{repo_path.name}' 以保留未提交的更改。"
+                )
                 return
 
         # 获取更新前的commit hash
@@ -2534,17 +2558,17 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
         after_hash = after_hash_result.stdout.strip()
 
         if before_hash != after_hash:
-            print(f"✅ {repo_type}库 '{repo_path.name}' 已更新。")
+            PrettyOutput.auto_print(f"✅ {repo_type}库 '{repo_path.name}' 已更新。")
 
     except FileNotFoundError:
-        print(f"⚠️ git 命令未找到，跳过更新 '{repo_path.name}'。")
+        PrettyOutput.auto_print(f"⚠️ git 命令未找到，跳过更新 '{repo_path.name}'。")
     except subprocess.TimeoutExpired:
-        print(f"❌ 更新 '{repo_path.name}' 超时。")
+        PrettyOutput.auto_print(f"❌ 更新 '{repo_path.name}' 超时。")
     except subprocess.CalledProcessError as e:
         error_message = e.stderr.strip() if e.stderr else str(e)
-        print(f"❌ 更新 '{repo_path.name}' 失败: {error_message}")
+        PrettyOutput.auto_print(f"❌ 更新 '{repo_path.name}' 失败: {error_message}")
     except Exception as e:
-        print(f"❌ 更新 '{repo_path.name}' 时发生未知错误: {str(e)}")
+        PrettyOutput.auto_print(f"❌ 更新 '{repo_path.name}' 时发生未知错误: {str(e)}")
 
 
 def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
@@ -2576,4 +2600,4 @@ def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
         try:
             last_check_file.write_text(str(time.time()))
         except IOError as e:
-            print(f"⚠️ 无法写入git更新检查时间戳: {e}")
+            PrettyOutput.auto_print(f"⚠️ 无法写入git更新检查时间戳: {e}")

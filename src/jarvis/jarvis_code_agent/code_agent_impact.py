@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """CodeAgent 影响分析模块"""
 
@@ -23,7 +25,7 @@ class ImpactManager:
         """更新上下文管理器：当文件被修改后，更新符号表和依赖图"""
         if not modified_files:
             return
-        print("🔄 正在更新代码上下文...")
+        PrettyOutput.auto_print("🔄 正在更新代码上下文...")
         for file_path in modified_files:
             import os
 
@@ -45,7 +47,7 @@ class ImpactManager:
         if not is_enable_impact_analysis():
             return None
 
-        print("🔍 正在进行变更影响分析...")
+        PrettyOutput.auto_print("🔍 正在进行变更影响分析...")
         try:
             impact_analyzer = ImpactAnalyzer(self.context_manager)
             all_edits = []
@@ -135,7 +137,7 @@ class ImpactManager:
             return impact_report
         except Exception as e:
             # 影响分析失败不应该影响主流程，仅记录日志
-            print(f"⚠️ 影响范围分析失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 影响范围分析失败: {e}")
             return None
 
     def handle_impact_report(

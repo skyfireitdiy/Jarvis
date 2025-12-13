@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 from typing import Any, Dict
 
@@ -80,14 +82,16 @@ class WebpageTool:
                 resp = http_get(url, timeout=10.0, allow_redirects=True)
                 content_md = md(resp.text, strip=["script", "style"])
             except requests.exceptions.HTTPError as e:
-                print(f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}")
+                PrettyOutput.auto_print(
+                    f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}"
+                )
                 return {
                     "success": False,
                     "stdout": "",
                     "stderr": f"HTTP错误：{e.response.status_code}",
                 }
             except requests.exceptions.RequestException as e:
-                print(f"⚠️ 请求错误: {e}")
+                PrettyOutput.auto_print(f"⚠️ 请求错误: {e}")
                 return {"success": False, "stdout": "", "stderr": f"请求错误：{e}"}
 
             if not content_md or not content_md.strip():
@@ -114,7 +118,7 @@ class WebpageTool:
             return {"success": True, "stdout": summary, "stderr": ""}
 
         except Exception as e:
-            print(f"❌ 读取网页失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 读取网页失败: {str(e)}")
             return {
                 "success": False,
                 "stdout": "",

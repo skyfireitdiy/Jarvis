@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """CodeAgent 构建验证模块"""
 
@@ -61,7 +63,7 @@ class BuildValidationManager:
         files_str = ", ".join(os.path.basename(f) for f in modified_files[:3])
         if file_count > 3:
             files_str += f" 等{file_count}个文件"
-        print(f"🔨 正在进行编译检查 ({files_str})...")
+        PrettyOutput.auto_print(f"🔨 正在进行编译检查 ({files_str})...")
 
         try:
             timeout = get_build_validation_timeout()
@@ -70,7 +72,7 @@ class BuildValidationManager:
             return result
         except Exception as e:
             # 构建验证失败不应该影响主流程，仅记录日志
-            print(f"⚠️ 构建验证执行失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 构建验证执行失败: {e}")
             return None
 
     def handle_build_validation_disabled(
@@ -126,8 +128,8 @@ class BuildValidationManager:
         if not config.has_been_asked():
             # 首次失败，询问用户
             error_preview = format_build_error(build_validation_result)
-            print(f"\n⚠️ 构建验证失败:\n{error_preview}\n")
-            print(
+            PrettyOutput.auto_print(f"\n⚠️ 构建验证失败:\n{error_preview}\n")
+            PrettyOutput.auto_print(
                 "ℹ️ 提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
                 "可以选择禁用构建验证，后续将仅进行基础静态检查。"
             )

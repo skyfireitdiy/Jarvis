@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -35,10 +36,16 @@ class NodeJSBuildValidator(BuildValidatorBase):
             success = returncode == 0
             output = stdout + stderr
             if success:
-                print(f"✅ Node.js (TypeScript) 构建验证成功（耗时 {duration:.2f} 秒）")
+                PrettyOutput.auto_print(
+                    f"✅ Node.js (TypeScript) 构建验证成功（耗时 {duration:.2f} 秒）"
+                )
             else:
-                print(f"❌ Node.js (TypeScript) 构建验证失败（耗时 {duration:.2f} 秒）")
-                print(f"错误信息：TypeScript类型检查失败\n{output[:500]}")
+                PrettyOutput.auto_print(
+                    f"❌ Node.js (TypeScript) 构建验证失败（耗时 {duration:.2f} 秒）"
+                )
+                PrettyOutput.auto_print(
+                    f"错误信息：TypeScript类型检查失败\n{output[:500]}"
+                )
             return BuildResult(
                 success=success,
                 output=output,
@@ -63,14 +70,16 @@ class NodeJSBuildValidator(BuildValidatorBase):
                         success = returncode == 0
                         output = stdout + stderr
                         if success:
-                            print(
+                            PrettyOutput.auto_print(
                                 f"✅ Node.js (npm build) 构建验证成功（耗时 {duration:.2f} 秒）"
                             )
                         else:
-                            print(
+                            PrettyOutput.auto_print(
                                 f"❌ Node.js (npm build) 构建验证失败（耗时 {duration:.2f} 秒）"
                             )
-                            print(f"错误信息：npm build失败\n{output[:500]}")
+                            PrettyOutput.auto_print(
+                                f"错误信息：npm build失败\n{output[:500]}"
+                            )
                         return BuildResult(
                             success=success,
                             output=output,
@@ -79,7 +88,7 @@ class NodeJSBuildValidator(BuildValidatorBase):
                             duration=duration,
                         )
             except Exception as e:
-                print(f"⚠️ 读取package.json失败: {e}")
+                PrettyOutput.auto_print(f"⚠️ 读取package.json失败: {e}")
 
         # 策略3: 使用 eslint 进行语法检查（如果存在）
         if modified_files:
@@ -96,7 +105,9 @@ class NodeJSBuildValidator(BuildValidatorBase):
                 duration = time.time() - start_time
                 output = stdout + stderr
                 # eslint返回非0可能是警告，不算失败
-                print(f"✅ Node.js (eslint) 构建验证成功（耗时 {duration:.2f} 秒）")
+                PrettyOutput.auto_print(
+                    f"✅ Node.js (eslint) 构建验证成功（耗时 {duration:.2f} 秒）"
+                )
                 return BuildResult(
                     success=True,  # 仅检查语法，警告不算失败
                     output=output,
@@ -106,7 +117,9 @@ class NodeJSBuildValidator(BuildValidatorBase):
                 )
 
         duration = time.time() - start_time
-        print(f"✅ Node.js 构建验证成功（耗时 {duration:.2f} 秒，无构建脚本）")
+        PrettyOutput.auto_print(
+            f"✅ Node.js 构建验证成功（耗时 {duration:.2f} 秒，无构建脚本）"
+        )
         return BuildResult(
             success=True,
             output="Node.js项目验证通过（无构建脚本）",

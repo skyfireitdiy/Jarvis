@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import os
 import tempfile
@@ -151,7 +153,7 @@ class ScriptTool:
                                     proc.wait()
                                 except Exception:
                                     pass
-                        print(f"❌ {str(e)}")
+                        PrettyOutput.auto_print(f"❌ {str(e)}")
                         # Attempt to read any partial output if available
                         try:
                             output = self.get_display_output(output_file)
@@ -205,7 +207,7 @@ class ScriptTool:
                 Path(output_file).unlink(missing_ok=True)
 
         except Exception as e:
-            print(f"❌ {str(e)}")
+            PrettyOutput.auto_print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
 
     def execute(self, args: Dict) -> Dict[str, Any]:
@@ -233,5 +235,5 @@ class ScriptTool:
             return self._execute_script_with_interpreter(interpreter, script_content)
 
         except Exception as e:
-            print(f"❌ {str(e)}")
+            PrettyOutput.auto_print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}

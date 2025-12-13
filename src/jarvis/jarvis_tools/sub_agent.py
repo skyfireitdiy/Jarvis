@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 sub_agent 工具
@@ -186,7 +188,7 @@ class SubAgentTool:
                         available_names = [m for m, _ in available_models]
                         current_model_name = platform.name()
                         if current_model_name not in available_names:
-                            print(
+                            PrettyOutput.auto_print(
                                 f"⚠️ 检测到子Agent模型 {current_model_name} 不存在于平台 {platform.platform_name()} 的可用模型列表，将回退到 {available_names[0]}"
                             )
                             platform.set_model_name(available_names[0])

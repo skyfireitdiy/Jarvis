@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 重排模型注册表，支持动态加载自定义重排模型实现。
@@ -31,7 +33,7 @@ class RerankerRegistry:
                 ):
                     pass
             except Exception as e:
-                print(f"❌ 创建重排模型目录失败: {str(e)}")
+                PrettyOutput.auto_print(f"❌ 创建重排模型目录失败: {str(e)}")
                 return ""
         return reranker_dir
 
@@ -80,7 +82,7 @@ class RerankerRegistry:
                 missing_methods.append(f"{method_name}(parameter mismatch)")
 
         if missing_methods:
-            print(
+            PrettyOutput.auto_print(
                 f"⚠️ 重排模型 {reranker_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}"
             )
             return False
@@ -103,7 +105,7 @@ class RerankerRegistry:
 
         # 确保目录存在
         if not os.path.exists(directory):
-            print(f"⚠️ 重排模型目录不存在: {directory}")
+            PrettyOutput.auto_print(f"⚠️ 重排模型目录不存在: {directory}")
             return rerankers
 
         # 获取目录的包名
@@ -153,7 +155,7 @@ class RerankerRegistry:
 
         if error_lines:
             joined_errors = "\n".join(error_lines)
-            print(f"❌ {joined_errors}")
+            PrettyOutput.auto_print(f"❌ {joined_errors}")
         return rerankers
 
     @staticmethod
@@ -210,14 +212,14 @@ class RerankerRegistry:
             RerankerInterface: 重排模型实例
         """
         if name not in self.rerankers:
-            print(f"⚠️ 未找到重排模型: {name}")
+            PrettyOutput.auto_print(f"⚠️ 未找到重排模型: {name}")
             return None
 
         try:
             reranker = self.rerankers[name](*args, **kwargs)
             return reranker
         except Exception as e:
-            print(f"❌ 创建重排模型失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 创建重排模型失败: {str(e)}")
             return None
 
     def get_available_rerankers(self) -> List[str]:

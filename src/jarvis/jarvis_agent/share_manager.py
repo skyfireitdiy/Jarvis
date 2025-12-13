@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """分享管理模块，负责工具和方法论的分享功能"""
 
@@ -62,7 +64,7 @@ class ShareManager(ABC):
     def update_central_repo(self) -> None:
         """克隆或更新中心仓库"""
         if not os.path.exists(self.repo_path):
-            print(f"ℹ️ 正在克隆中心{self.get_resource_type()}仓库...")
+            PrettyOutput.auto_print(f"ℹ️ 正在克隆中心{self.get_resource_type()}仓库...")
             subprocess.run(
                 ["git", "clone", self.central_repo_url, self.repo_path], check=True
             )
@@ -91,7 +93,7 @@ class ShareManager(ABC):
                 )
                 subprocess.run(["git", "push"], cwd=self.repo_path, check=True)
         else:
-            print(f"ℹ️ 正在更新中心{self.get_resource_type()}仓库...")
+            PrettyOutput.auto_print(f"ℹ️ 正在更新中心{self.get_resource_type()}仓库...")
             # 检查是否是空仓库
             try:
                 # 先尝试获取远程分支信息
@@ -120,20 +122,22 @@ class ShareManager(ABC):
                                 ["git", "checkout", "."], cwd=self.repo_path, check=True
                             )
                         else:
-                            print(f"ℹ️ 跳过更新 '{self.repo_name}' 以保留未提交的更改。")
+                            PrettyOutput.auto_print(
+                                f"ℹ️ 跳过更新 '{self.repo_name}' 以保留未提交的更改。"
+                            )
                             return
                     subprocess.run(["git", "pull"], cwd=self.repo_path, check=True)
                 else:
-                    print(
+                    PrettyOutput.auto_print(
                         f"ℹ️ 中心{self.get_resource_type()}仓库是空的，将初始化为新仓库"
                     )
             except subprocess.CalledProcessError:
                 # 如果命令失败，可能是网络问题或其他错误
-                print("⚠️ 无法连接到远程仓库，将跳过更新")
+                PrettyOutput.auto_print("⚠️ 无法连接到远程仓库，将跳过更新")
 
     def commit_and_push(self, count: int) -> None:
         """提交并推送更改"""
-        print("ℹ️ 正在提交更改...")
+        PrettyOutput.auto_print("ℹ️ 正在提交更改...")
         subprocess.run(["git", "add", "."], cwd=self.repo_path, check=True)
 
         commit_msg = f"Add {count} {self.get_resource_type()}(s) from local collection"
@@ -141,7 +145,7 @@ class ShareManager(ABC):
             ["git", "commit", "-m", commit_msg], cwd=self.repo_path, check=True
         )
 
-        print("ℹ️ 正在推送到远程仓库...")
+        PrettyOutput.auto_print("ℹ️ 正在推送到远程仓库...")
         # 检查是否需要设置上游分支（空仓库的情况）
         try:
             # 先尝试普通推送
@@ -173,7 +177,7 @@ class ShareManager(ABC):
 
         # 一次性打印所有资源
         joined_resources = "\n".join(resource_list)
-        print(f"ℹ️ {joined_resources}")
+        PrettyOutput.auto_print(f"ℹ️ {joined_resources}")
 
         # 让用户选择
         while True:
@@ -189,12 +193,12 @@ class ShareManager(ABC):
                 else:
                     selected_indices = parse_selection(choice_str, len(resources))
                     if not selected_indices:
-                        print("⚠️ 无效的选择")
+                        PrettyOutput.auto_print("⚠️ 无效的选择")
                         continue
                     return [resources[i - 1] for i in selected_indices]
 
             except ValueError:
-                print("⚠️ 请输入有效的数字")
+                PrettyOutput.auto_print("⚠️ 请输入有效的数字")
 
     @abstractmethod
     def get_resource_type(self) -> str:

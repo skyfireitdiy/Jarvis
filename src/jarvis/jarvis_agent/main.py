@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import os
 from typing import Optional
@@ -23,7 +25,7 @@ def load_config(config_path: str) -> dict:
         dict: 配置字典
     """
     if not os.path.exists(config_path):
-        print(f"⚠️ 配置文件 {config_path} 不存在，使用默认配置")
+        PrettyOutput.auto_print(f"⚠️ 配置文件 {config_path} 不存在，使用默认配置")
         return {}
 
     with open(config_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -31,7 +33,7 @@ def load_config(config_path: str) -> dict:
             config = yaml.safe_load(f)
             return config if config else {}
         except yaml.YAMLError as e:
-            print(f"❌ 配置文件解析失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 配置文件解析失败: {str(e)}")
             return {}
 
 
@@ -57,7 +59,9 @@ def cli(
     """Main entry point for Jarvis agent"""
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (task and str(task).strip()):
-        print("❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。")
+        PrettyOutput.auto_print(
+            "❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。"
+        )
         raise typer.Exit(code=2)
     # Initialize环境
     init_env(
@@ -88,7 +92,7 @@ def cli(
 
         # Run agent with initial task if specified
         if task:
-            print(f"ℹ️ 执行初始任务: {task}")
+            PrettyOutput.auto_print(f"ℹ️ 执行初始任务: {task}")
             agent.run(task)
             return
 
@@ -107,12 +111,12 @@ def cli(
             # 来自输入流程的正常退出
             return
         except Exception as e:
-            print(f"❌ 错误: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 错误: {str(e)}")
 
     except typer.Exit:
         return
     except Exception as e:
-        print(f"❌ 初始化错误: {str(e)}")
+        PrettyOutput.auto_print(f"❌ 初始化错误: {str(e)}")
         raise typer.Exit(code=1)
 
 

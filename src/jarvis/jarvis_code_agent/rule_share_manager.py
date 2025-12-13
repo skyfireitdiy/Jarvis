@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """规则分享管理模块"""
 
@@ -19,8 +21,10 @@ class RuleShareManager(ShareManager):
     def __init__(self):
         central_repo = get_central_rules_repo()
         if not central_repo:
-            print("❌ 错误：未配置中心规则仓库（JARVIS_CENTRAL_RULES_REPO）")
-            print("ℹ️ 请在配置文件中设置中心规则仓库的Git地址")
+            PrettyOutput.auto_print(
+                "❌ 错误：未配置中心规则仓库（JARVIS_CENTRAL_RULES_REPO）"
+            )
+            PrettyOutput.auto_print("ℹ️ 请在配置文件中设置中心规则仓库的Git地址")
             raise typer.Exit(code=1)
 
         super().__init__(central_repo, "central_rules_repo")
@@ -60,7 +64,7 @@ class RuleShareManager(ShareManager):
         # 只从默认数据目录的 rules 目录获取规则（不能共享配置的目录和项目rules）
         local_rules_dir = os.path.join(get_data_dir(), "rules")
         if not os.path.exists(local_rules_dir):
-            print(f"⚠️ 本地规则目录不存在: {local_rules_dir}")
+            PrettyOutput.auto_print(f"⚠️ 本地规则目录不存在: {local_rules_dir}")
             return []
 
         # 收集本地规则文件（排除已存在的）
@@ -92,7 +96,7 @@ class RuleShareManager(ShareManager):
         for rule in resources:
             share_list.append(f"- {rule['rule_name']} ({rule['filename']})")
         joined_list = "\n".join(share_list)
-        print(f"⚠️ {joined_list}")
+        PrettyOutput.auto_print(f"⚠️ {joined_list}")
 
         if not user_confirm("确认移动这些规则到中心仓库吗？（原文件将被删除）"):
             return []
@@ -121,7 +125,9 @@ class RuleShareManager(ShareManager):
             # 获取本地资源
             local_resources = self.get_local_resources()
             if not local_resources:
-                print("⚠️ 没有找到新的规则文件（所有规则可能已存在于中心仓库）")
+                PrettyOutput.auto_print(
+                    "⚠️ 没有找到新的规则文件（所有规则可能已存在于中心仓库）"
+                )
                 return
 
             # 选择要分享的资源
@@ -134,16 +140,16 @@ class RuleShareManager(ShareManager):
             if moved_list:
                 # 一次性显示所有移动结果
                 joined_moved = "\n".join(moved_list)
-                print(f"✅ {joined_moved}")
+                PrettyOutput.auto_print(f"✅ {joined_moved}")
 
                 # 提交并推送
                 self.commit_and_push(len(selected_resources))
 
-                print("✅ 规则已成功分享到中心仓库！")
-                print(
+                PrettyOutput.auto_print("✅ 规则已成功分享到中心仓库！")
+                PrettyOutput.auto_print(
                     f"ℹ️ 原文件已从 {os.path.join(get_data_dir(), 'rules')} 移动到中心仓库"
                 )
 
         except Exception as e:
-            print(f"❌ 分享规则时出错: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 分享规则时出错: {str(e)}")
             raise typer.Exit(code=1)

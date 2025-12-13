@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """Jarvis平台管理器主模块。
 
@@ -33,7 +35,7 @@ def list_platforms(
     registry = PlatformRegistry.get_global_platform_registry()
     platform_names = [platform] if platform else registry.get_available_platforms()
 
-    print("✅ Supported platforms and models")
+    PrettyOutput.auto_print("✅ Supported platforms and models")
 
     for platform_name in platform_names:
         try:
@@ -46,7 +48,7 @@ def list_platforms(
             models = platform_instance.get_model_list()
 
             # Print platform name
-            print(f"✅ {platform_name}")
+            PrettyOutput.auto_print(f"✅ {platform_name}")
 
             output = ""
             # Print model list
@@ -56,12 +58,12 @@ def list_platforms(
                         output += f"  • {model_name} - {description}\n"
                     else:
                         output += f"  • {model_name}\n"
-                print(f"✅ {output}")
+                PrettyOutput.auto_print(f"✅ {output}")
             else:
-                print("⚠️   • 没有可用的模型信息")
+                PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
 
         except Exception:
-            print(f"⚠️ 创建 {platform_name} 平台失败")
+            PrettyOutput.auto_print(f"⚠️ 创建 {platform_name} 平台失败")
 
 
 def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> None:
@@ -82,7 +84,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
         platform.set_model_name(model_name)
 
     if not platform:
-        print(f"⚠️ 创建平台 {platform_name} 失败")
+        PrettyOutput.auto_print(f"⚠️ 创建平台 {platform_name} 失败")
         return
 
     try:
@@ -91,8 +93,8 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
         if system_prompt:
             platform.set_system_prompt(system_prompt)
         platform.set_suppress_output(False)
-        print(f"✅ 连接到 {platform_name} 平台 {model_name} 模型")
-        print(
+        PrettyOutput.auto_print(f"✅ 连接到 {platform_name} 平台 {model_name} 模型")
+        PrettyOutput.auto_print(
             "ℹ️ 可用命令: /bye - 退出, /clear - 清除会话, /upload - 上传文件, "
             "/shell - 执行命令, /save - 保存对话, /saveall - 保存所有对话, "
             "/save_session - 保存会话状态, /load_session - 加载会话状态"
@@ -105,12 +107,12 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
 
             # Check if input is cancelled
             if user_input.strip() == "/bye":
-                print("✅ 再见!")
+                PrettyOutput.auto_print("✅ 再见!")
                 break
 
             # Check if input is empty
             if not user_input.strip():
-                print("ℹ️ 检测到空输入，退出聊天")
+                PrettyOutput.auto_print("ℹ️ 检测到空输入，退出聊天")
                 break
 
             # Parse command and arguments
@@ -125,9 +127,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                     platform.reset()
                     platform.set_model_name(model_name)  # Reinitialize session
                     conversation_history = []  # 重置对话记录
-                    print("✅ 会话已清除")
+                    PrettyOutput.auto_print("✅ 会话已清除")
                 except Exception as exc:
-                    print(f"❌ 清除会话失败: {str(exc)}")
+                    PrettyOutput.auto_print(f"❌ 清除会话失败: {str(exc)}")
                 continue
 
             # Check if it is an upload command
@@ -135,7 +137,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 try:
                     file_path = args
                     if not file_path:
-                        print(
+                        PrettyOutput.auto_print(
                             '⚠️ 请指定要上传的文件路径，例如: /upload /path/to/file 或 /upload "/path/with spaces/file"'
                         )
                         continue
@@ -147,16 +149,16 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         file_path = file_path[1:-1]
 
                     if not platform.support_upload_files():
-                        print("❌ 平台不支持上传文件")
+                        PrettyOutput.auto_print("❌ 平台不支持上传文件")
                         continue
 
-                    print(f"ℹ️ 正在上传文件: {file_path}")
+                    PrettyOutput.auto_print(f"ℹ️ 正在上传文件: {file_path}")
                     if platform.upload_files([file_path]):
-                        print("✅ 文件上传成功")
+                        PrettyOutput.auto_print("✅ 文件上传成功")
                     else:
-                        print("❌ 文件上传失败")
+                        PrettyOutput.auto_print("❌ 文件上传失败")
                 except Exception as exc:
-                    print(f"❌ 上传文件失败: {str(exc)}")
+                    PrettyOutput.auto_print(f"❌ 上传文件失败: {str(exc)}")
                 continue
 
             # Check if it is a save command
@@ -164,7 +166,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 try:
                     file_path = args
                     if not file_path:
-                        print("⚠️ 请指定保存文件名，例如: /save last_message.txt")
+                        PrettyOutput.auto_print(
+                            "⚠️ 请指定保存文件名，例如: /save last_message.txt"
+                        )
                         continue
 
                     # Remove quotes if present
@@ -178,11 +182,13 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         with open(file_path, "w", encoding="utf-8") as file_obj:
                             last_entry = conversation_history[-1]
                             file_obj.write(f"{last_entry['content']}\n")
-                        print(f"✅ 最后一条消息内容已保存到 {file_path}")
+                        PrettyOutput.auto_print(
+                            f"✅ 最后一条消息内容已保存到 {file_path}"
+                        )
                     else:
-                        print("⚠️ 没有可保存的消息")
+                        PrettyOutput.auto_print("⚠️ 没有可保存的消息")
                 except Exception as exc:
-                    print(f"❌ 保存消息失败: {str(exc)}")
+                    PrettyOutput.auto_print(f"❌ 保存消息失败: {str(exc)}")
                 continue
 
             # Check if it is a saveall command
@@ -190,7 +196,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 try:
                     file_path = args
                     if not file_path:
-                        print(
+                        PrettyOutput.auto_print(
                             "⚠️ 请指定保存文件名，例如: /saveall all_conversations.txt"
                         )
                         continue
@@ -206,9 +212,9 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         for entry in conversation_history:
                             file_obj.write(f"{entry['role']}: {entry['content']}\n\n")
 
-                    print(f"✅ 所有对话已保存到 {file_path}")
+                    PrettyOutput.auto_print(f"✅ 所有对话已保存到 {file_path}")
                 except Exception as exc:
-                    print(f"❌ 保存所有对话失败: {str(exc)}")
+                    PrettyOutput.auto_print(f"❌ 保存所有对话失败: {str(exc)}")
                 continue
 
             # Check if it is a save_session command
@@ -216,7 +222,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 try:
                     file_path = args
                     if not file_path:
-                        print(
+                        PrettyOutput.auto_print(
                             "⚠️ 请指定保存会话的文件名，例如: /save_session session.json"
                         )
                         continue
@@ -228,11 +234,11 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                         file_path = file_path[1:-1]
 
                     if platform.save(file_path):
-                        print(f"✅ 会话已保存到 {file_path}")
+                        PrettyOutput.auto_print(f"✅ 会话已保存到 {file_path}")
                     else:
-                        print("❌ 保存会话失败")
+                        PrettyOutput.auto_print("❌ 保存会话失败")
                 except Exception as exc:
-                    print(f"❌ 保存会话失败: {str(exc)}")
+                    PrettyOutput.auto_print(f"❌ 保存会话失败: {str(exc)}")
                 continue
 
             # Check if it is a load_session command
@@ -240,7 +246,7 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 try:
                     file_path = args
                     if not file_path:
-                        print(
+                        PrettyOutput.auto_print(
                             "⚠️ 请指定加载会话的文件名，例如: /load_session session.json"
                         )
                         continue
@@ -253,11 +259,11 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
 
                     if platform.restore(file_path):
                         conversation_history = []  # Clear local history after loading
-                        print(f"✅ 会话已从 {file_path} 加载")
+                        PrettyOutput.auto_print(f"✅ 会话已从 {file_path} 加载")
                     else:
-                        print("❌ 加载会话失败")
+                        PrettyOutput.auto_print("❌ 加载会话失败")
                 except Exception as exc:
-                    print(f"❌ 加载会话失败: {str(exc)}")
+                    PrettyOutput.auto_print(f"❌ 加载会话失败: {str(exc)}")
                 continue
 
             # Check if it is a shell command
@@ -265,17 +271,21 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 try:
                     shell_command = args
                     if not shell_command:
-                        print("⚠️ 请指定要执行的shell命令，例如: /shell ls -l")
+                        PrettyOutput.auto_print(
+                            "⚠️ 请指定要执行的shell命令，例如: /shell ls -l"
+                        )
                         continue
 
-                    print(f"ℹ️ 执行命令: {shell_command}")
+                    PrettyOutput.auto_print(f"ℹ️ 执行命令: {shell_command}")
                     return_code = os.system(shell_command)
                     if return_code == 0:
-                        print("✅ 命令执行完成")
+                        PrettyOutput.auto_print("✅ 命令执行完成")
                     else:
-                        print(f"❌ 命令执行失败(返回码: {return_code})")
+                        PrettyOutput.auto_print(
+                            f"❌ 命令执行失败(返回码: {return_code})"
+                        )
                 except Exception as exc:
-                    print(f"❌ 执行命令失败: {str(exc)}")
+                    PrettyOutput.auto_print(f"❌ 执行命令失败: {str(exc)}")
                 continue
 
             try:
@@ -285,19 +295,19 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 # Send to model and get reply
                 response = platform.chat_until_success(user_input)
                 if not response:
-                    print("⚠️ 没有有效的回复")
+                    PrettyOutput.auto_print("⚠️ 没有有效的回复")
                 else:
                     conversation_history.append(
                         {"role": "assistant", "content": response}
                     )  # 记录模型回复
 
             except Exception as exc:
-                print(f"❌ 聊天失败: {str(exc)}")
+                PrettyOutput.auto_print(f"❌ 聊天失败: {str(exc)}")
 
     except typer.Exit:
         raise
     except Exception as exc:
-        print(f"❌ 初始化会话失败: {str(exc)}")
+        PrettyOutput.auto_print(f"❌ 初始化会话失败: {str(exc)}")
         sys.exit(1)
     finally:
         # Clean up resources
@@ -318,7 +328,9 @@ def validate_platform_model(platform: Optional[str], model: Optional[str]) -> bo
         bool: 如果平台和模型有效返回True，否则返回False。
     """
     if not platform or not model:
-        print("⚠️ 请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。")
+        PrettyOutput.auto_print(
+            "⚠️ 请指定平台和模型。使用 'jarvis info' 查看可用平台和模型。"
+        )
         return False
     return True
 
@@ -373,7 +385,7 @@ def load_role_config(config_path: str) -> Dict[str, Any]:
     import yaml
 
     if not os.path.exists(config_path):
-        print(f"❌ 角色配置文件 {config_path} 不存在")
+        PrettyOutput.auto_print(f"❌ 角色配置文件 {config_path} 不存在")
         return {}
 
     with open(config_path, "r", encoding="utf-8", errors="ignore") as file_obj:
@@ -381,7 +393,7 @@ def load_role_config(config_path: str) -> Dict[str, Any]:
             config = yaml.safe_load(file_obj)
             return config if config else {}
         except yaml.YAMLError as exc:
-            print(f"❌ 角色配置文件解析失败: {str(exc)}")
+            PrettyOutput.auto_print(f"❌ 角色配置文件解析失败: {str(exc)}")
             return {}
 
 
@@ -407,18 +419,18 @@ def role_command(
     config_path = os.path.expanduser(config_file)
     config = load_role_config(config_path)
     if not config or "roles" not in config:
-        print("❌ 无效的角色配置文件")
+        PrettyOutput.auto_print("❌ 无效的角色配置文件")
         return
 
     # 显示可选角色列表
-    print("✅ 可用角色")
+    PrettyOutput.auto_print("✅ 可用角色")
     output_str = "\n".join(
         [
             f"{i}. {role['name']} - {role.get('description', '')}"
             for i, role in enumerate(config["roles"], 1)
         ]
     )
-    print(f"ℹ️ {output_str}")
+    PrettyOutput.auto_print(f"ℹ️ {output_str}")
 
     # 让用户选择角色（优先 fzf，回退编号输入）
     selected_role = None
@@ -439,13 +451,13 @@ def role_command(
     if selected_role is None:
         raw_choice = get_single_line_input("请选择角色(输入编号，直接回车退出): ")
         if not raw_choice.strip():
-            print("ℹ️ 已取消，退出程序")
+            PrettyOutput.auto_print("ℹ️ 已取消，退出程序")
             raise typer.Exit(code=0)
         try:
             choice = int(raw_choice)
             selected_role = config["roles"][choice - 1]
         except (ValueError, IndexError):
-            print("❌ 无效的选择")
+            PrettyOutput.auto_print("❌ 无效的选择")
             return
 
     # 初始化平台和模型
@@ -475,7 +487,7 @@ def role_command(
     system_prompt = selected_role.get("system_prompt", "")
 
     # 开始对话
-    print(f"✅ 已选择角色: {selected_role['name']}")
+    PrettyOutput.auto_print(f"✅ 已选择角色: {selected_role['name']}")
     chat_with_model(platform_name, model_name, system_prompt)
 
 

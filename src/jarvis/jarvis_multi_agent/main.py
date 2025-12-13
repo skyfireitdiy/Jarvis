@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 from typing import Optional
 
@@ -31,7 +33,9 @@ def cli(
     """从YAML配置文件初始化并运行多智能体系统"""
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (user_input and str(user_input).strip()):
-        print("❌ 非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。")
+        PrettyOutput.auto_print(
+            "❌ 非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。"
+        )
         raise typer.Exit(code=2)
     init_env()
 
@@ -75,7 +79,7 @@ def cli(
     except typer.Exit:
         return
     except (ValueError, RuntimeError, yaml.YAMLError) as e:
-        print(f"❌ 错误: {str(e)}")
+        PrettyOutput.auto_print(f"❌ 错误: {str(e)}")
         raise typer.Exit(code=1)
 
 

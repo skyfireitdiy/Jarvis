@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """任务管理模块，负责加载和选择预定义任务"""
 
@@ -30,7 +32,7 @@ class TaskManager:
         data_dir = get_data_dir()
         pre_command_path = os.path.join(data_dir, "pre-command")
         if os.path.exists(pre_command_path):
-            print(f"ℹ️ 从{pre_command_path}加载预定义任务...")
+            PrettyOutput.auto_print(f"ℹ️ 从{pre_command_path}加载预定义任务...")
             try:
                 with open(
                     pre_command_path, "r", encoding="utf-8", errors="ignore"
@@ -40,15 +42,15 @@ class TaskManager:
                     for name, desc in user_tasks.items():
                         if desc:
                             tasks[str(name)] = str(desc)
-                print(f"✅ 预定义任务加载完成 {pre_command_path}")
+                PrettyOutput.auto_print(f"✅ 预定义任务加载完成 {pre_command_path}")
             except (yaml.YAMLError, OSError):
-                print(f"❌ 预定义任务加载失败 {pre_command_path}")
+                PrettyOutput.auto_print(f"❌ 预定义任务加载失败 {pre_command_path}")
 
         # Check .jarvis/pre-command in current directory
         pre_command_path = ".jarvis/pre-command"
         if os.path.exists(pre_command_path):
             abs_path = os.path.abspath(pre_command_path)
-            print(f"ℹ️ 从{abs_path}加载预定义任务...")
+            PrettyOutput.auto_print(f"ℹ️ 从{abs_path}加载预定义任务...")
             try:
                 with open(
                     pre_command_path, "r", encoding="utf-8", errors="ignore"
@@ -58,9 +60,9 @@ class TaskManager:
                     for name, desc in local_tasks.items():
                         if desc:
                             tasks[str(name)] = str(desc)
-                print(f"✅ 预定义任务加载完成 {pre_command_path}")
+                PrettyOutput.auto_print(f"✅ 预定义任务加载完成 {pre_command_path}")
             except (yaml.YAMLError, OSError):
-                print(f"❌ 预定义任务加载失败 {pre_command_path}")
+                PrettyOutput.auto_print(f"❌ 预定义任务加载失败 {pre_command_path}")
 
         return tasks
 
@@ -78,7 +80,7 @@ class TaskManager:
         for i, name in enumerate(task_names, 1):
             table.add_row(str(i), name)
         Console().print(table)
-        print("ℹ️ [0] 跳过预定义任务")
+        PrettyOutput.auto_print("ℹ️ [0] 跳过预定义任务")
 
         # Try fzf selection first (with numbered options and a skip option)
         fzf_list = [f"{0:>3} | 跳过预定义任务"] + [
@@ -93,7 +95,7 @@ class TaskManager:
                     return ""
                 if 1 <= idx <= len(task_names):
                     selected_task = tasks[task_names[idx - 1]]
-                    print(f"ℹ️ 将要执行任务:\n {selected_task}")
+                    PrettyOutput.auto_print(f"ℹ️ 将要执行任务:\n {selected_task}")
                     # 询问是否需要补充信息
                     need_additional = user_confirm(
                         "需要为此任务添加补充信息吗？", default=False
@@ -122,7 +124,7 @@ class TaskManager:
                     return ""
                 if 1 <= choice <= len(task_names):
                     selected_task = tasks[task_names[choice - 1]]
-                    print(f"ℹ️ 将要执行任务:\n {selected_task}")
+                    PrettyOutput.auto_print(f"ℹ️ 将要执行任务:\n {selected_task}")
                     # 询问是否需要补充信息
                     need_additional = user_confirm(
                         "需要为此任务添加补充信息吗？", default=False
@@ -134,9 +136,9 @@ class TaskManager:
                                 [selected_task, f"补充信息:\n{additional_input}"]
                             )
                     return selected_task
-                print("⚠️ 无效的选择。请选择列表中的一个号码。")
+                PrettyOutput.auto_print("⚠️ 无效的选择。请选择列表中的一个号码。")
 
             except (KeyboardInterrupt, EOFError):
                 return ""
             except ValueError as val_err:
-                print(f"❌ 选择任务失败: {str(val_err)}")
+                PrettyOutput.auto_print(f"❌ 选择任务失败: {str(val_err)}")

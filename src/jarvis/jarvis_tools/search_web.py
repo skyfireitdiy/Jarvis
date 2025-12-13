@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """网络搜索工具。"""
 
@@ -64,9 +66,11 @@ class SearchWebTool:
                         visited_urls.append(url)
                         visited_count += 1
                 except requests.exceptions.HTTPError as e:
-                    print(f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}")
+                    PrettyOutput.auto_print(
+                        f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}"
+                    )
                 except requests.exceptions.RequestException as e:
-                    print(f"⚠️ 请求错误: {e}")
+                    PrettyOutput.auto_print(f"⚠️ 请求错误: {e}")
 
             if not full_content.strip():
                 return {
@@ -98,7 +102,7 @@ class SearchWebTool:
             return {"stdout": summary, "stderr": "", "success": True}
 
         except Exception as e:
-            print(f"❌ 网页搜索过程中发生错误: {e}")
+            PrettyOutput.auto_print(f"❌ 网页搜索过程中发生错误: {e}")
             return {
                 "stdout": "",
                 "stderr": f"网页搜索过程中发生错误: {e}",
