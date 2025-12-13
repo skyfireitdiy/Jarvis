@@ -12,7 +12,7 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_windows_clipboard(self, mock_print, mock_popen, mock_platform):
         """测试 Windows 剪贴板"""
         mock_platform.return_value = "Windows"
@@ -28,7 +28,7 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_macos_clipboard(self, mock_print, mock_popen, mock_platform):
         """测试 macOS 剪贴板"""
         mock_platform.return_value = "Darwin"
@@ -48,7 +48,7 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_linux_xsel_clipboard(self, mock_print, mock_popen, mock_platform):
         """测试 Linux xsel 剪贴板"""
         mock_platform.return_value = "Linux"
@@ -65,7 +65,7 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_linux_xsel_not_found_fallback_xclip(
         self, mock_print, mock_popen, mock_platform
     ):
@@ -87,7 +87,7 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_windows_clipboard_error(self, mock_print, mock_popen, mock_platform):
         """测试 Windows 剪贴板错误处理"""
         mock_platform.return_value = "Windows"
@@ -100,7 +100,7 @@ class TestCopyToClipboard:
 
     @patch("jarvis.jarvis_utils.clipboard.platform.system")
     @patch("jarvis.jarvis_utils.clipboard.subprocess.Popen")
-    @patch("jarvis.jarvis_utils.clipboard.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_linux_no_clipboard_tools(self, mock_print, mock_popen, mock_platform):
         """测试 Linux 没有剪贴板工具"""
         mock_platform.return_value = "Linux"
