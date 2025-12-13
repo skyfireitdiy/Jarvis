@@ -249,14 +249,12 @@ class task_list_manager:
                     header_style="bold magenta",
                     title_style="bold cyan",
                 )
-                table.add_column("任务ID", style="cyan", width=18)
+                table.add_column("任务ID", style="cyan", width=12)
                 table.add_column("任务名称", style="yellow", width=30)
                 table.add_column("状态", style="bold", width=12)
                 table.add_column("优先级", justify="center", width=8)
                 table.add_column("Agent类型", width=10)
                 table.add_column("依赖", width=12)
-                table.add_column("任务描述", style="dim", width=40, no_wrap=False)
-                table.add_column("实际输出", style="green", width=50, no_wrap=False)
 
                 # 按优先级和创建时间排序
                 sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
@@ -281,23 +279,6 @@ class task_list_manager:
                     if len(task.dependencies) > 3:
                         deps_text += f" (+{len(task.dependencies) - 3})"
 
-                    # 格式化任务描述
-                    desc_text = task.task_desc
-                    if len(desc_text) > 300:
-                        desc_text = desc_text[:297] + "..."
-                    elif not desc_text:
-                        desc_text = "-"
-
-                    # 格式化实际输出
-                    output_text = task.actual_output or "-"
-                    if len(output_text) > 300:
-                        output_text = output_text[:297] + "..."
-                    elif not output_text:
-                        output_text = "-"
-                    elif task.status.value != "completed":
-                        # 对于非完成状态的任务，显示状态提示
-                        output_text = f"[{task.status.value}]"
-
                     table.add_row(
                         task.task_id,
                         task.task_name[:28] + "..."
@@ -307,8 +288,6 @@ class task_list_manager:
                         str(task.priority),
                         task.agent_type.value,
                         deps_text if task.dependencies else "-",
-                        desc_text,
-                        output_text,
                     )
 
                 console.print(table)
