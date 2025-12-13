@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """CodeAgent 规则管理模块"""
 
@@ -50,13 +52,15 @@ class RulesManager:
                 # 确保中心规则仓库被克隆/更新
                 if not os.path.exists(self.central_repo_path):
                     try:
-                        print(f"ℹ️ 正在克隆中心规则仓库: {central_repo}")
+                        PrettyOutput.auto_print(
+                            f"ℹ️ 正在克隆中心规则仓库: {central_repo}"
+                        )
                         subprocess.run(
                             ["git", "clone", central_repo, self.central_repo_path],
                             check=True,
                         )
                     except Exception as e:
-                        print(f"❌ 克隆中心规则仓库失败: {str(e)}")
+                        PrettyOutput.auto_print(f"❌ 克隆中心规则仓库失败: {str(e)}")
 
         # 执行每日更新检查（包括中心库）
         all_dirs_for_update = self.rules_dirs.copy()
@@ -216,7 +220,7 @@ class RulesManager:
             return None
         except Exception as e:
             # 读取规则失败时忽略，不影响主流程
-            print(f"⚠️ 读取规则失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 读取规则失败: {e}")
             return None
 
     def get_all_available_rule_names(self) -> dict[str, List[str]]:

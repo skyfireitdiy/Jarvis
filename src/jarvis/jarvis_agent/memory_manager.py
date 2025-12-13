@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 记忆管理器模块
@@ -113,12 +115,12 @@ class MemoryManager:
                 saved = False
 
             if saved:
-                print("✅ 已自动保存有价值的信息到记忆系统")
+                PrettyOutput.auto_print("✅ 已自动保存有价值的信息到记忆系统")
             else:
-                print("ℹ️ 本次任务没有特别需要记忆的信息")
+                PrettyOutput.auto_print("ℹ️ 本次任务没有特别需要记忆的信息")
 
         except Exception as e:
-            print(f"❌ 记忆分析失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 记忆分析失败: {str(e)}")
         finally:
             # 设置记忆提示完成标记，避免事件触发造成重复处理
             self._memory_prompted = True

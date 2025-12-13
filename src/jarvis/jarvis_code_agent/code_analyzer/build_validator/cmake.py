@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -37,10 +38,14 @@ class CMakeBuildValidator(BuildValidatorBase):
                 success = returncode == 0
                 output = stdout + stderr
                 if success:
-                    print(f"✅ CMake 构建验证成功（耗时 {duration:.2f} 秒）")
+                    PrettyOutput.auto_print(
+                        f"✅ CMake 构建验证成功（耗时 {duration:.2f} 秒）"
+                    )
                 else:
-                    print(f"❌ CMake 构建验证失败（耗时 {duration:.2f} 秒）")
-                    print(f"错误信息：CMake构建失败\n{output[:500]}")
+                    PrettyOutput.auto_print(
+                        f"❌ CMake 构建验证失败（耗时 {duration:.2f} 秒）"
+                    )
+                    PrettyOutput.auto_print(f"错误信息：CMake构建失败\n{output[:500]}")
                 return BuildResult(
                     success=success,
                     output=output,
@@ -60,10 +65,10 @@ class CMakeBuildValidator(BuildValidatorBase):
         success = returncode == 0
         output = stdout + stderr
         if success:
-            print(f"✅ CMake 配置验证成功（耗时 {duration:.2f} 秒）")
+            PrettyOutput.auto_print(f"✅ CMake 配置验证成功（耗时 {duration:.2f} 秒）")
         else:
-            print(f"❌ CMake 配置验证失败（耗时 {duration:.2f} 秒）")
-            print(f"错误信息：CMake配置失败\n{output[:500]}")
+            PrettyOutput.auto_print(f"❌ CMake 配置验证失败（耗时 {duration:.2f} 秒）")
+            PrettyOutput.auto_print(f"错误信息：CMake配置失败\n{output[:500]}")
         return BuildResult(
             success=success,
             output=output,

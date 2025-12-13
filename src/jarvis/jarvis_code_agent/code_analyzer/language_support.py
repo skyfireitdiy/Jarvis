@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 """语言支持模块。
 
 提供语言检测和工厂函数，使用语言注册表管理所有语言支持。
@@ -23,7 +25,7 @@ try:
 
     register_language(PythonLanguageSupport())
 except ImportError as e:
-    print(f"Warning: Failed to import PythonLanguageSupport: {e}")
+    PrettyOutput.auto_print(f"Warning: Failed to import PythonLanguageSupport: {e}")
 
 # Rust语言支持（可选，需要tree-sitter）
 try:

@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import os
 from typing import Any, Dict
@@ -99,7 +101,7 @@ class RewriteFileTool:
                 except Exception:
                     pass
                 error_msg = f"文件重写失败: {str(e)}"
-                print(f"❌ {error_msg}")
+                PrettyOutput.auto_print(f"❌ {error_msg}")
                 return {
                     "success": False,
                     "stdout": "",
@@ -108,5 +110,5 @@ class RewriteFileTool:
 
         except Exception as e:
             error_msg = f"文件重写失败: {str(e)}"
-            print(f"❌ {error_msg}")
+            PrettyOutput.auto_print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}

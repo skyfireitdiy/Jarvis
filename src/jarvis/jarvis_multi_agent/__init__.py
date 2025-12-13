@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 import re
@@ -370,7 +372,7 @@ class MultiAgent(OutputHandler):
 
             if not isinstance(msg, Dict):
                 # Should not happen if agent.run() returns str or Dict
-                print(f"⚠️ 未知消息类型: {type(msg)}")
+                PrettyOutput.auto_print(f"⚠️ 未知消息类型: {type(msg)}")
                 break
 
             # Generate a brief summary via direct model call to avoid run-loop recursion
@@ -411,7 +413,7 @@ content: {msg["content"]}
                 return "消息中未指定 `to` 字段"
 
             if to_agent_name not in self.agents_config_map:
-                print(f"⚠️ 未找到智能体 {to_agent_name}，正在重试...")
+                PrettyOutput.auto_print(f"⚠️ 未找到智能体 {to_agent_name}，正在重试...")
                 agent = self._get_agent(last_agent_name)
                 if not agent:
                     return f"智能体 {last_agent_name} 未找到"
@@ -420,7 +422,9 @@ content: {msg["content"]}
                 )
                 continue
 
-            print(f"ℹ️ {last_agent_name} 正在向 {to_agent_name} 发送消息...")
+            PrettyOutput.auto_print(
+                f"ℹ️ {last_agent_name} 正在向 {to_agent_name} 发送消息..."
+            )
 
             # Keep a reference to the sender before switching to the receiver
             sender_agent = agent
@@ -433,7 +437,9 @@ content: {msg["content"]}
             sender_config = self.agents_config_map.get(last_agent_name, {})
             if sender_config.get("clear_after_send_message"):
                 if sender_agent:
-                    print(f"ℹ️ 清除智能体 {last_agent_name} 在发送消息后的历史记录...")
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 清除智能体 {last_agent_name} 在发送消息后的历史记录..."
+                    )
                     sender_agent.clear_history()
 
             last_agent_name = agent.name

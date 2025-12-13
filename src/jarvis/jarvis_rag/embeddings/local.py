@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 """
 本地嵌入模型实现。
 """
@@ -36,7 +38,7 @@ class LocalEmbeddingModel(EmbeddingInterface):
         self.model_name = model_name
         self.max_length = max_length
 
-        print(f"ℹ️ 初始化嵌入管理器, 模型: '{self.model_name}'...")
+        PrettyOutput.auto_print(f"ℹ️ 初始化嵌入管理器, 模型: '{self.model_name}'...")
 
         # 缓存的salt是模型名称，以防止冲突
         self.cache = EmbeddingCache(cache_dir=cache_dir, salt=self.model_name)
@@ -183,7 +185,7 @@ class LocalEmbeddingModel(EmbeddingInterface):
                     pass
 
                 if had_local_candidate:
-                    print(
+                    PrettyOutput.auto_print(
                         "❌ 检测到本地模型路径但加载失败。为避免触发网络访问，已中止远程回退。\n"
                         "请确认本地目录包含完整的 Transformers/Tokenizer 文件（如 config.json、model.safetensors、tokenizer.json/merges.txt 等），\n"
                         "或在配置中将 embedding_model 设置为该本地目录，或将模型放置到默认的 Hugging Face 缓存目录（例如 ~/.cache/huggingface/hub）。"
@@ -198,8 +200,10 @@ class LocalEmbeddingModel(EmbeddingInterface):
                     show_progress=True,
                 )
         except Exception as e:
-            print(f"❌ 加载嵌入模型 '{self.model_name}' 时出错: {e}")
-            print("⚠️ 请确保您已安装 'sentence_transformers' 和 'torch'。")
+            PrettyOutput.auto_print(f"❌ 加载嵌入模型 '{self.model_name}' 时出错: {e}")
+            PrettyOutput.auto_print(
+                "⚠️ 请确保您已安装 'sentence_transformers' 和 'torch'。"
+            )
             raise
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
@@ -227,7 +231,7 @@ class LocalEmbeddingModel(EmbeddingInterface):
 
         # 为不在缓存中的文本计算嵌入
         if texts_to_embed:
-            print(
+            PrettyOutput.auto_print(
                 f"ℹ️ 缓存未命中。正在为 {len(texts_to_embed)}/{len(texts)} 个文档计算嵌入。"
             )
             new_embeddings = self.model.embed_documents(texts_to_embed)
@@ -239,7 +243,9 @@ class LocalEmbeddingModel(EmbeddingInterface):
             for i, embedding in zip(indices_to_embed, new_embeddings):
                 cached_embeddings[i] = embedding
         else:
-            print(f"✅ 缓存命中。所有 {len(texts)} 个文档的嵌入均从缓存中检索。")
+            PrettyOutput.auto_print(
+                f"✅ 缓存命中。所有 {len(texts)} 个文档的嵌入均从缓存中检索。"
+            )
 
         return cast(List[List[float]], cached_embeddings)
 

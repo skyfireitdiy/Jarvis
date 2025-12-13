@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """CodeAgent 后处理模块"""
 
@@ -27,7 +29,7 @@ class PostProcessManager:
         if not after_change_commands:
             return
 
-        print("🔧 正在执行变更后处理...")
+        PrettyOutput.auto_print("🔧 正在执行变更后处理...")
 
         # 执行变更后处理命令
         processed_files = set()
@@ -58,28 +60,32 @@ class PostProcessManager:
 
                 if result.returncode == 0:
                     processed_files.add(file_path)
-                    print(f"✅ 已处理: {os.path.basename(file_path)} ({tool_name})")
+                    PrettyOutput.auto_print(
+                        f"✅ 已处理: {os.path.basename(file_path)} ({tool_name})"
+                    )
                 else:
                     # 处理失败，记录但不中断流程
                     error_msg = (result.stderr or result.stdout or "").strip()
                     if error_msg:
-                        print(
+                        PrettyOutput.auto_print(
                             f"⚠️ 处理失败 ({os.path.basename(file_path)}, {tool_name}): {error_msg[:200]}"
                         )
             except subprocess.TimeoutExpired:
-                print(f"⚠️ 处理超时: {os.path.basename(file_path)} ({tool_name})")
+                PrettyOutput.auto_print(
+                    f"⚠️ 处理超时: {os.path.basename(file_path)} ({tool_name})"
+                )
             except FileNotFoundError:
                 # 工具未安装，跳过
                 continue
             except Exception as e:
                 # 其他错误，记录但继续
-                print(
+                PrettyOutput.auto_print(
                     f"⚠️ 处理失败 ({os.path.basename(file_path)}, {tool_name}): {str(e)[:100]}"
                 )
                 continue
 
         if processed_files:
-            print(f"✅ 已处理 {len(processed_files)} 个文件")
+            PrettyOutput.auto_print(f"✅ 已处理 {len(processed_files)} 个文件")
             # 暂存处理后的文件
             try:
                 for file_path in processed_files:

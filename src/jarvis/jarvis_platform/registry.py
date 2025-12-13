@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import importlib
 import inspect
@@ -46,7 +48,7 @@ class PlatformRegistry:
                 ):
                     pass
             except Exception as e:
-                print(f"❌ 创建平台目录失败: {str(e)}")
+                PrettyOutput.auto_print(f"❌ 创建平台目录失败: {str(e)}")
                 return ""
         return user_platform_dir
 
@@ -81,7 +83,7 @@ class PlatformRegistry:
                 missing_methods.append(f"{method_name}(parameter mismatch)")
 
         if missing_methods:
-            print(
+            PrettyOutput.auto_print(
                 f"⚠️ 平台 {platform_class.__name__} 缺少必要的方法: {', '.join(missing_methods)}"
             )
             return False
@@ -102,7 +104,7 @@ class PlatformRegistry:
 
         # 确保目录存在
         if not os.path.exists(directory):
-            print(f"⚠️ 平台目录不存在: {directory}")
+            PrettyOutput.auto_print(f"⚠️ 平台目录不存在: {directory}")
             return platforms
 
         # 获取目录的包名
@@ -153,7 +155,7 @@ class PlatformRegistry:
 
         if error_lines:
             joined_errors = "\n".join(error_lines)
-            print(f"❌ {joined_errors}")
+            PrettyOutput.auto_print(f"❌ {joined_errors}")
         return platforms
 
     @staticmethod
@@ -239,14 +241,14 @@ class PlatformRegistry:
             BasePlatform: Platform instance
         """
         if name not in self.platforms:
-            print(f"⚠️ 未找到平台: {name}")
+            PrettyOutput.auto_print(f"⚠️ 未找到平台: {name}")
             return None
 
         try:
             platform = self.platforms[name](llm_config=llm_config or {})
             return platform
         except Exception as e:
-            print(f"❌ 创建平台失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 创建平台失败: {str(e)}")
             return None
 
     def get_available_platforms(self) -> List[str]:

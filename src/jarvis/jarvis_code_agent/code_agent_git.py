@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """CodeAgent Git 操作模块"""
 
@@ -14,7 +16,7 @@ from jarvis.jarvis_utils.git_utils import (
     has_uncommitted_changes,
 )
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_utils.globals import get_global_model_group
 
 
@@ -60,14 +62,14 @@ class GitManager:
                 message = "❌ Git 配置不完整\n\n请运行以下命令配置 Git：\n" + "\n".join(
                     missing_configs
                 )
-                print(f"❌ {message}")
+                PrettyOutput.auto_print(f"❌ {message}")
                 sys.exit(1)
 
         except FileNotFoundError:
-            print("❌ 未找到 git 命令，请先安装 Git")
+            PrettyOutput.auto_print("❌ 未找到 git 命令，请先安装 Git")
             sys.exit(1)
         except Exception as e:
-            print(f"❌ 检查 Git 配置时出错: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 检查 Git 配置时出错: {str(e)}")
             sys.exit(1)
 
     def find_git_root(self) -> str:
@@ -214,7 +216,7 @@ class GitManager:
                 content_to_write = "\n".join(new_lines).rstrip()
                 if content_to_write:
                     f.write(content_to_write + "\n")
-            print("✅ 已创建 .gitignore 并添加常用忽略规则")
+            PrettyOutput.auto_print("✅ 已创建 .gitignore 并添加常用忽略规则")
         else:
             if new_lines:
                 # 追加缺失的规则
@@ -223,7 +225,7 @@ class GitManager:
                     if existing_content and not existing_content.endswith("\n"):
                         f.write("\n")
                     f.write("\n".join(new_lines).rstrip() + "\n")
-                print("✅ 已更新 .gitignore，追加常用忽略规则")
+                PrettyOutput.auto_print("✅ 已更新 .gitignore，追加常用忽略规则")
 
     def handle_git_changes(self, prefix: str, suffix: str, agent: Any) -> None:
         """处理git仓库中的未提交修改"""
@@ -278,14 +280,16 @@ class GitManager:
         if not need_change:
             return
 
-        print("⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式")
+        PrettyOutput.auto_print(
+            "⚠️ 正在修改git换行符敏感设置，这会影响所有文件的换行符处理方式"
+        )
         # 避免在循环中逐条打印，先拼接后统一打印
         lines = ["将进行以下设置："]
         for key, value in target_settings.items():
             current = current_settings.get(key, "未设置")
             lines.append(f"{key}: {current} -> {value}")
         joined_lines = "\n".join(lines)
-        print(f"ℹ️ {joined_lines}")
+        PrettyOutput.auto_print(f"ℹ️ {joined_lines}")
 
         # 直接执行设置，不需要用户确认
         for key, value in target_settings.items():
@@ -295,7 +299,7 @@ class GitManager:
         if sys.platform.startswith("win"):
             self.handle_windows_line_endings()
 
-        print("✅ git换行符敏感设置已更新")
+        PrettyOutput.auto_print("✅ git换行符敏感设置已更新")
 
     def handle_windows_line_endings(self) -> None:
         """在Windows系统上处理换行符问题，提供建议而非强制修改"""
@@ -309,8 +313,12 @@ class GitManager:
             if any(keyword in content for keyword in ["text=", "eol=", "binary"]):
                 return
 
-        print("ℹ️ 提示：在Windows系统上，建议配置 .gitattributes 文件来避免换行符问题。")
-        print("ℹ️ 这可以防止仅因换行符不同而导致整个文件被标记为修改。")
+        PrettyOutput.auto_print(
+            "ℹ️ 提示：在Windows系统上，建议配置 .gitattributes 文件来避免换行符问题。"
+        )
+        PrettyOutput.auto_print(
+            "ℹ️ 这可以防止仅因换行符不同而导致整个文件被标记为修改。"
+        )
 
         if user_confirm("是否要创建一个最小化的.gitattributes文件？", False):
             # 最小化的内容，只影响特定类型的文件
@@ -329,9 +337,9 @@ class GitManager:
             if not os.path.exists(gitattributes_path):
                 with open(gitattributes_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(minimal_content)
-                print("✅ 已创建最小化的 .gitattributes 文件")
+                PrettyOutput.auto_print("✅ 已创建最小化的 .gitattributes 文件")
             else:
-                print("ℹ️ 将以下内容追加到现有 .gitattributes 文件：")
+                PrettyOutput.auto_print("ℹ️ 将以下内容追加到现有 .gitattributes 文件：")
                 PrettyOutput.print(
                     minimal_content, OutputType.CODE, lang="text"
                 )  # 保留语法高亮
@@ -340,9 +348,11 @@ class GitManager:
                         gitattributes_path, "a", encoding="utf-8", newline="\n"
                     ) as f:
                         f.write("\n" + minimal_content)
-                    print("✅ 已更新 .gitattributes 文件")
+                    PrettyOutput.auto_print("✅ 已更新 .gitattributes 文件")
         else:
-            print("ℹ️ 跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。")
+            PrettyOutput.auto_print(
+                "ℹ️ 跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。"
+            )
 
     def record_code_changes_stats(self, diff_text: str) -> None:
         """记录代码变更的统计信息。
@@ -393,7 +403,7 @@ class GitManager:
             except subprocess.CalledProcessError:
                 pass
 
-            print("⚠️ 检测到未提交的修改，是否要提交？")
+            PrettyOutput.auto_print("⚠️ 检测到未提交的修改，是否要提交？")
             if not user_confirm("是否要提交？", True):
                 return
 
@@ -431,7 +441,7 @@ class GitManager:
                     check=True,
                 )
             except subprocess.CalledProcessError as e:
-                print(f"❌ 提交失败: {str(e)}")
+                PrettyOutput.auto_print(f"❌ 提交失败: {str(e)}")
 
     def show_commit_history(
         self, start_commit: Optional[str], end_commit: Optional[str]
@@ -459,7 +469,7 @@ class GitManager:
             commit_messages = "检测到以下提交记录:\n" + "\n".join(
                 f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits
             )
-            print(f"ℹ️ {commit_messages}")
+            PrettyOutput.auto_print(f"ℹ️ {commit_messages}")
         return commits
 
     def handle_commit_confirmation(
@@ -509,4 +519,4 @@ class GitManager:
         elif start_commit and commits:
             if user_confirm("是否要重置到初始提交？", True):
                 os.system(f"git reset --hard {str(start_commit)}")  # 确保转换为字符串
-                print("ℹ️ 已重置到初始提交")
+                PrettyOutput.auto_print("ℹ️ 已重置到初始提交")

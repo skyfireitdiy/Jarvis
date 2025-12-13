@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -75,8 +77,8 @@ def run_command(cmd: List[str], error_msg: str) -> None:
             errors="replace",
         )
     except subprocess.CalledProcessError as e:
-        print(f"Error: {error_msg}")
-        print(f"Stderr: {e.stderr}")
+        PrettyOutput.auto_print(f"Error: {error_msg}")
+        PrettyOutput.auto_print(f"Stderr: {e.stderr}")
         sys.exit(1)
 
 
@@ -88,33 +90,33 @@ def remove_pycache_directories():
         for dir_name in dirs:
             if dir_name == "__pycache__":
                 pycache_dir = os.path.join(root, dir_name)
-                print(f"Removing {pycache_dir}")
+                PrettyOutput.auto_print(f"Removing {pycache_dir}")
                 shutil.rmtree(pycache_dir)
     # 新增清理.mypy_cache目录
-    print("Removing .mypy_cache directories...")
+    PrettyOutput.auto_print("Removing .mypy_cache directories...")
     # 使用Python的跨平台方式来查找和删除.mypy_cache目录
     for root, dirs, files in os.walk("."):
         if ".mypy_cache" in dirs:
             mypy_cache_path = os.path.join(root, ".mypy_cache")
-            print(f"Removing {mypy_cache_path}")
+            PrettyOutput.auto_print(f"Removing {mypy_cache_path}")
             shutil.rmtree(mypy_cache_path)
 
 
 def main():
     if len(sys.argv) != 2 or sys.argv[1] not in ["major", "minor", "patch"]:
-        print("Usage: python scripts/publish.py [major|minor|patch]")
+        PrettyOutput.auto_print("Usage: python scripts/publish.py [major|minor|patch]")
         sys.exit(1)
     version_type = sys.argv[1]
     try:
         # 更新版本号
         new_version = update_version(version_type)
-        print(f"Updated version to {new_version}")
+        PrettyOutput.auto_print(f"Updated version to {new_version}")
         # 删除所有的 __pycache__ 目录
-        print("Removing __pycache__ directories...")
+        PrettyOutput.auto_print("Removing __pycache__ directories...")
         remove_pycache_directories()
 
         # 提交版本更新
-        print("Committing version update...")
+        PrettyOutput.auto_print("Committing version update...")
         run_command(["git", "add", "."], "Failed to stage files")
         run_command(
             [
@@ -128,18 +130,18 @@ def main():
             "Failed to commit version update",
         )
         # 创建标签
-        print("Creating git tag...")
+        PrettyOutput.auto_print("Creating git tag...")
         run_command(["git", "tag", f"v{new_version}"], "Failed to create tag")
         # 推送到远程仓库
-        print("Pushing to remote...")
+        PrettyOutput.auto_print("Pushing to remote...")
         run_command(
             ["git", "push", "origin", "main", "--tags"], "Failed to push to remote"
         )
-        print(
+        PrettyOutput.auto_print(
             "\nSuccessfully tagged and pushed. The GitHub Action will now handle publishing to PyPI."
         )
     except Exception as e:
-        print(f"Error: {str(e)}")
+        PrettyOutput.auto_print(f"Error: {str(e)}")
         sys.exit(1)
 
 

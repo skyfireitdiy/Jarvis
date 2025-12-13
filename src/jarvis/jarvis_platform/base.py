@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import re
 import os
@@ -27,7 +29,7 @@ from jarvis.jarvis_utils.config import (
 )
 from jarvis.jarvis_utils.globals import set_in_chat, get_interrupt, console
 import jarvis.jarvis_utils.globals as G
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
+from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import while_success, while_true
 from jarvis.jarvis_utils.embedding import get_context_token_count
@@ -401,7 +403,7 @@ class BasePlatform(ABC):
 
         # 当输入为空白字符串时，打印警告并直接返回空字符串
         if message.strip() == "":
-            print("⚠️ 输入为空白字符串，已忽略本次请求")
+            PrettyOutput.auto_print("⚠️ 输入为空白字符串，已忽略本次请求")
             return ""
 
         # 检查并截断消息以避免超出剩余token限制
@@ -423,7 +425,7 @@ class BasePlatform(ABC):
         # 计算响应时间并打印总结
         end_time = time.time()
         duration = end_time - start_time
-        print(f"✅ {self.name()}模型响应完成: {duration:.2f}秒")
+        PrettyOutput.auto_print(f"✅ {self.name()}模型响应完成: {duration:.2f}秒")
 
         # 增加对话轮次计数
         self._conversation_turn += 1
@@ -682,7 +684,7 @@ class BasePlatform(ABC):
 
             # 如果剩余token为0或负数，返回空消息
             if remaining_tokens <= 0:
-                print("⚠️ 警告：剩余token为0，无法发送消息")
+                PrettyOutput.auto_print("⚠️ 警告：剩余token为0，无法发送消息")
                 return ""
 
             # 计算消息的token数量
@@ -695,7 +697,7 @@ class BasePlatform(ABC):
             # 需要截断：保留剩余token的80%用于消息，20%作为安全余量
             target_tokens = int(remaining_tokens * 0.8)
             if target_tokens <= 0:
-                print("⚠️ 警告：剩余token不足，无法发送消息")
+                PrettyOutput.auto_print("⚠️ 警告：剩余token不足，无法发送消息")
                 return ""
 
             # 估算字符数（1 token ≈ 4字符）
@@ -716,14 +718,14 @@ class BasePlatform(ABC):
                 truncated_message = truncated_message[: last_break + 1]
 
             truncated_message += "\n\n... (消息过长，已截断以避免超出上下文限制)"
-            print(
+            PrettyOutput.auto_print(
                 f"⚠️ 警告：消息过长（{message_tokens} tokens），已截断至约 {target_tokens} tokens"
             )
 
             return truncated_message
         except Exception as e:
             # 如果截断过程中出错，返回原消息（避免阻塞对话）
-            print(f"⚠️ 警告：检查消息长度时出错: {e}，使用原消息")
+            PrettyOutput.auto_print(f"⚠️ 警告：检查消息长度时出错: {e}，使用原消息")
             return message
 
     @abstractmethod

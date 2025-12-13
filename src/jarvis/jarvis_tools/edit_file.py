@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """普通文件编辑工具（基于 search/replace 的非结构化编辑）"""
 
@@ -190,7 +192,7 @@ class EditFileNormalTool:
                 except Exception:
                     pass
             error_msg = f"文件写入失败: {str(write_error)}"
-            print(f"❌ {error_msg}")
+            PrettyOutput.auto_print(f"❌ {error_msg}")
             return (False, error_msg)
 
     @staticmethod
@@ -515,26 +517,26 @@ class EditFileNormalTool:
 
 请严格按照协议格式回答，不要添加其他内容。"""
 
-            print("🤖 正在询问大模型确认多处匹配的修改是否合理...")
+            PrettyOutput.auto_print("🤖 正在询问大模型确认多处匹配的修改是否合理...")
             response = agent_instance.model.chat_until_success(prompt)
             response_str = str(response or "")
 
             # 使用确定的协议标记解析回答
             if "<!!!YES!!!>" in response_str:
-                print("✅ 大模型确认：修改合理，继续执行")
+                PrettyOutput.auto_print("✅ 大模型确认：修改合理，继续执行")
                 return True
             elif "<!!!NO!!!>" in response_str:
-                print("⚠️ 大模型确认：修改不合理，取消操作")
+                PrettyOutput.auto_print("⚠️ 大模型确认：修改不合理，取消操作")
                 return False
             else:
                 # 如果无法找到协议标记，默认认为不合理（保守策略）
-                print(
+                PrettyOutput.auto_print(
                     f"⚠️ 无法找到协议标记，默认认为不合理。回答内容: {response_str[:200]}"
                 )
                 return False
         except Exception as e:
             # 确认过程出错，默认不继续
-            print(f"⚠️ 确认过程出错: {e}，默认取消操作")
+            PrettyOutput.auto_print(f"⚠️ 确认过程出错: {e}，默认取消操作")
             return False
 
     @staticmethod
@@ -791,7 +793,7 @@ class EditFileNormalTool:
 
         except Exception as e:
             error_msg = f"文件编辑失败: {str(e)}"
-            print(f"❌ {error_msg}")
+            PrettyOutput.auto_print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}
 
 

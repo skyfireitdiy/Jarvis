@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -656,7 +658,9 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
 
     files = list(iter_source_files(scan_root))
     total_files = len(files)
-    print(f"[c2rust-scanner] 正在扫描 {scan_root} 目录下的 {total_files} 个文件")
+    PrettyOutput.auto_print(
+        f"[c2rust-scanner] 正在扫描 {scan_root} 目录下的 {total_files} 个文件"
+    )
 
     scanned = 0
     total_functions = 0
@@ -829,7 +833,9 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 try:
                     funcs = scan_file(cindex, p, [])
                 except Exception:
-                    print(f"[c2rust-scanner] 解析 {p} 失败: {e}", file=sys.stderr)
+                    PrettyOutput.auto_print(
+                        f"[c2rust-scanner] 解析 {p} 失败: {e}", file=sys.stderr
+                    )
                     continue
 
             # Write JSONL
@@ -860,7 +866,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
 
             scanned += 1
             if scanned % 20 == 0 or scanned == total_files:
-                print(
+                PrettyOutput.auto_print(
                     f"[c2rust-scanner] 进度: {scanned}/{total_files} 个文件, {total_functions} 个函数, {total_types} 个类型"
                 )
     finally:
@@ -885,14 +891,16 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     except Exception:
         pass
 
-    print(
+    PrettyOutput.auto_print(
         f"[c2rust-scanner] 完成。收集到的函数: {total_functions}, 类型: {total_types}, 符号: {total_functions + total_types}"
     )
-    print(f"[c2rust-scanner] JSONL 已写入: {symbols_raw_jsonl} (原始符号)")
+    PrettyOutput.auto_print(
+        f"[c2rust-scanner] JSONL 已写入: {symbols_raw_jsonl} (原始符号)"
+    )
     # 同步生成基线 symbols.jsonl（与 raw 等价），便于后续流程仅基于 symbols.jsonl 运行
     try:
         shutil.copy2(symbols_raw_jsonl, symbols_curated_jsonl)
-        print(
+        PrettyOutput.auto_print(
             f"[c2rust-scanner] JSONL 基线已写入: {symbols_curated_jsonl} (用于后续流程)"
         )
     except Exception as _e:
@@ -902,7 +910,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             err=True,
         )
         raise
-    print(f"[c2rust-scanner] 元数据已写入: {meta_json}")
+    PrettyOutput.auto_print(f"[c2rust-scanner] 元数据已写入: {meta_json}")
     return symbols_raw_jsonl
 
 

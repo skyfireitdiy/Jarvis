@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """CodeAgent 静态分析模块"""
 
@@ -49,7 +51,7 @@ class LintManager:
         tools_str = ", ".join(tool_names[:3])
         if len(tool_names) > 3:
             tools_str += f" 等{len(tool_names)}个工具"
-        print("🔍 静态检查中...")
+        PrettyOutput.auto_print("🔍 静态检查中...")
 
         results = []
         # 记录每个文件的检查结果
@@ -73,7 +75,7 @@ class LintManager:
                         continue
 
                     # 打印执行的命令
-                    print(f"ℹ️ 执行: {command}")
+                    PrettyOutput.auto_print(f"ℹ️ 执行: {command}")
 
                     # 执行命令
                     result = subprocess.run(
@@ -106,9 +108,13 @@ class LintManager:
                             output_preview = (
                                 output[:2000] if len(output) > 2000 else output
                             )
-                            print(f"⚠️ 检查失败 ({file_name}):\n{output_preview}")
+                            PrettyOutput.auto_print(
+                                f"⚠️ 检查失败 ({file_name}):\n{output_preview}"
+                            )
                             if len(output) > 2000:
-                                print(f"⚠️ ... (输出已截断，共 {len(output)} 字符)")
+                                PrettyOutput.auto_print(
+                                    f"⚠️ ... (输出已截断，共 {len(output)} 字符)"
+                                )
                         else:
                             file_results.append((file_name, command, "通过", ""))
                     else:
@@ -119,14 +125,16 @@ class LintManager:
                     file_results.append(
                         (file_name, command, "超时", "执行超时（600秒）")
                     )
-                    print(f"⚠️ 检查超时 ({file_name}): 执行超时（600秒）")
+                    PrettyOutput.auto_print(
+                        f"⚠️ 检查超时 ({file_name}): 执行超时（600秒）"
+                    )
                 except FileNotFoundError:
                     # 工具未安装，跳过
                     file_results.append((file_name, command, "跳过", "工具未安装"))
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
-                    print(f"⚠️ 执行lint命令失败: {command}, 错误: {e}")
+                    PrettyOutput.auto_print(f"⚠️ 执行lint命令失败: {command}, 错误: {e}")
                     file_results.append(
                         (file_name, command, "失败", f"执行失败: {str(e)[:50]}")
                     )
@@ -156,11 +164,11 @@ class LintManager:
                 summary += " ✅全部通过"
 
             if failed_count > 0 or timeout_count > 0:
-                print(f"⚠️ {summary}")
+                PrettyOutput.auto_print(f"⚠️ {summary}")
             else:
-                print(f"✅ {summary}")
+                PrettyOutput.auto_print(f"✅ {summary}")
         else:
-            print("✅ 静态检查完成")
+            PrettyOutput.auto_print("✅ 静态检查完成")
 
         return results
 
@@ -210,7 +218,7 @@ class LintManager:
         """
         # 检查是否启用静态分析
         if not is_enable_static_analysis():
-            print("ℹ️ 静态分析已禁用，跳过静态检查")
+            PrettyOutput.auto_print("ℹ️ 静态分析已禁用，跳过静态检查")
             return final_ret
 
         # 检查是否有可用的lint工具
@@ -236,7 +244,7 @@ class LintManager:
         )
 
         if not lint_tools_info:
-            print("ℹ️ 未找到可用的静态检查工具，跳过静态检查")
+            PrettyOutput.auto_print("ℹ️ 未找到可用的静态检查工具，跳过静态检查")
             return final_ret
 
         # 如果构建验证失败且未禁用，不进行静态分析（避免重复错误）
@@ -248,7 +256,7 @@ class LintManager:
         )
 
         if should_skip_static:
-            print("ℹ️ 构建验证失败，跳过静态分析（避免重复错误）")
+            PrettyOutput.auto_print("ℹ️ 构建验证失败，跳过静态分析（避免重复错误）")
             return final_ret
 
         # 直接执行静态扫描
@@ -257,7 +265,7 @@ class LintManager:
             # 有错误或警告，让大模型修复
             errors_summary = self.format_lint_results(lint_results)
             # 打印完整的检查结果
-            print(f"⚠️ 静态扫描发现问题:\n{errors_summary}")
+            PrettyOutput.auto_print(f"⚠️ 静态扫描发现问题:\n{errors_summary}")
             addon_prompt = f"""
 静态扫描发现以下问题，请根据错误信息修复代码:
 

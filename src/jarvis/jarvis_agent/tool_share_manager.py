@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """工具分享管理模块"""
 
@@ -19,8 +21,10 @@ class ToolShareManager(ShareManager):
     def __init__(self):
         central_repo = get_central_tool_repo()
         if not central_repo:
-            print("❌ 错误：未配置中心工具仓库（JARVIS_CENTRAL_TOOL_REPO）")
-            print("ℹ️ 请在配置文件中设置中心工具仓库的Git地址")
+            PrettyOutput.auto_print(
+                "❌ 错误：未配置中心工具仓库（JARVIS_CENTRAL_TOOL_REPO）"
+            )
+            PrettyOutput.auto_print("ℹ️ 请在配置文件中设置中心工具仓库的Git地址")
             raise typer.Exit(code=1)
 
         super().__init__(central_repo, "central_tool_repo")
@@ -48,7 +52,7 @@ class ToolShareManager(ShareManager):
         # 只从数据目录的tools目录获取工具
         local_tools_dir = os.path.join(get_data_dir(), "tools")
         if not os.path.exists(local_tools_dir):
-            print(f"⚠️ 本地工具目录不存在: {local_tools_dir}")
+            PrettyOutput.auto_print(f"⚠️ 本地工具目录不存在: {local_tools_dir}")
             return []
 
         # 收集本地工具文件（排除已存在的）
@@ -78,7 +82,7 @@ class ToolShareManager(ShareManager):
         for tool in resources:
             share_list.append(f"- {tool['tool_name']} ({tool['filename']})")
         joined_list = "\n".join(share_list)
-        print(f"⚠️ {joined_list}")
+        PrettyOutput.auto_print(f"⚠️ {joined_list}")
 
         if not user_confirm("确认移动这些工具到中心仓库吗？（原文件将被删除）"):
             return []
@@ -102,7 +106,9 @@ class ToolShareManager(ShareManager):
             # 获取本地资源
             local_resources = self.get_local_resources()
             if not local_resources:
-                print("⚠️ 没有找到新的工具文件（所有工具可能已存在于中心仓库）")
+                PrettyOutput.auto_print(
+                    "⚠️ 没有找到新的工具文件（所有工具可能已存在于中心仓库）"
+                )
                 return
 
             # 选择要分享的资源
@@ -115,16 +121,16 @@ class ToolShareManager(ShareManager):
             if moved_list:
                 # 一次性显示所有移动结果
                 joined_moved = "\n".join(moved_list)
-                print(f"✅ {joined_moved}")
+                PrettyOutput.auto_print(f"✅ {joined_moved}")
 
                 # 提交并推送
                 self.commit_and_push(len(selected_resources))
 
-                print("✅ 工具已成功分享到中心仓库！")
-                print(
+                PrettyOutput.auto_print("✅ 工具已成功分享到中心仓库！")
+                PrettyOutput.auto_print(
                     f"ℹ️ 原文件已从 {os.path.join(get_data_dir(), 'tools')} 移动到中心仓库"
                 )
 
         except Exception as e:
-            print(f"❌ 分享工具时出错: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 分享工具时出错: {str(e)}")
             raise typer.Exit(code=1)

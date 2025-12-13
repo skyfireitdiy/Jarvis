@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import json
 import threading
@@ -85,7 +87,7 @@ class StreamableMcpClient(McpClient):
             self._send_notification("notifications/initialized", {})
 
         except Exception as e:
-            print(f"❌ MCP初始化失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ MCP初始化失败: {str(e)}")
             raise
 
     def register_notification_handler(self, method: str, handler: Callable) -> None:
@@ -191,10 +193,10 @@ class StreamableMcpClient(McpClient):
 
             if warning_lines:
                 joined_warnings = "\n".join(warning_lines)
-                print(f"⚠️ {joined_warnings}")
+                PrettyOutput.auto_print(f"⚠️ {joined_warnings}")
             if error_lines:
                 joined_errors = "\n".join(error_lines)
-                print(f"❌ {joined_errors}")
+                PrettyOutput.auto_print(f"❌ {joined_errors}")
             # Ensure response is closed after streaming
             response.close()
             if result is None:
@@ -203,7 +205,7 @@ class StreamableMcpClient(McpClient):
             return cast(Dict[str, Any], result)
 
         except Exception as e:
-            print(f"❌ 发送请求失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 发送请求失败: {str(e)}")
             raise
         finally:
             # 清理请求状态
@@ -231,7 +233,7 @@ class StreamableMcpClient(McpClient):
             response.close()
 
         except Exception as e:
-            print(f"❌ 发送通知失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 发送通知失败: {str(e)}")
             raise
 
     def get_tool_list(self) -> List[Dict[str, Any]]:
@@ -274,10 +276,10 @@ class StreamableMcpClient(McpClient):
                 else:
                     error_msg += ": 未知错误"
 
-                print(f"❌ {error_msg}")
+                PrettyOutput.auto_print(f"❌ {error_msg}")
                 return []
         except Exception as e:
-            print(f"❌ 获取工具列表失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 获取工具列表失败: {str(e)}")
             return []
 
     def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -316,7 +318,7 @@ class StreamableMcpClient(McpClient):
                     "stderr": response.get("error", "Unknown error"),
                 }
         except Exception as e:
-            print(f"❌ 执行工具失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 执行工具失败: {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
 
     def get_resource_list(self) -> List[Dict[str, Any]]:
@@ -339,10 +341,10 @@ class StreamableMcpClient(McpClient):
                     error_msg += f": {response['error']}"
                 else:
                     error_msg += ": 未知错误"
-                print(f"❌ {error_msg}")
+                PrettyOutput.auto_print(f"❌ {error_msg}")
                 return []
         except Exception as e:
-            print(f"❌ 获取资源列表失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 获取资源列表失败: {str(e)}")
             return []
 
     def get_resource(self, uri: str) -> Dict[str, Any]:
@@ -383,11 +385,11 @@ class StreamableMcpClient(McpClient):
                     error_msg += f": {response['error']}"
                 else:
                     error_msg += ": 未知错误"
-                print(f"❌ {error_msg}")
+                PrettyOutput.auto_print(f"❌ {error_msg}")
                 return {"success": False, "stdout": "", "stderr": error_msg}
         except Exception as e:
             error_msg = f"获取资源内容失败: {str(e)}"
-            print(f"❌ {error_msg}")
+            PrettyOutput.auto_print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}
 
     def __del__(self):

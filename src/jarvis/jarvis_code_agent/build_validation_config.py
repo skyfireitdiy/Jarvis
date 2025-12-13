@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -45,7 +46,7 @@ class BuildValidationConfig:
             return self._config
         except Exception as e:
             # 配置文件损坏时，返回空配置
-            print(f"⚠️ 加载构建验证配置失败: {e}，使用默认配置")
+            PrettyOutput.auto_print(f"⚠️ 加载构建验证配置失败: {e}，使用默认配置")
             self._config = {}
             return self._config
 
@@ -59,7 +60,7 @@ class BuildValidationConfig:
                 )
             return True
         except Exception as e:
-            print(f"❌ 保存构建验证配置失败: {e}")
+            PrettyOutput.auto_print(f"❌ 保存构建验证配置失败: {e}")
             return False
 
     def is_build_validation_disabled(self) -> bool:

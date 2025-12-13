@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import os
 import re
@@ -18,7 +20,7 @@ from jarvis.jarvis_utils.git_utils import (
 from jarvis.jarvis_utils.globals import (
     get_global_model_group,
 )
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_utils.tag import ct, ot
 from jarvis.jarvis_utils.utils import init_env, is_context_overflow
 
@@ -77,7 +79,7 @@ class GitCommitTool:
         os.chdir(root_dir)
         find_git_root_and_cd()
         if not has_uncommitted_changes():
-            print("✅ 没有未提交的更改")
+            PrettyOutput.auto_print("✅ 没有未提交的更改")
             return None
         return original_dir
 
@@ -169,7 +171,9 @@ class GitCommitTool:
                 model_display_name = model_name or (
                     platform.name() if platform else "AI"
                 )
-                print(f"ℹ️ 正在使用{model_display_name}生成提交消息...")
+                PrettyOutput.auto_print(
+                    f"ℹ️ 正在使用{model_display_name}生成提交消息..."
+                )
 
                 # 准备提示信息
                 custom_prompt = get_git_commit_prompt()
@@ -222,7 +226,7 @@ commit信息
 
                 if is_large_content:
                     if not platform.support_upload_files():
-                        print("❌ 差异文件太大，无法处理")
+                        PrettyOutput.auto_print("❌ 差异文件太大，无法处理")
                         return {
                             "success": False,
                             "stdout": "",
@@ -241,7 +245,7 @@ commit信息
                     if upload_success:
                         pass
                     else:
-                        print("❌ 上传代码差异文件失败")
+                        PrettyOutput.auto_print("❌ 上传代码差异文件失败")
                         return {
                             "success": False,
                             "stdout": "",
@@ -340,7 +344,7 @@ commit信息
                     try:
                         os.unlink(temp_diff_file_path)
                     except Exception as e:
-                        print(f"⚠️ 无法删除临时文件: {str(e)}")
+                        PrettyOutput.auto_print(f"⚠️ 无法删除临时文件: {str(e)}")
 
             PrettyOutput.print(
                 f"提交哈希: {commit_hash}\n提交消息: {commit_message}",
@@ -356,7 +360,7 @@ commit信息
                 "stderr": "",
             }
         except Exception as e:
-            print(f"❌ 提交失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 提交失败: {str(e)}")
             return {
                 "success": False,
                 "stdout": "",

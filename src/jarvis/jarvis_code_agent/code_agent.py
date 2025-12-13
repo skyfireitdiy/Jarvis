@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """Jarvis代码代理模块。
 
@@ -49,7 +51,7 @@ from jarvis.jarvis_utils.git_utils import (
     revert_change,
 )
 from jarvis.jarvis_utils.input import get_multiline_input, user_confirm
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput  # 保留用于语法高亮
+from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.utils import init_env, _acquire_single_instance_lock
 
 app = typer.Typer(help="Jarvis 代码助手")
@@ -128,7 +130,7 @@ class CodeAgent(Agent):
             # 显示加载的规则名称
             if loaded_rule_names:
                 rules_display = ", ".join(loaded_rule_names)
-                print(f"ℹ️ 已加载规则: {rules_display}")
+                PrettyOutput.auto_print(f"ℹ️ 已加载规则: {rules_display}")
 
         # 调用父类 Agent 的初始化
         # 默认禁用方法论和分析，但允许通过 kwargs 覆盖
@@ -178,7 +180,9 @@ class CodeAgent(Agent):
             )
         except Exception as e:
             # LLM推荐器初始化失败
-            print(f"⚠️ 上下文推荐器初始化失败: {e}，将跳过上下文推荐功能")
+            PrettyOutput.auto_print(
+                f"⚠️ 上下文推荐器初始化失败: {e}，将跳过上下文推荐功能"
+            )
 
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
@@ -199,7 +203,7 @@ class CodeAgent(Agent):
 
         maybe_model = PlatformRegistry().create_platform(platform_name)
         if maybe_model is None:
-            print(f"⚠️ 平台 {platform_name} 不存在，将使用smart模型")
+            PrettyOutput.auto_print(f"⚠️ 平台 {platform_name} 不存在，将使用smart模型")
             maybe_model = PlatformRegistry().get_smart_platform()
 
         # 在此处收敛为非可选类型，确保后续赋值满足类型检查
@@ -271,7 +275,7 @@ class CodeAgent(Agent):
                     was_suppressed = getattr(self.model, "_suppress_output", False)
                     self.model.set_suppress_output(True)
                 try:
-                    print("🔍 正在进行智能上下文推荐....")
+                    PrettyOutput.auto_print("🔍 正在进行智能上下文推荐....")
 
                     # 生成上下文推荐（基于关键词和项目上下文）
                     recommendation = self.context_recommender.recommend_context(
@@ -285,10 +289,10 @@ class CodeAgent(Agent):
 
                     # 打印推荐的上下文
                     if context_recommendation_text:
-                        print(f"ℹ️ {context_recommendation_text}")
+                        PrettyOutput.auto_print(f"ℹ️ {context_recommendation_text}")
                 except Exception as e:
                     # 上下文推荐失败不应该影响主流程
-                    print(f"⚠️ 上下文推荐失败: {e}")
+                    PrettyOutput.auto_print(f"⚠️ 上下文推荐失败: {e}")
                 finally:
                     # 恢复模型输出设置
                     if self.model:
@@ -323,7 +327,7 @@ class CodeAgent(Agent):
                 else:
                     result_str = str(result)
             except RuntimeError as e:
-                print(f"⚠️ 执行失败: {str(e)}")
+                PrettyOutput.auto_print(f"⚠️ 执行失败: {str(e)}")
                 return str(e)
 
             # 处理未提交的更改（在 review 之前先提交）
@@ -404,7 +408,7 @@ class CodeAgent(Agent):
                 PrettyOutput.print(diff, OutputType.CODE, lang="diff")
             except Exception as e:
                 # 如果可视化失败，回退到原有方式
-                print(f"⚠️ Diff 可视化失败，使用默认方式: {e}")
+                PrettyOutput.auto_print(f"⚠️ Diff 可视化失败，使用默认方式: {e}")
                 PrettyOutput.print(diff, OutputType.CODE, lang="diff")
 
             # 更新上下文管理器
@@ -426,7 +430,7 @@ class CodeAgent(Agent):
                 )
                 if not is_reasonable:
                     # 大模型认为不合理，撤销修改
-                    print("ℹ️ 已撤销修改（大模型认为代码删除不合理）")
+                    PrettyOutput.auto_print("ℹ️ 已撤销修改（大模型认为代码删除不合理）")
                     revert_change()
                     final_ret += (
                         "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
@@ -644,7 +648,7 @@ class CodeAgent(Agent):
                 json_str = json_match.group(0)
             else:
                 # 无法解析，返回默认通过（避免无限循环）
-                print("⚠️ 无法解析 review 结果，默认通过")
+                PrettyOutput.auto_print("⚠️ 无法解析 review 结果，默认通过")
                 return {"ok": True, "issues": [], "summary": "无法解析审查结果"}
 
         try:
@@ -657,7 +661,7 @@ class CodeAgent(Agent):
                 "summary": result.get("summary", ""),
             }
         except json.JSONDecodeError as e:
-            print(f"⚠️ JSON 解析失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ JSON 解析失败: {e}")
             return {"ok": True, "issues": [], "summary": f"JSON 解析失败: {e}"}
 
     def _review_and_fix(
@@ -685,12 +689,16 @@ class CodeAgent(Agent):
 
             # 每轮审查开始前显示清晰的提示信息
             if not self.non_interactive:
-                print(f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮")
+                PrettyOutput.auto_print(
+                    f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
+                )
                 if not user_confirm("是否开始本轮代码审查？", default=True):
-                    print("ℹ️ 用户终止了代码审查")
+                    PrettyOutput.auto_print("ℹ️ 用户终止了代码审查")
                     return
             else:
-                print(f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查...")
+                PrettyOutput.auto_print(
+                    f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
+                )
 
             # 获取从开始到当前的 git diff
             current_commit = get_latest_commit_hash()
@@ -700,7 +708,7 @@ class CodeAgent(Agent):
                 git_diff = get_diff_between_commits(self.start_commit, current_commit)
 
             if not git_diff or not git_diff.strip():
-                print("ℹ️ 没有代码修改，跳过审查")
+                PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
                 return
 
             # 构建 review prompts
@@ -729,30 +737,32 @@ class CodeAgent(Agent):
             result = self._parse_review_result(str(summary) if summary else "")
 
             if result["ok"]:
-                print(f"\n✅ 代码审查通过（第 {iteration} 轮）")
+                PrettyOutput.auto_print(f"\n✅ 代码审查通过（第 {iteration} 轮）")
                 if result.get("summary"):
-                    print(f"   {result['summary']}")
+                    PrettyOutput.auto_print(f"   {result['summary']}")
                 return
 
             # 审查未通过，需要修复
-            print(f"\n⚠️ 代码审查发现问题（第 {iteration} 轮）：")
+            PrettyOutput.auto_print(f"\n⚠️ 代码审查发现问题（第 {iteration} 轮）：")
             for i, issue in enumerate(result.get("issues", []), 1):
                 issue_type = issue.get("type", "未知")
                 description = issue.get("description", "无描述")
                 location = issue.get("location", "未知位置")
                 suggestion = issue.get("suggestion", "无建议")
-                print(f"   {i}. [{issue_type}] {description}")
-                print(f"      位置: {location}")
-                print(f"      建议: {suggestion}")
+                PrettyOutput.auto_print(f"   {i}. [{issue_type}] {description}")
+                PrettyOutput.auto_print(f"      位置: {location}")
+                PrettyOutput.auto_print(f"      建议: {suggestion}")
 
             # 在每轮审查后给用户一个终止选择
             if not self.non_interactive:
                 if not user_confirm("是否继续修复这些问题？", default=True):
-                    print("ℹ️ 用户选择终止审查，保持当前代码状态")
+                    PrettyOutput.auto_print("ℹ️ 用户选择终止审查，保持当前代码状态")
                     return
 
             if iteration >= max_iterations:
-                print(f"\n⚠️ 已达到最大审查次数 ({max_iterations})，停止审查")
+                PrettyOutput.auto_print(
+                    f"\n⚠️ 已达到最大审查次数 ({max_iterations})，停止审查"
+                )
                 # 在非交互模式下直接返回，交互模式下询问用户
                 if not self.non_interactive:
                     if not user_confirm("是否继续修复？", default=False):
@@ -778,7 +788,7 @@ class CodeAgent(Agent):
 
             fix_prompt += "\n请根据上述问题进行修复，确保代码正确实现用户需求。"
 
-            print("\n🔧 开始修复问题...")
+            PrettyOutput.auto_print("\n🔧 开始修复问题...")
 
             # 调用 super().run() 进行修复
             try:
@@ -786,7 +796,7 @@ class CodeAgent(Agent):
                     self.model.set_suppress_output(False)
                 super().run(fix_prompt)
             except RuntimeError as e:
-                print(f"⚠️ 修复失败: {str(e)}")
+                PrettyOutput.auto_print(f"⚠️ 修复失败: {str(e)}")
                 return
 
             # 处理未提交的更改
@@ -850,7 +860,7 @@ def cli(
     """Jarvis主入口点。"""
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (requirement and str(requirement).strip()):
-        print(
+        PrettyOutput.auto_print(
             "❌ 非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。"
         )
         raise typer.Exit(code=2)
@@ -882,7 +892,7 @@ def cli(
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         curr_dir_path = os.getcwd()
-        print(f"⚠️ 警告：当前目录 '{curr_dir_path}' 不是一个git仓库。")
+        PrettyOutput.auto_print(f"⚠️ 警告：当前目录 '{curr_dir_path}' 不是一个git仓库。")
         init_git = (
             True
             if non_interactive
@@ -900,12 +910,12 @@ def cli(
                     encoding="utf-8",
                     errors="replace",
                 )
-                print("✅ 已成功初始化git仓库。")
+                PrettyOutput.auto_print("✅ 已成功初始化git仓库。")
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                print(f"❌ 初始化git仓库失败: {e}")
+                PrettyOutput.auto_print(f"❌ 初始化git仓库失败: {e}")
                 sys.exit(1)
         else:
-            print("ℹ️ 操作已取消。Jarvis需要在git仓库中运行。")
+            PrettyOutput.auto_print("ℹ️ 操作已取消。Jarvis需要在git仓库中运行。")
             sys.exit(0)
 
     curr_dir = os.getcwd()
@@ -938,9 +948,11 @@ def cli(
         # 尝试恢复会话
         if restore_session:
             if agent.restore_session():
-                print("✅ 已从 .jarvis/saved_session.json 恢复会话。")
+                PrettyOutput.auto_print("✅ 已从 .jarvis/saved_session.json 恢复会话。")
             else:
-                print("⚠️ 无法从 .jarvis/saved_session.json 恢复会话。")
+                PrettyOutput.auto_print(
+                    "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
+                )
 
         if requirement:
             agent.run(requirement, prefix=prefix, suffix=suffix)
@@ -958,7 +970,7 @@ def cli(
     except typer.Exit:
         raise
     except RuntimeError as e:
-        print(f"❌ 错误: {str(e)}")
+        PrettyOutput.auto_print(f"❌ 错误: {str(e)}")
         sys.exit(1)
 
 
@@ -977,7 +989,7 @@ def _print_available_rules(
         from rich.console import Console
 
         console = Console()
-        print("🔍 正在加载规则信息...")  # 调试信息
+        PrettyOutput.auto_print("🔍 正在加载规则信息...")  # 调试信息
 
         # 获取所有可用规则
         all_rules = rules_manager.get_all_available_rule_names()
@@ -1136,7 +1148,7 @@ def _print_available_rules(
             console.print(panel)
     except Exception as e:
         # 显示错误信息而不是静默失败
-        print(f"⚠️ 规则信息显示失败: {e}")
+        PrettyOutput.auto_print(f"⚠️ 规则信息显示失败: {e}")
         import traceback
 
         traceback.print_exc()

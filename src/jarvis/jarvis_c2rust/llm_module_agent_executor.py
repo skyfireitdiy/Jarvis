@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """LLM 模块规划 Agent 的执行器。"""
 
@@ -42,9 +44,9 @@ def execute_llm_plan(
         target_root = crate_name if crate_name else "."
         try:
             apply_project_structure_from_json(json_text, project_root=target_root)
-            print("[c2rust-llm-planner] 项目结构已应用。")
+            PrettyOutput.auto_print("[c2rust-llm-planner] 项目结构已应用。")
         except Exception as e:
-            print(f"[c2rust-llm-planner] 应用项目结构失败: {e}")
+            PrettyOutput.auto_print(f"[c2rust-llm-planner] 应用项目结构失败: {e}")
             raise
 
         # Post-apply: 检查生成的目录结构，使用 CodeAgent 更新 Cargo.toml
@@ -138,11 +140,11 @@ def execute_llm_plan(
         try:
             # 切换到 crate 目录运行 CodeAgent 与构建
             os.chdir(str(created_dir))
-            print(
+            PrettyOutput.auto_print(
                 f"[c2rust-llm-planner] 已切换到 crate 目录: {os.getcwd()}，执行 CodeAgent 初始化"
             )
             if llm_group:
-                print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
+                PrettyOutput.auto_print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
             try:
                 # 验证模型配置在切换目录后是否仍然有效
                 from jarvis.jarvis_utils.config import (
@@ -153,11 +155,13 @@ def execute_llm_plan(
                 if llm_group:
                     resolved_model = get_normal_model_name(llm_group)
                     resolved_platform = get_normal_platform_name(llm_group)
-                    print(
+                    PrettyOutput.auto_print(
                         f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}"
                     )
             except Exception as e:
-                print(f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}")
+                PrettyOutput.auto_print(
+                    f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}"
+                )
 
             try:
                 agent = CodeAgent(
@@ -169,19 +173,25 @@ def execute_llm_plan(
                 if hasattr(agent, "model") and agent.model:
                     actual_model = getattr(agent.model, "model_name", "unknown")
                     actual_platform = type(agent.model).__name__
-                    print(
+                    PrettyOutput.auto_print(
                         f"[c2rust-llm-planner] CodeAgent 内部模型: {actual_platform}.{actual_model}"
                     )
                 agent.run(requirement_text, prefix="[c2rust-llm-planner]", suffix="")
-                print("[c2rust-llm-planner] 初始 CodeAgent 运行完成。")
+                PrettyOutput.auto_print(
+                    "[c2rust-llm-planner] 初始 CodeAgent 运行完成。"
+                )
             except Exception as e:
                 error_msg = str(e)
                 if "does not exist" in error_msg or "404" in error_msg:
-                    print(f"[c2rust-llm-planner] 模型配置错误: {error_msg}")
-                    print(
+                    PrettyOutput.auto_print(
+                        f"[c2rust-llm-planner] 模型配置错误: {error_msg}"
+                    )
+                    PrettyOutput.auto_print(
                         f"[c2rust-llm-planner] 提示: 请检查模型组 '{llm_group}' 的配置是否正确"
                     )
-                    print(f"[c2rust-llm-planner] 当前工作目录: {os.getcwd()}")
+                    PrettyOutput.auto_print(
+                        f"[c2rust-llm-planner] 当前工作目录: {os.getcwd()}"
+                    )
                     # 尝试显示当前解析的模型配置
                     try:
                         from jarvis.jarvis_utils.config import (
@@ -190,7 +200,7 @@ def execute_llm_plan(
                         )
 
                         if llm_group:
-                            print(
+                            PrettyOutput.auto_print(
                                 f"[c2rust-llm-planner] 当前解析的模型: {get_normal_platform_name(llm_group)}/{get_normal_model_name(llm_group)}"
                             )
                     except Exception:
@@ -201,7 +211,9 @@ def execute_llm_plan(
             iter_count = 0
             while True:
                 iter_count += 1
-                print(f"[c2rust-llm-planner] 在 {os.getcwd()} 执行: cargo build -q")
+                PrettyOutput.auto_print(
+                    f"[c2rust-llm-planner] 在 {os.getcwd()} 执行: cargo build -q"
+                )
                 build_res = subprocess.run(
                     ["cargo", "build", "-q"],
                     capture_output=True,
@@ -213,13 +225,15 @@ def execute_llm_plan(
                 output = (stdout + "\n" + stderr).strip()
 
                 if build_res.returncode == 0:
-                    print("[c2rust-llm-planner] Cargo 构建成功。")
+                    PrettyOutput.auto_print("[c2rust-llm-planner] Cargo 构建成功。")
                     break
 
-                print(f"[c2rust-llm-planner] Cargo 构建失败 (iter={iter_count})。")
+                PrettyOutput.auto_print(
+                    f"[c2rust-llm-planner] Cargo 构建失败 (iter={iter_count})。"
+                )
                 # 打印编译错误输出，便于可视化与调试
-                print("[c2rust-llm-planner] 构建错误输出:")
-                print(output)
+                PrettyOutput.auto_print("[c2rust-llm-planner] 构建错误输出:")
+                PrettyOutput.auto_print(output)
                 # 将错误信息作为上下文，附加修复原则，生成新的 CodeAgent 进行最小修复
                 repair_prompt = "\n".join(
                     [
@@ -233,7 +247,7 @@ def execute_llm_plan(
                 )
 
                 if llm_group:
-                    print(
+                    PrettyOutput.auto_print(
                         f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}"
                     )
                 try:
@@ -250,10 +264,10 @@ def execute_llm_plan(
                 except Exception as e:
                     error_msg = str(e)
                     if "does not exist" in error_msg or "404" in error_msg:
-                        print(
+                        PrettyOutput.auto_print(
                             f"[c2rust-llm-planner][iter={iter_count}] 模型配置错误: {error_msg}"
                         )
-                        print(
+                        PrettyOutput.auto_print(
                             f"[c2rust-llm-planner][iter={iter_count}] 提示: 请检查模型组 '{llm_group}' 的配置"
                         )
                     raise
@@ -268,6 +282,6 @@ def execute_llm_plan(
         out_path.parent.mkdir(parents=True, exist_ok=True)
         # 使用原始文本写出，便于可读
         out_path.write_text(json_text, encoding="utf-8")
-        print(f"[c2rust-llm-planner] JSON 已写入: {out_path}")
+        PrettyOutput.auto_print(f"[c2rust-llm-planner] JSON 已写入: {out_path}")
 
     return entries

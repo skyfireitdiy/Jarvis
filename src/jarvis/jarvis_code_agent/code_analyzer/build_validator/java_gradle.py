@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -38,10 +39,10 @@ class JavaGradleBuildValidator(BuildValidatorBase):
         output = stdout + stderr
 
         if success:
-            print(f"✅ Gradle 构建验证成功（耗时 {duration:.2f} 秒）")
+            PrettyOutput.auto_print(f"✅ Gradle 构建验证成功（耗时 {duration:.2f} 秒）")
         else:
-            print(f"❌ Gradle 构建验证失败（耗时 {duration:.2f} 秒）")
-            print(f"错误信息：Gradle编译失败\n{output[:500]}")
+            PrettyOutput.auto_print(f"❌ Gradle 构建验证失败（耗时 {duration:.2f} 秒）")
+            PrettyOutput.auto_print(f"错误信息：Gradle编译失败\n{output[:500]}")
 
         return BuildResult(
             success=success,

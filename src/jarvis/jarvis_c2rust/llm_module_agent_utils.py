@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """LLM 模块规划 Agent 的工具函数。"""
 
@@ -51,7 +53,7 @@ def perform_pre_cleanup_for_planner(project_root: Union[Path, str]) -> None:
 
     tip_lines = ["将执行以下清理操作："] + targets + ["", "是否继续？"]
     if not user_confirm("\n".join(tip_lines), default=False):
-        print("[c2rust-llm-planner] 用户取消清理操作，退出。")
+        PrettyOutput.auto_print("[c2rust-llm-planner] 用户取消清理操作，退出。")
         sys.exit(0)
 
     # 执行清理操作

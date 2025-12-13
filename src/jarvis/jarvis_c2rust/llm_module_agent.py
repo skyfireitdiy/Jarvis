@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 LLM 驱动的 Rust Crate 模块规划 Agent
@@ -13,7 +15,7 @@ LLM 驱动的 Rust Crate 模块规划 Agent
 
 用法:
   from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_json_llm
-  print(plan_crate_json_llm(project_root="."))
+  PrettyOutput.auto_print(plan_crate_json_llm(project_root="."))
 
 CLI 集成建议:
   可在 jarvis_c2rust/cli.py 中新增 llm-plan 子命令调用本模块的 plan_crate_json_llm（已独立封装，便于后续补充）
@@ -204,7 +206,9 @@ class LLMRustCratePlannerAgent:
                     response = agent.model.chat_until_success(full_prompt)
                     summary_output = response
                 except Exception as e:
-                    print(f"[c2rust-llm-planner] 直接模型调用失败: {e}，回退到 run()")
+                    PrettyOutput.auto_print(
+                        f"[c2rust-llm-planner] 直接模型调用失败: {e}，回退到 run()"
+                    )
                     summary_output = agent.run(user_prompt)
             else:
                 # 第一次使用 run()，让 Agent 完整运行（可能使用工具）
@@ -219,7 +223,9 @@ class LLMRustCratePlannerAgent:
                 # JSON解析失败，记录错误并重试
                 last_error = parse_error_json
                 use_direct_model = True  # 格式校验失败，后续重试使用直接模型调用
-                print(f"[c2rust-llm-planner] JSON解析失败: {parse_error_json}")
+                PrettyOutput.auto_print(
+                    f"[c2rust-llm-planner] JSON解析失败: {parse_error_json}"
+                )
                 continue
 
             ok, reason = self.validator.validate_project_entries(entries)

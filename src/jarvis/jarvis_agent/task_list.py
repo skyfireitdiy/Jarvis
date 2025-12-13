@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """任务列表模块。
 
@@ -264,7 +266,7 @@ class TaskListManager:
                     data = json.load(f)
                     self.version_snapshots = data.get("snapshots", {})
             except Exception as e:
-                print(f"⚠️ 加载快照数据失败: {e}")
+                PrettyOutput.auto_print(f"⚠️ 加载快照数据失败: {e}")
 
     def _save_snapshot(self, task_list_id: str, task_list: TaskList):
         """保存版本快照。"""
@@ -289,7 +291,7 @@ class TaskListManager:
                     indent=2,
                 )
         except Exception as e:
-            print(f"⚠️ 保存快照失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 保存快照失败: {e}")
 
     def _check_agent_permission(
         self, agent_id: str, task_id: str, is_main_agent: bool

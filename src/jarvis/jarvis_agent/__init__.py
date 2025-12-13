@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 # 标准库导入
 import datetime
@@ -193,7 +195,7 @@ def show_agent_startup_stats(
         console.print(Align.center(panel))
 
     except Exception as e:
-        print(f"⚠️ 加载统计信息失败: {e}")
+        PrettyOutput.auto_print(f"⚠️ 加载统计信息失败: {e}")
 
 
 origin_agent_system_prompt = f"""
@@ -538,8 +540,8 @@ class Agent:
 
         # 提示用户会话文件位置
         if Path(session_file_path).exists():
-            print(f"💾 当前会话记录已保存到: {session_file_path}")
-            print("🤖 大模型可以读取此文件了解完整对话历史")
+            PrettyOutput.auto_print(f"💾 当前会话记录已保存到: {session_file_path}")
+            PrettyOutput.auto_print("🤖 大模型可以读取此文件了解完整对话历史")
 
         # 重置后重新设置系统提示词，确保系统约束仍然生效
         try:
@@ -782,7 +784,7 @@ class Agent:
 
         maybe_model = PlatformRegistry().create_platform(platform_name)
         if maybe_model is None:
-            print(f"⚠️ 平台 {platform_name} 不存在，将使用普通模型")
+            PrettyOutput.auto_print(f"⚠️ 平台 {platform_name} 不存在，将使用普通模型")
             maybe_model = PlatformRegistry().get_normal_platform()
 
         # 在此处收敛为非可选类型，确保后续赋值满足类型检查
@@ -977,7 +979,7 @@ class Agent:
                                 pass
 
                     except Exception as e:
-                        print(f"⚠️ 从 {file_path} 加载回调失败: {e}")
+                        PrettyOutput.auto_print(f"⚠️ 从 {file_path} 加载回调失败: {e}")
                     finally:
                         if added_path:
                             try:
@@ -985,7 +987,7 @@ class Agent:
                             except ValueError:
                                 pass
         except Exception as e:
-            print(f"⚠️ 加载回调目录时发生错误: {e}")
+            PrettyOutput.auto_print(f"⚠️ 加载回调目录时发生错误: {e}")
 
     def save_session(self) -> bool:
         """Saves the current session state by delegating to the session manager."""
@@ -1193,7 +1195,7 @@ class Agent:
         # 防御: 模型可能返回空响应(None或空字符串)，统一为空字符串并告警
         if not response:
             try:
-                print("⚠️ 模型返回空响应，已使用空字符串回退。")
+                PrettyOutput.auto_print("⚠️ 模型返回空响应，已使用空字符串回退。")
             except Exception:
                 pass
             response = ""
@@ -1231,7 +1233,7 @@ class Agent:
             if not self.model:
                 raise RuntimeError("Model not initialized")
 
-            print("🔍 开始生成对话历史摘要...")
+            PrettyOutput.auto_print("🔍 开始生成对话历史摘要...")
 
             if for_token_limit:
                 # token限制触发的summary：使用SUMMARY_REQUEST_PROMPT进行上下文压缩
@@ -1251,13 +1253,15 @@ class Agent:
             # 防御: 可能返回空响应(None或空字符串)，统一为空字符串并告警
             if not summary:
                 try:
-                    print("⚠️ 总结模型返回空响应，已使用空字符串回退。")
+                    PrettyOutput.auto_print(
+                        "⚠️ 总结模型返回空响应，已使用空字符串回退。"
+                    )
                 except Exception:
                     pass
                 summary = ""
             return summary
         except Exception:
-            print("❌ 总结对话历史失败")
+            PrettyOutput.auto_print("❌ 总结对话历史失败")
             return ""
 
     def _summarize_and_clear_history(self) -> str:
@@ -1573,7 +1577,9 @@ class Agent:
             # 防御: 总结阶段模型可能返回空响应(None或空字符串)，统一为空字符串并告警
             if not ret:
                 try:
-                    print("⚠️ 总结阶段模型返回空响应，已使用空字符串回退。")
+                    PrettyOutput.auto_print(
+                        "⚠️ 总结阶段模型返回空响应，已使用空字符串回退。"
+                    )
                 except Exception:
                     pass
                 ret = ""
@@ -1736,7 +1742,7 @@ class Agent:
         except Exception as e:
             # 确保即使出现异常也清除运行状态
             clear_running_agent(self.name)
-            print(f"❌ 任务失败: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
             return f"Task failed: {str(e)}"
 
     def _main_loop(self) -> Any:
@@ -1960,7 +1966,9 @@ class Agent:
 请根据用户任务，从列表中选择最相关的工具。
 请仅返回所选工具的编号，以逗号分隔。例如：1, 5, 12
 """
-        print(f"ℹ️ 工具数量超过{threshold}个，正在使用AI筛选相关工具...")
+        PrettyOutput.auto_print(
+            f"ℹ️ 工具数量超过{threshold}个，正在使用AI筛选相关工具..."
+        )
         # 广播工具筛选开始事件
         try:
             self.event_bus.emit(
@@ -1997,7 +2005,7 @@ class Agent:
                 tool_registry.use_tools(final_tool_names)
                 # 使用筛选后的工具列表重新设置系统提示
                 self._setup_system_prompt()
-                print(
+                PrettyOutput.auto_print(
                     f"✅ 已筛选出 {len(selected_tool_names)} 个相关工具: {', '.join(selected_tool_names)}"
                 )
                 # 广播工具筛选事件
@@ -2013,7 +2021,7 @@ class Agent:
                 except Exception:
                     pass
             else:
-                print("⚠️ AI 未能筛选出任何相关工具，将使用所有工具。")
+                PrettyOutput.auto_print("⚠️ AI 未能筛选出任何相关工具，将使用所有工具。")
                 # 广播工具筛选事件（无筛选结果）
                 try:
                     self.event_bus.emit(
@@ -2028,7 +2036,7 @@ class Agent:
                     pass
 
         except Exception as e:
-            print(f"❌ 工具筛选失败: {e}，将使用所有工具。")
+            PrettyOutput.auto_print(f"❌ 工具筛选失败: {e}，将使用所有工具。")
 
     def _check_and_organize_memory(self):
         """
@@ -2045,7 +2053,7 @@ class Agent:
                 "global",
             )
         except Exception as e:
-            print(f"⚠️ 检查记忆库时发生意外错误: {e}")
+            PrettyOutput.auto_print(f"⚠️ 检查记忆库时发生意外错误: {e}")
 
     def _perform_memory_check(self, memory_type: str, base_path: Path, scope_name: str):
         """执行特定范围的记忆检查和整理"""
@@ -2087,7 +2095,9 @@ class Agent:
             f"是否立即整理记忆库以优化性能和相关性？"
         )
         if self.confirm_callback(prompt, False):
-            print(f"ℹ️ 正在开始整理 '{scope_name}' ({memory_type}) 记忆库...")
+            PrettyOutput.auto_print(
+                f"ℹ️ 正在开始整理 '{scope_name}' ({memory_type}) 记忆库..."
+            )
             organizer.organize_memories(memory_type, min_overlap=3)
         else:
-            print(f"ℹ️ 已取消 '{scope_name}' 记忆库整理。")
+            PrettyOutput.auto_print(f"ℹ️ 已取消 '{scope_name}' 记忆库整理。")

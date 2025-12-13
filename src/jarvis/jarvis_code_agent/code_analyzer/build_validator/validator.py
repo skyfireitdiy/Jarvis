@@ -1,3 +1,4 @@
+from jarvis.jarvis_utils.output import PrettyOutput
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -78,17 +79,21 @@ class BuildValidator:
             try:
                 saved_enum = BuildSystem(saved_system)
                 if saved_enum in detected_systems:
-                    print(f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}")
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}"
+                    )
                     return saved_enum
             except ValueError:
                 # 配置文件中保存的构建系统无效，忽略
                 pass
 
         # 多个构建系统，需要用户选择
-        print("\n检测到多个构建系统，请选择要使用的构建系统：")
+        PrettyOutput.auto_print("\n检测到多个构建系统，请选择要使用的构建系统：")
         for idx, system in enumerate(detected_systems, start=1):
-            print(f"  {idx}. {system.value}")
-        print(f"  {len(detected_systems) + 1}. 取消（使用兜底验证器）")
+            PrettyOutput.auto_print(f"  {idx}. {system.value}")
+        PrettyOutput.auto_print(
+            f"  {len(detected_systems) + 1}. 取消（使用兜底验证器）"
+        )
 
         while True:
             try:
@@ -99,17 +104,19 @@ class BuildValidator:
                     selected = detected_systems[choice_num - 1]
                     # 保存用户选择
                     self.config.set_selected_build_system(selected.value)
-                    print(f"ℹ️ 用户选择构建系统: {selected.value}")
+                    PrettyOutput.auto_print(f"ℹ️ 用户选择构建系统: {selected.value}")
                     return selected
                 elif choice_num == len(detected_systems) + 1:
-                    print("ℹ️ 用户取消选择，使用兜底验证器")
+                    PrettyOutput.auto_print("ℹ️ 用户取消选择，使用兜底验证器")
                     return None
                 else:
-                    print(f"无效选择，请输入 1-{len(detected_systems) + 1}")
+                    PrettyOutput.auto_print(
+                        f"无效选择，请输入 1-{len(detected_systems) + 1}"
+                    )
             except ValueError:
-                print("请输入有效的数字")
+                PrettyOutput.auto_print("请输入有效的数字")
             except (KeyboardInterrupt, EOFError):
-                print("\n用户取消，使用兜底验证器")
+                PrettyOutput.auto_print("\n用户取消，使用兜底验证器")
                 return None
 
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
@@ -128,16 +135,20 @@ class BuildValidator:
                 saved_enum = BuildSystem(saved_system)
                 if saved_enum in self._validators:
                     validator = self._validators[saved_enum]
-                    print(f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}")
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 使用配置文件中保存的构建系统: {saved_system}"
+                    )
                     try:
                         return validator.validate(modified_files)
                     except Exception as e:
-                        print(
+                        PrettyOutput.auto_print(
                             f"⚠️ 验证器 {validator.__class__.__name__} 执行失败: {e}, 使用兜底验证器"
                         )
                         return self._fallback_validator.validate(modified_files)
                 elif saved_enum == BuildSystem.UNKNOWN:
-                    print("ℹ️ 使用配置文件中保存的构建系统: unknown，使用兜底验证器")
+                    PrettyOutput.auto_print(
+                        "ℹ️ 使用配置文件中保存的构建系统: unknown，使用兜底验证器"
+                    )
                     return self._fallback_validator.validate(modified_files)
             except ValueError:
                 # 配置文件中保存的构建系统无效，继续检测
@@ -148,7 +159,7 @@ class BuildValidator:
 
         if not detected_systems:
             # 用户取消或未检测到构建系统，使用兜底验证器
-            print("ℹ️ 未检测到构建系统或用户取消，使用兜底验证器")
+            PrettyOutput.auto_print("ℹ️ 未检测到构建系统或用户取消，使用兜底验证器")
             return self._fallback_validator.validate(modified_files)
 
         # 使用检测到的第一个构建系统（用户已确认）
@@ -156,25 +167,25 @@ class BuildValidator:
 
         if build_system == BuildSystem.UNKNOWN:
             # 未知构建系统，使用兜底验证器
-            print("ℹ️ 构建系统为unknown，使用兜底验证器")
+            PrettyOutput.auto_print("ℹ️ 构建系统为unknown，使用兜底验证器")
             return self._fallback_validator.validate(modified_files)
 
         if build_system in self._validators:
             validator = self._validators[build_system]
-            print(
+            PrettyOutput.auto_print(
                 f"ℹ️ 使用构建系统: {build_system.value}, 验证器: {validator.__class__.__name__}"
             )
             try:
                 return validator.validate(modified_files)
             except Exception as e:
-                print(
+                PrettyOutput.auto_print(
                     f"⚠️ 验证器 {validator.__class__.__name__} 执行失败: {e}, 使用兜底验证器"
                 )
                 # 验证器执行失败时，使用兜底验证器
                 return self._fallback_validator.validate(modified_files)
         else:
             # 未找到对应的验证器，使用兜底验证器
-            print("ℹ️ 未找到对应的验证器，使用兜底验证器")
+            PrettyOutput.auto_print("ℹ️ 未找到对应的验证器，使用兜底验证器")
             return self._fallback_validator.validate(modified_files)
 
     def register_validator(
@@ -187,6 +198,6 @@ class BuildValidator:
             validator: 验证器实例
         """
         self._validators[build_system] = validator
-        print(
+        PrettyOutput.auto_print(
             f"ℹ️ 注册自定义验证器: {build_system.value} -> {validator.__class__.__name__}"
         )

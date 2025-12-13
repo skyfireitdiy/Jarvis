@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 任务分析器模块
@@ -50,7 +52,7 @@ class TaskAnalyzer:
             self._process_analysis_loop()
 
         except Exception:
-            print("❌ 分析失败")
+            PrettyOutput.auto_print("❌ 分析失败")
         finally:
             # 标记已完成一次分析，避免事件回调重复执行
             self._analysis_done = True

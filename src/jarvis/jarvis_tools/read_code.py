@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 import os
 from typing import Any, Dict, List
@@ -216,7 +218,7 @@ class ReadCodeTool:
             return {"success": True, "stdout": output, "stderr": ""}
 
         except Exception as e:
-            print(f"❌ {str(e)}")
+            PrettyOutput.auto_print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": f"文件读取失败: {str(e)}"}
 
     def _get_file_context(
@@ -255,7 +257,9 @@ class ReadCodeTool:
                 line_info = f"第{start_line}行"
             else:
                 line_info = f"第{start_line}-{end_line}行"
-            print(f"🧠 正在分析代码上下文 ({file_name}, {line_info})...")
+            PrettyOutput.auto_print(
+                f"🧠 正在分析代码上下文 ({file_name}, {line_info})..."
+            )
 
             # 确保文件已更新到上下文管理器
             # 如果文件内容已缓存，直接使用；否则读取并更新
@@ -362,7 +366,7 @@ class ReadCodeTool:
 
             # 打印上下文感知结果到控制台
             context_output = "\n".join(context_lines)
-            print(f"🧠 上下文感知结果:\n{context_output}")
+            PrettyOutput.auto_print(f"🧠 上下文感知结果:\n{context_output}")
 
             return context_output
 
@@ -621,7 +625,7 @@ class ReadCodeTool:
             # 仅打印每个文件的读取状态，不打印具体内容
             try:
                 if status_lines:
-                    print("\n".join(status_lines), end="\n")
+                    PrettyOutput.auto_print("\n".join(status_lines), end="\n")
             except Exception:
                 pass
             return {
@@ -631,7 +635,7 @@ class ReadCodeTool:
             }
 
         except Exception as e:
-            print(f"❌ {str(e)}")
+            PrettyOutput.auto_print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": f"代码读取失败: {str(e)}"}
 
 
@@ -642,16 +646,16 @@ def main():
 
     tool = ReadCodeTool()
 
-    print("=" * 80)
-    print("测试读取功能")
-    print("=" * 80)
+    PrettyOutput.auto_print("=" * 80)
+    PrettyOutput.auto_print("测试读取功能")
+    PrettyOutput.auto_print("=" * 80)
 
     # 测试1: 基本读取
-    print("\n【测试1】基本读取")
-    print("-" * 80)
+    PrettyOutput.auto_print("\n【测试1】基本读取")
+    PrettyOutput.auto_print("-" * 80)
 
     test_code = """def hello():
-    print("Hello, World!")
+    PrettyOutput.auto_print("Hello, World!")
 
 def add(a, b):
     return a + b
@@ -673,17 +677,17 @@ def sub(a, b):
         )
 
         if result["success"]:
-            print("✅ 文件读取成功")
-            print("\n输出内容:")
-            print(result["stdout"])
+            PrettyOutput.auto_print("✅ 文件读取成功")
+            PrettyOutput.auto_print("\n输出内容:")
+            PrettyOutput.auto_print(result["stdout"])
         else:
-            print(f"❌ 文件读取失败: {result['stderr']}")
+            PrettyOutput.auto_print(f"❌ 文件读取失败: {result['stderr']}")
     finally:
         os.unlink(test_file)
 
     # 测试2: 指定行号范围
-    print("\n【测试2】指定行号范围读取")
-    print("-" * 80)
+    PrettyOutput.auto_print("\n【测试2】指定行号范围读取")
+    PrettyOutput.auto_print("-" * 80)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         test_file2 = f.name
@@ -698,17 +702,17 @@ def sub(a, b):
         )
 
         if result["success"]:
-            print("✅ 指定范围读取成功")
-            print("\n输出内容:")
-            print(result["stdout"])
+            PrettyOutput.auto_print("✅ 指定范围读取成功")
+            PrettyOutput.auto_print("\n输出内容:")
+            PrettyOutput.auto_print(result["stdout"])
         else:
-            print(f"❌ 指定范围读取失败: {result['stderr']}")
+            PrettyOutput.auto_print(f"❌ 指定范围读取失败: {result['stderr']}")
     finally:
         os.unlink(test_file2)
 
     # 测试3: 多个文件
-    print("\n【测试3】多个文件读取")
-    print("-" * 80)
+    PrettyOutput.auto_print("\n【测试3】多个文件读取")
+    PrettyOutput.auto_print("-" * 80)
 
     with (
         tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f1,
@@ -731,22 +735,22 @@ def sub(a, b):
         )
 
         if result["success"]:
-            print("✅ 多文件读取成功")
-            print("\n输出内容（前500字符）:")
-            print(
+            PrettyOutput.auto_print("✅ 多文件读取成功")
+            PrettyOutput.auto_print("\n输出内容（前500字符）:")
+            PrettyOutput.auto_print(
                 result["stdout"][:500] + "..."
                 if len(result["stdout"]) > 500
                 else result["stdout"]
             )
         else:
-            print(f"❌ 多文件读取失败: {result['stderr']}")
+            PrettyOutput.auto_print(f"❌ 多文件读取失败: {result['stderr']}")
     finally:
         os.unlink(test_file3)
         os.unlink(test_file4)
 
-    print("\n" + "=" * 80)
-    print("测试完成")
-    print("=" * 80)
+    PrettyOutput.auto_print("\n" + "=" * 80)
+    PrettyOutput.auto_print("测试完成")
+    PrettyOutput.auto_print("=" * 80)
 
 
 if __name__ == "__main__":

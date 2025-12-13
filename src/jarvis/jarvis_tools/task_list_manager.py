@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """任务列表管理工具。
 
@@ -247,8 +249,8 @@ class task_list_manager:
             # 打印详细错误信息，帮助调试
             import traceback
 
-            print(f"⚠️ 打印任务状态失败: {e}")
-            print(f"   错误详情: {traceback.format_exc()}")
+            PrettyOutput.auto_print(f"⚠️ 打印任务状态失败: {e}")
+            PrettyOutput.auto_print(f"   错误详情: {traceback.format_exc()}")
 
     description = f"""任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
 
@@ -1246,7 +1248,7 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                 execution_result_len = (
                     len(execution_result) if execution_result is not None else 0
                 )
-                print(
+                PrettyOutput.auto_print(
                     f"⚠️ 任务 {task_id} 的执行结果过长（{execution_result_len} 字符），"
                     f"已截断为 {len(truncated_result)} 字符（基于剩余token限制：{max_output_length} 字符）"
                 )

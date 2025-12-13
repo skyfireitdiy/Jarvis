@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """配置编辑器模块，负责配置文件的编辑功能"""
 
@@ -46,10 +48,10 @@ class ConfigEditor:
                 )
                 raise typer.Exit(code=0)
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
-                print(f"❌ Failed to open editor: {e}")
+                PrettyOutput.auto_print(f"❌ Failed to open editor: {e}")
                 raise typer.Exit(code=1)
         else:
-            print(
+            PrettyOutput.auto_print(
                 "❌ No suitable editor found. Please install one of: vim, nano, emacs, code"
             )
             raise typer.Exit(code=1)

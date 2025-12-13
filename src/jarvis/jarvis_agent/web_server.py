@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """
 基于 FastAPI 的 Web 服务：
@@ -517,7 +519,9 @@ def start_web_server(
                 _launch_cmd = app.state.launch_command
                 # 调试输出
                 if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
-                    print(f"🔍 Web服务器: 使用传入的启动命令: {_launch_cmd}")
+                    PrettyOutput.auto_print(
+                        f"🔍 Web服务器: 使用传入的启动命令: {_launch_cmd}"
+                    )
             else:
                 # 回退到环境变量
                 import json as _json
@@ -527,7 +531,7 @@ def start_web_server(
                     try:
                         _launch_cmd = _json.loads(_cmd_json)
                         if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
-                            print(
+                            PrettyOutput.auto_print(
                                 f"🔍 Web服务器: 从环境变量读取启动命令: {_launch_cmd}"
                             )
                     except Exception:
@@ -553,11 +557,11 @@ def start_web_server(
                     ):
                         try:
                             if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
-                                print(f"🔍 子进程: 执行命令: {_argv}")
+                                PrettyOutput.auto_print(f"🔍 子进程: 执行命令: {_argv}")
                             _os.execvp(_argv[0], _argv)
                         except Exception as e:
                             if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
-                                print(f"⚠️ 子进程: 执行命令失败: {e}")
+                                PrettyOutput.auto_print(f"⚠️ 子进程: 执行命令失败: {e}")
                             pass
                     # 若未配置或执行失败，回退到 /bin/bash 或 /bin/sh
                     try:
@@ -854,7 +858,7 @@ def start_web_server(
             except Exception:
                 pass
 
-    print(f"✅ 启动 Jarvis Web 服务: http://{host}:{port}")
+    PrettyOutput.auto_print(f"✅ 启动 Jarvis Web 服务: http://{host}:{port}")
     # 在服务端进程内也写入并维护 PID 文件，增强可检测性与可清理性
     try:
         pidfile = Path(os.path.expanduser("~/.jarvis")) / f"jarvis_web_{port}.pid"

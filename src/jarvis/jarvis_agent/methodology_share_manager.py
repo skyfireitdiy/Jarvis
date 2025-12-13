@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """方法论分享管理模块"""
 
@@ -23,8 +25,10 @@ class MethodologyShareManager(ShareManager):
     def __init__(self):
         central_repo = get_central_methodology_repo()
         if not central_repo:
-            print("❌ 错误：未配置中心方法论仓库（JARVIS_CENTRAL_METHODOLOGY_REPO）")
-            print("ℹ️ 请在配置文件中设置中心方法论仓库的Git地址")
+            PrettyOutput.auto_print(
+                "❌ 错误：未配置中心方法论仓库（JARVIS_CENTRAL_METHODOLOGY_REPO）"
+            )
+            PrettyOutput.auto_print("ℹ️ 请在配置文件中设置中心方法论仓库的Git地址")
             raise typer.Exit(code=1)
 
         super().__init__(central_repo, "central_methodology_repo")
@@ -120,7 +124,7 @@ class MethodologyShareManager(ShareManager):
         for meth in resources:
             share_list.append(f"- {meth['problem_type']}")
         joined_list = "\n".join(share_list)
-        print(f"ℹ️ {joined_list}")
+        PrettyOutput.auto_print(f"ℹ️ {joined_list}")
 
         if not user_confirm("确认分享这些方法论吗？"):
             return []
@@ -144,7 +148,9 @@ class MethodologyShareManager(ShareManager):
             # 获取本地资源
             local_resources = self.get_local_resources()
             if not local_resources:
-                print("⚠️ 没有找到新的方法论文件（所有方法论可能已存在于中心仓库）")
+                PrettyOutput.auto_print(
+                    "⚠️ 没有找到新的方法论文件（所有方法论可能已存在于中心仓库）"
+                )
                 return
 
             # 选择要分享的资源
@@ -157,13 +163,13 @@ class MethodologyShareManager(ShareManager):
             if copied_list:
                 # 一次性显示所有复制结果
                 joined_copied = "\n".join(copied_list)
-                print(f"✅ {joined_copied}")
+                PrettyOutput.auto_print(f"✅ {joined_copied}")
 
                 # 提交并推送
                 self.commit_and_push(len(selected_resources))
 
-                print("✅ 方法论已成功分享到中心仓库！")
+                PrettyOutput.auto_print("✅ 方法论已成功分享到中心仓库！")
 
         except Exception as e:
-            print(f"❌ 分享方法论时出错: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 分享方法论时出错: {str(e)}")
             raise typer.Exit(code=1)

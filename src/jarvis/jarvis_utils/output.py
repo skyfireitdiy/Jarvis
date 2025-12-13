@@ -431,7 +431,7 @@ class PrettyOutput:
     def auto_print(text: str, timestamp: bool = True) -> None:
         """
         自动根据打印信息的前缀emoji判断类型并着色输出。
-        
+
         支持的emoji前缀映射：
         - ⚠️ -> WARNING (黄色警告)
         - ❌ -> ERROR (红色错误)
@@ -445,7 +445,7 @@ class PrettyOutput:
         - ✨ -> RESULT (蓝色结果)
         - 👤 -> USER (绿色用户)
         - 🔧 -> TOOL (绿色工具)
-        
+
         参数：
             text: 要打印的文本
             timestamp: 是否显示时间戳
@@ -465,13 +465,13 @@ class PrettyOutput:
             "👤": OutputType.USER,
             "🔧": OutputType.TOOL,
         }
-        
+
         # 检测emoji前缀
         output_type = OutputType.INFO  # 默认类型
         for emoji, type_enum in emoji_mapping.items():
             if text.startswith(emoji):
                 output_type = type_enum
                 break
-        
+
         # 使用现有的print方法进行着色输出
         PrettyOutput.print(text=text, output_type=output_type, timestamp=timestamp)

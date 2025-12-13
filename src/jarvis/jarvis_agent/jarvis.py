@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 # -*- coding: utf-8 -*-
 """Jarvis AI 助手主入口模块"""
 
@@ -172,7 +174,7 @@ def handle_interactive_config_option(
             config_data, ask_all=True
         )
         if not changed:
-            print("ℹ️ 没有需要更新的配置项，保持现有配置。")
+            PrettyOutput.auto_print("ℹ️ 没有需要更新的配置项，保持现有配置。")
             return True
 
         # 剔除与 schema 默认值一致的键，保持配置精简
@@ -211,10 +213,10 @@ def handle_interactive_config_option(
                 wf.write(header)
             wf.write(yaml_str)
 
-        print(f"✅ 配置已更新: {config_path}")
+        PrettyOutput.auto_print(f"✅ 配置已更新: {config_path}")
         return True
     except Exception as e:
-        print(f"❌ 交互式配置失败: {e}")
+        PrettyOutput.auto_print(f"❌ 交互式配置失败: {e}")
         return True
 
 
@@ -226,7 +228,7 @@ def handle_backup_option(backup_dir_path: Optional[str]) -> bool:
     init_env("", config_file=None)
     data_dir = Path(get_data_dir())
     if not data_dir.is_dir():
-        print(f"❌ 数据目录不存在: {data_dir}")
+        PrettyOutput.auto_print(f"❌ 数据目录不存在: {data_dir}")
         return True
 
     backup_dir_str = backup_dir_path if backup_dir_path.strip() else "~/jarvis_backups"
@@ -240,9 +242,9 @@ def handle_backup_option(backup_dir_path: Optional[str]) -> bool:
         archive_path = shutil.make_archive(
             str(backup_file_base), "zip", root_dir=str(data_dir)
         )
-        print(f"✅ 数据已成功备份到: {archive_path}")
+        PrettyOutput.auto_print(f"✅ 数据已成功备份到: {archive_path}")
     except Exception as e:
-        print(f"❌ 数据备份失败: {e}")
+        PrettyOutput.auto_print(f"❌ 数据备份失败: {e}")
 
     return True
 
@@ -257,7 +259,7 @@ def handle_restore_option(
     restore_file = Path(os.path.expanduser(os.path.expandvars(restore_path)))
     # 兼容 ~ 与环境变量，避免用户输入未展开路径导致找不到文件
     if not restore_file.is_file():
-        print(f"❌ 指定的恢复文件不存在: {restore_file}")
+        PrettyOutput.auto_print(f"❌ 指定的恢复文件不存在: {restore_file}")
         return True
 
     # 在恢复数据时不要触发完整环境初始化，避免引导流程或网络请求
@@ -285,21 +287,21 @@ def handle_restore_option(
         if not user_confirm(
             f"数据目录 '{data_dir}' 已存在，恢复操作将覆盖它。是否继续？", default=False
         ):
-            print("ℹ️ 恢复操作已取消。")
+            PrettyOutput.auto_print("ℹ️ 恢复操作已取消。")
             return True
         try:
             shutil.rmtree(data_dir)
         except Exception as e:
-            print(f"❌ 无法移除现有数据目录: {e}")
+            PrettyOutput.auto_print(f"❌ 无法移除现有数据目录: {e}")
             return True
 
     try:
         data_dir.mkdir(parents=True)
         shutil.unpack_archive(str(restore_file), str(data_dir), "zip")
-        print(f"✅ 数据已从 '{restore_path}' 成功恢复到 '{data_dir}'")
+        PrettyOutput.auto_print(f"✅ 数据已从 '{restore_path}' 成功恢复到 '{data_dir}'")
 
     except Exception as e:
-        print(f"❌ 数据恢复失败: {e}")
+        PrettyOutput.auto_print(f"❌ 数据恢复失败: {e}")
 
     return True
 
@@ -335,7 +337,7 @@ def try_switch_to_jca_if_git_repo(
             if res.returncode == 0:
                 git_root = res.stdout.strip()
                 if git_root and os.path.isdir(git_root):
-                    print(f"ℹ️ 检测到当前位于 Git 仓库: {git_root}")
+                    PrettyOutput.auto_print(f"ℹ️ 检测到当前位于 Git 仓库: {git_root}")
                     if user_confirm(
                         "检测到Git仓库，是否切换到代码开发模式（jca）？", default=False
                     ):
@@ -351,7 +353,7 @@ def try_switch_to_jca_if_git_repo(
                             args += ["--restore-session"]
                         if task:
                             args += ["-r", task]
-                        print(
+                        PrettyOutput.auto_print(
                             "ℹ️ 正在切换到 'jca'（jarvis-code-agent）以进入代码开发模式..."
                         )
                         os.execvp(args[0], args)
@@ -461,7 +463,7 @@ def handle_builtin_config_selector(
                 # 可选调试输出：查看每类的搜索目录
                 try:
                     if os.environ.get("JARVIS_DEBUG_BUILTIN_SELECTOR") == "1":
-                        print(
+                        PrettyOutput.auto_print(
                             f"ℹ️ DEBUG: category={cat} search_dirs="
                             + ", ".join(str(p) for p in unique_dirs)
                         )
@@ -541,7 +543,7 @@ def handle_builtin_config_selector(
                     },
                 )
 
-                print("✅ 可用的内置配置")
+                PrettyOutput.auto_print("✅ 可用的内置配置")
                 # 使用 rich Table 呈现
                 table = Table(show_header=True, header_style="bold magenta")
                 table.add_column("No.", style="cyan", no_wrap=True)
@@ -647,7 +649,7 @@ def handle_builtin_config_selector(
                                     args += ["-g", str(model_group)]
 
                             if args:
-                                print(f"ℹ️ 正在启动: {' '.join(args)}")
+                                PrettyOutput.auto_print(f"ℹ️ 正在启动: {' '.join(args)}")
                                 os.execvp(args[0], args)
                     except Exception:
                         # 任何异常都不影响默认流程
@@ -755,7 +757,9 @@ def run_cli(
 
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (task and str(task).strip()):
-        print("❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。")
+        PrettyOutput.auto_print(
+            "❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。"
+        )
         raise typer.Exit(code=2)
 
     # 处理数据备份
@@ -818,12 +822,14 @@ def run_cli(
                                     candidate_pid = int(ln.strip())
                                     try:
                                         os.kill(candidate_pid, signal.SIGTERM)
-                                        print(
+                                        PrettyOutput.auto_print(
                                             f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。"
                                         )
                                         killed_any = True
                                     except Exception as e:
-                                        print(f"⚠️ 按端口停止失败: {e}")
+                                        PrettyOutput.auto_print(
+                                            f"⚠️ 按端口停止失败: {e}"
+                                        )
                                 except Exception:
                                     continue
                     except Exception:
@@ -848,12 +854,14 @@ def run_cli(
                                                     os.kill(
                                                         candidate_pid, signal.SIGTERM
                                                     )
-                                                    print(
+                                                    PrettyOutput.auto_print(
                                                         f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。"
                                                     )
                                                     killed_any = True
                                                 except Exception as e:
-                                                    print(f"⚠️ 按端口停止失败: {e}")
+                                                    PrettyOutput.auto_print(
+                                                        f"⚠️ 按端口停止失败: {e}"
+                                                    )
                                                 break
                                         except Exception:
                                             continue
@@ -870,10 +878,14 @@ def run_cli(
                                         p = int(ptxt)
                                         try:
                                             os.kill(p, signal.SIGTERM)
-                                            print(f"✅ 已停止后台 Web 服务 (PID {p})。")
+                                            PrettyOutput.auto_print(
+                                                f"✅ 已停止后台 Web 服务 (PID {p})。"
+                                            )
                                             killed_any = True
                                         except Exception as e:
-                                            print(f"⚠️ 停止 PID {p} 失败: {e}")
+                                            PrettyOutput.auto_print(
+                                                f"⚠️ 停止 PID {p} 失败: {e}"
+                                            )
                                     except Exception:
                                         pass
                                     try:
@@ -883,7 +895,9 @@ def run_cli(
                         except Exception:
                             pass
                     if not killed_any:
-                        print("⚠️ 未找到后台 Web 服务的 PID 文件，可能未启动或已停止。")
+                        PrettyOutput.auto_print(
+                            "⚠️ 未找到后台 Web 服务的 PID 文件，可能未启动或已停止。"
+                        )
                     return
                 # 优先使用 PID 文件中的 PID
                 try:
@@ -895,10 +909,12 @@ def run_cli(
                 if pid > 0:
                     try:
                         os.kill(pid, signal.SIGTERM)
-                        print(f"✅ 已向后台 Web 服务发送停止信号 (PID {pid})。")
+                        PrettyOutput.auto_print(
+                            f"✅ 已向后台 Web 服务发送停止信号 (PID {pid})。"
+                        )
                         killed = True
                     except Exception as e:
-                        print(f"⚠️ 发送停止信号失败或进程不存在: {e}")
+                        PrettyOutput.auto_print(f"⚠️ 发送停止信号失败或进程不存在: {e}")
                 if not killed:
                     # 无 PID 文件或停止失败时，尝试按端口查找进程
                     candidate_pid = 0
@@ -942,12 +958,12 @@ def run_cli(
                     if candidate_pid:
                         try:
                             os.kill(candidate_pid, signal.SIGTERM)
-                            print(
+                            PrettyOutput.auto_print(
                                 f"✅ 已按端口停止后台 Web 服务 (PID {candidate_pid})。"
                             )
                             killed = True
                         except Exception as e:
-                            print(f"⚠️ 按端口停止失败: {e}")
+                            PrettyOutput.auto_print(f"⚠️ 按端口停止失败: {e}")
                 # 清理可能存在的 PID 文件（两个位置）
                 try:
                     pidfile.unlink(missing_ok=True)  # 家目录位置
@@ -962,7 +978,7 @@ def run_cli(
                 except Exception:
                     pass
             except Exception as e:
-                print(f"❌ 停止后台 Web 服务失败: {e}")
+                PrettyOutput.auto_print(f"❌ 停止后台 Web 服务失败: {e}")
             finally:
                 return
         # 后台启动：父进程拉起子进程并记录 PID
@@ -1018,11 +1034,11 @@ def run_cli(
                     pidfile.write_text(str(proc.pid), encoding="utf-8")
                 except Exception:
                     pass
-                print(
+                PrettyOutput.auto_print(
                     f"✅ Web 服务已在后台启动 (PID {proc.pid})，地址: http://{web_host}:{web_port}"
                 )
             except Exception as e:
-                print(f"❌ 后台启动 Web 服务失败: {e}")
+                PrettyOutput.auto_print(f"❌ 后台启动 Web 服务失败: {e}")
                 raise typer.Exit(code=1)
             return
 
@@ -1123,12 +1139,16 @@ def run_cli(
                         launch_cmd = shlex.split(web_launch_cmd.strip())
                         # 调试输出（可选，可以通过环境变量控制）
                         if os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
-                            print(f"🔍 解析后的启动命令: {launch_cmd}")
+                            PrettyOutput.auto_print(
+                                f"🔍 解析后的启动命令: {launch_cmd}"
+                            )
                     except Exception:
                         # 如果解析失败，使用简单的空格分割
                         launch_cmd = web_launch_cmd.strip().split()
                         if os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
-                            print(f"🔍 使用简单分割的启动命令: {launch_cmd}")
+                            PrettyOutput.auto_print(
+                                f"🔍 使用简单分割的启动命令: {launch_cmd}"
+                            )
                 else:
                     # 如果没有指定，则自动构建（移除 web 相关参数）
                     try:
@@ -1182,7 +1202,9 @@ def run_cli(
                     except Exception:
                         pass
 
-                print("ℹ️ 以 Web 模式启动，请在浏览器中打开提供的地址进行交互。")
+                PrettyOutput.auto_print(
+                    "ℹ️ 以 Web 模式启动，请在浏览器中打开提供的地址进行交互。"
+                )
                 # 启动 Web 服务（阻塞调用），传入启动命令
                 start_web_server(
                     agent_manager,
@@ -1192,7 +1214,7 @@ def run_cli(
                 )
                 return
             except Exception as e:
-                print(f"❌ Web 模式启动失败: {e}")
+                PrettyOutput.auto_print(f"❌ Web 模式启动失败: {e}")
                 raise typer.Exit(code=1)
 
         # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
@@ -1200,7 +1222,7 @@ def run_cli(
     except typer.Exit:
         raise
     except Exception as err:  # pylint: disable=broad-except
-        print(f"❌ 初始化错误: {str(err)}")
+        PrettyOutput.auto_print(f"❌ 初始化错误: {str(err)}")
         raise typer.Exit(code=1)
 
 

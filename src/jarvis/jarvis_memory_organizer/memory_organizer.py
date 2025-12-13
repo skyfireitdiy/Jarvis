@@ -1,3 +1,5 @@
+from jarvis.jarvis_utils.output import PrettyOutput
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -75,7 +77,7 @@ class MemoryOrganizer:
 
         if error_lines:
             joined_errors = "\n".join(error_lines)
-            print(f"⚠️ {joined_errors}")
+            PrettyOutput.auto_print(f"⚠️ {joined_errors}")
 
         return memories
 
@@ -229,7 +231,7 @@ class MemoryOrganizer:
                 raise ValueError("无法从模型响应中提取 <merged_memory> 标签内容")
 
         except Exception as e:
-            print(f"⚠️ 调用大模型合并记忆失败: {str(e)}")
+            PrettyOutput.auto_print(f"⚠️ 调用大模型合并记忆失败: {str(e)}")
             # 返回 None 表示合并失败，跳过这组记忆
             return None
 
@@ -250,15 +252,17 @@ class MemoryOrganizer:
         返回：
             整理结果统计
         """
-        print(f"ℹ️ 开始整理{memory_type}类型的记忆，最小重叠标签数: {min_overlap}")
+        PrettyOutput.auto_print(
+            f"ℹ️ 开始整理{memory_type}类型的记忆，最小重叠标签数: {min_overlap}"
+        )
 
         # 加载记忆
         memories = self._load_memories(memory_type)
         if not memories:
-            print("ℹ️ 没有找到需要整理的记忆")
+            PrettyOutput.auto_print("ℹ️ 没有找到需要整理的记忆")
             return {"processed": 0, "merged": 0}
 
-        print(f"ℹ️ 加载了 {len(memories)} 个记忆")
+        PrettyOutput.auto_print(f"ℹ️ 加载了 {len(memories)} 个记忆")
 
         # 统计信息
         stats = {
@@ -291,7 +295,7 @@ class MemoryOrganizer:
 
             if overlap_count in overlap_groups:
                 groups = overlap_groups[overlap_count]
-                print(
+                PrettyOutput.auto_print(
                     f"\nℹ️ 发现 {len(groups)} 个具有 {overlap_count} 个重叠标签的记忆组"
                 )
 
@@ -312,7 +316,7 @@ class MemoryOrganizer:
                             f"标签: {', '.join(mem.get('tags', []))[:50]}..."
                         )
                     joined_lines = "\n".join(lines)
-                    print(f"ℹ️ {joined_lines}")
+                    PrettyOutput.auto_print(f"ℹ️ {joined_lines}")
 
                     if not dry_run:
                         # 合并记忆
@@ -320,7 +324,7 @@ class MemoryOrganizer:
 
                         # 如果合并失败，跳过这组
                         if merged_memory is None:
-                            print("  ⚠️ 跳过这组记忆的合并")
+                            PrettyOutput.auto_print("  ⚠️ 跳过这组记忆的合并")
                             continue
 
                         # 保存新记忆
@@ -337,14 +341,14 @@ class MemoryOrganizer:
                         # 标记这些记忆已被删除
                         deleted_indices.update(original_indices)
                     else:
-                        print("  ℹ️ [模拟运行] 跳过实际合并")
+                        PrettyOutput.auto_print("  ℹ️ [模拟运行] 跳过实际合并")
 
         # 显示统计信息
-        print("\n✅ 整理完成！")
-        print(f"ℹ️ 总记忆数: {stats['total_memories']}")
-        print(f"ℹ️ 处理的组数: {stats['processed_groups']}")
-        print(f"ℹ️ 合并的记忆数: {stats['merged_memories']}")
-        print(f"ℹ️ 创建的新记忆数: {stats['created_memories']}")
+        PrettyOutput.auto_print("\n✅ 整理完成！")
+        PrettyOutput.auto_print(f"ℹ️ 总记忆数: {stats['total_memories']}")
+        PrettyOutput.auto_print(f"ℹ️ 处理的组数: {stats['processed_groups']}")
+        PrettyOutput.auto_print(f"ℹ️ 合并的记忆数: {stats['merged_memories']}")
+        PrettyOutput.auto_print(f"ℹ️ 创建的新记忆数: {stats['created_memories']}")
 
         return stats
 
@@ -376,7 +380,7 @@ class MemoryOrganizer:
         with open(new_file, "w", encoding="utf-8") as f:
             json.dump(memory, f, ensure_ascii=False, indent=2)
 
-        print(
+        PrettyOutput.auto_print(
             f"✅ 创建新记忆: {memory['id']} (标签: {', '.join(memory['tags'][:3])}...)"
         )
 
@@ -402,10 +406,10 @@ class MemoryOrganizer:
                     )
         if info_lines:
             joined_info = "\n".join(info_lines)
-            print(f"ℹ️ {joined_info}")
+            PrettyOutput.auto_print(f"ℹ️ {joined_info}")
         if warn_lines:
             joined_warn = "\n".join(warn_lines)
-            print(f"⚠️ {joined_warn}")
+            PrettyOutput.auto_print(f"⚠️ {joined_warn}")
 
     def export_memories(
         self,
@@ -451,14 +455,16 @@ class MemoryOrganizer:
         # 统一展示导出进度日志
         if progress_lines:
             joined_progress = "\n".join(progress_lines)
-            print(f"ℹ️ {joined_progress}")
+            PrettyOutput.auto_print(f"ℹ️ {joined_progress}")
 
         # 保存到文件
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(all_memories, f, ensure_ascii=False, indent=2)
 
-        print(f"✅ 成功导出 {len(all_memories)} 个记忆到 {output_file}")
+        PrettyOutput.auto_print(
+            f"✅ 成功导出 {len(all_memories)} 个记忆到 {output_file}"
+        )
 
         return len(all_memories)
 
@@ -487,7 +493,7 @@ class MemoryOrganizer:
         if not isinstance(memories, list):
             raise ValueError("导入文件格式错误，应为记忆列表")
 
-        print(f"ℹ️ 准备导入 {len(memories)} 个记忆")
+        PrettyOutput.auto_print(f"ℹ️ 准备导入 {len(memories)} 个记忆")
 
         # 统计导入结果
         import_stats: Dict[str, int] = defaultdict(int)
@@ -505,7 +511,7 @@ class MemoryOrganizer:
             elif memory_type == "global_long_term":
                 memory_dir = self.global_memory_dir / memory_type
             else:
-                print(f"⚠️ 跳过不支持的记忆类型: {memory_type}")
+                PrettyOutput.auto_print(f"⚠️ 跳过不支持的记忆类型: {memory_type}")
                 skipped_count += 1
                 continue
 
@@ -522,7 +528,7 @@ class MemoryOrganizer:
             memory_file = memory_dir / f"{memory_id}.json"
 
             if memory_file.exists() and not overwrite:
-                print(f"ℹ️ 跳过已存在的记忆: {memory_id}")
+                PrettyOutput.auto_print(f"ℹ️ 跳过已存在的记忆: {memory_id}")
                 skipped_count += 1
                 continue
 
@@ -544,17 +550,17 @@ class MemoryOrganizer:
             import_stats[memory_type] += 1
 
         # 显示导入结果
-        print("\n✅ 导入完成！")
+        PrettyOutput.auto_print("\n✅ 导入完成！")
         if import_stats:
             lines = [
                 f"{memory_type}: 导入了 {count} 个记忆"
                 for memory_type, count in import_stats.items()
             ]
             joined_lines = "\n".join(lines)
-            print(f"ℹ️ {joined_lines}")
+            PrettyOutput.auto_print(f"ℹ️ {joined_lines}")
 
         if skipped_count > 0:
-            print(f"⚠️ 跳过了 {skipped_count} 个记忆")
+            PrettyOutput.auto_print(f"⚠️ 跳过了 {skipped_count} 个记忆")
 
         return dict(import_stats)
 
@@ -599,13 +605,13 @@ def organize(
     """
     # 验证参数
     if memory_type not in ["project_long_term", "global_long_term"]:
-        print(
+        PrettyOutput.auto_print(
             f"❌ 错误：不支持的记忆类型 '{memory_type}'，请选择 'project_long_term' 或 'global_long_term'"
         )
         raise typer.Exit(1)
 
     if min_overlap < 2:
-        print("❌ 错误：最小重叠数必须大于等于2")
+        PrettyOutput.auto_print("❌ 错误：最小重叠数必须大于等于2")
         raise typer.Exit(1)
 
     # 创建整理器并执行
@@ -625,7 +631,7 @@ def organize(
         # typer.Exit 是正常的退出方式，直接传播
         raise
     except Exception as e:
-        print(f"❌ 记忆整理失败: {str(e)}")
+        PrettyOutput.auto_print(f"❌ 记忆整理失败: {str(e)}")
         raise typer.Exit(1)
 
 
@@ -669,7 +675,7 @@ def export(
         invalid_types = [mt for mt in memory_types if mt not in valid_types]
         if invalid_types:
             invalid_str = ", ".join(f"'{mt}'" for mt in invalid_types)
-            print(f"❌ 错误：不支持的记忆类型: {invalid_str}")
+            PrettyOutput.auto_print(f"❌ 错误：不支持的记忆类型: {invalid_str}")
             raise typer.Exit(1)
 
         count = organizer.export_memories(
@@ -681,11 +687,11 @@ def export(
         if count > 0:
             raise typer.Exit(0)
         else:
-            print("⚠️ 没有找到要导出的记忆")
+            PrettyOutput.auto_print("⚠️ 没有找到要导出的记忆")
             raise typer.Exit(0)
 
     except Exception as e:
-        print(f"❌ 导出失败: {str(e)}")
+        PrettyOutput.auto_print(f"❌ 导出失败: {str(e)}")
         raise typer.Exit(1)
 
 
@@ -725,14 +731,14 @@ def import_memories(
         if total_imported > 0:
             raise typer.Exit(0)
         else:
-            print("⚠️ 没有导入任何记忆")
+            PrettyOutput.auto_print("⚠️ 没有导入任何记忆")
             raise typer.Exit(0)
 
     except FileNotFoundError as e:
-        print(f"❌ {str(e)}")
+        PrettyOutput.auto_print(f"❌ {str(e)}")
         raise typer.Exit(1)
     except Exception as e:
-        print(f"❌ 导入失败: {str(e)}")
+        PrettyOutput.auto_print(f"❌ 导入失败: {str(e)}")
         raise typer.Exit(1)
 
 
