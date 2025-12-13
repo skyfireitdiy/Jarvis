@@ -252,7 +252,7 @@ class BasePlatform(ABC):
                 update_count += 1
 
                 # Scrolling Logic - 只在内容超过一定行数时才应用滚动
-                max_text_height = console.height - 5
+                max_text_height = min(console.height - 5, 5)
                 if max_text_height <= 0:
                     max_text_height = 1
 
