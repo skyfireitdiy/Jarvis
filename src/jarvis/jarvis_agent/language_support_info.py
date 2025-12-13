@@ -15,7 +15,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
 
     # 确保语言支持模块已加载（触发自动注册）
     try:
-        import jarvis.jarvis_code_agent.code_analyzer.language_support  # noqa: F401
+        pass
     except Exception:
         pass
 
