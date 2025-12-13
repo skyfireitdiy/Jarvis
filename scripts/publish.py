@@ -1,5 +1,3 @@
-from jarvis.jarvis_utils.output import PrettyOutput
-
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -14,6 +12,7 @@ import sys
 import subprocess
 from pathlib import Path
 from typing import Tuple, List
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 def get_current_version() -> Tuple[int, int, int]:
