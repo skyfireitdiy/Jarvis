@@ -12,7 +12,6 @@
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from typing import Any
 from typing import Dict
@@ -399,23 +398,17 @@ class PrettyOutput:
     @staticmethod
     def _format(output_type: OutputType, timestamp: bool = True) -> str:
         """
-        使用时间戳和图标格式化输出头。
+        只返回Agent名字的简化格式。
 
         参数：
-            output_type: 输出类型
-            timestamp: 是否包含时间戳
+            output_type: 输出类型（不再使用）
+            timestamp: 是否包含时间戳（不再使用）
 
         返回：
-            Text: 格式化后的rich Text对象
+            str: 只包含Agent名字的字符串
         """
-        icon = PrettyOutput._ICONS.get(output_type, "")
-        formatted = f"{icon}  "
-        if timestamp:
-            formatted += f"[{datetime.now().strftime('%H:%M:%S')}][{output_type.value}]"
         agent_info = get_agent_list()
-        if agent_info:
-            formatted += f"[{agent_info}]"
-        return formatted
+        return agent_info if agent_info else ""
 
     @staticmethod
     def print(
