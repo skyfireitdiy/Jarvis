@@ -13,40 +13,40 @@ from jarvis.jarvis_platform_manager.main import (
 class TestValidatePlatformModel:
     """测试 validate_platform_model 函数"""
 
-    @patch("jarvis.jarvis_platform_manager.main.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_valid_platform_and_model(self, mock_print):
         """测试有效的平台和模型"""
         result = validate_platform_model("openai", "gpt-4")
         assert result is True
 
-    @patch("jarvis.jarvis_platform_manager.main.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_missing_platform(self, mock_print):
         """测试缺少平台"""
         result = validate_platform_model(None, "gpt-4")
         assert result is False
         mock_print.assert_called_once()
 
-    @patch("jarvis.jarvis_platform_manager.main.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_missing_model(self, mock_print):
         """测试缺少模型"""
         result = validate_platform_model("openai", None)
         assert result is False
         mock_print.assert_called_once()
 
-    @patch("jarvis.jarvis_platform_manager.main.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_both_missing(self, mock_print):
         """测试平台和模型都缺少"""
         result = validate_platform_model(None, None)
         assert result is False
         mock_print.assert_called_once()
 
-    @patch("jarvis.jarvis_platform_manager.main.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_empty_string_platform(self, mock_print):
         """测试空字符串平台"""
         result = validate_platform_model("", "gpt-4")
         assert result is False
 
-    @patch("jarvis.jarvis_platform_manager.main.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_empty_string_model(self, mock_print):
         """测试空字符串模型"""
         result = validate_platform_model("openai", "")
@@ -78,7 +78,7 @@ class TestLoadRoleConfig:
     def test_nonexistent_file(self, temp_dir):
         """测试不存在的文件"""
         nonexistent = temp_dir / "nonexistent.yaml"
-        with patch("jarvis.jarvis_platform_manager.main.print") as mock_print:
+        with patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print") as mock_print:
             result = load_role_config(str(nonexistent))
             assert result == {}
             mock_print.assert_called_once()
@@ -88,7 +88,7 @@ class TestLoadRoleConfig:
         config_file = temp_dir / "invalid.yaml"
         config_file.write_text("invalid: yaml: content: [", encoding="utf-8")
 
-        with patch("jarvis.jarvis_platform_manager.main.print") as mock_print:
+        with patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print") as mock_print:
             result = load_role_config(str(config_file))
             assert result == {}
             mock_print.assert_called_once()

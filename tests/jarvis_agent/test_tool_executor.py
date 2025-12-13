@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """tool_executor 单元测试"""
 
-from unittest.mock import Mock, patch, call
+from unittest.mock import Mock, patch
 import pytest
 
 from jarvis.jarvis_agent.tool_executor import execute_tool_call
@@ -43,7 +43,7 @@ class TestToolExecutor:
         """测试单个处理器的执行"""
         mock_agent.output_handler = [mock_handler]
 
-        with patch("builtins.print") as mock_print:
+        with patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print") as mock_print:
             result = execute_tool_call("test command", mock_agent)
 
         # 验证结果
@@ -54,11 +54,9 @@ class TestToolExecutor:
         mock_handler.handle.assert_called_once_with("test command", mock_agent)
 
         # 验证打印输出
-        mock_print.assert_has_calls(
-            [call("🔧 正在执行MockTool..."), call("✅ MockTool执行完成")]
-        )
+        mock_print.assert_called_once_with("✅ MockTool执行完成")
 
-    @patch("jarvis.jarvis_agent.tool_executor.print")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_multiple_handlers_error(self, mock_print, mock_agent):
         """测试多个处理器匹配时的错误"""
         # 创建两个都匹配的处理器
