@@ -22,8 +22,6 @@ from typing import Tuple
 
 from pygments.lexers import guess_lexer
 from pygments.util import ClassNotFound
-from rich.box import SIMPLE
-from rich.panel import Panel
 from rich.style import Style as RichStyle
 from rich.syntax import Syntax
 from rich.text import Text
@@ -105,12 +103,86 @@ class ConsoleOutputSink(OutputSink):
     def emit(self, event: OutputEvent) -> None:
         # 章节输出
         if event.section is not None:
-            text = Text(event.section, style=event.output_type.value, justify="center")
-            panel = Panel(text, border_style=event.output_type.value)
+            # 使用带背景色和样式的Text替代Panel
+            style_config = {
+                OutputType.SYSTEM: RichStyle(
+                    color="bright_cyan",
+                    bgcolor="#1e2b3c",
+                    frame=True,
+                    meta={"icon": "🤖"},
+                ),
+                OutputType.CODE: RichStyle(
+                    color="green", bgcolor="#1c2b1c", frame=True, meta={"icon": "📝"}
+                ),
+                OutputType.RESULT: RichStyle(
+                    color="bright_blue",
+                    bgcolor="#1c1c2b",
+                    frame=True,
+                    meta={"icon": "✨"},
+                ),
+                OutputType.ERROR: RichStyle(
+                    color="red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
+                ),
+                OutputType.INFO: RichStyle(
+                    color="bright_cyan",
+                    frame=True,
+                    bgcolor="#2b2b1c",
+                    meta={"icon": "ℹ️"},
+                ),
+                OutputType.PLANNING: RichStyle(
+                    color="purple",
+                    bold=True,
+                    frame=True,
+                    bgcolor="#2b1c2b",
+                    meta={"icon": "📋"},
+                ),
+                OutputType.PROGRESS: RichStyle(
+                    color="white",
+                    encircle=True,
+                    frame=True,
+                    bgcolor="#1c1c1c",
+                    meta={"icon": "⏳"},
+                ),
+                OutputType.SUCCESS: RichStyle(
+                    color="bright_green",
+                    bold=True,
+                    strike=False,
+                    bgcolor="#1c2b1c",
+                    meta={"icon": "✅"},
+                ),
+                OutputType.WARNING: RichStyle(
+                    color="yellow",
+                    bold=True,
+                    blink2=True,
+                    bgcolor="#2b2b1c",
+                    meta={"icon": "⚠️"},
+                ),
+                OutputType.DEBUG: RichStyle(
+                    color="grey58",
+                    dim=True,
+                    conceal=True,
+                    bgcolor="#1c1c1c",
+                    meta={"icon": "🔍"},
+                ),
+                OutputType.USER: RichStyle(
+                    color="spring_green2",
+                    frame=True,
+                    bgcolor="#1c2b2b",
+                    meta={"icon": "👤"},
+                ),
+                OutputType.TOOL: RichStyle(
+                    color="dark_sea_green4",
+                    bgcolor="#1c2b2b",
+                    frame=True,
+                    meta={"icon": "🔧"},
+                ),
+            }
+            style_obj = style_config.get(event.output_type, RichStyle(color="white"))
+            text = Text(f"\n{event.section}\n", style=style_obj, justify="center")
             if get_pretty_output():
-                console.print(panel)
-            else:
                 console.print(text)
+            else:
+                console.print(Text(event.section, style=event.output_type.value))
             return
 
         # 普通内容输出
@@ -212,14 +284,14 @@ class ConsoleOutputSink(OutputSink):
             word_wrap=True,
             background_color=styles[event.output_type]["bgcolor"],
         )
-        panel = Panel(
-            content,
-            border_style=header_styles[event.output_type],
-            padding=(0, 0),
-            highlight=True,
+        # 直接输出带背景色的内容，不再使用Panel包装
+        header_text = Text(
+            PrettyOutput._format(event.output_type, event.timestamp),
+            style=header_styles[event.output_type],
         )
         if get_pretty_output():
-            console.print(panel)
+            console.print(header_text)
+            console.print(content)
         else:
             console.print(content)
         if event.traceback or (
@@ -431,8 +503,8 @@ class PrettyOutput:
         colored_text = Text(
             "\n".join(colored_lines), style=OutputType.TOOL.value, justify="center"
         )
-        panel = Panel(colored_text, box=SIMPLE)
-        console.print(panel)
+        # 直接输出渐变文本，不再使用Panel包装
+        console.print(colored_text)
 
     @staticmethod
     def auto_print(text: str, timestamp: bool = True) -> None:
