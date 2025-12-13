@@ -604,131 +604,68 @@ def _show_usage_stats(welcome_str: str) -> None:
                 f"{accepted_commits}/{generated_commits}"
             )
 
-        # 构建输出
-        has_data = False
-        stats_output = []
+        # 右侧内容：总体表现 + 使命与愿景
+        right_column_items = []
+        summary_content: list[str] = []
+        from rich import box
 
-        for category, data in categorized_stats.items():
-            if data["metrics"]:
-                has_data = True
-                stats_output.append((data["title"], data["metrics"], data["suffix"]))
+        # 计算总体表现的摘要数据
+        # 总结统计
+        total_tools = sum(
+            count
+            for _, stats in categorized_stats["tool"]["metrics"].items()
+            for metric, count in {
+                k: v
+                for k, v in categorized_stats["tool"]["metrics"].items()
+                if isinstance(v, (int, float))
+            }.items()
+        )
+        total_tools = sum(
+            count
+            for metric, count in categorized_stats["tool"]["metrics"].items()
+            if isinstance(count, (int, float))
+        )
 
-        # 显示统计信息
-        if has_data:
-            # 1. 创建统计表格
-            from rich import box
+        total_changes = sum(
+            count
+            for metric, count in categorized_stats["code"]["metrics"].items()
+            if isinstance(count, (int, float))
+        )
 
-            table = Table(
-                show_header=True,
-                header_style="bold magenta",
-                title_justify="center",
-                box=box.ROUNDED,
-                padding=(0, 1),
-            )
-            table.add_column("分类", style="cyan", no_wrap=True, width=12)
-            table.add_column("指标", style="white", width=20)
-            table.add_column("数量", style="green", justify="right", width=10)
-            table.add_column("分类", style="cyan", no_wrap=True, width=12)
-            table.add_column("指标", style="white", width=20)
-            table.add_column("数量", style="green", justify="right", width=10)
+        # 统计代码行数
+        lines_stats = categorized_stats["lines"]["metrics"]
+        total_lines_added = lines_stats.get(
+            "code_lines_inserted", lines_stats.get("code_lines_added", 0)
+        )
+        total_lines_deleted = lines_stats.get("code_lines_deleted", 0)
+        total_lines_modified = total_lines_added + total_lines_deleted
 
-            # 收集所有要显示的数据
-            all_rows = []
-            for title, stats, suffix in stats_output:
-                if stats:
-                    sorted_stats = sorted(
-                        stats.items(), key=lambda item: item[1], reverse=True
-                    )
-                    for i, (metric, count) in enumerate(sorted_stats):
-                        display_name = metric.replace("_", " ").title()
-                        category_title = title if i == 0 else ""
-                        # 处理不同类型的count值
-                        if isinstance(count, (int, float)):
-                            count_str = f"{count:,} {suffix}"
-                        else:
-                            # 对于字符串类型的count（如百分比或比率），直接使用
-                            count_str = str(count)
-                        all_rows.append((category_title, display_name, count_str))
+        # 构建总体表现内容
+        if total_tools > 0 or total_changes > 0 or total_lines_modified > 0:
+            parts = []
+            if total_tools > 0:
+                parts.append(f"工具调用 {total_tools:,} 次")
+            if total_changes > 0:
+                parts.append(f"代码修改 {total_changes:,} 次")
+            if total_lines_modified > 0:
+                parts.append(f"修改代码行数 {total_lines_modified:,} 行")
 
-            # 以3行2列的方式添加数据
-            has_content = len(all_rows) > 0
-            # 计算需要多少行来显示所有数据
-            total_rows = len(all_rows)
-            rows_needed = (total_rows + 1) // 2  # 向上取整，因为是2列布局
+            if parts:
+                summary_content.append(f"📈 总计: {', '.join(parts)}")
 
-            for i in range(rows_needed):
-                left_idx = i
-                right_idx = i + rows_needed
-
-                if left_idx < len(all_rows):
-                    left_row = all_rows[left_idx]
-                else:
-                    left_row = ("", "", "")
-
-                if right_idx < len(all_rows):
-                    right_row = all_rows[right_idx]
-                else:
-                    right_row = ("", "", "")
-
-                table.add_row(
-                    left_row[0],
-                    left_row[1],
-                    left_row[2],
-                    right_row[0],
-                    right_row[1],
-                    right_row[2],
+            # 添加代码采纳率显示
+            adoption_metrics = categorized_stats["adoption"]["metrics"]
+            if "adoption_rate" in adoption_metrics:
+                summary_content.append(
+                    f"✅ 代码采纳率: {adoption_metrics['adoption_rate']}"
                 )
 
-            # 2. 创建总结面板
-            summary_content = []
-
-            # 总结统计
-            total_tools = sum(
-                count
-                for title, stats, _ in stats_output
-                if "工具" in title
-                for metric, count in stats.items()
-            )
-            total_changes = sum(
-                count
-                for title, stats, _ in stats_output
-                if "代码修改" in title
-                for metric, count in stats.items()
-            )
-
-            # 统计代码行数
-            lines_stats = categorized_stats["lines"]["metrics"]
-            total_lines_added = lines_stats.get(
-                "code_lines_inserted", lines_stats.get("code_lines_added", 0)
-            )
-            total_lines_deleted = lines_stats.get("code_lines_deleted", 0)
-            total_lines_modified = total_lines_added + total_lines_deleted
-
-            if total_tools > 0 or total_changes > 0 or total_lines_modified > 0:
-                parts = []
-                if total_tools > 0:
-                    parts.append(f"工具调用 {total_tools:,} 次")
-                if total_changes > 0:
-                    parts.append(f"代码修改 {total_changes:,} 次")
-                if total_lines_modified > 0:
-                    parts.append(f"修改代码行数 {total_lines_modified:,} 行")
-
-                if parts:
-                    summary_content.append(f"📈 总计: {', '.join(parts)}")
-
-                # 添加代码采纳率显示
-                adoption_metrics = categorized_stats["adoption"]["metrics"]
-                if "adoption_rate" in adoption_metrics:
-                    summary_content.append(
-                        f"✅ 代码采纳率: {adoption_metrics['adoption_rate']}"
-                    )
-
             # 计算节省的时间
-            time_saved_seconds = 0
+            time_saved_seconds: float = 0.0
             tool_stats = categorized_stats["tool"]["metrics"]
             code_agent_changes = categorized_stats["code"]["metrics"]
             lines_stats = categorized_stats["lines"]["metrics"]
-            # commit_stats is already defined above
+            commit_stats = categorized_stats["commit"]["metrics"]
             command_stats = categorized_stats["command"]["metrics"]
 
             # 统一的工具使用时间估算（每次调用节省2分钟）
@@ -736,23 +673,37 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             # 计算所有工具的时间节省
             for tool_name, count in tool_stats.items():
-                time_saved_seconds += count * DEFAULT_TOOL_TIME_SAVINGS
+                if isinstance(count, (int, float)):
+                    time_saved_seconds += count * DEFAULT_TOOL_TIME_SAVINGS
 
             # 其他类型的时间计算
-            total_code_agent_calls = sum(code_agent_changes.values())
+            total_code_agent_calls: float = float(
+                sum(
+                    v
+                    for v in code_agent_changes.values()
+                    if isinstance(v, (int, float))
+                )
+            )
             time_saved_seconds += total_code_agent_calls * 10 * 60
             time_saved_seconds += lines_stats.get("code_lines_added", 0) * 0.8 * 60
             time_saved_seconds += lines_stats.get("code_lines_deleted", 0) * 0.2 * 60
-            time_saved_seconds += sum(commit_stats.values()) * 10 * 60
-            time_saved_seconds += sum(command_stats.values()) * 1 * 60
+            time_saved_seconds += (
+                sum(v for v in commit_stats.values() if isinstance(v, (int, float)))
+                * 10
+                * 60
+            )
+            time_saved_seconds += (
+                sum(v for v in command_stats.values() if isinstance(v, (int, float)))
+                * 1
+                * 60
+            )
 
-            time_str = ""
-            hours = 0
             if time_saved_seconds > 0:
                 total_minutes = int(time_saved_seconds / 60)
                 seconds = int(time_saved_seconds % 60)
                 hours = total_minutes // 60
                 minutes = total_minutes % 60
+
                 # 只显示小时和分钟
                 if hours > 0:
                     time_str = f"{hours} 小时 {minutes} 分钟"
@@ -761,21 +712,17 @@ def _show_usage_stats(welcome_str: str) -> None:
                 else:
                     time_str = f"{seconds} 秒"
 
-                if summary_content:
-                    summary_content.append("")  # Add a separator line
                 summary_content.append(f"⏱️  节省时间: 约 {time_str}")
 
-                encouragement = ""
-                # 计算各级时间单位
-                total_work_days = hours // 8  # 总工作日数
-                work_years = total_work_days // 240  # 每年约240个工作日
+                # 计算时间节省的鼓励信息
+                total_work_days = hours // 8
+                work_years = total_work_days // 240
                 remaining_days_after_years = total_work_days % 240
-                work_months = remaining_days_after_years // 20  # 每月约20个工作日
+                work_months = remaining_days_after_years // 20
                 remaining_days_after_months = remaining_days_after_years % 20
                 work_days = remaining_days_after_months
-                remaining_hours = int(hours % 8)  # 剩余不足一个工作日的小时数
+                remaining_hours = int(hours % 8)
 
-                # 构建时间描述
                 time_parts = []
                 if work_years > 0:
                     time_parts.append(f"{work_years} 年")
@@ -806,18 +753,13 @@ def _show_usage_stats(welcome_str: str) -> None:
                         )
                 elif hours >= 1:
                     encouragement = f"⭐ 相当于节省了 {int(hours)} 小时的工作时间，积少成多，继续保持！"
+
                 if encouragement:
                     summary_content.append(encouragement)
 
-            # 3. 组合并打印
-            from rich import box
-
-            # 右侧内容：总体表现 + 使命与愿景
-            right_column_items = []
-
-            # 欢迎信息 Panel
-            if welcome_str:
-                jarvis_ascii_art_str = """
+        # 欢迎信息 Panel
+        if welcome_str:
+            jarvis_ascii_art_str = """
    ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
    ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
    ██║███████║██████╔╝██║   ██║██║███████╗
@@ -825,102 +767,97 @@ def _show_usage_stats(welcome_str: str) -> None:
 ╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝"""
 
-                welcome_panel_content = Group(
-                    Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
-                    Align.center(Text(welcome_str, style="bold")),
-                    "",  # for a blank line
-                    Align.center(Text(f"v{__version__}")),
-                    Align.center(Text("https://github.com/skyfireitdiy/Jarvis")),
-                )
-
-                welcome_panel = Panel(
-                    welcome_panel_content, border_style="yellow", expand=True
-                )
-                right_column_items.append(welcome_panel)
-            if summary_content:
-                summary_panel = Panel(
-                    Text("\n".join(summary_content), justify="left"),
-                    title="✨ 总体表现 ✨",
-                    title_align="center",
-                    border_style="green",
-                    expand=True,
-                )
-                right_column_items.append(summary_panel)
-
-            # 愿景 Panel
-            vision_text = Text(
-                "让开发者与AI成为共生伙伴",
-                justify="center",
-                style="italic",
+            welcome_panel_content = Group(
+                Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
+                Align.center(Text(welcome_str, style="bold")),
+                "",  # for a blank line
+                Align.center(Text(f"v{__version__}")),
+                Align.center(Text("https://github.com/skyfireitdiy/Jarvis")),
             )
-            vision_panel = Panel(
-                vision_text,
-                title="🔭 愿景 (Vision) 🔭",
-                title_align="center",
-                border_style="cyan",
+
+            welcome_panel = Panel(
+                welcome_panel_content, border_style="yellow", expand=True
+            )
+            right_column_items.append(welcome_panel)
+
+        # 总体表现 Panel
+        summary_panel = Panel(
+            Text(
+                "\n".join(summary_content) if summary_content else "暂无数据",
+                justify="left",
+            ),
+            title="✨ 总体表现 ✨",
+            title_align="center",
+            border_style="green",
+            expand=True,
+        )
+        right_column_items.append(summary_panel)
+
+        # 愿景 Panel
+        vision_text = Text(
+            "让开发者与AI成为共生伙伴",
+            justify="center",
+            style="italic",
+        )
+        vision_panel = Panel(
+            vision_text,
+            title="🔭 愿景 (Vision) 🔭",
+            title_align="center",
+            border_style="cyan",
+            expand=True,
+        )
+        right_column_items.append(vision_panel)
+
+        # 使命 Panel
+        mission_text = Text(
+            "让灵感高效落地为代码与行动",
+            justify="center",
+            style="italic",
+        )
+        mission_panel = Panel(
+            mission_text,
+            title="🎯 使命 (Mission) 🎯",
+            title_align="center",
+            border_style="magenta",
+            expand=True,
+        )
+        right_column_items.append(mission_panel)
+
+        right_column_group = Group(*right_column_items)
+
+        layout_renderable: RenderableType
+
+        if console.width < 200:
+            # 上下布局
+            layout_items: List[RenderableType] = []
+            layout_items.append(right_column_group)
+            layout_renderable = Group(*layout_items)
+        else:
+            # 左右布局（当前）
+            layout_table = Table(
+                show_header=False,
+                box=None,
+                padding=0,
                 expand=True,
+                pad_edge=False,
             )
-            right_column_items.append(vision_panel)
+            # 左右布局，总结信息占满
+            layout_table.add_column(ratio=5)  # 左侧
+            layout_table.add_column(ratio=5)  # 右侧
+            layout_table.add_row(right_column_group)
+            layout_renderable = layout_table
 
-            # 使命 Panel
-            mission_text = Text(
-                "让灵感高效落地为代码与行动",
-                justify="center",
-                style="italic",
-            )
-            mission_panel = Panel(
-                mission_text,
-                title="🎯 使命 (Mission) 🎯",
-                title_align="center",
-                border_style="magenta",
-                expand=True,
-            )
-            right_column_items.append(mission_panel)
-
-            right_column_group = Group(*right_column_items)
-
-            layout_renderable: RenderableType
-
-            if console.width < 200:
-                # 上下布局
-                layout_items: List[RenderableType] = []
-                layout_items.append(right_column_group)
-                if has_content:
-                    layout_items.append(Align.center(table))
-                layout_renderable = Group(*layout_items)
-            else:
-                # 左右布局（当前）
-                layout_table = Table(
-                    show_header=False,
-                    box=None,
-                    padding=0,
-                    expand=True,
-                    pad_edge=False,
-                )
-                # 左右布局，左侧为总结信息，右侧为统计表格
-                layout_table.add_column(ratio=5)  # 左侧
-                layout_table.add_column(ratio=5)  # 右侧
-
-                if has_content:
-                    # 将总结信息放在左侧，统计表格放在右侧（表格居中显示）
-                    layout_table.add_row(right_column_group, Align.center(table))
-                else:
-                    # 如果没有统计数据，则总结信息占满
-                    layout_table.add_row(right_column_group)
-                layout_renderable = layout_table
-
-            # 打印最终的布局
-            if has_content or summary_content:
-                # 将整体布局封装在一个最终的Panel中，以提供整体边框
-                final_panel = Panel(
-                    layout_renderable,
-                    title="Jarvis AI Assistant",
-                    title_align="center",
-                    border_style="blue",
-                    box=box.HEAVY,
-                    padding=(0, 1),
-                )
-                console.print(final_panel)
+        # 打印最终的布局
+        # 将整体布局封装在一个最终的Panel中，以提供整体边框
+        final_panel = Panel(
+            layout_renderable,
+            title="Jarvis AI Assistant",
+            title_align="center",
+            border_style="blue",
+            box=box.HEAVY,
+            padding=(0, 1),
+        )
+        console.print(final_panel)
     except Exception as e:
         # 输出错误信息以便调试
         import traceback
