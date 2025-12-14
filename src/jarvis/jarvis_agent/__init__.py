@@ -554,12 +554,7 @@ class Agent:
 
     def __del__(self):
         # 只有在记录启动时才停止记录
-        try:
-            name = getattr(self, "name", None)
-            if name:
-                delete_agent(name)
-        except Exception:
-            pass
+        pass
 
     def get_tool_usage_prompt(self) -> str:
         """获取工具使用提示"""
@@ -1722,7 +1717,12 @@ class Agent:
         # 记录用户输入
 
         try:
-            set_agent(self.name, self)
+            # 延迟导入CodeAgent以避免循环依赖
+            from jarvis.jarvis_code_agent.code_agent import CodeAgent
+
+            # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
+            if not isinstance(self, CodeAgent):
+                set_agent(self.name, self)
             set_running_agent(self.name)  # 标记agent开始运行
 
             # 关键流程：直接调用 memory_manager 重置任务状态
@@ -1752,6 +1752,17 @@ class Agent:
             finally:
                 # 确保在运行结束时清除运行状态
                 clear_running_agent(self.name)
+                # 在run方法结束时反注册agent（仅非CodeAgent）
+                # 延迟导入CodeAgent以避免循环依赖
+                from jarvis.jarvis_code_agent.code_agent import CodeAgent
+
+                if not isinstance(self, CodeAgent):
+                    try:
+                        name = getattr(self, "name", None)
+                        if name:
+                            delete_agent(name)
+                    except Exception:
+                        pass
         except Exception as e:
             # 确保即使出现异常也清除运行状态
             clear_running_agent(self.name)

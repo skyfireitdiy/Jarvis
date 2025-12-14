@@ -38,6 +38,7 @@ from jarvis.jarvis_utils.config import get_smart_platform_name
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
 from jarvis.jarvis_utils.config import set_config
+from jarvis.jarvis_utils.globals import set_agent, delete_agent
 from jarvis.jarvis_utils.git_utils import detect_large_code_deletion
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import get_commits_between
@@ -265,6 +266,14 @@ class CodeAgent(Agent):
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
 
+            # 在run方法开始时注册agent
+            try:
+                name = getattr(self, "name", None)
+                if name:
+                    set_agent(name, self)
+            except Exception:
+                pass
+
             # 智能上下文推荐：根据用户输入推荐相关上下文
             context_recommendation_text = ""
             if self.context_recommender and is_enable_intent_recognition():
@@ -352,6 +361,13 @@ class CodeAgent(Agent):
         except RuntimeError as e:
             return f"Error during execution: {str(e)}"
         finally:
+            # 在run方法结束时反注册agent
+            try:
+                name = getattr(self, "name", None)
+                if name:
+                    delete_agent(name)
+            except Exception:
+                pass
             # Ensure switching back to the original working directory after CodeAgent completes
             try:
                 os.chdir(prev_dir)
