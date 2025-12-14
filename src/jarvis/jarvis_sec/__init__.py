@@ -23,7 +23,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-import typer
+from jarvis.jarvis_tools.output import PrettyOutput
 
 from jarvis.jarvis_agent import Agent  # noqa: F401
 from jarvis.jarvis_sec.utils import (
@@ -149,9 +149,8 @@ def run_security_analysis(
         if groups:
             selected_file, items = max(groups.items(), key=lambda kv: len(kv[1]))
             try:
-                typer.secho(
-                    f"[jarvis-sec] 批次选择: 文件={selected_file} 数量={len(items)}",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 批次选择: 文件={selected_file} 数量={len(items)}"
                 )
             except Exception:
                 pass
