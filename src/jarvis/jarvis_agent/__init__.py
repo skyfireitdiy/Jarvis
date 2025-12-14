@@ -1407,9 +1407,7 @@ class Agent:
 
         # 添加用户固定的重要内容
         if self.pin_content.strip():
-            pin_section = (
-                f"\n\n## 用户的原始需求和要求\n{self.pin_content.strip()}"
-            )
+            pin_section = f"\n\n## 用户的原始需求和要求\n{self.pin_content.strip()}"
             formatted_summary += pin_section
 
         return formatted_summary

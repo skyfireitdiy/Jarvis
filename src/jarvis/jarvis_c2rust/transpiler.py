@@ -451,6 +451,12 @@ class Transpiler:
         """将模块文件路径转换为 crate 路径前缀（委托给 ModuleManager）"""
         return self.module_manager.module_file_to_crate_path(module)
 
+    def _ensure_cargo_toml_bin(
+        self, bin_path: str, bin_name: Optional[str] = None
+    ) -> None:
+        """在 Cargo.toml 中确保存在 [[bin]] 配置（委托给 ModuleManager）"""
+        self.module_manager.ensure_cargo_toml_bin(bin_path, bin_name)
+
     def _resolve_pending_todos_for_symbol(
         self, symbol: str, callee_module: str, callee_rust_fn: str, callee_rust_sig: str
     ) -> None:
@@ -734,6 +740,7 @@ class Transpiler:
                 self, "_current_function_start_commit", v
             ),
             get_build_loop_has_fixes_func=self._get_build_loop_has_fixes,
+            ensure_cargo_toml_bin_func=self._ensure_cargo_toml_bin,
         )
         executor.execute()
 
