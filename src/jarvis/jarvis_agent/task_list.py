@@ -852,5 +852,18 @@ class TaskListManager:
                 "abandoned": len(
                     [t for t in tasks if t.status == TaskStatus.ABANDONED]
                 ),
+                "tasks": [
+                    {
+                        "task_id": t.task_id,
+                        "task_name": t.task_name,
+                        "task_desc": t.task_desc,
+                        "status": t.status.value,
+                        "priority": t.priority,
+                        "agent_type": t.agent_type.value,
+                        "dependencies": t.dependencies,
+                        "actual_output": t.actual_output,
+                    }
+                    for t in tasks
+                ],
             }
             return summary
