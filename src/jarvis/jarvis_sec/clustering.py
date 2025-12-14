@@ -7,7 +7,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-import typer
 
 from jarvis.jarvis_sec.agents import create_cluster_agent
 from jarvis.jarvis_sec.agents import subscribe_summary_event
@@ -19,6 +18,7 @@ from jarvis.jarvis_sec.file_manager import validate_clustering_completeness
 from jarvis.jarvis_sec.parsers import parse_clusters_from_text
 from jarvis.jarvis_sec.prompts import get_cluster_summary_prompt
 from jarvis.jarvis_sec.utils import group_candidates_by_file
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 def load_existing_clusters(
@@ -250,17 +250,15 @@ def restore_clusters_from_checkpoint(
     # 输出统计信息
     if _reviewed_invalid_gids:
         try:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：发现 {len(_reviewed_invalid_gids)} 个已复核的无效聚类 gids",
-                fg=typer.colors.BLUE,
             )
         except Exception:
             pass
     if skipped_reviewed_count > 0:
         try:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 断点恢复：跳过 {skipped_reviewed_count} 个已复核的无效聚类",
-                fg=typer.colors.BLUE,
             )
         except Exception:
             pass
@@ -272,16 +270,14 @@ def restore_clusters_from_checkpoint(
         try:
             if missing_count <= 20:
                 missing_list = sorted(list(missing_gids_in_restore))
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 断点恢复诊断：发现 {missing_count} 个gid在当前候选集中但无法匹配（可能存在数据不一致）: {missing_list}",
-                    fg=typer.colors.YELLOW,
                 )
             else:
                 missing_list = sorted(list(missing_gids_in_restore))
                 display_list = missing_list[:10] + ["..."] + missing_list[-10:]
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 断点恢复诊断：发现 {missing_count} 个gid在当前候选集中但无法匹配（可能存在数据不一致）: {display_list}",
-                    fg=typer.colors.YELLOW,
                 )
         except Exception:
             pass
@@ -492,9 +488,8 @@ def filter_single_gid_clusters(
                             # 说明需要分析，保留它（避免遗漏告警）
                             # 但给出警告，因为这种情况不应该发生
                             try:
-                                typer.secho(
+                                PrettyOutput.auto_print(
                                     f"[jarvis-sec] 警告：gid={gid}是自动创建的单独聚类，但不在clusters.jsonl中，保留以避免遗漏告警",
-                                    fg=typer.colors.YELLOW,
                                 )
                             except Exception:
                                 pass
@@ -511,26 +506,22 @@ def filter_single_gid_clusters(
     if removed_count > 0:
         try:
             if len(removed_gids) <= 20:
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 已移除 {removed_count} 个单独聚类批次（共{len(removed_gids)}个gid），避免分析工作量激增",
-                    fg=typer.colors.GREEN,
                 )
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 移除的gid: {sorted(list(removed_gids))}",
-                    fg=typer.colors.GREEN,
                 )
             else:
                 removed_gids_list = sorted(list(removed_gids))
                 display_list = (
                     removed_gids_list[:10] + ["..."] + removed_gids_list[-10:]
                 )
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 已移除 {removed_count} 个单独聚类批次（共{len(removed_gids)}个gid），避免分析工作量激增",
-                    fg=typer.colors.GREEN,
                 )
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 移除的gid（示例）: {display_list}",
-                    fg=typer.colors.GREEN,
                 )
         except Exception:
             pass
@@ -578,9 +569,8 @@ def handle_single_alert_file(
     ]
     if current_batch_records:
         _write_cluster_batch_snapshot(current_batch_records)
-    typer.secho(
+    PrettyOutput.auto_print(
         f"[jarvis-sec] 文件 {file} 仅有一个告警（gid={single_gid}），跳过聚类直接写入",
-        fg=typer.colors.BLUE,
     )
 
 
@@ -658,9 +648,8 @@ def extract_classified_gids(cluster_items: List[Dict]) -> set:
                 except (ValueError, TypeError):
                     # 理论上不应该到达这里（格式验证应该已经捕获），但如果到达了，记录警告
                     try:
-                        typer.secho(
+                        PrettyOutput.auto_print(
                             f"[jarvis-sec] 警告：在提取gid时遇到格式错误（值={x}，类型={type(x).__name__}），这不应该发生（格式验证应该已捕获）",
-                            fg=typer.colors.YELLOW,
                         )
                     except Exception:
                         pass
@@ -733,9 +722,8 @@ def run_cluster_agent_direct_model(
         _cluster_summary["text"] = response
     except Exception as e:
         try:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()",
-                fg=typer.colors.YELLOW,
             )
         except Exception:
             pass
@@ -750,14 +738,13 @@ def validate_cluster_result(
     """验证聚类结果格式"""
     if parse_error:
         error_details = [f"JSON解析失败: {parse_error}"]
-        typer.secho(f"[jarvis-sec] JSON解析失败: {parse_error}", fg=typer.colors.YELLOW)
+        PrettyOutput.auto_print(f"[jarvis-sec] JSON解析失败: {parse_error}")
         return False, error_details
     else:
         valid, error_details = validate_cluster_format(cluster_items or [])
         if not valid:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 聚类结果格式无效（{'; '.join(error_details)}），重试第 {attempt} 次（使用直接模型调用）",
-                fg=typer.colors.YELLOW,
             )
         return valid, error_details
 
@@ -771,17 +758,15 @@ def check_cluster_completeness(
     classified_gids = extract_classified_gids(cluster_items)
     missing_gids = input_gids - classified_gids
     if not missing_gids:
-        typer.secho(
+        PrettyOutput.auto_print(
             f"[jarvis-sec] 聚类完整性校验通过，所有gid已分类（共尝试 {attempt} 次）",
-            fg=typer.colors.GREEN,
         )
         return True, set()
     else:
         missing_gids_list = sorted(list(missing_gids))
         missing_count = len(missing_gids)
-        typer.secho(
+        PrettyOutput.auto_print(
             f"[jarvis-sec] 聚类完整性校验失败：遗漏的gid: {missing_gids_list}（{missing_count}个），重试第 {attempt} 次（使用直接模型调用）",
-            fg=typer.colors.YELLOW,
         )
         return False, missing_gids
 
@@ -831,10 +816,8 @@ def run_cluster_agent_with_retry(
         if parse_error and _attempt == 1:
             preview = cluster_summary_text[:500] if cluster_summary_text else "(空)"
             try:
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 调试：摘要文本预览（前500字符）: {preview}",
-                    fg=typer.colors.CYAN,
-                    err=True,
                 )
             except Exception:
                 pass
@@ -862,9 +845,8 @@ def run_cluster_agent_with_retry(
         # 如果连续失败5次，且提供了创建agent的函数，则返回需要重新创建agent的标志
         if not valid and consecutive_failures >= 5 and create_agent_func is not None:
             try:
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 连续失败 {consecutive_failures} 次，需要重新创建agent",
-                    fg=typer.colors.YELLOW,
                 )
             except Exception:
                 pass
@@ -930,9 +912,8 @@ def process_cluster_results(
             invalid_gids = [m.get("gid") for m in members]
             invalid_reason = str(cl.get("invalid_reason", "")).strip()
             try:
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 聚类阶段判定为无效（gids={invalid_gids}），将提交复核Agent验证",
-                    fg=typer.colors.BLUE,
                 )
             except Exception:
                 pass
@@ -1132,9 +1113,8 @@ def process_cluster_chunk(
         # 需要重新创建agent（不限次数）
         recreate_count += 1
         try:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 重新创建聚类Agent（第 {recreate_count} 次）",
-                fg=typer.colors.MAGENTA,
             )
         except Exception:
             pass
@@ -1163,9 +1143,8 @@ def process_cluster_chunk(
         classified_gids_final = extract_classified_gids(cluster_items)
         missing_gids_final = input_gids - classified_gids_final
         if missing_gids_final:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 警告：仍有遗漏的gid {sorted(list(missing_gids_final))}，将为每个遗漏的gid创建单独聚类",
-                fg=typer.colors.YELLOW,
             )
             supplemented_count = supplement_missing_gids(
                 missing_gids_final,
@@ -1179,9 +1158,8 @@ def process_cluster_chunk(
     else:
         # 聚类结果为空或None：为所有输入的gid创建单独聚类（保守策略）
         if pending_in_file_with_ids:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 警告：聚类结果为空或None（文件={file}，批次={chunk_idx}），为所有gid创建单独聚类",
-                fg=typer.colors.YELLOW,
             )
             gid_to_item_fallback = build_gid_to_item_mapping(pending_in_file_with_ids)
 
@@ -1211,9 +1189,8 @@ def process_cluster_chunk(
     )
     if _invalid_count > 0:
         try:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 聚类批次完成: 有效聚类={_merged_count}，无效聚类={_invalid_count}（已跳过）",
-                fg=typer.colors.GREEN,
             )
         except Exception:
             pass
@@ -1367,17 +1344,15 @@ def check_unclustered_gids(
     unclustered_gids = all_candidate_gids - clustered_gids
     if unclustered_gids:
         try:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 发现 {len(unclustered_gids)} 个未聚类的 gid，将进行聚类",
-                fg=typer.colors.YELLOW,
             )
         except Exception:
             pass
     else:
         try:
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[jarvis-sec] 所有 {len(all_candidate_gids)} 个候选已聚类，跳过聚类阶段",
-                fg=typer.colors.GREEN,
             )
         except Exception:
             pass
@@ -1409,9 +1384,8 @@ def execute_clustering_for_files(
             message="开始聚类分析...",
         )
     for _file_idx, (_file, _items) in enumerate(file_groups.items(), start=1):
-        typer.secho(
+        PrettyOutput.auto_print(
             f"\n[jarvis-sec] 聚类文件 {_file_idx}/{total_files_to_cluster}: {_file}",
-            fg=typer.colors.CYAN,
         )
         # 更新当前文件进度
         status_mgr.update_clustering(
@@ -1600,16 +1574,14 @@ def process_clustering_phase(
         try:
             missing_count = len(missing_gids_final)
             if missing_count <= 20:
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 警告：发现 {missing_count} 个遗漏的gid（恢复逻辑可能有问题）: {sorted(list(missing_gids_final))}",
-                    fg=typer.colors.RED,
                 )
             else:
                 missing_list = sorted(list(missing_gids_final))
                 display_list = missing_list[:10] + ["..."] + missing_list[-10:]
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[jarvis-sec] 警告：发现 {missing_count} 个遗漏的gid（恢复逻辑可能有问题）: {display_list}",
-                    fg=typer.colors.RED,
                 )
 
         except Exception:
