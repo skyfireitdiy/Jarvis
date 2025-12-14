@@ -5,9 +5,8 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-import typer
-
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_sec.agents import create_analysis_agent
 from jarvis.jarvis_sec.agents import subscribe_summary_event
 from jarvis.jarvis_sec.analysis import build_analysis_task_context
@@ -38,9 +37,8 @@ def build_gid_to_verification_mapping(
                         gids_to_process.append(gid_int)
                 except Exception as e:
                     try:
-                        typer.secho(
-                            f"[jarvis-sec] 警告：验证结果中 gids 数组元素格式错误: {gid_val}, 错误: {e}",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            f"[jarvis-sec] 警告：验证结果中 gids 数组元素格式错误: {gid_val}, 错误: {e}"
                         )
                     except Exception:
                         pass
@@ -52,25 +50,22 @@ def build_gid_to_verification_mapping(
                     gids_to_process.append(gid_int)
                 else:
                     try:
-                        typer.secho(
-                            f"[jarvis-sec] 警告：验证结果中 gid 值无效: {gid_val} (必须 >= 1)",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            f"[jarvis-sec] 警告：验证结果中 gid 值无效: {gid_val} (必须 >= 1)"
                         )
                     except Exception:
                         pass
             except Exception as e:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 警告：验证结果中 gid 格式错误: {vr.get('gid')}, 错误: {e}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 警告：验证结果中 gid 格式错误: {vr.get('gid')}, 错误: {e}"
                     )
                 except Exception:
                     pass
         else:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 警告：验证结果项缺少 gid 或 gids 字段: {vr}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 警告：验证结果项缺少 gid 或 gids 字段: {vr}"
                 )
             except Exception:
                 pass
@@ -117,17 +112,15 @@ def merge_verified_items(
             verified_items.append(merged_item)
         elif verification and verification.get("is_valid") is False:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 验证 Agent 判定 gid={item_gid} 为误报: {verification.get('verification_notes', '')}"
                 )
             except Exception:
                 pass
         else:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 警告：验证结果中未找到 gid={item_gid}，视为验证不通过"
                 )
             except Exception:
                 pass
@@ -233,9 +226,8 @@ def run_verification_agent_with_retry(
                 verification_summary_container["text"] = verify_response
             except Exception as e:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 验证阶段直接模型调用失败: {e}，回退到 run()",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 验证阶段直接模型调用失败: {e}，回退到 run()"
                     )
                 except Exception:
                     pass
@@ -248,9 +240,8 @@ def run_verification_agent_with_retry(
             _changed_verify = git_restore_if_dirty(entry_path)
             if _changed_verify:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件）",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 验证 Agent 工作区已恢复 ({_changed_verify} 个文件）"
                     )
                 except Exception:
                     pass
@@ -267,9 +258,8 @@ def run_verification_agent_with_retry(
             if parse_error_verify:
                 prev_parse_error_verify = parse_error_verify
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 验证结果JSON解析失败: {parse_error_verify}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 验证结果JSON解析失败: {parse_error_verify}"
                     )
                 except Exception:
                     pass
@@ -285,17 +275,15 @@ def run_verification_agent_with_retry(
         use_direct_model_verify = True
         if parse_error_verify:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 验证结果JSON解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 验证结果JSON解析失败 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)"
                 )
             except Exception:
                 pass
         else:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 验证结果格式无效 -> 重试第 {verify_attempt} 次 (批次={bidx}，使用直接模型调用)"
                 )
             except Exception:
                 pass
@@ -369,14 +357,12 @@ def process_verification_batch(
     try:
         if batch_gids_all_sorted:
             gids_str = str(batch_gids_all_sorted)
-            typer.secho(
-                f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' gids={gids_str}",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' gids={gids_str}"
             )
         else:
-            typer.secho(
-                f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' (无有效gid)",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"\n[jarvis-sec] 分析批次 {bidx}/{total_batches}: 大小={len(batch)} 文件='{batch_file}' (无有效gid)"
             )
     except Exception:
         pass
@@ -412,9 +398,8 @@ def process_verification_batch(
                     if int(item.get("gid", 0)) >= 1
                 ]
             )
-            typer.secho(
-                f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 返回空数组，判定所有候选为无风险: 有风险gid=[], 无风险gid={batch_gids}",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 返回空数组，判定所有候选为无风险: 有风险gid=[], 无风险gid={batch_gids}"
             )
 
             # 构建无风险项（将批次中的所有候选标记为无风险）
@@ -444,16 +429,12 @@ def process_verification_batch(
                         task_id,
                         {"batch": True, "candidates": batch},
                     )
-                    typer.secho(
-                        f"[jarvis-sec] 批次 {bidx}/{total_batches} 已将所有无风险候选保存到 analysis.jsonl: gids={batch_gids}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 批次 {bidx}/{total_batches} 已将所有无风险候选保存到 analysis.jsonl: gids={batch_gids}"
                     )
         except Exception as e:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 警告：处理空数组结果失败: {e}",
-                    fg=typer.colors.YELLOW,
-                )
+                PrettyOutput.auto_print(f"[jarvis-sec] 警告：处理空数组结果失败: {e}")
             except Exception:
                 pass
 
@@ -489,9 +470,8 @@ def process_verification_batch(
 
         if items_with_risk or items_without_risk:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 判定结果: 有风险gid={risk_gids}, 无风险gid={no_risk_gids}",
-                    fg=typer.colors.YELLOW if items_with_risk else typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 分析 Agent 判定结果: 有风险gid={risk_gids}, 无风险gid={no_risk_gids}"
                 )
             except Exception:
                 pass
@@ -511,17 +491,15 @@ def process_verification_batch(
                         {"batch": True, "candidates": batch},
                     )
                     try:
-                        typer.secho(
-                            f"[jarvis-sec] 批次 {bidx}/{total_batches} 所有候选均为无风险，已保存到 analysis.jsonl",
-                            fg=typer.colors.BLUE,
+                        PrettyOutput.auto_print(
+                            f"[jarvis-sec] 批次 {bidx}/{total_batches} 所有候选均为无风险，已保存到 analysis.jsonl"
                         )
                     except Exception:
                         pass
             except Exception as e:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 警告：保存无风险 gid 失败: {e}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 警告：保存无风险 gid 失败: {e}"
                     )
                 except Exception:
                     pass
@@ -553,9 +531,8 @@ def process_verification_batch(
                             if gid not in verified_gids
                         ]
                     )
-                    typer.secho(
-                        f"[jarvis-sec] 批次 {bidx}/{total_batches} 跳过验证，直接写入: 数量={len(verified_items)} 有风险gid={verified_gids}, 无风险gid={no_risk_gids_in_batch}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 批次 {bidx}/{total_batches} 跳过验证，直接写入: 数量={len(verified_items)} 有风险gid={verified_gids}, 无风险gid={no_risk_gids_in_batch}"
                     )
                     _append_report(
                         verified_items,
@@ -647,33 +624,29 @@ def process_verification_batch(
                 # 调试日志：显示验证结果
                 if verification_results is None:
                     try:
-                        typer.secho(
-                            "[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            "[jarvis-sec] 警告：验证 Agent 返回 None，可能解析失败"
                         )
                     except Exception:
                         pass
                 elif not isinstance(verification_results, list):
                     try:
-                        typer.secho(
-                            f"[jarvis-sec] 警告：验证 Agent 返回类型错误，期望 list，实际: {type(verification_results)}",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            f"[jarvis-sec] 警告：验证 Agent 返回类型错误，期望 list，实际: {type(verification_results)}"
                         )
                     except Exception:
                         pass
                 elif len(verification_results) == 0:
                     try:
-                        typer.secho(
-                            "[jarvis-sec] 警告：验证 Agent 返回空列表",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            "[jarvis-sec] 警告：验证 Agent 返回空列表"
                         )
                     except Exception:
                         pass
                 else:
                     try:
-                        typer.secho(
-                            f"[jarvis-sec] 验证 Agent 返回 {len(verification_results)} 个结果项",
-                            fg=typer.colors.BLUE,
+                        PrettyOutput.auto_print(
+                            f"[jarvis-sec] 验证 Agent 返回 {len(verification_results)} 个结果项"
                         )
                     except Exception:
                         pass
@@ -716,32 +689,27 @@ def process_verification_batch(
                             all_no_risk_gids = sorted(
                                 list(set(invalid_gids + unverified_gids))
                             )
-                            typer.secho(
-                                f"[jarvis-sec] 验证 Agent 返回 {len(gid_to_verification)} 个验证结果: 有风险gid={valid_gids}, 无风险gid={all_no_risk_gids}",
-                                fg=typer.colors.BLUE,
+                            PrettyOutput.auto_print(
+                                f"[jarvis-sec] 验证 Agent 返回 {len(gid_to_verification)} 个验证结果: 有风险gid={valid_gids}, 无风险gid={all_no_risk_gids}"
                             )
                             if valid_gids:
-                                typer.secho(
-                                    f"[jarvis-sec] 验证 Agent 判定 {len(valid_gids)} 个候选验证通过（is_valid: true）: 有风险gid={valid_gids}",
-                                    fg=typer.colors.GREEN,
+                                PrettyOutput.auto_print(
+                                    f"[jarvis-sec] 验证 Agent 判定 {len(valid_gids)} 个候选验证通过（is_valid: true）: 有风险gid={valid_gids}"
                                 )
                             if invalid_gids:
-                                typer.secho(
-                                    f"[jarvis-sec] 验证 Agent 判定 {len(invalid_gids)} 个候选验证不通过（is_valid: false）: 无风险gid={invalid_gids}",
-                                    fg=typer.colors.RED,
+                                PrettyOutput.auto_print(
+                                    f"[jarvis-sec] 验证 Agent 判定 {len(invalid_gids)} 个候选验证不通过（is_valid: false）: 无风险gid={invalid_gids}"
                                 )
                             if unverified_gids:
-                                typer.secho(
-                                    f"[jarvis-sec] 验证 Agent 未验证的候选（不在验证结果中，视为无风险）: 无风险gid={unverified_gids}",
-                                    fg=typer.colors.BLUE,
+                                PrettyOutput.auto_print(
+                                    f"[jarvis-sec] 验证 Agent 未验证的候选（不在验证结果中，视为无风险）: 无风险gid={unverified_gids}"
                                 )
                         except Exception:
                             pass
                     else:
                         try:
-                            typer.secho(
-                                f"[jarvis-sec] 警告：验证结果解析成功，但未提取到任何有效的 gid。验证结果: {verification_results}",
-                                fg=typer.colors.YELLOW,
+                            PrettyOutput.auto_print(
+                                f"[jarvis-sec] 警告：验证结果解析成功，但未提取到任何有效的 gid。验证结果: {verification_results}"
                             )
                         except Exception:
                             pass
@@ -751,9 +719,8 @@ def process_verification_batch(
                         items_with_risk, batch, gid_to_verification
                     )
                 else:
-                    typer.secho(
-                        "[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "[jarvis-sec] 警告：验证 Agent 结果解析失败，不保留任何告警（保守策略）"
                     )
 
                 # 只有验证通过的告警才写入文件
@@ -777,9 +744,8 @@ def process_verification_batch(
                             if gid not in verified_gids
                         ]
                     )
-                    typer.secho(
-                        f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(items_with_risk)} -> 写入文件 有风险gid={verified_gids}, 无风险gid={no_risk_gids_in_batch}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证通过: 数量={len(verified_items)}/{len(items_with_risk)} -> 写入文件 有风险gid={verified_gids}, 无风险gid={no_risk_gids_in_batch}"
                     )
                     _append_report(
                         verified_items,
@@ -805,15 +771,10 @@ def process_verification_batch(
                                 if int(item.get("gid", 0)) >= 1
                             ]
                         )
-                        # 验证后全部不通过，所以所有gid都是无风险
-                        typer.secho(
-                            f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过 有风险gid=[], 无风险gid={batch_gids_all_sorted}",
-                            fg=typer.colors.BLUE,
-                        )
+                        # 验证后全部不通过，所以所有gid都是无风险 PrettyOutput.auto_print(f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过 有风险gid=[], 无风险gid={batch_gids_all_sorted}")
                     except Exception:
-                        typer.secho(
-                            f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过 有风险gid=[], 无风险gid={batch_gids_all_sorted}",
-                            fg=typer.colors.BLUE,
+                        PrettyOutput.auto_print(
+                            f"[jarvis-sec] 批次 {bidx}/{total_batches} 验证后无有效告警: 分析 Agent 发现 {len(items_with_risk)} 个有风险的问题，验证后全部不通过 有风险gid=[], 无风险gid={batch_gids_all_sorted}"
                         )
                     current_count = count_issues_from_file(sec_dir)
                     status_mgr.update_verification(
@@ -825,26 +786,22 @@ def process_verification_batch(
         elif parse_fail:
             # 解析失败时也要打印gid列表（无法判断风险，但显示所有gid）
             try:
-                typer.secho(
-                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效): 有风险gid=?, 无风险gid=? (无法判断，gids={batch_gids_all_sorted})",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效): 有风险gid=?, 无风险gid=? (无法判断，gids={batch_gids_all_sorted})"
                 )
             except Exception:
-                typer.secho(
-                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 解析失败 (摘要中无 <REPORT> 或字段无效)"
                 )
         else:
             # 未发现问题时也要打印gid列表（所有都视为无风险）
             try:
-                typer.secho(
-                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题: 有风险gid=[], 无风险gid={batch_gids_all_sorted}",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题: 有风险gid=[], 无风险gid={batch_gids_all_sorted}"
                 )
             except Exception:
-                typer.secho(
-                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 批次 {bidx}/{total_batches} 未发现问题"
                 )
             current_count = count_issues_from_file(sec_dir)
             status_mgr.update_verification(
@@ -922,18 +879,16 @@ def process_verification_phase(
 
     if completed_cluster_ids:
         try:
-            typer.secho(
-                f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(completed_cluster_ids)} 个已完成的聚类",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(completed_cluster_ids)} 个已完成的聚类"
             )
         except Exception:
             pass
 
     if analyzed_gids:
         try:
-            typer.secho(
-                f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(analyzed_gids)} 个已分析的 gids",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"[jarvis-sec] 断点恢复：从 analysis.jsonl 读取到 {len(analyzed_gids)} 个已分析的 gids"
             )
         except Exception:
             pass
@@ -959,9 +914,8 @@ def process_verification_phase(
                 if len(analyzed_gids_sorted) > 10
                 else analyzed_gids_sorted
             )
-            typer.secho(
-                f"[jarvis-sec] 断点恢复：已分析的 gid 示例: {sample_gids}{'...' if len(analyzed_gids_sorted) > 10 else ''} (共 {len(analyzed_gids)} 个)",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"[jarvis-sec] 断点恢复：已分析的 gid 示例: {sample_gids}{'...' if len(analyzed_gids_sorted) > 10 else ''} (共 {len(analyzed_gids)} 个)"
             )
         except Exception:
             pass
@@ -1033,9 +987,8 @@ def process_verification_phase(
                 completion_reason = f"所有 gid 已分析 (批次 gids: {sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''})"
             elif bidx <= 3:  # 调试：显示前3个批次的匹配情况
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 批次 {bidx} 部分 gid 未分析: 缺失={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''}, 已分析={sorted(list(batch_gids & analyzed_gids))[:5]}{'...' if len(batch_gids & analyzed_gids) > 5 else ''}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 批次 {bidx} 部分 gid 未分析: 缺失={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''}, 已分析={sorted(list(batch_gids & analyzed_gids))[:5]}{'...' if len(batch_gids & analyzed_gids) > 5 else ''}"
                     )
                 except Exception:
                     pass
@@ -1044,9 +997,8 @@ def process_verification_phase(
             skipped_count += 1
             # 调试日志：显示跳过的批次信息
             try:
-                typer.secho(
-                    f"[jarvis-sec] 跳过批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}): {completion_reason}",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"[jarvis-sec] 跳过批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}): {completion_reason}"
                 )
             except Exception:
                 pass
@@ -1057,9 +1009,8 @@ def process_verification_phase(
                     missing_gids = (
                         batch_gids - analyzed_gids if analyzed_gids else batch_gids
                     )
-                    typer.secho(
-                        f"[jarvis-sec] 待处理批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}, 未分析={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''})",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"[jarvis-sec] 待处理批次 {bidx}/{total_batches} (文件={batch_file}, gids={sorted(list(batch_gids))[:5]}{'...' if len(batch_gids) > 5 else ''}, 未分析={sorted(list(missing_gids))[:5]}{'...' if len(missing_gids) > 5 else ''})"
                     )
                 except Exception:
                     pass
@@ -1072,9 +1023,8 @@ def process_verification_phase(
     # 显示跳过批次的信息
     if skipped_count > 0:
         try:
-            typer.secho(
-                f"[jarvis-sec] 断点恢复：跳过 {skipped_count} 个已完成的批次，剩余 {actual_total_batches} 个批次待处理",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"[jarvis-sec] 断点恢复：跳过 {skipped_count} 个已完成的批次，剩余 {actual_total_batches} 个批次待处理"
             )
         except Exception:
             pass
