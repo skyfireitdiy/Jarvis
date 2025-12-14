@@ -1463,6 +1463,20 @@ class Agent:
         """格式化摘要消息"""
         # 获取任务列表信息
         task_list_info = self._get_task_list_info()
+        
+        # 获取会话文件路径信息
+        session_file_info = ""
+        try:
+            from jarvis.jarvis_utils.dialogue_recorder import get_global_recorder
+            from pathlib import Path
+            
+            recorder = get_global_recorder()
+            session_file_path = recorder.get_session_file_path()
+            if Path(session_file_path).exists():
+                session_file_info = f"\n\n**📁 完整对话历史文件**：\n完整的对话历史已自动保存到以下文件，如果需要查看详细的历史信息，可以读取此文件：\n`{session_file_path}`\n\n此文件包含之前所有对话的完整记录（JSONL格式），每行一个消息记录，包括时间戳、角色和内容。"
+        except Exception:
+            # 非关键流程，失败时不影响主要功能
+            pass
 
         formatted_message = f"""
 以下是之前对话的关键信息总结：
@@ -1477,7 +1491,7 @@ class Agent:
 3. **等待工具结果**：在继续下一步之前，必须等待当前工具的执行结果，不能假设工具执行的结果。
 4. **基于实际验证**：所有结论必须基于实际执行结果和验证证据，禁止基于推测或假设。
 
-请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。
+请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。{session_file_info}
         """
 
         # 如果有任务列表信息，添加到消息后面
