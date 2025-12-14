@@ -187,7 +187,7 @@ class ToolRegistry(OutputHandlerProtocol):
         # 记录内置工具名称，用于区分内置工具和用户自定义工具
         self._builtin_tool_names: set = set()
         # 定义必选工具列表（这些工具将始终可用）
-        self._required_tools: List[str] = ["task_list_manager", "execute_script"]
+        self._required_tools: List[str] = ["execute_script"]
         # 加载内置工具和外部工具
         self._load_builtin_tools()
         self._load_external_tools()
