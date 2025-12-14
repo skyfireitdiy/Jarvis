@@ -153,9 +153,8 @@ def process_review_batch(
                     review_notes = gid_to_review[cluster_gids[0]].get(
                         "review_notes", ""
                     )
-                typer.secho(
-                    f"[jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由充分，确认为无效",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"✅ [jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由充分，确认为无效"
                 )
                 reviewed_clusters.append(
                     {
@@ -204,17 +203,15 @@ def process_review_batch(
                     except Exception as e:
                         # 保存失败不影响主流程，只记录警告
                         try:
-                            typer.secho(
-                                f"[jarvis-sec] 警告：保存复核结果到analysis.jsonl失败: {str(e)}",
-                                fg=typer.colors.YELLOW,
+                            PrettyOutput.auto_print(
+                                f"⚠️ [jarvis-sec] 警告：保存复核结果到analysis.jsonl失败: {str(e)}"
                             )
                         except Exception:
                             pass
     else:
         # 复核结果解析失败，保守策略：重新加入验证流程
-        typer.secho(
-            "[jarvis-sec] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            "⚠️ [jarvis-sec] 警告：复核结果解析失败，保守策略：将批次中的所有候选重新加入验证流程"
         )
         for invalid_cluster in review_batch:
             cluster_members = invalid_cluster.get("members", [])
@@ -257,9 +254,8 @@ def reinstated_candidates_to_cluster_batches(
     if not reinstated_candidates:
         return
 
-    typer.secho(
-        f"[jarvis-sec] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程",
-        fg=typer.colors.GREEN,
+    PrettyOutput.auto_print(
+        f"🔄 [jarvis-sec] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程"
     )
     # 按文件分组重新加入的候选
     reinstated_by_file: Dict[str, List[Dict]] = _dd2(list)
@@ -316,7 +312,6 @@ def run_review_agent_with_retry(
                 try:
                     typer.secho(
                         f"[jarvis-sec] 复核阶段直接模型调用失败: {e}，回退到 run()",
-                        fg=typer.colors.YELLOW,
                     )
                 except Exception:
                     pass
@@ -331,7 +326,6 @@ def run_review_agent_with_retry(
                 try:
                     typer.secho(
                         f"[jarvis-sec] 复核 Agent 工作区已恢复 ({_changed_review} 个文件）",
-                        fg=typer.colors.BLUE,
                     )
                 except Exception:
                     pass
@@ -350,7 +344,6 @@ def run_review_agent_with_retry(
                 try:
                     typer.secho(
                         f"[jarvis-sec] 复核结果JSON解析失败: {parse_error_review}",
-                        fg=typer.colors.YELLOW,
                     )
                 except Exception:
                     pass
@@ -369,7 +362,6 @@ def run_review_agent_with_retry(
             try:
                 typer.secho(
                     f"[jarvis-sec] 复核结果JSON解析失败 -> 重试第 {review_attempt} 次 (使用直接模型调用，将反馈解析错误)",
-                    fg=typer.colors.YELLOW,
                 )
             except Exception:
                 pass
@@ -377,7 +369,6 @@ def run_review_agent_with_retry(
             try:
                 typer.secho(
                     f"[jarvis-sec] 复核结果格式无效 -> 重试第 {review_attempt} 次 (使用直接模型调用)",
-                    fg=typer.colors.YELLOW,
                 )
             except Exception:
                 pass
@@ -404,7 +395,6 @@ def process_review_phase(
 
     typer.secho(
         f"\n[jarvis-sec] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...",
-        fg=typer.colors.MAGENTA,
     )
     status_mgr.update_review(
         current_review=0,
@@ -431,7 +421,6 @@ def process_review_phase(
 
         typer.secho(
             f"[jarvis-sec] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类",
-            fg=typer.colors.CYAN,
         )
         status_mgr.update_review(
             current_review=current_review_num,
@@ -489,7 +478,6 @@ def process_review_phase(
     if not reinstated_candidates:
         typer.secho(
             "[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效",
-            fg=typer.colors.GREEN,
         )
 
     # 记录复核结果（汇总）
