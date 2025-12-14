@@ -1478,6 +1478,15 @@ class Agent:
             # 非关键流程，失败时不影响主要功能
             pass
 
+        # 获取初始 commit 信息（仅对 CodeAgent）
+        initial_commit_info = ""
+        try:
+            if hasattr(self, "start_commit") and self.start_commit:
+                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
+        except Exception:
+            # 非关键流程，失败时不影响主要功能
+            pass
+
         formatted_message = f"""
 以下是之前对话的关键信息总结：
 
@@ -1491,7 +1500,7 @@ class Agent:
 3. **等待工具结果**：在继续下一步之前，必须等待当前工具的执行结果，不能假设工具执行的结果。
 4. **基于实际验证**：所有结论必须基于实际执行结果和验证证据，禁止基于推测或假设。
 
-请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。{session_file_info}
+请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。{session_file_info}{initial_commit_info}
         """
 
         # 如果有任务列表信息，添加到消息后面

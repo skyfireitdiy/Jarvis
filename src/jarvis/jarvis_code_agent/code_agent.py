@@ -254,6 +254,24 @@ class CodeAgent(Agent):
             start_commit = get_latest_commit_hash()
             self.start_commit = start_commit
 
+            # 将初始 commit 信息添加到 addon_prompt（安全回退点）
+            if start_commit:
+                initial_commit_prompt = f"""
+**🔖 初始 Git Commit（安全回退点）**：
+本次任务开始时的初始 commit 是：`{start_commit}`
+
+**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：
+```bash
+git reset --hard {start_commit}
+```
+这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。
+"""
+                # 将初始 commit 信息追加到现有的 addon_prompt
+                current_addon = self.session.addon_prompt or ""
+                self.set_addon_prompt(
+                    f"{current_addon}\n{initial_commit_prompt}".strip()
+                )
+
             # 获取项目概况信息
             project_overview = get_project_overview(self.root_dir)
 
