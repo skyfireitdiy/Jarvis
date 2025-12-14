@@ -23,8 +23,7 @@ from typing import List
 from typing import Optional
 from typing import cast
 
-import typer
-
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_sec.checkers import analyze_c_files
 from jarvis.jarvis_sec.checkers import analyze_rust_files
 from jarvis.jarvis_sec.types import Issue
@@ -200,13 +199,12 @@ def direct_scan(
                 actual_excluded_dirs.append(str(rel_path))
 
     if actual_excluded_dirs:
-        typer.secho("[jarvis-sec] 实际排除的目录:", fg=typer.colors.BLUE)
+        PrettyOutput.auto_print("[jarvis-sec] 实际排除的目录:")
         for dir_path in sorted(actual_excluded_dirs):
-            typer.secho(f"  - {dir_path}", fg=typer.colors.BLUE)
+            PrettyOutput.auto_print(f"  - {dir_path}")
     else:
-        typer.secho(
-            f"[jarvis-sec] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）",
-            fg=typer.colors.BLUE,
+        PrettyOutput.auto_print(
+            f"[jarvis-sec] 未发现需要排除的目录（配置的排除目录: {', '.join(sorted(actual_excludes))}）"
         )
 
     files = list(_iter_source_files(entry_path, languages, exclude_dirs))
