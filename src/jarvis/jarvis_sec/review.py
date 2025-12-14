@@ -5,6 +5,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
+from jarvis.jarvis_utils.output import PrettyOutput
 import typer
 
 from jarvis.jarvis_sec.agents import create_review_agent
@@ -65,9 +66,6 @@ def build_gid_to_review_mapping(review_results: List[Dict]) -> Dict[int, Dict]:
     """构建gid到复核结果的映射（支持 gid 和 gids 两种格式）"""
     gid_to_review: Dict[int, Dict] = {}
     for rr in review_results:
-        if not isinstance(rr, dict):
-            continue
-
         # 支持 gid 和 gids 两种格式
         gids_to_process: List[int] = []
         if "gids" in rr and isinstance(rr.get("gids"), list):
@@ -132,9 +130,8 @@ def process_review_batch(
 
             if any_reviewed and not all_sufficient:
                 # 理由不充分，重新加入验证流程
-                typer.secho(
-                    f"[jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由不充分，重新加入验证流程",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"🔵 [jarvis-sec] 复核结果：无效聚类（gids={cluster_gids}）理由不充分，重新加入验证流程"
                 )
                 for member in cluster_members:
                     reinstated_candidates.append(member)
@@ -402,7 +399,7 @@ def process_review_phase(
     返回: 更新后的 cluster_batches（包含重新加入验证的候选）
     """
     if not invalid_clusters_for_review:
-        typer.secho("[jarvis-sec] 无无效聚类需要复核", fg=typer.colors.BLUE)
+        PrettyOutput.auto_print("🔵 [jarvis-sec] 无无效聚类需要复核")
         return cluster_batches
 
     typer.secho(

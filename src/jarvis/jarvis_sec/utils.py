@@ -7,6 +7,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
+from jarvis.jarvis_utils.output import PrettyOutput
 import typer
 
 from jarvis.jarvis_sec.workflow import direct_scan
@@ -418,9 +419,7 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]):
         except Exception as e:
             # 报告写入失败不影响主流程
             try:
-                typer.secho(
-                    f"[jarvis-sec] 警告：保存分析结果失败: {e}", fg=typer.colors.YELLOW
-                )
+                PrettyOutput.auto_print(f"⚠️ [jarvis-sec] 警告：保存分析结果失败: {e}")
             except Exception:
                 pass
 

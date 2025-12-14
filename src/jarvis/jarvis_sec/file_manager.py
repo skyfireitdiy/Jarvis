@@ -16,7 +16,7 @@ from typing import List
 from typing import Set
 from typing import Tuple
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 # ==================== 文件路径定义 ====================
 
@@ -65,9 +65,8 @@ def save_candidates(sec_dir: Path, candidates: List[Dict]) -> None:
             f.write(json.dumps(candidate, ensure_ascii=False) + "\n")
 
     try:
-        typer.secho(
-            f"[jarvis-sec] 已保存 {len(candidates)} 个候选到 {path}",
-            fg=typer.colors.GREEN,
+        PrettyOutput.auto_print(
+            f"✅ [jarvis-sec] 已保存 {len(candidates)} 个候选到 {path}"
         )
     except Exception:
         pass
@@ -96,9 +95,8 @@ def load_candidates(sec_dir: Path) -> List[Dict]:
                         pass
         except Exception as e:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 警告：加载 candidates.jsonl 失败: {e}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [jarvis-sec] 警告：加载 candidates.jsonl 失败: {e}"
                 )
             except Exception:
                 pass
@@ -195,9 +193,8 @@ def load_clusters(sec_dir: Path) -> List[Dict]:
             clusters = list(seen_clusters.values())
         except Exception as e:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 警告：加载 clusters.jsonl 失败: {e}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [jarvis-sec] 警告：加载 clusters.jsonl 失败: {e}"
                 )
             except Exception:
                 pass
@@ -358,9 +355,8 @@ def load_analysis_results(sec_dir: Path) -> List[Dict]:
             results = list(seen_results.values())
         except Exception as e:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 警告：加载 analysis.jsonl 失败: {e}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [jarvis-sec] 警告：加载 analysis.jsonl 失败: {e}"
                 )
             except Exception:
                 pass
