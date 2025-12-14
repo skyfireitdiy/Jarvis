@@ -73,6 +73,7 @@ class CodeAgent(Agent):
         rule_names: Optional[str] = None,
         enable_review: bool = False,
         review_max_iterations: int = 3,
+        enable_task_list_manager: bool = True,
         **kwargs,
     ):
         self.root_dir = os.getcwd()
@@ -108,8 +109,9 @@ class CodeAgent(Agent):
             "read_code",
             "edit_file",  # 普通 search/replace 编辑
             "rewrite_file",
-            "task_list_manager",  # 任务列表管理工具
         ]
+        if enable_task_list_manager:
+            base_tools.append("task_list_manager")  # 任务列表管理工具
 
         if append_tools:
             additional_tools = [
