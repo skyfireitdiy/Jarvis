@@ -1410,6 +1410,13 @@ class Agent:
         if task_list_info:
             formatted_summary += task_list_info
 
+        # 添加用户固定的重要内容
+        if self.pin_content.strip():
+            pin_section = (
+                f"\n\n## 用户强调的任务目标和关键信息\n{self.pin_content.strip()}"
+            )
+            formatted_summary += pin_section
+
         return formatted_summary
 
     def _handle_history_with_file_upload(self) -> str:
@@ -1431,6 +1438,13 @@ class Agent:
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
+
+        # 添加用户固定的重要内容
+        if self.pin_content.strip():
+            pin_section = (
+                f"\n\n## 用户强调的任务目标和关键信息\n{self.pin_content.strip()}"
+            )
+            result += pin_section
 
         # 非关键流程：广播清理历史后的事件（用于日志、监控等）
         try:
