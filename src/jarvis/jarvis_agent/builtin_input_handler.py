@@ -49,11 +49,19 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     if not special_tags:
         return user_input, False
 
+    # 检查是否包含Pin标记（需要最后处理）
+    has_pin = "Pin" in special_tags
+
     # 获取替换映射表
     replace_map = get_replace_map()
-    # 处理每个标记
+    processed_tag = set()
+    add_on_prompt = ""
+
+    # 处理所有非Pin标记
+    modified_input = user_input
+
     for tag in special_tags:
-        # 优先处理特殊标记
+        # 优先处理会立即返回的特殊标记（不包含Pin）
         if tag == "Summary":
             summary = agent._summarize_and_clear_history()
             memory_tags_prompt = agent.memory_manager.prepare_memory_tags_prompt()
@@ -86,10 +94,11 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         elif tag == "Quiet":
             agent.set_non_interactive(True)
             PrettyOutput.auto_print("🔇 已切换到静默模式（非交互模式）")
-            return user_input.replace("'<Quiet>'", ""), False
-
-        processed_tag = set()
-        add_on_prompt = ""
+            modified_input = modified_input.replace("'<Quiet>'", "")
+            continue
+        elif tag == "Pin":
+            # Pin标记最后处理，跳过此处
+            continue
 
         # 处理普通替换标记
         if tag in replace_map:
@@ -99,10 +108,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 and replace_map[tag]["append"]
                 and tag not in processed_tag
             ):
-                user_input = user_input.replace(f"'<{tag}>'", "")
+                modified_input = modified_input.replace(f"'<{tag}>'", "")
                 add_on_prompt += replace_map[tag]["template"] + "\n"
             else:
-                user_input = user_input.replace(
+                modified_input = modified_input.replace(
                     f"'<{tag}>'", replace_map[tag]["template"]
                 )
         elif tag.startswith("rule:"):
@@ -111,10 +120,25 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             rule_content = _get_rule_content(rule_name)
             if rule_content:
                 separator = "\n" + "=" * 50 + "\n"
-                user_input = user_input.replace(
+                modified_input = modified_input.replace(
                     f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
                 )
 
-        agent.set_addon_prompt(add_on_prompt)
+    # 最后处理Pin标记
+    if has_pin:
+        # 移除所有Pin标记后的处理内容，追加到pin_content
+        processed_content = modified_input.replace("'<Pin>'", "").strip()
+        if processed_content:
+            if agent.pin_content:
+                agent.pin_content += "\n" + processed_content
+            else:
+                agent.pin_content = processed_content
+            PrettyOutput.auto_print(f"📌 已固定内容: {processed_content[:50]}...")
 
-    return user_input, False
+        # 返回处理后的内容（移除了Pin标记）
+        agent.set_addon_prompt(add_on_prompt)
+        return processed_content, False
+
+    # 设置附加提示词
+    agent.set_addon_prompt(add_on_prompt)
+    return modified_input, False
