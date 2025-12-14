@@ -423,7 +423,7 @@ class BasePlatform(ABC):
                 response = self._chat_with_pretty_output(message, start_time)
             else:
                 response = self._chat_with_simple_output(message, start_time)
-            
+
             # 计算响应时间并打印总结
             end_time = time.time()
             duration = end_time - start_time

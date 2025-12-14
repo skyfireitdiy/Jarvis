@@ -20,6 +20,7 @@ from typing import Set
 import typer
 
 from jarvis.jarvis_c2rust.constants import MAX_FUNCTION_RETRIES
+from jarvis.jarvis_c2rust.library_replacer_utils import is_entry_function
 from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.utils import ensure_order_file
 from jarvis.jarvis_c2rust.utils import iter_order_steps
@@ -61,6 +62,7 @@ class TranspilerExecutor:
         current_function_start_commit_getter,
         current_function_start_commit_setter,
         get_build_loop_has_fixes_func,
+        ensure_cargo_toml_bin_func,
     ) -> None:
         self.project_root = project_root
         self.crate_dir = crate_dir
@@ -94,6 +96,7 @@ class TranspilerExecutor:
         self.current_function_start_commit_getter = current_function_start_commit_getter
         self.current_function_start_commit_setter = current_function_start_commit_setter
         self.get_build_loop_has_fixes = get_build_loop_has_fixes_func
+        self.ensure_cargo_toml_bin = ensure_cargo_toml_bin_func
 
     def execute(self) -> None:
         """执行转译主流程"""
@@ -315,6 +318,29 @@ class TranspilerExecutor:
             fg=typer.colors.CYAN,
         )
 
+        # 检测 main 函数并更新 Cargo.toml
+        if is_entry_function(rec.__dict__):
+            # 检查模块路径是否在 src/bin/ 下
+            module_path_clean = module.replace("\\", "/")
+            if module_path_clean.startswith("src/bin/") or "/bin/" in module_path_clean:
+                # 提取相对于 crate 根目录的路径
+                if not module_path_clean.startswith("src/"):
+                    # 如果是绝对路径，需要转换为相对路径
+                    try:
+                        mp = Path(module)
+                        if mp.is_absolute():
+                            rel = mp.relative_to(self.crate_dir.resolve())
+                            module_path_clean = str(rel).replace("\\", "/")
+                    except Exception:
+                        pass
+                # 确保路径以 src/ 开头
+                if module_path_clean.startswith("src/"):
+                    typer.secho(
+                        f"[c2rust-transpiler][main] 检测到 main 函数，更新 Cargo.toml 添加 [[bin]] 配置: {module_path_clean}",
+                        fg=typer.colors.CYAN,
+                    )
+                    self.ensure_cargo_toml_bin(module_path_clean)
+
         # 如果标记为跳过实现，则直接标记为已转换
         if skip_implementation:
             typer.secho(
@@ -517,8 +543,8 @@ class TranspilerExecutor:
                 parts = rel_s[len("src/") :].strip("/").split("/")
                 if parts and parts[0]:
                     top_mod = parts[0]
-                    # 过滤掉 "mod" 关键字和 .rs 文件
-                    if top_mod != "mod" and not top_mod.endswith(".rs"):
+                    # 过滤掉 "mod"、"bin" 关键字和 .rs 文件
+                    if top_mod not in ("mod", "bin") and not top_mod.endswith(".rs"):
                         self.ensure_top_level_pub_mod(top_mod)
                         typer.secho(
                             f"[c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}",

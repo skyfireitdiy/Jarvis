@@ -5,6 +5,7 @@
 
 import re
 from pathlib import Path
+from typing import Optional
 
 import typer
 
@@ -15,6 +16,106 @@ class ModuleManager:
     def __init__(self, crate_dir: Path) -> None:
         self.crate_dir = crate_dir
 
+    def ensure_cargo_toml_bin(
+        self, bin_path: str, bin_name: Optional[str] = None
+    ) -> None:
+        """
+        在 Cargo.toml 中确保存在 [[bin]] 配置。
+        - bin_path: 二进制文件的路径，相对于 crate 根目录（如 "src/bin/main.rs" 或 "src/bin/app.rs"）
+        - bin_name: 二进制名称，如果为 None 则从 bin_path 推导
+        """
+        try:
+            cargo_path = (self.crate_dir / "Cargo.toml").resolve()
+            if not cargo_path.exists():
+                # 如果 Cargo.toml 不存在，创建最小配置
+                pkg_name = self.crate_dir.name
+                content = (
+                    f'[package]\nname = "{pkg_name}"\nversion = "0.1.0"\nedition = "2021"\n\n'
+                    '[lib]\npath = "src/lib.rs"\n\n'
+                )
+                cargo_path.write_text(content, encoding="utf-8")
+                typer.secho(
+                    f"[c2rust-transpiler][cargo] 已创建 Cargo.toml: {cargo_path}",
+                    fg=typer.colors.GREEN,
+                )
+
+            # 读取现有内容
+            txt = cargo_path.read_text(encoding="utf-8", errors="replace")
+
+            # 从 bin_path 推导 bin_name
+            if bin_name is None:
+                # 从路径中提取文件名（去掉 .rs 后缀）
+                bin_path_clean = bin_path.replace("\\", "/")
+                if bin_path_clean.startswith("src/bin/"):
+                    bin_name = bin_path_clean[len("src/bin/") :]
+                    if bin_name.endswith(".rs"):
+                        bin_name = bin_name[:-3]
+                else:
+                    # 如果路径不是 src/bin/ 格式，使用默认名称
+                    bin_name = self.crate_dir.name
+
+            # 检查是否已存在相同的 [[bin]] 配置
+            # 匹配 [[bin]] 块，查找 name 和 path
+            bin_pattern = re.compile(
+                r"\[\[bin\]\]\s*\n(?:[^\[]*(?:\n[^\[]*)*?)(?=\[\[bin\]\]|\[\[|\[|$)",
+                re.MULTILINE,
+            )
+            existing_bins = bin_pattern.findall(txt)
+
+            # 检查是否已存在相同 path 的 bin
+            for bin_block in existing_bins:
+                # 检查 path 字段
+                path_match = re.search(r'path\s*=\s*["\']([^"\']+)["\']', bin_block)
+                if path_match and path_match.group(1) == bin_path:
+                    # 已存在相同路径的 bin 配置
+                    return
+                # 检查 name 字段
+                name_match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', bin_block)
+                if name_match and name_match.group(1) == bin_name:
+                    # 已存在相同名称的 bin，检查路径是否相同
+                    if path_match and path_match.group(1) == bin_path:
+                        # 完全相同的配置，无需添加
+                        return
+                    # 名称相同但路径不同，可能需要更新，但为了安全起见，我们仍然添加新的配置
+                    # （因为可能存在多个同名但不同路径的 bin）
+
+            # 添加 [[bin]] 配置
+            bin_config = f'\n[[bin]]\nname = "{bin_name}"\npath = "{bin_path}"\n'
+
+            # 在文件末尾添加（如果已有其他配置，在适当位置插入）
+            # 优先在 [lib] 之后添加，如果不存在则在 [dependencies] 之前添加
+            lib_match = re.search(r"(?m)^\s*\[lib\]\s*$", txt)
+            deps_match = re.search(r"(?m)^\s*\[dependencies\]\s*$", txt)
+
+            if lib_match:
+                # 在 [lib] 块之后添加
+                insert_pos = txt.find("\n", lib_match.end())
+                if insert_pos == -1:
+                    insert_pos = len(txt)
+                # 找到 [lib] 块的结束位置
+                next_section = re.search(r"(?m)^\s*\[", txt[insert_pos:])
+                if next_section:
+                    insert_pos = insert_pos + next_section.start()
+                new_txt = txt[:insert_pos] + bin_config + txt[insert_pos:]
+            elif deps_match:
+                # 在 [dependencies] 之前添加
+                insert_pos = deps_match.start()
+                new_txt = txt[:insert_pos] + bin_config + txt[insert_pos:]
+            else:
+                # 在文件末尾添加
+                new_txt = txt.rstrip() + bin_config
+
+            cargo_path.write_text(new_txt, encoding="utf-8")
+            typer.secho(
+                f"[c2rust-transpiler][cargo] 已在 Cargo.toml 中添加 [[bin]] 配置: name={bin_name}, path={bin_path}",
+                fg=typer.colors.GREEN,
+            )
+        except Exception as e:
+            typer.secho(
+                f"[c2rust-transpiler][cargo] 更新 Cargo.toml 失败: {e}",
+                fg=typer.colors.YELLOW,
+            )
+
     def ensure_top_level_pub_mod(self, mod_name: str) -> None:
         """
         在 src/lib.rs 中确保存在 `pub mod <mod_name>;`
@@ -24,7 +125,7 @@ class ModuleManager:
         - 最小改动，不覆盖其他内容
         """
         try:
-            if not mod_name or mod_name in ("lib", "main", "mod"):
+            if not mod_name or mod_name in ("lib", "main", "mod", "bin"):
                 return
             lib_rs = (self.crate_dir / "src" / "lib.rs").resolve()
             lib_rs.parent.mkdir(parents=True, exist_ok=True)
@@ -72,7 +173,7 @@ class ModuleManager:
         - 最小改动，不覆盖其他内容
         """
         try:
-            if not child_mod or child_mod in ("lib", "main", "mod"):
+            if not child_mod or child_mod in ("lib", "main", "mod", "bin"):
                 return
             mod_rs = (dir_path / "mod.rs").resolve()
             mod_rs.parent.mkdir(parents=True, exist_ok=True)
@@ -135,12 +236,15 @@ class ModuleManager:
             if not inside:
                 return
             parts = [p for p in inside.split("/") if p]  # 过滤空字符串
+            # 特殊处理：如果路径包含 bin/，不要生成 mod 声明
+            if "bin" in parts:
+                return
             if parts[-1].endswith(".rs"):
                 if parts[-1] in ("lib.rs", "main.rs"):
                     return
                 child = parts[-1][:-3]  # 去掉 .rs
-                # 过滤掉 "mod" 关键字
-                if child == "mod":
+                # 过滤掉 "mod" 和 "bin" 关键字
+                if child in ("mod", "bin"):
                     return
                 if len(parts) > 1:
                     start_dir = crate_root / "src" / "/".join(parts[:-1])
@@ -187,8 +291,8 @@ class ModuleManager:
                     break
                 # 在 parent/mod.rs 确保 pub mod <cur_dir.name>
                 # 确保 parent 在 crate/src 下
-                # 过滤掉 "mod" 关键字
-                if cur_dir.name == "mod":
+                # 过滤掉 "mod" 和 "bin" 关键字
+                if cur_dir.name in ("mod", "bin"):
                     cur_dir = parent
                     continue
                 try:
