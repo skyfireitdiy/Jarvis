@@ -508,8 +508,8 @@ class DiffVisualizer:
                     old_not_continuous = curr_old_line != prev_old_line + 1
                     new_not_continuous = curr_new_line != prev_new_line + 1
 
-                    # 只有当至少一个方向不连续时才添加分割线
-                    should_add_separator = old_not_continuous or new_not_continuous
+                    # 只有当两个方向都不连续时才添加分割线
+                    should_add_separator = old_not_continuous and new_not_continuous
 
                 if should_add_separator:
                     # 动态计算分隔符宽度（基于终端宽度，限制在合理范围）
