@@ -165,6 +165,7 @@ class BuildFixOptimizer:
                     need_summary=False,
                     non_interactive=self.options.non_interactive,
                     model_group=self.options.llm_group,
+                    enable_task_list_manager=False,
                 )
                 # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
                 agent.event_bus.subscribe(
@@ -256,8 +257,6 @@ class BuildFixOptimizer:
                         )
             finally:
                 os.chdir(prev_cwd)
-
-        return False
 
     def verify_and_fix_after_step(
         self, step_name: str, target_files: List[Path]
