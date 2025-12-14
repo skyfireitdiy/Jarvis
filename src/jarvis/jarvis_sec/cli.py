@@ -23,6 +23,7 @@ import typer
 
 from jarvis.jarvis_sec.report import aggregate_issues
 from jarvis.jarvis_sec.report import format_csv_report
+from jarvis.jarvis_utils.output import PrettyOutput
 
 # removed: set_config import（避免全局覆盖模型组配置）
 from jarvis.jarvis_sec.workflow import direct_scan
@@ -158,7 +159,7 @@ def agent(
                 )
             except Exception:
                 pass
-    typer.echo(text)
+    PrettyOutput.auto_print(text)
 
 
 def main() -> int:
