@@ -95,10 +95,8 @@ def agent(
         )
     except Exception as e:
         try:
-            typer.secho(
-                f"[jarvis_sec] Agent 分析过程出错，将回退到直扫基线（fast）：{e}",
-                fg=typer.colors.YELLOW,
-                err=True,
+            PrettyOutput.auto_print(
+                f"⚠️ [jarvis_sec] Agent 分析过程出错，将回退到直扫基线（fast）：{e}"
             )
         except Exception:
             pass
@@ -106,10 +104,8 @@ def agent(
 
     if not text or not str(text).strip():
         try:
-            typer.secho(
-                "[jarvis_sec] Agent 无输出，回退到直扫基线（fast）。",
-                fg=typer.colors.YELLOW,
-                err=True,
+            PrettyOutput.auto_print(
+                "⚠️ [jarvis_sec] Agent 无输出，回退到直扫基线（fast）。"
             )
         except Exception:
             pass
@@ -145,18 +141,12 @@ def agent(
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(md_text, encoding="utf-8")
             try:
-                typer.secho(
-                    f"[jarvis_sec] Markdown 报告已写入: {p}", fg=typer.colors.GREEN
-                )
+                PrettyOutput.auto_print(f"✅ [jarvis_sec] Markdown 报告已写入: {p}")
             except Exception:
                 pass
         except Exception as e:
             try:
-                typer.secho(
-                    f"[jarvis_sec] 写入Markdown报告失败: {e}",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
+                PrettyOutput.auto_print(f"❌ [jarvis_sec] 写入Markdown报告失败: {e}")
             except Exception:
                 pass
     PrettyOutput.auto_print(text)
