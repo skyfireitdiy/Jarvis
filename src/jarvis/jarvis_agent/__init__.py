@@ -645,6 +645,8 @@ class Agent:
         self.first = True
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
+        # 记录固定的内容
+        self.pin_content: str = ""
         # 记录连续未添加 addon_prompt 的轮数
         self._addon_prompt_skip_rounds = 0
         # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）

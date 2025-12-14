@@ -384,6 +384,7 @@ class FileCompleter(Completer):
         all_completions.extend(
             [
                 (ot("Summary"), "总结"),
+                (ot("Pin"), "固定/置顶内容"),
                 (ot("Clear"), "清除历史"),
                 (ot("ToolUsage"), "工具使用说明"),
                 (ot("ReloadConfig"), "重新加载配置"),
@@ -1041,6 +1042,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         try:
                             specials = [
                                 ot("Summary"),
+                                ot("Pin"),
                                 ot("Clear"),
                                 ot("ToolUsage"),
                                 ot("ReloadConfig"),
@@ -1152,6 +1154,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         try:
                             specials = [
                                 ot("Summary"),
+                                ot("Pin"),
                                 ot("Clear"),
                                 ot("ToolUsage"),
                                 ot("ReloadConfig"),
