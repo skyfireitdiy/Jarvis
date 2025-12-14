@@ -269,19 +269,23 @@ def get_system_prompt() -> str:
 5. 先读后写，精准执行（工具规范使用）：
    - 必须先通过 read_code 读取目标文件完整内容，确认待修改位置的上下文（如前后代码逻辑、缩进格式），再调用编辑工具；
    - 编辑工具选择：
-     - **精准单行或范围编辑（优先使用 sed）**：对于精准的单行修改或指定行号范围的编辑（如修改第N行、替换第M-N行），优先使用 `execute_script` 工具执行 `sed` 命令，比 `edit_file` 更高效精准，例如：
+     - **精准单行或范围编辑（推荐使用 edit_file）**：对于精准的单行修改或指定行号范围的编辑，推荐优先使用 `edit_file` 工具进行精确修改，避免使用sed命令因为极易出错。对于确实需要sed的特殊场景，必须：
        * 替换指定行：`sed -i 'N s/old/new/' file_path`（如 `sed -i '42 s/foo/bar/' src/main.rs` 替换第42行的foo为bar）
        * 替换行号范围：`sed -i 'start_line,end_line s/old/new/g' file_path`（如 `sed -i '10,20 s/old/new/g' src/main.rs` 替换10-20行中的所有old为new）
        * 在指定行后插入：`sed -i 'N a\\插入内容' file_path`（如 `sed -i '10 a\\    new_line_content' src/main.rs` 在第10行后插入新行）
        * 使用 `sed` 前建议先用 `read_code` 确认要修改的内容和行号，并备份文件，确保修改范围准确。
-     - **内容移动或复制（使用 sed）**：如果要将一个文件内的指定内容移动或复制到另一个文件的指定位置，使用 `sed` 命令即可，没必要使用 `edit_file` 或 `rewrite_file`，例如：
+     - **内容移动或复制（使用 read_code + edit_file）**：内容移动或复制操作推荐使用更安全的组合方式：先用 `read_code` 读取源文件内容，再用 `edit_file` 精确插入到目标位置。避免使用sed命令进行复杂的内容操作，因为极易产生不可预期的结果。
        * 提取源文件指定行并追加到目标文件：`sed -n 'start_line,end_line p' source_file >> target_file`（如 `sed -n '10,20p' src/a.rs >> src/b.rs` 将a.rs的10-20行追加到b.rs末尾）
        * 提取源文件指定行并插入到目标文件指定行后：`sed -n 'start_line,end_line p' source_file | sed -i 'target_line r /dev/stdin' target_file`（如先提取再插入）
        * 移动内容（先复制到目标位置，再从源文件删除）：先执行复制操作，再执行删除操作
        * 使用前先用 `read_code` 确认源文件和目标文件的内容，确保移动/复制位置准确。
      - 局部修改（改少数行、补代码块）：当 `sed` 无法满足需求时（如需要复杂上下文匹配），使用 edit_file_normal（普通 search/replace）或 edit_file_free（基于上下文的模糊匹配），明确标注"修改范围（行号/代码片段）+ 修改内容"（如"替换第15-20行的循环逻辑为：xxx"）；
      - 全文件重写（如格式统一、逻辑重构）：仅当局部修改无法满足需求时使用 rewrite_file，重写前必须备份原始文件到 /tmp/rewrite_backup_xxx.txt；
-     - **大量代码删除**：如果需要删除大量代码（如删除整个函数、大段注释、多个连续行），可以使用 `execute_script` 工具执行 `sed` 命令进行批量删除，例如：
+     - **大量代码删除**：批量删除代码推荐使用 `edit_file` 工具的精准删除功能，避免使用sed命令。对于必须删除的大段代码：
+      * 先用 `read_code` 确认要删除的确切内容和行号范围
+      * 使用 `edit_file` 的 search/replace 进行精确删除
+      * 删除前务必备份原文件到 /tmp/backup_xxx.txt
+      * 对于跨多行的复杂删除，分步骤进行并验证每一步
        * 删除指定行号范围：`sed -i 'start_line,end_line d' file_path`（如 `sed -i '100,200d' src/main.rs` 删除100-200行）
        * 删除匹配模式的行：`sed -i '/pattern/d' file_path`（如 `sed -i '/^\\s*#.*TODO/d' file_path` 删除所有TODO注释行）
        * 使用 `sed` 前建议先用 `read_code` 确认要删除的内容，并备份文件，确保删除范围准确。
