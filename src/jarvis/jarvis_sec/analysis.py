@@ -5,7 +5,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.parsers import try_parse_summary_report
@@ -82,7 +82,12 @@ def build_validation_error_guidance(
 ) -> str:
     """构建验证错误指导信息"""
     if parse_error_analysis:
-        return f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- JSON解析失败: {parse_error_analysis}\n\n请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
+        return f"""
+
+**格式错误详情（请根据以下错误修复输出格式）：**
+- JSON解析失败: {parse_error_analysis}
+
+请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。仅输出一个 <REPORT> 块，块内直接包含 JSON 数组（不需要额外的标签）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"""
     elif prev_parsed_items is None:
         return "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n- 无法从摘要中解析出有效的 JSON 数组"
     elif not valid_items(prev_parsed_items):
@@ -194,9 +199,8 @@ def run_analysis_agent_with_retry(
                 summary_container["text"] = response
             except Exception as e:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 直接模型调用失败: {e}，回退到 run()",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [jarvis-sec] 直接模型调用失败: {e}，回退到 run()"
                     )
                 except Exception:
                     pass
@@ -222,9 +226,8 @@ def run_analysis_agent_with_retry(
             )
             if _changed:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 工作区已恢复 ({_changed} 个文件），操作: git checkout -- .",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"🔵 [jarvis-sec] 工作区已恢复 ({_changed} 个文件），操作: git checkout -- ."
                     )
                 except Exception:
                     pass
@@ -239,9 +242,8 @@ def run_analysis_agent_with_retry(
             rep, parse_error_analysis = try_parse_summary_report(summary_text)
             if parse_error_analysis:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 分析结果JSON解析失败: {parse_error_analysis}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [jarvis-sec] 分析结果JSON解析失败: {parse_error_analysis}"
                     )
                 except Exception:
                     pass
@@ -269,17 +271,15 @@ def run_analysis_agent_with_retry(
         prev_parsed_items = parsed_items
         if parse_error_analysis:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 分析结果JSON解析失败 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [jarvis-sec] 分析结果JSON解析失败 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用，将反馈解析错误)"
                 )
             except Exception:
                 pass
         else:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 分析结果格式无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [jarvis-sec] 分析结果格式无效 -> 重试第 {attempt} 次 (批次={bidx}，使用直接模型调用)"
                 )
             except Exception:
                 pass
