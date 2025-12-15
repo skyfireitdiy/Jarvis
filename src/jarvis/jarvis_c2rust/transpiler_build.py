@@ -14,8 +14,8 @@ from typing import Optional
 from typing import Tuple
 from typing import cast
 
-import typer
 
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.constants import CONSECUTIVE_FIX_FAILURE_THRESHOLD
 from jarvis.jarvis_c2rust.constants import ERROR_SUMMARY_MAX_LENGTH
 from jarvis.jarvis_c2rust.utils import truncate_git_diff_with_context_limit
@@ -171,20 +171,16 @@ class BuildManager:
                 cwd=workspace_root,
             )
             if res.returncode == 0:
-                typer.secho(
-                    "[c2rust-transpiler][fmt] 代码格式化完成", fg=typer.colors.CYAN
-                )
+                PrettyOutput.auto_print("🔍 [c2rust-transpiler][fmt] 代码格式化完成")
             else:
                 # fmt 失败不影响主流程，只记录警告
-                typer.secho(
-                    f"[c2rust-transpiler][fmt] 代码格式化失败（非致命）: {res.stderr or res.stdout}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][fmt] 代码格式化失败（非致命）: {res.stderr or res.stdout}"
                 )
         except Exception as e:
             # fmt 失败不影响主流程，只记录警告
-            typer.secho(
-                f"[c2rust-transpiler][fmt] 代码格式化异常（非致命）: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][fmt] 代码格式化异常（非致命）: {e}"
             )
 
     def build_repair_prompt_base(
@@ -802,18 +798,16 @@ class BuildManager:
             stderr = "命令执行超时（30秒）\n" + (
                 e.stderr.decode("utf-8", errors="replace") if e.stderr else ""
             )
-            typer.secho(
-                "[c2rust-transpiler][build] Cargo 测试超时（30秒），视为失败并继续修复流程",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "⚠️ [c2rust-transpiler][build] Cargo 测试超时（30秒），视为失败并继续修复流程"
             )
         except Exception as e:
             # 其他异常也视为测试失败
             returncode = -1
             stdout = ""
             stderr = f"执行 cargo test 时发生异常: {str(e)}"
-            typer.secho(
-                f"[c2rust-transpiler][build] Cargo 测试执行异常: {e}，视为失败并继续修复流程",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][build] Cargo 测试执行异常: {e}，视为失败并继续修复流程"
             )
 
         # 检查 cargo test 输出中是否包含警告（即使测试通过也可能有警告）
@@ -826,11 +820,10 @@ class BuildManager:
             # 测试通过，先检查 cargo test 输出中的警告，再检查编译警告，最后检查 clippy 警告
             if test_has_warnings:
                 # cargo test 输出中有警告，提取并修复
-                typer.secho(
-                    "[c2rust-transpiler][build] Cargo 测试通过，但输出中存在警告，需要修复。",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-transpiler][build] Cargo 测试通过，但输出中存在警告，需要修复。"
                 )
-                typer.secho(test_output_combined, fg=typer.colors.YELLOW)
+                PrettyOutput.auto_print(test_output_combined)
                 # 将 cargo test 输出中的警告作为修复目标
                 warning_type = "cargo_test_warning"
                 output = test_output_combined
@@ -868,11 +861,10 @@ class BuildManager:
                     compiler_output = f"执行编译检查时发生异常: {str(e)}"
 
                 if compiler_has_warnings:
-                    typer.secho(
-                        "[c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，但存在编译警告，需要修复。",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，但存在编译警告，需要修复。"
                     )
-                    typer.secho(compiler_output, fg=typer.colors.YELLOW)
+                    PrettyOutput.auto_print(compiler_output)
                     # 将编译警告作为修复目标，继续修复流程
                     warning_type = "compiler"
                     output = compiler_output
@@ -906,18 +898,16 @@ class BuildManager:
                         clippy_output = f"执行 clippy 时发生异常: {str(e)}"
 
                     if clippy_has_warnings:
-                        typer.secho(
-                            "[c2rust-transpiler][build] Cargo 测试通过，无编译警告，但存在 clippy 警告，需要修复。",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            "⚠️ [c2rust-transpiler][build] Cargo 测试通过，无编译警告，但存在 clippy 警告，需要修复。"
                         )
-                        typer.secho(clippy_output, fg=typer.colors.YELLOW)
+                        PrettyOutput.auto_print(clippy_output)
                         # 将 clippy 警告作为修复目标，继续修复流程
                         warning_type = "clippy"
                         output = clippy_output
                     else:
-                        typer.secho(
-                            "[c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，无编译警告，clippy 无警告。",
-                            fg=typer.colors.GREEN,
+                        PrettyOutput.auto_print(
+                            "✅ [c2rust-transpiler][build] Cargo 测试通过，无 cargo test 警告，无编译警告，clippy 无警告。"
                         )
                         # 测试通过且无编译警告和 clippy 警告，重置连续失败计数
                         self._consecutive_fix_failures_setter(0)
@@ -938,9 +928,8 @@ class BuildManager:
             # 检查测试失败输出中是否也包含警告（可能需要一并修复）
             if test_has_warnings:
                 # 测试失败且输出中有警告，优先修复警告（因为警告可能导致测试失败）
-                typer.secho(
-                    "[c2rust-transpiler][build] Cargo 测试失败，且输出中存在警告，将优先修复警告。",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-transpiler][build] Cargo 测试失败，且输出中存在警告，将优先修复警告。"
                 )
                 warning_type = "cargo_test_warning"
                 output = test_output_combined
@@ -953,16 +942,14 @@ class BuildManager:
                 if test_iter % 10 == 0 or test_iter == 1
                 else ""
             )
-            typer.secho(
-                f"[c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试{limit_info})。",
-                fg=typer.colors.RED,
+            PrettyOutput.auto_print(
+                f"❌ [c2rust-transpiler][build] Cargo 测试失败 (第 {test_iter} 次尝试{limit_info})。"
             )
-            typer.secho(output, fg=typer.colors.RED)
+            PrettyOutput.auto_print(output)
             maxr = self.test_max_retries
             if maxr > 0 and test_iter >= maxr:
-                typer.secho(
-                    f"[c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    f"❌ [c2rust-transpiler][build] 已达到最大重试次数上限({maxr})，停止构建修复循环。"
                 )
                 try:
                     cur = self.progress.get("current") or {}
@@ -1010,9 +997,8 @@ class BuildManager:
 
         # 调试输出：确认错误信息是否正确传递
         if warning_type is None:
-            typer.secho(
-                f"[c2rust-transpiler][debug] 测试失败信息长度: {len(output)} 字符",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"🔍 [c2rust-transpiler][debug] 测试失败信息长度: {len(output)} 字符"
             )
             if output:
                 # 提取关键错误信息用于调试
@@ -1032,12 +1018,11 @@ class BuildManager:
                     )
                 ]
                 if key_errors:
-                    typer.secho(
-                        "[c2rust-transpiler][debug] 关键错误信息（前5行）:",
-                        fg=typer.colors.CYAN,
+                    PrettyOutput.auto_print(
+                        "🔍 [c2rust-transpiler][debug] 关键错误信息（前5行）:"
                     )
                     for i, line in enumerate(key_errors[:5], 1):
-                        typer.secho(f"  {i}. {line[:100]}", fg=typer.colors.CYAN)
+                        PrettyOutput.auto_print(f"🔍   {i}. {line[:100]}")
 
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
         # 记录运行前的 commit
@@ -1068,9 +1053,8 @@ class BuildManager:
         # 检测并处理测试代码删除
         if self.check_and_handle_test_deletion(before_commit, agent):
             # 如果回退了，需要重新运行 agent
-            typer.secho(
-                f"[c2rust-transpiler][build-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={test_iter})",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][build-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={test_iter})"
             )
             before_commit = self.get_crate_commit_hash()
             # 重新创建修复 Agent
@@ -1082,9 +1066,8 @@ class BuildManager:
             )
             # 再次检测
             if self.check_and_handle_test_deletion(before_commit, agent):
-                typer.secho(
-                    f"[c2rust-transpiler][build-fix] 再次检测到测试代码删除问题，已回退 (iter={test_iter})",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    f"❌ [c2rust-transpiler][build-fix] 再次检测到测试代码删除问题，已回退 (iter={test_iter})"
                 )
 
         # 修复后验证：先检查编译，再实际运行测试
@@ -1097,9 +1080,8 @@ class BuildManager:
             cwd=workspace_root,
         )
         if res_compile.returncode != 0:
-            typer.secho(
-                "[c2rust-transpiler][build] 修复后编译仍有错误，将在下一轮循环中处理",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "⚠️ [c2rust-transpiler][build] 修复后编译仍有错误，将在下一轮循环中处理"
             )
             # 编译失败，增加连续失败计数
             current_failures = self._consecutive_fix_failures_getter()
@@ -1110,21 +1092,18 @@ class BuildManager:
                 current_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD
                 and current_start_commit
             ):
-                typer.secho(
-                    f"[c2rust-transpiler][build] 连续修复失败 {current_failures} 次，回退到函数开始时的 commit: {current_start_commit}",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    f"❌ [c2rust-transpiler][build] 连续修复失败 {current_failures} 次，回退到函数开始时的 commit: {current_start_commit}"
                 )
                 if self.reset_to_commit(current_start_commit):
-                    typer.secho(
-                        "[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数"
                     )
                     # 返回特殊值，表示需要重新开始
                     return (False, None)
                 else:
-                    typer.secho(
-                        "[c2rust-transpiler][build] 回退失败，继续尝试修复",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-transpiler][build] 回退失败，继续尝试修复"
                     )
             return (False, False)  # 需要继续循环
 
@@ -1148,28 +1127,25 @@ class BuildManager:
             verify_returncode = -1
             verify_has_warnings = False
             verify_output_combined = ""
-            typer.secho(
-                "[c2rust-transpiler][build] 修复后验证测试超时（30秒），视为失败",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "⚠️ [c2rust-transpiler][build] 修复后验证测试超时（30秒），视为失败"
             )
         except Exception as e:
             # 其他异常也视为测试失败
             verify_returncode = -1
             verify_has_warnings = False
             verify_output_combined = ""
-            typer.secho(
-                f"[c2rust-transpiler][build] 修复后验证测试执行异常: {e}，视为失败",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][build] 修复后验证测试执行异常: {e}，视为失败"
             )
 
         if verify_returncode == 0:
             # 测试通过，检查是否有警告
             if verify_has_warnings:
-                typer.secho(
-                    "[c2rust-transpiler][build] 修复后测试通过，但输出中存在警告，将在下一轮循环中处理",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-transpiler][build] 修复后测试通过，但输出中存在警告，将在下一轮循环中处理"
                 )
-                typer.secho(verify_output_combined, fg=typer.colors.YELLOW)
+                PrettyOutput.auto_print(verify_output_combined)
                 # 有警告，继续循环修复
                 return (False, False)
             # 测试通过，先检查编译警告，再检查 clippy 警告
@@ -1204,11 +1180,10 @@ class BuildManager:
                 compiler_output_after_fix = f"执行编译检查时发生异常: {str(e)}"
 
             if compiler_has_warnings_after_fix:
-                typer.secho(
-                    "[c2rust-transpiler][build] 修复后测试通过，但存在编译警告，将在下一轮循环中处理",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-transpiler][build] 修复后测试通过，但存在编译警告，将在下一轮循环中处理"
                 )
-                typer.secho(compiler_output_after_fix, fg=typer.colors.YELLOW)
+                PrettyOutput.auto_print(compiler_output_after_fix)
                 # 有编译警告，继续循环修复
                 return (False, False)
             else:
@@ -1239,26 +1214,23 @@ class BuildManager:
                     clippy_output_after_fix = f"执行 clippy 时发生异常: {str(e)}"
 
                 if clippy_has_warnings_after_fix:
-                    typer.secho(
-                        "[c2rust-transpiler][build] 修复后测试通过，无编译警告，但存在 clippy 警告，将在下一轮循环中处理",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-transpiler][build] 修复后测试通过，无编译警告，但存在 clippy 警告，将在下一轮循环中处理"
                     )
-                    typer.secho(clippy_output_after_fix, fg=typer.colors.YELLOW)
+                    PrettyOutput.auto_print(clippy_output_after_fix)
                     # 有 clippy 警告，继续循环修复
                     return (False, False)
                 else:
-                    typer.secho(
-                        "[c2rust-transpiler][build] 修复后测试通过，无 cargo test 警告，无编译警告，clippy 无警告，继续构建循环",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        "✅ [c2rust-transpiler][build] 修复后测试通过，无 cargo test 警告，无编译警告，clippy 无警告，继续构建循环"
                     )
                     # 测试真正通过且无编译警告和 clippy 警告，重置连续失败计数
                     self._consecutive_fix_failures_setter(0)
                     return (False, False)  # 需要继续循环（但下次应该会通过）
         else:
             # 编译通过但测试仍然失败，说明修复没有解决测试逻辑问题
-            typer.secho(
-                "[c2rust-transpiler][build] 修复后编译通过，但测试仍然失败，将在下一轮循环中处理",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "⚠️ [c2rust-transpiler][build] 修复后编译通过，但测试仍然失败，将在下一轮循环中处理"
             )
             # 测试失败，增加连续失败计数（即使编译通过）
             current_failures = self._consecutive_fix_failures_getter()
@@ -1269,21 +1241,18 @@ class BuildManager:
                 current_failures >= CONSECUTIVE_FIX_FAILURE_THRESHOLD
                 and current_start_commit
             ):
-                typer.secho(
-                    f"[c2rust-transpiler][build] 连续修复失败 {current_failures} 次（编译通过但测试失败），回退到函数开始时的 commit: {current_start_commit}",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    f"❌ [c2rust-transpiler][build] 连续修复失败 {current_failures} 次（编译通过但测试失败），回退到函数开始时的 commit: {current_start_commit}"
                 )
                 if self.reset_to_commit(current_start_commit):
-                    typer.secho(
-                        "[c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数"
                     )
                     # 返回特殊值，表示需要重新开始
                     return (False, None)
                 else:
-                    typer.secho(
-                        "[c2rust-transpiler][build] 回退失败，继续尝试修复",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-transpiler][build] 回退失败，继续尝试修复"
                     )
             return (False, False)  # 需要继续循环
 
@@ -1298,9 +1267,8 @@ class BuildManager:
         """
         workspace_root = str(self.crate_dir)
         test_limit = f"最大重试: {self.test_max_retries if self.test_max_retries > 0 else '无限'}"
-        typer.secho(
-            f"[c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（test，{test_limit}）",
-            fg=typer.colors.MAGENTA,
+        PrettyOutput.auto_print(
+            f"🔍 [c2rust-transpiler][build] 工作区={workspace_root}，开始构建循环（test，{test_limit}）"
         )
         test_iter = 0
         has_fixes = False  # 标记是否进行了修复
