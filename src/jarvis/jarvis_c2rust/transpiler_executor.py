@@ -17,7 +17,6 @@ from typing import Dict
 from typing import List
 from typing import Set
 
-import typer
 
 from jarvis.jarvis_c2rust.constants import MAX_FUNCTION_RETRIES
 from jarvis.jarvis_c2rust.library_replacer_utils import is_entry_function
@@ -164,9 +163,8 @@ class TranspilerExecutor:
                     # 处理失败，保留当前状态，便于下次 resume
                     return
 
-            typer.secho(
-                "[c2rust-transpiler] 所有符合条件的函数均已处理完毕。",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                "📋 [c2rust-transpiler] 所有符合条件的函数均已处理完毕。"
             )
         finally:
             os.chdir(prev_cwd)
@@ -361,34 +359,29 @@ class TranspilerExecutor:
         build_has_fixes = False  # 在循环外定义，确保在 break 后仍可使用
         while function_retry_count <= max_function_retries:
             if function_retry_count > 0:
-                typer.secho(
-                    f"[c2rust-transpiler][retry] 重新开始处理函数 (第 {function_retry_count} 次重试)",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"🔁 [c2rust-transpiler][retry] 重新开始处理函数 (第 {function_retry_count} 次重试)"
                 )
                 # 重新记录 commit id（回退后的新 commit）
                 self.current_function_start_commit_setter(self.get_crate_commit_hash())
                 if self.current_function_start_commit_getter():
-                    typer.secho(
-                        f"[c2rust-transpiler][commit] 重新记录函数开始时的 commit: {self.current_function_start_commit_getter()}",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"📝 [c2rust-transpiler][commit] 重新记录函数开始时的 commit: {self.current_function_start_commit_getter()}"
                     )
                 # 重置连续失败计数（重新开始时重置）
                 self.consecutive_fix_failures_setter(0)
 
             # 2) 生成实现
             unresolved = self.untranslated_callee_symbols(rec)
-            typer.secho(
-                f"[c2rust-transpiler][deps] {progress_info} 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][deps] {progress_info} 未解析的被调符号: {', '.join(unresolved) if unresolved else '(none)'}"
             )
-            typer.secho(
-                f"[c2rust-transpiler][gen] {progress_info} 正在为 {rec.qname or rec.name} 生成 Rust 实现",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"📋 [c2rust-transpiler][gen] {progress_info} 正在为 {rec.qname or rec.name} 生成 Rust 实现"
             )
             self.codeagent_generate_impl(rec, c_code, module, rust_sig, unresolved)
-            typer.secho(
-                f"[c2rust-transpiler][gen] 已在 {module} 生成或更新实现",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"📋 [c2rust-transpiler][gen] 已在 {module} 生成或更新实现"
             )
             # 刷新精简上下文（防止签名/模块调整后提示不同步）
             try:
@@ -397,10 +390,7 @@ class TranspilerExecutor:
                 pass
 
             # 3) 构建与修复
-            typer.secho(
-                "[c2rust-transpiler][build] 开始 cargo 测试循环",
-                fg=typer.colors.MAGENTA,
-            )
+            PrettyOutput.auto_print("📋 [c2rust-transpiler][build] 开始 cargo 测试循环")
             ok = self.cargo_build_loop()
 
             # 检查构建循环中是否进行了修复（累积修复标记，不要重置）
@@ -417,9 +407,8 @@ class TranspilerExecutor:
                 # 需要重新开始
                 function_retry_count += 1
                 if function_retry_count > max_function_retries:
-                    typer.secho(
-                        f"[c2rust-transpiler] 函数重新开始次数已达上限({max_function_retries})，停止处理该函数",
-                        fg=typer.colors.RED,
+                    PrettyOutput.auto_print(
+                        f"🔄 [c2rust-transpiler] 函数重新开始次数已达上限({max_function_retries})，停止处理该函数"
                     )
                     # 保留当前状态，便于下次 resume
                     return False
@@ -428,14 +417,12 @@ class TranspilerExecutor:
                 # 继续循环，重新开始处理
                 continue
 
-            typer.secho(
-                f"[c2rust-transpiler][build] 构建结果: {'通过' if ok else '失败'}",
-                fg=typer.colors.MAGENTA,
+            PrettyOutput.auto_print(
+                f"📊 [c2rust-transpiler][build] 构建结果: {'通过' if ok else '失败'}"
             )
             if not ok:
-                typer.secho(
-                    "[c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    "🔁 [c2rust-transpiler] 在重试次数限制内未能成功构建，已停止。"
                 )
                 # 保留当前状态，便于下次 resume
                 return False
@@ -443,32 +430,28 @@ class TranspilerExecutor:
             # 构建成功，跳出循环继续后续流程
             # 如果构建过程中进行了修复，需要重新进行 review
             if build_has_fixes:
-                typer.secho(
-                    "[c2rust-transpiler][build] 构建过程中进行了修复，需要重新进行代码审查",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "👀 [c2rust-transpiler][build] 构建过程中进行了修复，需要重新进行代码审查"
                 )
             break
 
         # 4) 审查与优化（复用 Review Agent）
         # 如果构建过程中进行了修复，需要重新进行 review 以确保修复没有引入新问题
         if build_has_fixes:
-            typer.secho(
-                f"[c2rust-transpiler][review] {progress_info} 构建修复后重新开始代码审查: {rec.qname or rec.name}",
-                fg=typer.colors.MAGENTA,
+            PrettyOutput.auto_print(
+                f"🔄 [c2rust-transpiler][review] {progress_info} 构建修复后重新开始代码审查: {rec.qname or rec.name}"
             )
         else:
-            typer.secho(
-                f"[c2rust-transpiler][review] {progress_info} 开始代码审查: {rec.qname or rec.name}",
-                fg=typer.colors.MAGENTA,
+            PrettyOutput.auto_print(
+                f"👀 [c2rust-transpiler][review] {progress_info} 开始代码审查: {rec.qname or rec.name}"
             )
         self.review_and_optimize(rec, module, rust_sig)
-        typer.secho("[c2rust-transpiler][review] 代码审查完成", fg=typer.colors.MAGENTA)
+        PrettyOutput.auto_print("🔍 [c2rust-transpiler][review] 代码审查完成")
 
         # 5) 标记已转换与映射记录（JSONL）
         self.mark_converted(rec, module, rust_sig)
-        typer.secho(
-            f"[c2rust-transpiler][mark] {progress_info} 已标记并建立映射: {rec.qname or rec.name} -> {module}",
-            fg=typer.colors.GREEN,
+        PrettyOutput.auto_print(
+            f"📋 [c2rust-transpiler][mark] {progress_info} 已标记并建立映射: {rec.qname or rec.name} -> {module}"
         )
 
         # 6) 若此前有其它函数因依赖当前符号而在源码中放置了 todo!("<symbol>")，则立即回头消除（复用代码编写与修复Agent）
@@ -481,18 +464,16 @@ class TranspilerExecutor:
             symbols_to_resolve.append(rec.name)
         # 处理每个符号（去重后）
         for sym in symbols_to_resolve:
-            typer.secho(
-                f"[c2rust-transpiler][todo] 清理 todo!('{sym}') 的出现位置",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"📋 [c2rust-transpiler][todo] 清理 todo!('{sym}') 的出现位置"
             )
             self.resolve_pending_todos_for_symbol(
                 sym, module, current_rust_fn, rust_sig
             )
         # 如果有处理任何符号，统一运行一次 cargo test（避免重复运行）
         if symbols_to_resolve:
-            typer.secho(
-                "[c2rust-transpiler][build] 处理 todo 后重新运行 cargo test",
-                fg=typer.colors.MAGENTA,
+            PrettyOutput.auto_print(
+                "📋 [c2rust-transpiler][build] 处理 todo 后重新运行 cargo test"
             )
             self.cargo_build_loop()
 
@@ -502,9 +483,8 @@ class TranspilerExecutor:
         """确保模块声明链和顶层模块导出"""
         try:
             self.ensure_mod_chain_for_module(module)
-            typer.secho(
-                f"[c2rust-transpiler][mod] 已补齐 {module} 的 mod.rs 声明链",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"📋 [c2rust-transpiler][mod] 已补齐 {module} 的 mod.rs 声明链"
             )
             # 确保顶层模块在 src/lib.rs 中被公开
             mp = Path(module)
@@ -524,9 +504,8 @@ class TranspilerExecutor:
                     # 过滤掉 "mod"、"bin" 关键字和 .rs 文件
                     if top_mod not in ("mod", "bin") and not top_mod.endswith(".rs"):
                         self.ensure_top_level_pub_mod(top_mod)
-                        typer.secho(
-                            f"[c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}",
-                            fg=typer.colors.GREEN,
+                        PrettyOutput.auto_print(
+                            f"📋 [c2rust-transpiler][mod] 已在 src/lib.rs 确保顶层 pub mod {top_mod}"
                         )
             cur = self.progress.get("current") or {}
             cur["mod_chain_fixed"] = True
