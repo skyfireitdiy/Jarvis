@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List
 from typing import cast
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.models import FnRecord
 
@@ -213,9 +213,8 @@ class GenerationManager:
                     mp.write_text(
                         "// Auto-created by c2rust transpiler\n", encoding="utf-8"
                     )
-                    typer.secho(
-                        f"[c2rust-transpiler][gen] auto-created module file: {mp}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"[c2rust-transpiler][gen] auto-created module file: {mp}"
                     )
                 except Exception:
                     pass
@@ -236,9 +235,8 @@ class GenerationManager:
         # 检测并处理测试代码删除
         if self.check_and_handle_test_deletion(before_commit, agent):
             # 如果回退了，需要重新运行 agent
-            typer.secho(
-                "[c2rust-transpiler][gen] 检测到测试代码删除问题，已回退，重新运行 agent",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "[c2rust-transpiler][gen] 检测到测试代码删除问题，已回退，重新运行 agent"
             )
             before_commit = self.get_crate_commit_hash()
             # 重试时使用相同的 prompt（已包含 C 源文件位置信息）
@@ -249,9 +247,8 @@ class GenerationManager:
             )
             # 再次检测
             if self.check_and_handle_test_deletion(before_commit, agent):
-                typer.secho(
-                    "[c2rust-transpiler][gen] 再次检测到测试代码删除问题，已回退",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    "[c2rust-transpiler][gen] 再次检测到测试代码删除问题，已回退"
                 )
 
         # 如果是根符号，确保其模块在 lib.rs 中被暴露
@@ -274,9 +271,8 @@ class GenerationManager:
                         # 过滤掉 "mod" 关键字和 .rs 文件
                         if top_mod != "mod" and not top_mod.endswith(".rs"):
                             self.ensure_top_level_pub_mod(top_mod)
-                            typer.secho(
-                                f"[c2rust-transpiler][gen] 根符号 {rec.qname or rec.name} 的模块 {top_mod} 已在 lib.rs 中暴露",
-                                fg=typer.colors.GREEN,
+                            PrettyOutput.auto_print(
+                                f"[c2rust-transpiler][gen] 根符号 {rec.qname or rec.name} 的模块 {top_mod} 已在 lib.rs 中暴露"
                             )
             except Exception:
                 pass
