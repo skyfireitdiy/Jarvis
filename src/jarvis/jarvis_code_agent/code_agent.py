@@ -71,8 +71,8 @@ class CodeAgent(Agent):
         tool_group: Optional[str] = None,
         non_interactive: Optional[bool] = None,
         rule_names: Optional[str] = None,
-        enable_review: bool = False,
-        review_max_iterations: int = 3,
+        disable_review: bool = False,
+        review_max_iterations: int = 0,
         enable_task_list_manager: bool = True,
         **kwargs,
     ):
@@ -81,7 +81,7 @@ class CodeAgent(Agent):
         # 记录当前是否为非交互模式，便于在提示词/输入中动态调整行为说明
         self.non_interactive: bool = bool(non_interactive)
         # Review 相关配置
-        self.enable_review = enable_review
+        self.disable_review = disable_review
         self.review_max_iterations = review_max_iterations
 
         # 存储开始时的commit hash，用于后续git diff获取
@@ -356,7 +356,7 @@ git reset --hard {start_commit}
             self.git_manager.handle_uncommitted_changes()
 
             # 如果启用了 review，执行 review 和修复循环
-            if self.enable_review:
+            if not self.disable_review:
                 self._review_and_fix(
                     user_input=user_input,
                     enhanced_input=enhanced_input,
@@ -712,22 +712,34 @@ git reset --hard {start_commit}
 
         iteration = 0
         max_iterations = self.review_max_iterations
+        # 如果 max_iterations 为 0，表示无限 review
+        is_infinite = max_iterations == 0
 
-        while iteration < max_iterations:
+        while is_infinite or iteration < max_iterations:
             iteration += 1
 
             # 每轮审查开始前显示清晰的提示信息
             if not self.non_interactive:
-                PrettyOutput.auto_print(
-                    f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
-                )
+                if is_infinite:
+                    PrettyOutput.auto_print(
+                        f"\n🔄 代码审查循环 - 第 {iteration} 轮（无限模式）"
+                    )
+                else:
+                    PrettyOutput.auto_print(
+                        f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
+                    )
                 if not user_confirm("是否开始本轮代码审查？", default=True):
                     PrettyOutput.auto_print("ℹ️ 用户终止了代码审查")
                     return
             else:
-                PrettyOutput.auto_print(
-                    f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
-                )
+                if is_infinite:
+                    PrettyOutput.auto_print(
+                        f"\n🔍 开始第 {iteration} 轮代码审查...（无限模式）"
+                    )
+                else:
+                    PrettyOutput.auto_print(
+                        f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
+                    )
 
             # 获取从开始到当前的 git diff
             current_commit = get_latest_commit_hash()
@@ -788,7 +800,8 @@ git reset --hard {start_commit}
                     PrettyOutput.auto_print("ℹ️ 用户选择终止审查，保持当前代码状态")
                     return
 
-            if iteration >= max_iterations:
+            # 只有在非无限模式下才检查是否达到最大迭代次数
+            if not is_infinite and iteration >= max_iterations:
                 PrettyOutput.auto_print(
                     f"\n⚠️ 已达到最大审查次数 ({max_iterations})，停止审查"
                 )
@@ -799,6 +812,7 @@ git reset --hard {start_commit}
                     # 用户选择继续，重置迭代次数
                     iteration = 0
                     max_iterations = self.review_max_iterations
+                    is_infinite = max_iterations == 0
                 else:
                     return
 
@@ -875,13 +889,13 @@ def cli(
         "--rule-names",
         help="指定规则名称列表，用逗号分隔，从 rules.yaml 文件中读取对应的规则内容",
     ),
-    enable_review: bool = typer.Option(
+    disable_review: bool = typer.Option(
         False,
-        "--enable-review",
+        "--disable-review",
         help="启用代码审查：在代码修改完成后自动进行代码审查，发现问题则自动修复",
     ),
     review_max_iterations: int = typer.Option(
-        3,
+        0,
         "--review-max-iterations",
         help="代码审查最大迭代次数，达到上限后停止审查（默认3次）",
     ),
@@ -967,7 +981,7 @@ def cli(
             tool_group=tool_group,
             non_interactive=non_interactive,
             rule_names=rule_names,
-            enable_review=enable_review,
+            disable_review=disable_review,
             review_max_iterations=review_max_iterations,
         )
 
