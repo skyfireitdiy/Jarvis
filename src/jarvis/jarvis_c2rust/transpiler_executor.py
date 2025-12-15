@@ -24,6 +24,7 @@ from jarvis.jarvis_c2rust.library_replacer_utils import is_entry_function
 from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.utils import ensure_order_file
 from jarvis.jarvis_c2rust.utils import iter_order_steps
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class TranspilerExecutor:
@@ -100,14 +101,13 @@ class TranspilerExecutor:
 
     def execute(self) -> None:
         """执行转译主流程"""
-        typer.secho("[c2rust-transpiler][start] 开始转译", fg=typer.colors.BLUE)
+        PrettyOutput.auto_print("🚀 [c2rust-transpiler][start] 开始转译")
         # 切换到 crate 根目录，整个转译过程都在此目录下执行
         prev_cwd = os.getcwd()
         try:
             os.chdir(str(self.crate_dir))
-            typer.secho(
-                f"[c2rust-transpiler][start] 已切换到 crate 目录: {os.getcwd()}",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"📁 [c2rust-transpiler][start] 已切换到 crate 目录: {os.getcwd()}"
             )
             # 准确性兜底：在未执行 prepare 的情况下，确保 crate 目录与最小 Cargo 配置存在
             self._ensure_crate_structure()
@@ -115,9 +115,7 @@ class TranspilerExecutor:
             order_path = ensure_order_file(self.project_root)
             steps = iter_order_steps(order_path)
             if not steps:
-                typer.secho(
-                    "[c2rust-transpiler] 未找到翻译步骤。", fg=typer.colors.YELLOW
-                )
+                PrettyOutput.auto_print("⚠️ [c2rust-transpiler] 未找到翻译步骤。")
                 return
 
             # 构建自包含 order 索引（id -> FnRecord，name/qname -> id）
@@ -137,9 +135,8 @@ class TranspilerExecutor:
             # 恢复时，reset 到最后一个已转换函数的 commit id
             self._handle_resume(seq, done)
 
-            typer.secho(
-                f"[c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)} 待处理={total_to_process}",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"📊 [c2rust-transpiler][order] 顺序信息: 步骤数={len(steps)} 总ID={sum(len(g) for g in steps)} 已转换={len(done)} 待处理={total_to_process}"
             )
 
             for fid in seq:
@@ -149,9 +146,8 @@ class TranspilerExecutor:
                 if not rec:
                     continue
                 if self.should_skip(rec):
-                    typer.secho(
-                        f"[c2rust-transpiler][skip] 跳过 {rec.qname or rec.name} (id={rec.id}) 位于 {rec.file}:{rec.start_line}-{rec.end_line}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⏭️ [c2rust-transpiler][skip] 跳过 {rec.qname or rec.name} (id={rec.id}) 位于 {rec.file}:{rec.start_line}-{rec.end_line}"
                     )
                     continue
 
@@ -174,9 +170,8 @@ class TranspilerExecutor:
             )
         finally:
             os.chdir(prev_cwd)
-            typer.secho(
-                f"[c2rust-transpiler][end] 已恢复工作目录: {os.getcwd()}",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"🏁 [c2rust-transpiler][end] 已恢复工作目录: {os.getcwd()}"
             )
 
     def _ensure_crate_structure(self) -> None:
@@ -196,9 +191,8 @@ class TranspilerExecutor:
                 )
                 try:
                     cargo.write_text(content, encoding="utf-8")
-                    typer.secho(
-                        f"[c2rust-transpiler][init] created Cargo.toml at {cargo}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"✅ [c2rust-transpiler][init] created Cargo.toml at {cargo}"
                     )
                 except Exception:
                     pass
@@ -209,9 +203,8 @@ class TranspilerExecutor:
                     lib_rs.write_text(
                         "// Auto-created by c2rust transpiler\n", encoding="utf-8"
                     )
-                    typer.secho(
-                        f"[c2rust-transpiler][init] created src/lib.rs at {lib_rs}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"✅ [c2rust-transpiler][init] created src/lib.rs at {lib_rs}"
                     )
                 except Exception:
                     pass
@@ -242,24 +235,20 @@ class TranspilerExecutor:
 
         current_commit = self.get_crate_commit_hash()
         if current_commit != last_commit:
-            typer.secho(
-                f"[c2rust-transpiler][resume] 检测到代码状态不一致，正在 reset 到最后一个已转换函数的 commit: {last_commit}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"🔄 [c2rust-transpiler][resume] 检测到代码状态不一致，正在 reset 到最后一个已转换函数的 commit: {last_commit}"
             )
             if self.reset_to_commit(last_commit):
-                typer.secho(
-                    f"[c2rust-transpiler][resume] 已 reset 到 commit: {last_commit}",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"✅ [c2rust-transpiler][resume] 已 reset 到 commit: {last_commit}"
                 )
             else:
-                typer.secho(
-                    "[c2rust-transpiler][resume] reset 失败，继续使用当前代码状态",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-transpiler][resume] reset 失败，继续使用当前代码状态"
                 )
         else:
-            typer.secho(
-                "[c2rust-transpiler][resume] 代码状态一致，无需 reset",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                "✅ [c2rust-transpiler][resume] 代码状态一致，无需 reset"
             )
 
     def _process_function(self, rec: FnRecord, progress_info: str) -> bool:
@@ -273,14 +262,12 @@ class TranspilerExecutor:
         self.run_cargo_fmt(workspace_root)
 
         # 读取C函数源码
-        typer.secho(
-            f"[c2rust-transpiler][read] {progress_info} 读取 C 源码: {rec.qname or rec.name} (id={rec.id}) 来自 {rec.file}:{rec.start_line}-{rec.end_line}",
-            fg=typer.colors.BLUE,
+        PrettyOutput.auto_print(
+            f"📖 [c2rust-transpiler][read] {progress_info} 读取 C 源码: {rec.qname or rec.name} (id={rec.id}) 来自 {rec.file}:{rec.start_line}-{rec.end_line}"
         )
         c_code = self.read_source_span(rec)
-        typer.secho(
-            f"[c2rust-transpiler][read] 已加载 {len(c_code.splitlines()) if c_code else 0} 行",
-            fg=typer.colors.BLUE,
+        PrettyOutput.auto_print(
+            f"📊 [c2rust-transpiler][read] 已加载 {len(c_code.splitlines()) if c_code else 0} 行"
         )
 
         # 若缺少源码片段且缺乏签名/参数信息，则跳过本函数，记录进度以便后续处理
@@ -291,31 +278,27 @@ class TranspilerExecutor:
             if rec.id not in skipped:
                 skipped.append(rec.id)
             self.progress["skipped_missing_source"] = skipped
-            typer.secho(
-                f"[c2rust-transpiler] {progress_info} 跳过：缺少源码与签名信息 -> {rec.qname or rec.name} (id={rec.id})",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler] {progress_info} 跳过：缺少源码与签名信息 -> {rec.qname or rec.name} (id={rec.id})"
             )
             self.save_progress()
             return True  # 跳过不算失败
 
         # 1) 规划：模块路径与Rust签名
-        typer.secho(
-            f"[c2rust-transpiler][plan] {progress_info} 正在规划模块与签名: {rec.qname or rec.name} (id={rec.id})",
-            fg=typer.colors.CYAN,
+        PrettyOutput.auto_print(
+            f"📝 [c2rust-transpiler][plan] {progress_info} 正在规划模块与签名: {rec.qname or rec.name} (id={rec.id})"
         )
         module, rust_sig, skip_implementation = self.plan_module_and_signature(
             rec, c_code
         )
-        typer.secho(
-            f"[c2rust-transpiler][plan] 已选择 模块={module}, 签名={rust_sig}",
-            fg=typer.colors.CYAN,
+        PrettyOutput.auto_print(
+            f"✅ [c2rust-transpiler][plan] 已选择 模块={module}, 签名={rust_sig}"
         )
 
         # 记录当前进度
         self.update_progress_current(rec, module, rust_sig)
-        typer.secho(
-            f"[c2rust-transpiler][progress] 已更新当前进度记录 id={rec.id}",
-            fg=typer.colors.CYAN,
+        PrettyOutput.auto_print(
+            f"📝 [c2rust-transpiler][progress] 已更新当前进度记录 id={rec.id}"
         )
 
         # 检测 main 函数并更新 Cargo.toml
@@ -335,23 +318,20 @@ class TranspilerExecutor:
                         pass
                 # 确保路径以 src/ 开头
                 if module_path_clean.startswith("src/"):
-                    typer.secho(
-                        f"[c2rust-transpiler][main] 检测到 main 函数，更新 Cargo.toml 添加 [[bin]] 配置: {module_path_clean}",
-                        fg=typer.colors.CYAN,
+                    PrettyOutput.auto_print(
+                        f"⚙️ [c2rust-transpiler][main] 检测到 main 函数，更新 Cargo.toml 添加 [[bin]] 配置: {module_path_clean}"
                     )
                     self.ensure_cargo_toml_bin(module_path_clean)
 
         # 如果标记为跳过实现，则直接标记为已转换
         if skip_implementation:
-            typer.secho(
-                f"[c2rust-transpiler][skip-impl] 函数 {rec.qname or rec.name} 评估为不需要实现，跳过实现阶段",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"⏭️ [c2rust-transpiler][skip-impl] 函数 {rec.qname or rec.name} 评估为不需要实现，跳过实现阶段"
             )
             # 直接标记为已转换，跳过代码生成、构建和审查阶段
             self.mark_converted(rec, module, rust_sig)
-            typer.secho(
-                f"[c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module} (跳过实现，视为已实现)",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"✅ [c2rust-transpiler][mark] 已标记并建立映射: {rec.qname or rec.name} -> {module} (跳过实现，视为已实现)"
             )
             return True
 
@@ -364,14 +344,12 @@ class TranspilerExecutor:
         # 在处理函数前，记录当前的 commit id（用于失败回退）
         self.current_function_start_commit_setter(self.get_crate_commit_hash())
         if self.current_function_start_commit_getter():
-            typer.secho(
-                f"[c2rust-transpiler][commit] 记录函数开始时的 commit: {self.current_function_start_commit_getter()}",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"🔖 [c2rust-transpiler][commit] 记录函数开始时的 commit: {self.current_function_start_commit_getter()}"
             )
         else:
-            typer.secho(
-                "[c2rust-transpiler][commit] 警告：无法获取 commit id，将无法在失败时回退",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "⚠️ [c2rust-transpiler][commit] 警告：无法获取 commit id，将无法在失败时回退"
             )
 
         # 重置连续失败计数（每个新函数开始时重置）
