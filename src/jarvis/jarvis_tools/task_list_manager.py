@@ -596,6 +596,10 @@ class task_list_manager:
   - 如果子任务之间有依赖，使用 `dependencies` 参数明确指定
   - 切分后的子任务都应该使用 `agent_type: "sub"`，由系统自动创建子 Agent 执行
 
+**全局背景信息：**
+- 使用 `background` 参数为所有子任务提供统一的背景信息，这些信息会自动附加到每个子任务的描述中
+- 适用于提供全局约束、技术栈要求、统一规范等公共上下文
+
 **依赖关系：**
 - 在 `add_tasks` 时，任务的 `dependencies` 可以引用本次批次中的任务名称（系统会自动匹配）
 - 或者引用已存在的任务ID
@@ -795,6 +799,10 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
             "main_goal": {
                 "type": "string",
                 "description": "任务列表的核心目标（必填，仅在首次创建任务列表时使用）。创建新任务列表时必须提供此参数。",
+            },
+            "background": {
+                "type": "string",
+                "description": "所有子任务的公共背景信息，将自动添加到每个子任务的描述中。可用于提供全局上下文、约束条件或统一说明。",
             },
             "tasks_info": {
                 "type": "array",
@@ -1053,6 +1061,27 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                 "stdout": "",
                 "stderr": "tasks_info 必须是数组",
             }
+
+        # 获取background参数并处理
+        background = args.get("background", "")
+        if background and str(background).strip():
+            # 将background信息附加到每个子任务的描述中
+            processed_tasks_info = []
+            for task_info in tasks_info:
+                if isinstance(task_info, dict) and "task_desc" in task_info:
+                    # 创建新的task_info字典，避免修改原始数据
+                    new_task_info = task_info.copy()
+
+                    # 构建新的任务描述，包含background信息
+                    original_desc = task_info["task_desc"]
+                    separator = "\n" + "=" * 50 + "\n"
+                    new_task_info["task_desc"] = (
+                        f"{original_desc}{separator}公共背景信息:\n{background}"
+                    )
+                    processed_tasks_info.append(new_task_info)
+                else:
+                    processed_tasks_info.append(task_info)
+            tasks_info = processed_tasks_info
 
         # add_tasks 方法已经支持通过任务名称匹配依赖关系
         task_ids, success, error_msg = task_list_manager.add_tasks(
