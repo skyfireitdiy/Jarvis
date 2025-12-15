@@ -159,6 +159,258 @@ class task_list_manager:
             # 如果导入失败，回退到通用Agent
             return False
 
+    def _create_verification_agent(
+        self, task: Any, parent_agent: Any, verification_iteration: int = 1
+    ) -> Any:
+        """创建验证 Agent，只能使用 read_code 和 execute_script 工具
+
+        参数:
+            task: 任务对象
+            parent_agent: 父 Agent 实例
+            verification_iteration: 验证迭代次数
+
+        返回:
+            Agent: 验证 Agent 实例
+        """
+        from jarvis.jarvis_agent import Agent
+        from jarvis.jarvis_utils.globals import get_global_model_group
+
+        # 构建验证任务的系统提示词
+        verification_system_prompt = f"""你是一个任务验证专家。你的任务是验证任务是否真正完成。
+
+**任务信息：**
+- 任务名称：{task.task_name}
+- 任务描述：{task.task_desc}
+- 预期输出：{task.expected_output}
+
+**验证要求：**
+1. 使用 read_code 工具读取相关代码文件，检查任务是否真正完成
+2. 使用 execute_script 工具执行编译/构建命令，验证代码是否能够成功编译（如果有编译步骤）
+3. 使用 execute_script 工具执行测试命令，验证功能是否正常工作（如果有测试）
+4. 检查代码是否符合任务描述的要求
+5. 检查是否有编译错误、运行时错误或测试失败
+
+**验证标准：**
+- 代码必须能够成功编译/构建（无编译错误、无语法错误、无链接错误）
+- 功能必须经过实际运行验证（不能仅凭代码存在就认为完成）
+- 所有测试必须通过（如果有测试用例）
+- 代码必须符合任务描述的要求
+
+**重要：**
+- 只能使用 read_code 和 execute_script 工具
+- 必须基于实际验证结果，不能推测或假设
+- 如果存在编译错误、运行时错误或测试失败，必须明确标记为未完成
+"""
+
+        # 构建验证任务的总结提示词（结构化格式要求）
+        verification_summary_prompt = f"""请以结构化的格式总结任务验证结果。必须严格按照以下格式输出：
+
+## 任务验证结果
+
+**任务名称**：{task.task_name}
+
+**验证状态**：[PASSED/FAILED]
+
+**最终结论**：[VERIFICATION_PASSED 或 VERIFICATION_FAILED]
+
+**说明**：
+- 如果验证通过：输出 "任务已完成，所有验证通过"
+- 如果验证失败：详细说明不通过的原因，包括：
+  * 具体的错误信息（编译错误、运行时错误、测试失败等）
+  * 缺少什么功能或代码
+  * 需要如何修复
+
+**重要**：
+- 必须严格按照上述格式输出
+- 验证状态必须是 PASSED 或 FAILED
+- 最终结论必须是 "VERIFICATION_PASSED" 或 "VERIFICATION_FAILED"
+- 如果验证失败，必须在"说明"中提供具体的不通过原因和修复建议
+"""
+
+        # 获取父 Agent 的模型组
+        model_group = get_global_model_group()
+        try:
+            if parent_agent is not None:
+                model_group = getattr(parent_agent, "model_group", model_group)
+        except Exception:
+            pass
+
+        # 创建验证 Agent，只使用 read_code 和 execute_script 工具
+        verification_agent = Agent(
+            system_prompt=verification_system_prompt,
+            name=f"verification_agent_{task.task_id}_{verification_iteration}",
+            description="Task verification agent",
+            model_group=model_group,
+            summary_prompt=verification_summary_prompt,
+            auto_complete=True,
+            need_summary=True,
+            use_tools=["read_code", "execute_script"],  # 只使用这两个工具
+            non_interactive=True,
+        )
+
+        return verification_agent
+
+    def _verify_task_completion(
+        self,
+        task: Any,
+        task_content: str,
+        background: str,
+        parent_agent: Any,
+        verification_iteration: int = 1,
+    ) -> tuple[bool, str]:
+        """验证任务是否真正完成
+
+        参数:
+            task: 任务对象
+            task_content: 任务内容
+            background: 背景信息
+            parent_agent: 父 Agent 实例
+            verification_iteration: 验证迭代次数
+
+        返回:
+            tuple[bool, str]: (是否完成, 验证结果或失败原因)
+        """
+        try:
+            from jarvis.jarvis_utils.globals import delete_agent
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            # 创建验证 Agent
+            verification_agent = self._create_verification_agent(
+                task, parent_agent, verification_iteration
+            )
+
+            # 构建验证任务
+            verification_task = f"""请验证以下任务是否真正完成：
+
+{task_content}
+
+背景信息：
+{background}
+
+请使用 read_code 和 execute_script 工具进行验证，检查：
+1. 代码是否能够成功编译/构建
+2. 功能是否经过实际运行验证
+3. 所有测试是否通过
+4. 代码是否符合任务描述的要求
+
+如果存在编译错误、运行时错误或测试失败，必须明确标记为未完成，并详细说明原因。
+"""
+
+            PrettyOutput.auto_print(
+                f"🔍 开始验证任务 [{task.task_name}] (第 {verification_iteration} 次验证)..."
+            )
+
+            # 执行验证
+            verification_result = verification_agent.run(verification_task)
+
+            # 清理验证 Agent
+            try:
+                delete_agent(verification_agent.name)
+            except Exception:
+                pass
+
+            # 解析验证结果（从结构化的 summary 中提取）
+            if verification_result:
+                verification_result_str = str(verification_result)
+
+                # 尝试从结构化格式中提取验证状态
+                verification_status = None
+                final_conclusion = None
+                detailed_explanation = None
+
+                # 查找验证状态
+                import re
+
+                status_match = re.search(
+                    r"\*\*验证状态\*\*：\s*\[(PASSED|FAILED)\]", verification_result_str
+                )
+                if status_match:
+                    verification_status = status_match.group(1)
+
+                # 查找最终结论
+                conclusion_match = re.search(
+                    r"\*\*最终结论\*\*：\s*\[(VERIFICATION_PASSED|VERIFICATION_FAILED)\]",
+                    verification_result_str,
+                )
+                if conclusion_match:
+                    final_conclusion = conclusion_match.group(1)
+
+                # 提取说明（可能是"详细说明"或"说明"）
+                explanation_match = re.search(
+                    r"\*\*说明\*\*：\s*\n(.*?)(?=\n\n|\*\*|$)",
+                    verification_result_str,
+                    re.DOTALL,
+                )
+                if explanation_match:
+                    detailed_explanation = explanation_match.group(1).strip()
+                else:
+                    # 尝试查找"详细说明"
+                    explanation_match = re.search(
+                        r"\*\*详细说明\*\*：\s*\n(.*?)(?=\n\n|\*\*|$)",
+                        verification_result_str,
+                        re.DOTALL,
+                    )
+                    if explanation_match:
+                        detailed_explanation = explanation_match.group(1).strip()
+
+                # 判断验证是否通过
+                is_passed = False
+                if (
+                    verification_status == "PASSED"
+                    or final_conclusion == "VERIFICATION_PASSED"
+                ):
+                    is_passed = True
+                elif (
+                    verification_status == "FAILED"
+                    or final_conclusion == "VERIFICATION_FAILED"
+                ):
+                    is_passed = False
+                elif "VERIFICATION_PASSED" in verification_result_str.upper():
+                    is_passed = True
+                elif "VERIFICATION_FAILED" in verification_result_str.upper():
+                    is_passed = False
+                else:
+                    # 如果无法从结构化格式中提取，尝试查找关键词
+                    if (
+                        "验证通过" in verification_result_str
+                        or "所有验证通过" in verification_result_str
+                    ):
+                        is_passed = True
+                    elif (
+                        "验证失败" in verification_result_str
+                        or "验证未通过" in verification_result_str
+                    ):
+                        is_passed = False
+                    else:
+                        # 默认认为未通过
+                        is_passed = False
+
+                if is_passed:
+                    PrettyOutput.auto_print(f"✅ 任务 [{task.task_name}] 验证通过")
+                    return True, verification_result_str
+                else:
+                    # 使用详细说明作为失败原因，如果没有则使用整个结果
+                    failure_reason = (
+                        detailed_explanation
+                        if detailed_explanation
+                        else verification_result_str
+                    )
+                    PrettyOutput.auto_print(
+                        f"❌ 任务 [{task.task_name}] 验证未通过：{failure_reason[:200]}..."
+                    )
+                    return False, failure_reason
+            else:
+                PrettyOutput.auto_print(
+                    f"⚠️ 任务 [{task.task_name}] 验证无结果，默认认为未完成"
+                )
+                return False, "验证无结果"
+
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 验证任务 [{task.task_name}] 时发生异常: {str(e)}"
+            )
+            return False, f"验证异常: {str(e)}"
+
     def _print_task_list_status(
         self, task_list_manager: Any, task_list_id: Optional[str] = None
     ):
@@ -1176,38 +1428,71 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
 
             elif task.agent_type.value == "sub":
                 # 子 Agent 执行：自动识别使用合适的子 Agent 工具
+                # 执行后需要验证任务是否真正完成，如果未完成则继续迭代执行
+                # 初始化变量，确保在 try-except 外部可以访问
+                final_verification_passed = False
+                execution_result = None
+
                 try:
                     # 直接根据agent实例类型判断任务类型
                     is_code_task = self._determine_agent_type(
                         parent_agent, task, task_content, background
                     )
 
-                    if is_code_task:
-                        # 代码相关任务：使用 sub_code_agent 工具
-                        from jarvis.jarvis_tools.sub_code_agent import SubCodeAgentTool
+                    # 迭代执行和验证，直到任务真正完成（无限迭代，直到验证通过）
+                    iteration = 0
+                    verification_passed = False
+                    all_execution_results = []  # 记录所有执行结果
+                    all_verification_results = []  # 记录所有验证结果
 
-                        sub_code_agent_tool = SubCodeAgentTool()
+                    while not verification_passed:
+                        iteration += 1
+                        from jarvis.jarvis_utils.output import PrettyOutput
 
-                        # 构建子Agent名称：使用任务名称和ID，便于识别
-                        agent_name = f"{task.task_name} (task_{task_id})"
-
-                        # 调用 sub_code_agent 执行任务
-                        tool_result = sub_code_agent_tool.execute(
-                            {
-                                "task": task_content,
-                                "background": background,
-                                "name": agent_name,
-                                "agent": parent_agent,
-                            }
+                        PrettyOutput.auto_print(
+                            f"🔄 执行任务 [{task.task_name}] (第 {iteration} 次迭代)..."
                         )
-                    else:
-                        # 通用任务：使用 sub_agent 工具
-                        from jarvis.jarvis_tools.sub_agent import SubAgentTool
 
-                        sub_general_agent_tool = SubAgentTool()
+                        if is_code_task:
+                            # 代码相关任务：使用 sub_code_agent 工具
+                            from jarvis.jarvis_tools.sub_code_agent import (
+                                SubCodeAgentTool,
+                            )
 
-                        # 构建系统提示词和总结提示词
-                        system_prompt = f"""你是一个专业的任务执行助手。
+                            sub_code_agent_tool = SubCodeAgentTool()
+
+                            # 构建子Agent名称：使用任务名称和ID，便于识别
+                            agent_name = f"{task.task_name} (task_{task_id})"
+
+                            # 如果是第二次及以后的迭代，添加验证反馈信息
+                            enhanced_task_content = task_content
+                            if iteration > 1 and all_verification_results:
+                                last_verification = all_verification_results[-1]
+                                enhanced_task_content = f"""{task_content}
+
+**之前的验证反馈（需要修复的问题）：**
+{last_verification}
+
+请根据以上验证反馈修复问题，确保任务真正完成。
+"""
+
+                            # 调用 sub_code_agent 执行任务
+                            tool_result = sub_code_agent_tool.execute(
+                                {
+                                    "task": enhanced_task_content,
+                                    "background": background,
+                                    "name": agent_name,
+                                    "agent": parent_agent,
+                                }
+                            )
+                        else:
+                            # 通用任务：使用 sub_agent 工具
+                            from jarvis.jarvis_tools.sub_agent import SubAgentTool
+
+                            sub_general_agent_tool = SubAgentTool()
+
+                            # 构建系统提示词和总结提示词
+                            system_prompt = f"""你是一个专业的任务执行助手。
 
 当前任务: {task.task_name}
 
@@ -1217,42 +1502,90 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
 
 请专注于完成这个任务，完成后提供清晰的输出结果。
 """
-                        summary_prompt = f"总结任务 [{task.task_name}] 的执行结果，包括完成的工作和输出内容。"
+                            summary_prompt = f"总结任务 [{task.task_name}] 的执行结果，包括完成的工作和输出内容。"
 
-                        # 构建子Agent名称：使用任务名称和ID，便于识别
-                        agent_name = f"{task.task_name} (task_{task_id})"
+                            # 构建子Agent名称：使用任务名称和ID，便于识别
+                            agent_name = f"{task.task_name} (task_{task_id})"
 
-                        # 调用 sub_agent 执行任务
-                        tool_result = sub_general_agent_tool.execute(
-                            {
-                                "task": task_content,
-                                "background": background,
-                                "name": agent_name,
-                                "system_prompt": system_prompt,
-                                "summary_prompt": summary_prompt,
-                                "agent": parent_agent,
+                            # 如果是第二次及以后的迭代，添加验证反馈信息
+                            enhanced_task_content = task_content
+                            if iteration > 1 and all_verification_results:
+                                last_verification = all_verification_results[-1]
+                                enhanced_task_content = f"""{task_content}
+
+**之前的验证反馈（需要修复的问题）：**
+{last_verification}
+
+请根据以上验证反馈修复问题，确保任务真正完成。
+"""
+
+                            # 调用 sub_agent 执行任务
+                            tool_result = sub_general_agent_tool.execute(
+                                {
+                                    "task": enhanced_task_content,
+                                    "background": background,
+                                    "name": agent_name,
+                                    "system_prompt": system_prompt,
+                                    "summary_prompt": summary_prompt,
+                                    "agent": parent_agent,
+                                }
+                            )
+
+                        execution_result = tool_result.get("stdout", "")
+                        execution_success = tool_result.get("success", False)
+
+                        if not execution_success:
+                            # 执行失败，更新任务状态为 failed
+                            task_list_manager.update_task_status(
+                                task_list_id=task_list_id,
+                                task_id=task_id,
+                                status="failed",
+                                agent_id=agent_id,
+                                is_main_agent=is_main_agent,
+                                actual_output=f"执行失败: {tool_result.get('stderr', '未知错误')}",
+                            )
+                            return {
+                                "success": False,
+                                "stdout": "",
+                                "stderr": f"子 Agent 执行失败: {tool_result.get('stderr', '未知错误')}",
                             }
+
+                        # 记录执行结果
+                        all_execution_results.append(execution_result)
+
+                        # 验证任务是否真正完成
+                        verification_passed, verification_result = (
+                            self._verify_task_completion(
+                                task,
+                                task_content,
+                                background,
+                                parent_agent,
+                                verification_iteration=iteration,
+                            )
                         )
 
-                    execution_result = tool_result.get("stdout", "")
-                    execution_success = tool_result.get("success", False)
+                        # 记录验证结果
+                        all_verification_results.append(verification_result)
 
-                    if not execution_success:
-                        # 执行失败，更新任务状态为 failed
-                        task_list_manager.update_task_status(
-                            task_list_id=task_list_id,
-                            task_id=task_id,
-                            status="failed",
-                            agent_id=agent_id,
-                            is_main_agent=is_main_agent,
-                            actual_output=f"执行失败: {tool_result.get('stderr', '未知错误')}",
-                        )
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": f"子 Agent 执行失败: {tool_result.get('stderr', '未知错误')}",
-                        }
+                        if not verification_passed:
+                            PrettyOutput.auto_print(
+                                f"⚠️ 任务 [{task.task_name}] 验证未通过，将继续迭代修复 (第 {iteration} 次迭代)"
+                            )
+                        else:
+                            PrettyOutput.auto_print(
+                                f"✅ 任务 [{task.task_name}] 验证通过，任务真正完成 (共执行 {iteration} 次迭代)"
+                            )
+                            final_verification_passed = True
 
+                    # 保存最终验证状态（循环退出时 verification_passed 应该为 True）
+                    final_verification_passed = verification_passed
+
+                    # 使用最后一次的执行结果
+                    execution_result = (
+                        all_execution_results[-1]
+                        if all_execution_results
+                        else "任务执行完成"
+                    )
                 except Exception as e:
                     # 执行异常，更新任务状态为 failed
                     task_list_manager.update_task_status(
@@ -1268,6 +1601,10 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                         "stdout": "",
                         "stderr": f"创建子 Agent 执行任务失败: {str(e)}",
                     }
+
+                # 确保 execution_result 有值
+                if execution_result is None:
+                    execution_result = "任务执行完成"
 
             # 处理执行结果：如果结果太长，进行截断并添加提示
             processed_result = execution_result or "任务执行完成"
@@ -1296,15 +1633,34 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                     f"已截断为 {len(truncated_result)} 字符（基于剩余token限制：{max_output_length} 字符）"
                 )
 
-            # 执行成功，更新任务状态为 completed
-            task_list_manager.update_task_status(
-                task_list_id=task_list_id,
-                task_id=task_id,
-                status="completed",
-                agent_id=agent_id,
-                is_main_agent=is_main_agent,
-                actual_output=processed_result,
-            )
+            # 对于 sub agent 类型的任务，只有在验证通过后才更新为 completed
+            # 如果验证未通过但达到最大迭代次数，标记为 failed
+            if task.agent_type.value == "sub":
+                # 检查最终验证状态
+                if final_verification_passed:
+                    # 验证通过，更新任务状态为 completed
+                    task_list_manager.update_task_status(
+                        task_list_id=task_list_id,
+                        task_id=task_id,
+                        status="completed",
+                        agent_id=agent_id,
+                        is_main_agent=is_main_agent,
+                        actual_output=processed_result,
+                    )
+                else:
+                    # 验证未通过，标记为 failed
+                    task_list_manager.update_task_status(
+                        task_list_id=task_list_id,
+                        task_id=task_id,
+                        status="failed",
+                        agent_id=agent_id,
+                        is_main_agent=is_main_agent,
+                        actual_output=processed_result,
+                    )
+            else:
+                # 对于 main agent 类型的任务，直接更新为 completed（由主 Agent 自行管理状态）
+                # 这里不更新状态，由主 Agent 自行调用 update_task 更新
+                pass
 
             # 构建格式化的任务完成通知
             import datetime

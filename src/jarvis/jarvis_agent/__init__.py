@@ -1468,13 +1468,13 @@ class Agent:
         """格式化摘要消息"""
         # 获取任务列表信息
         task_list_info = self._get_task_list_info()
-        
+
         # 获取会话文件路径信息
         session_file_info = ""
         try:
             from jarvis.jarvis_utils.dialogue_recorder import get_global_recorder
             from pathlib import Path
-            
+
             recorder = get_global_recorder()
             session_file_path = recorder.get_session_file_path()
             if Path(session_file_path).exists():
