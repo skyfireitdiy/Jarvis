@@ -136,9 +136,10 @@ def codeagent_generate_impl(
                 mp.write_text(
                     "// Auto-created by c2rust transpiler\n", encoding="utf-8"
                 )
-                typer.secho(
-                    f"[c2rust-transpiler][gen] auto-created module file: {mp}",
-                    fg=typer.colors.GREEN,
+                from jarvis.jarvis_utils.output import PrettyOutput
+
+                PrettyOutput.auto_print(
+                    f"✅ [c2rust-transpiler][gen] auto-created module file: {mp}",
                 )
             except Exception:
                 pass
@@ -158,9 +159,10 @@ def codeagent_generate_impl(
     # 检测并处理测试代码删除
     if self._check_and_handle_test_deletion(before_commit, agent):
         # 如果回退了，需要重新运行 agent
-        typer.secho(
-            "[c2rust-transpiler][gen] 检测到测试代码删除问题，已回退，重新运行 agent",
-            fg=typer.colors.YELLOW,
+        from jarvis.jarvis_utils.output import PrettyOutput
+
+        PrettyOutput.auto_print(
+            "⚠️ [c2rust-transpiler][gen] 检测到测试代码删除问题，已回退，重新运行 agent",
         )
         before_commit = self._get_crate_commit_hash()
         agent.run(
@@ -195,9 +197,10 @@ def codeagent_generate_impl(
                     # 过滤掉 "mod" 关键字和 .rs 文件
                     if top_mod != "mod" and not top_mod.endswith(".rs"):
                         self._ensure_top_level_pub_mod(top_mod)
-                        typer.secho(
-                            f"[c2rust-transpiler][gen] 根符号 {rec.qname or rec.name} 的模块 {top_mod} 已在 lib.rs 中暴露",
-                            fg=typer.colors.GREEN,
+                        from jarvis.jarvis_utils.output import PrettyOutput
+
+                        PrettyOutput.auto_print(
+                            f"📋 [c2rust-transpiler][gen] 根符号 {rec.qname or rec.name} 的模块 {top_mod} 已在 lib.rs 中暴露",
                         )
         except Exception:
             pass
