@@ -11,9 +11,8 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import typer
-
 from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_c2rust.models import FnRecord
@@ -335,9 +334,8 @@ class PlanningManager:
                     response = agent.model.chat_until_success(full_prompt)
                     summary = response
                 except Exception as e:
-                    typer.secho(
-                        f"[c2rust-transpiler][plan] 直接模型调用失败: {e}，回退到 run()",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [c2rust-transpiler][plan] 直接模型调用失败: {e}，回退到 run()"
                     )
                     summary = agent.run(usr_p)
             else:
@@ -347,9 +345,8 @@ class PlanningManager:
             meta, parse_error = extract_json_from_summary(str(summary or ""))
             if parse_error:
                 # JSON解析失败，将错误信息反馈给模型
-                typer.secho(
-                    f"[c2rust-transpiler][plan] JSON解析失败: {parse_error}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][plan] JSON解析失败: {parse_error}"
                 )
                 last_reason = f"JSON解析失败: {parse_error}"
                 use_direct_model = True
@@ -363,25 +360,21 @@ class PlanningManager:
                 skip_impl = bool(meta.get("skip_implementation") is True)
                 if skip_impl:
                     notes = str(meta.get("notes") or "")
-                    typer.secho(
-                        f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}, 跳过实现={skip_impl}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"✅ [c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}, 跳过实现={skip_impl}"
                     )
                     if notes:
-                        typer.secho(
-                            f"[c2rust-transpiler][plan] 跳过实现原因: {notes}",
-                            fg=typer.colors.CYAN,
+                        PrettyOutput.auto_print(
+                            f"ℹ️ [c2rust-transpiler][plan] 跳过实现原因: {notes}"
                         )
                 else:
-                    typer.secho(
-                        f"[c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"✅ [c2rust-transpiler][plan] 第 {attempt} 次尝试成功: 模块={module}, 签名={rust_sig}"
                     )
                 return module, rust_sig, skip_impl
             else:
-                typer.secho(
-                    f"[c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][plan] 第 {attempt} 次尝试失败: {reason}"
                 )
                 last_reason = reason
                 # 格式校验失败，后续重试使用直接模型调用
@@ -395,8 +388,7 @@ class PlanningManager:
         except Exception:
             fallback_module = "src/ffi.rs"
         fallback_sig = f"pub fn {rec.name or ('fn_' + str(rec.id))}()"
-        typer.secho(
-            f"[c2rust-transpiler][plan] 超出规划重试上限({plan_max_retries_val if plan_max_retries_val > 0 else '无限'})，回退到兜底: module={fallback_module}, signature={fallback_sig}",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            f"⚠️ [c2rust-transpiler][plan] 超出规划重试上限({plan_max_retries_val if plan_max_retries_val > 0 else '无限'})，回退到兜底: module={fallback_module}, signature={fallback_sig}"
         )
         return fallback_module, fallback_sig, False
