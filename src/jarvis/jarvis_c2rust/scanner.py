@@ -639,7 +639,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             raise typer.Exit(code=2)
         else:
             # Other initialization errors: surface and exit
-            PrettyOutput.auto_print(f"[c2rust-scanner] libclang 初始化失败: {e}")
+            PrettyOutput.auto_print(f"❌ [c2rust-scanner] libclang 初始化失败: {e}")
             raise typer.Exit(code=2)
 
     # compile_commands
@@ -654,7 +654,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
     files = list(iter_source_files(scan_root))
     total_files = len(files)
     PrettyOutput.auto_print(
-        f"[c2rust-scanner] 正在扫描 {scan_root} 目录下的 {total_files} 个文件"
+        f"📋 [c2rust-scanner] 正在扫描 {scan_root} 目录下的 {total_files} 个文件"
     )
 
     scanned = 0
@@ -826,7 +826,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 try:
                     funcs = scan_file(cindex, p, [])
                 except Exception:
-                    PrettyOutput.auto_print(f"[c2rust-scanner] 解析 {p} 失败: {e}")
+                    PrettyOutput.auto_print(f"❌ [c2rust-scanner] 解析 {p} 失败: {e}")
                     continue
 
             # Write JSONL
@@ -858,7 +858,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             scanned += 1
             if scanned % 20 == 0 or scanned == total_files:
                 PrettyOutput.auto_print(
-                    f"[c2rust-scanner] 进度: {scanned}/{total_files} 个文件, {total_functions} 个函数, {total_types} 个类型"
+                    f"📊 [c2rust-scanner] 进度: {scanned}/{total_files} 个文件, {total_functions} 个函数, {total_types} 个类型"
                 )
     finally:
         try:
@@ -883,21 +883,21 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
         pass
 
     PrettyOutput.auto_print(
-        f"[c2rust-scanner] 完成。收集到的函数: {total_functions}, 类型: {total_types}, 符号: {total_functions + total_types}"
+        f"✅ [c2rust-scanner] 完成。收集到的函数: {total_functions}, 类型: {total_types}, 符号: {total_functions + total_types}"
     )
     PrettyOutput.auto_print(
-        f"[c2rust-scanner] JSONL 已写入: {symbols_raw_jsonl} (原始符号)"
+        f"📊 [c2rust-scanner] JSONL 已写入: {symbols_raw_jsonl} (原始符号)"
     )
     # 同步生成基线 symbols.jsonl（与 raw 等价），便于后续流程仅基于 symbols.jsonl 运行
     try:
         shutil.copy2(symbols_raw_jsonl, symbols_curated_jsonl)
         PrettyOutput.auto_print(
-            f"[c2rust-scanner] JSONL 基线已写入: {symbols_curated_jsonl} (用于后续流程)"
+            f"📊 [c2rust-scanner] JSONL 基线已写入: {symbols_curated_jsonl} (用于后续流程)"
         )
     except Exception as _e:
-        PrettyOutput.auto_print(f"[c2rust-scanner] 生成 symbols.jsonl 失败: {_e}")
+        PrettyOutput.auto_print(f"❌ [c2rust-scanner] 生成 symbols.jsonl 失败: {_e}")
         raise
-    PrettyOutput.auto_print(f"[c2rust-scanner] 元数据已写入: {meta_json}")
+    PrettyOutput.auto_print(f"📋 [c2rust-scanner] 元数据已写入: {meta_json}")
     return symbols_raw_jsonl
 
 
@@ -1683,21 +1683,23 @@ def run_scan(
         try:
             scan_directory(root)
         except Exception as e:
-            PrettyOutput.auto_print(f"[c2rust-scanner] 错误: {e}")
+            PrettyOutput.auto_print(f"❌ [c2rust-scanner] 错误: {e}")
             raise typer.Exit(code=1)
     else:
         # Only-generate mode (no rescan). 验证输入，仅基于既有 symbols.jsonl 进行可选的 DOT/子图输出；此处不计算翻译顺序。
         if not data_path_curated.exists():
-            PrettyOutput.auto_print(f"[c2rust-scanner] 未找到数据: {data_path_curated}")
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-scanner] 未找到数据: {data_path_curated}"
+            )
             raise typer.Exit(code=2)
         if only_dot and dot is None:
             PrettyOutput.auto_print(
-                "[c2rust-scanner] --only-dot 需要 --dot 来指定输出文件"
+                "⚠️ [c2rust-scanner] --only-dot 需要 --dot 来指定输出文件"
             )
             raise typer.Exit(code=2)
         if only_subgraphs and subgraphs_dir is None:
             PrettyOutput.auto_print(
-                "[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录"
+                "⚠️ [c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录"
             )
             raise typer.Exit(code=2)
 
@@ -1706,12 +1708,14 @@ def run_scan(
         try:
             # 使用正式符号表生成可视化
             generate_dot_from_db(data_path_curated, dot)
-            PrettyOutput.auto_print(f"[c2rust-scanner] DOT 文件已写入: {dot}")
+            PrettyOutput.auto_print(f"📊 [c2rust-scanner] DOT 文件已写入: {dot}")
             if png:
                 png_path = _render_dot_to_png(dot)
-                PrettyOutput.auto_print(f"[c2rust-scanner] PNG 文件已写入: {png_path}")
+                PrettyOutput.auto_print(
+                    f"📊 [c2rust-scanner] PNG 文件已写入: {png_path}"
+                )
         except Exception as e:
-            PrettyOutput.auto_print(f"[c2rust-scanner] 写入 DOT/PNG 失败: {e}")
+            PrettyOutput.auto_print(f"❌ [c2rust-scanner] 写入 DOT/PNG 失败: {e}")
             raise typer.Exit(code=1)
 
     # Generate per-root subgraphs if requested
@@ -1729,12 +1733,12 @@ def run_scan(
                         # Fail fast on PNG generation error for subgraphs to make issues visible
                         raise
                 PrettyOutput.auto_print(
-                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个 DOT 文件和 {png_count} 个 PNG 文件 -> {subgraphs_dir}"
+                    f"📊 [c2rust-scanner] 根节点子图已写入: {len(files)} 个 DOT 文件和 {png_count} 个 PNG 文件 -> {subgraphs_dir}"
                 )
             else:
                 PrettyOutput.auto_print(
-                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个文件 -> {subgraphs_dir}"
+                    f"📊 [c2rust-scanner] 根节点子图已写入: {len(files)} 个文件 -> {subgraphs_dir}"
                 )
         except Exception as e:
-            PrettyOutput.auto_print(f"[c2rust-scanner] 写入子图 DOT/PNG 失败: {e}")
+            PrettyOutput.auto_print(f"❌ [c2rust-scanner] 写入子图 DOT/PNG 失败: {e}")
             raise typer.Exit(code=1)

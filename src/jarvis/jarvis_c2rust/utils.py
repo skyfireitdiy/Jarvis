@@ -16,7 +16,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
 from jarvis.jarvis_c2rust.constants import ORDER_JSONL
@@ -31,9 +31,7 @@ def ensure_order_file(project_root: Path) -> Path:
     """确保 translation_order.jsonl 存在且包含有效步骤；仅基于 symbols.jsonl 生成，不使用任何回退。"""
     data_dir = project_root / C2RUST_DIRNAME
     order_path = data_dir / ORDER_JSONL
-    typer.secho(
-        f"[c2rust-transpiler][order] 目标顺序文件: {order_path}", fg=typer.colors.BLUE
-    )
+    PrettyOutput.auto_print(f"📋 [c2rust-transpiler][order] 目标顺序文件: {order_path}")
 
     def _has_steps(p: Path) -> bool:
         try:
@@ -43,21 +41,18 @@ def ensure_order_file(project_root: Path) -> Path:
             return False
 
     # 已存在则校验是否有步骤
-    typer.secho(
-        f"[c2rust-transpiler][order] 检查现有顺序文件有效性: {order_path}",
-        fg=typer.colors.BLUE,
+    PrettyOutput.auto_print(
+        f"🔍 [c2rust-transpiler][order] 检查现有顺序文件有效性: {order_path}"
     )
     if order_path.exists():
         if _has_steps(order_path):
-            typer.secho(
-                f"[c2rust-transpiler][order] 现有顺序文件有效，将使用 {order_path}",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"✅ [c2rust-transpiler][order] 现有顺序文件有效，将使用 {order_path}"
             )
             return order_path
         # 为空或不可读：基于标准路径重新计算（仅 symbols.jsonl）
-        typer.secho(
-            "[c2rust-transpiler][order] 现有顺序文件为空/无效，正基于 symbols.jsonl 重新计算",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            "⚠️ [c2rust-transpiler][order] 现有顺序文件为空/无效，正基于 symbols.jsonl 重新计算"
         )
         try:
             compute_translation_order_jsonl(data_dir, out_path=order_path)
@@ -71,9 +66,8 @@ def ensure_order_file(project_root: Path) -> Path:
     except Exception as e:
         raise RuntimeError(f"计算翻译顺序失败: {e}")
 
-    typer.secho(
-        f"[c2rust-transpiler][order] 已生成顺序文件: {order_path} (exists={order_path.exists()})",
-        fg=typer.colors.BLUE,
+    PrettyOutput.auto_print(
+        f"📋 [c2rust-transpiler][order] 已生成顺序文件: {order_path} (exists={order_path.exists()})"
     )
     if not order_path.exists():
         raise FileNotFoundError(f"计算后未找到 translation_order.jsonl: {order_path}")
@@ -293,9 +287,8 @@ def detect_test_deletion(log_prefix: str = "[c2rust]") -> Optional[Dict[str, Any
             }
         return None
     except Exception as e:
-        typer.secho(
-            f"{log_prefix}[test-detection] 检测测试删除时发生异常: {e}",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            f"⚠️ {log_prefix}[test-detection] 检测测试删除时发生异常: {e}"
         )
         return None
 
@@ -362,32 +355,28 @@ def ask_llm_about_test_deletion(
 请严格按照协议格式回答，不要添加其他内容。
 """
 
-        typer.secho(
-            f"{log_prefix}[test-detection] 正在询问 LLM 判断测试代码删除是否合理...",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            f"🤔 {log_prefix}[test-detection] 正在询问 LLM 判断测试代码删除是否合理..."
         )
         response = agent.model.chat_until_success(prompt)
         response_str = str(response or "")
 
         # 使用确定的协议标记解析回答
         if "<!!!NO!!!>" in response_str:
-            typer.secho("⚠️ LLM 确认：测试代码删除不合理，需要回退", fg=typer.colors.RED)
+            PrettyOutput.auto_print("❌ LLM 确认：测试代码删除不合理，需要回退")
             return True  # 需要回退
         elif "<!!!YES!!!>" in response_str:
-            typer.secho("✅ LLM 确认：测试代码删除合理", fg=typer.colors.GREEN)
+            PrettyOutput.auto_print("✅ LLM 确认：测试代码删除合理")
             return False  # 不需要回退
         else:
             # 如果无法找到协议标记，默认认为有问题（保守策略）
-            typer.secho(
-                f"⚠️ 无法找到协议标记，默认认为有问题。回答内容: {response_str[:200]}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ 无法找到协议标记，默认认为有问题。回答内容: {response_str[:200]}"
             )
             return True  # 保守策略：默认回退
     except Exception as e:
         # 如果询问失败，默认认为有问题（保守策略）
-        typer.secho(
-            f"⚠️ 询问 LLM 失败: {str(e)}，默认认为有问题", fg=typer.colors.YELLOW
-        )
+        PrettyOutput.auto_print(f"⚠️ 询问 LLM 失败: {str(e)}，默认认为有问题")
         return True  # 保守策略：默认回退
 
 
@@ -418,27 +407,24 @@ def check_and_handle_test_deletion(
         # 没有检测到删除
         return False
 
-    typer.secho(
-        f"{log_prefix}[test-detection] 检测到可能错误删除了测试代码标记",
-        fg=typer.colors.YELLOW,
+    PrettyOutput.auto_print(
+        f"⚠️ {log_prefix}[test-detection] 检测到可能错误删除了测试代码标记"
     )
 
     # 询问 LLM（使用传入的 agent 的 model）
     need_reset = ask_llm_about_test_deletion(detection_result, agent, log_prefix)
 
     if need_reset:
-        typer.secho(
-            f"{log_prefix}[test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}",
-            fg=typer.colors.RED,
+        PrettyOutput.auto_print(
+            f"❌ {log_prefix}[test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}"
         )
         if reset_to_commit_fn(before_commit):
-            typer.secho(
-                f"{log_prefix}[test-detection] 已回退到之前的 commit",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"✅ {log_prefix}[test-detection] 已回退到之前的 commit"
             )
             return True
         else:
-            typer.secho(f"{log_prefix}[test-detection] 回退失败", fg=typer.colors.RED)
+            PrettyOutput.auto_print(f"❌ {log_prefix}[test-detection] 回退失败")
             return False
 
     return False
