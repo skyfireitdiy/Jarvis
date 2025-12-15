@@ -10,7 +10,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 class generate_new_tool:
     name = "generate_new_tool"
-    description = "生成并注册新的Jarvis工具。在用户数据目录下创建工具文件并自动注册。"
+    description = "智能生成具备自举和自进化能力的Jarvis新工具。利用CodeAgent根据用户需求分析生成完整的工具代码，包含最佳实践模板、参数验证、错误处理，并自动注册到工具系统。支持调用现有Jarvis生态系统功能（Agent/CodeAgent）实现复杂任务处理，可自我分析和改进工具性能。生成的工具具备完整的生命周期管理，包括可用性检查、参数定义、执行逻辑和自动集成。"
 
     parameters = {
         "type": "object",
