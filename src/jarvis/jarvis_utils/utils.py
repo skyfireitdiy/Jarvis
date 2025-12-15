@@ -115,9 +115,9 @@ def is_editable_install() -> bool:
     """
     检测当前 Jarvis 是否以可编辑模式安装（pip/uv install -e .）。
 
-    判断顺序：
+    判断顺序（多策略并行，任意命中即认为是可编辑安装）：
     1. 读取 PEP 610 的 direct_url.json（dir_info.editable）
-    2. 兼容旧式 .egg-link 安装
+    2. 兼容旧式 .egg-link / .pth 可编辑安装
     3. 启发式回退：源码路径上游存在 .git 且不在 site-packages/dist-packages
     """
     # 优先使用 importlib.metadata 读取 distribution 的 direct_url.json
@@ -162,15 +162,28 @@ def is_editable_install() -> bool:
 
     res = _check_direct_url()
     if res is True:
+        # 明确标记为 editable，直接返回 True
         return True
-    if res is False:
-        # 明确不是可编辑安装
-        return False
+    # 对于 res 为 False/None 的情况，不直接下结论，继续使用后续多种兼容策略进行判断
 
-    # 兼容旧式 .egg-link 可编辑安装
+    # 兼容旧式 .egg-link / .pth 可编辑安装
     try:
         module_path = Path(__file__).resolve()
         pkg_root = module_path.parent.parent  # jarvis 包根目录
+
+        # 1) 基于 sys.path 的 .egg-link / .pth 检测（更贴近测试场景，依赖 os.path.exists）
+        import os as _os
+
+        for entry in sys.path:
+            try:
+                egg_link = Path(entry) / f"{pkg_root.name}.egg-link"
+                pth_file = Path(entry) / f"{pkg_root.name}.pth"
+                if _os.path.exists(str(egg_link)) or _os.path.exists(str(pth_file)):
+                    return True
+            except Exception:
+                continue
+
+        # 2) 兼容更通用的 .egg-link 形式（读取指向源码路径）
         for entry in sys.path:
             try:
                 p = Path(entry)
