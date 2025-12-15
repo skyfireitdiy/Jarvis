@@ -1,3 +1,65 @@
+### Release Note - v1.0.2 2025-12-15
+
+#### **🚀 新功能 (Features)**
+
+- **IIRIPER 工作流强化**
+  - **Agent / CodeAgent 全面收敛到 IIRIPER 严格顺序**：系统提示词大幅精简，同时强制工作流按照 INTENT → RESEARCH → INNOVATE → PLAN → EXECUTE → REVIEW 顺序推进，禁止无故跳步或乱序执行
+  - **非交互模式默认开启**：`Agent` 与 `CodeAgent` 的 `non_interactive` 默认值改为 `True`，结合 IIRIPER 约束在 PLAN 后自动进入 EXECUTE，适配 CI/无人值守场景
+  - **自动完成默认开启**：`auto_complete` 默认改为 `True`，配合 IIRIPER + 工具调用协议，减少“卡在等待确认”的风险
+
+- **MetaAgent 工具生成能力升级**
+  - 将 `generate_new_tool` 正式升级为 `meta_agent` 元代理，统一作为“自举与演化 Jarvis 工具生态”的入口
+  - 支持基于自然语言需求自动**创建或改进**工具，并在生成后自动写入 `data/tools` 与注册到 ToolRegistry
+  - 在任务分析提示词与示例中全面替换为 `meta_agent`，并补充如何在生成工具内编排 `Agent` / `CodeAgent` 的指导
+
+#### **📌 修复 (Fixes)**
+
+- **全局 Agent 生命周期修复**
+  - 引入 `set_current_agent` / `clear_current_agent` 与运行栈，统一管理当前运行中的 Agent，避免历史接口 `set_agent` / `delete_agent` 导致的残留状态和栈错乱
+  - `SubAgent` / `SubCodeAgent` 取消手动删除全局 Agent 的逻辑，改由新的当前 Agent 栈自动收尾，降低多层嵌套场景下的状态破坏风险
+
+- **可编辑安装检测修复**
+  - 优化 `is_editable_install` 多策略检测：在 direct_url.json 之外，补充对 `.egg-link` 与 `.pth` 的兼容判断，并加强基于 `.git` 与 `site-packages/dist-packages` 的启发式校验，修复部分环境下误判为非 editable 的问题
+
+- **文件编辑错误信息修复**
+  - `edit_file` 在多文件/多 diff 失败时，统一聚合每个失败 diff 的详细错误信息到 `stderr`，不再只输出“失败 X 个文件”的笼统提示
+  - 对应测试 `tests/jarvis_tools/test_edit_file.py` 补充关键断言，确保未来变更不会回退为“无上下文”的错误信息
+
+#### **🔧 优化与重构 (Refactors & Improvements)**
+
+- **Agent / CodeAgent 提示词与规则加载重构**
+  - 大幅精简通用 `Agent` 和 `CodeAgent` 的系统提示文本，保留核心 IIRIPER 约束与任务执行规则，显著降低 token 占用
+  - 将规则加载统一下沉到 `Agent` 基类，通过 `rules_manager.load_all_rules` 按需拼接 `<rules>` 段，`CodeAgent` 不再重复实现加载逻辑
+  - `builtin_input_handler` 在运行时通过 `add_runtime_rule` 记录动态加载的规则名称，`CodeAgent.add_runtime_rule` 维护 `loaded_rule_names`，便于后续子 Agent / Review Agent 继承同一规则集
+
+- **代码审查 (Review) 流程增强**
+  - Review 提示词强化：强调必须对“代码生成总结（summary）”逐条与实际 git diff / 代码进行核对，禁止只基于总结给结论
+  - `_parse_review_result` 新增 JSON 结构修复能力：当 Review 输出格式异常时，会通过 Review Agent 的同一模型多轮尝试“自修复” JSON，最多 3 次；若仍失败，则显式返回 `JSON_FORMAT_ERROR` 并触发重新审查
+  - `_review_and_fix` 创建的 Review Agent 会自动继承主 CodeAgent 当前加载的规则（rule_names），通过 `<rules>` 注入系统提示，保证审查标准与主 Agent 一致
+
+- **任务列表验证器 (task_list_manager) 优化**
+  - 明确要求 `expected_output` 以编号或 markdown 列表的**结构化条目**形式书写，验证器会将其拆分为多条预期结果并分别核验
+  - 验证提示与总结模板均改为“逐条验证+逐条给出 PASSED/FAILED 说明”的结构，并禁止验证 Agent 进行任何修复操作，只允许给出结论
+  - 验证 Agent 的系统提示中自动拼接父 Agent 已加载规则内容，确保验证逻辑与主任务保持同一约束体系
+
+- **工具系统可用性与可读性提升**
+  - ToolRegistry 的工具列表提示改用 Markdown + `json` 代码块展示参数 schema，替代旧的 XML 风格标签，提升人类可读性与模型解析稳定性
+  - `SubCodeAgent` 在创建子 CodeAgent 时显式继承父 Agent 的规则集合 (`rule_names`) 并开启 `auto_complete=True`，保证子代理行为与父代理一致且执行闭环更顺滑
+
+#### **📚 文档更新 (Documentation)**
+
+- **技术报告与工具生成文档更新**
+  - 在《技术报告》中新增 **MetaAgent（元代理 / 工具自举器）** 小节，系统说明其职责、输入输出、与 CodeAgent/Agent 的协作关系及源码位置
+  - 更新任务分析提示、工具使用说明等处的工具生成流程描述，从 `generate_new_tool` 全面迁移为 `meta_agent`，与代码实现保持一致
+
+#### **🧪 测试增强**
+
+- **edit_file 与全局工具行为回归**
+  - 补充并加强 `tests/jarvis_tools/test_edit_file.py` 中对多 diff、多文件失败场景的断言，确保详细错误信息与文件路径/文件名必然出现在 `stderr` 中
+  - 为全局 Agent 与可编辑安装检测逻辑新增或完善针对栈管理、规则继承与 `is_editable_install` 多策略判断的单元测试，避免后续重构引入回归问题
+
+---
+
 ### Release Note - v1.0.1 2025-12-15
 
 #### **🚀 新功能 (Features)**
