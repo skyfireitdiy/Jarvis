@@ -176,7 +176,7 @@ class task_list_manager:
         from jarvis.jarvis_utils.globals import get_global_model_group
 
         # 构建验证任务的系统提示词
-        verification_system_prompt = f"""你是一个任务验证专家。你的任务是验证任务是否真正完成。
+        verification_system_prompt = f"""你是一个任务验证专家。你的任务是验证任务是否真正完成，仅验证任务预期输出和产物。
 
 **任务信息：**
 - 任务名称：{task.task_name}
@@ -184,22 +184,20 @@ class task_list_manager:
 - 预期输出：{task.expected_output}
 
 **验证要求：**
-1. 使用 read_code 工具读取相关代码文件，检查任务是否真正完成
-2. 使用 execute_script 工具执行编译/构建命令，验证代码是否能够成功编译（如果有编译步骤）
-3. 使用 execute_script 工具执行测试命令，验证功能是否正常工作（如果有测试）
-4. 检查代码是否符合任务描述的要求
-5. 检查是否有编译错误、运行时错误或测试失败
+1. 使用 read_code 工具验证任务产生的代码或文件是否符合预期输出要求
+2. 仅检查任务明确要求的产物是否存在且正确
+3. 不要验证与任务预期输出无关的项目（如整体项目编译、无关测试等）
+4. 关注任务描述中明确提到的具体交付物
 
 **验证标准：**
-- 代码必须能够成功编译/构建（无编译错误、无语法错误、无链接错误）
-- 功能必须经过实际运行验证（不能仅凭代码存在就认为完成）
-- 所有测试必须通过（如果有测试用例）
-- 代码必须符合任务描述的要求
+- 任务预期输出是否已实际生成
+- 生成的产物是否符合任务描述中的具体要求
+- 不验证无关的编译状态、测试覆盖率或代码风格
 
 **重要：**
 - 只能使用 read_code 和 execute_script 工具
 - 必须基于实际验证结果，不能推测或假设
-- 如果存在编译错误、运行时错误或测试失败，必须明确标记为未完成
+- 仅验证任务预期输出和直接相关的产物
 """
 
         # 构建验证任务的总结提示词（结构化格式要求）
@@ -214,17 +212,17 @@ class task_list_manager:
 **最终结论**：[VERIFICATION_PASSED 或 VERIFICATION_FAILED]
 
 **说明**：
-- 如果验证通过：输出 "任务已完成，所有验证通过"
+- 如果验证通过：输出 "任务预期输出已验证完成"
 - 如果验证失败：详细说明不通过的原因，包括：
-  * 具体的错误信息（编译错误、运行时错误、测试失败等）
-  * 缺少什么功能或代码
-  * 需要如何修复
+  * 预期输出未找到或不完整
+  * 实际输出与预期不符的具体差异
+  * 需要补充或修正的部分
 
 **重要**：
 - 必须严格按照上述格式输出
 - 验证状态必须是 PASSED 或 FAILED
 - 最终结论必须是 "VERIFICATION_PASSED" 或 "VERIFICATION_FAILED"
-- 如果验证失败，必须在"说明"中提供具体的不通过原因和修复建议
+- 仅基于任务预期输出进行验证，不涉及无关检查
 """
 
         # 获取父 Agent 的模型组
@@ -1443,7 +1441,7 @@ assert additional_info and len(additional_info.strip()) > 10, "内容不足"
                     iteration = 0
                     verification_passed = False
                     all_execution_results = []  # 记录所有执行结果
-                    all_verification_results = []  # 记录所有验证结果
+                    all_verification_results: List[str] = []  # 记录所有验证结果
 
                     while not verification_passed:
                         iteration += 1
