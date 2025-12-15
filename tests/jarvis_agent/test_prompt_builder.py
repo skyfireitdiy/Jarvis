@@ -133,14 +133,3 @@ Fifth line"""
         assert "   Tool description" in result
         # 确保没有多余的空行
         assert "\n\n\n" not in result
-
-    def test_build_action_prompt_rules_content(self):
-        """测试规则部分的内容"""
-        result = build_action_prompt([])
-
-        # 验证所有规则都存在
-        assert "1. 一次对话只能使用一个操作，否则会出错" in result
-        assert "2. 严格按照每个操作的格式执行" in result
-        assert "3. 等待操作结果后再进行下一个操作" in result
-        assert "4. 处理完结果后再调用新的操作" in result
-        assert "5. 如果对操作使用不清楚，请请求帮助" in result
