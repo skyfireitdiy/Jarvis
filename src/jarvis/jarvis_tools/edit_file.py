@@ -623,7 +623,7 @@ class EditFileNormalTool:
             start_pos, end_pos = match_result
 
             # 执行替换（唯一匹配，直接替换）
-            content = content[:start_pos] + replace + content[end_pos:]
+            content = content.replace(search, replace, 1)
 
         return True, content, None, None
 
