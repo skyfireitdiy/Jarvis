@@ -828,6 +828,17 @@ git reset --hard {start_commit}
         while is_infinite or iteration < max_iterations:
             iteration += 1
 
+            # 获取从开始到当前的 git diff（提前检测是否有代码修改）
+            current_commit = get_latest_commit_hash()
+            if self.start_commit is None or current_commit == self.start_commit:
+                git_diff = get_diff()  # 获取未提交的更改
+            else:
+                git_diff = get_diff_between_commits(self.start_commit, current_commit)
+
+            if not git_diff or not git_diff.strip():
+                PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
+                return
+
             # 每轮审查开始前显示清晰的提示信息
             if not self.non_interactive:
                 if is_infinite:
@@ -850,17 +861,6 @@ git reset --hard {start_commit}
                     PrettyOutput.auto_print(
                         f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
                     )
-
-            # 获取从开始到当前的 git diff
-            current_commit = get_latest_commit_hash()
-            if self.start_commit is None or current_commit == self.start_commit:
-                git_diff = get_diff()  # 获取未提交的更改
-            else:
-                git_diff = get_diff_between_commits(self.start_commit, current_commit)
-
-            if not git_diff or not git_diff.strip():
-                PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
-                return
 
             # 对 git diff 进行 token 限制处理（review 需要更多上下文，使用 40% 的 token 比例）
             truncated_git_diff = self._truncate_diff_for_review(
