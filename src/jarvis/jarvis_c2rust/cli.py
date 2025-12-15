@@ -19,6 +19,7 @@ from typing import List
 from typing import Optional
 
 import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.library_replacer import (
     apply_library_replacement as _apply_library_replacement,
@@ -204,9 +205,7 @@ def _save_run_state(stage: str, completed: bool = True) -> None:
         with state_path.open("w", encoding="utf-8") as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        typer.secho(
-            f"[c2rust-run] 保存状态文件失败: {e}", fg=typer.colors.YELLOW, err=True
-        )
+        PrettyOutput.auto_print(f"⚠️ [c2rust-run] 保存状态文件失败: {e}")
 
 
 @app.command("config")
@@ -286,20 +285,16 @@ def config(
                 if not isinstance(current_config, dict):
                     current_config = default_config.copy()
         except Exception as e:
-            typer.secho(
-                f"[c2rust-config] 读取现有配置失败: {e}，将使用默认值",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-config] 读取现有配置失败: {e}，将使用默认值"
             )
             current_config = default_config.copy()
 
     # 如果只是查看配置
     if show:
-        typer.secho(
-            f"[c2rust-config] 当前配置文件: {config_path}", fg=typer.colors.BLUE
-        )
-        typer.secho(
-            json.dumps(current_config, ensure_ascii=False, indent=2),
-            fg=typer.colors.CYAN,
+        PrettyOutput.auto_print(f"📋 [c2rust-config] 当前配置文件: {config_path}")
+        PrettyOutput.auto_print(
+            json.dumps(current_config, ensure_ascii=False, indent=2)
         )
         return
 
@@ -308,7 +303,7 @@ def config(
         current_config = default_config.copy()
         with config_path.open("w", encoding="utf-8") as f:
             json.dump(current_config, f, ensure_ascii=False, indent=2)
-        typer.secho(f"[c2rust-config] 配置已清空: {config_path}", fg=typer.colors.GREEN)
+        PrettyOutput.auto_print(f"✅ [c2rust-config] 配置已清空: {config_path}")
         return
 
     # 读取根符号列表（从现有配置开始，以便追加而不是替换）
@@ -320,18 +315,16 @@ def config(
             try:
                 file_path = Path(file_path).resolve()
                 if not file_path.exists():
-                    typer.secho(
-                        f"[c2rust-config] 警告: 文件不存在，跳过: {file_path}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [c2rust-config] 警告: 文件不存在，跳过: {file_path}"
                     )
                     continue
 
                 # 检查是否是头文件
                 if file_path.suffix.lower() in header_exts:
                     # 从头文件提取函数名
-                    typer.secho(
-                        f"[c2rust-config] 从头文件提取函数名: {file_path}",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"📋 [c2rust-config] 从头文件提取函数名: {file_path}"
                     )
                     try:
                         # 使用临时文件存储提取的函数名
@@ -356,9 +349,8 @@ def config(
                             ln.strip() for ln in txt.splitlines() if ln.strip()
                         ]
                         root_symbols.extend(collected)
-                        typer.secho(
-                            f"[c2rust-config] 从头文件 {file_path.name} 提取了 {len(collected)} 个函数名",
-                            fg=typer.colors.GREEN,
+                        PrettyOutput.auto_print(
+                            f"✅ [c2rust-config] 从头文件 {file_path.name} 提取了 {len(collected)} 个函数名"
                         )
                         # 清理临时文件
                         try:
@@ -366,10 +358,8 @@ def config(
                         except Exception:
                             pass
                     except Exception as e:
-                        typer.secho(
-                            f"[c2rust-config] 从头文件提取函数名失败: {file_path}: {e}",
-                            fg=typer.colors.RED,
-                            err=True,
+                        PrettyOutput.auto_print(
+                            f"❌ [c2rust-config] 从头文件提取函数名失败: {file_path}: {e}"
                         )
                         raise typer.Exit(code=1)
                 else:
@@ -381,17 +371,14 @@ def config(
                         if ln.strip() and not ln.strip().startswith("#")
                     ]
                     root_symbols.extend(collected)
-                    typer.secho(
-                        f"[c2rust-config] 从文件 {file_path.name} 读取了 {len(collected)} 个根符号",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"📋 [c2rust-config] 从文件 {file_path.name} 读取了 {len(collected)} 个根符号"
                     )
             except typer.Exit:
                 raise
             except Exception as e:
-                typer.secho(
-                    f"[c2rust-config] 处理文件失败: {file_path}: {e}",
-                    fg=typer.colors.RED,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"❌ [c2rust-config] 处理文件失败: {file_path}: {e}"
                 )
                 raise typer.Exit(code=1)
 
@@ -403,8 +390,8 @@ def config(
         ]
         root_symbols.extend(parts)
         processed_root_list_syms = True
-        typer.secho(
-            f"[c2rust-config] 从命令行读取根符号: {len(parts)} 个", fg=typer.colors.BLUE
+        PrettyOutput.auto_print(
+            f"📋 [c2rust-config] 从命令行读取根符号: {len(parts)} 个"
         )
 
     # 去重根符号列表（如果处理了 files 或 root_list_syms，或者 root_symbols 非空，则更新配置）
@@ -414,9 +401,8 @@ def config(
         except Exception:
             root_symbols = sorted(list(set(root_symbols)))
         current_config["root_symbols"] = root_symbols
-        typer.secho(
-            f"[c2rust-config] 已设置根符号列表: {len(root_symbols)} 个",
-            fg=typer.colors.GREEN,
+        PrettyOutput.auto_print(
+            f"✅ [c2rust-config] 已设置根符号列表: {len(root_symbols)} 个"
         )
 
     # 读取禁用库列表
@@ -426,21 +412,19 @@ def config(
         ]
         if disabled_list:
             current_config["disabled_libraries"] = disabled_list
-            typer.secho(
-                f"[c2rust-config] 已设置禁用库列表: {', '.join(disabled_list)}",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"✅ [c2rust-config] 已设置禁用库列表: {', '.join(disabled_list)}"
             )
 
     # 读取附加说明
     if isinstance(additional_notes, str):
         current_config["additional_notes"] = additional_notes.strip()
         if additional_notes.strip():
-            typer.secho(
-                f"[c2rust-config] 已设置附加说明: {len(additional_notes.strip())} 字符",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"✅ [c2rust-config] 已设置附加说明: {len(additional_notes.strip())} 字符"
             )
         else:
-            typer.secho("[c2rust-config] 已清空附加说明", fg=typer.colors.GREEN)
+            PrettyOutput.auto_print("✅ [c2rust-config] 已清空附加说明")
 
     # 如果没有提供任何参数，提示用户
     if (
@@ -449,9 +433,8 @@ def config(
         and not disabled_libs
         and additional_notes is None
     ):
-        typer.secho(
-            "[c2rust-config] 未提供任何参数，使用 --show 查看当前配置，或使用 --help 查看帮助",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            "⚠️ [c2rust-config] 未提供任何参数，使用 --show 查看当前配置，或使用 --help 查看帮助"
         )
         return
 
@@ -459,13 +442,12 @@ def config(
     try:
         with config_path.open("w", encoding="utf-8") as f:
             json.dump(current_config, f, ensure_ascii=False, indent=2)
-        typer.secho(f"[c2rust-config] 配置已保存: {config_path}", fg=typer.colors.GREEN)
-        typer.secho(
-            json.dumps(current_config, ensure_ascii=False, indent=2),
-            fg=typer.colors.CYAN,
+        PrettyOutput.auto_print(f"✅ [c2rust-config] 配置已保存: {config_path}")
+        PrettyOutput.auto_print(
+            json.dumps(current_config, ensure_ascii=False, indent=2)
         )
     except Exception as e:
-        typer.secho(f"[c2rust-config] 保存配置失败: {e}", fg=typer.colors.RED, err=True)
+        PrettyOutput.auto_print(f"❌ [c2rust-config] 保存配置失败: {e}")
         raise typer.Exit(code=1)
 
 
@@ -518,9 +500,7 @@ def run(
             state_path = _get_run_state_path()
             if state_path.exists():
                 state_path.unlink()
-                typer.secho(
-                    "[c2rust-run] 已重置状态，将从头开始执行", fg=typer.colors.YELLOW
-                )
+                PrettyOutput.auto_print("⚠️ [c2rust-run] 已重置状态，将从头开始执行")
             state = _load_run_state()
         else:
             state = _load_run_state()
@@ -529,14 +509,13 @@ def run(
                 s for s, info in state.items() if info.get("completed", False)
             ]
             if completed_stages:
-                typer.secho(
-                    f"[c2rust-run] 检测到已完成阶段: {', '.join(completed_stages)}，将从断点继续",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    f"🚀 [c2rust-run] 检测到已完成阶段: {', '.join(completed_stages)}，将从断点继续"
                 )
 
         # Step 1: scan
         if not state.get("scan", {}).get("completed", False):
-            typer.secho("[c2rust-run] scan: 开始", fg=typer.colors.BLUE)
+            PrettyOutput.auto_print("🚀 [c2rust-run] scan: 开始")
             _run_scan(
                 dot=None,
                 only_dot=False,
@@ -545,11 +524,11 @@ def run(
                 png=False,
                 non_interactive=True,
             )
-            typer.secho("[c2rust-run] scan: 完成", fg=typer.colors.GREEN)
+            PrettyOutput.auto_print("✅ [c2rust-run] scan: 完成")
             # 保存状态（因为直接调用 _run_scan 函数，需要手动保存状态）
             _save_run_state("scan", completed=True)
         else:
-            typer.secho("[c2rust-run] scan: 已完成，跳过", fg=typer.colors.CYAN)
+            PrettyOutput.auto_print("🚀 [c2rust-run] scan: 已完成，跳过")
 
         # Step 2: lib-replace（从配置文件读取根列表和禁用库列表）
         if not state.get("lib_replace", {}).get("completed", False):
@@ -569,15 +548,13 @@ def run(
 
             candidates_list: Optional[List[str]] = root_names if root_names else None
             if not candidates_list:
-                typer.secho(
-                    "[c2rust-run] lib-replace: 根列表为空，将回退为自动检测的根集合（基于扫描结果）",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-run] lib-replace: 根列表为空，将回退为自动检测的根集合（基于扫描结果）"
                 )
 
             if disabled_list:
-                typer.secho(
-                    f"[c2rust-run] lib-replace: 从配置文件读取禁用库: {', '.join(disabled_list)}",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"📋 [c2rust-run] lib-replace: 从配置文件读取禁用库: {', '.join(disabled_list)}"
                 )
 
             # 执行 lib-replace（默认库 std）
@@ -585,9 +562,8 @@ def run(
             root_count_str = (
                 str(len(candidates_list)) if candidates_list is not None else "auto"
             )
-            typer.secho(
-                f"[c2rust-run] lib-replace: 开始（库: {library}，根数: {root_count_str}）",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"🚀 [c2rust-run] lib-replace: 开始（库: {library}，根数: {root_count_str}）"
             )
             ret = _apply_library_replacement(
                 db_path=Path("."),
@@ -606,37 +582,35 @@ def run(
                     if "order" in ret
                     else ""
                 )
-                typer.secho(
-                    f"[c2rust-run] lib-replace: 替代映射: {ret['mapping']}\n"
-                    f"[c2rust-run] lib-replace: 新符号表: {ret['symbols']}" + order_msg,
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"✅ [c2rust-run] lib-replace: 替代映射: {ret['mapping']}\n"
+                    f"✅ [c2rust-run] lib-replace: 新符号表: {ret['symbols']}"
+                    + order_msg
                 )
             except Exception as _e:
-                typer.secho(
-                    f"[c2rust-run] lib-replace: 结果输出时发生非致命错误: {_e}",
-                    fg=typer.colors.YELLOW,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-run] lib-replace: 结果输出时发生非致命错误: {_e}"
                 )
             # 保存状态（因为直接调用 _apply_library_replacement 函数，需要手动保存状态）
             _save_run_state("lib_replace", completed=True)
         else:
-            typer.secho("[c2rust-run] lib-replace: 已完成，跳过", fg=typer.colors.CYAN)
+            PrettyOutput.auto_print("🚀 [c2rust-run] lib-replace: 已完成，跳过")
 
         # Step 3: prepare
         if not state.get("prepare", {}).get("completed", False):
-            typer.secho("[c2rust-run] prepare: 开始", fg=typer.colors.BLUE)
+            PrettyOutput.auto_print("🚀 [c2rust-run] prepare: 开始")
             _execute_llm_plan(
                 apply=True, llm_group=llm_group, non_interactive=not interactive
             )
-            typer.secho("[c2rust-run] prepare: 完成", fg=typer.colors.GREEN)
+            PrettyOutput.auto_print("✅ [c2rust-run] prepare: 完成")
             # 保存状态（因为直接调用 _execute_llm_plan 函数，需要手动保存状态）
             _save_run_state("prepare", completed=True)
         else:
-            typer.secho("[c2rust-run] prepare: 已完成，跳过", fg=typer.colors.CYAN)
+            PrettyOutput.auto_print("🚀 [c2rust-run] prepare: 已完成，跳过")
 
         # Step 4: transpile
         if not state.get("transpile", {}).get("completed", False):
-            typer.secho("[c2rust-run] transpile: 开始", fg=typer.colors.BLUE)
+            PrettyOutput.auto_print("🚀 [c2rust-run] transpile: 开始")
             from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
 
             # 从配置文件读取配置（transpile 内部会自动读取）
@@ -649,16 +623,16 @@ def run(
                 root_symbols=None,  # 从配置文件恢复
                 non_interactive=not interactive,
             )
-            typer.secho("[c2rust-run] transpile: 完成", fg=typer.colors.GREEN)
+            PrettyOutput.auto_print("✅ [c2rust-run] transpile: 完成")
             # 保存状态（因为直接调用 _run_transpile 函数，需要手动保存状态）
             _save_run_state("transpile", completed=True)
         else:
-            typer.secho("[c2rust-run] transpile: 已完成，跳过", fg=typer.colors.CYAN)
+            PrettyOutput.auto_print("🚀 [c2rust-run] transpile: 已完成，跳过")
 
         # Step 5: optimize
         if not state.get("optimize", {}).get("completed", False):
             try:
-                typer.secho("[c2rust-run] optimize: 开始", fg=typer.colors.BLUE)
+                PrettyOutput.auto_print("🚀 [c2rust-run] optimize: 开始")
                 from jarvis.jarvis_c2rust.optimizer import (
                     optimize_project as _optimize_project,
                 )
@@ -667,9 +641,8 @@ def run(
                 # 使用与 transpile 相同的逻辑确定项目根目录和 crate 目录
                 project_root = Path(".")
                 crate_dir = default_crate_dir(project_root)
-                typer.secho(
-                    f"[c2rust-run] optimize: 使用项目根目录: {project_root}, crate 目录: {crate_dir}",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    f"📋 [c2rust-run] optimize: 使用项目根目录: {project_root}, crate 目录: {crate_dir}"
                 )
                 res = _optimize_project(
                     project_root=project_root,
@@ -686,32 +659,29 @@ def run(
                     f"  docs_added: {res.get('docs_added')}\n"
                     f"  cargo_checks: {res.get('cargo_checks')}\n"
                 )
-                typer.secho(summary, fg=typer.colors.GREEN)
+                PrettyOutput.auto_print(summary)
 
                 # 检查优化是否真正完成（所有步骤都完成，包括 clippy 告警修复）
                 optimize_truly_completed = _check_optimize_completed(crate_dir)
                 if optimize_truly_completed:
-                    typer.secho("[c2rust-run] optimize: 完成", fg=typer.colors.GREEN)
+                    PrettyOutput.auto_print("✅ [c2rust-run] optimize: 完成")
                     # 保存状态（因为直接调用 _optimize_project 函数，需要手动保存状态）
                     _save_run_state("optimize", completed=True)
                 else:
-                    typer.secho(
-                        "[c2rust-run] optimize: 部分步骤未完成（如 clippy 告警未完全修复），下次将继续",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-run] optimize: 部分步骤未完成（如 clippy 告警未完全修复），下次将继续"
                     )
                     # 不保存状态，下次恢复时会继续执行优化
             except Exception as _e:
-                typer.secho(
-                    f"[c2rust-run] optimize: 错误: {_e}", fg=typer.colors.RED, err=True
-                )
+                PrettyOutput.auto_print(f"❌ [c2rust-run] optimize: 错误: {_e}")
                 raise
         else:
-            typer.secho("[c2rust-run] optimize: 已完成，跳过", fg=typer.colors.CYAN)
+            PrettyOutput.auto_print("🚀 [c2rust-run] optimize: 已完成，跳过")
 
         # 所有阶段完成
-        typer.secho("[c2rust-run] 所有阶段已完成！", fg=typer.colors.GREEN)
+        PrettyOutput.auto_print("🎉 [c2rust-run] 所有阶段已完成！")
     except Exception as e:
-        typer.secho(f"[c2rust-run] 错误: {e}", fg=typer.colors.RED, err=True)
+        PrettyOutput.auto_print(f"❌ [c2rust-run] 错误: {e}")
         raise typer.Exit(code=1)
 
 
