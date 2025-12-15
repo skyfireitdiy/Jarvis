@@ -109,7 +109,7 @@ class CodeAgent(Agent):
             "execute_script",
             "read_code",
             "edit_file",  # 普通 search/replace 编辑
-            "rewrite_file",
+
         ]
         if enable_task_list_manager:
             base_tools.append("task_list_manager")  # 任务列表管理工具
@@ -282,7 +282,7 @@ git reset --hard {start_commit}
             3. 如果不清楚要修改的文件，必须先分析并找出需要修改的文件，明确目标后再进行编辑。
             4. 对于简单的文本替换，推荐使用 edit_file 工具进行精确修改。避免使用 sed 命令，因为sed极易出错且可能产生不可预期的结果。对于复杂代码（超过50行或涉及多文件协调），禁止直接使用sed或python脚本编辑，必须使用task_list_manager创建任务列表进行安全拆分。
             5. 代码编辑任务优先使用 PATCH 操作，确保搜索文本在目标文件中有且仅有一次精确匹配，保证修改的准确性和安全性。
-            6. 如需大范围重写（超过200行或涉及重构），必须使用 rewrite_file 工具，并提前备份原始文件。
+            6. 如需大范围重写（超过200行或涉及重构），请使用 edit_file 工具配合空search参数 ""，并提前备份原始文件。
             7. 如遇信息不明，优先调用工具补充分析，不要主观臆断。
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """

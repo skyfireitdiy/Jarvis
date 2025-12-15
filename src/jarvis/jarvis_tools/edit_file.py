@@ -23,14 +23,16 @@ class EditFileNormalTool:
         "1. 直接指定要编辑的文件路径\n"
         "2. 为每个文件提供一组 search/replace 操作\n"
         "3. 使用精确匹配查找 search 文本，找到匹配后替换为新文本\n\n"
+        "🚀 特殊功能：\n"
+        "- 当 search 为空字符串 \"\" 时，表示直接重写整个文件，replace 的内容将作为文件的完整新内容\n"
+        "- 如果存在多个diffs且第一个diff的search为空字符串，将只应用第一个diff（重写整个文件），跳过后续所有diffs\n\n"
         "⚠️ 提示：\n"
         "- search 使用精确字符串匹配，不支持正则表达式\n"
-        "- search 不能为空字符串\n"
         "- **重要：search 必须提供足够的上下文来唯一定位目标位置**，避免匹配到错误的位置。建议包含：\n"
         "  * 目标代码的前后几行上下文（至少包含目标代码所在函数的签名或关键标识）\n"
         "  * 目标代码附近的唯一标识符（如函数名、变量名、注释等）\n"
         "  * 避免使用过短的 search 文本（如单个单词、短字符串），除非能确保唯一性\n"
-        "- 如果某个 search 在文件中找不到精确匹配，将导致该文件的编辑失败，文件内容会回滚到原始状态\n"
+        "- 如果某个 search 在文件中找不到精确匹配（search非空时），将导致该文件的编辑失败，文件内容会回滚到原始状态\n"
         "- 建议在 search 中包含足够的上下文，确保能唯一匹配到目标位置，避免误匹配"
     )
 
@@ -53,7 +55,7 @@ class EditFileNormalTool:
                                 "properties": {
                                     "search": {
                                         "type": "string",
-                                        "description": "要搜索的原始文本（不支持正则表达式，不能为空）。**重要：必须提供足够的上下文来唯一定位目标位置**，建议包含目标代码的前后几行上下文、函数签名或唯一标识符，避免匹配到错误的位置。",
+                                        "description": "要搜索的原始文本（不支持正则表达式）。当为空字符串\"\"时，表示直接重写整个文件，replace的内容将作为文件的完整新内容。非空时，**重要：必须提供足够的上下文来唯一定位目标位置**，建议包含目标代码的前后几行上下文、函数签名或唯一标识符，避免匹配到错误的位置。",
                                     },
                                     "replace": {
                                         "type": "string",
@@ -230,15 +232,7 @@ class EditFileNormalTool:
                 },
                 None,
             )
-        if search == "":
-            return (
-                {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"第 {idx} 个diff的search参数不能为空字符串",
-                },
-                None,
-            )
+        # 允许空字符串作为search参数，表示直接重写整个文件
 
         if replace is None:
             return (
@@ -469,9 +463,16 @@ class EditFileNormalTool:
             search = diff["search"]
             replace = diff["replace"]
 
+            # 处理空字符串search的特殊情况
+            if search == "":
+                # 空字符串表示直接重写整个文件
+                content = replace
+                # 空search只处理第一个diff，跳过后续所有diffs
+                break
+
             # 验证 search 文本
-            if not search or not isinstance(search, str):
-                error_info = f"第 {idx} 个diff失败：search 文本不能为空"
+            if not isinstance(search, str):
+                error_info = f"第 {idx} 个diff失败：search 文本必须是字符串"
                 return False, error_info, None, None
 
             # 统计匹配次数

@@ -128,7 +128,6 @@ class SubCodeAgentTool:
                     "execute_script",
                     "read_code",
                     "edit_file",
-                    "rewrite_file",
                 ]
                 if use_tools:
                     # 过滤掉基础工具和禁止的工具

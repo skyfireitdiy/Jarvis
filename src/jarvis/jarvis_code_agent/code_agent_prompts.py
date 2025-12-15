@@ -277,17 +277,13 @@ def get_system_prompt() -> str:
    - 必须先通过 read_code 读取目标文件完整内容，确认待修改位置的上下文（如前后代码逻辑、缩进格式），再调用编辑工具；
    - 编辑工具选择：
      - **精准单行或范围编辑（推荐使用 edit_file）**：对于精准的单行修改或指定行号范围的编辑，推荐优先使用 `edit_file` 工具进行精确修改，避免使用sed命令因为极易出错。对于确实需要sed的特殊场景，必须：
-       * 替换指定行：`sed -i 'N s/old/new/' file_path`（如 `sed -i '42 s/foo/bar/' src/main.rs` 替换第42行的foo为bar）
-       * 替换行号范围：`sed -i 'start_line,end_line s/old/new/g' file_path`（如 `sed -i '10,20 s/old/new/g' src/main.rs` 替换10-20行中的所有old为new）
-       * 在指定行后插入：`sed -i 'N a\\插入内容' file_path`（如 `sed -i '10 a\\    new_line_content' src/main.rs` 在第10行后插入新行）
-       * 使用 `sed` 前建议先用 `read_code` 确认要修改的内容和行号，并备份文件，确保修改范围准确。
      - **内容移动或复制（使用 read_code + edit_file）**：内容移动或复制操作推荐使用更安全的组合方式：先用 `read_code` 读取源文件内容，再用 `edit_file` 精确插入到目标位置。避免使用sed命令进行复杂的内容操作，因为极易产生不可预期的结果。
        * 提取源文件指定行并追加到目标文件：`sed -n 'start_line,end_line p' source_file >> target_file`（如 `sed -n '10,20p' src/a.rs >> src/b.rs` 将a.rs的10-20行追加到b.rs末尾）
        * 提取源文件指定行并插入到目标文件指定行后：`sed -n 'start_line,end_line p' source_file | sed -i 'target_line r /dev/stdin' target_file`（如先提取再插入）
        * 移动内容（先复制到目标位置，再从源文件删除）：先执行复制操作，再执行删除操作
        * 使用前先用 `read_code` 确认源文件和目标文件的内容，确保移动/复制位置准确。
-     - 局部修改（改少数行、补代码块）：当 `sed` 无法满足需求时（如需要复杂上下文匹配），使用 edit_file_normal（普通 search/replace）或 edit_file_free（基于上下文的模糊匹配），明确标注"修改范围（行号/代码片段）+ 修改内容"（如"替换第15-20行的循环逻辑为：xxx"）；
-     - 全文件重写（如格式统一、逻辑重构）：仅当局部修改无法满足需求时使用 rewrite_file，重写前必须备份原始文件到 /tmp/rewrite_backup_xxx.txt；
+     - 局部修改（改少数行、补代码块）：当 `sed` 无法满足需求时（如需要复杂上下文匹配），使用 edit_file 工具进行search/replace精确匹配替换，明确标注"修改范围（上下文代码片段）+ 修改内容"（如"替换包含'for i in range'的循环逻辑为：xxx"）；
+     - 全文件重写（如格式统一、逻辑重构）：使用 edit_file 工具配合空search参数 ""（将search设置为空字符串），replace内容将作为文件的完整新内容，重写前必须备份原始文件到 /tmp/backup_xxx.txt；
      - **大量代码删除**：批量删除代码推荐使用 `edit_file` 工具的精准删除功能，避免使用sed命令。对于必须删除的大段代码：
       * 先用 `read_code` 确认要删除的确切内容和行号范围
       * 使用 `edit_file` 的 search/replace 进行精确删除
@@ -307,7 +303,7 @@ def get_system_prompt() -> str:
 
 - 全文搜索：必须添加"文件类型过滤""目录过滤"，减少无效结果（如仅搜索 src/ 目录下的 .java 文件）；
 - read_code：仅读取目标文件和关联依赖文件，不读取日志、测试数据、第三方依赖包等无关文件；
-- edit_file/rewrite_file：修改后必须保持代码缩进、命名规范与原文件一致（如原文件用4空格缩进，不改为2空格），不引入多余空行、注释。
+- edit_file：修改后必须保持代码缩进、命名规范与原文件一致（如原文件用4空格缩进，不改为2空格），不引入多余空行、注释。
 
 ## 代码质量约束（底线要求，不可突破）
 
@@ -331,7 +327,7 @@ def get_system_prompt() -> str:
 3. 禁止大篇幅删除、重构未明确要求修改的代码；
 4. 禁止引入项目未依赖的第三方库（除非用户明确允许）；
 5. 禁止修改 /tmp/ 以外的非项目目录文件，避免污染环境；
-6. **禁止sed/python编辑复杂代码**：对于超过50行或涉及多文件协调的复杂代码修改，禁止使用sed命令或python脚本直接编辑，必须使用`edit_file`/`rewrite_file`等安全工具或`task_list_manager`进行任务拆分；
+6. **禁止sed/python编辑复杂代码**：对于超过50行或涉及多文件协调的复杂代码修改，禁止使用sed命令或python脚本直接编辑，必须使用`edit_file`等安全工具或`task_list_manager`进行任务拆分；
 7. **禁止提交临时文件**：开发过程中产生的临时文件（如测试文件、调试文件、备份文件等）必须在提交前清理，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须删除。
 
 ## 重要提醒
