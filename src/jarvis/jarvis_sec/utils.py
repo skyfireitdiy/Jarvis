@@ -8,7 +8,6 @@ from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
-import typer
 
 from jarvis.jarvis_sec.workflow import direct_scan
 
@@ -102,9 +101,9 @@ def load_or_run_heuristic_scan(
 
     if candidates:
         try:
-            typer.secho(
-                f"[jarvis-sec] 从 {get_candidates_file(sec_dir)} 恢复启发式扫描",
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f"✨ [jarvis-sec] 从 {get_candidates_file(sec_dir)} 恢复启发式扫描",
+                timestamp=True,
             )
             _progress_append(
                 {
@@ -120,9 +119,9 @@ def load_or_run_heuristic_scan(
         _heuristic_path = sec_dir / "heuristic_issues.jsonl"
         if _heuristic_path.exists():
             try:
-                typer.secho(
-                    f"[jarvis-sec] 从 {_heuristic_path} 恢复启发式扫描（旧格式）",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"✨ [jarvis-sec] 从 {_heuristic_path} 恢复启发式扫描（旧格式）",
+                    timestamp=True,
                 )
                 with _heuristic_path.open("r", encoding="utf-8") as f:
                     for line in f:
@@ -136,9 +135,9 @@ def load_or_run_heuristic_scan(
                     }
                 )
             except Exception as e:
-                typer.secho(
-                    f"[jarvis-sec] 恢复启发式扫描失败，执行完整扫描: {e}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [jarvis-sec] 恢复启发式扫描失败，执行完整扫描: {e}",
+                    timestamp=True,
                 )
                 candidates = []  # 重置以便执行完整扫描
 
@@ -179,9 +178,9 @@ def load_or_run_heuristic_scan(
                     "issues_count": len(candidates),
                 }
             )
-            typer.secho(
-                f"[jarvis-sec] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"✅ [jarvis-sec] 已将 {len(candidates)} 个启发式扫描问题写入 {_heuristic_path}",
+                timestamp=True,
             )
         except Exception:
             pass
@@ -309,9 +308,9 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]):
                         line = json.dumps(item, ensure_ascii=False)
                         f.write(line + "\n")
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 已将 {len(items)} 个问题写入 {path}（旧格式）",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"✅ [jarvis-sec] 已将 {len(items)} 个问题写入 {path}（旧格式）",
+                        timestamp=True,
                     )
                 except Exception:
                     pass
@@ -410,9 +409,9 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]):
             save_analysis_result(sec_dir, analysis_result)
 
             try:
-                typer.secho(
-                    f"[jarvis-sec] 已将批次 {batch_index} 的分析结果写入 analysis.jsonl（问题: {len(verified_gids)}, 误报: {len(false_positive_gids)}）",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"✅ [jarvis-sec] 已将批次 {batch_index} 的分析结果写入 analysis.jsonl（问题: {len(verified_gids)}, 误报: {len(false_positive_gids)}）",
+                    timestamp=True,
                 )
             except Exception:
                 pass
@@ -451,9 +450,9 @@ def load_processed_gids_from_issues(sec_dir: Path) -> set:
                         pass
             if processed_gids:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 断点恢复：从 agent_issues.jsonl 读取到 {len(processed_gids)} 个已处理的 gid",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"✨ [jarvis-sec] 断点恢复：从 agent_issues.jsonl 读取到 {len(processed_gids)} 个已处理的 gid",
+                        timestamp=True,
                     )
                 except Exception:
                     pass
@@ -528,26 +527,26 @@ def load_all_issues_from_file(sec_dir: Path) -> List[Dict]:
 
             if all_issues:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 从 agent_issues.jsonl 加载了 {len(all_issues)} 个已保存的告警",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"✨ [jarvis-sec] 从 agent_issues.jsonl 加载了 {len(all_issues)} 个已保存的告警",
+                        timestamp=True,
                     )
                 except Exception:
                     pass
         else:
             try:
-                typer.secho(
-                    "[jarvis-sec] agent_issues.jsonl 不存在，当前运行未发现任何问题",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    "✨ [jarvis-sec] agent_issues.jsonl 不存在，当前运行未发现任何问题",
+                    timestamp=True,
                 )
             except Exception:
                 pass
     except Exception as e:
         # 加载失败不影响主流程
         try:
-            typer.secho(
-                f"[jarvis-sec] 警告：从 agent_issues.jsonl 加载告警失败: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [jarvis-sec] 警告：从 agent_issues.jsonl 加载告警失败: {e}",
+                timestamp=True,
             )
         except Exception:
             pass

@@ -6,7 +6,6 @@ from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
-import typer
 
 from jarvis.jarvis_sec.agents import create_review_agent
 from jarvis.jarvis_sec.agents import subscribe_summary_event
@@ -310,8 +309,9 @@ def run_review_agent_with_retry(
                 review_summary_container["text"] = review_response
             except Exception as e:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 复核阶段直接模型调用失败: {e}，回退到 run()",
+                    PrettyOutput.auto_print(
+                        f"✨ [jarvis-sec] 复核阶段直接模型调用失败: {e}，回退到 run()",
+                        timestamp=True,
                     )
                 except Exception:
                     pass
@@ -324,8 +324,9 @@ def run_review_agent_with_retry(
             _changed_review = git_restore_if_dirty(entry_path)
             if _changed_review:
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 复核 Agent 工作区已恢复 ({_changed_review} 个文件）",
+                    PrettyOutput.auto_print(
+                        f"✨ [jarvis-sec] 复核 Agent 工作区已恢复 ({_changed_review} 个文件）",
+                        timestamp=True,
                     )
                 except Exception:
                     pass
@@ -342,8 +343,9 @@ def run_review_agent_with_retry(
             if parse_error_review:
                 prev_parse_error_review = parse_error_review
                 try:
-                    typer.secho(
-                        f"[jarvis-sec] 复核结果JSON解析失败: {parse_error_review}",
+                    PrettyOutput.auto_print(
+                        f"✨ [jarvis-sec] 复核结果JSON解析失败: {parse_error_review}",
+                        timestamp=True,
                     )
                 except Exception:
                     pass
@@ -360,15 +362,17 @@ def run_review_agent_with_retry(
         use_direct_model_review = True
         if parse_error_review:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 复核结果JSON解析失败 -> 重试第 {review_attempt} 次 (使用直接模型调用，将反馈解析错误)",
+                PrettyOutput.auto_print(
+                    f"✨ [jarvis-sec] 复核结果JSON解析失败 -> 重试第 {review_attempt} 次 (使用直接模型调用，将反馈解析错误)",
+                    timestamp=True,
                 )
             except Exception:
                 pass
         else:
             try:
-                typer.secho(
-                    f"[jarvis-sec] 复核结果格式无效 -> 重试第 {review_attempt} 次 (使用直接模型调用)",
+                PrettyOutput.auto_print(
+                    f"✨ [jarvis-sec] 复核结果格式无效 -> 重试第 {review_attempt} 次 (使用直接模型调用)",
+                    timestamp=True,
                 )
             except Exception:
                 pass
@@ -393,8 +397,9 @@ def process_review_phase(
         PrettyOutput.auto_print("🔵 [jarvis-sec] 无无效聚类需要复核")
         return cluster_batches
 
-    typer.secho(
-        f"\n[jarvis-sec] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...",
+    PrettyOutput.auto_print(
+        f"✨ \n[jarvis-sec] 开始复核 {len(invalid_clusters_for_review)} 个无效聚类...",
+        timestamp=True,
     )
     status_mgr.update_review(
         current_review=0,
@@ -419,8 +424,9 @@ def process_review_phase(
             len(invalid_clusters_for_review) + review_batch_size - 1
         ) // review_batch_size
 
-        typer.secho(
-            f"[jarvis-sec] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类",
+        PrettyOutput.auto_print(
+            f"✨ [jarvis-sec] 复核批次 {current_review_num}/{total_review_batches}: {len(review_batch)} 个无效聚类",
+            timestamp=True,
         )
         status_mgr.update_review(
             current_review=current_review_num,
@@ -476,8 +482,8 @@ def process_review_phase(
     )
 
     if not reinstated_candidates:
-        typer.secho(
-            "[jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效",
+        PrettyOutput.auto_print(
+            "✨ [jarvis-sec] 复核完成：所有无效聚类理由充分，确认为无效", timestamp=True
         )
 
     # 记录复核结果（汇总）
