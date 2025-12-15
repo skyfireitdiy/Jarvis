@@ -7,6 +7,7 @@ from typing import Optional
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_sec.agents import create_analysis_agent
 from jarvis.jarvis_sec.agents import subscribe_summary_event
 from jarvis.jarvis_sec.analysis import build_analysis_task_context
@@ -550,7 +551,7 @@ def process_verification_batch(
             else:
                 # 启用二次验证，运行验证Agent
                 # 创建验证 Agent 来验证分析 Agent 的结论
-                verification_system_prompt = """
+                verification_system_prompt = f"""
 # 验证 Agent 约束
 - 你的核心任务是验证分析 Agent 给出的安全结论是否正确。
 - 你需要仔细检查分析 Agent 给出的前置条件、触发路径、后果和建议是否合理、准确。
@@ -562,7 +563,7 @@ def process_verification_batch(
   - 在验证过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是分析 Agent 保存的与当前验证函数相关的记忆。
   - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等，可以帮助你更准确地验证分析结论。
   - 如果发现分析 Agent 的结论与记忆中的信息不一致，需要仔细核实。
-- 完成验证后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+- 完成验证后，主输出仅打印结束符 {ot('!!!COMPLETE!!!')}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
 """.strip()
 
                 verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"

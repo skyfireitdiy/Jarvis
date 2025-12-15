@@ -11,6 +11,7 @@ from jarvis.jarvis_sec.prompts import get_cluster_system_prompt
 from jarvis.jarvis_sec.prompts import get_review_summary_prompt
 from jarvis.jarvis_sec.prompts import get_review_system_prompt
 from jarvis.jarvis_tools.registry import ToolRegistry
+from jarvis.jarvis_utils.tag import ot
 
 
 def subscribe_summary_event(agent: Agent) -> Dict[str, str]:
@@ -40,7 +41,7 @@ def create_analysis_agent(
     task_id: str, llm_group: Optional[str], force_save_memory: bool = False
 ) -> Agent:
     """创建分析Agent"""
-    system_prompt = """
+    system_prompt = f"""
 # 单Agent安全分析约束
 - 你的核心任务是评估代码的安全问题，目标：针对本候选问题进行证据核实、风险评估与修复建议补充，查找漏洞触发路径，确认在某些条件下会触发；以此来判断是否是漏洞。
 - **必须进行调用路径推导**：
@@ -68,7 +69,7 @@ def create_analysis_agent(
   - 如果有必要，使用 save_memory 工具保存每个函数的分析要点，使用函数名作为 tag（例如：函数名、文件名等）。
   - 记忆内容示例：某个函数的指针已经判空、某个函数已有输入校验、某个函数的调用路径分析结果等。
   - 这样可以避免重复分析，提高效率，并保持分析的一致性。
-- 完成对本批次候选问题的判断后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+- 完成对本批次候选问题的判断后，主输出仅打印结束符 {ot('!!!COMPLETE!!!')}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
 """.strip()
 
     agent_kwargs: Dict = dict(

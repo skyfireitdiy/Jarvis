@@ -156,7 +156,7 @@ class PromptManager:
 
         # 任务完成提示
         complete_prompt = (
-            f"- 输出{ot('!!!COMPLETE!!!')}"
+            f"- 如果任务已完成，只输出 {ot('!!!COMPLETE!!!')}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。"
             if need_complete and self.agent.auto_complete
             else ""
         )
@@ -174,8 +174,7 @@ class PromptManager:
         addon_prompt = f"""
 <system_prompt>
 {token_metadata_prompt}    请判断是否已经完成任务，如果已经完成：
-    - 直接输出完成原因，不需要再有新的操作，不要输出{ot("TOOL_CALL")}标签
-    {complete_prompt}
+    {complete_prompt if complete_prompt else f"- 直接输出完成原因，不需要再有新的操作，不要输出{ot('TOOL_CALL')}标签"}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作
     - 如果信息不明确，请请求用户补充
