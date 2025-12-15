@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable
 from typing import List
 
-import typer
+from jarvis.jarvis_utils.logger import PrettyOutput
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -88,9 +88,8 @@ class DocsOptimizer:
         prompt = self.append_additional_notes(prompt)
         # 切换到 crate 目录，确保 CodeAgent 在正确的上下文中创建和执行
         prev_cwd = os.getcwd()
-        typer.secho(
-            "[c2rust-optimizer][codeagent][doc] 正在调用 CodeAgent 进行文档补充...",
-            fg=typer.colors.CYAN,
+        PrettyOutput.auto_print(
+            "📝 [c2rust-optimizer][codeagent][doc] 正在调用 CodeAgent 进行文档补充..."
         )
         try:
             os.chdir(str(crate))
@@ -129,9 +128,8 @@ class DocsOptimizer:
                 commit_before, agent
             ):
                 # 如果回退了，需要重新运行 agent
-                typer.secho(
-                    "[c2rust-optimizer][codeagent][doc] 检测到测试代码删除问题，已回退，重新运行 agent",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-optimizer][codeagent][doc] 检测到测试代码删除问题，已回退，重新运行 agent"
                 )
                 commit_before = self.progress_manager.get_crate_commit_hash()
                 agent.run(
@@ -143,9 +141,8 @@ class DocsOptimizer:
                 if self.progress_manager.check_and_handle_test_deletion(
                     commit_before, agent
                 ):
-                    typer.secho(
-                        "[c2rust-optimizer][codeagent][doc] 再次检测到测试代码删除问题，已回退",
-                        fg=typer.colors.RED,
+                    PrettyOutput.auto_print(
+                        "❌ [c2rust-optimizer][codeagent][doc] 再次检测到测试代码删除问题，已回退"
                     )
 
             # 验证修复是否成功（通过 cargo test）
@@ -161,31 +158,26 @@ class DocsOptimizer:
                 self.progress_manager.save_fix_progress(
                     "doc_opt", "batch", file_paths if file_paths else None
                 )
-                typer.secho(
-                    "[c2rust-optimizer][codeagent][doc] 文档补充成功，已保存进度",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    "✅ [c2rust-optimizer][codeagent][doc] 文档补充成功，已保存进度"
                 )
             else:
                 # 测试失败，回退到运行前的 commit
                 if commit_before:
-                    typer.secho(
-                        f"[c2rust-optimizer][codeagent][doc] 文档补充后测试失败，回退到运行前的 commit: {commit_before[:8]}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [c2rust-optimizer][codeagent][doc] 文档补充后测试失败，回退到运行前的 commit: {commit_before[:8]}"
                     )
                     if self.progress_manager.reset_to_commit(commit_before):
-                        typer.secho(
-                            f"[c2rust-optimizer][codeagent][doc] 已成功回退到 commit: {commit_before[:8]}",
-                            fg=typer.colors.CYAN,
+                        PrettyOutput.auto_print(
+                            f"ℹ️ [c2rust-optimizer][codeagent][doc] 已成功回退到 commit: {commit_before[:8]}"
                         )
                     else:
-                        typer.secho(
-                            "[c2rust-optimizer][codeagent][doc] 回退失败，请手动检查代码状态",
-                            fg=typer.colors.RED,
+                        PrettyOutput.auto_print(
+                            "❌ [c2rust-optimizer][codeagent][doc] 回退失败，请手动检查代码状态"
                         )
                 else:
-                    typer.secho(
-                        "[c2rust-optimizer][codeagent][doc] 文档补充后测试失败，但无法获取运行前的 commit",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-optimizer][codeagent][doc] 文档补充后测试失败，但无法获取运行前的 commit"
                     )
         finally:
             os.chdir(prev_cwd)
