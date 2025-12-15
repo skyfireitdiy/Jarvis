@@ -8,7 +8,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-from jarvis.jarvis_utils.output_handler import PrettyOutput
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.constants import MAX_LLM_RETRIES
 from jarvis.jarvis_c2rust.library_replacer_prompts import build_subtree_prompt

@@ -9,8 +9,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 
-import typer
-
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.transpiler_modules import ModuleManager
 
@@ -63,9 +62,8 @@ class SymbolMapper:
         if current_commit:
             converted_commits[str(rec.id)] = current_commit
             self.progress["converted_commits"] = converted_commits
-            typer.secho(
-                f"[c2rust-transpiler][progress] 已记录函数 {rec.id} 的 commit: {current_commit}",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"🔍 [c2rust-transpiler][progress] 已记录函数 {rec.id} 的 commit: {current_commit}"
             )
 
         self.config_manager.save_progress()
@@ -122,16 +120,14 @@ class SymbolMapper:
                     matches.append(abs_path)
 
         if not matches:
-            typer.secho(
-                f'[c2rust-transpiler][todo] 未在 src/ 中找到 todo!("{symbol}") 或 unimplemented!("{symbol}") 的出现',
-                fg=typer.colors.BLUE,
+            PrettyOutput.auto_print(
+                f'🔍 [c2rust-transpiler][todo] 未在 src/ 中找到 todo!("{symbol}") 或 unimplemented!("{symbol}") 的出现'
             )
             return
 
         # 由于 transpile() 开始时已切换到 crate 目录，此处无需再次切换
-        typer.secho(
-            f'[c2rust-transpiler][todo] 发现 {len(matches)} 个包含 todo!("{symbol}") 或 unimplemented!("{symbol}") 的文件',
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            f'🔍 [c2rust-transpiler][todo] 发现 {len(matches)} 个包含 todo!("{symbol}") 或 unimplemented!("{symbol}") 的文件'
         )
         for target_file in matches:
             prompt = "\n".join(
@@ -164,9 +160,8 @@ class SymbolMapper:
             # 检测并处理测试代码删除
             if check_and_handle_test_deletion_func(before_commit, agent):
                 # 如果回退了，需要重新运行 agent
-                typer.secho(
-                    f"[c2rust-transpiler][todo-fix] 检测到测试代码删除问题，已回退，重新运行 agent (symbol={symbol})",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][todo-fix] 检测到测试代码删除问题，已回退，重新运行 agent (symbol={symbol})"
                 )
                 before_commit = self.git_manager.get_crate_commit_hash()
                 agent.run(
@@ -176,7 +171,6 @@ class SymbolMapper:
                 )
                 # 再次检测
                 if check_and_handle_test_deletion_func(before_commit, agent):
-                    typer.secho(
-                        f"[c2rust-transpiler][todo-fix] 再次检测到测试代码删除问题，已回退 (symbol={symbol})",
-                        fg=typer.colors.RED,
+                    PrettyOutput.auto_print(
+                        f"❌ [c2rust-transpiler][todo-fix] 再次检测到测试代码删除问题，已回退 (symbol={symbol})"
                     )

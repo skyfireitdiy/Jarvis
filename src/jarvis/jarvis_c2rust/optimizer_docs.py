@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable
 from typing import List
 
-from jarvis.jarvis_utils.logger import PrettyOutput
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL

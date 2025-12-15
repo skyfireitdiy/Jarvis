@@ -9,6 +9,7 @@ from typing import List
 from typing import Optional
 from typing import Set
 
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.scanner import find_root_function_ids
 
 
@@ -151,7 +152,6 @@ def process_candidate_scope(
     desc_cache: Dict[int, Set[int]],
 ) -> tuple[List[int], Set[int]]:
     """处理候选根和作用域，返回(过滤后的根函数列表, 不可达函数集合)"""
-    import typer
 
     scope_unreachable_funcs: Set[int] = set()
     if not candidates:
@@ -184,10 +184,8 @@ def process_candidate_scope(
     # 不可达函数（仅限函数类别）将被直接删除
     scope_unreachable_funcs = {fid for fid in func_ids if fid not in reachable_all}
     if scope_unreachable_funcs:
-        typer.secho(
-            f"[c2rust-library] 根据根列表，标记不可达函数删除: {len(scope_unreachable_funcs)} 个",
-            fg=typer.colors.YELLOW,
-            err=True,
+        PrettyOutput.auto_print(
+            f"⚠️ [c2rust-library] 根据根列表，标记不可达函数删除: {len(scope_unreachable_funcs)} 个"
         )
 
     return filtered_roots, scope_unreachable_funcs

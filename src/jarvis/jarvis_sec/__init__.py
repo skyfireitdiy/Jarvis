@@ -23,7 +23,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from jarvis.jarvis_tools.output import PrettyOutput
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_agent import Agent  # noqa: F401
 from jarvis.jarvis_sec.utils import (
