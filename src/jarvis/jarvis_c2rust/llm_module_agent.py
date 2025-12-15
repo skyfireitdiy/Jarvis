@@ -195,7 +195,7 @@ class LLMRustCratePlannerAgent:
                     use_analysis=False,
                 )
 
-            # 进入主循环：第一轮仅输出 <!!!COMPLETE!!!> 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 JSON）
+            # 进入主循环：第一轮仅输出 {ot('!!!COMPLETE!!!')} 触发自动完成；随后 summary 输出 <PROJECT> 块（仅含 JSON）
             if use_direct_model:
                 # 格式校验失败后，直接调用模型接口
                 # 构造包含摘要提示词和具体错误信息的完整提示

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """提示词构建模块"""
 
+from jarvis.jarvis_utils.tag import ot
+
 
 def build_summary_prompt() -> str:
     """
@@ -121,7 +123,7 @@ def build_verification_summary_prompt() -> str:
 
 def get_review_system_prompt() -> str:
     """获取复核Agent的系统提示词"""
-    return """
+    return f"""
 # 复核Agent约束
 - 你的核心任务是复核聚类Agent给出的无效结论是否充分和正确。
 - 你需要仔细检查聚类Agent提供的invalid_reason是否充分，是否真的考虑了所有可能的路径。
@@ -137,7 +139,7 @@ def get_review_system_prompt() -> str:
   - 必须验证聚类Agent是否真的确认了所有路径都有保护措施。
   - 如果发现聚类Agent遗漏了某些路径、调用者或边界情况，必须判定为理由不充分。
   - 保守策略：有疑问时，一律判定为理由不充分，将候选重新加入验证流程。
-- 完成复核后，主输出仅打印结束符 <!!!COMPLETE!!!> ，不需要汇总结果。
+- 完成复核后，主输出仅打印结束符 {ot('!!!COMPLETE!!!')}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
     """.strip()
 
 

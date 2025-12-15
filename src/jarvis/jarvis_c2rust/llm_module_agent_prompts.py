@@ -10,6 +10,7 @@ from typing import List
 
 from jarvis.jarvis_c2rust.llm_module_agent_utils import resolve_created_dir
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+from jarvis.jarvis_utils.tag import ot
 
 
 class PromptBuilder:
@@ -121,7 +122,7 @@ class PromptBuilder:
     def build_user_prompt(self, roots_context: List[Dict[str, Any]]) -> str:
         """
         主对话阶段：传入上下文，不给出输出要求，仅用于让模型获取信息并触发进入总结阶段。
-        请模型仅输出 <!!!COMPLETE!!!> 以进入总结（summary）阶段。
+        请模型仅输出 {ot('!!!COMPLETE!!!')} 以进入总结（summary）阶段。不要输出其他任何内容，任务总结将会在后面的交互中被询问。
         """
         crate_name = self.crate_name_func()
         has_main = self.has_original_main_func()
@@ -144,7 +145,7 @@ class PromptBuilder:
 {context_json}
 </context>
 
-如果已准备好进入总结阶段以生成完整输出，请仅输出：<!!!COMPLETE!!!>
+如果已准备好进入总结阶段以生成完整输出，请仅输出：{ot('!!!COMPLETE!!!')}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
 """.strip()
         return self.append_additional_notes(prompt)
 
