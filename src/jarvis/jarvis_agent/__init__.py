@@ -1643,6 +1643,27 @@ class Agent:
                 ret = ""
             result = ret
 
+            # 打印任务总结内容给用户查看
+            if ret and ret.strip():
+                try:
+                    import jarvis.jarvis_utils.globals as G
+                    from jarvis.jarvis_utils.globals import console
+                    from rich.panel import Panel
+                    from rich import box
+
+                    agent_name = self.name if hasattr(self, "name") else None
+                    panel = Panel(
+                        ret,
+                        title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 任务总结[/bold cyan]",
+                        border_style="bright_green",
+                        box=box.ROUNDED,
+                        expand=True,
+                    )
+                    console.print(panel)
+                except Exception:
+                    # 如果格式化输出失败，回退到简单打印
+                    PrettyOutput.auto_print(f"📋 任务总结:\n{ret}")
+
             # 非关键流程：广播完成总结事件（用于日志、监控等）
             try:
                 self.event_bus.emit(
