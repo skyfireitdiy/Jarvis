@@ -297,11 +297,61 @@ class task_list_manager:
 - **优先考虑主Agent执行**：对于可以在1-2步内完成的任务，优先使用 `main` 类型由主Agent直接执行
 - **评估拆分必要性**：在拆分任务前，评估是否真的需要创建子Agent，是否可以由主Agent更高效地完成
 
+**📊 数据量切分策略（避免长上下文目标偏移）**
+- **按数据切分任务**：当任务涉及大量数据时（如处理多个文件、多个目录、大量代码文件等），应该按照数据维度切分为多个子任务，由 sub agent 分别完成
+- **切分维度示例**：
+  - **按文件目录切分**：如果需要对多个目录进行处理，每个目录创建一个子任务（如"处理 src/auth/ 目录"、"处理 src/api/ 目录"）
+  - **按文件列表切分**：如果需要对大量文件进行处理，将文件列表分批切分（如"处理文件列表1-50"、"处理文件列表51-100"）
+  - **按功能模块切分**：如果涉及多个功能模块，每个模块创建一个子任务（如"处理用户认证模块"、"处理权限管理模块"）
+  - **按数据范围切分**：如果涉及大量数据，按数据范围切分（如"处理前1000条记录"、"处理后1000条记录"）
+- **切分的好处**：
+  - ✅ **避免长上下文目标偏移**：每个子任务专注于处理部分数据，上下文更聚焦，避免在处理大量数据时偏离目标
+  - ✅ **提高执行效率**：多个子任务可以并行执行（如果无依赖关系），提高整体执行效率
+  - ✅ **降低单次任务复杂度**：每个子任务处理的数据量更小，更容易成功完成
+  - ✅ **便于错误恢复**：如果某个子任务失败，只需重试该子任务，不影响其他已完成的任务
+- **切分示例**：
+  ```json
+  {{
+    "action": "add_tasks",
+    "main_goal": "重构整个项目的错误处理机制",
+    "tasks_info": [
+      {{
+        "task_name": "重构 src/auth/ 目录的错误处理",
+        "task_desc": "处理 src/auth/ 目录下的所有文件，统一错误处理机制",
+        "priority": 5,
+        "expected_output": "src/auth/ 目录下所有文件的错误处理已重构",
+        "agent_type": "sub"
+      }},
+      {{
+        "task_name": "重构 src/api/ 目录的错误处理",
+        "task_desc": "处理 src/api/ 目录下的所有文件，统一错误处理机制",
+        "priority": 5,
+        "expected_output": "src/api/ 目录下所有文件的错误处理已重构",
+        "agent_type": "sub"
+      }},
+      {{
+        "task_name": "重构 src/utils/ 目录的错误处理",
+        "task_desc": "处理 src/utils/ 目录下的所有文件，统一错误处理机制",
+        "priority": 4,
+        "expected_output": "src/utils/ 目录下所有文件的错误处理已重构",
+        "agent_type": "sub"
+      }}
+    ]
+  }}
+  ```
+- **切分原则**：
+  - 每个子任务处理的数据量应该适中（建议每个子任务处理10-50个文件，或单个目录）
+  - 子任务之间应该相对独立，减少依赖关系
+  - 如果子任务之间有依赖，使用 `dependencies` 参数明确指定
+  - 切分后的子任务都应该使用 `agent_type: "sub"`，由系统自动创建子 Agent 执行
+
 **依赖关系：**
 - 在 `add_tasks` 时，任务的 `dependencies` 可以引用本次批次中的任务名称（系统会自动匹配）
 - 或者引用已存在的任务ID
 
 **使用示例（推荐）：**
+
+示例1：功能模块拆分
 {ot("TOOL_CALL")}
 {{
   "want": "添加用户登录功能相关任务",
@@ -324,6 +374,41 @@ class task_list_manager:
         "expected_output": "登录接口代码",
         "agent_type": "sub",
         "dependencies": ["设计数据库表结构"]
+      }}
+    ]
+  }}
+}}
+{ct("TOOL_CALL")}
+
+示例2：按数据量切分（处理大量文件/目录）
+{ot("TOOL_CALL")}
+{{
+  "want": "重构整个项目的错误处理机制",
+  "name": "task_list_manager",
+  "arguments": {{
+    "action": "add_tasks",
+    "main_goal": "重构整个项目的错误处理机制，统一错误处理方式",
+    "tasks_info": [
+      {{
+        "task_name": "重构 src/auth/ 目录的错误处理",
+        "task_desc": "处理 src/auth/ 目录下的所有文件，统一错误处理机制",
+        "priority": 5,
+        "expected_output": "src/auth/ 目录下所有文件的错误处理已重构",
+        "agent_type": "sub"
+      }},
+      {{
+        "task_name": "重构 src/api/ 目录的错误处理",
+        "task_desc": "处理 src/api/ 目录下的所有文件，统一错误处理机制",
+        "priority": 5,
+        "expected_output": "src/api/ 目录下所有文件的错误处理已重构",
+        "agent_type": "sub"
+      }},
+      {{
+        "task_name": "重构 src/utils/ 目录的错误处理",
+        "task_desc": "处理 src/utils/ 目录下的所有文件，统一错误处理机制",
+        "priority": 4,
+        "expected_output": "src/utils/ 目录下所有文件的错误处理已重构",
+        "agent_type": "sub"
       }}
     ]
   }}
