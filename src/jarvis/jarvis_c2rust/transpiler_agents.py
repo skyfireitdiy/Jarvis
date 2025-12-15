@@ -10,7 +10,7 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -375,9 +375,8 @@ class AgentManager:
                     self.agent_before_commits[agent_key] = current_commit
         except Exception as e:
             # 事件处理器异常不应影响主流程
-            typer.secho(
-                f"[c2rust-transpiler][test-detection] BEFORE_TOOL_CALL 事件处理器异常: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][test-detection] BEFORE_TOOL_CALL 事件处理器异常: {e}"
             )
 
     def on_after_tool_call(
@@ -433,9 +432,8 @@ class AgentManager:
                     self.agent_before_commits[agent_key] = current_commit
                 return
 
-            typer.secho(
-                "[c2rust-transpiler][test-detection] 检测到可能错误删除了测试代码标记（工具调用后检测）",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "⚠️ [c2rust-transpiler][test-detection] 检测到可能错误删除了测试代码标记（工具调用后检测）"
             )
 
             # 询问 LLM 是否合理
@@ -444,17 +442,15 @@ class AgentManager:
             )
 
             if need_reset:
-                typer.secho(
-                    f"[c2rust-transpiler][test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    f"❌ [c2rust-transpiler][test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}"
                 )
                 # 需要调用 reset_to_commit 函数，但这里需要通过回调传递
                 # 暂时先记录，由调用方处理
                 if hasattr(self, "_reset_to_commit_func"):
                     if self._reset_to_commit_func(before_commit):
-                        typer.secho(
-                            "[c2rust-transpiler][test-detection] 已回退到之前的 commit（工具调用后检测）",
-                            fg=typer.colors.GREEN,
+                        PrettyOutput.auto_print(
+                            "✅ [c2rust-transpiler][test-detection] 已回退到之前的 commit（工具调用后检测）"
                         )
                         # 回退后，保持之前的 commit 记录
                         self.agent_before_commits[agent_key] = before_commit
@@ -464,9 +460,8 @@ class AgentManager:
                         ):
                             agent.session.prompt += "\n\n⚠️ 修改被撤销：检测到测试代码被错误删除，已回退到之前的版本。\n"
                     else:
-                        typer.secho(
-                            "[c2rust-transpiler][test-detection] 回退失败",
-                            fg=typer.colors.RED,
+                        PrettyOutput.auto_print(
+                            "❌ [c2rust-transpiler][test-detection] 回退失败"
                         )
             else:
                 # LLM 认为删除合理，更新 commit 记录
@@ -475,9 +470,8 @@ class AgentManager:
                     self.agent_before_commits[agent_key] = current_commit
         except Exception as e:
             # 事件处理器异常不应影响主流程
-            typer.secho(
-                f"[c2rust-transpiler][test-detection] AFTER_TOOL_CALL 事件处理器异常: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][test-detection] AFTER_TOOL_CALL 事件处理器异常: {e}"
             )
 
     def set_reset_to_commit_func(self, reset_func) -> None:
