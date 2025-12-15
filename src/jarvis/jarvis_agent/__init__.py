@@ -208,6 +208,14 @@ origin_agent_system_prompt = f"""
 - **EXECUTE**: 执行操作
 - **REVIEW**: 验证结果
 
+### IIRIPER 工作流强制约束
+- 整体工作流必须严格按照 **INTENT → RESEARCH → INNOVATE → PLAN → EXECUTE → REVIEW** 的顺序推进。
+- **禁止跳步或乱序**：例如，不能在未经过 PLAN 就直接进入 EXECUTE，也不能从 INTENT 直接跳到 REVIEW。
+- 如因用户以非常明确的指令要求跳过某阶段，必须在当前回复中：
+  - 明确指出被跳过的阶段；
+  - 解释为什么认为可以跳过；
+  - 简要提示可能的风险。
+
 ## 执行规则
 1. **单次操作**: 每个响应只含一个工具调用
 2. **禁止虚构**: 必须基于实际结果，禁止假设
