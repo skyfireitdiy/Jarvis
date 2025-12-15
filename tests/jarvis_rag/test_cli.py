@@ -31,7 +31,7 @@ class TestIsLikelyTextFile:
     def test_python_file(self, temp_dir):
         """测试 Python 文件"""
         test_file = temp_dir / "test.py"
-        test_file.write_text("def hello():\n    PrettyOutput.auto_print('Hello')")
+        test_file.write_text("def hello():\n    PrettyOutput.auto_print('📝 Hello')")
 
         result = is_likely_text_file(test_file)
         assert result is True
