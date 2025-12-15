@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import List
 from typing import cast
 
-import typer
 
 from jarvis.jarvis_c2rust.models import FnRecord
 
@@ -172,9 +171,8 @@ def codeagent_generate_impl(
         )
         # 再次检测
         if self._check_and_handle_test_deletion(before_commit, agent):
-            typer.secho(
-                "[c2rust-transpiler][gen] 再次检测到测试代码删除问题，已回退",
-                fg=typer.colors.RED,
+            PrettyOutput.auto_print(
+                "❌ [c2rust-transpiler][gen] 再次检测到测试代码删除问题，已回退",
             )
 
     # 如果是根符号，确保其模块在 lib.rs 中被暴露
