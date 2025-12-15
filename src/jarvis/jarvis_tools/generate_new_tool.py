@@ -144,15 +144,33 @@ class {tool_name}:
 
 请生成完整的、可直接使用的Python代码，生成完成后不用进行测试与验证。"""
 
-    def _register_new_tool(self, tool_name: str, tool_file_path: str) -> bool:
+    def _register_new_tool(self, agent, tool_name: str, tool_file_path: str) -> bool:
         """注册新生成的工具"""
         try:
-            from jarvis.jarvis_tools.registry import ToolRegistry
+            tool_registry = agent.get_tool_registry()
+            result = tool_registry.register_tool_by_file(tool_file_path)
+            if not result:
+                # 注册失败，清理生成的文件
+                try:
+                    from pathlib import Path
 
-            registry = ToolRegistry()
-            return registry.register_tool_by_file(tool_file_path)
+                    Path(tool_file_path).unlink(missing_ok=True)
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 已清理注册失败的工具文件: {tool_file_path}"
+                    )
+                except Exception as cleanup_error:
+                    PrettyOutput.auto_print(f"⚠️ 清理文件失败: {cleanup_error}")
+            return bool(result)
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 注册工具失败: {e}")
+            # 注册异常时也尝试清理文件
+            try:
+                from pathlib import Path
+
+                Path(tool_file_path).unlink(missing_ok=True)
+                PrettyOutput.auto_print(f"ℹ️ 已清理注册异常的工具文件: {tool_file_path}")
+            except Exception as cleanup_error:
+                PrettyOutput.auto_print(f"⚠️ 清理文件失败: {cleanup_error}")
             return False
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
@@ -214,7 +232,7 @@ class {tool_name}:
                 tool_file_path = tools_dir / f"{tool_name}.py"
                 if tool_file_path.exists():
                     # 自动注册新工具
-                    self._register_new_tool(tool_name, str(tool_file_path))
+                    self._register_new_tool(agent, tool_name, str(tool_file_path))
 
                     return {
                         "success": True,
