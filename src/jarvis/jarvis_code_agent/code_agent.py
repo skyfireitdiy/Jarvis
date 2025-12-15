@@ -11,7 +11,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 import subprocess
 import sys
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 
@@ -75,8 +75,8 @@ class CodeAgent(Agent):
         disable_review: bool = False,
         review_max_iterations: int = 0,
         enable_task_list_manager: bool = True,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
         # 记录当前是否为非交互模式，便于在提示词/输入中动态调整行为说明
@@ -198,7 +198,7 @@ class CodeAgent(Agent):
         except Exception:
             pass
 
-    def _init_model(self, model_group: Optional[str]):
+    def _init_model(self, model_group: Optional[str]) -> None:
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
         platform_name = get_smart_platform_name(model_group)
         model_name = get_smart_model_name(model_group)
@@ -362,6 +362,7 @@ git reset --hard {start_commit}
                     enhanced_input=enhanced_input,
                     prefix=prefix,
                     suffix=suffix,
+                    code_generation_summary=result_str,
                 )
 
             end_commit = get_latest_commit_hash()
@@ -397,10 +398,10 @@ git reset --hard {start_commit}
     def _on_after_tool_call(
         self,
         agent: Agent,
-        current_response=None,
-        need_return=None,
-        tool_prompt=None,
-        **kwargs,
+        current_response: Optional[str] = None,
+        need_return: Optional[bool] = None,
+        tool_prompt: Optional[str] = None,
+        **kwargs: Any,
     ) -> None:
         """工具调用后回调函数。"""
 
@@ -689,7 +690,12 @@ git reset --hard {start_commit}
 
         return "\n".join(truncated_lines)
 
-    def _build_review_prompts(self, user_input: str, git_diff: str) -> tuple:
+    def _build_review_prompts(
+        self,
+        user_input: str,
+        git_diff: str,
+        code_generation_summary: Optional[str] = None,
+    ) -> tuple:
         """构建 review Agent 的 prompts
 
         参数:
@@ -717,6 +723,9 @@ git reset --hard {start_commit}
 
 【用户需求】
 {user_input}
+
+【代码生成总结】
+{code_generation_summary if code_generation_summary else "无代码生成总结信息"}
 
 【代码修改（Git Diff）】
 ```diff
@@ -799,6 +808,7 @@ git reset --hard {start_commit}
         enhanced_input: str,
         prefix: str = "",
         suffix: str = "",
+        code_generation_summary: Optional[str] = None,
     ) -> None:
         """执行 review 和修复循环
 
@@ -861,7 +871,7 @@ git reset --hard {start_commit}
 
             # 构建 review prompts
             sys_prompt, usr_prompt, sum_prompt = self._build_review_prompts(
-                user_input, truncated_git_diff
+                user_input, truncated_git_diff, code_generation_summary
             )
 
             # 创建 review Agent
