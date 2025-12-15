@@ -333,7 +333,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
         # 添加警告信息
         PrettyOutput.auto_print(
-            "⚠️ 警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到JARVIS_MCP配置方式"
+            "⚠️ 警告: 从文件目录加载MCP工具的方式将在未来版本中废弃，请尽快迁移到mcp配置方式"
         )
 
         # 遍历目录中的所有.yaml文件

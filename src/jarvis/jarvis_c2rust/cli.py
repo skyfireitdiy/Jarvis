@@ -104,7 +104,7 @@ def _root():
     C2Rust 命令行工具
     """
     # 设置环境变量，标识当前运行在 c2rust 环境中
-    os.environ["JARVIS_C2RUST_ENABLED"] = "1"
+    os.environ["c2rust_enabled"] = "1"
     # 不做任何处理，仅作为命令组的占位，使 'scan' 作为子命令出现
     init_env("")
     pass

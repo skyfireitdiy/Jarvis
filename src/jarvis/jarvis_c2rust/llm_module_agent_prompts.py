@@ -145,7 +145,7 @@ class PromptBuilder:
 {context_json}
 </context>
 
-如果已准备好进入总结阶段以生成完整输出，请仅输出：{ot('!!!COMPLETE!!!')}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
+如果已准备好进入总结阶段以生成完整输出，请仅输出：{ot("!!!COMPLETE!!!")}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
 """.strip()
         return self.append_additional_notes(prompt)
 

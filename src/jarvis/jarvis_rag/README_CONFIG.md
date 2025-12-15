@@ -4,14 +4,14 @@
 
 ## 配置方式
 
-RAG 配置通过 `JARVIS_RAG` 环境变量或 `GLOBAL_CONFIG_DATA` 中的 `JARVIS_RAG` 键进行设置。
+RAG 配置通过 `rag` 环境变量或 `GLOBAL_CONFIG_DATA` 中的 `rag` 键进行设置。
 
 ## 配置结构
 
 ### 基本配置
 
 ```python
-JARVIS_RAG = {
+rag = {
     "embedding_model": "BAAI/bge-m3",           # 模型名称
     "embedding_type": "LocalEmbeddingModel",     # 模型实现类型
     "embedding_max_length": 512,                # 嵌入模型最大输入长度（token数）
@@ -26,7 +26,7 @@ JARVIS_RAG = {
 ### 高级配置（带额外参数）
 
 ```python
-JARVIS_RAG = {
+rag = {
     "embedding_model": "BAAI/bge-m3",
     "embedding_type": "LocalEmbeddingModel",
     "embedding_config": {
@@ -50,9 +50,9 @@ JARVIS_RAG = {
 类似于模型组，RAG 也支持配置组：
 
 ```python
-JARVIS_RAG_GROUP = "text"  # 或 "code"
+rag_group = "text"  # 或 "code"
 
-JARVIS_RAG_GROUPS = [
+rag_groups = [
     {
         "text": {
             "embedding_model": "BAAI/bge-m3",
@@ -99,7 +99,7 @@ JARVIS_RAG_GROUPS = [
 ```python
 # 使用默认配置，无需设置
 # 或显式设置：
-JARVIS_RAG = {
+rag = {
     "embedding_model": "BAAI/bge-m3",
     "embedding_type": "LocalEmbeddingModel",
     "embedding_max_length": 512,  # 根据模型调整
@@ -112,7 +112,7 @@ JARVIS_RAG = {
 ### 示例 2: 使用 OpenAI 嵌入模型
 
 ```python
-JARVIS_RAG = {
+rag = {
     "embedding_model": "text-embedding-3-small",
     "embedding_type": "OpenAIEmbeddingModel",
     "embedding_config": {
@@ -126,7 +126,7 @@ JARVIS_RAG = {
 ### 示例 3: 使用 EdgeFn 在线模型
 
 ```python
-JARVIS_RAG = {
+rag = {
     "embedding_model": "BAAI/bge-m3",
     "embedding_type": "EdgeFnEmbeddingModel",
     "embedding_config": {
@@ -143,7 +143,7 @@ JARVIS_RAG = {
 ### 示例 4: 混合使用（本地嵌入 + 在线重排）
 
 ```python
-JARVIS_RAG = {
+rag = {
     "embedding_model": "BAAI/bge-m3",
     "embedding_type": "LocalEmbeddingModel",
     "rerank_model": "rerank-english-v3.0",
@@ -160,7 +160,7 @@ JARVIS_RAG = {
 # 首先在 ~/.jarvis/embeddings/ 或 ~/.jarvis/rerankers/ 中创建自定义模型
 # 然后配置使用：
 
-JARVIS_RAG = {
+rag = {
     "embedding_model": "my-custom-model",
     "embedding_type": "MyCustomEmbeddingModel",  # 自定义类名
     "embedding_config": {
@@ -174,8 +174,8 @@ JARVIS_RAG = {
 
 配置的优先级顺序（从高到低）：
 
-1. **顶级 JARVIS_RAG 设置** - 直接设置的配置项
-2. **JARVIS_RAG_GROUP 组配置** - 通过组名选择的配置
+1. **顶级 rag 设置** - 直接设置的配置项
+2. **rag_group 组配置** - 通过组名选择的配置
 3. **代码默认值** - 硬编码的默认值
 
 ## 配置函数
@@ -274,7 +274,7 @@ export JINA_API_KEY="your-key"
 
 ```python
 # 在环境变量或配置文件中设置
-JARVIS_RAG = {
+rag = {
     # 嵌入模型配置
     "embedding_model": "BAAI/bge-m3",
     "embedding_type": "LocalEmbeddingModel",
@@ -298,8 +298,8 @@ JARVIS_RAG = {
 }
 
 # 或使用配置组
-JARVIS_RAG_GROUP = "text"
-JARVIS_RAG_GROUPS = [
+rag_group = "text"
+rag_groups = [
     {
         "text": {
             "embedding_model": "BAAI/bge-m3",

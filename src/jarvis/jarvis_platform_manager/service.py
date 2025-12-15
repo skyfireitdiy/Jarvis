@@ -83,7 +83,7 @@ def start_service(
     """Start OpenAI-compatible API server."""
     # Create logs directory if it doesn't exist
     # Prefer environment variable, then user directory, fall back to CWD
-    logs_dir = os.environ.get("JARVIS_LOG_DIR")
+    logs_dir = os.environ.get("log_dir")
     if not logs_dir:
         logs_dir = os.path.join(os.path.expanduser("~"), ".jarvis", "logs")
     try:

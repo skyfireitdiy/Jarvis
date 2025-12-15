@@ -754,24 +754,24 @@ def _get_multiline_input_internal(
                         if name == "cmd" or shutil.which(name):
                             if name == "cmd":
                                 # Keep session open with /K and set env for the spawned shell
-                                return "!cmd /K set JARVIS_TERMINAL=1"
+                                return "!cmd /K set terminal=1"
                             else:
                                 # PowerShell or pwsh: set env then remain in session
-                                return f"!{name} -NoExit -Command \"$env:JARVIS_TERMINAL='1'\""
+                                return f"!{name} -NoExit -Command \"$env:terminal='1'\""
                 else:
                     shell_path = os.environ.get("SHELL", "")
                     if shell_path:
                         base = os.path.basename(shell_path)
                         if base:
-                            return f"!env JARVIS_TERMINAL=1 {base}"
+                            return f"!env terminal=1 {base}"
                     for name in ("fish", "zsh", "bash", "sh"):
                         if shutil.which(name):
-                            return f"!env JARVIS_TERMINAL=1 {name}"
-                    return "!env JARVIS_TERMINAL=1 bash"
+                            return f"!env terminal=1 {name}"
+                    return "!env terminal=1 bash"
             except Exception:
-                return "!env JARVIS_TERMINAL=1 bash"
+                return "!env terminal=1 bash"
             # Fallback for all cases
-            return "!env JARVIS_TERMINAL=1 bash"
+            return "!env terminal=1 bash"
 
         # Append a special marker to indicate no-confirm execution in shell_input_handler
         event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")

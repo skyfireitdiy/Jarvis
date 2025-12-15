@@ -961,7 +961,7 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
     """
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
     try:
-        if os.environ.get("JARVIS_TERMINAL") == "1":
+        if os.environ.get("terminal") == "1":
             PrettyOutput.auto_print(
                 "⚠️ 检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。"
             )
@@ -1407,7 +1407,7 @@ def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_ENABLE_GIT_JCA_SWITCH",
+            "enable_git_jca_switch",
             "是否在检测到Git仓库时，提示并可自动切换到代码开发模式（jca）？",
             True,
         )
@@ -1417,7 +1417,7 @@ def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_ENABLE_STARTUP_CONFIG_SELECTOR",
+            "enable_startup_config_selector",
             "在进入默认通用代理前，是否先列出可用配置（agent/multi_agent/roles）供选择？",
             True,
         )
@@ -1440,7 +1440,7 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_PRETTY_OUTPUT",
+            "pretty_output",
             "是否启用更美观的终端输出（Pretty Output）？",
             _default_pretty,
         )
@@ -1450,7 +1450,7 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_PRINT_PROMPT",
+            "print_prompt",
             "是否打印发送给模型的提示词（Prompt）？",
             False,
         )
@@ -1460,7 +1460,7 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_IMMEDIATE_ABORT",
+            "immediate_abort",
             "是否启用立即中断？\n- 选择 是/true：在对话输出流的每次迭代中检测到用户中断（例如 Ctrl+C）时，立即返回当前已生成的内容并停止继续输出。\n- 选择 否/false：不会在输出过程中立刻返回，而是按既有流程处理（不中途打断输出）。",
             False,
         )
@@ -1468,10 +1468,10 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
     )
 
     # Diff 可视化模式配置
-    if ask_all or "JARVIS_DIFF_VISUALIZATION_MODE" not in config_data:
+    if ask_all or "diff_visualization_mode" not in config_data:
         from jarvis.jarvis_utils.input import get_choice
 
-        current_mode = config_data.get("JARVIS_DIFF_VISUALIZATION_MODE", "side_by_side")
+        current_mode = config_data.get("diff_visualization_mode", "side_by_side")
         diff_mode_choices = [
             f"side_by_side - 左右分栏对比显示{'（当前）' if current_mode == 'side_by_side' else ''}",
             f"unified - 统一diff格式{'（当前）' if current_mode == 'unified' else ''}",
@@ -1481,7 +1481,7 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
         selected_display = get_choice("选择 Diff 可视化模式", diff_mode_choices)
         selected_mode = selected_display.split(" - ")[0]
         if selected_mode != current_mode:
-            config_data["JARVIS_DIFF_VISUALIZATION_MODE"] = selected_mode
+            config_data["diff_visualization_mode"] = selected_mode
             changed = True
 
     return changed
@@ -1494,7 +1494,7 @@ def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_ENABLE_STATIC_ANALYSIS",
+            "enable_static_analysis",
             "是否启用静态代码分析（Static Analysis）？",
             True,
         )
@@ -1504,7 +1504,7 @@ def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_ENABLE_BUILD_VALIDATION",
+            "enable_build_validation",
             "是否启用构建验证（Build Validation）？在代码编辑后自动验证代码能否成功编译/构建。",
             True,
         )
@@ -1514,7 +1514,7 @@ def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_BUILD_VALIDATION_TIMEOUT",
+            "build_validation_timeout",
             "构建验证的超时时间（秒，默认30秒）",
             30,
         )
@@ -1524,7 +1524,7 @@ def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_ENABLE_IMPACT_ANALYSIS",
+            "enable_impact_analysis",
             "是否启用编辑影响范围分析（Impact Analysis）？分析代码编辑的影响范围，识别可能受影响的文件、函数、测试等。",
             True,
         )
@@ -1540,7 +1540,7 @@ def _collect_agent_features_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_USE_METHODOLOGY",
+            "use_methodology",
             "是否启用方法论系统（Methodology）？",
             True,
         )
@@ -1550,7 +1550,7 @@ def _collect_agent_features_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_USE_ANALYSIS",
+            "use_analysis",
             "是否启用分析流程（Analysis）？",
             True,
         )
@@ -1560,7 +1560,7 @@ def _collect_agent_features_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_FORCE_SAVE_MEMORY",
+            "force_save_memory",
             "是否强制保存会话记忆？",
             False,
         )
@@ -1576,7 +1576,7 @@ def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_SAVE_SESSION_HISTORY",
+            "save_session_history",
             "是否保存会话记录？",
             False,
         )
@@ -1586,7 +1586,7 @@ def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_PRINT_ERROR_TRACEBACK",
+            "print_error_traceback",
             "是否在错误输出时打印回溯调用链？",
             False,
         )
@@ -1596,7 +1596,7 @@ def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_SKIP_PREDEFINED_TASKS",
+            "skip_predefined_tasks",
             "是否跳过预定义任务加载（不读取 pre-command 列表）？",
             False,
         )
@@ -1606,7 +1606,7 @@ def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_CONVERSATION_TURN_THRESHOLD",
+            "conversation_turn_threshold",
             "对话轮次阈值（达到此轮次时触发总结，建议50-100）：",
             50,
         )
@@ -1622,7 +1622,7 @@ def _collect_safety_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_EXECUTE_TOOL_CONFIRM",
+            "execute_tool_confirm",
             "执行工具前是否需要确认？",
             False,
         )
@@ -1632,7 +1632,7 @@ def _collect_safety_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_CONFIRM_BEFORE_APPLY_PATCH",
+            "confirm_before_apply_patch",
             "应用补丁前是否需要确认？",
             False,
         )
@@ -1650,8 +1650,8 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_optional_str(
             config_data,
             ask_all,
-            "JARVIS_DATA_PATH",
-            f"是否自定义数据目录路径(JARVIS_DATA_PATH)？留空使用默认: {_get_data_dir()}",
+            "data_path",
+            f"是否自定义数据目录路径(data_path)？留空使用默认: {_get_data_dir()}",
         )
         or changed
     )
@@ -1659,7 +1659,7 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_MAX_INPUT_TOKEN_COUNT",
+            "max_input_token_count",
             "自定义最大输入Token数量（留空使用默认: 128000）",
             128000,
         )
@@ -1669,8 +1669,8 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_CHEAP_MAX_INPUT_TOKEN_COUNT",
-            "廉价模型的最大输入Token数量（留空或0表示使用JARVIS_MAX_INPUT_TOKEN_COUNT的值）",
+            "cheap_max_input_token_count",
+            "廉价模型的最大输入Token数量（留空或0表示使用max_input_token_count）",
             0,
         )
         or changed
@@ -1679,8 +1679,8 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_SMART_MAX_INPUT_TOKEN_COUNT",
-            "智能模型的最大输入Token数量（留空或0表示使用JARVIS_MAX_INPUT_TOKEN_COUNT的值）",
+            "smart_max_input_token_count",
+            "智能模型的最大输入Token数量（留空或0表示使用max_input_token_count）",
             0,
         )
         or changed
@@ -1689,7 +1689,7 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_TOOL_FILTER_THRESHOLD",
+            "tool_filter_threshold",
             "设置AI工具筛选阈值 (当可用工具数超过此值时触发AI筛选, 默认30)",
             30,
         )
@@ -1705,7 +1705,7 @@ def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_SCRIPT_EXECUTION_TIMEOUT",
+            "script_execution_timeout",
             "脚本执行超时时间（秒，默认300，仅非交互模式生效）",
             300,
         )
@@ -1715,7 +1715,7 @@ def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_int(
             config_data,
             ask_all,
-            "JARVIS_ADDON_PROMPT_THRESHOLD",
+            "addon_prompt_threshold",
             "附加提示的触发阈值（字符数，默认1024）。当消息长度超过此值时，会自动添加默认的附加提示",
             1024,
         )
@@ -1725,7 +1725,7 @@ def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_bool(
             config_data,
             ask_all,
-            "JARVIS_ENABLE_INTENT_RECOGNITION",
+            "enable_intent_recognition",
             "是否启用意图识别功能？用于智能上下文推荐中的LLM意图提取和语义分析",
             True,
         )
@@ -1741,7 +1741,7 @@ def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_list(
             config_data,
             ask_all,
-            "JARVIS_TOOL_LOAD_DIRS",
+            "tool_load_dirs",
             "指定工具加载目录（逗号分隔，留空跳过）：",
         )
         or changed
@@ -1750,7 +1750,7 @@ def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_list(
             config_data,
             ask_all,
-            "JARVIS_METHODOLOGY_DIRS",
+            "methodology_dirs",
             "指定方法论加载目录（逗号分隔，留空跳过）：",
         )
         or changed
@@ -1759,7 +1759,7 @@ def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_list(
             config_data,
             ask_all,
-            "JARVIS_AGENT_DEFINITION_DIRS",
+            "agent_definition_dirs",
             "指定 agent 定义加载目录（逗号分隔，留空跳过）：",
         )
         or changed
@@ -1768,7 +1768,7 @@ def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_list(
             config_data,
             ask_all,
-            "JARVIS_MULTI_AGENT_DIRS",
+            "multi_agent_dirs",
             "指定 multi_agent 加载目录（逗号分隔，留空跳过）：",
         )
         or changed
@@ -1777,7 +1777,7 @@ def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_list(
             config_data,
             ask_all,
-            "JARVIS_ROLES_DIRS",
+            "roles_dirs",
             "指定 roles 加载目录（逗号分隔，留空跳过）：",
         )
         or changed
@@ -1786,7 +1786,7 @@ def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_list(
             config_data,
             ask_all,
-            "JARVIS_AFTER_TOOL_CALL_CB_DIRS",
+            "after_tool_call_cb_dirs",
             "指定工具调用后回调实现目录（逗号分隔，留空跳过）：",
         )
         or changed
@@ -1801,7 +1801,7 @@ def _collect_web_search_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_optional_str(
             config_data,
             ask_all,
-            "JARVIS_WEB_SEARCH_PLATFORM",
+            "web_search_platform",
             "配置 Web 搜索平台名称（留空跳过）：",
         )
         or changed
@@ -1810,7 +1810,7 @@ def _collect_web_search_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_optional_str(
             config_data,
             ask_all,
-            "JARVIS_WEB_SEARCH_MODEL",
+            "web_search_model",
             "配置 Web 搜索模型名称（留空跳过）：",
         )
         or changed
@@ -1825,7 +1825,7 @@ def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_optional_str(
             config_data,
             ask_all,
-            "JARVIS_GIT_COMMIT_PROMPT",
+            "git_commit_prompt",
             "自定义 Git 提交提示模板（留空跳过）：",
         )
         or changed
@@ -1935,7 +1935,7 @@ def _collect_central_repo_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_str(
             config_data,
             ask_all,
-            "JARVIS_CENTRAL_METHODOLOGY_REPO",
+            "central_methodology_repo",
             "请输入中心方法论仓库路径或Git地址（可留空跳过）：",
             "",
         )
@@ -1945,7 +1945,7 @@ def _collect_central_repo_config(config_data: dict, ask_all: bool) -> bool:
         _ask_config_str(
             config_data,
             ask_all,
-            "JARVIS_CENTRAL_TOOL_REPO",
+            "central_tool_repo",
             "请输入中心工具仓库路径或Git地址（可留空跳过）：",
             "",
         )

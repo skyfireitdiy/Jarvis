@@ -1346,12 +1346,12 @@ def compute_translation_order_jsonl(
             nm = str(meta.get("name") or "").lower()
             qn = str(meta.get("qname") or "").lower()
             # Configurable delayed entry symbols via env:
-            # - JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS
-            # - JARVIS_C2RUST_DELAY_ENTRIES
+            # - c2rust_delay_entry_symbols
+            # - c2rust_delay_entries
             # - C2RUST_DELAY_ENTRIES
             entries_env = (
-                os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS")
-                or os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES")
+                os.environ.get("c2rust_delay_entry_symbols")
+                or os.environ.get("c2rust_delay_entries")
                 or os.environ.get("C2RUST_DELAY_ENTRIES")
                 or ""
             )

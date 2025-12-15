@@ -69,7 +69,7 @@ def cli(
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
         if model_group:
-            set_config("JARVIS_LLM_GROUP", str(model_group))
+            set_config("llm_group", str(model_group))
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass

@@ -186,7 +186,7 @@ class FileIgnorePatterns:
     }
 
     # Jarvis 特定
-    JARVIS_DIRS: Set[str] = {".jarvis"}
+    dirs: Set[str] = {".jarvis"}
 
     @classmethod
     def get_all_ignore_dirs(cls) -> Set[str]:
@@ -214,7 +214,7 @@ class FileIgnorePatterns:
             | cls.DOC_DIRS
             | cls.GENERATED_DIRS
             | cls.OTHER_DIRS
-            | cls.JARVIS_DIRS
+            | cls.dirs
         )
 
     @classmethod
@@ -242,7 +242,7 @@ class FileIgnorePatterns:
             | cls.DOC_DIRS
             | cls.GENERATED_DIRS
             | cls.OTHER_DIRS
-            | cls.JARVIS_DIRS
+            | cls.dirs
         )
 
     @classmethod
@@ -263,7 +263,7 @@ class FileIgnorePatterns:
             | cls.DOC_DIRS
             | cls.GENERATED_DIRS
             | cls.OTHER_DIRS
-            | cls.JARVIS_DIRS
+            | cls.dirs
         )
 
 

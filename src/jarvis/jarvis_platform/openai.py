@@ -35,7 +35,7 @@ class OpenAIModel(BasePlatform):
         self.base_url = llm_config.get("openai_api_base") or os.getenv(
             "OPENAI_API_BASE", "https://api.openai.com/v1"
         )
-        self.model_name = os.getenv("JARVIS_MODEL") or "gpt-4o"
+        self.model_name = os.getenv("model") or "gpt-4o"
 
         # Optional: Inject extra HTTP headers via llm_config or environment variable
         # Expected format: openai_extra_headers='{"Header-Name": "value", "X-Trace": "abc"}'

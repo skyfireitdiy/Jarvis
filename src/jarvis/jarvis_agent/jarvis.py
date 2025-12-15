@@ -263,7 +263,7 @@ def handle_restore_option(
         return True
 
     # 在恢复数据时不要触发完整环境初始化，避免引导流程或网络请求
-    # 优先从配置文件解析 JARVIS_DATA_PATH，否则回退到默认数据目录
+    # 优先从配置文件解析 data_path，否则回退到默认数据目录
     data_dir_str: Optional[str] = None
     try:
         if config_file:
@@ -272,7 +272,7 @@ def handle_restore_option(
                 with open(cfg_path, "r", encoding="utf-8", errors="ignore") as cf:
                     cfg_data = yaml.safe_load(cf) or {}
                 if isinstance(cfg_data, dict):
-                    val = cfg_data.get("JARVIS_DATA_PATH")
+                    val = cfg_data.get("data_path")
                     if isinstance(val, str) and val.strip():
                         data_dir_str = val.strip()
     except Exception:
@@ -462,7 +462,7 @@ def handle_builtin_config_selector(
 
                 # 可选调试输出：查看每类的搜索目录
                 try:
-                    if os.environ.get("JARVIS_DEBUG_BUILTIN_SELECTOR") == "1":
+                    if os.environ.get("debug_builtin_selector") == "1":
                         PrettyOutput.auto_print(
                             f"ℹ️ DEBUG: category={cat} search_dirs="
                             + ", ".join(str(p) for p in unique_dirs)
@@ -743,14 +743,14 @@ def run_cli(
     # 同步其他 CLI 选项到全局配置，确保后续模块读取一致
     try:
         if model_group:
-            set_config("JARVIS_LLM_GROUP", str(model_group))
+            set_config("llm_group", str(model_group))
         if tool_group:
-            set_config("JARVIS_TOOL_GROUP", str(tool_group))
+            set_config("tool_group", str(tool_group))
         if disable_methodology_analysis:
-            set_config("JARVIS_USE_METHODOLOGY", False)
-            set_config("JARVIS_USE_ANALYSIS", False)
+            set_config("use_methodology", False)
+            set_config("use_analysis", False)
         if restore_session:
-            set_config("JARVIS_RESTORE_SESSION", True)
+            set_config("restore_session", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
@@ -984,7 +984,7 @@ def run_cli(
         # 后台启动：父进程拉起子进程并记录 PID
         is_daemon = False
         try:
-            is_daemon = os.environ.get("JARVIS_WEB_DAEMON") == "1"
+            is_daemon = os.environ.get("web_daemon") == "1"
         except Exception:
             is_daemon = False
         if not is_daemon:
@@ -1015,7 +1015,7 @@ def run_cli(
                 if web_launch_cmd:
                     args += ["--web-launch-cmd", str(web_launch_cmd)]
                 env = os.environ.copy()
-                env["JARVIS_WEB_DAEMON"] = "1"
+                env["web_daemon"] = "1"
                 # 启动子进程（后台运行）
                 proc = subprocess.Popen(
                     args,
@@ -1063,14 +1063,14 @@ def run_cli(
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
         if model_group:
-            set_config("JARVIS_LLM_GROUP", str(model_group))
+            set_config("llm_group", str(model_group))
         if tool_group:
-            set_config("JARVIS_TOOL_GROUP", str(tool_group))
+            set_config("tool_group", str(tool_group))
         if disable_methodology_analysis:
-            set_config("JARVIS_USE_METHODOLOGY", False)
-            set_config("JARVIS_USE_ANALYSIS", False)
+            set_config("use_methodology", False)
+            set_config("use_analysis", False)
         if restore_session:
-            set_config("JARVIS_RESTORE_SESSION", True)
+            set_config("restore_session", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
@@ -1136,14 +1136,14 @@ def run_cli(
 
                         launch_cmd = shlex.split(web_launch_cmd.strip())
                         # 调试输出（可选，可以通过环境变量控制）
-                        if os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                        if os.environ.get("debug_web_launch_cmd") == "1":
                             PrettyOutput.auto_print(
                                 f"🔍 解析后的启动命令: {launch_cmd}"
                             )
                     except Exception:
                         # 如果解析失败，使用简单的空格分割
                         launch_cmd = web_launch_cmd.strip().split()
-                        if os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                        if os.environ.get("debug_web_launch_cmd") == "1":
                             PrettyOutput.auto_print(
                                 f"🔍 使用简单分割的启动命令: {launch_cmd}"
                             )
@@ -1194,7 +1194,7 @@ def run_cli(
                         import json as _json
                         import os as _os
 
-                        _os.environ["JARVIS_WEB_LAUNCH_JSON"] = _json.dumps(
+                        _os.environ["web_launch_json"] = _json.dumps(
                             launch_cmd, ensure_ascii=False
                         )
                     except Exception:

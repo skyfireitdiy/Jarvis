@@ -26,9 +26,7 @@ class RuleShareManager(ShareManager):
     def __init__(self):
         central_repo = get_central_rules_repo()
         if not central_repo:
-            PrettyOutput.auto_print(
-                "❌ 错误：未配置中心规则仓库（JARVIS_CENTRAL_RULES_REPO）"
-            )
+            PrettyOutput.auto_print("❌ 错误：未配置中心规则仓库（central_rules_repo）")
             PrettyOutput.auto_print("ℹ️ 请在配置文件中设置中心规则仓库的Git地址")
             raise typer.Exit(code=1)
 

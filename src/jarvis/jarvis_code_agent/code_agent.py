@@ -593,12 +593,108 @@ git reset --hard {start_commit}
         self.session.prompt += final_ret
         return
 
+    def _truncate_diff_for_review(self, git_diff: str, token_ratio: float = 0.4) -> str:
+        """截断 git diff 以适应 token 限制（用于 review）
+
+        参数:
+            git_diff: 原始的 git diff 内容
+            token_ratio: token 使用比例（默认 0.4，即 40%，review 需要更多上下文）
+
+        返回:
+            str: 截断后的 git diff（如果超出限制则截断并添加提示、文件列表和起始 commit）
+        """
+        if not git_diff or not git_diff.strip():
+            return git_diff
+
+        from jarvis.jarvis_utils.embedding import get_context_token_count
+        from jarvis.jarvis_utils.config import get_max_input_token_count
+
+        # 获取最大输入 token 数量
+        model_group = self.model.model_group if self.model else None
+        try:
+            max_input_tokens = get_max_input_token_count(model_group)
+        except Exception:
+            # 如果获取失败，使用默认值（约 100000 tokens）
+            max_input_tokens = 100000
+
+        # 使用指定比例作为 diff 的 token 限制
+        max_diff_tokens = int(max_input_tokens * token_ratio)
+
+        # 计算 diff 的 token 数量
+        diff_token_count = get_context_token_count(git_diff)
+
+        if diff_token_count <= max_diff_tokens:
+            return git_diff
+
+        # 如果 diff 内容太大，进行截断
+        # 先提取修改的文件列表和起始 commit
+        import re
+
+        files = set()
+        # 匹配 "diff --git a/path b/path" 格式
+        pattern = r"^diff --git a/([^\s]+) b/([^\s]+)$"
+        for line in git_diff.split("\n"):
+            match = re.match(pattern, line)
+            if match:
+                file_a = match.group(1)
+                file_b = match.group(2)
+                files.add(file_b)
+                if file_a != file_b:
+                    files.add(file_a)
+        modified_files = sorted(list(files))
+
+        # 获取起始 commit id
+        start_commit = self.start_commit if hasattr(self, "start_commit") else None
+
+        lines = git_diff.split("\n")
+        truncated_lines = []
+        current_tokens = 0
+
+        for line in lines:
+            line_tokens = get_context_token_count(line)
+            if current_tokens + line_tokens > max_diff_tokens:
+                # 添加截断提示
+                truncated_lines.append("")
+                truncated_lines.append(
+                    "# ⚠️ diff内容过大，已截断显示（review 需要更多上下文）"
+                )
+                truncated_lines.append(
+                    f"# 原始diff共 {len(lines)} 行，{diff_token_count} tokens"
+                )
+                truncated_lines.append(
+                    f"# 显示前 {len(truncated_lines) - 3} 行，约 {current_tokens} tokens"
+                )
+                truncated_lines.append(
+                    f"# 限制: {max_diff_tokens} tokens (输入窗口的 {token_ratio * 100:.0f}%)"
+                )
+
+                # 添加起始 commit id
+                if start_commit:
+                    truncated_lines.append("")
+                    truncated_lines.append(f"# 起始 Commit ID: {start_commit}")
+
+                # 添加完整修改文件列表
+                if modified_files:
+                    truncated_lines.append("")
+                    truncated_lines.append(
+                        f"# 完整修改文件列表（共 {len(modified_files)} 个文件）："
+                    )
+                    for file_path in modified_files:
+                        truncated_lines.append(f"#   - {file_path}")
+
+                break
+
+            truncated_lines.append(line)
+            current_tokens += line_tokens
+
+        return "\n".join(truncated_lines)
+
     def _build_review_prompts(self, user_input: str, git_diff: str) -> tuple:
         """构建 review Agent 的 prompts
 
         参数:
             user_input: 用户原始需求
-            git_diff: 代码修改的 git diff
+            git_diff: 代码修改的 git diff（会自动进行 token 限制处理）
 
         返回:
             tuple: (system_prompt, user_prompt, summary_prompt)
@@ -752,9 +848,16 @@ git reset --hard {start_commit}
                 PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
                 return
 
+            # 对 git diff 进行 token 限制处理（review 需要更多上下文，使用 40% 的 token 比例）
+            truncated_git_diff = self._truncate_diff_for_review(
+                git_diff, token_ratio=0.4
+            )
+            if truncated_git_diff != git_diff:
+                PrettyOutput.auto_print("⚠️ Git diff 内容过大，已截断以适应 token 限制")
+
             # 构建 review prompts
             sys_prompt, usr_prompt, sum_prompt = self._build_review_prompts(
-                user_input, git_diff
+                user_input, truncated_git_diff
             )
 
             # 创建 review Agent
@@ -917,11 +1020,11 @@ def cli(
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
         if model_group:
-            set_config("JARVIS_LLM_GROUP", str(model_group))
+            set_config("llm_group", str(model_group))
         if tool_group:
-            set_config("JARVIS_TOOL_GROUP", str(tool_group))
+            set_config("tool_group", str(tool_group))
         if restore_session:
-            set_config("JARVIS_RESTORE_SESSION", True)
+            set_config("restore_session", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
