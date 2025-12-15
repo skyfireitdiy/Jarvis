@@ -10,7 +10,12 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 class generate_new_tool:
     name = "generate_new_tool"
-    description = "智能生成具备自举和自进化能力的Jarvis新工具。利用CodeAgent根据用户需求分析生成完整的工具代码，包含最佳实践模板、参数验证、错误处理，并自动注册到工具系统。支持调用现有Jarvis生态系统功能（Agent/CodeAgent）实现复杂任务处理，可自我分析和改进工具性能。生成的工具具备完整的生命周期管理，包括可用性检查、参数定义、执行逻辑和自动集成。"
+    description = (
+        "智能生成具备自举和自进化能力，并可编排现有 Agent/CodeAgent 的 Jarvis 新工具。"
+        "利用 CodeAgent 根据用户需求分析生成完整的工具代码，包含最佳实践模板、参数验证、错误处理，并自动注册到工具系统。"
+        "生成的工具可以在内部调用和编排现有的 Agent（通用任务编排、IIRIPER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等），"
+        "实现复杂任务流程的自动化协同处理和自我分析改进，具备完整的生命周期管理，包括可用性检查、参数定义、执行逻辑和自动集成。"
+    )
 
     parameters = {
         "type": "object",
@@ -75,6 +80,22 @@ class generate_new_tool:
 {files_info}
 
 其他文件也可酌情参考。
+
+### Agent / CodeAgent 关键用法（仅列核心要点，详细规则请阅读源码的绝对路径）
+- Agent（通用 Agent）：
+  - 职责：通用任务编排与对话式工作流，严格遵循 IIRIPER（INTENT → RESEARCH → INNOVATE → PLAN → EXECUTE → REVIEW）。
+  - 初始化要点：`Agent(system_prompt=..., name=..., model_group=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{(jarvis_dir / "jarvis_agent" / "__init__.py").absolute()}` 中定义。
+  - 典型用法：通过 `agent.run(user_input)` 启动完整闭环，内部会自动处理系统提示、工具调用、task_list_manager 调度和总结；总结与返回值行为由 `summary_prompt` 和 `need_summary` 控制。
+  - 更多细节（参数含义、总结与返回值策略、事件回调等）请直接阅读：`{(jarvis_dir / "jarvis_agent" / "__init__.py").absolute()}`。
+- CodeAgent（代码 Agent）：
+  - 职责：代码分析与修改、git 操作、构建验证、lint、diff 展示和自动 review。
+  - 初始化要点：`CodeAgent(model_group=..., need_summary=..., non_interactive=True/False, append_tools=..., rule_names=...)`，工作流和提示词在 `{(jarvis_dir / "jarvis_code_agent" / "code_agent.py").absolute()}` 与 `{(jarvis_dir / "jarvis_code_agent" / "code_agent_prompts.py").absolute()}` 中定义。
+  - 典型用法：通过 `agent.run(requirement, prefix=..., suffix=...)` 驱动代码修改流程；内部会自动处理上下文分析、补丁生成、git 提交、构建校验、lint 与 review，`run` 的返回值通常是“结果摘要字符串或 None”。
+  - 更多细节（review 流程、任务总结、返回值语义等）请直接阅读：`{(jarvis_dir / "jarvis_code_agent" / "code_agent.py").absolute()}` 与 `{(jarvis_dir / "jarvis_code_agent" / "code_agent_prompts.py").absolute()}`。
+
+在本工具生成的新工具中，推荐：
+- 使用 Agent 负责上层的需求分析、IIRIPER 工作流以及多步骤任务编排；
+- 使用 CodeAgent 负责具体代码层面的修改、重构和验证。
 
 生成的工具必须具备以下特性：
 1. 自举能力：能够调用现有package中的Agent和CodeAgent
