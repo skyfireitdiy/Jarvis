@@ -23,7 +23,7 @@ try:
 
     register_language(PythonLanguageSupport())
 except ImportError as e:
-    PrettyOutput.auto_print(f"Warning: Failed to import PythonLanguageSupport: {e}")
+    PrettyOutput.auto_print(f"⚠️ Warning: Failed to import PythonLanguageSupport: {e}")
 
 # Rust语言支持（可选，需要tree-sitter）
 try:
