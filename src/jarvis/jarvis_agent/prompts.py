@@ -356,14 +356,15 @@ def get_task_analysis_prompt(
 2. 如果现有工具/方法论不足，评估当前任务是否可以通过编写新工具来自动化解决
 3. 如果可以通过工具解决，请使用 generate_new_tool 工具创建新工具：
    - 使用 generate_new_tool 工具，传入 tool_name 和 function_description 参数
-   - 工具将智能分析需求，利用CodeAgent生成包含最佳实践的完整工具代码
+   - 工具将利用CodeAgent智能分析需求，自动生成具备自举和自进化能力的完整工具代码
+   - 生成的工具将自动集成到Jarvis生态系统，支持调用Agent和CodeAgent处理复杂任务
 4. 如果无法通过编写通用工具完成，评估当前的执行流程是否可以总结为通用方法论
 5. 如果以上都不可行，给出详细理由"""
     else:
         solution_step = """第二步：分析任务解决方案
 1. 检查现有工具或方法论是否已经可以完成该任务，如果可以，直接说明即可，无需生成新内容
 2. 如果现有工具/方法论不足，评估当前任务是否可以通过编写新工具来自动化解决
-3. 如果可以通过工具解决，请设计并提供工具代码（注意：当前环境不支持 generate_new_tool 工具，需要手动创建工具文件）
+3. 如果可以通过工具解决，请使用 generate_new_tool 工具创建新工具（如果环境支持）或手动提供工具代码
 4. 如果无法通过编写通用工具完成，评估当前的执行流程是否可以总结为通用方法论
 5. 如果以上都不可行，给出详细理由"""
 
@@ -382,41 +383,7 @@ def get_task_analysis_prompt(
   "name": "generate_new_tool",
   "arguments": {{
     "tool_name": "工具名称",
-    "tool_code": `# -*- coding: utf-8 -*-
-from typing import Dict, Any
-
-class 工具名称:
-    name = "工具名称"
-    description = "智能生成的工具描述，基于CodeAgent分析和用户需求"
-    parameters = {{
-        "type": "object",
-        "properties": {{
-            # 参数定义
-        }},
-        "required": []
-    }}
-    @staticmethod
-    def check() -> bool:
-        return True
-    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            # 使用print显示执行过程
-            PrettyOutput.auto_print("ℹ️ 开始执行操作...")
-            # 实现逻辑
-            # ...
-            PrettyOutput.auto_print("✅ 操作已完成")
-            return {{
-                "success": True,
-                "stdout": "结果输出",
-                "stderr": ""
-            }}
-        except Exception as e:
-            PrettyOutput.auto_print(f"❌ 操作失败: {{str(e)}}")
-            return {{
-                "success": False,
-                "stdout": "",
-                "stderr": f"操作失败: {{str(e)}}"
-            }}`
+    "function_description": "工具的详细功能描述，说明工具要解决的具体问题和预期行为"
   }}
 }}
 {ct("TOOL_CALL")}
@@ -451,7 +418,7 @@ class 工具名称:
 可用的工具/方法论：[列出工具名称或方法论名称]
 使用方法：[简要说明如何使用]
 2. 工具创建（如果需要创建新工具）:
-注意：当前环境不支持 generate_new_tool 工具。如果需要创建新工具，请提供完整的工具代码和说明，用户需要手动创建工具文件。
+注意：如果环境支持，请使用 generate_new_tool 工具创建新工具；如果不支持，请提供完整的工具代码和说明，用户需要手动创建工具文件。
 3. 方法论创建（如果需要创建新方法论）:
 {ot("TOOL_CALL")}
 {{
