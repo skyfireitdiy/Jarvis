@@ -192,12 +192,20 @@ class {tool_name}:
 
             # 使用CodeAgent生成工具代码
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
+            from jarvis.jarvis_utils.globals import get_global_model_group
 
-            agent = CodeAgent()
+            # 使用全局模型组和标准配置创建CodeAgent
+            model_group = get_global_model_group()
+            agent = CodeAgent(
+                model_group=model_group,
+                need_summary=True,
+                non_interactive=True,
+            )
 
             try:
                 # 使用CodeAgent运行并生成工具代码
                 # CodeAgent会自动处理代码生成和文件写入
+                agent.auto_complete = True
                 agent.run(enhanced_prompt)
 
                 # 查找生成的工具文件
