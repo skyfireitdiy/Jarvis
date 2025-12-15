@@ -28,7 +28,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-import typer
 
 from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
 from jarvis.jarvis_c2rust.constants import CONFIG_JSON
@@ -247,9 +246,10 @@ class Transpiler:
         )
 
         # 在初始化完成后打印日志
-        typer.secho(
-            f"[c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}",
-            fg=typer.colors.BLUE,
+        from jarvis.jarvis_utils.output import PrettyOutput
+
+        PrettyOutput.auto_print(
+            f"📋 [c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}"
         )
         # 使用 JSONL 存储的符号映射
         self.symbol_map = _SymbolMapJsonl(self.symbol_map_path)
