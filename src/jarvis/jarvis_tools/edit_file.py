@@ -644,7 +644,8 @@ class EditFileNormalTool:
                             # 从下一个 diff 继续处理
                             # current_diff_idx 是 1-based（第几个 diff），转换为 0-based 列表索引
                             # 例如：diff_idx=2 表示第 2 个 diff（diffs[1]），下一个是 diffs[2]，所以 start_idx=2
-                            current_start_idx = current_diff_idx  # 直接使用，因为 enumerate 的 start 参数会处理
+                            # 注意：current_diff_idx 是 1-based，下一个 diff 的 0-based 索引正好等于 current_diff_idx
+                            current_start_idx = current_diff_idx
                             confirm_iteration += 1
                             # 继续循环处理剩余 diffs
                             continue
@@ -735,10 +736,20 @@ class EditFileNormalTool:
                     "stderr": "",
                 }
             else:
+                # 失败时，stderr 应该包含详细的错误信息，而不仅仅是文件列表
+                # 从 all_results 中提取失败文件的详细错误信息
+                failed_details = []
+                for result in all_results:
+                    if result.startswith("❌"):
+                        failed_details.append(result)
+                
+                # 如果有详细的错误信息，使用它们；否则使用 summary
+                stderr_content = "\n".join(failed_details) if failed_details else (summary if summary else "部分文件修改失败")
+                
                 return {
                     "success": False,
                     "stdout": stdout_text + ("\n\n" + summary if summary else ""),
-                    "stderr": summary if summary else "部分文件修改失败",
+                    "stderr": stderr_content,
                 }
 
         except Exception as e:
