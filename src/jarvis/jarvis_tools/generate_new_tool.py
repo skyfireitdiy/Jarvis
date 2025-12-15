@@ -74,6 +74,8 @@ class generate_new_tool:
 关键参考文件：
 {files_info}
 
+其他文件也可酌情参考。
+
 生成的工具必须具备以下特性：
 1. 自举能力：能够调用现有package中的Agent和CodeAgent
 2. 自我进化：能够利用现有的CodeAgent功能
@@ -140,7 +142,7 @@ class {tool_name}:
         pass
 ```
 
-请生成完整的、可直接使用的Python代码。"""
+请生成完整的、可直接使用的Python代码，生成完成后不用进行测试与验证。"""
 
     def _register_new_tool(self, tool_name: str, tool_file_path: str) -> bool:
         """注册新生成的工具"""
