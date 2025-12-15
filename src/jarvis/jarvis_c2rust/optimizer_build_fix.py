@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 from typing import List
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -79,9 +79,8 @@ class BuildFixOptimizer:
                 )
                 self.stats.cargo_checks += 1
                 if res.returncode == 0:
-                    typer.secho(
-                        "[c2rust-optimizer][build-fix] 构建修复成功。",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        "✅ [c2rust-optimizer][build-fix] 构建修复成功。"
                     )
                     return True
                 output = ((res.stdout or "") + ("\n" + (res.stderr or ""))).strip()
@@ -100,15 +99,13 @@ class BuildFixOptimizer:
             # 达到重试上限则失败
             attempt += 1
             if attempt > maxr:
-                typer.secho(
-                    "[c2rust-optimizer][build-fix] 构建修复重试次数已用尽。",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    "❌ [c2rust-optimizer][build-fix] 构建修复重试次数已用尽。"
                 )
                 return False
 
-            typer.secho(
-                f"[c2rust-optimizer][build-fix] 构建失败。正在尝试使用 CodeAgent 进行修复 (第 {attempt}/{maxr} 次尝试)...",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-optimizer][build-fix] 构建失败。正在尝试使用 CodeAgent 进行修复 (第 {attempt}/{maxr} 次尝试)..."
             )
             # 生成最小修复提示
             prompt_lines = [
@@ -194,9 +191,8 @@ class BuildFixOptimizer:
                     commit_before, agent
                 ):
                     # 如果回退了，需要重新运行 agent
-                    typer.secho(
-                        f"[c2rust-optimizer][build-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={attempt})",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [c2rust-optimizer][build-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={attempt})"
                     )
                     commit_before = self.progress_manager.get_crate_commit_hash()
                     agent.run(
@@ -208,9 +204,8 @@ class BuildFixOptimizer:
                     if self.progress_manager.check_and_handle_test_deletion(
                         commit_before, agent
                     ):
-                        typer.secho(
-                            f"[c2rust-optimizer][build-fix] 再次检测到测试代码删除问题，已回退 (iter={attempt})",
-                            fg=typer.colors.RED,
+                        PrettyOutput.auto_print(
+                            f"❌ [c2rust-optimizer][build-fix] 再次检测到测试代码删除问题，已回退 (iter={attempt})"
                         )
 
                 # 验证修复是否成功（通过 cargo test）
@@ -228,33 +223,28 @@ class BuildFixOptimizer:
                         f"iter{attempt}",
                         file_paths if file_paths else None,
                     )
-                    typer.secho(
-                        f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复成功，已保存进度",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        f"✅ [c2rust-optimizer][build-fix] 第 {attempt} 次修复成功，已保存进度"
                     )
                     # 返回 True 表示修复成功
                     return True
                 else:
                     # 测试失败，回退到运行前的 commit
                     if commit_before:
-                        typer.secho(
-                            f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，回退到运行前的 commit: {commit_before[:8]}",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            f"⚠️ [c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，回退到运行前的 commit: {commit_before[:8]}"
                         )
                         if self.progress_manager.reset_to_commit(commit_before):
-                            typer.secho(
-                                f"[c2rust-optimizer][build-fix] 已成功回退到 commit: {commit_before[:8]}",
-                                fg=typer.colors.CYAN,
+                            PrettyOutput.auto_print(
+                                f"ℹ️ [c2rust-optimizer][build-fix] 已成功回退到 commit: {commit_before[:8]}"
                             )
                         else:
-                            typer.secho(
-                                "[c2rust-optimizer][build-fix] 回退失败，请手动检查代码状态",
-                                fg=typer.colors.RED,
+                            PrettyOutput.auto_print(
+                                "❌ [c2rust-optimizer][build-fix] 回退失败，请手动检查代码状态"
                             )
                     else:
-                        typer.secho(
-                            f"[c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，但无法获取运行前的 commit，继续尝试",
-                            fg=typer.colors.YELLOW,
+                        PrettyOutput.auto_print(
+                            f"⚠️ [c2rust-optimizer][build-fix] 第 {attempt} 次修复后测试失败，但无法获取运行前的 commit，继续尝试"
                         )
             finally:
                 os.chdir(prev_cwd)
