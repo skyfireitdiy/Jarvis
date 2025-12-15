@@ -11,7 +11,7 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class CompileCommandsManager:
@@ -69,15 +69,13 @@ class CompileCommandsManager:
                 if isinstance(data, list):
                     self._compile_commands_cache = data
                     self._compile_commands_path = compile_commands_path
-                    typer.secho(
-                        f"[c2rust-transpiler][compile_commands] 已加载: {compile_commands_path} ({len(data)} 条记录)",
-                        fg=typer.colors.BLUE,
+                    PrettyOutput.auto_print(
+                        f"📋 [c2rust-transpiler][compile_commands] 已加载: {compile_commands_path} ({len(data)} 条记录)"
                     )
                     return data
         except Exception as e:
-            typer.secho(
-                f"[c2rust-transpiler][compile_commands] 加载失败: {compile_commands_path}: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"❌ [c2rust-transpiler][compile_commands] 加载失败: {compile_commands_path}: {e}"
             )
             self._compile_commands_cache = []
             self._compile_commands_path = None
