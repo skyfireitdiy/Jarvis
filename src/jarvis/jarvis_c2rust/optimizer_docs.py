@@ -107,6 +107,7 @@ class DocsOptimizer:
                 non_interactive=self.options.non_interactive,
                 model_group=self.options.llm_group,
                 enable_task_list_manager=False,
+                disable_review=True,
             )
             # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
             agent.event_bus.subscribe(
