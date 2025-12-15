@@ -8,7 +8,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import typer
+from jarvis.jarvis_utils.output_handler import PrettyOutput
 
 from jarvis.jarvis_c2rust.constants import MAX_LLM_RETRIES
 from jarvis.jarvis_c2rust.library_replacer_prompts import build_subtree_prompt
@@ -70,10 +70,8 @@ def create_llm_model(
         )
         return model
     except Exception as e:
-        typer.secho(
-            f"[c2rust-library] 初始化 LLM 平台失败，将回退为保守策略: {e}",
-            fg=typer.colors.YELLOW,
-            err=True,
+        PrettyOutput.auto_print(
+            f"⚠️ [c2rust-library] 初始化 LLM 平台失败，将回退为保守策略: {e}"
         )
         return None
 
@@ -156,64 +154,48 @@ def llm_evaluate_subtree(
             if parse_error:
                 # JSON解析失败，记录错误并准备重试
                 last_parse_error = parse_error
-                typer.secho(
-                    f"[c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：JSON解析失败: {parse_error}",
-                    fg=typer.colors.YELLOW,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：JSON解析失败: {parse_error}"
                 )
                 # 打印原始内容以便调试
                 result_text = str(result or "").strip()
                 if result_text:
-                    typer.secho(
-                        f"[c2rust-library] 原始LLM响应内容（前1000字符）:\n{result_text[:1000]}",
-                        fg=typer.colors.RED,
-                        err=True,
+                    PrettyOutput.auto_print(
+                        f"📄 [c2rust-library] 原始LLM响应内容（前1000字符）:\n{result_text[:1000]}"
                     )
                     if len(result_text) > 1000:
-                        typer.secho(
-                            f"[c2rust-library] ... (还有 {len(result_text) - 1000} 个字符未显示)",
-                            fg=typer.colors.RED,
-                            err=True,
+                        PrettyOutput.auto_print(
+                            f"📄 [c2rust-library] ... (还有 {len(result_text) - 1000} 个字符未显示)"
                         )
                 if attempt < MAX_LLM_RETRIES:
                     continue  # 继续重试
                 else:
                     # 最后一次尝试也失败，使用默认值
-                    typer.secho(
-                        f"[c2rust-library] 重试 {MAX_LLM_RETRIES} 次后JSON解析仍然失败: {parse_error}，使用默认值",
-                        fg=typer.colors.YELLOW,
-                        err=True,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [c2rust-library] 重试 {MAX_LLM_RETRIES} 次后JSON解析仍然失败: {parse_error}，使用默认值"
                     )
                     return {"replaceable": False}
 
             # 解析成功，检查是否为字典
             if not isinstance(parsed, dict):
                 last_parse_error = f"解析结果不是字典，而是 {type(parsed).__name__}"
-                typer.secho(
-                    f"[c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：{last_parse_error}",
-                    fg=typer.colors.YELLOW,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：{last_parse_error}"
                 )
                 # 打印解析结果和原始内容以便调试
-                typer.secho(
-                    f"[c2rust-library] 解析结果类型: {type(parsed).__name__}, 值: {repr(parsed)[:500]}",
-                    fg=typer.colors.RED,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"📊 [c2rust-library] 解析结果类型: {type(parsed).__name__}, 值: {repr(parsed)[:500]}"
                 )
                 result_text = str(result or "").strip()
                 if result_text:
-                    typer.secho(
-                        f"[c2rust-library] 原始LLM响应内容（前1000字符）:\n{result_text[:1000]}",
-                        fg=typer.colors.RED,
-                        err=True,
+                    PrettyOutput.auto_print(
+                        f"📄 [c2rust-library] 原始LLM响应内容（前1000字符）:\n{result_text[:1000]}"
                     )
                 if attempt < MAX_LLM_RETRIES:
                     continue  # 继续重试
                 else:
-                    typer.secho(
-                        f"[c2rust-library] 重试 {MAX_LLM_RETRIES} 次后结果格式仍然不正确，视为不可替代。",
-                        fg=typer.colors.YELLOW,
-                        err=True,
+                    PrettyOutput.auto_print(
+                        f"🔴 [c2rust-library] 重试 {MAX_LLM_RETRIES} 次后结果格式仍然不正确，视为不可替代。"
                     )
                     return {"replaceable": False}
 
@@ -259,10 +241,8 @@ def llm_evaluate_subtree(
                         or root_rec.get("name")
                         or f"sym_{fid}"
                     )
-                    typer.secho(
-                        f"[c2rust-library] 评估结果包含禁用库，强制判定为不可替代: {root_name} | 命中库: {warn_libs}",
-                        fg=typer.colors.YELLOW,
-                        err=True,
+                    PrettyOutput.auto_print(
+                        f"🚫 [c2rust-library] 评估结果包含禁用库，强制判定为不可替代: {root_name} | 命中库: {warn_libs}"
                     )
                     if notes:
                         notes = notes + f" | 禁用库命中: {warn_libs}"
@@ -283,29 +263,23 @@ def llm_evaluate_subtree(
 
             # 成功获取结果，返回
             if attempt > 1:
-                typer.secho(
-                    f"[c2rust-library] 第 {attempt} 次尝试成功获取评估结果",
-                    fg=typer.colors.GREEN,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"✅ [c2rust-library] 第 {attempt} 次尝试成功获取评估结果"
                 )
             return result_obj
 
         except Exception as e:
             # LLM调用异常，记录并准备重试
             last_parse_error = f"LLM调用异常: {str(e)}"
-            typer.secho(
-                f"[c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：LLM评估失败: {e}",
-                fg=typer.colors.YELLOW,
-                err=True,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-library] 第 {attempt}/{MAX_LLM_RETRIES} 次尝试：LLM评估失败: {e}"
             )
             if attempt < MAX_LLM_RETRIES:
                 continue  # 继续重试
             else:
                 # 最后一次尝试也失败，返回默认值
-                typer.secho(
-                    f"[c2rust-library] 重试 {MAX_LLM_RETRIES} 次后LLM评估仍然失败: {e}，视为不可替代",
-                    fg=typer.colors.YELLOW,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"🔴 [c2rust-library] 重试 {MAX_LLM_RETRIES} 次后LLM评估仍然失败: {e}，视为不可替代"
                 )
                 return {"replaceable": False}
 
