@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 from pathlib import Path
 from typing import Any
 from typing import Dict
@@ -44,6 +45,114 @@ class generate_new_tool:
 
         return True
 
+    def _build_enhanced_prompt(
+        self, tool_name: str, function_description: str, jarvis_dir: Path
+    ) -> str:
+        """构建增强的提示词，包含关键参考文件"""
+
+        key_files = [
+            jarvis_dir / "jarvis_tools" / "registry.py",
+            jarvis_dir / "jarvis_tools" / "base.py",
+            jarvis_dir / "jarvis_agent" / "__init__.py",
+            jarvis_dir / "jarvis_code_agent" / "code_agent.py",
+            jarvis_dir / "jarvis_utils" / "config.py",
+            jarvis_dir / "jarvis_utils" / "output.py",
+        ]
+
+        files_info = "\n".join([f"- {f.absolute()}" for f in key_files])
+
+        return f"""请根据用户需求生成一个新的Jarvis工具。
+
+工具要求：
+- 工具名称：{tool_name}
+- 功能描述：{function_description}
+- 生成的文件名：{tool_name}.py
+- 文件保存路径：{jarvis_dir.parent.parent / "data" / "tools" / f"{tool_name}.py"}
+- 必须继承自Tool基类（参考：src/jarvis/jarvis_tools/base.py）
+- 必须实现name、description、parameters、execute方法
+
+关键参考文件：
+{files_info}
+
+生成的工具必须具备以下特性：
+1. 自举能力：能够调用现有package中的Agent和CodeAgent
+2. 自我进化：能够利用现有的CodeAgent功能
+3. 自动注册：生成后能够立即注册到工具系统
+4. 完整功能：包含check()静态方法和execute()实例方法
+
+**强烈推荐使用Agent/CodeAgent**：
+- 在execute()方法中应该优先使用CodeAgent处理复杂的代码任务
+- 可以使用Agent进行需求分析和任务分解
+- 示例代码模式：
+  ```python
+  from jarvis.jarvis_agent import Agent
+  from jarvis.jarvis_code_agent.code_agent import CodeAgent
+  
+  # 使用CodeAgent处理代码相关任务
+  agent = CodeAgent()
+  agent.run("你的代码生成需求")
+  
+  # 或者使用普通Agent处理分析任务
+  agent = Agent()
+  agent.run("你的分析需求")
+  ```
+
+工具模板要求：
+```python
+class {tool_name}:
+    name = "{tool_name}"
+    description = "{function_description}"
+    
+    parameters = {{
+        "type": "object",
+        "properties": {{
+            # 根据功能定义参数
+        }},
+        "required": ["required_param1", "required_param2"]
+    }}
+    
+    @staticmethod
+    def check() -> bool:
+        # 检查工具是否可用
+        return True
+        
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        # 实现工具功能
+        # 可以调用：
+        # - from jarvis.jarvis_agent import Agent
+        # - from jarvis.jarvis_code_agent.code_agent import CodeAgent
+        # - 其他jarvis模块
+        
+        # 自举能力示例：使用generate_new_tool对自身进行改进
+        # from jarvis.jarvis_tools.generate_new_tool import generate_new_tool
+        # 
+        # # 生成改进版本
+        # improver = generate_new_tool()
+        # result = improver.execute({{
+        #     "tool_name": "{tool_name}_improved",
+        #     "function_description": "改进版本的{tool_name}，基于使用反馈优化"
+        # }})
+        
+        # 使用CodeAgent进行自我分析和改进
+        # agent = CodeAgent()
+        # analysis = agent.run("分析当前工具的性能瓶颈并提出改进方案")
+        
+        pass
+```
+
+请生成完整的、可直接使用的Python代码。"""
+
+    def _register_new_tool(self, tool_name: str, tool_file_path: str) -> bool:
+        """注册新生成的工具"""
+        try:
+            from jarvis.jarvis_tools.registry import ToolRegistry
+
+            registry = ToolRegistry()
+            return registry.register_tool_by_file(tool_file_path)
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 注册工具失败: {e}")
+            return False
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
         生成新工具并注册到当前的工具注册表中
@@ -55,11 +164,8 @@ class generate_new_tool:
             Dict: 包含生成结果的字典
         """
         tool_file_path = None
+        curr_dir = os.getcwd()
         try:
-            from jarvis.jarvis_code_agent.code_agent import CodeAgent
-
-            curr_dir = os.getcwd()
-            
             data_dir = get_data_dir()
             tools_dir = Path(data_dir) / "tools"
             tools_dir.mkdir(parents=True, exist_ok=True)
@@ -77,14 +183,47 @@ class generate_new_tool:
                     "stderr": f"工具名称 '{tool_name}' 不是有效的Python标识符",
                 }
 
-            prompt = f"请根据用户需求生成一个新的Jarvis工具，工具的名称是：{tool_name}，工具的功能描述是：{function_description}"
-            
-            # 获取当前脚本所在目录，告诉agent可以参考当前目录下的Jarvis实现，以便于集成
-            curr_dir =  Path(__file__).parent.parent.resolve()
+            jarvis_dir = Path(__file__).parent.parent.resolve()
 
-            prompt += f"你可以参考{curr_dir}目录下的Jarvis实现，以便于集成"
+            # 构建增强的提示词，包含关键参考文件
+            enhanced_prompt = self._build_enhanced_prompt(
+                tool_name, function_description, jarvis_dir
+            )
 
+            # 使用CodeAgent生成工具代码
+            from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
+            agent = CodeAgent()
+
+            try:
+                # 使用CodeAgent运行并生成工具代码
+                # CodeAgent会自动处理代码生成和文件写入
+                agent.run(enhanced_prompt)
+
+                # 查找生成的工具文件
+                tool_file_path = tools_dir / f"{tool_name}.py"
+                if tool_file_path.exists():
+                    # 自动注册新工具
+                    self._register_new_tool(tool_name, str(tool_file_path))
+
+                    return {
+                        "success": True,
+                        "stdout": f"成功生成并注册工具：{tool_name}\n文件路径：{tool_file_path}",
+                        "stderr": "",
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "CodeAgent未能生成工具文件",
+                    }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"生成工具时出错：{str(e)}",
+                }
 
         finally:
             if curr_dir:
