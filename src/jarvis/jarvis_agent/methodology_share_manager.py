@@ -25,7 +25,7 @@ class MethodologyShareManager(ShareManager):
         central_repo = get_central_methodology_repo()
         if not central_repo:
             PrettyOutput.auto_print(
-                "❌ 错误：未配置中心方法论仓库（JARVIS_CENTRAL_METHODOLOGY_REPO）"
+                "❌ 错误：未配置中心方法论仓库（central_methodology_repo）"
             )
             PrettyOutput.auto_print("ℹ️ 请在配置文件中设置中心方法论仓库的Git地址")
             raise typer.Exit(code=1)

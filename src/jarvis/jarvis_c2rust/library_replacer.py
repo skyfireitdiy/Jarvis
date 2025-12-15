@@ -9,7 +9,7 @@ Library-based dependency replacer for C→Rust migration (LLM-only subtree evalu
 - 支持禁用库约束：可传入 disabled_libraries（list[str]），若 LLM 建议命中禁用库，则强制判定为不可替代并记录备注
 - 断点恢复（checkpoint/resume）：可启用 resume，使用 library_replacer_checkpoint.json 记录 eval_counter/processed/pruned/selected 等信息，基于关键输入组合键进行匹配恢复；落盘采用原子写以防损坏
 - 主库字段回退策略：当存在 libraries 列表优先选择第一个作为 primary；否则回退到单一 library 字段；均为空则置空
-- 入口保护：默认跳过 main（可通过环境变量 JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS/JARVIS_C2RUST_DELAY_ENTRIES/C2RUST_DELAY_ENTRIES 配置多个入口名）
+- 入口保护：默认跳过 main（可通过环境变量 c2rust_delay_entry_symbols/c2rust_delay_entries/C2RUST_DELAY_ENTRIES 配置多个入口名）
 
 输入数据:
 - symbols.jsonl（或传入的 .jsonl 路径）：由 scanner 生成的统一符号表，字段参见 scanner.py

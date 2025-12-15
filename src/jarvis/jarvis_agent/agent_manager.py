@@ -46,7 +46,7 @@ class AgentManager:
         if self.tool_group:
             from jarvis.jarvis_utils.config import set_config
 
-            set_config("JARVIS_TOOL_GROUP", self.tool_group)
+            set_config("tool_group", self.tool_group)
 
         self.agent = Agent(
             system_prompt=origin_agent_system_prompt,

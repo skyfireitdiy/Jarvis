@@ -24,9 +24,7 @@ class ToolShareManager(ShareManager):
     def __init__(self):
         central_repo = get_central_tool_repo()
         if not central_repo:
-            PrettyOutput.auto_print(
-                "❌ 错误：未配置中心工具仓库（JARVIS_CENTRAL_TOOL_REPO）"
-            )
+            PrettyOutput.auto_print("❌ 错误：未配置中心工具仓库（central_tool_repo）")
             PrettyOutput.auto_print("ℹ️ 请在配置文件中设置中心工具仓库的Git地址")
             raise typer.Exit(code=1)
 

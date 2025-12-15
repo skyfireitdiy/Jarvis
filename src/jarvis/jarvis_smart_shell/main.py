@@ -446,7 +446,7 @@ def request_command(
 def cli():
     """Typer application entry point"""
     init_env("")
-    set_config("JARVIS_PRINT_PROMPT", "false")
+    set_config("print_prompt", "false")
     app()
 
 

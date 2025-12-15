@@ -35,9 +35,7 @@ if TYPE_CHECKING:
 class AgentRunLoop:
     def __init__(self, agent: "Agent") -> None:
         self.agent = agent
-        self.tool_reminder_rounds = int(
-            os.environ.get("JARVIS_TOOL_REMINDER_ROUNDS", 20)
-        )
+        self.tool_reminder_rounds = int(os.environ.get("tool_reminder_rounds", 20))
         # 基于剩余token数量的自动总结阈值：当剩余token低于输入窗口的20%时触发
         max_input_tokens = get_max_input_token_count(self.agent.model_group)
         self.summary_remaining_token_threshold = int(max_input_tokens * 0.2)

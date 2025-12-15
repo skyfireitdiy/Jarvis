@@ -159,10 +159,10 @@ def is_entry_function(rec_meta: dict) -> bool:
     nm = str(rec_meta.get("name") or "")
     qn = str(rec_meta.get("qualified_name") or "")
     # Configurable entry detection (avoid hard-coding 'main'):
-    # Honor env vars: JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS / JARVIS_C2RUST_DELAY_ENTRIES / C2RUST_DELAY_ENTRIES
+    # Honor env vars: c2rust_delay_entry_symbols / c2rust_delay_entries / C2RUST_DELAY_ENTRIES
     entries_env = (
-        os.environ.get("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS")
-        or os.environ.get("JARVIS_C2RUST_DELAY_ENTRIES")
+        os.environ.get("c2rust_delay_entry_symbols")
+        or os.environ.get("c2rust_delay_entries")
         or os.environ.get("C2RUST_DELAY_ENTRIES")
         or ""
     )

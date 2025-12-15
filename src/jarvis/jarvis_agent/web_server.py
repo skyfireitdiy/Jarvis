@@ -319,7 +319,7 @@ def start_web_server(
     - host: Web 服务主机地址
     - port: Web 服务端口
     - launch_command: 交互式终端启动命令（列表格式，如 ["jvs", "--task", "xxx"]），
-                      如果为 None，则从环境变量 JARVIS_WEB_LAUNCH_JSON 读取
+                      如果为 None，则从环境变量 web_launch_json 读取
     """
     app = _build_app()
     app.state.agent = agent  # 供 WS 端点调用
@@ -518,7 +518,7 @@ def start_web_server(
             if hasattr(app.state, "launch_command") and app.state.launch_command:
                 _launch_cmd = app.state.launch_command
                 # 调试输出
-                if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                if _os.environ.get("debug_web_launch_cmd") == "1":
                     PrettyOutput.auto_print(
                         f"🔍 Web服务器: 使用传入的启动命令: {_launch_cmd}"
                     )
@@ -526,11 +526,11 @@ def start_web_server(
                 # 回退到环境变量
                 import json as _json
 
-                _cmd_json = _os.environ.get("JARVIS_WEB_LAUNCH_JSON", "")
+                _cmd_json = _os.environ.get("web_launch_json", "")
                 if _cmd_json:
                     try:
                         _launch_cmd = _json.loads(_cmd_json)
-                        if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                        if _os.environ.get("debug_web_launch_cmd") == "1":
                             PrettyOutput.auto_print(
                                 f"🔍 Web服务器: 从环境变量读取启动命令: {_launch_cmd}"
                             )
@@ -556,11 +556,11 @@ def start_web_server(
                         and isinstance(_argv[0], str)
                     ):
                         try:
-                            if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                            if _os.environ.get("debug_web_launch_cmd") == "1":
                                 PrettyOutput.auto_print(f"🔍 子进程: 执行命令: {_argv}")
                             _os.execvp(_argv[0], _argv)
                         except Exception as e:
-                            if _os.environ.get("JARVIS_DEBUG_WEB_LAUNCH_CMD") == "1":
+                            if _os.environ.get("debug_web_launch_cmd") == "1":
                                 PrettyOutput.auto_print(f"⚠️ 子进程: 执行命令失败: {e}")
                             pass
                     # 若未配置或执行失败，回退到 /bin/bash 或 /bin/sh

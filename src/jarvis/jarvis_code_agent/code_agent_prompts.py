@@ -252,7 +252,7 @@ def get_system_prompt() -> str:
         - 在PLAN模式中，**简单任务不使用任务列表**，直接执行即可；只有**复杂任务**（需要多个步骤、涉及多个文件、需要协调多个子任务等）才使用 `task_list_manager` 创建任务列表并添加所有子任务，避免无限拆分
         - 如果EXECUTE模式发现需要偏离计划，自动回到PLAN模式（并可能需要更新任务列表）
         - 完成所有实施，且用户确认成功后，可以从EXECUTE模式转到REVIEW模式
-        - 对于非交互模式（例如通过命令行参数 --non-interactive 或环境变量 JARVIS_NON_INTERACTIVE 启用），在PLAN模式已经使用 `task_list_manager` 创建任务列表后，可以直接进入EXECUTE模式执行任务，无需再次等待用户确认
+        - 对于非交互模式（例如通过命令行参数 --non-interactive 或环境变量 non_interactive 启用），在PLAN模式已经使用 `task_list_manager` 创建任务列表后，可以直接进入EXECUTE模式执行任务，无需再次等待用户确认
 
 ## 工作流程（闭环执行，每步必落地）
 

@@ -51,9 +51,9 @@ class ReadSymbolsTool:
     def check() -> bool:
         """
         检查工具是否可用。
-        仅在 c2rust 环境中启用（通过环境变量 JARVIS_C2RUST_ENABLED 判断）。
+        仅在 c2rust 环境中启用（通过环境变量 c2rust_enabled 判断）。
         """
-        return os.environ.get("JARVIS_C2RUST_ENABLED") == "1"
+        return os.environ.get("c2rust_enabled") == "1"
 
     @staticmethod
     def _resolve_symbols_jsonl_path(path_hint: str) -> Path:
