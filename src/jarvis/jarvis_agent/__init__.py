@@ -1838,7 +1838,8 @@ class Agent:
                         pass
         except Exception as e:
             # 确保即使出现异常也清除运行状态
-            clear_running_agent(self.name)
+            if not isinstance(self, CodeAgent):
+                clear_running_agent(self.name)
             PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
             return f"Task failed: {str(e)}"
 
