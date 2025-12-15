@@ -268,120 +268,26 @@ class EditFileNormalTool:
         )
 
     @staticmethod
-    def _find_all_match_positions(
-        content: str, search_text: str
-    ) -> List[Tuple[int, int]]:
-        """在文件中查找所有精确匹配位置
+    def _count_matches(content: str, search_text: str) -> int:
+        """统计文本在内容中的匹配次数
 
         Args:
             content: 文件内容
             search_text: 要搜索的文本
 
         Returns:
-            所有匹配位置的列表 [(start_pos, end_pos), ...]
+            匹配次数
         """
-        matches = []
-        start_pos = 0
-        while True:
-            pos = content.find(search_text, start_pos)
-            if pos == -1:
-                break
-            matches.append((pos, pos + len(search_text)))
-            start_pos = pos + 1
-        return matches
-
-    @staticmethod
-    def _generate_match_preview(
-        content: str, matches: List[Tuple[int, int]], max_preview: int = 3
-    ) -> str:
-        """生成匹配位置的预览信息
-
-        Args:
-            content: 文件内容
-            matches: 匹配位置列表
-            max_preview: 最多预览的匹配数量
-
-        Returns:
-            预览信息字符串
-        """
-        lines = content.split("\n")
-        preview_lines = [
-            f"⚠️ 发现 {len(matches)} 处匹配，需要确认：",
-            "",
-        ]
-
-        for idx, (start_pos, end_pos) in enumerate(matches[:max_preview], 1):
-            # 计算匹配位置所在的行号
-            line_num = content[:start_pos].count("\n") + 1
-            col_num = start_pos - content.rfind("\n", 0, start_pos) - 1
-
-            # 获取匹配位置的上下文（前后各3行）
-            context_start = max(0, line_num - 4)
-            context_end = min(len(lines), line_num + 3)
-
-            preview_lines.append(f"匹配 #{idx} (行 {line_num}, 列 {col_num}):")
-            preview_lines.append("```")
-            for i in range(context_start, context_end):
-                prefix = ">>> " if i == line_num - 1 else "    "
-                preview_lines.append(f"{prefix}{i + 1:4d} | {lines[i]}")
-            preview_lines.append("```")
-            preview_lines.append("")
-
-        if len(matches) > max_preview:
-            preview_lines.append(f"... 还有 {len(matches) - max_preview} 处匹配未显示")
-            preview_lines.append("")
-
-        preview_lines.append("💡 建议：如果这不是预期的结果，请：")
-        preview_lines.append("   1. 增加 search 文本的上下文，使其能唯一定位目标位置")
-
-        return "\n".join(preview_lines)
-
-    @staticmethod
-    def _find_best_match_position(
-        content: str, search_text: str, require_unique: bool = True
-    ) -> Tuple[Optional[Tuple[int, int]], Optional[str], Optional[str]]:
-        """在文件中查找精确匹配位置
-
-        Args:
-            content: 文件内容
-            search_text: 要搜索的文本
-            require_unique: 是否要求唯一匹配（如果为 True，多个匹配时返回预览信息）
-
-        Returns:
-            ((start_pos, end_pos), error_msg, preview_info) 或 (None, error_msg, preview_info)
-        """
-        if not search_text.strip():
-            return None, "search 文本不能为空或只包含空白字符", None
-
-        # 查找所有匹配位置
-        matches = EditFileNormalTool._find_all_match_positions(content, search_text)
-
-        if len(matches) == 0:
-            return None, "未找到精确匹配的文本", None
-
-        if len(matches) == 1:
-            # 唯一匹配，直接返回
-            return matches[0], None, None
-
-        # 多个匹配
-        if require_unique:
-            # 需要唯一匹配，生成预览信息
-            preview = EditFileNormalTool._generate_match_preview(content, matches)
-            return (
-                None,
-                f"发现 {len(matches)} 处匹配，需要确认后再修改",
-                preview,
-            )
-
-        # 不要求唯一，返回第一个匹配
-        return matches[0], None, None
+        if not search_text:
+            return 0
+        return content.count(search_text)
 
     @staticmethod
     def _generate_diff_preview(
         original_content: str,
         modified_content: str,
         file_path: str,
-        matches: List[Tuple[int, int]],
+        match_count: int,
         search_text: str,
         replace_text: str,
         agent: Optional[Any] = None,
@@ -393,7 +299,7 @@ class EditFileNormalTool:
             original_content: 原始文件内容
             modified_content: 修改后的文件内容
             file_path: 文件路径
-            matches: 匹配位置列表
+            match_count: 匹配次数
             search_text: 搜索文本
             replace_text: 替换文本
             agent: 可选的 agent 实例，用于获取剩余 token 数量
@@ -461,7 +367,7 @@ class EditFileNormalTool:
         file_path: str,
         original_content: str,
         modified_content: str,
-        matches: List[Tuple[int, int]],
+        match_count: int,
         search_text: str,
         replace_text: str,
     ) -> bool:
@@ -472,7 +378,7 @@ class EditFileNormalTool:
             file_path: 文件路径
             original_content: 原始文件内容
             modified_content: 修改后的文件内容
-            matches: 匹配位置列表
+            match_count: 匹配次数
             search_text: 搜索文本
             replace_text: 替换文本
 
@@ -492,7 +398,7 @@ class EditFileNormalTool:
                 original_content,
                 modified_content,
                 file_path,
-                matches,
+                match_count,
                 search_text,
                 replace_text,
                 agent=agent_instance,
@@ -504,7 +410,7 @@ class EditFileNormalTool:
 文件路径：{file_path}
 
 匹配统计：
-- 匹配数量: {len(matches)}
+- 匹配数量: {match_count}
 - 搜索文本长度: {len(search_text)} 字符
 - 替换文本长度: {len(replace_text)} 字符
 
@@ -551,11 +457,11 @@ class EditFileNormalTool:
         agent: Optional[Any] = None,
         file_path: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[Dict[str, Any]], Optional[int]]:
-        """对文件内容按顺序应用普通 search/replace 编辑（使用精确匹配）
+        """对文件内容按顺序应用普通 search/replace 编辑（使用字符串替换）
 
         返回:
             (是否成功, 新内容或错误信息, 确认信息字典或None, 需要确认的diff索引或None)
-            确认信息字典包含: matches, search_text, replace_text, modified_content
+            确认信息字典包含: match_count, search_text, replace_text, modified_content
         """
         content = original_content
 
@@ -563,67 +469,47 @@ class EditFileNormalTool:
             search = diff["search"]
             replace = diff["replace"]
 
-            # 使用精确匹配查找位置，如果有多处匹配需要确认
-            require_unique = True
+            # 验证 search 文本
+            if not search or not isinstance(search, str):
+                error_info = f"第 {idx} 个diff失败：search 文本不能为空"
+                return False, error_info, None, None
 
-            # 使用精确匹配查找位置
-            (
-                match_result,
-                error_msg,
-                preview_info,
-            ) = EditFileNormalTool._find_best_match_position(
-                content, search, require_unique=require_unique
-            )
+            # 统计匹配次数
+            match_count = EditFileNormalTool._count_matches(content, search)
 
-            if match_result is None:
-                # 找不到匹配或需要确认
-                if preview_info:
-                    # 有预览信息，说明有多个匹配，需要生成修改后的预览
-                    # 查找所有匹配位置
-                    matches = EditFileNormalTool._find_all_match_positions(
-                        content, search
+            if match_count == 0:
+                # 找不到匹配
+                error_info = f"第 {idx} 个diff失败：未找到精确匹配的文本"
+                if search:
+                    error_info += f"\n搜索文本: {search[:200]}..."
+                    error_info += (
+                        "\n💡 提示：如果搜索文本在文件中存在但未找到匹配，可能是因为："
                     )
-                    # 生成修改后的内容（替换所有匹配）
-                    modified_content = content
-                    # 从后往前替换，避免位置偏移
-                    for start_pos, end_pos in reversed(matches):
-                        modified_content = (
-                            modified_content[:start_pos]
-                            + replace
-                            + modified_content[end_pos:]
-                        )
-                    # 返回确认信息
-                    confirm_info = {
-                        "matches": matches,
-                        "search_text": search,
-                        "replace_text": replace,
-                        "modified_content": modified_content,
-                    }
-                    error_info = f"第 {idx} 个diff失败：{error_msg}"
-                    return False, error_info, confirm_info, idx
-                else:
-                    # 没有预览信息，说明是找不到匹配
-                    error_info = f"第 {idx} 个diff失败：{error_msg}"
-                    if search:
-                        error_info += f"\n搜索文本: {search[:200]}..."
-                        error_info += "\n💡 提示：如果搜索文本在文件中存在但未找到匹配，可能是因为："
-                        error_info += (
-                            "\n   1. 搜索文本不够唯一，存在多个匹配（建议增加上下文）"
-                        )
-                        error_info += "\n   2. 搜索文本包含不可见字符或格式不匹配（建议检查空格、换行等）"
-                        error_info += (
-                            "\n   3. 搜索文本需要包含足够的上下文来唯一定位目标位置"
-                        )
-                        error_info += "\n   4. **文件可能已被更新**：如果文件在其他地方被修改了，搜索文本可能已经不存在或已改变"
-                        if file_path:
-                            error_info += f"\n   💡 建议：使用 `read_code` 工具重新读取文件 `{file_path}` 查看当前内容，"
-                            error_info += "\n      确认文件是否已被更新，然后根据实际内容调整 search 文本"
-                    return False, error_info, None, None
+                    error_info += "\n   1. 搜索文本包含不可见字符或格式不匹配（建议检查空格、换行等）"
+                    error_info += "\n   2. **文件可能已被更新**：如果文件在其他地方被修改了，搜索文本可能已经不存在或已改变"
+                    if file_path:
+                        error_info += f"\n   💡 建议：使用 `read_code` 工具重新读取文件 `{file_path}` 查看当前内容，"
+                        error_info += "\n      确认文件是否已被更新，然后根据实际内容调整 search 文本"
+                return False, error_info, None, None
 
-            start_pos, end_pos = match_result
-
-            # 执行替换（唯一匹配，直接替换）
-            content = content.replace(search, replace, 1)
+            if match_count == 1:
+                # 唯一匹配，直接替换
+                content = content.replace(search, replace, 1)
+            else:
+                # 多个匹配，需要确认
+                # 生成修改后的内容（替换所有匹配）
+                modified_content = content.replace(search, replace)
+                # 返回确认信息
+                confirm_info = {
+                    "match_count": match_count,
+                    "search_text": search,
+                    "replace_text": replace,
+                    "modified_content": modified_content,
+                }
+                error_info = (
+                    f"第 {idx} 个diff失败：发现 {match_count} 处匹配，需要确认后再修改"
+                )
+                return False, error_info, confirm_info, idx
 
         return True, content, None, None
 
@@ -715,7 +601,7 @@ class EditFileNormalTool:
                             file_path,
                             original_content,
                             confirm_info["modified_content"],
-                            confirm_info["matches"],
+                            confirm_info["match_count"],
                             confirm_info["search_text"],
                             confirm_info["replace_text"],
                         )
