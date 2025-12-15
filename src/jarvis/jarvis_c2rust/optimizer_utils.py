@@ -13,8 +13,7 @@ from typing import Optional
 from typing import Set
 from typing import Tuple
 
-import typer
-
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions
 from jarvis.jarvis_c2rust.optimizer_options import OptimizeStats
 
@@ -76,18 +75,16 @@ def run_cargo_fmt(crate_dir: Path) -> None:
             cwd=str(crate_dir),
         )
         if res.returncode == 0:
-            typer.secho("[c2rust-optimizer][fmt] 代码格式化完成", fg=typer.colors.CYAN)
+            PrettyOutput.auto_print("✅ [c2rust-optimizer][fmt] 代码格式化完成")
         else:
             # fmt 失败不影响主流程，只记录警告
-            typer.secho(
-                f"[c2rust-optimizer][fmt] 代码格式化失败（非致命）: {res.stderr or res.stdout}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-optimizer][fmt] 代码格式化失败（非致命）: {res.stderr or res.stdout}"
             )
     except Exception as e:
         # fmt 失败不影响主流程，只记录警告
-        typer.secho(
-            f"[c2rust-optimizer][fmt] 代码格式化异常（非致命）: {e}",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            f"⚠️ [c2rust-optimizer][fmt] 代码格式化异常（非致命）: {e}"
         )
 
 
@@ -132,29 +129,25 @@ def check_clippy_warnings(crate_dir: Path) -> Tuple[bool, str]:
 
         # 调试输出
         if has_warnings:
-            typer.secho(
-                f"[c2rust-optimizer][clippy-check] 检测到 {len(warnings)} 个 Clippy 告警",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-optimizer][clippy-check] 检测到 {len(warnings)} 个 Clippy 告警"
             )
         elif res.returncode != 0:
             # 如果返回码非零但没有警告，可能是编译错误
-            typer.secho(
-                f"[c2rust-optimizer][clippy-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警，可能是编译错误",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"📊 [c2rust-optimizer][clippy-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警，可能是编译错误"
             )
             if stderr_output:
-                typer.secho(
-                    f"[c2rust-optimizer][clippy-check] 错误输出预览（前200字符）: {stderr_output[:200]}",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    f"📊 [c2rust-optimizer][clippy-check] 错误输出预览（前200字符）: {stderr_output[:200]}"
                 )
 
         # 返回 JSON 格式的输出（用于后续解析）
         return has_warnings, stdout_output
     except Exception as e:
         # 检查失败时假设没有告警，避免阻塞流程
-        typer.secho(
-            f"[c2rust-optimizer][clippy-check] 检查 Clippy 告警异常（非致命）: {e}",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            f"⚠️ [c2rust-optimizer][clippy-check] 检查 Clippy 告警异常（非致命）: {e}"
         )
         return False, ""
 
@@ -209,29 +202,25 @@ def check_missing_safety_doc_warnings(crate_dir: Path) -> Tuple[bool, str]:
 
         # 调试输出
         if has_warnings:
-            typer.secho(
-                f"[c2rust-optimizer][missing-safety-doc-check] 检测到 {len(warnings)} 个 missing_safety_doc 告警",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-optimizer][missing-safety-doc-check] 检测到 {len(warnings)} 个 missing_safety_doc 告警"
             )
         elif res.returncode != 0:
             # 如果返回码非零但没有警告，可能是编译错误
-            typer.secho(
-                f"[c2rust-optimizer][missing-safety-doc-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警，可能是编译错误",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"📊 [c2rust-optimizer][missing-safety-doc-check] Clippy 返回非零退出码（{res.returncode}），但未检测到告警，可能是编译错误"
             )
             if stderr_output:
-                typer.secho(
-                    f"[c2rust-optimizer][missing-safety-doc-check] 错误输出预览（前200字符）: {stderr_output[:200]}",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    f"📊 [c2rust-optimizer][missing-safety-doc-check] 错误输出预览（前200字符）: {stderr_output[:200]}"
                 )
 
         # 返回 JSON 格式的输出（用于后续解析）
         return has_warnings, stdout_output
     except Exception as e:
         # 检查失败时假设没有告警，避免阻塞流程
-        typer.secho(
-            f"[c2rust-optimizer][missing-safety-doc-check] 检查 missing_safety_doc 告警异常（非致命）: {e}",
-            fg=typer.colors.YELLOW,
+        PrettyOutput.auto_print(
+            f"⚠️ [c2rust-optimizer][missing-safety-doc-check] 检查 missing_safety_doc 告警异常（非致命）: {e}"
         )
         return False, ""
 

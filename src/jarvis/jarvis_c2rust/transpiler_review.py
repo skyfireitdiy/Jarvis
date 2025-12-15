@@ -13,7 +13,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
@@ -203,9 +203,8 @@ class ReviewManager:
                 except Exception as e:
                     commit_diff = f"获取git差异时发生异常: {str(e)}"
                     diff_status = "error"
-                    typer.secho(
-                        f"[c2rust-transpiler][review] 获取git差异失败: {e}",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [c2rust-transpiler][review] 获取git差异失败: {e}",
                     )
             else:
                 # 没有提供 get_git_diff 函数
@@ -239,9 +238,8 @@ class ReviewManager:
                         build_fixes_summary += "\n"
                     build_fixes_summary += "提示：请参考上述修复总结，了解在构建修复阶段遇到的问题和修复过程，这有助于更准确地审查代码。"
             except Exception as e:
-                typer.secho(
-                    f"[c2rust-transpiler][review] 获取构建修复总结失败: {e}",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][review] 获取构建修复总结失败: {e}",
                 )
 
             usr_p_lines = [
@@ -783,17 +781,15 @@ class ReviewManager:
                     )
 
                 full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"
-                typer.secho(
-                    f"[c2rust-transpiler][review] 直接调用模型接口修复格式错误（第 {i + 1} 次重试）",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][review] 直接调用模型接口修复格式错误（第 {i + 1} 次重试）",
                 )
                 try:
                     response = agent.model.chat_until_success(full_prompt)
                     summary = str(response or "")
                 except Exception as e:
-                    typer.secho(
-                        f"[c2rust-transpiler][review] 直接模型调用失败: {e}，回退到 run()",
-                        fg=typer.colors.YELLOW,
+                    PrettyOutput.auto_print(
+                        f"⚠️ [c2rust-transpiler][review] 直接模型调用失败: {e}，回退到 run()",
                     )
                     summary = str(agent.run(composed_prompt) or "")
             else:
@@ -808,9 +804,8 @@ class ReviewManager:
                 # JSON解析失败
                 parse_failed = True
                 parse_error_msg = parse_error_review
-                typer.secho(
+                PrettyOutput.auto_print(
                     f"[c2rust-transpiler][review] JSON解析失败: {parse_error_review}",
-                    fg=typer.colors.YELLOW,
                 )
                 # 兼容旧格式：尝试解析纯文本 OK
                 m = re.search(
@@ -881,9 +876,8 @@ class ReviewManager:
                 else []
             )
 
-            typer.secho(
-                f"[c2rust-transpiler][review][iter={i + 1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}, breaking_issues={len(breaking_issues)}, structure_issues={len(structure_issues)}",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"📊 [c2rust-transpiler][review][iter={i + 1}] verdict ok={ok}, function_issues={len(function_issues)}, critical_issues={len(critical_issues)}, breaking_issues={len(breaking_issues)}, structure_issues={len(structure_issues)}",
             )
 
             # 保存本次审查发现的问题，供下次审查时验证（仅在发现问题时保存）
@@ -906,9 +900,8 @@ class ReviewManager:
                 limit_info = (
                     f" (上限: {max_iterations if max_iterations > 0 else '无限'})"
                 )
-                typer.secho(
-                    f"[c2rust-transpiler][review] 代码审查通过{limit_info} (共 {i + 1} 次迭代)。",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"✅ [c2rust-transpiler][review] 代码审查通过{limit_info} (共 {i + 1} 次迭代)。",
                 )
                 # 清理当前 agent 的事件订阅和记录
                 try:
@@ -1111,30 +1104,28 @@ class ReviewManager:
             fix_prompt_with_notes = self.append_additional_notes(fix_prompt)
             ca.run(
                 self.compose_prompt_with_context(fix_prompt_with_notes, True),
-                prefix=f"[c2rust-transpiler][review-fix iter={i + 1}{limit_info}]",
+                prefix=f"⚠️ [c2rust-transpiler][review-fix iter={i + 1}{limit_info}]",
                 suffix="",
             )
 
             # 检测并处理测试代码删除
             if self.check_and_handle_test_deletion(before_commit, ca):
                 # 如果回退了，需要重新运行 agent
-                typer.secho(
-                    f"[c2rust-transpiler][review-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={i + 1})",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][review-fix] 检测到测试代码删除问题，已回退，重新运行 agent (iter={i + 1})",
                 )
                 before_commit = self.get_crate_commit_hash()
                 # 重新创建修复 Agent
                 ca = self.get_fix_agent(c_code)
                 ca.run(
                     self.compose_prompt_with_context(fix_prompt_with_notes, True),
-                    prefix=f"[c2rust-transpiler][review-fix iter={i + 1}{limit_info}][retry]",
+                    prefix=f"⚠️ [c2rust-transpiler][review-fix iter={i + 1}{limit_info}][retry]",
                     suffix="",
                 )
                 # 再次检测
                 if self.check_and_handle_test_deletion(before_commit, ca):
-                    typer.secho(
-                        f"[c2rust-transpiler][review-fix] 再次检测到测试代码删除问题，已回退 (iter={i + 1})",
-                        fg=typer.colors.RED,
+                    PrettyOutput.auto_print(
+                        f"❌ [c2rust-transpiler][review-fix] 再次检测到测试代码删除问题，已回退 (iter={i + 1})",
                     )
 
             # 优化后进行一次构建验证；若未通过则进入构建修复循环，直到通过为止
@@ -1147,9 +1138,8 @@ class ReviewManager:
                 else False
             )
             if build_has_fixes:
-                typer.secho(
+                PrettyOutput.auto_print(
                     "[c2rust-transpiler][review-fix] 构建修复过程中进行了修复，将在下一轮审查中重新检查",
-                    fg=typer.colors.YELLOW,
                 )
 
             # 记录本次审查结果
@@ -1193,9 +1183,8 @@ class ReviewManager:
 
             # 达到迭代上限（仅当设置了上限时）
             # 注意：最后一次迭代的 agent 已经在循环内部清理过了，这里不需要额外清理
-            typer.secho(
-                f"[c2rust-transpiler][review] 已达到最大迭代次数上限({max_iterations})，停止审查优化。",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][review] 已达到最大迭代次数上限({max_iterations})，停止审查优化。",
             )
             try:
                 cur = self.progress.get("current") or {}

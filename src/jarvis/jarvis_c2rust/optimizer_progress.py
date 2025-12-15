@@ -10,7 +10,7 @@ from typing import Optional
 from typing import Set
 from typing import cast
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.optimizer_options import OptimizeOptions
 from jarvis.jarvis_c2rust.optimizer_utils import git_head_commit
@@ -105,24 +105,20 @@ class ProgressManager:
                         if last_commit:
                             current_commit = self.get_crate_commit_hash()
                             if current_commit != last_commit:
-                                typer.secho(
-                                    f"[c2rust-optimizer][resume] 检测到代码状态不一致，正在 reset 到最后一个步骤的 commit: {last_commit}",
-                                    fg=typer.colors.YELLOW,
+                                PrettyOutput.auto_print(
+                                    f"🔧 [c2rust-optimizer][resume] 检测到代码状态不一致，正在 reset 到最后一个步骤的 commit: {last_commit}",
                                 )
                                 if self.reset_to_commit(last_commit):
-                                    typer.secho(
-                                        f"[c2rust-optimizer][resume] 已 reset 到 commit: {last_commit}",
-                                        fg=typer.colors.GREEN,
+                                    PrettyOutput.auto_print(
+                                        f"✅ [c2rust-optimizer][resume] 已 reset 到 commit: {last_commit}",
                                     )
                                 else:
-                                    typer.secho(
-                                        "[c2rust-optimizer][resume] reset 失败，继续使用当前代码状态",
-                                        fg=typer.colors.YELLOW,
+                                    PrettyOutput.auto_print(
+                                        "⚠️ [c2rust-optimizer][resume] reset 失败，继续使用当前代码状态",
                                     )
                             else:
-                                typer.secho(
-                                    "[c2rust-optimizer][resume] 代码状态一致，无需 reset",
-                                    fg=typer.colors.CYAN,
+                                PrettyOutput.auto_print(
+                                    "ℹ️ [c2rust-optimizer][resume] 代码状态一致，无需 reset",
                                 )
                 else:
                     self.processed = set()
@@ -213,9 +209,8 @@ class ProgressManager:
             }
             if current_commit:
                 data["last_commit"] = current_commit
-                typer.secho(
-                    f"[c2rust-optimizer][progress] 已记录当前 commit: {current_commit}",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    f"ℹ️ [c2rust-optimizer][progress] 已记录当前 commit: {current_commit}",
                 )
 
             self.progress_path.write_text(
@@ -239,9 +234,8 @@ class ProgressManager:
             # 获取当前 commit id
             current_commit = self.get_crate_commit_hash()
             if not current_commit:
-                typer.secho(
-                    "[c2rust-optimizer][progress] 无法获取 commit id，跳过进度记录",
-                    fg=typer.colors.YELLOW,
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-optimizer][progress] 无法获取 commit id，跳过进度记录",
                 )
                 return
 
@@ -287,14 +281,12 @@ class ProgressManager:
             self.progress_path.write_text(
                 json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8"
             )
-            typer.secho(
-                f"[c2rust-optimizer][progress] 已记录修复进度: {step_name}/{fix_key} -> commit {current_commit[:8]}",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                f"ℹ️ [c2rust-optimizer][progress] 已记录修复进度: {step_name}/{fix_key} -> commit {current_commit[:8]}"
             )
         except Exception as e:
-            typer.secho(
-                f"[c2rust-optimizer] 保存修复进度失败（非致命）: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ ⚠️ [c2rust-optimizer] 保存修复进度失败（非致命）: {e}"
             )
 
     def save_step_progress(self, step_name: str, files: List[Path]) -> None:
@@ -327,22 +319,19 @@ class ProgressManager:
                 self._step_commits = step_commits
                 data["step_commits"] = cast(Dict[str, str], step_commits)
                 data["last_commit"] = current_commit
-                typer.secho(
-                    f"[c2rust-optimizer][progress] 已记录步骤 '{step_name}' 的 commit: {current_commit}",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    f"ℹ️ [c2rust-optimizer][progress] 已记录步骤 '{step_name}' 的 commit: {current_commit}",
                 )
 
             self.progress_path.write_text(
                 json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
             )
-            typer.secho(
-                f"[c2rust-optimizer] 步骤 '{step_name}' 进度已保存",
-                fg=typer.colors.CYAN,
+            PrettyOutput.auto_print(
+                "ℹ️ [c2rust-optimizer] 步骤进度已保存",
             )
         except Exception as e:
-            typer.secho(
-                f"[c2rust-optimizer] 保存步骤进度失败（非致命）: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-optimizer] 保存步骤进度失败（非致命）: {e}",
             )
 
     def on_before_tool_call(self, agent: Any, current_response=None, **kwargs) -> None:
@@ -367,9 +356,8 @@ class ProgressManager:
                     self._agent_before_commits[agent_key] = current_commit
         except Exception as e:
             # 事件处理器异常不应影响主流程
-            typer.secho(
-                f"[c2rust-optimizer][test-detection] BEFORE_TOOL_CALL 事件处理器异常: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ ⚠️ [c2rust-optimizer][test-detection] BEFORE_TOOL_CALL 事件处理器异常: {e}"
             )
 
     def on_after_tool_call(
@@ -425,9 +413,8 @@ class ProgressManager:
                     self._agent_before_commits[agent_key] = current_commit
                 return
 
-            typer.secho(
-                "[c2rust-optimizer][test-detection] 检测到可能错误删除了测试代码标记（工具调用后检测）",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                "⚠️ ⚠️ [c2rust-optimizer][test-detection] 检测到可能错误删除了测试代码标记（工具调用后检测）"
             )
 
             # 询问 LLM 是否合理
@@ -436,14 +423,12 @@ class ProgressManager:
             )
 
             if need_reset:
-                typer.secho(
-                    f"[c2rust-optimizer][test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}",
-                    fg=typer.colors.RED,
+                PrettyOutput.auto_print(
+                    f"❌ ❌ [c2rust-optimizer][test-detection] LLM 确认删除不合理，正在回退到 commit: {before_commit}"
                 )
                 if self.reset_to_commit(before_commit):
-                    typer.secho(
-                        "[c2rust-optimizer][test-detection] 已回退到之前的 commit（工具调用后检测）",
-                        fg=typer.colors.GREEN,
+                    PrettyOutput.auto_print(
+                        "✅ ✅ [c2rust-optimizer][test-detection] 已回退到之前的 commit（工具调用后检测）"
                     )
                     # 回退后，保持之前的 commit 记录
                     self._agent_before_commits[agent_key] = before_commit
@@ -451,9 +436,8 @@ class ProgressManager:
                     if hasattr(agent, "session") and hasattr(agent.session, "prompt"):
                         agent.session.prompt += "\n\n⚠️ 修改被撤销：检测到测试代码被错误删除，已回退到之前的版本。\n"
                 else:
-                    typer.secho(
-                        "[c2rust-optimizer][test-detection] 回退失败",
-                        fg=typer.colors.RED,
+                    PrettyOutput.auto_print(
+                        "❌ ❌ [c2rust-optimizer][test-detection] 回退失败"
                     )
             else:
                 # LLM 认为删除合理，更新 commit 记录
@@ -462,9 +446,8 @@ class ProgressManager:
                     self._agent_before_commits[agent_key] = current_commit
         except Exception as e:
             # 事件处理器异常不应影响主流程
-            typer.secho(
-                f"[c2rust-optimizer][test-detection] AFTER_TOOL_CALL 事件处理器异常: {e}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ ⚠️ [c2rust-optimizer][test-detection] AFTER_TOOL_CALL 事件处理器异常: {e}"
             )
 
     def check_and_handle_test_deletion(

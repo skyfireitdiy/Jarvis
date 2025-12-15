@@ -40,7 +40,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-import typer
+from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.optimizer_build_fix import BuildFixOptimizer
 from jarvis.jarvis_c2rust.optimizer_clippy import ClippyOptimizer
@@ -165,9 +165,9 @@ class Optimizer:
         Returns:
             下一个步骤编号，如果失败则返回 None
         """
-        typer.secho(
-            f"\n[c2rust-optimizer] 第 {step_num} 步：{step_display_name}",
-            fg=typer.colors.MAGENTA,
+        PrettyOutput.auto_print(
+            f"\n🔧 [c2rust-optimizer] 第 {step_num} 步：{step_display_name}",
+            color="magenta",
         )
         self.progress_manager.snapshot_commit()
         if not self.options.dry_run:
@@ -191,9 +191,9 @@ class Optimizer:
             优化统计信息
         """
         report_path = self.report_dir / "optimize_report.json"
-        typer.secho(
-            f"[c2rust-optimizer][start] 开始优化 Crate: {self.crate_dir}",
-            fg=typer.colors.BLUE,
+        PrettyOutput.auto_print(
+            f"🚀 [c2rust-optimizer][start] 开始优化 Crate: {self.crate_dir}",
+            color="blue",
         )
         try:
             # 批次开始前记录快照
@@ -232,21 +232,21 @@ class Optimizer:
 
             # 如果没有新文件但有未完成的步骤，使用所有 Rust 文件作为目标
             if not targets and has_pending_steps:
-                typer.secho(
-                    "[c2rust-optimizer] 无新文件需要处理，但检测到未完成的步骤，使用所有 Rust 文件作为目标。",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    "📝 [c2rust-optimizer] 无新文件需要处理，但检测到未完成的步骤，使用所有 Rust 文件作为目标。",
+                    color="cyan",
                 )
                 targets = list(iter_rust_files(self.crate_dir))
 
             if not targets:
-                typer.secho(
-                    "[c2rust-optimizer] 根据当前选项，无新文件需要处理，且所有步骤均已完成。",
-                    fg=typer.colors.CYAN,
+                PrettyOutput.auto_print(
+                    "✅ [c2rust-optimizer] 根据当前选项，无新文件需要处理，且所有步骤均已完成。",
+                    color="cyan",
                 )
             else:
-                typer.secho(
-                    f"[c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。",
-                    fg=typer.colors.BLUE,
+                PrettyOutput.auto_print(
+                    f"📊 [c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。",
+                    color="blue",
                 )
 
                 # 所有优化步骤都使用 CodeAgent
@@ -299,9 +299,9 @@ class Optimizer:
             report_display = get_report_display_path(
                 report_path, self.project_root, self.crate_dir
             )
-            typer.secho(
-                f"[c2rust-optimizer] 优化流程结束。报告已生成于: {report_display}",
-                fg=typer.colors.GREEN,
+            PrettyOutput.auto_print(
+                f"✅ [c2rust-optimizer] 优化流程结束。报告已生成于: {report_display}",
+                color="green",
             )
             write_final_report(report_path, self.stats)
         return self.stats

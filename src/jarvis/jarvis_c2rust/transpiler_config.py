@@ -8,8 +8,7 @@ from pathlib import Path
 from typing import Any
 from typing import Dict
 
-import typer
-
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.constants import CONFIG_JSON
 from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.utils import read_json
@@ -61,9 +60,8 @@ class ConfigManager:
                 "additional_notes": progress_config.get("additional_notes", ""),
             }
             write_json(config_path, migrated_config)
-            typer.secho(
-                f"[c2rust-transpiler][config] 已从 progress.json 迁移配置到 {config_path}",
-                fg=typer.colors.YELLOW,
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][config] 已从 progress.json 迁移配置到 {config_path}"
             )
             return migrated_config
 
@@ -98,9 +96,8 @@ class ConfigManager:
         """
         fn_index_by_id.clear()
         fn_name_to_id.clear()
-        typer.secho(
-            f"[c2rust-transpiler][index] 正在加载翻译顺序索引: {order_jsonl}",
-            fg=typer.colors.BLUE,
+        PrettyOutput.auto_print(
+            f"📊 [c2rust-transpiler][index] 正在加载翻译顺序索引: {order_jsonl}"
         )
         try:
             with order_jsonl.open("r", encoding="utf-8") as f:
@@ -176,7 +173,6 @@ class ConfigManager:
         except Exception:
             # 若索引构建失败，保持为空，后续流程将跳过
             pass
-        typer.secho(
-            f"[c2rust-transpiler][index] 索引构建完成: ids={len(fn_index_by_id)} names={len(fn_name_to_id)}",
-            fg=typer.colors.BLUE,
+        PrettyOutput.auto_print(
+            f"✅ [c2rust-transpiler][index] 索引构建完成: ids={len(fn_index_by_id)} names={len(fn_name_to_id)}"
         )
