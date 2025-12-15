@@ -38,8 +38,7 @@ from typing import Optional
 from typing import Set
 from typing import Tuple
 
-import typer
-
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.constants import DEFAULT_CHECKPOINT_FILE
 from jarvis.jarvis_c2rust.constants import DEFAULT_CHECKPOINT_INTERVAL
 from jarvis.jarvis_c2rust.constants import MAX_NOTES_DISPLAY_LENGTH
@@ -204,33 +203,25 @@ def apply_library_replacement(
                         continue
             selected_roots = sr_list
             if selected_roots:
-                typer.secho(
-                    f"[c2rust-library] 从断点恢复 selected_roots: {len(selected_roots)} 个替代根",
-                    fg=typer.colors.BLUE,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"[c2rust-library] 从断点恢复 selected_roots: {len(selected_roots)} 个替代根"
                 )
             else:
-                typer.secho(
-                    "[c2rust-library] 警告: 从断点恢复时 selected_roots 为空，可能导致 library_replacements.jsonl 为空",
-                    fg=typer.colors.YELLOW,
-                    err=True,
+                PrettyOutput.auto_print(
+                    "[c2rust-library] 警告: 从断点恢复时 selected_roots 为空，可能导致 library_replacements.jsonl 为空"
                 )
         except Exception as e:
             selected_roots = []
-            typer.secho(
-                f"[c2rust-library] 从断点恢复 selected_roots 时出错: {e}，将使用空列表",
-                fg=typer.colors.RED,
-                err=True,
+            PrettyOutput.auto_print(
+                f"[c2rust-library] 从断点恢复 selected_roots 时出错: {e}，将使用空列表"
             )
         # 恢复已处理的初始根函数集合（从 processed_roots 中筛选出在 root_funcs 中的）
         try:
             root_funcs_processed = {fid for fid in processed_roots if fid in root_funcs}
         except Exception:
             root_funcs_processed = set()
-        typer.secho(
-            f"[c2rust-library] 已从断点恢复: 已评估={eval_counter}, 已处理根={len(processed_roots)}, 已剪除={len(pruned_dynamic)}, 已选中替代根={len(selected_roots)}",
-            fg=typer.colors.YELLOW,
-            err=True,
+        PrettyOutput.auto_print(
+            f"[c2rust-library] 已从断点恢复: 已评估={eval_counter}, 已处理根={len(processed_roots)}, 已剪除={len(pruned_dynamic)}, 已选中替代根={len(selected_roots)}"
         )
 
     def evaluate_node(fid: int, is_root_func: bool = False) -> None:
@@ -264,10 +255,8 @@ def apply_library_replacement(
                 )
             else:
                 progress_info = f"(总评估={total_evaluated})"
-        typer.secho(
-            f"[c2rust-library] {progress_info} 正在评估: {label} (ID: {fid}), 子树函数数={len(desc)}",
-            fg=typer.colors.CYAN,
-            err=True,
+        PrettyOutput.auto_print(
+            f"[c2rust-library] {progress_info} 正在评估: {label} (ID: {fid}), 子树函数数={len(desc)}"
         )
 
         # 执行 LLM 评估
@@ -350,7 +339,7 @@ def apply_library_replacement(
                 msg += f"; 置信度: {conf:.2f}"
                 if notes:
                     msg += f"; 备注: {notes[:MAX_NOTES_DISPLAY_LENGTH]}"
-                typer.secho(msg, fg=typer.colors.GREEN, err=True)
+                PrettyOutput.auto_print(msg)
 
                 # 如果节点可替代，无论是否最终替代（如入口函数保护），都不评估其子节点
                 # 入口函数保护：不替代 main（保留进行转译），但需要剪除其子节点（因为功能可由库实现）
@@ -365,11 +354,9 @@ def apply_library_replacement(
                 is_entry = is_entry_function(rec_meta)
                 if is_entry:
                     res["is_entry_function"] = True
-                    typer.secho(
+                    PrettyOutput.auto_print(
                         f"[c2rust-library] 入口函数保护：{label} 保留转译（不修改 ref），但剪除其子节点（功能可由库实现）。"
-                        f"替代信息将记录到 library_replacements.jsonl 供转译参考。",
-                        fg=typer.colors.YELLOW,
-                        err=True,
+                        f"替代信息将记录到 library_replacements.jsonl 供转译参考。"
                     )
                 else:
                     res["is_entry_function"] = False
@@ -394,10 +381,8 @@ def apply_library_replacement(
                     resume,
                 )
 
-                typer.secho(
-                    f"[c2rust-library] 即时标记剪除子节点(本次新增): +{newly} 个 (累计={len(pruned_dynamic)})",
-                    fg=typer.colors.MAGENTA,
-                    err=True,
+                PrettyOutput.auto_print(
+                    f"[c2rust-library] 即时标记剪除子节点(本次新增): +{newly} 个 (累计={len(pruned_dynamic)})"
                 )
                 # 注意：无论是否入口函数，只要 replaceable 为 True，都不评估子节点
             else:
@@ -405,10 +390,8 @@ def apply_library_replacement(
                 for ch in adj_func.get(fid, []):
                     evaluate_node(ch, is_root_func=False)
         except Exception as e:
-            typer.secho(
-                f"[c2rust-library] 评估节点 {fid} ({label}) 时出错: {e}",
-                fg=typer.colors.RED,
-                err=True,
+            PrettyOutput.auto_print(
+                f"[c2rust-library] 评估节点 {fid} ({label}) 时出错: {e}"
             )
             # 即使出错，也标记为已处理，避免无限循环
             processed_roots.add(fid)
@@ -453,11 +436,9 @@ def apply_library_replacement(
                 }
             }
             fm.write(json.dumps(summary, ensure_ascii=False) + "\n")
-            typer.secho(
+            PrettyOutput.auto_print(
                 f"[c2rust-library] 警告: 没有找到可替代的函数，library_replacements.jsonl 仅包含统计信息。"
-                f"已评估={eval_counter}, 已处理根={len(processed_roots)}, 已选中替代根={len(selected_roots)}",
-                fg=typer.colors.YELLOW,
-                err=True,
+                f"已评估={eval_counter}, 已处理根={len(processed_roots)}, 已选中替代根={len(selected_roots)}"
             )
 
     # 生成转译顺序（剪枝阶段与别名）
@@ -469,25 +450,17 @@ def apply_library_replacement(
         shutil.copy2(order_prune_path, alias_order_path)
         order_path = alias_order_path
     except Exception as e:
-        typer.secho(
-            f"[c2rust-library] 基于剪枝符号表生成翻译顺序失败: {e}",
-            fg=typer.colors.YELLOW,
-            err=True,
-        )
+        PrettyOutput.auto_print(f"[c2rust-library] 基于剪枝符号表生成翻译顺序失败: {e}")
 
     # 完成后清理断点（可选）
     try:
         if resume and clear_checkpoint_on_done and ckpt_path.exists():
             ckpt_path.unlink()
-            typer.secho(
-                f"[c2rust-library] 已清理断点文件: {ckpt_path}",
-                fg=typer.colors.BLUE,
-                err=True,
-            )
+            PrettyOutput.auto_print(f"[c2rust-library] 已清理断点文件: {ckpt_path}")
     except Exception:
         pass
 
-    typer.secho(
+    PrettyOutput.auto_print(
         "[c2rust-library] 库替代剪枝完成（LLM 子树评估）:\n"
         f"- 选中替代根: {len(selected_roots)} 个\n"
         f"- 剪除函数: {len(pruned_funcs)} 个\n"
@@ -495,8 +468,7 @@ def apply_library_replacement(
         f"- 替代映射: {out_mapping_path}\n"
         f"- 兼容符号表输出: {out_symbols_prune_path}\n"
         + (f"- 转译顺序: {order_path}\n" if order_path else "")
-        + f"- 兼容顺序输出: {order_prune_path}",
-        fg=typer.colors.GREEN,
+        + f"- 兼容顺序输出: {order_prune_path}"
     )
 
     result: Dict[str, Path] = {
