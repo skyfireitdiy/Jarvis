@@ -109,7 +109,6 @@ class CodeAgent(Agent):
             "execute_script",
             "read_code",
             "edit_file",  # 普通 search/replace 编辑
-
         ]
         if enable_task_list_manager:
             base_tools.append("task_list_manager")  # 任务列表管理工具

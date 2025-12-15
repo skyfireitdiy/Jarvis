@@ -327,13 +327,13 @@ class TestIsEntryFunction:
 
     def test_custom_entry_via_env(self, monkeypatch):
         """测试通过环境变量自定义入口函数"""
-        monkeypatch.setenv("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS", "custom_entry")
+        monkeypatch.setenv("c2rust_delay_entry_symbols", "custom_entry")
         rec = {"name": "custom_entry", "qualified_name": "custom_entry"}
         assert is_entry_function(rec) is True
 
     def test_custom_entry_multiple(self, monkeypatch):
         """测试多个自定义入口函数"""
-        monkeypatch.setenv("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS", "entry1,entry2")
+        monkeypatch.setenv("c2rust_delay_entry_symbols", "entry1,entry2")
         rec1 = {"name": "entry1", "qualified_name": "entry1"}
         rec2 = {"name": "entry2", "qualified_name": "entry2"}
         rec3 = {"name": "other", "qualified_name": "other"}
@@ -343,13 +343,13 @@ class TestIsEntryFunction:
 
     def test_custom_entry_qualified(self, monkeypatch):
         """测试限定的自定义入口函数"""
-        monkeypatch.setenv("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS", "MyClass::init")
+        monkeypatch.setenv("c2rust_delay_entry_symbols", "MyClass::init")
         rec = {"name": "init", "qualified_name": "MyClass::init"}
         assert is_entry_function(rec) is True
 
     def test_case_insensitive(self, monkeypatch):
         """测试大小写不敏感"""
-        monkeypatch.setenv("JARVIS_C2RUST_DELAY_ENTRY_SYMBOLS", "CUSTOM")
+        monkeypatch.setenv("c2rust_delay_entry_symbols", "CUSTOM")
         rec = {"name": "custom", "qualified_name": "custom"}
         assert is_entry_function(rec) is True
 
