@@ -8,13 +8,21 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
-class generate_new_tool:
-    name = "generate_new_tool"
+class meta_agent:
+    """元代理（Meta-Agent）工具：负责自举和进化 Jarvis 工具生态。
+
+    该工具本身利用 CodeAgent/Agent 分析需求、生成/改进其他工具代码，并自动完成注册与集成，
+    是一个可以“创造和改造工具的工具”，体现 Jarvis 的自举和自演化能力。
+    """
+
+    name = "meta_agent"
     description = (
-        "智能生成具备自举和自进化能力，并可编排现有 Agent/CodeAgent 的 Jarvis 新工具。"
-        "利用 CodeAgent 根据用户需求分析生成完整的工具代码，包含最佳实践模板、参数验证、错误处理，并自动注册到工具系统。"
-        "生成的工具可以在内部调用和编排现有的 Agent（通用任务编排、IIRIPER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等），"
-        "实现复杂任务流程的自动化协同处理和自我分析改进，具备完整的生命周期管理，包括可用性检查、参数定义、执行逻辑和自动集成。"
+        "元代理（Meta-Agent）工具：用于**根据自然语言需求自动创建或改进 Jarvis 工具**，并完成注册集成。"
+        "核心能力：1）调用 CodeAgent 生成完整可用的新工具代码（包含参数定义、错误处理、最佳实践模板）；"
+        "2）在生成后自动写入到 data/tools 目录并注册到 ToolRegistry；"
+        "3）支持在新工具内部编排现有 Agent（通用任务编排、IIRIPER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等）；"
+        "4）支持通过再次调用 meta_agent 对已有工具进行自举式改进（自我分析和演化）。"
+        "调用方式：传入 tool_name（工具名/文件名）与 function_description（目标功能的清晰描述），返回值中包含生成状态和新工具文件的绝对路径。"
     )
 
     parameters = {
@@ -22,11 +30,11 @@ class generate_new_tool:
         "properties": {
             "tool_name": {
                 "type": "string",
-                "description": "新工具的名称，将用作文件名和工具类名",
+                "description": "要生成或改进的工具名称，将同时用作文件名（<name>.py）和工具类名",
             },
             "function_description": {
                 "type": "string",
-                "description": "工具的功能描述",
+                "description": "工具的目标功能与使用场景描述：应尽量具体，包含输入参数含义、预期输出、约束条件（例如只读/允许写文件）、是否需要编排 Agent/CodeAgent 等信息",
             },
         },
         "required": ["tool_name", "function_description"],
@@ -146,11 +154,11 @@ class {tool_name}:
         # - from jarvis.jarvis_code_agent.code_agent import CodeAgent
         # - 其他jarvis模块
         
-        # 自举能力示例：使用generate_new_tool对自身进行改进
-        # from jarvis.jarvis_tools.generate_new_tool import generate_new_tool
+        # 自举能力示例：使用 meta_agent 对自身进行改进
+        # from jarvis.jarvis_tools.meta_agent import meta_agent
         # 
         # # 生成改进版本
-        # improver = generate_new_tool()
+        # improver = meta_agent()
         # result = improver.execute({{
         #     "tool_name": "{tool_name}_improved",
         #     "function_description": "改进版本的{tool_name}，基于使用反馈优化"
@@ -277,3 +285,5 @@ class {tool_name}:
         finally:
             if curr_dir:
                 os.chdir(curr_dir)
+
+

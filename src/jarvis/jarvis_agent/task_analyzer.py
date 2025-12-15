@@ -62,7 +62,7 @@ class TaskAnalyzer:
         """准备分析提示"""
         # 检查是否有 save_memory 工具（工具可用性）
         has_save_memory = False
-        # 检查是否有 generate_new_tool 工具
+        # 检查是否有 meta_agent 工具（原 generate_new_tool，自举式工具生成器）
         has_generate_new_tool = False
         try:
             tool_registry = self.agent.get_tool_registry()
@@ -71,8 +71,8 @@ class TaskAnalyzer:
                 save_memory_tool = tool_registry.get_tool("save_memory")
                 has_save_memory = save_memory_tool is not None
 
-                # 检查 generate_new_tool 工具
-                generate_tool = tool_registry.get_tool("generate_new_tool")
+                # 检查 meta_agent 工具
+                generate_tool = tool_registry.get_tool("meta_agent")
                 has_generate_new_tool = generate_tool is not None
         except Exception:
             pass
