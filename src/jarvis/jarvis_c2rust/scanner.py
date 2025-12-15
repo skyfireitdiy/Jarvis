@@ -53,7 +53,6 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 import os
 import shutil
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -627,7 +626,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             if good:
                 hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
 
-            typer.secho(
+            PrettyOutput.auto_print(
                 "[c2rust-scanner] 检测到 libclang/python 绑定不匹配 (未定义符号)。"
                 f"\n详情: {msg}"
                 "\n这通常意味着您的 Python 'clang' 绑定版本高于已安装的 libclang。"
@@ -635,18 +634,12 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 "- 安装/更新 libclang 以匹配您 Python 'clang' 的主版本 (例如 16-21)。\n"
                 "- 或将 Python 'clang' 版本固定为与系统 libclang 匹配 (例如 pip install 'clang>=16,<22')。\n"
                 "- 或设置 CLANG_LIBRARY_FILE 指向匹配的 libclang 共享库。\n"
-                f"{hint}",
-                fg=typer.colors.RED,
-                err=True,
+                f"{hint}"
             )
             raise typer.Exit(code=2)
         else:
             # Other initialization errors: surface and exit
-            typer.secho(
-                f"[c2rust-scanner] libclang 初始化失败: {e}",
-                fg=typer.colors.RED,
-                err=True,
-            )
+            PrettyOutput.auto_print(f"[c2rust-scanner] libclang 初始化失败: {e}")
             raise typer.Exit(code=2)
 
     # compile_commands
@@ -817,7 +810,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                     if good:
                         hint = f"\n建议的包含所需符号的库:\n  export CLANG_LIBRARY_FILE={good[0]}\n然后重新运行: jarvis-c2rust scan -r {scan_root}"
 
-                    typer.secho(
+                    PrettyOutput.auto_print(
                         "[c2rust-scanner] 解析期间检测到 libclang/python 绑定不匹配 (未定义符号)。"
                         f"\n详情: {msg}"
                         "\n这通常意味着您的 Python 'clang' 绑定版本高于已安装的 libclang。"
@@ -825,9 +818,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                         "- 安装/更新 libclang 以匹配您 Python 'clang' 的主版本 (例如 19/20)。\n"
                         "- 或将 Python 'clang' 版本固定为与系统 libclang 匹配 (例如 pip install 'clang==18.*')。\n"
                         "- 或设置 CLANG_LIBRARY_FILE 指向匹配的 libclang 共享库。\n"
-                        f"{hint}",
-                        fg=typer.colors.RED,
-                        err=True,
+                        f"{hint}"
                     )
                     raise typer.Exit(code=2)
 
@@ -835,9 +826,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
                 try:
                     funcs = scan_file(cindex, p, [])
                 except Exception:
-                    PrettyOutput.auto_print(
-                        f"[c2rust-scanner] 解析 {p} 失败: {e}", file=sys.stderr
-                    )
+                    PrettyOutput.auto_print(f"[c2rust-scanner] 解析 {p} 失败: {e}")
                     continue
 
             # Write JSONL
@@ -906,11 +895,7 @@ def scan_directory(scan_root: Path, db_path: Optional[Path] = None) -> Path:
             f"[c2rust-scanner] JSONL 基线已写入: {symbols_curated_jsonl} (用于后续流程)"
         )
     except Exception as _e:
-        typer.secho(
-            f"[c2rust-scanner] 生成 symbols.jsonl 失败: {_e}",
-            fg=typer.colors.RED,
-            err=True,
-        )
+        PrettyOutput.auto_print(f"[c2rust-scanner] 生成 symbols.jsonl 失败: {_e}")
         raise
     PrettyOutput.auto_print(f"[c2rust-scanner] 元数据已写入: {meta_json}")
     return symbols_raw_jsonl
@@ -1076,8 +1061,6 @@ def generate_dot_from_db(db_path: Path, out_path: Path) -> Path:
         return base
 
     # Prepare output path
-    if out_path is None:
-        out_path = sjsonl.parent / "global_refgraph.dot"
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -1700,29 +1683,21 @@ def run_scan(
         try:
             scan_directory(root)
         except Exception as e:
-            typer.secho(f"[c2rust-scanner] 错误: {e}", fg=typer.colors.RED, err=True)
+            PrettyOutput.auto_print(f"[c2rust-scanner] 错误: {e}")
             raise typer.Exit(code=1)
     else:
         # Only-generate mode (no rescan). 验证输入，仅基于既有 symbols.jsonl 进行可选的 DOT/子图输出；此处不计算翻译顺序。
         if not data_path_curated.exists():
-            typer.secho(
-                f"[c2rust-scanner] 未找到数据: {data_path_curated}",
-                fg=typer.colors.RED,
-                err=True,
-            )
+            PrettyOutput.auto_print(f"[c2rust-scanner] 未找到数据: {data_path_curated}")
             raise typer.Exit(code=2)
         if only_dot and dot is None:
-            typer.secho(
-                "[c2rust-scanner] --only-dot 需要 --dot 来指定输出文件",
-                fg=typer.colors.RED,
-                err=True,
+            PrettyOutput.auto_print(
+                "[c2rust-scanner] --only-dot 需要 --dot 来指定输出文件"
             )
             raise typer.Exit(code=2)
         if only_subgraphs and subgraphs_dir is None:
-            typer.secho(
-                "[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录",
-                fg=typer.colors.RED,
-                err=True,
+            PrettyOutput.auto_print(
+                "[c2rust-scanner] --only-subgraphs 需要 --subgraphs-dir 来指定输出目录"
             )
             raise typer.Exit(code=2)
 
@@ -1731,21 +1706,12 @@ def run_scan(
         try:
             # 使用正式符号表生成可视化
             generate_dot_from_db(data_path_curated, dot)
-            typer.secho(
-                f"[c2rust-scanner] DOT 文件已写入: {dot}", fg=typer.colors.GREEN
-            )
+            PrettyOutput.auto_print(f"[c2rust-scanner] DOT 文件已写入: {dot}")
             if png:
                 png_path = _render_dot_to_png(dot)
-                typer.secho(
-                    f"[c2rust-scanner] PNG 文件已写入: {png_path}",
-                    fg=typer.colors.GREEN,
-                )
+                PrettyOutput.auto_print(f"[c2rust-scanner] PNG 文件已写入: {png_path}")
         except Exception as e:
-            typer.secho(
-                f"[c2rust-scanner] 写入 DOT/PNG 失败: {e}",
-                fg=typer.colors.RED,
-                err=True,
-            )
+            PrettyOutput.auto_print(f"[c2rust-scanner] 写入 DOT/PNG 失败: {e}")
             raise typer.Exit(code=1)
 
     # Generate per-root subgraphs if requested
@@ -1762,19 +1728,13 @@ def run_scan(
                     except Exception as _e:
                         # Fail fast on PNG generation error for subgraphs to make issues visible
                         raise
-                typer.secho(
-                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个 DOT 文件和 {png_count} 个 PNG 文件 -> {subgraphs_dir}",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个 DOT 文件和 {png_count} 个 PNG 文件 -> {subgraphs_dir}"
                 )
             else:
-                typer.secho(
-                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个文件 -> {subgraphs_dir}",
-                    fg=typer.colors.GREEN,
+                PrettyOutput.auto_print(
+                    f"[c2rust-scanner] 根节点子图已写入: {len(files)} 个文件 -> {subgraphs_dir}"
                 )
         except Exception as e:
-            typer.secho(
-                f"[c2rust-scanner] 写入子图 DOT/PNG 失败: {e}",
-                fg=typer.colors.RED,
-                err=True,
-            )
+            PrettyOutput.auto_print(f"[c2rust-scanner] 写入子图 DOT/PNG 失败: {e}")
             raise typer.Exit(code=1)
