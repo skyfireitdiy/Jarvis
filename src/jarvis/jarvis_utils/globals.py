@@ -61,12 +61,15 @@ custom_theme = Theme(
 )
 console = Console(theme=custom_theme)
 
-g_agent_index = 0
-
 
 def make_agent_name(agent_name: str) -> str:
     """
-    通过附加后缀生成唯一的代理名称（如果必要）。
+    基于现有 global_agents 生成唯一的代理名称。
+
+    约定：
+    - 如果该名称尚未被占用，直接返回原始名称；
+    - 如果已存在同名 Agent，则按 `name_1`、`name_2`... 的形式依次查找可用名称；
+    - 已存在的带后缀名称会被一并考虑，例如 `name`、`name_1`、`name_3` 已存在时，返回 `name_2`。
 
     参数：
         agent_name: 基础代理名称
@@ -74,9 +77,17 @@ def make_agent_name(agent_name: str) -> str:
     返回：
         str: 唯一的代理名称
     """
-    global g_agent_index
-    g_agent_index += 1
-    return f"{g_agent_index}_{agent_name}"
+    # 如果名称未被占用，直接返回原始名称
+    if agent_name not in global_agents:
+        return agent_name
+
+    # 已存在同名 Agent，按 name_1、name_2... 形式查找第一个未被占用的名称
+    index = 1
+    while True:
+        candidate = f"{agent_name}_{index}"
+        if candidate not in global_agents:
+            return candidate
+        index += 1
 
 
 def get_agent(agent_name: str) -> Any:

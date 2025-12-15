@@ -285,5 +285,3 @@ class {tool_name}:
         finally:
             if curr_dir:
                 os.chdir(curr_dir)
-
-
