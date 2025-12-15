@@ -655,9 +655,8 @@ class EditFileNormalTool:
                                     os.remove(backup_path)
                                 except Exception:
                                     pass
-                            all_results.append(
-                                f"❌ {file_path}: 操作已取消（发现多处匹配，已确认不继续）"
-                            )
+                            result_or_error = "操作已取消（发现多处匹配，已确认不继续）"
+                            all_results.append(f"❌ {file_path}: {result_or_error}")
                             failed_files.append(file_path)
                             overall_success = False
                             success = False  # 标记为失败，跳出循环
@@ -668,11 +667,16 @@ class EditFileNormalTool:
                         result_or_error = iter_result_or_error
                         break
 
-                if not success and confirm_iteration >= max_confirm_iterations:
-                    # 达到最大确认次数，可能陷入循环
-                    result_or_error = f"处理失败：达到最大确认次数限制（{max_confirm_iterations}），可能存在循环确认问题"
-
                 if not success:
+                    # 处理失败，确保有错误信息
+                    if confirm_iteration >= max_confirm_iterations:
+                        # 达到最大确认次数，可能陷入循环
+                        if not result_or_error:
+                            result_or_error = f"处理失败：达到最大确认次数限制（{max_confirm_iterations}），可能存在循环确认问题"
+                    elif not result_or_error:
+                        # 如果没有设置错误信息，使用默认错误信息
+                        result_or_error = "处理失败：未知错误"
+
                     # 处理失败
                     if backup_path and os.path.exists(backup_path):
                         try:
