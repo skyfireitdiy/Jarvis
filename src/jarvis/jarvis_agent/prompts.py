@@ -355,8 +355,8 @@ def get_task_analysis_prompt(
 1. 检查现有工具或方法论是否已经可以完成该任务，如果可以，直接说明即可，无需生成新内容
 2. 如果现有工具/方法论不足，评估当前任务是否可以通过编写新工具来自动化解决
 3. 如果可以通过工具解决，请使用 generate_new_tool 工具创建新工具：
-   - 使用 generate_new_tool 工具，传入 tool_name 和 tool_code 参数
-   - tool_code 应包含完整的工具类定义，遵循工具代码要求
+   - 使用 generate_new_tool 工具，传入 tool_name 和 function_description 参数
+   - 工具将智能分析需求，利用CodeAgent生成包含最佳实践的完整工具代码
 4. 如果无法通过编写通用工具完成，评估当前的执行流程是否可以总结为通用方法论
 5. 如果以上都不可行，给出详细理由"""
     else:
@@ -387,7 +387,7 @@ from typing import Dict, Any
 
 class 工具名称:
     name = "工具名称"
-    description = "Tool description"
+    description = "智能生成的工具描述，基于CodeAgent分析和用户需求"
     parameters = {{
         "type": "object",
         "properties": {{
