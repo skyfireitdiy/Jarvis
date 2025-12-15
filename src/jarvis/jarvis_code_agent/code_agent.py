@@ -53,6 +53,7 @@ from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.utils import _acquire_single_instance_lock
 from jarvis.jarvis_utils.utils import init_env
+from jarvis.jarvis_utils.tag import ot
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -721,9 +722,13 @@ git reset --hard {start_commit}
 【代码修改（Git Diff）】
 ```diff
 {git_diff}
+
 ```
 
-请仔细审查代码修改，如需要可使用 read_code 工具查看更多上下文。"""
+请仔细审查代码修改，如需要可使用 read_code 工具查看更多上下文。
+
+如果审查完毕，直接输出 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容。
+"""
 
         summary_prompt = """请输出 JSON 格式的审查结果，格式如下：
 
