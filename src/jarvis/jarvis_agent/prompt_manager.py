@@ -10,6 +10,7 @@ PromptManager: 统一管理 Agent 的系统提示词与附加提示词的构建�
 
 import shutil
 from typing import TYPE_CHECKING
+from typing import Any
 
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.tag import ot
@@ -31,10 +32,17 @@ class PromptManager:
     # ----------------------------
     # 系统提示词构建
     # ----------------------------
-    def build_system_prompt(self) -> str:
+    def build_system_prompt(self, agent_: Any) -> str:
         """
         构建系统提示词，复用现有的工具使用提示生成逻辑，保持行为一致。
         """
+        from jarvis.jarvis_code_agent.code_agent import CodeAgent
+
+        rules_prompt = ""
+        if isinstance(agent_, CodeAgent):
+            code_agent: CodeAgent = agent_
+            rules_prompt = code_agent.get_rules_prompt()
+
         action_prompt = self.agent.get_tool_usage_prompt()
 
         # 检查 task_list_manager 工具是否可用
@@ -87,7 +95,13 @@ class PromptManager:
         return f"""
 {self.agent.system_prompt}
 
-{action_prompt}{task_list_manager_note}{system_tools_info}
+{action_prompt}
+
+{task_list_manager_note}
+
+{system_tools_info}
+
+{rules_prompt}
 """
 
     # ----------------------------

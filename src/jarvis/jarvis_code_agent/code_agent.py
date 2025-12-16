@@ -96,6 +96,10 @@ class CodeAgent(Agent):
 
         # 初始化各个管理器
         self.rules_manager = RulesManager(self.root_dir)
+
+        # 加载入rules
+        _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
+
         self.git_manager = GitManager(self.root_dir)
         self.diff_manager = DiffManager(self.root_dir)
         self.impact_manager = ImpactManager(self.root_dir, self.context_manager)
@@ -187,6 +191,13 @@ class CodeAgent(Agent):
             print_language_support_table()
         except Exception:
             pass
+
+    def get_rules_prompt(self):
+        """
+        获取rules加载的prompt
+        """
+        prompt, _ = self.rules_manager.load_all_rules(",".join(self.loaded_rule_names))
+        return f"\n\n<rules>\n{prompt}</rules>\n"
 
     def _init_model(self, model_group: Optional[str]) -> None:
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
@@ -940,12 +951,8 @@ git reset --hard {start_commit}
                 user_input, truncated_git_diff, code_generation_summary
             )
 
-            rules_prompt = self.rules_manager.load_all_rules(
-                ",".join(self.loaded_rule_names)
-            )
-
             review_agent = Agent(
-                system_prompt=sys_prompt + f"\n\n<rules>\n{rules_prompt}\n</rules>",
+                system_prompt=sys_prompt,
                 name=f"CodeReview-Agent-{iteration}",
                 model_group=self.model.model_group if self.model else None,
                 summary_prompt=sum_prompt,
@@ -1055,6 +1062,11 @@ git reset --hard {start_commit}
 
         # 同时更新完整规则集合（自动去重）
         self.loaded_rule_names.add(rule_name)
+
+        # 防止rule_name无效
+        _, self.loaded_rule_names = self.rules_manager.load_all_rules(
+            ",".join(self.loaded_rule_names)
+        )
 
 
 @app.command()

@@ -242,16 +242,8 @@ class task_list_manager:
         except Exception:
             pass
 
-        # 创建验证 Agent，只使用 read_code 和 execute_script 工具
-        # 获取父代理所有规则内容并添加到系统提示词
-        rules_content, _ = parent_agent.rules_manager.load_all_rules(
-            ",".join(parent_agent.loaded_rule_names)
-        )
-
-        enhanced_system_prompt = verification_system_prompt + rules_content
-
         verification_agent = Agent(
-            system_prompt=enhanced_system_prompt,
+            system_prompt=verification_system_prompt,
             name=f"verification_agent_{task.task_id}_{verification_iteration}",
             description="Task verification agent",
             model_group=model_group,

@@ -563,24 +563,8 @@ class Agent:
 
     def _setup_system_prompt(self):
         """设置系统提示词"""
-        try:
-            prompt_text = self.prompt_manager.build_system_prompt()
-            self.model.set_system_prompt(prompt_text)
-        except Exception:
-            # 回退到原始行为，确保兼容性
-            action_prompt = self.get_tool_usage_prompt()
-            rules_prompt = self.rules_manager.load_all_rules(
-                ",".join(self.loaded_rule_names)
-            )
-            self.model.set_system_prompt(
-                f"""
-{self.system_prompt}
-
-{action_prompt}
-
-{rules_prompt}
-"""
-            )
+        prompt_text = self.prompt_manager.build_system_prompt(self)
+        self.model.set_system_prompt(prompt_text)
 
     def set_user_data(self, key: str, value: Any):
         """Sets user data in the session."""
