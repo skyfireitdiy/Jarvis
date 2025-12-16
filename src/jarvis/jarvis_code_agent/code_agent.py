@@ -38,7 +38,6 @@ from jarvis.jarvis_utils.config import get_smart_platform_name
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
 from jarvis.jarvis_utils.config import set_config
-from jarvis.jarvis_utils.globals import set_agent, delete_agent
 from jarvis.jarvis_utils.git_utils import detect_large_code_deletion
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import get_commits_between
@@ -54,6 +53,8 @@ from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.utils import _acquire_single_instance_lock
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.globals import set_current_agent
+from jarvis.jarvis_utils.globals import clear_current_agent
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -237,9 +238,11 @@ class CodeAgent(Agent):
         返回:
             str: 描述执行结果的输出，成功时返回None
         """
-        prev_dir = os.getcwd()
         try:
+            set_current_agent(self.name, self)
+
             # 根据当前模式生成额外说明，供 LLM 感知执行策略
+            prev_dir = os.getcwd()
             non_interactive_note = ""
             if getattr(self, "non_interactive", False):
                 non_interactive_note = (
@@ -285,14 +288,6 @@ git reset --hard {start_commit}
             7. 如遇信息不明，优先调用工具补充分析，不要主观臆断。
             8. **重要：清理临时文件**：开发过程中产生的临时文件（如测试文件、调试脚本、备份文件、临时日志等）必须在提交前清理删除，否则会被自动提交到git仓库。如果创建了临时文件用于调试或测试，完成后必须立即删除。
             """
-
-            # 在run方法开始时注册agent
-            try:
-                name = getattr(self, "name", None)
-                if name:
-                    set_agent(name, self)
-            except Exception:
-                pass
 
             # 智能上下文推荐：根据用户输入推荐相关上下文
             context_recommendation_text = ""
@@ -383,12 +378,8 @@ git reset --hard {start_commit}
             return f"Error during execution: {str(e)}"
         finally:
             # 在run方法结束时反注册agent
-            try:
-                name = getattr(self, "name", None)
-                if name:
-                    delete_agent(name)
-            except Exception:
-                pass
+            clear_current_agent()
+
             # Ensure switching back to the original working directory after CodeAgent completes
             try:
                 os.chdir(prev_dir)

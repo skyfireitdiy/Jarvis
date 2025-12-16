@@ -76,15 +76,13 @@ from jarvis.jarvis_utils.config import is_force_save_memory
 from jarvis.jarvis_utils.config import is_use_analysis
 from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import clear_running_agent
-from jarvis.jarvis_utils.globals import delete_agent
+from jarvis.jarvis_utils.globals import clear_current_agent
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.globals import make_agent_name
-from jarvis.jarvis_utils.globals import set_agent
 from jarvis.jarvis_utils.globals import set_global_model_group
 from jarvis.jarvis_utils.globals import set_interrupt
-from jarvis.jarvis_utils.globals import set_running_agent
+from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
@@ -1770,33 +1768,29 @@ class Agent:
             4. 自动加载相关方法论(如果是首次运行)
         """
         # 根据当前模式生成额外说明，供 LLM 感知执行策略
-        non_interactive_note = ""
-        if getattr(self, "non_interactive", False):
-            non_interactive_note = (
-                "\n\n[系统说明]\n"
-                "本次会话处于**非交互模式**：\n"
-                "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
-                "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问“是否继续”；\n"
-                "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
-            )
-
-            # 如果是非交互模式，可以假设用户输入的是完整的需求
-            self.pin_content = user_input
-
-        # 将非交互模式说明添加到用户输入中
-        enhanced_input = user_input + non_interactive_note
-        self.session.prompt = enhanced_input
-
-        # 记录用户输入
-
         try:
             # 延迟导入CodeAgent以避免循环依赖
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
             # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
             if not isinstance(self, CodeAgent):
-                set_agent(self.name, self)
-            set_running_agent(self.name)  # 标记agent开始运行
+                set_current_agent(self.name, self)  # 标记agent开始运行
+            non_interactive_note = ""
+            if getattr(self, "non_interactive", False):
+                non_interactive_note = (
+                    "\n\n[系统说明]\n"
+                    "本次会话处于**非交互模式**：\n"
+                    "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
+                    "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问“是否继续”；\n"
+                    "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
+                )
+
+                # 如果是非交互模式，可以假设用户输入的是完整的需求
+                self.pin_content = user_input
+
+            # 将非交互模式说明添加到用户输入中
+            enhanced_input = user_input + non_interactive_note
+            self.session.prompt = enhanced_input
 
             # 关键流程：直接调用 memory_manager 重置任务状态
             try:
@@ -1820,28 +1814,12 @@ class Agent:
                 )
             except Exception:
                 pass
-            try:
-                return self._main_loop()
-            finally:
-                # 确保在运行结束时清除运行状态
-                clear_running_agent(self.name)
-                # 在run方法结束时反注册agent（仅非CodeAgent）
-                # 延迟导入CodeAgent以避免循环依赖
-                from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
-                if not isinstance(self, CodeAgent):
-                    try:
-                        name = getattr(self, "name", None)
-                        if name:
-                            delete_agent(name)
-                    except Exception:
-                        pass
-        except Exception as e:
-            # 确保即使出现异常也清除运行状态
+            return self._main_loop()
+
+        finally:
             if not isinstance(self, CodeAgent):
-                clear_running_agent(self.name)
-            PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
-            return f"Task failed: {str(e)}"
+                clear_current_agent()
 
     def _main_loop(self) -> Any:
         """主运行循环"""
