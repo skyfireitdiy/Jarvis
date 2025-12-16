@@ -192,8 +192,7 @@ class Optimizer:
         """
         report_path = self.report_dir / "optimize_report.json"
         PrettyOutput.auto_print(
-            f"🚀 [c2rust-optimizer][start] 开始优化 Crate: {self.crate_dir}",
-            color="blue",
+            f"🚀 [c2rust-optimizer][start] 开始优化 Crate: {self.crate_dir}"
         )
         try:
             # 批次开始前记录快照
@@ -233,20 +232,17 @@ class Optimizer:
             # 如果没有新文件但有未完成的步骤，使用所有 Rust 文件作为目标
             if not targets and has_pending_steps:
                 PrettyOutput.auto_print(
-                    "📝 [c2rust-optimizer] 无新文件需要处理，但检测到未完成的步骤，使用所有 Rust 文件作为目标。",
-                    color="cyan",
+                    "📝 [c2rust-optimizer] 无新文件需要处理，但检测到未完成的步骤，使用所有 Rust 文件作为目标。"
                 )
                 targets = list(iter_rust_files(self.crate_dir))
 
             if not targets:
                 PrettyOutput.auto_print(
-                    "✅ [c2rust-optimizer] 根据当前选项，无新文件需要处理，且所有步骤均已完成。",
-                    color="cyan",
+                    "✅ [c2rust-optimizer] 根据当前选项，无新文件需要处理，且所有步骤均已完成。"
                 )
             else:
                 PrettyOutput.auto_print(
-                    f"📊 [c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。",
-                    color="blue",
+                    f"📊 [c2rust-optimizer] 本次批次发现 {len(targets)} 个待处理文件。"
                 )
 
                 # 所有优化步骤都使用 CodeAgent
@@ -300,8 +296,7 @@ class Optimizer:
                 report_path, self.project_root, self.crate_dir
             )
             PrettyOutput.auto_print(
-                f"✅ [c2rust-optimizer] 优化流程结束。报告已生成于: {report_display}",
-                color="green",
+                f"✅ [c2rust-optimizer] 优化流程结束。报告已生成于: {report_display}"
             )
             write_final_report(report_path, self.stats)
         return self.stats
