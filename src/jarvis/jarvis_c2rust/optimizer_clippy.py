@@ -57,7 +57,6 @@ class ClippyOptimizer:
         crate = self.crate_dir.resolve()
         PrettyOutput.auto_print(
             "🔄 [c2rust-optimizer][clippy-auto-fix] 尝试使用 clippy --fix 自动修复（包含测试代码）...",
-            color="cyan",
         )
 
         # 记录修复前的 commit id
@@ -65,7 +64,6 @@ class ClippyOptimizer:
         if not commit_before:
             PrettyOutput.auto_print(
                 "⚠️ [c2rust-optimizer][clippy-auto-fix] 无法获取 commit id，跳过自动修复",
-                color="yellow",
             )
             return False
 
@@ -93,12 +91,10 @@ class ClippyOptimizer:
             if res.returncode != 0:
                 PrettyOutput.auto_print(
                     f"❌ [c2rust-optimizer][clippy-auto-fix] clippy --fix 执行失败（返回码: {res.returncode}）",
-                    color="yellow",
                 )
                 if res.stderr:
                     PrettyOutput.auto_print(
                         f"📄 [c2rust-optimizer][clippy-auto-fix] 错误输出: {res.stderr[:500]}",
-                        color="yellow",
                     )
                 return False
 
@@ -122,13 +118,11 @@ class ClippyOptimizer:
             if not has_changes:
                 PrettyOutput.auto_print(
                     "📊 [c2rust-optimizer][clippy-auto-fix] clippy --fix 未修改任何文件",
-                    color="cyan",
                 )
                 return False
 
             PrettyOutput.auto_print(
                 "🔍 [c2rust-optimizer][clippy-auto-fix] clippy --fix 已执行，正在验证测试...",
-                color="cyan",
             )
 
             # 运行 cargo test 验证
@@ -142,13 +136,11 @@ class ClippyOptimizer:
             if ok:
                 PrettyOutput.auto_print(
                     "✅ [c2rust-optimizer][clippy-auto-fix] 自动修复成功且测试通过",
-                    color="green",
                 )
                 return True
             else:
                 PrettyOutput.auto_print(
                     "🔙 [c2rust-optimizer][clippy-auto-fix] 自动修复后测试失败，正在撤销修复...",
-                    color="yellow",
                 )
                 # 撤销修复：回退到修复前的 commit
                 if commit_before and self.progress_manager.reset_to_commit(
@@ -156,19 +148,16 @@ class ClippyOptimizer:
                 ):
                     PrettyOutput.auto_print(
                         f"[c2rust-optimizer][clippy-auto-fix] 已成功撤销自动修复，回退到 commit: {commit_before[:8]}",
-                        color="cyan",
                     )
                 else:
                     PrettyOutput.auto_print(
                         "[c2rust-optimizer][clippy-auto-fix] 撤销修复失败，请手动检查代码状态",
-                        color="red",
                     )
                 return False
 
         except subprocess.TimeoutExpired:
             PrettyOutput.auto_print(
                 "[c2rust-optimizer][clippy-auto-fix] clippy --fix 执行超时，正在检查是否有修改并撤销...",
-                color="yellow",
             )
             # 检查是否有修改，如果有则回退
             if commit_before:
@@ -183,12 +172,10 @@ class ClippyOptimizer:
                             if self.progress_manager.reset_to_commit(commit_before):
                                 PrettyOutput.auto_print(
                                     f"✅ [c2rust-optimizer][clippy-auto-fix] 已撤销超时前的修改，回退到 commit: {commit_before[:8]}",
-                                    color="cyan",
                                 )
                             else:
                                 PrettyOutput.auto_print(
                                     "❌ [c2rust-optimizer][clippy-auto-fix] 撤销修改失败，请手动检查代码状态",
-                                    color="red",
                                 )
                     except Exception:
                         # 无法检查状态，尝试直接回退
@@ -197,7 +184,6 @@ class ClippyOptimizer:
         except Exception as e:
             PrettyOutput.auto_print(
                 f"[c2rust-optimizer][clippy-auto-fix] clippy --fix 执行异常: {e}，正在检查是否有修改并撤销...",
-                color="yellow",
             )
             # 检查是否有修改，如果有则回退
             if commit_before:
@@ -212,12 +198,10 @@ class ClippyOptimizer:
                             if self.progress_manager.reset_to_commit(commit_before):
                                 PrettyOutput.auto_print(
                                     f"✅ [c2rust-optimizer][clippy-auto-fix] 已撤销异常前的修改，回退到 commit: {commit_before[:8]}",
-                                    color="cyan",
                                 )
                             else:
                                 PrettyOutput.auto_print(
                                     "❌ [c2rust-optimizer][clippy-auto-fix] 撤销修改失败，请手动检查代码状态",
-                                    color="red",
                                 )
                     except Exception:
                         # 无法检查状态，尝试直接回退
@@ -263,7 +247,6 @@ class ClippyOptimizer:
                 if not has_warnings:
                     PrettyOutput.auto_print(
                         f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration - 1} 次）",
-                        color="green",
                     )
                     return True  # 所有告警已消除
 
@@ -272,7 +255,6 @@ class ClippyOptimizer:
                 if not warnings_by_file:
                     PrettyOutput.auto_print(
                         "[c2rust-optimizer][codeagent][clippy] 无法提取告警，停止修复",
-                        color="yellow",
                     )
                     return False  # 仍有告警未消除
 
@@ -307,7 +289,6 @@ class ClippyOptimizer:
 
                 PrettyOutput.auto_print(
                     f"🔧 [c2rust-optimizer][codeagent][clippy] 第 {iteration} 次迭代：修复文件 {target_file_path} 的前 {warning_count} 个告警（共 {total_warnings_in_file} 个）",
-                    color="cyan",
                 )
 
                 # 格式化告警信息
@@ -404,7 +385,6 @@ class ClippyOptimizer:
                     # 如果回退了，需要重新运行 agent
                     PrettyOutput.auto_print(
                         f"[c2rust-optimizer][codeagent][clippy] 检测到测试代码删除问题，已回退，重新运行 agent (iter={iteration})",
-                        color="yellow",
                     )
                     commit_before = self.progress_manager.get_crate_commit_hash()
                     agent.run(
@@ -418,7 +398,6 @@ class ClippyOptimizer:
                     ):
                         PrettyOutput.auto_print(
                             f"[c2rust-optimizer][codeagent][clippy] 再次检测到测试代码删除问题，已回退 (iter={iteration})",
-                            color="red",
                         )
 
                 # 验证修复是否成功（通过 cargo test）
@@ -458,29 +437,24 @@ class ClippyOptimizer:
                         )
                     PrettyOutput.auto_print(
                         f"[c2rust-optimizer][codeagent][clippy] 文件 {target_file_path} 的前 {warning_count} 个告警修复成功，已保存进度",
-                        color="green",
                     )
                 else:
                     # 测试失败，回退到运行前的 commit
                     if commit_before:
                         PrettyOutput.auto_print(
                             f"[c2rust-optimizer][codeagent][clippy] 文件 {target_file_path} 修复后测试失败，回退到运行前的 commit: {commit_before[:8]}",
-                            color="yellow",
                         )
                         if self.progress_manager.reset_to_commit(commit_before):
                             PrettyOutput.auto_print(
                                 f"[c2rust-optimizer][codeagent][clippy] 已成功回退到 commit: {commit_before[:8]}",
-                                color="cyan",
                             )
                         else:
                             PrettyOutput.auto_print(
                                 "[c2rust-optimizer][codeagent][clippy] 回退失败，请手动检查代码状态",
-                                color="red",
                             )
                     else:
                         PrettyOutput.auto_print(
                             f"[c2rust-optimizer][codeagent][clippy] 文件 {target_file_path} 修复后测试失败，但无法获取运行前的 commit，继续修复",
-                            color="yellow",
                         )
 
                 # 修复后再次检查告警，如果告警数量没有减少，可能需要停止
@@ -488,7 +462,6 @@ class ClippyOptimizer:
                 if not has_warnings_after:
                     PrettyOutput.auto_print(
                         f"[c2rust-optimizer][codeagent][clippy] 所有告警已消除（共迭代 {iteration} 次）",
-                        color="green",
                     )
                     return True  # 所有告警已消除
         finally:
@@ -628,7 +601,6 @@ class ClippyOptimizer:
         """
         PrettyOutput.auto_print(
             "[c2rust-optimizer] 自动修复后仍有告警，继续使用 CodeAgent 修复...",
-            color="cyan",
         )
         all_warnings_eliminated = self.codeagent_eliminate_clippy_warnings(
             clippy_targets, clippy_output
@@ -641,9 +613,7 @@ class ClippyOptimizer:
         # 再次检查是否还有告警
         has_warnings_after, _ = check_clippy_warnings(self.crate_dir)
         if not has_warnings_after and all_warnings_eliminated:
-            PrettyOutput.auto_print(
-                "[c2rust-optimizer] Clippy 告警已全部消除", color="green"
-            )
+            PrettyOutput.auto_print("[c2rust-optimizer] Clippy 告警已全部消除")
             self.progress_manager.save_step_progress(
                 "clippy_elimination", clippy_targets
             )
@@ -651,7 +621,6 @@ class ClippyOptimizer:
         else:
             PrettyOutput.auto_print(
                 "[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤",
-                color="yellow",
             )
             return False
 
@@ -666,9 +635,7 @@ class ClippyOptimizer:
         if self.options.dry_run:
             return True
 
-        PrettyOutput.auto_print(
-            "🔍 [c2rust-optimizer] 检查 Clippy 告警...", color="cyan"
-        )
+        PrettyOutput.auto_print("🔍 [c2rust-optimizer] 检查 Clippy 告警...")
         has_warnings, clippy_output = check_clippy_warnings(self.crate_dir)
 
         # 如果步骤已标记为完成，但仍有告警，说明之前的完成标记是错误的，需要清除
@@ -678,7 +645,6 @@ class ClippyOptimizer:
         ):
             PrettyOutput.auto_print(
                 "[c2rust-optimizer] 检测到步骤已标记为完成，但仍有 Clippy 告警，清除完成标记并继续修复",
-                color="yellow",
             )
             self.progress_manager.steps_completed.discard("clippy_elimination")
             if "clippy_elimination" in self.progress_manager._step_commits:
@@ -687,7 +653,6 @@ class ClippyOptimizer:
         if not has_warnings:
             PrettyOutput.auto_print(
                 "[c2rust-optimizer] 未发现 Clippy 告警，跳过消除步骤",
-                color="cyan",
             )
             # 如果没有告警，标记 clippy_elimination 为完成（跳过状态）
             if "clippy_elimination" not in self.progress_manager.steps_completed:
@@ -701,7 +666,6 @@ class ClippyOptimizer:
         # 有告警，需要修复
         PrettyOutput.auto_print(
             "\n[c2rust-optimizer] 第 0 步：消除 Clippy 告警（必须完成此步骤才能继续其他优化）",
-            color="magenta",
         )
         self.progress_manager.snapshot_commit()
 
@@ -709,7 +673,6 @@ class ClippyOptimizer:
         if not clippy_targets:
             PrettyOutput.auto_print(
                 "[c2rust-optimizer] 警告：未找到任何 Rust 文件，无法修复 Clippy 告警",
-                color="yellow",
             )
             return False
 
@@ -718,14 +681,12 @@ class ClippyOptimizer:
         if auto_fix_success:
             PrettyOutput.auto_print(
                 "[c2rust-optimizer] clippy 自动修复成功，继续检查是否还有告警...",
-                color="green",
             )
             # 重新检查告警
             has_warnings, clippy_output = check_clippy_warnings(self.crate_dir)
             if not has_warnings:
                 PrettyOutput.auto_print(
                     "[c2rust-optimizer] 所有 Clippy 告警已通过自动修复消除",
-                    color="green",
                 )
                 self.progress_manager.save_step_progress(
                     "clippy_elimination", clippy_targets
@@ -738,7 +699,6 @@ class ClippyOptimizer:
             # 自动修复失败或未执行，继续使用 CodeAgent 修复
             PrettyOutput.auto_print(
                 "[c2rust-optimizer] clippy 自动修复未成功，继续使用 CodeAgent 修复...",
-                color="cyan",
             )
             all_warnings_eliminated = self.codeagent_eliminate_clippy_warnings(
                 clippy_targets, clippy_output
@@ -751,9 +711,7 @@ class ClippyOptimizer:
             # 再次检查是否还有告警
             has_warnings_after, _ = check_clippy_warnings(self.crate_dir)
             if not has_warnings_after and all_warnings_eliminated:
-                PrettyOutput.auto_print(
-                    "[c2rust-optimizer] Clippy 告警已全部消除", color="green"
-                )
+                PrettyOutput.auto_print("[c2rust-optimizer] Clippy 告警已全部消除")
                 self.progress_manager.save_step_progress(
                     "clippy_elimination", clippy_targets
                 )
@@ -761,6 +719,5 @@ class ClippyOptimizer:
             else:
                 PrettyOutput.auto_print(
                     "[c2rust-optimizer] 仍有部分 Clippy 告警无法自动消除，步骤未完成，停止后续优化步骤",
-                    color="yellow",
                 )
                 return False
