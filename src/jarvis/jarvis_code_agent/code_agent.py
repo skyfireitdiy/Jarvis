@@ -11,7 +11,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 import subprocess
 import sys
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 import typer
 
@@ -131,6 +131,9 @@ class CodeAgent(Agent):
 
         # 用于跟踪所有加载过的规则（包括运行时加载的）
         self.all_loaded_rules = set(loaded_rule_names)
+
+        # 存储运行时添加的规则内容
+        self.runtime_rules: Dict[str, str] = {}
 
         if merged_rules:
             code_system_prompt = (
@@ -951,8 +954,18 @@ git reset --hard {start_commit}
             )
 
             # 创建 review Agent
+            # 获取所有规则内容并添加到系统提示词
+            rules_content = ""
+            all_rules = self.get_all_rules()
+            if all_rules:
+                rules_content = "\n\n=== 继承的规则内容 ===\n"
+                for rule_name, rule_content in all_rules.items():
+                    rules_content += f"\n{rule_name}:\n{rule_content}\n"
+
+            enhanced_sys_prompt = sys_prompt + rules_content
+
             review_agent = Agent(
-                system_prompt=sys_prompt,
+                system_prompt=enhanced_sys_prompt,
                 name=f"CodeReview-Agent-{iteration}",
                 model_group=self.model.model_group if self.model else None,
                 summary_prompt=sum_prompt,
@@ -1066,6 +1079,30 @@ git reset --hard {start_commit}
 
         # 同时更新完整规则集合（自动去重）
         self.all_loaded_rules.add(rule_name)
+
+        # 获取并存储规则内容
+        if hasattr(self, "rules_manager") and self.rules_manager:
+            rule_content = self.rules_manager.get_named_rule(rule_name)
+            if rule_content:
+                self.runtime_rules[rule_name] = rule_content
+
+    def get_all_rules(self) -> Dict[str, str]:
+        """获取所有规则的完整映射，包括初始化和运行时添加的规则
+
+        返回:
+            Dict[str, str]: 包含所有规则名称和内容的映射
+        """
+        all_rules = {}
+
+        # 添加初始化时加载的规则（低优先级）
+        if hasattr(self, "merged_rules") and self.merged_rules:
+            all_rules.update(self.merged_rules)
+
+        # 添加运行时加载的规则（高优先级，会覆盖同名规则）
+        if hasattr(self, "runtime_rules") and self.runtime_rules:
+            all_rules.update(self.runtime_rules)
+
+        return all_rules
 
 
 @app.command()
