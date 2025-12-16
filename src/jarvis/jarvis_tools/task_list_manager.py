@@ -270,7 +270,6 @@ class task_list_manager:
             tuple[bool, str]: (是否完成, 验证结果或失败原因)
         """
         try:
-            from jarvis.jarvis_utils.globals import delete_agent
             from jarvis.jarvis_utils.output import PrettyOutput
 
             # 创建验证 Agent
@@ -301,12 +300,6 @@ class task_list_manager:
 
             # 执行验证
             verification_result = verification_agent.run(verification_task)
-
-            # 清理验证 Agent
-            try:
-                delete_agent(verification_agent.name)
-            except Exception:
-                pass
 
             # 解析验证结果（从结构化的 summary 中提取）
             if verification_result:
