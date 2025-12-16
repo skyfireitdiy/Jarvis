@@ -39,7 +39,7 @@ def get_analysis_file(sec_dir: Path) -> Path:
 # ==================== 只扫结果文件 (candidates.jsonl) ====================
 
 
-def save_candidates(sec_dir: Path, candidates: List[Dict]) -> None:
+def save_candidates(sec_dir: Path, candidates: List[Dict[str, Any]]) -> None:
     """
     保存只扫结果到 candidates.jsonl
 
@@ -72,7 +72,7 @@ def save_candidates(sec_dir: Path, candidates: List[Dict]) -> None:
         pass
 
 
-def load_candidates(sec_dir: Path) -> List[Dict]:
+def load_candidates(sec_dir: Path) -> List[Dict[str, Any]]:
     """
     从 candidates.jsonl 加载只扫结果
 
@@ -121,7 +121,7 @@ def get_all_candidate_gids(sec_dir: Path) -> Set[int]:
 # ==================== 聚类信息文件 (clusters.jsonl) ====================
 
 
-def save_cluster(sec_dir: Path, cluster: Dict) -> None:
+def save_cluster(sec_dir: Path, cluster: Dict[str, Any]) -> None:
     """
     保存单个聚类到 clusters.jsonl（追加模式）
 
@@ -146,7 +146,7 @@ def save_cluster(sec_dir: Path, cluster: Dict) -> None:
         f.write(json.dumps(cluster, ensure_ascii=False) + "\n")
 
 
-def load_clusters(sec_dir: Path) -> List[Dict]:
+def load_clusters(sec_dir: Path) -> List[Dict[str, Any]]:
     """
     从 clusters.jsonl 加载所有聚类
 
@@ -158,7 +158,7 @@ def load_clusters(sec_dir: Path) -> List[Dict]:
     if path.exists():
         try:
             # 使用字典合并：key 为 cluster_id，合并同一个 cluster_id 的所有记录的 gid
-            seen_clusters: Dict[str, Dict] = {}
+            seen_clusters: Dict[str, Dict[str, Any]] = {}
             with path.open("r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()
@@ -235,7 +235,7 @@ def validate_clustering_completeness(sec_dir: Path) -> Tuple[bool, Set[int]]:
 # ==================== 分析结果文件 (analysis.jsonl) ====================
 
 
-def save_analysis_result(sec_dir: Path, analysis: Dict) -> None:
+def save_analysis_result(sec_dir: Path, analysis: Dict[str, Any]) -> None:
     """
     保存单个分析结果到 analysis.jsonl（追加模式）
 
@@ -269,7 +269,7 @@ def save_analysis_result(sec_dir: Path, analysis: Dict) -> None:
         f.write(json.dumps(analysis, ensure_ascii=False) + "\n")
 
 
-def load_analysis_results(sec_dir: Path) -> List[Dict]:
+def load_analysis_results(sec_dir: Path) -> List[Dict[str, Any]]:
     """
     从 analysis.jsonl 加载所有分析结果
 
@@ -281,7 +281,7 @@ def load_analysis_results(sec_dir: Path) -> List[Dict]:
     if path.exists():
         try:
             # 使用字典合并：key 为 cluster_id，合并同一个 cluster_id 的所有记录
-            seen_results: Dict[str, Dict] = {}
+            seen_results: Dict[str, Dict[str, Any]] = {}
             with path.open("r", encoding="utf-8", errors="ignore") as f:
                 for line in f:
                     line = line.strip()

@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 """解析模块 - 用于解析Agent返回的JSON格式摘要"""
 
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
 
-def parse_clusters_from_text(text: str) -> tuple[Optional[List], Optional[str]]:
+def parse_clusters_from_text(
+    text: str,
+) -> tuple[Optional[List[Dict[str, Any]]], Optional[str]]:
     """解析聚类文本，返回(解析结果, 错误信息)"""
     try:
         import re as _re

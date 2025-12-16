@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 from typing import Iterable
 from typing import List
 from typing import Optional
@@ -375,7 +376,7 @@ def _strip_if0_blocks(text: str) -> str:
     lines = text.splitlines(keepends=True)
     out: list[str] = []
     stack: list[
-        dict
+        dict[str, Any]
     ] = []  # 每帧：{"kind": "if0"|"if", "skipping": bool, "in_else": bool}
 
     def any_skipping() -> bool:
@@ -2173,7 +2174,7 @@ def _rule_missing_virtual_dtor(lines: Sequence[str], relpath: str) -> List[Issue
     """
     issues: List[Issue] = []
     classes: dict[
-        str, dict
+        str, dict[str, Any]
     ] = {}  # class_name -> {"line": int, "has_virtual": bool, "has_virtual_dtor": bool}
     current_class: Optional[str] = None
     in_class = False

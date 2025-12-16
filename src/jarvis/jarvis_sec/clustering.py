@@ -3,6 +3,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -23,7 +24,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 def load_existing_clusters(
     sec_dir: Path,
-) -> tuple[Dict[tuple[str, int], List[Dict]], set, set]:
+) -> tuple[Dict[tuple[str, int], List[Dict[str, Any]]], set[str], set[int]]:
     """
     读取已有聚类报告以支持断点恢复。
 
@@ -31,9 +32,9 @@ def load_existing_clusters(
 
     返回: (_existing_clusters, _completed_cluster_batches, _reviewed_invalid_gids)
     """
-    _existing_clusters: Dict[tuple[str, int], List[Dict]] = {}
-    _completed_cluster_batches: set = set()
-    _reviewed_invalid_gids: set = set()  # 已复核的无效聚类的 gids
+    _existing_clusters: Dict[tuple[str, int], List[Dict[str, Any]]] = {}
+    _completed_cluster_batches: set[str] = set()
+    _reviewed_invalid_gids: set[int] = set()  # 已复核的无效聚类的 gids
 
     try:
         # 优先使用新的 clusters.jsonl 文件
@@ -80,18 +81,20 @@ def load_existing_clusters(
 
 
 def restore_clusters_from_checkpoint(
-    _existing_clusters: Dict[tuple[str, int], List[Dict]],
-    _file_groups: Dict[str, List[Dict]],
-    _reviewed_invalid_gids: set,
-) -> tuple[List[List[Dict]], List[Dict], List[Dict], set]:
+    _existing_clusters: Dict[tuple[str, int], List[Dict[str, Any]]],
+    _file_groups: Dict[str, List[Dict[str, Any]]],
+    _reviewed_invalid_gids: set[int],
+) -> tuple[
+    List[List[Dict[str, Any]]], List[Dict[str, Any]], List[Dict[str, Any]], set[int]
+]:
     """
     从断点恢复聚类结果。
 
     返回: (cluster_batches, cluster_records, invalid_clusters_for_review, clustered_gids)
     """
     # 1. 收集所有候选的 gid
-    all_candidate_gids_in_clustering = set()
-    gid_to_candidate: Dict[int, Dict] = {}
+    all_candidate_gids_in_clustering = set[int]()
+    gid_to_candidate: Dict[int, Dict[str, Any]] = {}
     for _file, _items in _file_groups.items():
         for it in _items:
             try:
@@ -103,18 +106,18 @@ def restore_clusters_from_checkpoint(
                 pass
 
     # 2. 从 cluster_report.jsonl 恢复所有聚类结果
-    clustered_gids = (
-        set()
-    )  # 已聚类的 gid（包括有效和无效的，因为无效的也需要进入复核阶段）
-    invalid_clusters_for_review: List[Dict] = []  # 无效聚类列表（从断点恢复）
-    cluster_batches: List[List[Dict]] = []
-    cluster_records: List[Dict] = []
+    clustered_gids = set[
+        int
+    ]()  # 已聚类的 gid（包括有效和无效的，因为无效的也需要进入复核阶段）
+    invalid_clusters_for_review: List[Dict[str, Any]] = []  # 无效聚类列表（从断点恢复）
+    cluster_batches: List[List[Dict[str, Any]]] = []
+    cluster_records: List[Dict[str, Any]] = []
     skipped_reviewed_count = 0  # 已复核的无效聚类数量（跳过）
-    missing_gids_in_restore = set()  # 记录恢复时无法匹配的gid（用于诊断）
+    missing_gids_in_restore = set[int]()  # 记录恢复时无法匹配的gid（用于诊断）
 
     # 首先，从所有聚类记录中收集所有已聚类的 gid（无论是否在当前候选集中）
     # 这样可以确保即使匹配失败，只要 gid 在 clusters.jsonl 中且在当前候选集中，就会被计入 clustered_gids
-    all_clustered_gids_from_file = set()
+    all_clustered_gids_from_file = set[int]()
     for (_file_key, _batch_idx), cluster_recs in _existing_clusters.items():
         for rec in cluster_recs:
             gids_list = rec.get("gids", [])
@@ -141,7 +144,7 @@ def restore_clusters_from_checkpoint(
                 continue
             is_invalid = rec.get("is_invalid", False)
             verification = str(rec.get("verification", "")).strip()
-            members: List[Dict] = []
+            members: List[Dict[str, Any]] = []
             for _gid in gids_list:
                 try:
                     _gid_int = int(_gid)
@@ -287,13 +290,13 @@ def restore_clusters_from_checkpoint(
 
 def create_cluster_snapshot_writer(
     sec_dir: Path,
-    cluster_records: List[Dict],
-    compact_candidates: List[Dict],
-    _progress_append,
-):
+    cluster_records: List[Dict[str, Any]],
+    compact_candidates: List[Dict[str, Any]],
+    _progress_append: Any,
+) -> Any:
     """创建聚类快照写入函数"""
 
-    def _write_cluster_batch_snapshot(batch_records: List[Dict]):
+    def _write_cluster_batch_snapshot(batch_records: List[Dict[str, Any]]) -> None:
         """写入单个批次的聚类结果，支持增量保存"""
         try:
             # 按 (file, batch_index) 分组，为每个分组内的记录生成唯一的 cluster_index
@@ -335,7 +338,7 @@ def create_cluster_snapshot_writer(
         except Exception:
             pass
 
-    def _write_cluster_report_snapshot():
+    def _write_cluster_report_snapshot() -> None:
         """写入聚类报告快照"""
         try:
             # 为每个记录生成 cluster_id 并保存
@@ -374,9 +377,9 @@ def create_cluster_snapshot_writer(
     return _write_cluster_batch_snapshot, _write_cluster_report_snapshot
 
 
-def collect_candidate_gids(file_groups: Dict[str, List[Dict]]) -> set:
+def collect_candidate_gids(file_groups: Dict[str, List[Dict[str, Any]]]) -> set[int]:
     """收集所有候选的 gid"""
-    all_gids = set()
+    all_gids = set[int]()
     for _file, _items in file_groups.items():
         for it in _items:
             try:
@@ -389,10 +392,11 @@ def collect_candidate_gids(file_groups: Dict[str, List[Dict]]) -> set:
 
 
 def collect_clustered_gids(
-    cluster_batches: List[List[Dict]], invalid_clusters_for_review: List[Dict]
-) -> set:
+    cluster_batches: List[List[Dict[str, Any]]],
+    invalid_clusters_for_review: List[Dict[str, Any]],
+) -> set[int]:
     """收集所有已聚类的 gid"""
-    all_clustered_gids = set()
+    all_clustered_gids = set[int]()
     for batch in cluster_batches:
         for item in batch:
             try:
@@ -420,23 +424,23 @@ def collect_clustered_gids(
 
 
 def filter_single_gid_clusters(
-    cluster_batches: List[List[Dict]],
+    cluster_batches: List[List[Dict[str, Any]]],
     sec_dir: Path,
-    _progress_append,
-) -> List[List[Dict]]:
+    _progress_append: Any,
+) -> List[List[Dict[str, Any]]]:
     """
     过滤掉单独聚类的批次（只包含1个gid的批次），避免分析工作量激增。
 
     这些单独聚类通常是之前为遗漏的gid自动创建的，现在不再需要。
     """
-    filtered_batches = []
+    filtered_batches: List[List[Dict[str, Any]]] = []
     removed_count = 0
-    removed_gids = set()
+    removed_gids = set[int]()
 
     # 读取已分析的gid（从analysis.jsonl）
     from jarvis.jarvis_sec.file_manager import get_all_analyzed_gids
 
-    processed_gids = get_all_analyzed_gids(sec_dir)
+    processed_gids = set[int](get_all_analyzed_gids(sec_dir))
 
     # 读取clusters.jsonl中的所有gid
     cluster_report_gids = get_all_clustered_gids(sec_dir)
@@ -531,12 +535,12 @@ def filter_single_gid_clusters(
 
 def handle_single_alert_file(
     file: str,
-    single_item: Dict,
+    single_item: Dict[str, Any],
     single_gid: int,
-    cluster_batches: List[List[Dict]],
-    cluster_records: List[Dict],
-    _progress_append,
-    _write_cluster_batch_snapshot,
+    cluster_batches: List[List[Dict[str, Any]]],
+    cluster_records: List[Dict[str, Any]],
+    _progress_append: Any,
+    _write_cluster_batch_snapshot: Any,
 ) -> None:
     """处理单告警文件：跳过聚类，直接写入"""
     default_verification = f"验证候选 {single_gid} 的安全风险"
@@ -574,7 +578,9 @@ def handle_single_alert_file(
     )
 
 
-def validate_cluster_format(cluster_items: List[Dict]) -> tuple[bool, List[str]]:
+def validate_cluster_format(
+    cluster_items: List[Dict[str, Any]],
+) -> tuple[bool, List[str]]:
     """验证聚类结果的格式，返回(是否有效, 错误详情列表)"""
     if not isinstance(cluster_items, list) or not cluster_items:
         return False, ["结果不是数组或数组为空"]
@@ -630,13 +636,13 @@ def validate_cluster_format(cluster_items: List[Dict]) -> tuple[bool, List[str]]
     return True, []
 
 
-def extract_classified_gids(cluster_items: List[Dict]) -> set:
+def extract_classified_gids(cluster_items: List[Dict[str, Any]]) -> set[int]:
     """从聚类结果中提取所有已分类的gid
 
     注意：此函数假设格式验证已经通过，所有gid都是有效的整数。
     如果遇到格式错误的gid，会记录警告但不会抛出异常（因为格式验证应该已经捕获了这些问题）。
     """
-    classified_gids = set()
+    classified_gids = set[int]()
     for cl in cluster_items:
         raw_gids = cl.get("gids", [])
         if isinstance(raw_gids, list):
@@ -659,7 +665,7 @@ def extract_classified_gids(cluster_items: List[Dict]) -> set:
 
 def build_cluster_retry_task(
     file: str,
-    missing_gids: set,
+    missing_gids: set[int],
     error_details: List[str],
 ) -> str:
     """构建聚类重试任务"""
@@ -685,7 +691,7 @@ def build_cluster_retry_task(
 
 def build_cluster_error_guidance(
     error_details: List[str],
-    missing_gids: set,
+    missing_gids: set[int],
 ) -> str:
     """构建聚类错误指导信息"""
     error_guidance = ""
@@ -705,11 +711,11 @@ def build_cluster_error_guidance(
 
 
 def run_cluster_agent_direct_model(
-    cluster_agent,
+    cluster_agent: Any,
     cluster_task: str,
     cluster_summary_prompt: str,
     file: str,
-    missing_gids: set,
+    missing_gids: set[int],
     error_details: List[str],
     _cluster_summary: Dict[str, str],
 ) -> None:
@@ -731,7 +737,7 @@ def run_cluster_agent_direct_model(
 
 
 def validate_cluster_result(
-    cluster_items: Optional[List[Dict]],
+    cluster_items: Optional[List[Dict[str, Any]]],
     parse_error: Optional[str],
     attempt: int,
 ) -> tuple[bool, List[str]]:
@@ -750,10 +756,10 @@ def validate_cluster_result(
 
 
 def check_cluster_completeness(
-    cluster_items: List[Dict],
-    input_gids: set,
+    cluster_items: List[Dict[str, Any]],
+    input_gids: set[int],
     attempt: int,
-) -> tuple[bool, set]:
+) -> tuple[bool, set[int]]:
     """检查聚类完整性，返回(是否完整, 遗漏的gid)"""
     classified_gids = extract_classified_gids(cluster_items)
     missing_gids = input_gids - classified_gids
@@ -772,14 +778,14 @@ def check_cluster_completeness(
 
 
 def run_cluster_agent_with_retry(
-    cluster_agent,
+    cluster_agent: Any,
     cluster_task: str,
     cluster_summary_prompt: str,
-    input_gids: set,
+    input_gids: set[int],
     file: str,
     _cluster_summary: Dict[str, str],
-    create_agent_func=None,
-) -> tuple[Optional[List[Dict]], Optional[str], bool]:
+    create_agent_func: Optional[Any] = None,
+) -> tuple[Optional[List[Dict[str, Any]]], Optional[str], bool]:
     """
     运行聚类Agent并永久重试直到所有gid都被分类，返回(聚类结果, 解析错误, 是否需要重新创建agent)
     如果需要重新创建agent，返回的第三个值为True
@@ -787,7 +793,7 @@ def run_cluster_agent_with_retry(
     _attempt = 0
     use_direct_model = False
     error_details: List[str] = []
-    missing_gids: set[str] = set()
+    missing_gids: set[int] = set()
     consecutive_failures = 0  # 连续失败次数
 
     while True:
@@ -828,7 +834,7 @@ def run_cluster_agent_with_retry(
         )
 
         # 完整性校验：检查所有输入的gid是否都被分类
-        missing_gids = set()
+        missing_gids = set[int]()
         if valid and cluster_items:
             is_complete, missing_gids = check_cluster_completeness(
                 cluster_items, input_gids, _attempt
@@ -858,17 +864,17 @@ def run_cluster_agent_with_retry(
 
 
 def process_cluster_results(
-    cluster_items: List[Dict],
-    pending_in_file_with_ids: List[Dict],
+    cluster_items: List[Dict[str, Any]],
+    pending_in_file_with_ids: List[Dict[str, Any]],
     file: str,
     chunk_idx: int,
-    cluster_batches: List[List[Dict]],
-    cluster_records: List[Dict],
-    invalid_clusters_for_review: List[Dict],
-    _progress_append,
+    cluster_batches: List[List[Dict[str, Any]]],
+    cluster_records: List[Dict[str, Any]],
+    invalid_clusters_for_review: List[Dict[str, Any]],
+    _progress_append: Any,
 ) -> tuple[int, int]:
     """处理聚类结果，返回(有效聚类数, 无效聚类数)"""
-    gid_to_item: Dict[int, Dict] = {}
+    gid_to_item: Dict[int, Dict[str, Any]] = {}
     try:
         for it in pending_in_file_with_ids:
             try:
@@ -882,7 +888,7 @@ def process_cluster_results(
 
     _merged_count = 0
     _invalid_count = 0
-    classified_gids_final = set()
+    classified_gids_final = set[int]()
 
     for cl in cluster_items:
         verification = str(cl.get("verification", "")).strip()
@@ -1030,7 +1036,7 @@ def extract_input_gids(pending_in_file_with_ids: List[Dict]) -> set:
 
 def build_gid_to_item_mapping(pending_in_file_with_ids: List[Dict]) -> Dict[int, Dict]:
     """构建gid到项的映射"""
-    gid_to_item: Dict[int, Dict] = {}
+    gid_to_item: Dict[int, Dict[str, Any]] = {}
     try:
         for it in pending_in_file_with_ids:
             try:
