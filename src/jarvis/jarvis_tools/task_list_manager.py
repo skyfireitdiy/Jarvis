@@ -16,7 +16,7 @@ from typing import Optional
 from jarvis.jarvis_agent.task_list import TaskStatus
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
-from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.tag import ot, ct
 
 
 class DependencyValidationError(Exception):
@@ -511,7 +511,7 @@ class task_list_manager:
             PrettyOutput.auto_print(f"⚠️ 打印任务状态失败: {e}")
             PrettyOutput.auto_print(f"   错误详情: {traceback.format_exc()}")
 
-    description = """任务列表管理工具，供LLM管理复杂任务拆分和执行。
+    description = f"""任务列表管理工具，供LLM管理复杂任务拆分和执行。
 
 **核心功能：**
 - `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
@@ -533,7 +533,74 @@ class task_list_manager:
 - 依赖管理：自动验证任务依赖关系
 
 **关键原则：**
-简单任务用main，复杂任务用sub，避免过度拆分。"""
+简单任务用main，复杂任务用sub，避免过度拆分。
+
+**使用示例**
+创建任务列表：
+```
+{ot("TOOL_CALL")}
+{{
+    "name": "task_list_manager",
+    "arguments": {{
+        "action": "add_tasks",
+        "main_goal": "创建任务列表",
+        "background": "背景信息",
+        "tasks_info": [
+            {{
+                "task_name": "任务1",
+                "task_desc": "任务1描述",
+                "priority": 1,
+                "expected_output": "任务1预期输出",
+                "agent_type": "main",
+                "dependencies": []
+            }}
+            {{
+                "task_name": "任务2",
+                "task_desc": "任务2描述",
+                "priority": 2,
+                "expected_output": "任务2预期输出",
+                "agent_type": "sub",
+                "dependencies": ["任务1"]
+            }}
+        ]
+    }}
+}}
+{ct("TOOL_CALL")}
+```
+
+执行任务：
+```
+{ot("TOOL_CALL")}
+{{
+    "name": "task_list_manager",
+    "arguments": {{
+        "action": "execute_task",
+        "task_id": "任务ID",
+        "additional_info": "任务详细信息"
+    }}
+}}
+{ct("TOOL_CALL")}
+```
+
+更新任务状态：
+```
+{ot("TOOL_CALL")}
+{{
+    "name": "task_list_manager",
+    "arguments": {{
+        "action": "update_task",
+        "task_id": "任务ID",
+        "task_update_info": {{
+            "status": "completed",
+            "actual_output": "任务实际输出"
+        }}
+    }}
+}}
+{ct("TOOL_CALL")}
+```
+
+
+"""
 
     parameters = {
         "type": "object",
