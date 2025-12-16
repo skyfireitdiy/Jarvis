@@ -71,7 +71,7 @@ class CodeAgent(Agent):
         need_summary: bool = True,
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
-        non_interactive: Optional[bool] = None,
+        non_interactive: Optional[bool] = True,
         rule_names: Optional[str] = None,
         disable_review: bool = False,
         review_max_iterations: int = 0,
