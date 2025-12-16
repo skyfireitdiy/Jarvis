@@ -94,7 +94,6 @@ class SubAgentTool:
 
             # 不继承父Agent，所有关键参数必须由调用方显式提供
             need_summary = True
-            auto_complete = True
 
             # 读取并校验必填参数
             system_prompt = str(args.get("system_prompt", "")).strip()
@@ -148,7 +147,7 @@ class SubAgentTool:
                 description="Temporary sub agent for executing a subtask",
                 model_group=parent_model_group,
                 summary_prompt=summary_prompt,
-                auto_complete=auto_complete,
+                auto_complete=True,
                 use_tools=None,
                 execute_tool_confirm=parent_execute_tool_confirm,
                 need_summary=need_summary,

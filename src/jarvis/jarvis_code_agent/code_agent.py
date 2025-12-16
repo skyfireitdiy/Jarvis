@@ -11,7 +11,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 import subprocess
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import typer
 
@@ -949,10 +949,12 @@ git reset --hard {start_commit}
 
             # 创建 review Agent
             # 获取所有规则内容并添加到系统提示词
-            merged_rules, _ = self.rules_manager.load_all_rules(','.join(self.loaded_rule_names))
+            merged_rules, _ = self.rules_manager.load_all_rules(
+                ",".join(self.loaded_rule_names)
+            )
 
             review_agent = Agent(
-                system_prompt=sys_prompt + f'\n\n<rules>\n{merged_rules}\n</rules>',
+                system_prompt=sys_prompt + f"\n\n<rules>\n{merged_rules}\n</rules>",
                 name=f"CodeReview-Agent-{iteration}",
                 model_group=self.model.model_group if self.model else None,
                 summary_prompt=sum_prompt,
@@ -1062,8 +1064,6 @@ git reset --hard {start_commit}
 
         # 同时更新完整规则集合（自动去重）
         self.loaded_rule_names.add(rule_name)
-
-
 
 
 @app.command()
