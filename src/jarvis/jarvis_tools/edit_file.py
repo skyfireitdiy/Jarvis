@@ -742,10 +742,14 @@ class EditFileNormalTool:
                 for result in all_results:
                     if result.startswith("❌"):
                         failed_details.append(result)
-                
+
                 # 如果有详细的错误信息，使用它们；否则使用 summary
-                stderr_content = "\n".join(failed_details) if failed_details else (summary if summary else "部分文件修改失败")
-                
+                stderr_content = (
+                    "\n".join(failed_details)
+                    if failed_details
+                    else (summary if summary else "部分文件修改失败")
+                )
+
                 return {
                     "success": False,
                     "stdout": stdout_text + ("\n\n" + summary if summary else ""),

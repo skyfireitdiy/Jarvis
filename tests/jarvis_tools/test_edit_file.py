@@ -3,7 +3,6 @@
 
 import os
 import tempfile
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -118,7 +117,7 @@ def multiply(x, y):
         with open(temp_file, "r", encoding="utf-8") as f:
             content = f.read()
             assert 'print("Hello, Jarvis!")' in content
-            assert 'return a + b + 1' in content
+            assert "return a + b + 1" in content
 
     def test_single_edit_failure_with_error_message(self, tool, temp_file):
         """测试单处编辑失败时，错误信息正确传递到 stderr"""
@@ -143,7 +142,10 @@ def multiply(x, y):
         assert "stderr" in result
         assert result["stderr"] != ""
         assert "未找到精确匹配的文本" in result["stderr"]
-        assert temp_file in result["stderr"] or os.path.basename(temp_file) in result["stderr"]
+        assert (
+            temp_file in result["stderr"]
+            or os.path.basename(temp_file) in result["stderr"]
+        )
 
     def test_multiple_edits_failure_with_error_message(self, tool, temp_file):
         """测试多处编辑失败时，错误信息正确传递到 stderr（关键测试）"""
@@ -172,11 +174,20 @@ def multiply(x, y):
         assert "stderr" in result
         assert result["stderr"] != ""
         # 验证包含详细的错误信息
-        assert "第 2 个diff失败" in result["stderr"] or "未找到精确匹配" in result["stderr"]
+        assert (
+            "第 2 个diff失败" in result["stderr"]
+            or "未找到精确匹配" in result["stderr"]
+        )
         # 验证不是只有文件列表
-        assert "失败 1 个文件" not in result["stderr"] or "未找到精确匹配" in result["stderr"]
+        assert (
+            "失败 1 个文件" not in result["stderr"]
+            or "未找到精确匹配" in result["stderr"]
+        )
         # 验证包含文件路径或文件名
-        assert temp_file in result["stderr"] or os.path.basename(temp_file) in result["stderr"]
+        assert (
+            temp_file in result["stderr"]
+            or os.path.basename(temp_file) in result["stderr"]
+        )
 
     def test_multiple_files_partial_failure(self, tool, temp_file, temp_file2):
         """测试多个文件编辑，部分成功部分失败"""
@@ -240,7 +251,10 @@ def multiply(x, y):
         # 验证 stderr 包含第二个 diff 的详细错误信息
         assert "stderr" in result
         assert result["stderr"] != ""
-        assert "第 2 个diff失败" in result["stderr"] or "未找到精确匹配" in result["stderr"]
+        assert (
+            "第 2 个diff失败" in result["stderr"]
+            or "未找到精确匹配" in result["stderr"]
+        )
         # 验证文件没有被修改（因为失败后回滚）
         with open(temp_file, "r", encoding="utf-8") as f:
             content = f.read()
@@ -395,19 +409,22 @@ def multiply(x, y):
 
         assert result["success"] is False
         stderr = result["stderr"]
-        
+
         # 验证 stderr 不为空
         assert stderr != ""
-        
+
         # 关键验证：stderr 应该包含详细的错误信息，而不仅仅是 "失败 X 个文件: - file"
         # 应该包含具体的错误描述
         has_detailed_error = (
             "未找到精确匹配" in stderr
-            or "第" in stderr and "个diff失败" in stderr
+            or "第" in stderr
+            and "个diff失败" in stderr
             or "搜索文本" in stderr
         )
-        assert has_detailed_error, f"stderr 应该包含详细错误信息，但实际内容为: {stderr[:200]}"
-        
+        assert has_detailed_error, (
+            f"stderr 应该包含详细错误信息，但实际内容为: {stderr[:200]}"
+        )
+
         # 验证包含文件路径或文件名
         assert temp_file in stderr or os.path.basename(temp_file) in stderr
 
@@ -496,23 +513,23 @@ def function1():""",
                             },
                             # 第二个修改：修改中间的函数（行号已经变化）
                             {
-                                "search": "def function3():\n    return \"third\"",
-                                "replace": "def function3():\n    return \"third_modified\"",
+                                "search": 'def function3():\n    return "third"',
+                                "replace": 'def function3():\n    return "third_modified"',
                             },
                             # 第三个修改：修改末尾的函数（行号已经变化）
                             {
-                                "search": "def function5():\n    return \"fifth\"",
-                                "replace": "def function5():\n    return \"fifth_modified\"",
+                                "search": 'def function5():\n    return "fifth"',
+                                "replace": 'def function5():\n    return "fifth_modified"',
                             },
                             # 第四个修改：修改第二个函数（行号已经变化）
                             {
-                                "search": "def function2():\n    return \"second\"",
-                                "replace": "def function2():\n    return \"second_modified\"",
+                                "search": 'def function2():\n    return "second"',
+                                "replace": 'def function2():\n    return "second_modified"',
                             },
                             # 第五个修改：修改第四个函数（行号已经变化）
                             {
-                                "search": "def function4():\n    return \"fourth\"",
-                                "replace": "def function4():\n    return \"fourth_modified\"",
+                                "search": 'def function4():\n    return "fourth"',
+                                "replace": 'def function4():\n    return "fourth_modified"',
                             },
                         ],
                     }
@@ -769,14 +786,27 @@ def format_output(text):
             # 验证第二个修改：calculate_sum 被修改
             # 检查函数定义中包含新的返回值
             import re
-            calculate_sum_match = re.search(r'def calculate_sum\([^)]+\):.*?return\s+(.+?)(?=\n\ndef|\Z)', content, re.DOTALL)
+
+            calculate_sum_match = re.search(
+                r"def calculate_sum\([^)]+\):.*?return\s+(.+?)(?=\n\ndef|\Z)",
+                content,
+                re.DOTALL,
+            )
             assert calculate_sum_match, "找不到 calculate_sum 函数"
-            assert "a + b + 1" in calculate_sum_match.group(1), f"calculate_sum 应该返回 a + b + 1，实际: {calculate_sum_match.group(1)}"
+            assert "a + b + 1" in calculate_sum_match.group(1), (
+                f"calculate_sum 应该返回 a + b + 1，实际: {calculate_sum_match.group(1)}"
+            )
 
             # 验证第三个修改：format_output 被修改
-            format_output_match = re.search(r'def format_output\([^)]+\):.*?return\s+(.+?)(?=\n\ndef|\Z)', content, re.DOTALL)
+            format_output_match = re.search(
+                r"def format_output\([^)]+\):.*?return\s+(.+?)(?=\n\ndef|\Z)",
+                content,
+                re.DOTALL,
+            )
             assert format_output_match, "找不到 format_output 函数"
-            assert "text.upper() + '!'" in format_output_match.group(1), f"format_output 应该返回 text.upper() + '!'，实际: {format_output_match.group(1)}"
+            assert "text.upper() + '!'" in format_output_match.group(1), (
+                f"format_output 应该返回 text.upper() + '!'，实际: {format_output_match.group(1)}"
+            )
 
             # 验证文件行数确实大幅减少了
             final_lines = len(content.splitlines())
