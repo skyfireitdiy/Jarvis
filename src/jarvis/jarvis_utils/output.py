@@ -32,6 +32,64 @@ from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_agent_list
 
 
+# Rich支持的标准颜色列表
+RICH_STANDARD_COLORS = {
+    "black",
+    "red",
+    "green",
+    "yellow",
+    "blue",
+    "magenta",
+    "cyan",
+    "white",
+    "bright_black",
+    "bright_red",
+    "bright_green",
+    "bright_yellow",
+    "bright_blue",
+    "bright_magenta",
+    "bright_cyan",
+    "bright_white",
+    "dark_red",
+    "dark_green",
+    "dark_yellow",
+    "dark_blue",
+    "dark_magenta",
+    "dark_cyan",
+    "grey0",
+    "grey100",
+    "grey50",
+    "grey70",
+    "grey30",
+}
+
+
+def _safe_color_get(color_name: str, fallback: str = "white") -> str:
+    """
+    安全的颜色获取函数，提供颜色验证和回退机制。
+
+    参数：
+        color_name: 期望的颜色名称
+        fallback: 回退颜色名称（默认为白色）
+
+    返回：
+        有效的颜色名称，如果原颜色无效则返回回退颜色
+    """
+    if color_name in RICH_STANDARD_COLORS:
+        return color_name
+
+    # 尝试一些常见的颜色别名映射
+    color_alias_map = {
+        "dark_olive_green": "green",
+        "orange3": "bright_yellow",
+        "sea_green3": "green",
+        "dark_sea_green": "green",
+        "grey58": "grey50",
+    }
+
+    return color_alias_map.get(color_name, fallback)
+
+
 class OutputType(Enum):
     """
     输出类型枚举，用于分类和样式化不同类型的消息。
@@ -208,7 +266,7 @@ class ConsoleOutputSink(OutputSink):
             OutputType.WARNING: "orange3",
             OutputType.DEBUG: "grey50",
             OutputType.USER: "dark_sea_green",
-            OutputType.TOOL: "dark_olive_green",
+            OutputType.TOOL: "yellow",
         }
 
         # 背景色映射（保持原有定义）
@@ -315,7 +373,10 @@ class ConsoleOutputSink(OutputSink):
             combined_text.append(header_text)
             combined_text.append(" ")  # 添加空格分隔
             colored_content = Text(
-                event.text, style=RichStyle(color=text_colors[event.output_type])
+                event.text,
+                style=RichStyle(
+                    color=_safe_color_get(text_colors[event.output_type], "white")
+                ),
             )
             combined_text.append(colored_content)
             console.print(combined_text)
