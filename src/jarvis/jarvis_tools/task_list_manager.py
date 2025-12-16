@@ -235,8 +235,19 @@ class task_list_manager:
             pass
 
         # 创建验证 Agent，只使用 read_code 和 execute_script 工具
+        # 获取父代理所有规则内容并添加到系统提示词
+        rules_content = ""
+        if parent_agent and hasattr(parent_agent, "get_all_rules"):
+            all_rules = parent_agent.get_all_rules()
+            if all_rules:
+                rules_content = "\n\n=== 继承的规则内容 ===\n"
+                for rule_name, rule_content in all_rules.items():
+                    rules_content += f"\n{rule_name}:\n{rule_content}\n"
+
+        enhanced_system_prompt = verification_system_prompt + rules_content
+
         verification_agent = Agent(
-            system_prompt=verification_system_prompt,
+            system_prompt=enhanced_system_prompt,
             name=f"verification_agent_{task.task_id}_{verification_iteration}",
             description="Task verification agent",
             model_group=model_group,
