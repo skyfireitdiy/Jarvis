@@ -126,6 +126,12 @@ class CodeAgent(Agent):
         # 加载所有规则
         merged_rules, loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
 
+        # 保存已加载的规则名称，用于子代理继承
+        self.loaded_rule_names = loaded_rule_names
+
+        # 用于跟踪所有加载过的规则（包括运行时加载的）
+        self.all_loaded_rules = set(loaded_rule_names)
+
         if merged_rules:
             code_system_prompt = (
                 f"{code_system_prompt}\n\n<rules>\n{merged_rules}\n</rules>"
@@ -1041,6 +1047,25 @@ git reset --hard {start_commit}
 
             # 处理未提交的更改
             self.git_manager.handle_uncommitted_changes()
+
+    def add_runtime_rule(self, rule_name: str) -> None:
+        """添加运行时加载的规则到跟踪列表
+
+        用于记录通过builtin_input_handler等方式动态加载的规则，
+        确保这些规则能够被后续的子代理继承。
+
+        参数:
+            rule_name: 规则名称
+        """
+        if not rule_name or not isinstance(rule_name, str):
+            return
+
+        # 避免重复添加
+        if rule_name not in self.loaded_rule_names:
+            self.loaded_rule_names.append(rule_name)
+
+        # 同时更新完整规则集合（自动去重）
+        self.all_loaded_rules.add(rule_name)
 
 
 @app.command()
