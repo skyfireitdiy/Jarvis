@@ -167,7 +167,6 @@ class Optimizer:
         """
         PrettyOutput.auto_print(
             f"\n🔧 [c2rust-optimizer] 第 {step_num} 步：{step_display_name}",
-            color="magenta",
         )
         self.progress_manager.snapshot_commit()
         if not self.options.dry_run:
