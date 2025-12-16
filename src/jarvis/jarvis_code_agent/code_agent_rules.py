@@ -304,4 +304,4 @@ class RulesManager:
         if combined_parts:
             merged_rules = "\n\n".join(combined_parts)
             return merged_rules, loaded_rule_names
-        return "", []
+        return "", set()
