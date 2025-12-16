@@ -754,7 +754,7 @@ git reset --hard {start_commit}
         return system_prompt, user_prompt, summary_prompt
 
     def _parse_review_result(
-        self, summary: str, review_agent=None, max_retries: int = 3
+        self, summary: str, review_agent: Optional[Any] = None, max_retries: int = 3
     ) -> dict:
         """解析 review 结果
 
@@ -841,7 +841,8 @@ git reset --hard {start_commit}
 确保回复只包含上述JSON格式，不要包含其他解释或文本。"""
 
             try:
-                fixed_summary = review_agent.run(fix_prompt)
+                # 使用review_agent的底层model进行修复，保持review_agent的专用配置和系统prompt
+                fixed_summary = review_agent.model.chat_until_success(fix_prompt)
                 if fixed_summary:
                     success, result, _ = _try_parse_json(str(fixed_summary))
                     if success and result is not None:
