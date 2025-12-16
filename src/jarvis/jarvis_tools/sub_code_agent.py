@@ -139,6 +139,18 @@ class SubCodeAgentTool:
             except Exception:
                 append_tools = None
 
+            # 获取父代理的规则名称列表用于继承
+            rule_names = None
+            try:
+                if parent_agent is not None and hasattr(
+                    parent_agent, "loaded_rule_names"
+                ):
+                    parent_rules = getattr(parent_agent, "loaded_rule_names", [])
+                    if parent_rules:
+                        rule_names = ",".join(parent_rules)
+            except Exception:
+                rule_names = None
+
             # 创建 CodeAgent，捕获 SystemExit 异常（如 git 配置不完整）
             try:
                 code_agent_kwargs = {
@@ -147,6 +159,7 @@ class SubCodeAgentTool:
                     "append_tools": append_tools,
                     "tool_group": tool_group,
                     "non_interactive": True,  # 强制设置为非交互模式
+                    "rule_names": rule_names,  # 继承父代理的规则
                 }
                 # 如果提供了名称，则使用该名称
                 if agent_name:

@@ -119,6 +119,14 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             rule_name = tag[5:]  # 去掉 "rule:" 前缀
             rule_content = _get_rule_content(rule_name)
             if rule_content:
+                # 记录运行时加载的规则到CodeAgent
+                try:
+                    if agent is not None and hasattr(agent, "add_runtime_rule"):
+                        agent.add_runtime_rule(rule_name)
+                except Exception:
+                    # 静默处理任何错误，不影响正常功能
+                    pass
+
                 separator = "\n" + "=" * 50 + "\n"
                 modified_input = modified_input.replace(
                     f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
