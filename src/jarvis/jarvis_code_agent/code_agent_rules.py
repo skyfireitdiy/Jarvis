@@ -280,7 +280,7 @@ class RulesManager:
             (merged_rules, loaded_rule_names): 合并后的规则字符串和已加载的规则名称列表
         """
         combined_parts: List[str] = []
-        loaded_rule_names: Set[str] = []
+        loaded_rule_names: Set[str] = set()
 
         global_rules = self.read_global_rules()
         project_rules = self.read_project_rule()

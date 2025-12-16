@@ -97,7 +97,7 @@ class CodeAgent(Agent):
         # 初始化各个管理器
         self.rules_manager = RulesManager(self.root_dir)
 
-        # 加载入rules
+        # 加载rules
         _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
 
         self.git_manager = GitManager(self.root_dir)
