@@ -753,11 +753,15 @@ git reset --hard {start_commit}
 
         return system_prompt, user_prompt, summary_prompt
 
-    def _parse_review_result(self, summary: str) -> dict:
+    def _parse_review_result(
+        self, summary: str, review_agent=None, max_retries: int = 3
+    ) -> dict:
         """解析 review 结果
 
         参数:
             summary: review Agent 的输出
+            review_agent: review Agent 实例，用于格式修复
+            max_retries: 最大重试次数
 
         返回:
             dict: 解析后的审查结果，包含 ok 和 issues 字段
@@ -765,33 +769,107 @@ git reset --hard {start_commit}
         import json
         import re
 
-        # 尝试从输出中提取 JSON
-        # 首先尝试匹配 ```json ... ``` 代码块
-        json_match = re.search(r"```json\s*([\s\S]*?)\s*```", summary)
-        if json_match:
-            json_str = json_match.group(1).strip()
-        else:
-            # 尝试匹配裸 JSON 对象
-            json_match = re.search(r'\{[\s\S]*"ok"[\s\S]*\}', summary)
+        def _try_parse_json(content: str) -> tuple[bool, dict | None, str | None]:
+            """尝试解析JSON，返回(成功, 结果, json字符串)"""
+            # 尝试从输出中提取 JSON
+            # 首先尝试匹配 ```json ... ``` 代码块
+            json_match = re.search(r"```json\s*([\s\S]*?)\s*```", content)
             if json_match:
-                json_str = json_match.group(0)
+                json_str = json_match.group(1).strip()
             else:
-                # 无法解析，返回默认通过（避免无限循环）
-                PrettyOutput.auto_print("⚠️ 无法解析 review 结果，默认通过")
-                return {"ok": True, "issues": [], "summary": "无法解析审查结果"}
+                # 尝试匹配裸 JSON 对象
+                json_match = re.search(r'\{[\s\S]*"ok"[\s\S]*\}', content)
+                if json_match:
+                    json_str = json_match.group(0)
+                else:
+                    return False, None, None
 
-        try:
-            result = json.loads(json_str)
-            if not isinstance(result, dict):
-                return {"ok": True, "issues": [], "summary": "解析结果不是有效的字典"}
+            try:
+                result = json.loads(json_str)
+                if isinstance(result, dict):
+                    return True, result, json_str
+                else:
+                    return False, None, json_str
+            except json.JSONDecodeError:
+                return False, None, json_str
+
+        # 第一次尝试解析
+        success, result, json_str = _try_parse_json(summary)
+        if success and result is not None:
             return {
                 "ok": result.get("ok", True),
                 "issues": result.get("issues", []),
                 "summary": result.get("summary", ""),
             }
-        except json.JSONDecodeError as e:
-            PrettyOutput.auto_print(f"⚠️ JSON 解析失败: {e}")
-            return {"ok": True, "issues": [], "summary": f"JSON 解析失败: {e}"}
+
+        # 如果没有提供review_agent，无法修复，返回默认值
+        if review_agent is None:
+            PrettyOutput.auto_print("⚠️ 无法解析 review 结果，且无法修复格式")
+            return {"ok": True, "issues": [], "summary": "无法解析审查结果"}
+
+        # 尝试修复格式
+        for retry in range(max_retries):
+            PrettyOutput.auto_print(
+                f"🔧 第 {retry + 1}/{max_retries} 次尝试修复 JSON 格式..."
+            )
+
+            fix_prompt = f"""
+之前的review回复格式不正确，无法解析为有效的JSON格式。
+
+原始回复内容：
+```
+{summary}
+```
+
+请严格按照以下JSON格式重新组织你的回复：
+
+```json
+{{
+    "ok": true/false,  // 表示代码是否通过审查
+    "summary": "总体评价和建议",  // 简短总结
+    "issues": [  // 问题列表，如果没有问题则为空数组
+        {{
+            "type": "问题类型",  // 如: bug, style, performance, security等
+            "description": "问题描述",
+            "location": "问题位置",  // 文件名和行号
+            "suggestion": "修复建议"
+        }}
+    ]
+}}
+```
+
+确保回复只包含上述JSON格式，不要包含其他解释或文本。"""
+
+            try:
+                fixed_summary = review_agent.run(fix_prompt)
+                if fixed_summary:
+                    success, result, _ = _try_parse_json(str(fixed_summary))
+                    if success and result is not None:
+                        PrettyOutput.auto_print(
+                            f"✅ JSON格式修复成功（第 {retry + 1} 次）"
+                        )
+                        return {
+                            "ok": result.get("ok", True),
+                            "issues": result.get("issues", []),
+                            "summary": result.get("summary", ""),
+                        }
+                    else:
+                        PrettyOutput.auto_print("⚠️ 修复后的格式仍不正确，继续尝试...")
+                        summary = str(fixed_summary)  # 使用修复后的内容继续尝试
+                else:
+                    PrettyOutput.auto_print("⚠️ 修复请求无响应")
+
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 修复过程中出错: {e}")
+
+        # 3次修复都失败，标记需要重新review
+        PrettyOutput.auto_print("❌ JSON格式修复失败，需要重新进行review")
+        return {
+            "ok": False,
+            "issues": [],
+            "summary": "JSON_FORMAT_ERROR",
+            "need_re_review": True,
+        }
 
     def _review_and_fix(
         self,
@@ -882,8 +960,18 @@ git reset --hard {start_commit}
             # 运行 review
             summary = review_agent.run(usr_prompt)
 
-            # 解析审查结果
-            result = self._parse_review_result(str(summary) if summary else "")
+            # 解析审查结果，支持格式修复和重新review
+            result = self._parse_review_result(
+                str(summary) if summary else "", review_agent=review_agent
+            )
+
+            # 检查是否需要重新review（JSON格式错误3次修复失败）
+            if result.get("need_re_review", False):
+                PrettyOutput.auto_print(
+                    f"\n🔄 JSON格式修复失败，重新进行代码审查（第 {iteration} 轮）"
+                )
+                # 跳过当前迭代，重新开始review流程
+                continue
 
             if result["ok"]:
                 PrettyOutput.auto_print(f"\n✅ 代码审查通过（第 {iteration} 轮）")
