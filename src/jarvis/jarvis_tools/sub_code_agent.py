@@ -153,18 +153,16 @@ class SubCodeAgentTool:
 
             # 创建 CodeAgent，捕获 SystemExit 异常（如 git 配置不完整）
             try:
-                code_agent_kwargs = {
-                    "model_group": model_group,
-                    "need_summary": True,
-                    "append_tools": append_tools,
-                    "tool_group": tool_group,
-                    "non_interactive": True,  # 强制设置为非交互模式
-                    "rule_names": rule_names,  # 继承父代理的规则
-                }
-                # 如果提供了名称，则使用该名称
-                if agent_name:
-                    code_agent_kwargs["name"] = agent_name
-                code_agent = CodeAgent(**code_agent_kwargs)  # type: ignore[arg-type]
+                code_agent = CodeAgent(
+                    name=agent_name,
+                    model_group=model_group,
+                    need_summary=True,
+                    append_tools=append_tools,
+                    tool_group=tool_group,
+                    non_interactive=True,
+                    rule_names=rule_names,
+                    auto_complete=True,
+                )  # type: ignore[arg-type]
             except SystemExit as se:
                 # 将底层 sys.exit 转换为工具错误，避免终止进程
                 return {
@@ -175,7 +173,6 @@ class SubCodeAgentTool:
 
             # 子Agent需要自动完成
             try:
-                code_agent.auto_complete = True
                 # 同步父Agent工具使用集（如可用），但禁用 sub_agent 和 sub_code_agent 避免无限递归
                 if use_tools:
                     forbidden_tools = {"sub_agent", "sub_code_agent"}
