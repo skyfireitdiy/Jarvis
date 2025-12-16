@@ -52,8 +52,9 @@ _multiline_example = """  {
   }"""
 
 tool_call_help = f"""
-<tool_system_guide>
-工具调用格式（Jsonnet）：
+## 工具调用指南（Markdown）
+
+**工具调用格式（Jsonnet）**
 {ot("TOOL_CALL")}
 {{
   "want": "想要从执行结果中获取到的信息",
@@ -65,7 +66,7 @@ tool_call_help = f"""
 }}
 {ct("TOOL_CALL")}
 
-Jsonnet格式特性：
+**Jsonnet格式特性**
 - 字符串引号：可使用双引号或单引号
 - 多行字符串：推荐使用 ||| 或 ``` 分隔符包裹多行字符串，直接换行无需转义，支持保留缩进
   示例：
@@ -73,15 +74,18 @@ Jsonnet格式特性：
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
 - 注释：支持 // 单行或 /* */ 多行注释
 
-关键规则：
+**关键规则**
 1. 每次只使用一个工具，等待结果后再进行下一步
 2. {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
 3. 多行字符串参数推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进
 4. 等待执行结果，不要假设或创建虚假响应
 5. 信息不足时询问用户，不要在没有完整信息的情况下继续
 
-常见错误：同时调用多个工具、假设工具结果、Jsonnet格式错误、标签未出现在行首
-</tool_system_guide>
+**常见错误**
+- 同时调用多个工具
+- 假设工具结果
+- Jsonnet格式错误
+- 缺少行首的开始/结束标签
 """
 
 
@@ -110,16 +114,13 @@ class ToolRegistry(OutputHandlerProtocol):
         """加载工具"""
         tools = self.get_all_tools()
         if tools:
-            tools_prompt = "<tools_section>\n"
-            tools_prompt += "  <header>## 可用工具:</header>\n"
-            tools_prompt += "  <tools_list>\n"
+            tools_prompt = "## 可用工具\n"
             for tool in tools:
                 try:
-                    tools_prompt += "    <tool>\n"
-                    tools_prompt += f"      <name>名称: {tool['name']}</name>\n"
-                    tools_prompt += f"      <description>描述: {tool['description']}</description>\n"
-                    tools_prompt += "      <parameters>\n"
-                    tools_prompt += "        <json>\n"
+                    tools_prompt += f"- **名称**: {tool['name']}\n"
+                    tools_prompt += f"  - 描述: {tool['description']}\n"
+                    tools_prompt += "  - 参数:\n"
+                    tools_prompt += "```json\n"
 
                     # 生成格式化的JSON参数
                     json_params = json.dumps(
@@ -131,11 +132,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
                     # 添加缩进并移除尾部空格
                     for line in json_params.split("\n"):
-                        tools_prompt += f"          {line.rstrip()}\n"
+                        tools_prompt += f"{line.rstrip()}\n"
 
-                    tools_prompt += "        </json>\n"
-                    tools_prompt += "      </parameters>\n"
-                    tools_prompt += "    </tool>\n"
+                    tools_prompt += "```\n"
 
                 except Exception as e:
                     PrettyOutput.auto_print(
@@ -143,8 +142,6 @@ class ToolRegistry(OutputHandlerProtocol):
                     )
                     continue
 
-            tools_prompt += "  </tools_list>\n"
-            tools_prompt += "</tools_section>\n"
             tools_prompt += tool_call_help.rstrip()  # 移除帮助文本尾部空格
             return tools_prompt
         return ""
