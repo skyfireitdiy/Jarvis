@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """复核相关模块"""
 
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -17,7 +15,7 @@ from jarvis.jarvis_sec.utils import git_restore_if_dirty
 
 
 def build_review_task(
-    review_batch: List[Dict], entry_path: str, langs: List[str]
+    review_batch: List[Dict[str, Any]], entry_path: str, langs: List[str]
 ) -> str:
     """构建复核任务上下文"""
     import json as _json_review
@@ -36,7 +34,7 @@ def build_review_task(
         """.strip()
 
 
-def is_valid_review_item(item: Dict) -> bool:
+def is_valid_review_item(item: Dict[str, Any]) -> bool:
     """验证复核结果项的格式"""
     if not isinstance(item, dict) or "is_reason_sufficient" not in item:
         return False
@@ -61,9 +59,11 @@ def is_valid_review_item(item: Dict) -> bool:
     return False
 
 
-def build_gid_to_review_mapping(review_results: List[Dict]) -> Dict[int, Dict]:
+def build_gid_to_review_mapping(
+    review_results: List[Dict[str, Any]],
+) -> Dict[int, Dict[str, Any]]:
     """构建gid到复核结果的映射（支持 gid 和 gids 两种格式）"""
-    gid_to_review: Dict[int, Dict] = {}
+    gid_to_review: Dict[int, Dict[str, Any]] = {}
     for rr in review_results:
         # 支持 gid 和 gids 两种格式
         gids_to_process: List[int] = []
@@ -97,11 +97,11 @@ def build_gid_to_review_mapping(review_results: List[Dict]) -> Dict[int, Dict]:
 
 
 def process_review_batch(
-    review_batch: List[Dict],
-    review_results: Optional[List[Dict]],
-    reviewed_clusters: List[Dict],
-    reinstated_candidates: List[Dict],
-    sec_dir=None,
+    review_batch: List[Dict[str, Any]],
+    review_results: Optional[List[Dict[str, Any]]],
+    reviewed_clusters: List[Dict[str, Any]],
+    reinstated_candidates: List[Dict[str, Any]],
+    sec_dir: Optional[Any] = None,
 ) -> None:
     """处理单个复核批次的结果"""
     if review_results:
@@ -226,11 +226,11 @@ def process_review_batch(
 
 
 def process_review_batch_items(
-    review_batch: List[Dict],
-    review_results: Optional[List[Dict]],
-    reviewed_clusters: List[Dict],
-    reinstated_candidates: List[Dict],
-    sec_dir=None,
+    review_batch: List[Dict[str, Any]],
+    review_results: Optional[List[Dict[str, Any]]],
+    reviewed_clusters: List[Dict[str, Any]],
+    reinstated_candidates: List[Dict[str, Any]],
+    sec_dir: Optional[Any] = None,
 ) -> None:
     """处理单个复核批次的结果"""
     process_review_batch(
@@ -243,9 +243,9 @@ def process_review_batch_items(
 
 
 def reinstated_candidates_to_cluster_batches(
-    reinstated_candidates: List[Dict],
-    cluster_batches: List[List[Dict]],
-    _progress_append,
+    reinstated_candidates: List[Dict[str, Any]],
+    cluster_batches: List[List[Dict[str, Any]]],
+    _progress_append: Any,
 ) -> None:
     """将重新加入的候选添加到cluster_batches"""
     from collections import defaultdict as _dd2
@@ -257,7 +257,7 @@ def reinstated_candidates_to_cluster_batches(
         f"🔄 [jarvis-sec] 复核完成：{len(reinstated_candidates)} 个候选重新加入验证流程"
     )
     # 按文件分组重新加入的候选
-    reinstated_by_file: Dict[str, List[Dict]] = _dd2(list)
+    reinstated_by_file: Dict[str, List[Dict[str, Any]]] = _dd2(list)
     for cand in reinstated_candidates:
         file_key = str(cand.get("file") or "")
         reinstated_by_file[file_key].append(cand)
@@ -277,12 +277,12 @@ def reinstated_candidates_to_cluster_batches(
 
 
 def run_review_agent_with_retry(
-    review_agent,
+    review_agent: Any,
     review_task: str,
     review_summary_prompt: str,
     entry_path: str,
     review_summary_container: Dict[str, str],
-) -> tuple[Optional[List[Dict]], Optional[str]]:
+) -> tuple[Optional[List[Dict[str, Any]]], Optional[str]]:
     """运行复核Agent并永久重试直到格式正确，返回(复核结果, 解析错误)"""
     use_direct_model_review = False
     prev_parse_error_review: Optional[str] = None
@@ -379,15 +379,15 @@ def run_review_agent_with_retry(
 
 
 def process_review_phase(
-    invalid_clusters_for_review: List[Dict],
+    invalid_clusters_for_review: List[Dict[str, Any]],
     entry_path: str,
     langs: List[str],
     llm_group: Optional[str],
-    status_mgr,
-    _progress_append,
-    cluster_batches: List[List[Dict]],
-    sec_dir=None,
-) -> List[List[Dict]]:
+    status_mgr: Any,
+    _progress_append: Any,
+    cluster_batches: List[List[Dict[str, Any]]],
+    sec_dir: Optional[Any] = None,
+) -> List[List[Dict[str, Any]]]:
     """
     处理复核阶段：验证所有标记为无效的聚类。
 
@@ -409,8 +409,8 @@ def process_review_phase(
 
     # 按批次复核（每批最多10个无效聚类，避免上下文过长）
     review_batch_size = 10
-    reviewed_clusters: List[Dict] = []
-    reinstated_candidates: List[Dict] = []  # 重新加入验证的候选
+    reviewed_clusters: List[Dict[str, Any]] = []
+    reinstated_candidates: List[Dict[str, Any]] = []  # 重新加入验证的候选
 
     get_review_system_prompt()
     review_summary_prompt = get_review_summary_prompt()

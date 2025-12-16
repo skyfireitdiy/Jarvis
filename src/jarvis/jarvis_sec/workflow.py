@@ -16,12 +16,7 @@ Jarvis 安全分析套件 —— Workflow（含可复现直扫基线）
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
-from typing import Dict
-from typing import Iterable
-from typing import List
-from typing import Optional
-from typing import cast
+from typing import Any, Dict, Iterable, List, Optional, cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_sec.checkers import analyze_c_files
@@ -132,7 +127,7 @@ def direct_scan(
     entry_path: str,
     languages: Optional[List[str]] = None,
     exclude_dirs: Optional[List[str]] = None,
-) -> Dict:
+) -> Dict[str, Any]:
     """
     直扫基线：对 C/C++/Rust 进行启发式扫描，输出结构化 JSON。
     - 改进：委派至模块化检查器（oh_sec.checkers），统一规则与置信度模型。
@@ -250,12 +245,12 @@ def direct_scan(
     return result
 
 
-def format_markdown_report(result_json: Dict) -> str:
+def format_markdown_report(result_json: Dict[str, Any]) -> str:
     """
     将结构化 JSON 转为 Markdown 可读报告。
     """
     s = result_json.get("summary", {})
-    issues: List[Dict] = result_json.get("issues", [])
+    issues: List[Dict[str, Any]] = result_json.get("issues", [])
     md: List[str] = []
     md.append("# Jarvis 安全问题分析报告（直扫基线）")
     md.append("")

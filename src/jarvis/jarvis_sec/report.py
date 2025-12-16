@@ -84,14 +84,14 @@ _SEVERITY_WEIGHT = {
 }
 
 
-def _as_dict(item: Union[Issue, Dict]) -> Dict:
+def _as_dict(item: Union[Issue, Dict[str, Any]]) -> Dict[str, Any]:
     """
     将 Issue/dataclass 或 dict 统一为 dict。
     """
     if isinstance(item, dict):
         return item
     # dataclass: 尝试属性访问
-    d: Dict = {}
+    d: Dict[str, Any] = {}
     for k in (
         "language",
         "category",
@@ -112,7 +112,7 @@ def _as_dict(item: Union[Issue, Dict]) -> Dict:
     return d
 
 
-def _normalize_issue(i: Dict) -> Dict:
+def _normalize_issue(i: Dict[str, Any]) -> Dict[str, Any]:
     """
     归一化字段并补充缺省值。
     """
@@ -155,10 +155,10 @@ def _make_issue_id(base: str, lang: str) -> str:
 
 
 def aggregate_issues(
-    issues: List[Union[Issue, Dict]],
+    issues: List[Union[Issue, Dict[str, Any]]],
     scanned_root: Optional[str] = None,
     scanned_files: Optional[int] = None,
-) -> Dict:
+) -> Dict[str, Any]:
     """
     聚合问题列表并生成 JSON 报告。
     """
@@ -167,7 +167,7 @@ def aggregate_issues(
 
     # 去重：通过 gid 去重（如果存在），否则通过 file:line:category:pattern 去重
     # 保留第一个出现的 issue（因为 load_analysis_results 已经保留了最新的）
-    seen_items: Dict[str, Dict] = {}
+    seen_items: Dict[str, Dict[str, Any]] = {}
     for item in normalized_items:
         # 优先使用 gid 作为唯一标识
         gid = item.get("gid")
@@ -182,7 +182,7 @@ def aggregate_issues(
 
     items = list(seen_items.values())
 
-    summary: Dict = {
+    summary: Dict[str, Any] = {
         "total": len(items),
         "by_language": {"c/cpp": 0, "rust": 0},
         "by_category": {k: 0 for k in _CATEGORY_ORDER},
@@ -218,12 +218,12 @@ def aggregate_issues(
 # ---------------------------
 
 
-def format_markdown_report(report_json: Dict) -> str:
+def format_markdown_report(report_json: Dict[str, Any]) -> str:
     """
     将聚合后的 JSON 报告渲染为 Markdown。
     """
     s = report_json.get("summary", {})
-    issues: List[Dict] = report_json.get("issues", [])
+    issues: List[Dict[str, Any]] = report_json.get("issues", [])
     lines: List[str] = []
 
     lines.append("# 安全问题分析报告（聚合）")
@@ -272,11 +272,11 @@ def format_markdown_report(report_json: Dict) -> str:
     return "\n".join(lines)
 
 
-def format_csv_report(report_json: Dict) -> str:
+def format_csv_report(report_json: Dict[str, Any]) -> str:
     """
     将聚合后的 JSON 报告渲染为 CSV 格式。
     """
-    issues: List[Dict] = report_json.get("issues", [])
+    issues: List[Dict[str, Any]] = report_json.get("issues", [])
 
     # 定义 CSV 列
     fieldnames = [
@@ -312,10 +312,10 @@ def format_csv_report(report_json: Dict) -> str:
 
 
 def build_json_and_markdown(
-    issues: List[Union[Issue, Dict]],
+    issues: List[Union[Issue, Dict[str, Any]]],
     scanned_root: Optional[str] = None,
     scanned_files: Optional[int] = None,
-    meta: Optional[List[Dict]] = None,
+    meta: Optional[List[Dict[str, Any]]] = None,
     output_file: Optional[str] = None,
 ) -> str:
     """

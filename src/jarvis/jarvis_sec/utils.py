@@ -3,9 +3,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -57,8 +55,8 @@ def get_sec_dir(base_path: str) -> Path:
 
 def initialize_analysis_context(
     entry_path: str,
-    status_mgr,
-) -> tuple:
+    status_mgr: Any,
+) -> Tuple[Path, Optional[str], Any]:
     """
     初始化分析上下文，包括状态管理、进度文件、目录等。
 
@@ -69,7 +67,7 @@ def initialize_analysis_context(
     progress_path = None  # 不再使用 progress.jsonl
 
     # 进度追加函数（空函数，不再记录）
-    def _progress_append(rec: Dict) -> None:
+    def _progress_append(rec: Dict[str, Any]) -> None:
         pass  # 不再记录进度日志
 
     return sec_dir, progress_path, _progress_append
@@ -80,9 +78,9 @@ def load_or_run_heuristic_scan(
     langs: List[str],
     exclude_dirs: Optional[List[str]],
     sec_dir: Path,
-    status_mgr,
-    _progress_append,
-) -> tuple[List[Dict], Dict]:
+    status_mgr: Any,
+    _progress_append: Any,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     加载或运行启发式扫描。
 
@@ -90,8 +88,8 @@ def load_or_run_heuristic_scan(
 
     返回: (candidates, summary)
     """
-    candidates: List[Dict] = []
-    summary: Dict = {}
+    candidates: List[Dict[str, Any]] = []
+    summary: Dict[str, Any] = {}
 
     # 优先使用新的 candidates.jsonl 文件
     from jarvis.jarvis_sec.file_manager import get_candidates_file
@@ -194,7 +192,7 @@ def load_or_run_heuristic_scan(
     return candidates, summary
 
 
-def compact_candidate(it: Dict) -> Dict:
+def compact_candidate(it: Dict[str, Any]) -> Dict[str, Any]:
     """精简候选问题，只保留必要字段"""
     result = {
         "language": it.get("language"),
@@ -217,7 +215,7 @@ def compact_candidate(it: Dict) -> Dict:
     return result
 
 
-def prepare_candidates(candidates: List[Dict]) -> List[Dict]:
+def prepare_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     将候选问题精简为子任务清单，控制上下文长度，并分配全局唯一ID。
 
@@ -264,22 +262,26 @@ def prepare_candidates(candidates: List[Dict]) -> List[Dict]:
     return compact_candidates
 
 
-def group_candidates_by_file(candidates: List[Dict]) -> Dict[str, List[Dict]]:
+def group_candidates_by_file(
+    candidates: List[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
     """按文件分组候选问题"""
     from collections import defaultdict
 
-    groups: Dict[str, List[Dict]] = defaultdict(list)
+    groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for it in candidates:
         groups[str(it.get("file") or "")].append(it)
     return groups
 
 
-def create_report_writer(sec_dir: Path, report_file: Optional[str]):
+def create_report_writer(sec_dir: Path, report_file: Optional[str]) -> Any:
     """创建报告写入函数"""
     from jarvis.jarvis_sec.file_manager import load_clusters
     from jarvis.jarvis_sec.file_manager import save_analysis_result
 
-    def _append_report(items, source: str, task_id: str, cand: Dict):
+    def _append_report(
+        items: List[Dict[str, Any]], source: str, task_id: str, cand: Dict[str, Any]
+    ) -> None:
         """
         将当前子任务的检测结果追加写入 analysis.jsonl 文件。
 
@@ -425,12 +427,12 @@ def create_report_writer(sec_dir: Path, report_file: Optional[str]):
     return _append_report
 
 
-def sig_of(c: Dict) -> str:
+def sig_of(c: Dict[str, Any]) -> str:
     """生成候选问题的签名"""
     return f"{c.get('language', '')}|{c.get('file', '')}|{c.get('line', '')}|{c.get('pattern', '')}"
 
 
-def load_processed_gids_from_issues(sec_dir: Path) -> set:
+def load_processed_gids_from_issues(sec_dir: Path) -> Set[int]:
     """从 agent_issues.jsonl 中读取已处理的 gid"""
     processed_gids = set()
     try:
@@ -499,9 +501,9 @@ def count_issues_from_file_old(sec_dir: Path) -> int:
     return count
 
 
-def load_all_issues_from_file(sec_dir: Path) -> List[Dict]:
+def load_all_issues_from_file(sec_dir: Path) -> List[Dict[str, Any]]:
     """从 agent_issues.jsonl 读取所有已保存的告警"""
-    all_issues: List[Dict] = []
+    all_issues: List[Dict[str, Any]] = []
     try:
         _agent_issues_path = sec_dir / "agent_issues.jsonl"
         if _agent_issues_path.exists():
@@ -553,7 +555,7 @@ def load_all_issues_from_file(sec_dir: Path) -> List[Dict]:
     return all_issues
 
 
-def load_processed_gids_from_agent_issues(sec_dir: Path) -> set:
+def load_processed_gids_from_agent_issues(sec_dir: Path) -> Set[int]:
     """从 agent_issues.jsonl 读取已处理的 gid"""
     processed_gids = set()
     try:

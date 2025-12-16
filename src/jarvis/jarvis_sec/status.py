@@ -34,7 +34,7 @@ class StatusManager:
         self.status_path = sec_dir / "status.json"
         self._ensure_dir()
 
-    def _ensure_dir(self):
+    def _ensure_dir(self) -> None:
         """确保状态文件目录存在"""
         self.status_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -48,7 +48,7 @@ class StatusManager:
         except Exception:
             return {}
 
-    def _write_status(self, status: Dict[str, Any]):
+    def _write_status(self, status: Dict[str, Any]) -> None:
         """写入状态文件"""
         try:
             status["last_updated"] = datetime.utcnow().isoformat() + "Z"
@@ -66,7 +66,7 @@ class StatusManager:
         total: Optional[int] = None,
         message: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
-    ):
+    ) -> None:
         """
         更新当前阶段和进度
 
@@ -116,7 +116,7 @@ class StatusManager:
         total_files: Optional[int] = None,
         issues_found: Optional[int] = None,
         message: Optional[str] = None,
-    ):
+    ) -> None:
         """更新启发式扫描阶段状态"""
         details = {}
         if issues_found is not None:
@@ -143,7 +143,7 @@ class StatusManager:
         total_batches: Optional[int] = None,
         file_name: Optional[str] = None,
         message: Optional[str] = None,
-    ):
+    ) -> None:
         """更新聚类阶段状态"""
         details: Dict[str, Any] = {}
         if file_name:
@@ -172,7 +172,7 @@ class StatusManager:
         current_review: Optional[int] = None,
         total_reviews: Optional[int] = None,
         message: Optional[str] = None,
-    ):
+    ) -> None:
         """更新复核阶段状态"""
         details: Dict[str, Any] = {}
 
@@ -204,7 +204,7 @@ class StatusManager:
         file_name: Optional[str] = None,
         issues_found: Optional[int] = None,
         message: Optional[str] = None,
-    ):
+    ) -> None:
         """更新验证阶段状态"""
         details: Dict[str, Any] = {}
         if batch_id:
@@ -236,7 +236,7 @@ class StatusManager:
         self,
         total_issues: Optional[int] = None,
         message: Optional[str] = None,
-    ):
+    ) -> None:
         """标记分析完成"""
         details = {}
         if total_issues is not None:
@@ -253,7 +253,7 @@ class StatusManager:
         self,
         error_message: str,
         error_type: Optional[str] = None,
-    ):
+    ) -> None:
         """标记错误状态"""
         details = {"error_message": error_message}
         if error_type:

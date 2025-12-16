@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """Agent创建和订阅模块"""
 
-from typing import Dict
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.prompts import build_summary_prompt
@@ -24,7 +23,7 @@ def subscribe_summary_event(agent: Agent) -> Dict[str, str]:
 
     if _AFTER_SUMMARY:
 
-        def _on_after_summary(**kwargs):
+        def _on_after_summary(**kwargs: Any) -> None:
             try:
                 summary_container["text"] = str(kwargs.get("summary", "") or "")
             except Exception:
@@ -72,7 +71,7 @@ def create_analysis_agent(
 - 完成对本批次候选问题的判断后，主输出仅打印结束符 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
 """.strip()
 
-    agent_kwargs: Dict = dict(
+    agent_kwargs: Dict[str, Any] = dict(
         system_prompt=system_prompt,
         name=task_id,
         auto_complete=True,
@@ -100,7 +99,7 @@ def create_review_agent(
     review_summary_prompt = get_review_summary_prompt()
 
     review_task_id = f"JARVIS-SEC-Review-Batch-{current_review_num}"
-    review_agent_kwargs: Dict = dict(
+    review_agent_kwargs: Dict[str, Any] = dict(
         system_prompt=review_system_prompt,
         name=review_task_id,
         auto_complete=True,
@@ -128,7 +127,7 @@ def create_cluster_agent(
     cluster_system_prompt = get_cluster_system_prompt()
     cluster_summary_prompt = get_cluster_summary_prompt()
 
-    agent_kwargs_cluster: Dict = dict(
+    agent_kwargs_cluster: Dict[str, Any] = dict(
         system_prompt=cluster_system_prompt,
         name=f"JARVIS-SEC-Cluster::{file}::batch{chunk_idx}",
         auto_complete=True,
