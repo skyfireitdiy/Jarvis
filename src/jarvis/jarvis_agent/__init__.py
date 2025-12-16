@@ -561,11 +561,16 @@ class Agent:
         except Exception:
             # 回退到原始行为，确保兼容性
             action_prompt = self.get_tool_usage_prompt()
+            rules_prompt = self.rules_manager.load_all_rules(
+                ",".join(self.loaded_rule_names)
+            )
             self.model.set_system_prompt(
                 f"""
 {self.system_prompt}
 
 {action_prompt}
+
+{rules_prompt}
 """
             )
 

@@ -123,20 +123,6 @@ class CodeAgent(Agent):
             base_tools = list(dict.fromkeys(base_tools))
 
         code_system_prompt = get_system_prompt()
-        # 加载所有规则
-        merged_rules, loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
-
-        # 保存已加载的规则名称，用于子代理继承
-        self.loaded_rule_names = set(loaded_rule_names)
-
-        if merged_rules:
-            code_system_prompt = (
-                f"{code_system_prompt}\n\n<rules>\n{merged_rules}\n</rules>"
-            )
-            # 显示加载的规则名称
-            if loaded_rule_names:
-                rules_display = ", ".join(loaded_rule_names)
-                PrettyOutput.auto_print(f"ℹ️ 已加载规则: {rules_display}")
 
         # 调用父类 Agent 的初始化
         # 默认禁用方法论和分析，但允许通过 kwargs 覆盖
@@ -947,14 +933,12 @@ git reset --hard {start_commit}
                 user_input, truncated_git_diff, code_generation_summary
             )
 
-            # 创建 review Agent
-            # 获取所有规则内容并添加到系统提示词
-            merged_rules, _ = self.rules_manager.load_all_rules(
+            rules_prompt = self.rules_manager.load_all_rules(
                 ",".join(self.loaded_rule_names)
             )
 
             review_agent = Agent(
-                system_prompt=sys_prompt + f"\n\n<rules>\n{merged_rules}\n</rules>",
+                system_prompt=sys_prompt + f"\n\n<rules>\n{rules_prompt}\n</rules>",
                 name=f"CodeReview-Agent-{iteration}",
                 model_group=self.model.model_group if self.model else None,
                 summary_prompt=sum_prompt,
