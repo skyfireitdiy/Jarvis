@@ -195,12 +195,14 @@ class task_list_manager:
 - 每一条条目对应的产物是否符合任务描述中的具体要求
 - 不验证无关的编译状态、测试覆盖率或代码风格
 
-**重要：**
-- 只能使用 read_code 和 execute_script 工具
+**重要限制（强制性）：**
+- 只能使用 read_code 和 execute_script 工具进行验证
 - 必须基于实际验证结果，不能推测或假设
 - 仅验证任务预期输出和直接相关的产物
 - 如果验证通过，直接输出 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容。
-- **严禁尝试修复问题**：只能报告发现的问题，严禁提供修复建议或尝试任何修复操作
+- **禁止实际修复行为**：严禁执行任何代码修改、文件操作或配置更改
+- **允许修复建议**：可以详细分析问题原因并提供具体的修复建议和指导
+- **明确区分建议与执行**：可以说明"应该如何修正"，但必须强调这只是建议
 """
 
         # 构建验证任务的总结提示词（结构化格式要求）
@@ -231,7 +233,8 @@ class task_list_manager:
 - 必须严格按照上述格式输出
 - 验证状态必须是 PASSED 或 FAILED
 - 最终结论必须是 "VERIFICATION_PASSED" 或 "VERIFICATION_FAILED"
-- 仅基于任务预期输出进行验证，不涉及无关检查
+- **允许修复建议**：可以详细分析问题并提供具体的修复指导
+- **禁止实际修复**：严禁执行任何代码修改或文件操作
 """
 
         # 获取父 Agent 的模型组
@@ -394,6 +397,7 @@ class task_list_manager:
                         if detailed_explanation
                         else verification_result_str
                     )
+
                     PrettyOutput.auto_print(
                         f"❌ 任务 [{task.task_name}] 验证未通过：{failure_reason[:200]}..."
                     )
