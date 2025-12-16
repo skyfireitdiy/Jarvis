@@ -266,7 +266,7 @@ class ConsoleOutputSink(OutputSink):
             OutputType.WARNING: "orange3",
             OutputType.DEBUG: "grey50",
             OutputType.USER: "dark_sea_green",
-            OutputType.TOOL: "yellow",
+            OutputType.TOOL: "dark_olive_green",
         }
 
         # 背景色映射（保持原有定义）
