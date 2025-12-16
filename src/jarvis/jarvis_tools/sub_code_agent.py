@@ -15,7 +15,6 @@ from typing import Dict
 from typing import List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_utils.globals import delete_agent
 from jarvis.jarvis_utils.globals import get_global_model_group
 
 
@@ -176,13 +175,6 @@ class SubCodeAgentTool:
 
             # 执行子任务（无提交信息前后缀）
             ret = code_agent.run(enhanced_task, prefix="", suffix="")
-
-            # 主动清理 CodeAgent 实例，避免污染父Agent的全局状态
-            try:
-                # CodeAgent 现在直接继承 Agent，所以直接使用 code_agent
-                delete_agent(code_agent.name)
-            except Exception:
-                pass
 
             return {
                 "success": True,

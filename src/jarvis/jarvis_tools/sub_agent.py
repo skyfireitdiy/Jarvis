@@ -19,7 +19,6 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from typing import Dict
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_utils.globals import delete_agent
 from jarvis.jarvis_utils.globals import get_global_model_group
 
 
@@ -201,12 +200,6 @@ class SubAgentTool:
 
             # 执行任务
             result = agent.run(enhanced_task)
-
-            # 主动清理，避免污染父 Agent 的全局状态
-            try:
-                delete_agent(agent.name)
-            except Exception:
-                pass
 
             # 规范化输出
             if isinstance(result, (dict, list)):
