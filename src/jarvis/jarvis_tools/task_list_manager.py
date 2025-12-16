@@ -16,7 +16,6 @@ from typing import Optional
 from jarvis.jarvis_agent.task_list import TaskStatus
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
-from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 
 
@@ -236,7 +235,9 @@ class task_list_manager:
 
         # 创建验证 Agent，只使用 read_code 和 execute_script 工具
         # 获取父代理所有规则内容并添加到系统提示词
-        rules_content, _ = parent_agent.rules_manager.load_all_rules(','.join(parent_agent.loaded_rule_names))
+        rules_content, _ = parent_agent.rules_manager.load_all_rules(
+            ",".join(parent_agent.loaded_rule_names)
+        )
 
         enhanced_system_prompt = verification_system_prompt + rules_content
 
@@ -509,294 +510,29 @@ class task_list_manager:
             PrettyOutput.auto_print(f"⚠️ 打印任务状态失败: {e}")
             PrettyOutput.auto_print(f"   错误详情: {traceback.format_exc()}")
 
-    description = f"""任务列表管理工具。用于在 PLAN 阶段拆分复杂任务为多个子任务，并管理任务执行。
+    description = """任务列表管理工具，供LLM管理复杂任务拆分和执行。
 
-**⚠️ 重要：任务描述和背景信息要求**
-- **任务描述（task_desc）必须包含**：
-  - **约束条件**：明确任务执行的技术约束、环境限制、性能要求等
-  - **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等
-  - **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等
-  - **验证标准**：明确任务完成的验证方式、验收标准、测试要求等
-- **背景信息（background）必须包含**：
-  - **全局约束条件**：所有子任务必须遵循的技术约束、环境限制、性能要求等
-  - **必须要求**：所有子任务必须完成的要求、必须遵循的规范、必须实现的功能等
-  - **禁止事项**：所有子任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等
-  - **验证标准**：所有子任务的统一验证方式、验收标准、测试要求等
-- 任务描述和背景信息应该清晰、具体、可执行，确保任务执行者有明确的指导
+**核心功能：**
+- `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
+- `execute_task`: 执行任务（自动创建子Agent）
+- `get_task_list_summary`: 查看任务状态
 
-**基本使用流程：**
-1. `add_tasks`: 添加任务（如果 Agent 还没有任务列表，会自动创建；推荐在 PLAN 阶段使用，一次性添加所有子任务。创建任务列表时必须提供 main_goal 参数）
-2. `execute_task`: 执行任务（自动创建子 Agent 执行，**执行完成后会自动更新任务状态为 completed 或 failed**）
-3. `get_task_list_summary`: 查看任务列表状态
+**任务类型选择：**
+- `main`: 简单任务（1-3步、单文件）由主Agent直接执行
+- `sub`: 复杂任务（多步骤、多文件）自动创建子Agent
 
-**重要说明：每个 Agent 只有一个任务列表**
-- 每个 Agent 只能拥有一个任务列表，系统会自动管理
-- **不需要提供 `task_list_id` 参数**，系统会自动从 Agent 的上下文中获取
-- 如果 Agent 还没有任务列表，调用 `add_tasks` 时会自动创建（使用第一个任务的名称作为 main_goal）
+**强制要求：**
+- execute_task必须提供non-empty additional_info参数
+- 禁止过度拆分简单任务
+- 每个Agent只能有一个任务列表
 
-**任务状态自动管理：**
-- 执行开始时：任务状态自动更新为 `running`
-- 执行完成时：任务状态自动更新为 `completed`，执行结果保存到 `actual_output`
-- 执行失败时：任务状态自动更新为 `failed`，错误信息保存到 `actual_output`
-- 可通过 `update_task` 手动更新任务状态和其他属性
+**使用场景：**
+- PLAN阶段：一次性添加所有子任务
+- 数据切分：按目录/文件/模块分批处理
+- 依赖管理：自动验证任务依赖关系
 
-**核心操作：**
-- `add_tasks`: 添加任务（支持单个或多个任务，推荐在 PLAN 阶段使用，一次性添加所有子任务；如果任务列表不存在会自动创建，可使用 main_goal 指定核心目标）
-- `execute_task`: 执行任务（根据 agent_type 自动创建子 Agent，**执行完成后会自动更新任务状态**）
-- `update_task`: 更新任务属性（包括任务名称、描述、优先级、预期输出、依赖关系、状态和实际输出）
-- `get_task_detail`: 获取任务详情
-- `get_task_list_summary`: 获取任务列表摘要
-
-**任务类型（agent_type）选择规则：**
-- **简单任务使用 `main`**：对于简单、直接的任务（如单次文件读取、简单的单步操作、单一工具调用等），**必须使用 `main`**，由主 Agent 直接执行，**不要将简单任务拆分为子任务**。避免对简单任务进行不必要的拆分，防止出现无限拆分的问题。
-- **复杂任务使用 `sub`**：对于**真正复杂**的任务（需要多个步骤、涉及多个文件、需要协调多个子任务、有明确的依赖关系等），应该使用 `sub` 类型，系统会自动处理任务执行。
-  - `main`: 由主 Agent 直接执行（**简单任务必须使用此类型**）
-  - `sub`: 由系统智能处理复杂任务（**复杂任务推荐使用此类型**）
-
-**⚠️ 重要提醒：避免过度拆分**
-- **不要过度拆分任务**：任务拆分应该保持合理的粒度，避免将简单任务拆分成过多过细的子任务
-- **平衡信息传递与效率**：过度拆分会增加信息传递负担，可能导致上下文丢失和执行效率降低
-- **优先考虑主Agent执行**：对于可以在1-2步内完成的任务，优先使用 `main` 类型由主Agent直接执行
-- **评估拆分必要性**：在拆分任务前，评估是否真的需要创建子Agent，是否可以由主Agent更高效地完成
-
-**📊 数据量切分策略（避免长上下文目标偏移）**
-- **按数据切分任务**：当任务涉及大量数据时（如处理多个文件、多个目录、大量代码文件等），应该按照数据维度切分为多个子任务，由 sub agent 分别完成
-- **切分维度示例**：
-  - **按文件目录切分**：如果需要对多个目录进行处理，每个目录创建一个子任务（如"处理 src/auth/ 目录"、"处理 src/api/ 目录"）
-  - **按文件列表切分**：如果需要对大量文件进行处理，将文件列表分批切分（如"处理文件列表1-50"、"处理文件列表51-100"）
-  - **按功能模块切分**：如果涉及多个功能模块，每个模块创建一个子任务（如"处理用户认证模块"、"处理权限管理模块"）
-  - **按数据范围切分**：如果涉及大量数据，按数据范围切分（如"处理前1000条记录"、"处理后1000条记录"）
-- **切分的好处**：
-  - ✅ **避免长上下文目标偏移**：每个子任务专注于处理部分数据，上下文更聚焦，避免在处理大量数据时偏离目标
-  - ✅ **提高执行效率**：多个子任务可以并行执行（如果无依赖关系），提高整体执行效率
-  - ✅ **降低单次任务复杂度**：每个子任务处理的数据量更小，更容易成功完成
-  - ✅ **便于错误恢复**：如果某个子任务失败，只需重试该子任务，不影响其他已完成的任务
-- **切分示例**：
-  ```json
-  {{
-    "action": "add_tasks",
-    "main_goal": "重构整个项目的错误处理机制",
-    "tasks_info": [
-      {{
-        "task_name": "重构 src/auth/ 目录的错误处理",
-        "task_desc": "处理 src/auth/ 目录下的所有文件，统一错误处理机制",
-        "priority": 5,
-        "expected_output": "src/auth/ 目录下所有文件的错误处理已重构",
-        "agent_type": "sub"
-      }},
-      {{
-        "task_name": "重构 src/api/ 目录的错误处理",
-        "task_desc": "处理 src/api/ 目录下的所有文件，统一错误处理机制",
-        "priority": 5,
-        "expected_output": "src/api/ 目录下所有文件的错误处理已重构",
-        "agent_type": "sub"
-      }},
-      {{
-        "task_name": "重构 src/utils/ 目录的错误处理",
-        "task_desc": "处理 src/utils/ 目录下的所有文件，统一错误处理机制",
-        "priority": 4,
-        "expected_output": "src/utils/ 目录下所有文件的错误处理已重构",
-        "agent_type": "sub"
-      }}
-    ]
-  }}
-  ```
-- **切分原则**：
-  - 每个子任务处理的数据量应该适中（建议每个子任务处理10-50个文件，或单个目录）
-  - 子任务之间应该相对独立，减少依赖关系
-  - 如果子任务之间有依赖，使用 `dependencies` 参数明确指定
-  - 切分后的子任务都应该使用 `agent_type: "sub"`，由系统自动创建子 Agent 执行
-
-**全局背景信息：**
-- 使用 `background` 参数为所有子任务提供统一的背景信息，这些信息会自动附加到每个子任务的描述中
-- **必须包含以下信息**：
-  - **全局约束条件**：所有子任务必须遵循的技术约束、环境限制、性能要求等
-  - **必须要求**：所有子任务必须完成的要求、必须遵循的规范、必须实现的功能等
-  - **禁止事项**：所有子任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等
-  - **验证标准**：所有子任务的统一验证方式、验收标准、测试要求等
-- 适用于提供全局上下文、统一规范等公共信息
-
-**依赖关系：**
-- 在 `add_tasks` 时，任务的 `dependencies` 可以引用本次批次中的任务名称（系统会自动匹配）
-- 或者引用已存在的任务ID
-
-**使用示例（推荐）：**
-
-示例1：功能模块拆分
-{ot("TOOL_CALL")}
-{{
-  "want": "添加用户登录功能相关任务",
-  "name": "task_list_manager",
-  "arguments": {{
-    "action": "add_tasks",
-    "main_goal": "实现完整的用户登录功能模块",  // ⚠️ 必填：任务列表的核心目标
-    "tasks_info": [
-      {{
-        "task_name": "设计数据库表结构",
-        "task_desc": "创建用户表和会话表",
-        "priority": 5,
-        "expected_output": "数据库表结构设计文档",
-        "agent_type": "sub"
-      }},
-      {{
-        "task_name": "实现登录接口",
-        "task_desc": "实现用户登录API",
-        "priority": 4,
-        "expected_output": "登录接口代码",
-        "agent_type": "sub",
-        "dependencies": ["设计数据库表结构"]
-      }}
-    ]
-  }}
-}}
-{ct("TOOL_CALL")}
-
-示例2：按数据量切分（处理大量文件/目录）
-{ot("TOOL_CALL")}
-{{
-  "want": "重构整个项目的错误处理机制",
-  "name": "task_list_manager",
-  "arguments": {{
-    "action": "add_tasks",
-    "main_goal": "重构整个项目的错误处理机制，统一错误处理方式",
-    "tasks_info": [
-      {{
-        "task_name": "重构 src/auth/ 目录的错误处理",
-        "task_desc": "处理 src/auth/ 目录下的所有文件，统一错误处理机制",
-        "priority": 5,
-        "expected_output": "src/auth/ 目录下所有文件的错误处理已重构",
-        "agent_type": "sub"
-      }},
-      {{
-        "task_name": "重构 src/api/ 目录的错误处理",
-        "task_desc": "处理 src/api/ 目录下的所有文件，统一错误处理机制",
-        "priority": 5,
-        "expected_output": "src/api/ 目录下所有文件的错误处理已重构",
-        "agent_type": "sub"
-      }},
-      {{
-        "task_name": "重构 src/utils/ 目录的错误处理",
-        "task_desc": "处理 src/utils/ 目录下的所有文件，统一错误处理机制",
-        "priority": 4,
-        "expected_output": "src/utils/ 目录下所有文件的错误处理已重构",
-        "agent_type": "sub"
-      }}
-    ]
-  }}
-}}
-{ct("TOOL_CALL")}
-
-🚨 **强制执行规范：additional_info 参数**
-
-## ❗ 绝对必要：execute_task 时必须提供 additional_info
-
-**⚠️ 警告：如果未提供有效的 additional_info 参数，任务执行将立即失败并返回错误**
-
----
-
-## 🎯 强制执行规则
-
-### 1️⃣ 零容忍政策
-- **不能为空字符串**：`""` ❌ 会导致："additional_info 参数不能为空"
-- **不能为None值**：`None` ❌ 会导致："缺少 additional_info 参数"  
-- **不能为纯空白**：`"   "` ❌ 会导致：执行失败
-- **必须包含实际内容**：最少10个有意义字符 ✅
-
-### 2️⃣ 执行前强制检查清单
-在使用 `execute_task` 前，必须确认：
-- ✅ `additional_info` 已定义为非空字符串
-- ✅ 内容包含任务的实际上下文信息
-- ✅ 长度在合理范围内（建议50-1000字符）
-- ✅ 使用场景相关的具体内容
-
----
-
-## 📋 标准格式模板
-
-### 🚀 execute_task 时的 additional_info 模板：
-```
-任务背景：[具体描述当前要解决的核心问题]
-
-关键信息：
-- 目标文件：[具体文件路径和行号范围]
-- 功能需求：[要新增/修改/修复的具体功能]
-- 约束条件：[技术限制、兼容性要求等]
-- 预期结果：[完成后的具体表现]
-
-特殊要求：
-- [任何特殊的实现要求或注意事项]
-```
-
-
----
-
-## 🎯 实际使用示例
-
-### ✅ 正确示例（任务执行）：
-```json
-{{
-        "action": "execute_task",
-  "task_id": "task_123",
-  "additional_info": "任务背景：修复用户登录功能的JWT token验证问题. 关键信息：目标文件src/auth/jwt_handler.py第45-67行, 功能需求是修复token过期后未正确刷新的bug, 约束条件必须兼容Python3.8+且不能修改API接口, 预期结果token过期时自动刷新并重定向到首页. 特殊要求：保留现有token格式不变, 添加适当的单元测试"
-}}
-```
-
-### ❌ 错误示例（会导致失败）：
-```json
-{{
-        "action": "execute_task",
-  "task_id": "task_123",
-  "additional_info": ""  // ❌ 空字符串，立即失败
-}}
-
-{{
-        "action": "execute_task",
-  "task_id": "task_123",
-  "additional_info": "修复bug"  // ❌ 过于简单，缺乏上下文
-}}
-```
-
-### ✅ 正确示例（获取详情）：
-```json
-{{
-        "action": "get_task_detail",
-  "task_id": "task_123"
-}}
-```
-
----
-
-## 🔧 常见错误预防
-
-| 错误模式 | 系统响应 | 立即修复方法 |
-|---------|----------|-------------|
-| `additional_info: null` | ❌ "缺少 additional_info 参数" | 提供字符串内容 |
-| `additional_info: ""` | ❌ "additional_info 参数不能为空" | 添加有意义内容 |
-| `additional_info: "test"` | ⚠️ 内容不足影响执行效果 | 提供详细上下文 |
-
----
-
-## 🚀 执行前强制检查口诀
-
-**每次执行前必须确认：**
-> "execute_task 三步检查：
->  1️⃣ 有任务ID ✅
->  2️⃣ 有additional_info ✅
->  3️⃣ 内容具体有意义 ✅"
-
-**快速验证：**
-```python
-# 执行前自问：
-additional_info = "..."  # 实际内容
-assert additional_info and len(additional_info.strip()) > 10, "内容不足"
-```
-
-**重要提醒：简单任务不需要拆分，必须使用 `main` 类型**
-- 简单任务判断标准：如果任务可以在1-3步内完成、只涉及单个文件修改、或只需要单次工具调用
-- 简单任务无需拆分：对于简单任务，绝对不要创建任务列表，直接使用 agent_type: "main" 由主 Agent 立即执行
-- 禁止过度拆分：简单任务创建子Agent会导致不必要的上下文切换和信息传递负担，大幅降低执行效率
-- 快速执行原则：简单任务应该立即执行，避免任何任务管理开销
-- 只有真正复杂的任务（需要多个步骤、涉及多个文件、需要协调多个子任务等）才使用子Agent"""
+**关键原则：**
+简单任务用main，复杂任务用sub，避免过度拆分。"""
 
     parameters = {
         "type": "object",
