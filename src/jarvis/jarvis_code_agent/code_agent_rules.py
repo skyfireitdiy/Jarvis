@@ -8,6 +8,8 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 from typing import List
 from typing import Optional
+from typing import Set
+from typing import Tuple
 
 import yaml
 
@@ -268,7 +270,7 @@ class RulesManager:
 
         return result
 
-    def load_all_rules(self, rule_names: Optional[str] = None) -> tuple[str, List[str]]:
+    def load_all_rules(self, rule_names: Optional[str] = None) -> Tuple[str, Set[str]]:
         """加载所有规则并合并
 
         参数:
@@ -278,17 +280,17 @@ class RulesManager:
             (merged_rules, loaded_rule_names): 合并后的规则字符串和已加载的规则名称列表
         """
         combined_parts: List[str] = []
-        loaded_rule_names: List[str] = []
+        loaded_rule_names: Set[str] = []
 
         global_rules = self.read_global_rules()
         project_rules = self.read_project_rule()
 
         if global_rules:
             combined_parts.append(global_rules)
-            loaded_rule_names.append("global_rule")
+            loaded_rule_names.add("global_rule")
         if project_rules:
             combined_parts.append(project_rules)
-            loaded_rule_names.append("project_rule")
+            loaded_rule_names.add("project_rule")
 
         # 如果指定了 rule_names，从 rules.yaml 文件中读取并添加多个规则
         if rule_names:
@@ -297,7 +299,7 @@ class RulesManager:
                 named_rule = self.get_named_rule(rule_name)
                 if named_rule:
                     combined_parts.append(named_rule)
-                    loaded_rule_names.append(rule_name)
+                    loaded_rule_names.add(rule_name)
 
         if combined_parts:
             merged_rules = "\n\n".join(combined_parts)
