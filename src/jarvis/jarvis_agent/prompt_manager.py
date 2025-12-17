@@ -124,15 +124,20 @@ class PromptManager:
         fd_installed = shutil.which("fd") is not None
         tools.append(f"fd_available: {fd_installed}")
 
+        import os
+
+        current_work_dir = os.getcwd()
+
         return (
             """
 <system_info>
 可用工具:
 """
             + "\n".join(f"- {tool}" for tool in tools)
-            + """
+            + f"""
 - rg: 递归快速搜索文件内容（ripgrep）
 - fd: 快速查找文件（fd-find）
+- 当前工作目录: {current_work_dir}
 </system_info>"""
         )
 
