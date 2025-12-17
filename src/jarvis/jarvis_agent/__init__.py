@@ -1107,6 +1107,8 @@ class Agent:
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
+        # 打开input handler开关，让下一轮可以处理pin_content中的特殊标记
+        self.run_input_handlers_next_turn = True
 
         # 获取任务列表信息（用于历史记录）
         task_list_info = ""
@@ -1176,6 +1178,8 @@ class Agent:
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
+        # 打开input handler开关，让下一轮可以处理pin_content中的特殊标记
+        self.run_input_handlers_next_turn = True
 
         # 添加系统约束提醒
         if result:
