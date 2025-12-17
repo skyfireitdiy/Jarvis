@@ -34,13 +34,12 @@ def _load_rules_from_directory(directory: Path) -> None:
 
 def _load_builtin_rules() -> None:
     """加载所有内置规则"""
-    rules_dir = Path(__file__).parent
-
     # 加载通用规则（rules 目录）
-    _load_rules_from_directory(rules_dir / "rules")
+    builtin_dir = Path(__file__).parent.parent.parent / "builtin"
+    _load_rules_from_directory(builtin_dir / "rules")
 
     # 加载测试规则（test_rules 目录）
-    _load_rules_from_directory(rules_dir / "test_rules")
+    _load_rules_from_directory(builtin_dir / "test_rules")
 
 
 # 在模块加载时自动加载所有规则
