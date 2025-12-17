@@ -41,7 +41,7 @@ class _DbLoader:
         不区分函数与类型定义，均加载为通用记录（位置与引用信息）。
         """
 
-        def _iter_records_from_file(path: Path):
+        def _iter_records_from_file(path: Path) -> Any:
             try:
                 with path.open("r", encoding="utf-8") as f:
                     idx = 0

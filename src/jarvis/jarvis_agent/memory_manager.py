@@ -4,6 +4,8 @@
 负责处理Agent的记忆保存和检索功能
 """
 
+from typing import Any
+
 from jarvis.jarvis_agent.events import BEFORE_HISTORY_CLEAR
 from jarvis.jarvis_agent.events import TASK_COMPLETED
 from jarvis.jarvis_agent.events import TASK_STARTED
@@ -14,7 +16,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class MemoryManager:
     """记忆管理器，负责处理记忆相关的功能"""
 
-    def __init__(self, agent):
+    def __init__(self, agent: Any) -> None:
         """
         初始化记忆管理器
 
@@ -53,7 +55,7 @@ class MemoryManager:
             return "save_memory" in tool_names
         return False
 
-    def _format_memory_tags(self, memory_tags: dict) -> str:
+    def _format_memory_tags(self, memory_tags: dict[str, Any]) -> str:
         """格式化记忆标签"""
         prompt = (
             "\n\n系统中存在以下记忆标签，你可以使用 retrieve_memory 工具检索相关记忆："
@@ -72,7 +74,7 @@ class MemoryManager:
 
         return prompt
 
-    def prompt_memory_save(self):
+    def prompt_memory_save(self) -> None:
         """让大模型自动判断并保存值得记忆的信息"""
         # 检查是否有记忆相关工具
         tool_registry = self.agent.get_tool_registry()
@@ -126,7 +128,7 @@ class MemoryManager:
             except Exception:
                 pass
 
-    def add_memory_prompts_to_addon(self, addon_prompt: str, tool_registry) -> str:
+    def add_memory_prompts_to_addon(self, addon_prompt: str, tool_registry: Any) -> str:
         """在附加提示中添加记忆相关提示"""
         memory_prompts = ""
 
@@ -160,14 +162,14 @@ class MemoryManager:
         # 任务完成时作为兜底再尝试一次
         bus.subscribe(TASK_COMPLETED, self._ensure_memory_prompt)
 
-    def _on_task_started(self, **payload) -> None:
+    def _on_task_started(self, **payload: Any) -> None:
         self._memory_prompted = False
         try:
             self.agent.set_user_data("__memory_save_prompted__", False)
         except Exception:
             pass
 
-    def _ensure_memory_prompt(self, **payload) -> None:
+    def _ensure_memory_prompt(self, **payload: Any) -> None:
         # 仅在开启强制保存记忆时启用
         if not getattr(self.agent, "force_save_memory", False):
             return

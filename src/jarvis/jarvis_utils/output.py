@@ -513,7 +513,7 @@ class PrettyOutput:
         timestamp: bool = True,
         lang: Optional[str] = None,
         traceback: bool = False,
-    ):
+    ) -> None:
         """
         使用样式和语法高亮打印格式化输出（已抽象为事件 + Sink 机制）。
         保持对现有调用方的向后兼容，同时为TUI/日志等前端预留扩展点。
@@ -528,7 +528,7 @@ class PrettyOutput:
         emit_output(event)
 
     @staticmethod
-    def section(title: str, output_type: OutputType = OutputType.INFO):
+    def section(title: str, output_type: OutputType = OutputType.INFO) -> None:
         """
         在样式化面板中打印章节标题（通过事件 + Sink 机制分发）。
         """

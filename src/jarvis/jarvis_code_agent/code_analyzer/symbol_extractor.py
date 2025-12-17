@@ -44,7 +44,7 @@ class SymbolTable:
         """获取缓存文件路径。"""
         return os.path.join(self.cache_dir, "symbol_table.json")
 
-    def _load_from_cache(self):
+    def _load_from_cache(self) -> None:
         """从缓存文件加载符号表数据。"""
         cache_file = self._get_cache_file()
         if os.path.exists(cache_file):
@@ -64,7 +64,7 @@ class SymbolTable:
                 # 如果缓存加载失败，则从空表开始
                 pass
 
-    def _save_to_cache(self):
+    def _save_to_cache(self) -> None:
         """将符号表数据保存到缓存文件。"""
         try:
             # 确保缓存目录存在
@@ -155,7 +155,7 @@ class SymbolTable:
             )
         return symbol
 
-    def add_symbol(self, symbol: Symbol, save_to_cache: bool = False):
+    def add_symbol(self, symbol: Symbol, save_to_cache: bool = False) -> None:
         """向表中添加符号。
 
         参数:
@@ -175,7 +175,7 @@ class SymbolTable:
         if save_to_cache:
             self._save_to_cache()
 
-    def save_cache(self):
+    def save_cache(self) -> None:
         """将整个符号表保存到缓存。批量操作后调用此方法。"""
         self._save_to_cache()
 
@@ -192,7 +192,7 @@ class SymbolTable:
         """获取特定文件中的所有符号。"""
         return self.symbols_by_file.get(file_path, [])
 
-    def clear_file_symbols(self, file_path: str):
+    def clear_file_symbols(self, file_path: str) -> None:
         """移除与特定文件关联的所有符号。"""
         if file_path in self.symbols_by_file:
             symbols_to_remove = self.symbols_by_file.pop(file_path)
@@ -213,7 +213,7 @@ class SymbolTable:
             # 清除后保存到缓存
             self._save_to_cache()
 
-    def _update_file_mtimes(self):
+    def _update_file_mtimes(self) -> None:
         """更新所有跟踪文件的修改时间。"""
         for file_path in list(self.symbols_by_file.keys()):
             if os.path.exists(file_path):

@@ -5,13 +5,11 @@
 """
 
 from typing import Any
-from typing import Dict
-from typing import List
 
 
-def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
+def _collect_language_support_info() -> dict[str, dict[str, Any]]:
     """收集所有语言的功能支持信息"""
-    info: Dict[str, Dict[str, Any]] = {}
+    info: dict[str, dict[str, Any]] = {}
 
     # 确保语言支持模块已加载（触发自动注册）
     try:
@@ -134,7 +132,7 @@ def _collect_language_support_info() -> Dict[str, Dict[str, Any]]:
                     continue
 
         # 为每种语言收集支持的构建系统名称
-        lang_to_build_systems: Dict[str, List[str]] = {}
+        lang_to_build_systems: dict[str, list[str]] = {}
 
         for validator_class in validator_classes:
             try:

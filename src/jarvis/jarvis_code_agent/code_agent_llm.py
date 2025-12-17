@@ -8,6 +8,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 from typing import Optional
 
+from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
@@ -48,7 +49,7 @@ class LLMManager:
         if not self._model_name:
             self._model_name = get_normal_model_name(None)
 
-    def _create_llm_model(self):
+    def _create_llm_model(self) -> BasePlatform:
         """创建新的 LLM 模型实例
 
         每次调用都创建新的实例，避免上下文窗口累积。

@@ -11,12 +11,11 @@ sub_agent 工具
 """
 
 import json
-from typing import Any
+from typing import Any, Dict
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-from typing import Dict
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_utils.globals import get_global_model_group
@@ -165,7 +164,7 @@ class SubAgentTool:
                 tool_registry = agent.get_tool_registry()
                 if tool_registry:
                     current_tools = [
-                        t.get("name")
+                        str(t.get("name"))
                         for t in tool_registry.get_all_tools()
                         if isinstance(t, dict) and t.get("name")
                     ]

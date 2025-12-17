@@ -4,6 +4,8 @@
 负责处理任务分析和方法论生成功能
 """
 
+from typing import Any
+
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -18,22 +20,22 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class TaskAnalyzer:
     """任务分析器，负责任务分析和满意度反馈处理"""
 
-    def __init__(self, agent):
+    def __init__(self, agent: Any) -> None:
         """
         初始化任务分析器
 
         参数:
             agent: Agent实例
         """
-        self.agent = agent
-        self._analysis_done = False
+        self.agent: Any = agent
+        self._analysis_done: bool = False
         # 旁路集成事件订阅，失败不影响主流程
         try:
             self._subscribe_events()
         except Exception:
             pass
 
-    def analysis_task(self, satisfaction_feedback: str = ""):
+    def analysis_task(self, satisfaction_feedback: str = "") -> None:
         """分析任务并生成方法论"""
 
         try:
@@ -84,7 +86,7 @@ class TaskAnalyzer:
 
         return join_prompts([analysis_prompt, satisfaction_feedback])
 
-    def _process_analysis_loop(self):
+    def _process_analysis_loop(self) -> None:
         """处理分析循环"""
         while True:
             response = self.agent.model.chat_until_success(self.agent.session.prompt)
@@ -169,7 +171,7 @@ class TaskAnalyzer:
 
     def collect_satisfaction_feedback(self, auto_completed: bool) -> str:
         """收集满意度反馈"""
-        satisfaction_feedback = ""
+        satisfaction_feedback: str = ""
 
         if not auto_completed and self.agent.use_analysis:
             if self.agent.confirm_callback("您对本次任务的完成是否满意？", True):
@@ -202,7 +204,7 @@ class TaskAnalyzer:
         # 当无需总结时，作为兜底触发分析
         bus.subscribe(TASK_COMPLETED, self._on_task_completed)
 
-    def _on_before_summary(self, **payload) -> None:
+    def _on_before_summary(self, **payload: Any) -> None:
         if self._analysis_done:
             return
         # 避免与直接调用重复
@@ -221,7 +223,7 @@ class TaskAnalyzer:
             # 忽略事件处理异常，保证主流程
             self._analysis_done = True
 
-    def _on_task_completed(self, **payload) -> None:
+    def _on_task_completed(self, **payload: Any) -> None:
         # 当未在 before_summary 阶段执行过时，作为兜底
         if self._analysis_done:
             return

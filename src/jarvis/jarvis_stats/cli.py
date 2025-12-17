@@ -31,7 +31,7 @@ _initialized = False
 _stats_dir = None
 
 
-def _get_stats_dir():
+def _get_stats_dir() -> str:
     """获取统计数据目录"""
     global _initialized, _stats_dir
     if not _initialized:
@@ -48,7 +48,7 @@ def add(
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签，格式: key=value"
     ),
-):
+) -> None:
     """添加统计数据"""
     stats = StatsManager(_get_stats_dir())
 
@@ -81,7 +81,7 @@ def inc(
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签，格式: key=value"
     ),
-):
+) -> None:
     """增加计数型指标"""
     stats = StatsManager(_get_stats_dir())
 
@@ -109,7 +109,7 @@ def show(
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签过滤，格式: key=value"
     ),
-):
+) -> None:
     """显示统计数据"""
     stats = StatsManager(_get_stats_dir())
 
@@ -141,7 +141,7 @@ def plot(
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签过滤，格式: key=value"
     ),
-):
+) -> None:
     """绘制指标折线图，支持根据标签过滤显示多个指标"""
     stats = StatsManager(_get_stats_dir())
 
@@ -163,7 +163,7 @@ def plot(
 
 
 @app.command()
-def list():
+def list() -> None:
     """列出所有指标"""
     stats = StatsManager(_get_stats_dir())
     metrics = stats.list_metrics()
@@ -237,7 +237,7 @@ def list():
 def clean(
     days: int = typer.Option(30, "--days", "-d", help="保留最近N天的数据"),
     yes: bool = typer.Option(False, "--yes", "-y", help="跳过确认"),
-):
+) -> None:
     """清理旧数据"""
     if not yes:
         confirm = typer.confirm(f"确定要删除 {days} 天前的数据吗？")
@@ -256,7 +256,7 @@ def export(
     tags: Optional[List[str]] = typer.Option(
         None, "--tag", "-t", help="标签过滤，格式: key=value"
     ),
-):
+) -> None:
     """导出统计数据"""
     import csv
     import json
@@ -294,7 +294,7 @@ def export(
 def remove(
     metric: str = typer.Argument(..., help="要删除的指标名称"),
     yes: bool = typer.Option(False, "--yes", "-y", help="跳过确认"),
-):
+) -> None:
     """删除指定的指标及其所有数据"""
     if not yes:
         # 显示指标信息供用户确认
@@ -331,7 +331,7 @@ def remove(
 
 
 @app.command()
-def demo():
+def demo() -> None:
     """运行演示，展示统计模块的功能"""
     import random
     import time
@@ -378,7 +378,7 @@ def demo():
     rprint("\n[green]✓[/green] 演示完成！")
 
 
-def main():
+def main() -> None:
     """主入口函数"""
     # 初始化环境，防止设置初始化太迟
     init_env()

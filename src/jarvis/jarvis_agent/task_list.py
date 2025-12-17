@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from enum import Enum
 from threading import Lock
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -58,7 +59,7 @@ class Task:
     dependencies: List[str] = field(default_factory=list)
     actual_output: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """验证字段约束。"""
         # 验证 task_id 格式（支持数字ID格式：task-数字）
         if not self.task_id.startswith("task-"):
@@ -74,7 +75,7 @@ class Task:
         if not (1 <= self.priority <= 5):
             raise ValueError(f"priority 必须在 1-5 之间: {self.priority}")
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典。"""
         result = asdict(self)
         result["status"] = self.status.value
@@ -82,7 +83,7 @@ class Task:
         return result
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Task":
+    def from_dict(cls, data: dict[str, Any]) -> "Task":
         """从字典创建任务。"""
         data = data.copy()
         data["status"] = TaskStatus(data["status"])
@@ -126,7 +127,7 @@ class TaskList:
         self.version = version
         self._lock = Lock()
 
-    def _update_active_and_completed_lists(self):
+    def _update_active_and_completed_lists(self) -> None:
         """更新活跃任务和已完成任务列表。"""
         # 这个方法主要用于内部维护，实际使用时通过属性访问
         pass
@@ -166,7 +167,7 @@ class TaskList:
         """获取任务。"""
         return self.tasks.get(task_id)
 
-    def update_task(self, task_id: str, **kwargs) -> bool:
+    def update_task(self, task_id: str, **kwargs: Any) -> bool:
         """更新任务。"""
         with self._lock:
             if task_id not in self.tasks:
@@ -179,7 +180,7 @@ class TaskList:
             self.version += 1
             return True
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典。"""
         return {
             "main_goal": self.main_goal,
@@ -189,7 +190,7 @@ class TaskList:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "TaskList":
+    def from_dict(cls, data: dict[str, Any]) -> "TaskList":
         """从字典创建任务列表。"""
         task_list = cls(
             main_goal=data["main_goal"],
@@ -233,7 +234,7 @@ class TaskListManager:
         self.agent_task_mapping: Dict[str, Set[str]] = {}
 
         # 版本快照：task_list_id -> List[Dict] (按版本号排序)
-        self.version_snapshots: Dict[str, List[Dict]] = {}
+        self.version_snapshots: dict[str, list[dict[str, Any]]] = {}
 
         self._lock = Lock()
 
@@ -262,7 +263,7 @@ class TaskListManager:
             cls._global_tasklist_counter += 1
             return f"tasklist-{cls._global_tasklist_counter}"
 
-    def _load_persisted_data(self):
+    def _load_persisted_data(self) -> None:
         """从磁盘加载持久化数据。"""
         snapshot_file = os.path.join(self.persist_dir, "snapshots.json")
         if os.path.exists(snapshot_file):
@@ -273,7 +274,7 @@ class TaskListManager:
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 加载快照数据失败: {e}")
 
-    def _save_snapshot(self, task_list_id: str, task_list: TaskList):
+    def _save_snapshot(self, task_list_id: str, task_list: TaskList) -> None:
         """保存版本快照。"""
         snapshot_file = os.path.join(self.persist_dir, "snapshots.json")
         try:
@@ -347,7 +348,7 @@ class TaskListManager:
             return None, False, str(e)
 
     def add_task(
-        self, task_list_id: str, task_info: Dict, agent_id: str
+        self, task_list_id: str, task_info: dict[str, Any], agent_id: str
     ) -> Tuple[Optional[str], bool, Optional[str]]:
         """添加任务至任务列表。
 
@@ -414,7 +415,7 @@ class TaskListManager:
             return None, False, str(e)
 
     def add_tasks(
-        self, task_list_id: str, tasks_info: List[Dict], agent_id: str
+        self, task_list_id: str, tasks_info: list[dict[str, Any]], agent_id: str
     ) -> Tuple[List[str], bool, Optional[str]]:
         """批量添加任务至任务列表。
 
@@ -825,7 +826,7 @@ class TaskListManager:
         """获取任务列表（内部方法）。"""
         return self.task_lists.get(task_list_id)
 
-    def get_task_list_summary(self, task_list_id: str) -> Optional[Dict]:
+    def get_task_list_summary(self, task_list_id: str) -> Optional[dict[str, Any]]:
         """获取任务列表摘要信息。
 
         返回:

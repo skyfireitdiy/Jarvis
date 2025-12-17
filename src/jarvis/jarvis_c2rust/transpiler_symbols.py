@@ -6,6 +6,7 @@
 import re
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 
@@ -75,9 +76,9 @@ class SymbolMapper:
         callee_rust_fn: str,
         callee_rust_sig: str,
         crate_dir: Path,
-        get_code_agent_func,
-        compose_prompt_func,
-        check_and_handle_test_deletion_func,
+        get_code_agent_func: Callable[[], Any],
+        compose_prompt_func: Callable[[str], str],
+        check_and_handle_test_deletion_func: Callable[[str, Any], bool],
     ) -> None:
         """
         当某个 C 符号对应的函数已转换为 Rust 后：

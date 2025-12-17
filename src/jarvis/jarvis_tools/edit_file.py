@@ -75,7 +75,7 @@ class EditFileNormalTool:
         "required": ["files"],
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化普通文件编辑工具"""
         pass
 

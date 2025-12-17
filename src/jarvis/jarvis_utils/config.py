@@ -48,7 +48,7 @@ INPUT_WINDOW_REVERSE_SIZE = 2048
 
 
 @lru_cache(maxsize=None)
-def get_replace_map() -> dict:
+def get_replace_map() -> Dict[str, Any]:
     """
     获取替换映射表。
 

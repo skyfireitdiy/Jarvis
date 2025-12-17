@@ -26,13 +26,13 @@ class Dependency:
 class DependencyGraph:
     """Represents the dependency graph of a project."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # file_path -> set of file_paths it depends on
         self.dependencies: Dict[str, Set[str]] = {}
         # file_path -> set of file_paths that depend on it
         self.dependents: Dict[str, Set[str]] = {}
 
-    def add_dependency(self, file_path: str, dependency_path: str):
+    def add_dependency(self, file_path: str, dependency_path: str) -> None:
         """Adds a dependency from file_path to dependency_path."""
         if file_path not in self.dependencies:
             self.dependencies[file_path] = set()
@@ -50,7 +50,7 @@ class DependencyGraph:
         """Gets the list of files that depend on file_path."""
         return list(self.dependents.get(file_path, set()))
 
-    def clear_file_dependencies(self, file_path: str):
+    def clear_file_dependencies(self, file_path: str) -> None:
         """Removes all dependency information for a specific file."""
         if file_path in self.dependencies:
             # Remove this file's dependencies on others

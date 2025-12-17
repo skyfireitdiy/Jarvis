@@ -113,7 +113,7 @@ class DiffVisualizer:
         in_hunk = False
         hunk_lines: list = []  # 存储当前 hunk 中的所有行（包括上下文和变更）
 
-        def flush_hunk_context():
+        def flush_hunk_context() -> None:
             """刷新当前 hunk，只显示 context_lines 数量的上下文"""
             nonlocal hunk_lines
             if not hunk_lines:

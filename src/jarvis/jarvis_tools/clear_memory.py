@@ -53,7 +53,7 @@ class ClearMemoryTool:
         "required": ["memory_types", "confirm"],
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化清除记忆工具"""
         self.project_memory_dir = Path(".jarvis/memory")
         self.global_memory_dir = Path(get_data_dir()) / "memory"

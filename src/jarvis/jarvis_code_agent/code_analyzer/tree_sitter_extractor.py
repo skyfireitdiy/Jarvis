@@ -62,9 +62,8 @@ class TreeSitterExtractor(SymbolExtractor):
             # 解析代码（即使有语法错误，tree-sitter也能部分解析）
             tree = self.parser.parse(bytes(content, "utf8"))
 
-            # 检查解析是否成功（tree.root_node 应该存在）
-            if tree is None or tree.root_node is None:
-                return []
+            # tree-sitter parse方法总是返回有效的tree对象
+            # 无需检查None值，继续处理
 
             # 尝试构造查询
             query = None

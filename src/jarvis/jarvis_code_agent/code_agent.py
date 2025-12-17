@@ -192,7 +192,7 @@ class CodeAgent(Agent):
         except Exception:
             pass
 
-    def get_rules_prompt(self):
+    def get_rules_prompt(self) -> str:
         """
         获取rules加载的prompt
         """

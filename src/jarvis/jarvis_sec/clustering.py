@@ -588,8 +588,7 @@ def validate_cluster_format(
     error_details = []
     for idx, it in enumerate(cluster_items):
         if not isinstance(it, dict):
-            error_details.append(f"元素{idx}不是字典")
-            return False, error_details
+            return False, [f"元素{idx}不是字典"]
 
         vals = it.get("gids", [])
         if not isinstance(it.get("verification", ""), str) or not isinstance(
@@ -905,7 +904,7 @@ def process_cluster_results(
                 except Exception:
                     pass
 
-        members: List[Dict] = []
+        members: List[Dict[str, Any]] = []
         for k in norm_keys:
             item = gid_to_item.get(k)
             if item is not None:
@@ -973,12 +972,12 @@ def process_cluster_results(
 
 
 def supplement_missing_gids(
-    missing_gids_final: set,
-    gid_to_item: Dict[int, Dict],
+    missing_gids_final: set[int],
+    gid_to_item: Dict[int, Dict[str, Any]],
     file: str,
     chunk_idx: int,
-    cluster_batches: List[List[Dict]],
-    cluster_records: List[Dict],
+    cluster_batches: List[List[Dict[str, Any]]],
+    cluster_records: List[Dict[str, Any]],
 ) -> int:
     """为遗漏的gid创建单独聚类，返回补充的聚类数"""
     supplemented_count = 0
@@ -1003,7 +1002,7 @@ def supplement_missing_gids(
 
 
 def build_cluster_task(
-    pending_in_file_with_ids: List[Dict],
+    pending_in_file_with_ids: List[Dict[str, Any]],
     entry_path: str,
     file: str,
     langs: List[str],
@@ -1021,7 +1020,7 @@ def build_cluster_task(
         """.strip()
 
 
-def extract_input_gids(pending_in_file_with_ids: List[Dict]) -> set:
+def extract_input_gids(pending_in_file_with_ids: List[Dict[str, Any]]) -> set[int]:
     """从待聚类项中提取gid集合"""
     input_gids = set()
     for it in pending_in_file_with_ids:
@@ -1034,7 +1033,7 @@ def extract_input_gids(pending_in_file_with_ids: List[Dict]) -> set:
     return input_gids
 
 
-def build_gid_to_item_mapping(pending_in_file_with_ids: List[Dict]) -> Dict[int, Dict]:
+def build_gid_to_item_mapping(pending_in_file_with_ids: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
     """构建gid到项的映射"""
     gid_to_item: Dict[int, Dict[str, Any]] = {}
     try:
@@ -1051,17 +1050,17 @@ def build_gid_to_item_mapping(pending_in_file_with_ids: List[Dict]) -> Dict[int,
 
 
 def process_cluster_chunk(
-    chunk: List[Dict],
+    chunk: List[Dict[str, Any]],
     chunk_idx: int,
     file: str,
     entry_path: str,
     langs: List[str],
     llm_group: Optional[str],
-    cluster_batches: List[List[Dict]],
-    cluster_records: List[Dict],
-    invalid_clusters_for_review: List[Dict],
-    _progress_append,
-    _write_cluster_batch_snapshot,
+    cluster_batches: List[List[Dict[str, Any]]],
+    cluster_records: List[Dict[str, Any]],
+    invalid_clusters_for_review: List[Dict[str, Any]],
+    _progress_append: Any,
+    _write_cluster_batch_snapshot: Any,
     force_save_memory: bool = False,
 ) -> None:
     """处理单个聚类批次"""
@@ -1211,9 +1210,9 @@ def process_cluster_chunk(
         _write_cluster_batch_snapshot(current_batch_records)
 
 
-def filter_pending_items(items: List[Dict], clustered_gids: set) -> List[Dict]:
+def filter_pending_items(items: List[Dict[str, Any]], clustered_gids: set[int]) -> List[Dict[str, Any]]:
     """过滤出待聚类的项"""
-    pending_in_file: List[Dict] = []
+    pending_in_file: List[Dict[str, Any]] = []
     for c in items:
         try:
             _gid = int(c.get("gid", 0))
@@ -1226,17 +1225,17 @@ def filter_pending_items(items: List[Dict], clustered_gids: set) -> List[Dict]:
 
 def process_file_clustering(
     file: str,
-    items: List[Dict],
-    clustered_gids: set,
-    cluster_batches: List[List[Dict]],
-    cluster_records: List[Dict],
-    invalid_clusters_for_review: List[Dict],
+    items: List[Dict[str, Any]],
+    clustered_gids: set[int],
+    cluster_batches: List[List[Dict[str, Any]]],
+    cluster_records: List[Dict[str, Any]],
+    invalid_clusters_for_review: List[Dict[str, Any]],
     entry_path: str,
     langs: List[str],
     cluster_limit: int,
     llm_group: Optional[str],
-    _progress_append,
-    _write_cluster_batch_snapshot,
+    _progress_append: Any,
+    _write_cluster_batch_snapshot: Any,
     force_save_memory: bool = False,
 ) -> None:
     """处理单个文件的聚类任务"""
@@ -1264,7 +1263,7 @@ def process_file_clustering(
     _limit = (
         cluster_limit if isinstance(cluster_limit, int) and cluster_limit > 0 else 50
     )
-    _chunks: List[List[Dict]] = [
+    _chunks: List[List[Dict[str, Any]]] = [
         pending_in_file[i : i + _limit] for i in range(0, len(pending_in_file), _limit)
     ]
 
@@ -1292,19 +1291,19 @@ def process_file_clustering(
 
 
 def initialize_clustering_context(
-    compact_candidates: List[Dict],
+    compact_candidates: List[Dict[str, Any]],
     sec_dir: Path,
-    _progress_append,
+    _progress_append: Any,
 ) -> tuple[
-    Dict[str, List[Dict]], Dict, tuple, List[List[Dict]], List[Dict], List[Dict], set
+    Dict[str, List[Dict[str, Any]]], Dict[tuple[str, int], List[Dict[str, Any]]], tuple[Any, Any], List[List[Dict[str, Any]]], List[Dict[str, Any]], List[Dict[str, Any]], set[int]
 ]:
     """初始化聚类上下文，返回(文件分组, 已有聚类, 快照写入函数, 聚类批次, 聚类记录, 无效聚类, 已聚类gid)"""
     # 按文件分组构建待聚类集合
     _file_groups = group_candidates_by_file(compact_candidates)
 
-    cluster_batches: List[List[Dict]] = []
-    cluster_records: List[Dict] = []
-    invalid_clusters_for_review: List[Dict] = []
+    cluster_batches: List[List[Dict[str, Any]]] = []
+    cluster_records: List[Dict[str, Any]] = []
+    invalid_clusters_for_review: List[Dict[str, Any]] = []
 
     # 读取已有聚类报告以支持断点
     (
@@ -1343,9 +1342,9 @@ def initialize_clustering_context(
 
 
 def check_unclustered_gids(
-    all_candidate_gids: set,
-    clustered_gids: set,
-) -> set:
+    all_candidate_gids: set[int],
+    clustered_gids: set[int],
+) -> set[int]:
     """检查未聚类的gid"""
     unclustered_gids = all_candidate_gids - clustered_gids
     if unclustered_gids:
@@ -1366,18 +1365,18 @@ def check_unclustered_gids(
 
 
 def execute_clustering_for_files(
-    file_groups: Dict[str, List[Dict]],
-    clustered_gids: set,
-    cluster_batches: List[List[Dict]],
-    cluster_records: List[Dict],
-    invalid_clusters_for_review: List[Dict],
+    file_groups: Dict[str, List[Dict[str, Any]]],
+    clustered_gids: set[int],
+    cluster_batches: List[List[Dict[str, Any]]],
+    cluster_records: List[Dict[str, Any]],
+    invalid_clusters_for_review: List[Dict[str, Any]],
     entry_path: str,
     langs: List[str],
     cluster_limit: int,
     llm_group: Optional[str],
-    status_mgr,
-    _progress_append,
-    _write_cluster_batch_snapshot,
+    status_mgr: Any,
+    _progress_append: Any,
+    _write_cluster_batch_snapshot: Any,
     force_save_memory: bool = False,
 ) -> None:
     """执行文件聚类"""
@@ -1420,9 +1419,9 @@ def execute_clustering_for_files(
 
 def record_clustering_completion(
     sec_dir: Path,
-    cluster_records: List[Dict],
-    compact_candidates: List[Dict],
-    _progress_append,
+    cluster_records: List[Dict[str, Any]],
+    compact_candidates: List[Dict[str, Any]],
+    _progress_append: Any,
 ) -> None:
     """记录聚类阶段完成"""
     try:
@@ -1441,9 +1440,9 @@ def record_clustering_completion(
 
 
 def fallback_to_file_based_batches(
-    file_groups: Dict[str, List[Dict]],
-    existing_clusters: Dict,
-) -> List[List[Dict]]:
+    file_groups: Dict[str, List[Dict[str, Any]]],
+    existing_clusters: Dict[tuple[str, int], List[Dict[str, Any]]],
+) -> List[List[Dict[str, Any]]]:
     """若聚类失败或空，则回退为按文件一次处理"""
     fallback_batches: List[List[Dict]] = []
 

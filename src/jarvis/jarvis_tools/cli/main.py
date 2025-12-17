@@ -16,7 +16,7 @@ app = typer.Typer(help="Jarvis 工具系统命令行界面")
 def list_tools(
     as_json: bool = typer.Option(False, "--json", help="以JSON格式输出"),
     detailed: bool = typer.Option(False, "--detailed", help="显示详细信息"),
-):
+) -> None:
     """列出所有可用工具"""
     registry = ToolRegistry()
     tools = registry.get_all_tools()
@@ -69,7 +69,7 @@ def stat_tools(
     format: str = typer.Option(
         "table", "--format", help="显示格式: table, chart, summary"
     ),
-):
+) -> None:
     """显示工具调用统计信息"""
     from jarvis.jarvis_stats.stats import StatsManager
 
@@ -178,7 +178,7 @@ def call_tool(
     args_file: Optional[str] = typer.Option(
         None, "--args-file", help="从文件加载工具参数 (JSON格式)"
     ),
-):
+) -> None:
     """调用指定工具"""
     registry = ToolRegistry()
     tool_obj = registry.get_tool(tool_name)
@@ -241,13 +241,13 @@ def call_tool(
         raise typer.Exit(code=1)
 
 
-def cli():
+def cli() -> None:
     """Typer application entry point"""
     init_env()
     app()
 
 
-def main():
+def main() -> None:
     """Main entry point for the script"""
     cli()
 

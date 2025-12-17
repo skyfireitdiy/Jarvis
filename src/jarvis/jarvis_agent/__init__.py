@@ -90,6 +90,14 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 
+__all__ = [
+    "Agent",
+    "LoopAction",
+    "show_agent_startup_stats",
+    "get_multiline_input",
+    "user_confirm",
+]
+
 
 def show_agent_startup_stats(
     agent_name: str,
@@ -251,7 +259,7 @@ class Agent:
     model: BasePlatform
     session: SessionManager
 
-    def clear_history(self):
+    def clear_history(self) -> None:
         """
         Clears the current conversation history by delegating to the session manager.
         直接调用关键流程函数，事件总线仅用于非关键流程（如日志、监控等）。
@@ -298,7 +306,7 @@ class Agent:
         except Exception:
             pass
 
-    def __del__(self):
+    def __del__(self) -> None:
         # 只有在记录启动时才停止记录
         pass
 
@@ -306,7 +314,7 @@ class Agent:
         """获取工具使用提示"""
         return build_action_prompt(self.output_handler)
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Agent":
         if kwargs.get("agent_type") == "code":
             try:
                 from jarvis.jarvis_code_agent.code_agent import CodeAgent
@@ -342,7 +350,7 @@ class Agent:
         non_interactive: Optional[bool] = True,
         in_multi_agent: Optional[bool] = None,
         agent_type: str = "normal",
-        **kwargs,
+        **kwargs: Any,
     ):
         """初始化Jarvis Agent实例
 
@@ -517,7 +525,7 @@ class Agent:
         # 动态加载工具调用后回调
         self._load_after_tool_callbacks()
 
-    def _init_model(self, model_group: Optional[str]):
+    def _init_model(self, model_group: Optional[str]) -> None:
         """初始化模型平台（统一使用 normal 平台/模型）"""
         platform_name = get_normal_platform_name(model_group)
         model_name = get_normal_model_name(model_group)
@@ -539,7 +547,7 @@ class Agent:
         # 设置全局模型组，供工具和其他组件使用
         set_global_model_group(model_group)
 
-    def _init_session(self):
+    def _init_session(self) -> None:
         """初始化会话管理器"""
         self.session = SessionManager(model=self.model, agent_name=self.name)
 
@@ -548,7 +556,7 @@ class Agent:
         multiline_inputer: Optional[Callable[[str], str]],
         output_handler: Optional[List[OutputHandlerProtocol]],
         use_tools: List[str],
-    ):
+    ) -> None:
         """初始化各种处理器"""
         default_handlers: List[Any] = [ToolRegistry()]
         handlers = output_handler or default_handlers
@@ -561,12 +569,12 @@ class Agent:
         ]
         self.multiline_inputer = multiline_inputer or get_multiline_input
 
-    def _setup_system_prompt(self):
+    def _setup_system_prompt(self) -> None:
         """设置系统提示词"""
         prompt_text = self.prompt_manager.build_system_prompt(self)
         self.model.set_system_prompt(prompt_text)
 
-    def set_user_data(self, key: str, value: Any):
+    def set_user_data(self, key: str, value: Any) -> None:
         """Sets user data in the session."""
         self.session.set_user_data(key, value)
 
@@ -587,7 +595,7 @@ class Agent:
         except Exception:
             return 0
 
-    def set_use_tools(self, use_tools):
+    def set_use_tools(self, use_tools: List[str]) -> None:
         """设置要使用的工具列表"""
         for handler in self.output_handler:
             if isinstance(handler, ToolRegistry):
@@ -595,11 +603,11 @@ class Agent:
                     handler.use_tools(use_tools)
                 break
 
-    def set_addon_prompt(self, addon_prompt: str):
+    def set_addon_prompt(self, addon_prompt: str) -> None:
         """Sets the addon prompt in the session."""
         self.session.set_addon_prompt(addon_prompt)
 
-    def set_run_input_handlers_next_turn(self, value: bool):
+    def set_run_input_handlers_next_turn(self, value: bool) -> None:
         """Sets the flag to run input handlers on the next turn."""
         self.run_input_handlers_next_turn = value
 
@@ -691,7 +699,9 @@ class Agent:
                         for cb in candidates:
                             try:
 
-                                def _make_wrapper(callback):
+                                def _make_wrapper(
+                                    callback: Callable[[Any], None],
+                                ) -> Callable[..., None]:
                                     def _wrapper(**kwargs: Any) -> None:
                                         try:
                                             agent = kwargs.get("agent")
@@ -1666,7 +1676,7 @@ class Agent:
         else:
             return LoopAction.COMPLETE
 
-    def _first_run(self):
+    def _first_run(self) -> None:
         """首次运行初始化"""
         # 如果工具过多，使用AI进行筛选
         if self.session.prompt:
@@ -1735,7 +1745,7 @@ class Agent:
             "in_multi_agent": True,
         }
 
-    def _filter_tools_if_needed(self, task: str):
+    def _filter_tools_if_needed(self, task: str) -> None:
         """如果工具数量超过阈值，使用大模型筛选相关工具
 
         注意：仅筛选用户自定义工具，内置工具不参与筛选（始终保留）
@@ -1848,7 +1858,7 @@ class Agent:
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 工具筛选失败: {e}，将使用所有工具。")
 
-    def _check_and_organize_memory(self):
+    def _check_and_organize_memory(self) -> None:
         """
         检查记忆库状态，如果满足条件则提示用户整理。
         每天只检测一次。
@@ -1865,7 +1875,9 @@ class Agent:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 检查记忆库时发生意外错误: {e}")
 
-    def _perform_memory_check(self, memory_type: str, base_path: Path, scope_name: str):
+    def _perform_memory_check(
+        self, memory_type: str, base_path: Path, scope_name: str
+    ) -> None:
         """执行特定范围的记忆检查和整理"""
         check_file = base_path / ".last_memory_organizer_check"
         now = datetime.datetime.now()

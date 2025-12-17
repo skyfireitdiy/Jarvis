@@ -23,7 +23,7 @@ from jarvis.jarvis_utils.config import get_data_dir
 class RuleShareManager(ShareManager):
     """规则分享管理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         central_repo = get_central_rules_repo()
         if not central_repo:
             PrettyOutput.auto_print("❌ 错误：未配置中心规则仓库（central_rules_repo）")

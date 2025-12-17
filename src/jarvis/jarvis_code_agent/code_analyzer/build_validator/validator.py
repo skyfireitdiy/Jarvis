@@ -194,7 +194,7 @@ class BuildValidator:
 
     def register_validator(
         self, build_system: BuildSystem, validator: BuildValidatorBase
-    ):
+    ) -> None:
         """注册自定义验证器（扩展点）
 
         Args:

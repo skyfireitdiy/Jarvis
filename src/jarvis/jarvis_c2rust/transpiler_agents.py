@@ -7,6 +7,7 @@ import json
 import time
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import Optional
 
@@ -29,7 +30,7 @@ class AgentManager:
         llm_group: Optional[str],
         non_interactive: bool,
         fn_index_by_id: Dict[int, FnRecord],
-        get_crate_commit_hash_func,
+        get_crate_commit_hash_func: Callable[[], str],
         agent_before_commits: Dict[str, Optional[str]],
     ) -> None:
         self.crate_dir = crate_dir
@@ -265,8 +266,8 @@ class AgentManager:
         module: str,
         rust_sig: str,
         c_code: str,
-        collect_callees_context_func,
-        extract_compile_flags_func,
+        collect_callees_context_func: Callable[[Any], str],
+        extract_compile_flags_func: Callable[[str], Dict[str, Any]],
     ) -> None:
         """
         初始化当前函数的上下文。
@@ -312,7 +313,7 @@ class AgentManager:
                 [
                     "",
                     "C文件编译参数（来自 compile_commands.json）：",
-                    compile_flags,
+                    str(compile_flags),
                 ]
             )
         header_lines.extend(
@@ -356,7 +357,9 @@ class AgentManager:
         except Exception:
             pass
 
-    def on_before_tool_call(self, agent: Any, current_response=None, **kwargs) -> None:
+    def on_before_tool_call(
+        self, agent: Any, current_response: Optional[Any] = None, **kwargs: Any
+    ) -> None:
         """
         工具调用前的事件处理器，用于记录工具调用前的 commit id。
 
@@ -385,10 +388,10 @@ class AgentManager:
     def on_after_tool_call(
         self,
         agent: Any,
-        current_response=None,
-        need_return=None,
-        tool_prompt=None,
-        **kwargs,
+        current_response: Optional[Any] = None,
+        need_return: Optional[bool] = None,
+        tool_prompt: Optional[str] = None,
+        **kwargs: Any,
     ) -> None:
         """
         工具调用后的事件处理器，用于细粒度检测测试代码删除。
@@ -476,7 +479,7 @@ class AgentManager:
                 f"⚠️ [c2rust-transpiler][test-detection] AFTER_TOOL_CALL 事件处理器异常: {e}"
             )
 
-    def set_reset_to_commit_func(self, reset_func) -> None:
+    def set_reset_to_commit_func(self, reset_func: Callable[[str], bool]) -> None:
         """设置回退 commit 的函数"""
         self._reset_to_commit_func = reset_func
 
@@ -486,7 +489,7 @@ class AgentManager:
         module: str,
         rust_sig: str,
         progress: Dict[str, Any],
-        save_progress_func,
+        save_progress_func: Callable[[], None],
     ) -> None:
         """更新当前进度"""
         progress["current"] = {

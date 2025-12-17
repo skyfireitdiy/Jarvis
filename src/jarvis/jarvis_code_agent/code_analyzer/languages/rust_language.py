@@ -76,7 +76,7 @@ except (ImportError, Exception):
 class RustSymbolExtractor(TreeSitterExtractor):
     """Extracts symbols from Rust code using tree-sitter."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not RUST_LANGUAGE:
             raise RuntimeError("Rust tree-sitter grammar not available.")
         super().__init__(RUST_LANGUAGE, RUST_SYMBOL_QUERY)

@@ -21,7 +21,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class MethodologyShareManager(ShareManager):
     """方法论分享管理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         central_repo = get_central_methodology_repo()
         if not central_repo:
             PrettyOutput.auto_print(

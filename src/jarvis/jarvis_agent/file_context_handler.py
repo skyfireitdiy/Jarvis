@@ -3,13 +3,14 @@ import os
 import re
 from typing import Any
 from typing import Callable
-from typing import Dict
-from typing import List
+
+
 from typing import Optional
 from typing import Tuple
+from typing import Union
 
 # 语言提取器注册表（导出供其他模块使用）
-_LANGUAGE_EXTRACTORS: Dict[str, Callable[[], Optional[Any]]] = {}
+_LANGUAGE_EXTRACTORS: dict[str, Callable[[], Optional[Any]]] = {}
 
 
 def is_text_file(filepath: str) -> bool:
@@ -35,7 +36,10 @@ def count_lines(filepath: str) -> int:
         return 0
 
 
-def register_language_extractor(extensions, extractor_factory=None):
+def register_language_extractor(
+    extensions: Union[str, list[str]],
+    extractor_factory: Optional[Callable[[], Optional[Any]]] = None,
+) -> Optional[Callable[[Callable[[], Optional[Any]]], Callable[[], Optional[Any]]]]:
     """
     Register a symbol extractor for one or more file extensions.
 
@@ -91,6 +95,7 @@ def register_language_extractor(extensions, extractor_factory=None):
             if not ext_lower.startswith("."):
                 ext_lower = "." + ext_lower
             _LANGUAGE_EXTRACTORS[ext_lower] = extractor_factory
+        return None
 
 
 def _get_symbol_extractor(filepath: str) -> Optional[Any]:
@@ -115,7 +120,7 @@ except (ImportError, Exception):
     pass
 
 
-def extract_symbols_from_file(filepath: str) -> List[Dict[str, Any]]:
+def extract_symbols_from_file(filepath: str) -> list[dict[str, Any]]:
     """Extract symbols from a file using tree-sitter or AST"""
     extractor = _get_symbol_extractor(filepath)
     if not extractor:
@@ -144,13 +149,13 @@ def extract_symbols_from_file(filepath: str) -> List[Dict[str, Any]]:
         return []
 
 
-def format_symbols_output(filepath: str, symbols: List[Dict[str, Any]]) -> str:
+def format_symbols_output(filepath: str, symbols: list[dict[str, Any]]) -> str:
     """Format symbols list as output string"""
     if not symbols:
         return ""
 
     # Group symbols by type
-    by_type: Dict[str, List[Dict[str, Any]]] = {}
+    by_type: dict[str, list[dict[str, Any]]] = {}
     for symbol in symbols:
         symbol_type = symbol["type"]
         if symbol_type not in by_type:

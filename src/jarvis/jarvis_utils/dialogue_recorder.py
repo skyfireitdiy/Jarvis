@@ -47,7 +47,7 @@ class DialogueRecorder:
         self._ensure_data_dir()
         self._register_cleanup_hook()
 
-    def __del__(self):
+    def __del__(self) -> None:
         """析构函数，确保清理资源"""
         if hasattr(self, "_cleanup_registered"):
             self._unregister_cleanup_hook()

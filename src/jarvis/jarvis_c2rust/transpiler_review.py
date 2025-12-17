@@ -825,27 +825,6 @@ class ReviewManager:
                 else:
                     # 无法解析，立即重试：设置标志并继续循环
                     use_direct_model_review = True
-                    # 继续循环，立即重试
-                    continue
-            elif not isinstance(verdict, dict):
-                parse_failed = True
-                # 兼容旧格式：尝试解析纯文本 OK
-                m = re.search(
-                    r"<SUMMARY>([\s\S]*?)</SUMMARY>", summary, flags=re.IGNORECASE
-                )
-                content = (m.group(1).strip() if m else summary.strip()).upper()
-                if content == "OK":
-                    verdict = {
-                        "ok": True,
-                        "function_issues": [],
-                        "critical_issues": [],
-                        "breaking_issues": [],
-                        "structure_issues": [],
-                    }
-                    parse_failed = False  # 兼容格式成功，不算解析失败
-                else:
-                    # 无法解析，立即重试：设置标志并继续循环
-                    use_direct_model_review = True
                     parse_error_msg = f"无法从摘要中解析出有效的 JSON 对象，得到的内容类型为: {type(verdict).__name__}"
                     # 继续循环，立即重试
                     continue

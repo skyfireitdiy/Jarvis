@@ -3,8 +3,10 @@
 
 import os
 import subprocess
+from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 
 from jarvis.jarvis_utils.config import get_diff_large_file_threshold
@@ -105,7 +107,7 @@ class DiffManager:
                 stderr=subprocess.DEVNULL,
             )
 
-    def _get_visualizer(self):
+    def _get_visualizer(self) -> Optional[Any]:
         """获取可视化器实例（延迟初始化）"""
         if self._visualizer is None:
             try:

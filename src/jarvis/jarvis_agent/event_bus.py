@@ -13,8 +13,6 @@ from collections import defaultdict
 from typing import Any
 from typing import Callable
 from typing import DefaultDict
-from typing import List
-from typing import Tuple
 
 
 class EventBus:
@@ -35,12 +33,12 @@ class EventBus:
         # 存储 (priority, order, callback) 元组列表，按优先级和注册顺序排序
         # order 用于相同优先级时保持注册顺序
         self._listeners: DefaultDict[
-            str, List[Tuple[int, int, Callable[..., None]]]
+            str, list[tuple[int, int, Callable[..., None]]]
         ] = defaultdict(list)
         # 注册顺序计数器（每个事件独立计数）
         self._order_counter: DefaultDict[str, int] = defaultdict(int)
         # 缓存排序后的回调列表，避免每次emit都排序
-        self._sorted_cache: DefaultDict[str, List[Callable[..., None]]] = defaultdict(
+        self._sorted_cache: DefaultDict[str, list[Callable[..., None]]] = defaultdict(
             list
         )
         # 标记是否需要重新排序
@@ -86,7 +84,7 @@ class EventBus:
                 self._dirty[event] = True
                 break
 
-    def _get_sorted_callbacks(self, event: str) -> List[Callable[..., None]]:
+    def _get_sorted_callbacks(self, event: str) -> list[Callable[..., None]]:
         """
         获取排序后的回调列表（带缓存）。
 

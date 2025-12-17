@@ -6,8 +6,7 @@
 import json
 import re
 from pathlib import Path
-from typing import List
-from typing import cast
+from typing import Any, Callable, List
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -23,14 +22,14 @@ class GenerationManager:
         crate_dir: Path,
         data_dir: Path,
         disabled_libraries: List[str],
-        extract_compile_flags_func,
-        append_additional_notes_func,
-        is_root_symbol_func,
-        get_generation_agent_func,
-        compose_prompt_with_context_func,
-        check_and_handle_test_deletion_func,
-        get_crate_commit_hash_func,
-        ensure_top_level_pub_mod_func,
+        extract_compile_flags_func: Callable[[str], List[str]],
+        append_additional_notes_func: Callable[[str, str], str],
+        is_root_symbol_func: Callable[[str], bool],
+        get_generation_agent_func: Callable[[], Any],
+        compose_prompt_with_context_func: Callable[[str, Any], str],
+        check_and_handle_test_deletion_func: Callable[[str, str], bool],
+        get_crate_commit_hash_func: Callable[[], str],
+        ensure_top_level_pub_mod_func: Callable[[str], None],
     ) -> None:
         self.project_root = project_root
         self.crate_dir = crate_dir
@@ -59,7 +58,7 @@ class GenerationManager:
         返回完整的提示词字符串。
         """
         symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
-        is_root = self.is_root_symbol(rec)
+        is_root = self.is_root_symbol(rec.qname or rec.name)
         # 获取 C 源文件位置信息
         c_file_location = ""
         if hasattr(rec, "file") and rec.file:
@@ -166,12 +165,12 @@ class GenerationManager:
                 [
                     "",
                     "C文件编译参数（来自 compile_commands.json）：",
-                    compile_flags,
+                    "\n".join(compile_flags),
                     "",
                 ]
             )
         prompt = "\n".join(requirement_lines)
-        return cast(str, self.append_additional_notes(prompt))
+        return self.append_additional_notes(prompt, "")
 
     def extract_rust_fn_name_from_sig(self, rust_sig: str) -> str:
         """
@@ -227,7 +226,7 @@ class GenerationManager:
         # 使用生成 Agent（可以复用）
         agent = self.get_generation_agent()
         agent.run(
-            self.compose_prompt_with_context(prompt),
+            self.compose_prompt_with_context(prompt, agent),
             prefix="[c2rust-transpiler][gen]",
             suffix="",
         )
@@ -241,7 +240,7 @@ class GenerationManager:
             before_commit = self.get_crate_commit_hash()
             # 重试时使用相同的 prompt（已包含 C 源文件位置信息）
             agent.run(
-                self.compose_prompt_with_context(prompt),
+                self.compose_prompt_with_context(prompt, agent),
                 prefix="[c2rust-transpiler][gen][retry]",
                 suffix="",
             )
@@ -252,7 +251,7 @@ class GenerationManager:
                 )
 
         # 如果是根符号，确保其模块在 lib.rs 中被暴露
-        if self.is_root_symbol(rec):
+        if self.is_root_symbol(rec.qname or rec.name):
             try:
                 mp = Path(module)
                 crate_root = self.crate_dir.resolve()

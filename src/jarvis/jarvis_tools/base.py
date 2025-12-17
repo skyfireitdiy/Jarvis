@@ -3,7 +3,6 @@ import json
 from typing import Any
 from typing import Callable
 from typing import Dict
-from typing import cast
 
 
 class Tool:
@@ -13,17 +12,17 @@ class Tool:
         self,
         name: str,
         description: str,
-        parameters: Dict,
-        func: Callable,
+        parameters: Dict[str, Any],
+        func: Callable[[Dict[str, Any]], Dict[str, Any]],
         protocol_version: str = "1.0",
-    ):
+    ) -> None:
         """
         初始化工具对象
 
         参数:
             name (str): 工具名称
             description (str): 工具描述
-            parameters (Dict): 工具参数定义
+            parameters (Dict[str, Any]): 工具参数定义
             func (Callable): 工具执行函数
             protocol_version (str): 工具协议版本，默认"1.0"；支持"1.0"或"2.0"
         """
@@ -33,7 +32,7 @@ class Tool:
         self.func = func
         self.protocol_version = protocol_version
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """将工具对象转换为字典格式，主要用于序列化"""
         return {
             "name": self.name,
@@ -41,7 +40,7 @@ class Tool:
             "parameters": json.dumps(self.parameters, ensure_ascii=False),
         }
 
-    def execute(self, arguments: Dict) -> Dict[str, Any]:
+    def execute(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行工具函数
 
@@ -52,7 +51,7 @@ class Tool:
             Dict[str, Any]: 工具执行结果
         """
         try:
-            return cast(Dict[str, Any], self.func(arguments))
+            return self.func(arguments)
         except Exception as e:
             return {
                 "success": False,

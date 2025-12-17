@@ -6,6 +6,7 @@
 
 import os
 import tempfile
+from typing import Any
 
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.config import get_normal_model_name
@@ -18,30 +19,30 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class FileMethodologyManager:
     """文件和方法论管理器，负责处理文件上传和方法论相关功能"""
 
-    def __init__(self, agent):
+    def __init__(self, agent: Any) -> None:
         """
         初始化文件和方法论管理器
 
         参数:
             agent: Agent实例
         """
-        self.agent = agent
+        self.agent: Any = agent
 
-    def handle_files_and_methodology(self):
+    def handle_files_and_methodology(self) -> None:
         """处理文件上传和方法论加载"""
         if self.agent.model and self.agent.model.support_upload_files():
             self._handle_file_upload_mode()
         else:
             self._handle_local_mode()
 
-    def _handle_file_upload_mode(self):
+    def _handle_file_upload_mode(self) -> None:
         """处理支持文件上传的模式"""
         if self.agent.use_methodology:
             self._handle_methodology_upload()
         elif self.agent.files:
             self._handle_files_upload()
 
-    def _handle_methodology_upload(self):
+    def _handle_methodology_upload(self) -> None:
         """处理方法论上传"""
         if not upload_methodology(self.agent.model, other_files=self.agent.files):
             if self.agent.files:
@@ -66,7 +67,7 @@ class FileMethodologyManager:
                     ]
                 )
 
-    def _handle_files_upload(self):
+    def _handle_files_upload(self) -> None:
         """处理普通文件上传"""
         if not self.agent.model.upload_files(self.agent.files):
             PrettyOutput.auto_print("⚠️ 文件上传失败，将忽略文件列表")
@@ -78,14 +79,14 @@ class FileMethodologyManager:
                 ]
             )
 
-    def _handle_local_mode(self):
+    def _handle_local_mode(self) -> None:
         """处理本地模式（不支持文件上传）"""
         if self.agent.files:
             PrettyOutput.auto_print("⚠️ 不支持上传文件，将忽略文件列表")
         if self.agent.use_methodology:
             self._load_local_methodology()
 
-    def _load_local_methodology(self):
+    def _load_local_methodology(self) -> None:
         """加载本地方法论"""
         msg = self.agent.session.prompt
         for handler in self.agent.input_handler:
@@ -110,7 +111,7 @@ class FileMethodologyManager:
 
     def handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""
-        tmp_file_name = ""
+        tmp_file_name: str = ""
         try:
             tmp_file = tempfile.NamedTemporaryFile(
                 delete=False, mode="w", encoding="utf-8"

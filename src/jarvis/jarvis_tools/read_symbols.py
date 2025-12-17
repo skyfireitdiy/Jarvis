@@ -158,7 +158,7 @@ class ReadSymbolsTool:
                     cnt = found_counts.get(s, 0)
                     status_lines.append(f"[read_symbols] {s}: {cnt} 条匹配")
                 if status_lines:
-                    PrettyOutput.auto_print("\n".join(status_lines), end="\n")
+                    PrettyOutput.auto_print("\n".join(status_lines))
             except Exception:
                 pass
 

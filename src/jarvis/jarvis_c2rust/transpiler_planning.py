@@ -6,6 +6,7 @@
 import json
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -33,13 +34,15 @@ class PlanningManager:
         non_interactive: bool,
         disabled_libraries: List[str],
         root_symbols: List[str],
-        extract_compile_flags_func,
-        collect_callees_context_func,
-        append_additional_notes_func,
-        is_root_symbol_func,
-        get_crate_commit_hash_func,
-        on_before_tool_call_func,
-        on_after_tool_call_func,
+        extract_compile_flags_func: Callable[[str], Dict[str, Any]],
+        collect_callees_context_func: Callable[[Any], List[Dict[str, Any]]],
+        append_additional_notes_func: Callable[[str], str],
+        is_root_symbol_func: Callable[[Any], bool],
+        get_crate_commit_hash_func: Callable[[], str],
+        on_before_tool_call_func: Callable[[Any, Optional[Any]], None],
+        on_after_tool_call_func: Callable[
+            [Any, Optional[Any], Optional[bool], Optional[str]], None
+        ],
         agent_before_commits: Dict[str, Optional[str]],
     ) -> None:
         self.project_root = project_root
@@ -109,7 +112,7 @@ class PlanningManager:
                 [
                     "",
                     "C文件编译参数（来自 compile_commands.json）：",
-                    compile_flags,
+                    str(compile_flags),
                 ]
             )
 

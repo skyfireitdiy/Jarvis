@@ -21,7 +21,7 @@ class LanguageRegistry:
     负责管理所有已注册的语言支持，提供语言检测和工厂方法。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._languages: Dict[str, BaseLanguageSupport] = {}
         self._extension_map: Dict[str, str] = {}  # extension -> language_name
 

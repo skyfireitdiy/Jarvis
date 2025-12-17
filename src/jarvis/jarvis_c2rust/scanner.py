@@ -401,7 +401,7 @@ def iter_source_files(root: Path) -> Iterable[Path]:
 # ---------------------------
 # AST utilities
 # ---------------------------
-def get_qualified_name(cursor) -> str:
+def get_qualified_name(cursor: Any) -> str:
     parts = []
     cur = cursor.semantic_parent
     while cur is not None and cur.kind.name != "TRANSLATION_UNIT":
@@ -415,7 +415,7 @@ def get_qualified_name(cursor) -> str:
     return cursor.spelling or ""
 
 
-def collect_params(cursor) -> List[Dict[str, str]]:
+def collect_params(cursor: Any) -> List[Dict[str, str]]:
     params = []
     for c in cursor.get_children():
         # In libclang, parameters are PARM_DECL
@@ -429,13 +429,13 @@ def collect_params(cursor) -> List[Dict[str, str]]:
     return params
 
 
-def collect_calls(cursor) -> List[str]:
+def collect_calls(cursor: Any) -> List[str]:
     """
     Collect called function names within a function definition.
     """
     calls: List[str] = []
 
-    def walk(node):
+    def walk(node: Any) -> None:
         for ch in node.get_children():
             kind = ch.kind.name
             if kind == "CALL_EXPR":
@@ -460,7 +460,7 @@ def collect_calls(cursor) -> List[str]:
     return calls
 
 
-def is_function_like(cursor) -> bool:
+def is_function_like(cursor: Any) -> bool:
     return cursor.kind.name in {
         "FUNCTION_DECL",
         "CXX_METHOD",
@@ -470,7 +470,7 @@ def is_function_like(cursor) -> bool:
     }
 
 
-def lang_from_cursor(cursor) -> str:
+def lang_from_cursor(cursor: Any) -> str:
     try:
         return str(cursor.language.name)
     except Exception:
@@ -487,7 +487,7 @@ def lang_from_cursor(cursor) -> str:
 # ---------------------------
 # Scanner core
 # ---------------------------
-def scan_file(cindex, file_path: Path, args: List[str]) -> List[FunctionInfo]:
+def scan_file(cindex: Any, file_path: Path, args: List[str]) -> List[FunctionInfo]:
     index = cindex.Index.create()
     tu = index.parse(
         str(file_path),
@@ -496,7 +496,7 @@ def scan_file(cindex, file_path: Path, args: List[str]) -> List[FunctionInfo]:
     )
     functions: List[FunctionInfo] = []
 
-    def visit(node):
+    def visit(node: Any) -> None:
         # Only consider functions with definitions in this file
         if is_function_like(node) and node.is_definition():
             loc_file = node.location.file
@@ -918,7 +918,7 @@ class TypeInfo:
     language: str
 
 
-def scan_types_file(cindex, file_path: Path, args: List[str]) -> List[TypeInfo]:
+def scan_types_file(cindex: Any, file_path: Path, args: List[str]) -> List[TypeInfo]:
     index = cindex.Index.create()
     tu = index.parse(
         str(file_path),
@@ -927,7 +927,7 @@ def scan_types_file(cindex, file_path: Path, args: List[str]) -> List[TypeInfo]:
     )
     types: List[TypeInfo] = []
 
-    def visit(node):
+    def visit(node: Any) -> None:
         kind = node.kind.name
         # Filter by file
         loc_file = node.location.file

@@ -143,7 +143,7 @@ class ModuleManager:
                 return
             if mod_pat.search(txt):
                 # 升级为 pub mod（保留原缩进）
-                def _repl(m):
+                def _repl(m: re.Match) -> str:
                     line = m.group(0)
                     match = re.match(r"^(\s*)", line)
                     ws = match.group(1) if match else ""
@@ -189,7 +189,7 @@ class ModuleManager:
                 return
             if mod_pat.search(txt):
                 # 升级为 pub mod（保留原缩进）
-                def _repl(m):
+                def _repl(m: re.Match) -> str:
                     line = m.group(0)
                     match = re.match(r"^(\s*)", line)
                     ws = match.group(1) if match else ""

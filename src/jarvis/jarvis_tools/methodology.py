@@ -35,12 +35,12 @@ class MethodologyTool:
         "required": ["operation", "problem_type"],
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化经验管理工具"""
         self.methodology_dir = os.path.join(get_data_dir(), "methodologies")
         self._ensure_dir_exists()
 
-    def _ensure_dir_exists(self):
+    def _ensure_dir_exists(self) -> None:
         """确保方法论目录存在"""
         if not os.path.exists(self.methodology_dir):
             try:

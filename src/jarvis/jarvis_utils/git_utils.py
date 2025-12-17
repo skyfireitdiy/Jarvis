@@ -379,9 +379,6 @@ def check_large_code_deletion(threshold: int = 30) -> bool:
     # 检测功能现在由调用方统一处理
     return True
 
-    # 直接返回True，让调用方统一处理大模型询问
-    return True
-
 
 def handle_commit_workflow() -> bool:
     """Handle the git commit workflow and return the commit details.
@@ -536,8 +533,9 @@ def check_and_update_git_repo(repo_path: str) -> bool:
             return False
 
     curr_dir = os.path.abspath(os.getcwd())
-    git_root = find_git_root_and_cd(repo_path)
-    if git_root is None:
+    try:
+        git_root = find_git_root_and_cd(repo_path)
+    except Exception:
         return False
 
     try:

@@ -202,7 +202,7 @@ class ContextManager:
             return symbols[0]
         return None
 
-    def update_context_for_file(self, file_path: str, content: str):
+    def update_context_for_file(self, file_path: str, content: str) -> None:
         """
         Updates the symbol table and dependency graph for a single file.
         """
@@ -247,7 +247,7 @@ class ContextManager:
         # 6. Save updated symbols to cache
         self.symbol_table.save_cache()
 
-    def _refresh_file_symbols(self, file_path: str):
+    def _refresh_file_symbols(self, file_path: str) -> None:
         """Refresh symbols for a file that has been modified externally.
 
         This method is called when a file is detected to be stale (modified

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Match
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -36,7 +37,7 @@ def ensure_top_level_pub_mod(crate_dir: Path, mod_name: str) -> None:
             return
         if mod_pat.search(txt):
             # 升级为 pub mod（保留原缩进）
-            def _repl(m):
+            def _repl(m: Match[str]) -> str:
                 line = m.group(0)
                 match = re.match(r"^(\s*)", line)
                 ws = match.group(1) if match is not None else ""
@@ -81,7 +82,7 @@ def ensure_mod_rs_decl(dir_path: Path, child_mod: str) -> None:
             return
         if mod_pat.search(txt):
             # 升级为 pub mod（保留原缩进）
-            def _repl(m):
+            def _repl(m: Match[str]) -> str:
                 line = m.group(0)
                 match = re.match(r"^(\s*)", line)
                 ws = match.group(1) if match is not None else ""

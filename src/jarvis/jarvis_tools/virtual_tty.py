@@ -258,7 +258,7 @@ class VirtualTTYTool:
             agent.tty_sessions[tty_id]["process"] = process
 
             # 创建输出读取线程
-            def read_output():
+            def read_output() -> None:
                 while True:
                     if process is None or process.poll() is not None:
                         break

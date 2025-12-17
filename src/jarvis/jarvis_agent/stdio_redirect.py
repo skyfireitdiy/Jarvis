@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import sys
 import threading
+from typing import Any, List
 from typing import Optional
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
@@ -75,11 +76,11 @@ class _WebStreamWrapper:
     def encoding(self) -> str:
         return self._encoding
 
-    def writelines(self, lines) -> None:
+    def writelines(self, lines: List[str]) -> None:
         for ln in lines:
             self.write(ln)
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Any:
         # 兼容性：必要时委派到原始 stdout/stderr 的属性（尽量避免）
         try:
             return getattr(
@@ -209,7 +210,7 @@ class _WebInputWrapper:
             with self._lock:
                 self._buffer += chunk
 
-    def readlines(self, hint: int = -1):
+    def readlines(self, hint: int = -1) -> List[str]:
         lines = []
         total = 0
         while True:
@@ -242,7 +243,7 @@ class _WebInputWrapper:
     def encoding(self) -> str:
         return self._encoding
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> Any:
         # 尽量代理到原始 stdin 的属性以增强兼容性
         try:
             return getattr(_original_stdin, name)

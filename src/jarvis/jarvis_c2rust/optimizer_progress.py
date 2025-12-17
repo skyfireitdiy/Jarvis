@@ -334,7 +334,9 @@ class ProgressManager:
                 f"⚠️ [c2rust-optimizer] 保存步骤进度失败（非致命）: {e}",
             )
 
-    def on_before_tool_call(self, agent: Any, current_response=None, **kwargs) -> None:
+    def on_before_tool_call(
+        self, agent: Any, current_response: Optional[Any] = None, **kwargs: Any
+    ) -> None:
         """
         工具调用前的事件处理器，用于记录工具调用前的 commit id。
 
@@ -363,10 +365,10 @@ class ProgressManager:
     def on_after_tool_call(
         self,
         agent: Any,
-        current_response=None,
-        need_return=None,
-        tool_prompt=None,
-        **kwargs,
+        current_response: Optional[Any] = None,
+        need_return: Optional[bool] = None,
+        tool_prompt: Optional[str] = None,
+        **kwargs: Any,
     ) -> None:
         """
         工具调用后的事件处理器，用于细粒度检测测试代码删除。
