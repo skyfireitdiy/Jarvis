@@ -1763,11 +1763,11 @@ class task_list_manager:
 
             if "priority" in task_update_info:
                 new_priority = task_update_info["priority"]
-                if not (1 <= new_priority <= 5):
+                if not isinstance(new_priority, int):
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": "priority 必须在 1-5 之间",
+                        "stderr": f"priority 必须是整数类型: {type(new_priority).__name__}",
                     }
                 update_kwargs["priority"] = new_priority
 

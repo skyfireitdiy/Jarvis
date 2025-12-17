@@ -71,9 +71,9 @@ class Task:
         except ValueError:
             raise ValueError(f"task_id 格式错误: {self.task_id}")
 
-        # 验证 priority
-        if not (1 <= self.priority <= 5):
-            raise ValueError(f"priority 必须在 1-5 之间: {self.priority}")
+        # 验证 priority 为整数类型
+        if not isinstance(self.priority, int):
+            raise ValueError(f"priority 必须是整数类型: {type(self.priority).__name__}")
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典。"""
