@@ -257,6 +257,113 @@ class task_list_manager:
 
         return verification_agent
 
+    def _build_task_content(self, task: Any, additional_info: str = "") -> str:
+        """构建任务内容
+
+        参数:
+            task: 任务对象
+            additional_info: 附加信息
+
+        返回:
+            str: 格式化的任务内容
+        """
+        task_desc = task.task_desc
+        if additional_info and str(additional_info).strip():
+            separator = "\n" + "=" * 50 + "\n"
+            task_desc = f"{task.task_desc}{separator}附加信息:\n{additional_info}"
+
+        return f"""任务名称: {task.task_name}
+
+任务描述:
+{task_desc}
+
+预期输出:
+{task.expected_output}"""
+
+    def _build_task_background(
+        self,
+        task_list_manager: Any,
+        task_list_id: str,
+        task: Any,
+        agent_id: str,
+        is_main_agent: bool,
+        include_completed_summary: bool = True,
+    ) -> str:
+        """构建任务背景信息
+
+        参数:
+            task_list_manager: 任务列表管理器
+            task_list_id: 任务列表ID
+            task: 任务对象
+            agent_id: Agent ID
+            is_main_agent: 是否为主Agent
+            include_completed_summary: 是否包含其他已完成任务的摘要
+
+        返回:
+            str: 格式化的背景信息
+        """
+        background_parts = []
+
+        # 1. 获取任务列表的 main_goal 作为全局上下文
+        task_list = task_list_manager.get_task_list(task_list_id)
+        if task_list:
+            background_parts.append(f"全局目标: {task_list.main_goal}")
+
+        # 2. 获取依赖任务的输出作为背景信息
+        if task.dependencies:
+            dep_outputs = []
+            for dep_id in task.dependencies:
+                dep_task, dep_success, _ = task_list_manager.get_task_detail(
+                    task_list_id=task_list_id,
+                    task_id=dep_id,
+                    agent_id=agent_id,
+                    is_main_agent=is_main_agent,
+                )
+                if dep_success and dep_task:
+                    if dep_task.actual_output:
+                        dep_outputs.append(
+                            f"依赖任务 [{dep_task.task_name}] 的输出:\n{dep_task.actual_output}"
+                        )
+                    elif dep_task.status == TaskStatus.COMPLETED:
+                        # 即使没有输出，也说明依赖任务已完成
+                        dep_outputs.append(
+                            f"依赖任务 [{dep_task.task_name}] 已完成（状态: {dep_task.status.value}）"
+                        )
+
+            if dep_outputs:
+                background_parts.append("依赖任务信息:\n" + "\n\n".join(dep_outputs))
+
+        # 3. 获取其他已完成任务的摘要信息（可选）
+        if include_completed_summary and task_list:
+            completed_tasks = [
+                t
+                for t in task_list.tasks.values()
+                if t.status == TaskStatus.COMPLETED
+                and t.task_id != task.task_id
+                and t.task_id not in (task.dependencies or [])
+            ]
+            if completed_tasks:
+                # 只包含前3个已完成任务的简要信息，避免上下文过长
+                completed_summary = []
+                for completed_task in completed_tasks[:3]:
+                    summary = (
+                        f"- [{completed_task.task_name}]: {completed_task.task_desc}"
+                    )
+                    if completed_task.actual_output:
+                        # 只取输出的前200字符作为摘要
+                        output_preview = completed_task.actual_output[:200]
+                        if len(completed_task.actual_output) > 200:
+                            output_preview += "..."
+                        summary += f"\n  输出摘要: {output_preview}"
+                    completed_summary.append(summary)
+
+                if completed_summary:
+                    background_parts.append(
+                        "其他已完成任务（参考信息）:\n" + "\n".join(completed_summary)
+                    )
+
+        return "\n\n".join(background_parts) if background_parts else ""
+
     def _verify_task_completion(
         self,
         task: Any,
@@ -1202,26 +1309,15 @@ class task_list_manager:
             }
 
         try:
-            # 合并任务描述和附加信息
-            merged_description = task.task_desc
+            # 合并任务描述和附加信息（实际更新任务的desc字段，使打印时可见）
             if additional_info and str(additional_info).strip():
-                # 使用清晰的分隔符合并原有描述和附加信息
                 separator = "\n" + "=" * 50 + "\n"
-                merged_description = (
+                task.task_desc = (
                     f"{task.task_desc}{separator}附加信息:\n{additional_info}"
                 )
 
-                # 实际更新任务的desc字段，使打印时可见
-                task.task_desc = merged_description
-
-            # 构建任务执行内容
-            task_content = f"""任务名称: {task.task_name}
-
-任务描述:
-{merged_description}
-
-预期输出:
-{task.expected_output}"""
+            # 使用公共方法构建任务执行内容
+            task_content = self._build_task_content(task)
 
             # 构建背景信息
             background_parts = []
@@ -1231,64 +1327,18 @@ class task_list_manager:
             if additional_background:
                 background_parts.append(f"额外背景信息: {additional_background}")
 
-            # 1. 获取任务列表的 main_goal 作为全局上下文
-            task_list = task_list_manager.get_task_list(task_list_id)
-            if task_list:
-                background_parts.append(f"全局目标: {task_list.main_goal}")
+            # 使用公共方法构建标准背景信息
+            standard_background = self._build_task_background(
+                task_list_manager=task_list_manager,
+                task_list_id=task_list_id,
+                task=task,
+                agent_id=agent_id,
+                is_main_agent=is_main_agent,
+                include_completed_summary=True,
+            )
 
-            # 2. 获取依赖任务的输出作为背景信息
-            if task.dependencies:
-                dep_outputs = []
-                for dep_id in task.dependencies:
-                    dep_task, dep_success, _ = task_list_manager.get_task_detail(
-                        task_list_id=task_list_id,
-                        task_id=dep_id,
-                        agent_id=agent_id,
-                        is_main_agent=is_main_agent,
-                    )
-                    if dep_success and dep_task:
-                        if dep_task.actual_output:
-                            dep_outputs.append(
-                                f"依赖任务 [{dep_task.task_name}] 的输出:\n{dep_task.actual_output}"
-                            )
-                        elif dep_task.status == TaskStatus.COMPLETED:
-                            # 即使没有输出，也说明依赖任务已完成
-                            dep_outputs.append(
-                                f"依赖任务 [{dep_task.task_name}] 已完成（状态: {dep_task.status.value}）"
-                            )
-
-                if dep_outputs:
-                    background_parts.append(
-                        "依赖任务信息:\n" + "\n\n".join(dep_outputs)
-                    )
-
-            # 3. 获取其他已完成任务的摘要信息（作为额外上下文，帮助理解整体进度）
-            if task_list:
-                completed_tasks = [
-                    t
-                    for t in task_list.tasks.values()
-                    if t.status == TaskStatus.COMPLETED
-                    and t.task_id != task_id
-                    and t.task_id not in (task.dependencies or [])
-                ]
-                if completed_tasks:
-                    # 只包含前3个已完成任务的简要信息，避免上下文过长
-                    completed_summary = []
-                    for completed_task in completed_tasks[:3]:
-                        summary = f"- [{completed_task.task_name}]: {completed_task.task_desc}"
-                        if completed_task.actual_output:
-                            # 只取输出的前200字符作为摘要
-                            output_preview = completed_task.actual_output[:200]
-                            if len(completed_task.actual_output) > 200:
-                                output_preview += "..."
-                            summary += f"\n  输出摘要: {output_preview}"
-                        completed_summary.append(summary)
-
-                    if completed_summary:
-                        background_parts.append(
-                            "其他已完成任务（参考信息）:\n"
-                            + "\n".join(completed_summary)
-                        )
+            if standard_background:
+                background_parts.append(standard_background)
 
             background = "\n\n".join(background_parts) if background_parts else ""
 
@@ -1792,6 +1842,53 @@ class task_list_manager:
             actual_output = task_update_info.get("actual_output")
 
             if status is not None:
+                # 对于 main 类型任务，在更新为 completed 状态时进行验证
+                if status == "completed" and task.agent_type.value == "main":
+                    # 使用公共方法构建任务内容
+                    task_content = self._build_task_content(task)
+
+                    # 使用公共方法构建背景信息
+                    background = self._build_task_background(
+                        task_list_manager=task_list_manager,
+                        task_list_id=task_list_id,
+                        task=task,
+                        agent_id=agent_id,
+                        is_main_agent=is_main_agent,
+                        include_completed_summary=False,  # main任务验证时不需要其他已完成任务摘要
+                    )
+
+                    # 执行验证
+                    from jarvis.jarvis_utils.output import PrettyOutput
+
+                    PrettyOutput.auto_print(
+                        f"🔍 开始验证 main 类型任务 [{task.task_name}] 的完成情况..."
+                    )
+
+                    verification_passed, verification_result = (
+                        self._verify_task_completion(
+                            task,
+                            task_content,
+                            background,
+                            agent,
+                            verification_iteration=1,
+                        )
+                    )
+
+                    if not verification_passed:
+                        # 验证未通过，不更新状态，返回失败原因
+                        PrettyOutput.auto_print(
+                            f"❌ 任务 [{task.task_name}] 验证未通过，状态未更新"
+                        )
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"任务验证未通过，无法更新为completed状态。验证失败原因：\n{verification_result}",
+                        }
+                    else:
+                        PrettyOutput.auto_print(
+                            f"✅ 任务 [{task.task_name}] 验证通过，更新状态为completed"
+                        )
+
                 # 使用 update_task_status 方法更新状态
                 status_success, status_msg = task_list_manager.update_task_status(
                     task_list_id=task_list_id,
