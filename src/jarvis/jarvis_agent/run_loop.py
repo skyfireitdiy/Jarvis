@@ -44,6 +44,89 @@ class AgentRunLoop:
         # Git diff相关属性
         self._git_diff: Optional[str] = None  # 缓存git diff内容
 
+    def _check_can_complete_task(self) -> tuple[bool, str]:
+        """检查agent是否可以完成任务（需要检查任务列表状态）
+
+        返回:
+            tuple[bool, str]: (是否可以完成, 错误信息)
+        """
+        try:
+            # 检查agent是否有task_list_manager
+            if not hasattr(self.agent, "task_list_manager"):
+                return True, ""
+
+            task_list_manager = self.agent.task_list_manager
+            if not task_list_manager:
+                return True, ""
+
+            # 获取当前agent的task_list_id
+            task_list_id = None
+            try:
+                task_list_id = self.agent.get_user_data("__task_list_id__")
+            except Exception:
+                return True, ""
+
+            if not task_list_id:
+                return True, ""
+
+            # 获取任务列表
+            task_list = task_list_manager.get_task_list(task_list_id)
+            if not task_list:
+                return True, ""
+
+            # 检查是否有pending或running状态的任务
+            pending_tasks = []
+            running_tasks = []
+
+            for task in task_list.tasks.values():
+                if task.status.value == "pending":
+                    pending_tasks.append(task)
+                elif task.status.value == "running":
+                    running_tasks.append(task)
+
+            # 如果有未完成的任务，返回详细信息
+            if pending_tasks or running_tasks:
+                error_parts = []
+                error_parts.append("❌ 无法完成任务：检测到任务列表中还有未完成的任务")
+                error_parts.append("")
+
+                if running_tasks:
+                    error_parts.append(f"🔄 运行中的任务 ({len(running_tasks)} 个)：")
+                    for task in running_tasks[:5]:  # 最多显示5个
+                        error_parts.append(f"  - [{task.task_id}] {task.task_name}")
+                    if len(running_tasks) > 5:
+                        error_parts.append(
+                            f"  ... 还有 {len(running_tasks) - 5} 个运行中的任务"
+                        )
+                    error_parts.append("")
+
+                if pending_tasks:
+                    error_parts.append(f"⏳ 待执行的任务 ({len(pending_tasks)} 个)：")
+                    for task in pending_tasks[:5]:  # 最多显示5个
+                        error_parts.append(f"  - [{task.task_id}] {task.task_name}")
+                    if len(pending_tasks) > 5:
+                        error_parts.append(
+                            f"  ... 还有 {len(pending_tasks) - 5} 个待执行的任务"
+                        )
+                    error_parts.append("")
+
+                error_parts.append("💡 建议：")
+                error_parts.append("  1. 使用 task_list_manager 工具完成所有任务")
+                error_parts.append("  2. 或者将不需要的任务状态更新为 abandoned")
+                error_parts.append(
+                    "  3. 确保所有任务都是 completed、failed 或 abandoned 状态后再完成"
+                )
+
+                error_message = "\n".join(error_parts)
+                return False, error_message
+
+            return True, ""
+
+        except Exception as e:
+            # 如果检查失败，记录警告但允许完成（避免阻塞正常流程）
+            PrettyOutput.auto_print(f"⚠️ 检查任务列表状态时发生异常: {str(e)}")
+            return True, ""
+
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
         run_input_handlers = True
@@ -213,6 +296,17 @@ class AgentRunLoop:
                 # 检查自动完成
                 if ag.auto_complete and is_auto_complete(current_response):
                     ag._no_tool_call_count = 0
+
+                    # 检查是否可以完成任务（需要检查任务列表状态）
+                    can_complete, error_message = self._check_can_complete_task()
+                    if not can_complete:
+                        # 无法完成任务，将错误信息作为提示返回给agent
+                        PrettyOutput.auto_print(error_message)
+                        ag.set_addon_prompt(error_message)
+                        # 重置计数器，继续执行
+                        ag._no_tool_call_count = 0
+                        continue
+
                     # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
                     result = ag._complete_task(auto_completed=True)
                     # 若不需要summary，则将最后一条LLM输出作为返回值
@@ -260,6 +354,15 @@ class AgentRunLoop:
                     run_input_handlers = True
                     continue
                 elif action == "complete":
+                    # 检查是否可以完成任务（需要检查任务列表状态）
+                    can_complete, error_message = self._check_can_complete_task()
+                    if not can_complete:
+                        # 无法完成任务，显示错误信息并继续
+                        PrettyOutput.auto_print(error_message)
+                        ag.set_addon_prompt(error_message)
+                        run_input_handlers = True
+                        continue
+
                     return ag._complete_task(auto_completed=False)
 
             except Exception as e:
