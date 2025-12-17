@@ -4,7 +4,7 @@
 """
 
 import json
-from typing import Any
+
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -1150,6 +1150,40 @@ class task_list_manager:
                 "stdout": "",
                 "stderr": f"任务状态为 {task.status.value}，无法执行（只有 pending 状态的任务可以执行）",
             }
+
+        # 检查是否有正在运行的任务
+        try:
+            running_tasks = []
+            # 获取任务列表实例
+            task_list = task_list_manager.get_task_list(task_list_id)
+            if task_list:
+                # 扫描所有任务，查找运行中的任务
+                for task_obj in task_list.tasks.values():
+                    if task_obj.status.value == "running":
+                        running_tasks.append(
+                            {
+                                "task_id": task_obj.task_id,
+                                "task_name": task_obj.task_name,
+                            }
+                        )
+
+            if running_tasks:
+                running_task_details = []
+                for rt in running_tasks:
+                    running_task_details.append(
+                        f"任务ID: {rt['task_id']}, 任务名称: {rt['task_name']}"
+                    )
+
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"检测到 {len(running_tasks)} 个任务正在运行，请先完成这些任务后再执行新任务：\n"
+                    + "\n".join(running_task_details),
+                }
+
+        except Exception:
+            # 如果检测失败，记录但不阻止任务执行，避免影响系统稳定性
+            pass
 
         # 更新任务状态为 running
         update_success, update_msg = task_list_manager.update_task_status(
