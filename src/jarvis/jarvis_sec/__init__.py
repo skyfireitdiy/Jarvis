@@ -19,6 +19,7 @@ Jarvis 安全分析套件
 - 模块化重构：将功能拆分为多个模块（prompts, parsers, utils, agents, clustering, analysis, verification, review）
 """
 
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -94,22 +95,22 @@ def run_security_analysis(
 
     # 状态管理器（不再使用 status.json，使用空对象）
     class DummyStatusManager:
-        def update_pre_scan(self, **kwargs):
+        def update_pre_scan(self, **kwargs: Any) -> None:
             pass
 
-        def update_clustering(self, **kwargs):
+        def update_clustering(self, **kwargs: Any) -> None:
             pass
 
-        def update_review(self, **kwargs):
+        def update_review(self, **kwargs: Any) -> None:
             pass
 
-        def update_verification(self, **kwargs):
+        def update_verification(self, **kwargs: Any) -> None:
             pass
 
-        def mark_completed(self, **kwargs):
+        def mark_completed(self, **kwargs: Any) -> None:
             pass
 
-        def mark_error(self, **kwargs):
+        def mark_error(self, **kwargs: Any) -> None:
             pass
 
     status_mgr = DummyStatusManager()
@@ -182,7 +183,7 @@ def run_security_analysis(
     )
 
     # 4) 处理验证阶段
-    meta_records: List[Dict] = []
+    meta_records: List[Dict[str, Any]] = []
     all_issues = _process_verification_phase(
         cluster_batches,
         entry_path,
