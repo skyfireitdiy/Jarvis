@@ -49,17 +49,35 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     if not special_tags:
         return user_input, False
 
-    # 检查是否包含Pin标记（需要最后处理）
-    has_pin = "Pin" in special_tags
-
     # 获取替换映射表
     replace_map = get_replace_map()
     processed_tag = set()
     add_on_prompt = ""
-
-    # 处理所有非Pin标记
     modified_input = user_input
 
+    # 优先处理Pin标记
+    if "Pin" in special_tags:
+        pin_marker = "'<Pin>'"
+        pin_index = modified_input.find(pin_marker)
+
+        if pin_index != -1:
+            # 分割为Pin标记前和Pin标记后的内容
+            before_pin = modified_input[:pin_index]
+            after_pin = modified_input[pin_index + len(pin_marker) :]
+
+            # 将Pin标记之后的内容追加到pin_content
+            after_pin_stripped = after_pin.strip()
+            if after_pin_stripped:
+                if agent.pin_content:
+                    agent.pin_content += "\n" + after_pin_stripped
+                else:
+                    agent.pin_content = after_pin_stripped
+                PrettyOutput.auto_print(f"📌 已固定内容: {after_pin_stripped[:50]}...")
+
+            # 移除Pin标记，保留前后内容
+            modified_input = before_pin + after_pin
+
+    # 处理其他标记
     for tag in special_tags:
         # 优先处理会立即返回的特殊标记（不包含Pin）
         if tag == "Summary":
@@ -97,7 +115,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             modified_input = modified_input.replace("'<Quiet>'", "")
             continue
         elif tag == "Pin":
-            # Pin标记最后处理，跳过此处
+            # Pin标记已在前面处理，跳过
             continue
 
         # 处理普通替换标记
@@ -130,21 +148,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
                 )
 
-    # 最后处理Pin标记
-    if has_pin:
-        # 移除所有Pin标记后的处理内容，追加到pin_content
-        processed_content = modified_input.replace("'<Pin>'", "").strip()
-        if processed_content:
-            if agent.pin_content:
-                agent.pin_content += "\n" + processed_content
-            else:
-                agent.pin_content = processed_content
-            PrettyOutput.auto_print(f"📌 已固定内容: {processed_content[:50]}...")
-
-        # 返回处理后的内容（移除了Pin标记）
-        agent.set_addon_prompt(add_on_prompt)
-        return processed_content, False
-
-    # 设置附加提示词
+    # 设置附加提示词并返回处理后的内容
     agent.set_addon_prompt(add_on_prompt)
     return modified_input, False
