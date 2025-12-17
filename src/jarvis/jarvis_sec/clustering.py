@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# mypy: disable-error-code=unreachable
 """聚类相关模块"""
 
 import json
@@ -585,53 +586,62 @@ def validate_cluster_format(
     if not isinstance(cluster_items, list) or not cluster_items:
         return False, ["结果不是数组或数组为空"]
 
-    error_details = []
+    errors: List[str] = []
     for idx, it in enumerate(cluster_items):
+        # 验证每个元素必须是字典
         if not isinstance(it, dict):
-            return False, [f"元素{idx}不是字典"]
+            errors.append(f"元素{idx}不是字典")
+            continue
 
+        # 获取和验证必需字段
         vals = it.get("gids", [])
-        if not isinstance(it.get("verification", ""), str) or not isinstance(
-            vals, list
-        ):
-            error_details.append(f"元素{idx}的verification或gids格式错误")
-            return False, error_details
+        verification = it.get("verification", "")
 
-        # 校验 gids 列表中的每个元素是否都是有效的整数
-        if isinstance(vals, list):
-            for gid_idx, gid_val in enumerate(vals):
-                try:
-                    gid_int = int(gid_val)
-                    if gid_int < 1:
-                        error_details.append(
-                            f"元素{idx}的gids[{gid_idx}]不是有效的正整数（值为{gid_val}）"
-                        )
-                        return False, error_details
-                except (ValueError, TypeError):
-                    error_details.append(
-                        f"元素{idx}的gids[{gid_idx}]不是有效的整数（值为{gid_val}，类型为{type(gid_val).__name__}）"
+        # 验证verification字段
+        if not isinstance(verification, str):
+            errors.append(f"元素{idx}的verification不是字符串")
+            continue
+
+        # 验证gids字段
+        if not isinstance(vals, list):
+            errors.append(f"元素{idx}的gids不是数组")
+            continue
+
+        # 验证gids中的每个元素是有效整数
+        for gid_idx, gid_val in enumerate(vals):
+            try:
+                gid_int = int(gid_val)
+                if gid_int < 1:
+                    errors.append(
+                        f"元素{idx}的gids[{gid_idx}]不是有效的正整数（值为{gid_val}）"
                     )
-                    return False, error_details
-
-        # 校验 is_invalid 字段（必填）
-        if "is_invalid" not in it:
-            error_details.append(f"元素{idx}缺少is_invalid字段（必填）")
-            return False, error_details
-
-        is_invalid_val = it.get("is_invalid")
-        if not isinstance(is_invalid_val, bool):
-            error_details.append(f"元素{idx}的is_invalid不是布尔值")
-            return False, error_details
-
-        # 如果is_invalid为true，必须提供invalid_reason
-        if is_invalid_val is True:
-            invalid_reason = it.get("invalid_reason", "")
-            if not isinstance(invalid_reason, str) or not invalid_reason.strip():
-                error_details.append(
-                    f"元素{idx}的is_invalid为true但缺少invalid_reason字段或理由为空（必填）"
+                    break
+            except (ValueError, TypeError):
+                errors.append(
+                    f"元素{idx}的gids[{gid_idx}]不是有效的整数（值为{gid_val}）"
                 )
-                return False, error_details
+                break
+        else:
+            # 只有前面的验证都通过才继续
+            # 验证is_invalid字段
+            is_invalid_val = it.get("is_invalid")
+            if is_invalid_val is None:
+                errors.append(f"元素{idx}缺少is_invalid字段（必填）")
+                continue
+            if not isinstance(is_invalid_val, bool):
+                errors.append(f"元素{idx}的is_invalid不是布尔值")
+                continue
 
+            # 如果is_invalid为true，验证invalid_reason
+            if is_invalid_val is True:
+                invalid_reason = it.get("invalid_reason", "")
+                if not isinstance(invalid_reason, str) or not invalid_reason.strip():
+                    errors.append(
+                        f"元素{idx}的is_invalid为true但缺少invalid_reason字段或理由为空（必填）"
+                    )
+
+    if errors:
+        return False, errors
     return True, []
 
 
@@ -1033,7 +1043,9 @@ def extract_input_gids(pending_in_file_with_ids: List[Dict[str, Any]]) -> set[in
     return input_gids
 
 
-def build_gid_to_item_mapping(pending_in_file_with_ids: List[Dict[str, Any]]) -> Dict[int, Dict[str, Any]]:
+def build_gid_to_item_mapping(
+    pending_in_file_with_ids: List[Dict[str, Any]],
+) -> Dict[int, Dict[str, Any]]:
     """构建gid到项的映射"""
     gid_to_item: Dict[int, Dict[str, Any]] = {}
     try:
@@ -1210,7 +1222,9 @@ def process_cluster_chunk(
         _write_cluster_batch_snapshot(current_batch_records)
 
 
-def filter_pending_items(items: List[Dict[str, Any]], clustered_gids: set[int]) -> List[Dict[str, Any]]:
+def filter_pending_items(
+    items: List[Dict[str, Any]], clustered_gids: set[int]
+) -> List[Dict[str, Any]]:
     """过滤出待聚类的项"""
     pending_in_file: List[Dict[str, Any]] = []
     for c in items:
@@ -1295,7 +1309,13 @@ def initialize_clustering_context(
     sec_dir: Path,
     _progress_append: Any,
 ) -> tuple[
-    Dict[str, List[Dict[str, Any]]], Dict[tuple[str, int], List[Dict[str, Any]]], tuple[Any, Any], List[List[Dict[str, Any]]], List[Dict[str, Any]], List[Dict[str, Any]], set[int]
+    Dict[str, List[Dict[str, Any]]],
+    Dict[tuple[str, int], List[Dict[str, Any]]],
+    tuple[Any, Any],
+    List[List[Dict[str, Any]]],
+    List[Dict[str, Any]],
+    List[Dict[str, Any]],
+    set[int],
 ]:
     """初始化聚类上下文，返回(文件分组, 已有聚类, 快照写入函数, 聚类批次, 聚类记录, 无效聚类, 已聚类gid)"""
     # 按文件分组构建待聚类集合
@@ -1444,11 +1464,11 @@ def fallback_to_file_based_batches(
     existing_clusters: Dict[tuple[str, int], List[Dict[str, Any]]],
 ) -> List[List[Dict[str, Any]]]:
     """若聚类失败或空，则回退为按文件一次处理"""
-    fallback_batches: List[List[Dict]] = []
+    fallback_batches: List[List[Dict[str, Any]]] = []
 
     # 收集所有未聚类的 gid（从所有候选 gid 中排除已聚类的）
     all_gids_in_file_groups = collect_candidate_gids(file_groups)
-    gid_to_item_fallback: Dict[int, Dict] = {}
+    gid_to_item_fallback: Dict[int, Dict[str, Any]] = {}
     for _file, _items in file_groups.items():
         for c in _items:
             try:
@@ -1480,7 +1500,7 @@ def fallback_to_file_based_batches(
             # 按文件分组未聚类的 gid
             from collections import defaultdict
 
-            unclustered_by_file: Dict[str, List[Dict]] = defaultdict(list)
+            unclustered_by_file: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
             for _gid in unclustered_gids_fallback:
                 item = gid_to_item_fallback.get(_gid)
                 if item:
@@ -1496,16 +1516,16 @@ def fallback_to_file_based_batches(
 
 
 def process_clustering_phase(
-    compact_candidates: List[Dict],
+    compact_candidates: List[Dict[str, Any]],
     entry_path: str,
     langs: List[str],
     cluster_limit: int,
     llm_group: Optional[str],
     sec_dir: Path,
-    status_mgr,
-    _progress_append,
+    status_mgr: Any,
+    _progress_append: Any,
     force_save_memory: bool = False,
-) -> tuple[List[List[Dict]], List[Dict]]:
+) -> tuple[List[List[Dict[str, Any]]], List[Dict[str, Any]]]:
     """处理聚类阶段，返回(cluster_batches, invalid_clusters_for_review)"""
     # 初始化聚类上下文
     (

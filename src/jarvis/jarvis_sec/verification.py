@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """验证相关模块"""
 
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -22,13 +23,13 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 
 
 def build_gid_to_verification_mapping(
-    verification_results: List[Dict],
-) -> Dict[int, Dict]:
+    verification_results: List[Dict[str, Any]],
+) -> Dict[int, Dict[str, Any]]:
     """构建gid到验证结果的映射"""
-    gid_to_verification: Dict[int, Dict] = {}
+    gid_to_verification: Dict[int, Dict[str, Any]] = {}
     for vr in verification_results:
         if not isinstance(vr, dict):
-            continue
+            continue  # type: ignore[unreachable]
         gids_to_process: List[int] = []
         if "gids" in vr and isinstance(vr.get("gids"), list):
             for gid_val in vr.get("gids", []):
@@ -82,12 +83,12 @@ def build_gid_to_verification_mapping(
 
 
 def merge_verified_items(
-    items_with_risk: List[Dict],
-    batch: List[Dict],
-    gid_to_verification: Dict[int, Dict],
-) -> List[Dict]:
+    items_with_risk: List[Dict[str, Any]],
+    batch: List[Dict[str, Any]],
+    gid_to_verification: Dict[int, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     """合并验证通过的告警"""
-    gid_to_candidate: Dict[int, Dict] = {}
+    gid_to_candidate: Dict[int, Dict[str, Any]] = {}
     for c in batch:
         try:
             c_gid = int(c.get("gid", 0))
@@ -96,7 +97,7 @@ def merge_verified_items(
         except Exception:
             pass
 
-    verified_items: List[Dict] = []
+    verified_items: List[Dict[str, Any]] = []
     for item in items_with_risk:
         item_gid = int(item.get("gid", 0))
         verification = gid_to_verification.get(item_gid)
@@ -129,11 +130,11 @@ def merge_verified_items(
 
 
 def merge_verified_items_without_verification(
-    items_with_risk: List[Dict],
-    batch: List[Dict],
-) -> List[Dict]:
+    items_with_risk: List[Dict[str, Any]],
+    batch: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     """合并分析Agent确认的问题（不进行二次验证）"""
-    gid_to_candidate: Dict[int, Dict] = {}
+    gid_to_candidate: Dict[int, Dict[str, Any]] = {}
     for c in batch:
         try:
             c_gid = int(c.get("gid", 0))
@@ -142,7 +143,7 @@ def merge_verified_items_without_verification(
         except Exception:
             pass
 
-    verified_items: List[Dict] = []
+    verified_items: List[Dict[str, Any]] = []
     for item in items_with_risk:
         item_gid = int(item.get("gid", 0))
         # 处理 gids 数组的情况
@@ -171,7 +172,7 @@ def merge_verified_items_without_verification(
     return verified_items
 
 
-def is_valid_verification_item(item: Dict) -> bool:
+def is_valid_verification_item(item: Dict[str, Any]) -> bool:
     """验证验证结果项的格式"""
     if not isinstance(item, dict) or "is_valid" not in item:
         return False
@@ -197,13 +198,13 @@ def is_valid_verification_item(item: Dict) -> bool:
 
 
 def run_verification_agent_with_retry(
-    verification_agent,
+    verification_agent: Any,
     verification_task: str,
     verification_summary_prompt: str,
     entry_path: str,
     verification_summary_container: Dict[str, str],
     bidx: int,
-) -> tuple[Optional[List[Dict]], Optional[str]]:
+) -> tuple[Optional[List[Dict[str, Any]]], Optional[str]]:
     """运行验证Agent并永久重试直到格式正确，返回(验证结果, 解析错误)"""
     use_direct_model_verify = False
     prev_parse_error_verify: Optional[str] = None
@@ -291,18 +292,18 @@ def run_verification_agent_with_retry(
 
 
 def process_verification_batch(
-    batch: List[Dict],
+    batch: List[Dict[str, Any]],
     bidx: int,
     total_batches: int,
     entry_path: str,
     langs: List[str],
     llm_group: Optional[str],
-    status_mgr,
-    _progress_append,
-    _append_report,
-    meta_records: List[Dict],
+    status_mgr: Any,
+    _progress_append: Any,
+    _append_report: Any,
+    meta_records: List[Dict[str, Any]],
     gid_counts: Dict[int, int],
-    sec_dir,
+    sec_dir: Any,
     enable_verification: bool = True,
     force_save_memory: bool = False,
 ) -> None:
@@ -386,7 +387,7 @@ def process_verification_batch(
 
     # 处理分析结果
     parse_fail = summary_items is None
-    verified_items: List[Dict] = []
+    verified_items: List[Dict[str, Any]] = []
 
     # 处理空数组情况：分析 Agent 返回 [] 表示所有候选都被判定为无风险
     if summary_items is not None and len(summary_items) == 0:
@@ -567,7 +568,7 @@ def process_verification_batch(
 """.strip()
 
                 verification_task_id = f"JARVIS-SEC-Verify-Batch-{bidx}"
-                verification_agent_kwargs: Dict = dict(
+                verification_agent_kwargs: Dict[str, Any] = dict(
                     system_prompt=verification_system_prompt,
                     name=verification_task_id,
                     auto_complete=True,
@@ -631,7 +632,7 @@ def process_verification_batch(
                     except Exception:
                         pass
                 elif not isinstance(verification_results, list):
-                    try:
+                    try:  # type: ignore[unreachable]
                         PrettyOutput.auto_print(
                             f"[jarvis-sec] 警告：验证 Agent 返回类型错误，期望 list，实际: {type(verification_results)}"
                         )
@@ -849,22 +850,22 @@ def process_verification_batch(
 
 
 def process_verification_phase(
-    cluster_batches: List[List[Dict]],
+    cluster_batches: List[List[Dict[str, Any]]],
     entry_path: str,
     langs: List[str],
     llm_group: Optional[str],
-    sec_dir,
-    status_mgr,
-    _progress_append,
-    _append_report,
+    sec_dir: Any,
+    status_mgr: Any,
+    _progress_append: Any,
+    _append_report: Any,
     enable_verification: bool = True,
     force_save_memory: bool = False,
-) -> List[Dict]:
+) -> List[Dict[str, Any]]:
     """处理验证阶段，返回所有已保存的告警"""
     from jarvis.jarvis_sec.file_manager import get_all_analyzed_gids
     from jarvis.jarvis_sec.file_manager import load_analysis_results
 
-    batches: List[List[Dict]] = cluster_batches
+    batches: List[List[Dict[str, Any]]] = cluster_batches
     total_batches = len(batches)
 
     # 从 analysis.jsonl 中读取已分析的结果
@@ -894,7 +895,7 @@ def process_verification_phase(
         except Exception:
             pass
 
-    meta_records: List[Dict] = []
+    meta_records: List[Dict[str, Any]] = []
     gid_counts: Dict[int, int] = {}
 
     # 加载 clusters.jsonl 以匹配批次和聚类
