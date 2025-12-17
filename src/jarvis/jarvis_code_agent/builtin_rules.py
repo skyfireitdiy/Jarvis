@@ -34,8 +34,12 @@ def _load_rules_from_directory(directory: Path) -> None:
 
 def _load_builtin_rules() -> None:
     """加载所有内置规则"""
+    # 获取当前文件所在的项目根目录
+    # 从 src/jarvis/jarvis_code_agent/builtin_rules.py 定位到项目根
+    project_root = Path(__file__).parent.parent.parent.parent
+    builtin_dir = project_root / "builtin"
+
     # 加载通用规则（rules 目录）
-    builtin_dir = Path(__file__).parent.parent.parent / "builtin"
     _load_rules_from_directory(builtin_dir / "rules")
 
     # 加载测试规则（test_rules 目录）
