@@ -134,7 +134,7 @@ def get_current_agent_name() -> str:
     """
     agent = get_current_agent()
     if agent:
-        name = getattr(agent, 'name', None)
+        name = getattr(agent, "name", None)
         if isinstance(name, str):
             return name
     return ""
