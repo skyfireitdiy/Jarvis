@@ -211,7 +211,7 @@ class ScriptTool:
             PrettyOutput.auto_print(f"❌ {str(e)}")
             return {"success": False, "stdout": "", "stderr": str(e)}
 
-    def execute(self, args: Dict) -> Dict[str, Any]:
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """Execute script based on interpreter and content
 
         Args:

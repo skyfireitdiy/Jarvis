@@ -2,7 +2,7 @@
 """任务管理模块，负责加载和选择预定义任务"""
 
 import os
-from typing import Dict
+
 
 import yaml
 from prompt_toolkit import prompt
@@ -21,9 +21,9 @@ class TaskManager:
     """任务管理器，负责预定义任务的加载和选择"""
 
     @staticmethod
-    def load_tasks() -> Dict[str, str]:
+    def load_tasks() -> dict[str, str]:
         """Load tasks from .jarvis files in user home and current directory."""
-        tasks: Dict[str, str] = {}
+        tasks: dict[str, str] = {}
 
         # Check pre-command in data directory
         data_dir = get_data_dir()
@@ -64,7 +64,7 @@ class TaskManager:
         return tasks
 
     @staticmethod
-    def select_task(tasks: Dict[str, str]) -> str:
+    def select_task(tasks: dict[str, str]) -> str:
         """Let user select a task from the list or skip. Returns task description if selected."""
         if not tasks:
             return ""

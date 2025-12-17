@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# mypy: disable-error-code=unreachable
 """
 构建和修复模块
 """
@@ -12,7 +13,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
-from typing import cast
 
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -33,15 +33,15 @@ class BuildManager:
         disabled_libraries: List[str],
         root_symbols: List[str],
         progress: Dict[str, Any],
-        save_progress_func,
-        extract_compile_flags_func,
-        get_current_function_context_func,
-        get_fix_agent_func,
-        compose_prompt_with_context_func,
-        check_and_handle_test_deletion_func,
-        get_crate_commit_hash_func,
-        reset_to_commit_func,
-        append_additional_notes_func,
+        save_progress_func: Callable[[], None],
+        extract_compile_flags_func: Callable[[str], List[str]],
+        get_current_function_context_func: Callable[[], Dict[str, Any]],
+        get_fix_agent_func: Callable[[], Any],
+        compose_prompt_with_context_func: Callable[[str], str],
+        check_and_handle_test_deletion_func: Callable[[str, Any], bool],
+        get_crate_commit_hash_func: Callable[[], str],
+        reset_to_commit_func: Callable[[str], None],
+        append_additional_notes_func: Callable[[str], str],
         consecutive_fix_failures_getter: Callable[[], int],
         consecutive_fix_failures_setter: Callable[[int], None],
         current_function_start_commit_getter: Callable[[], Optional[str]],
@@ -327,7 +327,7 @@ class BuildManager:
                     [
                         "",
                         "C文件编译参数（来自 compile_commands.json）：",
-                        compile_flags,
+                        "\n".join(compile_flags),
                     ]
                 )
         base_lines.extend(
@@ -767,7 +767,7 @@ class BuildManager:
         )
         stage_lines = self.build_repair_prompt_stage_section(stage, output, command)
         prompt = "\n".join(base_lines + stage_lines)
-        return cast(str, self.append_additional_notes(prompt))
+        return self.append_additional_notes(prompt)
 
     def run_cargo_test_and_fix(
         self, workspace_root: str, test_iter: int
@@ -993,7 +993,10 @@ class BuildManager:
             command_str = "cargo test -- --nocapture"
 
         symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
-        curr, sym_name, src_loc, c_code = self.get_current_function_context()
+        curr_info = self.get_current_function_context()
+        sym_name = curr_info.get("sym_name", "")
+        src_loc = curr_info.get("src_loc", "")
+        c_code = curr_info.get("c_code", "")
 
         # 调试输出：确认错误信息是否正确传递
         if warning_type is None:
@@ -1029,7 +1032,7 @@ class BuildManager:
         before_commit = self.get_crate_commit_hash()
         # 先创建修复 Agent（后续会复用）
         # 使用修复 Agent，每次重新创建，并传入 C 代码
-        agent = self.get_fix_agent(c_code)
+        agent = self.get_fix_agent()
 
         repair_prompt = self.build_repair_prompt(
             stage=stage_name,
@@ -1038,14 +1041,14 @@ class BuildManager:
             sym_name=sym_name,
             src_loc=src_loc,
             c_code=c_code,
-            curr=curr,
+            curr=curr_info,
             symbols_path=symbols_path,
             include_output_patch_hint=True,
             command=command_str,
             agent=agent,
         )
         agent.run(
-            self.compose_prompt_with_context(repair_prompt, for_fix=True),
+            self.compose_prompt_with_context(repair_prompt),
             prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test]",
             suffix="",
         )
@@ -1058,9 +1061,9 @@ class BuildManager:
             )
             before_commit = self.get_crate_commit_hash()
             # 重新创建修复 Agent
-            agent = self.get_fix_agent(c_code)
+            agent = self.get_fix_agent()
             agent.run(
-                self.compose_prompt_with_context(repair_prompt, for_fix=True),
+                self.compose_prompt_with_context(repair_prompt),
                 prefix=f"[c2rust-transpiler][build-fix iter={test_iter}][test][retry]",
                 suffix="",
             )
@@ -1096,15 +1099,9 @@ class BuildManager:
                     f"❌ [c2rust-transpiler][build] 连续修复失败 {current_failures} 次，回退到函数开始时的 commit: {current_start_commit}"
                 )
                 if self.reset_to_commit(current_start_commit):
-                    PrettyOutput.auto_print(
-                        "⚠️ [c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数"
-                    )
                     # 返回特殊值，表示需要重新开始
                     return (False, None)
-                else:
-                    PrettyOutput.auto_print(
-                        "⚠️ [c2rust-transpiler][build] 回退失败，继续尝试修复"
-                    )
+                # 回退失败，继续尝试修复
             return (False, False)  # 需要继续循环
 
         # 第二步：编译通过，实际运行测试验证
@@ -1245,15 +1242,9 @@ class BuildManager:
                     f"❌ [c2rust-transpiler][build] 连续修复失败 {current_failures} 次（编译通过但测试失败），回退到函数开始时的 commit: {current_start_commit}"
                 )
                 if self.reset_to_commit(current_start_commit):
-                    PrettyOutput.auto_print(
-                        "⚠️ [c2rust-transpiler][build] 已回退到函数开始时的 commit，将重新开始处理该函数"
-                    )
                     # 返回特殊值，表示需要重新开始
                     return (False, None)
-                else:
-                    PrettyOutput.auto_print(
-                        "⚠️ [c2rust-transpiler][build] 回退失败，继续尝试修复"
-                    )
+                # 回退失败，继续尝试修复
             return (False, False)  # 需要继续循环
 
     def cargo_build_loop(self) -> Optional[bool]:

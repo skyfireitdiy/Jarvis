@@ -6,9 +6,6 @@ import subprocess
 from abc import ABC
 from abc import abstractmethod
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Set
 
 from prompt_toolkit import prompt
 
@@ -17,12 +14,12 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
-def parse_selection(selection_str: str, max_value: int) -> List[int]:
+def parse_selection(selection_str: str, max_value: int) -> list[int]:
     """解析用户输入的选择字符串，支持逗号分隔和范围选择
 
     例如: "1,2,3,4-9,20" -> [1, 2, 3, 4, 5, 6, 7, 8, 9, 20]
     """
-    selected: Set[int] = set()
+    selected: set[int] = set()
     parts = selection_str.split(",")
 
     for part in parts:
@@ -169,7 +166,7 @@ class ShareManager(ABC):
                     check=True,
                 )
 
-    def select_resources(self, resources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def select_resources(self, resources: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """让用户选择要分享的资源"""
         # 显示可选的资源
         resource_list = [
@@ -209,7 +206,7 @@ class ShareManager(ABC):
         pass
 
     @abstractmethod
-    def format_resource_display(self, resource: Dict[str, Any]) -> str:
+    def format_resource_display(self, resource: dict[str, Any]) -> str:
         """格式化资源显示"""
         pass
 
@@ -219,11 +216,11 @@ class ShareManager(ABC):
         pass
 
     @abstractmethod
-    def get_local_resources(self) -> List[Dict[str, Any]]:
+    def get_local_resources(self) -> list[dict[str, Any]]:
         """获取本地资源"""
         pass
 
     @abstractmethod
-    def share_resources(self, resources: List[Dict[str, Any]]) -> List[str]:
+    def share_resources(self, resources: list[dict[str, Any]]) -> list[str]:
         """分享资源到中心仓库"""
         pass

@@ -3,14 +3,79 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import List
-from typing import cast
-
+from typing import Protocol
 
 from jarvis.jarvis_c2rust.models import FnRecord
 
 
+class _CodeAgentProtocol(Protocol):
+    """代码agent的协议接口"""
+
+    def run(self, prompt: str, prefix: str = ..., suffix: str = ...) -> None:
+        """运行代码agent"""
+        ...
+
+
+class _TranspilerProtocol(Protocol):
+    """Transpiler类的协议接口，用于避免循环导入"""
+
+    @property
+    def data_dir(self) -> Path:
+        """数据目录"""
+        ...
+
+    @property
+    def crate_dir(self) -> Path:
+        """crate目录"""
+        ...
+
+    @property
+    def project_root(self) -> Path:
+        """项目根目录"""
+        ...
+
+    @property
+    def disabled_libraries(self) -> list[str]:
+        """禁用库列表"""
+        ...
+
+    def _is_root_symbol(self, rec: FnRecord) -> bool:
+        """检查是否为根符号"""
+        ...
+
+    def _append_additional_notes(self, prompt: str) -> str:
+        """附加额外说明"""
+        ...
+
+    def _extract_compile_flags(self, file_path: str) -> str:
+        """提取编译标志"""
+        ...
+
+    def _get_crate_commit_hash(self) -> str:
+        """获取crate的commit hash"""
+        ...
+
+    def _get_code_agent(self) -> _CodeAgentProtocol:
+        """获取代码agent"""
+        ...
+
+    def _compose_prompt_with_context(self, prompt: str) -> str:
+        """组合带上下文的提示词"""
+        ...
+
+    def _check_and_handle_test_deletion(
+        self, before_commit: str, agent: _CodeAgentProtocol
+    ) -> bool:
+        """检查并处理测试代码删除"""
+        ...
+
+    def _ensure_top_level_pub_mod(self, top_mod: str) -> None:
+        """确保顶级模块为pub"""
+        ...
+
+
 def build_generate_impl_prompt(
-    self,
+    self: _TranspilerProtocol,
     rec: FnRecord,
     c_code: str,
     module: str,
@@ -107,11 +172,11 @@ def build_generate_impl_prompt(
             ]
         )
     prompt = "\n".join(requirement_lines)
-    return cast(str, self._append_additional_notes(prompt))
+    return self._append_additional_notes(prompt)
 
 
 def codeagent_generate_impl(
-    self,
+    self: _TranspilerProtocol,
     rec: FnRecord,
     c_code: str,
     module: str,

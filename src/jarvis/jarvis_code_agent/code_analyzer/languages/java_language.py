@@ -58,7 +58,7 @@ JAVA_SYMBOL_QUERY = """
 class JavaSymbolExtractor(TreeSitterExtractor):
     """Extracts symbols from Java code using tree-sitter."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not JAVA_LANGUAGE:
             raise RuntimeError("Java tree-sitter grammar not available.")
         # 如果传入的是 PyCapsule，需要转换为 Language 对象

@@ -63,7 +63,7 @@ JS_SYMBOL_QUERY = """
 class JavaScriptSymbolExtractor(TreeSitterExtractor):
     """Extracts symbols from JavaScript code using tree-sitter."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not JS_LANGUAGE:
             raise RuntimeError("JavaScript tree-sitter grammar not available.")
         # 如果传入的是 PyCapsule，需要转换为 Language 对象

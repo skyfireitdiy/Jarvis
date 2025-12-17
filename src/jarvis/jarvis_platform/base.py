@@ -75,7 +75,7 @@ class BasePlatform(ABC):
         """设置模型名称"""
         raise NotImplementedError("set_model_name is not implemented")
 
-    def reset(self):
+    def reset(self) -> None:
         """重置模型"""
         self.delete_chat()
         self._session_history_file = None

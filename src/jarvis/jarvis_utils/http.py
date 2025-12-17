@@ -29,7 +29,7 @@ def post(
     url: str,
     data: Optional[Any] = None,
     json: Optional[Dict[str, Any]] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> requests.Response:
     """
     发送增强版永不超时的 POST 请求，使用 requests 实现
@@ -54,7 +54,7 @@ def post(
         return response
 
 
-def get(url: str, **kwargs) -> requests.Response:
+def get(url: str, **kwargs: Any) -> requests.Response:
     """
     发送增强版永不超时的 GET 请求，使用 requests 实现
 
@@ -76,7 +76,7 @@ def get(url: str, **kwargs) -> requests.Response:
         return response
 
 
-def put(url: str, data: Optional[Any] = None, **kwargs) -> requests.Response:
+def put(url: str, data: Optional[Any] = None, **kwargs: Any) -> requests.Response:
     """
     发送增强版永不超时的 PUT 请求，使用 requests 实现
 
@@ -99,7 +99,7 @@ def put(url: str, data: Optional[Any] = None, **kwargs) -> requests.Response:
         return response
 
 
-def delete(url: str, **kwargs) -> requests.Response:
+def delete(url: str, **kwargs: Any) -> requests.Response:
     """
     发送增强版永不超时的 DELETE 请求，使用 requests 实现
 
@@ -126,7 +126,7 @@ def stream_post(
     url: str,
     data: Optional[Any] = None,
     json: Optional[Dict[str, Any]] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> Generator[str, None, None]:
     """
     发送流式 POST 请求，使用 requests 实现，返回解码后的字符串行生成器

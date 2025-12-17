@@ -26,7 +26,7 @@ WebSocketOutputSink: 将 PrettyOutput 的输出事件通过 WebBridge 广播给�
 from __future__ import annotations
 
 from typing import Any
-from typing import Dict
+
 
 from jarvis.jarvis_agent.web_bridge import WebBridge
 from jarvis.jarvis_utils.output import OutputEvent
@@ -38,7 +38,7 @@ class WebSocketOutputSink(OutputSink):
 
     def emit(self, event: OutputEvent) -> None:
         try:
-            payload: Dict[str, Any] = {
+            payload: dict[str, Any] = {
                 "type": "output",
                 "payload": {
                     "text": event.text,

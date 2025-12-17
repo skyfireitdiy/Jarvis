@@ -99,7 +99,7 @@ app = typer.Typer(help="C2Rust 命令行工具")
 
 # 显式定义根回调，确保为命令组而非单函数入口
 @app.callback()
-def _root():
+def _root() -> None:
     """
     C2Rust 命令行工具
     """

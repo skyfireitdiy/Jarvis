@@ -21,7 +21,7 @@ import json
 import os
 import signal
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -254,7 +254,7 @@ writeLine('消息解析失败: ' + e);
 # WebSocket 端点
 # ---------------------------
 async def _ws_sender_loop(
-    ws: WebSocket, queue: "asyncio.Queue[Dict[str, Any]]"
+    ws: WebSocket, queue: "asyncio.Queue[dict[str, Any]]"
 ) -> None:
     try:
         while True:
@@ -266,10 +266,10 @@ async def _ws_sender_loop(
 
 
 def _make_sender(
-    queue: "asyncio.Queue[Dict[str, Any]]",
-) -> Callable[[Dict[str, Any]], None]:
+    queue: "asyncio.Queue[dict[str, Any]]",
+) -> Callable[[dict[str, Any]], None]:
     # 同步函数，供 WebBridge 注册；将消息放入异步队列，由协程发送
-    def _sender(payload: Dict[str, Any]) -> None:
+    def _sender(payload: dict[str, Any]) -> None:
         try:
             queue.put_nowait(payload)
         except Exception:
@@ -279,14 +279,14 @@ def _make_sender(
 
 
 def _make_sender_filtered(
-    queue: "asyncio.Queue[Dict[str, Any]]", allowed_types: Optional[list[str]] = None
-) -> Callable[[Dict[str, Any]], None]:
+    queue: "asyncio.Queue[dict[str, Any]]", allowed_types: Optional[list[str]] = None
+) -> Callable[[dict[str, Any]], None]:
     """
     过滤版 sender：仅将指定类型的payload放入队列（用于单独的STDIO通道）。
     """
     allowed = set(allowed_types or [])
 
-    def _sender(payload: Dict[str, Any]) -> None:
+    def _sender(payload: dict[str, Any]) -> None:
         try:
             ptype = payload.get("type")
             if ptype in allowed:
@@ -311,7 +311,7 @@ def start_web_server(
     agent: Any,
     host: str = "127.0.0.1",
     port: int = 8765,
-    launch_command: Optional[List[str]] = None,
+    launch_command: Optional[list[str]] = None,
 ) -> None:
     """
     启动Web服务，并将Agent绑定到应用上下文。
@@ -336,7 +336,7 @@ def start_web_server(
     @app.websocket("/stdio")
     async def websocket_stdio(ws: WebSocket) -> None:
         await ws.accept()
-        queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
+        queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         sender = _make_sender_filtered(queue, allowed_types=["stdio"])
         bridge = WebBridge.instance()
         bridge.add_client(sender)
@@ -505,7 +505,7 @@ def start_web_server(
                 pass
 
         # 交互式会话状态与启动函数（优先执行 jvs 命令，失败回退到系统 shell）
-        session: Dict[str, Optional[int]] = {"pid": None, "master_fd": None}
+        session: dict[str, Optional[int]] = {"pid": None, "master_fd": None}
         last_cols = 0
         last_rows = 0
         # 会话结束后等待用户按回车再重启
@@ -589,7 +589,6 @@ def start_web_server(
                     return True
             except Exception:
                 return False
-            return False
 
         # 启动首个会话
         ok = _spawn_jvs_session()

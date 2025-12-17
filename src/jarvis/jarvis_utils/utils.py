@@ -19,6 +19,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 
 import yaml
 from rich.align import Align
@@ -38,7 +39,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # 向后兼容：导出 get_yes_no 供外部模块引用
 get_yes_no = user_confirm
 
-g_config_file = None
+g_config_file: Optional[str] = None
 
 COMMAND_MAPPING = {
     # jarvis主命令
@@ -225,7 +226,7 @@ def _setup_signal_handler() -> None:
     """设置SIGINT信号处理函数"""
     original_sigint = signal.getsignal(signal.SIGINT)
 
-    def sigint_handler(signum, frame):
+    def sigint_handler(signum: int, frame: Any) -> None:
         if get_in_chat():
             set_interrupt(True)
             if get_interrupt() > 5 and original_sigint and callable(original_sigint):
@@ -1013,7 +1014,7 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
             # 在后台线程中显示统计，避免阻塞主流程
             import threading
 
-            def show_stats_async():
+            def show_stats_async() -> None:
                 try:
                     _show_usage_stats(welcome_str)
                 except Exception:
@@ -1035,7 +1036,7 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
         pass
 
 
-def _interactive_config_setup(config_file_path: Path):
+def _interactive_config_setup(config_file_path: Path) -> None:
     """交互式配置引导"""
     from jarvis.jarvis_platform.registry import PlatformRegistry
     from jarvis.jarvis_utils.input import get_choice
@@ -1225,7 +1226,7 @@ def _interactive_config_setup(config_file_path: Path):
         sys.exit(1)
 
 
-def load_config():
+def load_config() -> None:
     config_file = g_config_file
     config_file_path = (
         Path(config_file)
@@ -1244,7 +1245,7 @@ def load_config():
         _load_and_process_config(str(config_file_path.parent), str(config_file_path))
 
 
-def _load_config_file(config_file: str) -> Tuple[str, dict]:
+def _load_config_file(config_file: str) -> Tuple[str, Dict[str, Any]]:
     """读取并解析YAML格式的配置文件
 
     参数:
@@ -1260,7 +1261,7 @@ def _load_config_file(config_file: str) -> Tuple[str, dict]:
 
 
 def _ensure_schema_declaration(
-    jarvis_dir: str, config_file: str, content: str, config_data: dict
+    jarvis_dir: str, config_file: str, content: str, config_data: Dict[str, Any]
 ) -> None:
     """确保配置文件包含schema声明
 
@@ -1285,7 +1286,7 @@ def _ensure_schema_declaration(
             f.write(content)
 
 
-def _process_env_variables(config_data: dict) -> None:
+def _process_env_variables(config_data: Dict[str, Any]) -> None:
     """处理配置中的环境变量
 
     参数:
@@ -1298,7 +1299,7 @@ def _process_env_variables(config_data: dict) -> None:
 
 
 def _ask_config_bool(
-    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: bool
+    config_data: Dict[str, Any], ask_all: bool, _key: str, _tip: str, _default: bool
 ) -> bool:
     """询问并设置布尔类型配置项"""
     try:
@@ -1317,7 +1318,7 @@ def _ask_config_bool(
 
 
 def _ask_config_str(
-    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = ""
+    config_data: Dict[str, Any], ask_all: bool, _key: str, _tip: str, _default: str = ""
 ) -> bool:
     """询问并设置字符串类型配置项"""
     try:
@@ -1337,7 +1338,7 @@ def _ask_config_str(
 
 
 def _ask_config_optional_str(
-    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: str = ""
+    config_data: Dict[str, Any], ask_all: bool, _key: str, _tip: str, _default: str = ""
 ) -> bool:
     """询问并设置可选字符串类型配置项（空输入表示不改变）"""
     try:
@@ -1359,7 +1360,7 @@ def _ask_config_optional_str(
 
 
 def _ask_config_int(
-    config_data: dict, ask_all: bool, _key: str, _tip: str, _default: int
+    config_data: Dict[str, Any], ask_all: bool, _key: str, _tip: str, _default: int
 ) -> bool:
     """询问并设置整数类型配置项"""
     try:
@@ -1384,7 +1385,9 @@ def _ask_config_int(
         return False
 
 
-def _ask_config_list(config_data: dict, ask_all: bool, _key: str, _tip: str) -> bool:
+def _ask_config_list(
+    config_data: Dict[str, Any], ask_all: bool, _key: str, _tip: str
+) -> bool:
     """询问并设置列表类型配置项（逗号分隔）"""
     try:
         if not ask_all and _key in config_data:
@@ -1413,7 +1416,7 @@ def _ask_config_list(config_data: dict, ask_all: bool, _key: str, _tip: str) -> 
         return False
 
 
-def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
+def _collect_basic_switches(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集基础开关配置"""
     changed = False
     changed = (
@@ -1439,7 +1442,7 @@ def _collect_basic_switches(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_ui_experience_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集UI体验相关配置"""
     changed = False
     try:
@@ -1500,7 +1503,7 @@ def _collect_ui_experience_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_analysis_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集代码分析相关配置"""
     changed = False
     changed = (
@@ -1546,7 +1549,7 @@ def _collect_analysis_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_agent_features_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_agent_features_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集Agent功能相关配置"""
     changed = False
     changed = (
@@ -1582,7 +1585,7 @@ def _collect_agent_features_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_session_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集会话与调试相关配置"""
     changed = False
     changed = (
@@ -1628,7 +1631,7 @@ def _collect_session_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_safety_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_safety_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集代码与工具操作安全提示配置"""
     changed = False
     changed = (
@@ -1654,7 +1657,7 @@ def _collect_safety_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_data_and_token_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集数据目录与最大输入Token配置"""
     changed = False
     from jarvis.jarvis_utils.config import get_data_dir as _get_data_dir
@@ -1711,7 +1714,7 @@ def _collect_data_and_token_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_advanced_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集高级配置（自动总结、脚本超时等）"""
     changed = False
     changed = (
@@ -1747,7 +1750,7 @@ def _collect_advanced_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_directory_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集目录类配置（逗号分隔）"""
     changed = False
     changed = (
@@ -1807,7 +1810,7 @@ def _collect_directory_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_web_search_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_web_search_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集Web搜索配置"""
     changed = False
     changed = (
@@ -1831,7 +1834,7 @@ def _collect_web_search_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_git_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集Git相关配置"""
     changed = False
     changed = (
@@ -1846,7 +1849,7 @@ def _collect_git_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_rag_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集RAG配置（使用新的引用方式）"""
     changed = False
     try:
@@ -1941,7 +1944,7 @@ def _collect_rag_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_central_repo_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_central_repo_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集中心仓库配置"""
     changed = False
     changed = (
@@ -1967,7 +1970,7 @@ def _collect_central_repo_config(config_data: dict, ask_all: bool) -> bool:
     return changed
 
 
-def _collect_shell_config(config_data: dict, ask_all: bool) -> bool:
+def _collect_shell_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集SHELL覆盖配置"""
     changed = False
     try:
@@ -1990,7 +1993,7 @@ def _collect_shell_config(config_data: dict, ask_all: bool) -> bool:
 
 
 def _collect_optional_config_interactively(
-    config_data: dict, ask_all: bool = False
+    config_data: Dict[str, Any], ask_all: bool = False
 ) -> bool:
     """
     复用的交互式配置收集逻辑：
@@ -2123,7 +2126,7 @@ def generate_default_config(schema_path: str, output_path: str) -> None:
         f.write(content)
 
 
-def _load_default_config_from_schema() -> dict:
+def _load_default_config_from_schema() -> Dict[str, Any]:
     """从 schema 生成默认配置字典，用于对比并剔除等于默认值的键"""
     try:
         schema_path = (
@@ -2151,7 +2154,7 @@ def _load_default_config_from_schema() -> dict:
         return {}
 
 
-def _prune_defaults_with_schema(config_data: dict) -> bool:
+def _prune_defaults_with_schema(config_data: Dict[str, Any]) -> bool:
     """
     删除与 schema 默认值一致的配置项，返回是否发生了变更
     仅处理 schema 中定义的键，未在 schema 中的键不会被修改
@@ -2162,7 +2165,7 @@ def _prune_defaults_with_schema(config_data: dict) -> bool:
 
     changed = False
 
-    def _prune_node(node: dict, default_node: dict):
+    def _prune_node(node: Dict[str, Any], default_node: Dict[str, Any]) -> None:
         nonlocal changed
         for key in list(node.keys()):
             if key in default_node:
@@ -2186,7 +2189,7 @@ def _prune_defaults_with_schema(config_data: dict) -> bool:
     return changed
 
 
-def _read_old_config_file(config_file):
+def _read_old_config_file(config_file: Union[str, Path]) -> None:
     """读取并解析旧格式的env配置文件
 
     功能：
@@ -2268,7 +2271,7 @@ def _increment_retry_count() -> int:
     return int(_retry_context.count)
 
 
-def _reset_retry_count():
+def _reset_retry_count() -> None:
     """重置重试计数"""
     _retry_context.count = 0
 
@@ -2491,7 +2494,7 @@ def get_loc_stats() -> str:
         return ""
 
 
-def _pull_git_repo(repo_path: Path, repo_type: str):
+def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
     """对指定的git仓库执行git pull操作，并根据commit hash判断是否有更新。"""
     git_dir = repo_path / ".git"
     if not git_dir.is_dir():
@@ -2616,7 +2619,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str):
         PrettyOutput.auto_print(f"❌ 更新 '{repo_path.name}' 时发生未知错误: {str(e)}")
 
 
-def daily_check_git_updates(repo_dirs: List[str], repo_type: str):
+def daily_check_git_updates(repo_dirs: List[str], repo_type: str) -> None:
     """
     对指定的目录列表执行每日一次的git更新检查。
 

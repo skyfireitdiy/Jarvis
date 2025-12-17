@@ -45,7 +45,7 @@ class PythonSymbolExtractor(SymbolExtractor):
         file_path: str,
         symbols: List[Symbol],
         parent_name: Optional[str],
-    ):
+    ) -> None:
         if isinstance(node, ast.FunctionDef):
             # Extract decorators before the function
             if node.decorator_list:

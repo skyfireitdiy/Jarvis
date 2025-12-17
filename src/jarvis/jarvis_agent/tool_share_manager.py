@@ -21,7 +21,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class ToolShareManager(ShareManager):
     """工具分享管理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         central_repo = get_central_tool_repo()
         if not central_repo:
             PrettyOutput.auto_print("❌ 错误：未配置中心工具仓库（central_tool_repo）")

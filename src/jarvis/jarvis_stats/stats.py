@@ -58,7 +58,7 @@ class StatsManager:
         tags: Optional[Dict[str, str]] = None,
         group: Optional[str] = None,
         unit: str = "count",
-    ):
+    ) -> None:
         """
         增加计数型指标
 
@@ -153,7 +153,7 @@ class StatsManager:
         format: str = "table",
         aggregation: str = "hourly",
         tags: Optional[Dict[str, str]] = None,
-    ):
+    ) -> None:
         """
         显示统计数据
 
@@ -240,7 +240,7 @@ class StatsManager:
         tags: Optional[Dict[str, str]] = None,
         width: Optional[int] = None,
         height: Optional[int] = None,
-    ):
+    ) -> None:
         """
         绘制指标的折线图
 
@@ -385,7 +385,7 @@ class StatsManager:
             }
 
     @staticmethod
-    def clean_old_data(days_to_keep: int = 30):
+    def clean_old_data(days_to_keep: int = 30) -> None:
         """
         清理旧数据
 
@@ -414,7 +414,7 @@ class StatsManager:
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
         tags: Optional[Dict[str, str]] = None,
-    ):
+    ) -> None:
         """显示所有指标摘要"""
         from rich.console import Console
         from rich.table import Table
@@ -522,7 +522,7 @@ class StatsManager:
         start_time: datetime,
         end_time: datetime,
         tags: Optional[Dict[str, str]],
-    ):
+    ) -> None:
         """以表格形式显示数据"""
         storage = StatsManager._get_storage()
         visualizer = StatsManager._get_visualizer()
@@ -551,7 +551,7 @@ class StatsManager:
         tags: Optional[Dict[str, str]],
         width: Optional[int] = None,
         height: Optional[int] = None,
-    ):
+    ) -> None:
         """显示图表"""
         storage = StatsManager._get_storage()
         visualizer = StatsManager._get_visualizer()
@@ -621,7 +621,7 @@ class StatsManager:
         tags: Optional[Dict[str, str]],
         width: Optional[int] = None,
         height: Optional[int] = None,
-    ):
+    ) -> None:
         """根据标签过滤显示多个指标的图表"""
         from rich.console import Console
 
@@ -681,7 +681,7 @@ class StatsManager:
         end_time: datetime,
         aggregation: str,
         tags: Optional[Dict[str, str]],
-    ):
+    ) -> None:
         """显示汇总信息"""
         storage = StatsManager._get_storage()
         visualizer = StatsManager._get_visualizer()

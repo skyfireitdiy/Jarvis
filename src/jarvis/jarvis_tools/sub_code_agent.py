@@ -10,9 +10,7 @@ sub_code_agent 工具
 - 子Agent必须自动完成(auto_complete=True)且需要summary(need_summary=True)
 """
 
-from typing import Any
-from typing import Dict
-from typing import List
+from typing import Any, Dict, List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
 from jarvis.jarvis_utils.globals import get_global_model_group
@@ -162,7 +160,7 @@ class SubCodeAgentTool:
                     non_interactive=True,
                     rule_names=rule_names,
                     auto_complete=True,
-                )  # type: ignore[arg-type]
+                )
             except SystemExit as se:
                 # 将底层 sys.exit 转换为工具错误，避免终止进程
                 return {

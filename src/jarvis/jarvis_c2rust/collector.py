@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Any
 
 from jarvis.jarvis_c2rust.constants import HEADER_EXTS
 from jarvis.jarvis_c2rust.scanner import _try_import_libclang
@@ -94,7 +95,7 @@ def _ensure_parse_args_for_header(
     return args
 
 
-def _collect_decl_function_names(cindex, file: Path, args: List[str]) -> List[str]:
+def _collect_decl_function_names(cindex: Any, file: Path, args: List[str]) -> List[str]:
     """
     对于没有内联定义的头文件的回退方案:
     收集此头文件中定义的函数声明(原型/方法)
@@ -107,7 +108,7 @@ def _collect_decl_function_names(cindex, file: Path, args: List[str]) -> List[st
     names: List[str] = []
     seen = set()
 
-    def visit(node):
+    def visit(node: Any) -> None:
         try:
             kind = node.kind.name
         except Exception:

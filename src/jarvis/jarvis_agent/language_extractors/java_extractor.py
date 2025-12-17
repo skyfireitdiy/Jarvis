@@ -41,7 +41,7 @@ def create_java_extractor() -> Optional[Any]:
             """
 
             class TreeSitterJavaSymbolExtractor:
-                def __init__(self):
+                def __init__(self) -> None:
                     # 如果传入的是 PyCapsule，需要转换为 Language 对象
                     if not isinstance(JAVA_LANGUAGE, Language):
                         self.language = Language(JAVA_LANGUAGE)
@@ -52,7 +52,9 @@ def create_java_extractor() -> Optional[Any]:
                     self.parser.language = self.language
                     self.symbol_query = JAVA_SYMBOL_QUERY
 
-                def extract_symbols(self, file_path: str, content: str) -> list:
+                def extract_symbols(
+                    self, file_path: str, content: str
+                ) -> list[dict[str, str]]:
                     try:
                         tree = self.parser.parse(bytes(content, "utf8"))
                         query = self.language.query(self.symbol_query)
@@ -68,14 +70,21 @@ def create_java_extractor() -> Optional[Any]:
                             }
                             symbol_kind = kind_map.get(name)
                             if symbol_kind:
+                                symbol = Symbol(
+                                    name=node.text.decode("utf8"),
+                                    kind=symbol_kind,
+                                    file_path=file_path,
+                                    line_start=node.start_point[0] + 1,
+                                    line_end=node.end_point[0] + 1,
+                                )
                                 symbols.append(
-                                    Symbol(
-                                        name=node.text.decode("utf8"),
-                                        kind=symbol_kind,
-                                        file_path=file_path,
-                                        line_start=node.start_point[0] + 1,
-                                        line_end=node.end_point[0] + 1,
-                                    )
+                                    {
+                                        "name": symbol.name,
+                                        "kind": symbol.kind,
+                                        "file_path": symbol.file_path,
+                                        "line_start": str(symbol.line_start),
+                                        "line_end": str(symbol.line_end),
+                                    }
                                 )
                         return symbols
                     except Exception:

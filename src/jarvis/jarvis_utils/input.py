@@ -17,6 +17,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 import sys
 from typing import Iterable
 from typing import List
+from typing import Any
 from typing import Optional
 from typing import Tuple
 
@@ -37,6 +38,7 @@ from prompt_toolkit.filters import has_focus
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.key_binding.key_processor import KeyPressEvent
 from prompt_toolkit.layout.containers import Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
@@ -88,9 +90,6 @@ def _calc_prompt_rows(prev_text: str) -> int:
     prefix = "👤 > "
     prefix_w = _display_width(prefix)
 
-    if prev_text is None:
-        return 1  # type: ignore
-
     lines = prev_text.splitlines()
     if not lines:
         lines = [""]
@@ -132,7 +131,7 @@ def get_single_line_input(tip: str, default: str = "") -> str:
     """
     获取支持历史记录的单行输入。
     """
-    session: PromptSession = PromptSession(history=None)
+    session: PromptSession[Any] = PromptSession(history=None)
     style = PromptStyle.from_dict(
         {"prompt": "ansicyan", "bottom-toolbar": "fg:#888888"}
     )
@@ -160,7 +159,7 @@ def get_choice(tip: str, choices: List[str]) -> str:
     start_index = 0
 
     @bindings.add("up")
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         nonlocal selected_index, start_index
         selected_index = (selected_index - 1 + len(choices)) % len(choices)
         if selected_index < start_index:
@@ -170,7 +169,7 @@ def get_choice(tip: str, choices: List[str]) -> str:
         event.app.invalidate()
 
     @bindings.add("down")
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         nonlocal selected_index, start_index
         selected_index = (selected_index + 1) % len(choices)
         if selected_index >= start_index + max_visible_choices:
@@ -180,10 +179,10 @@ def get_choice(tip: str, choices: List[str]) -> str:
         event.app.invalidate()
 
     @bindings.add("enter")
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         event.app.exit(result=choices[selected_index])
 
-    def get_prompt_tokens():
+    def get_prompt_tokens() -> FormattedText:
         tokens = [("class:question", f"{tip} (使用上下箭头选择, Enter确认)\n")]
 
         end_index = min(start_index + max_visible_choices, len(choices))
@@ -221,7 +220,7 @@ def get_choice(tip: str, choices: List[str]) -> str:
         )
     )
 
-    app: Application = Application(
+    app: Application[Any] = Application(
         layout=layout,
         key_bindings=bindings,
         style=style,
@@ -241,17 +240,17 @@ class FileCompleter(Completer):
     带有模糊匹配的文件路径自定义补全器。
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.path_completer = PathCompleter()
         self.max_suggestions = 30
         self.min_score = 10
         self.replace_map = get_replace_map()
         # Caches for file lists to avoid repeated expensive scans
-        self._git_files_cache = None
-        self._all_files_cache = None
+        self._git_files_cache: Optional[List[str]] = None
+        self._all_files_cache: Optional[List[str]] = None
         self._max_walk_files = 10000
         # Cache for rules to avoid repeated loading
-        self._rules_cache = None
+        self._rules_cache: Optional[List[Tuple[str, str]]] = None
 
     def _get_all_rule_completions(self) -> List[str]:
         """获取所有规则补全项的统一接口
@@ -304,7 +303,7 @@ class FileCompleter(Completer):
             List[Tuple[str, str]]: (规则名称, 规则描述) 列表
         """
         if self._rules_cache is not None:
-            return self._rules_cache  # type: ignore
+            return self._rules_cache
 
         all_rules = []
 
@@ -415,7 +414,7 @@ class FileCompleter(Completer):
                         ]
                     else:
                         self._git_files_cache = []
-                paths = self._git_files_cache or []
+                paths: List[str] = self._git_files_cache or []
             else:
                 import os as _os
 
@@ -579,7 +578,7 @@ def _get_fzf_completion_items(specials: List[str], files: List[str]) -> List[str
 # -+
 # 公共判定辅助函数（按当前Agent优先）
 # ---------------------
-def _get_current_agent_for_input():
+def _get_current_agent_for_input() -> Optional[Any]:
     try:
         import jarvis.jarvis_utils.globals as g
 
@@ -633,7 +632,7 @@ def user_confirm(tip: str, default: bool = True) -> bool:
         return False
 
 
-def _show_history_and_copy():
+def _show_history_and_copy() -> None:
     """
     显示消息历史记录并处理复制到剪贴板。
     此函数使用标准I/O，可在提示会话之外安全调用。
@@ -699,12 +698,12 @@ def _get_multiline_input_internal(
     first_enter_hint_shown = True
 
     @bindings.add("enter")
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         nonlocal first_enter_hint_shown
         if not first_enter_hint_shown and not _multiline_hint_already_shown():
             first_enter_hint_shown = True
 
-            def _show_notice():
+            def _show_notice() -> None:
                 PrettyOutput.auto_print(
                     "ℹ️ 提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。"
                 )
@@ -731,16 +730,16 @@ def _get_multiline_input_internal(
             event.current_buffer.insert_text("\n")
 
     @bindings.add("c-j", filter=has_focus(DEFAULT_BUFFER))
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         event.current_buffer.validate_and_handle()
 
     @bindings.add("c-o", filter=has_focus(DEFAULT_BUFFER))
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         """Handle Ctrl+O by exiting the prompt and returning the sentinel value."""
         event.app.exit(result=CTRL_O_SENTINEL)
 
     @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER), eager=True)
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         """Return a shell command like '!bash' for upper input_handler to execute."""
 
         def _gen_shell_cmd() -> str:
@@ -777,7 +776,7 @@ def _get_multiline_input_internal(
         event.app.exit(result=_gen_shell_cmd() + " # JARVIS-NOCONFIRM")
 
     @bindings.add("@", filter=has_focus(DEFAULT_BUFFER), eager=True)
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         """
         使用 @ 触发 fzf（当 fzf 存在）；否则仅插入 @ 以启用内置补全
         逻辑：
@@ -813,7 +812,7 @@ def _get_multiline_input_internal(
                 pass
 
     @bindings.add("#", filter=has_focus(DEFAULT_BUFFER), eager=True)
-    def _(event):
+    def _(event: KeyPressEvent) -> None:
         """
         使用 # 触发 fzf（当 fzf 存在），以“全量文件模式”进行选择（排除 .git）；否则仅插入 # 启用内置补全
         """
@@ -856,7 +855,7 @@ def _get_multiline_input_internal(
         }
     )
 
-    def _bottom_toolbar():
+    def _bottom_toolbar() -> Any:
         return FormattedText(
             [
                 ("class:bt.tip", f" {tip} "),
@@ -885,7 +884,7 @@ def _get_multiline_input_internal(
         )
 
     history_dir = get_data_dir()
-    session: PromptSession = PromptSession(
+    session: PromptSession[Any] = PromptSession(
         history=FileHistory(os.path.join(history_dir, "multiline_input_history")),
         completer=FileCompleter(),
         key_bindings=bindings,
@@ -898,7 +897,7 @@ def _get_multiline_input_internal(
     # Tip is shown in bottom toolbar; avoid extra print
     prompt = FormattedText([("class:prompt", "👤 > ")])
 
-    def _pre_run():
+    def _pre_run() -> None:
         try:
             from prompt_toolkit.application.current import get_app as _ga
 

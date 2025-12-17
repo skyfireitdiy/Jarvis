@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 from pathlib import Path
-from typing import Any
-from typing import Dict
+from typing import Any, Dict
 
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -173,7 +172,9 @@ class {tool_name}:
 
 请生成完整的、可直接使用的Python代码，生成完成后不用进行测试与验证。"""
 
-    def _register_new_tool(self, agent, tool_name: str, tool_file_path: str) -> bool:
+    def _register_new_tool(
+        self, agent: Any, tool_name: str, tool_file_path: str
+    ) -> bool:
         """注册新生成的工具"""
         try:
             tool_registry = agent.get_tool_registry()

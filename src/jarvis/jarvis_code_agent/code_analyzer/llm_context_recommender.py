@@ -15,6 +15,7 @@ from rich.console import Console
 
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_cheap_model_name
 from jarvis.jarvis_utils.config import get_cheap_platform_name
 from jarvis.jarvis_utils.globals import get_global_model_group
@@ -520,7 +521,7 @@ class ContextRecommender:
             # 解析失败，返回空列表
             return []
 
-    def _create_llm_model(self):
+    def _create_llm_model(self) -> BasePlatform:
         """创建新的 LLM 模型实例
 
         每次调用都创建新的实例，避免上下文窗口累积。

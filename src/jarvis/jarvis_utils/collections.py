@@ -13,6 +13,10 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
+from collections.abc import ItemsView
+from collections.abc import KeysView
+from collections.abc import ValuesView
+
 
 class CaseInsensitiveDict(Mapping[str, Any]):
     """
@@ -198,37 +202,31 @@ class CaseInsensitiveDict(Mapping[str, Any]):
         except KeyError:
             return default
 
-    def keys(self):
+    def keys(self) -> KeysView[str]:
         """
         返回所有键的视图，保持原始大小写。
 
         Returns:
             键的视图对象
         """
-        from collections.abc import KeysView
-
         return KeysView(self)
 
-    def values(self):
+    def values(self) -> ValuesView[Any]:
         """
         返回所有值的视图。
 
         Returns:
             值的视图对象
         """
-        from collections.abc import ValuesView
-
         return ValuesView(self)
 
-    def items(self):
+    def items(self) -> ItemsView[str, Any]:
         """
         返回所有键值对的视图，键保持原始大小写。
 
         Returns:
             键值对的视图对象
         """
-        from collections.abc import ItemsView
-
         return ItemsView(self)
 
     def pop(self, key: str, *args: Any) -> Any:

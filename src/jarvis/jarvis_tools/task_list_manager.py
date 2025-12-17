@@ -9,9 +9,7 @@ from typing import Any
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Dict, List, Optional, Any
 
 from jarvis.jarvis_agent.task_list import TaskStatus
 from jarvis.jarvis_utils.config import get_max_input_token_count
@@ -416,7 +414,7 @@ class task_list_manager:
 
     def _print_task_list_status(
         self, task_list_manager: Any, task_list_id: Optional[str] = None
-    ):
+    ) -> None:
         """打印任务列表状态
 
         参数:
@@ -809,7 +807,7 @@ class task_list_manager:
             }
 
     def _handle_add_tasks(
-        self, args: Dict, task_list_manager: Any, agent_id: str, agent: Any
+        self, args: Dict[str, Any], task_list_manager: Any, agent_id: str, agent: Any
     ) -> Dict[str, Any]:
         """处理批量添加任务（支持通过任务名称匹配依赖关系）"""
         task_list_id = self._get_task_list_id(agent)
@@ -936,7 +934,7 @@ class task_list_manager:
 
     def _handle_get_task_detail(
         self,
-        args: Dict,
+        args: Dict[str, Any],
         task_list_manager: Any,
         agent_id: str,
         is_main_agent: bool,
@@ -984,7 +982,7 @@ class task_list_manager:
             }
 
     def _handle_get_task_list_summary(
-        self, args: Dict, task_list_manager: Any, agent: Any
+        self, args: Dict[str, Any], task_list_manager: Any, agent: Any
     ) -> Dict[str, Any]:
         """处理获取任务列表摘要"""
         task_list_id = self._get_task_list_id(agent)
@@ -1073,7 +1071,7 @@ class task_list_manager:
 
     def _handle_execute_task(
         self,
-        args: Dict,
+        args: Dict[str, Any],
         task_list_manager: Any,
         agent_id: str,
         is_main_agent: bool,
@@ -1658,7 +1656,7 @@ class task_list_manager:
 
     def _handle_update_task(
         self,
-        args: Dict,
+        args: Dict[str, Any],
         task_list_manager: Any,
         agent_id: str,
         is_main_agent: bool,

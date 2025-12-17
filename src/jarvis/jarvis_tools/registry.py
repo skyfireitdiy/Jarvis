@@ -11,6 +11,7 @@ from typing import List
 from typing import Optional
 from typing import Protocol
 from typing import Tuple
+from typing import Set
 from typing import cast
 
 import yaml
@@ -182,7 +183,7 @@ class ToolRegistry(OutputHandlerProtocol):
         """初始化工具注册表"""
         self.tools: Dict[str, Tool] = {}
         # 记录内置工具名称，用于区分内置工具和用户自定义工具
-        self._builtin_tool_names: set = set()
+        self._builtin_tool_names: Set[str] = set()
         # 定义必选工具列表（这些工具将始终可用）
         self._required_tools: List[str] = ["execute_script"]
         # 加载内置工具和外部工具
@@ -428,7 +429,9 @@ class ToolRegistry(OutputHandlerProtocol):
             name = config.get("name", "mcp")
 
             # 注册资源工具
-            def create_resource_list_func(client: McpClient):
+            def create_resource_list_func(
+                client: McpClient,
+            ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
                 def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     args = arguments.copy()
                     args.pop("agent", None)
@@ -443,7 +446,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 return execute
 
-            def create_resource_get_func(client: McpClient):
+            def create_resource_get_func(
+                client: McpClient,
+            ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
                 def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     args = arguments.copy()
                     args.pop("agent", None)
@@ -460,7 +465,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
                 return execute
 
-            def create_mcp_execute_func(tool_name: str, client: McpClient):
+            def create_mcp_execute_func(
+                tool_name: str, client: McpClient
+            ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
                 def execute(arguments: Dict[str, Any]) -> Dict[str, Any]:
                     args = arguments.copy()
                     args.pop("agent", None)
@@ -1183,7 +1190,12 @@ class ToolRegistry(OutputHandlerProtocol):
         try:
             if getattr(tool, "protocol_version", "1.0") == "2.0":
                 # v2.0: agent与参数分离传递
-                return cast(Dict[str, Any], tool.func(arguments, agent))
+                # 尝试使用agent作为第二个参数，如果不兼容则回退到旧方式
+                try:
+                    return tool.func(arguments, agent)  # type: ignore[call-arg]
+                except TypeError:
+                    # 兼容旧版v2.0工具，只传arguments
+                    return tool.func(arguments)
             else:
                 # v1.0: 兼容旧实现，将agent注入到arguments（如果提供）
                 args_to_call = arguments.copy() if isinstance(arguments, dict) else {}

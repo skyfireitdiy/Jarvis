@@ -17,8 +17,7 @@ from __future__ import annotations
 
 import threading
 import uuid
-from queue import Empty
-from queue import Queue
+from queue import Empty, Queue
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -43,8 +42,8 @@ class WebBridge:
         self._clients_lock = threading.Lock()
 
         # 按 request_id 等待的阻塞队列
-        self._pending_inputs: Dict[str, Queue] = {}
-        self._pending_confirms: Dict[str, Queue] = {}
+        self._pending_inputs: Dict[str, Queue[Any]] = {}
+        self._pending_confirms: Dict[str, Queue[Any]] = {}
         self._pending_lock = threading.Lock()
 
     @classmethod
@@ -97,7 +96,7 @@ class WebBridge:
         返回用户输入的文本（可能为空字符串，表示取消）。
         """
         req_id = uuid.uuid4().hex
-        q: Queue = Queue(maxsize=1)
+        q: Queue[Any] = Queue(maxsize=1)
         with self._pending_lock:
             self._pending_inputs[req_id] = q
 
@@ -136,7 +135,7 @@ class WebBridge:
         返回 True/False，若超时则回退为 default。
         """
         req_id = uuid.uuid4().hex
-        q: Queue = Queue(maxsize=1)
+        q: Queue[Any] = Queue(maxsize=1)
         with self._pending_lock:
             self._pending_confirms[req_id] = q
 

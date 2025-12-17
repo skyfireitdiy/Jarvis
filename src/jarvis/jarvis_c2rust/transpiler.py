@@ -185,10 +185,10 @@ class Transpiler:
             self.non_interactive,
             self.disabled_libraries,
             self.root_symbols,
-            self._extract_compile_flags,
+            self._extract_compile_flags_for_planning,
             self._collect_callees_context,
-            self._append_additional_notes,
-            self._is_root_symbol,
+            self._append_notes_for_planning,
+            self._is_root_symbol_for_planning,
             self._get_crate_commit_hash,
             self.agent_manager.on_before_tool_call,
             self.agent_manager.on_after_tool_call,
@@ -201,7 +201,7 @@ class Transpiler:
             self.crate_dir,
             self.data_dir,
             self.disabled_libraries,
-            self._extract_compile_flags,
+            self._extract_compile_flags_for_generation,
             self._append_additional_notes,
             self._is_root_symbol,
             self._get_generation_agent,
@@ -229,14 +229,14 @@ class Transpiler:
             self._save_progress,
             self._read_source_span,
             self._collect_callees_context,
-            self._extract_compile_flags,
-            self._is_root_symbol,
+            self.compile_commands_manager.extract_compile_flags,
+            self._is_root_symbol_for_review,
             self._get_crate_commit_hash,
             lambda: self._current_function_start_commit,
-            self._compose_prompt_with_context,
+            self._compose_for_review,
             self._get_fix_agent,
             self._check_and_handle_test_deletion,
-            self._append_additional_notes,
+            self._append_notes_for_review,
             self._cargo_build_loop,
             self._get_build_loop_has_fixes,
             self._on_before_tool_call,
@@ -268,9 +268,30 @@ class Transpiler:
             self.git_manager,
         )
 
-    def _extract_compile_flags(self, c_file_path: Union[str, Path]) -> Optional[str]:
-        """从 compile_commands.json 中提取指定 C 文件的编译参数（委托给 CompileCommandsManager）"""
-        return self.compile_commands_manager.extract_compile_flags(c_file_path)
+    def _extract_compile_flags_for_context(self, c_file_path: str) -> Dict[str, Any]:
+        """为AgentManager适配的提取编译标志函数"""
+        flags = self.compile_commands_manager.extract_compile_flags(c_file_path)
+        return {"compile_flags": flags or []}
+
+    def _extract_compile_flags_for_generation(self, c_file_path: str) -> List[str]:
+        """为GenerationManager适配的提取编译标志函数"""
+        flags = self.compile_commands_manager.extract_compile_flags(c_file_path)
+        result: List[str] = []
+
+        if flags is None:
+            return result
+
+        # extract_compile_flags返回的是字符串，需要解析
+        # 这里简化为返回字符串列表
+        if flags:
+            result = [flags]
+
+        return result
+
+    def _collect_callees_context_for_context(self, rec: FnRecord) -> str:
+        """为AgentManager适配的收集被调用函数上下文函数"""
+        context_list = self._collect_callees_context(rec)
+        return str(context_list)
 
     def _save_progress(self) -> None:
         """保存进度，使用原子性写入"""
@@ -308,7 +329,7 @@ class Transpiler:
         """返回尚未转换的被调函数符号（委托给 ContextCollector）"""
         return self.context_collector.untranslated_callee_symbols(rec)
 
-    def _append_additional_notes(self, prompt: str) -> str:
+    def _append_additional_notes(self, prompt: str, _unused: str = "") -> str:
         """在提示词末尾追加附加说明（委托给 ContextCollector）"""
         return self.context_collector.append_additional_notes(
             prompt, self.additional_notes
@@ -357,21 +378,23 @@ class Transpiler:
             module,
             rust_sig,
             c_code,
-            self._collect_callees_context,
-            self._extract_compile_flags,
+            self._collect_callees_context_for_context,
+            self._extract_compile_flags_for_context,
         )
 
-    def _on_before_tool_call(self, agent: Any, current_response=None, **kwargs) -> None:
+    def _on_before_tool_call(
+        self, agent: Any, current_response: Any = None, **kwargs: Any
+    ) -> None:
         """工具调用前的事件处理器（委托给 AgentManager）"""
         return self.agent_manager.on_before_tool_call(agent, current_response, **kwargs)
 
     def _on_after_tool_call(
         self,
         agent: Any,
-        current_response=None,
-        need_return=None,
-        tool_prompt=None,
-        **kwargs,
+        current_response: Any = None,
+        need_return: Any = None,
+        tool_prompt: Any = None,
+        **kwargs: Any,
     ) -> None:
         """工具调用后的事件处理器（委托给 AgentManager）"""
         return self.agent_manager.on_after_tool_call(
@@ -398,12 +421,40 @@ class Transpiler:
 
     # ========= 代码生成与修复 =========
 
-    def _is_root_symbol(self, rec: FnRecord) -> bool:
+    def _is_root_symbol(self, symbol_name: str) -> bool:
         """判断函数是否为根符号（排除 main）"""
         if not self.root_symbols:
             return False
-        # 检查函数名或限定名是否在根符号列表中
+        return symbol_name in self.root_symbols
+
+    def _is_root_symbol_for_planning(self, rec: FnRecord) -> bool:
+        """为PlanningManager适配的根符号检查"""
+        if not self.root_symbols:
+            return False
         return (rec.name in self.root_symbols) or (rec.qname in self.root_symbols)
+
+    def _is_root_symbol_for_review(self, rec: FnRecord) -> bool:
+        """为ReviewManager适配的根符号检查"""
+        if not self.root_symbols:
+            return False
+        return (rec.name in self.root_symbols) or (rec.qname in self.root_symbols)
+
+    def _extract_compile_flags_for_planning(self, c_file_path: str) -> Dict[str, Any]:
+        """为PlanningManager适配的提取编译标志函数"""
+        flags = self.compile_commands_manager.extract_compile_flags(c_file_path)
+        return {"compile_flags": flags or []}
+
+    def _append_notes_for_planning(self, prompt: str) -> str:
+        """为PlanningManager适配的附加说明函数"""
+        return self._append_additional_notes(prompt, "")
+
+    def _append_notes_for_review(self, prompt: str) -> str:
+        """为ReviewManager适配的附加说明函数"""
+        return self._append_additional_notes(prompt, "")
+
+    def _compose_for_review(self, prompt: str, for_fix: bool = True) -> str:
+        """为ReviewManager适配的提示词组合函数"""
+        return self._compose_prompt_with_context(prompt, for_fix)
 
     def _build_generate_impl_prompt(
         self,
@@ -469,7 +520,7 @@ class Transpiler:
             callee_rust_sig,
             self.crate_dir,
             lambda: self._get_fix_agent(None),
-            lambda prompt: self._compose_prompt_with_context(prompt, for_fix=True),
+            self._compose_for_review,
             self._check_and_handle_test_deletion,
         )
 
@@ -487,13 +538,13 @@ class Transpiler:
                 self.root_symbols,
                 self.progress,
                 self._save_progress,
-                self._extract_compile_flags,
-                self._get_current_function_context,
+                self._extract_compile_flags_for_generation,
+                self._get_current_function_context_for_build,
                 self._get_fix_agent,
                 self._compose_prompt_with_context,
                 self._check_and_handle_test_deletion,
                 self._get_crate_commit_hash,
-                self._reset_to_commit,
+                self._reset_to_commit_for_build,
                 self._append_additional_notes,
                 lambda: self._consecutive_fix_failures,
                 lambda v: setattr(self, "_consecutive_fix_failures", v),
@@ -543,6 +594,81 @@ class Transpiler:
         except Exception:
             c_code = ""
         return curr, sym_name, src_loc, c_code
+
+    def _get_current_function_context_for_build(self) -> Dict[str, Any]:
+        """为BuildManager适配的获取当前函数上下文函数"""
+        curr, sym_name, src_loc, c_code = self._get_current_function_context()
+        return {
+            "curr": curr,
+            "sym_name": sym_name,
+            "src_loc": src_loc,
+            "c_code": c_code,
+        }
+
+    def _load_order_index_for_executor(self, path: Path) -> Dict[str, Any]:
+        """为TranspilerExecutor适配的加载顺序索引函数"""
+        self._load_order_index(path)
+        return {}
+
+    def _codeagent_generate_impl_for_executor(
+        self, rec: Any, c_code: str, module: str, rust_sig: str, callees: List[str]
+    ) -> str:
+        """为TranspilerExecutor适配的代码生成实现函数"""
+        from jarvis.jarvis_c2rust.models import FnRecord
+
+        if isinstance(rec, dict):
+            # 转换dict为FnRecord
+            rec_obj = FnRecord(
+                id=rec.get("id", 0),
+                name=rec.get("name", ""),
+                qname=rec.get("qname", ""),
+                file=rec.get("file", ""),
+                start_line=rec.get("start_line", 0),
+                start_col=rec.get("start_col", 0),
+                end_line=rec.get("end_line", 0),
+                end_col=rec.get("end_col", 0),
+                refs=rec.get("refs", []),
+                signature=rec.get("signature", ""),
+                return_type=rec.get("return_type", ""),
+                params=rec.get("params", None),
+                lib_replacement=rec.get("lib_replacement", None),
+            )
+        else:
+            rec_obj = rec
+        self._codeagent_generate_impl(rec_obj, c_code, module, rust_sig, callees)
+        return ""
+
+    def _cargo_build_loop_for_executor(self) -> bool:
+        """为TranspilerExecutor适配的构建循环函数"""
+        result = self._cargo_build_loop()
+        return bool(result)
+
+    def _review_and_optimize_for_executor(
+        self, rec: Any, module: str, rust_sig: str
+    ) -> bool:
+        """为TranspilerExecutor适配的审查优化函数"""
+        from jarvis.jarvis_c2rust.models import FnRecord
+
+        if isinstance(rec, dict):
+            rec_obj = FnRecord(
+                id=rec.get("id", 0),
+                name=rec.get("name", ""),
+                qname=rec.get("qname", ""),
+                file=rec.get("file", ""),
+                start_line=rec.get("start_line", 0),
+                start_col=rec.get("start_col", 0),
+                end_line=rec.get("end_line", 0),
+                end_col=rec.get("end_col", 0),
+                refs=rec.get("refs", []),
+                signature=rec.get("signature", ""),
+                return_type=rec.get("return_type", ""),
+                params=rec.get("params", None),
+                lib_replacement=rec.get("lib_replacement", None),
+            )
+        else:
+            rec_obj = rec
+        self._review_and_optimize(rec_obj, module, rust_sig)
+        return True
 
     def _build_repair_prompt_base(
         self,
@@ -635,9 +761,10 @@ class Transpiler:
         if self.build_manager is not None:
             self.build_manager.run_cargo_fmt(workspace_root)
 
-    def _get_crate_commit_hash(self) -> Optional[str]:
+    def _get_crate_commit_hash(self) -> str:
         """获取 crate 目录的当前 commit id（委托给 GitManager）"""
-        return self.git_manager.get_crate_commit_hash()
+        result = self.git_manager.get_crate_commit_hash()
+        return result or ""
 
     def _get_git_diff(self, base_commit: Optional[str] = None) -> str:
         """获取 git diff，显示从 base_commit 到当前工作区的变更（委托给 GitManager）"""
@@ -646,6 +773,10 @@ class Transpiler:
     def _reset_to_commit(self, commit_hash: str) -> bool:
         """回退 crate 目录到指定的 commit（委托给 GitManager）"""
         return self.git_manager.reset_to_commit(commit_hash)
+
+    def _reset_to_commit_for_build(self, commit_hash: str) -> None:
+        """为BuildManager适配的回退commit函数"""
+        self.git_manager.reset_to_commit(commit_hash)
 
     def _check_and_handle_test_deletion(
         self, before_commit: Optional[str], agent: Any
@@ -711,7 +842,7 @@ class Transpiler:
             progress=self.progress,
             resume=self.resume,
             fn_index_by_id=self.fn_index_by_id,
-            load_order_index_func=self._load_order_index,
+            load_order_index_func=self._load_order_index_for_executor,
             should_skip_func=self._should_skip,
             read_source_span_func=self._read_source_span,
             plan_module_and_signature_func=self._plan_module_and_signature,
@@ -721,13 +852,13 @@ class Transpiler:
             ensure_mod_chain_for_module_func=self._ensure_mod_chain_for_module,
             ensure_top_level_pub_mod_func=self._ensure_top_level_pub_mod,
             get_crate_commit_hash_func=self._get_crate_commit_hash,
-            reset_to_commit_func=self._reset_to_commit,
+            reset_to_commit_func=self._reset_to_commit_for_build,
             run_cargo_fmt_func=self._run_cargo_fmt,
             untranslated_callee_symbols_func=self._untranslated_callee_symbols,
-            codeagent_generate_impl_func=self._codeagent_generate_impl,
+            codeagent_generate_impl_func=self._codeagent_generate_impl_for_executor,
             refresh_compact_context_func=self._refresh_compact_context,
-            cargo_build_loop_func=self._cargo_build_loop,
-            review_and_optimize_func=self._review_and_optimize,
+            cargo_build_loop_func=self._cargo_build_loop_for_executor,
+            review_and_optimize_func=self._review_and_optimize_for_executor,
             extract_rust_fn_name_from_sig_func=self._extract_rust_fn_name_from_sig,
             resolve_pending_todos_for_symbol_func=self._resolve_pending_todos_for_symbol,
             save_progress_func=self._save_progress,
@@ -735,7 +866,8 @@ class Transpiler:
             consecutive_fix_failures_setter=lambda v: setattr(
                 self, "_consecutive_fix_failures", v
             ),
-            current_function_start_commit_getter=lambda: self._current_function_start_commit,
+            current_function_start_commit_getter=lambda: self._current_function_start_commit
+            or "",
             current_function_start_commit_setter=lambda v: setattr(
                 self, "_current_function_start_commit", v
             ),

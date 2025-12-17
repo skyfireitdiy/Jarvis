@@ -3,11 +3,13 @@
 
 import json
 from typing import Any
+from typing import Dict
+from typing import Match
 
 import _jsonnet
 
 
-def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
+def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, int]]:
     """
     修复 jsonnet ||| 多行字符串的缩进问题。
 
@@ -32,7 +34,7 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
     # 使用非贪婪匹配，确保匹配到最近的 |||
     pattern = r"(\|\|\|)(\s*\n)(.*?)(\n\s*\|\|\|)"
 
-    def fix_match(match):
+    def fix_match(match: Match[str]) -> tuple[str, Dict[str, int]]:
         start_marker = match.group(1)  # |||
         whitespace_after = match.group(2)  # 空白和换行
         content = match.group(3)  # 多行内容
@@ -173,7 +175,7 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, dict]:
     return fixed, all_indent_info
 
 
-def _restore_first_line_indent(obj: Any, indent_info: dict) -> Any:
+def _restore_first_line_indent(obj: Any, indent_info: Dict[str, int]) -> Any:
     """
     恢复第一行的原始缩进。
 
@@ -244,7 +246,7 @@ def _convert_backtick_multiline_strings(s: str) -> str:
     # 注意：这个模式匹配的是 JSON 值位置（冒号后）的 ```
     pattern = r"(:\s*)(```)(\s*\n)(.*?)(\n\s*```)"
 
-    def convert_match(match):
+    def convert_match(match: Match[str]) -> str:
         colon = match.group(1)  # 冒号和可选空白
         match.group(2)  # ``` (保留用于匹配，但不使用)
         whitespace_after = match.group(3)  # 空白和换行
@@ -277,10 +279,6 @@ def _strip_markdown_code_blocks(s: str) -> str:
     """
 
     import re
-
-    # 如果输入不是字符串，直接返回
-    if not isinstance(s, str):
-        return s
 
     # 先去除首尾空白，但保留内部结构
     block = s.strip()
@@ -466,7 +464,7 @@ def loads(s: str) -> Any:
     return result
 
 
-def dumps(obj: Any, **kwargs) -> str:
+def dumps(obj: Any, **kwargs: Any) -> str:
     """
     将 Python 对象序列化为 JSON 字符串
 

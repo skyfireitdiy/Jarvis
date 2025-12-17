@@ -51,7 +51,7 @@ class StatsStorage:
         # 初始化元数据
         self._init_metadata()
 
-    def _init_metadata(self):
+    def _init_metadata(self) -> None:
         """初始化元数据"""
         if not self.meta_file.exists():
             meta = {
@@ -65,7 +65,7 @@ class StatsStorage:
         """获取指定日期的数据文件路径"""
         return self.data_dir / f"stats_{date_str}.json"
 
-    def _load_json(self, filepath: Path) -> Dict:
+    def _load_json(self, filepath: Path) -> Dict[str, Any]:
         """加载JSON文件"""
         if not filepath.exists():
             return {}
@@ -84,7 +84,7 @@ class StatsStorage:
                 return {}
         return {}
 
-    def _save_json(self, filepath: Path, data: Dict):
+    def _save_json(self, filepath: Path, data: Dict[str, Any]) -> None:
         """保存JSON文件"""
         # 使用临时文件+重命名的原子操作来避免并发写入问题
         # 使用唯一的临时文件名避免并发冲突
@@ -118,7 +118,7 @@ class StatsStorage:
                         pass
                 raise RuntimeError(f"保存数据失败: {e}") from e
 
-    def _save_text_atomic(self, filepath: Path, text: str):
+    def _save_text_atomic(self, filepath: Path, text: str) -> None:
         """原子性地保存纯文本内容"""
         temp_suffix = f".tmp.{uuid.uuid4().hex[:8]}"
         temp_filepath = filepath.with_suffix(temp_suffix)
@@ -150,7 +150,7 @@ class StatsStorage:
         unit: Optional[str] = None,
         timestamp: Optional[datetime] = None,
         tags: Optional[Dict[str, str]] = None,
-    ):
+    ) -> None:
         """
         添加统计数据
 
@@ -240,7 +240,7 @@ class StatsStorage:
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
         tags: Optional[Dict[str, str]] = None,
-    ) -> List[Dict]:
+    ) -> List[Dict[str, Any]]:
         """
         获取指定时间范围的统计数据
 
@@ -593,7 +593,7 @@ class StatsStorage:
 
         return True
 
-    def delete_old_data(self, days_to_keep: int = 30):
+    def delete_old_data(self, days_to_keep: int = 30) -> None:
         """删除旧数据"""
         cutoff_date = (datetime.now() - timedelta(days=days_to_keep)).date()
 

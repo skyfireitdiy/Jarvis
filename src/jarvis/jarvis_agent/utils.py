@@ -9,7 +9,7 @@
 from enum import Enum
 from typing import Any
 from typing import Iterable
-from typing import List
+
 
 from jarvis.jarvis_utils.tag import ot
 
@@ -22,7 +22,7 @@ def join_prompts(parts: Iterable[str]) -> str:
     - 不进行额外 strip，保持调用方原样语义
     """
     try:
-        non_empty: List[str] = [p for p in parts if isinstance(p, str) and p]
+        non_empty: list[str] = [p for p in parts if isinstance(p, str) and p]
     except Exception:
         # 防御性处理：若 parts 不可迭代或出现异常，直接返回空字符串
         return ""

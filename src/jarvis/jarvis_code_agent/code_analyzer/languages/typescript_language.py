@@ -77,7 +77,7 @@ TS_SYMBOL_QUERY = """
 class TypeScriptSymbolExtractor(TreeSitterExtractor):
     """Extracts symbols from TypeScript code using tree-sitter."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not TS_LANGUAGE:
             raise RuntimeError("TypeScript tree-sitter grammar not available.")
         # 如果传入的是 PyCapsule，需要转换为 Language 对象

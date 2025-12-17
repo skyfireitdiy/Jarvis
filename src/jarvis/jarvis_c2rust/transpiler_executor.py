@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# mypy: disable-error-code=unreachable
 """
 转译执行器模块
 
@@ -13,9 +14,11 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Any
+from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Set
+from typing import Tuple
 
 
 from jarvis.jarvis_c2rust.constants import MAX_FUNCTION_RETRIES
@@ -37,32 +40,32 @@ class TranspilerExecutor:
         resume: bool,
         fn_index_by_id: Dict[int, FnRecord],
         # 依赖注入的方法
-        load_order_index_func,
-        should_skip_func,
-        read_source_span_func,
-        plan_module_and_signature_func,
-        update_progress_current_func,
-        mark_converted_func,
-        reset_function_context_func,
-        ensure_mod_chain_for_module_func,
-        ensure_top_level_pub_mod_func,
-        get_crate_commit_hash_func,
-        reset_to_commit_func,
-        run_cargo_fmt_func,
-        untranslated_callee_symbols_func,
-        codeagent_generate_impl_func,
-        refresh_compact_context_func,
-        cargo_build_loop_func,
-        review_and_optimize_func,
-        extract_rust_fn_name_from_sig_func,
-        resolve_pending_todos_for_symbol_func,
-        save_progress_func,
-        consecutive_fix_failures_getter,
-        consecutive_fix_failures_setter,
-        current_function_start_commit_getter,
-        current_function_start_commit_setter,
-        get_build_loop_has_fixes_func,
-        ensure_cargo_toml_bin_func,
+        load_order_index_func: Callable[[Path], Dict[str, Any]],
+        should_skip_func: Callable[[Any], bool],
+        read_source_span_func: Callable[[Any], str],
+        plan_module_and_signature_func: Callable[[Any, str], Tuple[str, str, bool]],
+        update_progress_current_func: Callable[[Any, str, str], None],
+        mark_converted_func: Callable[[Any, str, str], None],
+        reset_function_context_func: Callable[[Any, str, str, str], None],
+        ensure_mod_chain_for_module_func: Callable[[str], None],
+        ensure_top_level_pub_mod_func: Callable[[str], None],
+        get_crate_commit_hash_func: Callable[[], str],
+        reset_to_commit_func: Callable[[str], None],
+        run_cargo_fmt_func: Callable[[str], None],
+        untranslated_callee_symbols_func: Callable[[Any], List[str]],
+        codeagent_generate_impl_func: Callable[[Any, str, str, str, List[str]], str],
+        refresh_compact_context_func: Callable[[Any, str, str], None],
+        cargo_build_loop_func: Callable[[], bool],
+        review_and_optimize_func: Callable[[Any, str, str], bool],
+        extract_rust_fn_name_from_sig_func: Callable[[str], str],
+        resolve_pending_todos_for_symbol_func: Callable[[str, str, str, str], None],
+        save_progress_func: Callable[[], None],
+        consecutive_fix_failures_getter: Callable[[], int],
+        consecutive_fix_failures_setter: Callable[[int], None],
+        current_function_start_commit_getter: Callable[[], str],
+        current_function_start_commit_setter: Callable[[str], None],
+        get_build_loop_has_fixes_func: Callable[[], bool],
+        ensure_cargo_toml_bin_func: Callable[[str], None],
     ) -> None:
         self.project_root = project_root
         self.crate_dir = crate_dir

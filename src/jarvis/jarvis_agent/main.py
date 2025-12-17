@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+from typing import Any
 from typing import Optional
 
 import typer
@@ -14,7 +15,7 @@ from jarvis.jarvis_utils.utils import init_env
 app = typer.Typer(help="Jarvis AI 助手")
 
 
-def load_config(config_path: str) -> dict:
+def load_config(config_path: str) -> dict[str, Any]:
     """从YAML文件加载配置
 
     参数:
@@ -54,7 +55,7 @@ def cli(
         "--non-interactive",
         help="启用非交互模式：用户无法与命令交互，脚本执行超时限制为5分钟",
     ),
-):
+) -> None:
     """Main entry point for Jarvis agent"""
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (task and str(task).strip()):

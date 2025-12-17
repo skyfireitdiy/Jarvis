@@ -96,7 +96,7 @@ except (ImportError, Exception):
 class CSymbolExtractor(TreeSitterExtractor):
     """Extracts symbols from C code using tree-sitter."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not C_LANGUAGE:
             raise RuntimeError("C tree-sitter grammar not available.")
         super().__init__(C_LANGUAGE, C_SYMBOL_QUERY)
@@ -131,7 +131,7 @@ class CSymbolExtractor(TreeSitterExtractor):
 class CppSymbolExtractor(TreeSitterExtractor):
     """Extracts symbols from C++ code using tree-sitter."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not CPP_LANGUAGE:
             raise RuntimeError("C++ tree-sitter grammar not available.")
         super().__init__(CPP_LANGUAGE, CPP_SYMBOL_QUERY)

@@ -38,6 +38,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict
 from typing import List
+from typing import Callable
 from typing import Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -150,7 +151,7 @@ class Optimizer:
         step_display_name: str,
         step_num: int,
         target_files: List[Path],
-        opt_func,
+        opt_func: Callable[[List[Path]], None],
     ) -> Optional[int]:
         """
         执行单个优化步骤（unsafe_cleanup, visibility_opt, doc_opt）。

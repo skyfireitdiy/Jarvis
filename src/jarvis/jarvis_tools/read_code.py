@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
@@ -31,7 +31,7 @@ class ReadCodeTool:
         "required": ["files"],
     }
 
-    def _get_max_token_limit(self, agent: Any = None) -> int:
+    def _get_max_token_limit(self, agent: Optional[Any] = None) -> int:
         """获取基于剩余token数量的token限制
 
         Args:
@@ -70,7 +70,7 @@ class ReadCodeTool:
         filepath: str,
         start_line: int = 1,
         end_line: int = -1,
-        agent: Any = None,
+        agent: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """处理单个文件的读取操作
 
@@ -221,7 +221,7 @@ class ReadCodeTool:
             return {"success": False, "stdout": "", "stderr": f"文件读取失败: {str(e)}"}
 
     def _get_file_context(
-        self, filepath: str, start_line: int, end_line: int, agent: Any = None
+        self, filepath: str, start_line: int, end_line: int, agent: Optional[Any] = None
     ) -> str:
         """获取文件的上下文信息
 
@@ -364,7 +364,7 @@ class ReadCodeTool:
             return ""
 
     def _handle_merged_ranges(
-        self, filepath: str, requests: List[Dict], agent: Any = None
+        self, filepath: str, requests: List[Dict[str, Any]], agent: Optional[Any] = None
     ) -> Dict[str, Any]:
         """处理同一文件的多个范围请求，合并后去重
 
@@ -435,7 +435,7 @@ class ReadCodeTool:
                 "stderr": f"合并范围读取失败: {str(e)}",
             }
 
-    def execute(self, args: Dict) -> Dict[str, Any]:
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行代码读取操作
 
         Args:
@@ -628,7 +628,7 @@ class ReadCodeTool:
             return {"success": False, "stdout": "", "stderr": f"代码读取失败: {str(e)}"}
 
 
-def main():
+def main() -> None:
     """测试读取功能"""
     import os
     import tempfile

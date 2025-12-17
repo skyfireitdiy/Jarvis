@@ -62,7 +62,7 @@ except (ImportError, Exception):
 class GoSymbolExtractor(TreeSitterExtractor):
     """Extracts symbols from Go code using tree-sitter."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not GO_LANGUAGE:
             raise RuntimeError("Go tree-sitter grammar not available.")
         super().__init__(GO_LANGUAGE, GO_SYMBOL_QUERY)

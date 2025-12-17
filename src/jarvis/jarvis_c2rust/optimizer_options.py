@@ -43,6 +43,6 @@ class OptimizeStats:
     cargo_checks: int = 0
     errors: Optional[List[str]] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.errors is None:
             self.errors = []

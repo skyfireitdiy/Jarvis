@@ -25,7 +25,7 @@ class SessionManager:
         self.user_data: Dict[str, Any] = {}
         self.addon_prompt: str = ""
 
-    def set_user_data(self, key: str, value: Any):
+    def set_user_data(self, key: str, value: Any) -> None:
         """Sets a value in the user data dictionary."""
         self.user_data[key] = value
 
@@ -33,7 +33,7 @@ class SessionManager:
         """Gets a value from the user data dictionary."""
         return self.user_data.get(key)
 
-    def set_addon_prompt(self, addon_prompt: str):
+    def set_addon_prompt(self, addon_prompt: str) -> None:
         """Sets the addon prompt for the next model call."""
         self.addon_prompt = addon_prompt
 
