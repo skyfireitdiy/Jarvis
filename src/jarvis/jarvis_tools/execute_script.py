@@ -110,6 +110,22 @@ class ScriptTool:
                 with open(script_path, "w", encoding="utf-8", errors="ignore") as f:
                     f.write(script_content)
 
+                # Display script content using rich panel before execution
+                from rich.console import Console
+                from rich.panel import Panel
+                from rich.syntax import Syntax
+
+                console = Console()
+                syntax = Syntax(
+                    script_content, interpreter, theme="monokai", line_numbers=True
+                )
+                panel = Panel(
+                    syntax,
+                    title=f"📜 执行脚本 ({interpreter})",
+                    border_style="bright_blue",
+                )
+                console.print(panel)
+
                 # Use script command to capture both stdout and stderr
                 tee_command = (
                     f"script -q -c '{interpreter} {script_path}' {output_file}"
