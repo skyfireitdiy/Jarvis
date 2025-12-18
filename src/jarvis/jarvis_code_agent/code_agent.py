@@ -33,6 +33,7 @@ from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
 )
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_smart_model_name
 from jarvis.jarvis_utils.config import get_smart_platform_name
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
@@ -203,8 +204,9 @@ class CodeAgent(Agent):
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
         platform_name = get_smart_platform_name(model_group)
         model_name = get_smart_model_name(model_group)
+        llm_config = get_llm_config("smart", model_group)
 
-        maybe_model = PlatformRegistry().create_platform(platform_name)
+        maybe_model = PlatformRegistry().create_platform(platform_name, llm_config)
         if maybe_model is None:
             PrettyOutput.auto_print(f"⚠️ 平台 {platform_name} 不存在，将使用smart模型")
             maybe_model = PlatformRegistry().get_smart_platform()

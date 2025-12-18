@@ -141,20 +141,27 @@ class GitCommitTool:
                 # Get platform and model based on model_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import get_normal_model_name
                 from jarvis.jarvis_utils.config import get_normal_platform_name
+                from jarvis.jarvis_utils.config import get_llm_config
 
                 # 始终使用normal模型生成提交信息，不从agent.model获取（避免使用smart模型）
                 # 优先根据 model_group 获取（确保配置一致性）
                 if model_group:
                     platform_name = get_normal_platform_name(model_group)
                     model_name = get_normal_model_name(model_group)
+                    # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
+                    llm_config = get_llm_config("normal", model_group)
                 else:
                     # 如果没有提供 model_group，直接使用配置文件中的默认normal模型
                     platform_name = get_normal_platform_name(None)
                     model_name = get_normal_model_name(None)
+                    llm_config = get_llm_config("normal", None)
 
                 # Create a new platform instance
                 if platform_name:
-                    platform = PlatformRegistry().create_platform(platform_name)
+                    # 传入 normal_llm 的 llm_config，确保 API base 和 API key 与 model 匹配
+                    platform = PlatformRegistry().create_platform(
+                        platform_name, llm_config
+                    )
                     if platform and model_name:
                         platform.set_model_name(model_name)
                     if platform and model_group:

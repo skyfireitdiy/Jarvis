@@ -67,6 +67,7 @@ from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.config import get_addon_prompt_threshold
 from jarvis.jarvis_utils.config import get_after_tool_call_cb_dirs
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.config import get_tool_filter_threshold
@@ -529,8 +530,10 @@ class Agent:
         """初始化模型平台（统一使用 normal 平台/模型）"""
         platform_name = get_normal_platform_name(model_group)
         model_name = get_normal_model_name(model_group)
+        # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
+        llm_config = get_llm_config("normal", model_group)
 
-        maybe_model = PlatformRegistry().create_platform(platform_name)
+        maybe_model = PlatformRegistry().create_platform(platform_name, llm_config)
         if maybe_model is None:
             PrettyOutput.auto_print(f"⚠️ 平台 {platform_name} 不存在，将使用普通模型")
             maybe_model = PlatformRegistry().get_normal_platform()
@@ -1705,12 +1708,15 @@ class Agent:
         """
         from jarvis.jarvis_utils.config import get_cheap_model_name
         from jarvis.jarvis_utils.config import get_cheap_platform_name
+        from jarvis.jarvis_utils.config import get_llm_config
 
         # 筛选操作使用cheap模型
         platform_name = get_cheap_platform_name(None)
         model_name = get_cheap_model_name(None)
+        # 获取 cheap_llm 的 llm_config，确保使用正确的 API base 和 API key
+        llm_config = get_llm_config("cheap", None)
 
-        temp_model = PlatformRegistry().create_platform(platform_name)
+        temp_model = PlatformRegistry().create_platform(platform_name, llm_config)
         if not temp_model:
             raise RuntimeError("创建临时模型失败。")
 

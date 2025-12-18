@@ -14,18 +14,25 @@ from jarvis.jarvis_c2rust.constants import MAX_LLM_RETRIES
 from jarvis.jarvis_c2rust.library_replacer_prompts import build_subtree_prompt
 
 
-def check_llm_availability() -> tuple[bool, Any, Any, Any]:
-    """检查LLM可用性，返回(是否可用, PlatformRegistry, get_smart_platform_name, get_smart_model_name)
+def check_llm_availability() -> tuple[bool, Any, Any, Any, Any]:
+    """检查LLM可用性，返回(是否可用, PlatformRegistry, get_smart_platform_name, get_smart_model_name, get_llm_config)
     使用smart平台，适用于代码生成等复杂场景
     """
     try:
         from jarvis.jarvis_platform.registry import PlatformRegistry
+        from jarvis.jarvis_utils.config import get_llm_config
         from jarvis.jarvis_utils.config import get_smart_model_name
         from jarvis.jarvis_utils.config import get_smart_platform_name
 
-        return True, PlatformRegistry, get_smart_platform_name, get_smart_model_name
+        return (
+            True,
+            PlatformRegistry,
+            get_smart_platform_name,
+            get_smart_model_name,
+            get_llm_config,
+        )
     except Exception:
-        return False, None, None, None
+        return False, None, None, None, None
 
 
 def create_llm_model(
@@ -35,18 +42,21 @@ def create_llm_model(
     PlatformRegistry: Any,
     get_smart_platform_name: Any,
     get_smart_model_name: Any,
+    get_llm_config: Any,
 ) -> Optional[Any]:
     """创建LLM模型，使用smart平台，适用于代码生成等复杂场景"""
     if not model_available:
         return None
     try:
         registry = PlatformRegistry.get_global_platform_registry()
+        # 获取 smart_llm 的 llm_config，确保使用正确的 API base 和 API key
+        llm_config = get_llm_config("smart", llm_group)
         model = None
         if llm_group:
             try:
                 platform_name = get_smart_platform_name(llm_group)
                 if platform_name:
-                    model = registry.create_platform(platform_name)
+                    model = registry.create_platform(platform_name, llm_config)
             except Exception:
                 model = None
         if model is None:
