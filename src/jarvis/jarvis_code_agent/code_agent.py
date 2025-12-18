@@ -964,6 +964,7 @@ git reset --hard {start_commit}
                     "save_memory",
                     "retrieve_memory",
                     "clear_memory",
+                    "methodology",
                 ],
                 non_interactive=self.non_interactive,
                 use_methodology=True,

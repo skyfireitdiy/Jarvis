@@ -257,6 +257,7 @@ class task_list_manager:
                 "save_memory",
                 "retrieve_memory",
                 "clear_memory",
+                "methodology",
             ],
             non_interactive=True,
             use_methodology=True,
