@@ -958,10 +958,16 @@ git reset --hard {start_commit}
                 summary_prompt=sum_prompt,
                 need_summary=True,
                 auto_complete=True,
-                use_tools=["execute_script", "read_code"],
+                use_tools=[
+                    "execute_script",
+                    "read_code",
+                    "save_memory",
+                    "retrieve_memory",
+                    "clear_memory",
+                ],
                 non_interactive=self.non_interactive,
-                use_methodology=False,
-                use_analysis=False,
+                use_methodology=True,
+                use_analysis=True,
             )
 
             # 运行 review
