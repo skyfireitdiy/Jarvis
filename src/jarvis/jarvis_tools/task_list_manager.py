@@ -251,8 +251,16 @@ class task_list_manager:
             summary_prompt=verification_summary_prompt,
             auto_complete=True,
             need_summary=True,
-            use_tools=["read_code", "execute_script"],  # 只使用这两个工具
+            use_tools=[
+                "read_code",
+                "execute_script",
+                "save_memory",
+                "retrieve_memory",
+                "clear_memory",
+            ],
             non_interactive=True,
+            use_methodology=True,
+            use_analysis=True,
         )
 
         return verification_agent
@@ -1345,7 +1353,6 @@ class task_list_manager:
                 final_verification_passed = False
                 execution_result = None
                 iteration = 0
-                all_verification_results: List[str] = []
 
                 try:
                     # 直接根据agent实例类型判断任务类型
