@@ -1888,7 +1888,12 @@ class task_list_manager:
 
             if status is not None:
                 # 对于 main 类型任务，在更新为 completed 状态时进行验证
-                if status == "completed" and task.agent_type.value == "main":
+                # 但如果任务已经是 completed 状态，则不需要重新验证
+                if (
+                    status == "completed"
+                    and task.agent_type.value == "main"
+                    and task.status.value != "completed"
+                ):
                     # 使用公共方法构建任务内容
                     task_content = self._build_task_content(task)
 
