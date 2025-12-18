@@ -196,7 +196,8 @@ class ReadCodeTool:
                 }
 
             # 构造完整输出
-            output = f"\n🔍 文件: {abs_path}\n📄 总行数: {total_lines}\n📊 读取范围: {start_line}-{end_line}\n"
+            read_lines = end_line - start_line + 1
+            output = f"\n🔍 文件: {abs_path}\n📄 总行数: {total_lines}\n📊 读取范围: {start_line}-{end_line}\n📈 读取行数: {read_lines}\n"
             output += "=" * 80 + "\n"
             output += output_content
             output += "\n" + "=" * 80 + "\n"
