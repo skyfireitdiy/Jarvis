@@ -18,6 +18,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_cheap_model_name
 from jarvis.jarvis_utils.config import get_cheap_platform_name
+from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
@@ -536,8 +537,10 @@ class ContextRecommender:
             registry = PlatformRegistry.get_global_platform_registry()
 
             # 创建平台实例（筛选操作始终使用cheap平台以降低成本）
+            # 获取 cheap_llm 的 llm_config，确保使用正确的 API base 和 API key
+            llm_config = get_llm_config("cheap", self._model_group)
             if self._platform_name:
-                llm_model = registry.create_platform(self._platform_name)
+                llm_model = registry.create_platform(self._platform_name, llm_config)
                 if llm_model is None:
                     # 如果创建失败，使用cheap平台
                     llm_model = registry.get_cheap_platform()

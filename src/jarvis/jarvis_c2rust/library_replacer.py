@@ -133,6 +133,7 @@ def apply_library_replacement(
         PlatformRegistry,
         get_smart_platform_name,
         get_smart_model_name,
+        get_llm_config,
     ) = check_llm_availability()
 
     # 预处理禁用库
@@ -159,6 +160,7 @@ def apply_library_replacement(
             PlatformRegistry,
             get_smart_platform_name,
             get_smart_model_name,
+            get_llm_config,
         )
 
     # 评估阶段：若某节点评估不可替代，则继续评估其子节点（递归/深度优先）

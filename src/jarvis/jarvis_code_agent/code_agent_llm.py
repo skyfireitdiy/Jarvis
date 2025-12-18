@@ -10,6 +10,7 @@ from typing import Optional
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.globals import get_global_model_group
@@ -64,8 +65,10 @@ class LLMManager:
             registry = PlatformRegistry.get_global_platform_registry()
 
             # 创建平台实例
+            # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
+            llm_config = get_llm_config("normal", self._model_group)
             if self._platform_name:
-                llm_model = registry.create_platform(self._platform_name)
+                llm_model = registry.create_platform(self._platform_name, llm_config)
                 if llm_model is None:
                     # 如果创建失败，使用普通平台
                     llm_model = registry.get_normal_platform()

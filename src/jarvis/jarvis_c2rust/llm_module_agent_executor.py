@@ -148,12 +148,13 @@ def execute_llm_plan(
                 PrettyOutput.auto_print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
             try:
                 # 验证模型配置在切换目录后是否仍然有效
-                from jarvis.jarvis_utils.config import get_normal_model_name
-                from jarvis.jarvis_utils.config import get_normal_platform_name
+                # CodeAgent 使用 smart 模型，所以这里也使用 smart 配置来显示正确的模型信息
+                from jarvis.jarvis_utils.config import get_smart_model_name
+                from jarvis.jarvis_utils.config import get_smart_platform_name
 
                 if llm_group:
-                    resolved_model = get_normal_model_name(llm_group)
-                    resolved_platform = get_normal_platform_name(llm_group)
+                    resolved_model = get_smart_model_name(llm_group)
+                    resolved_platform = get_smart_platform_name(llm_group)
                     PrettyOutput.auto_print(
                         f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}"
                     )
@@ -193,14 +194,14 @@ def execute_llm_plan(
                     PrettyOutput.auto_print(
                         f"[c2rust-llm-planner] 当前工作目录: {os.getcwd()}"
                     )
-                    # 尝试显示当前解析的模型配置
+                    # 尝试显示当前解析的模型配置（CodeAgent 使用 smart 模型）
                     try:
-                        from jarvis.jarvis_utils.config import get_normal_model_name
-                        from jarvis.jarvis_utils.config import get_normal_platform_name
+                        from jarvis.jarvis_utils.config import get_smart_model_name
+                        from jarvis.jarvis_utils.config import get_smart_platform_name
 
                         if llm_group:
                             PrettyOutput.auto_print(
-                                f"[c2rust-llm-planner] 当前解析的模型: {get_normal_platform_name(llm_group)}/{get_normal_model_name(llm_group)}"
+                                f"[c2rust-llm-planner] 当前解析的模型: {get_smart_platform_name(llm_group)}/{get_smart_model_name(llm_group)}"
                             )
                     except Exception:
                         pass
