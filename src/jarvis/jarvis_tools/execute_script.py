@@ -16,7 +16,7 @@ class ScriptTool:
     """
 
     name = "execute_script"
-    description = "执行脚本并返回结果，支持任意解释器。建议使用rg过滤大量输出。"
+    description = "执行脚本并返回结果，支持任意解释器。为了避免输出过多内容，建议使用rg、grep、tail、head等命令过滤和限制输出长度。\n\n示例用法：\n• 查找日志中的错误：interpreter='bash', script_content='grep -i \"error\" /var/log/app.log'\n• 查看文件开头20行：interpreter='bash', script_content='head -n 20 large_file.txt'\n• 查看文件末尾50行：interpreter='bash', script_content='tail -n 50 /var/log/system.log'\n• 搜索代码中的函数定义：interpreter='bash', script_content=\"rg '^def ' src/\"\n• 限制命令输出：interpreter='bash', script_content='find /tmp -type f | head -n 100'"
     parameters = {
         "type": "object",
         "properties": {
@@ -24,7 +24,10 @@ class ScriptTool:
                 "type": "string",
                 "description": "脚本解释器（如bash、python3、perl等）。执行shell命令可使用bash。",
             },
-            "script_content": {"type": "string", "description": "要执行的脚本内容"},
+            "script_content": {
+                "type": "string",
+                "description": "要执行的脚本内容。为了避免输出过多，建议使用过滤命令：\n例如：\n• grep -i 'error' filename  # 查找包含'error'的行\n• rg 'pattern' filename     # 使用ripgrep查找模式\n• tail -n 50 filename       # 显示文件最后50行\n• head -n 20 filename       # 显示文件前20行\n• command | head -n 100     # 限制命令输出前100行",
+            },
         },
         "required": ["script_content"],
     }
