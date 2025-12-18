@@ -423,7 +423,6 @@ class task_list_manager:
                 # 尝试从结构化格式中提取验证状态
                 verification_status = None
                 final_conclusion = None
-                detailed_explanation = None
 
                 # 查找验证状态
                 import re
@@ -441,24 +440,6 @@ class task_list_manager:
                 )
                 if conclusion_match:
                     final_conclusion = conclusion_match.group(1)
-
-                # 提取说明（可能是"详细说明"或"说明"）
-                explanation_match = re.search(
-                    r"\*\*说明\*\*：\s*\n(.*?)(?=\n\n|\*\*|$)",
-                    verification_result_str,
-                    re.DOTALL,
-                )
-                if explanation_match:
-                    detailed_explanation = explanation_match.group(1).strip()
-                else:
-                    # 尝试查找"详细说明"
-                    explanation_match = re.search(
-                        r"\*\*详细说明\*\*：\s*\n(.*?)(?=\n\n|\*\*|$)",
-                        verification_result_str,
-                        re.DOTALL,
-                    )
-                    if explanation_match:
-                        detailed_explanation = explanation_match.group(1).strip()
 
                 # 判断验证是否通过
                 is_passed = False
@@ -496,17 +477,11 @@ class task_list_manager:
                     PrettyOutput.auto_print(f"✅ 任务 [{task.task_name}] 验证通过")
                     return True, verification_result_str
                 else:
-                    # 使用详细说明作为失败原因，如果没有则使用整个结果
-                    failure_reason = (
-                        detailed_explanation
-                        if detailed_explanation
-                        else verification_result_str
-                    )
-
+                    # 直接使用完整的验证结果作为失败原因
                     PrettyOutput.auto_print(
-                        f"❌ 任务 [{task.task_name}] 验证未通过：{failure_reason[:200]}..."
+                        f"❌ 任务 [{task.task_name}] 验证未通过：{verification_result_str[:200]}..."
                     )
-                    return False, failure_reason
+                    return False, verification_result_str
             else:
                 PrettyOutput.auto_print(
                     f"⚠️ 任务 [{task.task_name}] 验证无结果，默认认为未完成"
