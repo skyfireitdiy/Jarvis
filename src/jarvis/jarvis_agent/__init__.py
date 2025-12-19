@@ -530,16 +530,10 @@ class Agent:
         """初始化模型平台（统一使用 normal 平台/模型）"""
         platform_name = get_normal_platform_name(model_group)
         model_name = get_normal_model_name(model_group)
-        # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
-        llm_config = get_llm_config("normal", model_group)
-
-        maybe_model = PlatformRegistry().create_platform(platform_name, llm_config)
-        if maybe_model is None:
-            PrettyOutput.auto_print(f"⚠️ 平台 {platform_name} 不存在，将使用普通模型")
-            maybe_model = PlatformRegistry().get_normal_platform(model_group)
-
-        # 在此处收敛为非可选类型，确保后续赋值满足类型检查
-        self.model = maybe_model
+        
+        # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
+        # get_normal_platform 内部会处理配置获取和平台创建
+        self.model = PlatformRegistry().get_normal_platform(model_group)
 
         if model_name:
             self.model.set_model_name(model_name)

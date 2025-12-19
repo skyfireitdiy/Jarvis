@@ -193,6 +193,10 @@ class PlatformRegistry:
         model_name = get_normal_model_name(model_group_override)
         llm_config = get_llm_config("normal", model_group_override)
         platform = self.create_platform(platform_name, llm_config)
+        if platform is None:
+            raise RuntimeError(
+                f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
+            )
         platform.set_model_name(model_name)  # type: ignore
         return platform  # type: ignore
 
