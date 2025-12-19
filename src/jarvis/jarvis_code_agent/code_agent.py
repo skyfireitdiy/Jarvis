@@ -204,15 +204,10 @@ class CodeAgent(Agent):
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
         platform_name = get_smart_platform_name(model_group)
         model_name = get_smart_model_name(model_group)
-        llm_config = get_llm_config("smart", model_group)
-
-        maybe_model = PlatformRegistry().create_platform(platform_name, llm_config)
-        if maybe_model is None:
-            PrettyOutput.auto_print(f"⚠️ 平台 {platform_name} 不存在，将使用smart模型")
-            maybe_model = PlatformRegistry().get_smart_platform(model_group)
-
-        # 在此处收敛为非可选类型，确保后续赋值满足类型检查
-        self.model = maybe_model
+        
+        # 直接使用 get_smart_platform，避免先调用 create_platform 再回退导致的重复错误信息
+        # get_smart_platform 内部会处理配置获取和平台创建
+        self.model = PlatformRegistry().get_smart_platform(model_group)
 
         if model_name:
             self.model.set_model_name(model_name)
