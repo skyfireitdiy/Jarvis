@@ -536,7 +536,7 @@ class Agent:
         maybe_model = PlatformRegistry().create_platform(platform_name, llm_config)
         if maybe_model is None:
             PrettyOutput.auto_print(f"⚠️ 平台 {platform_name} 不存在，将使用普通模型")
-            maybe_model = PlatformRegistry().get_normal_platform()
+            maybe_model = PlatformRegistry().get_normal_platform(model_group)
 
         # 在此处收敛为非可选类型，确保后续赋值满足类型检查
         self.model = maybe_model
