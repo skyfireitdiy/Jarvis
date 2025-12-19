@@ -192,19 +192,29 @@ class PlatformRegistry:
         platform_name = get_normal_platform_name(model_group_override)
         model_name = get_normal_model_name(model_group_override)
         llm_config = get_llm_config("normal", model_group_override)
-        
+
         # 调试：检查配置中是否包含 API key
-        if not llm_config.get("openai_api_key") and platform_name in ("openai", "deepseek", "anthropic"):
+        if not llm_config.get("openai_api_key") and platform_name in (
+            "openai",
+            "deepseek",
+            "anthropic",
+        ):
             import os
-            env_key = os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+
+            env_key = (
+                os.getenv("OPENAI_API_KEY")
+                or os.getenv("DEEPSEEK_API_KEY")
+                or os.getenv("ANTHROPIC_API_KEY")
+            )
             if not env_key:
                 from jarvis.jarvis_utils.output import PrettyOutput
+
                 PrettyOutput.auto_print(
                     f"⚠️ 警告: 创建平台 '{platform_name}' 时，配置中未找到 API key，"
                     f"环境变量中也未设置。model_group={model_group_override}, "
                     f"llm_config keys={list(llm_config.keys())}"
                 )
-        
+
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
         platform = self.create_platform(platform_name, llm_config, silent=True)
         if platform is None:
@@ -259,7 +269,10 @@ class PlatformRegistry:
         self.platforms[name] = platform_class
 
     def create_platform(
-        self, name: str, llm_config: Optional[Dict[str, Any]] = None, silent: bool = False
+        self,
+        name: str,
+        llm_config: Optional[Dict[str, Any]] = None,
+        silent: bool = False,
     ) -> Optional[BasePlatform]:
         """Create platform instance
 

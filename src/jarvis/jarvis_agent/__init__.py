@@ -528,9 +528,8 @@ class Agent:
 
     def _init_model(self, model_group: Optional[str]) -> None:
         """初始化模型平台（统一使用 normal 平台/模型）"""
-        platform_name = get_normal_platform_name(model_group)
         model_name = get_normal_model_name(model_group)
-        
+
         # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
         # get_normal_platform 内部会处理配置获取和平台创建
         self.model = PlatformRegistry().get_normal_platform(model_group)
@@ -1702,7 +1701,6 @@ class Agent:
         """
         from jarvis.jarvis_utils.config import get_cheap_model_name
         from jarvis.jarvis_utils.config import get_cheap_platform_name
-        from jarvis.jarvis_utils.config import get_llm_config
 
         # 筛选操作使用cheap模型
         platform_name = get_cheap_platform_name(None)

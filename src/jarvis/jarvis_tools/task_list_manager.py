@@ -244,7 +244,7 @@ class task_list_manager:
                 model_group = getattr(parent_agent, "model_group", None)
         except Exception:
             pass
-        
+
         # 如果父 Agent 没有 model_group，才使用全局模型组
         if model_group is None:
             model_group = get_global_model_group()
