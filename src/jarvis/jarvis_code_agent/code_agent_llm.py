@@ -65,15 +65,9 @@ class LLMManager:
             registry = PlatformRegistry.get_global_platform_registry()
 
             # 创建平台实例
-            # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
-            llm_config = get_llm_config("normal", self._model_group)
-            if self._platform_name:
-                llm_model = registry.create_platform(self._platform_name, llm_config)
-                if llm_model is None:
-                    # 如果创建失败，使用普通平台
-                    llm_model = registry.get_normal_platform()
-            else:
-                llm_model = registry.get_normal_platform()
+            # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
+            # get_normal_platform 内部会处理配置获取和平台创建
+            llm_model = registry.get_normal_platform(self._model_group)
 
             if not llm_model:
                 raise ValueError("无法创建LLM模型实例")

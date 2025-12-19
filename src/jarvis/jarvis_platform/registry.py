@@ -208,6 +208,10 @@ class PlatformRegistry:
         model_name = get_cheap_model_name(model_group_override)
         llm_config = get_llm_config("cheap", model_group_override)
         platform = self.create_platform(platform_name, llm_config)
+        if platform is None:
+            raise RuntimeError(
+                f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
+            )
         platform.set_model_name(model_name)  # type: ignore
         platform.set_platform_type("cheap")  # type: ignore
         return platform  # type: ignore
@@ -220,6 +224,10 @@ class PlatformRegistry:
         model_name = get_smart_model_name(model_group_override)
         llm_config = get_llm_config("smart", model_group_override)
         platform = self.create_platform(platform_name, llm_config)
+        if platform is None:
+            raise RuntimeError(
+                f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
+            )
         platform.set_model_name(model_name)  # type: ignore
         platform.set_platform_type("smart")  # type: ignore
         return platform  # type: ignore

@@ -51,16 +51,9 @@ def create_llm_model(
         registry = PlatformRegistry.get_global_platform_registry()
         # 获取 smart_llm 的 llm_config，确保使用正确的 API base 和 API key
         llm_config = get_llm_config("smart", llm_group)
-        model = None
-        if llm_group:
-            try:
-                platform_name = get_smart_platform_name(llm_group)
-                if platform_name:
-                    model = registry.create_platform(platform_name, llm_config)
-            except Exception:
-                model = None
-        if model is None:
-            model = registry.get_smart_platform()
+        # 直接使用 get_smart_platform，避免先调用 create_platform 再回退导致的重复错误信息
+        # get_smart_platform 内部会处理配置获取和平台创建
+        model = registry.get_smart_platform(llm_group if llm_group else None)
         try:
             model.set_model_group(llm_group)
         except Exception:
