@@ -355,6 +355,9 @@ def _get_resolved_model_config(
         "smart_platform",
         "smart_model",
         "smart_max_input_token_count",
+        "llm_config",
+        "cheap_llm_config",
+        "smart_llm_config",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:
