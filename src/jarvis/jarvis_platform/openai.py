@@ -27,14 +27,29 @@ class OpenAIModel(BasePlatform):
         self.system_message = ""
         llm_config = llm_config or {}
 
-        # 从 llm_config 获取配置，如果没有则从环境变量获取（向后兼容）
-        self.api_key = llm_config.get("openai_api_key") or os.getenv("OPENAI_API_KEY")
+        # 如果传入了 llm_config（非空字典），优先从 llm_config 读取，避免环境变量污染
+        # 只有在 llm_config 中没有对应键时才从环境变量读取（向后兼容）
+        # 注意：如果 llm_config 中某个键存在但值为 None 或空字符串，也使用该值，不从环境变量读取
+        if llm_config:
+            # 传入了 llm_config，优先使用 llm_config 中的值
+            # 使用 get() 方法，如果键不存在返回 None，然后才从环境变量读取
+            self.api_key = llm_config.get("openai_api_key")
+            if self.api_key is None:
+                self.api_key = os.getenv("OPENAI_API_KEY")
+
+            self.base_url = llm_config.get("openai_api_base")
+            if self.base_url is None:
+                self.base_url = os.getenv(
+                    "OPENAI_API_BASE", "https://api.openai.com/v1"
+                )
+        else:
+            # 没有传入 llm_config，从环境变量读取（向后兼容）
+            self.api_key = os.getenv("OPENAI_API_KEY")
+            self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+
         if not self.api_key:
             PrettyOutput.auto_print("⚠️ OPENAI_API_KEY 未设置")
 
-        self.base_url = llm_config.get("openai_api_base") or os.getenv(
-            "OPENAI_API_BASE", "https://api.openai.com/v1"
-        )
         self.model_name = os.getenv("model") or "gpt-4o"
 
         # Optional: Inject extra HTTP headers via llm_config or environment variable

@@ -308,6 +308,9 @@ def _get_resolved_model_config(
         2. llm_group 中通过引用展开的配置
         3. 代码中的默认值
 
+    参数:
+        model_group_override: 模型组覆盖
+
     返回:
         Dict[str, Any]: 解析后的模型配置字典
 
@@ -373,8 +376,8 @@ def _get_resolved_model_config(
                 if key not in resolved_config:
                     resolved_config[key] = GLOBAL_CONFIG_DATA[key]
 
-    # 应用 llm_config 到环境变量
-    _apply_llm_config_to_env(resolved_config)
+    # 不再将 llm_config 应用到环境变量，所有配置通过 llm_config 参数直接传递给 platform
+    # _apply_llm_config_to_env(resolved_config)
 
     return resolved_config
 
@@ -392,6 +395,8 @@ def get_llm_config(
     返回:
         Dict[str, Any]: llm_config 配置字典
     """
+    # 不应用配置到环境变量，避免不同 llm 类型的配置互相覆盖
+    # 配置会通过 llm_config 参数直接传递给 platform，不依赖环境变量
     config = _get_resolved_model_config(model_group_override)
 
     if platform_type == "cheap":
