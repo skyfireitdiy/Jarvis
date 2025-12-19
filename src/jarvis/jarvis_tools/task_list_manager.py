@@ -236,12 +236,18 @@ class task_list_manager:
 """
 
         # 获取父 Agent 的模型组
-        model_group = get_global_model_group()
+        # 优先使用父 Agent 的 model_group，因为全局模型组可能还没有被正确设置（时序问题）
+        model_group = None
         try:
             if parent_agent is not None:
-                model_group = getattr(parent_agent, "model_group", model_group)
+                # 优先从父 Agent 获取 model_group
+                model_group = getattr(parent_agent, "model_group", None)
         except Exception:
             pass
+        
+        # 如果父 Agent 没有 model_group，才使用全局模型组
+        if model_group is None:
+            model_group = get_global_model_group()
 
         verification_agent = Agent(
             system_prompt=verification_system_prompt,
