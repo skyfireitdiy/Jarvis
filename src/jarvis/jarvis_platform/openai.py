@@ -55,7 +55,9 @@ class OpenAIModel(BasePlatform):
             self.api_key = os.getenv("OPENAI_API_KEY")
             self.base_url = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 
-        if not self.api_key:
+        # 只有当 llm_config 不为空但其中没有 openai_api_key，且环境变量也没有设置时，才打印警告
+        # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
+        if not self.api_key and llm_config:
             PrettyOutput.auto_print("⚠️ OPENAI_API_KEY 未设置")
 
         self.model_name = os.getenv("model") or "gpt-4o"
