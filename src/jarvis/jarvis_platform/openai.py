@@ -33,12 +33,20 @@ class OpenAIModel(BasePlatform):
         if llm_config:
             # 传入了 llm_config，优先使用 llm_config 中的值
             # 使用 get() 方法，如果键不存在返回 None，然后才从环境变量读取
-            self.api_key = llm_config.get("openai_api_key")
-            if self.api_key is None:
+            # 但是，如果 llm_config 是空字典 {}，说明是显式传入的空配置，应该从环境变量读取
+            # 如果 llm_config 中有键但值为 None，也应该使用 None，不从环境变量读取
+            if "openai_api_key" in llm_config:
+                # 键存在，使用 llm_config 中的值（即使为 None 或空字符串）
+                self.api_key = llm_config.get("openai_api_key")
+            else:
+                # 键不存在，从环境变量读取（向后兼容）
                 self.api_key = os.getenv("OPENAI_API_KEY")
 
-            self.base_url = llm_config.get("openai_api_base")
-            if self.base_url is None:
+            if "openai_api_base" in llm_config:
+                # 键存在，使用 llm_config 中的值（即使为 None 或空字符串）
+                self.base_url = llm_config.get("openai_api_base")
+            else:
+                # 键不存在，从环境变量读取（向后兼容）
                 self.base_url = os.getenv(
                     "OPENAI_API_BASE", "https://api.openai.com/v1"
                 )

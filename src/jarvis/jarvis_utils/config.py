@@ -71,7 +71,7 @@ def get_max_input_token_count(model_group_override: Optional[str] = None) -> int
     返回:
         int: 模型能处理的最大输入token数量。
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     return int(config.get("max_input_token_count", "128000"))
 
 
@@ -82,7 +82,7 @@ def get_cheap_max_input_token_count(model_group_override: Optional[str] = None) 
     返回:
         int: 模型能处理的最大输入token数量，如果未配置则回退到正常配置
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     cheap_max_token = config.get("cheap_max_input_token_count")
     if cheap_max_token:
         return int(cheap_max_token)
@@ -96,7 +96,7 @@ def get_smart_max_input_token_count(model_group_override: Optional[str] = None) 
     返回:
         int: 模型能处理的最大输入token数量，如果未配置则回退到正常配置
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     smart_max_token = config.get("smart_max_input_token_count")
     if smart_max_token:
         return int(smart_max_token)
@@ -290,6 +290,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
 
 def _get_resolved_model_config(
     model_group_override: Optional[str] = None,
+    apply_to_env: bool = True,
 ) -> Dict[str, Any]:
     """
     解析并合并模型配置，处理模型组。
@@ -310,6 +311,7 @@ def _get_resolved_model_config(
 
     参数:
         model_group_override: 模型组覆盖
+        apply_to_env: 是否将模型组配置中的 ENV 应用到环境变量，默认为 True（向后兼容）
 
     返回:
         Dict[str, Any]: 解析后的模型配置字典
@@ -346,7 +348,8 @@ def _get_resolved_model_config(
     if group_config:
         group_config = _expand_llm_references(group_config)
 
-    _apply_llm_group_env_override(group_config)
+    if apply_to_env:
+        _apply_llm_group_env_override(group_config)
 
     # Start with group config
     resolved_config = group_config.copy()
@@ -397,7 +400,7 @@ def get_llm_config(
     """
     # 不应用配置到环境变量，避免不同 llm 类型的配置互相覆盖
     # 配置会通过 llm_config 参数直接传递给 platform，不依赖环境变量
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
 
     if platform_type == "cheap":
         return dict(config.get("cheap_llm_config", {}))
@@ -414,7 +417,7 @@ def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
     返回：
         str: 平台名称，默认为'openai'
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     return cast(str, config.get("platform", "openai"))
 
 
@@ -425,7 +428,7 @@ def get_normal_model_name(model_group_override: Optional[str] = None) -> str:
     返回：
         str: 模型名称，默认为'gpt-5'
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     return cast(str, config.get("model", "gpt-5"))
 
 
@@ -436,7 +439,7 @@ def get_cheap_platform_name(model_group_override: Optional[str] = None) -> str:
     返回：
         str: 平台名称，如果未配置则回退到正常操作平台
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     cheap_platform = config.get("cheap_platform")
     if cheap_platform:
         return cast(str, cheap_platform)
@@ -450,7 +453,7 @@ def get_cheap_model_name(model_group_override: Optional[str] = None) -> str:
     返回：
         str: 模型名称，如果未配置则回退到正常操作模型
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     cheap_model = config.get("cheap_model")
     if cheap_model:
         return cast(str, cheap_model)
@@ -464,7 +467,7 @@ def get_smart_platform_name(model_group_override: Optional[str] = None) -> str:
     返回：
         str: 平台名称，如果未配置则回退到正常操作平台
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     smart_platform = config.get("smart_platform")
     if smart_platform:
         return cast(str, smart_platform)
@@ -478,7 +481,7 @@ def get_smart_model_name(model_group_override: Optional[str] = None) -> str:
     返回：
         str: 模型名称，如果未配置则回退到正常操作模型
     """
-    config = _get_resolved_model_config(model_group_override)
+    config = _get_resolved_model_config(model_group_override, apply_to_env=False)
     smart_model = config.get("smart_model")
     if smart_model:
         return cast(str, smart_model)
