@@ -18,7 +18,6 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_cheap_model_name
 from jarvis.jarvis_utils.config import get_cheap_platform_name
-from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
