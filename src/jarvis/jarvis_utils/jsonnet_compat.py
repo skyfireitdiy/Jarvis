@@ -9,7 +9,7 @@ from typing import Match
 import _jsonnet
 
 
-def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, int]]:
+def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, str]]:
     """
     修复 jsonnet ||| 多行字符串的缩进问题。
 
@@ -34,7 +34,7 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, int]]:
     # 使用非贪婪匹配，确保匹配到最近的 |||
     pattern = r"(\|\|\|)(\s*\n)(.*?)(\n\s*\|\|\|)"
 
-    def fix_match(match: Match[str]) -> tuple[str, Dict[str, int]]:
+    def fix_match(match: Match[str]) -> tuple[str, Dict[str, str]]:
         start_marker = match.group(1)  # |||
         whitespace_after = match.group(2)  # 空白和换行
         content = match.group(3)  # 多行内容
@@ -107,6 +107,7 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, int]]:
         has_mixed_indents = False
 
         # 记录所有行的原始缩进信息（无论是否混合缩进，都需要记录以便恢复）
+        # 保存原始缩进字符串而不是长度，以保留 Tab 等特殊字符
         if lines:
             seen_indents = set()
             for line in lines:
@@ -114,8 +115,8 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, int]]:
                     line_indent = len(line) - len(line.lstrip())
                     seen_indents.add(line_indent)
                     line_content = line.lstrip()
-                    # 记录原始缩进（包括0缩进的情况，用特殊值标记）
-                    original_indents[line_content] = line_indent
+                    # 记录原始缩进字符串（保留 Tab 等字符）
+                    original_indents[line_content] = line[:line_indent]
 
             # 如果有多个不同的缩进级别，说明是混合缩进
             if len(seen_indents) > 1:
@@ -124,9 +125,9 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, int]]:
         # 如果第一行有缩进，但后续行没有，我们也需要记录
         if first_line_has_indent and has_unindented_lines:
             has_mixed_indents = True
-            # 记录第一行的原始缩进
+            # 记录第一行的原始缩进字符串
             first_line_content = lines[0].lstrip()
-            original_indents[first_line_content] = first_line_indent
+            original_indents[first_line_content] = lines[0][:first_line_indent]
 
         # jsonnet的text block规则：所有行缩进必须 >= 首行缩进
         # 因此我们统一所有行为相同的基础缩进，通过恢复逻辑还原原始缩进
@@ -175,7 +176,7 @@ def _fix_jsonnet_multiline_strings(s: str) -> tuple[str, Dict[str, int]]:
     return fixed, all_indent_info
 
 
-def _restore_first_line_indent(obj: Any, indent_info: Dict[str, int]) -> Any:
+def _restore_first_line_indent(obj: Any, indent_info: Dict[str, str]) -> Any:
     """
     恢复第一行的原始缩进。
 
@@ -205,9 +206,9 @@ def _restore_first_line_indent(obj: Any, indent_info: Dict[str, int]) -> Any:
                     line_content = line.lstrip()
                     # 检查是否有对应的原始缩进信息
                     if line_content in indent_info:
-                        # 恢复原始缩进
+                        # 恢复原始缩进（直接使用保存的缩进字符串，保留 Tab 等字符）
                         original_indent = indent_info[line_content]
-                        restored_lines.append(" " * original_indent + line_content)
+                        restored_lines.append(original_indent + line_content)
                     else:
                         # 没有原始缩进信息，保持原样
                         restored_lines.append(line)
