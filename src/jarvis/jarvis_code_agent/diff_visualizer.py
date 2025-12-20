@@ -462,12 +462,12 @@ class DiffVisualizer:
         )
         table.add_column("", style="bright_cyan", width=6, justify="right")
         table.add_column(
-            "", style="bright_white", overflow="fold", ratio=10
-        )  # 增加ratio值获得更多空间
+            "", style="bright_white", overflow="fold", ratio=10, no_wrap=False
+        )  # 启用自动换行，增加ratio值获得更多空间
         table.add_column("", style="bright_cyan", width=6, justify="right")
         table.add_column(
-            "", style="bright_white", overflow="fold", ratio=10
-        )  # 增加ratio值获得更多空间
+            "", style="bright_white", overflow="fold", ratio=10, no_wrap=False
+        )  # 启用自动换行，增加ratio值获得更多空间
 
         additions = 0
         deletions = 0
