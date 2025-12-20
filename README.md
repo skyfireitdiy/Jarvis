@@ -100,10 +100,10 @@ Jarvis 正是为这种工作流而设计的工具。它通过无缝的命令行�
 
 ### 系统要求
 
-* **Linux**: 完全支持。
-
-* **Windows**: 完全支持（需要 PowerShell）。
-* **Docker**: 支持通过 Docker 镜像使用，无需本地安装 Python/Rust 环境。
+* **操作系统**: Jarvis 的许多核心工具依赖于Linux环境，因此目前主要支持在 **Linux** 系统下使用。
+* **Windows用户**: 虽然未经原生测试，但 Windows 10/11 用户可以通过 **WSL (Windows Subsystem for Linux)** 来完整地体验 Jarvis 的所有功能。
+* **Python版本**: 需要 Python 3.9 或更高版本（支持 3.9-3.12）。
+* **Docker**（可选）: 支持通过 Docker 镜像使用，无需本地安装 Python/Rust 环境。
 
 ### 安装
 
@@ -215,13 +215,11 @@ docker-compose run --rm jarvis
 ```bash
 # 使用当前用户运行（推荐）
 docker run -it --rm \
-  -u $(id -u):$(id -g) \
+  --user "$(id -u):$(id -g)" \
   -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/home/$(whoami)/.jarvis \
-  -v $HOME/.gitconfig:/home/$(whoami)/.gitconfig:ro \
+  -v $HOME/.jarvis:/home/jarvis/.jarvis \
+  -v $HOME/.gitconfig:/home/jarvis/.gitconfig:ro \
   -w /workspace \
-  -e USER=$(whoami) \
-  -e HOME=/home/$(whoami) \
   ghcr.io/skyfireitdiy/jarvis:latest
 ```
 
@@ -254,13 +252,11 @@ docker build -t jarvis:latest .
 
 # 运行容器（非 root 用户，推荐）
 docker run -it --rm \
-  -u $(id -u):$(id -g) \
+  --user "$(id -u):$(id -g)" \
   -v $(pwd):/workspace \
-  -v $HOME/.jarvis:/home/$(whoami)/.jarvis \
-  -v $HOME/.gitconfig:/home/$(whoami)/.gitconfig:ro \
+  -v $HOME/.jarvis:/home/jarvis/.jarvis \
+  -v $HOME/.gitconfig:/home/jarvis/.gitconfig:ro \
   -w /workspace \
-  -e USER=$(whoami) \
-  -e HOME=/home/$(whoami) \
   jarvis:latest
 
 # 或使用 root 用户
@@ -274,11 +270,13 @@ docker run -it --rm \
 
 > **提示**:
 >
+> * `$(pwd)` 可以替换为其他工程目录
+> * `.gitconfig` 文件可以保留 Git 用户信息，方便在容器内使用 Git
+> * `.jarvis` 文件可以保留主机 Jarvis 配置信息，方便在容器内使用 Jarvis
 > * Docker 镜像已预装所有工具（Python 3.12、Rust、Clang、Fish shell 等），开箱即用
 > * 容器启动后会自动进入 fish shell，虚拟环境已激活
 > * 使用 `-v` 挂载目录可以方便地在容器内处理本地代码
 > * **推荐使用非 root 用户**，避免文件权限问题，容器内创建的文件可直接在宿主机访问
-> * 挂载 `.gitconfig` 可以保留 Git 用户信息，方便在容器内使用 Git
 > * 使用 Docker Compose 是最简单的方式，自动处理用户权限配置和文件挂载
 > * 推荐直接使用 GHCR 上的预构建镜像，无需本地构建
 
@@ -327,22 +325,59 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 
 Jarvis 的主要配置文件位于 `~/.jarvis/config.yaml`。您可以在此文件中配置模型、平台和其他行为。
 
-**基本配置示例 (腾讯元宝):**
+**首次运行配置：**
+
+首次运行任何 Jarvis 命令时，系统会检测是否缺少配置文件。如果未找到配置，Jarvis 将自动启动交互式配置向导，引导您完成所有必要设置。
+
+**基本配置示例（推荐使用新的配置方式）：**
 
 ```yaml
-# ~/.jarvis/config.yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/docs/schema/config.schema.json
 
-# 使用的模型平台
-platform: yuanbao
-model: deep_seek_v3
+# ====== 基础配置 ======
+# 设置默认使用的模型组
+llm_group: default
 
-# 用于“思考”步骤的模型，通常选择能力更强的模型
+# ====== 模型组配置 ======
+# 可以定义多个模型组，通过llm_group切换
+llm_groups:
+  default: # 默认模型组
+    normal_llm: gpt-5 # 引用下面llms中定义的模型
+    # 可选配置廉价模型和智能模型
+    # cheap_llm: gpt-3.5-turbo
+    # smart_llm: gpt-5
 
+# ====== 模型定义 ======
+llms:
+  gpt-5:
+    platform: openai # 平台类型
+    model: gpt-5 # 模型名称
+    max_input_token_count: 128000 # 模型最大输入token数
 
-# 平台所需的环境变量
+    # 模型特定配置 (llm_config)
+    llm_config:
+      openai_api_key: "your-api-key-here" # 替换为你的API密钥
+      openai_api_base: "https://api.openai.com/v1" # API基础地址，可用于代理
+      openai_extra_headers: '{"X-Source": "jarvis"}' # 额外的HTTP头（可选）
+
+# ====== 环境变量配置 ======
+# 旧版配置方式（仍支持，但推荐使用上面的 llm_config）
 ENV:
+  # 腾讯元宝
   YUANBAO_COOKIES: "在此处粘贴您的元宝Cookies"
+  
+  # Kimi
+  KIMI_API_KEY: ""
+  
+  # 通义千问
+  TONGYI_COOKIES: ""
+  
+  # OpenAI
+  OPENAI_API_KEY: ""
+  OPENAI_API_BASE: ""
 ```
+
+> **注意**: 新版本推荐使用 `llm_groups` 和 `llms` 配置方式，它提供了更灵活的模型管理能力。`ENV` 配置方式仍然支持，但建议迁移到新的配置方式。
 
 提示：错误回溯输出控制
 
@@ -414,7 +449,7 @@ Jarvis 被设计为高度可扩展的框架。您可以轻松地：
 ## ⚠️ 免责声明 <a id="disclaimer"></a>
 
 * **模型使用风险**: 频繁使用通过非官方API（如腾讯元宝、Kimi、通义千问等）接入的模型可能会导致您的账户被平台封禁。请合理使用，并自行承担相应风险。
-* **命令执行风险**: Jarvis具备执行系统命令的能力。请确保您了解将要执行的命令，并避免输入可能导致系统风险的指令。为了增强安全性，您可以在配置文件中启用工具执行确认（`JARVIS_EXECUTE_TOOL_CONFIRM: true`），以便在执行每个工具前进行手动确认。
+* **命令执行风险**: Jarvis具备执行系统命令的能力。请确保您了解将要执行的命令，并避免输入可能导致系统风险的指令。为了增强安全性，您可以在配置文件中启用工具执行确认（`execute_tool_confirm: true`），以便在执行每个工具前进行手动确认。
 
 ---
 
