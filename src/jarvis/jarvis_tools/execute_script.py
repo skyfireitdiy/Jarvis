@@ -119,7 +119,11 @@ class ScriptTool:
 
                 console = Console()
                 syntax = Syntax(
-                    script_content, interpreter, theme="monokai", line_numbers=True
+                    script_content,
+                    interpreter,
+                    theme="monokai",
+                    line_numbers=True,
+                    word_wrap=True,
                 )
                 panel = Panel(
                     syntax,
