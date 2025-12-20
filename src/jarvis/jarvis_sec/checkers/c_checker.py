@@ -652,6 +652,80 @@ def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue
     return issues
 
 
+def _rule_function_return_ptr_no_check(lines: Sequence[str], relpath: str) -> List[Issue]:
+    """
+    检测函数返回指针后未检查 NULL 就直接使用的情况。
+    启发式：检测形如 "type *var = func(...);" 后直接使用 var 而未检查 NULL。
+    """
+    issues: List[Issue] = []
+    # 匹配指针赋值：type *var = func(...); 或 type* var = func(...);
+    # 支持 int *arr = allocate_array(a); 和 int* arr = allocate_array(a); 两种写法
+    # 匹配模式：类型 * 变量名 = 函数名( 或 类型* 变量名 = 函数名(
+    re_ptr_assign = re.compile(
+        r"\b[A-Za-z_]\w+\s*\*\s*([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)\s*\(",
+        re.IGNORECASE,
+    )
+    
+    for idx, s in enumerate(lines, start=1):
+        # 跳过类型声明行和预处理指令
+        t = s.lstrip()
+        if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
+            continue
+        
+        # 检测指针赋值：匹配 "type *var = func(" 或 "type* var = func("
+        var_name = None
+        func_name = None
+        
+        # 匹配 type *var = func(...) 或 type* var = func(...)
+        m = re_ptr_assign.search(s)
+        if m:
+            var_name = m.group(1)  # 变量名
+            func_name = m.group(2)  # 函数名
+        
+        if not var_name:
+            continue
+        
+        # 检查后续几行是否有 NULL 检查
+        has_check = _has_null_check_around(var_name, lines, idx, radius=4)
+        
+        # 检查后续几行是否直接使用了该变量（解引用或数组访问）
+        used_without_check = False
+        for j, sj in _window(lines, idx, before=0, after=6):
+            if j == idx:
+                continue
+            # 检测解引用使用：var->, *var, var[...]
+            if re.search(
+                rf"\b{re.escape(var_name)}\s*(->|\[|\(|\s*\*)",
+                sj,
+            ):
+                used_without_check = True
+                break
+        
+        if used_without_check and not has_check:
+            # 检查函数名是否可能是分配函数（提高置信度）
+            conf = 0.5
+            alloc_keywords = ("alloc", "malloc", "calloc", "realloc", "new", "create", "init")
+            if any(kw in func_name.lower() for kw in alloc_keywords):
+                conf += 0.2
+            
+            issues.append(
+                Issue(
+                    language="c/cpp",
+                    category="memory_mgmt",
+                    pattern="function_return_ptr_no_check",
+                    file=relpath,
+                    line=idx,
+                    evidence=_strip_line(s),
+                    description=f"函数 {func_name} 返回的指针赋值给 {var_name} 后，在使用前可能未检查 NULL，存在空指针解引用风险。",
+                    suggestion="在使用函数返回的指针前检查是否为 NULL；确保所有可能的返回路径都进行了验证。",
+                    confidence=min(conf, 0.85),
+                    severity="high" if conf >= 0.7 else "medium",
+                )
+            )
+    
+    return issues
+
+
 def _rule_uaf_suspect(lines: Sequence[str], relpath: str) -> List[Issue]:
     """
     启发式 UAF（use-after-free）线索检测（准确性优化版）：
@@ -1237,6 +1311,7 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
     """
     启发式检测空指针解引用：
     - 出现 p->... 或 *p 访问，且邻近未见明显的 NULL 检查。
+    - 出现 arr[...] 数组访问，且邻近未见明显的 NULL 检查。
     注：可能存在误报，需结合上下文确认。
     准确性优化：
     - 对于 *p 的检测，引入上下文判定，尽量排除乘法表达式 a * p 的误报
@@ -1245,6 +1320,8 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
     issues: List[Issue] = []
     re_arrow = re.compile(r"\b([A-Za-z_]\w*)\s*->")
     re_star = re.compile(r"(?<!\w)\*\s*([A-Za-z_]\w*)\b")
+    # 新增：检测数组访问 arr[...]，排除类型声明中的数组声明
+    re_array_access = re.compile(r"\b([A-Za-z_]\w*)\s*\[")
     type_kw = re.compile(
         r"\b(typedef|struct|union|enum|class|char|int|long|short|void|size_t|ssize_t|FILE)\b"
     )
@@ -1258,6 +1335,18 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
         # 典型可视为解引用的前导字符集合
         return line[k] in "(*,=:{;[!&"
 
+    def _is_array_declaration(line: str, var_pos: int) -> bool:
+        """判断是否是数组声明而非数组访问"""
+        # 检查变量前是否有类型关键字，且在同一行有分号（可能是声明）
+        before = line[:var_pos]
+        after = line[var_pos:]
+        # 如果前面有类型关键字且后面有分号，可能是声明
+        if type_kw.search(before) and ";" in after:
+            # 进一步检查：如果后面是 ] 然后是 ; 或 =，更可能是声明
+            if re.search(r"\]\s*[;=]", after):
+                return True
+        return False
+
     for idx, s in enumerate(lines, start=1):
         vars_hit: List[str] = []
         # '->' 访问几乎必为解引用
@@ -1270,6 +1359,21 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
                 if not _is_deref_context(s, star_pos):
                     continue
                 vars_hit.append(m.group(1))
+        # 数组访问 arr[...]：排除数组声明
+        for m in re_array_access.finditer(s):
+            var = m.group(1)
+            var_pos = m.start(1)
+            # 排除数组声明
+            if _is_array_declaration(s, var_pos):
+                continue
+            # 排除明显的数组初始化（如 int arr[] = {...}）
+            before_var = s[:var_pos]
+            if type_kw.search(before_var) and "=" in s[var_pos:]:
+                # 检查是否是初始化语法
+                after_var = s[var_pos + len(var):]
+                if re.match(r"\s*\[[^\]]*\]\s*=", after_var):
+                    continue
+            vars_hit.append(var)
         for v in set(vars_hit):
             if v == "this":  # C++ 成员函数中 this-> 通常不应视为空指针
                 continue
@@ -2806,6 +2910,7 @@ def analyze_c_cpp_text(relpath: str, text: str) -> List[Issue]:
     issues.extend(_rule_boundary_funcs(mlines, relpath))
     issues.extend(_rule_realloc_assign_back(mlines, relpath))
     issues.extend(_rule_malloc_no_null_check(mlines, relpath))
+    issues.extend(_rule_function_return_ptr_no_check(mlines, relpath))
     issues.extend(_rule_unchecked_io(mlines, relpath))
     # 需要字符串字面量信息的规则（使用原始行）
     issues.extend(_rule_strncpy_no_nullterm(lines, relpath))
