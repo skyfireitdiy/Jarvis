@@ -172,7 +172,7 @@ class TestRulesManager:
         merged_rules, loaded_names = manager.load_all_rules()
 
         assert merged_rules == ""
-        assert loaded_names == []
+        assert loaded_names == set()
 
     @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
     def test_load_all_rules_with_global_and_project(self, mock_get_data_dir, tmp_path):
@@ -238,7 +238,7 @@ class TestRulesManager:
         merged_rules, loaded_names = manager.load_all_rules("")
 
         assert merged_rules == ""
-        assert loaded_names == []
+        assert loaded_names == set()
 
     @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
     def test_load_all_rules_combined(self, mock_get_data_dir, tmp_path):
