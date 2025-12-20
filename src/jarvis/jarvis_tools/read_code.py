@@ -586,7 +586,9 @@ class ReadCodeTool:
                     )
                     if result["success"]:
                         all_outputs.append(result["stdout"])
-                        status_lines.append(f"✅ {file_info['path']} 文件读取成功")
+                        status_lines.append(
+                            f"✅ {file_info['path']} 文件读取成功 (范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
+                        )
                     else:
                         all_outputs.append(
                             f"❌ {file_info['path']}: {result['stderr']}"
@@ -601,8 +603,11 @@ class ReadCodeTool:
                     display_path = requests[0]["path"]
                     if merged_result["success"]:
                         all_outputs.append(merged_result["stdout"])
+                        # 获取合并后的范围信息
+                        min_start = min(req.get("start_line", 1) for req in requests)
+                        max_end = max(req.get("end_line", -1) for req in requests)
                         status_lines.append(
-                            f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重)"
+                            f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，范围: {min_start}-{max_end})"
                         )
                     else:
                         all_outputs.append(
