@@ -393,9 +393,17 @@ def get_llm_config(
     config = _get_resolved_model_config(model_group_override)
 
     if platform_type == "cheap":
-        return dict(config.get("cheap_llm_config", {}))
+        llm_config = dict(config.get("cheap_llm_config", {}))
+        # 如果 cheap_llm_config 为空，回退到 normal_llm_config
+        if not llm_config:
+            llm_config = dict(config.get("llm_config", {}))
+        return llm_config
     elif platform_type == "smart":
-        return dict(config.get("smart_llm_config", {}))
+        llm_config = dict(config.get("smart_llm_config", {}))
+        # 如果 smart_llm_config 为空，回退到 normal_llm_config（与 get_smart_platform_name 的回退逻辑一致）
+        if not llm_config:
+            llm_config = dict(config.get("llm_config", {}))
+        return llm_config
     else:
         return dict(config.get("llm_config", {}))
 
