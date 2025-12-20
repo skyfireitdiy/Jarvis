@@ -1069,6 +1069,9 @@ def process_verification_phase(
     get_verified_issue_gids(sec_dir)
     load_candidates(sec_dir)
 
+    # 重新加载 analysis.jsonl 以获取最新写入的验证结果
+    analysis_results = load_analysis_results(sec_dir)
+
     # 构建问题列表（从 analysis.jsonl 的 issues 字段）
     all_issues = []
     for result in analysis_results:
