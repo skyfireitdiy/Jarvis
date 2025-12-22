@@ -827,7 +827,27 @@ class task_list_manager:
                     },
                     "verification_method": {
                         "type": "string",
-                        "description": "验证方法说明（当 status 更新为 completed 时必填）。描述如何验证任务是否真正完成，包括：1) 需要检查的文件或代码位置；2) 验证的具体步骤和方法；3) 预期的验证结果。此信息将传递给验证Agent作为验证指导。",
+                        "description": """验证方法说明（当 status 更新为 completed 时必填）。描述如何验证任务是否真正完成。
+
+**必须包含以下信息：**
+1. **需要检查的文件或代码位置**：明确指出验证需要检查的具体文件路径、函数名、类名或代码行号范围；
+2. **验证的具体步骤和方法**：说明应该执行什么命令、调用什么工具、或检查什么内容来验证任务完成；
+3. **预期的验证结果**：明确描述验证通过时应该看到的结果，以及验证失败时可能出现的情况；
+4. **判断标准**：给出明确的通过/失败判断条件。
+
+**示例：**
+```
+验证文件：src/utils/helper.py
+验证步骤：
+1. 使用 read_code 工具读取 src/utils/helper.py 的第 50-80 行
+2. 检查 parse_config() 函数是否添加了 timeout 参数（默认值为30）
+3. 执行命令 'python -c "from src.utils.helper import parse_config; print(parse_config.__doc__)"' 确认函数可正常导入
+判断标准：
+- 通过：parse_config 函数签名包含 timeout: int = 30 参数，且函数可正常导入无报错
+- 失败：参数缺失、默认值错误、或导入时抛出异常
+```
+
+此信息将传递给验证Agent作为验证指导，请确保描述足够详细和具体。""",
                     },
                 },
             },
