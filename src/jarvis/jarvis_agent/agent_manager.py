@@ -57,6 +57,7 @@ class AgentManager:
             multiline_inputer=self.multiline_inputer,
             confirm_callback=self.confirm_callback,
             non_interactive=self.non_interactive,
+            auto_complete=self.non_interactive, # 非交互模式下自动完成
         )
 
         # 尝试恢复会话
