@@ -157,7 +157,11 @@ class task_list_manager:
             return False
 
     def _create_verification_agent(
-        self, task: Any, parent_agent: Any, verification_iteration: int = 1
+        self,
+        task: Any,
+        parent_agent: Any,
+        verification_iteration: int = 1,
+        verification_method: str = "",
     ) -> Any:
         """创建验证 Agent，只能使用 read_code 和 execute_script 工具
 
@@ -165,6 +169,7 @@ class task_list_manager:
             task: 任务对象
             parent_agent: 父 Agent 实例
             verification_iteration: 验证迭代次数
+            verification_method: 验证方法说明，描述如何验证任务是否真正完成
 
         返回:
             Agent: 验证 Agent 实例
@@ -172,13 +177,21 @@ class task_list_manager:
         from jarvis.jarvis_agent import Agent
         from jarvis.jarvis_utils.globals import get_global_model_group
 
+        # 构建验证方法说明部分
+        verification_method_section = ""
+        if verification_method and str(verification_method).strip():
+            verification_method_section = f"""\n\n**验证方法说明（由任务执行者提供）：**
+{verification_method}
+
+请按照上述验证方法说明进行验证，这是任务执行者指定的验证方式。"""
+
         # 构建验证任务的系统提示词
         verification_system_prompt = f"""你是一个任务验证专家。你的任务是验证任务是否真正完成，仅验证任务预期输出和产物。
 
 **任务信息：**
 - 任务名称：{task.task_name}
 - 任务描述：{task.task_desc}
-- 预期输出（建议为分条列出的结构化条目，例如 1)、2)、3) 或 markdown 列表 - item）：{task.expected_output}
+- 预期输出（建议为分条列出的结构化条目，例如 1)、2)、3) 或 markdown 列表 - item）：{task.expected_output}{verification_method_section}
 
 **验证要求：**
 1. 将预期输出解析为一组**逐条的预期结果条目**（例如按换行、编号 1)、2)、3) 或 markdown 列表 - item 进行切分）
@@ -386,6 +399,7 @@ class task_list_manager:
         background: str,
         parent_agent: Any,
         verification_iteration: int = 1,
+        verification_method: str = "",
     ) -> tuple[bool, str]:
         """验证任务是否真正完成
 
@@ -395,6 +409,7 @@ class task_list_manager:
             background: 背景信息
             parent_agent: 父 Agent 实例
             verification_iteration: 验证迭代次数
+            verification_method: 验证方法说明，描述如何验证任务是否真正完成
 
         返回:
             tuple[bool, str]: (是否完成, 验证结果或失败原因)
@@ -404,7 +419,7 @@ class task_list_manager:
 
             # 创建验证 Agent
             verification_agent = self._create_verification_agent(
-                task, parent_agent, verification_iteration
+                task, parent_agent, verification_iteration, verification_method
             )
 
             # 构建验证任务
@@ -809,6 +824,10 @@ class task_list_manager:
                     "actual_output": {
                         "type": "string",
                         "description": "更新后的实际输出（可选，通常不需要手动调用）",
+                    },
+                    "verification_method": {
+                        "type": "string",
+                        "description": "验证方法说明（当 status 更新为 completed 时必填）。描述如何验证任务是否真正完成，包括：1) 需要检查的文件或代码位置；2) 验证的具体步骤和方法；3) 预期的验证结果。此信息将传递给验证Agent作为验证指导。",
                     },
                 },
             },
@@ -1874,8 +1893,18 @@ class task_list_manager:
             # 处理状态更新（如果提供）
             status = task_update_info.get("status")
             actual_output = task_update_info.get("actual_output")
+            verification_method = task_update_info.get("verification_method")
 
             if status is not None:
+                # 当状态更新为 completed 时，验证 verification_method 必须存在
+                if status == "completed" and task.status.value != "completed":
+                    if not verification_method or not str(verification_method).strip():
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": "缺少 verification_method 参数：当任务状态更新为 completed 时，必须提供 verification_method 参数，描述如何验证任务是否真正完成。",
+                        }
+
                 # 对于 main 类型任务，在更新为 completed 状态时进行验证
                 # 但如果任务已经是 completed 状态，则不需要重新验证
                 if (
@@ -1910,6 +1939,7 @@ class task_list_manager:
                             background,
                             agent,
                             verification_iteration=1,
+                            verification_method=verification_method,
                         )
                     )
 
