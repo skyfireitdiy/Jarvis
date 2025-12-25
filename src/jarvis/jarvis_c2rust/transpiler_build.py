@@ -46,6 +46,7 @@ class BuildManager:
         consecutive_fix_failures_setter: Callable[[int], None],
         current_function_start_commit_getter: Callable[[], Optional[str]],
         get_git_diff_func: Optional[Callable[[Optional[str]], str]] = None,
+        enable_ffi_export_validation: bool = False,
     ) -> None:
         self.crate_dir = crate_dir
         self.project_root = project_root
@@ -69,6 +70,7 @@ class BuildManager:
             current_function_start_commit_getter
         )
         self.get_git_diff = get_git_diff_func
+        self.enable_ffi_export_validation = enable_ffi_export_validation
         self._build_loop_has_fixes = False  # 标记构建循环中是否进行了修复
 
     def classify_rust_error(self, text: str) -> List[str]:
@@ -672,6 +674,66 @@ class BuildManager:
                     "  * 如果问题不稳定，可能需要添加重试机制或调整测试策略",
                     "",
                     "修复后请再次执行 `cargo test -q` 进行验证。",
+                ]
+            )
+        elif stage == "ffi_export_validation":
+            section_lines.extend(
+                [
+                    "",
+                    "【⚠️ 重要：FFI 导出验证失败 - 必须修复】",
+                    "以下输出来自 FFI 导出验证，包含缺失的根符号信息：",
+                    "- **FFI 导出验证当前状态：失败** - 以下根符号未在生成的 .so 文件中找到",
+                    '- 这些符号必须使用 `#[no_mangle]` 和 `pub extern "C"` 正确导出',
+                    "- **请仔细阅读缺失符号信息**，包括：",
+                    "  * 缺失的根符号名称列表",
+                    "  * 这些符号对应的 C 函数名",
+                    "",
+                    "**关键要求：**",
+                    "- 必须确保所有根符号（除 main 外）都使用 FFI 接口形式正确导出",
+                    "- 函数必须使用 `#[no_mangle]` 属性，确保符号名称不被 Rust 编译器修改",
+                    '- 函数必须使用 `pub extern "C"` 声明，使用 C ABI 调用约定',
+                    "- 函数签名应使用 C 兼容类型（如 `*const c_char`、`c_int`、`c_void` 等）",
+                    "- 函数名应保持与 C 原始函数名一致（或遵循 C 命名约定）",
+                    "- 修复后必须重新构建 cdylib 并验证符号是否已正确导出",
+                    "",
+                ]
+            )
+            if command:
+                section_lines.append(f"执行的命令：{command}")
+            section_lines.extend(
+                [
+                    "",
+                    "【FFI 导出验证详细信息 - 必须仔细阅读并修复】",
+                    "以下是从 FFI 导出验证获取的完整信息，包含所有缺失符号的具体信息：",
+                    "<FFI_EXPORT_VALIDATION>",
+                    output,
+                    "</FFI_EXPORT_VALIDATION>",
+                    "",
+                    "**修复要求：**",
+                    "1. 仔细分析上述缺失符号信息，找出每个符号对应的函数",
+                    "2. 定位到具体的代码位置（文件路径和函数定义）",
+                    "3. 对于每个缺失的根符号，确保：",
+                    "   - 函数使用 `#[no_mangle]` 属性",
+                    '   - 函数使用 `pub extern "C"` 声明',
+                    "   - 函数签名使用 C 兼容类型",
+                    "   - 函数名与 C 原始函数名一致",
+                    "   - 函数所在的模块在 src/lib.rs 中被导出",
+                    '4. 如果函数已经存在但未正确导出，修改函数声明添加 `#[no_mangle]` 和 `extern "C"`',
+                    "5. 如果函数不存在，需要实现该函数（使用 FFI 接口形式）",
+                    "6. 修复后必须重新构建 cdylib：执行 `cargo build --lib`",
+                    "7. 验证修复效果：使用 `nm -D <so_file>` 或 `objdump -T <so_file>` 检查符号是否已导出",
+                    "",
+                    "**⚠️ 重要：修复后必须验证**",
+                    "- 修复完成后，**必须使用 `execute_script` 工具执行以下命令验证修复效果**：",
+                    "  - 命令1：`cargo build --lib`（重新构建 cdylib）",
+                    "  - 命令2：`nm -D target/debug/*.so | grep <symbol_name>`（验证符号是否已导出）",
+                    "- 验证要求：",
+                    "  * 构建命令必须执行成功（返回码为 0）",
+                    "  * 符号检查命令必须能找到所有缺失的符号",
+                    "  * **不要假设修复成功，必须实际执行命令验证**",
+                    "- 如果验证失败，请分析失败原因并继续修复，直到验证通过",
+                    "",
+                    "修复后请重新构建 cdylib 并验证符号导出。",
                 ]
             )
         else:
@@ -1279,7 +1341,194 @@ class BuildManager:
                     has_fixes = True
                 # 将修复标记保存到实例变量，供调用方检查
                 self._build_loop_has_fixes = has_fixes
+
+                # 如果启用了 FFI 导出验证，在构建验证通过后检测 so 文件中的根符号
+                if self.enable_ffi_export_validation:
+                    ffi_fix_needed = self._validate_ffi_exports()
+                    if ffi_fix_needed:
+                        # 需要修复 FFI 导出，继续循环
+                        has_fixes = True
+                        self._build_loop_has_fixes = True
+                        continue
+
                 return True  # 测试通过
             # 如果测试失败，说明进行了修复尝试
             if test_iter > 1:
                 has_fixes = True
+
+    def _validate_ffi_exports(self) -> bool:
+        """
+        验证 FFI 导出：确保产物有 cdylib，并在构建后检测 so 文件中的根符号。
+        如果缺少符号，进行修复。
+
+        Returns:
+            bool: 如果需要进行修复，返回 True；否则返回 False
+        """
+        try:
+            # 1. 确保 Cargo.toml 中有 cdylib 配置
+            from jarvis.jarvis_c2rust.transpiler_modules import ModuleManager
+
+            module_manager = ModuleManager(self.crate_dir)
+            module_manager.ensure_cargo_toml_cdylib()
+
+            # 2. 构建 cdylib
+            PrettyOutput.auto_print(
+                "🔍 [c2rust-transpiler][ffi] 构建 cdylib 以验证 FFI 导出..."
+            )
+            build_result = subprocess.run(
+                ["cargo", "build", "--lib"],
+                capture_output=True,
+                text=True,
+                cwd=str(self.crate_dir),
+            )
+
+            if build_result.returncode != 0:
+                PrettyOutput.auto_print(
+                    f"⚠️ [c2rust-transpiler][ffi] cdylib 构建失败: {build_result.stderr}"
+                )
+                # 构建失败，需要修复
+                return True
+
+            # 3. 找到生成的 so 文件
+            # 在 Linux 上，so 文件通常在 target/debug/ 目录下
+            target_dir = self.crate_dir / "target" / "debug"
+            so_files = list(target_dir.glob("*.so"))
+
+            if not so_files:
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-transpiler][ffi] 未找到生成的 .so 文件"
+                )
+                return True  # 需要修复
+
+            # 使用第一个找到的 so 文件（通常只有一个）
+            so_file = so_files[0]
+            PrettyOutput.auto_print(
+                f"📋 [c2rust-transpiler][ffi] 检测到 so 文件: {so_file}"
+            )
+
+            # 4. 使用 nm 或 objdump 检测 so 文件中的符号
+            # 获取根符号列表（排除 main）
+            root_symbols_not_main = [
+                sym for sym in (self.root_symbols or []) if sym != "main"
+            ]
+
+            if not root_symbols_not_main:
+                PrettyOutput.auto_print(
+                    "📋 [c2rust-transpiler][ffi] 没有需要验证的根符号（除 main 外）"
+                )
+                return False  # 不需要验证
+
+            # 使用 nm 命令获取导出的符号
+            nm_result = subprocess.run(
+                ["nm", "-D", str(so_file)],  # -D 表示只显示动态符号
+                capture_output=True,
+                text=True,
+                cwd=str(self.crate_dir),
+            )
+
+            exported_symbols = set()
+            if nm_result.returncode == 0:
+                # 解析 nm 输出，提取符号名
+                for line in nm_result.stdout.splitlines():
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        # nm 输出格式: 地址 类型 符号名
+                        symbol_name = parts[2]
+                        # 只关注 T (text) 和 D (data) 类型的符号
+                        if parts[1] in ("T", "D", "B"):
+                            exported_symbols.add(symbol_name)
+            else:
+                # nm 失败，尝试使用 objdump
+                objdump_result = subprocess.run(
+                    ["objdump", "-T", str(so_file)],
+                    capture_output=True,
+                    text=True,
+                    cwd=str(self.crate_dir),
+                )
+                if objdump_result.returncode == 0:
+                    # 解析 objdump 输出
+                    for line in objdump_result.stdout.splitlines():
+                        parts = line.split()
+                        if len(parts) >= 6 and parts[1] in (".text", ".data", ".bss"):
+                            symbol_name = parts[-1]
+                            exported_symbols.add(symbol_name)
+                else:
+                    PrettyOutput.auto_print(
+                        "⚠️ [c2rust-transpiler][ffi] 无法读取 so 文件符号: nm 和 objdump 都失败"
+                    )
+                    return True  # 需要修复
+
+            # 5. 检查根符号是否都在 so 文件中
+            missing_symbols = []
+            for sym in root_symbols_not_main:
+                # 检查符号名（可能带有下划线前缀，取决于平台）
+                found = False
+                for exported in exported_symbols:
+                    # 符号名可能完全匹配，或者带有下划线前缀
+                    if exported == sym or exported == f"_{sym}":
+                        found = True
+                        break
+                if not found:
+                    missing_symbols.append(sym)
+
+            if not missing_symbols:
+                PrettyOutput.auto_print(
+                    "✅ [c2rust-transpiler][ffi] 所有根符号（除 main 外）都已正确导出到 so 文件"
+                )
+                return False  # 不需要修复
+
+            # 6. 如果缺少符号，进行修复
+            PrettyOutput.auto_print(
+                f"⚠️ [c2rust-transpiler][ffi] 以下根符号未在 so 文件中找到: {', '.join(missing_symbols)}"
+            )
+
+            # 构建修复提示词
+            curr, sym_name, src_loc, c_code = self._get_current_function_context_tuple()
+            tags = ["ffi_export_missing"]
+
+            prompt = self.build_repair_prompt(
+                stage="ffi_export_validation",
+                output=f"缺少的根符号: {', '.join(missing_symbols)}",
+                tags=tags,
+                sym_name=sym_name or "FFI导出验证",
+                src_loc=src_loc,
+                c_code=c_code,
+                curr=curr,
+                symbols_path=str((self.data_dir / "symbols.jsonl").resolve()),
+                include_output_patch_hint=False,
+            )
+
+            # 使用修复 Agent 修复
+            before_commit = self.get_crate_commit_hash()
+            agent = self.get_fix_agent()
+            agent.run(
+                self.compose_prompt_with_context(prompt),
+                prefix="[c2rust-transpiler][ffi-fix]",
+                suffix="",
+            )
+
+            # 检测并处理测试代码删除
+            if self.check_and_handle_test_deletion(before_commit, agent):
+                PrettyOutput.auto_print(
+                    "⚠️ [c2rust-transpiler][ffi-fix] 检测到测试代码删除问题，已回退"
+                )
+
+            return True  # 已进行修复，需要重新验证
+
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"❌ [c2rust-transpiler][ffi] FFI 导出验证失败: {e}"
+            )
+            return True  # 出错，需要修复
+
+    def _get_current_function_context_tuple(
+        self,
+    ) -> Tuple[Dict[str, Any], str, str, str]:
+        """获取当前函数上下文信息，返回元组格式"""
+        ctx = self.get_current_function_context()
+        return (
+            ctx.get("curr", {}),
+            ctx.get("sym_name", ""),
+            ctx.get("src_loc", ""),
+            ctx.get("c_code", ""),
+        )
