@@ -50,24 +50,24 @@ def create_llm_model(
     try:
         # 参考 jarvis_rag/llm_interface.py 的实现：使用全局 PlatformRegistry 实例
         from jarvis.jarvis_platform.registry import PlatformRegistry
-        
+
         # 使用全局 PlatformRegistry 实例，确保平台已正确加载
         # get_smart_platform 内部会调用 get_llm_config("smart", ...)，现在 get_llm_config 已经处理了回退逻辑
         registry = PlatformRegistry.get_global_platform_registry()
         model = registry.get_smart_platform(llm_group)
-        
+
         # 设置 model_group（如果支持）
         try:
             model.set_model_group(llm_group)
         except Exception:
             pass
-        
+
         # 确保模型没有控制台输出（与 code_agent.py 保持一致）
         try:
             model.set_suppress_output(False)
         except Exception:
             pass
-        
+
         # 设置系统提示词
         model.set_system_prompt(
             "你是资深 C→Rust 迁移专家。任务：给定一个函数及其调用子树（依赖图摘要、函数签名、源码片段），"

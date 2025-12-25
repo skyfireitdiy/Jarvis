@@ -44,6 +44,7 @@ class PlanningManager:
             [Any, Optional[Any], Optional[bool], Optional[str]], None
         ],
         agent_before_commits: Dict[str, Optional[str]],
+        enable_ffi_export_validation: bool = False,
     ) -> None:
         self.project_root = project_root
         self.crate_dir = crate_dir
@@ -61,6 +62,7 @@ class PlanningManager:
         self.on_before_tool_call = on_before_tool_call_func
         self.on_after_tool_call = on_after_tool_call_func
         self.agent_before_commits = agent_before_commits
+        self.enable_ffi_export_validation = enable_ffi_export_validation
 
     def build_module_selection_prompts(
         self,
@@ -79,6 +81,8 @@ class PlanningManager:
         }
         """
         is_root = self.is_root_symbol(rec)
+        is_main = rec.name == "main" or rec.qname == "main"
+        is_root_not_main = is_root and not is_main
         system_prompt = (
             "你是资深Rust工程师，擅长为C/C++函数选择合适的Rust模块位置并产出对应的Rust函数签名。\n"
             "目标：根据提供的C源码、调用者上下文与crate目录结构，为该函数选择合适的Rust模块文件并给出Rust函数签名（不实现）。\n"
@@ -91,6 +95,16 @@ class PlanningManager:
             + (
                 "- **根符号要求**：此函数是根符号，必须使用 `pub` 关键字对外暴露，确保可以从 crate 外部访问。同时，该函数所在的模块必须在 src/lib.rs 中被导出（使用 `pub mod <模块名>;`）。\n"
                 if is_root
+                else ""
+            )
+            + (
+                "\n- **FFI 导出要求**：此函数是根符号（除 main 外），且已启用 FFI 导出验证。函数必须以 FFI 接口的形式命名和导出：\n"
+                "  * 函数必须使用 `#[no_mangle]` 属性，确保符号名称不被 Rust 编译器修改\n"
+                '  * 函数必须使用 `pub extern "C"` 声明，使用 C ABI 调用约定\n'
+                "  * 函数签名应使用 C 兼容类型（如 `*const c_char`、`c_int`、`c_void` 等），以便从 C 代码调用\n"
+                "  * 函数名应保持与 C 原始函数名一致，以便在生成的 cdylib 中正确导出\n"
+                '  * 注意：虽然使用了 `extern "C"`，但函数实现仍应遵循 Rust 安全实践，在内部可以使用 Rust 原生类型和安全 API\n'
+                if (is_root_not_main and self.enable_ffi_export_validation)
                 else ""
             )
             + "- **评估是否需要实现**：在规划阶段，请评估此函数是否真的需要实现。以下情况可以跳过实现（设置 skip_implementation 为 true），但**必须确保功能一致性**：\n"

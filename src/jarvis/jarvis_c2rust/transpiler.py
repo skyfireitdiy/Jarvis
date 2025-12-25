@@ -77,6 +77,7 @@ class Transpiler:
             List[str]
         ] = None,  # 根符号列表（这些符号对应的接口实现时要求对外暴露，main除外）
         non_interactive: bool = True,
+        enable_ffi_export_validation: bool = False,  # 启用 FFI 导出验证
     ) -> None:
         self.project_root = Path(project_root).resolve()
         self.data_dir = self.project_root / C2RUST_DIRNAME
@@ -106,6 +107,7 @@ class Transpiler:
         )  # 保持兼容性
         self.review_max_iterations = review_max_iterations
         self.non_interactive = non_interactive
+        self.enable_ffi_export_validation = enable_ffi_export_validation
 
         self.crate_dir = (
             Path(crate_dir) if crate_dir else default_crate_dir(self.project_root)
@@ -193,6 +195,7 @@ class Transpiler:
             self.agent_manager.on_before_tool_call,
             self.agent_manager.on_after_tool_call,
             self._agent_before_commits,
+            self.enable_ffi_export_validation,
         )
 
         # 初始化代码生成管理器
@@ -209,6 +212,7 @@ class Transpiler:
             self._check_and_handle_test_deletion,
             self._get_crate_commit_hash,
             self._ensure_top_level_pub_mod,
+            self.enable_ffi_export_validation,
         )
 
         # 构建管理器将在需要时延迟初始化（因为需要访问其他管理器的方法）
@@ -249,7 +253,7 @@ class Transpiler:
         from jarvis.jarvis_utils.output import PrettyOutput
 
         PrettyOutput.auto_print(
-            f"📋 [c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive}"
+            f"📋 [c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive} enable_ffi_export_validation={self.enable_ffi_export_validation}"
         )
         # 使用 JSONL 存储的符号映射
         self.symbol_map = _SymbolMapJsonl(self.symbol_map_path)
@@ -550,6 +554,7 @@ class Transpiler:
                 lambda v: setattr(self, "_consecutive_fix_failures", v),
                 lambda: self._current_function_start_commit,
                 self._get_git_diff,
+                self.enable_ffi_export_validation,
             )
 
     def _classify_rust_error(self, text: str) -> List[str]:
@@ -889,6 +894,7 @@ def run_transpile(
     disabled_libraries: Optional[List[str]] = None,  # None 表示从配置文件恢复
     root_symbols: Optional[List[str]] = None,  # None 表示从配置文件恢复
     non_interactive: bool = True,
+    enable_ffi_export_validation: bool = False,  # 启用 FFI 导出验证
 ) -> None:
     """
     入口函数：执行转译流程
@@ -910,5 +916,6 @@ def run_transpile(
         disabled_libraries=disabled_libraries,
         root_symbols=root_symbols,
         non_interactive=non_interactive,
+        enable_ffi_export_validation=enable_ffi_export_validation,
     )
     t.transpile()

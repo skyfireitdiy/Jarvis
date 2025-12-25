@@ -30,6 +30,7 @@ class GenerationManager:
         check_and_handle_test_deletion_func: Callable[[str, str], bool],
         get_crate_commit_hash_func: Callable[[], str],
         ensure_top_level_pub_mod_func: Callable[[str], None],
+        enable_ffi_export_validation: bool = False,
     ) -> None:
         self.project_root = project_root
         self.crate_dir = crate_dir
@@ -43,6 +44,7 @@ class GenerationManager:
         self.check_and_handle_test_deletion = check_and_handle_test_deletion_func
         self.get_crate_commit_hash = get_crate_commit_hash_func
         self.ensure_top_level_pub_mod = ensure_top_level_pub_mod_func
+        self.enable_ffi_export_validation = enable_ffi_export_validation
 
     def build_generate_impl_prompt(
         self,
@@ -59,6 +61,8 @@ class GenerationManager:
         """
         symbols_path = str((self.data_dir / "symbols.jsonl").resolve())
         is_root = self.is_root_symbol(rec.qname or rec.name)
+        is_main = rec.name == "main" or rec.qname == "main"
+        is_root_not_main = is_root and not is_main
         # 获取 C 源文件位置信息
         c_file_location = ""
         if hasattr(rec, "file") and rec.file:
@@ -81,6 +85,18 @@ class GenerationManager:
             *(
                 ["根符号要求：必须使用 `pub` 关键字，模块必须在 src/lib.rs 中导出"]
                 if is_root
+                else []
+            ),
+            *(
+                [
+                    "FFI 导出要求：此函数是根符号（除 main 外），且已启用 FFI 导出验证。函数必须以 FFI 接口的形式命名和导出：",
+                    "  * 函数必须使用 `#[no_mangle]` 属性，确保符号名称不被 Rust 编译器修改",
+                    '  * 函数必须使用 `pub extern "C"` 声明，使用 C ABI 调用约定',
+                    "  * 函数签名应使用 C 兼容类型（如 `*const c_char`、`c_int`、`c_void` 等），以便从 C 代码调用",
+                    "  * 函数名应保持与 C 原始函数名一致（或遵循 C 命名约定），以便在生成的 cdylib 中正确导出",
+                    '  * 注意：虽然使用了 `extern "C"`，但函数实现仍应遵循 Rust 安全实践，在内部可以使用 Rust 原生类型和安全 API',
+                ]
+                if (is_root_not_main and self.enable_ffi_export_validation)
                 else []
             ),
             "",

@@ -475,6 +475,11 @@ def run(
         "--reset",
         help="重置状态，从头开始执行所有阶段",
     ),
+    enable_ffi_export_validation: bool = typer.Option(
+        False,
+        "--enable-ffi-export-validation",
+        help="启用 FFI 导出验证：要求产物必须有 cdylib，根符号（除 main 外）必须以 FFI 接口形式命名和导出，并在构建后验证 so 文件中的符号",
+    ),
 ) -> None:
     """
     依次执行流水线：scan -> lib-replace -> prepare -> transpile -> optimize
@@ -622,6 +627,7 @@ def run(
                 disabled_libraries=None,  # 从配置文件恢复
                 root_symbols=None,  # 从配置文件恢复
                 non_interactive=not interactive,
+                enable_ffi_export_validation=enable_ffi_export_validation,
             )
             PrettyOutput.auto_print("✅ [c2rust-run] transpile: 完成")
             # 保存状态（因为直接调用 _run_transpile 函数，需要手动保存状态）

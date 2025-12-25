@@ -652,7 +652,9 @@ def _rule_malloc_no_null_check(lines: Sequence[str], relpath: str) -> List[Issue
     return issues
 
 
-def _rule_function_return_ptr_no_check(lines: Sequence[str], relpath: str) -> List[Issue]:
+def _rule_function_return_ptr_no_check(
+    lines: Sequence[str], relpath: str
+) -> List[Issue]:
     """
     检测函数返回指针后未检查 NULL 就直接使用的情况。
     启发式：检测形如 "type *var = func(...);" 后直接使用 var 而未检查 NULL。
@@ -665,29 +667,29 @@ def _rule_function_return_ptr_no_check(lines: Sequence[str], relpath: str) -> Li
         r"\b[A-Za-z_]\w+\s*\*\s*([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)\s*\(",
         re.IGNORECASE,
     )
-    
+
     for idx, s in enumerate(lines, start=1):
         # 跳过类型声明行和预处理指令
         t = s.lstrip()
         if t.startswith("#") or re.search(r"\b(typedef|extern)\b", s):
             continue
-        
+
         # 检测指针赋值：匹配 "type *var = func(" 或 "type* var = func("
         var_name = None
         func_name = None
-        
+
         # 匹配 type *var = func(...) 或 type* var = func(...)
         m = re_ptr_assign.search(s)
         if m:
             var_name = m.group(1)  # 变量名
             func_name = m.group(2)  # 函数名
-        
+
         if not var_name:
             continue
-        
+
         # 检查后续几行是否有 NULL 检查
         has_check = _has_null_check_around(var_name, lines, idx, radius=4)
-        
+
         # 检查后续几行是否直接使用了该变量（解引用或数组访问）
         used_without_check = False
         for j, sj in _window(lines, idx, before=0, after=6):
@@ -700,14 +702,22 @@ def _rule_function_return_ptr_no_check(lines: Sequence[str], relpath: str) -> Li
             ):
                 used_without_check = True
                 break
-        
+
         if used_without_check and not has_check:
             # 检查函数名是否可能是分配函数（提高置信度）
             conf = 0.5
-            alloc_keywords = ("alloc", "malloc", "calloc", "realloc", "new", "create", "init")
+            alloc_keywords = (
+                "alloc",
+                "malloc",
+                "calloc",
+                "realloc",
+                "new",
+                "create",
+                "init",
+            )
             if any(kw in func_name.lower() for kw in alloc_keywords):
                 conf += 0.2
-            
+
             issues.append(
                 Issue(
                     language="c/cpp",
@@ -722,7 +732,7 @@ def _rule_function_return_ptr_no_check(lines: Sequence[str], relpath: str) -> Li
                     severity="high" if conf >= 0.7 else "medium",
                 )
             )
-    
+
     return issues
 
 
@@ -1370,7 +1380,7 @@ def _rule_possible_null_deref(lines: Sequence[str], relpath: str) -> List[Issue]
             before_var = s[:var_pos]
             if type_kw.search(before_var) and "=" in s[var_pos:]:
                 # 检查是否是初始化语法
-                after_var = s[var_pos + len(var):]
+                after_var = s[var_pos + len(var) :]
                 if re.match(r"\s*\[[^\]]*\]\s*=", after_var):
                     continue
             vars_hit.append(var)
