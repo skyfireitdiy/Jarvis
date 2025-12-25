@@ -605,7 +605,10 @@ def run(
         if not state.get("prepare", {}).get("completed", False):
             PrettyOutput.auto_print("🚀 [c2rust-run] prepare: 开始")
             _execute_llm_plan(
-                apply=True, llm_group=llm_group, non_interactive=not interactive
+                apply=True,
+                llm_group=llm_group,
+                non_interactive=not interactive,
+                enable_ffi_export_validation=enable_ffi_export_validation,
             )
             PrettyOutput.auto_print("✅ [c2rust-run] prepare: 完成")
             # 保存状态（因为直接调用 _execute_llm_plan 函数，需要手动保存状态）
