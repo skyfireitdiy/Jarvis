@@ -20,6 +20,7 @@ class ModuleManager:
         """
         在 Cargo.toml 中确保存在 [lib] 配置，且 crate-type 包含 "cdylib"。
         如果 [lib] 不存在，则创建；如果存在但没有 crate-type，则添加；如果存在但 crate-type 不包含 "cdylib"，则添加。
+        注意：可以同时包含 "cdylib" 和 "rlib"，只要包含 "cdylib" 即可。
         """
         try:
             cargo_path = (self.crate_dir / "Cargo.toml").resolve()
@@ -28,11 +29,11 @@ class ModuleManager:
                 pkg_name = self.crate_dir.name
                 content = (
                     f'[package]\nname = "{pkg_name}"\nversion = "0.1.0"\nedition = "2021"\n\n'
-                    '[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib"]\n\n'
+                    '[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib", "rlib"]\n\n'
                 )
                 cargo_path.write_text(content, encoding="utf-8")
                 PrettyOutput.auto_print(
-                    f"✅ [c2rust-transpiler][cargo] 已创建 Cargo.toml 并设置 cdylib: {cargo_path}"
+                    f"✅ [c2rust-transpiler][cargo] 已创建 Cargo.toml 并设置 cdylib 和 rlib: {cargo_path}"
                 )
                 return
 
@@ -55,26 +56,20 @@ class ModuleManager:
                     next_section = re.search(r"(?m)^\s*\[", txt[insert_pos:])
                     if next_section:
                         insert_pos = insert_pos + next_section.start()
-                    lib_config = (
-                        '\n[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib"]\n'
-                    )
+                    lib_config = '\n[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib", "rlib"]\n'
                     new_txt = txt[:insert_pos] + lib_config + txt[insert_pos:]
                 elif deps_match:
                     # 在 [dependencies] 之前添加
                     insert_pos = deps_match.start()
-                    lib_config = (
-                        '\n[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib"]\n'
-                    )
+                    lib_config = '\n[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib", "rlib"]\n'
                     new_txt = txt[:insert_pos] + lib_config + txt[insert_pos:]
                 else:
                     # 在文件末尾添加
-                    lib_config = (
-                        '\n[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib"]\n'
-                    )
+                    lib_config = '\n[lib]\npath = "src/lib.rs"\ncrate-type = ["cdylib", "rlib"]\n'
                     new_txt = txt.rstrip() + lib_config
                 cargo_path.write_text(new_txt, encoding="utf-8")
                 PrettyOutput.auto_print(
-                    f"✅ [c2rust-transpiler][cargo] 已在 Cargo.toml 中添加 [lib] 配置并设置 cdylib: {cargo_path}"
+                    f"✅ [c2rust-transpiler][cargo] 已在 Cargo.toml 中添加 [lib] 配置并设置 cdylib 和 rlib: {cargo_path}"
                 )
                 return
 
@@ -100,7 +95,7 @@ class ModuleManager:
                     t.strip().strip('"').strip("'") for t in crate_types_str.split(",")
                 ]
                 if "cdylib" not in crate_types:
-                    # 添加 "cdylib"
+                    # 添加 "cdylib"（保留已有的类型，如 rlib）
                     crate_types.append("cdylib")
                     new_crate_types_str = ", ".join(f'"{ct}"' for ct in crate_types)
                     new_lib_block = lib_block.replace(
@@ -110,7 +105,7 @@ class ModuleManager:
                     new_txt = txt[:lib_start] + new_lib_block + txt[lib_end:]
                     cargo_path.write_text(new_txt, encoding="utf-8")
                     PrettyOutput.auto_print(
-                        f"✅ [c2rust-transpiler][cargo] 已在 Cargo.toml 的 [lib] 中添加 cdylib: {cargo_path}"
+                        f"✅ [c2rust-transpiler][cargo] 已在 Cargo.toml 的 [lib] 中添加 cdylib（保留已有类型）: {cargo_path}"
                     )
             else:
                 # 没有 crate-type，添加
@@ -121,16 +116,18 @@ class ModuleManager:
                     insert_pos_in_block = path_match.end()
                     new_lib_block = (
                         lib_block[:insert_pos_in_block]
-                        + '\ncrate-type = ["cdylib"]'
+                        + '\ncrate-type = ["cdylib", "rlib"]'
                         + lib_block[insert_pos_in_block:]
                     )
                 else:
                     # 没有 path，直接在 [lib] 后添加
-                    new_lib_block = lib_block.rstrip() + '\ncrate-type = ["cdylib"]\n'
+                    new_lib_block = (
+                        lib_block.rstrip() + '\ncrate-type = ["cdylib", "rlib"]\n'
+                    )
                 new_txt = txt[:lib_start] + new_lib_block + txt[lib_end:]
                 cargo_path.write_text(new_txt, encoding="utf-8")
                 PrettyOutput.auto_print(
-                    f'✅ [c2rust-transpiler][cargo] 已在 Cargo.toml 的 [lib] 中添加 crate-type = ["cdylib"]: {cargo_path}'
+                    f'✅ [c2rust-transpiler][cargo] 已在 Cargo.toml 的 [lib] 中添加 crate-type = ["cdylib", "rlib"]: {cargo_path}'
                 )
         except Exception as e:
             PrettyOutput.auto_print(

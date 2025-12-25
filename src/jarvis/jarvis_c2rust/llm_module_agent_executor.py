@@ -24,6 +24,7 @@ def execute_llm_plan(
     crate_name: Optional[Union[Path, str]] = None,
     llm_group: Optional[str] = None,
     non_interactive: bool = True,
+    enable_ffi_export_validation: bool = False,
 ) -> List:
     """
     返回 LLM 生成的目录结构原始 JSON 文本（来自 <PROJECT> 块）。
@@ -112,9 +113,24 @@ def execute_llm_plan(
             "   - 严禁删除现有声明或修改非声明代码；",
             '2) 在 Cargo.toml 的 [package] 中设置 edition："2024"；若本地工具链不支持 2024，请降级为 "2021" 并在说明中记录原因；保留其他已有字段与依赖不变。',
             "3) 根据当前源代码实际情况配置入口：",
-            "   - 仅库：仅配置 [lib]（path=src/lib.rs），不要生成 main.rs；",
-            "   - 单一可执行：存在 src/main.rs 时配置 [[bin]] 或默认二进制；可选保留 [lib] 以沉淀共享逻辑；",
-            "   - 多可执行：为每个 src/bin/<name>.rs 配置 [[bin]]；共享代码放在 src/lib.rs；",
+            "   - 仅库：仅配置 [lib]（path=src/lib.rs），不要生成 main.rs；"
+            + (
+                '**重要**：必须在 [lib] 配置中添加 `crate-type = ["cdylib", "rlib"]`（或至少包含 "cdylib"），确保产物包含 cdylib。可以同时包含 rlib，但不能只有 rlib。'
+                if enable_ffi_export_validation
+                else ""
+            ),
+            "   - 单一可执行：存在 src/main.rs 时配置 [[bin]] 或默认二进制；可选保留 [lib] 以沉淀共享逻辑；"
+            + (
+                '**重要**：如果配置了 [lib]，必须在 [lib] 配置中添加 `crate-type = ["cdylib", "rlib"]`（或至少包含 "cdylib"），确保产物包含 cdylib。可以同时包含 rlib，但不能只有 rlib。'
+                if enable_ffi_export_validation
+                else ""
+            ),
+            "   - 多可执行：为每个 src/bin/<name>.rs 配置 [[bin]]；共享代码放在 src/lib.rs；"
+            + (
+                '**重要**：必须在 [lib] 配置中添加 `crate-type = ["cdylib", "rlib"]`（或至少包含 "cdylib"），确保产物包含 cdylib。可以同时包含 rlib，但不能只有 rlib。'
+                if enable_ffi_export_validation
+                else ""
+            ),
             "   - 不要创建与目录结构不一致的占位入口。",
             "4) 对被作为入口的源文件：若不存在 fn main() 则仅添加最小可用实现（不要改动已存在的实现）：",
             '   fn main() { println!("ok"); }',
