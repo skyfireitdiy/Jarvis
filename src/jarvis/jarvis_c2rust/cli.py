@@ -308,7 +308,7 @@ def config(
 
     # 读取根符号列表（从现有配置开始，以便追加而不是替换）
     root_symbols: List[str] = list(current_config.get("root_symbols", []))
-    header_exts = {".h", ".hh", ".hpp", ".hxx"}
+    header_exts = {".h", ".hh", ".hpp", ".hxx", ".c", ".cxx", ".cpp"}
 
     if files:
         for file_path in files:
@@ -363,6 +363,15 @@ def config(
                         )
                         raise typer.Exit(code=1)
                 else:
+                    # 只允许 .txt 文件作为符号列表文件
+                    if file_path.suffix.lower() != ".txt":
+                        PrettyOutput.auto_print(
+                            f"⚠️ [c2rust-config] 警告: 不支持的文件类型 {file_path.suffix}，跳过: {file_path}"
+                        )
+                        PrettyOutput.auto_print(
+                            "💡 [c2rust-config] 提示: 请使用头文件/源文件（.h/.hh/.hpp/.hxx/.c/.cxx/.cpp）提取函数名，或使用 .txt 文件提供符号列表"
+                        )
+                        continue
                     # 读取函数名列表文件（每行一个函数名）
                     txt = file_path.read_text(encoding="utf-8")
                     collected = [
