@@ -478,6 +478,11 @@ class EditFileNormalTool:
                 # 空search只处理第一个diff，跳过后续所有diffs
                 break
 
+            # 检查 search 和 replace 是否完全一致（无效操作）
+            if search == replace:
+                error_info = f"第 {idx} 个diff失败：search 和 replace 内容完全相同，这是一个无效操作（没有实际修改）"
+                return False, error_info, None, None
+
             # 验证 search 文本
             if not isinstance(search, str):
                 error_info = f"第 {idx} 个diff失败：search 文本必须是字符串"
