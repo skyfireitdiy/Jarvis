@@ -104,7 +104,7 @@
     "max_input_token_count": {
       "type": "number",
       "description": "模型能处理的最大输入token数量。其他token限制基于此值计算：最大token数量=此值×100，最大大内容尺寸=此值×5",
-      "default": 32000
+      "default": 128000
     },
     "platform": {
       "type": "string",
