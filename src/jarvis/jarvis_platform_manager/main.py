@@ -6,6 +6,10 @@
 import os
 import sys
 
+from rich import box
+from rich.panel import Panel
+from rich.console import Console
+
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -304,6 +308,16 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
                 if not response:
                     PrettyOutput.auto_print("⚠️ 没有有效的回复")
                 else:
+                    # 使用 Panel 打印 LLM 响应
+                    console = Console()
+                    panel = Panel(
+                        response,
+                        title=f"[bold cyan]{platform_name} · {model_name}[/bold cyan]",
+                        border_style="bright_blue",
+                        box=box.ROUNDED,
+                        expand=True,
+                    )
+                    console.print(panel)
                     conversation_history.append(
                         {"role": "assistant", "content": response}
                     )  # 记录模型回复
