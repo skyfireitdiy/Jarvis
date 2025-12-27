@@ -74,20 +74,26 @@ def list_platforms(
             PrettyOutput.auto_print(f"⚠️ 创建 {platform_name} 平台失败")
 
 
-def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> None:
+def chat_with_model(
+    platform_name: str,
+    model_name: str,
+    system_prompt: str,
+    llm_group: Optional[str] = None,
+) -> None:
     """与指定平台和模型进行对话。
 
     参数:
         platform_name: 平台名称
         model_name: 模型名称
         system_prompt: 系统提示语
+        llm_group: 使用的模型组，覆盖配置文件中的设置
 
     """
     registry = PlatformRegistry.get_global_platform_registry()
     conversation_history: List[Dict[str, str]] = []  # 存储对话记录
 
     # 获取 llm_config，确保传递 api_key 等配置
-    llm_config = get_llm_config("normal", None)
+    llm_config = get_llm_config("normal", llm_group)
 
     # Create platform instance
     platform = registry.create_platform(platform_name, llm_config)
@@ -373,7 +379,7 @@ def chat_command(
 
     if not validate_platform_model(platform, model):
         return
-    chat_with_model(platform, model, "")
+    chat_with_model(platform, model, "", llm_group)
 
 
 @app.command("service")
@@ -509,7 +515,7 @@ def role_command(
 
     # 开始对话
     PrettyOutput.auto_print(f"✅ 已选择角色: {selected_role['name']}")
-    chat_with_model(platform_name, model_name, system_prompt)
+    chat_with_model(platform_name, model_name, system_prompt, llm_group)
 
 
 def main() -> None:
