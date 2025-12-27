@@ -18,6 +18,7 @@ import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.service import start_service
+from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.fzf import fzf_select
@@ -81,8 +82,11 @@ def chat_with_model(platform_name: str, model_name: str, system_prompt: str) -> 
     registry = PlatformRegistry.get_global_platform_registry()
     conversation_history: List[Dict[str, str]] = []  # 存储对话记录
 
+    # 获取 llm_config，确保传递 api_key 等配置
+    llm_config = get_llm_config("normal", None)
+
     # Create platform instance
-    platform = registry.create_platform(platform_name)
+    platform = registry.create_platform(platform_name, llm_config)
     if platform:
         platform.set_model_name(model_name)
 
