@@ -1,0 +1,3699 @@
+{
+  "symbols_by_name": {
+    "adler32": [
+      {
+        "name": "adler32",
+        "kind": "module",
+        "file_path": "src/lib.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 70,
+        "line_end": 70,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/lib.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 70,
+        "line_end": 70,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 128,
+        "line_end": 128,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "ffi": [
+      {
+        "name": "ffi",
+        "kind": "module",
+        "file_path": "src/lib.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "ffi",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/lib.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "main": [
+      {
+        "name": "main",
+        "kind": "function",
+        "file_path": "src/bin/zlib_rs.rs",
+        "line_start": 10,
+        "line_end": 10,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "main",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/bin/zlib_rs.rs",
+        "line_start": 10,
+        "line_end": 10,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "combine": [
+      {
+        "name": "combine",
+        "kind": "module",
+        "file_path": "src/adler32/mod.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "combine",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/mod.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "core": [
+      {
+        "name": "core",
+        "kind": "module",
+        "file_path": "src/adler32/mod.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "core",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/mod.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "types": [
+      {
+        "name": "types",
+        "kind": "module",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 5,
+        "line_end": 5,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "types",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 5,
+        "line_end": 5,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "BASE": [
+      {
+        "name": "BASE",
+        "kind": "const",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 6,
+        "line_end": 6,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "BASE",
+        "kind": "const",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 6,
+        "line_end": 6,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "BASE",
+        "kind": "macro",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 10,
+        "line_end": 10,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "adler32_combine_": [
+      {
+        "name": "adler32_combine_",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 20,
+        "line_end": 20,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine_",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 20,
+        "line_end": 20,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine_",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 133,
+        "line_end": 133,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "adler32_combine": [
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 73,
+        "line_end": 73,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 108,
+        "line_end": 108,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 73,
+        "line_end": 73,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 108,
+        "line_end": 108,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 158,
+        "line_end": 158,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "cfg": [
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 77,
+        "line_end": 77,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 130,
+        "line_end": 130,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 77,
+        "line_end": 77,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 130,
+        "line_end": 130,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 78,
+        "line_end": 78,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 78,
+        "line_end": 78,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test": [
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 82,
+        "line_end": 82,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 93,
+        "line_end": 93,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 106,
+        "line_end": 106,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 115,
+        "line_end": 115,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 142,
+        "line_end": 142,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 152,
+        "line_end": 152,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 164,
+        "line_end": 164,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 181,
+        "line_end": 181,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 198,
+        "line_end": 198,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 210,
+        "line_end": 210,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 221,
+        "line_end": 221,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 228,
+        "line_end": 228,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 240,
+        "line_end": 240,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 249,
+        "line_end": 249,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 259,
+        "line_end": 259,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 135,
+        "line_end": 135,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 145,
+        "line_end": 145,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 161,
+        "line_end": 161,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 173,
+        "line_end": 173,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 187,
+        "line_end": 187,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 203,
+        "line_end": 203,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 213,
+        "line_end": 213,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 224,
+        "line_end": 224,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 233,
+        "line_end": 233,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 243,
+        "line_end": 243,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 82,
+        "line_end": 82,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 93,
+        "line_end": 93,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 106,
+        "line_end": 106,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 115,
+        "line_end": 115,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 142,
+        "line_end": 142,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 152,
+        "line_end": 152,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 164,
+        "line_end": 164,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 181,
+        "line_end": 181,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 198,
+        "line_end": 198,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 210,
+        "line_end": 210,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 221,
+        "line_end": 221,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 228,
+        "line_end": 228,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 240,
+        "line_end": 240,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 249,
+        "line_end": 249,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 259,
+        "line_end": 259,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 135,
+        "line_end": 135,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 145,
+        "line_end": 145,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 161,
+        "line_end": 161,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 173,
+        "line_end": 173,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 187,
+        "line_end": 187,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 203,
+        "line_end": 203,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 213,
+        "line_end": 213,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 224,
+        "line_end": 224,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 233,
+        "line_end": 233,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 243,
+        "line_end": 243,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_negative_len_returns_invalid": [
+      {
+        "name": "test_negative_len_returns_invalid",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 83,
+        "line_end": 83,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_negative_len_returns_invalid",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 83,
+        "line_end": 83,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_zero_len": [
+      {
+        "name": "test_zero_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 94,
+        "line_end": 94,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 94,
+        "line_end": 94,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_initial_adler_values": [
+      {
+        "name": "test_initial_adler_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_initial_adler_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_typical_values": [
+      {
+        "name": "test_typical_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 116,
+        "line_end": 116,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_typical_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 116,
+        "line_end": 116,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_len_equals_base": [
+      {
+        "name": "test_len_equals_base",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 132,
+        "line_end": 132,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_len_equals_base",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 132,
+        "line_end": 132,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_len_greater_than_base": [
+      {
+        "name": "test_len_greater_than_base",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 143,
+        "line_end": 143,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_len_greater_than_base",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 143,
+        "line_end": 143,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_large_values": [
+      {
+        "name": "test_large_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_large_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_max_len": [
+      {
+        "name": "test_max_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 165,
+        "line_end": 165,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_max_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 165,
+        "line_end": 165,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_zero_adler_values": [
+      {
+        "name": "test_zero_adler_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 175,
+        "line_end": 175,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_adler_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 175,
+        "line_end": 175,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_sum1_double_reduction": [
+      {
+        "name": "test_sum1_double_reduction",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 182,
+        "line_end": 182,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_sum1_double_reduction",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 182,
+        "line_end": 182,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_adler32_combine_wrapper_consistency": [
+      {
+        "name": "test_adler32_combine_wrapper_consistency",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 199,
+        "line_end": 199,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_wrapper_consistency",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 199,
+        "line_end": 199,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_adler32_combine_negative_len": [
+      {
+        "name": "test_adler32_combine_negative_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 211,
+        "line_end": 211,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_negative_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 211,
+        "line_end": 211,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_adler32_combine_zero_len": [
+      {
+        "name": "test_adler32_combine_zero_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 222,
+        "line_end": 222,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_zero_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 222,
+        "line_end": 222,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_adler32_combine_typical_values": [
+      {
+        "name": "test_adler32_combine_typical_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 229,
+        "line_end": 229,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_typical_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 229,
+        "line_end": 229,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_adler32_combine_len_equals_base": [
+      {
+        "name": "test_adler32_combine_len_equals_base",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 241,
+        "line_end": 241,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_len_equals_base",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 241,
+        "line_end": 241,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_adler32_combine_large_values": [
+      {
+        "name": "test_adler32_combine_large_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 250,
+        "line_end": 250,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_large_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 250,
+        "line_end": 250,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_adler32_combine_max_len": [
+      {
+        "name": "test_adler32_combine_max_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 260,
+        "line_end": 260,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_max_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 260,
+        "line_end": 260,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "no_mangle": [
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 44,
+        "line_end": 44,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 69,
+        "line_end": 69,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 125,
+        "line_end": 125,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 44,
+        "line_end": 44,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 69,
+        "line_end": 69,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 125,
+        "line_end": 125,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_null_pointer_returns_initial": [
+      {
+        "name": "test_null_pointer_returns_initial",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 136,
+        "line_end": 136,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_null_pointer_returns_initial",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 136,
+        "line_end": 136,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_zero_length_returns_original": [
+      {
+        "name": "test_zero_length_returns_original",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 146,
+        "line_end": 146,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_length_returns_original",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 146,
+        "line_end": 146,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_empty_data": [
+      {
+        "name": "test_empty_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 154,
+        "line_end": 154,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_empty_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 154,
+        "line_end": 154,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_single_byte": [
+      {
+        "name": "test_single_byte",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 162,
+        "line_end": 162,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_single_byte",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 162,
+        "line_end": 162,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_multiple_bytes": [
+      {
+        "name": "test_multiple_bytes",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_multiple_bytes",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_incremental_calculation": [
+      {
+        "name": "test_incremental_calculation",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 188,
+        "line_end": 188,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_incremental_calculation",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 188,
+        "line_end": 188,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_longer_data": [
+      {
+        "name": "test_longer_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 204,
+        "line_end": 204,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_longer_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 204,
+        "line_end": 204,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_zero_data": [
+      {
+        "name": "test_zero_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 214,
+        "line_end": 214,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 214,
+        "line_end": 214,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_max_byte_data": [
+      {
+        "name": "test_max_byte_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 225,
+        "line_end": 225,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_max_byte_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 225,
+        "line_end": 225,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_initial_zero_equals_one": [
+      {
+        "name": "test_initial_zero_equals_one",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 234,
+        "line_end": 234,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_initial_zero_equals_one",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 234,
+        "line_end": 234,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "test_large_buffer": [
+      {
+        "name": "test_large_buffer",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 244,
+        "line_end": 244,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_large_buffer",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 244,
+        "line_end": 244,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "adler32_z": [
+      {
+        "name": "adler32_z",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 45,
+        "line_end": 45,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_z",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 45,
+        "line_end": 45,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_z",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 61,
+        "line_end": 61,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "adler32_combine64": [
+      {
+        "name": "adler32_combine64",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 126,
+        "line_end": 126,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine64",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 126,
+        "line_end": 126,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine64",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 162,
+        "line_end": 162,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "NMAX": [
+      {
+        "name": "NMAX",
+        "kind": "macro",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "z_off64_t": [
+      {
+        "name": "z_off64_t",
+        "kind": "macro",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 43,
+        "line_end": 43,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ]
+  },
+  "symbols_by_file": {
+    "src/adler32/combine.rs": [
+      {
+        "name": "BASE",
+        "kind": "const",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 6,
+        "line_end": 6,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine_",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 20,
+        "line_end": 20,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 73,
+        "line_end": 73,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 77,
+        "line_end": 77,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 78,
+        "line_end": 78,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 82,
+        "line_end": 82,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_negative_len_returns_invalid",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 83,
+        "line_end": 83,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 93,
+        "line_end": 93,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 94,
+        "line_end": 94,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 106,
+        "line_end": 106,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_initial_adler_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 115,
+        "line_end": 115,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_typical_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 116,
+        "line_end": 116,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_len_equals_base",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 132,
+        "line_end": 132,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 142,
+        "line_end": 142,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_len_greater_than_base",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 143,
+        "line_end": 143,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 152,
+        "line_end": 152,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_large_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 164,
+        "line_end": 164,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_max_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 165,
+        "line_end": 165,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_adler_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 175,
+        "line_end": 175,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 181,
+        "line_end": 181,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_sum1_double_reduction",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 182,
+        "line_end": 182,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 198,
+        "line_end": 198,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_wrapper_consistency",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 199,
+        "line_end": 199,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 210,
+        "line_end": 210,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_negative_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 211,
+        "line_end": 211,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 221,
+        "line_end": 221,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_zero_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 222,
+        "line_end": 222,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 228,
+        "line_end": 228,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_typical_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 229,
+        "line_end": 229,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 240,
+        "line_end": 240,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_len_equals_base",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 241,
+        "line_end": 241,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 249,
+        "line_end": 249,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_large_values",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 250,
+        "line_end": 250,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 259,
+        "line_end": 259,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_adler32_combine_max_len",
+        "kind": "function",
+        "file_path": "src/adler32/combine.rs",
+        "line_start": 260,
+        "line_end": 260,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "src/lib.rs": [
+      {
+        "name": "adler32",
+        "kind": "module",
+        "file_path": "src/lib.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "ffi",
+        "kind": "module",
+        "file_path": "src/lib.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "src/adler32/mod.rs": [
+      {
+        "name": "combine",
+        "kind": "module",
+        "file_path": "src/adler32/mod.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "core",
+        "kind": "module",
+        "file_path": "src/adler32/mod.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "src/bin/zlib_rs.rs": [
+      {
+        "name": "main",
+        "kind": "function",
+        "file_path": "src/bin/zlib_rs.rs",
+        "line_start": 10,
+        "line_end": 10,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "src/ffi/mod.rs": [
+      {
+        "name": "types",
+        "kind": "module",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 5,
+        "line_end": 5,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 44,
+        "line_end": 44,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_z",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 45,
+        "line_end": 45,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 69,
+        "line_end": 69,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 70,
+        "line_end": 70,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 108,
+        "line_end": 108,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 125,
+        "line_end": 125,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine64",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 126,
+        "line_end": 126,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 130,
+        "line_end": 130,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 135,
+        "line_end": 135,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_null_pointer_returns_initial",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 136,
+        "line_end": 136,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 145,
+        "line_end": 145,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_length_returns_original",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 146,
+        "line_end": 146,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_empty_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 154,
+        "line_end": 154,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 161,
+        "line_end": 161,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_single_byte",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 162,
+        "line_end": 162,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 173,
+        "line_end": 173,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_multiple_bytes",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 187,
+        "line_end": 187,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_incremental_calculation",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 188,
+        "line_end": 188,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 203,
+        "line_end": 203,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_longer_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 204,
+        "line_end": 204,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 213,
+        "line_end": 213,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_zero_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 214,
+        "line_end": 214,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 224,
+        "line_end": 224,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_max_byte_data",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 225,
+        "line_end": 225,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 233,
+        "line_end": 233,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_initial_zero_equals_one",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 234,
+        "line_end": 234,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 243,
+        "line_end": 243,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "test_large_buffer",
+        "kind": "function",
+        "file_path": "src/ffi/mod.rs",
+        "line_start": 244,
+        "line_end": 244,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ],
+    "/home/skyfire/code/zlib_rs/src/lib.rs": [
+      {
+        "name": "adler32",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/lib.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "ffi",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/lib.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "/home/skyfire/code/zlib_rs/src/adler32/mod.rs": [
+      {
+        "name": "combine",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/mod.rs",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "core",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/mod.rs",
+        "line_start": 12,
+        "line_end": 12,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "/home/skyfire/code/zlib_rs/src/adler32/combine.rs": [
+      {
+        "name": "BASE",
+        "kind": "const",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 6,
+        "line_end": 6,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine_",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 20,
+        "line_end": 20,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 73,
+        "line_end": 73,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 77,
+        "line_end": 77,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 78,
+        "line_end": 78,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 82,
+        "line_end": 82,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_negative_len_returns_invalid",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 83,
+        "line_end": 83,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 93,
+        "line_end": 93,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_zero_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 94,
+        "line_end": 94,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 106,
+        "line_end": 106,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_initial_adler_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 115,
+        "line_end": 115,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_typical_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 116,
+        "line_end": 116,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_len_equals_base",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 132,
+        "line_end": 132,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 142,
+        "line_end": 142,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_len_greater_than_base",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 143,
+        "line_end": 143,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 152,
+        "line_end": 152,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_large_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 164,
+        "line_end": 164,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_max_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 165,
+        "line_end": 165,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_zero_adler_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 175,
+        "line_end": 175,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 181,
+        "line_end": 181,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_sum1_double_reduction",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 182,
+        "line_end": 182,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 198,
+        "line_end": 198,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_adler32_combine_wrapper_consistency",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 199,
+        "line_end": 199,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 210,
+        "line_end": 210,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_adler32_combine_negative_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 211,
+        "line_end": 211,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 221,
+        "line_end": 221,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_adler32_combine_zero_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 222,
+        "line_end": 222,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 228,
+        "line_end": 228,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_adler32_combine_typical_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 229,
+        "line_end": 229,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 240,
+        "line_end": 240,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_adler32_combine_len_equals_base",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 241,
+        "line_end": 241,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 249,
+        "line_end": 249,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_adler32_combine_large_values",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 250,
+        "line_end": 250,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 259,
+        "line_end": 259,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_adler32_combine_max_len",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/adler32/combine.rs",
+        "line_start": 260,
+        "line_end": 260,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "/home/skyfire/code/zlib_rs/src/ffi/mod.rs": [
+      {
+        "name": "types",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 5,
+        "line_end": 5,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 44,
+        "line_end": 44,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_z",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 45,
+        "line_end": 45,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 69,
+        "line_end": 69,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 70,
+        "line_end": 70,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 107,
+        "line_end": 107,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 108,
+        "line_end": 108,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "no_mangle",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 125,
+        "line_end": 125,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "adler32_combine64",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 126,
+        "line_end": 126,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "cfg",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 130,
+        "line_end": 130,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "tests",
+        "kind": "module",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 131,
+        "line_end": 131,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 135,
+        "line_end": 135,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_null_pointer_returns_initial",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 136,
+        "line_end": 136,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 145,
+        "line_end": 145,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_zero_length_returns_original",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 146,
+        "line_end": 146,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 153,
+        "line_end": 153,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_empty_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 154,
+        "line_end": 154,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 161,
+        "line_end": 161,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_single_byte",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 162,
+        "line_end": 162,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 173,
+        "line_end": 173,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_multiple_bytes",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 174,
+        "line_end": 174,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 187,
+        "line_end": 187,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_incremental_calculation",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 188,
+        "line_end": 188,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 203,
+        "line_end": 203,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_longer_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 204,
+        "line_end": 204,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 213,
+        "line_end": 213,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_zero_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 214,
+        "line_end": 214,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 224,
+        "line_end": 224,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_max_byte_data",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 225,
+        "line_end": 225,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 233,
+        "line_end": 233,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_initial_zero_equals_one",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 234,
+        "line_end": 234,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test",
+        "kind": "attribute",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 243,
+        "line_end": 243,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      },
+      {
+        "name": "test_large_buffer",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/ffi/mod.rs",
+        "line_start": 244,
+        "line_end": 244,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "/home/skyfire/code/zlib_rs/src/bin/zlib_rs.rs": [
+      {
+        "name": "main",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib_rs/src/bin/zlib_rs.rs",
+        "line_start": 10,
+        "line_end": 10,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": true
+      }
+    ],
+    "/home/skyfire/code/zlib/adler32.c": [
+      {
+        "name": "BASE",
+        "kind": "macro",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 10,
+        "line_end": 10,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "NMAX",
+        "kind": "macro",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 11,
+        "line_end": 11,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "z_off64_t",
+        "kind": "macro",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 43,
+        "line_end": 43,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_z",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 61,
+        "line_end": 61,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 128,
+        "line_end": 128,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine_",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 133,
+        "line_end": 133,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 158,
+        "line_end": 158,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      },
+      {
+        "name": "adler32_combine64",
+        "kind": "function",
+        "file_path": "/home/skyfire/code/zlib/adler32.c",
+        "line_start": 162,
+        "line_end": 162,
+        "signature": null,
+        "docstring": null,
+        "parent": null,
+        "is_definition": false
+      }
+    ]
+  },
+  "file_mtimes": {
+    "/home/skyfire/code/zlib_rs/src/adler32/core.rs": 1766888579.5338712,
+    "/home/skyfire/code/zlib_rs/src/ffi/types.rs": 1766888588.2458708,
+    "src/adler32/combine.rs": 1766888510.2858717,
+    "src/lib.rs": 1766888564.7498717,
+    "src/adler32/mod.rs": 1766888573.0258715,
+    "src/adler32/core.rs": 1766888579.5338712,
+    "src/ffi/types.rs": 1766888588.2458708,
+    "src/bin/zlib_rs.rs": 1766888597.3658702,
+    "src/ffi/mod.rs": 1766888830.8738716,
+    "/home/skyfire/code/zlib_rs/src/lib.rs": 1766888564.7498717,
+    "/home/skyfire/code/zlib_rs/src/adler32/mod.rs": 1766888573.0258715,
+    "/home/skyfire/code/zlib_rs/src/adler32/combine.rs": 1766888510.2858717,
+    "/home/skyfire/code/zlib_rs/src/ffi/mod.rs": 1766888830.8738716,
+    "/home/skyfire/code/zlib_rs/src/bin/zlib_rs.rs": 1766888597.3658702,
+    "/home/skyfire/code/zlib/adler32.c": 1766882498.9898696
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "processed": [
+    "src/adler32/combine.rs",
+    "src/adler32/core.rs",
+    "src/adler32/mod.rs",
+    "src/bin/zlib_rs.rs",
+    "src/ffi/mod.rs",
+    "src/ffi/types.rs",
+    "src/lib.rs"
+  ],
+  "steps_completed": [
+    "clippy_elimination",
+    "doc_opt",
+    "unsafe_cleanup",
+    "visibility_opt"
+  ],
+  "last_commit": "0f71de83c93fe871ec7aa525c29c871d4bef5da0"
+}
