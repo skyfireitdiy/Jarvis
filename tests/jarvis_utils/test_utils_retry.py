@@ -23,7 +23,8 @@ class TestWhileSuccess:
         result = while_success(test_func)
         assert result == "success"
 
-    def test_success_after_retries(self):
+    @patch("jarvis.jarvis_utils.utils.time.sleep")
+    def test_success_after_retries(self, mock_sleep):
         """测试重试后成功"""
         call_count = [0]
 
@@ -37,7 +38,8 @@ class TestWhileSuccess:
         assert result == "success"
         assert call_count[0] == 3
 
-    def test_max_retries_exceeded(self):
+    @patch("jarvis.jarvis_utils.utils.time.sleep")
+    def test_max_retries_exceeded(self, mock_sleep):
         """测试超过最大重试次数"""
 
         def test_func():
@@ -99,7 +101,8 @@ class TestWhileTrue:
         result = while_true(test_func)
         assert result is True
 
-    def test_true_after_retries(self):
+    @patch("jarvis.jarvis_utils.utils.time.sleep")
+    def test_true_after_retries(self, mock_sleep):
         """测试重试后返回 True"""
         call_count = [0]
 
@@ -111,7 +114,8 @@ class TestWhileTrue:
         assert result is True
         assert call_count[0] == 3
 
-    def test_false_after_max_retries(self):
+    @patch("jarvis.jarvis_utils.utils.time.sleep")
+    def test_false_after_max_retries(self, mock_sleep):
         """测试超过最大重试次数后返回 False"""
 
         def test_func():
@@ -169,7 +173,8 @@ class TestSharedRetryCounter:
         """每个测试前重置重试计数器"""
         _reset_retry_count()
 
-    def test_shared_counter_between_functions(self):
+    @patch("jarvis.jarvis_utils.utils.time.sleep")
+    def test_shared_counter_between_functions(self, mock_sleep):
         """测试 while_true 和 while_success 共享重试计数器"""
         call_count = [0]
 
