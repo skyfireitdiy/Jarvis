@@ -58,6 +58,7 @@ class Task:
     update_time: int
     dependencies: List[str] = field(default_factory=list)
     actual_output: Optional[str] = None
+    conversation_rounds: int = 0
 
     def __post_init__(self) -> None:
         """验证字段约束。"""
