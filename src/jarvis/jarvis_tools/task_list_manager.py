@@ -119,6 +119,80 @@ class task_list_manager:
         except Exception:
             return None
 
+    def _get_running_task_id(self, agent: Any) -> Optional[str]:
+        """从 Agent 的 user_data 中获取正在运行的 task_id
+
+        参数:
+            agent: Agent 实例
+
+        返回:
+            Optional[str]: task_id，如果不存在则返回 None
+        """
+        if not agent:
+            return None
+        try:
+            result = agent.get_user_data("__running_task_id__")
+            return str(result) if result is not None else None
+        except Exception:
+            return None
+
+    def _set_running_task_id(self, agent: Any, task_id: Optional[str]) -> None:
+        """将正在运行的 task_id 保存到 Agent 的 user_data 中
+
+        参数:
+            agent: Agent 实例
+            task_id: 任务 ID，为 None 时表示清除
+        """
+        if not agent:
+            return
+        try:
+            if task_id is None:
+                # 清除 user_data 中的 running_task_id
+                agent.delete_user_data("__running_task_id__")
+            else:
+                agent.set_user_data("__running_task_id__", task_id)
+        except Exception:
+            pass
+
+    def _increment_task_conversation_round(
+        self, agent: Any, task_list_manager: Any, task_list_id: str
+    ) -> None:
+        """事件回调：递增正在运行任务的对话轮次
+
+        参数:
+            agent: Agent 实例
+            task_list_manager: TaskListManager 实例
+            task_list_id: 任务列表 ID
+        """
+        if not agent or not task_list_manager:
+            return
+
+        try:
+            # 获取正在运行的任务 ID
+            task_id = self._get_running_task_id(agent)
+            if not task_id:
+                return
+
+            # 获取任务列表和任务
+            task_list = task_list_manager.get_task_list(task_list_id)
+            if not task_list:
+                return
+
+            task = task_list.get_task(task_id)
+            if not task:
+                return
+
+            # 只有运行状态的任务才递增对话轮次
+            if task.status.value == "running" and task.agent_type.value == "main":
+                task.conversation_rounds += 1
+
+                # 保存快照
+                task_list_manager._save_snapshot(task_list_id, task_list)
+
+        except Exception:
+            # 异常不影响主流程
+            pass
+
     def _set_task_list_id(self, agent: Any, task_list_id: str) -> None:
         """将 task_list_id 保存到 Agent 的 user_data 中
 
@@ -1337,6 +1411,34 @@ class task_list_manager:
                 "stderr": f"更新任务状态失败: {update_msg}",
             }
 
+        # 对于 main 类型的任务，初始化对话轮次并订阅事件
+        if task.agent_type.value == "main":
+            try:
+                # 初始化对话轮次为0
+                task_list = task_list_manager.get_task_list(task_list_id)
+                if task_list:
+                    current_task = task_list.get_task(task_id)
+                    if current_task:
+                        current_task.conversation_rounds = 0
+                        task_list_manager._save_snapshot(task_list_id, task_list)
+
+                # 保存正在运行的任务ID
+                self._set_running_task_id(parent_agent, task_id)
+
+                # 订阅BEFORE_MODEL_CALL事件，用于记录对话轮次
+                from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
+
+                parent_agent.event_bus.subscribe(
+                    BEFORE_MODEL_CALL,
+                    lambda agent, message: self._increment_task_conversation_round(
+                        parent_agent, task_list_manager, task_list_id
+                    ),
+                    priority=50,  # 高优先级，确保在事件处理中较早执行
+                )
+            except Exception:
+                # 订阅失败不影响任务执行
+                pass
+
         try:
             # 合并任务描述和附加信息（实际更新任务的desc字段，使打印时可见）
             if additional_info and str(additional_info).strip():
@@ -1932,36 +2034,46 @@ class task_list_manager:
                     and task.agent_type.value == "main"
                     and task.status.value != "completed"
                 ):
-                    # 使用公共方法构建任务内容
-                    task_content = self._build_task_content(task)
+                    # 检查对话轮次，如果≤5则跳过验证
+                    if task.conversation_rounds <= 5:
+                        from jarvis.jarvis_utils.output import PrettyOutput
 
-                    # 使用公共方法构建背景信息
-                    background = self._build_task_background(
-                        task_list_manager=task_list_manager,
-                        task_list_id=task_list_id,
-                        task=task,
-                        agent_id=agent_id,
-                        is_main_agent=is_main_agent,
-                        include_completed_summary=False,  # main任务验证时不需要其他已完成任务摘要
-                    )
-
-                    # 执行验证
-                    from jarvis.jarvis_utils.output import PrettyOutput
-
-                    PrettyOutput.auto_print(
-                        f"🔍 开始验证 main 类型任务 [{task.task_name}] 的完成情况..."
-                    )
-
-                    verification_passed, verification_result = (
-                        self._verify_task_completion(
-                            task,
-                            task_content,
-                            background,
-                            agent,
-                            verification_iteration=1,
-                            verification_method=verification_method,
+                        PrettyOutput.auto_print(
+                            f"⚡ 任务 [{task.task_name}] 对话轮次≤5 (实际{task.conversation_rounds}轮)，跳过验证直接完成"
                         )
-                    )
+                        verification_passed = True
+                        verification_result = "对话轮次≤5，跳过验证"
+                    else:
+                        # 使用公共方法构建任务内容
+                        task_content = self._build_task_content(task)
+
+                        # 使用公共方法构建背景信息
+                        background = self._build_task_background(
+                            task_list_manager=task_list_manager,
+                            task_list_id=task_list_id,
+                            task=task,
+                            agent_id=agent_id,
+                            is_main_agent=is_main_agent,
+                            include_completed_summary=False,  # main任务验证时不需要其他已完成任务摘要
+                        )
+
+                        # 执行验证
+                        from jarvis.jarvis_utils.output import PrettyOutput
+
+                        PrettyOutput.auto_print(
+                            f"🔍 开始验证 main 类型任务 [{task.task_name}] 的完成情况..."
+                        )
+
+                        verification_passed, verification_result = (
+                            self._verify_task_completion(
+                                task,
+                                task_content,
+                                background,
+                                agent,
+                                verification_iteration=1,
+                                verification_method=verification_method,
+                            )
+                        )
 
                     if not verification_passed:
                         # 验证未通过，不更新状态，返回失败原因给agent
@@ -2021,6 +2133,21 @@ class task_list_manager:
                         "stdout": "",
                         "stderr": f"更新任务状态失败: {status_msg}",
                     }
+
+                # 任务状态更新成功后，清理事件订阅（对于 main 类型的任务）
+                if task.agent_type.value == "main":
+                    try:
+                        # 清除 user_data 中的 running_task_id
+                        self._set_running_task_id(agent, None)
+
+                        # 取消事件订阅（由于 lambda 函数无法直接取消，这里采用简化处理）
+                        # 注意：EventBus 的 unsubscribe 需要传入原始的 callback 函数引用
+                        # 由于我们在 subscribe 时使用了 lambda，无法直接取消
+                        # 但由于我们已经清除了 running_task_id，事件回调中不会再递增轮次
+                        # 这种方式是安全的，因为轮次记录逻辑依赖于 running_task_id 的存在
+                    except Exception:
+                        # 清理失败不影响主流程
+                        pass
 
             # 执行其他属性更新（如果有）
             if update_kwargs:
