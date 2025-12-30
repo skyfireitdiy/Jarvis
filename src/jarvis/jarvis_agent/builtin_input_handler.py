@@ -111,7 +111,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "Quiet":
             agent.set_non_interactive(True)
-            PrettyOutput.auto_print("🔇 已切换到静默模式（非交互模式）")
+            PrettyOutput.auto_print("🔇 已切换到无人值守模式（非交互模式）")
             modified_input = modified_input.replace("'<Quiet>'", "")
             continue
         elif tag == "Pin":

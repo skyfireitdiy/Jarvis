@@ -388,7 +388,7 @@ class FileCompleter(Completer):
                 (ot("ToolUsage"), "工具使用说明"),
                 (ot("ReloadConfig"), "重新加载配置"),
                 (ot("SaveSession"), "保存当前会话"),
-                (ot("Quiet"), "静默模式"),
+                (ot("Quiet"), "无人值守模式"),
             ]
         )
         # 添加所有规则（包括内置规则、文件规则、YAML规则）到补全列表
@@ -876,7 +876,7 @@ def _get_multiline_input_internal(
                 ("class:bt.key", "Ctrl+T"),
                 ("class:bt.label", " 终端(!SHELL) "),
                 ("class:bt.sep", " • "),
-                ("class:bt.label", " '<Quiet>' 静默模式 "),
+                ("class:bt.label", " '<Quiet>' 无人值守模式 "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+C/D"),
                 ("class:bt.label", " 取消 "),

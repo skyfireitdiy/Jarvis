@@ -371,7 +371,7 @@ class BasePlatform(ABC):
         return response
 
     def _chat_with_suppressed_output(self, message: str) -> str:
-        """使用静默模式进行聊天
+        """使用无人值守模式进行聊天
 
         参数:
             message: 用户消息

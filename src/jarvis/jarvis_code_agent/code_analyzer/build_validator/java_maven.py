@@ -28,7 +28,7 @@ class JavaMavenBuildValidator(BuildValidatorBase):
         start_time = time.time()
 
         # 使用 mvn compile 进行编译验证
-        cmd = ["mvn", "compile", "-q"]  # -q 静默模式
+        cmd = ["mvn", "compile", "-q"]  # -q 无人值守模式
 
         returncode, stdout, stderr = self._run_command(cmd, timeout=60)
         duration = time.time() - start_time
