@@ -1036,78 +1036,6 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
         pass
 
 
-def _run_tui_config_form(
-    platform_name: str,
-    model_name: str,
-    env_vars: Dict[str, Any],
-    llm_config: Dict[str, Any],
-    max_input_token_count: int,
-) -> Optional[Dict[str, Any]]:
-    """使用 TUI 表单收集配置
-
-    参数:
-        platform_name: 已选择的平台名称
-        model_name: 已选择的模型名称
-        env_vars: 已收集的环境变量
-        llm_config: LLM 配置
-        max_input_token_count: 最大输入 token 数量
-
-    返回:
-        用户填写的配置字典，用户取消或失败返回 None
-    """
-    try:
-        from jarvis.jarvis_config.tui_app import run_tui_form
-    except ImportError:
-        # textual 未安装，返回 None 使用降级方案
-        return None
-
-    # 加载 schema
-    schema_path = Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
-    try:
-        with open(schema_path, "r", encoding="utf-8") as f:
-            schema = json.load(f)
-    except Exception:
-        # schema 加载失败，返回 None
-        return None
-
-    # 生成 LLM 配置名称
-    llm_name = f"{platform_name}-{model_name}".replace(" ", "-").lower()
-    import re
-
-    llm_name = re.sub(r"[^a-z0-9-]", "", llm_name)
-    if not llm_name:
-        llm_name = "default-llm"
-
-    # 准备默认值
-    defaults = {
-        "platform": platform_name,
-        "model": model_name,
-        "max_input_token_count": max_input_token_count,
-        "ENV": env_vars,
-        "llms": {
-            llm_name: {
-                "platform": platform_name,
-                "model": model_name,
-                "max_input_token_count": max_input_token_count,
-                "llm_config": llm_config if llm_config else {},
-            }
-        },
-        "llm_groups": {
-            "default": {
-                "normal_llm": llm_name,
-            }
-        },
-        "llm_group": "default",
-    }
-
-    try:
-        result = run_tui_form(schema=schema, defaults=defaults, title="Jarvis 配置向导")
-        return result
-    except Exception:
-        # TUI 运行失败，返回 None
-        return None
-
-
 def _interactive_config_setup(config_file_path: Path) -> None:
     """交互式配置引导"""
     from jarvis.jarvis_platform.registry import PlatformRegistry
@@ -1246,48 +1174,32 @@ def _interactive_config_setup(config_file_path: Path) -> None:
     if not llm_name:
         llm_name = "default-llm"
 
-    # 7. 尝试使用 TUI 表单收集完整配置
-    PrettyOutput.auto_print("ℹ️ 正在启动交互式配置界面...")
-    config_data = _run_tui_config_form(
-        platform_name=platform_name,
-        model_name=model_name,
-        env_vars=env_vars,
-        llm_config=llm_config if llm_config else {},
-        max_input_token_count=max_input_token_count,
-    )
-
-    # 如果 TUI 失败或用户取消，回退到命令行交互模式
-    if config_data is None:
-        PrettyOutput.auto_print("ℹ️ TUI 配置不可用，使用命令行交互模式...")
-        # 回退到原来的逻辑：构建基础配置并收集可选项
-        config_data = {
-            "ENV": env_vars,
-            "llms": {
-                llm_name: {
-                    "platform": platform_name,
-                    "model": model_name,
-                    "max_input_token_count": max_input_token_count,
-                    "llm_config": llm_config if llm_config else {},
-                }
-            },
-            "llm_groups": {
-                "default": {
-                    "normal_llm": llm_name,
-                }
-            },
-            "llm_group": "default",
-        }
+    # 7. 交互式确认并应用配置（使用新的引用方式）
+    config_data = {
+        "ENV": env_vars,
+        "llms": {
+            llm_name: {
+                "platform": platform_name,
+                "model": model_name,
+                "max_input_token_count": max_input_token_count,
+                "llm_config": llm_config if llm_config else {},
+            }
+        },
+        "llm_groups": {
+            "default": {
+                "normal_llm": llm_name,
+            }
+        },
+        "llm_group": "default",
+    }
 
     if not test_passed:
         if not get_yes_no("配置测试失败，是否仍要应用该配置并继续？", default=False):
             PrettyOutput.auto_print("ℹ️ 已取消配置。")
             sys.exit(0)
 
-    # 8. 选择其他功能开关与可选项（仅在 TUI 降级时使用）
-    # 如果 TUI 成功返回配置，则不需要再收集可选项
-    # 检查 config_data 是否包含 TUI 返回的完整配置（包含更多字段）
-    if len(config_data) <= 5:  # 基础配置只有 5 个键：ENV, llms, llm_groups, llm_group
-        _collect_optional_config_interactively(config_data)
+    # 8. 选择其他功能开关与可选项（复用统一逻辑）
+    _collect_optional_config_interactively(config_data)
 
     # 7. 应用到当前会话并写入配置文件（基于交互结果，不从默认值生成）
     set_global_env_data(config_data)
