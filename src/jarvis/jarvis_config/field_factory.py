@@ -14,15 +14,18 @@
 from typing import Any, Dict, List, Optional, Union
 
 try:
+    from textual.app import ComposeResult
+    from textual import on
+    from textual.screen import ModalScreen
     from textual.widgets import (
         Input,
-        TextArea,
         Select,
         Switch,
         Label,
         Static,
+        Button,
     )
-    from textual.containers import Container
+    from textual.containers import Container, Vertical, Horizontal
     from textual.reactive import reactive
 except ImportError:
     raise ImportError(
@@ -300,7 +303,7 @@ class BooleanField(FieldContainer):
 
 
 class ArrayField(FieldContainer):
-    """数组输入字段（文本区域，逗号分隔）。"""
+    """数组输入字段，支持动态添加和删除项。"""
 
     def __init__(
         self,
@@ -309,6 +312,7 @@ class ArrayField(FieldContainer):
         is_required: bool = False,
         description: Optional[str] = None,
         default: List[Any] = [],
+        items_schema: Dict[str, Any] = {},
         **kwargs: Any,
     ) -> None:
         """初始化数组字段。
@@ -319,6 +323,7 @@ class ArrayField(FieldContainer):
             is_required: 是否必填
             description: 字段描述
             default: 默认值
+            items_schema: 数组项的 Schema 定义
             **kwargs: 传递给父类的其他参数
         """
         super().__init__(
@@ -329,41 +334,137 @@ class ArrayField(FieldContainer):
             **kwargs,
         )
         self._default_value = default
+        self.items_schema = items_schema
+        self._items: List[ArrayItemField] = []
 
     def compose(self):
         """组合字段组件。"""
         yield from super().compose()
 
-        # 将默认列表转换为逗号分隔的字符串
-        default_text = (
-            ", ".join(str(v) for v in self._default_value)
-            if self._default_value
-            else ""
+        # 创建数组项容器
+        yield Vertical(id=f"items-container-{self.field_name}")
+
+        # 创建添加按钮
+        yield Button(
+            "+ 添加项",
+            variant="primary",
+            id=f"add-item-{self.field_name}",
         )
 
-        yield TextArea(
-            default_text,
-            id=f"textarea-{self.field_name}",
-            classes="field-textarea",
+    def on_mount(self) -> None:
+        """挂载时初始化数组项。"""
+        self._populate_items()
+
+    def _populate_items(self) -> None:
+        """根据默认值填充数组项。"""
+        items_container = self.query_one(
+            f"#items-container-{self.field_name}", Vertical
         )
+
+        for index, value in enumerate(self._default_value):
+            self._add_item_to_container(items_container, index, value)
+
+    def _add_item_to_container(
+        self,
+        container: Vertical,
+        index: int,
+        value: Optional[Any] = None,
+    ) -> None:
+        """向容器添加一个数组项。
+
+        参数:
+            container: 容器对象
+            index: 数组索引
+            value: 初始值
+        """
+        item_field = ArrayItemField(
+            items_schema=self.items_schema,
+            index=index,
+            value=value,
+            on_remove=self._on_item_remove,
+        )
+        container.mount(item_field)
+        self._items.append(item_field)
+
+    def _add_item(self) -> None:
+        """添加一个新的数组项。"""
+        items_container = self.query_one(
+            f"#items-container-{self.field_name}", Vertical
+        )
+        new_index = len(self._items)
+        self._add_item_to_container(items_container, new_index)
+
+    def _remove_item(self, index: int) -> None:
+        """移除指定索引的数组项。
+
+        参数:
+            index: 数组索引
+        """
+        # 找到对应索引的项
+        for item in self._items:
+            if item.index == index:
+                item.remove()
+                self._items.remove(item)
+                # 重新索引剩余的项
+                self._reindex_items()
+                break
+
+    def _reindex_items(self) -> None:
+        """重新索引所有数组项。"""
+        for new_index, item in enumerate(self._items):
+            item.index = new_index
+            # 更新子控件的 ID
+            items_type = self.items_schema.get("type", "string")
+            if items_type != SchemaParser.TYPE_OBJECT:
+                # 更新输入控件 ID
+                input_id = f"input-{new_index}"
+                switch_id = f"switch-{new_index}"
+                remove_id = f"remove-{new_index}"
+
+                if hasattr(item, "children"):
+                    for child in item.children:
+                        if isinstance(child, Horizontal):
+                            for control in child.children:
+                                if isinstance(control, Input):
+                                    control.id = input_id
+                                elif isinstance(control, Switch):
+                                    control.id = switch_id
+                                elif isinstance(control, Button):
+                                    if control.id and "remove" in control.id:
+                                        control.id = remove_id
+
+    def _on_item_remove(self, index: int) -> None:
+        """数组项删除回调。
+
+        参数:
+            index: 数组索引
+        """
+        self._remove_item(index)
+
+    @on(Button.Pressed)
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """按钮按下事件处理。"""
+        button_id = event.button.id
+        if button_id == f"add-item-{self.field_name}":
+            self._add_item()
 
     def get_value(self) -> List[Any]:
         """获取数组值。"""
-        textarea_widget = self.query_one(
-            "#textarea-{}".format(self.field_name), TextArea
-        )
-        text = textarea_widget.text.strip()
-        if not text:
-            return []
-        return [item.strip() for item in text.split(",")]
+        return [item.get_value() for item in self._items]
 
     def set_value(self, value: List[Any]) -> None:
         """设置数组值。"""
-        textarea_widget = self.query_one(
-            "#textarea-{}".format(self.field_name), TextArea
+        items_container = self.query_one(
+            f"#items-container-{self.field_name}", Vertical
         )
-        text = ", ".join(str(v) for v in value)
-        textarea_widget.text = text
+        # 清除现有项
+        for item in self._items:
+            item.remove()
+        self._items.clear()
+
+        # 添加新项
+        for index, item_value in enumerate(value):
+            self._add_item_to_container(items_container, index, item_value)
 
 
 class FieldFactory:
@@ -478,6 +579,7 @@ class FieldFactory:
                     is_required=is_required,
                     description=description,
                     default_value=default_value,
+                    items_schema=items_schema,
                 )
 
         elif field_type == SchemaParser.TYPE_OBJECT:
@@ -602,6 +704,7 @@ class FieldFactory:
         is_required: bool,
         description: Optional[str],
         default_value: Any,
+        items_schema: Optional[Dict[str, Any]] = None,
     ) -> ArrayField:
         """创建数组输入字段。"""
         default_list = list(default_value) if default_value else []
@@ -612,7 +715,304 @@ class FieldFactory:
             is_required=is_required,
             description=description,
             default=default_list,
+            items_schema=items_schema or {},
         )
+
+
+class ArrayItemField(FieldContainer):
+    """数组项字段，用于显示和编辑单个数组项。
+
+    支持基本类型（string, number, integer, boolean）的直接编辑，
+    对象类型使用按钮触发弹出窗口编辑。
+    """
+
+    value = reactive(None)
+
+    def __init__(
+        self,
+        items_schema: Dict[str, Any],
+        index: int,
+        value: Optional[Any] = None,
+        on_remove: Optional[callable] = None,
+        **kwargs: Any,
+    ) -> None:
+        """初始化数组项字段。
+
+        参数:
+            items_schema: 数组项的 Schema 定义
+            index: 数组索引
+            value: 初始值
+            on_remove: 删除回调函数
+            **kwargs: 传递给父类的其他参数
+        """
+        super().__init__(
+            field_name=f"Item {index}",
+            field_type=items_schema.get("type", "string"),
+            is_required=False,
+            **kwargs,
+        )
+        self.items_schema = items_schema
+        self.index = index
+        self.value = value
+        self.on_remove = on_remove
+
+    def compose(self) -> ComposeResult:
+        """组合数组项组件。"""
+        yield from super().compose()
+
+        items_type = self.items_schema.get("type", "string")
+
+        if items_type == SchemaParser.TYPE_OBJECT:
+            # 对象类型：显示编辑按钮和删除按钮
+            button_container = Horizontal()
+            edit_button = Button("编辑", variant="primary", id=f"edit-{self.index}")
+            remove_button = Button("删除", variant="error", id=f"remove-{self.index}")
+            button_container.mount(edit_button)
+            button_container.mount(remove_button)
+            yield button_container
+        else:
+            # 基本类型：根据类型创建输入控件
+            input_container = Horizontal()
+
+            if items_type == SchemaParser.TYPE_STRING:
+                default_str = str(self.value) if self.value is not None else ""
+                input_widget = Input(
+                    value=default_str,
+                    placeholder=f"Item {self.index}",
+                    id=f"input-{self.index}",
+                )
+                input_container.mount(input_widget)
+
+            elif items_type in (SchemaParser.TYPE_NUMBER, SchemaParser.TYPE_INTEGER):
+                if self.value is None:
+                    default_num = 0
+                elif items_type == SchemaParser.TYPE_INTEGER:
+                    default_num = int(self.value)
+                else:
+                    default_num = float(self.value)
+                input_widget = Input(
+                    value=str(default_num),
+                    placeholder=f"Item {self.index}",
+                    id=f"input-{self.index}",
+                )
+                input_container.mount(input_widget)
+
+            elif items_type == SchemaParser.TYPE_BOOLEAN:
+                default_bool = bool(self.value) if self.value is not None else False
+                switch_widget = Switch(
+                    value=default_bool,
+                    id=f"switch-{self.index}",
+                )
+                input_container.mount(switch_widget)
+
+            else:
+                # 默认使用 Input
+                default_str = str(self.value) if self.value is not None else ""
+                input_widget = Input(
+                    value=default_str,
+                    placeholder=f"Item {self.index}",
+                    id=f"input-{self.index}",
+                )
+                input_container.mount(input_widget)
+
+            # 添加删除按钮
+            remove_button = Button("删除", variant="error", id=f"remove-{self.index}")
+            input_container.mount(remove_button)
+
+            yield input_container
+
+    def get_value(self) -> Any:
+        """获取数组项的值。"""
+        items_type = self.items_schema.get("type", "string")
+
+        if items_type == SchemaParser.TYPE_OBJECT:
+            return self.value
+
+        try:
+            if items_type == SchemaParser.TYPE_STRING:
+                input_widget = self.query_one(f"#input-{self.index}", Input)
+                return input_widget.value
+
+            elif items_type in (SchemaParser.TYPE_NUMBER, SchemaParser.TYPE_INTEGER):
+                input_widget = self.query_one(f"#input-{self.index}", Input)
+                value_str = input_widget.value
+                if not value_str:
+                    return 0
+                if items_type == SchemaParser.TYPE_INTEGER:
+                    return int(value_str)
+                return float(value_str)
+
+            elif items_type == SchemaParser.TYPE_BOOLEAN:
+                switch_widget = self.query_one(f"#switch-{self.index}", Switch)
+                return switch_widget.value
+
+            else:
+                input_widget = self.query_one(f"#input-{self.index}", Input)
+                return input_widget.value
+        except Exception:
+            return None
+
+    def set_value(self, value: Any) -> None:
+        """设置数组项的值。"""
+        items_type = self.items_schema.get("type", "string")
+
+        if items_type == SchemaParser.TYPE_OBJECT:
+            self.value = value
+            return
+
+        try:
+            if items_type == SchemaParser.TYPE_STRING:
+                input_widget = self.query_one(f"#input-{self.index}", Input)
+                input_widget.value = str(value) if value is not None else ""
+
+            elif items_type in (SchemaParser.TYPE_NUMBER, SchemaParser.TYPE_INTEGER):
+                input_widget = self.query_one(f"#input-{self.index}", Input)
+                input_widget.value = str(value) if value is not None else "0"
+
+            elif items_type == SchemaParser.TYPE_BOOLEAN:
+                switch_widget = self.query_one(f"#switch-{self.index}", Switch)
+                switch_widget.value = bool(value) if value is not None else False
+
+            else:
+                input_widget = self.query_one(f"#input-{self.index}", Input)
+                input_widget.value = str(value) if value is not None else ""
+        except Exception:
+            pass
+
+    @on(Button.Pressed)
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """按钮按下事件处理。"""
+        button_id = event.button.id
+
+        if button_id == f"remove-{self.index}":
+            # 删除按钮
+            if self.on_remove:
+                self.on_remove(self.index)
+        elif button_id == f"edit-{self.index}":
+            # 编辑按钮（对象类型）
+            self._open_edit_modal()
+
+    def _open_edit_modal(self) -> None:
+        """打开对象编辑模态窗口。"""
+        # 这里需要通过父级 App 来打开模态窗口
+        # 由于无法直接访问 App，我们使用事件传递的方式
+        # 或者通过 screen 来处理
+        pass
+
+
+class ObjectEditModal(ModalScreen):
+    """对象编辑模态窗口。
+
+    该模态窗口用于编辑嵌套对象，提供确认和取消功能。
+    """
+
+    def __init__(
+        self,
+        schema: Dict[str, Any],
+        initial_value: Optional[Dict[str, Any]] = None,
+        title: str = "Edit Object",
+        **kwargs: Any,
+    ) -> None:
+        """初始化对象编辑模态窗口。
+
+        参数:
+            schema: JSON Schema 定义
+            initial_value: 初始值
+            title: 窗口标题
+            **kwargs: 传递给父类的其他参数
+        """
+        super().__init__(**kwargs)
+        self.schema = schema
+        self.initial_value = initial_value or {}
+        self.title = title
+
+    def compose(self) -> ComposeResult:
+        """组合模态窗口组件。"""
+        # 创建容器
+        yield Vertical(
+            Static(f"── {self.title} ──", classes="nested-title"),
+            self._build_form(),
+            self._build_buttons(),
+            classes="modal-container",
+        )
+
+    def _build_form(self) -> Vertical:
+        """构建表单界面。"""
+        container = Vertical(id="modal-form-container")
+        return container
+
+    def _build_buttons(self) -> Horizontal:
+        """构建按钮容器。"""
+        container = Horizontal()
+        confirm_button = Button("确认", variant="primary", id="confirm")
+        cancel_button = Button("取消", variant="default", id="cancel")
+
+        container.mount(confirm_button)
+        container.mount(cancel_button)
+
+        return container
+
+    def on_mount(self) -> None:
+        """挂载时构建表单。"""
+        self._populate_form()
+
+    def _populate_form(self) -> None:
+        """填充表单字段。"""
+        form_container = self.query_one("#modal-form-container", Vertical)
+
+        # 创建临时的 SchemaFormApp 来获取表单结构
+        # 注意：这里不能直接运行 App，而是复用其构建逻辑
+        parser = SchemaParser(self.schema)
+        factory = FieldFactory(parser)
+
+        properties = parser.get_properties()
+        for field_name, field_schema in properties.items():
+            field_path = field_name
+            field_type = parser.get_field_type(field_path)
+
+            if field_type == SchemaParser.TYPE_OBJECT:
+                # 嵌套对象不支持在模态窗口中编辑
+                continue
+            else:
+                # 普通字段
+                defaults = {field_name: self.initial_value.get(field_name)}
+                field = factory.create_field(
+                    field_path,
+                    field_name,
+                    defaults,
+                )
+                if field:
+                    form_container.mount(field)
+                    # 为字段设置唯一的 ID
+                    field.id = f"modal-field-{field_name}"
+
+    @on(Button.Pressed, "#confirm")
+    def on_confirm_pressed(self, event: Button.Pressed) -> None:
+        """确认按钮按下事件。"""
+        result = self._collect_values()
+        self.dismiss(result)
+
+    @on(Button.Pressed, "#cancel")
+    def on_cancel_pressed(self, event: Button.Pressed) -> None:
+        """取消按钮按下事件。"""
+        self.dismiss(None)
+
+    def _collect_values(self) -> Dict[str, Any]:
+        """收集表单值。
+
+        返回:
+            收集的值字典
+        """
+        result: Dict[str, Any] = {}
+        form_container = self.query_one("#modal-form-container", Vertical)
+
+        for child in form_container.children:
+            if hasattr(child, "field_name") and hasattr(child, "get_value"):
+                field_name = child.field_name
+                value = child.get_value()
+                result[field_name] = value
+
+        return result
 
 
 def create_field_factory(schema: Dict[str, Any]) -> FieldFactory:
