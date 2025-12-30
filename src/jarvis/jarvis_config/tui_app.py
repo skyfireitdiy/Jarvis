@@ -195,20 +195,10 @@ class SchemaFormApp(App):
         for field_name, field_schema in properties.items():
             field_path = f"{parent_path}.{field_name}" if parent_path else field_name
 
-            # 检查是否为嵌套对象或数组
+            # 检查是否为嵌套对象
             field_type = self.parser.get_field_type(field_path)
 
-            if field_type == SchemaParser.TYPE_ARRAY:
-                # 数组类型字段
-                field = self.factory.create_field(
-                    field_path,
-                    field_name,
-                    self.defaults,
-                )
-                if field:
-                    container.mount(field)
-                    self.fields[field_path] = field
-            elif field_type == SchemaParser.TYPE_OBJECT:
+            if field_type == SchemaParser.TYPE_OBJECT:
                 # 嵌套对象
                 nested_container = NestedObjectContainer(field_name)
                 container.mount(nested_container)
