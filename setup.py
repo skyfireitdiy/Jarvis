@@ -150,6 +150,8 @@ setup(
             "jsec=jarvis.jarvis_sec.cli:main",
             "jarvis-c2rust=jarvis.jarvis_c2rust.cli:main",
             "jc2r=jarvis.jarvis_c2rust.cli:main",
+            "jarvis-config=jarvis.jarvis_config.cli:app",
+            "jcfg=jarvis.jarvis_config.cli:app",
         ],
     },
     python_requires=">=3.9,<3.13",
