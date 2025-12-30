@@ -215,7 +215,7 @@ class RetrieveMemoryTool:
 
             # 如果记忆较多，在终端显示摘要
             if len(all_memories) > 5:
-                # 静默模式下不再打印摘要，完整结果已包含在返回的markdown_output中
+                # 无人值守模式下不再打印摘要，完整结果已包含在返回的markdown_output中
                 for i, memory in enumerate(all_memories[:5]):
                     content_preview = memory.get("content", "")[:100]
                     if len(memory.get("content", "")) > 100:
