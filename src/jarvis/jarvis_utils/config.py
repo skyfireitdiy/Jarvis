@@ -359,19 +359,10 @@ def _get_resolved_model_config(
     resolved_config = group_config.copy()
 
     # 覆盖策略：
-    # - 若通过 CLI 传入了 model_group_override，则优先使用组内配置；
-    #   仅当组未提供对应键时，才回落到顶层 GLOBAL_CONFIG_DATA。
-    # - 若未传入 override（即使用默认组），保持原有行为：由顶层键覆盖组配置。
+    # - 废弃的顶层配置键（platform, model, cheap_*, smart_* 等）已移除支持
+    # - 必须通过 llms + llm_groups 配置模型
+    # - 仅保留 llm_config 相关键的回退处理（用于 llm_groups 展开后的内部配置）
     override_keys = [
-        "platform",
-        "model",
-        "max_input_token_count",
-        "cheap_platform",
-        "cheap_model",
-        "cheap_max_input_token_count",
-        "smart_platform",
-        "smart_model",
-        "smart_max_input_token_count",
         "web_platform",
         "web_model",
         "web_max_input_token_count",
@@ -1196,42 +1187,26 @@ def get_web_search_platform_name() -> Optional[str]:
     """
     获取Web搜索使用的平台名称。
 
-    优先使用 llm_groups 中 web_llm 展开后的 web_platform 配置，
-    如未配置则回退到已废弃的 web_search_platform。
+    使用 llm_groups 中 web_llm 展开后的 web_platform 配置。
 
     返回:
         Optional[str]: 平台名称，如果未配置则返回None
     """
-    # 优先使用新的 web_platform 配置（来自 llm_groups.web_llm）
-    if GLOBAL_CONFIG_DATA.get("web_platform"):
-        return str(GLOBAL_CONFIG_DATA.get("web_platform"))
-    # 回退到已废弃的 web_search_platform
-    return (
-        str(GLOBAL_CONFIG_DATA.get("web_search_platform"))
-        if GLOBAL_CONFIG_DATA.get("web_search_platform")
-        else None
-    )
+    web_platform = GLOBAL_CONFIG_DATA.get("web_platform")
+    return str(web_platform) if web_platform else None
 
 
 def get_web_search_model_name() -> Optional[str]:
     """
     获取Web搜索使用的模型名称。
 
-    优先使用 llm_groups 中 web_llm 展开后的 web_model 配置，
-    如未配置则回退到已废弃的 web_search_model。
+    使用 llm_groups 中 web_llm 展开后的 web_model 配置。
 
     返回:
         Optional[str]: 模型名称，如果未配置则返回None
     """
-    # 优先使用新的 web_model 配置（来自 llm_groups.web_llm）
-    if GLOBAL_CONFIG_DATA.get("web_model"):
-        return str(GLOBAL_CONFIG_DATA.get("web_model"))
-    # 回退到已废弃的 web_search_model
-    return (
-        str(GLOBAL_CONFIG_DATA.get("web_search_model"))
-        if GLOBAL_CONFIG_DATA.get("web_search_model")
-        else None
-    )
+    web_model = GLOBAL_CONFIG_DATA.get("web_model")
+    return str(web_model) if web_model else None
 
 
 # ==============================================================================

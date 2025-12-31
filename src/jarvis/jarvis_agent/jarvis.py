@@ -152,71 +152,25 @@ def handle_share_tool_option(share_tool: bool, config_file: Optional[str]) -> bo
 def handle_interactive_config_option(
     interactive_config: bool, config_file: Optional[str]
 ) -> bool:
-    """处理交互式配置选项，返回是否已处理并需提前结束。"""
+    """处理交互式配置选项，返回是否已处理并需提前结束。
+
+    直接调用 jcfg 命令启动 Web 配置界面。
+    """
     if not interactive_config:
         return False
     try:
-        config_path = (
-            Path(config_file)
-            if config_file is not None
-            else Path(os.path.expanduser("~/.jarvis/config.yaml"))
-        )
-        if not config_path.exists():
-            # 无现有配置时，进入完整引导流程（该流程内会写入并退出）
-            jutils._interactive_config_setup(config_path)
-            return True
+        PrettyOutput.auto_print("ℹ️ 正在启动 Web 配置界面...")
 
-        # 读取现有配置
-        _, config_data = jutils._load_config_file(str(config_path))
+        # 构建 jcfg 命令
+        cmd = ["jcfg", "--port", "9312"]
+        if config_file is not None:
+            cmd.extend(["--output", config_file])
 
-        # 复用 utils 中的交互式配置逻辑，对所有项进行询问，默认值来自现有配置
-        changed = jutils._collect_optional_config_interactively(
-            config_data, ask_all=True
-        )
-        if not changed:
-            PrettyOutput.auto_print("ℹ️ 没有需要更新的配置项，保持现有配置。")
-            return True
-
-        # 剔除与 schema 默认值一致的键，保持配置精简
-        try:
-            jutils._prune_defaults_with_schema(config_data)
-        except Exception:
-            pass
-
-        # 生成/保留 schema 头
-        header = ""
-        try:
-            with open(config_path, "r", encoding="utf-8") as rf:
-                first_line = rf.readline()
-                if first_line.startswith("# yaml-language-server: $schema="):
-                    header = first_line
-        except Exception:
-            header = ""
-
-        yaml_str = yaml.dump(config_data, allow_unicode=True, sort_keys=False)
-        if not header:
-            try:
-                schema_path = Path(
-                    os.path.relpath(
-                        Path(__file__).resolve().parents[1]
-                        / "jarvis_data"
-                        / "config_schema.json",
-                        start=str(config_path.parent),
-                    )
-                )
-                header = f"# yaml-language-server: $schema={schema_path}\n"
-            except Exception:
-                header = ""
-
-        with open(config_path, "w", encoding="utf-8") as wf:
-            if header:
-                wf.write(header)
-            wf.write(yaml_str)
-
-        PrettyOutput.auto_print(f"✅ 配置已更新: {config_path}")
+        # 直接调用 jcfg 命令
+        subprocess.run(cmd)
         return True
     except Exception as e:
-        PrettyOutput.auto_print(f"❌ 交互式配置失败: {e}")
+        PrettyOutput.auto_print(f"❌ 启动配置界面失败: {e}")
         return True
 
 

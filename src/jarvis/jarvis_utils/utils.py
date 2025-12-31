@@ -1037,192 +1037,21 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
 
 
 def _interactive_config_setup(config_file_path: Path) -> None:
-    """交互式配置引导"""
-    from jarvis.jarvis_platform.registry import PlatformRegistry
-    from jarvis.jarvis_utils.input import get_choice
-    from jarvis.jarvis_utils.input import get_single_line_input as get_input
-    from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+    """交互式配置引导
 
-    PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！未找到配置文件，现在开始引导配置。")
+    直接调用 jcfg 命令启动 Web 配置界面。
+    """
+    PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！正在启动 Web 配置界面...")
 
-    # 1. 选择平台
-    registry = PlatformRegistry.get_global_platform_registry()
-    platforms = registry.get_available_platforms()
-    platform_name = get_choice("请选择您要使用的AI平台", platforms)
-
-    # 2. 配置 API 密钥等信息（用于 llm_config）
-    platform_class = registry.platforms.get(platform_name)
-    if not platform_class:
-        PrettyOutput.auto_print(f"❌ 平台 '{platform_name}' 加载失败。")
-        sys.exit(1)
-
-    env_vars = {}
-    llm_config = {}
-    required_keys = platform_class.get_required_env_keys()
-    defaults = platform_class.get_env_defaults()
-    config_guide = platform_class.get_env_config_guide()
-
-    # 环境变量到 llm_config 键名的映射
-    env_to_llm_config_map = {
-        "OPENAI_API_KEY": "openai_api_key",
-        "OPENAI_API_BASE": "openai_api_base",
-        "OPENAI_EXTRA_HEADERS": "openai_extra_headers",
-        "KIMI_API_KEY": "kimi_api_key",
-        "TONGYI_COOKIES": "tongyi_cookies",
-        "YUANBAO_COOKIES": "yuanbao_cookies",
-    }
-
-    if required_keys:
-        PrettyOutput.auto_print(f"ℹ️ 请输入 {platform_name} 平台所需的配置信息:")
-
-        # 如果有配置指导，先显示总体说明
-        if config_guide:
-            # 为避免 PrettyOutput 在循环中为每行加框，先拼接后统一打印
-            guide_lines = ["", "配置获取方法:"]
-            for key in required_keys:
-                if key in config_guide and config_guide[key]:
-                    guide_lines.append("")
-                    guide_lines.append(f"{key} 获取方法:")
-                    guide_lines.append(str(config_guide[key]))
-            PrettyOutput.auto_print("ℹ️ " + "\n".join(guide_lines))
-        else:
-            # 若无指导，仍需遍历以保持后续逻辑一致
-            pass
-
-        for key in required_keys:
-            # 显示该环境变量的配置指导（上文已统一打印，此处不再逐条打印）
-
-            default_value = defaults.get(key, "")
-            prompt_text = f"  - {key}"
-            if default_value:
-                prompt_text += f" (默认: {default_value})"
-            prompt_text += ": "
-
-            value = get_input(prompt_text, default=default_value)
-            env_vars[key] = value
-            os.environ[key] = value  # 立即设置环境变量以便后续测试
-
-            # 同时添加到 llm_config（如果存在映射）
-            llm_config_key = env_to_llm_config_map.get(key)
-            if llm_config_key:
-                llm_config[llm_config_key] = value
-
-    # 3. 选择模型
     try:
-        # 创建平台实例时传递 llm_config（如果已收集）
-        platform_instance = registry.create_platform(
-            platform_name, llm_config=llm_config if llm_config else None
-        )
-        if not platform_instance:
-            PrettyOutput.auto_print(f"❌ 无法创建平台 '{platform_name}'。")
-            sys.exit(1)
+        # 构建 jcfg 命令
+        cmd = ["jcfg", "--port", "9312", "--output", str(config_file_path)]
 
-        model_list_tuples = platform_instance.get_model_list()
-        model_choices = [f"{name} ({desc})" for name, desc in model_list_tuples]
-        model_display_name = get_choice("请选择要使用的模型", model_choices)
-
-        # 从显示名称反向查找模型ID
-        selected_index = model_choices.index(model_display_name)
-        model_name, _ = model_list_tuples[selected_index]
-
-    except Exception:
-        PrettyOutput.auto_print("❌ 获取模型列表失败")
-        if not get_yes_no("无法获取模型列表，是否继续配置？"):
-            sys.exit(1)
-        model_name = get_input("请输入模型名称:")
-
-    # 4. 测试配置
-    PrettyOutput.auto_print("ℹ️ 正在测试配置...")
-    test_passed = False
-    try:
-        # 创建平台实例时传递 llm_config（如果已收集）
-        platform_instance = registry.create_platform(
-            platform_name, llm_config=llm_config if llm_config else None
-        )
-        if platform_instance:
-            platform_instance.set_model_name(model_name)
-            response_generator = platform_instance.chat("hello")
-            response = "".join(response_generator)
-            if response:
-                PrettyOutput.auto_print(f"✅ 测试成功，模型响应: {response}")
-                test_passed = True
-            else:
-                PrettyOutput.auto_print("❌ 测试失败，模型没有响应。")
-        else:
-            PrettyOutput.auto_print("❌ 测试失败，无法创建平台实例。")
-    except Exception:
-        PrettyOutput.auto_print("❌ 测试失败")
-
-    # 5. 询问最大输入 token 数量
-    max_input_token_count = 128000
-    try:
-        max_input_token_str = get_input(
-            "请输入最大输入 token 数量（留空使用默认: 128000）:",
-            default="128000",
-        )
-        if max_input_token_str and max_input_token_str.strip():
-            max_input_token_count = int(max_input_token_str.strip())
-    except Exception:
-        pass
-
-    # 6. 生成 LLM 配置名称
-    llm_name = f"{platform_name}-{model_name}".replace(" ", "-").lower()
-    # 清理名称，只保留字母、数字和连字符
-    import re
-
-    llm_name = re.sub(r"[^a-z0-9-]", "", llm_name)
-    if not llm_name:
-        llm_name = "default-llm"
-
-    # 7. 交互式确认并应用配置（使用新的引用方式）
-    config_data = {
-        "ENV": env_vars,
-        "llms": {
-            llm_name: {
-                "platform": platform_name,
-                "model": model_name,
-                "max_input_token_count": max_input_token_count,
-                "llm_config": llm_config if llm_config else {},
-            }
-        },
-        "llm_groups": {
-            "default": {
-                "normal_llm": llm_name,
-            }
-        },
-        "llm_group": "default",
-    }
-
-    if not test_passed:
-        if not get_yes_no("配置测试失败，是否仍要应用该配置并继续？", default=False):
-            PrettyOutput.auto_print("ℹ️ 已取消配置。")
-            sys.exit(0)
-
-    # 8. 选择其他功能开关与可选项（复用统一逻辑）
-    _collect_optional_config_interactively(config_data)
-
-    # 7. 应用到当前会话并写入配置文件（基于交互结果，不从默认值生成）
-    set_global_env_data(config_data)
-    _process_env_variables(config_data)
-    try:
-        schema_path = (
-            Path(__file__).parent.parent / "jarvis_data" / "config_schema.json"
-        )
-        config_file_path.parent.mkdir(parents=True, exist_ok=True)
-        header = ""
-        if schema_path.exists():
-            header = f"# yaml-language-server: $schema={str(schema_path.absolute())}\n"
-        _prune_defaults_with_schema(config_data)
-        yaml_str = yaml.dump(config_data, allow_unicode=True, sort_keys=False)
-        with open(config_file_path, "w", encoding="utf-8") as f:
-            if header:
-                f.write(header)
-            f.write(yaml_str)
-        PrettyOutput.auto_print(f"✅ 配置文件已生成: {config_file_path}")
-        PrettyOutput.auto_print("ℹ️ 配置完成，请重新启动Jarvis。")
+        # 直接调用 jcfg 命令
+        subprocess.run(cmd)
         sys.exit(0)
-    except Exception:
-        PrettyOutput.auto_print("❌ 写入配置文件失败")
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 启动配置界面失败: {e}")
         sys.exit(1)
 
 
