@@ -1842,27 +1842,26 @@ def _collect_directory_config(config_data: Dict[str, Any], ask_all: bool) -> boo
 
 
 def _collect_web_search_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
-    """收集Web搜索配置"""
-    changed = False
-    changed = (
-        _ask_config_optional_str(
-            config_data,
-            ask_all,
-            "web_search_platform",
-            "配置 Web 搜索平台名称（留空跳过）：",
-        )
-        or changed
-    )
-    changed = (
-        _ask_config_optional_str(
-            config_data,
-            ask_all,
-            "web_search_model",
-            "配置 Web 搜索模型名称（留空跳过）：",
-        )
-        or changed
-    )
-    return changed
+    """收集Web搜索配置（已废弃）
+
+    Web搜索配置已迁移到 llm_groups 中的 web_llm 字段。
+    请在 llms 中定义 Web 搜索专用的 LLM 配置，然后在 llm_groups 中通过 web_llm 引用。
+
+    示例配置：
+    ```yaml
+    llms:
+      my_web_search:
+        platform: "openai"
+        model: "gpt-4o-search-preview"
+    llm_groups:
+      default:
+        normal_llm: "my_normal"
+        web_llm: "my_web_search"  # 用于网页搜索和读取
+    ```
+    """
+    # 不再收集废弃的 web_search_platform 和 web_search_model
+    # 如果用户之前配置过这些值，仍会保持向后兼容
+    return False
 
 
 def _collect_git_config(config_data: Dict[str, Any], ask_all: bool) -> bool:

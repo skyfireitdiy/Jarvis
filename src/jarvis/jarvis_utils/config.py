@@ -276,6 +276,24 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
             expanded_config["smart_llm_config"] = llm_ref["llm_config"].copy()
         expanded_config.pop("smart_llm", None)
 
+    # 处理 web_llm 引用
+    if "web_llm" in expanded_config:
+        llm_ref = _resolve_llm_reference(expanded_config["web_llm"])
+        if not llm_ref:
+            raise ValueError(
+                f"❌ 错误：web_llm 引用的 '{expanded_config['web_llm']}' 在 llms 中不存在。"
+            )
+        # 直接使用引用的值
+        expanded_config["web_platform"] = llm_ref.get("platform", "openai")
+        expanded_config["web_model"] = llm_ref.get("model", "gpt-5")
+        expanded_config["web_max_input_token_count"] = llm_ref.get(
+            "max_input_token_count", 32000
+        )
+        # 合并 llm_config
+        if "llm_config" in llm_ref:
+            expanded_config["web_llm_config"] = llm_ref["llm_config"].copy()
+        expanded_config.pop("web_llm", None)
+
     return expanded_config
 
 
@@ -354,9 +372,13 @@ def _get_resolved_model_config(
         "smart_platform",
         "smart_model",
         "smart_max_input_token_count",
+        "web_platform",
+        "web_model",
+        "web_max_input_token_count",
         "llm_config",
         "cheap_llm_config",
         "smart_llm_config",
+        "web_llm_config",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:
@@ -1174,12 +1196,19 @@ def get_web_search_platform_name() -> Optional[str]:
     """
     获取Web搜索使用的平台名称。
 
+    优先使用 llm_groups 中 web_llm 展开后的 web_platform 配置，
+    如未配置则回退到已废弃的 web_search_platform。
+
     返回:
         Optional[str]: 平台名称，如果未配置则返回None
     """
+    # 优先使用新的 web_platform 配置（来自 llm_groups.web_llm）
+    if GLOBAL_CONFIG_DATA.get("web_platform"):
+        return str(GLOBAL_CONFIG_DATA.get("web_platform"))
+    # 回退到已废弃的 web_search_platform
     return (
         str(GLOBAL_CONFIG_DATA.get("web_search_platform"))
-        if GLOBAL_CONFIG_DATA.get("web_search_platform") is not None
+        if GLOBAL_CONFIG_DATA.get("web_search_platform")
         else None
     )
 
@@ -1188,12 +1217,19 @@ def get_web_search_model_name() -> Optional[str]:
     """
     获取Web搜索使用的模型名称。
 
+    优先使用 llm_groups 中 web_llm 展开后的 web_model 配置，
+    如未配置则回退到已废弃的 web_search_model。
+
     返回:
         Optional[str]: 模型名称，如果未配置则返回None
     """
+    # 优先使用新的 web_model 配置（来自 llm_groups.web_llm）
+    if GLOBAL_CONFIG_DATA.get("web_model"):
+        return str(GLOBAL_CONFIG_DATA.get("web_model"))
+    # 回退到已废弃的 web_search_model
     return (
         str(GLOBAL_CONFIG_DATA.get("web_search_model"))
-        if GLOBAL_CONFIG_DATA.get("web_search_model") is not None
+        if GLOBAL_CONFIG_DATA.get("web_search_model")
         else None
     )
 
