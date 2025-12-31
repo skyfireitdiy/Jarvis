@@ -382,6 +382,19 @@ def get_html_template() -> str:
             line-height: 1.3;
         }
 
+        .field-description.deprecated {
+            color: #9CA3AF;
+            font-style: italic;
+            background: linear-gradient(135deg, rgba(156, 163, 175, 0.1), rgba(156, 163, 175, 0.05));
+            padding: 4px 8px;
+            border-radius: 4px;
+            border-left: 3px solid #F59E0B;
+        }
+
+        .field-description.deprecated::before {
+            content: "⚠️ ";
+        }
+
         input[type="text"],
         input[type="number"],
         input[type="email"],
@@ -796,7 +809,9 @@ def get_html_template() -> str:
             html += '<label>' + labelText + '</label>';
             
             if (meta.description) {
-                html += '<span class="field-description">' + escapeHtml(meta.description) + '</span>';
+                const isDeprecated = meta.description.includes('[已废弃');
+                const descClass = isDeprecated ? 'field-description deprecated' : 'field-description';
+                html += '<span class="' + descClass + '">' + escapeHtml(meta.description) + '</span>';
             }
 
             if (prop.enum) {
