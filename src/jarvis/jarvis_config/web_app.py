@@ -205,6 +205,23 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
         """健康检查"""
         return {"status": "ok"}
 
+    @app.post("/api/shutdown")
+    async def shutdown() -> Dict[str, str]:
+        """关闭服务器"""
+        import threading
+        import os
+        import signal
+
+        def delayed_shutdown():
+            """延迟关闭，确保响应先发送"""
+            import time
+
+            time.sleep(0.5)
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        threading.Thread(target=delayed_shutdown, daemon=True).start()
+        return {"status": "shutting_down"}
+
     return app
 
 
@@ -1173,11 +1190,18 @@ def get_html_template() -> str:
                 const result = await response.json();
 
                 if (result.success) {
-                    document.getElementById('success').style.display = 'block';
-                    document.getElementById('success').innerHTML = '<div style="margin-bottom: 8px;">\n                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">\n                            <polyline points="20 6 9 17 4 12"></polyline>\n                        </svg>\n                    </div>' + result.message;
+                    // 弹出成功提示
+                    alert('✅ ' + result.message + '\n\n页面即将关闭...');
+                    
+                    // 调用 shutdown 接口关闭服务器
+                    fetch('/api/shutdown', { method: 'POST' }).catch(() => {});
+                    
+                    // 关闭页面
                     setTimeout(function() {
-                        document.getElementById('success').style.display = 'none';
-                    }, 5000);
+                        window.close();
+                        // 如果 window.close() 不起作用（非脚本打开的窗口），显示提示
+                        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;font-size:24px;color:#059669;">✅ 配置已保存，请手动关闭此页面</div>';
+                    }, 500);
                 } else {
                     for (let i = 0; i < result.errors.length; i++) {
                         const err = result.errors[i];
