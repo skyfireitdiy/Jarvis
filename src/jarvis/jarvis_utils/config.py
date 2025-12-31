@@ -111,13 +111,12 @@ def get_shell_name() -> str:
         str: Shell名称（例如bash, zsh, fish），默认为bash
 
     获取顺序：
-    1. 先从GLOBAL_CONFIG_DATA中获取shell配置
-    2. 再从GLOBAL_CONFIG_DATA中获取SHELL配置
-    3. 最后从环境变量SHELL获取
-    4. 如果都未配置，则默认返回bash
+    1. 先从GLOBAL_CONFIG_DATA中获取SHELL配置
+    2. 再从环境变量SHELL获取
+    3. 如果都未配置，则默认返回bash
     """
-    shell_path = GLOBAL_CONFIG_DATA.get("SHELL", os.getenv("SHELL", "/bin/bash"))
-    return cast(str, os.path.basename(shell_path).lower())
+    shell_path = GLOBAL_CONFIG_DATA.get("SHELL") or os.getenv("SHELL", "/bin/bash")
+    return os.path.basename(shell_path).lower()
 
 
 def _apply_llm_config_to_env(resolved_config: Dict[str, Any]) -> None:

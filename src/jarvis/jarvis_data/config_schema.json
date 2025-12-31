@@ -369,6 +369,14 @@
       },
       "default": []
     },
+    "rules_load_dirs": {
+      "type": "array",
+      "description": "规则加载目录",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "after_tool_call_cb_dirs": {
       "type": "array",
       "description": "工具调用后回调函数实现目录",
@@ -385,6 +393,11 @@
     "central_tool_repo": {
       "type": "string",
       "description": "中心工具仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加载其中的工具；若为Git URL则会克隆到数据目录并加载。",
+      "default": ""
+    },
+    "central_rules_repo": {
+      "type": "string",
+      "description": "中心规则仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入规则加载路径；若为Git URL则会克隆到数据目录并加载。",
       "default": ""
     },
     "print_prompt": {
