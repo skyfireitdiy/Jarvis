@@ -101,61 +101,6 @@
       "description": "Git提交信息生成提示模板",
       "default": ""
     },
-    "max_input_token_count": {
-      "type": "number",
-      "description": "[已废弃] 模型能处理的最大输入token数量。建议使用 llms 配置中的 max_input_token_count",
-      "default": 128000
-    },
-    "platform": {
-      "type": "string",
-      "description": "[已废弃] 常规操作平台名称。建议使用 llms + llm_groups 配置",
-      "default": "openai"
-    },
-    "model": {
-      "type": "string",
-      "description": "[已废弃] 常规操作模型名称。建议使用 llms + llm_groups 配置",
-      "default": "gpt-5"
-    },
-    "cheap_platform": {
-      "type": "string",
-      "description": "[已废弃] 廉价操作的平台名称。建议使用 llms + llm_groups 配置中的 cheap_llm",
-      "default": ""
-    },
-    "cheap_model": {
-      "type": "string",
-      "description": "[已废弃] 廉价操作的模型名称。建议使用 llms + llm_groups 配置中的 cheap_llm",
-      "default": ""
-    },
-    "cheap_max_input_token_count": {
-      "type": "number",
-      "description": "[已废弃] 廉价模型允许的最大输入token数量。建议使用 llms 配置中的 max_input_token_count",
-      "default": 0
-    },
-    "smart_platform": {
-      "type": "string",
-      "description": "[已废弃] 智能操作的平台名称。建议使用 llms + llm_groups 配置中的 smart_llm",
-      "default": ""
-    },
-    "smart_model": {
-      "type": "string",
-      "description": "[已废弃] 智能操作的模型名称。建议使用 llms + llm_groups 配置中的 smart_llm",
-      "default": ""
-    },
-    "smart_max_input_token_count": {
-      "type": "number",
-      "description": "[已废弃] 智能模型允许的最大输入token数量。建议使用 llms 配置中的 max_input_token_count",
-      "default": 0
-    },
-    "web_search_platform": {
-      "type": "string",
-      "description": "[已废弃，请勿使用] Web搜索平台名称。请改用 llm_groups 中的 web_llm 配置",
-      "default": ""
-    },
-    "web_search_model": {
-      "type": "string",
-      "description": "[已废弃，请勿使用] Web搜索模型名称。请改用 llm_groups 中的 web_llm 配置",
-      "default": ""
-    },
     "llms": {
       "type": "object",
       "description": "可复用的LLM配置定义，可以在llm_groups中通过引用名称来使用",
