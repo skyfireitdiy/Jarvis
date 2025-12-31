@@ -255,8 +255,35 @@ def get_html_template() -> str:
         }
 
         .main-container {
-            max-width: 900px;
+            max-width: 1400px;
             margin: 0 auto;
+        }
+
+        #form-fields {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        /* 宽屏多列布局 */
+        @media (min-width: 1024px) {
+            #form-fields {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            /* 复杂字段（包含嵌套对象或数组）占满整行 */
+            .form-section:has(.nested-object),
+            .form-section:has(.dict-container),
+            .form-section:has(.array-item) {
+                grid-column: 1 / -1;
+            }
+        }
+
+        /* 超宽屏三列布局 */
+        @media (min-width: 1600px) {
+            #form-fields {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
 
         .glass-card {
@@ -319,9 +346,9 @@ def get_html_template() -> str:
             backdrop-filter: blur(40px);
             border-radius: 12px;
             padding: 14px;
-            margin-bottom: 10px;
             border: 1px solid var(--border-inner);
             box-shadow: 0 0 0 1px var(--border-outer), var(--shadow-float);
+            /* Grid 布局时不再需要 margin-bottom，由 gap 控制 */
         }
 
         .form-group {
