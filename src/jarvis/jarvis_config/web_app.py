@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from .schema_parser import SchemaParser
 
-from jarvis.jarvis_utils.output.PrettyOutput import auto_print
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 # 请求模型
@@ -136,9 +136,9 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
             raise HTTPException(status_code=500, detail="Output path not set")
 
         # 调试：打印保存信息
-        auto_print(f"🔍 [DEBUG] 准备保存配置到: {_output_path}", timestamp=False)
-        auto_print(f"🔍 [DEBUG] 文件路径类型: {type(_output_path)}", timestamp=False)
-        auto_print(f"🔍 [DEBUG] 文件路径存在: {_output_path.exists()}", timestamp=False)
+        PrettyOutput.auto_print(f"🔍 [DEBUG] 准备保存配置到: {_output_path}", timestamp=False)
+        PrettyOutput.auto_print(f"🔍 [DEBUG] 文件路径类型: {type(_output_path)}", timestamp=False)
+        PrettyOutput.auto_print(f"🔍 [DEBUG] 文件路径存在: {_output_path.exists()}", timestamp=False)
 
         # 清理配置中的 null 值（递归移除）
         def clean_null_values(obj: Any) -> Any:
@@ -151,20 +151,20 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
             return obj
 
         cleaned_config = clean_null_values(request.config)
-        auto_print(
+        PrettyOutput.auto_print(
             f"🔍 [DEBUG] 清理 null 值后的配置键数: {len(cleaned_config)}",
             timestamp=False,
         )
 
         # 验证配置
         errors = _schema_parser.validate_config(cleaned_config)
-        auto_print(
+        PrettyOutput.auto_print(
             f"🔍 [DEBUG] 验证结果: {len(errors) if errors else 0} 个错误",
             timestamp=False,
         )
         if errors:
             for error in errors:
-                auto_print(
+                PrettyOutput.auto_print(
                     f"🔍 [DEBUG] 验证错误: path={error.path}, message={error.message}",
                     timestamp=False,
                 )
@@ -181,7 +181,7 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
             _output_path.parent.mkdir(parents=True, exist_ok=True)
 
             # 根据文件后缀决定格式
-            auto_print(
+            PrettyOutput.auto_print(
                 f"🔍 [DEBUG] 开始写入文件，后缀: {_output_path.suffix}", timestamp=False
             )
             if _output_path.suffix in (".yaml", ".yml"):
@@ -193,20 +193,20 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
                         default_flow_style=False,
                         sort_keys=False,
                     )
-                auto_print("🔍 [DEBUG] YAML 写入完成", timestamp=False)
+                PrettyOutput.auto_print("🔍 [DEBUG] YAML 写入完成", timestamp=False)
             else:
                 with open(_output_path, "w", encoding="utf-8") as f:
                     json.dump(cleaned_config, f, indent=2, ensure_ascii=False)
-                auto_print("🔍 [DEBUG] JSON 写入完成", timestamp=False)
+                PrettyOutput.auto_print("🔍 [DEBUG] JSON 写入完成", timestamp=False)
 
             # 验证写入结果
             import os
 
-            auto_print(
+            PrettyOutput.auto_print(
                 f"🔍 [DEBUG] 写入后文件大小: {os.path.getsize(_output_path)} 字节",
                 timestamp=False,
             )
-            auto_print(
+            PrettyOutput.auto_print(
                 f"🔍 [DEBUG] 写入后文件修改时间: {os.path.getmtime(_output_path)}",
                 timestamp=False,
             )
