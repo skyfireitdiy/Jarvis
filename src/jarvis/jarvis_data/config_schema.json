@@ -119,7 +119,7 @@
           "max_input_token_count": {
             "type": "number",
             "description": "最大输入token数量",
-            "default": 32000
+            "default": 128000
           },
           "llm_config": {
             "type": "object",
