@@ -893,7 +893,7 @@ def get_html_template() -> str:
 
         function createSwitchHTML(path, defaultValue) {
             const checked = defaultValue === true ? 'checked' : '';
-            return '<div class="switch-container">\n                <span>' + (defaultValue === true ? '已启用' : '已禁用') + '</span>\n                <label class="switch">\n                    <input type="checkbox" name="' + path + '" ' + checked + '>\n                    <span class="switch-slider"></span>\n                </label>\n            </div>';
+            return '<div class="switch-container">\n                <span>' + (defaultValue === true ? '已启用' : '已禁用') + '</span>\n                <label class="switch">\n                    <input type="checkbox" name="' + path + '" value="true" ' + checked + '>\n                    <span class="switch-slider"></span>\n                </label>\n            </div>';
         }
 
         function createArrayHTML(path, prop, defaultValue, parentPath) {
@@ -1371,6 +1371,9 @@ def get_html_template() -> str:
             const value = formData.get(name);
 
             if (value === null || value === '') {
+                if (type === 'boolean') {
+                    return false;  // checkbox 未选中时返回 false，而不是默认值
+                }
                 return prop.default;
             }
 
