@@ -1107,7 +1107,7 @@ def get_html_template() -> str:
                 const entries = formData.entries();
                 
                 for (const [key, value] of entries) {
-                    const match = key.match(new RegExp('^' + name.replace(/\./g, '\\.') + '\[([^\]]+)\](.*)$'));
+                    const match = key.match(new RegExp('^' + name.replace(/\./g, '\\.') + '\\[([^\\]]+)\\](.*)$'));
                     if (match) {
                         const dictKey = match[1];
                         const subPath = match[2];
