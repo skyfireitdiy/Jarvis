@@ -242,57 +242,69 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
 
     # 处理 cheap_llm 引用
     if "cheap_llm" in expanded_config:
-        llm_ref = _resolve_llm_reference(expanded_config["cheap_llm"])
-        if not llm_ref:
-            raise ValueError(
-                f"❌ 错误：cheap_llm 引用的 '{expanded_config['cheap_llm']}' 在 llms 中不存在。"
+        # 跳过空值（空字符串或 None）
+        if not expanded_config.get("cheap_llm"):
+            expanded_config.pop("cheap_llm", None)
+        else:
+            llm_ref = _resolve_llm_reference(expanded_config["cheap_llm"])
+            if not llm_ref:
+                raise ValueError(
+                    f"❌ 错误：cheap_llm 引用的 '{expanded_config['cheap_llm']}' 在 llms 中不存在。"
+                )
+            # 直接使用引用的值
+            expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
+            expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
+            expanded_config["cheap_max_input_token_count"] = llm_ref.get(
+                "max_input_token_count", 32000
             )
-        # 直接使用引用的值
-        expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
-        expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
-        expanded_config["cheap_max_input_token_count"] = llm_ref.get(
-            "max_input_token_count", 32000
-        )
-        # 合并 llm_config
-        if "llm_config" in llm_ref:
-            expanded_config["cheap_llm_config"] = llm_ref["llm_config"].copy()
-        expanded_config.pop("cheap_llm", None)
+            # 合并 llm_config
+            if "llm_config" in llm_ref:
+                expanded_config["cheap_llm_config"] = llm_ref["llm_config"].copy()
+            expanded_config.pop("cheap_llm", None)
 
     # 处理 smart_llm 引用
     if "smart_llm" in expanded_config:
-        llm_ref = _resolve_llm_reference(expanded_config["smart_llm"])
-        if not llm_ref:
-            raise ValueError(
-                f"❌ 错误：smart_llm 引用的 '{expanded_config['smart_llm']}' 在 llms 中不存在。"
+        # 跳过空值（空字符串或 None）
+        if not expanded_config.get("smart_llm"):
+            expanded_config.pop("smart_llm", None)
+        else:
+            llm_ref = _resolve_llm_reference(expanded_config["smart_llm"])
+            if not llm_ref:
+                raise ValueError(
+                    f"❌ 错误：smart_llm 引用的 '{expanded_config['smart_llm']}' 在 llms 中不存在。"
+                )
+            # 直接使用引用的值
+            expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
+            expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
+            expanded_config["smart_max_input_token_count"] = llm_ref.get(
+                "max_input_token_count", 32000
             )
-        # 直接使用引用的值
-        expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
-        expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
-        expanded_config["smart_max_input_token_count"] = llm_ref.get(
-            "max_input_token_count", 32000
-        )
-        # 合并 llm_config
-        if "llm_config" in llm_ref:
-            expanded_config["smart_llm_config"] = llm_ref["llm_config"].copy()
-        expanded_config.pop("smart_llm", None)
+            # 合并 llm_config
+            if "llm_config" in llm_ref:
+                expanded_config["smart_llm_config"] = llm_ref["llm_config"].copy()
+            expanded_config.pop("smart_llm", None)
 
     # 处理 web_llm 引用
     if "web_llm" in expanded_config:
-        llm_ref = _resolve_llm_reference(expanded_config["web_llm"])
-        if not llm_ref:
-            raise ValueError(
-                f"❌ 错误：web_llm 引用的 '{expanded_config['web_llm']}' 在 llms 中不存在。"
+        # 跳过空值（空字符串或 None）
+        if not expanded_config.get("web_llm"):
+            expanded_config.pop("web_llm", None)
+        else:
+            llm_ref = _resolve_llm_reference(expanded_config["web_llm"])
+            if not llm_ref:
+                raise ValueError(
+                    f"❌ 错误：web_llm 引用的 '{expanded_config['web_llm']}' 在 llms 中不存在。"
+                )
+            # 直接使用引用的值
+            expanded_config["web_platform"] = llm_ref.get("platform", "openai")
+            expanded_config["web_model"] = llm_ref.get("model", "gpt-5")
+            expanded_config["web_max_input_token_count"] = llm_ref.get(
+                "max_input_token_count", 32000
             )
-        # 直接使用引用的值
-        expanded_config["web_platform"] = llm_ref.get("platform", "openai")
-        expanded_config["web_model"] = llm_ref.get("model", "gpt-5")
-        expanded_config["web_max_input_token_count"] = llm_ref.get(
-            "max_input_token_count", 32000
-        )
-        # 合并 llm_config
-        if "llm_config" in llm_ref:
-            expanded_config["web_llm_config"] = llm_ref["llm_config"].copy()
-        expanded_config.pop("web_llm", None)
+            # 合并 llm_config
+            if "llm_config" in llm_ref:
+                expanded_config["web_llm_config"] = llm_ref["llm_config"].copy()
+            expanded_config.pop("web_llm", None)
 
     return expanded_config
 
