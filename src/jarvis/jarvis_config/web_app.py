@@ -133,9 +133,30 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
         if _output_path is None:
             raise HTTPException(status_code=500, detail="Output path not set")
 
+        # 调试：打印保存信息
+        print(f"\n[DEBUG] 准备保存配置到: {_output_path}")
+        print(f"[DEBUG] 文件路径类型: {type(_output_path)}")
+        print(f"[DEBUG] 文件路径存在: {_output_path.exists()}")
+
+        # 清理配置中的 null 值（递归移除）
+        def clean_null_values(obj: Any) -> Any:
+            if isinstance(obj, dict):
+                return {
+                    k: clean_null_values(v) for k, v in obj.items() if v is not None
+                }
+            elif isinstance(obj, list):
+                return [clean_null_values(item) for item in obj if item is not None]
+            return obj
+
+        cleaned_config = clean_null_values(request.config)
+        print(f"[DEBUG] 清理 null 值后的配置键数: {len(cleaned_config)}")
+
         # 验证配置
-        errors = _schema_parser.validate_config(request.config)
+        errors = _schema_parser.validate_config(cleaned_config)
+        print(f"[DEBUG] 验证结果: {len(errors) if errors else 0} 个错误")
         if errors:
+            for error in errors:
+                print(f"[DEBUG] 验证错误: path={error.path}, message={error.message}")
             return {
                 "success": False,
                 "errors": [
@@ -149,18 +170,27 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
             _output_path.parent.mkdir(parents=True, exist_ok=True)
 
             # 根据文件后缀决定格式
+            print(f"[DEBUG] 开始写入文件，后缀: {_output_path.suffix}")
             if _output_path.suffix in (".yaml", ".yml"):
                 with open(_output_path, "w", encoding="utf-8") as f:
                     yaml.dump(
-                        request.config,
+                        cleaned_config,
                         f,
                         allow_unicode=True,
                         default_flow_style=False,
                         sort_keys=False,
                     )
+                print("[DEBUG] YAML 写入完成")
             else:
                 with open(_output_path, "w", encoding="utf-8") as f:
-                    json.dump(request.config, f, indent=2, ensure_ascii=False)
+                    json.dump(cleaned_config, f, indent=2, ensure_ascii=False)
+                print("[DEBUG] JSON 写入完成")
+
+            # 验证写入结果
+            import os
+
+            print(f"[DEBUG] 写入后文件大小: {os.path.getsize(_output_path)} 字节")
+            print(f"[DEBUG] 写入后文件修改时间: {os.path.getmtime(_output_path)}")
 
             return {
                 "success": True,
@@ -751,13 +781,13 @@ def get_html_template() -> str:
             } else if (type === 'number' || type === 'integer') {
                 html += createNumberInputHTML(fullPathStr, prop, meta.default);
             } else if (type === 'array') {
-                html += createArrayHTML(fullPathStr, prop, meta.default, path);
+                html += createArrayHTML(fullPathStr, prop, meta.default, fullPath);
             } else if (type === 'object') {
                 // 判断是固定属性对象还是字典类型
                 if (prop.additionalProperties && !prop.properties) {
-                    html += createDictHTML(fullPathStr, prop, meta.default, path);
+                    html += createDictHTML(fullPathStr, prop, meta.default, fullPath);
                 } else {
-                    html += createObjectHTML(fullPathStr, prop, meta.default, path);
+                    html += createObjectHTML(fullPathStr, prop, meta.default, fullPath);
                 }
             } else {
                 html += createTextInputHTML(fullPathStr, prop, meta.default);
@@ -808,8 +838,9 @@ def get_html_template() -> str:
         }
 
         function createArrayHTML(path, prop, defaultValue, parentPath) {
-            const fullPath = parentPath.concat(path);
-            const fullPathStr = fullPath.join('.');
+            // path 已经是完整路径字符串
+            // parentPath 不再使用，保留参数以保持兼容性
+            const fullPathStr = path;
             
             if (!arrayCounters[fullPathStr]) {
                 arrayCounters[fullPathStr] = 0;
@@ -873,8 +904,9 @@ def get_html_template() -> str:
         }
 
         function createObjectHTML(path, prop, defaultValue, parentPath) {
-            const fullPath = parentPath.concat(path);
-            const fullPathStr = fullPath.join('.');
+            // path 已经是完整路径字符串
+            // parentPath 是包含完整路径的数组，用于传递给子字段
+            const fullPathStr = path;
             
             let html = '<div class="nested-object" data-path="' + fullPathStr + '">';
             
@@ -882,7 +914,7 @@ def get_html_template() -> str:
                 const propSchema = prop.properties[propName];
                 const propMeta = propSchema._meta || {};
                 const propRequired = (prop.required || []).includes(propName);
-                html += createFieldHTML(propName, propSchema, propMeta, propRequired, fullPath);
+                html += createFieldHTML(propName, propSchema, propMeta, propRequired, parentPath);
             }
             
             html += '</div>';
@@ -890,8 +922,9 @@ def get_html_template() -> str:
         }
 
         function createDictHTML(path, prop, defaultValue, parentPath) {
-            const fullPath = parentPath.concat(path);
-            const fullPathStr = fullPath.join('.');
+            // path 已经是完整路径字符串（如 "llms[glm].llm_config"）
+            // parentPath 不再使用，保留参数以保持兼容性
+            const fullPathStr = path;
             
             if (!dictCounters[fullPathStr]) {
                 dictCounters[fullPathStr] = Object.keys(defaultValue || {}).length;
@@ -955,16 +988,29 @@ def get_html_template() -> str:
                         fieldHTML += createFieldHTML(propName, propSchema, propMeta, propRequired, valuePath);
                     }
                 } else {
-                    // 非对象类型：创建单个值字段
-                    const meta = {
-                        default: existingValue !== undefined ? existingValue : schema.default
-                    };
-                    fieldHTML += createFieldHTML('value', schema, meta, false, valuePath);
+                    // 非对象类型：直接使用路径作为字段名，不添加额外后缀
+                    const fieldPath = path + '[' + existingKey + ']';
+                    const defaultVal = existingValue !== undefined ? existingValue : (schema.default || '');
+                    if (schema.type === 'boolean') {
+                        fieldHTML += createSwitchHTML(fieldPath, defaultVal);
+                    } else if (schema.type === 'number' || schema.type === 'integer') {
+                        fieldHTML += createNumberInputHTML(fieldPath, schema, defaultVal);
+                    } else {
+                        fieldHTML += createTextInputHTML(fieldPath, schema, defaultVal);
+                    }
                 }
             } else {
                 // 添加新条目，创建键名输入框和值字段
                 fieldHTML = '<input type="text" class="dict-key-input" placeholder="输入键名..." onchange="updateDictKey(\'' + path + '\', \'' + itemId + '\', this.value)">';
-                fieldHTML += createFieldHTML('value', schema, {}, false, [path + '[' + key + ']']);
+                // 对于简单类型，直接创建输入框
+                const fieldPath = path + '[' + key + ']';
+                if (schema.type === 'boolean') {
+                    fieldHTML += createSwitchHTML(fieldPath, schema.default);
+                } else if (schema.type === 'number' || schema.type === 'integer') {
+                    fieldHTML += createNumberInputHTML(fieldPath, schema, schema.default);
+                } else {
+                    fieldHTML += createTextInputHTML(fieldPath, schema, schema.default || '');
+                }
                 fieldHTML += '<button type="button" class="btn btn-danger btn-sm btn-icon dict-item-remove" onclick="removeDictItem(\'' + path + '\', \'' + itemId + '\')" style="margin-top: 12px;">×</button>';
             }
 
@@ -1029,6 +1075,10 @@ def get_html_template() -> str:
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function escapeRegExp(str) {
+            return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
         function clearErrors() {
@@ -1098,6 +1148,47 @@ def get_html_template() -> str:
             }
         }
 
+        // 辅助函数：将路径字符串解析为嵌套对象并设置值
+        function setNestedValue(obj, path, value) {
+            // 解析路径，支持 .field 和 [key] 格式
+            const parts = [];
+            let remaining = path;
+            while (remaining) {
+                if (remaining.startsWith('.')) {
+                    // 处理 .field 格式
+                    remaining = remaining.substring(1);
+                    const dotMatch = remaining.match(/^([^.\[]+)/);
+                    if (dotMatch) {
+                        parts.push(dotMatch[1]);
+                        remaining = remaining.substring(dotMatch[1].length);
+                    }
+                } else if (remaining.startsWith('[')) {
+                    // 处理 [key] 格式
+                    const bracketMatch = remaining.match(/^\[([^\]]+)\]/);
+                    if (bracketMatch) {
+                        parts.push(bracketMatch[1]);
+                        remaining = remaining.substring(bracketMatch[0].length);
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            
+            // 设置嵌套值
+            let current = obj;
+            for (let i = 0; i < parts.length - 1; i++) {
+                if (!current[parts[i]]) {
+                    current[parts[i]] = {};
+                }
+                current = current[parts[i]];
+            }
+            if (parts.length > 0) {
+                current[parts[parts.length - 1]] = value;
+            }
+        }
+
         function collectFieldValue(name, prop, formData) {
             const type = prop.type;
             
@@ -1107,7 +1198,7 @@ def get_html_template() -> str:
                 const entries = formData.entries();
                 
                 for (const [key, value] of entries) {
-                    const match = key.match(new RegExp('^' + name.replace(/\./g, '\\.') + '\\[([^\\]]+)\\](.*)$'));
+                    const match = key.match(new RegExp('^' + escapeRegExp(name) + '\\[([^\\]]+)\\](.*)$'));
                     if (match) {
                         const dictKey = match[1];
                         const subPath = match[2];
@@ -1117,13 +1208,8 @@ def get_html_template() -> str:
                         }
                         
                         if (subPath) {
-                            if (subPath.startsWith('.')) {
-                                const subField = subPath.substring(1);
-                                if (!dict[dictKey]) dict[dictKey] = {};
-                                dict[dictKey][subField] = value;
-                            } else {
-                                dict[dictKey][subPath] = value;
-                            }
+                            // 使用辅助函数处理深层嵌套路径
+                            setNestedValue(dict[dictKey], subPath, value);
                         } else {
                             dict[dictKey] = value;
                         }
@@ -1152,7 +1238,7 @@ def get_html_template() -> str:
                 
                 for (const [key, value] of entries) {
                     if (key.startsWith(name + '[')) {
-                        const match = key.match(new RegExp('^' + name.replace(/\./g, '\\\\.') + '\\[(\\d+)\\](.*)$'));
+                        const match = key.match(new RegExp('^' + escapeRegExp(name) + '\\[(\\d+)\\](.*)$'));
                         if (match) {
                             const idx = parseInt(match[1]);
                             const subPath = match[2];
