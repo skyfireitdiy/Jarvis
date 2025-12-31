@@ -249,8 +249,8 @@ def get_html_template() -> str:
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
-            line-height: 1.5;
-            padding: 24px;
+            line-height: 1.4;
+            padding: 12px;
             min-height: 100vh;
         }
 
@@ -263,32 +263,32 @@ def get_html_template() -> str:
             background: var(--bg-glass);
             backdrop-filter: blur(50px);
             -webkit-backdrop-filter: blur(50px);
-            border-radius: 44px;
-            padding: 48px;
+            border-radius: 20px;
+            padding: 20px;
             border: 1px solid var(--border-inner);
             box-shadow: 0 0 0 1px var(--border-outer), var(--shadow-float);
-            margin-bottom: 24px;
+            margin-bottom: 12px;
         }
 
         h1 {
             font-weight: 800;
             letter-spacing: -0.02em;
-            font-size: 32px;
-            margin-bottom: 8px;
+            font-size: 22px;
+            margin-bottom: 4px;
             color: var(--text-primary);
         }
 
         .description {
             color: var(--text-secondary);
-            font-size: 16px;
-            line-height: 1.6;
-            margin-bottom: 40px;
+            font-size: 13px;
+            line-height: 1.4;
+            margin-bottom: 16px;
         }
 
         .loading, .error, .success {
             text-align: center;
-            padding: 60px 24px;
-            border-radius: 28px;
+            padding: 24px 16px;
+            border-radius: 12px;
             background: var(--bg-glass);
             backdrop-filter: blur(50px);
         }
@@ -317,15 +317,15 @@ def get_html_template() -> str:
         .form-section {
             background: var(--bg-glass);
             backdrop-filter: blur(40px);
-            border-radius: 32px;
-            padding: 32px;
-            margin-bottom: 24px;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 10px;
             border: 1px solid var(--border-inner);
             box-shadow: 0 0 0 1px var(--border-outer), var(--shadow-float);
         }
 
         .form-group {
-            margin-bottom: 28px;
+            margin-bottom: 12px;
         }
 
         .form-group:last-child {
@@ -337,9 +337,9 @@ def get_html_template() -> str:
             font-weight: 700;
             font-size: 11px;
             text-transform: uppercase;
-            letter-spacing: 0.15em;
+            letter-spacing: 0.1em;
             color: var(--text-label);
-            margin-bottom: 10px;
+            margin-bottom: 4px;
         }
 
         .required-mark {
@@ -350,9 +350,9 @@ def get_html_template() -> str:
         .field-description {
             display: block;
             color: var(--text-secondary);
-            font-size: 14px;
-            margin-bottom: 10px;
-            line-height: 1.5;
+            font-size: 12px;
+            margin-bottom: 4px;
+            line-height: 1.3;
         }
 
         input[type="text"],
@@ -363,11 +363,11 @@ def get_html_template() -> str:
         textarea,
         select {
             width: 100%;
-            padding: 14px 18px;
+            padding: 8px 12px;
             border: 1px solid var(--border-inner);
-            border-radius: 16px;
+            border-radius: 8px;
             background: var(--bg-input);
-            font-size: 16px;
+            font-size: 14px;
             color: var(--text-primary);
             outline: none;
             transition: all 0.2s ease;
@@ -388,7 +388,7 @@ def get_html_template() -> str:
         }
 
         textarea {
-            min-height: 100px;
+            min-height: 60px;
             resize: vertical;
         }
 
@@ -396,17 +396,17 @@ def get_html_template() -> str:
         .radio-group {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 6px;
         }
 
         .checkbox-item,
         .radio-item {
             display: flex;
             align-items: center;
-            padding: 14px 18px;
+            padding: 8px 12px;
             background: var(--bg-input);
             border: 1px solid var(--border-inner);
-            border-radius: 16px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
             box-shadow: var(--shadow-inset);
@@ -424,9 +424,9 @@ def get_html_template() -> str:
 
         .checkbox-item input,
         .radio-item input {
-            width: 20px;
-            height: 20px;
-            margin-right: 12px;
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
             cursor: pointer;
             accent-color: var(--button-primary);
         }
@@ -435,17 +435,17 @@ def get_html_template() -> str:
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 18px;
+            padding: 6px 12px;
             background: var(--bg-input);
             border: 1px solid var(--border-inner);
-            border-radius: 16px;
+            border-radius: 8px;
             box-shadow: var(--shadow-inset);
         }
 
         .switch {
             position: relative;
-            width: 52px;
-            height: 32px;
+            width: 40px;
+            height: 24px;
             flex-shrink: 0;
         }
 
@@ -464,14 +464,14 @@ def get_html_template() -> str:
             bottom: 0;
             background-color: #D1D1D6;
             transition: 0.3s;
-            border-radius: 16px;
+            border-radius: 12px;
         }
 
         .switch-slider:before {
             position: absolute;
             content: "";
-            height: 28px;
-            width: 28px;
+            height: 20px;
+            width: 20px;
             left: 2px;
             bottom: 2px;
             background-color: white;
@@ -485,34 +485,34 @@ def get_html_template() -> str:
         }
 
         .switch input:checked + .switch-slider:before {
-            transform: translateX(20px);
+            transform: translateX(16px);
         }
 
         .switch:active .switch-slider:before {
-            width: 32px;
+            width: 24px;
         }
 
         .nested-object {
             background: rgba(243, 244, 246, 0.3);
-            border-radius: 24px;
-            padding: 24px;
-            margin-top: 12px;
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 6px;
             border: 1px solid var(--border-inner);
         }
 
         .dict-container {
             background: var(--bg-input);
             border: 1px solid var(--border-inner);
-            border-radius: 20px;
-            padding: 20px;
+            border-radius: 10px;
+            padding: 10px;
         }
 
         .dict-item {
             background: var(--bg-glass);
             border: 1px solid var(--border-inner);
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 12px;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
             box-shadow: var(--shadow-inset);
         }
 
@@ -522,14 +522,14 @@ def get_html_template() -> str:
 
         .dict-key-input {
             width: 100%;
-            padding: 10px 14px;
+            padding: 6px 10px;
             border: 1px solid var(--border-inner);
-            border-radius: 12px;
+            border-radius: 6px;
             background: var(--bg-primary);
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text-primary);
             outline: none;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
             box-shadow: var(--shadow-inset);
         }
 
@@ -540,15 +540,15 @@ def get_html_template() -> str:
 
         .dict-controls {
             display: flex;
-            gap: 12px;
-            margin-top: 16px;
+            gap: 8px;
+            margin-top: 8px;
         }
 
         .dict-item-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 6px;
         }
 
         .dict-item-remove {
@@ -559,9 +559,9 @@ def get_html_template() -> str:
         .array-item {
             background: var(--bg-input);
             border: 1px solid var(--border-inner);
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 16px;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
             box-shadow: var(--shadow-inset);
         }
 
@@ -571,16 +571,16 @@ def get_html_template() -> str:
 
         .array-controls {
             display: flex;
-            gap: 12px;
-            margin-top: 16px;
+            gap: 8px;
+            margin-top: 8px;
         }
 
         .btn {
-            padding: 14px 28px;
+            padding: 8px 16px;
             border: none;
-            border-radius: 16px;
+            border-radius: 8px;
             font-weight: 600;
-            font-size: 16px;
+            font-size: 13px;
             cursor: pointer;
             transition: all 0.2s ease;
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
@@ -620,31 +620,31 @@ def get_html_template() -> str:
         }
 
         .btn-sm {
-            padding: 10px 20px;
-            font-size: 14px;
-            border-radius: 12px;
+            padding: 5px 12px;
+            font-size: 12px;
+            border-radius: 6px;
         }
 
         .btn-icon {
-            width: 36px;
-            height: 36px;
+            width: 26px;
+            height: 26px;
             padding: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            border-radius: 12px;
+            border-radius: 6px;
         }
 
         .form-actions {
-            margin-top: 40px;
+            margin-top: 16px;
             display: flex;
-            gap: 16px;
+            gap: 10px;
         }
 
         .field-error {
             color: var(--error);
-            font-size: 13px;
-            margin-top: 6px;
+            font-size: 11px;
+            margin-top: 4px;
             display: none;
         }
 
