@@ -371,10 +371,13 @@ def _get_resolved_model_config(
     resolved_config = group_config.copy()
 
     # 覆盖策略：
-    # - 废弃的顶层配置键（platform, model, cheap_*, smart_* 等）已移除支持
+    # - 保留顶层配置键（platform, model, max_input_token_count）用于直接配置
     # - 必须通过 llms + llm_groups 配置模型
-    # - 仅保留 llm_config 相关键的回退处理（用于 llm_groups 展开后的内部配置）
+    # - 保留 llm_config 相关键的回退处理（用于 llm_groups 展开后的内部配置）
     override_keys = [
+        "platform",
+        "model",
+        "max_input_token_count",
         "web_platform",
         "web_model",
         "web_max_input_token_count",
