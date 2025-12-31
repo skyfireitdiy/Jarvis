@@ -1154,11 +1154,11 @@ def _interactive_config_setup(config_file_path: Path) -> None:
         PrettyOutput.auto_print("❌ 测试失败")
 
     # 5. 询问最大输入 token 数量
-    max_input_token_count = 32000
+    max_input_token_count = 128000
     try:
         max_input_token_str = get_input(
-            "请输入最大输入 token 数量（留空使用默认: 32000）:",
-            default="32000",
+            "请输入最大输入 token 数量（留空使用默认: 128000）:",
+            default="128000",
         )
         if max_input_token_str and max_input_token_str.strip():
             max_input_token_count = int(max_input_token_str.strip())
@@ -1500,6 +1500,27 @@ def _collect_ui_experience_config(config_data: Dict[str, Any], ask_all: bool) ->
             config_data["diff_visualization_mode"] = selected_mode
             changed = True
 
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "diff_show_line_numbers",
+            "是否在 diff 中显示行号？",
+            True,
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_int(
+            config_data,
+            ask_all,
+            "diff_large_file_threshold",
+            "大文件阈值（超过此行数只显示统计）",
+            300,
+        )
+        or changed
+    )
+
     return changed
 
 
@@ -1747,6 +1768,16 @@ def _collect_advanced_config(config_data: Dict[str, Any], ask_all: bool) -> bool
         )
         or changed
     )
+    changed = (
+        _ask_config_bool(
+            config_data,
+            ask_all,
+            "enable_memory_organizer",
+            "是否启用自动记忆整理功能？在任务完成后自动检测记忆库状态，当记忆数量超过200条且存在重叠时提示用户整理",
+            False,
+        )
+        or changed
+    )
     return changed
 
 
@@ -1964,6 +1995,25 @@ def _collect_central_repo_config(config_data: Dict[str, Any], ask_all: bool) -> 
             "central_tool_repo",
             "请输入中心工具仓库路径或Git地址（可留空跳过）：",
             "",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_str(
+            config_data,
+            ask_all,
+            "central_rules_repo",
+            "请输入中心规则仓库路径或Git地址（可留空跳过）：",
+            "",
+        )
+        or changed
+    )
+    changed = (
+        _ask_config_list(
+            config_data,
+            ask_all,
+            "rules_load_dirs",
+            "指定规则加载目录（逗号分隔，留空跳过）：",
         )
         or changed
     )
