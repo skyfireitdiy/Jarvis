@@ -740,9 +740,9 @@ def run_cli(
     if handle_interactive_config_option(interactive_config, config_file):
         return
 
-    # 预加载配置（仅用于读取功能开关），不会显示欢迎信息或影响后续 init_env
-    preload_config_for_flags(config_file)
     # Web 模式后台管理：支持 --web 后台启动与 --web --stop 停止
+    # 预加载配置（仅用于读取功能开关），需在所有早期 return 处理后执行，避免触发配置文件写入
+    preload_config_for_flags(config_file)
     if web:
         # PID 文件路径（按端口区分，便于多实例）
         pidfile = Path(os.path.expanduser("~/.jarvis")) / f"jarvis_web_{web_port}.pid"
