@@ -588,9 +588,9 @@ class SchemaParser:
                 elif target_type == "integer":
                     return int(value)
                 elif target_type == "boolean":
-                    if value.lower() in ("true", "1", "yes"):
+                    if value.lower() in ("true", "1", "yes", "on"):
                         return True
-                    elif value.lower() in ("false", "0", "no"):
+                    elif value.lower() in ("false", "0", "no", "off"):
                         return False
                 elif target_type == "string":
                     return str(value)
