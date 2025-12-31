@@ -154,6 +154,11 @@ class SchemaParser:
         """
         errors: List[ValidationError] = []
         self._validate_against_schema(config, self.schema, "", errors)
+
+        # 如果验证通过，进行类型转换
+        if not errors:
+            self._convert_types(config, self.schema, "")
+
         return errors
 
     def _validate_against_schema(
@@ -445,3 +450,171 @@ class SchemaParser:
                 errors.append(
                     ValidationError(f"Additional property '{field}' not allowed", path)
                 )
+
+    def _convert_types(self, value: Any, schema: Dict[str, Any], path: str) -> None:
+        """根据 Schema 转换值的类型
+
+        Args:
+            value: 要转换的值（会被就地修改）
+            schema: Schema 定义
+            path: 当前路径
+        """
+        import sys
+
+        # 调试信息：打印转换路径和类型
+        # print(f"[DEBUG TYPE] Converting path: {path}, value type: {type(value).__name__}, schema type: {schema.get('type', 'N/A')}", file=sys.stderr)
+        # 处理 oneOf/anyOf：找到匹配的 schema 并转换
+        if "oneOf" in schema:
+            for sub_schema in schema["oneOf"]:
+                sub_errors: List[ValidationError] = []
+                self._validate_against_schema(value, sub_schema, path, sub_errors)
+                if not sub_errors:
+                    self._convert_types(value, sub_schema, path)
+                    return
+            return
+
+        if "anyOf" in schema:
+            for sub_schema in schema["anyOf"]:
+                sub_errors: List[ValidationError] = []
+                self._validate_against_schema(value, sub_schema, path, sub_errors)
+                if not sub_errors:
+                    self._convert_types(value, sub_schema, path)
+                    return
+            return
+
+        # 转换基本类型
+        if "type" in schema:
+            expected_type = schema["type"]
+            if isinstance(expected_type, list):
+                # 对于多类型，尝试第一个匹配的类型
+                for t in expected_type:
+                    converted = self._try_convert(value, t)
+                    if converted is not None:
+                        # 注意：这里无法直接修改外层的 value 引用
+                        # 所以需要特殊处理对象和数组的情况
+                        pass
+            else:
+                converted = self._try_convert(value, expected_type)
+                if converted is not None and converted is not value:
+                    # 注意：基本类型无法就地修改，需要在调用层处理
+                    pass
+
+        # 递归处理数组和对象
+        if isinstance(value, list) and "items" in schema:
+            item_schema = schema["items"]
+            for i, item in enumerate(value):
+                # 转换数组元素
+                converted = self._try_convert(item, item_schema.get("type"))
+                if converted is not None and converted is not item:
+                    value[i] = converted
+                    item = converted
+                # 递归处理嵌套结构
+                self._convert_types(item, item_schema, f"{path}[{i}]")
+
+        if isinstance(value, dict):
+            # 处理直接定义的 properties
+            if "properties" in schema:
+                properties = schema["properties"]
+                for field, field_value in value.items():
+                    if field in properties:
+                        field_path = f"{path}.{field}" if path else field
+                        # 转换字段值
+                        converted = self._try_convert(
+                            field_value, properties[field].get("type")
+                        )
+                        if converted is not None and converted is not field_value:
+                            value[field] = converted
+                            field_value = converted
+                        # 递归处理嵌套结构
+                        self._convert_types(field_value, properties[field], field_path)
+            # 处理 additionalProperties
+            elif "additionalProperties" in schema:
+                additional_schema = schema["additionalProperties"]
+                if isinstance(additional_schema, dict):
+                    for field, field_value in value.items():
+                        field_path = f"{path}.{field}" if path else field
+                        # 转换字段值
+                        converted = self._try_convert(
+                            field_value, additional_schema.get("type")
+                        )
+                        if converted is not None and converted is not field_value:
+                            import sys
+
+                            print(
+                                f"[DEBUG TYPE] Converted {field_path}: {type(field_value).__name__} -> {type(converted).__name__}, value: {field_value} -> {converted}",
+                                file=sys.stderr,
+                            )
+                            value[field] = converted
+                            field_value = converted
+                        # 递归处理嵌套结构
+                        self._convert_types(field_value, additional_schema, field_path)
+
+    def _try_convert(self, value: Any, target_type: str) -> Any:
+        """尝试将值转换为目标类型
+
+        Args:
+            value: 要转换的值
+            target_type: 目标类型（string, number, integer, boolean）
+
+        Returns:
+            转换后的值，如果无法转换则返回 None
+        """
+        if value is None:
+            return None
+
+        # 已经是正确类型，直接返回
+        if target_type == "string" and isinstance(value, str):
+            return None
+        if target_type == "number" and isinstance(value, (int, float)):
+            return None
+        if (
+            target_type == "integer"
+            and isinstance(value, int)
+            and not isinstance(value, bool)
+        ):
+            return None
+        if target_type == "boolean" and isinstance(value, bool):
+            return None
+
+        # 尝试从字符串转换
+        if isinstance(value, str):
+            try:
+                if target_type == "number":
+                    # 先尝试转整数，再尝试浮点数
+                    if "." in value or "e" in value.lower():
+                        return float(value)
+                    else:
+                        return int(value)
+                elif target_type == "integer":
+                    return int(value)
+                elif target_type == "boolean":
+                    if value.lower() in ("true", "1", "yes"):
+                        return True
+                    elif value.lower() in ("false", "0", "no"):
+                        return False
+                elif target_type == "string":
+                    return str(value)
+            except (ValueError, TypeError):
+                pass
+
+        # 尝试从数字转换
+        if isinstance(value, (int, float)):
+            if target_type == "string":
+                return str(value)
+            elif (
+                target_type == "integer"
+                and isinstance(value, float)
+                and value.is_integer()
+            ):
+                return int(value)
+            elif target_type == "boolean":
+                return bool(value)
+
+        # 尝试从布尔值转换
+        if isinstance(value, bool):
+            if target_type == "string":
+                return "true" if value else "false"
+            elif target_type in ("number", "integer"):
+                return 1 if value else 0
+
+        return None
