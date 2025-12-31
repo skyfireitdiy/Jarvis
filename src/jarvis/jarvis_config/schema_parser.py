@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, cast
 
+from jarvis.jarvis_utils.output.PrettyOutput import auto_print
+
 
 class ValidationError(Exception):
     """Schema 验证错误"""
@@ -459,8 +461,6 @@ class SchemaParser:
             schema: Schema 定义
             path: 当前路径
         """
-        import sys
-
         # 调试信息：打印转换路径和类型
         # print(f"[DEBUG TYPE] Converting path: {path}, value type: {type(value).__name__}, schema type: {schema.get('type', 'N/A')}", file=sys.stderr)
         # 处理 oneOf/anyOf：找到匹配的 schema 并转换
@@ -538,11 +538,9 @@ class SchemaParser:
                             field_value, additional_schema.get("type")
                         )
                         if converted is not None and converted is not field_value:
-                            import sys
-
-                            print(
-                                f"[DEBUG TYPE] Converted {field_path}: {type(field_value).__name__} -> {type(converted).__name__}, value: {field_value} -> {converted}",
-                                file=sys.stderr,
+                            auto_print(
+                                f"🔍 [DEBUG TYPE] Converted {field_path}: {type(field_value).__name__} -> {type(converted).__name__}, value: {field_value} -> {converted}",
+                                timestamp=False,
                             )
                             value[field] = converted
                             field_value = converted
