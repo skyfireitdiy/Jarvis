@@ -1080,14 +1080,31 @@ def get_html_template() -> str:
             } else {
                 // 添加新条目，创建键名输入框和值字段
                 fieldHTML = '<input type="text" class="dict-key-input" placeholder="输入键名..." onchange="updateDictKey(\'' + path + '\', \'' + itemId + '\', this.value)">';
-                // 对于简单类型，直接创建输入框
-                const fieldPath = path + '[' + key + ']';
-                if (schema.type === 'boolean') {
-                    fieldHTML += createSwitchHTML(fieldPath, schema.default);
-                } else if (schema.type === 'number' || schema.type === 'integer') {
-                    fieldHTML += createNumberInputHTML(fieldPath, schema, schema.default);
+                
+                // 根据值类型创建不同的字段
+                if (schema.type === 'object' && schema.properties) {
+                    // 对象类型：遍历所有属性
+                    const valuePath = [path + '[new]'];
+                    for (const propName in schema.properties || {}) {
+                        const propSchema = schema.properties[propName];
+                        const propMeta = {
+                            default: propSchema.default,
+                            description: propSchema.description,
+                            enum: propSchema.enum
+                        };
+                        const propRequired = (schema.required || []).includes(propName);
+                        fieldHTML += createFieldHTML(propName, propSchema, propMeta, propRequired, valuePath);
+                    }
                 } else {
-                    fieldHTML += createTextInputHTML(fieldPath, schema, schema.default || '');
+                    // 简单类型：直接创建输入框
+                    const fieldPath = path + '[' + key + ']';
+                    if (schema.type === 'boolean') {
+                        fieldHTML += createSwitchHTML(fieldPath, schema.default);
+                    } else if (schema.type === 'number' || schema.type === 'integer') {
+                        fieldHTML += createNumberInputHTML(fieldPath, schema, schema.default);
+                    } else {
+                        fieldHTML += createTextInputHTML(fieldPath, schema, schema.default || '');
+                    }
                 }
                 fieldHTML += '<button type="button" class="btn btn-danger btn-sm btn-icon dict-item-remove" onclick="removeDictItem(\'' + path + '\', \'' + itemId + '\')" style="margin-top: 12px;">×</button>';
             }
@@ -1111,16 +1128,18 @@ def get_html_template() -> str:
             const item = container.querySelector('[data-id="' + itemId + '"]');
             if (!item) return;
 
-            // 更新值字段的 name 属性
-            const valueField = item.querySelector('[name]');
-            if (valueField && newKey) {
-                const oldName = valueField.getAttribute('name');
-                const match = oldName.match(/^(.*)\[.*\](.*)$/);
-                if (match) {
-                    const prefix = match[1];
-                    const suffix = match[2];
-                    valueField.setAttribute('name', prefix + '[' + newKey + ']' + suffix);
-                }
+            // 更新所有值字段的 name 属性
+            const valueFields = item.querySelectorAll('[name]');
+            if (newKey) {
+                valueFields.forEach(function(valueField) {
+                    const oldName = valueField.getAttribute('name');
+                    const match = oldName.match(/^(.*)\[.*\](.*)$/);
+                    if (match) {
+                        const prefix = match[1];
+                        const suffix = match[2];
+                        valueField.setAttribute('name', prefix + '[' + newKey + ']' + suffix);
+                    }
+                });
             }
         }
 
