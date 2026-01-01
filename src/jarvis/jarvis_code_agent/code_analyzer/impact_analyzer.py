@@ -15,6 +15,8 @@ from typing import List
 from typing import Optional
 from typing import Set
 
+from jarvis.jarvis_utils.utils import decode_output
+
 from .context_manager import ContextManager
 from .file_ignore import filter_walk_dirs
 from .symbol_extractor import Symbol
@@ -723,10 +725,11 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
                 ["git", "rev-parse", "HEAD"],
                 cwd=project_root,
                 capture_output=True,
-                text=True,
+                text=False,
                 check=False,
             )
-            head_exists = result.returncode == 0 and result.stdout.strip()
+            stdout = decode_output(result.stdout)
+            head_exists = result.returncode == 0 and stdout.strip()
         except Exception:
             head_exists = False
 
@@ -746,16 +749,15 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
                 cmd,
                 cwd=project_root,
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                text=False,
                 check=False,
             )
+            diff_stdout = decode_output(result.stdout)
 
-            if result.returncode != 0 or not result.stdout:
+            if result.returncode != 0 or not diff_stdout:
                 return edits
 
-            diff_text = result.stdout
+            diff_text = diff_stdout
 
             # 解析diff文本
             lines = diff_text.split("\n")

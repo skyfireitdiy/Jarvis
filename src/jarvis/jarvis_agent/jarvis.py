@@ -35,6 +35,7 @@ from jarvis.jarvis_utils.fzf import fzf_select
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import init_env
 
 
@@ -286,10 +287,10 @@ def try_switch_to_jca_if_git_repo(
             res = subprocess.run(
                 ["git", "rev-parse", "--show-toplevel"],
                 capture_output=True,
-                text=True,
+                text=False,
             )
             if res.returncode == 0:
-                git_root = res.stdout.strip()
+                git_root = decode_output(res.stdout).strip()
                 if git_root and os.path.isdir(git_root):
                     PrettyOutput.auto_print(f"ℹ️ 检测到当前位于 Git 仓库: {git_root}")
                     if user_confirm(
@@ -768,10 +769,10 @@ def run_cli(
                         res = subprocess.run(
                             ["lsof", "-iTCP:%d" % web_port, "-sTCP:LISTEN", "-t"],
                             capture_output=True,
-                            text=True,
+                            text=False,
                         )
-                        if res.returncode == 0 and res.stdout.strip():
-                            for ln in res.stdout.strip().splitlines():
+                        if res.returncode == 0 and decode_output(res.stdout).strip():
+                            for ln in decode_output(res.stdout).strip().splitlines():
                                 try:
                                     candidate_pid = int(ln.strip())
                                     try:
@@ -791,10 +792,10 @@ def run_cli(
                     if not killed_any:
                         try:
                             res2 = subprocess.run(
-                                ["ss", "-ltpn"], capture_output=True, text=True
+                                ["ss", "-ltpn"], capture_output=True, text=False
                             )
-                            if res2.returncode == 0 and res2.stdout:
-                                for ln in res2.stdout.splitlines():
+                            if res2.returncode == 0 and decode_output(res2.stdout):
+                                for ln in decode_output(res2.stdout).splitlines():
                                     if f":{web_port} " in ln or f":{web_port}\n" in ln:
                                         try:
                                             idx = ln.find("pid=")
@@ -876,10 +877,10 @@ def run_cli(
                         res = subprocess.run(
                             ["lsof", "-iTCP:%d" % web_port, "-sTCP:LISTEN", "-t"],
                             capture_output=True,
-                            text=True,
+                            text=False,
                         )
-                        if res.returncode == 0 and res.stdout.strip():
-                            for ln in res.stdout.strip().splitlines():
+                        if res.returncode == 0 and decode_output(res.stdout).strip():
+                            for ln in decode_output(res.stdout).strip().splitlines():
                                 try:
                                     candidate_pid = int(ln.strip())
                                     break
@@ -890,10 +891,10 @@ def run_cli(
                     if not candidate_pid:
                         try:
                             res2 = subprocess.run(
-                                ["ss", "-ltpn"], capture_output=True, text=True
+                                ["ss", "-ltpn"], capture_output=True, text=False
                             )
-                            if res2.returncode == 0 and res2.stdout:
-                                for ln in res2.stdout.splitlines():
+                            if res2.returncode == 0 and decode_output(res2.stdout):
+                                for ln in decode_output(res2.stdout).splitlines():
                                     if f":{web_port} " in ln or f":{web_port}\n" in ln:
                                         # 格式示例: LISTEN ... users:(("uvicorn",pid=12345,fd=7))
                                         try:

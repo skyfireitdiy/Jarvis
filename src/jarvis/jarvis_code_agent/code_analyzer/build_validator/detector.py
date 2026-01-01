@@ -9,6 +9,7 @@ import re
 import subprocess
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -40,14 +41,13 @@ class BuildSystemDetector:
                 ["loc"],
                 cwd=self.project_root,
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                text=False,
                 check=False,
             )
+            stdout = decode_output(result.stdout)
 
-            if result.returncode == 0 and result.stdout:
-                return result.stdout.strip()
+            if result.returncode == 0 and stdout:
+                return stdout.strip()
             else:
                 return ""
         except FileNotFoundError:
@@ -76,15 +76,16 @@ class BuildSystemDetector:
                 ["git", "rev-parse", "--show-toplevel"],
                 cwd=self.project_root,
                 capture_output=True,
-                text=True,
+                text=False,
                 check=False,
             )
+            git_root_stdout = decode_output(git_root_result.stdout)
 
             if git_root_result.returncode != 0:
                 # 如果不是git仓库，尝试直接读取当前目录
                 git_root = self.project_root
             else:
-                git_root = git_root_result.stdout.strip()
+                git_root = git_root_stdout.strip()
 
             # 列出git根目录下的文件
             file_list: List[str] = []
@@ -94,12 +95,13 @@ class BuildSystemDetector:
                 ["git", "ls-files"],
                 cwd=git_root,
                 capture_output=True,
-                text=True,
+                text=False,
                 check=False,
             )
+            ls_files_stdout = decode_output(result.stdout)
 
             if result.returncode == 0:
-                files = result.stdout.strip().split("\n")
+                files = ls_files_stdout.strip().split("\n")
                 # 只取根目录下的文件（不包含子目录）
                 for file_path in files:
                     if not file_path.strip():

@@ -16,6 +16,8 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+from jarvis.jarvis_utils.utils import decode_output
+
 
 class BuildSystem(Enum):
     """支持的构建系统类型"""
@@ -95,12 +97,10 @@ class BuildValidatorBase(ABC):
                 cwd=cwd,
                 timeout=timeout,
                 capture_output=capture_output,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                text=False,
             )
-            stdout = result.stdout if capture_output else ""
-            stderr = result.stderr if capture_output else ""
+            stdout = decode_output(result.stdout) if capture_output else ""
+            stderr = decode_output(result.stderr) if capture_output else ""
             return result.returncode, stdout, stderr
         except subprocess.TimeoutExpired:
             return -1, "", f"命令执行超时（{timeout}秒）"

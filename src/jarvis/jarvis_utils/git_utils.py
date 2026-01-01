@@ -28,8 +28,8 @@ from typing import Tuple
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.utils import is_rag_installed
 from jarvis.jarvis_utils.utils import decode_output
+from jarvis.jarvis_utils.utils import is_rag_installed
 
 
 def find_git_root_and_cd(start_dir: str = ".") -> str:
@@ -47,10 +47,10 @@ def find_git_root_and_cd(start_dir: str = ".") -> str:
         result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
             capture_output=True,
-            text=True,
+            text=False,
             check=True,
         )
-        git_root = result.stdout.strip()
+        git_root = decode_output(result.stdout).strip()
         if not git_root:
             subprocess.run(["git", "init"], check=True)
             git_root = os.path.abspath(".")
@@ -400,12 +400,14 @@ def handle_commit_workflow() -> bool:
 
         # 获取当前分支的提交总数
         commit_result = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD"], capture_output=True, text=True
+            ["git", "rev-list", "--count", "HEAD"],
+            capture_output=True,
+            text=False,
         )
         if commit_result.returncode != 0:
             return False
 
-        commit_count = int(commit_result.stdout.strip())
+        commit_count = int(decode_output(commit_result.stdout).strip())
 
         # 暂存所有修改
         subprocess.run(["git", "add", "."], check=True)
