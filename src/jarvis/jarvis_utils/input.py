@@ -49,6 +49,7 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.globals import get_message_history
 from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import decode_output
 
 # Sentinel value to indicate that Ctrl+O was pressed
 CTRL_O_SENTINEL = "__CTRL_O_PRESSED__"
@@ -406,11 +407,13 @@ class FileCompleter(Completer):
                         ["git", "ls-files"],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
+                        text=False,
                     )
                     if result.returncode == 0:
                         self._git_files_cache = [
-                            p for p in result.stdout.splitlines() if p.strip()
+                            p
+                            for p in decode_output(result.stdout).splitlines()
+                            if p.strip()
                         ]
                     else:
                         self._git_files_cache = []
@@ -1015,11 +1018,13 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             ["git", "ls-files"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            text=True,
+                            text=False,
                         )
                         if r.returncode == 0:
                             files = [
-                                line for line in r.stdout.splitlines() if line.strip()
+                                line
+                                for line in decode_output(r.stdout).splitlines()
+                                if line.strip()
                             ]
                     except Exception:
                         files = []
