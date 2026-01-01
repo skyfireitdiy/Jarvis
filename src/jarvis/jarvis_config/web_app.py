@@ -1042,14 +1042,14 @@ def get_html_template() -> str:
 
             const key = existingKey || '';
             let fieldHTML = '';
-            
+
             if (existingKey) {
                 // 编辑已有条目，创建键名显示和值字段
                 fieldHTML = '<div class="dict-item-header">';
                 fieldHTML += '<label>键名: ' + escapeHtml(String(existingKey)) + '</label>';
                 fieldHTML += '<button type="button" class="btn btn-danger btn-sm btn-icon dict-item-remove" onclick="removeDictItem(\'' + path + '\', \'' + itemId + '\')">×</button>';
                 fieldHTML += '</div>';
-                
+
                 // 根据值类型创建不同的字段
                 const valuePath = [path + '[' + existingKey + ']'];
                 if (schema.type === 'object' && schema.properties) {
@@ -1079,12 +1079,14 @@ def get_html_template() -> str:
                 }
             } else {
                 // 添加新条目，创建键名输入框和值字段
-                fieldHTML = '<input type="text" class="dict-key-input" placeholder="输入键名..." onchange="updateDictKey(\'' + path + '\', \'' + itemId + '\', this.value)">';
-                
+                // 使用特殊的 name 属性格式：path[__key__] 用于标识这是键名输入框
+                fieldHTML = '<input type="text" class="dict-key-input" name="' + path + '[__key__]' + '" placeholder="输入键名..." value="">';
+
                 // 根据值类型创建不同的字段
+                // 使用临时键名 __temp__，在收集数据时会根据实际的键名输入框的值来替换
                 if (schema.type === 'object' && schema.properties) {
                     // 对象类型：遍历所有属性
-                    const valuePath = [path + '[new]'];
+                    const valuePath = [path + '[__temp__]'];
                     for (const propName in schema.properties || {}) {
                         const propSchema = schema.properties[propName];
                         const propMeta = {
@@ -1097,7 +1099,7 @@ def get_html_template() -> str:
                     }
                 } else {
                     // 简单类型：直接创建输入框
-                    const fieldPath = path + '[' + key + ']';
+                    const fieldPath = path + '[__temp__]';
                     if (schema.type === 'boolean') {
                         fieldHTML += createSwitchHTML(fieldPath, schema.default);
                     } else if (schema.type === 'number' || schema.type === 'integer') {
@@ -1133,11 +1135,13 @@ def get_html_template() -> str:
             if (newKey) {
                 valueFields.forEach(function(valueField) {
                     const oldName = valueField.getAttribute('name');
-                    const match = oldName.match(/^(.*)\[.*\](.*)$/);
+                    // 匹配模式：path[__temp__] 或 path[__temp__].subfield 或 path[__temp__][subkey]
+                    // 需要替换 __temp__ 为实际的键名
+                    const tempKeyPattern = new RegExp('^' + escapeRegExp(path) + '\\[__temp__\\](.*)$');
+                    const match = oldName.match(tempKeyPattern);
                     if (match) {
-                        const prefix = match[1];
-                        const suffix = match[2];
-                        valueField.setAttribute('name', prefix + '[' + newKey + ']' + suffix);
+                        const suffix = match[1];
+                        valueField.setAttribute('name', path + '[' + newKey + ']' + suffix);
                     }
                 });
             }
@@ -1295,22 +1299,42 @@ def get_html_template() -> str:
 
         function collectFieldValue(name, prop, formData) {
             const type = prop.type;
-            
+
             // 先判断是否是字典类型（object 且有 additionalProperties 但没有 properties）
             if (type === 'object' && prop.additionalProperties && !prop.properties) {
                 const dict = {};
+                const tempData = {};  // 存储临时键名 __temp__ 的数据
                 const entries = formData.entries();
-                
+
                 for (const [key, value] of entries) {
                     const match = key.match(new RegExp('^' + escapeRegExp(name) + '\\[([^\\]]+)\\](.*)$'));
                     if (match) {
                         const dictKey = match[1];
                         const subPath = match[2];
-                        
+
+                        // 跳过 __key__ 键，它只是用于标识键名输入框
+                        if (dictKey === '__key__') {
+                            continue;
+                        }
+
+                        // 如果是 __temp__ 键，先存储到 tempData 中
+                        if (dictKey === '__temp__') {
+                            if (!tempData.__temp__) {
+                                tempData.__temp__ = subPath ? {} : value;
+                            }
+                            if (subPath) {
+                                setNestedValue(tempData.__temp__, subPath, value);
+                            } else {
+                                tempData.__temp__ = value;
+                            }
+                            continue;
+                        }
+
+                        // 正常的字典键
                         if (!dict[dictKey]) {
                             dict[dictKey] = subPath ? {} : value;
                         }
-                        
+
                         if (subPath) {
                             // 使用辅助函数处理深层嵌套路径
                             setNestedValue(dict[dictKey], subPath, value);
@@ -1319,7 +1343,31 @@ def get_html_template() -> str:
                         }
                     }
                 }
-                
+
+                // 处理临时键名 __temp__ 的数据
+                // 查找对应的键名输入框的值
+                if (tempData.__temp__ !== undefined) {
+                    // 遍历所有表单字段，查找 name[__key__] 的值
+                    for (const [key, value] of entries) {
+                        const keyMatch = key.match(new RegExp('^' + escapeRegExp(name) + '\\[__key__\\]$'));
+                        if (keyMatch && value && value.trim() !== '') {
+                            // 使用用户输入的实际键名
+                            const actualKey = value.trim();
+                            if (!dict[actualKey]) {
+                                dict[actualKey] = tempData.__temp__;
+                            } else {
+                                // 如果该键已存在，合并数据
+                                if (typeof dict[actualKey] === 'object' && typeof tempData.__temp__ === 'object') {
+                                    Object.assign(dict[actualKey], tempData.__temp__);
+                                } else {
+                                    dict[actualKey] = tempData.__temp__;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+
                 // 类型转换
                 const valueSchema = prop.additionalProperties || {};
                 if (valueSchema.type === 'number' || valueSchema.type === 'integer') {
@@ -1331,7 +1379,7 @@ def get_html_template() -> str:
                         dict[key] = dict[key] === 'true';
                     }
                 }
-                
+
                 return Object.keys(dict).length > 0 ? dict : prop.default || {};
             }
             
