@@ -1086,7 +1086,8 @@ def get_html_template() -> str:
             } else {
                 // 添加新条目，创建键名输入框和值字段
                 // 使用特殊的 name 属性格式：path[__key__] 用于标识这是键名输入框
-                fieldHTML = '<input type="text" class="dict-key-input" name="' + path + '[__key__]' + '" placeholder="输入键名..." value="">';
+                // 添加 oninput 事件，当用户输入键名时立即更新相关字段的 name 属性
+                fieldHTML = '<input type="text" class="dict-key-input" name="' + path + '[__key__]' + '" placeholder="输入键名..." value="" oninput="updateDictKey(\'' + path + '\', \'' + itemId + '\', this.value)">';
 
                 // 根据值类型创建不同的字段
                 // 使用临时键名 __temp__，在收集数据时会根据实际的键名输入框的值来替换
@@ -1136,20 +1137,29 @@ def get_html_template() -> str:
             const item = container.querySelector('[data-id="' + itemId + '"]');
             if (!item) return;
 
+            // 获取当前存储的键名，如果没有则默认为 __temp__
+            const currentKey = item.dataset.currentKey || '__temp__';
+            
             // 更新所有值字段的 name 属性
             const valueFields = item.querySelectorAll('[name]');
             if (newKey) {
                 valueFields.forEach(function(valueField) {
                     const oldName = valueField.getAttribute('name');
-                    // 匹配模式：path[__temp__] 或 path[__temp__].subfield 或 path[__temp__][subkey]
-                    // 需要替换 __temp__ 为实际的键名
-                    const tempKeyPattern = new RegExp('^' + escapeRegExp(path) + '\\[__temp__\\](.*)$');
-                    const match = oldName.match(tempKeyPattern);
+                    // 跳过键名输入框本身
+                    if (oldName === path + '[__key__]') {
+                        return;
+                    }
+                    // 匹配模式：path[currentKey] 或 path[currentKey].subfield 或 path[currentKey][subkey]
+                    // 使用当前存储的键名进行匹配
+                    const keyPattern = new RegExp('^' + escapeRegExp(path) + '\\[' + escapeRegExp(currentKey) + '\\](.*)$');
+                    const match = oldName.match(keyPattern);
                     if (match) {
                         const suffix = match[1];
                         valueField.setAttribute('name', path + '[' + newKey + ']' + suffix);
                     }
                 });
+                // 更新存储的当前键名
+                item.dataset.currentKey = newKey;
             }
         }
 
