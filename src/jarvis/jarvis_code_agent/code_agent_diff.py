@@ -13,6 +13,7 @@ from jarvis.jarvis_utils.config import get_diff_large_file_threshold
 from jarvis.jarvis_utils.config import get_diff_show_line_numbers
 from jarvis.jarvis_utils.config import get_diff_visualization_mode
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+from jarvis.jarvis_utils.utils import decode_output
 
 
 class DiffManager:
@@ -39,11 +40,10 @@ class DiffManager:
             res = subprocess.run(
                 cmd,
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                text=False,
                 check=False,
             )
+            stdout = decode_output(res.stdout) if res.stdout else ""
         finally:
             subprocess.run(
                 ["git", "reset"],
@@ -52,8 +52,8 @@ class DiffManager:
                 stderr=subprocess.DEVNULL,
             )
 
-        if res.returncode == 0 and res.stdout:
-            for line in res.stdout.splitlines():
+        if res.returncode == 0 and stdout:
+            for line in stdout.splitlines():
                 if not line.strip():
                     continue
                 parts = line.split("\t")
@@ -91,13 +91,12 @@ class DiffManager:
             res = subprocess.run(
                 cmd,
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                text=False,
                 check=False,
             )
+            stdout = decode_output(res.stdout) if res.stdout else ""
             if res.returncode == 0:
-                return res.stdout or ""
+                return stdout
             return ""
         finally:
             subprocess.run(
@@ -159,13 +158,12 @@ class DiffManager:
                 res = subprocess.run(
                     cmd,
                     capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
+                    text=False,
                     check=False,
                 )
-                if res.returncode == 0 and res.stdout:
-                    for line in res.stdout.splitlines():
+                stdout = decode_output(res.stdout) if res.stdout else ""
+                if res.returncode == 0 and stdout:
+                    for line in stdout.splitlines():
                         parts = line.strip().split("\t")
                         if len(parts) >= 3:
                             add_s, del_s = parts[0], parts[1]

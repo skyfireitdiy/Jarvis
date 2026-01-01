@@ -12,6 +12,7 @@ from prompt_toolkit import prompt
 from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 
 
 def parse_selection(selection_str: str, max_value: int) -> list[int]:
@@ -101,20 +102,20 @@ class ShareManager(ABC):
                     ["git", "ls-remote", "--heads", "origin"],
                     cwd=self.repo_path,
                     capture_output=True,
-                    text=True,
+                    text=False,
                     check=True,
                 )
                 # 如果有远程分支，执行pull
-                if result.stdout.strip():
+                if decode_output(result.stdout).strip():
                     # 检查是否有未提交的更改
                     status_result = subprocess.run(
                         ["git", "status", "--porcelain"],
                         cwd=self.repo_path,
                         capture_output=True,
-                        text=True,
+                        text=False,
                         check=True,
                     )
-                    if status_result.stdout:
+                    if decode_output(status_result.stdout):
                         if user_confirm(
                             f"检测到中心{self.get_resource_type()}仓库 '{self.repo_name}' 存在未提交的更改，是否放弃这些更改并更新？"
                         ):

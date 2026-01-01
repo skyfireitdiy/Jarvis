@@ -11,7 +11,7 @@ from typing import List
 from typing import Optional
 
 from jarvis.jarvis_utils.git_utils import get_recent_commits_with_files
-from jarvis.jarvis_utils.utils import get_loc_stats
+from jarvis.jarvis_utils.utils import decode_output, get_loc_stats
 
 
 def get_git_tracked_files_info(
@@ -33,19 +33,16 @@ def get_git_tracked_files_info(
         result = subprocess.run(
             ["git", "ls-files"],
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+            text=False,
             check=True,
             cwd=project_root,
         )
+        stdout = decode_output(result.stdout)
 
-        if result.returncode != 0 or not result.stdout.strip():
+        if result.returncode != 0 or not stdout.strip():
             return None
 
-        files = [
-            line.strip() for line in result.stdout.strip().splitlines() if line.strip()
-        ]
+        files = [line.strip() for line in stdout.strip().splitlines() if line.strip()]
         file_count = len(files)
 
         if file_count == 0:

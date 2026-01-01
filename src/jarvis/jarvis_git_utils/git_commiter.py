@@ -21,6 +21,7 @@ from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.utils import is_context_overflow
 
@@ -117,9 +118,10 @@ class GitCommitTool:
             # 获取文件列表
             files_cmd = ["git", "diff", "--cached", "--name-only"]
             process = subprocess.Popen(
-                files_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                files_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=False
             )
-            files_output = process.communicate()[0]
+            stdout_bytes, _ = process.communicate()
+            files_output = decode_output(stdout_bytes)
             files = [f.strip() for f in files_output.split("\n") if f.strip()]
             file_count = len(files)
 
@@ -128,9 +130,10 @@ class GitCommitTool:
                 ["git", "diff", "--cached", "--exit-code"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
+                text=False,
             )
-            diff = process.communicate()[0]
+            diff_bytes, _ = process.communicate()
+            diff = decode_output(diff_bytes)
 
             try:
                 temp_diff_file_path = None
@@ -321,9 +324,10 @@ commit信息
                         commit_cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        text=True,
+                        text=False,
                     )
-                    stdout, stderr = process.communicate()
+                    stdout_bytes, stderr_bytes = process.communicate()
+                    _, stderr = decode_output(stdout_bytes), decode_output(stderr_bytes)
 
                     if process.returncode != 0:
                         # 如果提交失败，重置暂存区

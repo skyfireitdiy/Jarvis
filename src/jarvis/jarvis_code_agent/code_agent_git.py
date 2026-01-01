@@ -4,6 +4,7 @@ import os
 import subprocess
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 
 # -*- coding: utf-8 -*-
 import sys
@@ -35,19 +36,19 @@ class GitManager:
             result = subprocess.run(
                 ["git", "config", "--get", "user.name"],
                 capture_output=True,
-                text=True,
+                text=False,
                 check=False,
             )
-            username = result.stdout.strip()
+            username = decode_output(result.stdout).strip()
 
             # 检查 git user.email
             result = subprocess.run(
                 ["git", "config", "--get", "user.email"],
                 capture_output=True,
-                text=True,
+                text=False,
                 check=False,
             )
-            email = result.stdout.strip()
+            email = decode_output(result.stdout).strip()
 
             # 如果任一配置未设置，提示并退出
             if not username or not email:
@@ -271,10 +272,10 @@ class GitManager:
             result = subprocess.run(
                 ["git", "config", "--get", key],
                 capture_output=True,
-                text=True,
+                text=False,
                 check=False,
             )
-            current_value = result.stdout.strip()
+            current_value = decode_output(result.stdout).strip()
             current_settings[key] = current_value
             if current_value != target_value:
                 need_change = True
@@ -396,13 +397,12 @@ class GitManager:
                 diff_result = subprocess.run(
                     ["git", "diff", "HEAD", "--shortstat"],
                     capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
+                    text=False,
                     check=True,
                 )
-                if diff_result.returncode == 0 and diff_result.stdout:
-                    self.record_code_changes_stats(diff_result.stdout)
+                diff_stdout = decode_output(diff_result.stdout)
+                if diff_result.returncode == 0 and diff_stdout:
+                    self.record_code_changes_stats(diff_stdout)
             except subprocess.CalledProcessError:
                 pass
 
@@ -423,13 +423,11 @@ class GitManager:
                     commit_result = subprocess.run(
                         ["git", "rev-list", "--count", "HEAD"],
                         capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
+                        text=False,
                         check=False,
                     )
                     if commit_result.returncode == 0:
-                        out = commit_result.stdout.strip()
+                        out = decode_output(commit_result.stdout).strip()
                         if out.isdigit():
                             commit_count = int(out)
                 except Exception:

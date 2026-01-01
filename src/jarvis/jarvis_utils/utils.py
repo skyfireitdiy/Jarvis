@@ -35,9 +35,11 @@ from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.output import PrettyOutput
 
+
 # 向后兼容：导出 get_yes_no 供外部模块引用（延迟导入以避免循环依赖）
 def get_yes_no(*args, **kwargs):
     from jarvis.jarvis_utils.input import user_confirm
+
     return user_confirm(*args, **kwargs)
 
 
@@ -50,21 +52,21 @@ def decode_output(data: bytes) -> str:
     Returns:
         解码后的字符串
     """
-    # 优先尝试 UTF-8
+    # 优先尝试 UTF-8（严格模式，失败时回退到其他编码）
     try:
-        return data.decode("utf-8", errors="replace")
+        return data.decode("utf-8")
     except (UnicodeDecodeError, AttributeError):
         pass
 
     # 回退到 GBK（Windows 常用编码）
     try:
-        return data.decode("gbk", errors="replace")
+        return data.decode("gbk")
     except (UnicodeDecodeError, AttributeError):
         pass
 
     # 最后尝试 latin-1（不会失败，但可能有乱码）
     try:
-        return data.decode("latin-1", errors="replace")
+        return data.decode("latin-1")
     except AttributeError:
         # 如果不是字节类型，转换为字符串
         return str(data)
@@ -1013,6 +1015,7 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
                 "⚠️ 检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。"
             )
             from jarvis.jarvis_utils.input import user_confirm
+
             if not user_confirm("是否仍要继续启动 Jarvis？", default=False):
                 PrettyOutput.auto_print("ℹ️ 已取消启动以避免终端嵌套。")
                 sys.exit(0)
@@ -2402,6 +2405,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
         )
         if decode_output(status_result.stdout):
             from jarvis.jarvis_utils.input import user_confirm
+
             if user_confirm(
                 f"检测到 '{repo_path.name}' 存在未提交的更改，是否放弃这些更改并更新？"
             ):

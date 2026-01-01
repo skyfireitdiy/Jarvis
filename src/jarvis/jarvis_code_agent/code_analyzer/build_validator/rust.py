@@ -9,6 +9,7 @@ import subprocess
 import time
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -51,14 +52,12 @@ class RustBuildValidator(BuildValidatorBase):
                 cwd=self.project_root,
                 timeout=self.timeout,
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                text=False,
                 env=env,
             )
             returncode = result.returncode
-            stdout = result.stdout
-            stderr = result.stderr
+            stdout = decode_output(result.stdout)
+            stderr = decode_output(result.stderr)
         except subprocess.TimeoutExpired:
             returncode = -1
             stdout = ""

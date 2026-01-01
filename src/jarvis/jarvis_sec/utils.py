@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 
 from jarvis.jarvis_sec.workflow import direct_scan
 
@@ -25,17 +26,19 @@ def git_restore_if_dirty(repo_root: str) -> int:
             ["git", "status", "--porcelain"],
             cwd=str(root),
             capture_output=True,
-            text=True,
+            text=False,
         )
         if proc.returncode != 0:
             return 0
-        lines = [line for line in proc.stdout.splitlines() if line.strip()]
+        lines = [
+            line for line in decode_output(proc.stdout).splitlines() if line.strip()
+        ]
         if lines:
             _sub.run(
                 ["git", "checkout", "--", "."],
                 cwd=str(root),
                 capture_output=True,
-                text=True,
+                text=False,
             )
             return len(lines)
     except Exception:
