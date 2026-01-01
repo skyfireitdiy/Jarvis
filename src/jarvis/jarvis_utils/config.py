@@ -564,12 +564,6 @@ def get_pretty_output() -> bool:
     返回：
         bool: 如果启用PrettyOutput则返回True，默认为True
     """
-    import platform
-
-    # Windows系统强制设置为False
-    if platform.system() == "Windows":
-        return False
-
     return cast(bool, GLOBAL_CONFIG_DATA.get("pretty_output", True))
 
 
