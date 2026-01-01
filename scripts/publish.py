@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 from typing import Tuple, List
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 
 
 def get_current_version() -> Tuple[int, int, int]:
@@ -71,13 +72,10 @@ def run_command(cmd: List[str], error_msg: str) -> None:
             cmd,
             check=True,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
         )
     except subprocess.CalledProcessError as e:
         PrettyOutput.auto_print(f"❌ Error: {error_msg}")
-        PrettyOutput.auto_print(f"❌ Stderr: {e.stderr}")
+        PrettyOutput.auto_print(f"❌ Stderr: {decode_output(e.stderr)}")
         sys.exit(1)
 
 

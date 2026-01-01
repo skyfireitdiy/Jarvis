@@ -39,6 +39,36 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # 向后兼容：导出 get_yes_no 供外部模块引用
 get_yes_no = user_confirm
 
+
+def decode_output(data: bytes) -> str:
+    """解码命令输出，自动尝试 UTF-8 和 GBK 编码
+
+    Args:
+        data: 字节类型的输出数据
+
+    Returns:
+        解码后的字符串
+    """
+    # 优先尝试 UTF-8
+    try:
+        return data.decode("utf-8", errors="replace")
+    except (UnicodeDecodeError, AttributeError):
+        pass
+
+    # 回退到 GBK（Windows 常用编码）
+    try:
+        return data.decode("gbk", errors="replace")
+    except (UnicodeDecodeError, AttributeError):
+        pass
+
+    # 最后尝试 latin-1（不会失败，但可能有乱码）
+    try:
+        return data.decode("latin-1", errors="replace")
+    except AttributeError:
+        # 如果不是字节类型，转换为字符串
+        return str(data)
+
+
 g_config_file: Optional[str] = None
 
 COMMAND_MAPPING = {
@@ -450,9 +480,6 @@ def _check_pip_updates() -> bool:
                 result = subprocess.run(
                     cmd_list,
                     capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
                     timeout=600,
                 )
                 if result.returncode == 0:
@@ -461,7 +488,11 @@ def _check_pip_updates() -> bool:
                     last_check_file.write_text(today_str)
                     return True
                 else:
-                    err = (result.stderr or result.stdout or "").strip()
+                    err = (
+                        decode_output(result.stderr)
+                        or decode_output(result.stdout)
+                        or ""
+                    ).strip()
                     if err:
                         PrettyOutput.auto_print(
                             f"⚠️ 自动更新失败，错误信息（已截断）: {err[:500]}"
@@ -2334,10 +2365,8 @@ def get_loc_stats() -> str:
         str: loc命令输出的原始字符串，失败时返回空字符串
     """
     try:
-        result = subprocess.run(
-            ["loc"], capture_output=True, text=True, encoding="utf-8", errors="replace"
-        )
-        return result.stdout if result.returncode == 0 else ""
+        result = subprocess.run(["loc"], capture_output=True)
+        return decode_output(result.stdout) if result.returncode == 0 else ""
     except FileNotFoundError:
         return ""
 
@@ -2354,13 +2383,10 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             ["git", "remote"],
             cwd=repo_path,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             check=True,
             timeout=10,
         )
-        if not remote_result.stdout.strip():
+        if not decode_output(remote_result.stdout).strip():
             return
 
         # 检查git仓库状态
@@ -2368,13 +2394,10 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             ["git", "status", "--porcelain"],
             cwd=repo_path,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             check=True,
             timeout=10,
         )
-        if status_result.stdout:
+        if decode_output(status_result.stdout):
             if user_confirm(
                 f"检测到 '{repo_path.name}' 存在未提交的更改，是否放弃这些更改并更新？"
             ):
@@ -2383,9 +2406,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
                         ["git", "checkout", "."],
                         cwd=repo_path,
                         capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
                         check=True,
                         timeout=10,
                     )
@@ -2409,27 +2429,21 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             ["git", "rev-parse", "HEAD"],
             cwd=repo_path,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             check=True,
             timeout=10,
         )
-        before_hash = before_hash_result.stdout.strip()
+        before_hash = decode_output(before_hash_result.stdout).strip()
 
         # 检查是否是空仓库
         ls_remote_result = subprocess.run(
             ["git", "ls-remote", "--heads", "origin"],
             cwd=repo_path,
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             check=True,
             timeout=10,
         )
 
-        if not ls_remote_result.stdout.strip():
+        if not decode_output(ls_remote_result.stdout).strip():
             return
 
         # 执行 git pull
@@ -2437,7 +2451,6 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             ["git", "pull"],
             cwd=repo_path,
             capture_output=True,
-            text=True,
             check=True,
             timeout=60,
         )
@@ -2447,11 +2460,10 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             ["git", "rev-parse", "HEAD"],
             cwd=repo_path,
             capture_output=True,
-            text=True,
             check=True,
             timeout=10,
         )
-        after_hash = after_hash_result.stdout.strip()
+        after_hash = decode_output(after_hash_result.stdout).strip()
 
         if before_hash != after_hash:
             PrettyOutput.auto_print(f"✅ {repo_type}库 '{repo_path.name}' 已更新。")
@@ -2461,7 +2473,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
     except subprocess.TimeoutExpired:
         PrettyOutput.auto_print(f"❌ 更新 '{repo_path.name}' 超时。")
     except subprocess.CalledProcessError as e:
-        error_message = e.stderr.strip() if e.stderr else str(e)
+        error_message = decode_output(e.stderr).strip() if e.stderr else str(e)
         PrettyOutput.auto_print(f"❌ 更新 '{repo_path.name}' 失败: {error_message}")
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 更新 '{repo_path.name}' 时发生未知错误: {str(e)}")

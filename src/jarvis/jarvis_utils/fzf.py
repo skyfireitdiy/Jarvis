@@ -10,6 +10,8 @@ from typing import Optional
 from typing import Union
 from typing import cast
 
+from jarvis.jarvis_utils.utils import decode_output
+
 
 def fzf_select(
     options: Union[List[str], List[Dict[str, Any]]],
@@ -54,10 +56,9 @@ def fzf_select(
             input="\n".join(input_lines),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
             check=True,
         )
-        selected = process.stdout.strip()
+        selected = decode_output(process.stdout).strip()
         return selected if selected else None
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
