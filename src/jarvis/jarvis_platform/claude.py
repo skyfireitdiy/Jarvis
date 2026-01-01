@@ -170,13 +170,22 @@ class ClaudeModel(BasePlatform):
             # 累计完整响应
             accumulated_response = ""
 
+            # 准备 system 参数：后端期望数组格式，而不是字符串
+            system_param = None
+            if self.system_message:
+                # 将字符串转换为数组格式：[{"type": "text", "text": "系统消息内容"}]
+                system_param = [{"type": "text", "text": self.system_message}]
+
             # 调用 Anthropic API
-            with self.client.messages.stream(
-                model=self.model_name,
-                system=self.system_message,
-                messages=anthropic_messages,
-                max_tokens=4096,
-            ) as stream:
+            stream_kwargs = {
+                "model": self.model_name,
+                "messages": anthropic_messages,
+                "max_tokens": 4096,
+            }
+            if system_param:
+                stream_kwargs["system"] = system_param
+
+            with self.client.messages.stream(**stream_kwargs) as stream:
                 full_response = ""
                 for text in stream.text_stream:
                     full_response += text
