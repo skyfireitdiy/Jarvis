@@ -29,6 +29,7 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.utils import is_rag_installed
+from jarvis.jarvis_utils.utils import decode_output
 
 
 def find_git_root_and_cd(start_dir: str = ".") -> str:
@@ -223,12 +224,12 @@ def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) ->
         )
 
         try:
-            return result.stdout.decode("utf-8")
-        except UnicodeDecodeError:
-            return result.stdout.decode("utf-8", errors="replace")
+            return decode_output(result.stdout)
+        except Exception as e:
+            return f"解码输出失败: {str(e)}"
 
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
+        error_msg = decode_output(e.stderr) if e.stderr else str(e)
         return f"获取commit差异失败: {error_msg}"
     except Exception as e:
         return f"发生意外错误: {str(e)}"
@@ -252,7 +253,7 @@ def revert_file(filepath: str) -> None:
                 os.remove(filepath)
         subprocess.run(["git", "clean", "-f", "--", filepath], check=True)
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
+        error_msg = decode_output(e.stderr) if e.stderr else str(e)
         PrettyOutput.auto_print(f"❌ 恢复文件失败: {error_msg}")
 
 
@@ -313,9 +314,6 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
             diff_result = subprocess.run(
                 ["git", "diff", "HEAD", "--shortstat"],
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
                 check=False,
             )
         else:
@@ -323,9 +321,6 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
             diff_result = subprocess.run(
                 ["git", "diff", "--shortstat"],
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
                 check=False,
             )
 
@@ -339,12 +334,11 @@ def detect_large_code_deletion(threshold: int = 30) -> Optional[Dict[str, int]]:
 
         # 解析插入和删除行数
         if diff_result.returncode == 0 and diff_result.stdout:
+            output = decode_output(diff_result.stdout)
             insertions = 0
             deletions = 0
-            insertions_match = re.search(
-                r"(\d+)\s+insertions?\(\+\)", diff_result.stdout
-            )
-            deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_result.stdout)
+            insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", output)
+            deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", output)
             if insertions_match:
                 insertions = int(insertions_match.group(1))
             if deletions_match:
@@ -449,11 +443,7 @@ def get_latest_commit_hash() -> str:
             stderr=subprocess.PIPE,
             text=False,
         )
-        return (
-            result.stdout.decode("utf-8", errors="replace").strip()
-            if result.returncode == 0
-            else ""
-        )
+        return decode_output(result.stdout).strip() if result.returncode == 0 else ""
     except Exception:
         return ""
 
@@ -470,9 +460,8 @@ def get_modified_line_ranges() -> Dict[str, List[Tuple[int, int]]]:
     proc = subprocess.run(
         ["git", "show", "--no-color"],
         capture_output=True,
-        text=True,
     )
-    diff_output = proc.stdout
+    diff_output = decode_output(proc.stdout)
 
     # 解析差异以获取修改的文件及其行范围
     result: Dict[str, List[Tuple[int, int]]] = {}
@@ -504,9 +493,14 @@ def is_file_in_git_repo(filepath: str) -> bool:
 
     try:
         # 获取Git仓库根目录
-        repo_root = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
-        ).stdout.strip()
+        repo_root_result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True
+        )
+        repo_root = (
+            decode_output(repo_root_result.stdout).strip()
+            if repo_root_result.returncode == 0
+            else ""
+        )
 
         # 检查文件路径是否在仓库根目录下
         return os.path.abspath(filepath).startswith(os.path.abspath(repo_root))
@@ -550,18 +544,19 @@ def check_and_update_git_repo(repo_path: str) -> bool:
             ["git", "describe", "--tags", "--abbrev=0"],
             cwd=git_root,
             capture_output=True,
-            text=True,
         )
         # 获取最新远程tag
         remote_tag_result = subprocess.run(
             ["git", "ls-remote", "--tags", "--refs", "origin"],
             cwd=git_root,
             capture_output=True,
-            text=True,
         )
         if remote_tag_result.returncode == 0:
             # 提取最新的tag名称
-            tags = [ref.split("/")[-1] for ref in remote_tag_result.stdout.splitlines()]
+            tags = [
+                ref.split("/")[-1]
+                for ref in decode_output(remote_tag_result.stdout).splitlines()
+            ]
             tags = sorted(
                 tags,
                 key=lambda x: [
@@ -569,24 +564,21 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                 ],
             )
             remote_tag = tags[-1] if tags else ""
-            remote_tag_result.stdout = remote_tag
 
         if (
             local_tag_result.returncode == 0
             and remote_tag_result.returncode == 0
-            and local_tag_result.stdout.strip() != remote_tag_result.stdout.strip()
+            and decode_output(local_tag_result.stdout).strip() != remote_tag
         ):
             PrettyOutput.auto_print(
-                f"ℹ️ 检测到新版本tag {remote_tag_result.stdout.strip()}，正在更新Jarvis..."
+                f"ℹ️ 检测到新版本tag {remote_tag}，正在更新Jarvis..."
             )
             subprocess.run(
-                ["git", "checkout", remote_tag_result.stdout.strip()],
+                ["git", "checkout", remote_tag],
                 cwd=git_root,
                 check=True,
             )
-            PrettyOutput.auto_print(
-                f"✅ Jarvis已更新到tag {remote_tag_result.stdout.strip()}"
-            )
+            PrettyOutput.auto_print(f"✅ Jarvis已更新到tag {remote_tag}")
 
             # 执行pip安装更新代码
             try:
@@ -643,16 +635,14 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                         ]
 
                 # 尝试安装
-                result = subprocess.run(
-                    install_cmd, cwd=git_root, capture_output=True, text=True
-                )
+                result = subprocess.run(install_cmd, cwd=git_root, capture_output=True)
 
                 if result.returncode == 0:
                     PrettyOutput.auto_print("✅ 代码更新安装成功")
                     return True
 
                 # 处理权限错误
-                error_msg = result.stderr.strip()
+                error_msg = decode_output(result.stderr).strip()
                 if not in_venv and (
                     "Permission denied" in error_msg or "not writeable" in error_msg
                 ):
@@ -663,12 +653,11 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                             install_cmd + ["--user"],
                             cwd=git_root,
                             capture_output=True,
-                            text=True,
                         )
                         if user_result.returncode == 0:
                             PrettyOutput.auto_print("✅ 用户级代码安装成功")
                             return True
-                        error_msg = user_result.stderr.strip()
+                        error_msg = decode_output(user_result.stderr).strip()
 
                 PrettyOutput.auto_print(f"❌ 代码安装失败: {error_msg}")
                 return False
@@ -700,17 +689,19 @@ def get_diff_file_list() -> List[str]:
 
         # 获取所有差异文件（包括新增文件）
         result = subprocess.run(
-            ["git", "diff", "--name-only", "HEAD"], capture_output=True, text=True
+            ["git", "diff", "--name-only", "HEAD"], capture_output=True
         )
 
         # 重置暂存区
         subprocess.run(["git", "reset"], check=True)
 
         if result.returncode != 0:
-            PrettyOutput.auto_print(f"❌ 获取差异文件列表失败: {result.stderr}")
+            PrettyOutput.auto_print(
+                f"❌ 获取差异文件列表失败: {decode_output(result.stderr)}"
+            )
             return []
 
-        return [f for f in result.stdout.splitlines() if f]
+        return [f for f in decode_output(result.stdout).splitlines() if f]
 
     except subprocess.CalledProcessError as e:
         PrettyOutput.auto_print(f"❌ 获取差异文件列表失败: {str(e)}")
@@ -739,11 +730,15 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
     """
     try:
         # 获取当前git用户名
-        current_author = subprocess.run(
+        current_author_result = subprocess.run(
             ["git", "config", "user.name"],
             capture_output=True,
-            text=True,
-        ).stdout.strip()
+        )
+        current_author = (
+            decode_output(current_author_result.stdout).strip()
+            if current_author_result.returncode == 0
+            else ""
+        )
 
         # 获取当前用户最近5次提交的基本信息
         result = subprocess.run(
@@ -755,16 +750,13 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
                 "--pretty=format:%H%n%s%n%an%n%ad",
             ],
             capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
         )
-        if result.returncode != 0 or result.stdout is None:
+        if result.returncode != 0:
             return []
 
         # 解析提交信息
         commits: List[Dict[str, Any]] = []
-        lines = result.stdout.splitlines()
+        lines = decode_output(result.stdout).splitlines()
         for i in range(0, len(lines), 4):
             if i + 3 >= len(lines):
                 break
@@ -782,10 +774,9 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
             files_result = subprocess.run(
                 ["git", "show", "--name-only", "--pretty=format:", commit["hash"]],
                 capture_output=True,
-                text=True,
             )
             if files_result.returncode == 0:
-                file_lines = files_result.stdout.splitlines()
+                file_lines = decode_output(files_result.stdout).splitlines()
                 unique_files: Set[str] = set(filter(None, file_lines))
                 commit["files"] = list(unique_files)[:20]  # 限制最多20个文件
 
@@ -797,12 +788,12 @@ def get_recent_commits_with_files() -> List[Dict[str, Any]]:
 
 def _get_new_files() -> List[str]:
     """获取新增文件列表"""
-    return subprocess.run(
+    result = subprocess.run(
         ["git", "ls-files", "--others", "--exclude-standard"],
         capture_output=True,
-        text=True,
         check=True,
-    ).stdout.splitlines()
+    )
+    return decode_output(result.stdout).splitlines()
 
 
 def confirm_add_new_files() -> None:
@@ -810,12 +801,12 @@ def confirm_add_new_files() -> None:
 
     def _get_added_lines() -> int:
         """获取新增代码行数"""
-        diff_stats = subprocess.run(
+        diff_stats_result = subprocess.run(
             ["git", "diff", "--numstat"],
             capture_output=True,
-            text=True,
             check=True,
-        ).stdout.splitlines()
+        )
+        diff_stats = decode_output(diff_stats_result.stdout).splitlines()
 
         added_lines = 0
         for stat in diff_stats:
@@ -887,10 +878,9 @@ def confirm_add_new_files() -> None:
                 repo_root_result = subprocess.run(
                     ["git", "rev-parse", "--show-toplevel"],
                     capture_output=True,
-                    text=True,
                     check=True,
                 )
-                repo_root = repo_root_result.stdout.strip() or "."
+                repo_root = decode_output(repo_root_result.stdout).strip() or "."
             except Exception:
                 repo_root = "."
             gitignore_path = os.path.join(repo_root, ".gitignore")

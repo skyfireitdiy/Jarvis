@@ -19,6 +19,7 @@ from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.utils import is_context_overflow
+from jarvis.jarvis_utils.utils import decode_output
 
 app = typer.Typer(help="自动代码审查工具")
 
@@ -269,13 +270,11 @@ def execute_code_review(
                 diff_cmd = f"git show {commit_sha} | cat -"
 
                 # Execute git command and get diff output
-                diff_output = subprocess.check_output(
+                diff_output_bytes = subprocess.check_output(
                     diff_cmd,
                     shell=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
                 )
+                diff_output = decode_output(diff_output_bytes)
                 if not diff_output:
                     return {
                         "success": False,
@@ -286,9 +285,8 @@ def execute_code_review(
                 # Extract changed files using git command
                 files_cmd = f"git show --name-only --pretty=format: {commit_sha}"
                 try:
-                    files_output = subprocess.check_output(
-                        files_cmd, shell=True, text=True
-                    )
+                    files_output_bytes = subprocess.check_output(files_cmd, shell=True)
+                    files_output = decode_output(files_output_bytes)
                     # Filter out empty lines without using grep
                     file_paths = [
                         f.strip() for f in files_output.split("\n") if f.strip()
@@ -311,13 +309,11 @@ def execute_code_review(
                 diff_cmd = f"git diff {start_commit}..{end_commit} | cat -"
 
                 # Execute git command and get diff output
-                diff_output = subprocess.check_output(
+                diff_output_bytes = subprocess.check_output(
                     diff_cmd,
                     shell=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
                 )
+                diff_output = decode_output(diff_output_bytes)
                 if not diff_output:
                     return {
                         "success": False,
@@ -328,9 +324,8 @@ def execute_code_review(
                 # Extract changed files using git command
                 files_cmd = f"git diff --name-only {start_commit}..{end_commit}"
                 try:
-                    files_output = subprocess.check_output(
-                        files_cmd, shell=True, text=True
-                    )
+                    files_output_bytes = subprocess.check_output(files_cmd, shell=True)
+                    files_output = decode_output(files_output_bytes)
                     file_paths = [
                         f.strip() for f in files_output.split("\n") if f.strip()
                     ]
@@ -357,13 +352,11 @@ def execute_code_review(
                 diff_cmd = "git diff HEAD | cat -"
 
                 # Execute git command and get diff output
-                diff_output = subprocess.check_output(
+                diff_output_bytes = subprocess.check_output(
                     diff_cmd,
                     shell=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
                 )
+                diff_output = decode_output(diff_output_bytes)
                 if not diff_output:
                     return {
                         "success": False,
@@ -374,9 +367,8 @@ def execute_code_review(
                 # Extract changed files using git command
                 files_cmd = "git diff --name-only HEAD"
                 try:
-                    files_output = subprocess.check_output(
-                        files_cmd, shell=True, text=True
-                    )
+                    files_output_bytes = subprocess.check_output(files_cmd, shell=True)
+                    files_output = decode_output(files_output_bytes)
                     file_paths = [
                         f.strip() for f in files_output.split("\n") if f.strip()
                     ]
