@@ -1,3 +1,42 @@
+### Release Note - v1.0.10 2025-01-01
+
+#### **🚀 新功能 (Features)**
+
+- **配置系统增强**
+  - **支持字典配置中添加对象类型的值**：扩展了动态表单生成逻辑，允许在添加字典条目时处理对象类型的值。当值 schema 为对象时，系统将根据 schema 定义渲染其属性字段，同时更新了键名变更处理函数，确保对象内的所有嵌套字段名同步更新
+
+#### **📌 修复 (Fixes)**
+
+- **Claude 平台修复**
+  - **系统消息格式适配**：修复系统消息从字符串格式转换为数组格式以满足后端API期望的格式要求
+  - **模型列表获取**：修复消息格式类型注解并实现从 API 获取实际模型列表功能
+- **Web 应用修复**
+  - **动态字典键名同步**：添加了键名输入框的 oninput 事件监听，实现了键名输入时的实时更新，使用 dataset.currentKey 来追踪当前的键名状态，确保在用户修改字典键名时，关联的值字段 name 属性能够正确更新
+  - **嵌套字典处理**：添加 processNestedDictKeys 函数用于递归处理嵌套对象中的 **key** 和 **temp** 特殊键，能够遍历整个对象树，将临时键值对转换为实际的键值对，解决了之前只能处理单层字典的限制
+  - **字典键名处理**：修复动态字典键名输入时的字段同步问题
+- **工具与依赖修复**
+  - **subprocess 输出解码**：新增 decode_output 工具函数，支持 UTF-8、GBK 和 latin-1 编码自动回退机制，重构了所有涉及 subprocess 调用的模块，移除 text=True 和硬编码的 encoding 参数
+
+#### **🔧 优化与重构 (Refactors & Improvements)**
+
+- **配置系统优化**
+  - **移除Windows系统限制**：删除了 get_pretty_output 函数中对Windows操作系统的特殊判断逻辑，现在函数不再根据操作系统类型强制返回False，而是直接返回配置文件中的设定，以支持现代Windows终端环境
+- **工具与依赖优化**
+  - **统一 subprocess 输出处理**：重构了所有涉及 subprocess 调用的模块，移除 text=True 和硬编码的 encoding 参数，改为统一捕获字节流并使用 decode_output 进行解码，解决了不同操作系统（特别是 Windows）下 Git 命令输出中文乱码或解码失败的问题
+  - **修复循环依赖**：将 user_confirm 的导入改为延迟导入，避免模块间的循环依赖，更新终端嵌套检测和git存储库更改确认处的导入方式
+- **Web 应用重构**
+  - **字典表单字段重构**：变更了动态字典类型表单字段的生成与数据提交机制，移除了依赖 onchange 事件实时更新字段 name 属性的逻辑，转而采用占位符 **temp** 和 **key** 进行标识，在数据收集阶段，根据 **key** 输入框的值将 **temp** 对应的数据映射到用户输入的实际键名下，简化了前端状态管理，避免了动态修改 DOM 名称可能导致的同步问题
+  - **字典键名处理优化**：重构字典键名处理逻辑，代码格式化修正了 PrettyOutput.auto_print 调用的代码格式，符合代码规范；重构字典键名收集逻辑，在第一次遍历表单数据时直接收集用户输入的实际键名，避免二次遍历 entries；简化临时键名处理，使用预先收集的 actualKeyName 替代重复遍历查找，提高代码可读性和执行效率
+
+#### **📚 文档更新 (Documentation)**
+
+- **架构文档更新**
+  - **新增配置系统文档**：新增配置系统文档与架构图更新，核心概念章节新增"配置系统"作为第八大基石，完善系统基础定义；新增配置系统组件（Schema解析器、Web应用、CLI工具）的详细功能与使用场景说明；更新系统架构图，集成配置系统模块及其与用户、代理等组件的交互；新增核心架构原则"基于 Schema 的配置驱动"；补充 3.3.8 节，深入解析配置系统的内部实现与外部集成
+- **移除项目条目**
+  - **移除 zlib_rs 项目**：从更新日志中移除了关于 'zlib_rs 项目' 的条目
+
+---
+
 ### Release Note - v1.0.8 2025-12-31
 
 #### **🚀 新功能 (Features)**
@@ -518,11 +557,13 @@
 本次更新是一次**重大架构重构和功能增强**的主要版本。核心亮点是**配置系统的全面重构**，通过统一配置键名、支持配置引用、大小写不敏感访问等能力，显著提升了配置管理的灵活性和易用性。**差异可视化功能**的引入，让代码变更更加直观和易于理解。**对话记录器**的加入，为后续分析和改进提供了数据基础。
 
 **升级建议**：
+
 1. **备份配置**：升级前请备份 `~/.jarvis/config.yaml` 配置文件
 2. **更新配置**：运行 `jvs -I` 交互式配置向导，系统会自动检测并提示需要更新的配置项
 3. **测试验证**：在测试环境中先验证升级，确保所有功能正常工作后再应用到生产环境
 
 **技术亮点**：
+
 - **配置系统重构**：统一配置键名、支持配置引用、大小写不敏感访问、配置合并机制
 - **差异可视化**：并排显示、语法高亮、智能行配对、变更统计、动态分隔符
 - **对话记录**：完整交互历史、持久化存储、配置支持
@@ -863,26 +904,26 @@
 
 ### Release Note - v0.7.4 2025-11-30
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增完整的Docker支持，包括多阶段构建的Dockerfile和docker-compose配置
 - 实现自动化的Docker镜像发布流程，通过GitHub Actions发布到GHCR
 - 扩展LSP客户端工具，支持更多语言特性如装饰器、模板、宏等符号分析
 - 引入安全分析套件(jsec)和C→Rust迁移套件(jc2r)两个专业工具
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 改进代码符号提取器，支持15+种语言特性
 - 优化read_code工具的分块逻辑，优先按语义空白行分组
 - 增强结构化代码分析能力，提升代码导航精度
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 全面更新README.md，新增Docker安装和使用指南
 - 完善各语言符号提取器的技术文档
 - 添加安全分析套件和C→Rust迁移套件的详细使用说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 新增200+测试用例，覆盖更多边界情况
 - 更新.gitignore和.dockerignore文件，优化开发体验
@@ -1328,17 +1369,17 @@
 
 ### Release Note - v0.3.34 2025-10-07
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增通用的基础软件库安全演进多智能体配置(security_evolution.yaml)，支持更灵活的安全分析流程
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构安全演进多智能体架构，将OpenHarmony专用版本升级为通用版本
 - 优化多智能体协作流程
 - 增强非交互模式支持，添加脚本执行超时控制
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新Jarvis手册，新增非交互模式和脚本超时配置说明
 
@@ -1406,7 +1447,7 @@
 
 ### Release Note - v0.3.31 2025-09-27
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增代码反构设计专家智能体（CodeReverseDesignExpert），支持阅读代码并输出详细设计方案，助力功能对齐的重构
 - 新增麦肯锡风格管理咨询顾问智能体（McKinseyConsultant），系统化分析业务问题并提供可落地解决方案
@@ -1418,7 +1459,7 @@
 - 新增代码代理按文件展示 diff 功能，优化变更可视化体验
 - 新增模型空响应防御机制，避免 None 或空字符串导致的异常
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复代码代理中 git reset 操作缺少用户确认的问题，防止误操作
 - 修复配置文件默认值与平台差异不一致的问题（如 Windows 下 JARVIS_PRETTY_OUTPUT 默认关闭）
@@ -1426,7 +1467,7 @@
 - 修复 git show 命令输出过大导致的解析性能问题，采用 -U0 参数减少上下文
 - 修复文件哈希与行数统计的内存占用问题，采用流式处理提升性能
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构 ToolRegistry 工具调用解析逻辑，强化行首标签匹配，提升容错能力
 - 重构 EditFileHandler 补丁处理机制，支持 RANGE 限定行号范围与区间替换模式
@@ -1435,14 +1476,14 @@
 - 优化配置交互体验，新增补丁格式选择与说明，适配不同模型能力
 - 优化愿景与使命表述，更加简洁聚焦开发者与 AI 的共生关系
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新核心概念与架构文档，精简 MCP 工具配置细节，新增工具加载与兼容性概览
 - 更新使用指南，移除记忆管理技巧重复内容，聚焦高级用法
 - 更新附录配置表，补充新增配置项说明与默认值调整
 - 新增高级主题章节，详细介绍补丁格式控制配置的使用方法与注意事项
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 调整多个智能体配置文件，补充 execute_script 与 read_code 工具支持
 - 统一配置 schema 默认值与代码逻辑一致性，提升配置健壮性
@@ -1452,7 +1493,7 @@
 
 ### Release Note - v0.3.30 2025-09-20
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增工具调用后回调扩展（after_tool_call_cb），支持动态加载多个回调函数
 - 支持通过配置文件指定回调目录（JARVIS_AFTER_TOOL_CALL_CB_DIRS），自动扫描并注册回调
@@ -1460,7 +1501,7 @@
 - 新增事件总线集成，回调在AFTER_TOOL_CALL事件广播前后依次触发
 - 新增配置项JARVIS_AFTER_TOOL_CALL_CB_DIRS，支持~和环境变量展开
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构Agent初始化逻辑，支持动态加载工具调用后回调
 - 优化代码代理工具执行记录机制，使用事件总线替代直接回调
@@ -1468,12 +1509,12 @@
 - 优化更新检测逻辑，优先检测虚拟环境内的uv可用性
 - 优化git仓库更新逻辑，增强uv环境检测准确性
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新高级主题文档，新增工具调用后回调扩展详细说明
 - 更新配置文件附录，新增JARVIS_AFTER_TOOL_CALL_CB_DIRS配置项说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 修复generate_new_tool工具中依赖安装命令，支持uv和pip双路径
 - 修复git_utils中uv环境检测逻辑，优先检测虚拟环境内的uv
@@ -1483,7 +1524,7 @@
 
 ### Release Note - v0.3.29 2025-09-17
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增 Jarvis 系统架构图 PlantUML 更新，细化组件职责与交互流程
 - 新增事件总线（EventBus）机制，支持任务生命周期事件广播与旁路扩展
@@ -1506,7 +1547,7 @@
 - 新增统计工具（jst）命令扩展：remove、--width、--height、--agg 等参数支持
 - 新增文档构建脚本优化，支持代码块外列表空行自动修正与表格格式统一
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构 Agent 初始化流程，引入 EventBus、PromptManager、AgentConfig 等组件
 - 重构主运行循环为 AgentRunLoop，支持事件广播与回调隔离
@@ -1527,7 +1568,7 @@
 - 优化输出处理器链，支持多处理器协同与优先级处理
 - 优化文档结构，统一术语表述与配置项说明，修正章节编号错误
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复特殊指令文档中 `@` 符号误用为 `'<...>'` 的问题
 - 修复 CLI 参数 `-t` 被误用为任务参数的问题，统一改为 `-T/--task`
@@ -1543,7 +1584,7 @@
 - 修复文档中表格格式不一致的问题，统一表头前空行处理
 - 修复代码中类型注解不兼容 Python 3.8 的问题（如 str | None -> Optional[str]）
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新系统架构图，细化组件职责与交互流程，补充事件机制说明
 - 更新核心概念章节，新增记忆系统与事件总线介绍
@@ -1555,7 +1596,7 @@
 - 更新方法论模板，优化“可复用解决流程”表述，避免绑定特定上下文
 - 更新代码注释与 docstring，统一使用英文保持项目一致性
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 调整 JARVIS_PRETTY_OUTPUT 默认值为 true（非 Windows 平台）
 - 调整 JARVIS_FORCE_SAVE_MEMORY 默认值为 false，避免频繁提示
@@ -1572,14 +1613,14 @@
 
 ### Release Note - v0.3.28 2025-09-10
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增命令行参数 `--disable-methodology-analysis`（简写 `-D`），支持一键禁用方法论和任务分析功能
 - Agent 启动统计信息新增展示平台名称，提升多平台使用时的识别度
 - 子 Agent（sub_agent/sub_code_agent）新增模型有效性校验与自动回退机制，增强模型兼容性
 - Git 提交工具新增对 `model_group` 参数的支持，完善代码代理的模型上下文传递
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复若干处未使用变量的代码警告，提升代码整洁度
 - 修复若干处 f-string 无变量引用的问题，避免潜在的性能损耗
@@ -1587,7 +1628,7 @@
 - 修复 `VirtualTTYTool` 中平台相关导入警告，优化跨平台兼容性
 - 修复 `while_success`/`while_true` 重试提示信息不明确的问题，增强可观测性
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构模型配置解析逻辑，明确 `model_group_override` 时的优先级策略，支持组配置与全局环境变量的灵活覆盖
 - 优化自动更新检测机制，支持 `uv` 和 `pip` 的自动升级并提示重启，提升用户体验
@@ -1595,12 +1636,12 @@
 - 统一多处字符串格式化风格，提升代码可读性和一致性
 - 清理大量未使用导入，减少模块耦合和加载时间
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新配置说明，补充 `model_group_override` 的优先级逻辑注释
 - 删除过时测试文件与冗余代码，保持项目结构清晰
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 删除重复 `X-Requested-With` 请求头，精简 HTTP 请求
 - 补充缺失的异常处理分支，增强健壮性
@@ -1609,7 +1650,7 @@
 
 ### Release Note - v0.3.27 2025-09-07
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增PPT设计专家智能体(PptDesignExpert)，支持用户需求沟通、宏观结构设计、单页内容设计和视觉呈现强化
 - 新增潜意识植入助手智能体(SubliminalMessageExpertAgent)，基于心理学原理设计潜意识植入计划
@@ -1621,7 +1662,7 @@
 - 新增AgentRunLoop独立运行循环类，解耦主循环逻辑
 - 新增UserInteractionHandler用户交互封装，便于后续UI替换
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构Agent初始化配置逻辑，支持更灵活的参数解析与默认值处理
 - 优化代码代理工具执行记录机制，精确追踪工具调用情况
@@ -1634,11 +1675,11 @@
 - 优化代码静态分析工具链，将black替换为ruff提升效率
 - 优化开发依赖配置，移除isort并统一使用ruff进行代码格式化
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新配置文件附录，新增JARVIS_GIT_CHECK_MODE配置项说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 修复ReleaseNote版本号显示错误
 - 修复提交历史展示逻辑，限制显示最近5条提交
@@ -1649,7 +1690,7 @@
 
 ### Release Note - v0.3.26 2025-08-31
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增儿童心理学专家智能体(ChildPsychologyExpertAgent)，为家长提供专业育儿指导
 - 新增人生顾问智能体(LifeConsultantAgent)，持续建立用户性格画像并提供个性化决策建议
@@ -1657,13 +1698,13 @@
 - 新增PUA专家智能体(PuaExpertAgent)，提供基于尊重的沟通策略和心理分析
 - RAG知识库新增`retrieve`子命令，支持仅检索文档而不生成答案
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 增强RAG依赖检测机制，提供更精确的模块缺失提示
 - 优化智能体记忆管理，支持强制保存记忆功能
 - 改进RAG安装检测逻辑，使用更准确的依赖检查方法
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新使用指南文档，新增RAG `retrieve`命令的详细使用说明
 - 补充新智能体的功能描述和使用场景
@@ -1744,7 +1785,7 @@
 #### 优化与重构 (Refactors & Improvements)
 
 - CodeAgent 工具集成优化：新增 edit_file 工具；移除旧的 EditFileHandler 输出处理链，统一由工具注册表接管，调用路径更清晰。
-- 文件编辑工具逻辑精简：基于 EditFileHandler._fast_edit 的结果进行统一处理与反馈，减少文件回滚与写入分支，提升稳定性与可维护性。
+- 文件编辑工具逻辑精简：基于 EditFileHandler.\_fast_edit 的结果进行统一处理与反馈，减少文件回滚与写入分支，提升稳定性与可维护性。
 - RAG 流程优化：在 answer 与 retrieve_documents 两条路径均增加“检索前索引检查”，确保入口一致。
 - BM25 索引重建流程更稳健：在增量更新后自动重建索引、同步清理已删除文档的清单记录。
 
@@ -1843,7 +1884,7 @@
 
 #### **修复 (Fixes)**
 
-- 输入兼容性修复：新增 Agent._multiline_input 包装，兼容仅接受单参数的自定义多行输入器（TypeError 兜底），避免交互中断。
+- 输入兼容性修复：新增 Agent.\_multiline_input 包装，兼容仅接受单参数的自定义多行输入器（TypeError 兜底），避免交互中断。
 - 提交流程稳健性：Git 提交在 Windows 下的临时文件读写与清理更加可靠；大 diff 上传/处理路径更加稳健，失败信息更清晰。
 
 #### **优化与重构 (Refactors & Improvements)**
@@ -1867,30 +1908,30 @@
 
 ### Release Note - v0.3.18 2025-08-19
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增 `JARVIS_IMMEDIATE_ABORT` 环境变量配置，支持在对话输出过程中检测到用户中断信号（如 Ctrl+C）时立即返回当前已生成内容并停止继续输出
 - 增强网页内容读取功能，支持使用配置的 web_search_platform 与模型的原生 web 能力，并在不支持时自动回退到 requests 抓取页面分析
 - 优化角色选择器界面，新增角色数量显示功能，在选择角色时直观展示每个角色配置包含的角色数量
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复用户中断处理逻辑，在中断后正确设置 `run_input_handlers_next_turn` 标志，确保下一次运行能正确处理用户输入
 - 修复工具分享和资源分享管理器中的异常处理，将 `typer.Exit` 异常替换为 `return` 语句，避免不必要的程序退出
 - 修复角色选择器中的空输入处理，支持直接回车退出程序，提升用户体验
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化网页内容读取工具的可用性检查逻辑，确保工具始终可用，即使模型不支持 web 功能也能通过回退方案正常工作
 - 优化命令行界面输出格式，简化多个命令的输出信息，使输出更加简洁清晰
 - 增强配置管理功能，新增 `is_immediate_abort()` 配置读取函数，支持从配置文件中读取立即中断设置
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新项目文档，新增 `JARVIS_IMMEDIATE_ABORT` 环境变量的详细说明和使用指南
 - 更新配置 schema 文档，添加新配置项的 JSON Schema 定义和描述
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 更新了微信二维码图片文件
 
@@ -1934,34 +1975,34 @@
 
 ### Release Note - v0.3.16 2025-08-16
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增Git仓库自动检测与代码开发模式切换功能，启动时智能识别Git项目并提示切换到jca模式
 - 增强CLI交互体验，提供内置配置选择界面，支持agent、multi_agent、roles等多种配置类型
 - 新增工具协议版本支持（v1.0/v2.0），实现agent与参数的分离传递机制
 - 为多智能体系统添加详细描述信息，提升配置可读性
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复YAML解析错误处理的可观测性问题，提升错误定位能力
 - 修复工具注册时的参数注入问题，避免agent参数污染工具参数
 - 修复命令行参数解析错误，统一短选项格式（-T/-t区分）
 - 修复多智能体系统启动时的异常处理问题，增强健壮性
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构工具执行逻辑，支持向后兼容的工具协议版本机制
 - 优化内部配置管理，将example目录重命名为builtin，提升项目结构清晰度
 - 改进CLI启动流程，增加用户友好的配置选择界面
 - 增强代码风格一致性，统一YAML文件格式规范
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新所有智能体配置文件，添加详细描述和使用说明
 - 完善多智能体系统文档，补充交互流程和输出格式说明
 - 新增开发者角色配置，支持thinking模式的高端智能体
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 清理TODO.md文件，整理项目开发计划和里程碑
 - 更新依赖管理和类型注解，提升代码质量
@@ -1970,20 +2011,20 @@
 
 ### Release Note - v0.3.15 2025-08-16
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 为提交信息添加前缀和后缀参数支持
 - 修正script_cotent拼写错误为script_content
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复流式客户端的URL拼接、超时及响应处理问题
 - 修复阻塞调用与日志目录配置问题
-- 为_git相关方法添加prefix和suffix参数
+- 为\_git相关方法添加prefix和suffix参数
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
-- 更新 _extract_tool_calls 方法的返回类型注释
+- 更新 \_extract_tool_calls 方法的返回类型注释
 - 添加TODO文档记录项目待办事项
 - 移除已完成的拼写修复任务
 
@@ -2017,23 +2058,23 @@
 
 ### Release Note - v0.3.13 2025-08-13
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增 `run_input_handlers_next_turn` 标志位，用于更精确控制下一轮输入处理器的行为
 - 优化了平台不存在时的提示信息格式，提升用户体验
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了 `Agent.clear()` 方法命名冲突问题，统一为 `clear_history()` 避免歧义
 - 修复了会话提示词拼接逻辑，避免空值导致的格式问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构了工具调用后的提示词处理逻辑，使其更清晰和健壮
 - 改进了多行输入提示的格式，增强可读性
 - 移除了冗余的 `clear()` 和 `clear_history()` 重复定义，简化代码结构
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 清理了未使用的导入和冗余方法定义
 
@@ -2041,40 +2082,40 @@
 
 ### Release Note - v0.3.12 2025-08-12
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
-- 优化Agent类输入处理逻辑，简化_run方法中的输入处理流程  
-- 重构历史处理机制，改进摘要生成和清理逻辑  
-- 优化命令行参数格式，简化typer选项定义格式  
-- 改进文件方法论管理器，移除冗余的记忆标签提示  
-- 优化分享管理器代码结构，修复类型注解兼容性问题  
+- 优化Agent类输入处理逻辑，简化\_run方法中的输入处理流程
+- 重构历史处理机制，改进摘要生成和清理逻辑
+- 优化命令行参数格式，简化typer选项定义格式
+- 改进文件方法论管理器，移除冗余的记忆标签提示
+- 优化分享管理器代码结构，修复类型注解兼容性问题
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
-- 修复Summary标签处理逻辑，确保会话重置时正确设置初始提示  
-- 修复历史清理时的模型重置问题，避免会话状态残留  
-- 修复.gitignore处理中的格式问题，确保提交信息格式统一  
+- 修复Summary标签处理逻辑，确保会话重置时正确设置初始提示
+- 修复历史清理时的模型重置问题，避免会话状态残留
+- 修复.gitignore处理中的格式问题，确保提交信息格式统一
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
-- 更新输入处理器的调用方式，提升代码可读性  
-- 标准化代码格式，统一字符串引号使用风格  
+- 更新输入处理器的调用方式，提升代码可读性
+- 标准化代码格式，统一字符串引号使用风格
 
 本次更新主要聚焦于代码质量提升和用户体验优化，通过重构核心逻辑简化了Agent的工作流程，同时修复了会话管理中的一些边界情况处理问题。
 
 ### Release Note - v0.3.11 2025-08-11
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 支持独立配置Web搜索使用的平台和模型，通过`JARVIS_WEB_SEARCH_PLATFORM`和`JARVIS_WEB_SEARCH_MODEL`环境变量进行设置
 - 新增Web搜索配置优先级逻辑，当配置了专门的搜索平台和模型时，优先使用配置项而非默认模型选择流程
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化Web搜索工具的实现逻辑，增强平台选择和模型配置的灵活性
 - 改进配置系统，新增Web搜索相关配置项到配置schema中
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新配置文档，新增Web搜索相关环境变量的说明和配置示例
 
@@ -2082,12 +2123,12 @@
 
 ### Release Note - v0.3.8 2025-08-10
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 将代码RAG配置的embedding模型从"Qodo/Qodo-Embed-1-7B"优化为"Qodo/Qodo-Embed-1-1.5B"，显著减少内存占用和计算开销
 - 统一更新文档和配置文件中所有相关的模型引用，确保配置一致性
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新《使用指南》中RAG配置组的示例，采用更轻量级的1.5B模型
 - 修订《高级主题》文档中的配置说明，提供更高效的模型选择建议
@@ -2129,25 +2170,25 @@
 
 ### 发布说明 - v0.3.6 2025-08-08
 
-#### **新功能**  
+#### **新功能**
 
 - 新增Shell环境自动配置功能，支持bash/zsh/fish
 - 将PowerShell安装脚本改为英文版，解决Windows编码问题
 
-#### **问题修复**  
+#### **问题修复**
 
 - 移除了pyproject.toml中的网易镜像源配置
 
-#### **优化改进**  
+#### **优化改进**
 
 - 重构PowerShell安装脚本，优化虚拟环境激活流程
 - 改进memory_organizer.py中的记忆合并提示格式
 
-#### **文档更新**  
+#### **文档更新**
 
 - 更新安装脚本中的帮助信息和提示文本
 
-#### **其他**  
+#### **其他**
 
 - 优化安装过程中的用户交互体验
 
@@ -2155,27 +2196,27 @@
 
 ### Release Note - v0.3.5 2025-08-08
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增网易镜像源(netease)到uv配置中，提供更多pypi镜像选择
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复记忆合并过程中索引越界问题，改进记忆合并算法
 - 修复删除不存在的记忆文件时的错误处理
 - 修复typer.Exit异常处理逻辑
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构uv配置结构，使用index-strategy替代旧的配置方式
 - 优化记忆合并性能，使用标记删除代替直接删除
 - 简化平台对话统计信息显示，移除token计算相关指标
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 无
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 改进记忆合并过程中的日志输出信息
 
@@ -2268,31 +2309,31 @@
 
 ### Release Note - v0.3.1 2025-08-04
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增交互式配置向导，简化首次运行设置流程
 - 添加`JARVIS_FORCE_SAVE_MEMORY`配置项，控制记忆保存提示行为
 - 实现PDF生成脚本自动命名功能
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复平台管理器服务启动时的模型解析逻辑
 - 修正记忆提示信息的格式和内容
 - 解决搜索工具的结果分页问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构记忆管理系统提示模板
 - 优化配置架构设计文档
 - 改进技术文档组织结构，合并分散内容
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 新增完整的Jarvis使用手册（9章节）
 - 更新配置系统技术文档
 - 添加开发环境设置指南
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 移除过时的技术文档文件
 - 更新微信二维码图片
@@ -2361,7 +2402,7 @@
 
 ### Release Note - v0.2.6 2025-07-31
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - **长短期记忆系统**：引入了革命性的三层记忆架构
   - 短期记忆：存储当前任务相关的临时信息（内存中，非持久化）
@@ -2379,19 +2420,19 @@
 - **代码工程师记忆集成**：`code_agent`现已集成完整的记忆管理功能
 - **用户满意度反馈机制**：任务完成后收集用户反馈，用于持续改进
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复生成配置文件时schema路径错误问题（使用绝对路径）
 - 修复`edit_file_handler`文本替换时可能替换多个匹配项的问题（现在只替换第一个匹配）
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化记忆检索输出格式，限制最多返回50条记忆（随机选取）
 - 统一长短命令的使用统计，合并历史数据
 - 移除git换行符设置的用户确认步骤，简化操作流程
 - 增强代码编辑器的缩进和格式处理能力
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 新增记忆系统使用指南（第4.12节）
   - 详细介绍三种记忆类型
@@ -2410,7 +2451,7 @@
 
 ### Release Note - v0.2.5 2025-07-30
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - Windows PowerShell 一键安装脚本支持，大幅简化Windows用户的安装流程
 - 统计模块引入 plotext 图表库，提供专业的数据可视化效果
@@ -2420,13 +2461,13 @@
 - 剪贴板功能新增跨平台支持（Windows、macOS、Linux）
 - 新增 Vibe Working 工作模式文档，介绍更直觉的人机协作理念
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复指标摘要显示时的时间范围和标签过滤功能
 - 修复 list_metrics 方法未返回所有指标的问题
 - 修复用户中断后工具调用的处理逻辑，改进交互体验
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 统计模块全面重构：使用 Rich 库美化表格和面板显示
 - 简化 token 限制配置，采用动态计算替代多个独立配置项
@@ -2436,13 +2477,13 @@
 - 将StatsManager改为静态方法调用，简化使用方式
 - 根据输出文件名动态生成PDF标题
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - README 新增 Windows PowerShell 安装说明
 - 新增 Vibe Working 工作模式介绍章节
 - 更新配置文档，简化 token 相关配置说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 将时间节省统计中的一天调整为8小时工作时
 - 统计显示界面采用3行2列布局，信息展示更紧凑
@@ -2550,7 +2591,7 @@
 
 - **引入Jarvis Book**: 正式引入 "Jarvis Book" 作为官方文档，覆盖项目介绍、快速开始、核心概念、使用指南、工具开发、高级主题等九大章节。
 - **README优化**: 大幅重构了主 `README.md` 文件，使其结构更清晰、内容更精简，并提供了指向新文档系统的清晰导航。
-本次更新主要聚焦于提升用户体验和可维护性，通过引入全新的 "Jarvis Book" 文档系统和升级到 `typer` 框架，让用户能更轻松地学习和使用Jarvis。同时，底层的重构和代码精简也为项目未来的发展奠定了更坚实的基础。
+  本次更新主要聚焦于提升用户体验和可维护性，通过引入全新的 "Jarvis Book" 文档系统和升级到 `typer` 框架，让用户能更轻松地学习和使用Jarvis。同时，底层的重构和代码精简也为项目未来的发展奠定了更坚实的基础。
 
 ### Release Note - v0.2.1 2025-07-25
 
@@ -2670,11 +2711,11 @@
   - 为智能体添加了 `use_methodology` 和 `use_analysis` 控制开关，并引入了“禁止杜撰”、“主动提问”等交互原则。
 - **丰富AI教练的方法论**:
   - 在 `example/roles/roles.yaml` 中，为“技术教练”角色在问题定义、根因分析、方案评估等阶段，补充了大量业界标准方法论，如 `5W1H`、`帕累托分析`、`SWOT分析`、`成本效益分析(CBA)` 和
-`多标准决策分析(MCDA)` 等。
+    `多标准决策分析(MCDA)` 等。
 - **命令行工具功能增强**:
-
   - **会话管理**: 为 `jarvis` 和 `jarvis-code-agent` 新增 `--restore-session` 功能；为 `jarvis-platform-manager` 聊天模式增加了 `/save_session` 和 `/load_session` 命令。
   - **知识库(RAG)增强**: `jarvis-rag` 新增 `list-docs` 子命令，并为常用选项增加了简写形式和 `--batch-size` 选项。
+
 - **模型更新**:
   - 在 `src/jarvis/jarvis_platform/kimi.py` 中，更新了 Kimi 平台的模型列表，以匹配最新的版本名称 (`k1.5`, `k1.5-thinking`, `k2-thinking`)。
 
@@ -2865,29 +2906,29 @@
 
 ### Release Note - v0.1.212 2025-07-06
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增AI8模型平台实现，支持AI8 API集成
 - 新增OYI模型平台实现，支持OYI API集成
 - 添加全局最后一条消息记录功能，可通过Ctrl+L快捷键复制
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复Kimi模型文件解析和流式响应处理逻辑
 - 修复Kimi模型消息流式响应处理中的Unicode解码问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构Kimi模型的消息流式响应处理机制
 - 优化平台管理器主模块的中文注释和文档
 - 改进输入模块，添加最后一条消息复制功能
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新平台管理器主模块的注释为中文
 - 添加新功能的文档说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 更新输入模块的提示信息，包含新快捷键说明
 - 优化代码格式和结构
@@ -2914,28 +2955,28 @@
 
 ### Release Note - v0.1.210 2025-07-05
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增httpx>=0.28.1依赖，用于改进HTTP请求处理
 - 实现stream_post流式POST请求方法，支持更高效的流式响应处理
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复平台消息流处理逻辑，改进SSE格式数据解析
 - 修复git工具中最新提交日期检查逻辑
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构HTTP模块，从requests迁移到httpx库
 - 优化流式响应处理逻辑，减少内存使用
 - 改进代码结构，增加类型提示和文档字符串
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新HTTP模块文档，反映新的httpx实现
 - 添加stream_post方法文档说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 禁用CodeAgent中的方法论和分析功能
 - 改进错误处理和连接稳定性
@@ -2947,41 +2988,41 @@
 #### 1. 新功能(New Features)
 
 - **新增平台管理命令别名**  
-  在`pyproject.toml`和`setup.py`中为`jarvis-platform-manager`添加了`jpm`别名，提高命令可用性  
+  在`pyproject.toml`和`setup.py`中为`jarvis-platform-manager`添加了`jpm`别名，提高命令可用性
 - **新增HTTP工具模块**  
-  新增`src/jarvis/jarvis_utils/http.py`文件，提供统一的HTTP请求处理  
+  新增`src/jarvis/jarvis_utils/http.py`文件，提供统一的HTTP请求处理
 - **新增自动安装机制**  
-  在`jarvis_utils/git_utils.py`中增加git更新后自动pip安装的逻辑  
+  在`jarvis_utils/git_utils.py`中增加git更新后自动pip安装的逻辑
 
 #### 2. Bug修复(Bug Fixes)
 
 - **修复编辑文件输出抑制问题**  
-  在`edit_file_handler.py`中修正输出抑制逻辑  
+  在`edit_file_handler.py`中修正输出抑制逻辑
 
 - **修复文件上传逻辑**  
-  在各平台文件中统一使用新的HTTP模块处理上传  
+  在各平台文件中统一使用新的HTTP模块处理上传
 
 - **修复初始化流程**  
-  在`jarvis_agent/__init__.py`中移除无效的历史记录处理  
+  在`jarvis_agent/__init__.py`中移除无效的历史记录处理
 
 #### 3. 性能优化(Performance Improvements)
 
 - **优化token计数**  
-  使用`tiktoken`替代`transformers`进行token计数  
+  使用`tiktoken`替代`transformers`进行token计数
 
 #### 4. 文档更新(Documentation)
 
 - **更新README文档**  
-  修正命令行别名说明和配置参数说明  
+  修正命令行别名说明和配置参数说明
 
 - **更新配置schema**  
-  移除过期的配置参数如`JARVIS_AUTO_UPDATE`  
+  移除过期的配置参数如`JARVIS_AUTO_UPDATE`
 
 #### 5. 其他变更(Other Changes)
 
 - **依赖项更新**  
-  移除`transformers`和`torch`，新增`tiktoken`和`pyyaml`  
-- **新增.gitignore规则**  
+  移除`transformers`和`torch`，新增`tiktoken`和`pyyaml`
+- **新增.gitignore规则**
 
 # Release Note v0.1.208 - 2025-07-02
 
@@ -3013,29 +3054,29 @@
 
 ### Release Note - v0.1.207 2025-06-27
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增'ToolUsage'命令，提示可用工具列表及使用方法
 - 新增'ReloadConfig'命令，重新加载配置文件
 - 新增'Check'命令，执行静态代码检查，包括错误和风格问题
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了分块提交内容时的响应处理逻辑
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 调整了JARVIS_CONFIRM_BEFORE_APPLY_PATCH默认值为false
 - 优化了Web搜索命令的描述，支持多种提问格式
 - 优化了'FindRelatedFiles'命令的描述，更准确地查找与功能相关的文件
 - 重构了分块提交内容时的响应处理逻辑，提高稳定性
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新了README.md中的命令列表和描述
 - 更新了配置项JARVIS_CONFIRM_BEFORE_APPLY_PATCH的默认值说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 调整了部分代码格式和注释
 
@@ -3043,7 +3084,7 @@
 
 ### Release Note - v0.1.206 2025-06-27
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化了edit_file_handler.py中的代码格式和类型提示
 - 修复了中断处理时的spinner显示问题
@@ -3053,22 +3094,22 @@
 
 ### Release Note - v0.1.205 2025-06-23
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增中断处理机制，允许用户在补丁应用中断时提供补充信息
 - 更新了多行输入提示信息，改为中文显示
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了多个类型检查警告，添加了类型忽略注释
 - 修复了中断处理逻辑，添加了中断状态重置
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构了文件编辑处理器的补丁应用逻辑
 - 优化了输入工具的类型提示和导入结构
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 移除了不必要的代码注释
 - 统一了多行输入工具的使用方式
@@ -3077,27 +3118,27 @@
 
 ### Release Note - v0.1.204 2025-06-19
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增文件添加确认机制，当检测到大量新增文件、代码行数或二进制文件时会提示用户确认
 - 在代码编辑器中添加中断检查功能，支持用户中断补丁应用
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了长上下文提交时的进度显示问题
 - 修复了git提交流程中新增文件检测逻辑
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构了git工具类，提取新增文件检测和确认逻辑到独立函数
 - 优化了平台基础类的长文本提交处理，移除spinner改用普通输出
 - 改进代码编辑器的错误处理流程
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新代码工程师指南，添加文件操作工具使用说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 添加开发者激励提示信息
 - 改进git提交信息模板
@@ -3106,28 +3147,28 @@
 
 ### Release Note - v0.1.203 2025-06-17
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 改进了文件路径解析逻辑，支持单引号、双引号和无引号的文件路径格式
 - 添加了重复文件路径的合并处理功能
 - 增强了搜索文本的多处匹配警告提示
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了搜索文本在文件中不存在时的错误处理
 - 修复了缩进搜索文本的多处匹配检测问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 统一了补丁数据结构中的键名（SEARCH/REPLACE）
 - 优化了错误提示信息的输出格式
 - 重构了补丁解析逻辑，提高代码可读性
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新了方法注释，更清晰地描述功能和行为
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 改进了代码缩进和格式一致性
 
@@ -3135,13 +3176,13 @@
 
 ### Release Note - v0.1.202 2025-06-16
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化了文件编辑处理器的正则表达式匹配逻辑，移除了不必要的空格匹配
 - 简化了DIFF块的格式标记，使用更简洁的SEARCH/REPLACE标签
 - 改进了文件编辑指令的模板格式，使其更加紧凑易读
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 修复了平台基础类中消息接收确认的格式问题
 
@@ -3149,30 +3190,30 @@
 
 ### Release Note - v0.1.201 2025-06-15
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增EditFileHandler类，用于处理文件编辑指令(PATCH块)
 - 支持通过PATCH指令进行精确的文件内容修改
 - 新增fast_edit和slow_edit两种编辑模式
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复yuanbao平台首次聊天标志未正确重置的问题
 - 修复文件编辑工具中yaml解析失败时的错误处理
 - 修复thinking标签未正确处理的问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构文件编辑工具为多文件处理模式
 - 优化代码补丁生成逻辑，增加自动缩进匹配功能
 - 改进文件编辑失败时的回滚机制
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新文件编辑指令格式文档
 - 添加PATCH处理器使用说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 移除旧的edit_file工具，改用新的EditFileHandler
 - 优化工具调用格式错误提示信息
@@ -3181,26 +3222,26 @@
 
 ### Release Note - v0.1.200 2025-06-13
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 添加了工具调用中断时的用户干预处理逻辑
 - 新增git仓库更新后的自动重启功能
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了builtin_input_handler中ReloadConfig的返回逻辑
 - 修复了Yuanbao平台请求超时问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化了Yuanbao平台所有请求的超时处理(统一设置为600秒)
 - 移除了builtin_replace_map.py中冗余的ToolHelp模板
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 无
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 优化了utils.py的导入顺序
 
@@ -3208,26 +3249,26 @@
 
 ### Release Note - v0.1.199 2025-06-10
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 无
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了edit_file工具的多处匹配错误提示格式
 - 修复了user_confirm函数中的KeyboardInterrupt异常处理问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化rewrite_file工具，统一使用绝对路径处理文件
 - 改进rewrite_file工具的文件列表记录功能
 - 移除了utils.py中不必要的空行
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 无
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 更新了docs/images/wechat.png图片文件
 
@@ -3235,18 +3276,18 @@
 
 ### Release Note - v0.1.197 2025-06-07
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增历史对话文件上传功能，支持将历史对话保存为临时文件并上传
 - 添加JARVIS_USE_HISTORY_COUNT配置项，替代原有的JARVIS_USE_HISTORY布尔配置
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构历史记录处理逻辑，分离保存功能到独立方法
 - 优化上下文切换机制，支持文件上传方式保留历史
 - 改进README.md配置说明，更新历史记录相关文档
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 修复临时文件清理逻辑，确保异常情况下也能正确清理
 
@@ -3254,18 +3295,18 @@
 
 ### Release Note - v0.1.196 2025-06-05
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增历史记录功能(JARVIS_USE_HISTORY_COUNT配置项)
 - 添加历史记录导出为Markdown的功能
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 调整首次运行时文件上传逻辑
-- 重构Agent初始化代码，提取_first_run方法
+- 重构Agent初始化代码，提取\_first_run方法
 - 优化历史记录处理逻辑
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新README.md添加JARVIS_USE_HISTORY配置说明
 
@@ -3273,23 +3314,23 @@
 
 ### Release Note - v0.1.195 2025-06-04
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增Jarvis历史记录功能(jarvis_history)
 - 新增Jarvis通用代理工具功能文档
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 改进git差异获取逻辑，支持空仓库情况
 - 优化输出异常处理，防止崩溃
 - 增强方法论上传功能，支持同时上传其他文件
 - 改进代码导入组织，加快初始化速度
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新README.md，添加Jarvis通用代理工具详细文档
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 修复git差异解码错误处理
 - 改进文件上传失败处理逻辑
@@ -3299,25 +3340,25 @@
 
 ### Release Note - v0.1.194 2025-06-01
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 添加重新加载配置功能
 - 添加ToolUsage标记处理功能
 - 在提交流程中提前获取修改文件列表
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复缩进处理时空行也被添加空格的问题
 - 调整工具调用和中断处理的执行顺序
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 将配置文件加载逻辑提取到独立函数
 - 优化代码格式和导入顺序
 - 精简各语言默认的lint工具配置
 - 移除未使用的导入语句和功能
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 重构文档结构并优化内容组织
 
@@ -3325,29 +3366,29 @@
 
 ### Release Note - v0.1.193 2025-05-31
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 添加example/roles/roles.yaml角色配置文件
 - 完善代码代理功能文档和使用说明
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复addon_prompt生成逻辑
 - 修复代码代理功能中的文件修改提示逻辑
 - 修复yuanbao平台初始化参数传递问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化代码代理功能的输出格式
 - 重构工具注册表的输出格式
 - 改进方法论模块的输出显示
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新README.md添加代码代理功能说明
 - 完善内置工具帮助文档
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 添加空文件处理逻辑
 - 改进错误处理提示
@@ -3356,27 +3397,27 @@
 
 ### Release Note - v0.1.192 2025-05-31
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增OpenAI平台文件上传功能支持检测方法
 - 改进中断信号处理机制，支持中断计数
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复用户干预信息拼接格式问题
 - 修正补丁应用后的提示信息显示逻辑
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构全局变量管理代码，改进代码格式和可读性
 - 优化中断信号处理逻辑，增加多次中断保护
 - 改进代码代理的返回信息提示
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新代码注释和类型提示
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 调整控制台主题配置格式
 - 优化SIGINT信号处理逻辑
@@ -3385,28 +3426,28 @@
 
 ### Release Note - v0.1.191 2025-05-31
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增角色配置功能，支持从YAML文件加载角色配置并开始对话
 - 添加中断处理机制，支持在模型交互期间接收SIGINT信号
 - 为平台管理器添加角色子命令(--role/-c)
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了文件分析工具的输出格式，使用<output>和<error>标签包裹
 - 修复了set_system_message方法名不一致问题，统一为set_system_prompt
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构了平台管理器的代码结构，提高可读性
 - 移除了默认的addon提示
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新了工具注册表的输出处理文档
 - 添加了角色配置文件的示例说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 优化了信号处理逻辑
 
@@ -3414,28 +3455,28 @@
 
 ### Release Note - v0.1.190 2025-05-30
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增预定义任务(pre-command)功能，支持通过YAML文件快速执行常用命令
 - 工具生成功能增加自动依赖检查和安装功能
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了工具注册时参数处理的问题
 - 移除了已废弃的`jarvis-ask-codebase`功能
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化了工具生成器的代码结构和错误处理
 - 改进了工具注册流程的稳定性
 - 增强了工具生成时的依赖管理功能
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新了README中的预定义任务使用说明
 - 完善了工具生成功能的文档
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 更新了微信图片资源
 
@@ -3443,30 +3484,30 @@
 
 ### Release Note - v0.1.189 2025-05-29
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增`support_upload_files()`方法用于检查平台是否支持文件上传
 - 新增`generate_summary()`方法用于生成对话历史摘要
 - 优化了代码差异文件上传处理逻辑
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了文件上传失败时的错误处理流程
 - 修复了`clear_history()`方法的重命名问题
 - 修复了平台不支持上传文件时的错误提示
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构了`GitCommitTool`的代码结构，提取了独立方法
 - 优化了文件上传前的平台支持检查
 - 改进了大文件处理逻辑
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新了方法文档字符串
 - 完善了错误提示信息
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 调整了`JARVIS_MAX_BIG_CONTENT_SIZE`默认值为160000
 - 优化了代码格式和缩进风格
@@ -3475,27 +3516,27 @@
 
 ### Release Note - v0.1.188 2025-05-28
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增RefactorCheckerExpert重构检查专家，用于检查重构后的代码逻辑是否与原代码完全一致
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了文件输入处理器中文件引用解析的问题，防止有其他引号干扰文件路径解析
 - 修复了edit_file工具中补丁应用失败的问题，现在会自动尝试增加1-16个空格缩进重试匹配
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构了jarvis_agent的初始化逻辑，调整了输入处理器的执行顺序
 - 优化了文件输入处理器的中文注释和错误处理
 - 去除了main.py中的交互模式循环结构
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新了RefactorCheckerExpert的详细工作流程文档
 - 完善了file_input_handler的中文参数说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 改进了edit_file工具的错误提示信息，现在会显示更详细的匹配失败原因
 
@@ -3503,28 +3544,28 @@
 
 ### Release Note - v0.1.187 2025-05-27
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了config参数从必选改为可选(main.py)
 - 修复了对话长度计算逻辑(**init**.py)
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化了模型响应处理流程(**init**.py)
 - 改进了文件上传后的提示信息(**init**.py)
 
 ### Release Note - v0.1.186 2025-05-27
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增支持通过`-f/--config`参数指定自定义配置文件路径
 - 添加对`-c/--agent_definition`参数的支持，用于指定代理定义文件
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复文件编辑工具中文件路径处理问题，现在使用绝对路径
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 重构`init_env`函数，支持通过参数传递配置文件路径
 - 优化配置文件加载逻辑
@@ -3534,25 +3575,25 @@
 
 ### Release Note - v0.1.185 2025-05-26
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 推荐腾讯元宝作为首选平台，优化了平台适配性
 - 新增文件上传功能，支持在Agent初始化时自动上传文件
 - 扩展通义平台支持的文件类型，新增对多种图片格式的支持
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复了文件处理工具中的文件存在性检查逻辑
 - 修复了补丁应用失败时的错误信息显示问题
 - 修复了工具调用格式错误的提示信息
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化了README文档中的平台推荐说明
 - 重构了文件上传处理流程，提升稳定性
 - 改进了补丁应用的错误处理机制
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新了README中的配置说明，明确推荐腾讯元宝平台
 - 完善了工具调用格式错误的帮助信息
@@ -3575,23 +3616,23 @@
 
 本次更新主要优化了文件上传的用户体验，并增加了系统消息的支持，以提升对话初始化的功能。
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增通义千问平台支持，包含四种模型类型：Normal, Thinking, Deep-Research, Code-Chat
 - 添加通义千问cookies获取指南和配置说明文档
 - 新增通义千问平台实现文件(src/jarvis/jarvis_platform/tongyi.py)
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复Yuanbao平台中思考模式消息处理逻辑
 - 修复Kimi平台模型名称返回问题
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化平台注册表中不再需要的set_suppress_output方法
 - 统一各平台思考模式消息处理格式
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新README.md添加通义千问平台配置说明
 - 添加通义千问cookies获取图示(docs/images/tongyi.png)
@@ -3600,24 +3641,24 @@
 
 ### Release Note - v0.1.182 2025-05-25
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增文件输入处理功能 (file_input_handler.py)
 - 新增用户数据存储功能 (**init**.py)
 - 新增文件内容读取时的用户数据跟踪功能 (file_operation.py, read_code.py)
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修正git diff命令参数错误 (pre-command)
 - 修复文件操作工具中的边界条件问题 (file_operation.py)
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化编辑工具的核心逻辑 (edit_file.py)
 - 改进代码阅读工具的输出格式 (read_code.py)
 - 重构系统提示标签格式 (**init**.py)
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新jarvis_agent模块的初始化文档 (**init**.py)
 
@@ -3653,7 +3694,7 @@
 
 ### Release Note - v0.1.180 2025-05-23
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 新增yaml配置文件方式配置替换键值对
 - 添加MCP工具配置支持并重构注册逻辑
@@ -3661,12 +3702,12 @@
 - Kimi、OpenAI和Yuanbao平台认证配置项使用ENV配置管理
 - 添加配置文件schema支持并改进配置文件处理
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修正自动更新配置默认值
 - 修正文件编辑工具中的补丁内容格式化
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 将配置文件读取逻辑拆分为独立函数
 - 重构环境初始化逻辑以同时支持配置文件和旧版env文件
@@ -3677,7 +3718,7 @@
 - 将环境变量配置重构为通用配置系统
 - 移除不再使用的旧配置文件引用
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新配置方式说明并移除废弃方法
 - 更新MCP配置文档并调整配置模式
@@ -3686,7 +3727,7 @@
 - 为所有MCP配置模式添加enable字段说明
 - 添加流式MCP配置说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 添加旧配置文件格式迁移警告
 - 移除API密钥未设置时的详细指引信息
@@ -3696,7 +3737,7 @@
 
 ### Release Note - v0.1.179 2025-05-22
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 添加可流式传输的HTTP MCP客户端实现(StreamableMcpClient)
 - 新增lint工具支持并集成到代码修改提示中
@@ -3704,12 +3745,12 @@
 - 添加YAML格式配置文件支持
 - 添加任务分析功能支持
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修改环境变量默认值：JARVIS_USE_METHODOLOGY和JARVIS_USE_ANALYSIS从'true'改为'false'
 - 移除不再使用的lsp_get_diagnostics工具
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化代码结构和导入顺序
 - 优化lint工具匹配逻辑并统一文件名大小写处理
@@ -3718,13 +3759,13 @@
 - 优化系统提示格式和内容
 - 优化提交信息生成提示模板结构
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 统一函数文档字符串格式
 - 更新README导航链接格式
 - 更新配置格式并添加文件路径说明
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 删除空文件aaaa
 - 移除不再需要的依赖项(jedi和sseclient)
@@ -3734,31 +3775,31 @@
 
 ### Release Note - v0.1.178 2025-05-21
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 添加方法论分析功能，支持通过配置启用任务分析和方法论生成
 - 新增`use_methodology`参数控制方法论的使用
 - 增强文件编辑工具功能，支持两种编辑模式和AI辅助编辑
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修复工具过滤逻辑错误，避免KeyError异常
 - 修正生成release note时的git log参数错误
 - 移除冗余的错误信息输出和未使用的库导入
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 移除整个LSP实现模块，将被新的代码分析架构替代
 - 重构文件编辑工具文档，提供更清晰的使用指南
 - 更新代码库分析工具的平台配置
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 为OpenAIModel类添加详细方法文档
 - 在分析步骤中新增要求，确保结论基于实际代码证据
 - 更新微信二维码图片
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 修改任务完成提示逻辑，明确禁止输出TOOL_CALL标签
 - 清理代码保持简洁性
@@ -3798,11 +3839,11 @@
 
 #### ⚙️ 配置变更
 
-| 配置项 | 原值 | 新值 | 说明 |
-|-------|------|------|------|
-| MAX_TOKEN_COUNT | 102M | 960K | 降低内存占用 |
-| MAX_BIG_CONTENT | 96K | 1M | 支持更大文件处理 |
-| MAX_TOOL_CALLS | 20 | 0=∞ | 支持无限调用模式 |
+| 配置项          | 原值 | 新值 | 说明             |
+| --------------- | ---- | ---- | ---------------- |
+| MAX_TOKEN_COUNT | 102M | 960K | 降低内存占用     |
+| MAX_BIG_CONTENT | 96K  | 1M   | 支持更大文件处理 |
+| MAX_TOOL_CALLS  | 20   | 0=∞  | 支持无限调用模式 |
 
 ### Release Note - v0.1.176 2025-05-19
 
@@ -3867,11 +3908,11 @@
 
 ### Release Note - v0.1.174 2025-05-16
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 调整JARVIS_MAX_BIG_CONTENT_SIZE默认值从64000到96000
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化长文本处理逻辑和token计算方式
 
@@ -3879,7 +3920,7 @@
 
 ### Release Note - v0.1.173 2025-05-16
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 调整JARVIS_MAX_BIG_CONTENT_SIZE默认值为64000，优化内存使用
 
@@ -3887,7 +3928,7 @@
 
 ### Release Note - v0.1.171 2025-05-16
 
-#### **新功能 (Features)**  
+#### **新功能 (Features)**
 
 - 添加生成ReleaseNote的自动化流程
 - 添加长上下文交互时的进度显示
@@ -3895,29 +3936,29 @@
 - 改进任务分析流程和工作生成机制
 - 重构任务分析提示模板以支持工作生成和版本控制
 - 为agent添加基本优先级显示
-- 改进release_note生成格式和内容结构  
+- 改进release_note生成格式和内容结构
 
-#### **修复 (Fixes)**  
+#### **修复 (Fixes)**
 
 - 修正ReleaseNote.md文件写入方式为追加导致重复问题
 - 修改默认最大内容大小从10MB改为1MB
 - 修复上下文丢失时的空响应处理
 - 修复自定义回复循环和显示格式问题
-- 修复大文件上下文丢失时的错误处理逻辑  
+- 修复大文件上下文丢失时的错误处理逻辑
 
-#### **优化与重构 (Refactors & Improvements)**  
+#### **优化与重构 (Refactors & Improvements)**
 
 - 优化上下文长度过滤编辑逻辑
 - 简化对话配置和结果显示模板
-- 移除chat_big_content策略并统一为大内容处理编辑逻辑  
+- 移除chat_big_content策略并统一为大内容处理编辑逻辑
 
-#### **文档更新 (Documentation)**  
+#### **文档更新 (Documentation)**
 
 - 更新release_note生成编辑和重命名文件
 - 更新pre-command文档中jgc命令的说明
-- 重构发布说明格式和补充细节更新内容  
+- 重构发布说明格式和补充细节更新内容
 
-#### **其他 (Miscellaneous)**  
+#### **其他 (Miscellaneous)**
 
 - 在发布说明中添加当前日期和预期发布时间
 
