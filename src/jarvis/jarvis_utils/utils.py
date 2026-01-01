@@ -770,6 +770,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                 remaining_hours = int(hours % 8)
 
                 time_parts = []
+                encouragement = None
                 if work_years > 0:
                     time_parts.append(f"{work_years} 年")
                 if work_months > 0:
