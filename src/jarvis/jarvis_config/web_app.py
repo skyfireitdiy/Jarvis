@@ -1303,6 +1303,44 @@ def get_html_template() -> str:
             }
         }
 
+        // 辅助函数：递归处理嵌套对象中的 __key__ 和 __temp__ 键
+        function processNestedDictKeys(obj) {
+            if (typeof obj !== 'object' || obj === null) {
+                return obj;
+            }
+            
+            if (Array.isArray(obj)) {
+                return obj.map(item => processNestedDictKeys(item));
+            }
+            
+            const result = {};
+            let tempValue = null;
+            let actualKey = null;
+            
+            // 第一遍：收集 __key__ 和 __temp__ 的值
+            for (const key in obj) {
+                if (key === '__key__') {
+                    actualKey = obj[key];
+                } else if (key === '__temp__') {
+                    tempValue = processNestedDictKeys(obj[key]);
+                } else {
+                    // 递归处理其他键的值
+                    result[key] = processNestedDictKeys(obj[key]);
+                }
+            }
+            
+            // 如果存在 __key__ 和 __temp__，用实际键名替换
+            if (actualKey && tempValue !== null) {
+                result[actualKey] = tempValue;
+            } else if (tempValue !== null && !actualKey) {
+                // 如果只有 __temp__ 没有 __key__，保留 __temp__ 的值但记录警告
+                // 这种情况不应该发生，但为了安全起见处理它
+                result['__temp__'] = tempValue;
+            }
+            
+            return result;
+        }
+
         function collectFieldValue(name, prop, formData) {
             const type = prop.type;
 
@@ -1381,7 +1419,9 @@ def get_html_template() -> str:
                     }
                 }
 
-                return Object.keys(dict).length > 0 ? dict : prop.default || {};
+                // 递归处理嵌套对象中的 __key__ 和 __temp__ 键
+                const processedDict = processNestedDictKeys(dict);
+                return Object.keys(processedDict).length > 0 ? processedDict : prop.default || {};
             }
             
             if (type === 'array') {
