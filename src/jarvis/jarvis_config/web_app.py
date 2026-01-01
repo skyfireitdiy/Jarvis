@@ -136,9 +136,15 @@ def create_app(schema_path: Path, output_path: Path) -> FastAPI:
             raise HTTPException(status_code=500, detail="Output path not set")
 
         # 调试：打印保存信息
-        PrettyOutput.auto_print(f"🔍 [DEBUG] 准备保存配置到: {_output_path}", timestamp=False)
-        PrettyOutput.auto_print(f"🔍 [DEBUG] 文件路径类型: {type(_output_path)}", timestamp=False)
-        PrettyOutput.auto_print(f"🔍 [DEBUG] 文件路径存在: {_output_path.exists()}", timestamp=False)
+        PrettyOutput.auto_print(
+            f"🔍 [DEBUG] 准备保存配置到: {_output_path}", timestamp=False
+        )
+        PrettyOutput.auto_print(
+            f"🔍 [DEBUG] 文件路径类型: {type(_output_path)}", timestamp=False
+        )
+        PrettyOutput.auto_print(
+            f"🔍 [DEBUG] 文件路径存在: {_output_path.exists()}", timestamp=False
+        )
 
         # 清理配置中的 null 值（递归移除）
         def clean_null_values(obj: Any) -> Any:
@@ -1304,6 +1310,7 @@ def get_html_template() -> str:
             if (type === 'object' && prop.additionalProperties && !prop.properties) {
                 const dict = {};
                 const tempData = {};  // 存储临时键名 __temp__ 的数据
+                let actualKeyName = null;  // 存储用户输入的实际键名
                 const entries = formData.entries();
 
                 for (const [key, value] of entries) {
@@ -1312,8 +1319,11 @@ def get_html_template() -> str:
                         const dictKey = match[1];
                         const subPath = match[2];
 
-                        // 跳过 __key__ 键，它只是用于标识键名输入框
+                        // 收集 __key__ 键的值（用户输入的实际键名）
                         if (dictKey === '__key__') {
+                            if (value && value.trim() !== '') {
+                                actualKeyName = value.trim();
+                            }
                             continue;
                         }
 
@@ -1345,25 +1355,16 @@ def get_html_template() -> str:
                 }
 
                 // 处理临时键名 __temp__ 的数据
-                // 查找对应的键名输入框的值
-                if (tempData.__temp__ !== undefined) {
-                    // 遍历所有表单字段，查找 name[__key__] 的值
-                    for (const [key, value] of entries) {
-                        const keyMatch = key.match(new RegExp('^' + escapeRegExp(name) + '\\[__key__\\]$'));
-                        if (keyMatch && value && value.trim() !== '') {
-                            // 使用用户输入的实际键名
-                            const actualKey = value.trim();
-                            if (!dict[actualKey]) {
-                                dict[actualKey] = tempData.__temp__;
-                            } else {
-                                // 如果该键已存在，合并数据
-                                if (typeof dict[actualKey] === 'object' && typeof tempData.__temp__ === 'object') {
-                                    Object.assign(dict[actualKey], tempData.__temp__);
-                                } else {
-                                    dict[actualKey] = tempData.__temp__;
-                                }
-                            }
-                            break;
+                // 使用第一次遍历时收集的实际键名
+                if (tempData.__temp__ !== undefined && actualKeyName) {
+                    if (!dict[actualKeyName]) {
+                        dict[actualKeyName] = tempData.__temp__;
+                    } else {
+                        // 如果该键已存在，合并数据
+                        if (typeof dict[actualKeyName] === 'object' && typeof tempData.__temp__ === 'object') {
+                            Object.assign(dict[actualKeyName], tempData.__temp__);
+                        } else {
+                            dict[actualKeyName] = tempData.__temp__;
                         }
                     }
                 }
