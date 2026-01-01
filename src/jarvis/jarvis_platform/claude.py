@@ -9,6 +9,7 @@ from typing import List
 from typing import Tuple
 
 from anthropic import Anthropic
+from anthropic.types import MessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -52,6 +53,7 @@ class ClaudeModel(BasePlatform):
         self.model_name = os.getenv("model") or "claude-3-5-sonnet-20241022"
 
         # 初始化 Anthropic 客户端
+        self.client = None
         try:
             if self.base_url:
                 self.client = Anthropic(api_key=self.api_key, base_url=self.base_url)
@@ -59,7 +61,6 @@ class ClaudeModel(BasePlatform):
                 self.client = Anthropic(api_key=self.api_key)
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 初始化 Anthropic 客户端失败: {e}")
-            self.client = None
 
         # 消息历史
         self.messages: List[Dict[str, str]] = []
@@ -87,15 +88,32 @@ class ClaudeModel(BasePlatform):
         异常:
             当API调用失败时会打印错误信息并返回空列表
         """
-        # Anthropic 不提供模型列表 API，返回常用模型
-        models = [
-            ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
-            ("claude-3-5-haiku-20241022", "Claude 3.5 Haiku"),
-            ("claude-3-opus-20240229", "Claude 3 Opus"),
-            ("claude-3-sonnet-20240229", "Claude 3 Sonnet"),
-            ("claude-3-haiku-20240307", "Claude 3 Haiku"),
-        ]
-        return models
+        if not self.client:
+            PrettyOutput.auto_print("❌ Anthropic 客户端未初始化")
+            return []
+
+        try:
+            # 尝试使用models API获取实际的模型列表
+            model_response = self.client.models.list()
+            models = []
+            for model in model_response.data:
+                model_id = model.id if hasattr(model, "id") else str(model)
+                model_name = model.id if hasattr(model, "id") else str(model)
+                models.append((model_id, model_name))
+
+            if models:
+                PrettyOutput.auto_print("✅ 成功从API获取模型列表")
+                return models
+            else:
+                PrettyOutput.auto_print("⚠️ API响应中没有模型数据")
+                return []
+        except AttributeError:
+            # models API 不存在或不支持
+            PrettyOutput.auto_print("❌ 模型列表API不可用")
+            return []
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 获取模型列表失败: {e}")
+            return []
 
     def set_model_name(self, model_name: str):
         """
@@ -137,7 +155,7 @@ class ClaudeModel(BasePlatform):
 
         try:
             # 转换消息格式为 Anthropic 格式
-            anthropic_messages = []
+            anthropic_messages: List[MessageParam] = []
             for msg in self.messages:
                 role = msg.get("role")
                 content = msg.get("content")
