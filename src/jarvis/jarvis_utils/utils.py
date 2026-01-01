@@ -33,11 +33,12 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_in_chat
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
-from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
 
-# 向后兼容：导出 get_yes_no 供外部模块引用
-get_yes_no = user_confirm
+# 向后兼容：导出 get_yes_no 供外部模块引用（延迟导入以避免循环依赖）
+def get_yes_no(*args, **kwargs):
+    from jarvis.jarvis_utils.input import user_confirm
+    return user_confirm(*args, **kwargs)
 
 
 def decode_output(data: bytes) -> str:
@@ -1010,6 +1011,7 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
             PrettyOutput.auto_print(
                 "⚠️ 检测到当前终端由 Jarvis 打开。再次启动可能导致嵌套。"
             )
+            from jarvis.jarvis_utils.input import user_confirm
             if not user_confirm("是否仍要继续启动 Jarvis？", default=False):
                 PrettyOutput.auto_print("ℹ️ 已取消启动以避免终端嵌套。")
                 sys.exit(0)
@@ -2398,6 +2400,7 @@ def _pull_git_repo(repo_path: Path, repo_type: str) -> None:
             timeout=10,
         )
         if decode_output(status_result.stdout):
+            from jarvis.jarvis_utils.input import user_confirm
             if user_confirm(
                 f"检测到 '{repo_path.name}' 存在未提交的更改，是否放弃这些更改并更新？"
             ):
