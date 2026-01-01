@@ -12,7 +12,6 @@ import base64
 import os
 
 from jarvis.jarvis_utils.output import PrettyOutput
-from jarvis.jarvis_utils.utils import decode_output
 
 # -*- coding: utf-8 -*-
 import sys
@@ -407,11 +406,11 @@ class FileCompleter(Completer):
                         ["git", "ls-files"],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
+                        text=True,
                     )
                     if result.returncode == 0:
-                        decoded_output = decode_output(result.stdout)
                         self._git_files_cache = [
-                            p for p in decoded_output.splitlines() if p.strip()
+                            p for p in result.stdout.splitlines() if p.strip()
                         ]
                     else:
                         self._git_files_cache = []
@@ -1016,13 +1015,11 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             ["git", "ls-files"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
+                            text=True,
                         )
                         if r.returncode == 0:
-                            decoded_output = decode_output(r.stdout)
                             files = [
-                                line
-                                for line in decoded_output.splitlines()
-                                if line.strip()
+                                line for line in r.stdout.splitlines() if line.strip()
                             ]
                     except Exception:
                         files = []
@@ -1066,8 +1063,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             input="\n".join(items),
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
+                            text=True,
                         )
-                        sel = decode_output(proc.stdout).strip()
+                        sel = proc.stdout.strip()
                         if sel:
                             selected_path = sel
             except Exception as e:
@@ -1176,8 +1174,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                             input="\n".join(items),
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
+                            text=True,
                         )
-                        sel = decode_output(proc.stdout).strip()
+                        sel = proc.stdout.strip()
                         if sel:
                             selected_path = sel
             except Exception as e:
