@@ -459,8 +459,6 @@ class SchemaParser:
             schema: Schema 定义
             path: 当前路径
         """
-        # 调试信息：打印转换路径和类型
-        # print(f"[DEBUG TYPE] Converting path: {path}, value type: {type(value).__name__}, schema type: {schema.get('type', 'N/A')}", file=sys.stderr)
         # 处理 oneOf/anyOf：找到匹配的 schema 并转换
         if "oneOf" in schema:
             for sub_schema in schema["oneOf"]:
