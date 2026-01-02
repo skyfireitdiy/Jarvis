@@ -45,8 +45,42 @@ class DependencyFailedError(DependencyValidationError):
     pass
 
 
-# 任务输出长度限制常量
-DEFAULT_MAX_TASK_OUTPUT_LENGTH = 10000  # 默认最大任务输出长度（字符数）
+def _calculate_default_max_output_length(agent: Any = None) -> int:
+    """基于当前模型配置计算默认的最大输出长度
+
+    参数:
+        agent: Agent实例，用于获取模型配置
+
+    返回:
+        int: 默认最大输出长度（字符数）
+    """
+    try:
+        # 如果有agent实例，优先使用agent的模型配置
+        if agent and hasattr(agent, "model"):
+            try:
+                # 尝试从agent的模型获取最大输入token数
+                max_input_tokens = (
+                    agent.model.get_max_input_token_count()
+                    if hasattr(agent.model, "get_max_input_token_count")
+                    else get_max_input_token_count(get_global_model_group())
+                )
+            except Exception:
+                # 如果通过agent获取失败，使用全局配置
+                model_group = get_global_model_group()
+                max_input_tokens = get_max_input_token_count(model_group)
+        else:
+            # 没有agent时使用全局配置
+            model_group = get_global_model_group()
+            max_input_tokens = get_max_input_token_count(model_group)
+
+        # 计算1/3限制的token数（更保守的回退方案），然后转换为字符数
+        limit_tokens = int(max_input_tokens * 1 / 3)
+        limit_chars = limit_tokens * 4
+        # 确保返回一个合理的正数
+        return max(1000, limit_chars)  # 最小1000字符，避免过小的限制
+    except Exception:
+        # 如果获取失败，返回一个相对安全的默认值
+        return 4000  # 4000字符作为最终回退值
 
 
 class task_list_manager:
@@ -89,8 +123,8 @@ class task_list_manager:
             limit_chars = limit_tokens * 4
             return limit_chars
         except Exception:
-            # 如果获取失败，使用默认值
-            return DEFAULT_MAX_TASK_OUTPUT_LENGTH
+            # 如果获取失败，使用基于当前模型配置的动态计算值
+            return _calculate_default_max_output_length(agent)
 
     def _get_truncate_lengths(self, max_length: int) -> tuple[int, int]:
         """根据最大长度计算截断时的前缀和后缀长度
@@ -1632,7 +1666,9 @@ class task_list_manager:
                             diff = get_diff_between_commits(start_commit, end_commit)
 
                             # 限制diff大小以适应上下文窗口
-                            max_diff_length = 10000  # 可根据需要调整最大长度
+                            max_diff_length = _calculate_default_max_output_length(
+                                parent_agent
+                            )  # 基于agent上下文动态计算最大长度
                             if len(diff) > max_diff_length:
                                 # 截断diff并在末尾添加提示信息
                                 diff = (
