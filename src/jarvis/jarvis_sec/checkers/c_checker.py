@@ -715,7 +715,7 @@ def _rule_function_return_ptr_no_check(
                 "create",
                 "init",
             )
-            if any(kw in func_name.lower() for kw in alloc_keywords):
+            if func_name and any(kw in func_name.lower() for kw in alloc_keywords):
                 conf += 0.2
 
             issues.append(

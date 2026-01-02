@@ -263,7 +263,7 @@ def _convert_backtick_multiline_strings(s: str) -> str:
     return result
 
 
-def _strip_markdown_code_blocks(s: str) -> str:
+def _strip_markdown_code_blocks(s: Any) -> Any:
     """
     去除字符串中的 markdown 代码块标记（如 ```json5、```json、``` 等）
 

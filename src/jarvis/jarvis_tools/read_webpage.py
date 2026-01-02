@@ -2,7 +2,7 @@
 from typing import Any
 from typing import Dict
 
-import requests
+import requests  # type: ignore # 导入第三方库requests
 from markdownify import markdownify as md
 
 from jarvis.jarvis_platform.registry import PlatformRegistry

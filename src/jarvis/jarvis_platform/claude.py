@@ -177,7 +177,18 @@ class ClaudeModel(BasePlatform):
                 system_param = [{"type": "text", "text": self.system_message}]
 
             # 调用 Anthropic API
-            stream_kwargs = {
+            from typing import Union
+
+            stream_kwargs: Dict[
+                str,
+                Union[
+                    str,
+                    List[MessageParam],
+                    int,
+                    List[List[Dict[str, str]]],
+                    List[Dict[str, str]],
+                ],
+            ] = {
                 "model": self.model_name,
                 "messages": anthropic_messages,
                 "max_tokens": 4096,
@@ -185,7 +196,7 @@ class ClaudeModel(BasePlatform):
             if system_param:
                 stream_kwargs["system"] = system_param
 
-            with self.client.messages.stream(**stream_kwargs) as stream:
+            with self.client.messages.stream(**stream_kwargs) as stream:  # type: ignore
                 full_response = ""
                 for text in stream.text_stream:
                     full_response += text

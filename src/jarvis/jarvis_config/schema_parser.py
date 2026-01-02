@@ -475,9 +475,9 @@ class SchemaParser:
 
         if "anyOf" in schema:
             for sub_schema in schema["anyOf"]:
-                sub_errors: List[ValidationError] = []
-                self._validate_against_schema(value, sub_schema, path, sub_errors)
-                if not sub_errors:
+                sub_errors_anyof: List[ValidationError] = []
+                self._validate_against_schema(value, sub_schema, path, sub_errors_anyof)
+                if not sub_errors_anyof:
                     self._convert_types(value, sub_schema, path)
                     return
             return
@@ -534,8 +534,10 @@ class SchemaParser:
                     for field, field_value in value.items():
                         field_path = f"{path}.{field}" if path else field
                         # 转换字段值
+                        type_value = additional_schema.get("type")
                         converted = self._try_convert(
-                            field_value, additional_schema.get("type")
+                            field_value,
+                            type_value if type_value is not None else "string",
                         )
                         if converted is not None and converted is not field_value:
                             PrettyOutput.auto_print(
