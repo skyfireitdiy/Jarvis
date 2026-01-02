@@ -974,27 +974,23 @@ git reset --hard {start_commit}
                 return
 
             # 每轮审查开始前显示清晰的提示信息
-            if not self.non_interactive:
-                if is_infinite:
-                    PrettyOutput.auto_print(
-                        f"\n🔄 代码审查循环 - 第 {iteration} 轮（无限模式）"
-                    )
-                else:
-                    PrettyOutput.auto_print(
-                        f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
-                    )
-                if not user_confirm("是否开始本轮代码审查？", default=True):
-                    PrettyOutput.auto_print("ℹ️ 用户终止了代码审查")
-                    return
+            if is_infinite:
+                PrettyOutput.auto_print(
+                    f"\n🔄 代码审查循环 - 第 {iteration} 轮（无限模式）"
+                )
             else:
-                if is_infinite:
-                    PrettyOutput.auto_print(
-                        f"\n🔍 开始第 {iteration} 轮代码审查...（无限模式）"
-                    )
-                else:
-                    PrettyOutput.auto_print(
-                        f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
-                    )
+                PrettyOutput.auto_print(
+                    f"\n🔄 代码审查循环 - 第 {iteration}/{max_iterations} 轮"
+                )
+
+            if is_infinite:
+                PrettyOutput.auto_print(
+                    f"\n🔍 开始第 {iteration} 轮代码审查...（无限模式）"
+                )
+            else:
+                PrettyOutput.auto_print(
+                    f"\n🔍 开始第 {iteration}/{max_iterations} 轮代码审查..."
+                )
 
             # 对 git diff 进行 token 限制处理（review 需要更多上下文，使用 40% 的 token 比例）
             truncated_git_diff = self._truncate_diff_for_review(
@@ -1061,27 +1057,13 @@ git reset --hard {start_commit}
                 PrettyOutput.auto_print(f"      位置: {location}")
                 PrettyOutput.auto_print(f"      建议: {suggestion}")
 
-            # 在每轮审查后给用户一个终止选择
-            if not self.non_interactive:
-                if not user_confirm("是否继续修复这些问题？", default=True):
-                    PrettyOutput.auto_print("ℹ️ 用户选择终止审查，保持当前代码状态")
-                    return
-
             # 只有在非无限模式下才检查是否达到最大迭代次数
             if not is_infinite and iteration >= max_iterations:
                 PrettyOutput.auto_print(
                     f"\n⚠️ 已达到最大审查次数 ({max_iterations})，停止审查"
                 )
-                # 在非交互模式下直接返回，交互模式下询问用户
-                if not self.non_interactive:
-                    if not user_confirm("是否继续修复？", default=False):
-                        return
-                    # 用户选择继续，重置迭代次数
-                    iteration = 0
-                    max_iterations = self.review_max_iterations
-                    is_infinite = max_iterations == 0
-                else:
-                    return
+                # 达到最大迭代次数，直接返回
+                return
 
             # 构建修复 prompt
             fix_prompt = f"""代码审查发现以下问题，请修复：
