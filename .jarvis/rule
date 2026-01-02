@@ -1,0 +1,1258 @@
+# AI代码开发指导规则 - 编码规范维度
+
+## AI开发指令
+
+1. **编码与格式**:
+   - 所有Python文件必须使用UTF-8编码
+   - 遵循PEP 8代码风格规范
+   - 使用4个空格作为缩进，禁止使用Tab
+   - 行长度限制在88个字符以内
+   - 文件开头必须包含`# -*- coding: utf-8 -*-`
+
+2. **注释与文档**:
+   - 每个模块、类、函数都必须包含文档字符串
+   - 使用多行文档字符串格式，遵循Google风格
+   - 注释内容需描述意图而非代码实现细节
+   - 类型注解必须与实际参数/返回值匹配
+
+3. **命名约定**:
+   - 类名使用PascalCase
+   - 函数名使用snake_case
+   - 常量使用UPPER_SNAKE_CASE
+   - 私有属性/方法以单下划线开头
+   - 包和模块名使用snake_case
+
+4. **代码结构**:
+   - 导入顺序：标准库→第三方库→项目内部库，按字母排序
+   - 类定义前添加空行，函数定义前后各空一行
+   - 模块中按import→常量→类→函数的顺序组织
+
+## 代码生成准则
+
+### UTF-8编码
+- **AI指令**: 生成的所有Python文件必须以`# -*- coding: utf-8 -*-`开头
+- **代码样例**:
+  ```python
+  # -*- coding: utf-8 -*-
+  """模块文档字符串"""
+  ```
+
+### PEP 8规范
+- **AI指令**: 遵循PEP 8风格，使用4个空格缩进，行长度不超过88字符
+- **代码样例**:
+  ```python
+  def example_function(param_one: str, param_two: int) -> bool:
+      """函数文档字符串."""
+      if param_one and param_two > 0:
+          return True
+      return False
+  ```
+
+### 类型注解
+- **AI指令**: 所有函数必须包含类型注解，使用typing模块处理复杂类型
+- **代码样例**:
+  ```python
+  from typing import Optional, Dict, Any, List
+  
+  def process_data(data: List[Dict[str, Any]], 
+                   timeout: Optional[int] = None) -> Dict[str, Any]:
+      """处理数据.
+      
+      Args:
+          data: 要处理的数据列表
+          timeout: 超时时间（秒）
+          
+      Returns:
+          处理结果字典
+      """
+      return {"processed": True}
+  ```
+
+### 命名约定
+- **AI指令**: 严格遵循项目命名约定，类名使用PascalCase，函数名使用snake_case
+- **代码样例**:
+  ```python
+  class DataProcessor:
+      def __init__(self):
+          self._private_attr = None
+      
+      def process_item(self, item_id: str) -> str:
+          """处理项目."""
+          return f"Processed: {item_id}"
+  ```
+
+### 文档字符串
+- **AI指令**: 所有公共函数和类必须包含Google风格的文档字符串
+- **代码样例**:
+  ```python
+  def calculate_score(self, 
+                      values: List[float], 
+                      weight: float = 1.0) -> float:
+      """计算加权分数.
+      
+      Args:
+          values: 数值列表
+          weight: 权重系数
+          
+      Returns:
+          计算后的加权分数
+          
+      Raises:
+          ValueError: 当输入包含负数时
+      """
+      if any(v < 0 for v in values):
+          raise ValueError("Values must be non-negative")
+      return sum(values) * weight
+  ```
+
+### 导入组织
+- **AI指令**: 按标准库→第三方库→内部库的顺序导入，每组之间空一行
+- **代码样例**:
+  ```python
+  import os
+  import sys
+  from typing import Any, Dict
+  
+  import requests
+  import yaml
+  from pydantic import BaseModel
+  
+  from jarvis.jarvis_utils.config import get_data_dir
+  from jarvis.jarvis_utils.output import PrettyOutput
+  ```
+
+## 实际项目代码参考
+
+- **UTF-8编码**: `src/jarvis/jarvis_utils/utils.py` 第4行 `# -*- coding: utf-8 -*-`
+- **类型注解**: `src/jarvis/jarvis_utils/utils.py` 大量使用typing模块
+- **文档字符串**: `src/jarvis/jarvis_config/web_app.py` 函数文档字符串遵循Google风格
+- **命名约定**: `src/jarvis/jarvis_platform/registry.py` 类名使用PascalCase，函数名使用snake_case
+- **代码结构**: `src/jarvis/jarvis_utils/output.py` 导入→常量→类→函数的组织顺序
+
+# AI代码开发指导规则 - 工程结构规范维度
+
+## AI开发指令
+
+1. **目录布局**:
+   - 代码存放于src/目录下，项目主包名为jarvis
+   - 每个功能模块作为独立子包组织在src/jarvis/下
+   - 测试代码存放于tests/目录下，与源码目录结构保持一致
+   - 配置文件和资源文件存放在特定目录如builtin/、docs/等
+
+2. **模块组织**:
+   - 每个子包应有清晰的功能边界和职责划分
+   - 主要功能模块包括agent、utils、config、platform等
+   - 子模块按功能垂直切分，避免跨模块依赖环
+   - 公共功能统一归类到utils包中
+
+3. **包和子模块组织**:
+   - 每个子包必须包含__init__.py文件
+   - 复杂子包可进一步划分子模块
+   - __init__.py中只导出公共接口，内部实现不对外暴露
+   - 子模块命名应清晰反映其功能职责
+
+4. **依赖关系**:
+   - 遵循依赖倒置原则，高层模块不依赖低层模块
+   - 内部模块间依赖关系应保持清晰、可追踪
+   - 避免循环依赖
+   - 通过__init__.py统一管理对外暴露的API
+
+## 代码生成准则
+
+### 目录结构
+- **AI指令**: 生成代码时应遵循项目目录结构规范，主要模块放置在src/jarvis/下
+- **代码样例**:
+  ```
+  src/
+  └── jarvis/
+      ├── __init__.py
+      ├── jarvis_agent/
+      │   ├── __init__.py
+      │   └── jarvis.py
+      ├── jarvis_utils/
+      │   ├── __init__.py
+      │   ├── output.py
+      │   └── utils.py
+      └── jarvis_config/
+          ├── __init__.py
+          ├── cli.py
+          └── web_app.py
+  tests/
+  └── jarvis/
+      └── jarvis_utils/
+          └── test_utils.py
+  ```
+
+### 模块组织
+- **AI指令**: 每个功能模块应作为独立子包组织，具有清晰职责
+- **代码样例**:
+  ```python
+  # src/jarvis/jarvis_stats/__init__.py
+  from .stats import StatsManager
+  
+  __all__ = ["StatsManager"]
+  ```
+
+### 包组织原则
+- **AI指令**: 遵循单一职责原则，每个包只负责特定功能领域
+- **代码样例**:
+  ```python
+  # src/jarvis/jarvis_utils/__init__.py
+  """Jarvis工具模块
+  该模块提供了Jarvis系统中使用的各种实用函数和类。
+  包含多种辅助函数、配置管理和常见操作。
+  该模块组织为以下几个子模块：
+  - config: 配置管理
+  - dialogue_recorder: 对话记录器
+  - embedding: 文本嵌入工具
+  - git_utils: Git仓库操作
+  - input: 用户输入处理
+  - methodology: 方法论管理
+  - output: 输出格式化
+  - utils: 通用工具
+  """
+  
+  import os
+  import colorama
+  from rich.traceback import install as install_rich_traceback
+  
+  # 从新模块重新导出
+  # 这些导入是项目功能所必需的，可能会被动态使用
+  from .dialogue_recorder import DialogueRecorder as DialogueRecorder
+  
+  # 初始化colorama以支持跨平台的彩色文本
+  colorama.init()
+  # 禁用tokenizers并行以避免多进程问题
+  os.environ["TOKENIZERS_PARALLELISM"] = "false"
+  # 安装rich traceback处理器以获得更好的错误信息
+  install_rich_traceback()
+  ```
+
+### 子模块划分
+- **AI指令**: 复杂功能应进一步划分子模块，保持单一职责
+- **代码样例**:
+  ```python
+  # src/jarvis/jarvis_code_agent/
+  jarvis_code_agent/
+  ├── __init__.py
+  └── code_analyzer/
+      ├── __init__.py
+      ├── build_validator/
+      │   ├── __init__.py
+      │   └── validator.py
+      └── languages/
+          ├── __init__.py
+          ├── python_analyzer.py
+          └── rust_analyzer.py
+  ```
+
+### 依赖管理
+- **AI指令**: 避免循环依赖，合理组织模块间关系
+- **代码样例**:
+  ```python
+  # src/jarvis/jarvis_utils/config.py 依赖
+  from jarvis.jarvis_utils.builtin_replace_map import BUILTIN_REPLACE_MAP
+  from jarvis.jarvis_utils.collections import CaseInsensitiveDict
+  
+  # 而不是反向依赖
+  ```
+
+## 实际项目代码参考
+
+- **目录布局**: `src/jarvis/` 下包含jarvis_agent、jarvis_utils、jarvis_config等多个功能模块
+- **模块组织**: `src/jarvis/jarvis_code_agent/code_analyzer/languages/` 按语言类型组织分析器
+- **包组织**: `src/jarvis/jarvis_utils/__init__.py` 提供模块级文档说明功能划分
+- **依赖关系**: `src/jarvis/jarvis_git_utils/` 依赖于 `src/jarvis/jarvis_utils/` 中的工具函数
+- **子模块划分**: `src/jarvis/jarvis_code_analysis/checklists/` 按语言类型划分不同的检查表
+
+# AI代码开发指导规则 - 错误处理规范维度
+
+## AI开发指令
+
+1. **异常类型定义**:
+   - 自定义异常应继承自Exception或其子类
+   - 异常类名应以Error或Exception结尾
+   - 异常构造函数应接收message参数并传给父类
+   - 业务相关异常应使用有意义的命名
+
+2. **异常处理策略**:
+   - 使用try-except块捕获特定异常类型
+   - 避免捕获过于宽泛的异常（如裸露的except:）
+   - 在except块中添加错误日志记录
+   - 适当使用finally块进行资源清理
+
+3. **错误日志记录**:
+   - 使用PrettyOutput进行格式化错误输出
+   - 按照OutputType.ERROR类型输出错误信息
+   - 记录错误发生的具体位置和上下文信息
+   - 对于敏感信息进行脱敏处理
+
+4. **错误恢复机制**:
+   - 实现优雅降级机制，确保系统基本功能可用
+   - 对于可恢复的错误提供重试机制
+   - 使用上下文管理器确保资源正确释放
+   - 在错误处理后提供适当的用户反馈
+
+## 代码生成准则
+
+### 异常类型定义
+- **AI指令**: 定义自定义异常类时应继承自Exception并提供有意义的名称
+- **代码样例**:
+  ```python
+  class ValidationError(Exception):
+      """Schema 验证错误"""
+      
+      def __init__(self, message: str, path: str = ""):
+          self.message = message
+          self.path = path
+          super().__init__(f"{path}: {message}" if path else message)
+  ```
+
+### 异常捕获和处理
+- **AI指令**: 捕获特定异常类型，避免使用裸露的except子句
+- **代码样例**:
+  ```python
+  try:
+      # 执行可能抛出异常的代码
+      result = process_data(input_data)
+  except ValueError as e:
+      # 记录错误并进行处理
+      PrettyOutput.auto_print(f"❌ 数据处理失败: {str(e)}")
+      return {"success": False, "error": str(e)}
+  except FileNotFoundError as e:
+      PrettyOutput.auto_print(f"❌ 文件未找到: {str(e)}")
+      return {"success": False, "error": f"文件不存在: {str(e)}"}
+  ```
+
+### 错误日志记录
+- **AI指令**: 使用PrettyOutput进行格式化错误输出，并提供上下文信息
+- **代码样例**:
+  ```python
+  from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+  
+  try:
+      # 某些操作
+      pass
+  except Exception as e:
+      error_message = f"❌ 操作失败: {str(e)}"
+      PrettyOutput.print(error_message, output_type=OutputType.ERROR)
+      return {"success": False, "stdout": "", "stderr": str(e)}
+  ```
+
+### 资源清理
+- **AI指令**: 在finally块中进行必要的资源清理，或使用上下文管理器
+- **代码样例**:
+  ```python
+  temp_file_path = None
+  try:
+      # 创建临时文件
+      tmp_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+      temp_file_path = tmp_file.name
+      tmp_file.write(data)
+      tmp_file.close()
+      
+      # 使用临时文件
+      result = process_with_file(temp_file_path)
+      
+      return result
+  except Exception as e:
+      PrettyOutput.print(f"❌ 处理失败: {str(e)}", output_type=OutputType.ERROR)
+      return {"success": False, "error": str(e)}
+  finally:
+      # 清理临时文件
+      if temp_file_path and os.path.exists(temp_file_path):
+          try:
+              os.unlink(temp_file_path)
+          except Exception:
+              # 记录清理失败但不抛出异常
+              PrettyOutput.auto_print(f"⚠️ 无法删除临时文件: {temp_file_path}")
+  ```
+
+### 错误恢复
+- **AI指令**: 实现优雅降级，确保系统在错误情况下仍能提供基础功能
+- **代码样例**:
+  ```python
+  def get_config_value(key: str, default: Any = None) -> Any:
+      """获取配置值，失败时返回默认值"""
+      try:
+          # 尝试从配置文件获取值
+          return load_config_from_file(key)
+      except (FileNotFoundError, KeyError):
+          # 配置文件不存在或键不存在时返回默认值
+          PrettyOutput.auto_print(f"⚠️ 使用默认配置值: {key} = {default}")
+          return default
+      except Exception as e:
+          # 其他错误也返回默认值
+          PrettyOutput.auto_print(f"⚠️ 配置加载失败，使用默认值: {str(e)}")
+          return default
+  ```
+
+## 实际项目代码参考
+
+- **异常定义**: `src/jarvis/jarvis_config/schema_parser.py` 第14-20行定义了ValidationError异常类
+- **错误处理**: `src/jarvis/jarvis_git_utils/git_commiter.py` 第372-379行展示了完整的try-catch-finally错误处理模式
+- **日志记录**: `src/jarvis/jarvis_utils/output.py` 实现了PrettyOutput类用于格式化输出
+- **资源清理**: `src/jarvis/jarvis_git_utils/git_commiter.py` 第349-358行展示了在finally块中清理临时文件
+- **错误恢复**: `src/jarvis/jarvis_platform/registry.py` 第236-240行展示了失败时的回退机制
+
+# AI代码开发指导规则 - 数据处理规范维度
+
+## AI开发指令
+
+1. **数据格式支持**:
+   - 优先支持JSON和YAML格式的数据处理
+   - 使用json和yaml模块进行序列化和反序列化
+   - 对于配置文件，支持JSON Schema验证
+   - 处理大文件时使用流式处理或分块读取
+
+2. **数据验证**:
+   - 实现完整的数据验证机制，包括类型、范围、格式验证
+   - 使用JSON Schema进行结构验证
+   - 验证失败时提供详细的错误信息
+   - 支持对嵌套数据结构的递归验证
+
+3. **数据转换**:
+   - 支持不同数据类型之间的安全转换
+   - 实现类型转换失败时的优雅处理
+   - 提供数据格式标准化功能
+   - 保持数据精度和格式的一致性
+
+4. **编码兼容性处理**:
+   - 优先使用UTF-8编码处理文本数据
+   - 自动检测和处理其他编码（如GBK、latin-1）
+   - 对于无法识别的编码，使用latin-1作为最后回退
+   - 在数据传输过程中保持编码一致性
+
+## 代码生成准则
+
+### JSON/YAML处理
+- **AI指令**: 使用json和yaml模块处理数据，支持完整的序列化和反序列化
+- **代码样例**:
+  ```python
+  import json
+  import yaml
+  from pathlib import Path
+  
+  def load_json_file(file_path: Path) -> dict:
+      """加载JSON文件"""
+      with open(file_path, 'r', encoding='utf-8') as f:
+          return json.load(f)
+  
+  def save_yaml_file(data: dict, file_path: Path) -> None:
+      """保存YAML文件"""
+      with open(file_path, 'w', encoding='utf-8') as f:
+          yaml.safe_dump(
+              data,
+              f,
+              allow_unicode=True,
+              default_flow_style=False,
+              sort_keys=False
+          )
+  ```
+
+### 数据验证
+- **AI指令**: 实现递归验证机制，支持嵌套数据结构的验证
+- **代码样例**:
+  ```python
+  def validate_config(self, config: Dict[str, Any]) -> List[ValidationError]:
+      """验证配置是否符合 Schema
+      
+      Args:
+          config: 配置字典
+      
+      Returns:
+          验证错误列表，如果为空则验证通过
+      """
+      errors: List[ValidationError] = []
+      self._validate_against_schema(config, self.schema, "", errors)
+      
+      # 如果验证通过，进行类型转换
+      if not errors:
+          self._convert_types(config, self.schema, "")
+      return errors
+  ```
+
+### 类型转换
+- **AI指令**: 提供安全的类型转换功能，处理转换失败的情况
+- **代码样例**:
+  ```python
+  def _try_convert(self, value: Any, target_type: str) -> Any:
+      """尝试将值转换为目标类型
+      
+      Args:
+          value: 要转换的值
+          target_type: 目标类型（string, number, integer, boolean）
+      
+      Returns:
+          转换后的值，如果无法转换则返回 None
+      """
+      if value is None:
+          return None
+      
+      # 已经是正确类型，直接返回
+      if target_type == "string" and isinstance(value, str):
+          return None
+      if target_type == "number" and isinstance(value, (int, float)):
+          return None
+      if (
+          target_type == "integer"
+          and isinstance(value, int)
+          and not isinstance(value, bool)
+      ):
+          return None
+      if target_type == "boolean" and isinstance(value, bool):
+          return None
+      
+      # 尝试从字符串转换
+      if isinstance(value, str):
+          try:
+              if target_type == "number":
+                  # 先尝试转整数，再尝试浮点数
+                  if "." in value or "e" in value.lower():
+                      return float(value)
+                  else:
+                      return int(value)
+              elif target_type == "integer":
+                  return int(value)
+              elif target_type == "boolean":
+                  if value.lower() in ("true", "1", "yes", "on"):
+                      return True
+                  elif value.lower() in ("false", "0", "no", "off"):
+                      return False
+              elif target_type == "string":
+                  return str(value)
+          except (ValueError, TypeError):
+              pass
+      
+      return None
+  ```
+
+### 编码处理
+- **AI指令**: 实现多层次编码检测和处理机制
+- **代码样例**:
+  ```python
+  def decode_output(data: bytes) -> str:
+      """解码命令输出，自动尝试 UTF-8 和 GBK 编码
+      
+      Args:
+          data: 字节类型的输出数据
+      
+      Returns:
+          解码后的字符串
+      """
+      # 优先尝试 UTF-8（严格模式，失败时回退到其他编码）
+      try:
+          return data.decode("utf-8")
+      except (UnicodeDecodeError, AttributeError):
+          pass
+      
+      # 回退到 GBK（Windows 常用编码）
+      try:
+          return data.decode("gbk")
+      except (UnicodeDecodeError, AttributeError):
+          pass
+      
+      # 最后尝试 latin-1（不会失败，但可能有乱码）
+      try:
+          return data.decode("latin-1")
+      except AttributeError:
+          # 如果不是字节类型，转换为字符串
+          return str(data)
+  ```
+
+### 数据清理
+- **AI指令**: 提供数据清理和标准化功能
+- **代码样例**:
+  ```python
+  def clean_null_values(obj: Any) -> Any:
+      """递归清理配置中的 null 值
+      
+      Args:
+          obj: 要清理的对象
+      
+      Returns:
+          清理后的对象
+      """
+      if isinstance(obj, dict):
+          return {
+              k: clean_null_values(v) for k, v in obj.items() if v is not None
+          }
+      elif isinstance(obj, list):
+          return [clean_null_values(item) for item in obj if item is not None]
+      return obj
+  ```
+
+## 实际项目代码参考
+
+- **JSON/YAML处理**: `src/jarvis/jarvis_config/web_app.py` 第159-175行展示了JSON和YAML文件的保存逻辑
+- **数据验证**: `src/jarvis/jarvis_config/schema_parser.py` 第146-163行实现了完整的配置验证机制
+- **类型转换**: `src/jarvis/jarvis_config/schema_parser.py` 第544-611行提供了类型转换功能
+- **编码处理**: `src/jarvis/jarvis_utils/utils.py` 第46-72行实现了多层次编码解码功能
+- **数据清理**: `src/jarvis/jarvis_config/web_app.py` 第136-144行展示了数据清理逻辑
+
+# AI代码开发指导规则 - 接口设计规范维度
+
+## AI开发指令
+
+1. **Web API设计**:
+   - 使用FastAPI构建RESTful API服务
+   - 使用Pydantic模型定义请求和响应数据结构
+   - 实现CORS中间件以支持跨域请求
+   - 使用HTTPException处理API错误
+
+2. **CLI接口设计**:
+   - 使用Typer构建命令行接口
+   - 为每个参数提供清晰的帮助信息
+   - 支持默认参数值和类型转换
+   - 使用Option和Argument区分不同类型的参数
+
+3. **API命名规范**:
+   - 路由路径使用小写字母和连字符
+   - 使用名词表示资源，动词表示操作
+   - 版本号在URL中体现（如/v1/）
+   - 保持路径层次结构清晰
+
+4. **参数和返回值规范**:
+   - 所有参数必须包含类型注解
+   - 使用Pydantic模型进行数据验证
+   - 返回值应包括状态码和错误信息
+   - 实现分页和过滤参数的标准格式
+
+## 代码生成准则
+
+### FastAPI应用
+- **AI指令**: 使用FastAPI创建Web服务，包含CORS配置和异常处理
+- **代码样例**:
+  ```python
+  from fastapi import FastAPI, HTTPException
+  from fastapi.middleware.cors import CORSMiddleware
+  from pydantic import BaseModel
+  
+  # 请求模型
+  class SaveConfigRequest(BaseModel):
+      """保存配置的请求模型"""
+      config: Dict[str, Any]
+  
+  def create_app(schema_path: Path, output_path: Path) -> FastAPI:
+      """创建 FastAPI 应用
+      
+      Args:
+          schema_path: JSON Schema 文件路径
+          output_path: 输出配置文件路径
+      
+      Returns:
+          FastAPI 应用实例
+      """
+      # 创建 FastAPI 应用
+      app = FastAPI(
+          title="Jarvis 配置工具",
+          description="基于 JSON Schema 的动态配置表单",
+          version="1.0.0",
+      )
+      
+      # 启用 CORS
+      app.add_middleware(
+          CORSMiddleware,
+          allow_origins=["*"],
+          allow_credentials=True,
+          allow_methods=["*"],
+          allow_headers=["*"],
+      )
+      
+      return app
+  ```
+
+### Pydantic模型
+- **AI指令**: 使用Pydantic模型定义数据结构和验证规则
+- **代码样例**:
+  ```python
+  from pydantic import BaseModel
+  from typing import Dict, Any, Optional
+  
+  class SaveConfigRequest(BaseModel):
+      """保存配置的请求模型"""
+      config: Dict[str, Any]
+  
+  class ApiResponse(BaseModel):
+      """通用API响应模型"""
+      success: bool
+      message: Optional[str] = None
+      data: Optional[Dict[str, Any]] = None
+      errors: Optional[list] = None
+  ```
+
+### Typer CLI接口
+- **AI指令**: 使用Typer创建命令行接口，提供参数类型和帮助信息
+- **代码样例**:
+  ```python
+  import typer
+  from pathlib import Path
+  from typing import Optional
+  
+  app = typer.Typer(help="工具命令行接口")
+  
+  @app.command()
+  def web(
+      schema_file: Optional[Path] = typer.Option(
+          None,
+          "--schema",
+          "-s",
+          help="JSON Schema 文件路径",
+      ),
+      output_file: Optional[Path] = typer.Option(
+          None,
+          "--output",
+          "-o",
+          help="输出的配置文件路径",
+      ),
+      port: int = typer.Option(
+          8080,
+          "--port",
+          "-p",
+          help="Web 服务端口",
+      ),
+  ) -> None:
+      """启动 Web 配置界面"""
+      # 实现命令逻辑
+      pass
+  ```
+
+### API端点设计
+- **AI指令**: 遵循RESTful设计原则，提供适当的HTTP方法和状态码
+- **代码样例**:
+  ```python
+  @app.get("/api/schema")
+  async def get_schema() -> Dict[str, Any]:
+      """获取 Schema 数据
+      
+      Returns:
+          Schema 对象，包含属性、类型、约束等信息
+      """
+      if _schema_parser is None:
+          raise HTTPException(status_code=500, detail="Schema parser not initialized")
+      
+      properties = _schema_parser.get_properties()
+      
+      return {
+          "title": _schema_parser.get_title(),
+          "description": _schema_parser.get_description(),
+          "properties": properties,
+          "required": _schema_parser.get_required(),
+      }
+  
+  @app.post("/api/save")
+  async def save_config(request: SaveConfigRequest) -> Dict[str, Any]:
+      """保存配置
+      
+      Args:
+          request: 配置数据请求
+      
+      Returns:
+          保存结果
+      """
+      # 实现保存逻辑
+      return {"success": True, "message": "配置已保存"}
+  ```
+
+### 错误处理
+- **AI指令**: 使用HTTPException和自定义错误格式处理API错误
+- **代码样例**:
+  ```python
+  from fastapi import HTTPException
+  
+  @app.post("/api/save")
+  async def save_config(request: SaveConfigRequest) -> Dict[str, Any]:
+      """保存配置"""
+      if _schema_parser is None:
+          raise HTTPException(status_code=500, detail="Schema parser not initialized")
+      
+      # 验证配置
+      errors = _schema_parser.validate_config(request.config)
+      if errors:
+          return {
+              "success": False,
+              "errors": [
+                  {"path": error.path, "message": error.message} for error in errors
+              ],
+          }
+      
+      # 保存配置逻辑
+      return {"success": True, "message": f"配置已保存到 {_output_path}"}
+  ```
+
+## 实际项目代码参考
+
+- **FastAPI应用**: `src/jarvis/jarvis_config/web_app.py` 第35-209行展示了完整的FastAPI应用实现
+- **Pydantic模型**: `src/jarvis/jarvis_config/web_app.py` 第23-28行定义了SaveConfigRequest模型
+- **Typer CLI**: `src/jarvis/jarvis_config/cli.py` 第25-51行展示了Typer命令定义
+- **API端点**: `src/jarvis/jarvis_config/web_app.py` 第80-186行实现了多个API端点
+- **错误处理**: `src/jarvis/jarvis_config/web_app.py` 第90-95行展示了HTTPException的使用
+
+# AI代码开发指导规则 - 性能与资源规范维度
+
+## AI开发指令
+
+1. **缓存机制**:
+   - 使用@lru_cache装饰器缓存函数结果
+   - 合理设置缓存大小以平衡内存和性能
+   - 仅对纯函数或结果稳定的函数使用缓存
+   - 监控缓存命中率以评估有效性
+
+2. **资源管理**:
+   - 使用上下文管理器确保资源正确释放
+   - 实现资源池以减少创建和销毁开销
+   - 及时关闭文件、网络连接等资源
+   - 使用weakref避免循环引用
+
+3. **内存管理**:
+   - 避免创建不必要的中间对象
+   - 使用生成器处理大量数据
+   - 及时删除不再需要的大对象
+   - 使用__slots__减少对象内存占用
+
+4. **性能优化**:
+   - 优先优化性能瓶颈而非全面优化
+   - 使用性能分析工具定位热点代码
+   - 避免过早优化，先确保功能正确
+   - 实现性能监控和度量机制
+
+## 代码生成准则
+
+### 缓存机制
+- **AI指令**: 使用lru_cache装饰器缓存函数结果，提高重复调用性能
+- **代码样例**:
+  ```python
+  from functools import lru_cache
+  
+  @lru_cache(maxsize=None)
+  def get_replace_map() -> Dict[str, Any]:
+      """
+      获取替换映射表。
+      
+      优先使用GLOBAL_CONFIG_DATA['replace_map']的配置，
+      如果未配置则返回内置替换映射表。
+      
+      返回:
+          dict: 合并后的替换映射表字典(内置+配置中的映射表)
+      """
+      if "replace_map" in GLOBAL_CONFIG_DATA:
+          return {**BUILTIN_REPLACE_MAP, **GLOBAL_CONFIG_DATA["replace_map"]}
+      
+      return BUILTIN_REPLACE_MAP.copy()
+  ```
+
+### 资源管理
+- **AI指令**: 使用上下文管理器确保资源正确释放
+- **代码样例**:
+  ```python
+  import tempfile
+  
+  # 使用临时文件
+  with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+      temp_file.write(data)
+      temp_file_path = temp_file.name
+  
+  # 使用完后手动删除
+  try:
+      os.unlink(temp_file_path)
+  except Exception:
+      PrettyOutput.auto_print(f"⚠️ 无法删除临时文件: {temp_file_path}")
+  ```
+
+### 生成器使用
+- **AI指令**: 使用生成器处理大量数据，避免一次性加载到内存
+- **代码样例**:
+  ```python
+  def process_large_dataset(file_path: str):
+      """使用生成器逐行处理大文件"""
+      with open(file_path, 'r', encoding='utf-8') as f:
+          for line in f:
+              yield process_line(line.strip())
+  
+  # 使用生成器
+  for processed_item in process_large_dataset('large_file.txt'):
+      handle_item(processed_item)
+  ```
+
+### 性能监控
+- **AI指令**: 实现性能监控机制，统计关键操作的时间
+- **代码样例**:
+  ```python
+  from jarvis.jarvis_stats.stats import StatsManager
+  from datetime import datetime
+  
+  def monitored_function(data: Any) -> Any:
+      start_time = datetime.now()
+      try:
+          # 执行主要逻辑
+          result = process_data(data)
+          
+          # 记录成功执行时间
+          execution_time = (datetime.now() - start_time).total_seconds()
+          StatsManager.increment(
+              "function_execution_time",
+              amount=execution_time,
+              tags={"function": "monitored_function", "status": "success"},
+              unit="seconds"
+          )
+          return result
+      except Exception as e:
+          # 记录失败执行时间
+          execution_time = (datetime.now() - start_time).total_seconds()
+          StatsManager.increment(
+              "function_execution_time",
+              amount=execution_time,
+              tags={"function": "monitored_function", "status": "error"},
+              unit="seconds"
+          )
+          raise e
+  ```
+
+### 内存优化
+- **AI指令**: 使用__slots__减少对象内存占用
+- **代码样例**:
+  ```python
+  class CompactClass:
+      """使用__slots__优化内存占用"""
+      __slots__ = ['field1', 'field2', 'field3']
+      
+      def __init__(self, field1, field2, field3):
+          self.field1 = field1
+          self.field2 = field2
+          self.field3 = field3
+  ```
+
+## 实际项目代码参考
+
+- **缓存机制**: `src/jarvis/jarvis_utils/config.py` 第50行使用@lru_cache装饰器缓存get_replace_map函数
+- **资源管理**: `src/jarvis/jarvis_git_utils/git_commiter.py` 第349-358行在finally块中清理临时文件
+- **性能监控**: `src/jarvis/jarvis_stats/stats.py` 实现了完整的统计管理器
+- **内存管理**: `src/jarvis/jarvis_utils/config.py` 通过全局字典管理配置数据，避免重复加载
+- **生成器使用**: 项目中多处使用生成器模式处理大量数据，如配置验证过程
+
+# AI代码开发指导规则 - 依赖管理规范维度
+
+## AI开发指令
+
+1. **导入顺序规范**:
+   - 标准库导入
+   - 第三方库导入
+   - 项目内部模块导入
+   - 每组导入之间用空行分隔
+
+2. **第三方库使用**:
+   - 优先使用项目中已有的库
+   - 添加新库前检查是否已有类似功能
+   - 使用版本约束避免依赖冲突
+   - 避免使用已弃用的库和功能
+
+3. **配置管理**:
+   - 使用全局配置管理器统一管理配置
+   - 通过环境变量或配置文件注入依赖
+   - 支持运行时动态配置切换
+   - 实现配置验证和默认值回退
+
+4. **模块化依赖注入**:
+   - 使用工厂模式创建依赖实例
+   - 实现依赖解析和注册机制
+   - 支持多种实现的动态切换
+   - 保持依赖关系的清晰性
+
+## 代码生成准则
+
+### 导入顺序
+- **AI指令**: 遵循标准的导入顺序，分组之间用空行分隔
+- **代码样例**:
+  ```python
+  import os
+  import sys
+  from typing import Any, Dict, List, Optional
+  
+  import requests
+  import yaml
+  from pydantic import BaseModel
+  
+  from jarvis.jarvis_utils.config import get_data_dir
+  from jarvis.jarvis_utils.output import PrettyOutput
+  from jarvis.jarvis_utils.utils import decode_output
+  ```
+
+### 依赖注册机制
+- **AI指令**: 使用注册表模式管理不同平台或工具的实现
+- **代码样例**:
+  ```python
+  class PlatformRegistry:
+      """平台注册表"""
+      
+      def __init__(self):
+          self.platforms: Dict[str, Type[BasePlatform]] = {}
+      
+      def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:
+          """注册平台类
+          
+          Args:
+              name: 平台名称
+              model_class: 平台类
+          """
+          self.platforms[name] = platform_class
+      
+      def create_platform(self, name: str, llm_config: Optional[Dict[str, Any]] = None) -> Optional[BasePlatform]:
+          """创建平台实例
+          
+          Args:
+              name: 平台名称
+              llm_config: LLM配置字典，包含平台特定的配置参数
+          
+          Returns:
+              BasePlatform: 平台实例
+          """
+          if name not in self.platforms:
+              return None
+          
+          try:
+              platform = self.platforms[name](llm_config=llm_config or {})
+              return platform
+          except Exception as e:
+              PrettyOutput.auto_print(f"❌ 创建平台失败: {str(e)}")
+              return None
+  ```
+
+### 配置管理
+- **AI指令**: 使用全局配置管理器统一管理配置项
+- **代码样例**:
+  ```python
+  # 全局配置数据存储
+  GLOBAL_CONFIG_DATA: CaseInsensitiveDict = CaseInsensitiveDict()
+  
+  def set_global_env_data(env_data: Dict[str, Any]) -> None:
+      """设置全局环境变量数据"""
+      global GLOBAL_CONFIG_DATA
+      GLOBAL_CONFIG_DATA = CaseInsensitiveDict(env_data)
+  
+  def get_normal_platform_name(model_group_override: Optional[str] = None) -> str:
+      """获取正常操作的平台名称"""
+      config = _get_resolved_model_config(model_group_override)
+      return cast(str, config.get("platform", "openai"))
+  ```
+
+### 动态配置解析
+- **AI指令**: 实现动态配置解析，支持模型组配置
+- **代码样例**:
+  ```python
+  def _get_resolved_model_config(
+      model_group_override: Optional[str] = None,
+  ) -> Dict[str, Any]:
+      """
+      解析并合并模型配置，处理模型组。
+      
+      优先级顺序:
+      - 当通过 model_group_override（例如命令行 -g/--llm-group）指定组时：
+          1. llm_group 中通过引用展开的配置
+          2. 仅当组未提供对应键时，回退到顶层环境变量
+          3. 代码中的默认值
+      - 当未显式指定组时（使用默认组或未设置）：
+          1. 顶层环境变量
+          2. llm_group 中通过引用展开的配置
+          3. 代码中的默认值
+      """
+      group_config = {}
+      model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("llm_group")
+      model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
+      
+      if model_group_name and isinstance(model_groups, dict):
+          if model_group_name in model_groups:
+              group_config = model_groups[model_group_name]
+          elif model_group_override:
+              # 当显式指定了模型组但未找到时，报错并退出
+              PrettyOutput.auto_print(
+                  f"❌ 错误：指定的模型组 '{model_group_name}' 不存在于配置中。"
+              )
+              import sys
+              sys.exit(1)
+      
+      # 合并配置
+      resolved_config = group_config.copy()
+      
+      # 应用顶层配置覆盖
+      override_keys = ["platform", "model", "max_input_token_count"]
+      for key in override_keys:
+          if key in GLOBAL_CONFIG_DATA:
+              if model_group_override is None:
+                  # 未显式指定组：顶层覆盖组
+                  resolved_config[key] = GLOBAL_CONFIG_DATA[key]
+              else:
+                  # 显式指定组：仅在组未定义该键时回退到顶层
+                  if key not in resolved_config:
+                      resolved_config[key] = GLOBAL_CONFIG_DATA[key]
+      
+      return resolved_config
+  ```
+
+### 依赖注入
+- **AI指令**: 使用依赖注入模式管理组件间的依赖关系
+- **代码样例**:
+  ```python
+  def get_platform_by_type(platform_type: str = "normal", model_group_override: Optional[str] = None) -> BasePlatform:
+      """根据类型获取平台实例"""
+      if platform_type == "cheap":
+          platform_name = get_cheap_platform_name(model_group_override)
+          model_name = get_cheap_model_name(model_group_override)
+      elif platform_type == "smart":
+          platform_name = get_smart_platform_name(model_group_override)
+          model_name = get_smart_model_name(model_group_override)
+      else:
+          platform_name = get_normal_platform_name(model_group_override)
+          model_name = get_normal_model_name(model_group_override)
+      
+      # 获取llm_config
+      llm_config = get_llm_config(platform_type, model_group_override)
+      
+      # 创建平台实例
+      platform = PlatformRegistry().create_platform(platform_name, llm_config)
+      if platform is None:
+          raise RuntimeError(f"无法创建平台实例: {platform_name}")
+      platform.set_model_name(model_name)
+      
+      return platform
+  ```
+
+## 实际项目代码参考
+
+- **导入顺序**: `src/jarvis/jarvis_utils/output.py` 第12-33行展示了标准的导入分组顺序
+- **依赖注册**: `src/jarvis/jarvis_platform/registry.py` 实现了完整的平台注册机制
+- **配置管理**: `src/jarvis/jarvis_utils/config.py` 实现了全局配置管理器
+- **动态配置**: `src/jarvis/jarvis_utils/config.py` 中的_get_resolved_model_config函数
+- **依赖注入**: `src/jarvis/jarvis_git_utils/git_commiter.py` 中的平台创建和使用
+
+# AI代码开发指导规则 - 类型注解规范维度
+
+## AI开发指令
+
+1. **基础类型注解**:
+   - 为所有函数参数和返回值提供类型注解
+   - 使用标准库typing模块中的类型
+   - 对复杂类型使用类型别名提高可读性
+   - 避免使用字符串形式的前向引用
+
+2. **可选类型和联合类型**:
+   - 使用Optional[T]表示可能为None的值
+   - 使用Union[T1, T2]表示多种可能的类型
+   - Python 3.10+中使用T1 | T2语法
+   - 在适当情况下使用默认值处理可选参数
+
+3. **泛型和集合类型**:
+   - 使用List[T]、Dict[K, V]、Tuple[T1, T2, ...]等泛型类型
+   - 为集合类型指定元素的具体类型
+   - 使用TypeVar定义泛型函数和类
+   - 使用Generic创建自定义泛型类
+
+4. **高级类型特性**:
+   - 使用Protocol定义结构化类型契约
+   - 使用Callable表示函数类型
+   - 使用Type[MyClass]表示类对象类型
+   - 在类型注解中使用类型检查工具支持的特性
+
+## 代码生成准则
+
+### 基础类型注解
+- **AI指令**: 为所有函数参数和返回值提供精确的类型注解
+- **代码样例**:
+  ```python
+  from typing import Dict, Any, List, Optional, cast
+  
+  def process_data(data: List[Dict[str, Any]], 
+                   threshold: float = 0.5, 
+                   output_format: Optional[str] = None) -> Dict[str, Any]:
+      """处理数据并返回结果
+      
+      Args:
+          data: 输入的数据列表
+          threshold: 处理阈值
+          output_format: 输出格式，如果为None则使用默认格式
+          
+      Returns:
+          处理结果字典
+      """
+      result: Dict[str, Any] = {"processed": True, "count": len(data)}
+      return result
+  ```
+
+### 可选类型和联合类型
+- **AI指令**: 使用Optional和Union处理可能的空值或多种类型
+- **代码样例**:
+  ```python
+  from typing import Optional, Union
+  
+  def find_user(user_id: int) -> Optional[Dict[str, Any]]:
+      """查找用户，如果找不到返回None"""
+      # 实现查找逻辑
+      return None  # 或者用户数据
+  
+  def process_value(value: Union[int, str, float]) -> str:
+      """处理可能为多种类型的值"""
+      if isinstance(value, (int, float)):
+          return str(value)
+      return value
+  ```
+
+### 泛型和集合类型
+- **AI指令**: 为集合类型提供具体的元素类型注解
+- **代码样例**:
+  ```python
+  from typing import List, Dict, Tuple, TypeVar, Generic
+  
+  # 使用具体的集合类型注解
+  user_data: List[Dict[str, Any]] = []
+  metadata: Dict[str, List[str]] = {}
+  coord: Tuple[float, float] = (0.0, 0.0)
+  
+  # 定义泛型类
+  T = TypeVar('T')
+  
+  class Container(Generic[T]):
+      def __init__(self, value: T):
+          self.value = value
+      
+      def get_value(self) -> T:
+          return self.value
+  ```
+
+### 高级类型特性
+- **AI指令**: 使用协议和高级类型特性定义类型契约
+- **代码样例**:
+  ```python
+  from typing import Protocol, Type, Callable
+  
+  # 定义协议
+  class Drawable(Protocol):
+      def draw(self) -> None:
+          ...
+  
+  # 函数类型
+  Processor = Callable[[str], str]
+  
+  # 类类型
+  def create_instance(cls: Type['BaseModel'], *args, **kwargs) -> 'BaseModel':
+      return cls(*args, **kwargs)
+  ```
+
+### 类型转换和类型断言
+- **AI指令**: 使用cast进行安全的类型断言，避免运行时错误
+- **代码样例**:
+  ```python
+  from typing import cast
+  
+  def get_config_value(key: str) -> str:
+      # 假设config.get返回Any类型
+      value = config.get(key)
+      # 使用cast进行类型断言
+      return cast(str, value)
+  ```
+
+## 实际项目代码参考
+
+- **基础类型**: `src/jarvis/jarvis_utils/output.py` 中OutputEvent类的属性类型注解
+- **可选类型**: `src/jarvis/jarvis_config/schema_parser.py` 中多个函数使用Optional
+- **集合类型**: `src/jarvis/jarvis_platform/registry.py` 中Dict[str, Type[BasePlatform]]使用
+- **泛型使用**: `src/jarvis/jarvis_utils/config.py` 中广泛的typing模块使用
+- **类型转换**: `src/jarvis/jarvis_utils/output.py` 中使用cast进行类型转换
