@@ -222,8 +222,8 @@ class PlatformRegistry:
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）。"
                 f"model_group={model_group_override}, llm_config keys={list(llm_config.keys())}"
             )
-        platform.set_model_name(model_name)  # type: ignore
-        return platform  # type: ignore
+        platform.set_model_name(model_name)
+        return platform
 
     def get_cheap_platform(
         self, model_group_override: Optional[str] = None
@@ -238,9 +238,9 @@ class PlatformRegistry:
             raise RuntimeError(
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
             )
-        platform.set_model_name(model_name)  # type: ignore
-        platform.set_platform_type("cheap")  # type: ignore
-        return platform  # type: ignore
+        platform.set_model_name(model_name)
+        platform.set_platform_type("cheap")
+        return platform
 
     def get_smart_platform(
         self, model_group_override: Optional[str] = None
@@ -255,9 +255,9 @@ class PlatformRegistry:
             raise RuntimeError(
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
             )
-        platform.set_model_name(model_name)  # type: ignore
-        platform.set_platform_type("smart")  # type: ignore
-        return platform  # type: ignore
+        platform.set_model_name(model_name)
+        platform.set_platform_type("smart")
+        return platform
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:
         """Register platform class

@@ -229,12 +229,13 @@ def load_methodology(
                     platform.set_model_name(model_name)
             except Exception as e:
                 # 如果获取失败，尝试直接创建（向后兼容）
-                platform = PlatformRegistry().create_platform(platform_name)
-                if platform and model_name:
-                    platform.set_model_name(model_name)
-                if not platform:
+                platform_created = PlatformRegistry().create_platform(platform_name)
+                if platform_created and model_name:
+                    platform_created.set_model_name(model_name)
+                if not platform_created:
                     PrettyOutput.auto_print(f"❌ 无法创建平台实例: {str(e)}")
                     return ""
+                platform = platform_created
         else:
             # 方法论推荐使用cheap模型以降低成本
             platform = PlatformRegistry().get_cheap_platform(model_group)

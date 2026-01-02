@@ -6,7 +6,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
 
-import requests
+import requests  # type: ignore # 导入第三方库requests
 
 # pylint: disable=import-error,missing-module-docstring
 # fmt: off

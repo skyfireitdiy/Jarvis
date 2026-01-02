@@ -12,7 +12,7 @@ from urllib.parse import parse_qs
 from urllib.parse import urlencode
 from urllib.parse import urljoin
 
-import requests
+import requests  # type: ignore # 导入第三方库requests
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_utils.output import PrettyOutput
