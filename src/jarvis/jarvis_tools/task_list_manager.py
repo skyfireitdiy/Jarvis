@@ -15,6 +15,10 @@ from jarvis.jarvis_agent.task_list import TaskStatus
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.tag import ot, ct
+from jarvis.jarvis_utils.git_utils import (
+    get_latest_commit_hash,
+    get_diff_between_commits,
+)
 
 
 class DependencyValidationError(Exception):
@@ -1436,6 +1440,9 @@ class task_list_manager:
                 pass
 
         try:
+            # 记录执行前的commit
+            start_commit = get_latest_commit_hash()
+
             # 合并任务描述和附加信息（实际更新任务的desc字段，使打印时可见）
             if additional_info and str(additional_info).strip():
                 separator = "\n" + "=" * 50 + "\n"
@@ -1618,12 +1625,34 @@ class task_list_manager:
                         # 记录执行结果
                         all_execution_results.append(execution_result)
 
+                        # 获取执行后的commit并计算diff
+                        end_commit = get_latest_commit_hash()
+                        diff = ""
+                        if start_commit and end_commit and start_commit != end_commit:
+                            diff = get_diff_between_commits(start_commit, end_commit)
+
+                            # 限制diff大小以适应上下文窗口
+                            max_diff_length = 10000  # 可根据需要调整最大长度
+                            if len(diff) > max_diff_length:
+                                # 截断diff并在末尾添加提示信息
+                                diff = (
+                                    diff[: max_diff_length - 100]
+                                    + f"\n\n... (diff已截断，省略了{len(diff) - max_diff_length + 100}个字符) ..."
+                                )
+
+                        # 构建包含diff的背景信息用于验证
+                        verification_background = background
+                        if diff:  # 如果有diff，将其添加到验证背景中
+                            verification_background = (
+                                f"{background}\n\n代码变更diff:\n{diff}"
+                            )
+
                         # 验证任务是否真正完成
                         verification_passed, verification_result = (
                             self._verify_task_completion(
                                 task,
                                 task_content,
-                                background,
+                                verification_background,
                                 parent_agent,
                                 verification_iteration=iteration,
                             )
