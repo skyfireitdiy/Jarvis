@@ -111,6 +111,19 @@ class GitCommitTool:
             if not has_uncommitted_changes():
                 return {"success": True, "stdout": "No changes to commit", "stderr": ""}
 
+            # 在执行git add .之前，记录当前暂存区的文件（可能有用户手动添加的被gitignore的文件）
+            process = subprocess.Popen(
+                ["git", "diff", "--cached", "--name-only"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=False,
+            )
+            stdout_bytes, _ = process.communicate()
+            staged_files_before_add = decode_output(stdout_bytes)
+            manually_staged_files = [
+                f.strip() for f in staged_files_before_add.split("\n") if f.strip()
+            ]
+
             self._stage_changes()
 
             # 获取差异
@@ -332,6 +345,15 @@ commit信息
                     if process.returncode != 0:
                         # 如果提交失败，重置暂存区
                         subprocess.run(["git", "reset", "HEAD"], check=False)
+
+                        # 重置后，重新添加之前手动暂存的可能被gitignore的文件
+                        for file_path in manually_staged_files:
+                            if os.path.exists(file_path):
+                                # 使用 -f 参数强制添加被 .gitignore 忽略的文件
+                                subprocess.run(
+                                    ["git", "add", "-f", file_path], check=False
+                                )
+
                         error_msg = (
                             stderr.strip() if stderr else "Unknown git commit error"
                         )
