@@ -473,63 +473,7 @@ class DiffVisualizer:
         deletions = 0
         has_changes = False
 
-        # 用于跟踪前一个变更块的结束位置
-        prev_change_end_old = 0
-        prev_change_end_new = 0
-
         for idx, (tag, i1, i2, j1, j2) in enumerate(opcodes):
-            # 检测是否需要在变更块之间插入分隔符
-            if idx > 0 and tag in ("replace", "delete", "insert"):
-                # 使用实际行号检查连续性
-                prev_old_line = (
-                    old_line_map[prev_change_end_old - 1]
-                    if prev_change_end_old > 0
-                    and prev_change_end_old - 1 < len(old_line_map)
-                    else None
-                )
-                curr_old_line = old_line_map[i1] if i1 < len(old_line_map) else None
-                prev_new_line = (
-                    new_line_map[prev_change_end_new - 1]
-                    if prev_change_end_new > 0
-                    and prev_change_end_new - 1 < len(new_line_map)
-                    else None
-                )
-                curr_new_line = new_line_map[j1] if j1 < len(new_line_map) else None
-
-                # 只有当所有行号都有效且都不连续时才添加分割线
-                should_add_separator = False
-                if (
-                    prev_old_line is not None
-                    and curr_old_line is not None
-                    and prev_new_line is not None
-                    and curr_new_line is not None
-                ):
-                    # 检查实际行号是否不连续（两个方向都不连续）
-                    old_not_continuous = curr_old_line != prev_old_line + 1
-                    new_not_continuous = curr_new_line != prev_new_line + 1
-
-                    # 只有当两个方向都不连续时才添加分割线
-                    should_add_separator = old_not_continuous and new_not_continuous
-
-                if should_add_separator:
-                    # 动态计算分隔符宽度（基于终端宽度，限制在合理范围）
-                    terminal_width = self.console.width or 120
-                    # 表格有两列内容区域（每列约占总宽度的45%，减去行号列）
-                    separator_width = max(20, min(50, int(terminal_width * 0.4)))
-                    separator_text = "─" * separator_width
-                    separator = Text(separator_text, style="bright_black dim")
-                    table.add_row(
-                        "",
-                        separator,
-                        "",
-                        separator,
-                    )
-
-            # 只有在处理变更块时才更新结束位置
-            if tag in ("replace", "delete", "insert"):
-                prev_change_end_old = i2
-                prev_change_end_new = j2
-
             if tag == "equal":
                 # 显示未更改的行（灰色/dim样式），但只显示上下文行数
                 equal_chunk = old_lines[i1:i2]
