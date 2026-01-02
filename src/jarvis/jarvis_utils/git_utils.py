@@ -68,6 +68,19 @@ def has_uncommitted_changes() -> bool:
     返回:
         bool: 如果有未提交的更改返回True，否则返回False
     """
+    # 在执行git add .之前，记录当前暂存区的文件（可能有用户手动添加的被gitignore的文件）
+    process = subprocess.Popen(
+        ["git", "diff", "--cached", "--name-only"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=False,
+    )
+    stdout_bytes, _ = process.communicate()
+    staged_files_before_add = decode_output(stdout_bytes)
+    manually_staged_files = [
+        f.strip() for f in staged_files_before_add.split("\n") if f.strip()
+    ]
+
     # 静默添加所有更改
     subprocess.run(
         ["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -97,6 +110,12 @@ def has_uncommitted_changes() -> bool:
     subprocess.run(
         ["git", "reset"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
+
+    # 重置后，重新添加之前手动暂存的可能被gitignore忽略的文件
+    for file_path in manually_staged_files:
+        if os.path.exists(file_path):
+            # 使用 -f 参数强制添加被 .gitignore 忽略的文件
+            subprocess.run(["git", "add", "-f", file_path], check=False)
 
     return working_changes or staged_changes
 
