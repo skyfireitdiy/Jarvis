@@ -586,9 +586,45 @@ class ReadCodeTool:
                     )
                     if result["success"]:
                         all_outputs.append(result["stdout"])
-                        status_lines.append(
-                            f"✅ {file_info['path']} 文件读取成功 (范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
-                        )
+                        # 提取真实读取的实际范围信息
+                        try:
+                            # 从result输出中解析真实的读取范围
+                            stdout_lines = result["stdout"].split("\n")
+                            actual_range_line = None
+                            total_lines_line = None
+                            for line in stdout_lines:
+                                if "📊 读取范围:" in line:
+                                    actual_range_line = line
+                                elif "📄 总行数:" in line:
+                                    total_lines_line = line
+                            if actual_range_line and total_lines_line:
+                                # 从实际输出中提取真实范围
+                                import re
+
+                                range_match = re.search(
+                                    r"📊 读取范围: (\d+)-(\d+)", actual_range_line
+                                )
+                                if range_match:
+                                    actual_start = range_match.group(1)
+                                    actual_end = range_match.group(2)
+                                    status_lines.append(
+                                        f"✅ {file_info['path']} 文件读取成功 (实际范围: {actual_start}-{actual_end})"
+                                    )
+                                else:
+                                    # 如果无法解析范围，则显示请求的范围
+                                    status_lines.append(
+                                        f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
+                                    )
+                            else:
+                                # 如果无法从输出中找到范围信息，也显示请求的范围
+                                status_lines.append(
+                                    f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
+                                )
+                        except Exception:
+                            # 如果解析失败，回退到原始行为
+                            status_lines.append(
+                                f"✅ {file_info['path']} 文件读取成功 (请求范围: {file_info.get('start_line', 1)}-{file_info.get('end_line', -1)})"
+                            )
                     else:
                         all_outputs.append(
                             f"❌ {file_info['path']}: {result['stderr']}"
@@ -603,12 +639,61 @@ class ReadCodeTool:
                     display_path = requests[0]["path"]
                     if merged_result["success"]:
                         all_outputs.append(merged_result["stdout"])
-                        # 获取合并后的范围信息
-                        min_start = min(req.get("start_line", 1) for req in requests)
-                        max_end = max(req.get("end_line", -1) for req in requests)
-                        status_lines.append(
-                            f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，范围: {min_start}-{max_end})"
-                        )
+                        # 获取真实读取的范围信息
+                        try:
+                            # 从merged_result输出中解析真实的读取范围
+                            stdout_lines = merged_result["stdout"].split("\n")
+                            actual_range_line = None
+                            total_lines_line = None
+                            for line in stdout_lines:
+                                if "📊 读取范围:" in line:
+                                    actual_range_line = line
+                                elif "📄 总行数:" in line:
+                                    total_lines_line = line
+                            if actual_range_line and total_lines_line:
+                                # 从实际输出中提取真实范围
+                                import re
+
+                                range_match = re.search(
+                                    r"📊 读取范围: (\d+)-(\d+)", actual_range_line
+                                )
+                                if range_match:
+                                    actual_start = range_match.group(1)
+                                    actual_end = range_match.group(2)
+                                    status_lines.append(
+                                        f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，实际范围: {actual_start}-{actual_end})"
+                                    )
+                                else:
+                                    # 如果无法解析范围，则显示请求的合并范围
+                                    min_start = min(
+                                        req.get("start_line", 1) for req in requests
+                                    )
+                                    max_end = max(
+                                        req.get("end_line", -1) for req in requests
+                                    )
+                                    status_lines.append(
+                                        f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，请求范围: {min_start}-{max_end})"
+                                    )
+                            else:
+                                # 如果无法从输出中找到范围信息，显示请求的合并范围
+                                min_start = min(
+                                    req.get("start_line", 1) for req in requests
+                                )
+                                max_end = max(
+                                    req.get("end_line", -1) for req in requests
+                                )
+                                status_lines.append(
+                                    f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，请求范围: {min_start}-{max_end})"
+                                )
+                        except Exception:
+                            # 如果解析失败，回退到原始行为
+                            min_start = min(
+                                req.get("start_line", 1) for req in requests
+                            )
+                            max_end = max(req.get("end_line", -1) for req in requests)
+                            status_lines.append(
+                                f"✅ {display_path} 文件读取成功 (合并{len(requests)}个范围请求，已去重，范围: {min_start}-{max_end})"
+                            )
                     else:
                         all_outputs.append(
                             f"❌ {display_path}: {merged_result['stderr']}"
