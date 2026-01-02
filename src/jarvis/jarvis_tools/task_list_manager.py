@@ -186,9 +186,6 @@ class task_list_manager:
             if task.status.value == "running" and task.agent_type.value == "main":
                 task.conversation_rounds += 1
 
-                # 保存快照
-                task_list_manager._save_snapshot(task_list_id, task_list)
-
         except Exception:
             # 异常不影响主流程
             pass
@@ -1420,7 +1417,6 @@ class task_list_manager:
                     current_task = task_list.get_task(task_id)
                     if current_task:
                         current_task.conversation_rounds = 0
-                        task_list_manager._save_snapshot(task_list_id, task_list)
 
                 # 保存正在运行的任务ID
                 self._set_running_task_id(parent_agent, task_id)
@@ -2157,9 +2153,6 @@ class task_list_manager:
                         "stdout": "",
                         "stderr": "更新任务属性失败",
                     }
-
-            # 保存快照
-            task_list_manager._save_snapshot(task_list_id, task_list)
 
             # 获取更新后的任务信息
             updated_task = task_list.get_task(task_id)
