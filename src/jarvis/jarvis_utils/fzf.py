@@ -53,7 +53,7 @@ def fzf_select(
                 "--border",
                 "--layout=reverse",
             ],
-            input="\n".join(input_lines),
+            input="\n".join(input_lines).encode("utf-8"),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=True,
