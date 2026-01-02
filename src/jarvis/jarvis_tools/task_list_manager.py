@@ -16,10 +16,6 @@ from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.tag import ot, ct
 
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from collections import defaultdict, deque
-
 
 class DependencyValidationError(Exception):
     """依赖验证错误的基类"""
@@ -49,54 +45,10 @@ class DependencyFailedError(DependencyValidationError):
 DEFAULT_MAX_TASK_OUTPUT_LENGTH = 10000  # 默认最大任务输出长度（字符数）
 
 
-class ParallelTaskExecutor:
-    """并行任务执行器"""
-
-    def __init__(self, max_workers=4):
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.lock = threading.RLock()
-        self.file_locks = {}
-
-    def submit_task(self, task_func, *args, **kwargs):
-        """提交任务到线程池"""
-        return self.executor.submit(task_func, *args, **kwargs)
-
-    def acquire_file_lock(self, file_path: str):
-        """获取文件锁"""
-        with self.lock:
-            if file_path not in self.file_locks:
-                self.file_locks[file_path] = threading.RLock()
-            return self.file_locks[file_path]
-
-    def execute_task_group(self, tasks, execute_func):
-        """并行执行任务组"""
-        futures = {}
-        results = {}
-
-        for task in tasks:
-            future = self.submit_task(execute_func, task)
-            futures[future] = task.task_id
-
-        for future in as_completed(futures):
-            task_id = futures[future]
-            try:
-                result = future.result()
-                results[task_id] = result
-            except Exception as e:
-                results[task_id] = {"success": False, "error": str(e)}
-
-        return results
-
-
 class task_list_manager:
     """任务列表管理工具，供 LLM 调用"""
 
     name = "task_list_manager"
-
-    def __init__(self):
-        self.parallel_executor = None
-        self.max_parallel_tasks = 4
-        self.enable_parallel = True
 
     def _get_max_output_length(self, agent: Any = None) -> int:
         """获取基于剩余token数量的最大输出长度（字符数）
@@ -135,66 +87,6 @@ class task_list_manager:
         except Exception:
             # 如果获取失败，使用默认值
             return DEFAULT_MAX_TASK_OUTPUT_LENGTH
-
-    def _get_parallel_task_groups(self, task_list):
-        """获取可并行执行的任务分组（拓扑排序）"""
-        # 构建依赖图
-        graph = defaultdict(list)
-        in_degree = defaultdict(int)
-        all_tasks = set(task_list.tasks.keys())
-
-        # 初始化入度
-        for task_id in all_tasks:
-            in_degree[task_id] = 0
-
-        # 构建图和计算入度
-        for task_id, task in task_list.tasks.items():
-            deps = task.dependencies or []
-            in_degree[task_id] = len(deps)
-            for dep_id in deps:
-                if dep_id in all_tasks:
-                    graph[dep_id].append(task_id)
-
-        # 拓扑排序，按层级分组
-        queue = deque([task_id for task_id in all_tasks if in_degree[task_id] == 0])
-        groups = []
-
-        while queue:
-            current_group = []
-            group_size = len(queue)
-
-            for _ in range(group_size):
-                task_id = queue.popleft()
-                current_group.append(task_id)
-
-                # 减少依赖当前任务的其他任务的入度
-                for next_task_id in graph[task_id]:
-                    in_degree[next_task_id] -= 1
-                    if in_degree[next_task_id] == 0:
-                        queue.append(next_task_id)
-
-            if current_group:
-                groups.append(current_group)
-
-        return groups
-
-    def _check_task_conflicts(
-        self, current_task: Any, running_tasks: List[Any]
-    ) -> bool:
-        """检查当前任务与运行中任务是否存在资源冲突"""
-        # 目前实现为简单版本，总是返回False（无冲突）
-        # 在实际场景中，可以根据任务描述中的资源使用情况来判断冲突
-        # 例如：检查涉及的文件路径、资源名称等
-        return False
-
-    def _check_parallel_conditions(self, parent_agent: Any, task: Any) -> bool:
-        """检查是否满足并行执行条件"""
-        # sub类型无依赖且非CodeAgent的任务允许并行执行
-        is_sub_type = task.agent_type.value == "sub"
-        is_code_agent = self._determine_agent_type(parent_agent, task, "", "")
-        has_no_dependencies = not task.dependencies or len(task.dependencies) == 0
-
-        return is_sub_type and not is_code_agent and has_no_dependencies
 
     def _get_truncate_lengths(self, max_length: int) -> tuple[int, int]:
         """根据最大长度计算截断时的前缀和后缀长度
@@ -1478,31 +1370,26 @@ class task_list_manager:
                 # 扫描所有任务，查找运行中的任务
                 for task_obj in task_list.tasks.values():
                     if task_obj.status.value == "running":
-                        running_tasks.append(task_obj)
-
-            # 检查当前任务是否可以并行执行
-            if running_tasks and task:
-                # sub类型无冲突且非CodeAgent的任务允许并行执行
-                is_sub_type = task.agent_type.value == "sub"
-                is_code_agent = self._determine_agent_type(parent_agent, task, "", "")
-                has_no_conflicts = self._check_task_conflicts(task, running_tasks)
-
-                if is_sub_type and not is_code_agent and has_no_conflicts:
-                    # 允许并行执行
-                    pass
-                else:
-                    # 对于CodeAgent、非sub类型或有冲突的任务，保持串行执行
-                    running_task_details = []
-                    for rt in running_tasks:
-                        running_task_details.append(
-                            f"任务ID: {rt.task_id}, 任务名称: {rt.task_name}"
+                        running_tasks.append(
+                            {
+                                "task_id": task_obj.task_id,
+                                "task_name": task_obj.task_name,
+                            }
                         )
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"检测到 {len(running_tasks)} 个任务正在运行，请先完成这些任务后再执行新任务：\n"
-                        + "\n".join(running_task_details),
-                    }
+
+            if running_tasks:
+                running_task_details = []
+                for rt in running_tasks:
+                    running_task_details.append(
+                        f"任务ID: {rt['task_id']}, 任务名称: {rt['task_name']}"
+                    )
+
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"检测到 {len(running_tasks)} 个任务正在运行，请先完成这些任务后再执行新任务：\n"
+                    + "\n".join(running_task_details),
+                }
 
         except Exception:
             # 如果检测失败，记录但不阻止任务执行，避免影响系统稳定性
