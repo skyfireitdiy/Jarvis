@@ -10,8 +10,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, cast
 
-from jarvis.jarvis_utils.output import PrettyOutput
-
 
 class ValidationError(Exception):
     """Schema 验证错误"""
@@ -540,10 +538,6 @@ class SchemaParser:
                             type_value if type_value is not None else "string",
                         )
                         if converted is not None and converted is not field_value:
-                            PrettyOutput.auto_print(
-                                f"🔍 [DEBUG TYPE] Converted {field_path}: {type(field_value).__name__} -> {type(converted).__name__}, value: {field_value} -> {converted}",
-                                timestamp=False,
-                            )
                             value[field] = converted
                             field_value = converted
                         # 递归处理嵌套结构
