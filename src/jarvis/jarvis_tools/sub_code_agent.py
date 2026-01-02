@@ -149,13 +149,8 @@ class SubCodeAgentTool:
             except Exception:
                 rule_names = None
 
-            # 从父代理继承disable_review配置
-            disable_review = False
-            try:
-                if parent_agent is not None and hasattr(parent_agent, "disable_review"):
-                    disable_review = getattr(parent_agent, "disable_review", False)
-            except Exception:
-                disable_review = False
+            # 自动禁用review功能
+            disable_review = True
 
             # 创建 CodeAgent，捕获 SystemExit 异常（如 git 配置不完整）
             try:
