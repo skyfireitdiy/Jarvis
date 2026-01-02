@@ -34,7 +34,7 @@ from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.fzf import fzf_select
 from jarvis.jarvis_utils.input import get_single_line_input
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import init_env
 
@@ -70,6 +70,8 @@ app = typer.Typer(help="Jarvis AI 助手")
 def print_commands_overview() -> None:
     """打印命令与快捷方式总览表。"""
     try:
+        from io import StringIO
+
         cmd_table = Table(show_header=True, header_style="bold magenta")
         cmd_table.add_column("命令", style="bold")
         cmd_table.add_column("快捷方式", style="cyan")
@@ -114,7 +116,12 @@ def print_commands_overview() -> None:
             "记忆管理工具，支持整理、合并、导入导出记忆",
         )
 
-        Console().print(cmd_table)
+        # 将Table渲染为字符串并输出
+        string_buffer = StringIO()
+        console = Console(file=string_buffer, width=200)  # 限制宽度以适应终端
+        console.print(cmd_table)
+        table_str = string_buffer.getvalue()
+        PrettyOutput.print(table_str, output_type=OutputType.INFO, lang="markdown")
     except Exception:
         # 静默忽略渲染异常，避免影响主流程
         pass
@@ -525,7 +532,16 @@ def handle_builtin_config_selector(
                         desc_display = str(opt.get("desc", ""))
                     table.add_row(str(idx), category, name, file_path, desc_display)
 
-                Console().print(table)
+                # 将Table渲染为字符串并输出
+                from io import StringIO
+
+                string_buffer = StringIO()
+                console = Console(file=string_buffer, width=200)  # 限制宽度以适应终端
+                console.print(table)
+                table_str = string_buffer.getvalue()
+                PrettyOutput.print(
+                    table_str, output_type=OutputType.INFO, lang="markdown"
+                )
 
                 # Try to use fzf for selection if available (include No. to support number-based filtering)
                 fzf_options = [
