@@ -67,8 +67,8 @@ def _build_app() -> FastAPI:
       font-family: 'Inter', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       display: flex;
       flex-direction: column;
-      background: #F2F2F7; /* iOS 系统级灰 */
-      color: #1C1C1E;
+      background: #1a1a1a; /* 深色背景 */
+      color: #e0e0e0;
       overflow: hidden;
     }
     
@@ -79,114 +79,35 @@ def _build_app() -> FastAPI:
       overflow: hidden;
     }
     
-    /* 终端容器样式 - 毛玻璃效果和物理质感 */
+    /* 终端容器样式 - 暗色风格 */
     #terminal {
       width: 100%;
       height: 100%;
-      background: rgba(255, 255, 255, 0.4); /* 半透明白色 */
-      backdrop-filter: blur(40px); /* 毛玻璃效果 */
-      -webkit-backdrop-filter: blur(40px);
-      border: 1px solid rgba(255, 255, 255, 0.6); /* 内描边 */
-      border-top: 1px solid rgba(209, 213, 219, 0.4); /* 外描边 */
-      border-bottom: 1px solid rgba(209, 213, 219, 0.4);
-      border-left: 1px solid rgba(209, 213, 219, 0.4);
-      border-right: 1px solid rgba(209, 213, 219, 0.4);
-      border-radius: 28px; /* iOS 连续曲率 */
-      box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.08); /* 柔和扩散阴影 */
+      background: rgba(0, 0, 0, 0.85); /* 深色背景 */
+      backdrop-filter: blur(20px); /* 减少毛玻璃效果以适应暗色 */
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(80, 80, 80, 0.6); /* 暗色描边 */
+      border-top: 1px solid rgba(100, 100, 100, 0.4); /* 外描边 */
+      border-bottom: 1px solid rgba(100, 100, 100, 0.4);
+      border-left: 1px solid rgba(100, 100, 100, 0.4);
+      border-right: 1px solid rgba(100, 100, 100, 0.4);
+      border-radius: 12px; /* 减少圆角 */
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* 暗色阴影 */
       overflow: hidden;
       padding: 12px;
     }
     
-    /* 底部：输入区域（固定高度） */
-    #input-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 24px;
-      background: rgba(249, 249, 251, 0.8); /* 冷灰半透明 */
-      backdrop-filter: blur(40px); /* 毛玻璃效果 */
-      -webkit-backdrop-filter: blur(40px);
-      border-top: 1px solid rgba(255, 255, 255, 0.6); /* 内描边 */
-      border-bottom: 1px solid rgba(209, 213, 219, 0.4); /* 外描边 */
-      box-shadow: 0 -8px 32px 0 rgba(0, 0, 0, 0.05); /* 顶部阴影 */
-    }
+
     
-    #tip {
-      color: #6B7280;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: bold;
-    }
+
     
-    textarea#input {
-      width: 100%;
-      height: 140px;
-      background: rgba(255, 255, 255, 0.5); /* 半透明填充 */
-      color: #1C1C1E;
-      border: 1px solid rgba(255, 255, 255, 0.6); /* 内描边 */
-      border-top: 1px solid rgba(209, 213, 219, 0.4); /* 外描边 */
-      border-bottom: 1px solid rgba(209, 213, 219, 0.4);
-      border-left: 1px solid rgba(209, 213, 219, 0.4);
-      border-right: 1px solid rgba(209, 213, 219, 0.4);
-      border-radius: 16px; /* iOS 连续曲率 */
-      padding: 16px;
-      resize: vertical;
-      outline: none;
-      font-family: 'Inter', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05); /* 凹陷效果 */
-    }
+
     
-    textarea#input:focus {
-      border: 1px solid rgba(255, 255, 255, 0.8);
-      border-top: 1px solid rgba(156, 163, 175, 0.4);
-      border-bottom: 1px solid rgba(156, 163, 175, 0.4);
-      border-left: 1px solid rgba(156, 163, 175, 0.4);
-      border-right: 1px solid rgba(156, 163, 175, 0.4);
-      box-shadow: inset 0 2px 8px 0 rgba(0, 0, 0, 0.1);
-    }
+
     
-    #actions {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      justify-content: flex-end;
-    }
+
     
-    button {
-      padding: 10px 16px;
-      background: #1C1C1E; /* 深空黑 */
-      color: #FFFFFF;
-      border: none;
-      border-radius: 12px; /* iOS 连续曲率 */
-      cursor: pointer;
-      font-family: 'Inter', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-weight: 600;
-      transition: all 0.2s ease;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    
-    button:hover {
-      background: #333336;
-      transform: scale(1.02);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
-    
-    button:active {
-      transform: scale(0.98);
-      background: #0a0a0b;
-    }
-    
-    .secondary-button {
-      background: rgba(255, 255, 255, 0.8); /* 纯白色块带透明度 */
-      color: #1C1C1E;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-    }
-    
-    .secondary-button:hover {
-      background: rgba(255, 255, 255, 1);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
-    }
+
     
   </style>
 </head>
@@ -194,14 +115,7 @@ def _build_app() -> FastAPI:
   <div id="terminal-container">
     <div id="terminal"></div>
   </div>
-  <div id="input-panel">
-    <div id="tip">JARVIS AI ASSISTANT - SECURE TERMINAL</div>
-    <textarea id="input" placeholder="Type your command or query here..."></textarea>
-    <div id="actions">
-      <button class="secondary-button" onclick="document.getElementById('input').value=''">Clear</button>
-      <button onclick="sendInput()">Execute</button>
-    </div>
-  </div>
+
 
   <!-- xterm.js 与 fit 插件 -->
   <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
@@ -214,10 +128,26 @@ def _build_app() -> FastAPI:
       fontSize: 13,
       fontFamily: '"FiraCode Nerd Font", "JetBrainsMono NF", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
       theme: {
-        background: 'rgba(255, 255, 255, 0.4)',
-        foreground: '#1C1C1E',
-        cursor: '#1C1C1E',
-        selection: '#9aa0a644'
+        background: '#000000',
+        foreground: '#ffffff',
+        cursor: '#ffffff',
+        selection: '#ffffff44',
+        black: '#000000',
+        red: '#ff5555',
+        green: '#50fa7b',
+        yellow: '#f1fa8c',
+        blue: '#bd93f9',
+        magenta: '#ff79c6',
+        cyan: '#8be9fd',
+        white: '#bfbfbf',
+        brightBlack: '#4d4d4d',
+        brightRed: '#ff6e67',
+        brightGreen: '#5af78e',
+        brightYellow: '#f4f99d',
+        brightBlue: '#caa9fa',
+        brightMagenta: '#ff92d0',
+        brightCyan: '#9aedfe',
+        brightWhite: '#e6e6e6'
       }
     });
     const fitAddon = new FitAddon.FitAddon();
@@ -329,32 +259,7 @@ writeLine('消息解析失败: ' + e);
       }
     };
     
-    // 新增：发送输入的函数
-    function sendInput() {
-      const inputElement = document.getElementById('input');
-      const text = inputElement.value;
-      if (text.trim() !== '') {
-        // 显示用户输入
-        writeLine('> ' + text);
-        
-        // 通过WebSocket发送到后端
-        if (typeof wsTerm !== 'undefined' && wsTerm && wsTerm.readyState === WebSocket.OPEN) {
-          wsTerm.send(JSON.stringify({ type: 'stdin', data: text + '\\r' }));
-        } else if (wsStd && wsStd.readyState === WebSocket.OPEN) {
-          wsStd.send(JSON.stringify({ type: 'stdin', data: text + '\\r' }));
-        }
-        
-        // 清空输入框
-        inputElement.value = '';
-      }
-    }
-    
-    // 添加回车键发送功能
-    document.getElementById('input').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && e.ctrlKey) {
-        sendInput();
-      }
-    });
+
   </script>
 </body>
 </html>
