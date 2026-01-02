@@ -6,6 +6,7 @@ import os
 
 import yaml
 from prompt_toolkit import prompt
+from rich.console import Console
 from rich.table import Table
 
 from jarvis.jarvis_agent import get_multiline_input
@@ -13,7 +14,7 @@ from jarvis.jarvis_agent import user_confirm
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.fzf import fzf_select
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class TaskManager:
@@ -70,20 +71,12 @@ class TaskManager:
 
         task_names = list(tasks.keys())
         # 使用 rich.Table 展示预定义任务
-        from io import StringIO
-        from rich.console import Console as RichConsole
-
         table = Table(show_header=True, header_style="bold magenta")
         table.add_column("No.", style="cyan", no_wrap=True)
         table.add_column("任务名", style="bold")
         for i, name in enumerate(task_names, 1):
             table.add_row(str(i), name)
-        # 将Table渲染为字符串并输出
-        string_buffer = StringIO()
-        rich_console = RichConsole(file=string_buffer, width=200)  # 限制宽度以适应终端
-        rich_console.print(table)
-        table_str = string_buffer.getvalue()
-        PrettyOutput.print(table_str, output_type=OutputType.INFO, lang="markdown")
+        Console().print(table)
         PrettyOutput.auto_print("ℹ️ [0] 跳过预定义任务")
 
         # Try fzf selection first (with numbered options and a skip option)
