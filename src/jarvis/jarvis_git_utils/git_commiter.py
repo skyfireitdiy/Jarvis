@@ -126,6 +126,12 @@ class GitCommitTool:
 
             self._stage_changes()
 
+            # 执行 git add . 后，重新添加之前手动暂存的可能被gitignore忽略的文件
+            for file_path in manually_staged_files:
+                if os.path.exists(file_path):
+                    # 使用 -f 参数强制添加被 .gitignore 忽略的文件
+                    subprocess.run(["git", "add", "-f", file_path], check=False)
+
             # 获取差异
 
             # 获取文件列表
