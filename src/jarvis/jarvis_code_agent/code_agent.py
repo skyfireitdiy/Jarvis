@@ -81,7 +81,11 @@ class CodeAgent(Agent):
         # 记录当前是否为非交互模式，便于在提示词/输入中动态调整行为说明
         self.non_interactive: bool = bool(non_interactive)
         # Review 相关配置
-        self.disable_review = disable_review
+        # 只在非交互模式下启用 review 功能
+        if non_interactive:
+            self.disable_review = disable_review  # 使用传入的 disable_review 值
+        else:
+            self.disable_review = True  # 交互模式下禁用 review
         self.review_max_iterations = review_max_iterations
 
         # 存储开始时的commit hash，用于后续git diff获取
@@ -1161,7 +1165,7 @@ def cli(
     disable_review: bool = typer.Option(
         False,
         "--disable-review",
-        help="启用代码审查：在代码修改完成后自动进行代码审查，发现问题则自动修复",
+        help="禁用代码审查：在代码修改完成后不进行自动代码审查",
     ),
     review_max_iterations: int = typer.Option(
         0,
