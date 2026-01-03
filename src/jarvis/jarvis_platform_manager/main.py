@@ -35,43 +35,84 @@ app = typer.Typer(help="Jarvis AI 平台")
 
 @app.command("info")
 def list_platforms(
-    platform: Optional[str] = typer.Option(
-        None, "--platform", "-p", help="指定要查看的平台"
+    llm_group: Optional[str] = typer.Option(
+        None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ) -> None:
-    """列出所有支持的平台和模型，或指定平台的详细信息。"""
+    """列出所有支持的平台和模型，支持交互式选择查看特定平台的详细信息。"""
     registry = PlatformRegistry.get_global_platform_registry()
-    platform_names = [platform] if platform else registry.get_available_platforms()
+    platform_names = registry.get_available_platforms()
 
-    PrettyOutput.auto_print("✅ Supported platforms and models")
+    if not platform_names:
+        PrettyOutput.auto_print("⚠️ 没有可用的平台")
+        return
 
-    for platform_name in platform_names:
+    # 获取默认模型组配置，或使用指定的模型组
+    current_llm_group = llm_group
+    if current_llm_group:
+        platform_from_config = get_normal_platform_name(current_llm_group)
+        model_from_config = get_normal_model_name(current_llm_group)
+        llm_config = get_llm_config("normal", current_llm_group)  # 获取完整配置
+        PrettyOutput.auto_print(f"✅ 从模型组 '{current_llm_group}' 获取的配置信息:")
+        PrettyOutput.auto_print(f"  平台: {platform_from_config}")
+        PrettyOutput.auto_print(f"  模型: {model_from_config}")
+
+        # 只显示配置中指定的平台信息
+        platform_names = [platform_from_config]
+
+        # 使用配置创建平台实例并显示详细信息
         try:
-            # Create platform instance
-            platform_instance = registry.create_platform(platform_name)
-            if not platform_instance:
-                continue
-
-            # Get the list of models supported by the platform
-            models = platform_instance.get_model_list()
-
-            # Print platform name
-            PrettyOutput.auto_print(f"✅ {platform_name}")
-
-            output = ""
-            # Print model list
-            if models:
-                for model_name, description in models:
-                    if description:
-                        output += f"  • {model_name} - {description}\n"
-                    else:
-                        output += f"  • {model_name}\n"
-                PrettyOutput.auto_print(f"✅ {output}")
+            platform_instance = registry.create_platform(
+                platform_from_config, llm_config
+            )
+            if platform_instance:
+                models = platform_instance.get_model_list()
+                PrettyOutput.auto_print(f"✅ {platform_from_config}")
+                if models:
+                    for model_name, description in models:
+                        if description:
+                            PrettyOutput.auto_print(f"  • {model_name} - {description}")
+                        else:
+                            PrettyOutput.auto_print(f"  • {model_name}")
+                else:
+                    PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
             else:
-                PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
-
+                PrettyOutput.auto_print(f"⚠️ 创建 {platform_from_config} 平台失败")
         except Exception:
-            PrettyOutput.auto_print(f"⚠️ 创建 {platform_name} 平台失败")
+            PrettyOutput.auto_print(f"⚠️ 创建 {platform_from_config} 平台失败")
+        return
+    else:
+        # 获取默认模型组配置
+        default_llm_group = get_normal_platform_name(None)
+        default_model = get_normal_model_name(None)
+
+        # 显示默认配置信息
+        PrettyOutput.auto_print("✅ 默认配置信息:")
+        PrettyOutput.auto_print(f"  平台: {default_llm_group}")
+        PrettyOutput.auto_print(f"  模型: {default_model}")
+
+        # 显示默认平台的详细信息
+        try:
+            default_llm_config = get_llm_config("normal", None)
+            platform_instance = registry.create_platform(
+                default_llm_group, default_llm_config
+            )
+            if platform_instance:
+                models = platform_instance.get_model_list()
+                PrettyOutput.auto_print(f"\n✅ {default_llm_group} 平台详情")
+                if models:
+                    for model_name, description in models:
+                        if description:
+                            PrettyOutput.auto_print(f"  • {model_name} - {description}")
+                        else:
+                            PrettyOutput.auto_print(f"  • {model_name}")
+                else:
+                    PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
+            else:
+                PrettyOutput.auto_print(f"⚠️ 创建 {default_llm_group} 平台失败")
+        except Exception:
+            PrettyOutput.auto_print(f"⚠️ 创建 {default_llm_group} 平台失败")
+        return
 
 
 def chat_with_model(
@@ -364,18 +405,14 @@ def validate_platform_model(platform: Optional[str], model: Optional[str]) -> bo
 
 @app.command("chat")
 def chat_command(
-    platform: Optional[str] = typer.Option(
-        None, "--platform", "-p", help="指定要使用的平台"
-    ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="指定要使用的模型"),
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ) -> None:
     """与指定平台和模型聊天。"""
-    # 如果未提供平台或模型参数，则从config获取默认值
-    platform = platform or get_normal_platform_name(llm_group)
-    model = model or get_normal_model_name(llm_group)
+    # 从config获取默认值
+    platform = get_normal_platform_name(llm_group)
+    model = get_normal_model_name(llm_group)
 
     if not validate_platform_model(platform, model):
         return
@@ -386,17 +423,11 @@ def chat_command(
 def service_command(
     host: str = typer.Option("127.0.0.1", help="服务主机地址 (默认: 127.0.0.1)"),
     port: int = typer.Option(8000, help="服务端口 (默认: 8000)"),
-    platform: Optional[str] = typer.Option(
-        None, "-p", "--platform", help="指定默认平台，当客户端未指定平台时使用"
-    ),
-    model: Optional[str] = typer.Option(
-        None, "-m", "--model", help="指定默认模型，当客户端未指定平台时使用"
-    ),
 ) -> None:
     """启动OpenAI兼容的API服务。"""
-    # 如果未提供平台或模型参数，则从config获取默认值
-    platform = platform or get_normal_platform_name()
-    model = model or get_normal_model_name()
+    # 从config获取默认值
+    platform = get_normal_platform_name()
+    model = get_normal_model_name()
     start_service(host=host, port=port, default_platform=platform, default_model=model)
 
 
@@ -431,12 +462,6 @@ def role_command(
         "--config",
         "-c",
         help="角色配置文件路径(YAML格式，默认: ~/.jarvis/roles.yaml)",
-    ),
-    platform: Optional[str] = typer.Option(
-        None, "--platform", "-p", help="指定要使用的平台，覆盖角色配置"
-    ),
-    model: Optional[str] = typer.Option(
-        None, "--model", "-m", help="指定要使用的模型，覆盖角色配置"
     ),
     llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
@@ -488,12 +513,9 @@ def role_command(
             return
 
     # 初始化平台和模型
-    # 如果提供了platform或model参数，优先使用命令行参数
-    # 否则，如果提供了 llm_group，则从配置中获取
-    # 最后才使用角色配置中的platform和model
-    if platform:
-        platform_name = platform
-    elif llm_group:
+    # 如果提供了 llm_group，则从配置中获取
+    # 否则使用角色配置中的platform和model
+    if llm_group:
         platform_name = get_normal_platform_name(llm_group)
     else:
         platform_name = selected_role.get("platform")
@@ -501,9 +523,7 @@ def role_command(
             # 如果角色配置中没有platform，使用默认配置
             platform_name = get_normal_platform_name()
 
-    if model:
-        model_name = model
-    elif llm_group:
+    if llm_group:
         model_name = get_normal_model_name(llm_group)
     else:
         model_name = selected_role.get("model")
