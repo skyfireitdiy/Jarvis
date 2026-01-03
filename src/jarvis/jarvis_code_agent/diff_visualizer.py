@@ -103,9 +103,11 @@ class DiffVisualizer:
         )
 
         if show_line_numbers:
-            table.add_column("", style="red", width=8, justify="right")
-            table.add_column("", style="green", width=8, justify="right")
-        table.add_column("", width=4, justify="center")
+            table.add_column("", style="red", width=8, justify="right", overflow="fold")
+            table.add_column(
+                "", style="green", width=8, justify="right", overflow="fold"
+            )
+        table.add_column("", width=4, justify="center", overflow="fold")
         table.add_column("", style="white", overflow="fold")
 
         old_line_num = 0
@@ -460,11 +462,15 @@ class DiffVisualizer:
             padding=(0, 0),  # 移除内部padding让内容更紧凑
             expand=True,  # 让表格占满可用宽度
         )
-        table.add_column("", style="bright_cyan", width=6, justify="right")
+        table.add_column(
+            "", style="bright_cyan", width=6, justify="right", overflow="fold"
+        )
         table.add_column(
             "", style="bright_white", overflow="fold", ratio=10, no_wrap=False
         )  # 启用自动换行，增加ratio值获得更多空间
-        table.add_column("", style="bright_cyan", width=6, justify="right")
+        table.add_column(
+            "", style="bright_cyan", width=6, justify="right", overflow="fold"
+        )
         table.add_column(
             "", style="bright_white", overflow="fold", ratio=10, no_wrap=False
         )  # 启用自动换行，增加ratio值获得更多空间
@@ -500,12 +506,14 @@ class DiffVisualizer:
                                 language,
                                 theme="monokai",
                                 background_color="default",
+                                word_wrap=True,
                             )
                             new_syntax = Syntax(
                                 equal_chunk[k],
                                 language,
                                 theme="monokai",
                                 background_color="default",
+                                word_wrap=True,
                             )
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
@@ -540,12 +548,14 @@ class DiffVisualizer:
                                 language,
                                 theme="monokai",
                                 background_color="default",
+                                word_wrap=True,
                             )
                             new_syntax = Syntax(
                                 equal_chunk[k],
                                 language,
                                 theme="monokai",
                                 background_color="default",
+                                word_wrap=True,
                             )
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
@@ -572,12 +582,14 @@ class DiffVisualizer:
                                 language,
                                 theme="monokai",
                                 background_color="default",
+                                word_wrap=True,
                             )
                             new_syntax = Syntax(
                                 equal_chunk[k],
                                 language,
                                 theme="monokai",
                                 background_color="default",
+                                word_wrap=True,
                             )
                             table.add_row(
                                 f"[bright_cyan]{old_line_num}[/bright_cyan]",
@@ -603,12 +615,14 @@ class DiffVisualizer:
                             language,
                             theme="monokai",
                             background_color="default",
+                            word_wrap=True,
                         )
                         new_syntax = Syntax(
                             line,
                             language,
                             theme="monokai",
                             background_color="default",
+                            word_wrap=True,
                         )
                         table.add_row(
                             f"[bright_cyan]{old_line_num}[/bright_cyan]",
@@ -640,6 +654,7 @@ class DiffVisualizer:
                             language,
                             theme="monokai",
                             background_color="#5c0000",
+                            word_wrap=True,
                         )
                     else:
                         old_line_num_actual = ""
@@ -656,6 +671,7 @@ class DiffVisualizer:
                             language,
                             theme="monokai",
                             background_color="#004d00",
+                            word_wrap=True,
                         )
                     else:
                         new_line_num_actual = ""
@@ -680,7 +696,11 @@ class DiffVisualizer:
                         else i1 + k + 1
                     )
                     old_delete_syntax: Union[Syntax, str] = Syntax(
-                        line, language, theme="monokai", background_color="#5c0000"
+                        line,
+                        language,
+                        theme="monokai",
+                        background_color="#5c0000",
+                        word_wrap=True,
                     )
                     table.add_row(
                         str(old_line_num),
@@ -701,7 +721,11 @@ class DiffVisualizer:
                         else j1 + k + 1
                     )
                     new_insert_syntax: Union[Syntax, str] = Syntax(
-                        line, language, theme="monokai", background_color="#004d00"
+                        line,
+                        language,
+                        theme="monokai",
+                        background_color="#004d00",
+                        word_wrap=True,
                     )
                     table.add_row(
                         "",
