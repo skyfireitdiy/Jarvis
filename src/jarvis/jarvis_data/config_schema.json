@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Jarvis环境变量配置模式",
+  "title": "Jarvis系统配置模式",
   "description": "Jarvis系统配置模式",
   "type": "object",
   "properties": {
