@@ -1308,7 +1308,7 @@ def is_immediate_abort() -> bool:
     是否启用立即中断：当在对话过程中检测到用户中断信号时，立即停止输出并返回。
     默认关闭
     """
-    return GLOBAL_CONFIG_DATA.get("immediate_abort", False) is True
+    return GLOBAL_CONFIG_DATA.get("immediate_abort", True) is True
 
 
 def is_non_interactive() -> bool:
