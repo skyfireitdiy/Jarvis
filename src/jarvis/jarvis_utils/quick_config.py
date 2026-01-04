@@ -64,29 +64,40 @@ def quick_config(
         f"📋 可用模型: {', '.join(models[:10])}{'...' if len(models) > 10 else ''}"
     )
 
-    # 询问用户选择模型
-    if len(models) == 1:
-        selected_model = models[0]
-    else:
-        console.print("[bold]请选择一个模型:[/]")
+    # 询问用户是否配置所有模型
+    if len(models) > 1:
+        console.print("[bold]可用模型列表:[/]")
         for i, model in enumerate(models, 1):
             console.print(f"  {i}. {model}")
 
-        model_choice = Prompt.ask("输入模型编号或名称", default=str(models[0]))
+        configure_all = Confirm.ask("是否配置所有模型？", default=False)
 
-        # 处理用户输入
-        if model_choice.isdigit():
-            idx = int(model_choice) - 1
-            if 0 <= idx < len(models):
-                selected_model = models[idx]
-            else:
-                PrettyOutput.auto_print(f"❌ 无效的模型编号: {model_choice}")
-                raise typer.Exit(code=1)
+        if configure_all:
+            selected_models = models
         else:
-            # 假设用户输入了模型名称
-            selected_model = model_choice
+            model_choices = Prompt.ask("请输入要配置的模型序号（用逗号分隔）")
+            try:
+                indices = [int(x.strip()) - 1 for x in model_choices.split(",")]
+                selected_models = []
+                for idx in indices:
+                    if 0 <= idx < len(models):
+                        selected_models.append(models[idx])
+                    else:
+                        PrettyOutput.auto_print(f"❌ 无效的模型序号: {idx + 1}")
+                        raise typer.Exit(code=1)
+                if not selected_models:
+                    PrettyOutput.auto_print("❌ 没有选择任何有效模型")
+                    raise typer.Exit(code=1)
+            except ValueError:
+                PrettyOutput.auto_print("❌ 请输入有效的数字序号，用逗号分隔")
+                raise typer.Exit(code=1)
+    else:
+        # 单个模型情况，直接选择
+        selected_models = [models[0]]
 
-    PrettyOutput.auto_print(f"✅ 已选择模型: {selected_model}")
+    PrettyOutput.auto_print(
+        f"✅ 已选择 {len(selected_models)} 个模型: {', '.join(selected_models)}"
+    )
 
     # 设置默认输出文件
     if output_file is None:
@@ -110,23 +121,35 @@ def quick_config(
             if not Confirm.ask("是否继续创建新配置？", default=True):
                 raise typer.Exit(code=0)
 
-    # 创建LLM配置
-    llm_config = {
-        "platform": platform,
-        "model": selected_model,
-        "max_input_token_count": 128000,
-        "llm_config": {
-            f"{platform}_api_key": api_key,
-            f"{platform}_base_url": base_url,
-        },
-    }
-
     # 初始化llms部分
     if "llms" not in config:
         config["llms"] = {}
 
-    # 添加新的配置
-    config["llms"][config_name] = llm_config
+    # 为每个选择的模型创建配置
+    for i, model in enumerate(selected_models):
+        if len(selected_models) == 1:
+            # 单个模型使用指定的配置名称
+            model_config_name = config_name
+        else:
+            # 多个模型使用配置名称+模型名的方式避免冲突
+            model_config_name = (
+                f"{config_name}_{model.replace('.', '_').replace('-', '_')}"
+            )
+
+        llm_config = {
+            "platform": platform,
+            "model": model,
+            "max_input_token_count": 128000,
+            "llm_config": {
+                f"{platform}_api_key": api_key,
+                f"{platform}_base_url": base_url,
+            },
+        }
+
+        # 添加模型配置
+        config["llms"][model_config_name] = llm_config
+
+    PrettyOutput.auto_print(f"✅ 已为 {len(selected_models)} 个模型创建配置")
 
     # 保存配置文件
     try:
