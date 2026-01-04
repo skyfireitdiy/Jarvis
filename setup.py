@@ -152,6 +152,8 @@ setup(
             "jc2r=jarvis.jarvis_c2rust.cli:main",
             "jarvis-config=jarvis.jarvis_config.cli:app",
             "jcfg=jarvis.jarvis_config.cli:app",
+            "jarvis-quick-config=jarvis.jarvis_utils.quick_config:app",
+            "jqc=jarvis.jarvis_utils.quick_config:app",
         ],
     },
     python_requires=">=3.9,<3.13",

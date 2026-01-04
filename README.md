@@ -330,6 +330,7 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | `jarvis-sec`              | `jsec`   | 安全分析套件，结合启发式扫描和 AI 深度验证，支持 C/C++ 和 Rust 语言      |
 | `jarvis-c2rust`           | `jc2r`   | C→Rust 迁移套件，支持渐进式迁移、断点续跑和智能库替代                    |
 | `jarvis-config`           | `jcfg`   | 配置管理工具，基于 JSON Schema 动态生成配置 Web 页面，提供可视化配置界面 |
+| `jarvis-quick-config`       | `jqc`    | 快速配置 LLM 平台信息（Claude/OpenAI）到 Jarvis 配置文件的 llms 部分       |
 
 更多详细用法和参数，请查阅我们的 [**使用指南**](docs/jarvis_book/4.使用指南.md)。
 
