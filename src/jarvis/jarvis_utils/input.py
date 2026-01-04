@@ -656,7 +656,7 @@ def _show_history_and_copy() -> None:
         )
         lines.append(f"  {i + 1}: {display_msg.strip()}")
         lines.append("=" * 58 + "\n")
-    PrettyOutput.auto_print("ℹ️ " + "\n".join(lines))
+    print("\n".join(lines))
 
     while True:
         try:
