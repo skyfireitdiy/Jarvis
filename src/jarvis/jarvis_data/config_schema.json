@@ -388,7 +388,7 @@
     "immediate_abort": {
       "type": "boolean",
       "description": "是否启用立即中断：在对话迭代中检测到中断信号时立即返回",
-      "default": false
+      "default": true
     },
     "save_session_history": {
       "type": "boolean",
