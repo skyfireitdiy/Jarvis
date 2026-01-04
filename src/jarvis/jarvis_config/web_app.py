@@ -262,6 +262,25 @@ def get_html_template() -> str:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jarvis 配置工具</title>
+    <script>
+        function expandAll() {
+            document.querySelectorAll('.form-section').forEach(section => {
+                section.classList.remove('collapsed');
+            });
+            document.querySelectorAll('.collapse-toggle').forEach(btn => {
+                btn.textContent = '▼';
+            });
+        }
+        
+        function collapseAll() {
+            document.querySelectorAll('.form-section').forEach(section => {
+                section.classList.add('collapsed');
+            });
+            document.querySelectorAll('.collapse-toggle').forEach(btn => {
+                btn.textContent = '▶';
+            });
+        }
+    </script>
     <style>
         :root {
             --bg-primary: #F2F2F7;
@@ -387,10 +406,48 @@ def get_html_template() -> str:
             background: var(--bg-glass);
             backdrop-filter: blur(40px);
             border-radius: 12px;
-            padding: 14px;
+            padding: 0;
             border: 1px solid var(--border-inner);
             box-shadow: 0 0 0 1px var(--border-outer), var(--shadow-float);
             /* Grid 布局时不再需要 margin-bottom，由 gap 控制 */
+        }
+        
+        .form-section-header {
+            padding: 14px;
+            border-bottom: 1px solid var(--border-inner);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .form-section-header:hover {
+            background: var(--bg-input-focus);
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .form-section-content {
+            padding: 14px;
+            display: block;
+        }
+        
+        .form-section.collapsed .form-section-content {
+            display: none;
+        }
+        
+        .collapse-toggle {
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        
+        .collapse-toggle:hover {
+            background: var(--bg-input);
+            color: var(--text-primary);
         }
 
         .form-group {
@@ -790,6 +847,10 @@ def get_html_template() -> str:
             
             <div id="form-container">
                 <form id="config-form" novalidate>
+                    <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+                        <button type="button" class="btn btn-secondary" onclick="expandAll()">展开所有</button>
+                        <button type="button" class="btn btn-secondary" onclick="collapseAll()">折叠所有</button>
+                    </div>
                     <div id="form-fields"></div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">保存配置</button>
@@ -847,8 +908,14 @@ def get_html_template() -> str:
             const fullPathStr = fullPath.join('.');
             const labelText = name + (isRequired ? '<span class="required-mark">*</span>' : '');
             
-            let html = '<div class="form-group" data-path="' + fullPathStr + '">';
-            html += '<label>' + labelText + '</label>';
+            // 创建可折叠的表单区域，默认折叠
+            let html = '<div class="form-section collapsed">';
+            html += '<div class="form-section-header" onclick="toggleCollapse(this)">';
+            html += '<span>' + labelText + '</span>';
+            html += '<button type="button" class="collapse-toggle" onclick="event.stopPropagation(); toggleCollapse(this.closest(\'.form-section\'));">▶</button>';
+            html += '</div>';
+            html += '<div class="form-section-content">';
+            html += '<div class="form-group" data-path="' + fullPathStr + '">';
             
             if (meta.description) {
                 const isDeprecated = meta.description.includes('[已废弃');
@@ -878,6 +945,8 @@ def get_html_template() -> str:
             }
 
             html += '<div class="field-error" id="error-' + fullPathStr + '"></div>';
+            html += '</div>';
+            html += '</div>';
             html += '</div>';
 
             return html;
@@ -930,11 +999,14 @@ def get_html_template() -> str:
                 arrayCounters[fullPathStr] = 0;
             }
 
+            // 创建数组容器，不具有独立折叠功能
             let html = '<div class="array-container" data-path="' + fullPathStr + '">';
             html += '<div id="array-items-' + fullPathStr + '"></div>';
             html += '<div class="array-controls">';
             html += '<button type="button" class="btn btn-secondary btn-sm" onclick="addArrayItem(\'' + fullPathStr + '\')">+ 添加项</button>';
             html += '</div></div>';
+            html += '</div>';
+            html += '</div>';
 
             setTimeout(function() {
                 const itemsContainer = document.getElementById('array-items-' + fullPathStr);
@@ -992,6 +1064,7 @@ def get_html_template() -> str:
             // parentPath 是包含完整路径的数组，用于传递给子字段
             const fullPathStr = path;
             
+            // 创建对象容器，不具有独立折叠功能
             let html = '<div class="nested-object" data-path="' + fullPathStr + '">';
             
             for (const propName in prop.properties || {}) {
@@ -1001,6 +1074,8 @@ def get_html_template() -> str:
                 html += createFieldHTML(propName, propSchema, propMeta, propRequired, parentPath);
             }
             
+            html += '</div>';
+            html += '</div>';
             html += '</div>';
             return html;
         }
@@ -1014,11 +1089,14 @@ def get_html_template() -> str:
                 dictCounters[fullPathStr] = Object.keys(defaultValue || {}).length;
             }
             
+            // 创建字典容器，不具有独立折叠功能
             let html = '<div class="dict-container" data-path="' + fullPathStr + '">';
             html += '<div id="dict-items-' + fullPathStr + '"></div>';
             html += '<div class="dict-controls">';
             html += '<button type="button" class="btn btn-secondary btn-sm" onclick="addDictItem(\'' + fullPathStr + '\')">+ 添加条目</button>';
             html += '</div></div>';
+            html += '</div>';
+            html += '</div>';
             
             setTimeout(function() {
                 const itemsContainer = document.getElementById('dict-items-' + fullPathStr);
@@ -1192,6 +1270,19 @@ def get_html_template() -> str:
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+        
+        function toggleCollapse(element) {
+            const section = element.closest('.form-section');
+            if (section) {
+                section.classList.toggle('collapsed');
+                
+                // 更新折叠按钮的图标
+                const toggleBtn = section.querySelector('.collapse-toggle');
+                if (toggleBtn) {
+                    toggleBtn.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
+                }
+            }
         }
 
         function escapeRegExp(str) {
