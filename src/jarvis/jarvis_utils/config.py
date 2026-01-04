@@ -998,9 +998,8 @@ def _get_resolved_rag_config(
     - rag_groups 中不再支持直接定义 embedding_model、embedding_type 等参数，只能通过 embedding 和 reranker 引用 embeddings 和 rerankers 中定义的配置
 
     优先级顺序:
-    1. rag 中的顶级设置 (embedding_model, etc.)
-    2. rag_group 中通过引用展开的组配置
-    3. 代码中的默认值
+    1. rag_group 中通过引用展开的组配置
+    2. 代码中的默认值
 
     返回:
         Dict[str, Any]: 解析后的RAG配置字典
@@ -1036,23 +1035,7 @@ def _get_resolved_rag_config(
     # Start with group config
     resolved_config = group_config.copy()
 
-    # Override with specific settings from the top-level rag dict
-    top_level_rag_config = GLOBAL_CONFIG_DATA.get("rag", {})
-    if isinstance(top_level_rag_config, dict):
-        for key in [
-            "embedding_model",
-            "embedding_type",
-            "embedding_max_length",  # 嵌入模型最大输入长度
-            "embedding_config",  # 额外的嵌入模型配置参数
-            "rerank_model",
-            "reranker_type",
-            "reranker_max_length",  # 重排模型最大输入长度
-            "reranker_config",  # 额外的重排模型配置参数
-            "use_bm25",
-            "use_rerank",
-        ]:
-            if key in top_level_rag_config:
-                resolved_config[key] = top_level_rag_config[key]
+    # 由于已移除顶层rag配置，不再处理top-level rag配置
 
     return resolved_config
 
