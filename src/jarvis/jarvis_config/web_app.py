@@ -264,21 +264,29 @@ def get_html_template() -> str:
     <title>Jarvis 配置工具</title>
     <script>
         function expandAll() {
-            document.querySelectorAll('.form-section').forEach(section => {
-                section.classList.remove('collapsed');
-            });
-            document.querySelectorAll('.collapse-toggle').forEach(btn => {
-                btn.textContent = '▼';
-            });
+            const sections = document.querySelectorAll('.form-section');
+            
+            // 对于每个折叠的区域，模拟点击其折叠按钮以确保状态一致
+            for (let i = 0; i < sections.length; i++) {
+                const toggleBtn = sections[i].querySelector('.collapse-toggle');
+                if (toggleBtn && sections[i].classList.contains('collapsed')) {
+                    // 模拟点击操作，确保调用toggleCollapse函数
+                    toggleBtn.click();
+                }
+            }
         }
         
         function collapseAll() {
-            document.querySelectorAll('.form-section').forEach(section => {
-                section.classList.add('collapsed');
-            });
-            document.querySelectorAll('.collapse-toggle').forEach(btn => {
-                btn.textContent = '▶';
-            });
+            const sections = document.querySelectorAll('.form-section');
+            
+            // 对于每个展开的区域，模拟点击其折叠按钮以确保状态一致
+            for (let i = 0; i < sections.length; i++) {
+                const toggleBtn = sections[i].querySelector('.collapse-toggle');
+                if (toggleBtn && !sections[i].classList.contains('collapsed')) {
+                    // 模拟点击操作，确保调用toggleCollapse函数
+                    toggleBtn.click();
+                }
+            }
         }
     </script>
     <style>
@@ -413,12 +421,22 @@ def get_html_template() -> str:
         }
         
         .form-section-header {
-            padding: 14px;
+            padding: 8px;
             border-bottom: 1px solid var(--border-inner);
             cursor: pointer;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+        }
+        
+        .collapse-toggle {
+            background: none;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-left: auto;
         }
         
         .form-section-header:hover {
@@ -427,7 +445,7 @@ def get_html_template() -> str:
         }
         
         .form-section-content {
-            padding: 14px;
+            padding: 8px;
             display: block;
         }
         
@@ -435,14 +453,24 @@ def get_html_template() -> str:
             display: none;
         }
         
+        /* 添加CSS优化以提高性能 */
+        .form-section {
+            will-change: transform;
+        }
+        
+        .form-section-header {
+            cursor: pointer;
+            user-select: none; /* 防止误选文本 */
+        }
+        
         .collapse-toggle {
             background: none;
             border: none;
-            font-size: 16px;
+            font-size: 14px;
             cursor: pointer;
             color: var(--text-secondary);
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 1px 4px;
+            border-radius: 3px;
         }
         
         .collapse-toggle:hover {
@@ -451,7 +479,7 @@ def get_html_template() -> str:
         }
 
         .form-group {
-            margin-bottom: 12px;
+            margin-bottom: 6px;
         }
 
         .form-group:last-child {
@@ -474,11 +502,12 @@ def get_html_template() -> str:
         }
 
         .field-description {
-            display: block;
+            display: inline-block;
             color: var(--text-secondary);
-            font-size: 12px;
-            margin-bottom: 4px;
+            font-size: 11px;
+            margin-left: 6px;
             line-height: 1.3;
+            vertical-align: middle;
         }
 
         .field-description.deprecated {
@@ -502,11 +531,11 @@ def get_html_template() -> str:
         textarea,
         select {
             width: 100%;
-            padding: 8px 12px;
+            padding: 4px 8px;
             border: 1px solid var(--border-inner);
-            border-radius: 8px;
+            border-radius: 6px;
             background: var(--bg-input);
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text-primary);
             outline: none;
             transition: all 0.2s ease;
@@ -888,6 +917,9 @@ def get_html_template() -> str:
 
             const fieldsContainer = document.getElementById('form-fields');
             fieldsContainer.innerHTML = '';
+            
+            // 使用 DocumentFragment 来批量添加元素，减少重排次数
+            const fragment = document.createDocumentFragment();
 
             for (const [name, prop] of Object.entries(schemaData.properties)) {
                 const meta = prop._meta || {};
@@ -896,8 +928,10 @@ def get_html_template() -> str:
                 const section = document.createElement('div');
                 section.className = 'form-section';
                 section.innerHTML = createFieldHTML(name, prop, meta, isRequired, []);
-                fieldsContainer.appendChild(section);
+                fragment.appendChild(section);
             }
+            
+            fieldsContainer.appendChild(fragment);
 
             initializeFormValues();
         }
@@ -910,18 +944,20 @@ def get_html_template() -> str:
             
             // 创建可折叠的表单区域，默认折叠
             let html = '<div class="form-section collapsed">';
-            html += '<div class="form-section-header" onclick="toggleCollapse(this)">';
+            html += '<div class="form-section-header">';
             html += '<span>' + labelText + '</span>';
-            html += '<button type="button" class="collapse-toggle" onclick="event.stopPropagation(); toggleCollapse(this.closest(\'.form-section\'));">▶</button>';
-            html += '</div>';
-            html += '<div class="form-section-content">';
-            html += '<div class="form-group" data-path="' + fullPathStr + '">';
             
+            // 如果有描述，将其添加到标签后面
             if (meta.description) {
                 const isDeprecated = meta.description.includes('[已废弃');
                 const descClass = isDeprecated ? 'field-description deprecated' : 'field-description';
                 html += '<span class="' + descClass + '">' + escapeHtml(meta.description) + '</span>';
             }
+            
+            html += '<button type="button" class="collapse-toggle">▶</button>';
+            html += '</div>';
+            html += '<div class="form-section-content">';
+            html += '<div class="form-group" data-path="' + fullPathStr + '">';
 
             if (prop.enum) {
                 html += createSelectHTML(fullPathStr, prop.enum, meta.default);
@@ -1275,13 +1311,36 @@ def get_html_template() -> str:
         function toggleCollapse(element) {
             const section = element.closest('.form-section');
             if (section) {
-                section.classList.toggle('collapsed');
+                // 获取折叠按钮
+                const toggleBtn = element.classList.contains('collapse-toggle') ? element : section.querySelector('.collapse-toggle');
                 
-                // 更新折叠按钮的图标
-                const toggleBtn = section.querySelector('.collapse-toggle');
-                if (toggleBtn) {
-                    toggleBtn.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
+                // 检查当前是否是折叠状态
+                const isCurrentlyCollapsed = section.classList.contains('collapsed');
+                
+                if (isCurrentlyCollapsed) {
+                    // 当前是折叠状态，需要展开
+                    section.classList.remove('collapsed');
+                    
+                    // 确保移除了类，再设置按钮文本
+                    setTimeout(() => {
+                        if (toggleBtn) {
+                            toggleBtn.textContent = '▼';
+                        }
+                    }, 0);
+                } else {
+                    // 当前是展开状态，需要折叠
+                    section.classList.add('collapsed');
+                    
+                    // 确保添加了类，再设置按钮文本
+                    setTimeout(() => {
+                        if (toggleBtn) {
+                            toggleBtn.textContent = '▶';
+                        }
+                    }, 0);
                 }
+                
+                // 强制重排以确保CSS变更被应用
+                void section.offsetWidth;
             }
         }
 
@@ -1614,6 +1673,19 @@ def get_html_template() -> str:
             }
         }
 
+        // 使用事件委托处理折叠操作
+        document.getElementById('form-fields').addEventListener('click', function(e) {
+            if (e.target.classList.contains('form-section-header')) {
+                // 如果点击的是折叠按钮，则不触发头部的折叠功能
+                if (!e.target.classList.contains('collapse-toggle')) {
+                    toggleCollapse(e.target);
+                }
+            } else if (e.target.classList.contains('collapse-toggle')) {
+                e.stopPropagation();
+                toggleCollapse(e.target.closest('.form-section'));
+            }
+        });
+        
         document.getElementById('config-form').addEventListener('submit', handleSubmit);
         loadSchema();
     </script>
