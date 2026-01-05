@@ -9,6 +9,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 if TYPE_CHECKING:
     from jarvis.jarvis_platform.base import BasePlatform
+    from jarvis.jarvis_agent import Agent
 
 
 class SessionManager:
@@ -17,9 +18,12 @@ class SessionManager:
     user data, and persistence.
     """
 
-    def __init__(self, model: "BasePlatform", agent_name: str):
+    def __init__(
+        self, model: "BasePlatform", agent_name: str, agent: Optional["Agent"] = None
+    ):
         self.model = model
         self.agent_name = agent_name
+        self.agent = agent  # 添加agent引用
         self.prompt: str = ""
         self.conversation_length: int = 0
         self.user_data: Dict[str, Any] = {}

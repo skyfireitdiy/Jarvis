@@ -87,7 +87,7 @@ class HumanPlatform(BasePlatform):
 
     def save(self, file_path: str) -> bool:
         """Save chat session to a file."""
-        state = {
+        state: Dict[str, Any] = {
             "conversation_id": self.conversation_id,
             "model_name": self.model_name,
             "system_message": self.system_message,
@@ -114,6 +114,9 @@ class HumanPlatform(BasePlatform):
             self.model_name = state.get("model_name", "human")
             self.system_message = state.get("system_message", "")
             self.first_message = state.get("first_message", True)
+            # 处理start_commit信息（如果存在）
+            # start_commit = state.get("start_commit", None)
+            # 可以根据需要使用start_commit信息
             self._saved = True
 
             PrettyOutput.auto_print(f"✅ 从 {file_path} 成功恢复会话")

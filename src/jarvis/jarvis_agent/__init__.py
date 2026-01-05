@@ -52,7 +52,7 @@ from jarvis.jarvis_agent.run_loop import AgentRunLoop
 from jarvis.jarvis_agent.session_manager import SessionManager
 from jarvis.jarvis_agent.shell_input_handler import shell_input_handler
 from jarvis.jarvis_agent.task_analyzer import TaskAnalyzer
-from jarvis.jarvis_agent.task_list import TaskListManager
+from jarvis.jarvis_agent.task_list import TaskList, TaskListManager
 from jarvis.jarvis_agent.tool_executor import execute_tool_call
 from jarvis.jarvis_agent.user_interaction import UserInteractionHandler
 from jarvis.jarvis_agent.utils import join_prompts
@@ -549,7 +549,9 @@ class Agent:
 
     def _init_session(self) -> None:
         """初始化会话管理器"""
-        self.session = SessionManager(model=self.model, agent_name=self.name)
+        self.session = SessionManager(
+            model=self.model, agent_name=self.name, agent=self
+        )
 
     def _init_handlers(
         self,
@@ -776,8 +778,36 @@ class Agent:
 
     def save_session(self) -> bool:
         """Saves the current session state by delegating to the session manager."""
+        import json
+
         # 保存会话
         session_saved = self.session.save_session()
+
+        # 如果当前是CodeAgent，额外保存start_commit信息到单独的文件
+        if hasattr(self, "start_commit") and self.start_commit is not None:
+            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            os.makedirs(session_dir, exist_ok=True)
+            platform_name = self.model.platform_name()
+            model_name = self.model.name().replace("/", "_").replace("\\", "_")
+            # 使用与会话文件相同的命名规则，但添加_commit后缀
+            commit_file = os.path.join(
+                session_dir,
+                f"saved_session_{self.name}_{platform_name}_{model_name}_commit.json",
+            )
+
+            commit_data = {
+                "start_commit": self.start_commit,
+                "agent_name": self.name,
+                "platform_name": platform_name,
+                "model_name": model_name,
+                "timestamp": datetime.datetime.now().isoformat(),
+            }
+
+            try:
+                with open(commit_file, "w", encoding="utf-8") as f:
+                    json.dump(commit_data, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 保存commit信息失败: {e}")
 
         # 保存任务列表（如果存在）
         self._save_task_lists()
@@ -787,10 +817,79 @@ class Agent:
 
     def restore_session(self) -> bool:
         """Restores the session state by delegating to the session manager."""
-        if self.session.restore_session():
+        import json
+
+        session_restored = self.session.restore_session()
+
+        # 如果当前是CodeAgent，尝试恢复start_commit信息
+        if hasattr(self, "start_commit"):
+            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            platform_name = self.model.platform_name()
+            model_name = self.model.name().replace("/", "_").replace("\\", "_")
+            # 使用与会话文件相同的命名规则，但添加_commit后缀
+            commit_file = os.path.join(
+                session_dir,
+                f"saved_session_{self.name}_{platform_name}_{model_name}_commit.json",
+            )
+
+            try:
+                if os.path.exists(commit_file):
+                    with open(commit_file, "r", encoding="utf-8") as f:
+                        commit_data = json.load(f)
+                        # 恢复start_commit信息
+                        self.start_commit = commit_data.get("start_commit")
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 恢复commit信息失败: {e}")
+
+        # 恢复任务列表（如果存在）
+        self._restore_task_lists()
+
+        if session_restored:
             self.first = False
+        return session_restored
+
+    def _restore_task_lists(self) -> bool:
+        """从文件恢复当前 Agent 的任务列表。
+
+        文件命名规则：saved_session_{agent_name}_{platform_name}_{model_name}_tasklist.json
+        与会话文件保存在同一目录下，便于关联。
+
+        返回:
+            bool: 是否成功恢复
+        """
+        import json
+
+        try:
+            # 构建文件路径（与保存时相同的前缀）
+            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            platform_name = self.model.platform_name()
+            model_name = self.model.name().replace("/", "_").replace("\\", "_")
+            tasklist_file = os.path.join(
+                session_dir,
+                f"saved_session_{self.name}_{platform_name}_{model_name}_tasklist.json",
+            )
+
+            if not os.path.exists(tasklist_file):
+                return True  # 文件不存在，视为成功（没有可恢复的任务列表）
+
+            # 从文件加载任务列表数据
+            with open(tasklist_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            task_lists_data = data.get("task_lists", {})
+
+            # 清空当前的任务列表，然后从文件中恢复
+            self.task_list_manager.task_lists.clear()
+
+            # 逐个恢复任务列表
+            for task_list_id, task_list_data in task_lists_data.items():
+                task_list = TaskList.from_dict(task_list_data)
+                self.task_list_manager.task_lists[task_list_id] = task_list
+
             return True
-        return False
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 恢复任务列表失败: {e}")
+            return False
 
     def get_tool_registry(self) -> Optional[Any]:
         """获取工具注册表实例"""
