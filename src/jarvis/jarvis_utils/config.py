@@ -232,7 +232,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
     expanded_config["platform"] = llm_ref.get("platform", "openai")
     expanded_config["model"] = llm_ref.get("model", "gpt-5")
     expanded_config["max_input_token_count"] = llm_ref.get(
-        "max_input_token_count", 32000
+        "max_input_token_count", 128000
     )
     # 合并 llm_config
     if "llm_config" in llm_ref:
@@ -255,7 +255,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
             expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
             expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
             expanded_config["cheap_max_input_token_count"] = llm_ref.get(
-                "max_input_token_count", 32000
+                "max_input_token_count", 128000
             )
             # 合并 llm_config
             if "llm_config" in llm_ref:
@@ -277,7 +277,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
             expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
             expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
             expanded_config["smart_max_input_token_count"] = llm_ref.get(
-                "max_input_token_count", 32000
+                "max_input_token_count", 128000
             )
             # 合并 llm_config
             if "llm_config" in llm_ref:
@@ -299,7 +299,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
             expanded_config["web_platform"] = llm_ref.get("platform", "openai")
             expanded_config["web_model"] = llm_ref.get("model", "gpt-5")
             expanded_config["web_max_input_token_count"] = llm_ref.get(
-                "max_input_token_count", 32000
+                "max_input_token_count", 128000
             )
             # 合并 llm_config
             if "llm_config" in llm_ref:
