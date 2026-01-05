@@ -2817,6 +2817,8 @@ class task_list_manager:
 
                 # 构建命令
                 cmd = [cmd_prefix, file_param, str(task_file), "-n"]
+                if is_code_agent:
+                    cmd.extend(["--worktree"])
                 if model_group:
                     cmd.extend(["-g", model_group])
                 if tool_group:
