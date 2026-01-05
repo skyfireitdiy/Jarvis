@@ -1219,10 +1219,54 @@ def run_cli(
                 raise typer.Exit(code=1)
 
         # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
+        output_content = ""
+        import json
+
         try:
-            agent_manager.run_task(task)
+            # 初始化agent并运行任务，捕获输出
+            agent = agent_manager.initialize()
+
+            # 优先处理命令行直接传入的任务
+            if task:
+                output_content = agent.run(task)
+                # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
+                exit_code = 0
+                error_message = ""
+            else:
+                # 处理预定义任务或交互输入
+                from jarvis.jarvis_agent.task_manager import TaskManager
+                from jarvis.jarvis_agent import get_multiline_input
+                from jarvis.jarvis_utils.config import (
+                    is_non_interactive,
+                    is_skip_predefined_tasks,
+                )
+
+                # 处理预定义任务（非交互模式下跳过；支持配置跳过加载；命令行指定任务时跳过）
+                if (
+                    not is_non_interactive()
+                    and not is_skip_predefined_tasks()
+                    and agent.first
+                ):
+                    task_manager = TaskManager()
+                    tasks = task_manager.load_tasks()
+                    if tasks and (selected_task := task_manager.select_task(tasks)):
+                        from jarvis.jarvis_utils.output import PrettyOutput
+
+                        PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
+                        output_content = agent.run(selected_task)
+                        # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
+
+                # 获取用户输入
+                user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
+                if user_input:
+                    output_content = agent.run(user_input)
+
+                raise typer.Exit(code=0)
+        except typer.Exit:
+            # 正常退出，设置成功状态
             exit_code = 0
             error_message = ""
+            # agent.run() 正常结束时output_content应该已经有了值
         except Exception as exec_err:
             exit_code = 1
             error_message = str(exec_err)
@@ -1245,18 +1289,37 @@ def run_cli(
 
                     # 写入输出文件（如果存在）
                     output_file = status_file_path.with_suffix(".output")
-                    # 这里无法直接获取agent_manager.run_task()的输出
-                    # 暂时写入空字符串
-                    output_content = ""
+                    # 将捕获的输出内容写入文件
                     try:
-                        output_file.write_text(output_content, encoding="utf-8")
-                    except Exception:
+                        # 确保输出内容为字符串
+                        def _convert_to_string(content):
+                            if content is None:
+                                return ""
+                            try:
+                                # 尝试序列化，如果失败则转换为字符串
+                                json.dumps(content)
+                                return json.dumps(content, ensure_ascii=False, indent=2)
+                            except (TypeError, ValueError):
+                                # 无法序列化时，转换为字符串
+                                return str(content)
+
+                        output_content_str = _convert_to_string(output_content)
+                        output_file.write_text(output_content_str, encoding="utf-8")
+                    except Exception as output_err:
+                        # 如果写入输出失败，至少写入错误信息
+                        from jarvis.jarvis_utils.output import PrettyOutput
+
+                        PrettyOutput.auto_print(
+                            f"⚠️ 写入输出文件失败: {str(output_err)}"
+                        )
                         pass
 
                     # 写入错误文件
                     if exit_code != 0 and error_message:
                         error_file = status_file_path.with_suffix(".error")
                         error_file.write_text(error_message, encoding="utf-8")
+
+                    from jarvis.jarvis_utils.output import PrettyOutput
 
                     PrettyOutput.auto_print(f"✅ 已写入状态文件: {status_file_path}")
                 except Exception as status_err:
