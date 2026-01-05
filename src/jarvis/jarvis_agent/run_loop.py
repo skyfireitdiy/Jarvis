@@ -60,10 +60,11 @@ class AgentRunLoop:
                     )
                 # 基于剩余token数量或对话轮次的自动总结判断
                 remaining_tokens = self.agent.model.get_remaining_token_count()
-                should_summarize = (
+                token_limit_triggered = (
                     remaining_tokens <= self.summary_remaining_token_threshold
-                    or current_round > self.conversation_turn_threshold
                 )
+                turn_limit_triggered = current_round > self.conversation_turn_threshold
+                should_summarize = token_limit_triggered or turn_limit_triggered
                 if should_summarize:
                     # 在总结前获取git diff（仅对CodeAgent类型）
                     try:
@@ -78,7 +79,17 @@ class AgentRunLoop:
                         PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
                         self._git_diff = f"获取git diff失败: {str(e)}"
 
-                    summary_text = self.agent._summarize_and_clear_history()
+                    # 确定触发原因
+                    if token_limit_triggered and turn_limit_triggered:
+                        trigger_reason = "Token和轮次双重限制触发"
+                    elif token_limit_triggered:
+                        trigger_reason = "Token限制触发"
+                    else:
+                        trigger_reason = "对话轮次限制触发"
+
+                    summary_text = self.agent._summarize_and_clear_history(
+                        trigger_reason=trigger_reason
+                    )
                     if summary_text:
                         # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
                         self.agent.session.addon_prompt = join_prompts(
@@ -125,7 +136,9 @@ class AgentRunLoop:
                         PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
                         self._git_diff = f"获取git diff失败: {str(e)}"
                     # 触发总结并清空历史
-                    summary_text = ag._summarize_and_clear_history()
+                    summary_text = ag._summarize_and_clear_history(
+                        trigger_reason="手动触发"
+                    )
                     if summary_text:
                         # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
                         ag.session.addon_prompt = join_prompts(

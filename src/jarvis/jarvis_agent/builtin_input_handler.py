@@ -81,7 +81,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     for tag in special_tags:
         # 优先处理会立即返回的特殊标记（不包含Pin）
         if tag == "Summary":
-            summary = agent._summarize_and_clear_history()
+            summary = agent._summarize_and_clear_history(trigger_reason="用户指令触发")
             memory_tags_prompt = agent.memory_manager.prepare_memory_tags_prompt()
             prompt = ""
             if summary:
