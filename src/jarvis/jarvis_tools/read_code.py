@@ -84,7 +84,8 @@ class ReadCodeTool:
             Dict[str, Any]: 包含成功状态、输出内容和错误信息的字典
         """
         try:
-            abs_path = os.path.abspath(filepath)
+            expanded_path = os.path.expanduser(filepath)
+            abs_path = os.path.abspath(expanded_path)
 
             # 文件存在性检查
             if not os.path.exists(abs_path):
@@ -478,7 +479,8 @@ class ReadCodeTool:
                 end_line = file_info.get("end_line", -1)
 
                 # 检查文件是否存在并计算要读取的token数
-                abs_path = os.path.abspath(filepath)
+                expanded_path = os.path.expanduser(filepath)
+                abs_path = os.path.abspath(expanded_path)
                 if not os.path.exists(abs_path):
                     continue
 
@@ -570,7 +572,8 @@ class ReadCodeTool:
             for file_info in args["files"]:
                 if not isinstance(file_info, dict) or "path" not in file_info:
                     continue
-                abs_path = os.path.abspath(file_info["path"].strip())
+                expanded_path = os.path.expanduser(file_info["path"].strip())
+                abs_path = os.path.abspath(expanded_path)
                 file_requests[abs_path].append(file_info)
 
             # 按文件处理，合并同一文件的多个范围请求
