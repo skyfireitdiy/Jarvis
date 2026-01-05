@@ -65,6 +65,14 @@ class AgentRunLoop:
                 )
                 turn_limit_triggered = current_round > self.conversation_turn_threshold
                 should_summarize = token_limit_triggered or turn_limit_triggered
+
+                # 如果是token限制触发，打印当前token数量
+                if token_limit_triggered:
+                    max_input_tokens = get_max_input_token_count(self.agent.model_group)
+                    PrettyOutput.auto_print(
+                        f"🔍 Token限制触发自动总结，当前剩余token数量: {remaining_tokens}/{max_input_tokens} (剩余 {remaining_tokens / max_input_tokens * 100:.1f}%)"
+                    )
+
                 if should_summarize:
                     # 在总结前获取git diff（仅对CodeAgent类型）
                     try:
