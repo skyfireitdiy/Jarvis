@@ -308,7 +308,7 @@ class OpenAIModel(BasePlatform):
 
     def save(self, file_path: str) -> bool:
         """Save chat session to a file."""
-        state = {
+        state: Dict[str, Any] = {
             "messages": self.messages,
             "model_name": self.model_name,
         }
@@ -331,6 +331,9 @@ class OpenAIModel(BasePlatform):
 
             self.messages = state.get("messages", [])
             self.model_name = state.get("model_name", "gpt-4o")
+            # 处理start_commit信息（如果存在）
+            # start_commit = state.get("start_commit", None)
+            # 可以根据需要使用start_commit信息
             # atexit.register(self.delete_chat)
             self._saved = True
 

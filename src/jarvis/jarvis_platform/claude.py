@@ -258,7 +258,7 @@ class ClaudeModel(BasePlatform):
         返回:
             bool: 保存是否成功
         """
-        state = {
+        state: Dict[str, Any] = {
             "messages": self.messages,
             "model_name": self.model_name,
             "system_message": self.system_message,
@@ -291,6 +291,9 @@ class ClaudeModel(BasePlatform):
             self.messages = state.get("messages", [])
             self.model_name = state.get("model_name", "claude-3-5-sonnet-20241022")
             self.system_message = state.get("system_message", "")
+            # 处理start_commit信息（如果存在）
+            # start_commit = state.get("start_commit", None)
+            # 可以根据需要使用start_commit信息
             self._saved = True
 
             PrettyOutput.auto_print(f"✅ 从 {file_path} 成功恢复会话")

@@ -350,7 +350,7 @@ class KimiModel(BasePlatform):
             PrettyOutput.auto_print("⚠️ 没有活动的会话可供保存")
             return False
 
-        state = {
+        state: Dict[str, Any] = {
             "chat_id": self.chat_id,
             "model_name": self.model_name,
             "system_message": self.system_message,
@@ -379,6 +379,9 @@ class KimiModel(BasePlatform):
             self.system_message = state.get("system_message", "")
             self.first_chat = state.get("first_chat", True)
             self.uploaded_files = state.get("uploaded_files", [])
+            # 处理start_commit信息（如果存在）
+            # start_commit = state.get("start_commit", None)
+            # 可以根据需要使用start_commit信息
             self._saved = True
 
             PrettyOutput.auto_print(f"✅ 从 {file_path} 成功恢复会话")
