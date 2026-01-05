@@ -184,16 +184,6 @@ class CodeAgent(Agent):
 
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
-        # 打印语言功能支持表格
-        try:
-            from jarvis.jarvis_agent.language_support_info import (
-                print_language_support_table,
-            )
-
-            print_language_support_table()
-        except Exception:
-            pass
-
     def get_rules_prompt(self) -> str:
         """
         获取rules加载的prompt
