@@ -968,7 +968,14 @@ class Agent:
             if not self.model:
                 raise RuntimeError("Model not initialized")
 
-            PrettyOutput.auto_print("🔍 开始生成对话历史摘要...")
+            if for_token_limit:
+                PrettyOutput.auto_print(
+                    "🔍 开始生成对话历史摘要... (原因: Token限制触发)"
+                )
+            else:
+                PrettyOutput.auto_print(
+                    "🔍 开始生成对话历史摘要... (原因: 任务完成触发)"
+                )
 
             if for_token_limit:
                 # token限制触发的summary：使用SUMMARY_REQUEST_PROMPT进行上下文压缩
@@ -999,7 +1006,9 @@ class Agent:
             PrettyOutput.auto_print("❌ 总结对话历史失败")
             return ""
 
-    def _summarize_and_clear_history(self) -> str:
+    def _summarize_and_clear_history(
+        self, trigger_reason: str = "Token限制触发"
+    ) -> str:
         """总结当前对话并清理历史记录
 
         该方法将:
@@ -1010,12 +1019,17 @@ class Agent:
         5. 添加摘要作为新上下文
         6. 重置对话长度计数器
 
+        参数:
+            trigger_reason: 触发摘要的原因
+
         返回:
             str: 包含对话摘要的字符串
 
         注意:
             当上下文长度超过最大值时使用
         """
+        # 保存触发原因到实例变量，供后续方法使用
+        self._summary_trigger_reason = trigger_reason
 
         if self._should_use_file_upload():
             return self._handle_history_with_file_upload()
@@ -1028,8 +1042,15 @@ class Agent:
 
     def _handle_history_with_summary(self) -> str:
         """使用摘要方式处理历史"""
-        # token限制触发的summary，使用SUMMARY_REQUEST_PROMPT
-        summary = self.generate_summary(for_token_limit=True)
+        # 使用保存的触发原因
+        trigger_reason = getattr(self, "_summary_trigger_reason", "Token限制触发")
+        # 根据触发原因决定是否为token限制触发
+        is_for_token_limit = trigger_reason in [
+            "Token限制触发",
+            "对话轮次限制触发",
+            "其他限制触发",
+        ]
+        summary = self.generate_summary(for_token_limit=is_for_token_limit)
 
         # 获取git diff信息
         git_diff_info = ""
@@ -1157,6 +1178,9 @@ class Agent:
 
     def _handle_history_with_file_upload(self) -> str:
         """使用文件上传方式处理历史"""
+        # 显示触发原因
+        trigger_reason = getattr(self, "_summary_trigger_reason", "Token限制触发")
+        PrettyOutput.auto_print(f"🔍 开始生成对话历史摘要... (原因: {trigger_reason})")
         # 关键流程：直接调用 memory_manager 确保记忆提示
         try:
             self.memory_manager._ensure_memory_prompt(agent=self)
