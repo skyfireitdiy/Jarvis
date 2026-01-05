@@ -220,12 +220,33 @@ class task_list_manager:
             if not task:
                 return
 
-            # 只有运行状态的任务才递增对话轮次
+            # 只有运行状态的main任务才递增模型调用次数
             if task.status.value == "running" and task.agent_type.value == "main":
-                task.conversation_rounds += 1
+                task.model_call_count += 1
 
         except Exception:
             # 异常不影响主流程
+            pass
+
+    def _unsubscribe_model_call_event(self, agent: Any) -> None:
+        """取消模型调用事件的订阅
+
+        参数:
+            agent: Agent 实例
+        """
+        if not agent:
+            return
+        try:
+            # 获取之前保存的回调函数
+            from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
+
+            callback = agent.get_user_data("__model_call_callback__")
+            if callback:
+                agent.event_bus.unsubscribe(BEFORE_MODEL_CALL, callback)
+                # 清除保存的回调引用
+                agent.delete_user_data("__model_call_callback__")
+        except Exception:
+            # 取消订阅失败不影响主流程
             pass
 
     def _set_task_list_id(self, agent: Any, task_list_id: str) -> None:
@@ -1446,29 +1467,42 @@ class task_list_manager:
                 "stderr": f"更新任务状态失败: {update_msg}",
             }
 
-        # 对于 main 类型的任务，初始化对话轮次并订阅事件
+        # 对于 main 类型的任务，初始化模型调用次数并订阅事件
         if task.agent_type.value == "main":
             try:
-                # 初始化对话轮次为0
+                # 先取消之前的事件订阅（避免累积）
+                self._unsubscribe_model_call_event(parent_agent)
+
+                # 初始化模型调用次数为0
                 task_list = task_list_manager.get_task_list(task_list_id)
                 if task_list:
                     current_task = task_list.get_task(task_id)
                     if current_task:
-                        current_task.conversation_rounds = 0
+                        current_task.model_call_count = 0
 
                 # 保存正在运行的任务ID
                 self._set_running_task_id(parent_agent, task_id)
 
-                # 订阅BEFORE_MODEL_CALL事件，用于记录对话轮次
+                # 订阅BEFORE_MODEL_CALL事件，用于记录模型调用次数
                 from jarvis.jarvis_agent.events import BEFORE_MODEL_CALL
+
+                # 使用命名函数而不是lambda，以便后续取消订阅
+                def model_call_callback(agent: Any, message: Any) -> None:
+                    self._increment_task_conversation_round(
+                        parent_agent, task_list_manager, task_list_id
+                    )
 
                 parent_agent.event_bus.subscribe(
                     BEFORE_MODEL_CALL,
-                    lambda agent, message: self._increment_task_conversation_round(
-                        parent_agent, task_list_manager, task_list_id
-                    ),
+                    model_call_callback,
                     priority=50,  # 高优先级，确保在事件处理中较早执行
                 )
+
+                # 保存回调函数引用，以便后续取消订阅
+                parent_agent.set_user_data(
+                    "__model_call_callback__", model_call_callback
+                )
+
             except Exception:
                 # 订阅失败不影响任务执行
                 pass
@@ -2095,15 +2129,15 @@ class task_list_manager:
                     and task.agent_type.value == "main"
                     and task.status.value != "completed"
                 ):
-                    # 检查对话轮次，如果≤5则跳过验证
-                    if task.conversation_rounds <= 5:
+                    # 检查模型调用次数，如果≤15则跳过验证（15次调用通常对应2-3轮对话）
+                    if task.model_call_count <= 15:
                         from jarvis.jarvis_utils.output import PrettyOutput
 
                         PrettyOutput.auto_print(
-                            f"⚡ 任务 [{task.task_name}] 对话轮次≤5 (实际{task.conversation_rounds}轮)，跳过验证直接完成"
+                            f"⚡ 任务 [{task.task_name}] 模型调用次数≤15 (实际{task.model_call_count}次)，跳过验证直接完成"
                         )
                         verification_passed = True
-                        verification_result = "对话轮次≤5，跳过验证"
+                        verification_result = "模型调用次数≤15，跳过验证"
                     else:
                         # 使用公共方法构建任务内容
                         task_content = self._build_task_content(task)
@@ -2201,11 +2235,8 @@ class task_list_manager:
                         # 清除 user_data 中的 running_task_id
                         self._set_running_task_id(agent, None)
 
-                        # 取消事件订阅（由于 lambda 函数无法直接取消，这里采用简化处理）
-                        # 注意：EventBus 的 unsubscribe 需要传入原始的 callback 函数引用
-                        # 由于我们在 subscribe 时使用了 lambda，无法直接取消
-                        # 但由于我们已经清除了 running_task_id，事件回调中不会再递增轮次
-                        # 这种方式是安全的，因为轮次记录逻辑依赖于 running_task_id 的存在
+                        # 取消事件订阅
+                        self._unsubscribe_model_call_event(agent)
                     except Exception:
                         # 清理失败不影响主流程
                         pass
