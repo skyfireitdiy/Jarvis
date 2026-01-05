@@ -1341,12 +1341,17 @@ def cli(
                     "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
                 )
 
+        output_content: Optional[str] = ""
+        import json
+
         try:
             exit_code = 0
             error_message = ""
             try:
                 if requirement:
-                    agent.run(requirement, prefix=prefix, suffix=suffix)
+                    output_content = agent.run(
+                        requirement, prefix=prefix, suffix=suffix
+                    )
                     if agent.non_interactive:
                         raise typer.Exit(code=0)
                 else:
@@ -1356,9 +1361,16 @@ def cli(
                         )
                         if not user_input:
                             raise typer.Exit(code=0)
-                        agent.run(user_input, prefix=prefix, suffix=suffix)
+                        output_content = agent.run(
+                            user_input, prefix=prefix, suffix=suffix
+                        )
                         if agent.non_interactive:
                             raise typer.Exit(code=0)
+            except typer.Exit:
+                # 正常退出，设置成功状态
+                exit_code = 0
+                error_message = ""
+                # agent.run() 正常结束时output_content应该已经有了值
             except Exception as exec_err:
                 exit_code = 1
                 error_message = str(exec_err)
@@ -1381,12 +1393,27 @@ def cli(
 
                     # 写入输出文件（如果存在）
                     output_file = status_file_path.with_suffix(".output")
-                    # 这里无法直接获取agent.run()的输出
-                    # 暂时写入空字符串
-                    output_content = ""
+
+                    # 将捕获的输出内容写入文件
+                    def _convert_to_string(content: Any) -> str:
+                        if content is None:
+                            return ""
+                        try:
+                            # 尝试序列化，如果失败则转换为字符串
+                            json.dumps(content)
+                            return json.dumps(content, ensure_ascii=False, indent=2)
+                        except (TypeError, ValueError):
+                            # 无法序列化时，转换为字符串
+                            return str(content)
+
+                    output_content_str = _convert_to_string(output_content)
                     try:
-                        output_file.write_text(output_content, encoding="utf-8")
-                    except Exception:
+                        output_file.write_text(output_content_str, encoding="utf-8")
+                    except Exception as output_err:
+                        # 如果写入输出失败，记录错误
+                        PrettyOutput.auto_print(
+                            f"⚠️ 写入输出文件失败: {str(output_err)}"
+                        )
                         pass
 
                     # 写入错误文件

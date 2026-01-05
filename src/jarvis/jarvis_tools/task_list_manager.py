@@ -2660,12 +2660,16 @@ class task_list_manager:
         """
         import json
 
+        # 创建状态文件路径，与任务ID对应
+        status_file_path = batch_dir / f"task_{task.task_id}.status"
+
         task_data = {
-            "task_id": task.task_id,
-            "task_name": task.task_name,
+            "task_id": task.task.task_id,
+            "task_name": task.task.task_name,
             "task_desc": task_content,
             "background": background,
             "is_code_task": is_code_task,
+            "status_file": str(status_file_path),
         }
 
         task_file = batch_dir / f"task_{task.task_id}.json"
