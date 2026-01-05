@@ -43,7 +43,11 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
     executable = sys.executable
     argv = sys.argv
 
+    # 获取用户的默认shell
+    user_shell = os.environ.get("SHELL", "/bin/sh")
+
     # 构造tmux命令参数
+    # 使用shell包装器来确保会话在主命令结束后继续运行
     tmux_args = [
         "tmux",
         "new-session",
@@ -51,9 +55,10 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
         "-s",
         session_name,
         "--",
-        executable,
+        user_shell,
+        "-c",
+        f'{executable} {" ".join([repr(arg) for arg in argv])}; exec "{user_shell}"',  # 主命令结束后启动用户默认shell保持会话
     ]
-    tmux_args.extend(argv)
 
     # 替换当前进程为tmux
     # execvp会替换当前进程，不会返回
