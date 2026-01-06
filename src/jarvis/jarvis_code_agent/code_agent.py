@@ -1325,7 +1325,10 @@ def _handle_worktree_merge(
     original_branch: str,
     non_interactive: bool,
 ) -> None:
-    """处理 worktree 合并逻辑
+    """处理 worktree rebase 并合并逻辑
+
+    使用 rebase 策略：先在 worktree 分支上执行 rebase 到原分支，
+    然后通过 fast-forward 合并，保持线性历史。
 
     参数:
         worktree_manager: WorktreeManager 实例
@@ -1340,24 +1343,24 @@ def _handle_worktree_merge(
         PrettyOutput.auto_print(f"\n🌿 Worktree 分支: {worktree_branch}")
         PrettyOutput.auto_print(f"📁 Worktree 路径: {worktree_path}")
 
-        # 询问用户是否合并（交互模式）或自动合并（非交互模式）
+        # 询问用户是否 rebase 并合并（交互模式）或自动执行（非交互模式）
         should_merge = False
         if non_interactive:
             should_merge = True
-            PrettyOutput.auto_print("🤖 非交互模式：自动合并 worktree 分支")
+            PrettyOutput.auto_print("🤖 非交互模式：自动 rebase 并合并 worktree 分支")
         else:
             should_merge = user_confirm(
-                f"是否将 worktree 分支 '{worktree_branch}' 合并回 '{original_branch}'？",
+                f"是否将 worktree 分支 '{worktree_branch}' 变基并合并回 '{original_branch}'？",
                 default=True,
             )
 
         if should_merge:
-            # 合并 worktree 分支
+            # Rebase 并合并 worktree 分支
             merge_success = worktree_manager.merge_back(
                 original_branch, non_interactive
             )
             if merge_success:
-                PrettyOutput.auto_print("✅ Worktree 分支已成功合并")
+                PrettyOutput.auto_print("✅ Worktree 分支已成功 rebase 并合并")
                 # 提示用户手动清理 worktree
                 PrettyOutput.auto_print(
                     f"💡 提示：worktree 目录 '{worktree_path}' 仍保留，如不再需要请手动删除："
@@ -1365,15 +1368,17 @@ def _handle_worktree_merge(
                 PrettyOutput.auto_print(f"   git worktree remove {worktree_branch}")
             else:
                 PrettyOutput.auto_print(
-                    f"⚠️ 合并失败或取消，worktree 分支 '{worktree_branch}' 保留"
+                    f"⚠️ Rebase/合并失败或取消，worktree 分支 '{worktree_branch}' 保留"
                 )
-                PrettyOutput.auto_print("💡 提示：您可以稍后手动合并或清理 worktree：")
+                PrettyOutput.auto_print(
+                    "💡 提示：您可以稍后手动 rebase 并合并或清理 worktree："
+                )
                 PrettyOutput.auto_print(f"   cd {worktree_path}")
                 PrettyOutput.auto_print(f"   git checkout {original_branch}")
-                PrettyOutput.auto_print(f"   git merge {worktree_branch}")
+                PrettyOutput.auto_print(f"   git rebase {worktree_branch}")
         else:
             PrettyOutput.auto_print(
-                f"ℹ️ worktree 分支 '{worktree_branch}' 已保留，您可以稍后手动合并"
+                f"ℹ️ worktree 分支 '{worktree_branch}' 已保留，您可以稍后手动 rebase 并合并"
             )
             PrettyOutput.auto_print(f"💡 提示：worktree 路径: {worktree_path}")
 
