@@ -1237,15 +1237,17 @@ def cli(
     curr_dir = os.getcwd()
     find_git_root_and_cd(curr_dir)
     # 在定位到 git 根目录后，按仓库维度加锁，避免跨仓库互斥
-    try:
-        repo_root = os.getcwd()
-        lock_name = (
-            f"code_agent_{hashlib.md5(repo_root.encode('utf-8')).hexdigest()}.lock"
-        )
-        _acquire_single_instance_lock(lock_name=lock_name)
-    except Exception:
-        # 回退到全局锁，确保至少有互斥保护
-        _acquire_single_instance_lock(lock_name="code_agent.lock")
+    # worktree 模式下不需要创建文件锁，因为 worktree 本身就是为了隔离不同任务
+    if not worktree:
+        try:
+            repo_root = os.getcwd()
+            lock_name = (
+                f"code_agent_{hashlib.md5(repo_root.encode('utf-8')).hexdigest()}.lock"
+            )
+            _acquire_single_instance_lock(lock_name=lock_name)
+        except Exception:
+            # 回退到全局锁，确保至少有互斥保护
+            _acquire_single_instance_lock(lock_name="code_agent.lock")
 
     # Worktree 管理
     worktree_manager = None
@@ -1256,7 +1258,7 @@ def cli(
             worktree_manager = WorktreeManager(repo_root)
             original_branch = worktree_manager.get_current_branch()
             PrettyOutput.auto_print(f"📍 当前分支: {original_branch}")
-            
+
             # 创建 worktree
             worktree_path = worktree_manager.create_worktree()
             # 切换到 worktree 目录
@@ -1306,7 +1308,9 @@ def cli(
         finally:
             # Worktree 合并逻辑（确保所有退出路径都会执行）
             if worktree and worktree_manager and original_branch:
-                _handle_worktree_merge(worktree_manager, original_branch, non_interactive)
+                _handle_worktree_merge(
+                    worktree_manager, original_branch, non_interactive
+                )
 
     except typer.Exit:
         raise
@@ -1348,7 +1352,9 @@ def _handle_worktree_merge(
 
         if should_merge:
             # 合并 worktree 分支
-            merge_success = worktree_manager.merge_back(original_branch, non_interactive)
+            merge_success = worktree_manager.merge_back(
+                original_branch, non_interactive
+            )
             if merge_success:
                 PrettyOutput.auto_print("✅ Worktree 分支已成功合并")
                 # 提示用户手动清理 worktree
@@ -1360,9 +1366,7 @@ def _handle_worktree_merge(
                 PrettyOutput.auto_print(
                     f"⚠️ 合并失败或取消，worktree 分支 '{worktree_branch}' 保留"
                 )
-                PrettyOutput.auto_print(
-                    "💡 提示：您可以稍后手动合并或清理 worktree："
-                )
+                PrettyOutput.auto_print("💡 提示：您可以稍后手动合并或清理 worktree：")
                 PrettyOutput.auto_print(f"   cd {worktree_path}")
                 PrettyOutput.auto_print(f"   git checkout {original_branch}")
                 PrettyOutput.auto_print(f"   git merge {worktree_branch}")
