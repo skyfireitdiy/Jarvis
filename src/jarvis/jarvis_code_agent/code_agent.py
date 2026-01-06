@@ -30,6 +30,7 @@ from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
     ContextRecommender,
 )
+from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_smart_model_name
@@ -1165,6 +1166,12 @@ def cli(
         "--review-max-iterations",
         help="代码审查最大迭代次数，达到上限后停止审查（默认3次）",
     ),
+    worktree: bool = typer.Option(
+        False,
+        "-w",
+        "--worktree",
+        help="启用 git worktree 模式，在独立分支上开发",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # 非交互模式要求从命令行传入任务
@@ -1239,6 +1246,26 @@ def cli(
     except Exception:
         # 回退到全局锁，确保至少有互斥保护
         _acquire_single_instance_lock(lock_name="code_agent.lock")
+
+    # Worktree 管理
+    worktree_manager = None
+    original_branch = None
+    if worktree:
+        try:
+            PrettyOutput.auto_print("🌿 Git Worktree 模式已启用")
+            worktree_manager = WorktreeManager(repo_root)
+            original_branch = worktree_manager.get_current_branch()
+            PrettyOutput.auto_print(f"📍 当前分支: {original_branch}")
+            
+            # 创建 worktree
+            worktree_path = worktree_manager.create_worktree()
+            # 切换到 worktree 目录
+            os.chdir(worktree_path)
+            repo_root = worktree_path
+            PrettyOutput.auto_print(f"✅ 已切换到 worktree 目录: {worktree_path}")
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 创建 worktree 失败: {str(e)}")
+            sys.exit(1)
     try:
         agent = CodeAgent(
             model_group=model_group,
@@ -1263,24 +1290,90 @@ def cli(
                     "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
                 )
 
-        if requirement:
-            agent.run(requirement, prefix=prefix, suffix=suffix)
-            if agent.non_interactive:
-                raise typer.Exit(code=0)
-        else:
-            while True:
-                user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
-                if not user_input:
-                    raise typer.Exit(code=0)
-                agent.run(user_input, prefix=prefix, suffix=suffix)
+        try:
+            if requirement:
+                agent.run(requirement, prefix=prefix, suffix=suffix)
                 if agent.non_interactive:
                     raise typer.Exit(code=0)
+            else:
+                while True:
+                    user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
+                    if not user_input:
+                        raise typer.Exit(code=0)
+                    agent.run(user_input, prefix=prefix, suffix=suffix)
+                    if agent.non_interactive:
+                        raise typer.Exit(code=0)
+        finally:
+            # Worktree 合并逻辑（确保所有退出路径都会执行）
+            if worktree and worktree_manager and original_branch:
+                _handle_worktree_merge(worktree_manager, original_branch, non_interactive)
 
     except typer.Exit:
         raise
     except RuntimeError as e:
         PrettyOutput.auto_print(f"❌ 错误: {str(e)}")
         sys.exit(1)
+
+
+def _handle_worktree_merge(
+    worktree_manager: "WorktreeManager",
+    original_branch: str,
+    non_interactive: bool,
+) -> None:
+    """处理 worktree 合并逻辑
+
+    参数:
+        worktree_manager: WorktreeManager 实例
+        original_branch: 原始分支名
+        non_interactive: 是否为非交互模式
+    """
+    try:
+        worktree_info = worktree_manager.get_worktree_info()
+        worktree_branch = worktree_info.get("worktree_branch")
+        worktree_path = worktree_info.get("worktree_path")
+
+        PrettyOutput.auto_print(f"\n🌿 Worktree 分支: {worktree_branch}")
+        PrettyOutput.auto_print(f"📁 Worktree 路径: {worktree_path}")
+
+        # 询问用户是否合并（交互模式）或自动合并（非交互模式）
+        should_merge = False
+        if non_interactive:
+            should_merge = True
+            PrettyOutput.auto_print("🤖 非交互模式：自动合并 worktree 分支")
+        else:
+            should_merge = user_confirm(
+                f"是否将 worktree 分支 '{worktree_branch}' 合并回 '{original_branch}'？",
+                default=True,
+            )
+
+        if should_merge:
+            # 合并 worktree 分支
+            merge_success = worktree_manager.merge_back(original_branch, non_interactive)
+            if merge_success:
+                PrettyOutput.auto_print("✅ Worktree 分支已成功合并")
+                # 提示用户手动清理 worktree
+                PrettyOutput.auto_print(
+                    f"💡 提示：worktree 目录 '{worktree_path}' 仍保留，如不再需要请手动删除："
+                )
+                PrettyOutput.auto_print(f"   git worktree remove {worktree_branch}")
+            else:
+                PrettyOutput.auto_print(
+                    f"⚠️ 合并失败或取消，worktree 分支 '{worktree_branch}' 保留"
+                )
+                PrettyOutput.auto_print(
+                    "💡 提示：您可以稍后手动合并或清理 worktree："
+                )
+                PrettyOutput.auto_print(f"   cd {worktree_path}")
+                PrettyOutput.auto_print(f"   git checkout {original_branch}")
+                PrettyOutput.auto_print(f"   git merge {worktree_branch}")
+        else:
+            PrettyOutput.auto_print(
+                f"ℹ️ worktree 分支 '{worktree_branch}' 已保留，您可以稍后手动合并"
+            )
+            PrettyOutput.auto_print(f"💡 提示：worktree 路径: {worktree_path}")
+
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ 处理 worktree 合并时出错: {str(e)}")
 
 
 def _print_available_rules(
