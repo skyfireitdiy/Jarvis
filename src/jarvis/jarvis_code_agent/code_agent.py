@@ -1185,10 +1185,38 @@ def cli(
         )
         raise typer.Exit(code=1)
 
+    # 用于tmux并行任务的状态文件路径
+    status_file_path = None
+
     if requirement_file:
         try:
-            with open(requirement_file, "r", encoding="utf-8") as f:
-                requirement = f.read()
+            import json
+            from pathlib import Path
+
+            with open(requirement_file, "r", encoding="utf-8") as file_handle:
+                file_content = file_handle.read()
+
+            # 尝试解析为JSON以获取status_file字段
+            try:
+                task_data = json.loads(file_content)
+                status_file_path = task_data.get("status_file")
+                if status_file_path:
+                    # 将status_file_path转换为Path对象
+                    status_file_path = Path(status_file_path)
+                # 提取实际任务内容
+                if "task_desc" in task_data:
+                    requirement = task_data["task_desc"]
+                    if "background" in task_data:
+                        requirement += f"\n\n背景信息:\n{task_data['background']}"
+                    if "additional_info" in task_data:
+                        requirement += f"\n\n附加信息:\n{task_data['additional_info']}"
+                else:
+                    # 不是JSON格式或没有task_desc字段，直接使用文件内容
+                    requirement = file_content
+            except json.JSONDecodeError:
+                # 不是JSON格式，直接使用文件内容
+                requirement = file_content
+
         except (Exception, FileNotFoundError) as e:
             PrettyOutput.auto_print(f"❌ 错误: 无法从文件读取需求描述: {str(e)}")
             raise typer.Exit(code=1)
@@ -1313,19 +1341,63 @@ def cli(
                 )
 
         try:
-            if requirement:
-                agent.run(requirement, prefix=prefix, suffix=suffix)
-                if agent.non_interactive:
-                    raise typer.Exit(code=0)
-            else:
-                while True:
-                    user_input = get_multiline_input("请输入你的需求（输入空行退出）:")
-                    if not user_input:
-                        raise typer.Exit(code=0)
-                    agent.run(user_input, prefix=prefix, suffix=suffix)
+            exit_code = 0
+            error_message = ""
+            try:
+                if requirement:
+                    agent.run(requirement, prefix=prefix, suffix=suffix)
                     if agent.non_interactive:
                         raise typer.Exit(code=0)
+                else:
+                    while True:
+                        user_input = get_multiline_input(
+                            "请输入你的需求（输入空行退出）:"
+                        )
+                        if not user_input:
+                            raise typer.Exit(code=0)
+                        agent.run(user_input, prefix=prefix, suffix=suffix)
+                        if agent.non_interactive:
+                            raise typer.Exit(code=0)
+            except Exception as exec_err:
+                exit_code = 1
+                error_message = str(exec_err)
+                raise
         finally:
+            # 如果是tmux并行任务，写入状态文件
+            if status_file_path:
+                import json
+                from pathlib import Path
+
+                try:
+                    # 写入状态文件
+                    status_data = {
+                        "status": "completed" if exit_code == 0 else "failed",
+                        "exit_code": exit_code,
+                    }
+                    status_file_path.write_text(
+                        json.dumps(status_data, ensure_ascii=False), encoding="utf-8"
+                    )
+
+                    # 写入输出文件（如果存在）
+                    output_file = status_file_path.with_suffix(".output")
+                    # 这里无法直接获取agent.run()的输出
+                    # 暂时写入空字符串
+                    output_content = ""
+                    try:
+                        output_file.write_text(output_content, encoding="utf-8")
+                    except Exception:
+                        pass
+
+                    # 写入错误文件
+                    if exit_code != 0 and error_message:
+                        error_file = status_file_path.with_suffix(".error")
+                        try:
+                            error_file.write_text(error_message, encoding="utf-8")
+                        except Exception:
+                            pass
+                except Exception as status_err:
+                    PrettyOutput.auto_print(f"⚠️ 写入状态文件失败: {str(status_err)}")
+
             # Worktree 合并逻辑（确保所有退出路径都会执行）
             if worktree and worktree_manager and original_branch:
                 _handle_worktree_merge(

@@ -699,10 +699,38 @@ def run_cli(
         PrettyOutput.auto_print("❌ 错误: 不能同时使用 --task 和 --task-file 参数")
         raise typer.Exit(code=1)
 
+    # 用于tmux并行任务的状态文件路径
+    status_file_path = None
+
     if task_file:
         try:
-            with open(task_file, "r", encoding="utf-8") as f:
-                task = f.read()
+            import json
+            from pathlib import Path
+
+            with open(task_file, "r", encoding="utf-8") as file_handle:
+                file_content = file_handle.read()
+
+            # 尝试解析为JSON以获取status_file字段
+            try:
+                task_data = json.loads(file_content)
+                status_file_path = task_data.get("status_file")
+                if status_file_path:
+                    # 将status_file_path转换为Path对象
+                    status_file_path = Path(status_file_path)
+                # 提取实际任务内容
+                if "task_desc" in task_data:
+                    task = task_data["task_desc"]
+                    if "background" in task_data:
+                        task += f"\n\n背景信息:\n{task_data['background']}"
+                    if "additional_info" in task_data:
+                        task += f"\n\n附加信息:\n{task_data['additional_info']}"
+                else:
+                    # 不是JSON格式或没有task_desc字段，直接使用文件内容
+                    task = file_content
+            except json.JSONDecodeError:
+                # 不是JSON格式，直接使用文件内容
+                task = file_content
+
         except (Exception, FileNotFoundError) as e:
             PrettyOutput.auto_print(f"❌ 错误: 无法从文件读取任务内容: {str(e)}")
             raise typer.Exit(code=1)
@@ -844,9 +872,11 @@ def run_cli(
                         try:
                             pid_dir = Path(os.path.expanduser("~/.jarvis"))
                             if pid_dir.is_dir():
-                                for f in pid_dir.glob("jarvis_web_*.pid"):
+                                for pid_file in pid_dir.glob("jarvis_web_*.pid"):  # type: Path
                                     try:
-                                        ptxt = f.read_text(encoding="utf-8").strip()
+                                        ptxt = pid_file.read_text(
+                                            encoding="utf-8"
+                                        ).strip()
                                         p = int(ptxt)
                                         try:
                                             os.kill(p, signal.SIGTERM)
@@ -861,7 +891,7 @@ def run_cli(
                                     except Exception:
                                         pass
                                     try:
-                                        f.unlink(missing_ok=True)
+                                        pid_file.unlink(missing_ok=True)
                                     except Exception:
                                         pass
                         except Exception:
@@ -1188,7 +1218,49 @@ def run_cli(
                 raise typer.Exit(code=1)
 
         # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
-        agent_manager.run_task(task)
+        try:
+            agent_manager.run_task(task)
+            exit_code = 0
+            error_message = ""
+        except Exception as exec_err:
+            exit_code = 1
+            error_message = str(exec_err)
+            raise
+        finally:
+            # 如果是tmux并行任务，写入状态文件
+            if status_file_path:
+                import json
+                from pathlib import Path
+
+                try:
+                    # 写入状态文件
+                    status_data = {
+                        "status": "completed" if exit_code == 0 else "failed",
+                        "exit_code": exit_code,
+                    }
+                    status_file_path.write_text(
+                        json.dumps(status_data, ensure_ascii=False), encoding="utf-8"
+                    )
+
+                    # 写入输出文件（如果存在）
+                    output_file = status_file_path.with_suffix(".output")
+                    # 这里无法直接获取agent_manager.run_task()的输出
+                    # 暂时写入空字符串
+                    output_content = ""
+                    try:
+                        output_file.write_text(output_content, encoding="utf-8")
+                    except Exception:
+                        pass
+
+                    # 写入错误文件
+                    if exit_code != 0 and error_message:
+                        error_file = status_file_path.with_suffix(".error")
+                        error_file.write_text(error_message, encoding="utf-8")
+
+                    PrettyOutput.auto_print(f"✅ 已写入状态文件: {status_file_path}")
+                except Exception as status_err:
+                    PrettyOutput.auto_print(f"⚠️ 写入状态文件失败: {str(status_err)}")
+
     except typer.Exit:
         raise
     except Exception as err:  # pylint: disable=broad-except
