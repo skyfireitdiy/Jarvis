@@ -1236,11 +1236,12 @@ def cli(
 
     curr_dir = os.getcwd()
     find_git_root_and_cd(curr_dir)
+    # 获取 git 仓库根目录（用于文件锁和 worktree 管理）
+    repo_root = os.getcwd()
     # 在定位到 git 根目录后，按仓库维度加锁，避免跨仓库互斥
     # worktree 模式下不需要创建文件锁，因为 worktree 本身就是为了隔离不同任务
     if not worktree:
         try:
-            repo_root = os.getcwd()
             lock_name = (
                 f"code_agent_{hashlib.md5(repo_root.encode('utf-8')).hexdigest()}.lock"
             )
