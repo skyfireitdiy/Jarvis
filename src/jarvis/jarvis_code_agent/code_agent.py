@@ -1361,11 +1361,18 @@ def _handle_worktree_merge(
             )
             if merge_success:
                 PrettyOutput.auto_print("✅ Worktree 分支已成功 rebase 并合并")
-                # 提示用户手动清理 worktree
-                PrettyOutput.auto_print(
-                    f"💡 提示：worktree 目录 '{worktree_path}' 仍保留，如不再需要请手动删除："
-                )
-                PrettyOutput.auto_print(f"   git worktree remove {worktree_branch}")
+                # 自动清理 worktree 目录
+                PrettyOutput.auto_print("🧹 正在清理 worktree 目录...")
+                cleanup_success = worktree_manager.cleanup()
+                if cleanup_success:
+                    PrettyOutput.auto_print(
+                        f"✅ Worktree 目录已自动删除: {worktree_path}"
+                    )
+                else:
+                    PrettyOutput.auto_print(
+                        f"⚠️ Worktree 目录删除失败，请手动清理: {worktree_path}"
+                    )
+                    PrettyOutput.auto_print(f"   git worktree remove {worktree_branch}")
             else:
                 PrettyOutput.auto_print(
                     f"⚠️ Rebase/合并失败或取消，worktree 分支 '{worktree_branch}' 保留"
