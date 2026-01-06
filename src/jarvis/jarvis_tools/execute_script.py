@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
 import tempfile
-import time
 from pathlib import Path
 from typing import Any
 from typing import Dict
@@ -95,7 +94,6 @@ class ScriptTool:
         Returns:
             Dictionary with execution results
         """
-        start_time = time.perf_counter()
         try:
             # Get file extension for the interpreter
             extension = self.INTERPRETER_EXTENSIONS.get(interpreter, "script")
@@ -215,17 +213,15 @@ class ScriptTool:
 
                 # Return result (handle timeout in non-interactive mode)
                 if is_non_interactive() and timed_out:
-                    elapsed_time = time.perf_counter() - start_time
                     return {
                         "success": False,
-                        "stdout": f"[执行耗时: {elapsed_time:.2f}s]\n{output}",
+                        "stdout": output,
                         "stderr": f"执行超时（超过{get_script_execution_timeout()}秒），进程已被终止（非交互模式）。",
                     }
                 else:
-                    elapsed_time = time.perf_counter() - start_time
                     return {
                         "success": True,
-                        "stdout": f"[执行耗时: {elapsed_time:.2f}s]\n{output}",
+                        "stdout": output,
                         "stderr": "",
                     }
 
