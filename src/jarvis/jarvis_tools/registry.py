@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 from typing import Callable
@@ -1186,28 +1187,44 @@ class ToolRegistry(OutputHandlerProtocol):
         # 更新工具调用统计
         self._update_tool_stats(name)
 
+        # 记录开始时间
+        start_time = time.perf_counter()
+
         # 根据工具实现声明的协议版本分发调用方式
         try:
+            result = None
             if getattr(tool, "protocol_version", "1.0") == "2.0":
                 # v2.0: agent与参数分离传递
                 # 尝试使用agent作为第二个参数，如果不兼容则回退到旧方式
                 try:
-                    return tool.func(arguments, agent)  # type: ignore[call-arg]
+                    result = tool.func(arguments, agent)  # type: ignore[call-arg]
                 except TypeError:
                     # 兼容旧版v2.0工具，只传arguments
-                    return tool.func(arguments)
+                    result = tool.func(arguments)
             else:
                 # v1.0: 兼容旧实现，将agent注入到arguments（如果提供）
                 args_to_call = arguments.copy() if isinstance(arguments, dict) else {}
                 if agent is not None:
                     args_to_call["agent"] = agent
-                return tool.execute(args_to_call)
+                result = tool.execute(args_to_call)
         except TypeError:
             # 兼容处理：如果函数签名不匹配，回退到旧方式
             args_to_call = arguments.copy() if isinstance(arguments, dict) else {}
             if agent is not None:
                 args_to_call["agent"] = agent
-            return tool.execute(args_to_call)
+            result = tool.execute(args_to_call)
+        finally:
+            # 记录工具执行耗时
+            try:
+                elapsed_time = time.perf_counter() - start_time
+                from jarvis.jarvis_stats.stats import StatsManager
+
+                StatsManager.increment(name, elapsed_time, unit="seconds", group="tool")
+            except Exception:
+                # 避免统计失败影响工具执行
+                pass
+
+        return result
 
     def _format_tool_output(self, stdout: str, stderr: str) -> str:
         """格式化工具输出为可读字符串
