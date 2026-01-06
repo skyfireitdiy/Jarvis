@@ -708,7 +708,7 @@ def _get_multiline_input_internal(
 
             def _show_notice() -> None:
                 PrettyOutput.auto_print(
-                    "ℹ️ 提示：当前支持多行输入。输入完成请使用 Ctrl+J 确认；Enter 仅用于换行。"
+                    "ℹ️ 提示：当前支持多行输入。输入完成请使用 Ctrl+J 或 Ctrl+] 确认；Enter 仅用于换行。"
                 )
                 try:
                     input("按回车继续...")
@@ -733,6 +733,10 @@ def _get_multiline_input_internal(
             event.current_buffer.insert_text("\n")
 
     @bindings.add("c-j", filter=has_focus(DEFAULT_BUFFER))
+    def _(event: KeyPressEvent) -> None:
+        event.current_buffer.validate_and_handle()
+
+    @bindings.add("c-]", filter=has_focus(DEFAULT_BUFFER))
     def _(event: KeyPressEvent) -> None:
         event.current_buffer.validate_and_handle()
 
@@ -870,7 +874,7 @@ def _get_multiline_input_internal(
                 ("class:bt.key", "Tab"),
                 ("class:bt.label", " 选择 "),
                 ("class:bt.sep", " • "),
-                ("class:bt.key", "Ctrl+J"),
+                ("class:bt.key", "Ctrl+J / Ctrl+]"),
                 ("class:bt.label", " 确认 "),
                 ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+O"),
@@ -984,7 +988,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
 
         if user_input == CTRL_O_SENTINEL:
             _show_history_and_copy()
-            tip = "请继续输入（或按Ctrl+J确认）:"
+            tip = "请继续输入（或按Ctrl+J/Ctrl+]确认）:"
             continue
         elif isinstance(user_input, str) and user_input.startswith(
             FZF_REQUEST_SENTINEL_PREFIX
@@ -1092,7 +1096,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                     new_cursor = cursor + len(inserted)
                 preset = new_text
                 preset_cursor = new_cursor
-                tip = "已插入文件，继续编辑或按Ctrl+J确认:"
+                tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
             else:
                 # No selection; keep original text and cursor
                 preset = text
@@ -1203,7 +1207,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                     new_cursor = cursor + len(inserted)
                 preset = new_text
                 preset_cursor = new_cursor
-                tip = "已插入文件，继续编辑或按Ctrl+J确认:"
+                tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
             else:
                 # No selection; keep original text and cursor
                 preset = text
@@ -1235,7 +1239,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                 sys.stdout.flush()
             except Exception:
                 pass
-            tip = "已插入文件，继续编辑或按Ctrl+J确认:"
+            tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
             continue
         else:
             if not user_input and print_on_empty:
