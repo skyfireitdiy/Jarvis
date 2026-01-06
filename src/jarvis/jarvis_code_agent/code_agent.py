@@ -1326,6 +1326,7 @@ def cli(
             rule_names=rule_names,
             disable_review=disable_review,
             review_max_iterations=review_max_iterations,
+            allow_savesession=True,
         )
 
         # 显示可用的规则信息

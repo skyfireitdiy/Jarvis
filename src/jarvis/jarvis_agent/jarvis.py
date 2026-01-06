@@ -1093,6 +1093,7 @@ def run_cli(
             use_methodology=False if disable_methodology_analysis else None,
             use_analysis=False if disable_methodology_analysis else None,
             non_interactive=non_interactive,
+            allow_savesession=True,
             **extra_kwargs,
         )
         agent_manager.initialize()
