@@ -126,7 +126,7 @@ def _build_app() -> FastAPI:
     const term = new Terminal({
       convertEol: true,
       fontSize: 13,
-      fontFamily: '"FiraCode Nerd Font", "JetBrainsMono NF", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+      fontFamily: '"FiraCode Nerd Font", "JetBrainsMono NF", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", monospace',
       theme: {
         background: '#000000',
         foreground: '#ffffff',
