@@ -690,8 +690,8 @@ def run_cli(
     if ctx.invoked_subcommand is not None:
         return
 
-    # 使用 rich 输出命令与快捷方式总览
-    print_commands_overview()
+    # 初始化时不再打印命令列表
+    # print_commands_overview()
 
     # CLI 标志：非交互模式（不依赖配置文件，仅作为 Agent 实例属性）
 
