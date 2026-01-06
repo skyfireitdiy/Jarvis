@@ -1129,6 +1129,9 @@ def cli(
     requirement: Optional[str] = typer.Option(
         None, "-r", "--requirement", help="要处理的需求描述"
     ),
+    requirement_file: Optional[str] = typer.Option(
+        None, "--requirement-file", help="从文件读取需求描述"
+    ),
     append_tools: Optional[str] = typer.Option(
         None, "--append-tools", help="要追加的工具列表，用逗号分隔"
     ),
@@ -1176,6 +1179,21 @@ def cli(
     ),
 ) -> None:
     """Jarvis主入口点。"""
+    # 处理需求描述：优先从文件读取
+    if requirement and requirement_file:
+        PrettyOutput.auto_print(
+            "❌ 错误: 不能同时使用 --requirement 和 --requirement-file 参数"
+        )
+        raise typer.Exit(code=1)
+
+    if requirement_file:
+        try:
+            with open(requirement_file, "r", encoding="utf-8") as f:
+                requirement = f.read()
+        except (Exception, FileNotFoundError) as e:
+            PrettyOutput.auto_print(f"❌ 错误: 无法从文件读取需求描述: {str(e)}")
+            raise typer.Exit(code=1)
+
     # 非交互模式要求从命令行传入任务
     if non_interactive and not (requirement and str(requirement).strip()):
         PrettyOutput.auto_print(
