@@ -81,11 +81,8 @@ class CodeAgent(Agent):
         # 记录当前是否为非交互模式，便于在提示词/输入中动态调整行为说明
         self.non_interactive: bool = bool(non_interactive)
         # Review 相关配置
-        # 只在非交互模式下启用 review 功能
-        if non_interactive:
-            self.disable_review = disable_review  # 使用传入的 disable_review 值
-        else:
-            self.disable_review = True  # 交互模式下禁用 review
+        # 注意：disable_review 仅保存配置值，实际是否执行 review 在运行时动态判断
+        self.disable_review = disable_review  # 保存用户配置的 disable_review 值
         self.review_max_iterations = review_max_iterations
 
         # 存储开始时的commit hash，用于后续git diff获取
@@ -946,6 +943,12 @@ git reset --hard {start_commit}
             prefix: 前缀
             suffix: 后缀
         """
+        # 动态判断是否执行 review：根据运行时的 non_interactive 状态和用户配置
+        # 只在非交互模式下才执行 review（用户明确禁用时除外）
+        if self.disable_review or not self.non_interactive:
+            PrettyOutput.auto_print("ℹ️ 跳过代码审查（当前模式或配置不支持）")
+            return
+
         from jarvis.jarvis_agent import Agent
 
         iteration = 0
