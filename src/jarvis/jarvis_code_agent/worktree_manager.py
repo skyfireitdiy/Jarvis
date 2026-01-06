@@ -5,6 +5,7 @@
 
 import os
 import random
+import shutil
 import string
 import subprocess
 from datetime import datetime
@@ -97,6 +98,53 @@ class WorktreeManager:
         except Exception as e:
             raise RuntimeError(f"获取当前分支时出错: {str(e)}")
 
+    def _link_jarvis_dir(self, worktree_path: str) -> None:
+        """将原仓库的 .jarvis 目录软链接到 worktree 中
+
+        参数:
+            worktree_path: worktree 目录路径
+
+        抛出:
+            RuntimeError: 如果创建软链接失败
+        """
+        original_jarvis_dir = os.path.join(self.repo_root, ".jarvis")
+        worktree_jarvis_dir = os.path.join(worktree_path, ".jarvis")
+
+        # 检查原仓库的 .jarvis 目录是否存在
+        if not os.path.exists(original_jarvis_dir):
+            PrettyOutput.auto_print("⚠️ 原仓库不存在 .jarvis 目录，跳过软链接创建")
+            return
+
+        # 获取原仓库 .jarvis 的真实路径（处理软链接链）
+        original_jarvis_real = os.path.realpath(original_jarvis_dir)
+
+        # 路径安全验证：确保软链接目标路径在 worktree 目录下
+        worktree_path_real = os.path.realpath(worktree_path)
+        worktree_jarvis_real = os.path.realpath(worktree_jarvis_dir)
+        if (
+            not os.path.commonprefix([worktree_jarvis_real, worktree_path_real])
+            == worktree_path_real
+        ):
+            raise RuntimeError(f"软链接目标路径不安全: {worktree_jarvis_dir}")
+
+        try:
+            # 如果 worktree 中已存在 .jarvis 目录，先删除
+            if os.path.exists(worktree_jarvis_dir):
+                if os.path.islink(worktree_jarvis_dir):
+                    os.unlink(worktree_jarvis_dir)
+                else:
+                    shutil.rmtree(worktree_jarvis_dir)
+
+            # 创建软链接：worktree/.jarvis -> 原仓库/.jarvis（使用真实路径）
+            os.symlink(original_jarvis_real, worktree_jarvis_dir)
+            PrettyOutput.auto_print(
+                f"🔗 已创建软链接: {worktree_jarvis_dir} -> {original_jarvis_real}"
+            )
+
+        except Exception as e:
+            # 软链接创建失败应视为严重错误，因为数据共享是核心需求
+            raise RuntimeError(f"创建 .jarvis 软链接失败: {str(e)}")
+
     def create_worktree(self, branch_name: Optional[str] = None) -> str:
         """创建 git worktree 分支和目录
 
@@ -130,6 +178,10 @@ class WorktreeManager:
             self.worktree_path = worktree_path
 
             PrettyOutput.auto_print(f"✅ Worktree 创建成功: {worktree_path}")
+
+            # 将原仓库的 .jarvis 目录软链接到 worktree 中
+            self._link_jarvis_dir(worktree_path)
+
             return worktree_path
 
         except subprocess.CalledProcessError as e:
