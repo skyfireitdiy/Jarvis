@@ -221,7 +221,6 @@ class BasePlatform(ABC):
         """
         import time
 
-        chat_iterator = self.chat(message)
         first_chunk = None
 
         with Status(
@@ -229,6 +228,7 @@ class BasePlatform(ABC):
             spinner="dots",
             console=console,
         ):
+            chat_iterator = self.chat(message)
             try:
                 while True:
                     first_chunk = next(chat_iterator)
@@ -251,7 +251,7 @@ class BasePlatform(ABC):
         response = ""
         last_subtitle_update_time = time.time()
         subtitle_update_interval = (
-            3  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
+            1  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
         )
         update_count = 0  # 更新计数器，用于控制 subtitle 更新频率
         with Live(panel, refresh_per_second=4, transient=True) as live:
