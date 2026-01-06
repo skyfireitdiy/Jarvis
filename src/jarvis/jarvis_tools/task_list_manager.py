@@ -88,6 +88,9 @@ class task_list_manager:
 
     name = "task_list_manager"
 
+    # 批量执行相关常量
+    BATCH_EXECUTION_ERROR_PREFIX = "批量执行验证失败"
+
     def _get_max_output_length(self, agent: Any = None) -> int:
         """获取基于剩余token数量的最大输出长度（字符数）
 
@@ -760,6 +763,7 @@ class task_list_manager:
 **核心功能：**
 - `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
 - `execute_task`: 执行任务（自动创建子Agent）
+- `execute_batch_tasks`: 批量执行多个sub类型任务（要求：所有任务都是sub类型、状态为pending、依赖已完成、任务之间彼此独立）
 - `get_task_list_summary`: 查看任务状态
 
 **任务类型选择：**
@@ -826,6 +830,20 @@ class task_list_manager:
 {ct("TOOL_CALL")}
 ```
 
+批量执行任务：
+```
+{ot("TOOL_CALL")}
+{{
+    "name": "task_list_manager",
+    "arguments": {{
+        "action": "execute_batch_tasks",
+        "task_ids": ["task-1", "task-2", "task-3"],
+        "additional_info": "批量执行的公共附加信息"
+    }}
+}}
+{ct("TOOL_CALL")}
+```
+
 更新任务状态：
 ```
 {ot("TOOL_CALL")}
@@ -856,6 +874,7 @@ class task_list_manager:
                     "get_task_detail",
                     "get_task_list_summary",
                     "execute_task",
+                    "execute_batch_tasks",
                     "update_task",
                 ],
                 "description": "要执行的操作",
@@ -911,9 +930,14 @@ class task_list_manager:
                 "type": "string",
                 "description": "任务ID（execute_task/update_task/get_task_detail 需要）",
             },
+            "task_ids": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "任务ID列表（execute_batch_tasks 需要）。批量执行多个任务，每个任务必须满足：1) 都是sub类型；2) 状态为pending；3) 依赖任务都已completed；4) 任务之间彼此无依赖关系。",
+            },
             "additional_info": {
                 "type": "string",
-                "description": "附加信息（**仅在 execute_task 时必填**）。必须提供任务的详细上下文信息，包括任务背景、关键信息、约束条件、预期结果等。不能为空字符串或None。",
+                "description": "附加信息（**仅在 execute_task 和 execute_batch_tasks 时必填**）。必须提供任务的详细上下文信息，包括任务背景、关键信息、约束条件、预期结果等。不能为空字符串或None。",
             },
             "task_update_info": {
                 "type": "object",
@@ -1041,6 +1065,12 @@ class task_list_manager:
 
             elif action == "execute_task":
                 result = self._handle_execute_task(
+                    args, task_list_manager, agent_id, is_main_agent, agent
+                )
+                task_list_id_for_status = self._get_task_list_id(agent)
+
+            elif action == "execute_batch_tasks":
+                result = self._handle_execute_batch_tasks(
                     args, task_list_manager, agent_id, is_main_agent, agent
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
@@ -1932,6 +1962,283 @@ class task_list_manager:
                 "stdout": "",
                 "stderr": f"执行任务失败: {str(e)}",
             }
+
+    def _validate_batch_execution_conditions(
+        self,
+        task_list_manager: Any,
+        task_list_id: str,
+        task_ids: List[str],
+        agent_id: str,
+        is_main_agent: bool,
+    ) -> tuple[bool, Optional[str], List[Any]]:
+        """验证批量执行的前置条件。
+
+        参数:
+            task_list_manager: 任务列表管理器
+            task_list_id: 任务列表 ID
+            task_ids: 要批量执行的任务 ID 列表
+            agent_id: Agent ID
+            is_main_agent: 是否为主 Agent
+
+        返回:
+            Tuple[是否通过, 错误信息, 任务对象列表]
+        """
+        if not task_ids:
+            return False, f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务ID列表为空", []
+
+        tasks = []
+        task_id_set = set(task_ids)
+
+        # 验证每个任务的基本条件
+        for task_id in task_ids:
+            task, success, error_msg = task_list_manager.get_task_detail(
+                task_list_id=task_list_id,
+                task_id=task_id,
+                agent_id=agent_id,
+                is_main_agent=is_main_agent,
+            )
+
+            if not success or not task:
+                return (
+                    False,
+                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} 不存在或无权访问",
+                    [],
+                )
+
+            # 检查任务类型必须是 sub
+            if task.agent_type.value != "sub":
+                return (
+                    False,
+                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} ({task.task_name}) 的类型不是 sub（当前为 {task.agent_type.value}）",
+                    [],
+                )
+
+            # 检查任务状态必须是 pending
+            if task.status.value != "pending":
+                return (
+                    False,
+                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} ({task.task_name}) 状态不是 pending（当前为 {task.status.value}）",
+                    [],
+                )
+
+            # 验证依赖任务都已完成
+            dep_check_result = self._check_dependencies_completed(
+                task_list_manager=task_list_manager,
+                task_list_id=task_list_id,
+                dependencies=task.dependencies,
+                agent_id=agent_id,
+                is_main_agent=is_main_agent,
+            )
+
+            if not dep_check_result["success"]:
+                return (
+                    False,
+                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} ({task.task_name}) 的依赖验证未通过: {dep_check_result['stderr']}",
+                    [],
+                )
+
+            tasks.append(task)
+
+        # 验证任务之间彼此无依赖关系
+        # 只需检查每个任务的依赖是否在任务列表中即可
+        # 如果存在依赖关系，必然有一方的依赖在另一方
+        for task in tasks:
+            for dep_id in task.dependencies:
+                if dep_id in task_id_set:
+                    return (
+                        False,
+                        f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task.task_id} ({task.task_name}) 依赖于任务 {dep_id}，批量执行要求任务之间彼此独立",
+                        [],
+                    )
+
+        return True, None, tasks
+
+    def _handle_execute_batch_tasks(
+        self,
+        args: Dict[str, Any],
+        task_list_manager: Any,
+        agent_id: str,
+        is_main_agent: bool,
+        parent_agent: Any,
+    ) -> Dict[str, Any]:
+        """处理批量执行任务。
+
+        参数:
+            args: 调用参数
+            task_list_manager: 任务列表管理器
+            agent_id: Agent ID
+            is_main_agent: 是否为主 Agent
+            parent_agent: 父 Agent 实例
+
+        返回:
+            Dict: 执行结果
+        """
+        task_list_id = self._get_task_list_id(parent_agent)
+        if not task_list_id:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
+            }
+
+        task_ids = args.get("task_ids")
+        additional_info = args.get("additional_info")
+
+        if not task_ids:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 task_ids 参数",
+            }
+
+        if not isinstance(task_ids, list):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "task_ids 必须是数组",
+            }
+
+        if additional_info is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 additional_info 参数",
+            }
+
+        if not additional_info or not str(additional_info).strip():
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "additional_info 参数不能为空",
+            }
+
+        # 检查是否有正在运行的任务
+        try:
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            task_list = task_list_manager.get_task_list(task_list_id)
+            if task_list:
+                for task_obj in task_list.tasks.values():
+                    if task_obj.status.value == "running":
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"检测到任务 {task_obj.task_id} ({task_obj.task_name}) 正在运行，请先完成该任务后再执行批量任务",
+                        }
+        except Exception as e:
+            PrettyOutput.auto_print(
+                f"⚠️ 检查运行中任务时发生异常: {str(e)}，继续执行批量任务"
+            )
+
+        # 验证批量执行的前置条件
+        (
+            validation_passed,
+            validation_error,
+            tasks,
+        ) = self._validate_batch_execution_conditions(
+            task_list_manager=task_list_manager,
+            task_list_id=task_list_id,
+            task_ids=task_ids,
+            agent_id=agent_id,
+            is_main_agent=is_main_agent,
+        )
+
+        if not validation_passed:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"批量执行验证失败: {validation_error}",
+            }
+
+        # 批量执行任务（顺序执行）
+        results = []
+        completed_count = 0
+        failed_count = 0
+
+        from jarvis.jarvis_utils.output import PrettyOutput
+
+        PrettyOutput.auto_print(f"🚀 开始批量执行 {len(tasks)} 个任务...")
+
+        for idx, task in enumerate(tasks):
+            PrettyOutput.auto_print(
+                f"📋 [{idx + 1}/{len(tasks)}] 执行任务: {task.task_name} ({task.task_id})"
+            )
+
+            # 复用单任务执行逻辑
+            execute_args = {
+                "task_id": task.task_id,
+                "additional_info": additional_info,
+            }
+
+            result = self._handle_execute_task(
+                execute_args,
+                task_list_manager,
+                agent_id,
+                is_main_agent,
+                parent_agent,
+            )
+
+            # 记录结果
+            task_result = {
+                "task_id": task.task_id,
+                "task_name": task.task_name,
+                "success": result.get("success", False),
+            }
+
+            if result.get("success"):
+                task_result["status"] = "completed"
+                task_result["output"] = result.get("stdout", "")[:500]  # 截断输出
+                completed_count += 1
+                PrettyOutput.auto_print(f"✅ 任务 {task.task_name} 执行成功")
+            else:
+                task_result["status"] = "failed"
+                task_result["error"] = result.get("stderr", "未知错误")
+                failed_count += 1
+                PrettyOutput.auto_print(
+                    f"❌ 任务 {task.task_name} 执行失败: {result.get('stderr', '未知错误')[:200]}"
+                )
+
+            results.append(task_result)
+
+        # 构建汇总结果
+        import datetime
+
+        completion_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        summary = f"""📊 **批量执行完成报告**
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 **执行概览**
+   任务总数: {len(tasks)}
+   ✅ 成功: {completed_count}
+   ❌ 失败: {failed_count}
+   完成时间: {completion_time}
+
+📋 **详细结果**
+"""
+
+        for idx, result in enumerate(results):
+            status_icon = "✅" if result["success"] else "❌"
+            summary += f"\n{idx + 1}. {status_icon} {result['task_name']} ({result['task_id']})\n"
+            summary += f"   状态: {result['status']}\n"
+            if result["success"]:
+                summary += f"   输出摘要: {result.get('output', '')}\n"
+            else:
+                summary += f"   错误信息: {result.get('error', '')}\n"
+
+        summary += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        return {
+            "success": True,
+            "stdout": summary,
+            "stderr": "",
+            "_internal": {
+                "total": len(tasks),
+                "completed": completed_count,
+                "failed": failed_count,
+                "results": results,
+            },
+        }
 
     def _check_dependencies_completed(
         self,

@@ -346,3 +346,208 @@ class TestDependencyValidationIntegration:
             "依赖任务 [待执行的任务] 状态为 pending，需要为 completed"
             in result["stderr"]
         )
+
+
+class TestBatchExecution:
+    """测试批量执行任务功能"""
+
+    def setup_method(self):
+        """设置测试环境"""
+        self.tool = task_list_manager()
+        self.mock_agent = Mock()
+        self.mock_task_list_manager = Mock()
+        self.mock_agent.task_list_manager = self.mock_task_list_manager
+        self.mock_agent.name = "test_agent"
+
+        # 设置默认的user_data行为
+        self.mock_agent.get_user_data.return_value = None
+        self.mock_agent.set_user_data.return_value = None
+
+    def test_validate_batch_execution_conditions_empty_task_ids(self):
+        """测试空任务ID列表的情况"""
+        result = self.tool._validate_batch_execution_conditions(
+            task_list_manager=self.mock_task_list_manager,
+            task_list_id="test_list_id",
+            task_ids=[],
+            agent_id="test_agent",
+            is_main_agent=True,
+        )
+
+        assert result[0] is False
+        assert "任务ID列表为空" in result[1]
+        assert result[2] == []
+
+    def test_validate_batch_execution_conditions_task_not_found(self):
+        """测试任务不存在的情况"""
+        self.mock_task_list_manager.get_task_detail.return_value = (
+            None,
+            False,
+            "任务不存在",
+        )
+
+        result = self.tool._validate_batch_execution_conditions(
+            task_list_manager=self.mock_task_list_manager,
+            task_list_id="test_list_id",
+            task_ids=["task-1"],
+            agent_id="test_agent",
+            is_main_agent=True,
+        )
+
+        assert result[0] is False
+        assert "不存在或无权访问" in result[1]
+
+    def test_validate_batch_execution_conditions_not_sub_type(self):
+        """测试任务类型不是sub的情况"""
+        mock_task = Mock()
+        mock_task.agent_type.value = "main"
+        mock_task.status.value = "pending"
+        mock_task.dependencies = []
+
+        self.mock_task_list_manager.get_task_detail.return_value = (
+            mock_task,
+            True,
+            None,
+        )
+
+        result = self.tool._validate_batch_execution_conditions(
+            task_list_manager=self.mock_task_list_manager,
+            task_list_id="test_list_id",
+            task_ids=["task-1"],
+            agent_id="test_agent",
+            is_main_agent=True,
+        )
+
+        assert result[0] is False
+        assert "类型不是 sub" in result[1]
+
+    def test_validate_batch_execution_conditions_not_pending_status(self):
+        """测试任务状态不是pending的情况"""
+        mock_task = Mock()
+        mock_task.agent_type.value = "sub"
+        mock_task.status.value = "running"
+        mock_task.dependencies = []
+
+        self.mock_task_list_manager.get_task_detail.return_value = (
+            mock_task,
+            True,
+            None,
+        )
+
+        result = self.tool._validate_batch_execution_conditions(
+            task_list_manager=self.mock_task_list_manager,
+            task_list_id="test_list_id",
+            task_ids=["task-1"],
+            agent_id="test_agent",
+            is_main_agent=True,
+        )
+
+        assert result[0] is False
+        assert "状态不是 pending" in result[1]
+
+    def test_validate_batch_execution_conditions_dependency_not_completed(self):
+        """测试依赖任务未完成的情况"""
+        mock_task = Mock()
+        mock_task.agent_type.value = "sub"
+        mock_task.status.value = "pending"
+        mock_task.dependencies = ["dep-1"]
+        mock_task.task_name = "测试任务"
+
+        self.mock_task_list_manager.get_task_detail.return_value = (
+            mock_task,
+            True,
+            None,
+        )
+
+        self.tool._check_dependencies_completed = Mock(
+            return_value={"success": False, "stderr": "依赖未完成"}
+        )
+
+        result = self.tool._validate_batch_execution_conditions(
+            task_list_manager=self.mock_task_list_manager,
+            task_list_id="test_list_id",
+            task_ids=["task-1"],
+            agent_id="test_agent",
+            is_main_agent=True,
+        )
+
+        assert result[0] is False
+        assert "依赖验证未通过" in result[1]
+
+    def test_validate_batch_execution_conditions_dependent_on_each_other(self):
+        """测试任务之间存在依赖关系的情况"""
+        mock_task_1 = Mock()
+        mock_task_1.task_id = "task-1"
+        mock_task_1.task_name = "任务1"
+        mock_task_1.agent_type.value = "sub"
+        mock_task_1.status.value = "pending"
+        mock_task_1.dependencies = ["task-2"]
+
+        mock_task_2 = Mock()
+        mock_task_2.task_id = "task-2"
+        mock_task_2.task_name = "任务2"
+        mock_task_2.agent_type.value = "sub"
+        mock_task_2.status.value = "pending"
+        mock_task_2.dependencies = []
+
+        def mock_get_task_detail(task_list_id, task_id, **kwargs):
+            if task_id == "task-1":
+                return mock_task_1, True, None
+            elif task_id == "task-2":
+                return mock_task_2, True, None
+            return None, False, "不存在"
+
+        self.mock_task_list_manager.get_task_detail.side_effect = mock_get_task_detail
+        self.tool._check_dependencies_completed = Mock(
+            return_value={"success": True, "stderr": ""}
+        )
+
+        result = self.tool._validate_batch_execution_conditions(
+            task_list_manager=self.mock_task_list_manager,
+            task_list_id="test_list_id",
+            task_ids=["task-1", "task-2"],
+            agent_id="test_agent",
+            is_main_agent=True,
+        )
+
+        assert result[0] is False
+        assert "批量执行要求任务之间彼此独立" in result[1]
+
+    def test_validate_batch_execution_conditions_success(self):
+        """测试验证通过的情况"""
+        mock_task_1 = Mock()
+        mock_task_1.task_id = "task-1"
+        mock_task_1.task_name = "任务1"
+        mock_task_1.agent_type.value = "sub"
+        mock_task_1.status.value = "pending"
+        mock_task_1.dependencies = []
+
+        mock_task_2 = Mock()
+        mock_task_2.task_id = "task-2"
+        mock_task_2.task_name = "任务2"
+        mock_task_2.agent_type.value = "sub"
+        mock_task_2.status.value = "pending"
+        mock_task_2.dependencies = []
+
+        def mock_get_task_detail(task_list_id, task_id, **kwargs):
+            if task_id == "task-1":
+                return mock_task_1, True, None
+            elif task_id == "task-2":
+                return mock_task_2, True, None
+            return None, False, "不存在"
+
+        self.mock_task_list_manager.get_task_detail.side_effect = mock_get_task_detail
+        self.tool._check_dependencies_completed = Mock(
+            return_value={"success": True, "stderr": ""}
+        )
+
+        result = self.tool._validate_batch_execution_conditions(
+            task_list_manager=self.mock_task_list_manager,
+            task_list_id="test_list_id",
+            task_ids=["task-1", "task-2"],
+            agent_id="test_agent",
+            is_main_agent=True,
+        )
+
+        assert result[0] is True
+        assert result[1] is None
+        assert len(result[2]) == 2
