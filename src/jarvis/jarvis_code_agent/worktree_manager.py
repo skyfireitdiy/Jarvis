@@ -211,51 +211,35 @@ class WorktreeManager:
             f"🔀 将 {self.worktree_branch} 变基并合并到 {original_branch}"
         )
 
-        # 记录初始分支状态，用于异常恢复
-        initial_branch = None
+        # 检查主仓库状态，确保是干净的
         try:
-            # 获取当前分支（添加超时保护）
-            result = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain"],
                 capture_output=True,
                 check=True,
                 text=True,
                 timeout=5,
                 cwd=self.repo_root,
             )
-            initial_branch = result.stdout.strip()
-            if initial_branch == "HEAD":
-                # detached HEAD 状态
-                PrettyOutput.auto_print("⚠️ 当前处于 detached HEAD 状态")
-        except subprocess.TimeoutExpired:
-            PrettyOutput.auto_print("⚠️ 获取当前分支超时")
+            if status_result.stdout.strip():
+                PrettyOutput.auto_print("⚠️ 主仓库有未提交的更改，无法安全合并")
+                PrettyOutput.auto_print("💡 请先提交或暂存主仓库的更改")
+                return False
         except subprocess.CalledProcessError:
-            PrettyOutput.auto_print("⚠️ 无法获取当前分支信息")
-
-        # 标记是否需要恢复分支状态
-        needs_restore = False
+            PrettyOutput.auto_print("⚠️ 无法检查主仓库状态")
+            return False
 
         try:
-            # 第一步：切换到 worktree 分支并执行 rebase
-            PrettyOutput.auto_print(f"📍 切换到 worktree 分支: {self.worktree_branch}")
-            subprocess.run(
-                ["git", "checkout", self.worktree_branch],
-                capture_output=True,
-                check=True,
-                cwd=self.repo_root,
-            )
-            needs_restore = True  # 已切换分支，如果失败需要恢复
-
-            # 执行 rebase
+            # 第一步：在 worktree 目录中执行 rebase
             PrettyOutput.auto_print(
-                f"🔄 将 {self.worktree_branch} 变基到 {original_branch}..."
+                f"🔄 在 worktree 中将 {self.worktree_branch} 变基到 {original_branch}..."
             )
             result = subprocess.run(
                 ["git", "rebase", original_branch],
                 capture_output=True,
                 check=False,
                 text=True,
-                cwd=self.repo_root,
+                cwd=self.worktree_path,
             )
 
             if result.returncode != 0:
@@ -277,7 +261,7 @@ class WorktreeManager:
                         capture_output=True,
                         check=False,
                         timeout=5,
-                        cwd=self.repo_root,
+                        cwd=self.worktree_path,
                     )
                     if abort_result.returncode != 0:
                         abort_error = (
@@ -291,17 +275,7 @@ class WorktreeManager:
                 else:
                     raise RuntimeError(f"Rebase 失败: {error_msg}")
 
-            # 第二步：切换回原分支
-            PrettyOutput.auto_print(f"📍 切换回原分支: {original_branch}")
-            subprocess.run(
-                ["git", "checkout", original_branch],
-                capture_output=True,
-                check=True,
-                cwd=self.repo_root,
-            )
-            needs_restore = False  # 已恢复到目标分支
-
-            # 第三步：通过 fast-forward 合并
+            # 第二步：通过 fast-forward 合并
             PrettyOutput.auto_print(
                 f"🔀 快速合并 {self.worktree_branch} (fast-forward)..."
             )
@@ -328,122 +302,41 @@ class WorktreeManager:
             PrettyOutput.auto_print(f"❌ 操作时出错: {str(e)}")
             return False
         finally:
-            # 确保在异常情况下恢复到调用前的分支状态
-            if needs_restore:
-                # 优先恢复到 initial_branch（操作前的分支），其次尝试 original_branch
-                target_branch = initial_branch if initial_branch else original_branch
-                recovered = False  # 标记是否成功恢复
+            # 清理 worktree 中的 rebase 状态（如果 rebase 失败）
+            try:
+                abort_result = subprocess.run(
+                    ["git", "rebase", "--abort"],
+                    capture_output=True,
+                    check=False,
+                    timeout=5,
+                    cwd=self.worktree_path,
+                )
+                # 如果没有进行中的 rebase，返回码非0是正常的，忽略错误
+            except Exception:
+                pass
 
-                if target_branch:
-                    try:
-                        # 尝试中止任何进行中的 rebase
-                        abort_result = subprocess.run(
-                            ["git", "rebase", "--abort"],
-                            capture_output=True,
-                            check=False,
-                            timeout=5,
-                            cwd=self.repo_root,
-                        )
-                        if abort_result.returncode != 0:
-                            abort_error = (
-                                decode_output(abort_result.stderr)
-                                if abort_result.stderr
-                                else "未知错误"
-                            )
-                            PrettyOutput.auto_print(
-                                f"⚠️ 中止 rebase 时出现问题: {abort_error}"
-                            )
-                    except Exception:
-                        pass
-
-                    # 验证目标分支是否存在
-                    try:
-                        subprocess.run(
-                            [
-                                "git",
-                                "rev-parse",
-                                "--verify",
-                                f"refs/heads/{target_branch}",
-                            ],
-                            capture_output=True,
-                            check=True,
-                            timeout=5,
-                            cwd=self.repo_root,
-                        )
-                        # 分支存在，尝试切换
-                        try:
-                            PrettyOutput.auto_print(f"🔙 恢复到分支: {target_branch}")
-                            subprocess.run(
-                                ["git", "checkout", target_branch],
-                                capture_output=True,
-                                check=True,
-                                timeout=10,
-                                cwd=self.repo_root,
-                            )
-                            PrettyOutput.auto_print(f"✅ 已恢复到分支: {target_branch}")
-                            recovered = True
-                        except subprocess.CalledProcessError as e:
-                            error_msg = decode_output(e.stderr) if e.stderr else str(e)
-                            PrettyOutput.auto_print(f"⚠️ 恢复分支失败: {error_msg}")
-                            raise
-                    except subprocess.CalledProcessError:
-                        # 分支不存在，尝试回退策略
-                        PrettyOutput.auto_print(f"⚠️ 目标分支 '{target_branch}' 不存在")
-
-                        # 尝试其他备选分支
-                        backup_branches = [initial_branch, original_branch]
-                        for backup in backup_branches:
-                            if backup and backup != target_branch:
-                                try:
-                                    subprocess.run(
-                                        [
-                                            "git",
-                                            "rev-parse",
-                                            "--verify",
-                                            f"refs/heads/{backup}",
-                                        ],
-                                        capture_output=True,
-                                        check=True,
-                                        timeout=5,
-                                        cwd=self.repo_root,
-                                    )
-                                    PrettyOutput.auto_print(
-                                        f"🔙 尝试恢复到备选分支: {backup}"
-                                    )
-                                    subprocess.run(
-                                        ["git", "checkout", backup],
-                                        capture_output=True,
-                                        check=True,
-                                        timeout=10,
-                                        cwd=self.repo_root,
-                                    )
-                                    PrettyOutput.auto_print(
-                                        f"✅ 已恢复到分支: {backup}"
-                                    )
-                                    recovered = True
-                                    break
-                                except Exception:
-                                    continue
-
-                        # 所有尝试都失败
-                        if not recovered:
-                            PrettyOutput.auto_print("⚠️ 无法自动恢复到任何分支")
-                            PrettyOutput.auto_print("💡 当前 Git 状态:")
-                            try:
-                                status_result = subprocess.run(
-                                    ["git", "status", "--short", "--branch"],
-                                    capture_output=True,
-                                    check=True,
-                                    text=True,
-                                    timeout=5,
-                                    cwd=self.repo_root,
-                                )
-                                PrettyOutput.auto_print(status_result.stdout)
-                            except Exception:
-                                pass
-                            PrettyOutput.auto_print("💡 请手动检查并恢复: git status")
-                    except Exception as e:
-                        PrettyOutput.auto_print(f"⚠️ 恢复分支时出错: {str(e)}")
+            # 检查 worktree 状态，提供恢复指导
+            try:
+                status_result = subprocess.run(
+                    ["git", "status", "--short", "--branch"],
+                    capture_output=True,
+                    check=True,
+                    text=True,
+                    timeout=5,
+                    cwd=self.worktree_path,
+                )
+                # 如果有未合并的文件或冲突，提示用户
+                if (
+                    "rebasing" in status_result.stdout
+                    or "conflict" in status_result.stdout.lower()
+                ):
+                    PrettyOutput.auto_print("⚠️ Worktree 状态异常，可能存在未解决的冲突")
+                    PrettyOutput.auto_print(f"💡 Worktree 路径: {self.worktree_path}")
+                    PrettyOutput.auto_print("💡 请手动检查并处理:")
+                    PrettyOutput.auto_print(f"   cd {self.worktree_path}")
+                    PrettyOutput.auto_print("   git status")
+            except Exception:
+                pass
 
     def cleanup(self, worktree_path: Optional[str] = None) -> bool:
         """清理 worktree 目录
