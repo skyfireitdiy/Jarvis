@@ -728,9 +728,62 @@ class Agent:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 加载回调目录时发生错误: {e}")
 
+    def _save_task_lists(self) -> bool:
+        """保存当前 Agent 的任务列表到文件。
+
+        文件命名规则：saved_session_{agent_name}_{platform_name}_{model_name}_tasklist.json
+        与会话文件保存在同一目录下，便于关联。
+
+        返回:
+            bool: 是否成功保存
+        """
+        import json
+
+        try:
+            # 检查是否有任务列表
+            if (
+                not hasattr(self, "task_list_manager")
+                or not self.task_list_manager.task_lists
+            ):
+                return True  # 没有任务列表，视为成功
+
+            # 构建文件路径（与会话文件相同的前缀）
+            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            os.makedirs(session_dir, exist_ok=True)
+
+            platform_name = self.model.platform_name()
+            model_name = self.model.name().replace("/", "_").replace("\\", "_")
+            tasklist_file = os.path.join(
+                session_dir,
+                f"saved_session_{self.name}_{platform_name}_{model_name}_tasklist.json",
+            )
+
+            # 收集所有任务列表数据
+            task_lists_data = {}
+            for task_list_id, task_list in self.task_list_manager.task_lists.items():
+                task_lists_data[task_list_id] = task_list.to_dict()
+
+            # 保存到文件
+            with open(tasklist_file, "w", encoding="utf-8") as f:
+                json.dump(
+                    {"task_lists": task_lists_data}, f, ensure_ascii=False, indent=2
+                )
+
+            return True
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 保存任务列表失败: {e}")
+            return False
+
     def save_session(self) -> bool:
         """Saves the current session state by delegating to the session manager."""
-        return self.session.save_session()
+        # 保存会话
+        session_saved = self.session.save_session()
+
+        # 保存任务列表（如果存在）
+        self._save_task_lists()
+
+        # 会话保存成功即可返回 True，任务列表保存失败不影响主流程
+        return session_saved
 
     def restore_session(self) -> bool:
         """Restores the session state by delegating to the session manager."""
