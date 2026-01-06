@@ -37,7 +37,7 @@ from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import init_env
-from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
+# from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux  # 已禁用自动tmux启动
 
 
 def _normalize_backup_data_argv(argv: List[str]) -> None:
@@ -1183,7 +1183,8 @@ def run_cli(
 def main() -> None:
     """Application entry point."""
     # 检测tmux并在需要时启动
-    check_and_launch_tmux("jarvis")
+    # 已禁用自动tmux启动，避免程序退出时关闭tmux会话
+    # check_and_launch_tmux("jarvis")
     app()
 
 
