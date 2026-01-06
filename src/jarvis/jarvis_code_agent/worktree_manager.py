@@ -30,15 +30,48 @@ class WorktreeManager:
         self.worktree_path: Optional[str] = None
         self.worktree_branch: Optional[str] = None
 
+    def _get_project_name(self) -> str:
+        """获取项目名称
+
+        尝试从 git remote URL 提取项目名，如果没有 remote 则使用目录名
+
+        返回:
+            str: 项目名称
+        """
+        try:
+            # 尝试从 git remote 获取 URL
+            result = subprocess.run(
+                ["git", "remote", "get-url", "origin"],
+                capture_output=True,
+                check=True,
+                text=True,
+            )
+            url = result.stdout.strip()
+            # 从 URL 提取项目名：如 https://github.com/user/repo.git 提取 repo
+            if url:
+                # 移除 .git 后缀
+                if url.endswith(".git"):
+                    url = url[:-4]
+                # 获取最后一部分
+                project_name = os.path.basename(url)
+                if project_name:
+                    return project_name
+        except (subprocess.CalledProcessError, Exception):
+            pass
+
+        # 降级策略：使用当前目录名
+        return os.path.basename(self.repo_root)
+
     def _generate_branch_name(self) -> str:
         """生成 worktree 分支名
 
         返回:
-            str: 格式为 worktree-YYYYMMDD-HHMMSS-<4位随机字符>
+            str: 格式为 jarvis-{project_name}-YYYYMMDD-HHMMSS-<4位随机字符>
         """
+        project_name = self._get_project_name()
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        random_suffix = ''.join(random.choices(string.ascii_lowercase, k=4))
-        return f"worktree-{timestamp}-{random_suffix}"
+        random_suffix = "".join(random.choices(string.ascii_lowercase, k=4))
+        return f"jarvis-{project_name}-{timestamp}-{random_suffix}"
 
     def get_current_branch(self) -> str:
         """获取当前分支名
@@ -134,7 +167,14 @@ class WorktreeManager:
             # 合并 worktree 分支
             PrettyOutput.auto_print(f"🔀 合并分支 {self.worktree_branch}...")
             result = subprocess.run(
-                ["git", "merge", "--no-ff", self.worktree_branch, "-m", f"Merge worktree branch '{self.worktree_branch}'"],
+                [
+                    "git",
+                    "merge",
+                    "--no-ff",
+                    self.worktree_branch,
+                    "-m",
+                    f"Merge worktree branch '{self.worktree_branch}'",
+                ],
                 capture_output=True,
                 check=False,
                 text=True,
@@ -188,7 +228,9 @@ class WorktreeManager:
             )
 
             if result.returncode != 0:
-                error_msg = decode_output(result.stderr) if result.stderr else "未知错误"
+                error_msg = (
+                    decode_output(result.stderr) if result.stderr else "未知错误"
+                )
                 PrettyOutput.auto_print(f"⚠️ 删除 worktree 失败: {error_msg}")
                 return False
 
