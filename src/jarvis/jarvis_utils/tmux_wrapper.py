@@ -7,6 +7,7 @@
 import os
 import shutil
 import sys
+import uuid
 
 
 def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
@@ -18,6 +19,8 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
     注意:
         此函数使用subprocess.execvp替换当前进程，如果成功则不会返回。
     """
+    # 为会话名称添加随机后缀，避免冲突
+    session_name = f"{session_name}-{uuid.uuid4().hex[:8]}"
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
     if tmux_path is None:
