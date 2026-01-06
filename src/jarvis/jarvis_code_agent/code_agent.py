@@ -48,6 +48,7 @@ from jarvis.jarvis_utils.git_utils import handle_commit_workflow
 from jarvis.jarvis_utils.git_utils import revert_change
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
+from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
 from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.utils import _acquire_single_instance_lock
 from jarvis.jarvis_utils.utils import init_env
@@ -1574,6 +1575,8 @@ def _print_available_rules(
 
 def main() -> None:
     """Application entry point."""
+    # 检测tmux并在需要时启动
+    check_and_launch_tmux("jarvis-code-agent")
     app()
 
 
