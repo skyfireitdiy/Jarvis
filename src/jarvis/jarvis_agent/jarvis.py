@@ -624,6 +624,9 @@ def run_cli(
     task: Optional[str] = typer.Option(
         None, "-T", "--task", help="从命令行直接输入任务内容"
     ),
+    task_file: Optional[str] = typer.Option(
+        None, "--task-file", help="从文件读取任务内容"
+    ),
     model_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
@@ -690,6 +693,19 @@ def run_cli(
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
         return
+
+    # 处理任务内容：优先从文件读取
+    if task and task_file:
+        PrettyOutput.auto_print("❌ 错误: 不能同时使用 --task 和 --task-file 参数")
+        raise typer.Exit(code=1)
+
+    if task_file:
+        try:
+            with open(task_file, "r", encoding="utf-8") as f:
+                task = f.read()
+        except (Exception, FileNotFoundError) as e:
+            PrettyOutput.auto_print(f"❌ 错误: 无法从文件读取任务内容: {str(e)}")
+            raise typer.Exit(code=1)
 
     # 初始化时不再打印命令列表
     # print_commands_overview()
