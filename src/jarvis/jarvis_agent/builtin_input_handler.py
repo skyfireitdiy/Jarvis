@@ -103,6 +103,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             load_config()
             return "", True
         elif tag == "SaveSession":
+            # 检查是否允许使用SaveSession命令
+            if not getattr(agent, "allow_savesession", False):
+                PrettyOutput.auto_print("⚠️ SaveSession 命令仅在 jvs/jca 主程序中可用。")
+                return "", True
             if agent.save_session():
                 PrettyOutput.auto_print("✅ 会话已成功保存。正在退出...")
                 sys.exit(0)

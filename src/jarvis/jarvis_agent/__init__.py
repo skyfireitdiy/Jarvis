@@ -351,6 +351,7 @@ class Agent:
         non_interactive: Optional[bool] = True,
         in_multi_agent: Optional[bool] = None,
         agent_type: str = "normal",
+        allow_savesession: bool = False,
         **kwargs: Any,
     ):
         """初始化Jarvis Agent实例
@@ -370,6 +371,7 @@ class Agent:
             force_save_memory: 是否强制保存记忆
             confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
+            allow_savesession: 是否允许使用SaveSession命令（默认False，仅jvs/jca主程序传入True）
         """
         # 基础属性初始化（仅根据入参设置原始值；实际生效的默认回退在 _init_config 中统一解析）
         # 标识与描述
@@ -397,6 +399,8 @@ class Agent:
         self.user_data: Dict[str, Any] = {}
         # 记录固定的内容
         self.pin_content: str = ""
+        # SaveSession 命令权限控制
+        self.allow_savesession = bool(allow_savesession)
         # 记录连续未添加 addon_prompt 的轮数
         self._addon_prompt_skip_rounds = 0
         # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
