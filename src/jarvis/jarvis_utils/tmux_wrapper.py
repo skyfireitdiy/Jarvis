@@ -219,7 +219,7 @@ def _dispatch_to_existing_jarvis_session(
     """将任务派发到现有 codeagent tmux session 的 panel 中执行。
 
     这是一个降级方案：当不在 tmux 环境中时，尝试找到 codeagent 创建的 session
-    并在其中创建 panel 执行命令。
+    并在其中创建 panel 执行命令。如果未找到 session，则创建一个新的 session。
 
     Args:
         task_arg: 任务内容（已废弃，保留用于兼容）
@@ -231,13 +231,35 @@ def _dispatch_to_existing_jarvis_session(
     # 查找 codeagent 创建的 session
     session_name = _find_jarvis_code_agent_session()
     if not session_name:
+        # 未找到现有 session，创建一个新的 session
         print(
-            "ℹ️ 未找到 codeagent 创建的 tmux session，无法派发任务",
+            "ℹ️ 未找到 codeagent 创建的 tmux session，正在创建新 session...",
             file=sys.stderr,
         )
-        return False
-
-    print(f"ℹ️ 找到 codeagent session: {session_name}", file=sys.stderr)
+        # 生成新的 session 名称
+        session_name = f"jarvis-code-agent-{uuid.uuid4().hex[:8]}"
+        try:
+            # 创建新的 detached session
+            subprocess.run(
+                ["tmux", "new-session", "-d", "-s", session_name],
+                check=True,
+                timeout=10,
+            )
+            print(f"✅ 已创建新的 tmux session: {session_name}", file=sys.stderr)
+        except subprocess.CalledProcessError as e:
+            print(
+                f"❌ 创建 tmux session 失败: {e}",
+                file=sys.stderr,
+            )
+            return False
+        except subprocess.TimeoutExpired:
+            print(
+                "❌ 创建 tmux session 超时",
+                file=sys.stderr,
+            )
+            return False
+    else:
+        print(f"ℹ️ 找到 codeagent session: {session_name}", file=sys.stderr)
 
     # 过滤 --dispatch/-d 参数，避免循环派发
     filtered_argv = []
