@@ -15,6 +15,9 @@ from typer.models import ArgumentInfo
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
+# 创建 typer 应用
+app = typer.Typer(help="Jarvis Code Agent Dispatcher - jca 的便捷封装")
+
 
 def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:") -> str:
     """获取多行输入，直到遇到空行或 EOF"""
@@ -67,6 +70,7 @@ def run_jca_dispatch(task: Any) -> None:
         sys.exit(1)
 
 
+@app.command()
 def main(
     task: Optional[str] = typer.Argument(
         None, help="任务内容（可选，不提供则进入交互模式）"
@@ -117,4 +121,4 @@ def main(
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    app()
