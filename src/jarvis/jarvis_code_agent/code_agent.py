@@ -323,9 +323,8 @@ git reset --hard {start_commit}
                     + user_input
                 )
 
-            # 保存原始用户输入，用于非交互模式下打印
-            if self.non_interactive:
-                self.original_user_input = user_input
+            # 保存原始用户输入（所有模式下都保存）
+            self.original_user_input = user_input
 
             try:
                 if self.model:
