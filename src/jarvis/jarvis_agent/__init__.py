@@ -1607,6 +1607,14 @@ class Agent:
                     # 如果格式化输出失败，回退到简单打印
                     PrettyOutput.auto_print(f"📋 任务总结:\n{ret}")
 
+            # 如果是非交互模式，打印原始用户输入，帮助用户区分多个任务
+            if (
+                self.non_interactive
+                and hasattr(self, "pin_content")
+                and self.pin_content
+            ):
+                PrettyOutput.auto_print(f"\n📝 原始任务输入:\n{self.pin_content}")
+
             # 非关键流程：广播完成总结事件（用于日志、监控等）
             try:
                 self.event_bus.emit(
