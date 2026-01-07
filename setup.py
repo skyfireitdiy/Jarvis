@@ -125,7 +125,9 @@ setup(
     entry_points={
         "console_scripts": [
             "jarvis=jarvis.jarvis_agent.jarvis:main",
+            "jarvis-agent-dispatcher=jarvis.jarvis_agent.jvsd_cli:app",
             "jvs=jarvis.jarvis_agent.jarvis:main",
+            "jvsd=jarvis.jarvis_agent.jvsd_cli:app",
             "jarvis-code-agent=jarvis.jarvis_code_agent.code_agent:main",
             "jca=jarvis.jarvis_code_agent.code_agent:main",
             "jarvis-code-agent-dispatcher=jarvis.jarvis_code_agent.jcad_cli:app",
