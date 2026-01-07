@@ -2698,23 +2698,29 @@ class task_list_manager:
         from jarvis.jarvis_utils.output import PrettyOutput
 
         while not all(completed.values()):
-            time.sleep(check_interval)
+            try:
+                time.sleep(check_interval)
 
-            for task_id in task_ids:
-                if completed[task_id]:
-                    continue
+                for task_id in task_ids:
+                    if completed[task_id]:
+                        continue
 
-                status_file = batch_dir / f"task_{task_id}.status"
-                if status_file.exists():
-                    try:
-                        data = json.loads(status_file.read_text(encoding="utf-8"))
-                        if data.get("status") in ("completed", "failed"):
-                            completed[task_id] = True
-                            PrettyOutput.auto_print(
-                                f"✅ 子任务 [{task_id}] 已完成: {data.get('status')}"
-                            )
-                    except Exception:
-                        pass
+                    status_file = batch_dir / f"task_{task_id}.status"
+                    if status_file.exists():
+                        try:
+                            data = json.loads(status_file.read_text(encoding="utf-8"))
+                            if data.get("status") in ("completed", "failed"):
+                                completed[task_id] = True
+                                PrettyOutput.auto_print(
+                                    f"✅ 子任务 [{task_id}] 已完成: {data.get('status')}"
+                                )
+                        except Exception:
+                            pass
+            except (KeyboardInterrupt, Exception) as e:
+                # 忽略所有异常（包括 Ctrl+C），继续等待子进程完成
+                if isinstance(e, KeyboardInterrupt):
+                    PrettyOutput.auto_print("⚠️ 检测到 Ctrl+C，继续等待子进程完成...")
+                continue
 
         return completed
 
