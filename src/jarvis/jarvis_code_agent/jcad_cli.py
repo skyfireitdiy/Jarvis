@@ -32,7 +32,8 @@ def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:"
 
 def run_jca_dispatch(task: str) -> None:
     """执行 jca -n -w --dispatch -r <task>"""
-    cmd = ["jca", "-n", "-w", "--dispatch", "-r", task]
+    task_str = str(task)  # 显式转换为字符串，避免 ArgumentInfo 类型错误
+    cmd = ["jca", "-n", "-w", "--dispatch", "-r", task_str]
     try:
         # 直接执行 jca 命令，不捕获输出，让用户直接看到 jca 的输出
         result = subprocess.run(cmd)
