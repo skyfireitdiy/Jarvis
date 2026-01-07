@@ -49,6 +49,7 @@ from jarvis.jarvis_utils.git_utils import revert_change
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
+from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
 
 from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.utils import _acquire_single_instance_lock
@@ -1177,6 +1178,11 @@ def cli(
         "--worktree",
         help="启用 git worktree 模式，在独立分支上开发",
     ),
+    dispatch: bool = typer.Option(
+        False,
+        "--dispatch",
+        help="将任务派发到新的 tmux 窗口中执行（仅在 tmux 环境中有效），当前进程退出",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # 处理需求描述：优先从文件读取
@@ -1228,6 +1234,25 @@ def cli(
             "❌ 非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。"
         )
         raise typer.Exit(code=2)
+
+    # 处理 --dispatch 参数：派发任务到新的 tmux 窗口
+    if dispatch:
+        if not (requirement and str(requirement).strip()):
+            PrettyOutput.auto_print(
+                "❌ 错误: --dispatch 参数必须与 --requirement 参数配合使用"
+            )
+            raise typer.Exit(code=1)
+
+        PrettyOutput.auto_print("ℹ️ 正在派发任务到新的 tmux 窗口...")
+        success = dispatch_to_tmux_window(requirement, sys.argv)
+        if success:
+            PrettyOutput.auto_print("✅ 任务已成功派发到新的 tmux 窗口")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print(
+                "❌ 派发失败：当前不在 tmux 环境中或 tmux 未安装，请在 tmux 环境中使用 --dispatch 参数"
+            )
+            raise typer.Exit(code=1)
 
     # 检测tmux并在需要时启动（在参数解析之后）
     check_and_launch_tmux("jarvis-code-agent")
