@@ -65,6 +65,19 @@ def dispatch_to_tmux_window(
             # 保留其他参数
             filtered_argv.append(arg)
 
+    # 获取当前窗口标识，用于后续布局切换
+    current_window = None
+    try:
+        result = subprocess.run(
+            ["tmux", "display-message", "-p", "#{session_name}:#{window_index}"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        current_window = result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to get current window: {e}", file=sys.stderr)
+
     # 构造 tmux split-window 命令（在当前窗口创建新的窗格）
     # split-window -h "<command>" - 水平分割（左右布局）
     executable = sys.executable
@@ -85,11 +98,15 @@ def dispatch_to_tmux_window(
     try:
         subprocess.run(tmux_args, check=True)
         # 创建新pane后，自动切换到tiled布局
-        try:
-            subprocess.run(["tmux", "select-layout", "tiled"], check=True)
-        except subprocess.CalledProcessError:
-            # 布局切换失败不影响主流程
-            pass
+        if current_window:
+            try:
+                subprocess.run(
+                    ["tmux", "select-layout", "-t", current_window, "tiled"],
+                    check=True
+                )
+            except subprocess.CalledProcessError as e:
+                # 布局切换失败记录错误，但不影响主流程
+                print(f"Warning: Failed to set tiled layout for window {current_window}: {e}", file=sys.stderr)
         return True
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to dispatch to tmux window: {e}", file=sys.stderr)
