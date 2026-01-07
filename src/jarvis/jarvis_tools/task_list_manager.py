@@ -2653,7 +2653,7 @@ class task_list_manager:
             task: 任务对象
             task_content: 任务内容
             background: 背景信息
-            is_code_task: 是否为代码任务
+            is_code_task: 是否为代码任务（未使用但保留参数兼容性）
 
         Returns:
             Path: 临时文件路径
@@ -2664,11 +2664,8 @@ class task_list_manager:
         status_file_path = batch_dir / f"task_{task.task_id}.status"
 
         task_data = {
-            "task_id": task.task.task_id,
-            "task_name": task.task.task_name,
             "task_desc": task_content,
             "background": background,
-            "is_code_task": is_code_task,
             "status_file": str(status_file_path),
         }
 
