@@ -337,7 +337,7 @@ git reset --hard {start_commit}
             self.git_manager.handle_uncommitted_changes()
 
             # 如果启用了 review，执行 review 和修复循环
-            if not self.disable_review:
+            if not self.disable_review and not self.non_interactive:
                 self._review_and_fix(
                     user_input=user_input,
                     enhanced_input=enhanced_input,
