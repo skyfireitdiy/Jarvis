@@ -300,40 +300,49 @@ class AgentRunLoop:
                     if should_auto_complete:
                         # 检查是否有未完成的任务
                         should_auto_complete = True
+                        all_unfinished_tasks = []
                         try:
                             if (
                                 hasattr(ag, "task_list_manager")
                                 and ag.task_list_manager.task_lists
                             ):
-                                all_unfinished_tasks = []
-                            for (
-                                task_list_id,
-                                task_list,
-                            ) in ag.task_list_manager.task_lists.items():
-                                summary = ag.task_list_manager.get_task_list_summary(
-                                    task_list_id
-                                )
-                                if summary:
-                                    for task in summary.get("tasks", []):
-                                        if task.get("status") in ["pending", "running"]:
-                                            all_unfinished_tasks.append(
-                                                {
-                                                    "task_id": task.get("task_id"),
-                                                    "task_name": task.get("task_name"),
-                                                    "task_desc": task.get(
-                                                        "task_desc", ""
-                                                    )[:100]
-                                                    + "..."
-                                                    if len(task.get("task_desc", ""))
-                                                    > 100
-                                                    else task.get("task_desc", ""),
-                                                    "status": task.get("status"),
-                                                    "task_list_id": task_list_id,
-                                                    "main_goal": summary.get(
-                                                        "main_goal", ""
-                                                    ),
-                                                }
-                                            )
+                                for (
+                                    task_list_id,
+                                    task_list,
+                                ) in ag.task_list_manager.task_lists.items():
+                                    summary = (
+                                        ag.task_list_manager.get_task_list_summary(
+                                            task_list_id
+                                        )
+                                    )
+                                    if summary:
+                                        for task in summary.get("tasks", []):
+                                            if task.get("status") in [
+                                                "pending",
+                                                "running",
+                                            ]:
+                                                all_unfinished_tasks.append(
+                                                    {
+                                                        "task_id": task.get("task_id"),
+                                                        "task_name": task.get(
+                                                            "task_name"
+                                                        ),
+                                                        "task_desc": task.get(
+                                                            "task_desc", ""
+                                                        )[:100]
+                                                        + "..."
+                                                        if len(
+                                                            task.get("task_desc", "")
+                                                        )
+                                                        > 100
+                                                        else task.get("task_desc", ""),
+                                                        "status": task.get("status"),
+                                                        "task_list_id": task_list_id,
+                                                        "main_goal": summary.get(
+                                                            "main_goal", ""
+                                                        ),
+                                                    }
+                                                )
 
                             if all_unfinished_tasks:
                                 # 构造任务提示
