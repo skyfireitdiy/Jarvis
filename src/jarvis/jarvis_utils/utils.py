@@ -553,6 +553,11 @@ def _show_usage_stats(welcome_str: str) -> None:
         console = Console()
 
         from jarvis.jarvis_stats.stats import StatsManager
+        from jarvis.jarvis_utils.config import (
+            get_normal_model_name,
+            get_normal_platform_name,
+        )
+        import os
         from jarvis.jarvis_stats.storage import StatsStorage
 
         # 获取所有可用的指标
@@ -814,9 +819,23 @@ def _show_usage_stats(welcome_str: str) -> None:
 ╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝"""
 
+            # 获取模型信息和工作目录
+            try:
+                model_name = get_normal_model_name()
+                platform_name = get_normal_platform_name()
+                model_info = f"🤖 模型: {model_name} ({platform_name})"
+            except Exception:
+                model_info = "🤖 模型: 未知"
+
+            work_dir = os.getcwd()
+            work_dir_info = f"📁 工作目录: {work_dir}"
+
             welcome_panel_content = Group(
                 Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
                 Align.center(Text(welcome_str, style="bold")),
+                "",  # for a blank line
+                Align.center(Text(model_info, style="cyan")),
+                Align.center(Text(work_dir_info, style="dim")),
                 "",  # for a blank line
                 Align.center(Text(f"v{__version__}")),
                 Align.center(Text("https://github.com/skyfireitdiy/Jarvis")),
