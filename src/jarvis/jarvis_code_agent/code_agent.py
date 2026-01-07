@@ -1385,9 +1385,6 @@ def cli(
             allow_savesession=True,
         )
 
-        # 显示可用的规则信息
-        _print_available_rules(agent.rules_manager, rule_names)
-
         # 尝试恢复会话
         if restore_session:
             if agent.restore_session():
