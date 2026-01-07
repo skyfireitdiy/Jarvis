@@ -14,7 +14,7 @@ from typing import Any, Optional
 import typer
 from typer.models import ArgumentInfo
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.input import (
     get_multiline_input as get_multiline_input_enhanced,
 )
@@ -81,10 +81,6 @@ def run_jca_dispatch(task: Any) -> None:
         # 如果是直接内容，使用 --task 参数
         cmd = ["jca", "-n", "-w", "--dispatch", "--task", task_str]
     try:
-        # 打印即将执行的命令
-        PrettyOutput.print(
-            f"Executing command: {' '.join(cmd)}", output_type=OutputType.DEBUG
-        )
         # 直接执行 jca 命令，不捕获输出，让用户直接看到 jca 的输出
         result = subprocess.run(cmd)
         sys.exit(result.returncode)
@@ -108,11 +104,6 @@ def main(
         jcad "你的任务"           # 直接执行任务
         jcad                      # 进入交互模式输入任务
     """
-    # 调试信息：打印接收到的 task 参数
-    PrettyOutput.print(
-        f"[DEBUG] main() 接收到的 task 参数: type={type(task).__name__}, value={task}",
-        output_type=OutputType.DEBUG,
-    )
 
     if task:
         # 直接模式：传入任务字符串
