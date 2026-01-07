@@ -16,12 +16,12 @@ from typing import Optional
 def dispatch_to_tmux_window(
     task_arg: Optional[str], argv: list[str], window_name: str = "jarvis-dispatch"
 ) -> bool:
-    """将任务派发到新的 tmux 窗口中执行。
+    """将任务派发到新的 tmux 窗格（pane）中执行。
 
     Args:
-        task_arg: 任务内容（用于窗口命名）
+        task_arg: 任务内容（已废弃，保留用于兼容）
         argv: 当前命令行参数（需要过滤 --dispatch）
-        window_name: tmux 窗口名称前缀，默认为"jarvis-dispatch"
+        window_name: 窗口名称前缀（已废弃，保留用于兼容）
 
     Returns:
         bool: 是否成功派发（True表示成功，False表示失败）
@@ -29,6 +29,7 @@ def dispatch_to_tmux_window(
     注意:
         仅在 tmux 环境中才能派发。
         如果不在 tmux 环境中，返回 False。
+        使用水平分割（split-window -h）创建新窗格，适合代码任务。
     """
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
@@ -64,8 +65,8 @@ def dispatch_to_tmux_window(
             # 保留其他参数
             filtered_argv.append(arg)
 
-    # 构造tmux new-window命令
-    # new-window -n <window_name> "<command>"
+    # 构造 tmux split-window 命令（在当前窗口创建新的窗格）
+    # split-window -h "<command>" - 水平分割（左右布局）
     executable = sys.executable
     # 使用 shlex.quote() 安全地转义每个参数，防止 shell 注入
     quoted_args = [shlex.quote(arg) for arg in filtered_argv]
@@ -73,9 +74,8 @@ def dispatch_to_tmux_window(
 
     tmux_args = [
         "tmux",
-        "new-window",
-        "-n",
-        window_name,
+        "split-window",
+        "-h",  # 水平分割（左右布局），适合代码任务
         command,
     ]
 
