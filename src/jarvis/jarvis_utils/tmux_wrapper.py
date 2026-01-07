@@ -5,9 +5,87 @@
 """
 
 import os
+import shlex
 import shutil
+import subprocess
 import sys
 import uuid
+from typing import Optional
+
+
+def dispatch_to_tmux_window(
+    task_arg: Optional[str], argv: list[str], window_name: str = "jarvis-dispatch"
+) -> bool:
+    """将任务派发到新的 tmux 窗口中执行。
+
+    Args:
+        task_arg: 任务内容（用于窗口命名）
+        argv: 当前命令行参数（需要过滤 --dispatch）
+        window_name: tmux 窗口名称前缀，默认为"jarvis-dispatch"
+
+    Returns:
+        bool: 是否成功派发（True表示成功，False表示失败）
+
+    注意:
+        仅在 tmux 环境中才能派发。
+        如果不在 tmux 环境中，返回 False。
+    """
+    # 检查tmux是否安装
+    tmux_path = shutil.which("tmux")
+    if tmux_path is None:
+        return False
+
+    # 检查是否已在tmux环境中运行
+    if "TMUX" not in os.environ:
+        return False
+
+    # 生成窗口名称（使用任务内容的前20个字符）
+    if task_arg and str(task_arg).strip():
+        # 清理任务内容，移除换行和特殊字符
+        clean_task = str(task_arg).strip()[:20].replace("\n", " ").replace("\r", " ")
+        window_name = f"{window_name}-{clean_task}"
+
+    # 过滤 --dispatch 参数，避免循环派发
+    # 由于 --dispatch 是布尔参数，通常不会带值
+    # 但为了健壮性，处理所有可能的格式
+    filtered_argv = []
+    skip_next = False
+    for i, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--dispatch":
+            # 情况1: --dispatch（无值），直接跳过
+            continue
+        elif arg.startswith("--dispatch="):
+            # 情况2: --dispatch=value，整个参数跳过
+            continue
+        else:
+            # 保留其他参数
+            filtered_argv.append(arg)
+
+    # 构造tmux new-window命令
+    # new-window -n <window_name> "<command>"
+    executable = sys.executable
+    # 使用 shlex.quote() 安全地转义每个参数，防止 shell 注入
+    quoted_args = [shlex.quote(arg) for arg in filtered_argv]
+    command = f"{executable} {' '.join(quoted_args)}"
+
+    tmux_args = [
+        "tmux",
+        "new-window",
+        "-n",
+        window_name,
+        command,
+    ]
+
+    # 执行tmux命令
+    try:
+        subprocess.run(tmux_args, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Failed to dispatch to tmux window: {e}", file=sys.stderr)
+        return False
 
 
 def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:

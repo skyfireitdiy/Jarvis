@@ -40,6 +40,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
+from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
 
 
 def _normalize_backup_data_argv(argv: List[str]) -> None:
@@ -723,6 +724,11 @@ def run_cli(
     stop: bool = typer.Option(
         False, "--stop", help="停止后台 Web 服务（需与 --web 一起使用）"
     ),
+    dispatch: bool = typer.Option(
+        False,
+        "--dispatch",
+        help="将任务派发到新的 tmux 窗口中执行（仅在 tmux 环境中有效），当前进程退出",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -795,6 +801,25 @@ def run_cli(
             "❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。"
         )
         raise typer.Exit(code=2)
+
+    # 处理 --dispatch 参数：派发任务到新的 tmux 窗口
+    if dispatch:
+        if not (task and str(task).strip()):
+            PrettyOutput.auto_print(
+                "❌ 错误: --dispatch 参数必须与 --task 参数配合使用"
+            )
+            raise typer.Exit(code=1)
+
+        PrettyOutput.auto_print("ℹ️ 正在派发任务到新的 tmux 窗口...")
+        success = dispatch_to_tmux_window(task, sys.argv)
+        if success:
+            PrettyOutput.auto_print("✅ 任务已成功派发到新的 tmux 窗口")
+            raise typer.Exit(code=0)
+        else:
+            PrettyOutput.auto_print(
+                "❌ 派发失败：当前不在 tmux 环境中或 tmux 未安装，请在 tmux 环境中使用 --dispatch 参数"
+            )
+            raise typer.Exit(code=1)
 
     # 处理数据备份
     if handle_backup_option(backup_data):
