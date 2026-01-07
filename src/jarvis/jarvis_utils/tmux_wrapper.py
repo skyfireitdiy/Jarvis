@@ -305,10 +305,8 @@ def _find_jarvis_code_agent_session() -> Optional[str]:
         仅查找带用户名前缀的 "jarvis" session。
         格式：{username}-jarvis-{uuid}
     """
-    # 获取用户名
-    username = _get_username()
-    # 仅查找带用户名前缀的 "jarvis" session
-    return _find_jarvis_session(f"{username}-jarvis")
+    # 查找带用户名前缀的 "jarvis" session
+    return _find_jarvis_session("jarvis")
 
 
 def find_or_create_jarvis_session(
