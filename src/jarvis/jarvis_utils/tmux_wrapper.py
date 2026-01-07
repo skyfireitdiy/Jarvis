@@ -211,6 +211,10 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
 
     Returns:
         Optional[str]: 找到的 session 名称，未找到返回 None
+
+    注意:
+        使用精确前缀匹配，避免误判。例如查找 "jarvis-" 时，
+        只匹配 "jarvis-{uuid}"，不匹配 "jarvis-code-agent-{uuid}"
     """
     try:
         result = subprocess.run(
@@ -227,7 +231,15 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
                 session_name = line.split(":")[0].strip()
                 # 检查是否是指定前缀的 session
                 if session_name.startswith(f"{session_prefix}-"):
-                    return session_name
+                    # 精确前缀匹配：检查去除前缀后的部分是否为数字或UUID
+                    # 这可以避免匹配到 "jarvis-code-agent-{uuid}" 这样的session
+                    # 当查找 "jarvis-" 时，只匹配 "jarvis-{uuid}"
+                    suffix = session_name[len(session_prefix) + 1 :]
+                    if suffix and (
+                        suffix[0].isdigit() or suffix[0] in "abcdef0123456789"
+                    ):
+                        # 匹配成功：后缀以数字或UUID字符开头
+                        return session_name
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         # 正常情况：没有活动的 tmux 会话时不打印警告
         pass
