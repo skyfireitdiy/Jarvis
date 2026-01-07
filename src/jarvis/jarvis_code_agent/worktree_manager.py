@@ -373,6 +373,33 @@ class WorktreeManager:
                 return False
 
             PrettyOutput.auto_print("✅ Worktree 清理成功")
+
+            # 删除对应的分支
+            if self.worktree_branch:
+                PrettyOutput.auto_print(f"🗑️  删除分支: {self.worktree_branch}")
+                try:
+                    delete_result = subprocess.run(
+                        ["git", "branch", "-D", self.worktree_branch],
+                        capture_output=True,
+                        check=False,
+                    )
+                    if delete_result.returncode == 0:
+                        PrettyOutput.auto_print(
+                            f"✅ 分支 {self.worktree_branch} 已删除"
+                        )
+                    else:
+                        error_msg = (
+                            decode_output(delete_result.stderr)
+                            if delete_result.stderr
+                            else "未知错误"
+                        )
+                        PrettyOutput.auto_print(f"⚠️ 删除分支失败: {error_msg}")
+                        PrettyOutput.auto_print(
+                            f"💡 请手动删除分支: git branch -D {self.worktree_branch}"
+                        )
+                except Exception as e:
+                    PrettyOutput.auto_print(f"⚠️ 删除分支时出错: {str(e)}")
+
             return True
 
         except Exception as e:
