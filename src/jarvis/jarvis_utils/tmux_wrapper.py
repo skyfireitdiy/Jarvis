@@ -84,6 +84,12 @@ def dispatch_to_tmux_window(
     # 执行tmux命令
     try:
         subprocess.run(tmux_args, check=True)
+        # 创建新pane后，自动切换到tiled布局
+        try:
+            subprocess.run(["tmux", "select-layout", "tiled"], check=True)
+        except subprocess.CalledProcessError:
+            # 布局切换失败不影响主流程
+            pass
         return True
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to dispatch to tmux window: {e}", file=sys.stderr)
