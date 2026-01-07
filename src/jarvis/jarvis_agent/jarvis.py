@@ -746,7 +746,6 @@ def run_cli(
     if task_file:
         try:
             import json
-            from pathlib import Path
 
             with open(task_file, "r", encoding="utf-8") as file_handle:
                 file_content = file_handle.read()
@@ -1368,7 +1367,6 @@ def run_cli(
             # 如果是tmux并行任务，写入状态文件
             if status_file_path:
                 import json
-                from pathlib import Path
 
                 try:
                     # 写入状态文件
