@@ -55,7 +55,7 @@ def _write_task_to_temp_file(task_content: str) -> str:
 
 
 def run_jca_dispatch(task: Any) -> None:
-    """执行 jca -n -w --dispatch --requirement <task>"""
+    """执行 jca -n -w --dispatch --task <task>"""
     # 确保 task 是字符串内容而非类型对象
     if isinstance(task, str):
         task_str = task
@@ -75,11 +75,11 @@ def run_jca_dispatch(task: Any) -> None:
 
     # 判断是文件路径还是直接内容
     if os.path.exists(task_str):
-        # 如果是文件路径，使用 --requirement-file 参数
-        cmd = ["jca", "-n", "-w", "--dispatch", "--requirement-file", task_str]
+        # 如果是文件路径，使用 --task-file 参数
+        cmd = ["jca", "-n", "-w", "--dispatch", "--task-file", task_str]
     else:
-        # 如果是直接内容，使用 --requirement 参数
-        cmd = ["jca", "-n", "-w", "--dispatch", "--requirement", task_str]
+        # 如果是直接内容，使用 --task 参数
+        cmd = ["jca", "-n", "-w", "--dispatch", "--task", task_str]
     try:
         # 打印即将执行的命令
         PrettyOutput.print(

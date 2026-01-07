@@ -1163,11 +1163,9 @@ def cli(
     config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="配置文件路径"
     ),
-    requirement: Optional[str] = typer.Option(
-        None, "-r", "--requirement", help="要处理的需求描述"
-    ),
-    requirement_file: Optional[str] = typer.Option(
-        None, "--requirement-file", help="从文件读取需求描述"
+    task: Optional[str] = typer.Option(None, "-r", "--task", help="要处理的任务描述"),
+    task_file: Optional[str] = typer.Option(
+        None, "--task-file", help="从文件读取任务描述"
     ),
     append_tools: Optional[str] = typer.Option(
         None, "--append-tools", help="要追加的工具列表，用逗号分隔"
@@ -1222,22 +1220,20 @@ def cli(
     ),
 ) -> None:
     """Jarvis主入口点。"""
-    # 处理需求描述：优先从文件读取
-    if requirement and requirement_file:
-        PrettyOutput.auto_print(
-            "❌ 错误: 不能同时使用 --requirement 和 --requirement-file 参数"
-        )
+    # 处理任务描述：优先从文件读取
+    if task and task_file:
+        PrettyOutput.auto_print("❌ 错误: 不能同时使用 --task 和 --task-file 参数")
         raise typer.Exit(code=1)
 
     # 用于tmux并行任务的状态文件路径
     status_file_path = None
 
-    if requirement_file:
+    if task_file:
         try:
             import json
             from pathlib import Path
 
-            with open(requirement_file, "r", encoding="utf-8") as file_handle:
+            with open(task_file, "r", encoding="utf-8") as file_handle:
                 file_content = file_handle.read()
 
             # 尝试解析为JSON以获取status_file字段
@@ -1249,39 +1245,39 @@ def cli(
                     status_file_path = Path(status_file_path)
                 # 提取实际任务内容
                 if "task_desc" in task_data:
-                    requirement = task_data["task_desc"]
+                    task = task_data["task_desc"]
                     if "background" in task_data:
-                        requirement += f"\n\n背景信息:\n{task_data['background']}"
+                        task += f"\n\n背景信息:\n{task_data['background']}"
                     if "additional_info" in task_data:
-                        requirement += f"\n\n附加信息:\n{task_data['additional_info']}"
+                        task += f"\n\n附加信息:\n{task_data['additional_info']}"
                 else:
                     # 不是JSON格式或没有task_desc字段，直接使用文件内容
-                    requirement = file_content
+                    task = file_content
             except json.JSONDecodeError:
                 # 不是JSON格式，直接使用文件内容
-                requirement = file_content
+                task = file_content
 
         except (Exception, FileNotFoundError) as e:
-            PrettyOutput.auto_print(f"❌ 错误: 无法从文件读取需求描述: {str(e)}")
+            PrettyOutput.auto_print(f"❌ 错误: 无法从文件读取任务描述: {str(e)}")
             raise typer.Exit(code=1)
 
     # 非交互模式要求从命令行传入任务
-    if non_interactive and not (requirement and str(requirement).strip()):
+    if non_interactive and not (task and str(task).strip()):
         PrettyOutput.auto_print(
-            "❌ 非交互模式已启用：必须使用 --requirement 传入任务内容，因多行输入不可用。"
+            "❌ 非交互模式已启用：必须使用 --task 传入任务内容，因多行输入不可用。"
         )
         raise typer.Exit(code=2)
 
     # 处理 --dispatch 参数：派发任务到新的 tmux 窗口
     if dispatch:
-        if not (requirement and str(requirement).strip()):
+        if not (task and str(task).strip()):
             PrettyOutput.auto_print(
-                "❌ 错误: --dispatch 参数必须与 --requirement 参数配合使用"
+                "❌ 错误: --dispatch 参数必须与 --task 参数配合使用"
             )
             raise typer.Exit(code=1)
 
         PrettyOutput.auto_print("ℹ️ 正在派发任务到新的 tmux 窗口...")
-        success = dispatch_to_tmux_window(requirement, sys.argv)
+        success = dispatch_to_tmux_window(task, sys.argv)
         if success:
             PrettyOutput.auto_print("✅ 任务已成功派发到新的 tmux 窗口")
             raise typer.Exit(code=0)
@@ -1415,10 +1411,8 @@ def cli(
             exit_code = 0
             error_message = ""
             try:
-                if requirement:
-                    output_content = agent.run(
-                        requirement, prefix=prefix, suffix=suffix
-                    )
+                if task:
+                    output_content = agent.run(task, prefix=prefix, suffix=suffix)
                     if agent.non_interactive:
                         raise typer.Exit(code=0)
                 else:
