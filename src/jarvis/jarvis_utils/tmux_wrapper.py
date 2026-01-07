@@ -4,6 +4,7 @@
 检测系统是否安装tmux，如果不在tmux环境中运行，自动创建tmux会话并重新执行命令。
 """
 
+import getpass
 import os
 import shlex
 import shutil
@@ -11,6 +12,21 @@ import subprocess
 import sys
 import uuid
 from typing import Optional
+
+
+def _get_username() -> str:
+    """获取当前用户名。
+
+    优先使用getpass.getuser()，降级到环境变量USER，
+    最后返回'unknown'作为兜底。
+
+    Returns:
+        str: 用户名
+    """
+    try:
+        return getpass.getuser()
+    except Exception:
+        return os.environ.get("USER", "unknown")
 
 
 def dispatch_to_tmux_window(
@@ -170,7 +186,8 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
 
     # 未找到现有 session，创建新的 session
     # 为会话名称添加随机后缀，避免冲突
-    session_name = f"{session_name}-{uuid.uuid4().hex[:8]}"
+    username = _get_username()
+    session_name = f"{username}-{session_name}-{uuid.uuid4().hex[:8]}"
     # 构造tmux命令：new-session -s <session_name> -- <command>
     # -s: 指定会话名称
     # --: 后面的参数是要执行的命令
@@ -226,20 +243,29 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
             check=True,
             timeout=5,
         )
+        # 获取用户名用于构建前缀
+        username = _get_username()
         # 解析 session 名称：格式为 "session-name: windows (created ...)"
         for line in result.stdout.strip().split("\n"):
             if line.strip():
                 # 提取 session 名称（冒号之前的部分）
                 session_name = line.split(":")[0].strip()
-                # 检查是否是指定前缀的 session
-                if session_name.startswith(f"{session_prefix}-"):
+                # 优先匹配带用户名前缀的会话：{username}-{session_prefix}-{uuid}
+                expected_prefix = f"{username}-{session_prefix}-"
+                if session_name.startswith(expected_prefix):
                     # 精确前缀匹配：检查去除前缀后的部分是否为数字或UUID
-                    # 当查找 "jarvis-" 时，只匹配 "jarvis-{uuid}"
-                    suffix = session_name[len(session_prefix) + 1 :]
+                    suffix = session_name[len(expected_prefix) :]
                     if suffix and (
                         suffix[0].isdigit() or suffix[0] in "abcdef0123456789"
                     ):
                         # 匹配成功：后缀以数字或UUID字符开头
+                        return session_name
+                # 向后兼容：匹配旧格式的不带用户名前缀的会话：{session_prefix}-{uuid}
+                if session_name.startswith(f"{session_prefix}-"):
+                    suffix = session_name[len(session_prefix) + 1 :]
+                    if suffix and (
+                        suffix[0].isdigit() or suffix[0] in "abcdef0123456789"
+                    ):
                         return session_name
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         # 正常情况：没有活动的 tmux 会话时不打印警告
@@ -257,13 +283,24 @@ def _find_jarvis_code_agent_session() -> Optional[str]:
         Optional[str]: 找到的 session 名称，未找到返回 None
 
     注意:
-        优先查找 "jarvis" 前缀的 session，向后兼容 "jarvis-code-agent" 前缀。
+        优先查找带用户名前缀的 "jarvis" session，向后兼容 "jarvis-code-agent" 前缀。
+        同时支持查找不带用户名前缀的旧格式会话（向后兼容）。
     """
-    # 优先查找统一的 "jarvis" 前缀
+    # 获取用户名
+    username = _get_username()
+    # 优先查找带用户名前缀的统一 "jarvis" 前缀
+    session = _find_jarvis_session(f"{username}-jarvis")
+    if session:
+        return session
+    # 向后兼容：查找带用户名前缀的 "jarvis-code-agent" 前缀
+    session = _find_jarvis_session(f"{username}-jarvis-code-agent")
+    if session:
+        return session
+    # 向后兼容：查找旧的不带用户名前缀的 "jarvis" 前缀
     session = _find_jarvis_session("jarvis")
     if session:
         return session
-    # 向后兼容：查找旧的 "jarvis-code-agent" 前缀
+    # 向后兼容：查找旧的不带用户名前缀的 "jarvis-code-agent" 前缀
     return _find_jarvis_session("jarvis-code-agent")
 
 
@@ -292,7 +329,8 @@ def find_or_create_jarvis_session(
         return None
 
     # 创建新的 session
-    session_name = f"{session_prefix}-{uuid.uuid4().hex[:8]}"
+    username = _get_username()
+    session_name = f"{username}-{session_prefix}-{uuid.uuid4().hex[:8]}"
     try:
         # 创建新的 detached session
         subprocess.run(
@@ -339,7 +377,8 @@ def _dispatch_to_existing_jarvis_session(
             file=sys.stderr,
         )
         # 生成新的 session 名称
-        session_name = f"jarvis-{uuid.uuid4().hex[:8]}"
+        username = _get_username()
+        session_name = f"{username}-jarvis-{uuid.uuid4().hex[:8]}"
         try:
             # 创建新的 detached session
             subprocess.run(
