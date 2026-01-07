@@ -2663,6 +2663,66 @@ class task_list_manager:
                 "stderr": f"更新任务失败: {str(e)}",
             }
 
+    def _find_window_with_available_panes(
+        self, session_name: str, max_panes: int = 4
+    ) -> Optional[str]:
+        """查找panel数量小于max_panes的window。
+
+        Args:
+            session_name: tmux session名称
+            max_panes: 每个window的最大panel数量
+
+        Returns:
+            Optional[str]: 可用window的索引（如 '0', '1'），没有则返回None
+        """
+        import subprocess
+
+        try:
+            # 获取session中所有window的索引
+            result = subprocess.run(
+                ["tmux", "list-windows", "-t", session_name, "-F", "#{window_index}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            if result.returncode != 0:
+                return None
+
+            window_indices = result.stdout.strip().split("\n")
+
+            # 遍历每个window，检查pane数量
+            for window_idx in window_indices:
+                if not window_idx.strip():
+                    continue
+
+                # 获取该window的pane数量
+                panes_result = subprocess.run(
+                    [
+                        "tmux",
+                        "list-panes",
+                        "-t",
+                        f"{session_name}:{window_idx}",
+                        "-F",
+                        "#P",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+
+                if panes_result.returncode == 0:
+                    # 处理pane数量计算：使用列表推导式过滤空字符串，确保准确计算
+                    pane_lines = panes_result.stdout.strip().split("\n")
+                    pane_count = len([line for line in pane_lines if line.strip()])
+                    if pane_count < max_panes:
+                        return window_idx
+
+        except Exception:
+            pass
+
+        return None
+
     def _is_in_tmux(self) -> bool:
         """检测当前是否在tmux环境中运行。
 
@@ -2906,16 +2966,36 @@ class task_list_manager:
                 if config_file:
                     cmd.extend(["-f", config_file])
 
-                # 在tmux新窗口中启动子进程
-                window_name = f"task_{task.task_id}"
-                tmux_cmd = [
-                    "tmux",
-                    "new-window",
-                    "-n",
-                    window_name,
-                    "-t",
-                    session_name,
-                ]
+                # 查找panel数量<4的window，如果没有则创建新窗口
+                available_window = self._find_window_with_available_panes(
+                    session_name, max_panes=4
+                )
+
+                if available_window is not None:
+                    # 在可用window中split panel
+                    PrettyOutput.auto_print(
+                        f"📦 在窗口 {available_window} 中创建 panel (当前pane数量<4)"
+                    )
+                    tmux_cmd = [
+                        "tmux",
+                        "split-window",
+                        "-h",  # 水平分割
+                        "-t",
+                        f"{session_name}:{available_window}",
+                    ]
+                else:
+                    # 没有可用window，创建新窗口
+                    PrettyOutput.auto_print("📄 创建新窗口 (所有窗口pane数量>=4)")
+                    window_name = f"task_{task.task_id}"
+                    tmux_cmd = [
+                        "tmux",
+                        "new-window",
+                        "-n",
+                        window_name,
+                        "-t",
+                        session_name,
+                    ]
+
                 # 将命令转换为字符串并正确转义
                 cmd_str = " ".join(shlex.quote(arg) for arg in cmd)
                 tmux_cmd.append(cmd_str)
@@ -2926,9 +3006,14 @@ class task_list_manager:
                         capture_output=True,
                         timeout=10,
                     )
-                    PrettyOutput.auto_print(
-                        f"✅ 任务 [{task.task_name}] 已在新窗口启动"
-                    )
+                    if available_window is not None:
+                        PrettyOutput.auto_print(
+                            f"✅ 任务 [{task.task_name}] 已在窗口 {available_window} 的 panel 中启动"
+                        )
+                    else:
+                        PrettyOutput.auto_print(
+                            f"✅ 任务 [{task.task_name}] 已在新窗口启动"
+                        )
                 except subprocess.TimeoutExpired:
                     PrettyOutput.auto_print(
                         f"⚠️ 任务 [{task.task_name}] 启动超时，但窗口可能已创建"
