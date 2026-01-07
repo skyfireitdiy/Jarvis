@@ -78,6 +78,12 @@ def main(
         jcad "你的任务"           # 直接执行任务
         jcad                      # 进入交互模式输入任务
     """
+    # 调试信息：打印接收到的 task 参数
+    PrettyOutput.print(
+        f"[DEBUG] main() 接收到的 task 参数: type={type(task).__name__}, value={task}", 
+        output_type=OutputType.DEBUG
+    )
+    
     if task:
         # 直接模式：传入任务字符串
         run_jca_dispatch(task)
