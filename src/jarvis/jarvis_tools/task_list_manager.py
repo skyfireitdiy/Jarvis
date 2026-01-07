@@ -4,6 +4,7 @@
 """
 
 import json
+import re
 
 
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -657,6 +658,23 @@ class task_list_manager:
             )
             return False, f"验证异常: {str(e)}"
 
+    def _extract_task_number(self, task_id: str) -> int:
+        """从 task_id 中提取数字部分用于排序
+
+        参数:
+            task_id: 任务ID，格式为 task-{数字}
+
+        返回:
+            任务数字，如果提取失败返回 999999（排在最后）
+        """
+        try:
+            match = re.search(r"\d+", task_id)
+            if match:
+                return int(match.group())
+            return 999999
+        except (ValueError, AttributeError):
+            return 999999
+
     def _print_task_list_status(
         self, task_list_manager: Any, task_list_id: Optional[str] = None
     ) -> None:
@@ -701,8 +719,10 @@ class task_list_manager:
                 table.add_column("Agent类型", width=10)
                 table.add_column("依赖", width=12)
 
-                # 按优先级和创建时间排序
-                sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
+                # 按任务序号（task_id）排序
+                sorted_tasks = sorted(
+                    tasks, key=lambda t: self._extract_task_number(t.task_id)
+                )
 
                 # 状态颜色映射
                 status_colors = {
