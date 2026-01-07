@@ -2866,7 +2866,8 @@ class task_list_manager:
             # 判断agent类型
             is_code_agent = self._is_code_agent(parent_agent)
             cmd_prefix = "jca" if is_code_agent else "jvs"
-            file_param = "--requirement-file" if is_code_agent else "--task-file"
+            # 统一使用 --task-file 参数（jca 和 jvs 参数已对齐）
+            file_param = "--task-file"
 
             PrettyOutput.auto_print(f"📝 使用命令: {cmd_prefix} {file_param}")
 
