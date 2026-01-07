@@ -654,7 +654,6 @@ def _show_usage_stats(welcome_str: str) -> None:
         # 右侧内容：总体表现 + 使命与愿景
         right_column_items = []
         summary_content: list[str] = []
-        from rich import box
 
         # 计算总体表现的摘要数据
         # 总结统计
@@ -872,7 +871,6 @@ def _show_usage_stats(welcome_str: str) -> None:
         right_column_items.append(mission_panel)
 
         # 创建左右两列的内容组
-        left_column_items = []
         right_column_items = []
 
         # 左侧：欢迎Logo和基本信息
@@ -899,22 +897,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                 border_style="yellow",
                 expand=True,
             )
-            left_column_items.append(welcome_panel)
-
-        # 只显示左侧的Jarvis AI Assistant框
-        if left_column_items:
-            layout_renderable = Group(*left_column_items)
-            # 打印最终的布局
-            # 将整体布局封装在一个最终的Panel中，以提供整体边框
-            final_panel = Panel(
-                layout_renderable,
-                title="Jarvis AI Assistant",
-                title_align="center",
-                border_style="blue",
-                box=box.HEAVY,
-                padding=(0, 1),
-            )
-            console.print(final_panel)
+            console.print(welcome_panel)
     except Exception as e:
         # 输出错误信息以便调试
         import traceback
