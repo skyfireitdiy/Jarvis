@@ -42,6 +42,14 @@ def run_jca_dispatch(task: Any) -> None:
     else:
         # 处理非字符串类型，尝试获取实际值
         task_str = str(task) if task is not None else ""
+    
+    # 检查 task_str 是否为空
+    if not task_str or not task_str.strip():
+        PrettyOutput.auto_print(
+            f"❌ 错误: 任务内容为空，无法执行。task 类型: {type(task).__name__}, task 值: {task}"
+        )
+        sys.exit(1)
+    
     cmd = ["jca", "-n", "-w", "--dispatch", "--requirement", task_str]
     try:
         # 打印即将执行的命令
