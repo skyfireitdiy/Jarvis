@@ -139,11 +139,11 @@ def get_commits_between(start_hash: str, end_hash: str) -> List[Tuple[str, str]]
             text=False,  # 禁用自动文本解码
         )
         if result.returncode != 0:
-            error_msg = result.stderr.decode("utf-8", errors="replace")
+            error_msg = decode_output(result.stderr)
             PrettyOutput.auto_print(f"❌ 获取commit历史失败: {error_msg}")
             return []
 
-        output = result.stdout.decode("utf-8", errors="replace")
+        output = decode_output(result.stdout)
         commits = []
         for line in output.splitlines():
             if "|" in line:
@@ -190,10 +190,7 @@ def get_diff() -> str:
             # 重置暂存区
             subprocess.run(["git", "reset"], check=True)
 
-        try:
-            return result.stdout.decode("utf-8")
-        except UnicodeDecodeError:
-            return result.stdout.decode("utf-8", errors="replace")
+        return decode_output(result.stdout)
 
     except subprocess.CalledProcessError as e:
         return f"获取差异失败: {str(e)}"

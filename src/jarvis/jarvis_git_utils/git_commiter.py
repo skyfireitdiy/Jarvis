@@ -73,7 +73,7 @@ class GitCommitTool:
             stderr=subprocess.PIPE,
         )
         stdout, _ = process.communicate()
-        return stdout.decode().strip()
+        return decode_output(stdout).strip()
 
     def _prepare_git_environment(self, root_dir: str) -> Optional[str]:
         """Prepare git environment by changing directory and checking for changes"""
