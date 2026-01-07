@@ -1009,8 +1009,106 @@ class task_list_manager:
         "required": ["action"],
     }
 
+    def _adjust_description_for_environment(self) -> None:
+        """根据环境调整工具描述"""
+        if not self._is_in_tmux():
+            # 非tmux环境，修改description，移除批量执行相关说明
+            self.description = f"""任务列表管理工具，供LLM管理复杂任务拆分和执行。
+
+**核心功能：**
+- `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
+- `execute_task`: 执行任务（自动创建子Agent）
+- `get_task_list_summary`: 查看任务状态
+
+**任务类型选择：**
+- `main`: 简单任务（1-3步、单文件）由主Agent直接执行
+- `sub`: 复杂任务（多步骤、多文件）自动创建子Agent
+
+**强制要求：**
+- execute_task必须提供non-empty additional_info参数
+- 禁止过度拆分简单任务
+- 每个Agent只能有一个任务列表
+
+**使用场景：**
+- PLAN阶段：一次性添加所有子任务
+- 数据切分：按目录/文件/模块分批处理
+- 依赖管理：自动验证任务依赖关系
+
+**关键原则：**
+简单任务用main，复杂任务用sub，避免过度拆分。
+
+**使用示例**
+创建任务列表：
+```
+{ot("TOOL_CALL")}
+{{
+    "name": "task_list_manager",
+    "arguments": {{
+        "action": "add_tasks",
+        "main_goal": "创建任务列表",
+        "background": "背景信息",
+        "tasks_info": [
+            {{
+                "task_name": "任务1",
+                "task_desc": "任务1描述",
+                "priority": 1,
+                "expected_output": "任务1预期输出",
+                "agent_type": "main",
+                "dependencies": []
+            }}
+            {{
+                "task_name": "任务2",
+                "task_desc": "任务2描述",
+                "priority": 2,
+                "expected_output": "任务2预期输出",
+                "agent_type": "sub",
+                "dependencies": ["任务1"]
+            }}
+        ]
+    }}
+}}
+{ct("TOOL_CALL")}
+```
+
+执行任务：
+```
+{ot("TOOL_CALL")}
+{{
+    "name": "task_list_manager",
+    "arguments": {{
+        "action": "execute_task",
+        "task_id": "任务ID",
+        "additional_info": "任务详细信息"
+    }}
+}}
+{ct("TOOL_CALL")}
+```
+
+更新任务状态：
+```
+{ot("TOOL_CALL")}
+{{
+    "name": "task_list_manager",
+    "arguments": {{
+        "action": "update_task",
+        "task_id": "任务ID",
+        "task_update_info": {{
+            "status": "completed",
+            "actual_output": "任务实际输出"
+        }}
+    }}
+}}
+{ct("TOOL_CALL")}
+```
+
+
+"""
+
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行任务列表管理操作"""
+        # 根据环境调整工具描述
+        self._adjust_description_for_environment()
+
         try:
             agent = args.get("agent")
             if not agent:
