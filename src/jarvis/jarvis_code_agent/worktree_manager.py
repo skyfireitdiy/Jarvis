@@ -238,12 +238,13 @@ class WorktreeManager:
                 ["git", "rebase", original_branch],
                 capture_output=True,
                 check=False,
-                text=True,
                 cwd=self.worktree_path,
             )
 
             if result.returncode != 0:
-                error_msg = result.stderr if result.stderr else "未知错误"
+                error_msg = (
+                    decode_output(result.stderr) if result.stderr else "未知错误"
+                )
                 if "CONFLICT" in error_msg or "conflict" in error_msg.lower():
                     PrettyOutput.auto_print("⚠️ Rebase 产生冲突")
                     PrettyOutput.auto_print("📋 冲突处理选项:")
@@ -283,12 +284,13 @@ class WorktreeManager:
                 ["git", "merge", "--ff-only", self.worktree_branch],
                 capture_output=True,
                 check=False,
-                text=True,
                 cwd=self.repo_root,
             )
 
             if result.returncode != 0:
-                error_msg = result.stderr if result.stderr else "未知错误"
+                error_msg = (
+                    decode_output(result.stderr) if result.stderr else "未知错误"
+                )
                 raise RuntimeError(f"Fast-forward 合并失败: {error_msg}")
 
             PrettyOutput.auto_print("✅ Rebase 并合并成功")
