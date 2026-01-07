@@ -260,13 +260,6 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
                     ):
                         # 匹配成功：后缀以数字或UUID字符开头
                         return session_name
-                # 向后兼容：匹配旧格式的不带用户名前缀的会话：{session_prefix}-{uuid}
-                if session_name.startswith(f"{session_prefix}-"):
-                    suffix = session_name[len(session_prefix) + 1 :]
-                    if suffix and (
-                        suffix[0].isdigit() or suffix[0] in "abcdef0123456789"
-                    ):
-                        return session_name
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         # 正常情况：没有活动的 tmux 会话时不打印警告
         pass
@@ -283,25 +276,13 @@ def _find_jarvis_code_agent_session() -> Optional[str]:
         Optional[str]: 找到的 session 名称，未找到返回 None
 
     注意:
-        优先查找带用户名前缀的 "jarvis" session，向后兼容 "jarvis-code-agent" 前缀。
-        同时支持查找不带用户名前缀的旧格式会话（向后兼容）。
+        仅查找带用户名前缀的 "jarvis" session。
+        格式：{username}-jarvis-{uuid}
     """
     # 获取用户名
     username = _get_username()
-    # 优先查找带用户名前缀的统一 "jarvis" 前缀
-    session = _find_jarvis_session(f"{username}-jarvis")
-    if session:
-        return session
-    # 向后兼容：查找带用户名前缀的 "jarvis-code-agent" 前缀
-    session = _find_jarvis_session(f"{username}-jarvis-code-agent")
-    if session:
-        return session
-    # 向后兼容：查找旧的不带用户名前缀的 "jarvis" 前缀
-    session = _find_jarvis_session("jarvis")
-    if session:
-        return session
-    # 向后兼容：查找旧的不带用户名前缀的 "jarvis-code-agent" 前缀
-    return _find_jarvis_session("jarvis-code-agent")
+    # 仅查找带用户名前缀的 "jarvis" session
+    return _find_jarvis_session(f"{username}-jarvis")
 
 
 def find_or_create_jarvis_session(
