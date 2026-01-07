@@ -1118,6 +1118,7 @@ git reset --hard {start_commit}
 
             # 生成修复总结并追加到修改历史
             fix_summary = self._generate_fix_summary()
+            PrettyOutput.auto_print(f"🔍 修复总结: {fix_summary}")
             if fix_summary:
                 modification_history += (
                     f"\n\n【第 {iteration} 轮修复总结】\n{fix_summary}"
