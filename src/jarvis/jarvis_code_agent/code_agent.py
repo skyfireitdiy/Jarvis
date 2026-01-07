@@ -733,11 +733,28 @@ git reset --hard {start_commit}
 
         return "\n".join(truncated_lines)
 
+    def _generate_fix_summary(self) -> str:
+        """生成修复阶段的总结
+
+        返回:
+            str: 修复总结
+        """
+        if not self.need_summary:
+            return ""
+
+        try:
+            # 使用父类的 generate_summary 方法
+            summary = self.generate_summary(for_token_limit=False)
+            return summary or ""
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 生成修复总结失败: {e}")
+            return ""
+
     def _build_review_prompts(
         self,
         user_input: str,
         git_diff: str,
-        code_generation_summary: Optional[str] = None,
+        modification_history: Optional[str] = None,
     ) -> tuple:
         """构建 review Agent 的 prompts
 
@@ -769,8 +786,8 @@ git reset --hard {start_commit}
 【用户需求】
 {user_input}
 
-【代码生成总结】
-{code_generation_summary if code_generation_summary else "无代码生成总结信息（如为空，说明主 Agent 未生成总结，请完全依赖 git diff 和实际代码进行审查）"}
+【完整的修改历史】
+{modification_history if modification_history else "无修改历史（如为空，说明主 Agent 未生成总结或未进行修复）"}
 
 【代码修改（Git Diff）】
 ```diff
@@ -779,7 +796,8 @@ git reset --hard {start_commit}
 ```
 
 请仔细审查代码修改，并特别注意：
-- 不要直接相信代码生成总结中的描述，而是将其视为“待核实的说明”
+- 修改历史包含了初始生成和所有修复阶段的总结
+- 不要直接相信总结中的描述，而是将其视为“待核实的说明”
 - 对总结中提到的每一个关键修改点（如函数/文件/行为变化），都应在 git diff 或实际代码中找到对应依据
 - 如发现总结与实际代码不一致，必须在审查结果中指出
 
@@ -955,6 +973,9 @@ git reset --hard {start_commit}
 
         from jarvis.jarvis_agent import Agent
 
+        # 保存初始总结作为修改历史的第一部分
+        modification_history = code_generation_summary or ""
+
         iteration = 0
         max_iterations = self.review_max_iterations
         # 如果 max_iterations 为 0，表示无限 review
@@ -1002,7 +1023,7 @@ git reset --hard {start_commit}
 
             # 构建 review prompts
             sys_prompt, usr_prompt, sum_prompt = self._build_review_prompts(
-                user_input, truncated_git_diff, code_generation_summary
+                user_input, truncated_git_diff, modification_history
             )
 
             review_agent = Agent(
@@ -1094,6 +1115,13 @@ git reset --hard {start_commit}
 
             # 处理未提交的更改
             self.git_manager.handle_uncommitted_changes()
+
+            # 生成修复总结并追加到修改历史
+            fix_summary = self._generate_fix_summary()
+            if fix_summary:
+                modification_history += (
+                    f"\n\n【第 {iteration} 轮修复总结】\n{fix_summary}"
+                )
 
     def add_runtime_rule(self, rule_name: str) -> None:
         """添加运行时加载的规则到跟踪列表
