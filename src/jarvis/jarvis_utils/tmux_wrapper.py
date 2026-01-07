@@ -94,7 +94,9 @@ def dispatch_to_tmux_window(
     quoted_args = [shlex.quote(arg) for arg in filtered_argv]
     # 获取用户的默认shell，主命令结束后启动shell保持panel活动
     user_shell = os.environ.get("SHELL", "/bin/sh")
-    command = f'{executable} {" ".join(quoted_args)}; exec "{user_shell}"'
+    # 先切换到当前工作目录，再执行命令
+    cwd = os.getcwd()
+    command = f'cd {shlex.quote(cwd)} && {executable} {" ".join(quoted_args)}; exec "{user_shell}"'
 
     tmux_args = [
         "tmux",
@@ -372,7 +374,9 @@ def _dispatch_to_existing_jarvis_session(
     executable = sys.executable
     quoted_args = [shlex.quote(arg) for arg in filtered_argv]
     user_shell = os.environ.get("SHELL", "/bin/sh")
-    command = f'{executable} {" ".join(quoted_args)}; exec "{user_shell}"'
+    # 先切换到当前工作目录，再执行命令
+    cwd = os.getcwd()
+    command = f'cd {shlex.quote(cwd)} && {executable} {" ".join(quoted_args)}; exec "{user_shell}"'
 
     tmux_args = [
         "tmux",
