@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 
@@ -30,9 +30,14 @@ def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:"
     return "\n".join(lines)
 
 
-def run_jca_dispatch(task: str) -> None:
+def run_jca_dispatch(task: Any) -> None:
     """执行 jca -n -w --dispatch -r <task>"""
-    task_str = str(task)  # 显式转换为字符串，避免 ArgumentInfo 类型错误
+    # 确保 task 是字符串内容而非类型对象
+    if isinstance(task, str):
+        task_str = task
+    else:
+        # 处理非字符串类型，尝试获取实际值
+        task_str = str(task) if task is not None else ""
     cmd = ["jca", "-n", "-w", "--dispatch", "-r", task_str]
     try:
         # 直接执行 jca 命令，不捕获输出，让用户直接看到 jca 的输出
