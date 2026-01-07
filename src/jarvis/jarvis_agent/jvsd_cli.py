@@ -14,25 +14,13 @@ from typing import Any, Optional
 import typer
 from typer.models import ArgumentInfo
 
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.input import (
+    get_multiline_input as get_multiline_input_enhanced,
+)
 
 # 创建 typer 应用
 app = typer.Typer(help="Jarvis Agent Dispatcher - jvs 的便捷封装")
-
-
-def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:") -> str:
-    """获取多行输入，直到遇到空行或 EOF"""
-    lines = []
-    PrettyOutput.auto_print(prompt)
-    while True:
-        try:
-            line = input()
-            if line.strip() == "":
-                break
-            lines.append(line)
-        except EOFError:
-            break
-    return "\n".join(lines)
 
 
 def _write_task_to_temp_file(task_content: str) -> str:
@@ -93,10 +81,6 @@ def run_jvs_dispatch(task: Any) -> None:
         # 如果是直接内容，使用 --task 参数
         cmd = ["jvs", "-n", "-d", "--task", task_str]
     try:
-        # 打印即将执行的命令
-        PrettyOutput.print(
-            f"Executing command: {' '.join(cmd)}", output_type=OutputType.DEBUG
-        )
         # 直接执行 jvs 命令，不捕获输出，让用户直接看到 jvs 的输出
         result = subprocess.run(cmd)
         sys.exit(result.returncode)
@@ -120,11 +104,6 @@ def main(
         jvsd "你的任务"           # 直接执行任务
         jvsd                      # 进入交互模式输入任务
     """
-    # 调试信息：打印接收到的 task 参数
-    PrettyOutput.print(
-        f"[DEBUG] main() 接收到的 task 参数: type={type(task).__name__}, value={task}",
-        output_type=OutputType.DEBUG,
-    )
 
     if task:
         # 直接模式：传入任务字符串
@@ -145,8 +124,10 @@ def main(
             # 单行输入：直接传递
             run_jvs_dispatch(task)
     else:
-        # 交互模式：多行输入
-        task_content = get_multiline_input()
+        # 交互模式：多行输入（使用input模块的增强接口）
+        task_content = get_multiline_input_enhanced(
+            "请输入任务内容（Ctrl+J/Ctrl+] 确认，Enter 换行）"
+        )
         if not task_content.strip():
             PrettyOutput.auto_print("ℹ️ 未输入任务内容，退出")
             sys.exit(0)
