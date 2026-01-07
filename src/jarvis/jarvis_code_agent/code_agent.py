@@ -1170,7 +1170,7 @@ def cli(
     review_max_iterations: int = typer.Option(
         0,
         "--review-max-iterations",
-        help="代码审查最大迭代次数，达到上限后停止审查（默认3次）",
+        help="代码审查最大迭代次数，达到上限后停止审查（默认0次，表示无限）",
     ),
     worktree: bool = typer.Option(
         False,
