@@ -32,7 +32,7 @@ def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:"
 
 
 def run_jca_dispatch(task: Any) -> None:
-    """执行 jca -n -w --dispatch -r <task>"""
+    """执行 jca -n -w --dispatch --requirement <task>"""
     # 确保 task 是字符串内容而非类型对象
     if isinstance(task, str):
         task_str = task
@@ -42,7 +42,7 @@ def run_jca_dispatch(task: Any) -> None:
     else:
         # 处理非字符串类型，尝试获取实际值
         task_str = str(task) if task is not None else ""
-    cmd = ["jca", "-n", "-w", "--dispatch", "-r", task_str]
+    cmd = ["jca", "-n", "-w", "--dispatch", "--requirement", task_str]
     try:
         # 打印即将执行的命令
         PrettyOutput.print(
