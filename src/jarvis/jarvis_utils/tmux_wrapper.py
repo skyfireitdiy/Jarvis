@@ -113,14 +113,14 @@ def dispatch_to_tmux_window(
         # 验证格式是否正确（应包含冒号分隔符）
         if not current_window or ":" not in current_window:
             PrettyOutput.print(
-                f"Invalid window format: '{current_window}'",
+                f"⚠️ Invalid window format: '{current_window}'",
                 OutputType.WARNING,
                 timestamp=False,
             )
             current_window = None
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(
-            f"Failed to get current window: {e}",
+            f"⚠️ Failed to get current window: {e}",
             OutputType.WARNING,
             timestamp=False,
         )
@@ -155,14 +155,14 @@ def dispatch_to_tmux_window(
             except subprocess.CalledProcessError as e:
                 # 布局切换失败记录错误，但不影响主流程
                 PrettyOutput.print(
-                    f"Failed to set tiled layout for window {current_window}: {e}",
+                    f"⚠️ Failed to set tiled layout for window {current_window}: {e}",
                     OutputType.WARNING,
                     timestamp=False,
                 )
         return True
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(
-            f"Failed to dispatch to tmux window: {e}",
+            f"⚠️ Failed to dispatch to tmux window: {e}",
             OutputType.WARNING,
             timestamp=False,
         )
@@ -194,7 +194,7 @@ def check_and_launch_tmux() -> None:
     # 如果找到现有 session，附加到该 session
     if existing_session:
         PrettyOutput.print(
-            f"找到现有 session: {existing_session}，正在附加...",
+            f"ℹ️ 找到现有 session: {existing_session}，正在附加...",
             OutputType.INFO,
             timestamp=False,
         )
@@ -208,7 +208,7 @@ def check_and_launch_tmux() -> None:
             os.execvp("tmux", tmux_args)
         except OSError as e:
             PrettyOutput.print(
-                f"Failed to attach to tmux session '{existing_session}': {e}",
+                f"⚠️ Failed to attach to tmux session '{existing_session}': {e}",
                 OutputType.WARNING,
                 timestamp=False,
             )
@@ -248,7 +248,7 @@ def check_and_launch_tmux() -> None:
     except OSError as e:
         # 如果执行失败，输出警告并继续
         PrettyOutput.print(
-            f"Failed to launch tmux: {e}",
+            f"⚠️ Failed to launch tmux: {e}",
             OutputType.WARNING,
             timestamp=False,
         )
@@ -296,7 +296,7 @@ def _find_jarvis_session() -> Optional[str]:
     except Exception as e:
         # 保留真正的意外错误警告
         PrettyOutput.print(
-            f"Unexpected error while listing sessions: {e}",
+            f"⚠️ Unexpected error while listing sessions: {e}",
             OutputType.WARNING,
             timestamp=False,
         )
@@ -336,14 +336,14 @@ def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
         return session_name
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(
-            f"Failed to create tmux session '{session_name}': {e}",
+            f"⚠️ Failed to create tmux session '{session_name}': {e}",
             OutputType.WARNING,
             timestamp=False,
         )
         return None
     except subprocess.TimeoutExpired:
         PrettyOutput.print(
-            f"Creating tmux session '{session_name}' timed out",
+            f"⚠️ Creating tmux session '{session_name}' timed out",
             OutputType.WARNING,
             timestamp=False,
         )
@@ -370,7 +370,7 @@ def _dispatch_to_existing_jarvis_session(
     if not session_name:
         # 未找到现有 session，创建一个新的 session
         PrettyOutput.print(
-            "未找到 jarvis tmux session，正在创建新 session...",
+            "ℹ️ 未找到 jarvis tmux session，正在创建新 session...",
             OutputType.INFO,
             timestamp=False,
         )
@@ -384,27 +384,27 @@ def _dispatch_to_existing_jarvis_session(
                 timeout=10,
             )
             PrettyOutput.print(
-                f"已创建新的 tmux session: {session_name}",
+                f"✅ 已创建新的 tmux session: {session_name}",
                 OutputType.SUCCESS,
                 timestamp=False,
             )
         except subprocess.CalledProcessError as e:
             PrettyOutput.print(
-                f"创建 tmux session 失败: {e}",
+                f"❌ 创建 tmux session 失败: {e}",
                 OutputType.ERROR,
                 timestamp=False,
             )
             return False
         except subprocess.TimeoutExpired:
             PrettyOutput.print(
-                "创建 tmux session 超时",
+                "❌ 创建 tmux session 超时",
                 OutputType.ERROR,
                 timestamp=False,
             )
             return False
     else:
         PrettyOutput.print(
-            f"找到 jarvis session: {session_name}",
+            f"ℹ️ 找到 jarvis session: {session_name}",
             OutputType.INFO,
             timestamp=False,
         )
@@ -449,14 +449,14 @@ def _dispatch_to_existing_jarvis_session(
             check=True,
         )
         PrettyOutput.print(
-            f"任务已派发到 tmux session '{session_name}' 的 panel 中",
+            f"✅ 任务已派发到 tmux session '{session_name}' 的 panel 中",
             OutputType.SUCCESS,
             timestamp=False,
         )
         return True
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(
-            f"Failed to dispatch to tmux session '{session_name}': {e}",
+            f"⚠️ Failed to dispatch to tmux session '{session_name}': {e}",
             OutputType.WARNING,
             timestamp=False,
         )
