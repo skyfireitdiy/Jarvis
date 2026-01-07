@@ -657,7 +657,6 @@ def _show_usage_stats(welcome_str: str) -> None:
             )
 
         # 右侧内容：总体表现 + 使命与愿景
-        right_column_items = []
         summary_content: list[str] = []
 
         # 计算总体表现的摘要数据
@@ -843,78 +842,6 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             welcome_panel = Panel(
                 welcome_panel_content, border_style="yellow", expand=True
-            )
-            right_column_items.append(welcome_panel)
-
-        # 总体表现 Panel
-        summary_panel = Panel(
-            Text(
-                "\n".join(summary_content) if summary_content else "暂无数据",
-                justify="left",
-            ),
-            title="✨ 总体表现 ✨",
-            title_align="center",
-            border_style="green",
-            expand=True,
-        )
-        right_column_items.append(summary_panel)
-
-        # 愿景 Panel
-        vision_text = Text(
-            "让开发者与AI成为共生伙伴",
-            justify="center",
-            style="italic",
-        )
-        vision_panel = Panel(
-            vision_text,
-            title="🔭 愿景 (Vision) 🔭",
-            title_align="center",
-            border_style="cyan",
-            expand=True,
-        )
-        right_column_items.append(vision_panel)
-
-        # 使命 Panel
-        mission_text = Text(
-            "让灵感高效落地为代码与行动",
-            justify="center",
-            style="italic",
-        )
-        mission_panel = Panel(
-            mission_text,
-            title="🎯 使命 (Mission) 🎯",
-            title_align="center",
-            border_style="magenta",
-            expand=True,
-        )
-        right_column_items.append(mission_panel)
-
-        # 创建左右两列的内容组
-        right_column_items = []
-
-        # 左侧：欢迎Logo和基本信息
-        if welcome_str:
-            jarvis_ascii_art_str = """
-   ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗
-   ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝
-   ██║███████║██████╔╝██║   ██║██║███████╗
-██╗██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║
-╚████║██║  ██║██║  ██║ ╚████╔╝ ██║███████║
- ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝"""
-
-            welcome_content = Group(
-                Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
-                Align.center(Text(welcome_str, style="bold")),
-                "",  # for a blank line
-                Align.center(Text(f"v{__version__}")),
-                Align.center(Text("https://github.com/skyfireitdiy/Jarvis")),
-            )
-
-            welcome_panel = Panel(
-                welcome_content,
-                title="🤖 Jarvis AI Assistant",
-                border_style="yellow",
-                expand=True,
             )
             console.print(welcome_panel)
     except Exception as e:
