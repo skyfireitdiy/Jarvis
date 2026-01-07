@@ -128,13 +128,11 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
     """检测tmux并在需要时启动tmux会话。
 
     Args:
-        session_name: tmux会话名称，默认为"jarvis-auto"
+        session_name: tmux会话名称前缀，默认为"jarvis-auto"
 
     注意:
         此函数使用subprocess.execvp替换当前进程，如果成功则不会返回。
     """
-    # 为会话名称添加随机后缀，避免冲突
-    session_name = f"{session_name}-{uuid.uuid4().hex[:8]}"
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
     if tmux_path is None:
@@ -147,9 +145,31 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
         # 已在tmux中，正常继续执行
         return
 
-    # tmux已安装且不在tmux中，启动tmux会话
-    # 构造tmux命令：new-session -A -s <session_name> -- <command>
-    # -A: 如果会话已存在则attach，否则创建新会话
+    # tmux已安装且不在tmux中，优先查找现有 session
+    existing_session = find_or_create_jarvis_session(session_name, force_create=False)
+
+    # 如果找到现有 session，附加到该 session
+    if existing_session:
+        print(f"ℹ️ 找到现有 session: {existing_session}，正在附加...", file=sys.stderr)
+        tmux_args = [
+            "tmux",
+            "attach",
+            "-t",
+            existing_session,
+        ]
+        try:
+            os.execvp("tmux", tmux_args)
+        except OSError as e:
+            print(
+                f"Warning: Failed to attach to tmux session '{existing_session}': {e}",
+                file=sys.stderr,
+            )
+            return
+
+    # 未找到现有 session，创建新的 session
+    # 为会话名称添加随机后缀，避免冲突
+    session_name = f"{session_name}-{uuid.uuid4().hex[:8]}"
+    # 构造tmux命令：new-session -s <session_name> -- <command>
     # -s: 指定会话名称
     # --: 后面的参数是要执行的命令
 
@@ -165,7 +185,6 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
     tmux_args = [
         "tmux",
         "new-session",
-        "-A",  # Attach if session exists
         "-s",
         session_name,
         "--",
@@ -184,8 +203,11 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
         return
 
 
-def _find_jarvis_code_agent_session() -> Optional[str]:
-    """查找 codeagent 创建的 tmux session。
+def _find_jarvis_session(session_prefix: str) -> Optional[str]:
+    """查找指定前缀的 jarvis tmux session。
+
+    Args:
+        session_prefix: session 名称前缀（如 "jarvis-code-agent"）
 
     Returns:
         Optional[str]: 找到的 session 名称，未找到返回 None
@@ -203,14 +225,71 @@ def _find_jarvis_code_agent_session() -> Optional[str]:
             if line.strip():
                 # 提取 session 名称（冒号之前的部分）
                 session_name = line.split(":")[0].strip()
-                # 检查是否是 codeagent 创建的 session
-                if session_name.startswith("jarvis-code-agent-"):
+                # 检查是否是指定前缀的 session
+                if session_name.startswith(f"{session_prefix}-"):
                     return session_name
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         print(f"Warning: Failed to list tmux sessions: {e}", file=sys.stderr)
     except Exception as e:
         print(f"Warning: Unexpected error while listing sessions: {e}", file=sys.stderr)
     return None
+
+
+def _find_jarvis_code_agent_session() -> Optional[str]:
+    """查找 codeagent 创建的 tmux session（兼容函数）。
+
+    Returns:
+        Optional[str]: 找到的 session 名称，未找到返回 None
+    """
+    return _find_jarvis_session("jarvis-code-agent")
+
+
+def find_or_create_jarvis_session(
+    session_prefix: str, force_create: bool = True
+) -> Optional[str]:
+    """查找或创建 jarvis session。
+
+    优先查找以 session_prefix- 开头的现有 session，
+    找到则返回 session 名称，未找到则创建新 session。
+
+    Args:
+        session_prefix: session 名称前缀（如 "jarvis-code-agent"）
+        force_create: 未找到时是否创建新 session
+
+    Returns:
+        Optional[str]: 找到或创建的 session 名称，未找到且不创建则返回 None
+    """
+    # 先尝试查找现有 session
+    existing_session = _find_jarvis_session(session_prefix)
+    if existing_session:
+        return existing_session
+
+    # 未找到现有 session
+    if not force_create:
+        return None
+
+    # 创建新的 session
+    session_name = f"{session_prefix}-{uuid.uuid4().hex[:8]}"
+    try:
+        # 创建新的 detached session
+        subprocess.run(
+            ["tmux", "new-session", "-d", "-s", session_name],
+            check=True,
+            timeout=10,
+        )
+        return session_name
+    except subprocess.CalledProcessError as e:
+        print(
+            f"Warning: Failed to create tmux session '{session_name}': {e}",
+            file=sys.stderr,
+        )
+        return None
+    except subprocess.TimeoutExpired:
+        print(
+            f"Warning: Creating tmux session '{session_name}' timed out",
+            file=sys.stderr,
+        )
+        return None
 
 
 def _dispatch_to_existing_jarvis_session(
