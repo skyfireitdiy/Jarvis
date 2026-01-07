@@ -1609,8 +1609,23 @@ class Agent:
 
             # 如果是非交互模式，打印原始用户输入，帮助用户区分多个任务
             if self.non_interactive:
-                # 优先使用 original_user_input（CodeAgent 保存的原始输入）
+                # 多级回退策略：
+                # 1. 优先使用 original_user_input（CodeAgent 保存的原始输入）
+                # 2. 回退到 pin_content（Agent.run 中保存的原始输入）
+                # 3. 回退到 session.prompt（可能包含增强信息）
                 original_input = getattr(self, "original_user_input", None)
+                if not original_input or not original_input.strip():
+                    original_input = (
+                        self.pin_content.strip() if self.pin_content.strip() else ""
+                    )
+                if not original_input:
+                    # 从 session.prompt 中提取原始输入（移除系统说明等附加内容）
+                    session_prompt = getattr(self.session, "prompt", "")
+                    if session_prompt:
+                        # 简单分割，取第一部分（假设原始输入在前面）
+                        parts = session_prompt.split("\n\n[系统说明]")
+                        original_input = parts[0].strip() if parts else ""
+
                 if original_input and original_input.strip():
                     PrettyOutput.auto_print(f"\n📝 原始任务输入:\n{original_input}")
 
