@@ -92,6 +92,9 @@ class CodeAgent(Agent):
         # 存储开始时的commit hash，用于后续git diff获取
         self.start_commit: Optional[str] = None
 
+        # 保存原始用户输入，用于非交互模式下打印
+        self.original_user_input: str = ""
+
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
         # 上下文推荐器将在Agent创建后初始化（需要LLM模型）
@@ -319,6 +322,10 @@ git reset --hard {start_commit}
                     + "\n\n任务描述：\n"
                     + user_input
                 )
+
+            # 保存原始用户输入，用于非交互模式下打印
+            if self.non_interactive:
+                self.original_user_input = user_input
 
             try:
                 if self.model:
