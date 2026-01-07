@@ -12,6 +12,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 import typer
 import yaml
@@ -20,6 +21,7 @@ from rich.table import Table
 
 import jarvis.jarvis_utils.utils as jutils
 from jarvis.jarvis_agent.agent_manager import AgentManager
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.config_editor import ConfigEditor
 from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
@@ -616,6 +618,38 @@ def handle_builtin_config_selector(
         except Exception:
             # 静默忽略内置配置扫描错误，不影响主流程
             pass
+
+
+def _run_with_builtin_handler(
+    user_input: str,
+    agent: Any,
+    output_content_ref: list,
+    exit_code_ref: list,
+    error_message_ref: list,
+) -> Tuple[bool, str]:
+    """使用 builtin_input_handler 处理输入，并返回是否需要调用 agent.run 和处理后的输入
+
+    参数:
+        user_input: 用户输入
+        agent: Agent 实例
+        output_content_ref: 输出内容的引用列表
+        exit_code_ref: 退出码的引用列表
+        error_message_ref: 错误信息的引用列表
+
+    返回:
+        Tuple[bool, str]: (是否需要调用 agent.run, 处理后的输入)
+            - (True, "") = 跳过 agent.run， builtin handler 已处理
+            - (False, processed_input) = 需要调用 agent.run，传入处理后的输入
+    """
+    processed_input, should_skip_agent = builtin_input_handler(user_input, agent)
+    if should_skip_agent:
+        # builtin handler 已处理完成，不需要调用 agent
+        output_content_ref[0] = ""
+        exit_code_ref[0] = 0
+        error_message_ref[0] = ""
+        return True, ""  # 跳过 agent.run
+    else:
+        return False, processed_input  # 需要调用 agent.run
 
 
 @app.callback(invoke_without_command=True)
@@ -1220,6 +1254,8 @@ def run_cli(
 
         # 默认 CLI 模式：运行任务（可能来自 --task 或交互输入）
         output_content = ""
+        exit_code = 0
+        error_message = ""
         import json
 
         try:
@@ -1228,7 +1264,12 @@ def run_cli(
 
             # 优先处理命令行直接传入的任务
             if task:
-                output_content = agent.run(task)
+                # 先经过 builtin_input_handler 处理
+                should_skip, processed_input = _run_with_builtin_handler(
+                    task, agent, [output_content], [exit_code], [error_message]
+                )
+                if not should_skip:
+                    output_content = agent.run(processed_input)
                 # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
                 exit_code = 0
                 error_message = ""
@@ -1253,13 +1294,38 @@ def run_cli(
                         from jarvis.jarvis_utils.output import PrettyOutput
 
                         PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
-                        output_content = agent.run(selected_task)
+                        # 先经过 builtin_input_handler 处理
+                        should_skip, processed_input = _run_with_builtin_handler(
+                            selected_task,
+                            agent,
+                            [output_content],
+                            [exit_code],
+                            [error_message],
+                        )
+                        if not should_skip:
+                            output_content = agent.run(processed_input)
                         # agent.run() 会抛出 typer.Exit，所以正常不会到达这里
 
-                # 获取用户输入
-                user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
-                if user_input:
-                    output_content = agent.run(user_input)
+                # 获取用户输入，循环直到需要传递给 agent
+                while True:
+                    user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
+                    if not user_input:
+                        break
+                    # 先经过 builtin_input_handler 处理
+                    should_skip, processed_input = _run_with_builtin_handler(
+                        user_input,
+                        agent,
+                        [output_content],
+                        [exit_code],
+                        [error_message],
+                    )
+                    if should_skip:
+                        # builtin handler 已处理完成，继续循环获取新输入
+                        continue
+                    else:
+                        # 需要传递给 agent 处理
+                        output_content = agent.run(processed_input)
+                        break
 
                 raise typer.Exit(code=0)
         except typer.Exit:
