@@ -1320,8 +1320,6 @@ def run_cli(
                     task_manager = TaskManager()
                     tasks = task_manager.load_tasks()
                     if tasks and (selected_task := task_manager.select_task(tasks)):
-                        from jarvis.jarvis_utils.output import PrettyOutput
-
                         PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
                         # 先经过 builtin_input_handler 处理
                         should_skip, processed_input = _run_with_builtin_handler(
@@ -1402,8 +1400,6 @@ def run_cli(
                         output_file.write_text(output_content_str, encoding="utf-8")
                     except Exception as output_err:
                         # 如果写入输出失败，至少写入错误信息
-                        from jarvis.jarvis_utils.output import PrettyOutput
-
                         PrettyOutput.auto_print(
                             f"⚠️ 写入输出文件失败: {str(output_err)}"
                         )
@@ -1413,8 +1409,6 @@ def run_cli(
                     if exit_code != 0 and error_message:
                         error_file = status_file_path.with_suffix(".error")
                         error_file.write_text(error_message, encoding="utf-8")
-
-                    from jarvis.jarvis_utils.output import PrettyOutput
 
                     PrettyOutput.auto_print(f"✅ 已写入状态文件: {status_file_path}")
                 except Exception as status_err:
