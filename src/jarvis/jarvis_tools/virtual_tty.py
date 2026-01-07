@@ -7,6 +7,7 @@ from typing import Any
 from typing import Dict
 
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.utils import decode_output
 
 # 为了类型检查，总是导入这些模块
 if TYPE_CHECKING:
@@ -212,7 +213,7 @@ class VirtualTTYTool:
                         if r:
                             data = os.read(master_fd, 1024)
                             if data:
-                                output += data.decode()
+                                output += decode_output(data)
                     except BlockingIOError:
                         continue
 
@@ -362,7 +363,7 @@ class VirtualTTYTool:
                     if r:
                         data = os.read(agent.tty_sessions[tty_id]["master_fd"], 1024)
                         if data:
-                            output += data.decode()
+                            output += decode_output(data)
                 except BlockingIOError:
                     continue
             if output:
@@ -468,7 +469,7 @@ class VirtualTTYTool:
                                 agent.tty_sessions[tty_id]["master_fd"], 1024
                             )
                             if data:
-                                output += data.decode()
+                                output += decode_output(data)
                             else:
                                 break
                         except BlockingIOError:
@@ -664,7 +665,7 @@ class VirtualTTYTool:
                     if r:
                         data = os.read(agent.tty_sessions[tty_id]["master_fd"], 1024)
                         if data:
-                            output += data.decode()
+                            output += decode_output(data)
                 except BlockingIOError:
                     continue
 
