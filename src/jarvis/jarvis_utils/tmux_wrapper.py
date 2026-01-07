@@ -46,8 +46,8 @@ def dispatch_to_tmux_window(
         clean_task = str(task_arg).strip()[:20].replace("\n", " ").replace("\r", " ")
         window_name = f"{window_name}-{clean_task}"
 
-    # 过滤 --dispatch 参数，避免循环派发
-    # 由于 --dispatch 是布尔参数，通常不会带值
+    # 过滤 --dispatch/-d 参数，避免循环派发
+    # 由于 --dispatch/-d 是布尔参数，通常不会带值
     # 但为了健壮性，处理所有可能的格式
     filtered_argv = []
     skip_next = False
@@ -55,11 +55,11 @@ def dispatch_to_tmux_window(
         if skip_next:
             skip_next = False
             continue
-        if arg == "--dispatch":
-            # 情况1: --dispatch（无值），直接跳过
+        if arg == "--dispatch" or arg == "-d":
+            # 情况1: --dispatch/-d（无值），直接跳过
             continue
-        elif arg.startswith("--dispatch="):
-            # 情况2: --dispatch=value，整个参数跳过
+        elif arg.startswith("--dispatch=") or arg.startswith("-d="):
+            # 情况2: --dispatch=value/-d=value，整个参数跳过
             continue
         else:
             # 保留其他参数
