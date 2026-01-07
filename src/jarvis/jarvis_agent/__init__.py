@@ -780,8 +780,11 @@ class Agent:
         """Saves the current session state by delegating to the session manager."""
         import json
 
-        # 保存会话
+        # 保存会话并获取时间戳
         session_saved = self.session.save_session()
+
+        # 获取时间戳（与会话文件使用相同的时间戳）
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # 如果当前是CodeAgent，额外保存start_commit信息到单独的文件
         if hasattr(self, "start_commit") and self.start_commit is not None:
@@ -789,10 +792,10 @@ class Agent:
             os.makedirs(session_dir, exist_ok=True)
             platform_name = self.model.platform_name()
             model_name = self.model.name().replace("/", "_").replace("\\", "_")
-            # 使用与会话文件相同的命名规则，但添加_commit后缀
+            # 使用与会话文件相同的时间戳，但添加_commit后缀
             commit_file = os.path.join(
                 session_dir,
-                f"saved_session_{self.name}_{platform_name}_{model_name}_commit.json",
+                f"saved_session_{self.name}_{platform_name}_{model_name}_{timestamp}_commit.json",
             )
 
             commit_data = {
@@ -822,15 +825,24 @@ class Agent:
         session_restored = self.session.restore_session()
 
         # 如果当前是CodeAgent，尝试恢复start_commit信息
-        if hasattr(self, "start_commit"):
+        if hasattr(self, "start_commit") and self.session.last_restored_session:
+            # 使用 SessionManager 的 _extract_timestamp 方法来提取时间戳
+            session_file = os.path.basename(self.session.last_restored_session)
+            timestamp = self.session._extract_timestamp(session_file)
+
+            # 构建commit文件的基础名称
+            base_name = f"saved_session_{self.name}_{self.model.platform_name()}_{self.model.name().replace('/', '_').replace('\\', '_')}"
+
+            # 根据时间戳确定commit文件名
+            if timestamp:
+                # 新格式：包含时间戳
+                commit_filename = f"{base_name}_{timestamp}_commit.json"
+            else:
+                # 旧格式：不包含时间戳
+                commit_filename = f"{base_name}_commit.json"
+
             session_dir = os.path.join(os.getcwd(), ".jarvis")
-            platform_name = self.model.platform_name()
-            model_name = self.model.name().replace("/", "_").replace("\\", "_")
-            # 使用与会话文件相同的命名规则，但添加_commit后缀
-            commit_file = os.path.join(
-                session_dir,
-                f"saved_session_{self.name}_{platform_name}_{model_name}_commit.json",
-            )
+            commit_file = os.path.join(session_dir, commit_filename)
 
             try:
                 if os.path.exists(commit_file):
@@ -838,6 +850,13 @@ class Agent:
                         commit_data = json.load(f)
                         # 恢复start_commit信息
                         self.start_commit = commit_data.get("start_commit")
+                        PrettyOutput.auto_print(
+                            f"✅ 已恢复commit信息: {self.start_commit[:8] if self.start_commit else 'None'}..."
+                        )
+                else:
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 未找到对应的commit文件: {commit_filename}"
+                    )
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 恢复commit信息失败: {e}")
 
@@ -1769,6 +1788,9 @@ class Agent:
 
         # 设置非交互模式（仅作为 Agent 实例属性，不写入环境变量或全局配置）
         self.non_interactive = value
+
+        # 同步更新 SessionManager 的非交互模式状态
+        self.session.non_interactive = value
 
         # 根据non_interactive的值调整auto_complete
         if value:  # 进入非交互模式
