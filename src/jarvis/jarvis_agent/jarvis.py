@@ -311,7 +311,7 @@ def try_switch_to_jca_if_git_repo(
                         if restore_session:
                             args += ["--restore-session"]
                         if task:
-                            args += ["-r", task]
+                            args += ["-T", task]
                         PrettyOutput.auto_print(
                             "ℹ️ 正在切换到 'jca'（jarvis-code-agent）以进入代码开发模式..."
                         )

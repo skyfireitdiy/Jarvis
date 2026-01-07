@@ -1162,7 +1162,7 @@ def cli(
     config_file: Optional[str] = typer.Option(
         None, "-f", "--config", help="配置文件路径"
     ),
-    task: Optional[str] = typer.Option(None, "-r", "--task", help="要处理的任务描述"),
+    task: Optional[str] = typer.Option(None, "-T", "--task", help="要处理的任务描述"),
     task_file: Optional[str] = typer.Option(
         None, "--task-file", help="从文件读取任务描述"
     ),
