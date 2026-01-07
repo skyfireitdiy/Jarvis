@@ -708,7 +708,7 @@ class ReadCodeTool:
             # 仅打印每个文件的读取状态，不打印具体内容
             try:
                 if status_lines:
-                    PrettyOutput.auto_print("\n".join(status_lines))
+                    PrettyOutput.auto_print("".join(status_lines))
             except Exception:
                 pass
             return {
@@ -734,7 +734,7 @@ def main() -> None:
     PrettyOutput.auto_print("=" * 80)
 
     # 测试1: 基本读取
-    PrettyOutput.auto_print("\n【测试1】基本读取")
+    PrettyOutput.auto_print("【测试1】基本读取")
     PrettyOutput.auto_print("-" * 80)
 
     test_code = """def hello():
@@ -761,7 +761,7 @@ def sub(a, b):
 
         if result["success"]:
             PrettyOutput.auto_print("✅ 文件读取成功")
-            PrettyOutput.auto_print("\n输出内容:")
+            PrettyOutput.auto_print("输出内容:")
             PrettyOutput.auto_print(result["stdout"])
         else:
             PrettyOutput.auto_print(f"❌ 文件读取失败: {result['stderr']}")
@@ -769,7 +769,7 @@ def sub(a, b):
         os.unlink(test_file)
 
     # 测试2: 指定行号范围
-    PrettyOutput.auto_print("\n【测试2】指定行号范围读取")
+    PrettyOutput.auto_print("【测试2】指定行号范围读取")
     PrettyOutput.auto_print("-" * 80)
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
@@ -786,7 +786,7 @@ def sub(a, b):
 
         if result["success"]:
             PrettyOutput.auto_print("✅ 指定范围读取成功")
-            PrettyOutput.auto_print("\n输出内容:")
+            PrettyOutput.auto_print("输出内容:")
             PrettyOutput.auto_print(result["stdout"])
         else:
             PrettyOutput.auto_print(f"❌ 指定范围读取失败: {result['stderr']}")
@@ -794,7 +794,7 @@ def sub(a, b):
         os.unlink(test_file2)
 
     # 测试3: 多个文件
-    PrettyOutput.auto_print("\n【测试3】多个文件读取")
+    PrettyOutput.auto_print("【测试3】多个文件读取")
     PrettyOutput.auto_print("-" * 80)
 
     with (
@@ -819,7 +819,7 @@ def sub(a, b):
 
         if result["success"]:
             PrettyOutput.auto_print("✅ 多文件读取成功")
-            PrettyOutput.auto_print("\n输出内容（前500字符）:")
+            PrettyOutput.auto_print("输出内容（前500字符）:")
             PrettyOutput.auto_print(
                 result["stdout"][:500] + "..."
                 if len(result["stdout"]) > 500
@@ -831,7 +831,7 @@ def sub(a, b):
         os.unlink(test_file3)
         os.unlink(test_file4)
 
-    PrettyOutput.auto_print("\n" + "=" * 80)
+    PrettyOutput.auto_print("" + "=" * 80)
     PrettyOutput.auto_print("测试完成")
     PrettyOutput.auto_print("=" * 80)
 

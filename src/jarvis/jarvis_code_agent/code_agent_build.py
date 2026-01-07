@@ -130,7 +130,7 @@ class BuildValidationManager:
         if not config.has_been_asked():
             # 首次失败，询问用户
             error_preview = format_build_error(build_validation_result)
-            PrettyOutput.auto_print(f"\n⚠️ 构建验证失败:\n{error_preview}\n")
+            PrettyOutput.auto_print(f"⚠️ 构建验证失败:\n{error_preview}\n")
             PrettyOutput.auto_print(
                 "ℹ️ 提示：如果此项目需要在特殊环境（如容器）中构建，或使用独立构建脚本，"
                 "可以选择禁用构建验证，后续将仅进行基础静态检查。"

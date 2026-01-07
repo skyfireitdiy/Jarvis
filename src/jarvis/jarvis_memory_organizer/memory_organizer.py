@@ -348,7 +348,7 @@ class MemoryOrganizer:
                         PrettyOutput.auto_print("  ℹ️ [模拟运行] 跳过实际合并")
 
         # 显示统计信息
-        PrettyOutput.auto_print("\n✅ 整理完成！")
+        PrettyOutput.auto_print("✅ 整理完成！")
         PrettyOutput.auto_print(f"ℹ️ 总记忆数: {stats['total_memories']}")
         PrettyOutput.auto_print(f"ℹ️ 处理的组数: {stats['processed_groups']}")
         PrettyOutput.auto_print(f"ℹ️ 合并的记忆数: {stats['merged_memories']}")
@@ -554,7 +554,7 @@ class MemoryOrganizer:
             import_stats[memory_type] += 1
 
         # 显示导入结果
-        PrettyOutput.auto_print("\n✅ 导入完成！")
+        PrettyOutput.auto_print("✅ 导入完成！")
         if import_stats:
             lines = [
                 f"{memory_type}: 导入了 {count} 个记忆"

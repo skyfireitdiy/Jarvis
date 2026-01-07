@@ -230,11 +230,11 @@ def call_tool(
         PrettyOutput.auto_print(f"❌ 工具 {tool_name} 执行失败")
 
     if result.get("stdout"):
-        PrettyOutput.auto_print("\n📤 输出:")
+        PrettyOutput.auto_print("📤 输出:")
         PrettyOutput.print(result["stdout"], OutputType.CODE, lang="text")
 
     if result.get("stderr"):
-        PrettyOutput.auto_print("\n❌ 错误:")
+        PrettyOutput.auto_print("❌ 错误:")
         PrettyOutput.print(result["stderr"], OutputType.CODE, lang="text")
 
     if not result["success"]:

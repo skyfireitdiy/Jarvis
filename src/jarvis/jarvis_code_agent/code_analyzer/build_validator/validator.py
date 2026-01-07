@@ -92,7 +92,7 @@ class BuildValidator:
                 pass
 
         # 多个构建系统，需要用户选择
-        PrettyOutput.auto_print("\n检测到多个构建系统，请选择要使用的构建系统：")
+        PrettyOutput.auto_print("检测到多个构建系统，请选择要使用的构建系统：")
         for idx, system in enumerate(detected_systems, start=1):
             PrettyOutput.auto_print(f"  {idx}. {system.value}")
         PrettyOutput.auto_print(
@@ -120,7 +120,7 @@ class BuildValidator:
             except ValueError:
                 PrettyOutput.auto_print("请输入有效的数字")
             except (KeyboardInterrupt, EOFError):
-                PrettyOutput.auto_print("\n用户取消，使用兜底验证器")
+                PrettyOutput.auto_print("用户取消，使用兜底验证器")
                 return None
 
     def validate(self, modified_files: Optional[List[str]] = None) -> BuildResult:
