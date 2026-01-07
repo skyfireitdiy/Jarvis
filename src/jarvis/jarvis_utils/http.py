@@ -5,7 +5,7 @@ from typing import Dict
 from typing import Generator
 from typing import Optional
 
-import requests  # type: ignore # 导入第三方库requests
+import requests  # 导入第三方库requests
 
 
 def get_requests_session() -> requests.Session:

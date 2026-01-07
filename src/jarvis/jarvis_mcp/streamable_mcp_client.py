@@ -8,7 +8,7 @@ from typing import List
 from typing import cast
 from urllib.parse import urljoin
 
-import requests  # type: ignore # 导入第三方库requests
+import requests  # 导入第三方库requests
 
 from jarvis.jarvis_mcp import McpClient
 from jarvis.jarvis_utils.output import PrettyOutput

@@ -2,7 +2,7 @@ import json
 from typing import Optional
 
 import typer
-from tabulate import tabulate  # type: ignore # 导入第三方库tabulate
+from tabulate import tabulate  # 导入第三方库tabulate
 
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_utils.output import OutputType
