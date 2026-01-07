@@ -6,7 +6,7 @@
 - WS  /stdio    独立通道：专门接收标准输出/错误（sys.stdout/sys.stderr）重定向的流式文本
 
 集成方式（在 --web 模式下）：
-- 注册 WebSocketOutputSink，将 PrettyOutput 事件广播到前端
+- 启用 STDIO 重定向：捕获工具直接打印的输出并转发到前端
 - 注入 web_multiline_input 与 web_user_confirm 到 Agent，使输入与确认经由浏览器完成
 - 启动本服务，前端通过页面与 Agent 交互
 """
