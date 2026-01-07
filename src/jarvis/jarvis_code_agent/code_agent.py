@@ -92,9 +92,6 @@ class CodeAgent(Agent):
         # 存储开始时的commit hash，用于后续git diff获取
         self.start_commit: Optional[str] = None
 
-        # 保存原始用户输入，用于非交互模式下打印
-        self.original_user_input: str = ""
-
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
         # 上下文推荐器将在Agent创建后初始化（需要LLM模型）
@@ -322,9 +319,6 @@ git reset --hard {start_commit}
                     + "\n\n任务描述：\n"
                     + user_input
                 )
-
-            # 保存原始用户输入（所有模式下都保存）
-            self.original_user_input = user_input
 
             try:
                 if self.model:
@@ -1069,13 +1063,13 @@ git reset --hard {start_commit}
                 continue
 
             if result["ok"]:
-                PrettyOutput.auto_print(f"\n✅ 代码审查通过（第 {iteration} 轮）")
+                PrettyOutput.auto_print(f"✅ 代码审查通过（第 {iteration} 轮）")
                 if result.get("summary"):
                     PrettyOutput.auto_print(f"   {result['summary']}")
                 return
 
             # 审查未通过，需要修复
-            PrettyOutput.auto_print(f"\n⚠️ 代码审查发现问题（第 {iteration} 轮）：")
+            PrettyOutput.auto_print(f"⚠️ 代码审查发现问题（第 {iteration} 轮）：")
             for i, issue in enumerate(result.get("issues", []), 1):
                 issue_type = issue.get("type", "未知")
                 description = issue.get("description", "无描述")
@@ -1108,7 +1102,7 @@ git reset --hard {start_commit}
 
             fix_prompt += "\n请根据上述问题进行修复，确保代码正确实现用户需求。"
 
-            PrettyOutput.auto_print("\n🔧 开始修复问题...")
+            PrettyOutput.auto_print("🔧 开始修复问题...")
 
             # 调用 super().run() 进行修复
             try:
@@ -1519,7 +1513,7 @@ def _handle_worktree_merge(
         worktree_branch = worktree_info.get("worktree_branch")
         worktree_path = worktree_info.get("worktree_path")
 
-        PrettyOutput.auto_print(f"\n🌿 Worktree 分支: {worktree_branch}")
+        PrettyOutput.auto_print(f"🌿 Worktree 分支: {worktree_branch}")
         PrettyOutput.auto_print(f"📁 Worktree 路径: {worktree_path}")
 
         # 询问用户是否 rebase 并合并（交互模式）或自动执行（非交互模式）

@@ -684,7 +684,7 @@ def _show_history_and_copy() -> None:
         except ValueError:
             PrettyOutput.auto_print("⚠️ 无效的输入，请输入数字。")
         except (KeyboardInterrupt, EOFError):
-            PrettyOutput.auto_print("\nℹ️ 操作取消")
+            PrettyOutput.auto_print("ℹ️ 操作取消")
             break
 
 

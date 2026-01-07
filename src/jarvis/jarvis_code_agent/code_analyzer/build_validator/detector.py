@@ -380,7 +380,7 @@ Git根目录文件列表（前30项）：
             return detected_systems
 
         # 显示检测结果（按概率从大到小排序）
-        PrettyOutput.auto_print("\n🤖 LLM判断结果（按概率从大到小排序）：")
+        PrettyOutput.auto_print("🤖 LLM判断结果（按概率从大到小排序）：")
         for idx, (system, prob) in enumerate(detected_systems_with_prob, start=1):
             PrettyOutput.auto_print(f"  {idx}. {system.value} (概率: {prob:.2%})")
 
@@ -452,7 +452,7 @@ Git根目录文件列表（前30项）：
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]
 
-        PrettyOutput.auto_print("\n请选择构建系统（按概率从大到小排序）：")
+        PrettyOutput.auto_print("请选择构建系统（按概率从大到小排序）：")
         for idx, (system, prob) in enumerate(detected_systems_with_prob, start=1):
             PrettyOutput.auto_print(f"  {idx}. {system.value} (概率: {prob:.2%})")
         PrettyOutput.auto_print(
@@ -485,7 +485,7 @@ Git根目录文件列表（前30项）：
             except ValueError:
                 PrettyOutput.auto_print("请输入有效的数字")
             except (KeyboardInterrupt, EOFError):
-                PrettyOutput.auto_print("\n用户取消，使用unknown")
+                PrettyOutput.auto_print("用户取消，使用unknown")
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]
 
@@ -545,7 +545,7 @@ Git根目录文件列表（前30项）：
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]
 
-        PrettyOutput.auto_print("\n请选择构建系统：")
+        PrettyOutput.auto_print("请选择构建系统：")
         for idx, system in enumerate(detected_systems, start=1):
             PrettyOutput.auto_print(f"  {idx}. {system.value}")
         PrettyOutput.auto_print(f"  {len(detected_systems) + 1}. 取消（使用unknown）")
@@ -576,6 +576,6 @@ Git根目录文件列表（前30项）：
             except ValueError:
                 PrettyOutput.auto_print("请输入有效的数字")
             except (KeyboardInterrupt, EOFError):
-                PrettyOutput.auto_print("\n用户取消，使用unknown")
+                PrettyOutput.auto_print("用户取消，使用unknown")
                 config.set_selected_build_system("unknown")
                 return [BuildSystem.UNKNOWN]

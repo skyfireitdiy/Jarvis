@@ -99,7 +99,7 @@ def list_platforms(
             )
             if platform_instance:
                 models = platform_instance.get_model_list()
-                PrettyOutput.auto_print(f"\n✅ {default_llm_group} 平台详情")
+                PrettyOutput.auto_print(f"✅ {default_llm_group} 平台详情")
                 if models:
                     for model_name, description in models:
                         if description:
