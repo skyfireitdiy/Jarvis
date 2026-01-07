@@ -236,14 +236,76 @@ class AgentRunLoop:
                 if ag.auto_complete and is_auto_complete(current_response):
                     ag._no_tool_call_count = 0
 
-                    # 检查是否有未完成的任务
+                    # 检查是否有代码修改（仅对CodeAgent）
                     should_auto_complete = True
                     try:
-                        if (
-                            hasattr(ag, "task_list_manager")
-                            and ag.task_list_manager.task_lists
-                        ):
-                            all_unfinished_tasks = []
+                        if hasattr(ag, "start_commit") and ag.start_commit:
+                            from jarvis.jarvis_utils.git_utils import (
+                                get_latest_commit_hash,
+                            )
+
+                            current_commit = get_latest_commit_hash()
+                            if current_commit and ag.start_commit == current_commit:
+                                # 没有代码修改，询问LLM是否应该结束
+                                no_code_mod_prompt_parts = [
+                                    "检测到本次任务没有产生任何代码修改。"
+                                ]
+                                no_code_mod_prompt_parts.append(
+                                    "\n请确认是否要完成任务（自动完成）。"
+                                )
+                                no_code_mod_prompt_parts.append(
+                                    "如果确认完成，请回复 <!!!YES!!!>"
+                                )
+                                no_code_mod_prompt_parts.append(
+                                    "如果要继续执行任务，请回复 <!!!NO!!!>"
+                                )
+
+                                no_code_mod_prompt = "\n".join(no_code_mod_prompt_parts)
+
+                                # 询问 LLM
+                                llm_response = ag._call_model(
+                                    no_code_mod_prompt, False, False
+                                )
+
+                                # 解析响应
+                                if "<!!!NO!!!>" in llm_response:
+                                    should_auto_complete = False
+                                    ag.set_addon_prompt(
+                                        "本次任务没有代码修改，但LLM选择继续执行。"
+                                    )
+                                    PrettyOutput.auto_print(
+                                        "📝 未检测到代码修改，将继续执行任务。"
+                                    )
+                                elif "<!!!YES!!!>" in llm_response:
+                                    should_auto_complete = True
+                                    PrettyOutput.auto_print(
+                                        "✅ 确认完成当前任务，即使没有代码修改。"
+                                    )
+                                else:
+                                    # 无法明确判断，默认不完成（安全优先）
+                                    should_auto_complete = False
+                                    ag.set_addon_prompt(
+                                        "本次任务没有代码修改，请继续执行任务。"
+                                    )
+                                    PrettyOutput.auto_print(
+                                        "⚠️ 未收到明确的完成确认，将继续执行任务。"
+                                    )
+                    except Exception as e:
+                        # 检查过程出错，默认继续原有流程
+                        PrettyOutput.auto_print(
+                            f"⚠️ 检查代码修改时出错: {str(e)}，继续原有流程。"
+                        )
+                        should_auto_complete = True
+
+                    if should_auto_complete:
+                        # 检查是否有未完成的任务
+                        should_auto_complete = True
+                        try:
+                            if (
+                                hasattr(ag, "task_list_manager")
+                                and ag.task_list_manager.task_lists
+                            ):
+                                all_unfinished_tasks = []
                             for (
                                 task_list_id,
                                 task_list,
@@ -339,12 +401,12 @@ class AgentRunLoop:
                                     PrettyOutput.auto_print(
                                         "⚠️ 未收到明确的完成确认，将继续执行任务列表。"
                                     )
-                    except Exception as e:
-                        # 检查过程出错，默认继续自动完成
-                        PrettyOutput.auto_print(
-                            f"⚠️ 检查任务列表时出错: {str(e)}，继续自动完成。"
-                        )
-                        should_auto_complete = True
+                        except Exception as e:
+                            # 检查过程出错，默认继续自动完成
+                            PrettyOutput.auto_print(
+                                f"⚠️ 检查任务列表时出错: {str(e)}，继续自动完成。"
+                            )
+                            should_auto_complete = True
 
                     if should_auto_complete:
                         # 先运行_complete_task，触发记忆整理/事件等副作用，再决定返回值
