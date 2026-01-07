@@ -28,7 +28,7 @@ def dispatch_to_tmux_window(
 
     注意:
         在 tmux 环境中直接在当前窗口创建新窗格。
-        如果不在 tmux 环境中，会查找 codeagent 创建的 tmux session
+        如果不在 tmux 环境中，会查找 jarvis 创建的 tmux session
         并在其中创建窗格作为降级方案。
         使用水平分割（split-window -h）创建新窗格，适合代码任务。
     """
@@ -39,7 +39,7 @@ def dispatch_to_tmux_window(
 
     # 检查是否已在tmux环境中运行
     if "TMUX" not in os.environ:
-        # 不在tmux中，尝试查找codeagent创建的session作为降级方案
+        # 不在tmux中，尝试查找jarvis创建的session作为降级方案
         return _dispatch_to_existing_jarvis_session(task_arg, argv)
 
     # 生成窗口名称（使用任务内容的前20个字符）
@@ -209,14 +209,14 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
     """查找指定前缀的 jarvis tmux session。
 
     Args:
-        session_prefix: session 名称前缀（如 "jarvis-code-agent"）
+        session_prefix: session 名称前缀（如 "jarvis"）
 
     Returns:
         Optional[str]: 找到的 session 名称，未找到返回 None
 
     注意:
         使用精确前缀匹配，避免误判。例如查找 "jarvis-" 时，
-        只匹配 "jarvis-{uuid}"，不匹配 "jarvis-code-agent-{uuid}"
+        只匹配 "jarvis-{uuid}"
     """
     try:
         result = subprocess.run(
@@ -234,7 +234,6 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
                 # 检查是否是指定前缀的 session
                 if session_name.startswith(f"{session_prefix}-"):
                     # 精确前缀匹配：检查去除前缀后的部分是否为数字或UUID
-                    # 这可以避免匹配到 "jarvis-code-agent-{uuid}" 这样的session
                     # 当查找 "jarvis-" 时，只匹配 "jarvis-{uuid}"
                     suffix = session_name[len(session_prefix) + 1 :]
                     if suffix and (
@@ -252,11 +251,19 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
 
 
 def _find_jarvis_code_agent_session() -> Optional[str]:
-    """查找 codeagent 创建的 tmux session（兼容函数）。
+    """查找 jarvis tmux session。
 
     Returns:
         Optional[str]: 找到的 session 名称，未找到返回 None
+
+    注意:
+        优先查找 "jarvis" 前缀的 session，向后兼容 "jarvis-code-agent" 前缀。
     """
+    # 优先查找统一的 "jarvis" 前缀
+    session = _find_jarvis_session("jarvis")
+    if session:
+        return session
+    # 向后兼容：查找旧的 "jarvis-code-agent" 前缀
     return _find_jarvis_session("jarvis-code-agent")
 
 
@@ -269,7 +276,7 @@ def find_or_create_jarvis_session(
     找到则返回 session 名称，未找到则创建新 session。
 
     Args:
-        session_prefix: session 名称前缀（如 "jarvis-code-agent"）
+        session_prefix: session 名称前缀（如 "jarvis"）
         force_create: 未找到时是否创建新 session
 
     Returns:
@@ -311,9 +318,9 @@ def find_or_create_jarvis_session(
 def _dispatch_to_existing_jarvis_session(
     task_arg: Optional[str], argv: list[str]
 ) -> bool:
-    """将任务派发到现有 codeagent tmux session 的 panel 中执行。
+    """将任务派发到现有 jarvis tmux session 的 panel 中执行。
 
-    这是一个降级方案：当不在 tmux 环境中时，尝试找到 codeagent 创建的 session
+    这是一个降级方案：当不在 tmux 环境中时，尝试找到 jarvis 创建的 session
     并在其中创建 panel 执行命令。如果未找到 session，则创建一个新的 session。
 
     Args:
@@ -323,16 +330,16 @@ def _dispatch_to_existing_jarvis_session(
     Returns:
         bool: 是否成功派发（True表示成功，False表示失败）
     """
-    # 查找 codeagent 创建的 session
+    # 查找 jarvis session
     session_name = _find_jarvis_code_agent_session()
     if not session_name:
         # 未找到现有 session，创建一个新的 session
         print(
-            "ℹ️ 未找到 codeagent 创建的 tmux session，正在创建新 session...",
+            "ℹ️ 未找到 jarvis tmux session，正在创建新 session...",
             file=sys.stderr,
         )
         # 生成新的 session 名称
-        session_name = f"jarvis-code-agent-{uuid.uuid4().hex[:8]}"
+        session_name = f"jarvis-{uuid.uuid4().hex[:8]}"
         try:
             # 创建新的 detached session
             subprocess.run(
@@ -354,7 +361,7 @@ def _dispatch_to_existing_jarvis_session(
             )
             return False
     else:
-        print(f"ℹ️ 找到 codeagent session: {session_name}", file=sys.stderr)
+        print(f"ℹ️ 找到 jarvis session: {session_name}", file=sys.stderr)
 
     # 过滤 --dispatch/-d 参数，避免循环派发
     filtered_argv = []
