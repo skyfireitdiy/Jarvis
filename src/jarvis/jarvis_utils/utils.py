@@ -23,7 +23,7 @@ from typing import Union
 
 import yaml
 from rich.align import Align
-from rich.console import RenderableType
+
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import get_data_dir
@@ -548,7 +548,6 @@ def _show_usage_stats(welcome_str: str) -> None:
         from rich.console import Console
         from rich.console import Group
         from rich.panel import Panel
-        from rich.table import Table
         from rich.text import Text
 
         console = Console()
@@ -902,97 +901,20 @@ def _show_usage_stats(welcome_str: str) -> None:
             )
             left_column_items.append(welcome_panel)
 
-        # 右侧：总体表现、愿景和使命
-        # 总体表现 Panel
-        summary_panel = Panel(
-            Text(
-                "\n".join(summary_content) if summary_content else "暂无数据",
-                justify="left",
-            ),
-            title="✨ 总体表现 ✨",
-            title_align="center",
-            border_style="green",
-            expand=True,
-        )
-        right_column_items.append(summary_panel)
-
-        # 愿景 Panel
-        vision_text = Text(
-            "让开发者与AI成为共生伙伴",
-            justify="center",
-            style="italic",
-        )
-        vision_panel = Panel(
-            vision_text,
-            title="🔭 愿景 (Vision) 🔭",
-            title_align="center",
-            border_style="cyan",
-            expand=True,
-        )
-        right_column_items.append(vision_panel)
-
-        # 使命 Panel
-        mission_text = Text(
-            "让灵感高效落地为代码与行动",
-            justify="center",
-            style="italic",
-        )
-        mission_panel = Panel(
-            mission_text,
-            title="🎯 使命 (Mission) 🎯",
-            title_align="center",
-            border_style="magenta",
-            expand=True,
-        )
-        right_column_items.append(mission_panel)
-
-        left_column_group = Group(*left_column_items) if left_column_items else None
-        right_column_group = Group(*right_column_items)
-
-        layout_renderable: RenderableType
-
-        if console.width < 200:
-            # 上下布局（窄屏）
-            layout_items: List[RenderableType] = []
-            if left_column_group:
-                layout_items.append(left_column_group)
-            layout_items.append(right_column_group)
-            layout_renderable = Group(*layout_items)
-        else:
-            # 左右布局（宽屏）
-            layout_table = Table(
-                show_header=False,
-                box=None,
-                padding=(0, 2),  # 上下0，左右2字符的内边距
-                expand=True,
-                pad_edge=False,
+        # 只显示左侧的Jarvis AI Assistant框
+        if left_column_items:
+            layout_renderable = Group(*left_column_items)
+            # 打印最终的布局
+            # 将整体布局封装在一个最终的Panel中，以提供整体边框
+            final_panel = Panel(
+                layout_renderable,
+                title="Jarvis AI Assistant",
+                title_align="center",
+                border_style="blue",
+                box=box.HEAVY,
+                padding=(0, 1),
             )
-            # 左右布局，优化比例：左侧更紧凑，右侧更宽敞
-            if left_column_group:
-                layout_table.add_column(
-                    ratio=35, min_width=40
-                )  # 左侧欢迎信息，最小宽度40
-                layout_table.add_column(
-                    ratio=65, min_width=80
-                )  # 右侧统计信息，最小宽度80
-                layout_table.add_row(left_column_group, right_column_group)
-            else:
-                # 如果没有欢迎信息，右侧占满
-                layout_table.add_column(ratio=100)
-                layout_table.add_row(right_column_group)
-            layout_renderable = layout_table
-
-        # 打印最终的布局
-        # 将整体布局封装在一个最终的Panel中，以提供整体边框
-        final_panel = Panel(
-            layout_renderable,
-            title="Jarvis AI Assistant",
-            title_align="center",
-            border_style="blue",
-            box=box.HEAVY,
-            padding=(0, 1),
-        )
-        console.print(final_panel)
+            console.print(final_panel)
     except Exception as e:
         # 输出错误信息以便调试
         import traceback
