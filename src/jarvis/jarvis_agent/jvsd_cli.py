@@ -106,11 +106,20 @@ def main(
     """
 
     if task:
+        # 确保 task 是字符串内容而非类型对象
+        if isinstance(task, str):
+            task_str = task
+        elif isinstance(task, ArgumentInfo):  # type: ignore[unreachable]
+            # 处理 typer 的 ArgumentInfo 对象
+            task_str = task.default if task.default is not None else ""
+        else:
+            task_str = str(task) if task is not None else ""
+
         # 直接模式：传入任务字符串
         # 检查是否包含多行内容（换行符）
-        if "\n" in task:
+        if "\n" in task_str:
             # 多行输入：创建临时文件
-            temp_file_path = _write_task_to_temp_file(task)
+            temp_file_path = _write_task_to_temp_file(task_str)
             try:
                 # 使用临时文件路径作为任务参数
                 run_jvs_dispatch(temp_file_path)
@@ -122,7 +131,7 @@ def main(
                     pass
         else:
             # 单行输入：直接传递
-            run_jvs_dispatch(task)
+            run_jvs_dispatch(task_str)
     else:
         # 交互模式：多行输入（使用input模块的增强接口）
         task_content = get_multiline_input_enhanced(
