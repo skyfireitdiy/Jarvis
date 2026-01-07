@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 import typer
 
-from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
 
 def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:") -> str:
@@ -40,6 +40,10 @@ def run_jca_dispatch(task: Any) -> None:
         task_str = str(task) if task is not None else ""
     cmd = ["jca", "-n", "-w", "--dispatch", "-r", task_str]
     try:
+        # 打印即将执行的命令
+        PrettyOutput.print(
+            f"Executing command: {' '.join(cmd)}", output_type=OutputType.DEBUG
+        )
         # 直接执行 jca 命令，不捕获输出，让用户直接看到 jca 的输出
         result = subprocess.run(cmd)
         sys.exit(result.returncode)
