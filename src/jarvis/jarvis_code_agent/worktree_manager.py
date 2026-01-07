@@ -382,6 +382,7 @@ class WorktreeManager:
                         ["git", "branch", "-D", self.worktree_branch],
                         capture_output=True,
                         check=False,
+                        cwd=self.repo_root,
                     )
                     if delete_result.returncode == 0:
                         PrettyOutput.auto_print(
