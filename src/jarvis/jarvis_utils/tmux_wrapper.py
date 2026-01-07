@@ -182,15 +182,15 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
 
     # 构造tmux命令参数
     # 使用shell包装器来确保会话在主命令结束后继续运行
+    # 参考 dispatch_to_tmux_window 的实现，使用 shlex.quote 安全转义参数
+    quoted_args = [shlex.quote(arg) for arg in argv]
+    command = f'{executable} {" ".join(quoted_args)}; exec "{user_shell}"'
     tmux_args = [
         "tmux",
         "new-session",
         "-s",
         session_name,
-        "--",
-        user_shell,
-        "-c",
-        f'{executable} {" ".join([repr(arg) for arg in argv])}; exec "{user_shell}"',  # 主命令结束后启动用户默认shell保持会话
+        command,
     ]
 
     # 替换当前进程为tmux
