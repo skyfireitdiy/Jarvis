@@ -70,7 +70,9 @@ def dispatch_to_tmux_window(
     executable = sys.executable
     # 使用 shlex.quote() 安全地转义每个参数，防止 shell 注入
     quoted_args = [shlex.quote(arg) for arg in filtered_argv]
-    command = f"{executable} {' '.join(quoted_args)}"
+    # 获取用户的默认shell，主命令结束后启动shell保持panel活动
+    user_shell = os.environ.get("SHELL", "/bin/sh")
+    command = f'{executable} {" ".join(quoted_args)}; exec "{user_shell}"'
 
     tmux_args = [
         "tmux",
