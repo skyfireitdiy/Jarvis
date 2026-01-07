@@ -113,6 +113,52 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             else:
                 PrettyOutput.auto_print("❌ 保存会话失败。")
             return "", True
+        elif tag == "RestoreSession":
+            # 检查是否允许使用RestoreSession命令
+            if not getattr(agent, "allow_savesession", False):
+                PrettyOutput.auto_print(
+                    "⚠️ RestoreSession 命令仅在 jvs/jca 主程序中可用。"
+                )
+                return "", True
+            if agent.restore_session():
+                PrettyOutput.auto_print("✅ 会话已成功恢复。")
+            else:
+                PrettyOutput.auto_print("❌ 恢复会话失败。")
+            return "", True
+        elif tag == "ListSessions":
+            # 列出所有已保存的会话文件
+            import os
+
+            sessions = agent.session._parse_session_files()
+
+            if not sessions:
+                PrettyOutput.auto_print("📋 未找到已保存的会话文件。")
+            else:
+                PrettyOutput.auto_print(f"📋 找到 {len(sessions)} 个会话文件：")
+                for idx, (file_path, timestamp) in enumerate(sessions, 1):
+                    # 获取文件大小
+                    try:
+                        file_size = os.path.getsize(file_path)
+                        size_str = f"({file_size / 1024:.1f} KB)"
+                    except OSError:
+                        size_str = "(未知大小)"
+
+                    # 格式化时间戳显示
+                    if timestamp:
+                        # 时间戳格式：YYYYMMDD_HHMMSS
+                        try:
+                            from datetime import datetime
+
+                            dt = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+                            time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            time_str = timestamp
+                    else:
+                        time_str = "(无时间戳)"
+
+                    PrettyOutput.auto_print(f"  {idx}. {os.path.basename(file_path)}")
+                    PrettyOutput.auto_print(f"     时间: {time_str}  大小: {size_str}")
+            return "", True
         elif tag == "Quiet":
             agent.set_non_interactive(True)
             PrettyOutput.auto_print("🔇 已切换到无人值守模式（非交互模式）")
