@@ -1118,7 +1118,7 @@ def run_cli(
         handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
     # 检测tmux并在需要时启动（在参数解析之后）
-    check_and_launch_tmux("jarvis")
+    check_and_launch_tmux()
 
     # 初始化环境
     init_env(
