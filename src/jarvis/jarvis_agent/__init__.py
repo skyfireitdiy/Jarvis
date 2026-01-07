@@ -523,12 +523,13 @@ class Agent:
         self._setup_system_prompt()
 
         # 输出统计信息（包含欢迎信息）
-        show_agent_startup_stats(
-            name,
-            self.model.name(),
-            self.get_tool_registry(),
-            platform_name=self.model.platform_name(),
-        )
+        # 已移除：资源概览不再单独打印，相关信息已集成到AI Assistant欢迎界面
+        # show_agent_startup_stats(
+        #     name,
+        #     self.model.name(),
+        #     self.get_tool_registry(),
+        #     platform_name=self.model.platform_name(),
+        # )
 
         # 动态加载工具调用后回调
         self._load_after_tool_callbacks()
