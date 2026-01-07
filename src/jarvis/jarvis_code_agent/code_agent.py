@@ -92,6 +92,9 @@ class CodeAgent(Agent):
         # 存储开始时的commit hash，用于后续git diff获取
         self.start_commit: Optional[str] = None
 
+        # 标记任务是否被中断退出（如Ctrl+C），用于判断是否跳过review
+        self._interrupted_exit: bool = False
+
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
         # 上下文推荐器将在Agent创建后初始化（需要LLM模型）
@@ -330,6 +333,8 @@ git reset --hard {start_commit}
                 else:
                     result_str = str(result)
             except RuntimeError as e:
+                # 标记任务被中断退出（如Ctrl+C），用于跳过review
+                self._interrupted_exit = True
                 PrettyOutput.auto_print(f"⚠️ 执行失败: {str(e)}")
                 return str(e)
 
@@ -947,6 +952,11 @@ git reset --hard {start_commit}
             prefix: 前缀
             suffix: 后缀
         """
+        # 如果任务被中断退出（如Ctrl+C），跳过review
+        if self._interrupted_exit:
+            PrettyOutput.auto_print("ℹ️ 跳过代码审查（任务被中断退出）")
+            return
+
         # 动态判断是否执行 review：根据运行时的 non_interactive 状态和用户配置
         # 只在非交互模式下才执行 review（用户明确禁用时除外）
         if self.disable_review or not self.non_interactive:
