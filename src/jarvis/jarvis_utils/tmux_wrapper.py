@@ -228,9 +228,11 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
                 # 检查是否是指定前缀的 session
                 if session_name.startswith(f"{session_prefix}-"):
                     return session_name
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        print(f"Warning: Failed to list tmux sessions: {e}", file=sys.stderr)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        # 正常情况：没有活动的 tmux 会话时不打印警告
+        pass
     except Exception as e:
+        # 保留真正的意外错误警告
         print(f"Warning: Unexpected error while listing sessions: {e}", file=sys.stderr)
     return None
 
