@@ -1327,11 +1327,15 @@ class ToolRegistry(OutputHandlerProtocol):
                 PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name}")
 
             # 执行工具调用（根据工具实现的协议版本，由系统在内部决定agent的传递方式）
+            start_time = time.time()
             result = self.execute_tool(name, args, agent)
+            elapsed_time = time.time() - start_time
 
             # 打印执行状态
             if result.get("success", False):
-                PrettyOutput.auto_print(f"✅ 执行工具调用 {name} 成功")
+                PrettyOutput.auto_print(
+                    f"✅ 执行工具调用 {name} 成功 (耗时: {elapsed_time:.2f}s)"
+                )
             else:
                 # 获取失败原因
                 stderr = result.get("stderr", "")
