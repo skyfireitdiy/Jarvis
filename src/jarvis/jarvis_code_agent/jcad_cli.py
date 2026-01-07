@@ -15,6 +15,9 @@ from typer.models import ArgumentInfo
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
+# 创建 typer 应用
+app = typer.Typer(help="Jarvis Code Agent Dispatcher - jca 的便捷封装")
+
 
 def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:") -> str:
     """获取多行输入，直到遇到空行或 EOF"""
@@ -42,6 +45,14 @@ def run_jca_dispatch(task: Any) -> None:
     else:
         # 处理非字符串类型，尝试获取实际值
         task_str = str(task) if task is not None else ""
+    
+    # 检查 task_str 是否为空
+    if not task_str or not task_str.strip():
+        PrettyOutput.auto_print(
+            f"❌ 错误: 任务内容为空，无法执行。task 类型: {type(task).__name__}, task 值: {task}"
+        )
+        sys.exit(1)
+    
     cmd = ["jca", "-n", "-w", "--dispatch", "--requirement", task_str]
     try:
         # 打印即将执行的命令
@@ -59,6 +70,7 @@ def run_jca_dispatch(task: Any) -> None:
         sys.exit(1)
 
 
+@app.command()
 def main(
     task: Optional[str] = typer.Argument(
         None, help="任务内容（可选，不提供则进入交互模式）"
@@ -70,6 +82,12 @@ def main(
         jcad "你的任务"           # 直接执行任务
         jcad                      # 进入交互模式输入任务
     """
+    # 调试信息：打印接收到的 task 参数
+    PrettyOutput.print(
+        f"[DEBUG] main() 接收到的 task 参数: type={type(task).__name__}, value={task}", 
+        output_type=OutputType.DEBUG
+    )
+    
     if task:
         # 直接模式：传入任务字符串
         run_jca_dispatch(task)
@@ -103,4 +121,4 @@ def main(
 
 
 if __name__ == "__main__":
-    typer.run(main)
+    app()
