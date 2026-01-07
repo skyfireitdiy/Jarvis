@@ -874,7 +874,7 @@ class task_list_manager:
 
         # 如果在tmux环境，添加批量执行示例
         if self._is_in_tmux():
-            description += """
+            description += f"""
 
 批量执行任务（仅在tmux环境支持）：
 ```
@@ -891,7 +891,7 @@ class task_list_manager:
 ```
 """
 
-        description += """
+        description += f"""
 
 更新任务状态：
 ```
