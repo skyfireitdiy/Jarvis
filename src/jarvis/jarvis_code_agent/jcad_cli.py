@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import typer
+from typer.models import ArgumentInfo
 
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
 
@@ -35,6 +36,9 @@ def run_jca_dispatch(task: Any) -> None:
     # 确保 task 是字符串内容而非类型对象
     if isinstance(task, str):
         task_str = task
+    elif isinstance(task, ArgumentInfo):
+        # 处理 typer 的 ArgumentInfo 对象，提取 default 属性
+        task_str = task.default if task.default is not None else ""
     else:
         # 处理非字符串类型，尝试获取实际值
         task_str = str(task) if task is not None else ""
