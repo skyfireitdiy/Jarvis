@@ -24,6 +24,7 @@ from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_tool_load_dirs
+from jarvis.jarvis_utils.config import is_show_tool_execution_time
 from jarvis.jarvis_utils.globals import get_global_model_group
 
 # -*- coding: utf-8 -*-
@@ -1379,6 +1380,11 @@ class ToolRegistry(OutputHandlerProtocol):
             output = self._format_tool_output(
                 result["stdout"], result.get("stderr", "")
             )
+
+            # 添加执行时间信息供LLM参考
+            if elapsed_time > 0 and is_show_tool_execution_time():
+                execution_time_info = f"\n\n<execution_time>\n工具名称: {name}\n执行耗时: {elapsed_time:.2f}秒\n</execution_time>"
+                output = output + execution_time_info
 
             # 检查内容是否过大
             # 使用全局模型组（不再从 agent 继承）

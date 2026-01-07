@@ -1303,6 +1303,16 @@ def is_save_session_history() -> bool:
     return GLOBAL_CONFIG_DATA.get("save_session_history", False) is True
 
 
+def is_show_tool_execution_time() -> bool:
+    """
+    是否向LLM反馈工具执行时间。
+
+    返回:
+        bool: 如果要显示工具执行时间则返回True, 默认为True
+    """
+    return GLOBAL_CONFIG_DATA.get("show_tool_execution_time", True) is True
+
+
 def is_immediate_abort() -> bool:
     """
     是否启用立即中断：当在对话过程中检测到用户中断信号时，立即停止输出并返回。
