@@ -31,6 +31,20 @@ def _get_username() -> str:
         return os.environ.get("USER", "unknown")
 
 
+def _generate_session_name() -> str:
+    """生成带用户名前缀的tmux session名称。
+
+    统一格式：{username}-jarvis-{uuid}
+    使用UUID确保唯一性，支持多用户环境。
+
+    Returns:
+        str: 生成的session名称
+    """
+    username = _get_username()
+    unique_suffix = uuid.uuid4().hex[:8]
+    return f"{username}-jarvis-{unique_suffix}"
+
+
 def dispatch_to_tmux_window(
     task_arg: Optional[str], argv: list[str], window_name: str = "jarvis-dispatch"
 ) -> bool:
@@ -155,14 +169,12 @@ def dispatch_to_tmux_window(
         return False
 
 
-def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
+def check_and_launch_tmux() -> None:
     """检测tmux并在需要时启动tmux会话。
-
-    Args:
-        session_name: tmux会话名称前缀，默认为"jarvis-auto"
 
     注意:
         此函数使用subprocess.execvp替换当前进程，如果成功则不会返回。
+        Session名称统一使用 {username}-jarvis-{uuid} 格式。
     """
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
@@ -177,7 +189,7 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
         return
 
     # tmux已安装且不在tmux中，优先查找现有 session
-    existing_session = find_or_create_jarvis_session(session_name, force_create=False)
+    existing_session = find_or_create_jarvis_session(force_create=False)
 
     # 如果找到现有 session，附加到该 session
     if existing_session:
@@ -204,8 +216,7 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
 
     # 未找到现有 session，创建新的 session
     # 为会话名称添加随机后缀，避免冲突
-    username = _get_username()
-    session_name = f"{username}-{session_name}-{uuid.uuid4().hex[:8]}"
+    session_name = _generate_session_name()
     # 构造tmux命令：new-session -s <session_name> -- <command>
     # -s: 指定会话名称
     # --: 后面的参数是要执行的命令
@@ -244,18 +255,15 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
         return
 
 
-def _find_jarvis_session(session_prefix: str) -> Optional[str]:
-    """查找指定前缀的 jarvis tmux session。
-
-    Args:
-        session_prefix: session 名称前缀（如 "jarvis"）
+def _find_jarvis_session() -> Optional[str]:
+    """查找 jarvis tmux session。
 
     Returns:
         Optional[str]: 找到的 session 名称，未找到返回 None
 
     注意:
-        使用精确前缀匹配，避免误判。例如查找 "jarvis-" 时，
-        只匹配 "jarvis-{uuid}"
+        仅查找带用户名前缀的 "jarvis" session。
+        格式：{username}-jarvis-{uuid}
     """
     try:
         result = subprocess.run(
@@ -272,8 +280,8 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
             if line.strip():
                 # 提取 session 名称（冒号之前的部分）
                 session_name = line.split(":")[0].strip()
-                # 优先匹配带用户名前缀的会话：{username}-{session_prefix}-{uuid}
-                expected_prefix = f"{username}-{session_prefix}-"
+                # 匹配带用户名前缀的会话：{username}-jarvis-{uuid}
+                expected_prefix = f"{username}-jarvis-"
                 if session_name.startswith(expected_prefix):
                     # 精确前缀匹配：检查去除前缀后的部分是否为数字或UUID
                     suffix = session_name[len(expected_prefix) :]
@@ -295,37 +303,20 @@ def _find_jarvis_session(session_prefix: str) -> Optional[str]:
     return None
 
 
-def _find_jarvis_code_agent_session() -> Optional[str]:
-    """查找 jarvis tmux session。
-
-    Returns:
-        Optional[str]: 找到的 session 名称，未找到返回 None
-
-    注意:
-        仅查找带用户名前缀的 "jarvis" session。
-        格式：{username}-jarvis-{uuid}
-    """
-    # 查找带用户名前缀的 "jarvis" session
-    return _find_jarvis_session("jarvis")
-
-
-def find_or_create_jarvis_session(
-    session_prefix: str, force_create: bool = True
-) -> Optional[str]:
+def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
     """查找或创建 jarvis session。
 
-    优先查找以 session_prefix- 开头的现有 session，
-    找到则返回 session 名称，未找到则创建新 session。
+    优先查找现有的 jarvis session，找到则返回 session 名称，
+    未找到则创建新 session。
 
     Args:
-        session_prefix: session 名称前缀（如 "jarvis"）
         force_create: 未找到时是否创建新 session
 
     Returns:
         Optional[str]: 找到或创建的 session 名称，未找到且不创建则返回 None
     """
     # 先尝试查找现有 session
-    existing_session = _find_jarvis_session(session_prefix)
+    existing_session = _find_jarvis_session()
     if existing_session:
         return existing_session
 
@@ -334,8 +325,7 @@ def find_or_create_jarvis_session(
         return None
 
     # 创建新的 session
-    username = _get_username()
-    session_name = f"{username}-{session_prefix}-{uuid.uuid4().hex[:8]}"
+    session_name = _generate_session_name()
     try:
         # 创建新的 detached session
         subprocess.run(
@@ -376,7 +366,7 @@ def _dispatch_to_existing_jarvis_session(
         bool: 是否成功派发（True表示成功，False表示失败）
     """
     # 查找 jarvis session
-    session_name = _find_jarvis_code_agent_session()
+    session_name = _find_jarvis_session()
     if not session_name:
         # 未找到现有 session，创建一个新的 session
         PrettyOutput.print(
@@ -385,8 +375,7 @@ def _dispatch_to_existing_jarvis_session(
             timestamp=False,
         )
         # 生成新的 session 名称
-        username = _get_username()
-        session_name = f"{username}-jarvis-{uuid.uuid4().hex[:8]}"
+        session_name = _generate_session_name()
         try:
             # 创建新的 detached session
             subprocess.run(
