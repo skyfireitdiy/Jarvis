@@ -25,14 +25,15 @@ class EditFileNormalTool:
         "3. 使用精确匹配查找 search 文本，找到匹配后替换为新文本\n\n"
         "🚀 特殊功能：\n"
         '- 当 search 为空字符串 "" 时，表示直接重写整个文件，replace 的内容将作为文件的完整新内容\n'
-        "- 如果存在多个diffs且第一个diff的search为空字符串，将只应用第一个diff（重写整个文件），跳过后续所有diffs\n\n"
+        "- 如果存在多个diffs且第一个diff的search为空字符串，将只应用第一个diff（重写整个文件），跳过后续所有diffs\n"
+        "- **支持部分成功**：当某个文件的多个 diffs 中有部分失败时，已成功的修改仍会保留到文件中，并会详细报告每个 diff 的执行结果\n\n"
         "⚠️ 提示：\n"
         "- search 使用精确字符串匹配，不支持正则表达式\n"
         "- **重要：search 必须提供足够的上下文来唯一定位目标位置**，避免匹配到错误的位置。建议包含：\n"
         "  * 目标代码的前后几行上下文（至少包含目标代码所在函数的签名或关键标识）\n"
         "  * 目标代码附近的唯一标识符（如函数名、变量名、注释等）\n"
         "  * 避免使用过短的 search 文本（如单个单词、短字符串），除非能确保唯一性\n"
-        "- 如果某个 search 在文件中找不到精确匹配（search非空时），将导致该文件的编辑失败，文件内容会回滚到原始状态\n"
+        "- 如果某个 search 在文件中找不到精确匹配（search非空时），该 diff 会失败，但已成功的修改会保留\n"
         "- 建议在 search 中包含足够的上下文，确保能唯一匹配到目标位置，避免误匹配"
     )
 
@@ -451,7 +452,9 @@ class EditFileNormalTool:
         agent: Optional[Any] = None,
         file_path: Optional[str] = None,
         start_idx: int = 0,
-    ) -> Tuple[bool, str, Optional[Dict[str, Any]], Optional[int]]:
+    ) -> Tuple[
+        bool, str, List[Dict[str, Any]], Optional[Dict[str, Any]], Optional[int]
+    ]:
         """对文件内容按顺序应用普通 search/replace 编辑（使用字符串替换）
 
         Args:
@@ -462,10 +465,13 @@ class EditFileNormalTool:
             start_idx: 从哪个 diff 索引开始处理（0-based，用于继续处理剩余 diffs）
 
         返回:
-            (是否成功, 新内容或错误信息, 确认信息字典或None, 需要确认的diff索引或None)
+            (是否全部成功, 最终内容, diff执行结果列表, 确认信息字典或None, 需要确认的diff索引或None)
+            diff执行结果列表格式: [{idx: int, success: bool, error: str or None}]
             确认信息字典包含: match_count, search_text, replace_text, modified_content, current_content
         """
         content = original_content
+        diff_results: List[Dict[str, Any]] = []  # 记录每个 diff 的执行结果
+        all_success = True  # 标记是否所有 diff 都成功
 
         for idx, diff in enumerate(diffs[start_idx:], start=start_idx + 1):
             search = diff["search"]
@@ -475,25 +481,34 @@ class EditFileNormalTool:
             if search == "":
                 # 空字符串表示直接重写整个文件
                 content = replace
+                # 记录这个 diff 成功
+                diff_results.append({"idx": idx, "success": True, "error": None})
                 # 空search只处理第一个diff，跳过后续所有diffs
                 break
 
             # 检查 search 和 replace 是否完全一致（无效操作）
             if search == replace:
-                error_info = f"第 {idx} 个diff失败：search 和 replace 内容完全相同，这是一个无效操作（没有实际修改）"
-                return False, error_info, None, None
+                all_success = False
+                error_info = (
+                    "search 和 replace 内容完全相同，这是一个无效操作（没有实际修改）"
+                )
+                diff_results.append({"idx": idx, "success": False, "error": error_info})
+                continue  # 继续处理后续 diffs
 
             # 验证 search 文本
             if not isinstance(search, str):
-                error_info = f"第 {idx} 个diff失败：search 文本必须是字符串"
-                return False, error_info, None, None
+                all_success = False
+                error_info = "search 文本必须是字符串"
+                diff_results.append({"idx": idx, "success": False, "error": error_info})
+                continue
 
             # 统计匹配次数
             match_count = EditFileNormalTool._count_matches(content, search)
 
             if match_count == 0:
                 # 找不到匹配
-                error_info = f"第 {idx} 个diff失败：未找到精确匹配的文本"
+                all_success = False
+                error_info = "未找到精确匹配的文本"
                 if search:
                     error_info += f"\n搜索文本: {search[:200]}..."
                     error_info += (
@@ -504,16 +519,19 @@ class EditFileNormalTool:
                     if file_path:
                         error_info += f"\n   💡 建议：使用 `read_code` 工具重新读取文件 `{file_path}` 查看当前内容，"
                         error_info += "\n      确认文件是否已被更新，然后根据实际内容调整 search 文本"
-                return False, error_info, None, None
+                diff_results.append({"idx": idx, "success": False, "error": error_info})
+                continue
 
             if match_count == 1:
                 # 唯一匹配，直接替换
                 content = content.replace(search, replace, 1)
+                diff_results.append({"idx": idx, "success": True, "error": None})
             else:
                 # 多个匹配，需要确认
                 # 生成修改后的内容（替换所有匹配）
                 modified_content = content.replace(search, replace)
                 # 返回确认信息，包含当前内容以便继续处理后续 diffs
+                # 注意：这里返回时，之前成功的 diff 的修改已经应用到 content 中了
                 confirm_info = {
                     "match_count": match_count,
                     "search_text": search,
@@ -521,13 +539,12 @@ class EditFileNormalTool:
                     "modified_content": modified_content,
                     "current_content": content,  # 保存当前内容，用于继续处理
                     "diff_idx": idx,  # 保存当前 diff 索引
+                    "diff_results_before_confirm": diff_results,  # 保存之前成功的结果
                 }
-                error_info = (
-                    f"第 {idx} 个diff失败：发现 {match_count} 处匹配，需要确认后再修改"
-                )
-                return False, error_info, confirm_info, idx
+                # 返回 False 表示需要确认，但之前成功的修改已经保留在 diff_results 中
+                return False, content, diff_results, confirm_info, idx
 
-        return True, content, None, None
+        return all_success, content, diff_results, None, None
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行普通 search/replace 文件编辑操作（支持同时修改多个文件）"""
@@ -600,13 +617,15 @@ class EditFileNormalTool:
                 current_start_idx = 0
                 success = False
                 result_or_error = ""
+                diff_results: List[Dict[str, Any]] = []  # 存储所有 diff 的执行结果
                 max_confirm_iterations = len(normalized_diffs) * 2  # 防止无限循环
                 confirm_iteration = 0
 
                 while confirm_iteration < max_confirm_iterations:
                     (
-                        iter_success,
-                        iter_result_or_error,
+                        iter_all_success,
+                        iter_result_content,
+                        iter_diff_results,
                         iter_confirm_info,
                         iter_confirm_diff_idx,
                     ) = EditFileNormalTool._apply_normal_edits_to_content(
@@ -617,10 +636,13 @@ class EditFileNormalTool:
                         start_idx=current_start_idx,
                     )
 
-                    if iter_success:
+                    # 合并本次迭代的 diff_results
+                    diff_results.extend(iter_diff_results)
+
+                    if iter_all_success:
                         # 所有 diffs 处理成功
                         success = True
-                        result_or_error = iter_result_or_error
+                        result_or_error = iter_result_content
                         break
 
                     # 处理失败，检查是否需要确认
@@ -643,6 +665,14 @@ class EditFileNormalTool:
                         if confirmed:
                             # 确认继续，应用当前 diff 的所有匹配替换
                             current_content = iter_confirm_info["modified_content"]
+                            # 记录当前 diff 成功
+                            diff_results.append(
+                                {
+                                    "idx": iter_confirm_diff_idx,
+                                    "success": True,
+                                    "error": None,
+                                }
+                            )
                             current_diff_idx = iter_confirm_info.get(
                                 "diff_idx", iter_confirm_diff_idx
                             )
@@ -661,27 +691,55 @@ class EditFileNormalTool:
                                     os.remove(backup_path)
                                 except Exception:
                                     pass
-                            result_or_error = "操作已取消（发现多处匹配，已确认不继续）"
-                            all_results.append(f"❌ {file_path}: {result_or_error}")
-                            failed_files.append(file_path)
-                            overall_success = False
-                            success = False  # 标记为失败，跳出循环
+                            # 检查是否有任何成功的 diff
+                            has_success = any(dr.get("success") for dr in diff_results)
+                            if has_success:
+                                success = True  # 部分成功
+                                result_or_error = current_content
+                                # 添加取消信息到结果中
+                                all_results.append(
+                                    f"⚠️ {file_path}: 部分成功（取消多处匹配确认）"
+                                )
+                            else:
+                                result_or_error = (
+                                    "操作已取消（发现多处匹配，已确认不继续）"
+                                )
+                                all_results.append(f"❌ {file_path}: {result_or_error}")
+                                failed_files.append(file_path)
+                                overall_success = False
                             break
                     else:
-                        # 没有确认信息或没有 agent，直接失败
-                        success = False
-                        result_or_error = iter_result_or_error
+                        # 没有确认信息或没有 agent，检查是否有任何成功的 diff
+                        has_success = any(dr.get("success") for dr in diff_results)
+                        if has_success:
+                            # 部分成功
+                            success = True
+                            result_or_error = iter_result_content
+                        else:
+                            # 完全失败
+                            success = False
+                            # 构建错误信息
+                            error_msg_parts = []
+                            for dr in diff_results:
+                                if not dr.get("success"):
+                                    error_msg_parts.append(
+                                        f"Diff #{dr.get('idx')}: {dr.get('error', '未知错误')}"
+                                    )
+                            result_or_error = (
+                                "\n".join(error_msg_parts)
+                                if error_msg_parts
+                                else "处理失败：未知错误"
+                            )
                         break
 
                 if not success:
                     # 处理失败，确保有错误信息
-                    if confirm_iteration >= max_confirm_iterations:
-                        # 达到最大确认次数，可能陷入循环
-                        if not result_or_error:
+                    if not result_or_error:
+                        if confirm_iteration >= max_confirm_iterations:
+                            # 达到最大确认次数，可能陷入循环
                             result_or_error = f"处理失败：达到最大确认次数限制（{max_confirm_iterations}），可能存在循环确认问题"
-                    elif not result_or_error:
-                        # 如果没有设置错误信息，使用默认错误信息
-                        result_or_error = "处理失败：未知错误"
+                        else:
+                            result_or_error = "处理失败：未知错误"
 
                     # 处理失败
                     if backup_path and os.path.exists(backup_path):
@@ -712,8 +770,31 @@ class EditFileNormalTool:
                             os.remove(backup_path)
                         except Exception:
                             pass
-                    all_results.append(f"✅ {file_path}: 修改成功")
-                    successful_files.append(file_path)
+
+                    # 检查是否是部分成功（有失败的 diff）
+                    failed_diffs = [dr for dr in diff_results if not dr.get("success")]
+                    if failed_diffs:
+                        # 部分成功，生成详细报告
+                        success_count = sum(
+                            1 for dr in diff_results if dr.get("success")
+                        )
+                        all_results.append(
+                            f"⚠️ {file_path}: 部分成功 ({success_count}/{len(diff_results)} 个diff成功)"
+                        )
+                        # 添加每个 diff 的详细信息
+                        for dr in diff_results:
+                            idx = dr.get("idx", 0)
+                            if dr.get("success"):
+                                all_results.append(f"   ✅ Diff #{idx}: 成功")
+                            else:
+                                error = dr.get("error", "未知错误")
+                                # 简化错误信息显示（每行错误缩进显示）
+                                for line in error.split("\n"):
+                                    all_results.append(f"   ❌ Diff #{idx}: {line}")
+                        successful_files.append(file_path)  # 仍然算作成功文件
+                    else:
+                        all_results.append(f"✅ {file_path}: 修改成功")
+                        successful_files.append(file_path)
                 else:
                     all_results.append(f"❌ {file_path}: {write_error}")
                     failed_files.append(file_path)
