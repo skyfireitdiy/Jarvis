@@ -726,6 +726,7 @@ def run_cli(
     ),
     dispatch: bool = typer.Option(
         False,
+        "-d",
         "--dispatch",
         help="将任务派发到新的 tmux 窗口中执行（仅在 tmux 环境中有效），当前进程退出",
     ),
