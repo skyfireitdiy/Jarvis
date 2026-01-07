@@ -758,13 +758,34 @@ class task_list_manager:
             PrettyOutput.auto_print(f"⚠️ 打印任务状态失败: {e}")
             PrettyOutput.auto_print(f"   错误详情: {traceback.format_exc()}")
 
-    description = f"""任务列表管理工具，供LLM管理复杂任务拆分和执行。
+    @property
+    def description(self) -> str:
+        """动态生成工具描述，根据tmux环境决定是否包含批量执行功能
+
+        Returns:
+            str: 工具描述
+        """
+        return self._get_description()
+
+    def _get_description(self) -> str:
+        """根据环境动态生成工具描述
+
+        Returns:
+            str: 工具描述
+        """
+        # 根据tmux环境决定是否包含批量执行功能
+        if self._is_in_tmux():
+            batch_execution_line = """- `execute_batch_tasks`: 批量执行多个sub类型任务（要求：所有任务都是sub类型、状态为pending、依赖已完成、任务之间彼此独立）
+"""
+        else:
+            batch_execution_line = ""
+
+        description = f"""任务列表管理工具，供LLM管理复杂任务拆分和执行。
 
 **核心功能：**
 - `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
 - `execute_task`: 执行任务（自动创建子Agent）
-- `execute_batch_tasks`: 批量执行多个sub类型任务（要求：所有任务都是sub类型、状态为pending、依赖已完成、任务之间彼此独立）
-- `get_task_list_summary`: 查看任务状态
+{batch_execution_line}- `get_task_list_summary`: 查看任务状态
 
 **任务类型选择：**
 - `main`: 简单任务（1-3步、单文件）由主Agent直接执行
@@ -829,8 +850,13 @@ class task_list_manager:
 }}
 {ct("TOOL_CALL")}
 ```
+"""
 
-批量执行任务：
+        # 如果在tmux环境，添加批量执行示例
+        if self._is_in_tmux():
+            description += """
+
+批量执行任务（仅在tmux环境支持）：
 ```
 {ot("TOOL_CALL")}
 {{
@@ -843,6 +869,9 @@ class task_list_manager:
 }}
 {ct("TOOL_CALL")}
 ```
+"""
+
+        description += """
 
 更新任务状态：
 ```
@@ -864,124 +893,146 @@ class task_list_manager:
 
 """
 
-    parameters = {
-        "type": "object",
-        "properties": {
-            "action": {
-                "type": "string",
-                "enum": [
-                    "add_tasks",
-                    "get_task_detail",
-                    "get_task_list_summary",
-                    "execute_task",
-                    "execute_batch_tasks",
-                    "update_task",
-                ],
-                "description": "要执行的操作",
-            },
-            "main_goal": {
-                "type": "string",
-                "description": "任务列表的核心目标（必填，仅在首次创建任务列表时使用）。创建新任务列表时必须提供此参数。",
-            },
-            "background": {
-                "type": "string",
-                "description": "所有子任务的公共背景信息，将自动添加到每个子任务的描述中。**必须包含以下信息**：1) **全局约束条件**：所有子任务必须遵循的技术约束、环境限制、性能要求等；2) **必须要求**：所有子任务必须完成的要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：所有子任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：所有子任务的统一验证方式、验收标准、测试要求等。可用于提供全局上下文、统一规范等公共信息。",
-            },
-            "tasks_info": {
-                "type": "array",
-                "description": "任务信息列表（add_tasks 需要，如果任务列表不存在会自动创建）",
-                "items": {
+        return description
+
+    @property
+    def parameters(self) -> dict:
+        """动态生成工具参数，根据tmux环境决定是否支持批量执行
+
+        Returns:
+            dict: 工具参数定义
+        """
+        return self._get_parameters()
+
+    def _get_parameters(self) -> dict:
+        """根据环境动态生成工具参数
+
+        Returns:
+            dict: 工具参数定义
+        """
+        action_enum = [
+            "add_tasks",
+            "get_task_detail",
+            "get_task_list_summary",
+            "execute_task",
+            "update_task",
+        ]
+
+        # 只有在 tmux 环境下才支持批量执行
+        if self._is_in_tmux():
+            action_enum.insert(4, "execute_batch_tasks")
+
+        return {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": action_enum,
+                    "description": "要执行的操作",
+                },
+                "main_goal": {
+                    "type": "string",
+                    "description": "任务列表的核心目标（必填，仅在首次创建任务列表时使用）。创建新任务列表时必须提供此参数。",
+                },
+                "background": {
+                    "type": "string",
+                    "description": "所有子任务的公共背景信息，将自动添加到每个子任务的描述中。**必须包含以下信息**：1) **全局约束条件**：所有子任务必须遵循的技术约束、环境限制、性能要求等；2) **必须要求**：所有子任务必须完成的要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：所有子任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：所有子任务的统一验证方式、验收标准、测试要求等。可用于提供全局上下文、统一规范等公共信息。",
+                },
+                "tasks_info": {
+                    "type": "array",
+                    "description": "任务信息列表（add_tasks 需要，如果任务列表不存在会自动创建）",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "task_name": {"type": "string", "description": "任务名称"},
+                            "task_desc": {
+                                "type": "string",
+                                "description": "任务描述。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
+                            },
+                            "priority": {
+                                "type": "integer",
+                                "description": "优先级（1-5，5为最高）",
+                            },
+                            "expected_output": {
+                                "type": "string",
+                                "description": "预期输出。**必须使用分条列出的结构化格式**，例如：1) xxx；2) yyy；3) zzz，或使用 markdown 列表 - xxx、- yyy、- zzz。后续验证 Agent 会对每一条预期输出条目分别进行验证。",
+                            },
+                            "agent_type": {
+                                "type": "string",
+                                "enum": ["main", "sub"],
+                                "description": "Agent类型：**简单任务必须使用 `main`**（由主Agent直接执行，不要拆分为子任务）；**复杂任务使用 `sub`**（系统智能处理复杂任务）",
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "依赖的任务名称或任务ID列表（可选，可以引用本次批次中的任务名称）",
+                            },
+                        },
+                        "required": [
+                            "task_name",
+                            "task_desc",
+                            "priority",
+                            "expected_output",
+                            "agent_type",
+                        ],
+                    },
+                },
+                "task_id": {
+                    "type": "string",
+                    "description": "任务ID（execute_task/update_task/get_task_detail 需要）",
+                },
+                "task_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "任务ID列表（execute_batch_tasks 需要）。批量执行多个任务，每个任务必须满足：1) 都是sub类型；2) 状态为pending；3) 依赖任务都已completed；4) 任务之间彼此无依赖关系。",
+                },
+                "additional_info": {
+                    "type": "string",
+                    "description": "附加信息（**仅在 execute_task 和 execute_batch_tasks 时必填**）。必须提供任务的详细上下文信息，包括任务背景、关键信息、约束条件、预期结果等。不能为空字符串或None。",
+                },
+                "task_update_info": {
                     "type": "object",
+                    "description": "任务更新信息（update_task 需要）",
                     "properties": {
-                        "task_name": {"type": "string", "description": "任务名称"},
+                        "task_name": {
+                            "type": "string",
+                            "description": "更新后的任务名称（可选）",
+                        },
                         "task_desc": {
                             "type": "string",
-                            "description": "任务描述。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
+                            "description": "更新后的任务描述（可选）。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
                         },
                         "priority": {
                             "type": "integer",
-                            "description": "优先级（1-5，5为最高）",
+                            "description": "更新后的优先级（可选，1-5）",
                         },
                         "expected_output": {
                             "type": "string",
-                            "description": "预期输出。**必须使用分条列出的结构化格式**，例如：1) xxx；2) yyy；3) zzz，或使用 markdown 列表 - xxx、- yyy、- zzz。后续验证 Agent 会对每一条预期输出条目分别进行验证。",
-                        },
-                        "agent_type": {
-                            "type": "string",
-                            "enum": ["main", "sub"],
-                            "description": "Agent类型：**简单任务必须使用 `main`**（由主Agent直接执行，不要拆分为子任务）；**复杂任务使用 `sub`**（系统智能处理复杂任务）",
+                            "description": "更新后的预期输出（可选）",
                         },
                         "dependencies": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "依赖的任务名称或任务ID列表（可选，可以引用本次批次中的任务名称）",
+                            "description": "更新后的依赖任务ID列表（可选）",
                         },
-                    },
-                    "required": [
-                        "task_name",
-                        "task_desc",
-                        "priority",
-                        "expected_output",
-                        "agent_type",
-                    ],
-                },
-            },
-            "task_id": {
-                "type": "string",
-                "description": "任务ID（execute_task/update_task/get_task_detail 需要）",
-            },
-            "task_ids": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "任务ID列表（execute_batch_tasks 需要）。批量执行多个任务，每个任务必须满足：1) 都是sub类型；2) 状态为pending；3) 依赖任务都已completed；4) 任务之间彼此无依赖关系。",
-            },
-            "additional_info": {
-                "type": "string",
-                "description": "附加信息（**仅在 execute_task 和 execute_batch_tasks 时必填**）。必须提供任务的详细上下文信息，包括任务背景、关键信息、约束条件、预期结果等。不能为空字符串或None。",
-            },
-            "task_update_info": {
-                "type": "object",
-                "description": "任务更新信息（update_task 需要）",
-                "properties": {
-                    "task_name": {
-                        "type": "string",
-                        "description": "更新后的任务名称（可选）",
-                    },
-                    "task_desc": {
-                        "type": "string",
-                        "description": "更新后的任务描述（可选）。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
-                    },
-                    "priority": {
-                        "type": "integer",
-                        "description": "更新后的优先级（可选，1-5）",
-                    },
-                    "expected_output": {
-                        "type": "string",
-                        "description": "更新后的预期输出（可选）",
-                    },
-                    "dependencies": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "更新后的依赖任务ID列表（可选）",
-                    },
-                    "status": {
-                        "type": "string",
-                        "enum": [
-                            "pending",
-                            "running",
-                            "completed",
-                            "failed",
-                            "abandoned",
-                        ],
-                        "description": "更新后的任务状态（可选，通常不需要手动调用）",
-                    },
-                    "actual_output": {
-                        "type": "string",
-                        "description": "更新后的实际输出（可选，通常不需要手动调用）",
-                    },
-                    "verification_method": {
-                        "type": "string",
-                        "description": """验证方法说明（当 status 更新为 completed 时必填）。描述如何验证任务是否真正完成。
+                        "status": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "running",
+                                "completed",
+                                "failed",
+                                "abandoned",
+                            ],
+                            "description": "更新后的任务状态（可选，通常不需要手动调用）",
+                        },
+                        "actual_output": {
+                            "type": "string",
+                            "description": "更新后的实际输出（可选，通常不需要手动调用）",
+                        },
+                        "verification_method": {
+                            "type": "string",
+                            "description": """验证方法说明（当 status 更新为 completed 时必填）。描述如何验证任务是否真正完成。
 
 **必须包含以下信息：**
 1. **需要检查的文件或代码位置**：明确指出验证需要检查的具体文件路径、函数名、类名或代码行号范围；
@@ -1002,112 +1053,15 @@ class task_list_manager:
 ```
 
 此信息将传递给验证Agent作为验证指导，请确保描述足够详细和具体。""",
+                        },
                     },
                 },
             },
-        },
-        "required": ["action"],
-    }
-
-    def _adjust_description_for_environment(self) -> None:
-        """根据环境调整工具描述"""
-        if not self._is_in_tmux():
-            # 非tmux环境，修改description，移除批量执行相关说明
-            self.description = f"""任务列表管理工具，供LLM管理复杂任务拆分和执行。
-
-**核心功能：**
-- `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
-- `execute_task`: 执行任务（自动创建子Agent）
-- `get_task_list_summary`: 查看任务状态
-
-**任务类型选择：**
-- `main`: 简单任务（1-3步、单文件）由主Agent直接执行
-- `sub`: 复杂任务（多步骤、多文件）自动创建子Agent
-
-**强制要求：**
-- execute_task必须提供non-empty additional_info参数
-- 禁止过度拆分简单任务
-- 每个Agent只能有一个任务列表
-
-**使用场景：**
-- PLAN阶段：一次性添加所有子任务
-- 数据切分：按目录/文件/模块分批处理
-- 依赖管理：自动验证任务依赖关系
-
-**关键原则：**
-简单任务用main，复杂任务用sub，避免过度拆分。
-
-**使用示例**
-创建任务列表：
-```
-{ot("TOOL_CALL")}
-{{
-    "name": "task_list_manager",
-    "arguments": {{
-        "action": "add_tasks",
-        "main_goal": "创建任务列表",
-        "background": "背景信息",
-        "tasks_info": [
-            {{
-                "task_name": "任务1",
-                "task_desc": "任务1描述",
-                "priority": 1,
-                "expected_output": "任务1预期输出",
-                "agent_type": "main",
-                "dependencies": []
-            }}
-            {{
-                "task_name": "任务2",
-                "task_desc": "任务2描述",
-                "priority": 2,
-                "expected_output": "任务2预期输出",
-                "agent_type": "sub",
-                "dependencies": ["任务1"]
-            }}
-        ]
-    }}
-}}
-{ct("TOOL_CALL")}
-```
-
-执行任务：
-```
-{ot("TOOL_CALL")}
-{{
-    "name": "task_list_manager",
-    "arguments": {{
-        "action": "execute_task",
-        "task_id": "任务ID",
-        "additional_info": "任务详细信息"
-    }}
-}}
-{ct("TOOL_CALL")}
-```
-
-更新任务状态：
-```
-{ot("TOOL_CALL")}
-{{
-    "name": "task_list_manager",
-    "arguments": {{
-        "action": "update_task",
-        "task_id": "任务ID",
-        "task_update_info": {{
-            "status": "completed",
-            "actual_output": "任务实际输出"
-        }}
-    }}
-}}
-{ct("TOOL_CALL")}
-```
-
-
-"""
+            "required": ["action"],
+        }
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行任务列表管理操作"""
-        # 根据环境调整工具描述
-        self._adjust_description_for_environment()
 
         try:
             agent = args.get("agent")
