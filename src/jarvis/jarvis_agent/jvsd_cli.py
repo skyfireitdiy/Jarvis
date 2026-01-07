@@ -92,7 +92,7 @@ def run_jvs_dispatch(task: Any, is_dispatch_mode: bool = False) -> None:
         quoted_task_file = shlex.quote(task_str)
 
         # 构造命令：cd 到工作目录，执行 jvs，然后删除临时文件，最后启动 shell
-        command = f"cd {quoted_cwd} && {executable} -m jarvis.jarvis_agent.jarvis -n -d --task-file {quoted_task_file} && rm -f {quoted_task_file}; exec {shlex.quote(user_shell)}"
+        command = f"cd {quoted_cwd} && jvs -n -d --task-file {quoted_task_file} && rm -f {quoted_task_file}; exec {shlex.quote(user_shell)}"
 
         try:
             tmux_path = shutil.which("tmux")
