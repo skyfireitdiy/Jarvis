@@ -1091,6 +1091,9 @@ def run_cli(
     if not non_interactive and not task:
         handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
+    # 检测tmux并在需要时启动（在参数解析之后）
+    check_and_launch_tmux("jarvis")
+
     # 初始化环境
     init_env(
         "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
@@ -1400,8 +1403,6 @@ def run_cli(
 
 def main() -> None:
     """Application entry point."""
-    # 检测tmux并在需要时启动
-    check_and_launch_tmux("jarvis")
     app()
 
 
