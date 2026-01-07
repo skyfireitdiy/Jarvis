@@ -66,6 +66,7 @@ def dispatch_to_tmux_window(
             filtered_argv.append(arg)
 
     # 获取当前窗口标识，用于后续布局切换
+    # tmux select-layout 支持 session_name:window_index 格式的目标参数
     current_window = None
     try:
         result = subprocess.run(
@@ -75,6 +76,10 @@ def dispatch_to_tmux_window(
             check=True
         )
         current_window = result.stdout.strip()
+        # 验证格式是否正确（应包含冒号分隔符）
+        if not current_window or ":" not in current_window:
+            print(f"Warning: Invalid window format: '{current_window}'", file=sys.stderr)
+            current_window = None
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to get current window: {e}", file=sys.stderr)
 
