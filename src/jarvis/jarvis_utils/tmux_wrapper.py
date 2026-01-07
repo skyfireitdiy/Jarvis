@@ -27,8 +27,9 @@ def dispatch_to_tmux_window(
         bool: 是否成功派发（True表示成功，False表示失败）
 
     注意:
-        仅在 tmux 环境中才能派发。
-        如果不在 tmux 环境中，返回 False。
+        在 tmux 环境中直接在当前窗口创建新窗格。
+        如果不在 tmux 环境中，会查找 codeagent 创建的 tmux session
+        并在其中创建窗格作为降级方案。
         使用水平分割（split-window -h）创建新窗格，适合代码任务。
     """
     # 检查tmux是否安装
@@ -38,7 +39,8 @@ def dispatch_to_tmux_window(
 
     # 检查是否已在tmux环境中运行
     if "TMUX" not in os.environ:
-        return False
+        # 不在tmux中，尝试查找codeagent创建的session作为降级方案
+        return _dispatch_to_existing_jarvis_session(task_arg, argv)
 
     # 生成窗口名称（使用任务内容的前20个字符）
     if task_arg and str(task_arg).strip():
@@ -73,12 +75,14 @@ def dispatch_to_tmux_window(
             ["tmux", "display-message", "-p", "#{session_name}:#{window_index}"],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         current_window = result.stdout.strip()
         # 验证格式是否正确（应包含冒号分隔符）
         if not current_window or ":" not in current_window:
-            print(f"Warning: Invalid window format: '{current_window}'", file=sys.stderr)
+            print(
+                f"Warning: Invalid window format: '{current_window}'", file=sys.stderr
+            )
             current_window = None
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to get current window: {e}", file=sys.stderr)
@@ -106,12 +110,14 @@ def dispatch_to_tmux_window(
         if current_window:
             try:
                 subprocess.run(
-                    ["tmux", "select-layout", "-t", current_window, "tiled"],
-                    check=True
+                    ["tmux", "select-layout", "-t", current_window, "tiled"], check=True
                 )
             except subprocess.CalledProcessError as e:
                 # 布局切换失败记录错误，但不影响主流程
-                print(f"Warning: Failed to set tiled layout for window {current_window}: {e}", file=sys.stderr)
+                print(
+                    f"Warning: Failed to set tiled layout for window {current_window}: {e}",
+                    file=sys.stderr,
+                )
         return True
     except subprocess.CalledProcessError as e:
         print(f"Warning: Failed to dispatch to tmux window: {e}", file=sys.stderr)
@@ -176,3 +182,108 @@ def check_and_launch_tmux(session_name: str = "jarvis-auto") -> None:
         # 如果执行失败，输出警告并继续
         print(f"Warning: Failed to launch tmux: {e}", file=sys.stderr)
         return
+
+
+def _find_jarvis_code_agent_session() -> Optional[str]:
+    """查找 codeagent 创建的 tmux session。
+
+    Returns:
+        Optional[str]: 找到的 session 名称，未找到返回 None
+    """
+    try:
+        result = subprocess.run(
+            ["tmux", "list-sessions"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        # 解析 session 名称：格式为 "session-name: windows (created ...)"
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                # 提取 session 名称（冒号之前的部分）
+                session_name = line.split(":")[0].strip()
+                # 检查是否是 codeagent 创建的 session
+                if session_name.startswith("jarvis-code-agent-"):
+                    return session_name
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        print(f"Warning: Failed to list tmux sessions: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: Unexpected error while listing sessions: {e}", file=sys.stderr)
+    return None
+
+
+def _dispatch_to_existing_jarvis_session(
+    task_arg: Optional[str], argv: list[str]
+) -> bool:
+    """将任务派发到现有 codeagent tmux session 的 panel 中执行。
+
+    这是一个降级方案：当不在 tmux 环境中时，尝试找到 codeagent 创建的 session
+    并在其中创建 panel 执行命令。
+
+    Args:
+        task_arg: 任务内容（已废弃，保留用于兼容）
+        argv: 当前命令行参数（需要过滤 --dispatch）
+
+    Returns:
+        bool: 是否成功派发（True表示成功，False表示失败）
+    """
+    # 查找 codeagent 创建的 session
+    session_name = _find_jarvis_code_agent_session()
+    if not session_name:
+        print(
+            "ℹ️ 未找到 codeagent 创建的 tmux session，无法派发任务",
+            file=sys.stderr,
+        )
+        return False
+
+    print(f"ℹ️ 找到 codeagent session: {session_name}", file=sys.stderr)
+
+    # 过滤 --dispatch/-d 参数，避免循环派发
+    filtered_argv = []
+    skip_next = False
+    for i, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg == "--dispatch" or arg == "-d":
+            continue
+        elif arg.startswith("--dispatch=") or arg.startswith("-d="):
+            continue
+        else:
+            filtered_argv.append(arg)
+
+    # 构造 tmux split-window 命令（在指定 session 的当前窗口创建新 pane）
+    executable = sys.executable
+    quoted_args = [shlex.quote(arg) for arg in filtered_argv]
+    user_shell = os.environ.get("SHELL", "/bin/sh")
+    command = f'{executable} {" ".join(quoted_args)}; exec "{user_shell}"'
+
+    tmux_args = [
+        "tmux",
+        "split-window",
+        "-h",  # 水平分割（左右布局）
+        "-t",  # 指定目标 session
+        session_name,
+        command,
+    ]
+
+    # 执行 tmux 命令
+    try:
+        subprocess.run(tmux_args, check=True)
+        # 创建新 pane 后，切换到 tiled 布局
+        subprocess.run(
+            ["tmux", "select-layout", "-t", session_name, "tiled"],
+            check=True,
+        )
+        print(
+            f"✅ 任务已派发到 tmux session '{session_name}' 的 panel 中",
+            file=sys.stderr,
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        print(
+            f"Warning: Failed to dispatch to tmux session '{session_name}': {e}",
+            file=sys.stderr,
+        )
+        return False
