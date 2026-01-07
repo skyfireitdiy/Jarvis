@@ -4,6 +4,7 @@
 便捷命令，用于快速启动 jca 任务派发。
 """
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,37 @@ def get_multiline_input(prompt: str = "请输入任务内容（空行结束）:"
     return "\n".join(lines)
 
 
+def _write_task_to_temp_file(task_content: str) -> str:
+    """将任务内容写入临时文件并返回文件路径
+
+    参数:
+        task_content: 任务内容（字符串）
+
+    返回:
+        str: 临时文件路径
+    """
+    temp_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        suffix=".txt",
+        prefix="jcad_task_",
+        delete=False,
+        encoding="utf-8",
+    )
+    try:
+        temp_file.write(task_content)
+        return temp_file.name
+    except Exception:
+        # 如果写入失败，清理临时文件
+        try:
+            temp_file.close()
+            Path(temp_file.name).unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise
+    finally:
+        temp_file.close()
+
+
 def run_jca_dispatch(task: Any) -> None:
     """执行 jca -n -w --dispatch --requirement <task>"""
     # 确保 task 是字符串内容而非类型对象
@@ -45,15 +77,21 @@ def run_jca_dispatch(task: Any) -> None:
     else:
         # 处理非字符串类型，尝试获取实际值
         task_str = str(task) if task is not None else ""
-    
+
     # 检查 task_str 是否为空
     if not task_str or not task_str.strip():
         PrettyOutput.auto_print(
             f"❌ 错误: 任务内容为空，无法执行。task 类型: {type(task).__name__}, task 值: {task}"
         )
         sys.exit(1)
-    
-    cmd = ["jca", "-n", "-w", "--dispatch", "--requirement", task_str]
+
+    # 判断是文件路径还是直接内容
+    if os.path.exists(task_str):
+        # 如果是文件路径，使用 --requirement-file 参数
+        cmd = ["jca", "-n", "-w", "--dispatch", "--requirement-file", task_str]
+    else:
+        # 如果是直接内容，使用 --requirement 参数
+        cmd = ["jca", "-n", "-w", "--dispatch", "--requirement", task_str]
     try:
         # 打印即将执行的命令
         PrettyOutput.print(
@@ -84,13 +122,28 @@ def main(
     """
     # 调试信息：打印接收到的 task 参数
     PrettyOutput.print(
-        f"[DEBUG] main() 接收到的 task 参数: type={type(task).__name__}, value={task}", 
-        output_type=OutputType.DEBUG
+        f"[DEBUG] main() 接收到的 task 参数: type={type(task).__name__}, value={task}",
+        output_type=OutputType.DEBUG,
     )
-    
+
     if task:
         # 直接模式：传入任务字符串
-        run_jca_dispatch(task)
+        # 检查是否包含多行内容（换行符）
+        if "\n" in task:
+            # 多行输入：创建临时文件
+            temp_file_path = _write_task_to_temp_file(task)
+            try:
+                # 使用临时文件路径作为任务参数
+                run_jca_dispatch(temp_file_path)
+            finally:
+                # 清理临时文件
+                try:
+                    Path(temp_file_path).unlink(missing_ok=True)
+                except Exception:
+                    pass
+        else:
+            # 单行输入：直接传递
+            run_jca_dispatch(task)
     else:
         # 交互模式：多行输入
         task_content = get_multiline_input()
@@ -99,16 +152,7 @@ def main(
             sys.exit(0)
 
         # 创建临时文件
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".txt",
-            prefix="jcad_task_",
-            delete=False,
-            encoding="utf-8",
-        ) as temp_file:
-            temp_file.write(task_content)
-            temp_file_path = temp_file.name
-
+        temp_file_path = _write_task_to_temp_file(task_content)
         try:
             # 使用临时文件路径作为任务参数
             run_jca_dispatch(temp_file_path)
