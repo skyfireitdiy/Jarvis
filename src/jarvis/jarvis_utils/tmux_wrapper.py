@@ -601,6 +601,57 @@ def create_panel(
         return None
 
 
+def set_window_tiled_layout(session_name: str, window_id: Optional[str] = None) -> bool:
+    """设置指定 tmux session 的 window 布局为 tiled（平铺）。
+
+    Args:
+        session_name: tmux session 名称
+        window_id: window 标识（索引或名称，如 "1" 或 "1: bash"）
+                     如果为 None，则设置 session 的当前 window
+
+    Returns:
+        bool: 是否成功设置布局（True表示成功，False表示失败）
+
+    注意:
+        window_id 可以是完整的"index: name"格式，也可以仅是索引。
+        如果 window_id 为 None，则设置 session 中当前活跃的 window。
+        tiled 布局会将所有 pane 平均分配空间。
+    """
+    # 构造 tmux 目标参数
+    if window_id is None:
+        # 设置 session 的当前 window
+        target = session_name
+    else:
+        # 解析 window_id：支持 "index: name" 和 "index" 两种格式
+        target_window = (
+            window_id.split(":")[0].strip() if ":" in window_id else window_id
+        )
+        target = f"{session_name}:{target_window}"
+
+    # 执行 tmux select-layout 命令
+    try:
+        subprocess.run(
+            ["tmux", "select-layout", "-t", target, "tiled"],
+            check=True,
+            timeout=5,
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.print(
+            f"⚠️ Failed to set tiled layout for window '{window_id or 'current'}' in session '{session_name}': {e}",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return False
+    except subprocess.TimeoutExpired:
+        PrettyOutput.print(
+            f"⚠️ Setting tiled layout for window '{window_id or 'current'}' in session '{session_name}' timed out",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return False
+
+
 def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
     """查找或创建 jarvis session。
 
