@@ -416,6 +416,90 @@ def get_window_pane_count(session_name: str, window_id: str) -> int:
         return 0
 
 
+def create_window(
+    session_name: str,
+    window_name: Optional[str] = None,
+    working_dir: Optional[str] = None,
+    initial_command: Optional[str] = None,
+) -> Optional[str]:
+    """在指定的 tmux session 中创建一个新的 window。
+
+    Args:
+        session_name: tmux session 名称
+        window_name: window 名称（可选）
+        working_dir: 工作目录（可选，None表示使用当前工作目录）
+        initial_command: 初始命令（可选，None表示只启动用户shell）
+
+    Returns:
+        Optional[str]: 新创建的 window ID，失败返回 None
+
+    注意:
+        创建的 window 是 detached 状态，不会自动切换到该 window。
+        如果指定了 initial_command，命令执行结束后会启动用户的默认 shell 保持 window 活动。
+    """
+    # 确定工作目录
+    if working_dir is None:
+        working_dir = os.getcwd()
+
+    # 获取用户的默认 shell
+    user_shell = os.environ.get("SHELL", "/bin/sh")
+
+    # 构造命令
+    if initial_command:
+        # 先切换到工作目录，执行初始命令，然后启动 shell 保持 window 活动
+        command = (
+            f'cd {shlex.quote(working_dir)} && {initial_command}; exec "{user_shell}"'
+        )
+    else:
+        # 只切换到工作目录并启动 shell
+        command = f'cd {shlex.quote(working_dir)}; exec "{user_shell}"'
+
+    # 构造 tmux new-window 命令
+    tmux_args = [
+        "tmux",
+        "new-window",
+        "-d",  # 创建 detached window
+        "-F",  # 指定输出格式
+        "#{window_id}",
+        "-c",  # 指定工作目录
+        working_dir,
+    ]
+
+    # 如果指定了 window 名称，添加 -n 参数
+    if window_name:
+        tmux_args.extend(["-n", window_name])
+
+    # 添加目标 session 和命令
+    tmux_args.extend(["-t", session_name, command])
+
+    # 执行 tmux 命令
+    try:
+        result = subprocess.run(
+            tmux_args,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        # 返回新创建的 window ID
+        window_id = result.stdout.strip()
+        return window_id if window_id else None
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.print(
+            f"⚠️ Failed to create window in session '{session_name}': {e}",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+    except subprocess.TimeoutExpired:
+        PrettyOutput.print(
+            f"⚠️ Creating window in session '{session_name}' timed out",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+
+
 def create_panel(
     session_name: str,
     window_id: str,
