@@ -136,14 +136,28 @@ def quick_config(
                 f"{config_name}_{model.replace('.', '_').replace('-', '_')}"
             )
 
+        # 根据平台类型生成正确的配置键名
+        if platform == "openai":
+            llm_config_dict = {
+                "openai_api_key": api_key,
+                "openai_api_base": base_url,
+            }
+        elif platform == "claude":
+            llm_config_dict = {
+                "anthropic_api_key": api_key,
+                "anthropic_base_url": base_url,
+            }
+        else:
+            llm_config_dict = {
+                f"{platform}_api_key": api_key,
+                f"{platform}_base_url": base_url,
+            }
+
         llm_config = {
             "platform": platform,
             "model": model,
             "max_input_token_count": 128000,
-            "llm_config": {
-                f"{platform}_api_key": api_key,
-                f"{platform}_base_url": base_url,
-            },
+            "llm_config": llm_config_dict,
         }
 
         # 添加模型配置
