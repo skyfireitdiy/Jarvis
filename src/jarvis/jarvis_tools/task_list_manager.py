@@ -2668,6 +2668,11 @@ class task_list_manager:
     ) -> Optional[str]:
         """查找panel数量小于max_panes的window。
 
+        优先级：
+        1. 如果当前window pane数量 < max_panes，返回当前window索引
+        2. 否则，查找其他pane数量 < max_panes的window
+        3. 如果都满了，返回None
+
         Args:
             session_name: tmux session名称
             max_panes: 每个window的最大panel数量
@@ -2678,6 +2683,42 @@ class task_list_manager:
         import subprocess
 
         try:
+            # 获取当前window的索引
+            current_window_result = subprocess.run(
+                ["tmux", "display-message", "-p", "#{window_index}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            current_window_idx = None
+            if current_window_result.returncode == 0:
+                current_window_idx = current_window_result.stdout.strip()
+
+            # 优先检查当前window
+            if current_window_idx:
+                panes_result = subprocess.run(
+                    [
+                        "tmux",
+                        "list-panes",
+                        "-t",
+                        f"{session_name}:{current_window_idx}",
+                        "-F",
+                        "#P",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+
+                if panes_result.returncode == 0:
+                    pane_lines = panes_result.stdout.strip().split("\n")
+                    pane_count = len([line for line in pane_lines if line.strip()])
+                    # 当前window有空间，优先返回
+                    if pane_count < max_panes:
+                        return current_window_idx
+
+            # 当前window已满，查找其他可用window
             # 获取session中所有window的索引
             result = subprocess.run(
                 ["tmux", "list-windows", "-t", session_name, "-F", "#{window_index}"],
@@ -2691,9 +2732,12 @@ class task_list_manager:
 
             window_indices = result.stdout.strip().split("\n")
 
-            # 遍历每个window，检查pane数量
+            # 遍历每个window，检查pane数量（跳过当前window，因为已经检查过了）
             for window_idx in window_indices:
                 if not window_idx.strip():
+                    continue
+                # 跳过当前window
+                if window_idx == current_window_idx:
                     continue
 
                 # 获取该window的pane数量
