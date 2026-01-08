@@ -85,6 +85,8 @@ class TestSessionManager:
     @patch("os.makedirs")
     def test_save_session_success(self, mock_makedirs, session_manager, mock_model):
         """测试成功保存会话"""
+        import re
+
         with patch("os.getcwd", return_value="/test/dir"):
             result = session_manager.save_session()
 
@@ -92,46 +94,60 @@ class TestSessionManager:
             assert result is True
             mock_makedirs.assert_called_once_with("/test/dir/.jarvis", exist_ok=True)
 
-            # 验证保存路径
-            expected_path = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model.json"
-            mock_model.save.assert_called_once_with(expected_path)
+            # 验证保存路径格式（文件名包含时间戳）
+            actual_path = mock_model.save.call_args[0][0]
+            expected_pattern = r"/test/dir/\.jarvis/saved_session_test_agent_test_platform_test_model_\d{8}_\d{6}\.json$"
+            assert re.match(expected_pattern, actual_path), (
+                f"路径格式不匹配: {actual_path}"
+            )
 
     @patch("os.makedirs")
     def test_save_session_with_special_chars(
         self, mock_makedirs, session_manager, mock_model
     ):
         """测试带特殊字符的模型名称"""
+        import re
+
         mock_model.name.return_value = "test/model\\name"
 
         with patch("os.getcwd", return_value="/test/dir"):
             session_manager.save_session()
 
-            # 验证特殊字符被替换
-            expected_path = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_name.json"
-            mock_model.save.assert_called_once_with(expected_path)
+            # 验证特殊字符被替换，且文件名包含时间戳
+            actual_path = mock_model.save.call_args[0][0]
+            expected_pattern = r"/test/dir/\.jarvis/saved_session_test_agent_test_platform_test_model_name_\d{8}_\d{6}\.json$"
+            assert re.match(expected_pattern, actual_path), (
+                f"路径格式不匹配: {actual_path}"
+            )
 
-    @patch("os.path.exists")
-    @patch("os.remove")
     @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_restore_session_success(
-        self, mock_auto_print, mock_remove, mock_exists, session_manager, mock_model
+        self, mock_auto_print, session_manager, mock_model
     ):
         """测试成功恢复会话"""
-        mock_exists.return_value = True
-
-        with patch("os.getcwd", return_value="/test/dir"):
+        # Mock _parse_session_files 返回一个模拟的会话文件
+        mock_session_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250107_120000.json"
+        with patch.object(
+            session_manager,
+            "_parse_session_files",
+            return_value=[(mock_session_file, "20250107_120000")],
+        ):
             result = session_manager.restore_session()
 
             # 验证结果
             assert result is True
 
             # 验证文件路径
-            expected_path = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model.json"
-            mock_model.restore.assert_called_once_with(expected_path)
-            mock_remove.assert_called_once_with(expected_path)
+            mock_model.restore.assert_called_once_with(mock_session_file)
 
-            # 验证输出
-            mock_auto_print.assert_called_once_with("✅ 会话已恢复，并已删除会话文件。")
+            # 验证输出：应该有两次print调用（显示恢复的文件名和成功消息）
+            assert mock_auto_print.call_count == 2
+            # 第一次调用显示恢复的文件名
+            first_call = mock_auto_print.call_args_list[0][0][0]
+            assert "📂 恢复会话:" in first_call
+            # 第二次调用显示成功消息
+            second_call = mock_auto_print.call_args_list[1][0][0]
+            assert "✅ 会话已恢复。" == second_call
 
     @patch("os.path.exists")
     def test_restore_session_file_not_exists(self, mock_exists, session_manager):
@@ -143,42 +159,67 @@ class TestSessionManager:
 
             assert result is False
 
-    @patch("os.path.exists")
-    @patch("os.remove")
     @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
-    def test_restore_session_remove_failure(
-        self, mock_auto_print, mock_remove, mock_exists, session_manager, mock_model
+    def test_restore_session_non_interactive_mode(
+        self, mock_auto_print, session_manager, mock_model
     ):
-        """测试删除会话文件失败的情况"""
-        mock_exists.return_value = True
-        mock_remove.side_effect = OSError("Permission denied")
+        """测试非交互模式下自动恢复最新会话"""
+        # 设置非交互模式
+        session_manager.non_interactive = True
 
-        with patch("os.getcwd", return_value="/test/dir"):
+        # Mock _parse_session_files 返回两个会话文件
+        mock_newer_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250107_120000.json"
+        mock_older_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250106_080000.json"
+        with patch.object(
+            session_manager,
+            "_parse_session_files",
+            return_value=[
+                (mock_newer_file, "20250107_120000"),
+                (mock_older_file, "20250106_080000"),
+            ],
+        ):
             result = session_manager.restore_session()
 
-            # 验证结果（恢复成功，但删除失败）
+            # 验证结果
             assert result is True
 
-            # 验证输出：根据代码逻辑，成功恢复和删除失败时应该有两次print调用
-            # 但实际测试中只有一次调用，说明mock可能有问题
-            # 让我们只验证至少有一次调用，并且包含错误消息
-            assert mock_auto_print.call_count >= 1
+            # 验证恢复的是最新的会话文件（列表第一个）
+            mock_model.restore.assert_called_once_with(mock_newer_file)
 
-            # 检查最后一次调用的消息内容应该包含错误信息
-            last_call = mock_auto_print.call_args_list[-1]
-            assert "删除会话文件失败" in str(last_call) or "会话已恢复" in str(
-                last_call
-            )
+            # 验证输出：应该有两次print调用
+            assert mock_auto_print.call_count == 2
+            # 第一次调用显示非交互模式自动恢复的消息
+            first_call = mock_auto_print.call_args_list[0][0][0]
+            assert "🤖 非交互模式" in first_call
+            # 第二次调用显示成功消息
+            second_call = mock_auto_print.call_args_list[1][0][0]
+            assert "✅ 会话已恢复。" == second_call
 
-    @patch("os.path.exists")
+    @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_restore_session_restore_failure(
-        self, mock_exists, session_manager, mock_model
+        self, mock_auto_print, session_manager, mock_model
     ):
         """测试恢复会话失败的情况"""
-        mock_exists.return_value = True
-        mock_model.restore.return_value = False
+        # Mock _parse_session_files 返回一个模拟的会话文件
+        mock_session_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250107_120000.json"
+        with patch.object(
+            session_manager,
+            "_parse_session_files",
+            return_value=[(mock_session_file, "20250107_120000")],
+        ):
+            # 模拟 restore 失败
+            mock_model.restore.return_value = False
 
-        with patch("os.getcwd", return_value="/test/dir"):
             result = session_manager.restore_session()
 
+            # 验证结果
             assert result is False
+
+            # 验证输出：应该有两次print调用（显示恢复的文件名和失败消息）
+            assert mock_auto_print.call_count == 2
+            # 第一次调用显示恢复的文件名
+            first_call = mock_auto_print.call_args_list[0][0][0]
+            assert "📂 恢复会话:" in first_call
+            # 第二次调用显示失败消息
+            second_call = mock_auto_print.call_args_list[1][0][0]
+            assert "❌ 会话恢复失败。" == second_call

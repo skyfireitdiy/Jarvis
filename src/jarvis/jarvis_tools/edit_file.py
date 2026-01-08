@@ -715,6 +715,8 @@ class EditFileNormalTool:
                             # 部分成功
                             success = True
                             result_or_error = iter_result_content
+                            # 部分成功时，需要将整体操作标记为失败
+                            overall_success = False
                         else:
                             # 完全失败
                             success = False
@@ -791,7 +793,12 @@ class EditFileNormalTool:
                                 # 简化错误信息显示（每行错误缩进显示）
                                 for line in error.split("\n"):
                                     all_results.append(f"   ❌ Diff #{idx}: {line}")
-                        successful_files.append(file_path)  # 仍然算作成功文件
+                        successful_files.append(
+                            file_path
+                        )  # 仍然算作成功文件（部分成功也算成功）
+                        # 部分成功时，不将文件添加到 failed_files，因为文件已成功写入
+                        # 但需要将整体操作标记为失败
+                        overall_success = False
                     else:
                         all_results.append(f"✅ {file_path}: 修改成功")
                         successful_files.append(file_path)
@@ -823,10 +830,12 @@ class EditFileNormalTool:
                 }
             else:
                 # 失败时，stderr 应该包含详细的错误信息，而不仅仅是文件列表
-                # 从 all_results 中提取失败文件的详细错误信息
+                # 从 all_results 中提取失败和部分成功的详细错误信息
                 failed_details = []
                 for result in all_results:
-                    if result.startswith("❌"):
+                    # 提取失败信息（包含❌）和部分成功的警告（包含⚠️）
+                    # 检查是否包含这些标记，而不是只检查开头，因为详细错误信息可能有缩进
+                    if "❌" in result or "⚠️" in result:
                         failed_details.append(result)
 
                 # 如果有详细的错误信息，使用它们；否则使用 summary
