@@ -255,11 +255,10 @@ def multiply(x, y):
             "第 2 个diff失败" in result["stderr"]
             or "未找到精确匹配" in result["stderr"]
         )
-        # 验证文件没有被修改（因为失败后回滚）
+        # 验证文件被部分修改（第一个成功的diff已应用）
         with open(temp_file, "r", encoding="utf-8") as f:
             content = f.read()
-            assert "def add(a, b, c=0):" not in content
-            assert "def add(a, b):" in content
+            assert "def add(a, b, c=0):" in content
 
     def test_empty_search_rewrite_file(self, tool, temp_file):
         """测试空 search 重写整个文件"""
