@@ -46,7 +46,10 @@ def _generate_session_name() -> str:
 
 
 def dispatch_to_tmux_window(
-    task_arg: Optional[str], argv: list[str], window_name: str = "jarvis-dispatch"
+    task_arg: Optional[str],
+    argv: list[str],
+    window_name: str = "jarvis-dispatch",
+    stay_in_session_after_exit: bool = True,
 ) -> bool:
     """将任务派发到新的 tmux 窗格（pane）中执行。
 
@@ -54,6 +57,7 @@ def dispatch_to_tmux_window(
         task_arg: 任务内容（已废弃，保留用于兼容）
         argv: 当前命令行参数（需要过滤 --dispatch）
         window_name: 窗口名称前缀（已废弃，保留用于兼容）
+        stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
 
     Returns:
         bool: 是否成功派发（True表示成功，False表示失败）
@@ -78,7 +82,9 @@ def dispatch_to_tmux_window(
     # 检查是否已在tmux环境中运行
     if "TMUX" not in os.environ:
         # 不在tmux中，尝试查找jarvis创建的session作为降级方案
-        return _dispatch_to_existing_jarvis_session(task_arg, argv)
+        return _dispatch_to_existing_jarvis_session(
+            task_arg, argv, stay_in_session_after_exit
+        )
 
     # 生成窗口名称（使用任务内容的前20个字符）
     if task_arg and str(task_arg).strip():
@@ -136,11 +142,14 @@ def dispatch_to_tmux_window(
     executable = sys.executable
     # 使用 shlex.quote() 安全地转义每个参数，防止 shell 注入
     quoted_args = [shlex.quote(arg) for arg in filtered_argv]
-    # 获取用户的默认shell，主命令结束后启动shell保持panel活动
+    # 获取用户的默认shell
     user_shell = os.environ.get("SHELL", "/bin/sh")
     # 先切换到当前工作目录，再执行命令
     cwd = os.getcwd()
-    command = f'cd {shlex.quote(cwd)} && {executable} {" ".join(quoted_args)}; exec "{user_shell}"'
+    command = f"cd {shlex.quote(cwd)} && {executable} {' '.join(quoted_args)}"
+    # 如果需要保持会话活动，则启动shell
+    if stay_in_session_after_exit:
+        command += f'; exec "{user_shell}"'
 
     tmux_args = [
         "tmux",
@@ -162,8 +171,11 @@ def dispatch_to_tmux_window(
         return False
 
 
-def check_and_launch_tmux() -> None:
+def check_and_launch_tmux(stay_in_session_after_exit: bool = True) -> None:
     """检测tmux并在需要时启动tmux会话。
+
+    Args:
+        stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
 
     注意:
         此函数使用subprocess.execvp替换当前进程，如果成功则不会返回。
@@ -228,10 +240,12 @@ def check_and_launch_tmux() -> None:
     user_shell = os.environ.get("SHELL", "/bin/sh")
 
     # 构造tmux命令参数
-    # 使用shell包装器来确保会话在主命令结束后继续运行
     # 参考 dispatch_to_tmux_window 的实现，使用 shlex.quote 安全转义参数
     quoted_args = [shlex.quote(arg) for arg in argv]
-    command = f'{executable} {" ".join(quoted_args)}; exec "{user_shell}"'
+    command = f"{executable} {' '.join(quoted_args)}"
+    # 如果需要保持会话活动，则启动shell
+    if stay_in_session_after_exit:
+        command += f'; exec "{user_shell}"'
     tmux_args = [
         "tmux",
         "new-session",
@@ -408,6 +422,7 @@ def create_window(
     window_name: Optional[str] = None,
     working_dir: Optional[str] = None,
     initial_command: Optional[str] = None,
+    stay_in_session_after_exit: bool = True,
 ) -> Optional[str]:
     """在指定的 tmux session 中创建一个新的 window。
 
@@ -416,6 +431,7 @@ def create_window(
         window_name: window 名称（可选）
         working_dir: 工作目录（可选，None表示使用当前工作目录）
         initial_command: 初始命令（可选，None表示只启动用户shell）
+        stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
 
     Returns:
         Optional[str]: 新创建的 window ID，失败返回 None
@@ -433,10 +449,11 @@ def create_window(
 
     # 构造命令
     if initial_command:
-        # 先切换到工作目录，执行初始命令，然后启动 shell 保持 window 活动
-        command = (
-            f'cd {shlex.quote(working_dir)} && {initial_command}; exec "{user_shell}"'
-        )
+        # 先切换到工作目录，执行初始命令
+        command = f"cd {shlex.quote(working_dir)} && {initial_command}"
+        # 如果需要保持会话活动，则启动shell
+        if stay_in_session_after_exit:
+            command += f'; exec "{user_shell}"'
     else:
         # 只切换到工作目录并启动 shell
         command = f'cd {shlex.quote(working_dir)}; exec "{user_shell}"'
@@ -515,6 +532,7 @@ def create_panel(
     split_direction: str = "h",
     working_dir: Optional[str] = None,
     pane_percentage: Optional[int] = None,
+    stay_in_session_after_exit: bool = True,
 ) -> Optional[str]:
     """在指定的 tmux session 和 window 中创建 panel 并执行初始命令。
 
@@ -525,6 +543,7 @@ def create_panel(
         split_direction: 分割方向，"h"表示水平分割（左右），"v"表示垂直分割（上下）
         working_dir: 工作目录，None表示使用当前工作目录
         pane_percentage: pane 大小百分比（1-99），None表示默认大小
+        stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
 
     Returns:
         Optional[str]: 新创建的 pane ID，失败返回 None
@@ -564,8 +583,11 @@ def create_panel(
     # 获取用户的默认 shell
     user_shell = os.environ.get("SHELL", "/bin/sh")
 
-    # 构造命令：先切换到工作目录，执行初始命令，然后启动 shell 保持 panel 活动
-    command = f'cd {shlex.quote(working_dir)} && {initial_command}; exec "{user_shell}"'
+    # 构造命令：先切换到工作目录，执行初始命令
+    command = f"cd {shlex.quote(working_dir)} && {initial_command}"
+    # 如果需要保持会话活动，则启动shell
+    if stay_in_session_after_exit:
+        command += f'; exec "{user_shell}"'
 
     # 构造 tmux split-window 命令
     tmux_args = [
@@ -996,7 +1018,7 @@ def dispatch_command_to_panel(
 
 
 def _dispatch_to_existing_jarvis_session(
-    task_arg: Optional[str], argv: list[str]
+    task_arg: Optional[str], argv: list[str], stay_in_session_after_exit: bool = True
 ) -> bool:
     """将任务派发到现有 jarvis tmux session 的 panel 中执行。
 
@@ -1006,6 +1028,7 @@ def _dispatch_to_existing_jarvis_session(
     Args:
         task_arg: 任务内容（已废弃，保留用于兼容）
         argv: 当前命令行参数（需要过滤 --dispatch）
+        stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
 
     Returns:
         bool: 是否成功派发（True表示成功，False表示失败）
@@ -1045,7 +1068,10 @@ def _dispatch_to_existing_jarvis_session(
     quoted_args = [shlex.quote(arg) for arg in filtered_argv]
     user_shell = os.environ.get("SHELL", "/bin/sh")
     cwd = os.getcwd()
-    command = f'cd {shlex.quote(cwd)} && {executable} {" ".join(quoted_args)}; exec "{user_shell}"'
+    command = f"cd {shlex.quote(cwd)} && {executable} {' '.join(quoted_args)}"
+    # 如果需要保持会话活动，则启动shell
+    if stay_in_session_after_exit:
+        command += f'; exec "{user_shell}"'
 
     # 获取 session 的当前窗口
     current_window = get_session_current_window(session_name)
@@ -1063,6 +1089,7 @@ def _dispatch_to_existing_jarvis_session(
         window_id=current_window,
         initial_command=command,
         split_direction="h",
+        stay_in_session_after_exit=stay_in_session_after_exit,
     )
     if not pane_id:
         PrettyOutput.print(
