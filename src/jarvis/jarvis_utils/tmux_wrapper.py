@@ -935,6 +935,17 @@ def dispatch_command_to_panel(
                 timestamp=False,
             )
             return session_name
+        else:
+            PrettyOutput.print(
+                f"❌ Failed to create new window in session '{session_name}'",
+                OutputType.ERROR,
+                timestamp=False,
+            )
+            PrettyOutput.print(
+                f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
+                OutputType.INFO,
+                timestamp=False,
+            )
 
     return None
 
