@@ -43,6 +43,9 @@ class YuanbaoPlatform(BasePlatform):
             llm_config: LLM配置字典，包含 yuanbao_cookies 等
         """
         super().__init__()
+        PrettyOutput.auto_print(
+            "⚠️ 警告：yuanbao 平台将在未来版本中被废弃，建议迁移到 openai 或 claude 平台。"
+        )
         self.conversation_id = ""  # 会话ID，用于标识当前对话
         llm_config = llm_config or {}
 

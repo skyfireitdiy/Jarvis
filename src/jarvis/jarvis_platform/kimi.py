@@ -43,6 +43,9 @@ class KimiModel(BasePlatform):
             llm_config: LLM配置字典，包含 kimi_api_key 等
         """
         super().__init__()
+        PrettyOutput.auto_print(
+            "⚠️ 警告：kimi 平台将在未来版本中被废弃，建议迁移到 openai 或 claude 平台。"
+        )
         self.chat_id = ""  # 当前会话ID
         llm_config = llm_config or {}
 
