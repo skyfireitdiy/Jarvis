@@ -753,6 +753,7 @@ git reset --hard {start_commit}
         user_input: str,
         git_diff: str,
         modification_history: Optional[str] = None,
+        start_commit: Optional[str] = None,
     ) -> tuple:
         """构建 review Agent 的 prompts
 
@@ -785,7 +786,7 @@ git reset --hard {start_commit}
 【用户需求】
 {user_input}
 
-【完整的修改历史】
+{f"【起始 Commit】\n{start_commit}\n\n" if start_commit else ""}【完整的修改历史】
 {modification_history if modification_history else "无修改历史（如为空，说明主 Agent 未生成总结或未进行修复）"}
 
 【代码修改（Git Diff）】
@@ -1022,7 +1023,7 @@ git reset --hard {start_commit}
 
             # 构建 review prompts
             sys_prompt, usr_prompt, sum_prompt = self._build_review_prompts(
-                user_input, truncated_git_diff, modification_history
+                user_input, truncated_git_diff, modification_history, self.start_commit
             )
 
             review_agent = Agent(
