@@ -583,6 +583,7 @@ def create_panel(
     tmux_args = [
         "tmux",
         "split-window",
+        "-d",  # 创建 detached pane，避免影响当前 pane
         f"-{split_direction}",  # -h 水平分割，-v 垂直分割
     ]
 
@@ -591,29 +592,76 @@ def create_panel(
         tmux_args.extend(["-p", str(pane_percentage)])
 
     # 添加目标和命令
-    tmux_args.extend(["-t", target, "-F", "#{pane_id}", command])
+    tmux_args.extend(["-t", target, command])
 
-    # 执行 tmux 命令
+    # 执行 tmux 命令创建 pane
     try:
-        result = subprocess.run(
+        subprocess.run(
             tmux_args,
             capture_output=True,
             text=True,
             check=True,
             timeout=10,
         )
-        # 返回新创建的 pane ID
-        pane_id = result.stdout.strip()
+
+        # 获取新创建的 pane ID（通过 list-panes 找到最新的 pane）
+        list_args = [
+            "tmux",
+            "list-panes",
+            "-t",
+            target,
+            "-F",
+            "#{pane_index}",
+        ]
+        list_result = subprocess.run(
+            list_args,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+
+        # 找到最新的 pane（索引最大的）
+        panes = list_result.stdout.strip().split("\n")
+        if not panes or not panes[0]:
+            PrettyOutput.print(
+                f"⚠️ Failed to list panes for target '{target}'",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            return None
+
+        # 最后一个 pane 就是最新的
+        latest_pane_index = panes[-1]
+
+        # 获取完整的 pane_id
+        get_id_args = [
+            "tmux",
+            "display-message",
+            "-t",
+            f"{target}.{latest_pane_index}",
+            "-p",
+            "#{pane_id}",
+        ]
+        id_result = subprocess.run(
+            get_id_args,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+
+        pane_id = id_result.stdout.strip()
         if pane_id:
             return pane_id
         else:
             PrettyOutput.print(
-                f"⚠️ tmux split-window returned empty pane_id for target '{target}'",
+                f"⚠️ Failed to get pane_id for target '{target}'",
                 OutputType.WARNING,
                 timestamp=False,
             )
             PrettyOutput.print(
-                f"⚠️ stdout: {result.stdout}",
+                f"⚠️ list-panes output: {list_result.stdout.strip()}",
                 OutputType.WARNING,
                 timestamp=False,
             )
