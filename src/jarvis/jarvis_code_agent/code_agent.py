@@ -1276,7 +1276,7 @@ def cli(
             raise typer.Exit(code=0)
         else:
             PrettyOutput.auto_print(
-                "❌ 派发失败：当前不在 tmux 环境中或 tmux 未安装，请在 tmux 环境中使用 --dispatch 参数"
+                "❌ 任务派发失败：无法创建tmux窗口或窗格，请检查tmux配置"
             )
             raise typer.Exit(code=1)
 

@@ -586,8 +586,14 @@ def create_panel(
         pane_id = result.stdout.strip()
         return pane_id if pane_id else None
     except subprocess.CalledProcessError as e:
+        stderr_output = e.stderr.strip() if e.stderr else "(no stderr output)"
         PrettyOutput.print(
             f"⚠️ Failed to create panel in window '{window_id}' of session '{session_name}': {e}",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        PrettyOutput.print(
+            f"⚠️ tmux stderr: {stderr_output}",
             OutputType.WARNING,
             timestamp=False,
         )
@@ -992,9 +998,34 @@ def _dispatch_to_existing_jarvis_session(
             OutputType.WARNING,
             timestamp=False,
         )
-        return False
+        # 降级方案：尝试创建新window
+        PrettyOutput.print(
+            "ℹ️ 尝试降级方案：创建新window...",
+            OutputType.INFO,
+            timestamp=False,
+        )
+        new_window_id = create_window(
+            session_name=session_name,
+            initial_command=command,
+        )
+        if new_window_id:
+            window_index = new_window_id.split(":")[0].strip()
+            set_window_tiled_layout(session_name, window_index)
+            PrettyOutput.print(
+                f"✅ 任务已派发到新window {window_index}",
+                OutputType.SUCCESS,
+                timestamp=False,
+            )
+            return True
+        else:
+            PrettyOutput.print(
+                "❌ 创建新window失败，无法派发任务",
+                OutputType.ERROR,
+                timestamp=False,
+            )
+            return False
 
-    # 切换到 tiled 布局
+    # panel创建成功，切换到 tiled 布局
     if set_window_tiled_layout(session_name, current_window):
         PrettyOutput.print(
             f"✅ 任务已派发到 tmux session '{session_name}' 的 panel 中",
