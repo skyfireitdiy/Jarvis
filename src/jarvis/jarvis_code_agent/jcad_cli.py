@@ -54,7 +54,11 @@ def _write_task_to_temp_file(task_content: str) -> str:
         temp_file.close()
 
 
-def run_jca_dispatch(task: Any, is_dispatch_mode: bool = False) -> None:
+def run_jca_dispatch(
+    task: Any,
+    is_dispatch_mode: bool = False,
+    stay_in_session_after_exit: bool = True,
+) -> None:
     """执行 jca -n -w --dispatch --task <task>"""
     # 确保 task 是字符串内容而非类型对象
     if isinstance(task, str):
@@ -96,7 +100,9 @@ def run_jca_dispatch(task: Any, is_dispatch_mode: bool = False) -> None:
             # 使用智能调度函数创建 tmux panel
             from jarvis.jarvis_utils.tmux_wrapper import dispatch_command_to_panel
 
-            session_name = dispatch_command_to_panel(command)
+            session_name = dispatch_command_to_panel(
+                command, stay_in_session_after_exit=stay_in_session_after_exit
+            )
             if not session_name:
                 PrettyOutput.auto_print("❌ 错误: dispatch 模式创建 tmux panel 失败")
                 sys.exit(1)

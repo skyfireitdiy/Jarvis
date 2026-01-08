@@ -953,7 +953,9 @@ def send_command_to_window(
 
 
 def dispatch_command_to_panel(
-    shell_command: str, max_panes_per_window: int = 4
+    shell_command: str,
+    max_panes_per_window: int = 4,
+    stay_in_session_after_exit: bool = True,
 ) -> Optional[str]:
     """调度命令到当前 tmux window 的 panel 中执行。
 
@@ -994,6 +996,7 @@ def dispatch_command_to_panel(
         window_id=current_window,
         initial_command=shell_command,
         split_direction="h",
+        stay_in_session_after_exit=stay_in_session_after_exit,
     )
     if pane_id:
         PrettyOutput.print(
