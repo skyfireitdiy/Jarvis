@@ -13,6 +13,10 @@ from typing import Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
+from jarvis.jarvis_utils.git_utils import (
+    has_uncommitted_changes,
+    handle_commit_workflow,
+)
 
 
 class WorktreeManager:
@@ -30,6 +34,23 @@ class WorktreeManager:
         self.repo_root = repo_root
         self.worktree_path: Optional[str] = None
         self.worktree_branch: Optional[str] = None
+
+    def _auto_commit_if_needed(self) -> None:
+        """检测并自动提交未提交的更改
+
+        在创建 worktree 前，确保主仓库处于干净状态。
+        如果有未提交的更改，自动执行提交。
+        """
+        try:
+            if has_uncommitted_changes():
+                PrettyOutput.auto_print("⚠️  检测到主仓库有未提交的更改")
+                PrettyOutput.auto_print("🔄 自动提交主仓库更改...")
+                if handle_commit_workflow():
+                    PrettyOutput.auto_print("✅ 已自动提交主仓库更改")
+                else:
+                    PrettyOutput.auto_print("⚠️  自动提交失败，可能影响 worktree 创建")
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️  自动提交过程中出错: {str(e)}")
 
     def _get_project_name(self) -> str:
         """获取项目名称
@@ -175,6 +196,9 @@ class WorktreeManager:
         抛出:
             RuntimeError: 如果创建 worktree 失败
         """
+        # 检测并自动提交未提交的更改（确保主仓库处于干净状态）
+        self._auto_commit_if_needed()
+
         # 检测仓库是否有提交记录，如果没有则自动创建初始提交
         if not self._has_commits():
             PrettyOutput.auto_print("⚠️ 仓库没有任何提交记录，自动创建初始提交...")
