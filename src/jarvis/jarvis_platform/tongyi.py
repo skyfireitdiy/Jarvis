@@ -84,6 +84,14 @@ class TongyiPlatform(BasePlatform):
         """Check if platform supports upload files"""
         return True
 
+    def trim_messages(self) -> bool:
+        """未实现：不支持裁剪消息历史
+
+        返回:
+            bool: 返回False表示不支持裁剪
+        """
+        return False
+
     def chat(self, message: str) -> Generator[str, None, None]:
         if not self.request_id:
             self._generate_request_id()

@@ -323,6 +323,44 @@ class ClaudeModel(BasePlatform):
         """
         return False
 
+    def trim_messages(self) -> bool:
+        """裁剪消息历史以腾出token空间
+
+        Claude的system_message单独存储，不在messages列表中。
+        丢弃开头的10条非system消息（user/assistant消息）。
+
+        返回:
+            bool: 如果成功腾出空间返回True，否则返回False
+        """
+        if not self.messages:
+            return False
+
+        # Claude的messages列表只包含user和assistant消息
+        # 如果消息少于等于10条，无法裁剪
+        if len(self.messages) <= 10:
+            PrettyOutput.auto_print("⚠️ 警告：消息不足10条，无法裁剪")
+            return False
+
+        # 记录原始消息数量
+        original_count = len(self.messages)
+
+        # 丢弃开头的10条消息
+        self.messages = self.messages[10:]
+        trimmed_count = original_count - len(self.messages)
+
+        # 检查裁剪后是否有剩余token
+        remaining_tokens = self.get_remaining_token_count()
+        if remaining_tokens > 0:
+            PrettyOutput.auto_print(
+                f"✅ 裁剪成功：丢弃了{trimmed_count}条消息，剩余token: {remaining_tokens}"
+            )
+            return True
+        else:
+            PrettyOutput.auto_print(
+                f"⚠️ 警告：已裁剪{trimmed_count}条消息，但仍无剩余token"
+            )
+            return False
+
     @classmethod
     def get_required_env_keys(cls) -> List[str]:
         """
