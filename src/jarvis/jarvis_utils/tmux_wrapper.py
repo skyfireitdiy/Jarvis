@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from jarvis.jarvis_utils.output import PrettyOutput, OutputType
 
@@ -313,6 +313,52 @@ def _find_jarvis_session() -> Optional[str]:
             timestamp=False,
         )
     return None
+
+
+def list_session_windows(session_name: str) -> List[str]:
+    """获取指定tmux session的window列表。
+
+    Args:
+        session_name: tmux session名称
+
+    Returns:
+        List[str]: window列表，格式为["index: name", ...]（如["1: bash", "2: editor"]）
+
+    注意:
+        如果session不存在或命令执行失败，返回空列表。
+        window列表按索引顺序排列。
+    """
+    try:
+        result = subprocess.run(
+            [
+                "tmux",
+                "list-windows",
+                "-t",
+                session_name,
+                "-F",
+                "#{window_index}: #{window_name}",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        # 解析输出，过滤空行
+        windows = [
+            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+        ]
+        return windows
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        # session不存在或命令执行失败，返回空列表
+        return []
+    except Exception as e:
+        # 记录意外错误
+        PrettyOutput.print(
+            f"⚠️ Unexpected error while listing windows for session '{session_name}': {e}",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return []
 
 
 def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
