@@ -416,6 +416,107 @@ def get_window_pane_count(session_name: str, window_id: str) -> int:
         return 0
 
 
+def create_panel(
+    session_name: str,
+    window_id: str,
+    initial_command: str,
+    split_direction: str = "h",
+    working_dir: Optional[str] = None,
+    pane_percentage: Optional[int] = None,
+) -> Optional[str]:
+    """在指定的 tmux session 和 window 中创建 panel 并执行初始命令。
+
+    Args:
+        session_name: tmux session 名称
+        window_id: window 标识（索引或名称，如 "1" 或 "1: bash"）
+        initial_command: panel 中执行的初始命令
+        split_direction: 分割方向，"h"表示水平分割（左右），"v"表示垂直分割（上下）
+        working_dir: 工作目录，None表示使用当前工作目录
+        pane_percentage: pane 大小百分比（1-99），None表示默认大小
+
+    Returns:
+        Optional[str]: 新创建的 pane ID，失败返回 None
+
+    注意:
+        window_id 可以是完整的"index: name"格式，也可以仅是索引。
+        创建 panel 后会在命令执行结束后启动用户的默认 shell 保持 panel 活动。
+    """
+    # 验证 split_direction 参数
+    if split_direction not in ("h", "v"):
+        PrettyOutput.print(
+            f"⚠️ Invalid split_direction: '{split_direction}', must be 'h' or 'v'",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+
+    # 验证 pane_percentage 参数
+    if pane_percentage is not None and (pane_percentage < 1 or pane_percentage > 99):
+        PrettyOutput.print(
+            f"⚠️ Invalid pane_percentage: '{pane_percentage}', must be between 1 and 99",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+
+    # 解析 window_id：支持 "index: name" 和 "index" 两种格式
+    target_window = window_id.split(":")[0].strip() if ":" in window_id else window_id
+
+    # 构造 tmux 目标参数
+    target = f"{session_name}:{target_window}"
+
+    # 确定工作目录
+    if working_dir is None:
+        working_dir = os.getcwd()
+
+    # 获取用户的默认 shell
+    user_shell = os.environ.get("SHELL", "/bin/sh")
+
+    # 构造命令：先切换到工作目录，执行初始命令，然后启动 shell 保持 panel 活动
+    command = f'cd {shlex.quote(working_dir)} && {initial_command}; exec "{user_shell}"'
+
+    # 构造 tmux split-window 命令
+    tmux_args = [
+        "tmux",
+        "split-window",
+        f"-{split_direction}",  # -h 水平分割，-v 垂直分割
+    ]
+
+    # 如果指定了 pane 大小，添加 -p 参数
+    if pane_percentage is not None:
+        tmux_args.extend(["-p", str(pane_percentage)])
+
+    # 添加目标和命令
+    tmux_args.extend(["-t", target, "-F", "#{pane_id}", command])
+
+    # 执行 tmux 命令
+    try:
+        result = subprocess.run(
+            tmux_args,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=10,
+        )
+        # 返回新创建的 pane ID
+        pane_id = result.stdout.strip()
+        return pane_id if pane_id else None
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.print(
+            f"⚠️ Failed to create panel in window '{window_id}' of session '{session_name}': {e}",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+    except subprocess.TimeoutExpired:
+        PrettyOutput.print(
+            f"⚠️ Creating panel in window '{window_id}' of session '{session_name}' timed out",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+
+
 def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
     """查找或创建 jarvis session。
 
