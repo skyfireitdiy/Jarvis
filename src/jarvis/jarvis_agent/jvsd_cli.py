@@ -87,21 +87,22 @@ def run_jvs_dispatch(
 
         # 获取当前工作目录
         cwd = os.getcwd()
-        user_shell = os.environ.get("SHELL", "/bin/sh")
 
         # 安全转义路径
         quoted_cwd = shlex.quote(cwd)
         quoted_task_file = shlex.quote(task_str)
 
-        # 构造命令：cd 到工作目录，执行 jvs，然后删除临时文件，最后启动 shell
-        command = f"cd {quoted_cwd} && jvs -n -d --task-file {quoted_task_file} && rm -f {quoted_task_file}; exec {shlex.quote(user_shell)}"
+        # 构造命令：cd 到工作目录，执行 jvs，然后删除临时文件
+        command = f"cd {quoted_cwd} && jvs -n -d --task-file {quoted_task_file} && rm -f {quoted_task_file}"
 
         try:
             # 使用智能调度函数创建 tmux panel
             from jarvis.jarvis_utils.tmux_wrapper import dispatch_command_to_panel
 
             session_name = dispatch_command_to_panel(
-                command, stay_in_session_after_exit=stay_in_session_after_exit
+                command,
+                stay_in_session_after_exit=stay_in_session_after_exit,
+                shell_fallback=False,
             )
             if not session_name:
                 PrettyOutput.auto_print("❌ 错误: dispatch 模式创建 tmux panel 失败")
