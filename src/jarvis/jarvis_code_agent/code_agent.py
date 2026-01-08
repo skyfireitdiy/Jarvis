@@ -82,8 +82,6 @@ class CodeAgent(Agent):
     ) -> None:
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
-        # 记录当前是否为非交互模式，便于在提示词/输入中动态调整行为说明
-        self.non_interactive: bool = bool(non_interactive)
         # Review 相关配置
         # 注意：disable_review 仅保存配置值，实际是否执行 review 在运行时动态判断
         self.disable_review = disable_review  # 保存用户配置的 disable_review 值
