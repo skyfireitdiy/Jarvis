@@ -45,6 +45,33 @@ class AgentRunLoop:
         # Git diff相关属性
         self._git_diff: Optional[str] = None  # 缓存git diff内容
 
+    def _handle_interrupt_with_input(self) -> Optional[str]:
+        """处理中断并获取用户补充信息
+
+        返回:
+            Optional[str]: 如果用户输入了补充信息，返回格式化字符串；否则返回 None
+        """
+        from jarvis.jarvis_utils.input import get_single_line_input
+
+        try:
+            user_input = get_single_line_input(
+                "⚠ 检测到中断，请输入补充信息（直接回车跳过）："
+            )
+            if user_input and user_input.strip():
+                return f"[用户中断] 补充信息：{user_input.strip()}"
+        except (KeyboardInterrupt, EOFError):
+            # 用户再次中断，询问是否要完全退出
+            PrettyOutput.auto_print("\n🔄 再次检测到中断，请选择操作：")
+            PrettyOutput.auto_print("  1. 跳过补充信息，继续执行")
+            PrettyOutput.auto_print("  2. 完全退出程序")
+            try:
+                choice = get_single_line_input("请输入选项（1/2，直接回车默认跳过）：")
+                if choice and choice.strip() == "2":
+                    raise  # 重新抛出KeyboardInterrupt，让外层处理退出
+            except (KeyboardInterrupt, EOFError):
+                raise  # 用户再次中断，直接退出
+        return None
+
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
         run_input_handlers = True
@@ -84,6 +111,8 @@ class AgentRunLoop:
                             self._git_diff = self.get_git_diff()
                         else:
                             self._git_diff = None
+                    except KeyboardInterrupt:
+                        raise
                     except Exception as e:
                         PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
                         self._git_diff = f"获取git diff失败: {str(e)}"
@@ -120,9 +149,18 @@ class AgentRunLoop:
                     ag._first_run()
 
                 # 调用模型获取响应
-                current_response = ag._call_model(
-                    ag.session.prompt, True, run_input_handlers
-                )
+                try:
+                    current_response = ag._call_model(
+                        ag.session.prompt, True, run_input_handlers
+                    )
+                except KeyboardInterrupt:
+                    # 获取用户补充信息并继续下一轮
+                    addon_info = self._handle_interrupt_with_input()
+                    if addon_info:
+                        ag.session.addon_prompt = join_prompts(
+                            [ag.session.addon_prompt, addon_info]
+                        )
+                    continue
 
                 ag.session.prompt = ""
                 run_input_handlers = False
@@ -141,6 +179,8 @@ class AgentRunLoop:
                             self._git_diff = self.get_git_diff()
                         else:
                             self._git_diff = None
+                    except KeyboardInterrupt:
+                        raise
                     except Exception as e:
                         PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
                         self._git_diff = f"获取git diff失败: {str(e)}"
@@ -184,7 +224,17 @@ class AgentRunLoop:
                     )
                 except Exception:
                     pass
-                need_return, tool_prompt = ag._call_tools(current_response)
+                try:
+                    need_return, tool_prompt = ag._call_tools(current_response)
+                except KeyboardInterrupt:
+                    # 获取用户补充信息并继续执行
+                    addon_info = self._handle_interrupt_with_input()
+                    if addon_info:
+                        ag.session.addon_prompt = join_prompts(
+                            [ag.session.addon_prompt, addon_info]
+                        )
+                    need_return = False
+                    tool_prompt = ""
 
                 # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
                 if need_return:
@@ -263,9 +313,19 @@ class AgentRunLoop:
                                 no_code_mod_prompt = "\n".join(no_code_mod_prompt_parts)
 
                                 # 询问 LLM
-                                llm_response = ag._call_model(
-                                    no_code_mod_prompt, False, False
-                                )
+                                try:
+                                    llm_response = ag._call_model(
+                                        no_code_mod_prompt, False, False
+                                    )
+                                except KeyboardInterrupt:
+                                    # 获取用户补充信息并继续主循环下一轮
+                                    addon_info = self._handle_interrupt_with_input()
+                                    if addon_info:
+                                        ag.session.addon_prompt = join_prompts(
+                                            [ag.session.addon_prompt, addon_info]
+                                        )
+                                    should_auto_complete = False
+                                    continue
 
                                 # 解析响应
                                 if "<!!!NO!!!>" in llm_response:
@@ -290,6 +350,8 @@ class AgentRunLoop:
                                     PrettyOutput.auto_print(
                                         "⚠️ 未收到明确的完成确认，将继续执行任务。"
                                     )
+                    except KeyboardInterrupt:
+                        raise
                     except Exception as e:
                         # 检查过程出错，默认继续原有流程
                         PrettyOutput.auto_print(
@@ -385,7 +447,19 @@ class AgentRunLoop:
                                 task_prompt = "\n".join(task_prompt_parts)
 
                                 # 询问 LLM
-                                llm_response = ag._call_model(task_prompt, False, False)
+                                try:
+                                    llm_response = ag._call_model(
+                                        task_prompt, False, False
+                                    )
+                                except KeyboardInterrupt:
+                                    # 获取用户补充信息并继续主循环下一轮
+                                    addon_info = self._handle_interrupt_with_input()
+                                    if addon_info:
+                                        ag.session.addon_prompt = join_prompts(
+                                            [ag.session.addon_prompt, addon_info]
+                                        )
+                                    should_auto_complete = False
+                                    continue
 
                                 # 解析响应
                                 if "<!!!NO!!!>" in llm_response:
@@ -410,6 +484,8 @@ class AgentRunLoop:
                                     PrettyOutput.auto_print(
                                         "⚠️ 未收到明确的完成确认，将继续执行任务列表。"
                                     )
+                        except KeyboardInterrupt:
+                            raise
                         except Exception as e:
                             # 检查过程出错，默认继续自动完成
                             PrettyOutput.auto_print(
@@ -459,7 +535,16 @@ class AgentRunLoop:
                     console.print(panel)
 
                 # 获取下一步用户输入
-                next_action = ag._get_next_user_action()
+                try:
+                    next_action = ag._get_next_user_action()
+                except KeyboardInterrupt:
+                    # 获取用户补充信息并继续下一轮
+                    addon_info = self._handle_interrupt_with_input()
+                    if addon_info:
+                        ag.session.addon_prompt = join_prompts(
+                            [ag.session.addon_prompt, addon_info]
+                        )
+                    continue
                 action = normalize_next_action(next_action)
                 if action == "continue":
                     run_input_handlers = True
@@ -467,6 +552,14 @@ class AgentRunLoop:
                 elif action == "complete":
                     return ag._complete_task(auto_completed=False)
 
+            except KeyboardInterrupt:
+                # 获取用户补充信息并继续执行
+                addon_info = self._handle_interrupt_with_input()
+                if addon_info:
+                    ag.session.addon_prompt = join_prompts(
+                        [ag.session.addon_prompt, addon_info]
+                    )
+                continue
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
                 return f"Task failed: {str(e)}"
