@@ -511,6 +511,13 @@ def create_window(
             timestamp=False,
         )
         return None
+    except Exception as e:
+        PrettyOutput.print(
+            f"⚠️ Unexpected error creating window in session '{session_name}': {type(e).__name__}: {e}",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
 
 
 def create_panel(
@@ -627,6 +634,13 @@ def create_panel(
     except subprocess.TimeoutExpired:
         PrettyOutput.print(
             f"⚠️ Creating panel in window '{window_id}' of session '{session_name}' timed out",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+    except Exception as e:
+        PrettyOutput.print(
+            f"⚠️ Unexpected error creating panel in window '{window_id}' of session '{session_name}': {type(e).__name__}: {e}",
             OutputType.WARNING,
             timestamp=False,
         )
@@ -929,7 +943,14 @@ def dispatch_command_to_panel(
             split_direction="h",
         )
         if pane_id:
-            set_window_tiled_layout(session_name, target_window_id)
+            try:
+                set_window_tiled_layout(session_name, target_window_id)
+            except Exception as e:
+                PrettyOutput.print(
+                    f"⚠️ Failed to set tiled layout for window {target_window_id}: {type(e).__name__}: {e}",
+                    OutputType.WARNING,
+                    timestamp=False,
+                )
             PrettyOutput.print(
                 f"✅ Successfully created panel {pane_id} in window {target_window_id}",
                 OutputType.SUCCESS,
@@ -954,7 +975,14 @@ def dispatch_command_to_panel(
         )
         if new_window_id:
             window_index = new_window_id.split(":")[0].strip()
-            set_window_tiled_layout(session_name, window_index)
+            try:
+                set_window_tiled_layout(session_name, window_index)
+            except Exception as e:
+                PrettyOutput.print(
+                    f"⚠️ Failed to set tiled layout for new window {window_index}: {type(e).__name__}: {e}",
+                    OutputType.WARNING,
+                    timestamp=False,
+                )
             PrettyOutput.print(
                 f"ℹ️ Created new window {window_index} for command",
                 OutputType.INFO,
