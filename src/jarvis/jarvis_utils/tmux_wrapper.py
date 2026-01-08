@@ -764,7 +764,9 @@ def set_window_tiled_layout(session_name: str, window_id: Optional[str] = None) 
         return False
 
 
-def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
+def find_or_create_jarvis_session(
+    force_create: bool = True, initial_command: Optional[str] = None
+) -> Optional[str]:
     """查找或创建 jarvis session。
 
     优先查找现有的 jarvis session，找到则返回 session 名称，
@@ -772,6 +774,7 @@ def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
 
     Args:
         force_create: 未找到时是否创建新 session
+        initial_command: 初始命令（可选），如果指定则在创建 session 时直接以该命令启动
 
     Returns:
         Optional[str]: 找到或创建的 session 名称，未找到且不创建则返回 None
@@ -788,12 +791,21 @@ def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
     # 创建新的 session
     session_name = _generate_session_name()
     try:
-        # 创建新的 detached session
-        subprocess.run(
-            ["tmux", "new-session", "-d", "-s", session_name],
-            check=True,
-            timeout=10,
-        )
+        if initial_command:
+            # 创建新的 detached session，直接以指定命令启动
+            subprocess.run(
+                ["tmux", "new-session", "-d", "-s", session_name, initial_command],
+                check=True,
+                timeout=10,
+            )
+        else:
+            # 创建新的 detached session，使用 true 命令作为初始 pane（立即退出）
+            # 这样可以避免默认的 shell pane，同时保持 window 存在
+            subprocess.run(
+                ["tmux", "new-session", "-d", "-s", session_name, "true"],
+                check=True,
+                timeout=10,
+            )
         return session_name
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(
@@ -985,55 +997,74 @@ def dispatch_command_to_panel(
         )
         return None
 
-    # 查找或创建 jarvis session
-    session_name = find_or_create_jarvis_session(force_create=True)
-    if not session_name:
-        PrettyOutput.print(
-            "⚠️ Failed to find or create jarvis session",
-            OutputType.WARNING,
-            timestamp=False,
-        )
-        return None
+    # 先尝试查找现有 session
+    existing_session = _find_jarvis_session()
 
-    # 获取当前窗口索引
-    current_window = get_session_current_window(session_name)
-    if not current_window:
+    if existing_session:
+        # 使用现有 session，在当前 window 创建 panel
         PrettyOutput.print(
-            f"⚠️ 无法获取 session '{session_name}' 的当前窗口",
-            OutputType.WARNING,
-            timestamp=False,
-        )
-        return None
-
-    # 在当前窗口创建 panel
-    pane_id = create_panel(
-        session_name=session_name,
-        window_id=current_window,
-        initial_command=shell_command,
-        split_direction="h",
-        stay_in_session_after_exit=stay_in_session_after_exit,
-        shell_fallback=shell_fallback,
-    )
-    if pane_id:
-        PrettyOutput.print(
-            f"✅ Successfully created panel {pane_id} in current window {current_window}",
-            OutputType.SUCCESS,
-            timestamp=False,
-        )
-        return session_name
-    else:
-        PrettyOutput.print(
-            f"❌ Failed to create panel in window {current_window} of session '{session_name}'",
-            OutputType.ERROR,
-            timestamp=False,
-        )
-        PrettyOutput.print(
-            f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
+            f"ℹ️ 使用现有 tmux session: {existing_session}",
             OutputType.INFO,
             timestamp=False,
         )
 
-    return None
+        # 获取当前窗口索引
+        current_window = get_session_current_window(existing_session)
+        if not current_window:
+            PrettyOutput.print(
+                f"⚠️ 无法获取 session '{existing_session}' 的当前窗口",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            return None
+
+        # 在当前窗口创建 panel
+        pane_id = create_panel(
+            session_name=existing_session,
+            window_id=current_window,
+            initial_command=shell_command,
+            split_direction="h",
+            stay_in_session_after_exit=stay_in_session_after_exit,
+            shell_fallback=shell_fallback,
+        )
+        if pane_id:
+            PrettyOutput.print(
+                f"✅ Successfully created panel {pane_id} in current window {current_window}",
+                OutputType.SUCCESS,
+                timestamp=False,
+            )
+            return existing_session
+        else:
+            PrettyOutput.print(
+                f"❌ Failed to create panel in window {current_window} of session '{existing_session}'",
+                OutputType.ERROR,
+                timestamp=False,
+            )
+            PrettyOutput.print(
+                f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
+                OutputType.INFO,
+                timestamp=False,
+            )
+            return None
+    else:
+        # 没有现有 session，创建新 session 并直接以主进程启动
+        new_session = find_or_create_jarvis_session(
+            force_create=True, initial_command=shell_command
+        )
+        if not new_session:
+            PrettyOutput.print(
+                "⚠️ Failed to create jarvis session",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            return None
+
+        PrettyOutput.print(
+            f"✅ Successfully created session '{new_session}' with main process",
+            OutputType.SUCCESS,
+            timestamp=False,
+        )
+        return new_session
 
 
 def _dispatch_to_existing_jarvis_session(
