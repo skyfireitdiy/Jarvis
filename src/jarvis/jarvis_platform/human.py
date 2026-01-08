@@ -145,6 +145,14 @@ class HumanPlatform(BasePlatform):
         """是否支持文件上传功能"""
         return False
 
+    def trim_messages(self) -> bool:
+        """未实现：不支持裁剪消息历史
+
+        返回:
+            bool: 返回False表示不支持裁剪
+        """
+        return False
+
     @classmethod
     def get_required_env_keys(cls) -> List[str]:
         """

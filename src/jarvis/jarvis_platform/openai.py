@@ -364,6 +364,48 @@ class OpenAIModel(BasePlatform):
         """
         return False
 
+    def trim_messages(self) -> bool:
+        """裁剪消息历史以腾出token空间
+
+        保留所有system消息，并丢弃开头的10条非system消息。
+
+        返回:
+            bool: 如果成功腾出空间返回True，否则返回False
+        """
+        if not self.messages:
+            return False
+
+        # 分离system消息和非system消息
+        system_messages = [msg for msg in self.messages if msg.get("role") == "system"]
+        non_system_messages = [
+            msg for msg in self.messages if msg.get("role") != "system"
+        ]
+
+        # 如果非system消息少于等于10条，无法裁剪
+        if len(non_system_messages) <= 10:
+            PrettyOutput.auto_print("⚠️ 警告：非system消息不足10条，无法裁剪")
+            return False
+
+        # 丢弃开头的10条非system消息
+        trimmed_messages = non_system_messages[10:]
+        trimmed_count = len(non_system_messages) - len(trimmed_messages)
+
+        # 重新组装消息列表：system消息 + 裁剪后的非system消息
+        self.messages = system_messages + trimmed_messages
+
+        # 检查裁剪后是否有剩余token
+        remaining_tokens = self.get_remaining_token_count()
+        if remaining_tokens > 0:
+            PrettyOutput.auto_print(
+                f"✅ 裁剪成功：丢弃了{trimmed_count}条非system消息，剩余token: {remaining_tokens}"
+            )
+            return True
+        else:
+            PrettyOutput.auto_print(
+                f"⚠️ 警告：已裁剪{trimmed_count}条消息，但仍无剩余token"
+            )
+            return False
+
     @classmethod
     def get_required_env_keys(cls) -> List[str]:
         """

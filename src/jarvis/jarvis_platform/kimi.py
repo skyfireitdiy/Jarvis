@@ -108,6 +108,14 @@ class KimiModel(BasePlatform):
         """Check if platform supports upload files"""
         return True
 
+    def trim_messages(self) -> bool:
+        """未实现：不支持裁剪消息历史
+
+        返回:
+            bool: 返回False表示不支持裁剪
+        """
+        return False
+
     def _upload_file(self, file_path: str, presigned_url: str) -> bool:
         """Upload file to presigned URL"""
         try:

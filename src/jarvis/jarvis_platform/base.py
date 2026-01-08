@@ -690,10 +690,28 @@ class BasePlatform(ABC):
             # 获取剩余token数量
             remaining_tokens = self.get_remaining_token_count()
 
-            # 如果剩余token为0或负数，返回空消息
+            # 如果剩余token为0或负数，尝试裁剪历史消息以腾出空间
             if remaining_tokens <= 0:
-                PrettyOutput.auto_print("⚠️ 警告：剩余token为0，无法发送消息")
-                return ""
+                PrettyOutput.auto_print("⚠️ 警告：剩余token为0，尝试裁剪历史消息...")
+                if self.trim_messages():
+                    # 裁剪成功，重新计算剩余token
+                    remaining_tokens = self.get_remaining_token_count()
+                    PrettyOutput.auto_print(
+                        f"✅ 裁剪成功，当前剩余token: {remaining_tokens}"
+                    )
+                    if remaining_tokens > 0:
+                        # 裁剪后仍有空间，继续处理消息
+                        pass
+                    else:
+                        PrettyOutput.auto_print(
+                            "⚠️ 警告：裁剪后仍无剩余token，无法发送消息"
+                        )
+                        return ""
+                else:
+                    PrettyOutput.auto_print(
+                        "⚠️ 警告：裁剪失败或无消息可裁剪，无法发送消息"
+                    )
+                    return ""
 
             # 计算消息的token数量
             message_tokens = get_context_token_count(message)
@@ -740,3 +758,15 @@ class BasePlatform(ABC):
     def support_web(self) -> bool:
         """检查平台是否支持网页功能"""
         return False
+
+    @abstractmethod
+    def trim_messages(self) -> bool:
+        """裁剪消息历史以腾出token空间
+
+        当剩余token不足时，通过裁剪历史消息来腾出空间。
+        默认实现应保留system消息，并丢弃开头的10条非system消息。
+
+        返回:
+            bool: 如果成功腾出空间返回True，否则返回False
+        """
+        raise NotImplementedError("trim_messages is not implemented")
