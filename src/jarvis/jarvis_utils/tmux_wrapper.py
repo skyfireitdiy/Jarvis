@@ -904,7 +904,23 @@ def dispatch_command_to_panel(
         )
         if pane_id:
             set_window_tiled_layout(session_name, target_window_id)
+            PrettyOutput.print(
+                f"✅ Successfully created panel {pane_id} in window {target_window_id}",
+                OutputType.SUCCESS,
+                timestamp=False,
+            )
             return session_name
+        else:
+            PrettyOutput.print(
+                f"❌ Failed to create panel in window {target_window_id} of session '{session_name}'",
+                OutputType.ERROR,
+                timestamp=False,
+            )
+            PrettyOutput.print(
+                f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
+                OutputType.INFO,
+                timestamp=False,
+            )
     else:
         # 创建新 window
         new_window_id = create_window(
