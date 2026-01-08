@@ -584,7 +584,20 @@ def create_panel(
         )
         # 返回新创建的 pane ID
         pane_id = result.stdout.strip()
-        return pane_id if pane_id else None
+        if pane_id:
+            return pane_id
+        else:
+            PrettyOutput.print(
+                f"⚠️ tmux split-window returned empty pane_id for target '{target}'",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            PrettyOutput.print(
+                f"⚠️ stdout: {result.stdout}",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            return None
     except subprocess.CalledProcessError as e:
         stderr_output = e.stderr.strip() if e.stderr else "(no stderr output)"
         PrettyOutput.print(
