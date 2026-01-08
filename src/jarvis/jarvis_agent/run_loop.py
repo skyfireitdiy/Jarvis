@@ -14,8 +14,6 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import Optional
 
-from rich import box
-from rich.panel import Panel
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -247,6 +245,25 @@ class AgentRunLoop:
                 safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
 
                 ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
+
+                # 只有在没有工具调用时，才打印LLM输出
+                # safe_tool_prompt 为空表示没有工具被调用
+                if not safe_tool_prompt or not safe_tool_prompt.strip():
+                    if current_response and current_response.strip():
+                        import jarvis.jarvis_utils.globals as G
+                        from jarvis.jarvis_utils.globals import console
+                        from rich.panel import Panel
+                        from rich import box
+
+                        agent_name = ag.name if hasattr(ag, "name") else None
+                        panel = Panel(
+                            current_response,
+                            title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'}[/bold cyan]",
+                            border_style="bright_blue",
+                            box=box.ROUNDED,
+                            expand=True,
+                        )
+                        console.print(panel)
 
                 # 关键流程：直接调用 after_tool_call 回调函数
                 try:
@@ -520,21 +537,6 @@ class AgentRunLoop:
                             ag.set_addon_prompt(tool_usage_prompt)
                             # 重置计数器，避免重复添加
                             ag._no_tool_call_count = 0
-
-                # 如果没有工具调用，显示完整响应
-                if not has_tool_call and current_response and current_response.strip():
-                    import jarvis.jarvis_utils.globals as G
-                    from jarvis.jarvis_utils.globals import console
-
-                    agent_name = ag.name if hasattr(ag, "name") else None
-                    panel = Panel(
-                        current_response,
-                        title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'}[/bold cyan]",
-                        border_style="bright_blue",
-                        box=box.ROUNDED,
-                        expand=True,
-                    )
-                    console.print(panel)
 
                 # 获取下一步用户输入
                 try:
