@@ -483,7 +483,20 @@ def create_window(
         )
         # 返回新创建的 window ID
         window_id = result.stdout.strip()
-        return window_id if window_id else None
+        if window_id:
+            return window_id
+        else:
+            PrettyOutput.print(
+                f"⚠️ tmux new-window returned empty window_id for session '{session_name}'",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            PrettyOutput.print(
+                f"⚠️ stdout: {result.stdout}",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            return None
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(
             f"⚠️ Failed to create window in session '{session_name}': {e}",
