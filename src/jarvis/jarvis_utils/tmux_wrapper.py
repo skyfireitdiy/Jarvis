@@ -459,8 +459,8 @@ def create_window(
         "tmux",
         "new-window",
         "-d",  # 创建 detached window
-        "-F",  # 指定输出格式
-        "#{window_id}",
+        "-F",  # 指定输出格式（使用 window_index 以便后续 send-keys 调用）
+        "#{window_index}",
         "-c",  # 指定工作目录
         working_dir,
     ]
@@ -699,6 +699,224 @@ def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
         return None
 
 
+def get_session_current_window(session_name: str) -> Optional[str]:
+    """获取指定 tmux session 的当前窗口索引。
+
+    Args:
+        session_name: tmux session 名称
+
+    Returns:
+        Optional[str]: 当前窗口索引（如 '0', '1'），如果失败则返回 None
+    """
+    tmux_path = shutil.which("tmux")
+    if tmux_path is None:
+        return None
+
+    try:
+        # 获取 session 的所有窗口，当前窗口会带有 * 标记
+        result = subprocess.run(
+            [
+                "tmux",
+                "list-windows",
+                "-t",
+                session_name,
+                "-F",
+                "#{window_index}:#{window_flags}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+
+        # 解析输出，查找带有 * 标记的窗口（当前窗口）
+        for line in result.stdout.strip().split("\n"):
+            if "*" in line:
+                # 返回窗口索引部分（冒号之前）
+                window_idx = line.split(":")[0].strip()
+                return window_idx if window_idx else None
+        return None
+    except Exception:
+        return None
+
+
+def get_current_session_name() -> Optional[str]:
+    """获取当前 tmux session 名称。
+
+    Returns:
+        Optional[str]: 当前 session 名称，如果不在 tmux 环境或失败则返回 None
+    """
+    tmux_path = shutil.which("tmux")
+    if tmux_path is None:
+        return None
+
+    try:
+        result = subprocess.run(
+            ["tmux", "display-message", "-p", "#S"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            session_name = result.stdout.strip()
+            return session_name if session_name else None
+        return None
+    except Exception:
+        return None
+
+
+def get_current_window_index() -> Optional[str]:
+    """获取当前 tmux 窗口的索引。
+
+    Returns:
+        Optional[str]: 当前窗口索引（如 '0', '1'），如果不在 tmux 环境或失败则返回 None
+    """
+    tmux_path = shutil.which("tmux")
+    if tmux_path is None:
+        return None
+
+    try:
+        result = subprocess.run(
+            ["tmux", "display-message", "-p", "#{window_index}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            window_index = result.stdout.strip()
+            return window_index if window_index else None
+        return None
+    except Exception:
+        return None
+
+
+def has_session(session_name: str) -> bool:
+    """检查指定的 tmux session 是否存在。
+
+    Args:
+        session_name: session 名称
+
+    Returns:
+        bool: session 是否存在
+    """
+    tmux_path = shutil.which("tmux")
+    if tmux_path is None:
+        return False
+
+    try:
+        result = subprocess.run(
+            ["tmux", "has-session", "-t", session_name],
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
+def send_command_to_window(
+    session_name: str, window_id: str, command: list[str]
+) -> bool:
+    """向指定窗口的初始 pane 发送命令。
+
+    Args:
+        session_name: session 名称
+        window_id: 窗口索引
+        command: 命令列表（会被 shell 转义）
+
+    Returns:
+        bool: 是否成功发送
+    """
+    import shlex
+
+    tmux_path = shutil.which("tmux")
+    if tmux_path is None:
+        return False
+
+    # 将命令转换为字符串并正确转义
+    cmd_str = " ".join(shlex.quote(arg) for arg in command)
+
+    try:
+        subprocess.run(
+            ["tmux", "send-keys", "-t", f"{session_name}:{window_id}", cmd_str, "C-m"],
+            capture_output=True,
+            timeout=10,
+        )
+        return True
+    except Exception:
+        return False
+
+
+def dispatch_command_to_panel(
+    shell_command: str, max_panes_per_window: int = 4
+) -> Optional[str]:
+    """智能调度命令到 tmux panel 中执行。"""
+    # 检查 tmux 是否安装
+    tmux_path = shutil.which("tmux")
+    if tmux_path is None:
+        PrettyOutput.print(
+            "⚠️ tmux is not installed", OutputType.WARNING, timestamp=False
+        )
+        return None
+
+    # 查找或创建 jarvis session
+    session_name = find_or_create_jarvis_session(force_create=True)
+    if not session_name:
+        PrettyOutput.print(
+            "⚠️ Failed to find or create jarvis session",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return None
+
+    # 获取 session 的所有 window
+    windows = list_session_windows(session_name)
+
+    # 查找 panel 数量 < max_panes_per_window 的 window
+    target_window_id = None
+    for window in windows:
+        window_id = window.split(":")[0].strip()
+        pane_count = get_window_pane_count(session_name, window_id)
+        if pane_count < max_panes_per_window:
+            target_window_id = window_id
+            PrettyOutput.print(
+                f"ℹ️ Found window {window_id} with {pane_count} panes, reusing it",
+                OutputType.INFO,
+                timestamp=False,
+            )
+            break
+
+    # 创建 panel 或 window
+    if target_window_id:
+        # 在现有 window 创建 panel
+        pane_id = create_panel(
+            session_name=session_name,
+            window_id=target_window_id,
+            initial_command=shell_command,
+            split_direction="h",
+        )
+        if pane_id:
+            set_window_tiled_layout(session_name, target_window_id)
+            return session_name
+    else:
+        # 创建新 window
+        new_window_id = create_window(
+            session_name=session_name, initial_command=shell_command
+        )
+        if new_window_id:
+            window_index = new_window_id.split(":")[0].strip()
+            set_window_tiled_layout(session_name, window_index)
+            PrettyOutput.print(
+                f"ℹ️ Created new window {window_index} for command",
+                OutputType.INFO,
+                timestamp=False,
+            )
+            return session_name
+
+    return None
+
+
 def _dispatch_to_existing_jarvis_session(
     task_arg: Optional[str], argv: list[str]
 ) -> bool:
@@ -714,49 +932,21 @@ def _dispatch_to_existing_jarvis_session(
     Returns:
         bool: 是否成功派发（True表示成功，False表示失败）
     """
-    # 查找 jarvis session
-    session_name = _find_jarvis_session()
+    # 查找或创建 jarvis session
+    session_name = find_or_create_jarvis_session(force_create=True)
     if not session_name:
-        # 未找到现有 session，创建一个新的 session
         PrettyOutput.print(
-            "ℹ️ 未找到 jarvis tmux session，正在创建新 session...",
-            OutputType.INFO,
+            "❌ 无法找到或创建 tmux session",
+            OutputType.ERROR,
             timestamp=False,
         )
-        # 生成新的 session 名称
-        session_name = _generate_session_name()
-        try:
-            # 创建新的 detached session
-            subprocess.run(
-                ["tmux", "new-session", "-d", "-s", session_name],
-                check=True,
-                timeout=10,
-            )
-            PrettyOutput.print(
-                f"✅ 已创建新的 tmux session: {session_name}",
-                OutputType.SUCCESS,
-                timestamp=False,
-            )
-        except subprocess.CalledProcessError as e:
-            PrettyOutput.print(
-                f"❌ 创建 tmux session 失败: {e}",
-                OutputType.ERROR,
-                timestamp=False,
-            )
-            return False
-        except subprocess.TimeoutExpired:
-            PrettyOutput.print(
-                "❌ 创建 tmux session 超时",
-                OutputType.ERROR,
-                timestamp=False,
-            )
-            return False
-    else:
-        PrettyOutput.print(
-            f"ℹ️ 找到 jarvis session: {session_name}",
-            OutputType.INFO,
-            timestamp=False,
-        )
+        return False
+
+    PrettyOutput.print(
+        f"ℹ️ 使用 tmux session: {session_name}",
+        OutputType.INFO,
+        timestamp=False,
+    )
 
     # 过滤 --dispatch/-d 参数，避免循环派发
     filtered_argv = []
@@ -772,41 +962,50 @@ def _dispatch_to_existing_jarvis_session(
         else:
             filtered_argv.append(arg)
 
-    # 构造 tmux split-window 命令（在指定 session 的当前窗口创建新 pane）
+    # 构造命令字符串
     executable = sys.executable
     quoted_args = [shlex.quote(arg) for arg in filtered_argv]
     user_shell = os.environ.get("SHELL", "/bin/sh")
-    # 先切换到当前工作目录，再执行命令
     cwd = os.getcwd()
     command = f'cd {shlex.quote(cwd)} && {executable} {" ".join(quoted_args)}; exec "{user_shell}"'
 
-    tmux_args = [
-        "tmux",
-        "split-window",
-        "-h",  # 水平分割（左右布局）
-        "-t",  # 指定目标 session
-        session_name,
-        command,
-    ]
-
-    # 执行 tmux 命令
-    try:
-        subprocess.run(tmux_args, check=True)
-        # 创建新 pane 后，切换到 tiled 布局
-        subprocess.run(
-            ["tmux", "select-layout", "-t", session_name, "tiled"],
-            check=True,
+    # 获取 session 的当前窗口
+    current_window = get_session_current_window(session_name)
+    if not current_window:
+        PrettyOutput.print(
+            f"⚠️ 无法获取 session '{session_name}' 的当前窗口",
+            OutputType.WARNING,
+            timestamp=False,
         )
+        return False
+
+    # 在当前窗口创建 panel
+    pane_id = create_panel(
+        session_name=session_name,
+        window_id=current_window,
+        initial_command=command,
+        split_direction="h",
+    )
+    if not pane_id:
+        PrettyOutput.print(
+            f"⚠️ 在窗口 '{current_window}' 中创建 panel 失败",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return False
+
+    # 切换到 tiled 布局
+    if set_window_tiled_layout(session_name, current_window):
         PrettyOutput.print(
             f"✅ 任务已派发到 tmux session '{session_name}' 的 panel 中",
             OutputType.SUCCESS,
             timestamp=False,
         )
         return True
-    except subprocess.CalledProcessError as e:
+    else:
         PrettyOutput.print(
-            f"⚠️ Failed to dispatch to tmux session '{session_name}': {e}",
+            "⚠️ 布局切换失败，但任务可能已派发",
             OutputType.WARNING,
             timestamp=False,
         )
-        return False
+        return True

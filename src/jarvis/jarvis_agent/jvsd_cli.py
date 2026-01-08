@@ -5,7 +5,6 @@
 """
 
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -82,9 +81,8 @@ def run_jvs_dispatch(task: Any, is_dispatch_mode: bool = False) -> None:
         # 构造 tmux split-window 命令
         import shlex
 
-        # 获取当前工作目录和可执行文件路径
+        # 获取当前工作目录
         cwd = os.getcwd()
-        executable = sys.executable
         user_shell = os.environ.get("SHELL", "/bin/sh")
 
         # 安全转义路径
@@ -95,13 +93,14 @@ def run_jvs_dispatch(task: Any, is_dispatch_mode: bool = False) -> None:
         command = f"cd {quoted_cwd} && jvs -n -d --task-file {quoted_task_file} && rm -f {quoted_task_file}; exec {shlex.quote(user_shell)}"
 
         try:
-            tmux_path = shutil.which("tmux")
-            if tmux_path is None:
-                PrettyOutput.auto_print("❌ 错误: dispatch 模式需要 tmux")
+            # 使用智能调度函数创建 tmux panel
+            from jarvis.jarvis_utils.tmux_wrapper import dispatch_command_to_panel
+
+            session_name = dispatch_command_to_panel(command)
+            if not session_name:
+                PrettyOutput.auto_print("❌ 错误: dispatch 模式创建 tmux panel 失败")
                 sys.exit(1)
 
-            # 创建新的 tmux pane
-            subprocess.run(["tmux", "split-window", "-h", command], check=True)
             # 父进程退出，不等待子进程完成
             sys.exit(0)
         except subprocess.CalledProcessError as e:

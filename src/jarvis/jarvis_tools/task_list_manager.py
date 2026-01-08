@@ -21,6 +21,16 @@ from jarvis.jarvis_utils.git_utils import (
     get_diff_between_commits,
 )
 
+from jarvis.jarvis_utils.tmux_wrapper import (
+    has_session,
+    send_command_to_window,
+    create_window,
+    get_current_window_index,
+    list_session_windows,
+    get_window_pane_count,
+    get_current_session_name,
+)
+
 
 class DependencyValidationError(Exception):
     """依赖验证错误的基类"""
@@ -2683,90 +2693,34 @@ class task_list_manager:
         Returns:
             Optional[str]: 可用window的索引（如 '0', '1'），没有则返回None
         """
-        import subprocess
+        # 获取当前window的索引
+        current_window_idx = get_current_window_index()
 
-        try:
-            # 获取当前window的索引
-            current_window_result = subprocess.run(
-                ["tmux", "display-message", "-p", "#{window_index}"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
+        # 优先检查当前window
+        if current_window_idx:
+            pane_count = get_window_pane_count(session_name, current_window_idx)
+            if pane_count < max_panes:
+                return current_window_idx
 
-            current_window_idx = None
-            if current_window_result.returncode == 0:
-                current_window_idx = current_window_result.stdout.strip()
+        # 当前window已满，查找其他可用window
+        # 获取session中所有window的索引
+        windows = list_session_windows(session_name)
+        if not windows:
+            return None
 
-            # 优先检查当前window
-            if current_window_idx:
-                panes_result = subprocess.run(
-                    [
-                        "tmux",
-                        "list-panes",
-                        "-t",
-                        f"{session_name}:{current_window_idx}",
-                        "-F",
-                        "#P",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
+        # 遍历每个window，检查pane数量（跳过当前window，因为已经检查过了）
+        for window in windows:
+            window_id = window.split(":")[0].strip()
+            if not window_id:
+                continue
+            # 跳过当前window
+            if window_id == current_window_idx:
+                continue
 
-                if panes_result.returncode == 0:
-                    pane_lines = panes_result.stdout.strip().split("\n")
-                    pane_count = len([line for line in pane_lines if line.strip()])
-                    # 当前window有空间，优先返回
-                    if pane_count < max_panes:
-                        return current_window_idx
-
-            # 当前window已满，查找其他可用window
-            # 获取session中所有window的索引
-            result = subprocess.run(
-                ["tmux", "list-windows", "-t", session_name, "-F", "#{window_index}"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-
-            if result.returncode != 0:
-                return None
-
-            window_indices = result.stdout.strip().split("\n")
-
-            # 遍历每个window，检查pane数量（跳过当前window，因为已经检查过了）
-            for window_idx in window_indices:
-                if not window_idx.strip():
-                    continue
-                # 跳过当前window
-                if window_idx == current_window_idx:
-                    continue
-
-                # 获取该window的pane数量
-                panes_result = subprocess.run(
-                    [
-                        "tmux",
-                        "list-panes",
-                        "-t",
-                        f"{session_name}:{window_idx}",
-                        "-F",
-                        "#P",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-
-                if panes_result.returncode == 0:
-                    # 处理pane数量计算：使用列表推导式过滤空字符串，确保准确计算
-                    pane_lines = panes_result.stdout.strip().split("\n")
-                    pane_count = len([line for line in pane_lines if line.strip()])
-                    if pane_count < max_panes:
-                        return window_idx
-
-        except Exception:
-            pass
+            # 获取该window的pane数量
+            pane_count = get_window_pane_count(session_name, window_id)
+            if pane_count < max_panes:
+                return window_id
 
         return None
 
@@ -2792,20 +2746,7 @@ class task_list_manager:
         Returns:
             Optional[str]: 如果在tmux环境返回session名称，否则返回None
         """
-        import subprocess
-
-        try:
-            result = subprocess.run(
-                ["tmux", "display-message", "-p", "#S"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
-        except Exception:
-            pass
-        return None
+        return get_current_session_name()
 
     def _is_code_agent(self, agent: Any) -> bool:
         """判断父agent是否为CodeAgent类型。
@@ -2931,8 +2872,6 @@ class task_list_manager:
             Dict: 执行结果
         """
         import json
-        import shlex
-        import subprocess
         import uuid
         from pathlib import Path
         from jarvis.jarvis_utils.output import PrettyOutput
@@ -2989,76 +2928,37 @@ class task_list_manager:
             window_first_task_map: Dict[str, str] = {}  # 记录新窗口的第一个任务task_id
 
             # 检查session是否存在
-            try:
-                has_session_result = subprocess.run(
-                    ["tmux", "has-session", "-t", session_name],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                if has_session_result.returncode != 0:
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f'tmux session "{session_name}" 不存在',
-                    }
-            except Exception as e:
+            if not has_session(session_name):
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"检查tmux session失败: {str(e)}",
+                    "stderr": f'tmux session "{session_name}" 不存在',
                 }
 
             # 为每个任务创建新窗口
             for idx, task in enumerate(tasks):
                 window_name = f"batch_{batch_id}_{idx}"
 
-                # 使用 -P -F 直接获取新窗口索引，避免竞态条件
-                new_window_result = subprocess.run(
-                    [
-                        "tmux",
-                        "new-window",
-                        "-d",
-                        "-P",
-                        "-F",
-                        "#{window_index}",
-                        "-n",
-                        window_name,
-                        "-t",
-                        session_name,
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
+                # 使用封装函数创建新窗口
+                assigned_window = create_window(
+                    session_name=session_name,
+                    window_name=window_name,
                 )
 
-                if new_window_result.returncode == 0:
-                    assigned_window = new_window_result.stdout.strip()
-                    if assigned_window:
-                        task_windows.append(assigned_window)
-                        window_first_task_map[assigned_window] = (
-                            task.task_id
-                        )  # 每个新窗口的第一个任务
-                        PrettyOutput.auto_print(
-                            f"✅ 为任务 [{task.task_name}] 创建新窗口 {assigned_window}"
-                        )
-                    else:
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": f"为任务 [{task.task_name}] 创建窗口成功，但无法获取窗口索引",
-                        }
-                else:
-                    # 创建窗口失败，返回详细错误信息
-                    stderr_msg = (
-                        new_window_result.stderr
-                        if new_window_result.stderr
-                        else "未知错误"
+                if assigned_window:
+                    task_windows.append(assigned_window)
+                    window_first_task_map[assigned_window] = (
+                        task.task_id
+                    )  # 每个新窗口的第一个任务
+                    PrettyOutput.auto_print(
+                        f"✅ 为任务 [{task.task_name}] 创建新窗口 {assigned_window}"
                     )
+                else:
+                    # 创建窗口失败
                     return {
                         "success": False,
                         "stdout": "",
-                        "stderr": f"为任务 [{task.task_name}] 创建tmux窗口失败: {stderr_msg}",
+                        "stderr": f"为任务 [{task.task_name}] 创建tmux窗口失败",
                     }
 
             PrettyOutput.auto_print(f"📊 已为 {len(tasks)} 个任务创建新窗口")
@@ -3103,36 +3003,14 @@ class task_list_manager:
                 PrettyOutput.auto_print(
                     f"📦 在窗口 {assigned_window} 的初始pane中运行任务"
                 )
-                tmux_cmd = [
-                    "tmux",
-                    "send-keys",
-                    "-t",
-                    f"{session_name}:{assigned_window}",
-                ]
-
-                # 将命令转换为字符串并正确转义
-                cmd_str = " ".join(shlex.quote(arg) for arg in cmd)
-                # send-keys需要Enter来执行命令
-                tmux_cmd.append(cmd_str)
-                tmux_cmd.append("C-m")  # 发送回车键
-
-                try:
-                    subprocess.run(
-                        tmux_cmd,
-                        capture_output=True,
-                        timeout=10,
-                    )
+                # 使用封装函数发送命令到窗口
+                success = send_command_to_window(session_name, assigned_window, cmd)
+                if success:
                     PrettyOutput.auto_print(
                         f"✅ 任务 [{task.task_name}] 已在窗口 {assigned_window} 的初始pane中启动"
                     )
-                except subprocess.TimeoutExpired:
-                    PrettyOutput.auto_print(
-                        f"⚠️ 任务 [{task.task_name}] 启动超时，但窗口可能已创建"
-                    )
-                except Exception as e:
-                    PrettyOutput.auto_print(
-                        f"❌ 任务 [{task.task_name}] 启动失败: {str(e)}"
-                    )
+                else:
+                    PrettyOutput.auto_print(f"❌ 任务 [{task.task_name}] 启动失败")
 
             # 等待所有子进程完成
             PrettyOutput.auto_print("⏳ 等待所有子任务完成...")
