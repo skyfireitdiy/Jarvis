@@ -64,6 +64,12 @@ def dispatch_to_tmux_window(
         并在其中创建窗格作为降级方案。
         使用水平分割（split-window -h）创建新窗格，适合代码任务。
     """
+    # 检查配置中是否启用了tmux
+    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+    if not GLOBAL_CONFIG_DATA.get("enable_tmux", True):
+        return False
+
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
     if tmux_path is None:
@@ -176,6 +182,12 @@ def check_and_launch_tmux() -> None:
         此函数使用subprocess.execvp替换当前进程，如果成功则不会返回。
         Session名称统一使用 {username}-jarvis-{uuid} 格式。
     """
+    # 检查配置中是否启用了tmux
+    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+    if not GLOBAL_CONFIG_DATA.get("enable_tmux", True):
+        return
+
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
     if tmux_path is None:

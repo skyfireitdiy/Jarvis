@@ -350,6 +350,11 @@
       "description": "是否在错误输出时打印回溯调用链",
       "default": false
     },
+    "enable_tmux": {
+      "type": "boolean",
+      "description": "是否启用tmux功能",
+      "default": true
+    },
     "enable_static_analysis": {
       "type": "boolean",
       "description": "是否启用静态代码分析",

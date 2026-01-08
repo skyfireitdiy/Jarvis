@@ -2778,6 +2778,12 @@ class task_list_manager:
         """
         import os
 
+        # 检查配置中是否启用了tmux
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+
+        if not GLOBAL_CONFIG_DATA.get("enable_tmux", True):
+            return False
+
         return "TMUX" in os.environ
 
     def _get_tmux_session_name(self) -> Optional[str]:
