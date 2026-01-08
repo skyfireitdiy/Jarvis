@@ -933,7 +933,11 @@ def send_command_to_window(
 def dispatch_command_to_panel(
     shell_command: str, max_panes_per_window: int = 4
 ) -> Optional[str]:
-    """智能调度命令到 tmux panel 中执行。"""
+    """调度命令到当前 tmux window 的 panel 中执行。
+
+    简化实现：始终在当前 window 创建 panel，不再创建新 window。
+    max_panes_per_window 参数保留用于兼容，但不再生效。
+    """
     # 检查 tmux 是否安装
     tmux_path = shutil.which("tmux")
     if tmux_path is None:
@@ -952,74 +956,41 @@ def dispatch_command_to_panel(
         )
         return None
 
-    # 获取 session 的所有 window
-    windows = list_session_windows(session_name)
-
-    # 查找 panel 数量 < max_panes_per_window 的 window
-    target_window_id = None
-    for window in windows:
-        window_id = window.split(":")[0].strip()
-        pane_count = get_window_pane_count(session_name, window_id)
-        if pane_count < max_panes_per_window:
-            target_window_id = window_id
-            PrettyOutput.print(
-                f"ℹ️ Found window {window_id} with {pane_count} panes, reusing it",
-                OutputType.INFO,
-                timestamp=False,
-            )
-            break
-
-    # 创建 panel 或 window
-    if target_window_id:
-        # 在现有 window 创建 panel
-        pane_id = create_panel(
-            session_name=session_name,
-            window_id=target_window_id,
-            initial_command=shell_command,
-            split_direction="h",
+    # 获取当前窗口索引
+    current_window = get_session_current_window(session_name)
+    if not current_window:
+        PrettyOutput.print(
+            f"⚠️ 无法获取 session '{session_name}' 的当前窗口",
+            OutputType.WARNING,
+            timestamp=False,
         )
-        if pane_id:
-            PrettyOutput.print(
-                f"✅ Successfully created panel {pane_id} in window {target_window_id}",
-                OutputType.SUCCESS,
-                timestamp=False,
-            )
-            return session_name
-        else:
-            PrettyOutput.print(
-                f"❌ Failed to create panel in window {target_window_id} of session '{session_name}'",
-                OutputType.ERROR,
-                timestamp=False,
-            )
-            PrettyOutput.print(
-                f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
-                OutputType.INFO,
-                timestamp=False,
-            )
+        return None
+
+    # 在当前窗口创建 panel
+    pane_id = create_panel(
+        session_name=session_name,
+        window_id=current_window,
+        initial_command=shell_command,
+        split_direction="h",
+    )
+    if pane_id:
+        PrettyOutput.print(
+            f"✅ Successfully created panel {pane_id} in current window {current_window}",
+            OutputType.SUCCESS,
+            timestamp=False,
+        )
+        return session_name
     else:
-        # 创建新 window
-        new_window_id = create_window(
-            session_name=session_name, initial_command=shell_command
+        PrettyOutput.print(
+            f"❌ Failed to create panel in window {current_window} of session '{session_name}'",
+            OutputType.ERROR,
+            timestamp=False,
         )
-        if new_window_id:
-            window_index = new_window_id.split(":")[0].strip()
-            PrettyOutput.print(
-                f"ℹ️ Created new window {window_index} for command",
-                OutputType.INFO,
-                timestamp=False,
-            )
-            return session_name
-        else:
-            PrettyOutput.print(
-                f"❌ Failed to create new window in session '{session_name}'",
-                OutputType.ERROR,
-                timestamp=False,
-            )
-            PrettyOutput.print(
-                f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
-                OutputType.INFO,
-                timestamp=False,
-            )
+        PrettyOutput.print(
+            f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
+            OutputType.INFO,
+            timestamp=False,
+        )
 
     return None
 
@@ -1099,31 +1070,7 @@ def _dispatch_to_existing_jarvis_session(
             OutputType.WARNING,
             timestamp=False,
         )
-        # 降级方案：尝试创建新window
-        PrettyOutput.print(
-            "ℹ️ 尝试降级方案：创建新window...",
-            OutputType.INFO,
-            timestamp=False,
-        )
-        new_window_id = create_window(
-            session_name=session_name,
-            initial_command=command,
-        )
-        if new_window_id:
-            window_index = new_window_id.split(":")[0].strip()
-            PrettyOutput.print(
-                f"✅ 任务已派发到新window {window_index}",
-                OutputType.SUCCESS,
-                timestamp=False,
-            )
-            return True
-        else:
-            PrettyOutput.print(
-                "❌ 创建新window失败，无法派发任务",
-                OutputType.ERROR,
-                timestamp=False,
-            )
-            return False
+        return False
 
     # panel创建成功
     PrettyOutput.print(

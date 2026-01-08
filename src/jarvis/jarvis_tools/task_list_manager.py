@@ -23,11 +23,8 @@ from jarvis.jarvis_utils.git_utils import (
 
 from jarvis.jarvis_utils.tmux_wrapper import (
     has_session,
-    send_command_to_window,
-    create_window,
+    create_panel,
     get_current_window_index,
-    list_session_windows,
-    get_window_pane_count,
     get_current_session_name,
 )
 
@@ -2676,54 +2673,6 @@ class task_list_manager:
                 "stderr": f"更新任务失败: {str(e)}",
             }
 
-    def _find_window_with_available_panes(
-        self, session_name: str, max_panes: int = 4
-    ) -> Optional[str]:
-        """查找panel数量小于max_panes的window。
-
-        优先级：
-        1. 如果当前window pane数量 < max_panes，返回当前window索引
-        2. 否则，查找其他pane数量 < max_panes的window
-        3. 如果都满了，返回None
-
-        Args:
-            session_name: tmux session名称
-            max_panes: 每个window的最大panel数量
-
-        Returns:
-            Optional[str]: 可用window的索引（如 '0', '1'），没有则返回None
-        """
-        # 获取当前window的索引
-        current_window_idx = get_current_window_index()
-
-        # 优先检查当前window
-        if current_window_idx:
-            pane_count = get_window_pane_count(session_name, current_window_idx)
-            if pane_count < max_panes:
-                return current_window_idx
-
-        # 当前window已满，查找其他可用window
-        # 获取session中所有window的索引
-        windows = list_session_windows(session_name)
-        if not windows:
-            return None
-
-        # 遍历每个window，检查pane数量（跳过当前window，因为已经检查过了）
-        for window in windows:
-            window_id = window.split(":")[0].strip()
-            if not window_id:
-                continue
-            # 跳过当前window
-            if window_id == current_window_idx:
-                continue
-
-            # 获取该window的pane数量
-            pane_count = get_window_pane_count(session_name, window_id)
-            if pane_count < max_panes:
-                return window_id
-
-        return None
-
     def _is_in_tmux(self) -> bool:
         """检测当前是否在tmux环境中运行。
 
@@ -2923,9 +2872,8 @@ class task_list_manager:
 
             PrettyOutput.auto_print(f"📝 使用命令: {cmd_prefix} {file_param}")
 
-            # 简化策略：为每个任务创建独立窗口，避免pane复用的复杂性
-            task_windows: List[str] = []  # 存储每个任务分配的window索引
-            window_first_task_map: Dict[str, str] = {}  # 记录新窗口的第一个任务task_id
+            # 简化策略：在当前窗口为每个任务创建panel
+            task_panes: List[str] = []  # 存储每个任务分配的pane ID
 
             # 检查session是否存在
             if not has_session(session_name):
@@ -2935,39 +2883,22 @@ class task_list_manager:
                     "stderr": f'tmux session "{session_name}" 不存在',
                 }
 
-            # 为每个任务创建新窗口
+            # 获取当前窗口索引
+            current_window = get_current_window_index()
+            if not current_window:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "无法获取当前窗口索引",
+                }
+
+            PrettyOutput.auto_print(f"📋 使用当前窗口: {current_window}")
+
+            # 为每个任务创建临时文件
+            task_files: List[Path] = []
             for idx, task in enumerate(tasks):
-                window_name = f"batch_{batch_id}_{idx}"
-
-                # 使用封装函数创建新窗口
-                assigned_window = create_window(
-                    session_name=session_name,
-                    window_name=window_name,
-                )
-
-                if assigned_window:
-                    task_windows.append(assigned_window)
-                    window_first_task_map[assigned_window] = (
-                        task.task_id
-                    )  # 每个新窗口的第一个任务
-                    PrettyOutput.auto_print(
-                        f"✅ 为任务 [{task.task_name}] 创建新窗口 {assigned_window}"
-                    )
-                else:
-                    # 创建窗口失败
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"为任务 [{task.task_name}] 创建tmux窗口失败",
-                    }
-
-            PrettyOutput.auto_print(f"📊 已为 {len(tasks)} 个任务创建新窗口")
-
-            # 为每个任务创建临时文件和启动子进程
-            for idx, task in enumerate(tasks):
-                assigned_window = task_windows[idx]
                 PrettyOutput.auto_print(
-                    f"📋 [{idx + 1}/{len(tasks)}] 启动任务: {task.task_name} ({task.task_id}) -> 窗口 {assigned_window}"
+                    f"📋 [{idx + 1}/{len(tasks)}] 准备任务: {task.task_name} ({task.task_id})"
                 )
 
                 # 构建任务内容
@@ -2987,6 +2918,7 @@ class task_list_manager:
                 task_file = self._write_task_file(
                     batch_dir, task, task_content, background, is_code_agent
                 )
+                task_files.append(task_file)
 
                 # 构建命令
                 cmd = [cmd_prefix, file_param, str(task_file), "-n"]
@@ -2999,18 +2931,31 @@ class task_list_manager:
                 if config_file:
                     cmd.extend(["-f", config_file])
 
-                # 简化后：所有任务都是新窗口的第一个任务，直接在初始pane中运行
-                PrettyOutput.auto_print(
-                    f"📦 在窗口 {assigned_window} 的初始pane中运行任务"
+                # 将命令列表转换为字符串
+                cmd_str = " ".join(f'"{arg}"' if " " in arg else arg for arg in cmd)
+
+                # 在当前窗口创建新panel并执行命令
+                pane_id = create_panel(
+                    session_name=session_name,
+                    window_id=current_window,
+                    initial_command=cmd_str,
+                    split_direction="h",
                 )
-                # 使用封装函数发送命令到窗口
-                success = send_command_to_window(session_name, assigned_window, cmd)
-                if success:
+
+                if pane_id:
+                    task_panes.append(pane_id)
                     PrettyOutput.auto_print(
-                        f"✅ 任务 [{task.task_name}] 已在窗口 {assigned_window} 的初始pane中启动"
+                        f"✅ 为任务 [{task.task_name}] 创建panel {pane_id}"
                     )
                 else:
-                    PrettyOutput.auto_print(f"❌ 任务 [{task.task_name}] 启动失败")
+                    # 创建panel失败
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"为任务 [{task.task_name}] 创建tmux panel失败",
+                    }
+
+            PrettyOutput.auto_print(f"📊 已为 {len(tasks)} 个任务创建panel")
 
             # 等待所有子进程完成
             PrettyOutput.auto_print("⏳ 等待所有子任务完成...")
