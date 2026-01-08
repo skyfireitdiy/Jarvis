@@ -128,6 +128,7 @@ def web(
             host="0.0.0.0",
             port=port,
             log_level="info",
+            timeout_graceful_shutdown=30,  # 优雅关闭：给30秒时间处理现有请求
         )
 
     except KeyboardInterrupt:
