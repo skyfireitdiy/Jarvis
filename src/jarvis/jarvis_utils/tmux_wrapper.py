@@ -50,6 +50,7 @@ def dispatch_to_tmux_window(
     argv: list[str],
     window_name: str = "jarvis-dispatch",
     stay_in_session_after_exit: bool = True,
+    shell_fallback: bool = True,
 ) -> bool:
     """将任务派发到新的 tmux 窗格（pane）中执行。
 
@@ -58,6 +59,7 @@ def dispatch_to_tmux_window(
         argv: 当前命令行参数（需要过滤 --dispatch）
         window_name: 窗口名称前缀（已废弃，保留用于兼容）
         stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
+        shell_fallback: 命令执行结束后是否启动shell作为fallback（True表示启动shell，False表示不启动shell，直接以进程为入口）
 
     Returns:
         bool: 是否成功派发（True表示成功，False表示失败）
@@ -83,7 +85,7 @@ def dispatch_to_tmux_window(
     if "TMUX" not in os.environ:
         # 不在tmux中，尝试查找jarvis创建的session作为降级方案
         return _dispatch_to_existing_jarvis_session(
-            task_arg, argv, stay_in_session_after_exit
+            task_arg, argv, stay_in_session_after_exit, shell_fallback
         )
 
     # 生成窗口名称（使用任务内容的前20个字符）
@@ -147,8 +149,8 @@ def dispatch_to_tmux_window(
     # 先切换到当前工作目录，再执行命令
     cwd = os.getcwd()
     command = f"cd {shlex.quote(cwd)} && {executable} {' '.join(quoted_args)}"
-    # 如果需要保持会话活动，则启动shell
-    if stay_in_session_after_exit:
+    # 如果需要保持会话活动且允许shell fallback，则启动shell
+    if stay_in_session_after_exit and shell_fallback:
         command += f'; exec "{user_shell}"'
 
     tmux_args = [
@@ -171,11 +173,15 @@ def dispatch_to_tmux_window(
         return False
 
 
-def check_and_launch_tmux(stay_in_session_after_exit: bool = True) -> None:
+def check_and_launch_tmux(
+    stay_in_session_after_exit: bool = True,
+    shell_fallback: bool = True,
+) -> None:
     """检测tmux并在需要时启动tmux会话。
 
     Args:
         stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
+        shell_fallback: 命令执行结束后是否启动shell作为fallback（True表示启动shell，False表示不启动shell，直接以进程为入口）
 
     注意:
         此函数使用subprocess.execvp替换当前进程，如果成功则不会返回。
@@ -243,8 +249,8 @@ def check_and_launch_tmux(stay_in_session_after_exit: bool = True) -> None:
     # 参考 dispatch_to_tmux_window 的实现，使用 shlex.quote 安全转义参数
     quoted_args = [shlex.quote(arg) for arg in argv]
     command = f"{executable} {' '.join(quoted_args)}"
-    # 如果需要保持会话活动，则启动shell
-    if stay_in_session_after_exit:
+    # 如果需要保持会话活动且允许shell fallback，则启动shell
+    if stay_in_session_after_exit and shell_fallback:
         command += f'; exec "{user_shell}"'
     tmux_args = [
         "tmux",
@@ -533,6 +539,7 @@ def create_panel(
     working_dir: Optional[str] = None,
     pane_percentage: Optional[int] = None,
     stay_in_session_after_exit: bool = True,
+    shell_fallback: bool = True,
 ) -> Optional[str]:
     """在指定的 tmux session 和 window 中创建 panel 并执行初始命令。
 
@@ -544,6 +551,7 @@ def create_panel(
         working_dir: 工作目录，None表示使用当前工作目录
         pane_percentage: pane 大小百分比（1-99），None表示默认大小
         stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
+        shell_fallback: 命令执行结束后是否启动shell作为fallback（True表示启动shell，False表示不启动shell，直接以进程为入口）
 
     Returns:
         Optional[str]: 新创建的 pane ID，失败返回 None
@@ -585,8 +593,8 @@ def create_panel(
 
     # 构造命令：先切换到工作目录，执行初始命令
     command = f"cd {shlex.quote(working_dir)} && {initial_command}"
-    # 如果需要保持会话活动，则启动shell
-    if stay_in_session_after_exit:
+    # 如果需要保持会话活动且允许shell fallback，则启动shell
+    if stay_in_session_after_exit and shell_fallback:
         command += f'; exec "{user_shell}"'
 
     # 构造 tmux split-window 命令
@@ -956,11 +964,18 @@ def dispatch_command_to_panel(
     shell_command: str,
     max_panes_per_window: int = 4,
     stay_in_session_after_exit: bool = True,
+    shell_fallback: bool = True,
 ) -> Optional[str]:
     """调度命令到当前 tmux window 的 panel 中执行。
 
     简化实现：始终在当前 window 创建 panel，不再创建新 window。
     max_panes_per_window 参数保留用于兼容，但不再生效。
+
+    Args:
+        shell_command: 要执行的 shell 命令
+        max_panes_per_window: 每个 window 的最大 pane 数（保留用于兼容，不再生效）
+        stay_in_session_after_exit: 命令执行结束后是否保持会话活动
+        shell_fallback: 命令执行结束后是否启动shell作为fallback（True表示启动shell，False表示不启动shell，直接以进程为入口）
     """
     # 检查 tmux 是否安装
     tmux_path = shutil.which("tmux")
@@ -997,6 +1012,7 @@ def dispatch_command_to_panel(
         initial_command=shell_command,
         split_direction="h",
         stay_in_session_after_exit=stay_in_session_after_exit,
+        shell_fallback=shell_fallback,
     )
     if pane_id:
         PrettyOutput.print(
@@ -1021,7 +1037,10 @@ def dispatch_command_to_panel(
 
 
 def _dispatch_to_existing_jarvis_session(
-    task_arg: Optional[str], argv: list[str], stay_in_session_after_exit: bool = True
+    task_arg: Optional[str],
+    argv: list[str],
+    stay_in_session_after_exit: bool = True,
+    shell_fallback: bool = True,
 ) -> bool:
     """将任务派发到现有 jarvis tmux session 的 panel 中执行。
 
@@ -1032,6 +1051,7 @@ def _dispatch_to_existing_jarvis_session(
         task_arg: 任务内容（已废弃，保留用于兼容）
         argv: 当前命令行参数（需要过滤 --dispatch）
         stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
+        shell_fallback: 命令执行结束后是否启动shell作为fallback（True表示启动shell，False表示不启动shell，直接以进程为入口）
 
     Returns:
         bool: 是否成功派发（True表示成功，False表示失败）
@@ -1072,8 +1092,8 @@ def _dispatch_to_existing_jarvis_session(
     user_shell = os.environ.get("SHELL", "/bin/sh")
     cwd = os.getcwd()
     command = f"cd {shlex.quote(cwd)} && {executable} {' '.join(quoted_args)}"
-    # 如果需要保持会话活动，则启动shell
-    if stay_in_session_after_exit:
+    # 如果需要保持会话活动且允许shell fallback，则启动shell
+    if stay_in_session_after_exit and shell_fallback:
         command += f'; exec "{user_shell}"'
 
     # 获取 session 的当前窗口
@@ -1093,6 +1113,7 @@ def _dispatch_to_existing_jarvis_session(
         initial_command=command,
         split_direction="h",
         stay_in_session_after_exit=stay_in_session_after_exit,
+        shell_fallback=shell_fallback,
     )
     if not pane_id:
         PrettyOutput.print(
