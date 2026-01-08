@@ -63,6 +63,24 @@ class WorktreeManager:
         # 降级策略：使用当前目录名
         return os.path.basename(self.repo_root)
 
+    def _has_commits(self) -> bool:
+        """检测仓库是否有至少一次提交记录
+
+        返回:
+            bool: 如果有提交返回 True，否则返回 False
+        """
+        try:
+            # 使用 git rev-parse HEAD 检测是否有提交
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                check=False,
+                cwd=self.repo_root,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
     def _generate_branch_name(self) -> str:
         """生成 worktree 分支名
 
@@ -157,6 +175,38 @@ class WorktreeManager:
         抛出:
             RuntimeError: 如果创建 worktree 失败
         """
+        # 检测仓库是否有提交记录，如果没有则自动创建初始提交
+        if not self._has_commits():
+            PrettyOutput.auto_print("⚠️ 仓库没有任何提交记录，自动创建初始提交...")
+            try:
+                # 配置 git 用户信息（避免提交失败）
+                subprocess.run(
+                    ["git", "config", "user.email", "jarvis@localhost"],
+                    capture_output=True,
+                    check=True,
+                    cwd=self.repo_root,
+                )
+                subprocess.run(
+                    ["git", "config", "user.name", "Jarvis AI Agent"],
+                    capture_output=True,
+                    check=True,
+                    cwd=self.repo_root,
+                )
+                # 创建空提交
+                subprocess.run(
+                    ["git", "commit", "--allow-empty", "-m", "Initial commit"],
+                    capture_output=True,
+                    check=True,
+                    cwd=self.repo_root,
+                )
+                PrettyOutput.auto_print("✅ 已自动创建初始提交")
+            except subprocess.CalledProcessError as e:
+                error_msg = decode_output(e.stderr) if e.stderr else str(e)
+                raise RuntimeError(
+                    f"自动创建初始提交失败: {error_msg}\n"
+                    f"请手动执行: git commit --allow-empty -m 'Initial commit'"
+                )
+
         if branch_name is None:
             branch_name = self._generate_branch_name()
 
