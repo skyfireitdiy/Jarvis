@@ -89,6 +89,9 @@ class task_list_manager:
 
     name = "task_list_manager"
 
+    # tmux窗口最大pane数量
+    MAX_PANES_PER_WINDOW = 4
+
     # 批量执行相关常量
     BATCH_EXECUTION_ERROR_PREFIX = "批量执行验证失败"
 
@@ -2975,10 +2978,159 @@ class task_list_manager:
 
             PrettyOutput.auto_print(f"📝 使用命令: {cmd_prefix} {file_param}")
 
+            # 预先为所有任务分配window
+            max_panes = self.MAX_PANES_PER_WINDOW
+            task_windows: List[str] = []  # 存储每个任务分配的window索引
+            window_pane_counts: Dict[str, int] = {}  # 跟踪每个window已分配的pane数
+            new_windows_created: List[str] = []  # 记录新创建的窗口
+            window_first_task_map: Dict[str, str] = {}  # 记录新窗口的第一个任务task_id
+
+            # 检查session是否存在
+            try:
+                has_session_result = subprocess.run(
+                    ["tmux", "has-session", "-t", session_name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if has_session_result.returncode != 0:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f'tmux session "{session_name}" 不存在',
+                    }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"检查tmux session失败: {str(e)}",
+                }
+
+            # 获取所有现有window及其pane数量
+            try:
+                all_windows_result = subprocess.run(
+                    [
+                        "tmux",
+                        "list-windows",
+                        "-t",
+                        session_name,
+                        "-F",
+                        "#{window_index}",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                existing_windows = (
+                    all_windows_result.stdout.strip().split("\n")
+                    if all_windows_result.returncode == 0
+                    else []
+                )
+            except Exception:
+                existing_windows = []
+
+            # 初始化现有window的pane计数
+            for win_idx in existing_windows:
+                if not win_idx.strip():
+                    continue
+                try:
+                    panes_result = subprocess.run(
+                        [
+                            "tmux",
+                            "list-panes",
+                            "-t",
+                            f"{session_name}:{win_idx}",
+                            "-F",
+                            "#P",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if panes_result.returncode == 0:
+                        pane_count = len(
+                            [
+                                line
+                                for line in panes_result.stdout.strip().split("\n")
+                                if line.strip()
+                            ]
+                        )
+                        # 验证pane_count为有效值
+                        if pane_count >= 0:
+                            window_pane_counts[win_idx] = pane_count
+                        else:
+                            window_pane_counts[win_idx] = 0
+                except Exception:
+                    window_pane_counts[win_idx] = 0
+
+            # 为每个任务预先分配window
+            for idx, task in enumerate(tasks):
+                assigned_window = None
+
+                # 查找有空间的现有window
+                for win_idx, pane_count in sorted(window_pane_counts.items()):
+                    if pane_count < max_panes:
+                        assigned_window = win_idx
+                        # 递增pane计数
+                        window_pane_counts[win_idx] += 1
+                        break
+
+                # 如果没有有空间的window，创建新窗口
+                if assigned_window is None:
+                    window_name = f"batch_{batch_id}_{len(new_windows_created)}"
+
+                    # 使用 -P -F 直接获取新窗口索引，避免竞态条件
+                    new_window_result = subprocess.run(
+                        [
+                            "tmux",
+                            "new-window",
+                            "-d",
+                            "-P",
+                            "-F",
+                            "#{window_index}",
+                            "-n",
+                            window_name,
+                            "-t",
+                            session_name,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+
+                    if new_window_result.returncode == 0:
+                        assigned_window = new_window_result.stdout.strip()
+                        if assigned_window:
+                            window_pane_counts[assigned_window] = 1
+                            new_windows_created.append(window_name)
+                            window_first_task_map[assigned_window] = (
+                                task.task_id
+                            )  # 标记该窗口的第一个任务
+                        else:
+                            return {
+                                "success": False,
+                                "stdout": "",
+                                "stderr": "无法获取新创建窗口的索引",
+                            }
+                    else:
+                        # 创建窗口失败，直接返回错误
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"创建tmux窗口失败: {new_window_result.stderr if new_window_result.stderr else '未知错误'}",
+                        }
+
+                task_windows.append(assigned_window)
+
+            PrettyOutput.auto_print(
+                f"📊 已为 {len(tasks)} 个任务预先分配window，新建了 {len(new_windows_created)} 个窗口"
+            )
+
             # 为每个任务创建临时文件和启动子进程
             for idx, task in enumerate(tasks):
+                assigned_window = task_windows[idx]
                 PrettyOutput.auto_print(
-                    f"📋 [{idx + 1}/{len(tasks)}] 启动任务: {task.task_name} ({task.task_id})"
+                    f"📋 [{idx + 1}/{len(tasks)}] 启动任务: {task.task_name} ({task.task_id}) -> 窗口 {assigned_window}"
                 )
 
                 # 构建任务内容
@@ -3010,39 +3162,44 @@ class task_list_manager:
                 if config_file:
                     cmd.extend(["-f", config_file])
 
-                # 查找panel数量<4的window，如果没有则创建新窗口
-                available_window = self._find_window_with_available_panes(
-                    session_name, max_panes=4
+                # 判断是否是新窗口的第一个任务（应在初始pane中运行）
+                is_first_task_in_new_window = (
+                    assigned_window in window_first_task_map
+                    and window_first_task_map[assigned_window] == task.task_id
                 )
 
-                if available_window is not None:
-                    # 在可用window中split panel
+                if is_first_task_in_new_window:
+                    # 新窗口的第一个任务：直接在初始pane中运行
                     PrettyOutput.auto_print(
-                        f"📦 在窗口 {available_window} 中创建 panel (当前pane数量<4)"
+                        f"📦 在窗口 {assigned_window} 的初始pane中运行（新窗口首个任务）"
                     )
+                    tmux_cmd = [
+                        "tmux",
+                        "send-keys",
+                        "-t",
+                        f"{session_name}:{assigned_window}",
+                    ]
+                else:
+                    # 其他任务：split window创建新pane
+                    PrettyOutput.auto_print(f"📦 在窗口 {assigned_window} 中创建 panel")
                     tmux_cmd = [
                         "tmux",
                         "split-window",
                         "-h",  # 水平分割
                         "-t",
-                        f"{session_name}:{available_window}",
-                    ]
-                else:
-                    # 没有可用window，创建新窗口
-                    PrettyOutput.auto_print("📄 创建新窗口 (所有窗口pane数量>=4)")
-                    window_name = f"task_{task.task_id}"
-                    tmux_cmd = [
-                        "tmux",
-                        "new-window",
-                        "-n",
-                        window_name,
-                        "-t",
-                        session_name,
+                        f"{session_name}:{assigned_window}",
                     ]
 
                 # 将命令转换为字符串并正确转义
                 cmd_str = " ".join(shlex.quote(arg) for arg in cmd)
-                tmux_cmd.append(cmd_str)
+
+                if is_first_task_in_new_window:
+                    # send-keys需要Enter来执行命令
+                    tmux_cmd.append(cmd_str)
+                    tmux_cmd.append("C-m")  # 发送回车键
+                else:
+                    # split-window直接将命令作为参数
+                    tmux_cmd.append(cmd_str)
 
                 try:
                     subprocess.run(
@@ -3050,13 +3207,13 @@ class task_list_manager:
                         capture_output=True,
                         timeout=10,
                     )
-                    if available_window is not None:
+                    if is_first_task_in_new_window:
                         PrettyOutput.auto_print(
-                            f"✅ 任务 [{task.task_name}] 已在窗口 {available_window} 的 panel 中启动"
+                            f"✅ 任务 [{task.task_name}] 已在窗口 {assigned_window} 的初始pane中启动"
                         )
                     else:
                         PrettyOutput.auto_print(
-                            f"✅ 任务 [{task.task_name}] 已在新窗口启动"
+                            f"✅ 任务 [{task.task_name}] 已在窗口 {assigned_window} 的 panel 中启动"
                         )
                 except subprocess.TimeoutExpired:
                     PrettyOutput.auto_print(
