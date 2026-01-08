@@ -152,19 +152,6 @@ def dispatch_to_tmux_window(
     # 执行tmux命令
     try:
         subprocess.run(tmux_args, check=True)
-        # 创建新pane后，自动切换到tiled布局
-        if current_window:
-            try:
-                subprocess.run(
-                    ["tmux", "select-layout", "-t", current_window, "tiled"], check=True
-                )
-            except subprocess.CalledProcessError as e:
-                # 布局切换失败记录错误，但不影响主流程
-                PrettyOutput.print(
-                    f"⚠️ Failed to set tiled layout for window {current_window}: {e}",
-                    OutputType.WARNING,
-                    timestamp=False,
-                )
         return True
     except subprocess.CalledProcessError as e:
         PrettyOutput.print(
@@ -991,14 +978,6 @@ def dispatch_command_to_panel(
             split_direction="h",
         )
         if pane_id:
-            try:
-                set_window_tiled_layout(session_name, target_window_id)
-            except Exception as e:
-                PrettyOutput.print(
-                    f"⚠️ Failed to set tiled layout for window {target_window_id}: {type(e).__name__}: {e}",
-                    OutputType.WARNING,
-                    timestamp=False,
-                )
             PrettyOutput.print(
                 f"✅ Successfully created panel {pane_id} in window {target_window_id}",
                 OutputType.SUCCESS,
@@ -1023,14 +1002,6 @@ def dispatch_command_to_panel(
         )
         if new_window_id:
             window_index = new_window_id.split(":")[0].strip()
-            try:
-                set_window_tiled_layout(session_name, window_index)
-            except Exception as e:
-                PrettyOutput.print(
-                    f"⚠️ Failed to set tiled layout for new window {window_index}: {type(e).__name__}: {e}",
-                    OutputType.WARNING,
-                    timestamp=False,
-                )
             PrettyOutput.print(
                 f"ℹ️ Created new window {window_index} for command",
                 OutputType.INFO,
@@ -1139,7 +1110,6 @@ def _dispatch_to_existing_jarvis_session(
         )
         if new_window_id:
             window_index = new_window_id.split(":")[0].strip()
-            set_window_tiled_layout(session_name, window_index)
             PrettyOutput.print(
                 f"✅ 任务已派发到新window {window_index}",
                 OutputType.SUCCESS,
@@ -1154,18 +1124,10 @@ def _dispatch_to_existing_jarvis_session(
             )
             return False
 
-    # panel创建成功，切换到 tiled 布局
-    if set_window_tiled_layout(session_name, current_window):
-        PrettyOutput.print(
-            f"✅ 任务已派发到 tmux session '{session_name}' 的 panel 中",
-            OutputType.SUCCESS,
-            timestamp=False,
-        )
-        return True
-    else:
-        PrettyOutput.print(
-            "⚠️ 布局切换失败，但任务可能已派发",
-            OutputType.WARNING,
-            timestamp=False,
-        )
-        return True
+    # panel创建成功
+    PrettyOutput.print(
+        f"✅ 任务已派发到 tmux session '{session_name}' 的 panel 中",
+        OutputType.SUCCESS,
+        timestamp=False,
+    )
+    return True
