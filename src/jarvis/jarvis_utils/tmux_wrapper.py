@@ -361,6 +361,61 @@ def list_session_windows(session_name: str) -> List[str]:
         return []
 
 
+def get_window_pane_count(session_name: str, window_id: str) -> int:
+    """获取指定tmux session的指定window的panel数量。
+
+    Args:
+        session_name: tmux session名称
+        window_id: window标识（索引或名称，如 "1" 或 "1: bash"）
+
+    Returns:
+        int: panel数量，如果window不存在或命令执行失败返回0
+
+    注意:
+        window_id可以是完整的"index: name"格式（如"1: bash"），
+        也可以仅是索引（如"1"）。
+        如果session不存在或命令执行失败，返回0。
+    """
+    try:
+        # 解析 window_id：支持 "index: name" 和 "index" 两种格式
+        # 如果包含冒号，提取索引部分；否则直接使用
+        target_window = (
+            window_id.split(":")[0].strip() if ":" in window_id else window_id
+        )
+
+        # 构造 tmux 目标参数
+        target = f"{session_name}:{target_window}"
+
+        result = subprocess.run(
+            [
+                "tmux",
+                "list-panes",
+                "-t",
+                target,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,
+        )
+        # 统计输出行数（每行代表一个 pane）
+        panes = [
+            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+        ]
+        return len(panes)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        # window不存在或命令执行失败，返回0
+        return 0
+    except Exception as e:
+        # 记录意外错误
+        PrettyOutput.print(
+            f"⚠️ Unexpected error while counting panes for window '{window_id}' in session '{session_name}': {e}",
+            OutputType.WARNING,
+            timestamp=False,
+        )
+        return 0
+
+
 def find_or_create_jarvis_session(force_create: bool = True) -> Optional[str]:
     """查找或创建 jarvis session。
 
