@@ -51,11 +51,13 @@ class AgentRunLoop:
         返回:
             Optional[str]: 如果用户输入了补充信息，返回格式化字符串；否则返回 None
         """
+        from jarvis.jarvis_utils.input import get_multiline_input
         from jarvis.jarvis_utils.input import get_single_line_input
 
         try:
-            user_input = get_single_line_input(
-                "⚠ 检测到中断，请输入补充信息（直接回车跳过）："
+            user_input = get_multiline_input(
+                "⚠ 检测到中断，请输入补充信息（Ctrl+J/Ctrl+]确认，直接回车跳过）",
+                print_on_empty=False,
             )
             if user_input and user_input.strip():
                 return f"[用户中断] 补充信息：{user_input.strip()}"
