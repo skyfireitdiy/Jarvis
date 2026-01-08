@@ -446,6 +446,7 @@ def create_window(
         "tmux",
         "new-window",
         "-d",  # 创建 detached window
+        "-P",  # 打印新创建的 window 信息
         "-F",  # 指定输出格式（使用 window_index 以便后续 send-keys 调用）
         "#{window_index}",
         "-c",  # 指定工作目录
