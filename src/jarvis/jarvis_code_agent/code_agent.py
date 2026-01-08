@@ -1360,11 +1360,12 @@ def cli(
         try:
             PrettyOutput.auto_print("🌿 Git Worktree 模式已启用")
             worktree_manager = WorktreeManager(repo_root)
-            original_branch = worktree_manager.get_current_branch()
-            PrettyOutput.auto_print(f"📍 当前分支: {original_branch}")
 
             # 创建 worktree
             worktree_path = worktree_manager.create_worktree()
+
+            original_branch = worktree_manager.get_current_branch()
+            PrettyOutput.auto_print(f"📍 当前分支: {original_branch}")
             # 切换到 worktree 目录
             os.chdir(worktree_path)
             repo_root = worktree_path
