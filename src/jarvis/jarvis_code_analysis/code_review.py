@@ -235,6 +235,44 @@ def _get_language_checklist(language: str) -> str:
     return checklist if checklist else ""
 
 
+def _read_rule_files(rule_file_paths: List[str]) -> str:
+    """
+    Read content from specified rule files and format them for code review context.
+
+    Args:
+        rule_file_paths: List of file paths to rule files
+
+    Returns:
+        Formatted string containing all rule file contents, or empty string if no files
+    """
+    if not rule_file_paths:
+        return ""
+
+    rule_content_parts = []
+
+    for file_path in rule_file_paths:
+        file_path = file_path.strip()
+        if not file_path:
+            continue
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Add file header and content
+            rule_content_parts.append(f"----- 自定义规则文件: {file_path} -----")
+            rule_content_parts.append(content)
+            rule_content_parts.append("")  # Empty line for separation
+        except FileNotFoundError:
+            PrettyOutput.auto_print(f"⚠️ 警告：规则文件不存在: {file_path}")
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 警告：读取规则文件失败 {file_path}: {str(e)}")
+
+    if rule_content_parts:
+        return "\n".join(rule_content_parts)
+    return ""
+
+
 def execute_code_review(
     args: Dict[str, Any], agent: Optional["Agent"] = None
 ) -> Dict[str, Any]:
@@ -381,6 +419,12 @@ def execute_code_review(
             # Detect languages from the file paths
             detected_languages = _detect_languages_from_files(file_paths)
 
+            # Read custom rule files if specified
+            review_rules = args.get("review_rule")
+            custom_rules_content = (
+                _read_rule_files(review_rules) if review_rules else ""
+            )
+
             # Add review type and related information to the diff output
             review_info = f"""
 ----- 代码审查信息 -----
@@ -412,6 +456,11 @@ def execute_code_review(
                     checklist = _get_language_checklist(lang)
                     if checklist:
                         review_info += f"\n{checklist}"
+
+            # Add custom rule files if provided
+            if custom_rules_content:
+                review_info += "\n\n----- 自定义审查规则 -----"
+                review_info += f"\n{custom_rules_content}"
 
             review_info += "\n------------------------\n\n"
 
@@ -544,8 +593,10 @@ def execute_code_review(
 </output>
 
 <language_specific>
-# 语言特定审查
-如果在审查信息中检测到了语言特定的审查清单，请按照清单中的项目进行逐一检查，并在报告中针对每个适用的清单项给出详细分析。
+# 语言特定审查与自定义规则
+1. 如果在审查信息中检测到了语言特定的审查清单，请按照清单中的项目进行逐一检查，并在报告中针对每个适用的清单项给出详细分析。
+2. 如果在审查信息中提供了自定义审查规则文件，请严格按照这些自定义规则进行审查，确保代码变更符合这些规则的要求。
+3. 当语言特定清单与自定义规则存在冲突时，以自定义规则为准。
 </language_specific>
 
 我将分析上传的代码差异文件，进行全面的代码审查。
@@ -746,6 +797,9 @@ def review_commit(
     auto_complete: bool = typer.Option(
         False, "--auto-complete/--no-auto-complete", help="是否自动完成"
     ),
+    review_rule: Optional[List[str]] = typer.Option(
+        None, "--review-rule", help="自定义审查规则文件（可多次指定）"
+    ),
 ):
     """审查指定的提交"""
     tool_args = {
@@ -754,6 +808,7 @@ def review_commit(
         "root_dir": root_dir,
         "model_group": model_group,
         "auto_complete": auto_complete,
+        "review_rule": review_rule,
     }
     result = execute_code_review(tool_args)
     if result["success"]:
@@ -773,6 +828,9 @@ def review_current(
     auto_complete: bool = typer.Option(
         False, "--auto-complete/--no-auto-complete", help="是否自动完成"
     ),
+    review_rule: Optional[List[str]] = typer.Option(
+        None, "--review-rule", help="自定义审查规则文件（可多次指定）"
+    ),
 ):
     """审查当前的变更"""
     tool_args = {
@@ -780,6 +838,7 @@ def review_current(
         "root_dir": root_dir,
         "model_group": model_group,
         "auto_complete": auto_complete,
+        "review_rule": review_rule,
     }
     result = execute_code_review(tool_args)
     if result["success"]:
@@ -801,6 +860,9 @@ def review_range(
     auto_complete: bool = typer.Option(
         False, "--auto-complete/--no-auto-complete", help="是否自动完成"
     ),
+    review_rule: Optional[List[str]] = typer.Option(
+        None, "--review-rule", help="自定义审查规则文件（可多次指定）"
+    ),
 ):
     """审查提交范围"""
     tool_args = {
@@ -810,6 +872,7 @@ def review_range(
         "root_dir": root_dir,
         "model_group": model_group,
         "auto_complete": auto_complete,
+        "review_rule": review_rule,
     }
     result = execute_code_review(tool_args)
     if result["success"]:
@@ -830,6 +893,9 @@ def review_file(
     auto_complete: bool = typer.Option(
         False, "--auto-complete/--no-auto-complete", help="是否自动完成"
     ),
+    review_rule: Optional[List[str]] = typer.Option(
+        None, "--review-rule", help="自定义审查规则文件（可多次指定）"
+    ),
 ):
     """审查指定的文件"""
     tool_args = {
@@ -838,6 +904,7 @@ def review_file(
         "root_dir": root_dir,
         "model_group": model_group,
         "auto_complete": auto_complete,
+        "review_rule": review_rule,
     }
     result = execute_code_review(tool_args)
     if result["success"]:
