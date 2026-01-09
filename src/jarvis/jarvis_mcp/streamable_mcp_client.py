@@ -52,6 +52,9 @@ class StreamableMcpClient(McpClient):
         # 添加额外的HTTP头
         extra_headers = config.get("headers", {})
         self.session.headers.update(extra_headers)
+
+        PrettyOutput.auto_print(f"🔍 http 头: {self.session.headers}")
+
         # Request timeouts (connect, read) in seconds; can be overridden via config["timeout"]
         self.timeout = config.get("timeout", (10, 300))
 
