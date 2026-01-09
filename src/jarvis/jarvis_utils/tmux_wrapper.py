@@ -208,18 +208,65 @@ def check_and_launch_tmux(
     # tmux已安装且不在tmux中，优先查找现有 session
     existing_session = find_or_create_jarvis_session(force_create=False)
 
-    # 如果找到现有 session，附加到该 session
+    # 如果找到现有 session，在该 session 中创建新窗口执行命令
     if existing_session:
         PrettyOutput.print(
-            f"ℹ️ 找到现有 session: {existing_session}，正在附加...",
+            f"ℹ️ 找到现有 session: {existing_session}，正在创建新窗口...",
             OutputType.INFO,
             timestamp=False,
+        )
+
+        # 获取当前可执行文件路径和参数
+        executable = sys.executable
+        argv = sys.argv
+
+        # 获取用户的默认shell
+        user_shell = os.environ.get("SHELL", "/bin/sh")
+
+        # 构造命令
+        quoted_args = [shlex.quote(arg) for arg in argv]
+        command = f"{executable} {' '.join(quoted_args)}"
+        # 如果需要保持会话活动且允许shell fallback，则启动shell
+        if stay_in_session_after_exit and shell_fallback:
+            command += f'; exec "{user_shell}"'
+
+        # 在现有 session 中创建新窗口执行命令，并获取新窗口索引
+        new_window_index = None
+        try:
+            result = subprocess.run(
+                [
+                    "tmux",
+                    "new-window",
+                    "-F",
+                    "#{window_index}",
+                    "-t",
+                    existing_session,
+                    command,
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            new_window_index = result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            PrettyOutput.print(
+                f"⚠️ Failed to create new window in tmux session '{existing_session}': {e}",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            return
+
+        # 直接附加到新创建的窗口（格式：session_name:window_index）
+        attach_target = (
+            f"{existing_session}:{new_window_index}"
+            if new_window_index
+            else existing_session
         )
         tmux_args = [
             "tmux",
             "attach",
             "-t",
-            existing_session,
+            attach_target,
         ]
         try:
             os.execvp("tmux", tmux_args)
