@@ -58,7 +58,7 @@ class meta_agent:
         return True
 
     def _build_enhanced_prompt(
-        self, tool_name: str, function_description: str, jarvis_dir: Path
+        self, tool_name: str, function_description: str, jarvis_dir: Path, tools_dir: Path
     ) -> str:
         """构建增强的提示词，包含关键参考文件"""
 
@@ -71,7 +71,14 @@ class meta_agent:
             jarvis_dir / "jarvis_utils" / "output.py",
         ]
 
-        files_info = "\n".join([f"- {f.absolute()}" for f in key_files])
+        # 转换为绝对路径
+        key_files_absolute = [f.resolve() for f in key_files]
+        base_tool_file = (jarvis_dir / "jarvis_tools" / "base.py").resolve()
+        agent_init_file = (jarvis_dir / "jarvis_agent" / "__init__.py").resolve()
+        code_agent_file = (jarvis_dir / "jarvis_code_agent" / "code_agent.py").resolve()
+        code_agent_prompts_file = (jarvis_dir / "jarvis_code_agent" / "code_agent_prompts.py").resolve()
+
+        files_info = "\n".join([f"- {f}" for f in key_files_absolute])
 
         return f"""请根据用户需求生成一个新的Jarvis工具。
 
@@ -79,8 +86,8 @@ class meta_agent:
 - 工具名称：{tool_name}
 - 功能描述：{function_description}
 - 生成的文件名：{tool_name}.py
-- 文件保存路径：{jarvis_dir.parent.parent / "data" / "tools" / f"{tool_name}.py"}
-- 必须继承自Tool基类（参考：src/jarvis/jarvis_tools/base.py）
+- 文件保存路径：{tools_dir.resolve() / f"{tool_name}.py"}
+- 必须继承自Tool基类（参考：{base_tool_file}）
 - 必须实现name、description、parameters、execute方法
 
 关键参考文件：
@@ -91,14 +98,14 @@ class meta_agent:
 ### Agent / CodeAgent 关键用法（仅列核心要点，详细规则请阅读源码的绝对路径）
 - Agent（通用 Agent）：
   - 职责：通用任务编排与对话式工作流，严格遵循 IIRIPER（INTENT → RESEARCH → INNOVATE → PLAN → EXECUTE → REVIEW）。
-  - 初始化要点：`Agent(system_prompt=..., name=..., model_group=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{(jarvis_dir / "jarvis_agent" / "__init__.py").absolute()}` 中定义。
+  - 初始化要点：`Agent(system_prompt=..., name=..., model_group=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{agent_init_file}` 中定义。
   - 典型用法：通过 `agent.run(user_input)` 启动完整闭环，内部会自动处理系统提示、工具调用、task_list_manager 调度和总结；总结与返回值行为由 `summary_prompt` 和 `need_summary` 控制。
-  - 更多细节（参数含义、总结与返回值策略、事件回调等）请直接阅读：`{(jarvis_dir / "jarvis_agent" / "__init__.py").absolute()}`。
+  - 更多细节（参数含义、总结与返回值策略、事件回调等）请直接阅读：`{agent_init_file}`。
 - CodeAgent（代码 Agent）：
   - 职责：代码分析与修改、git 操作、构建验证、lint、diff 展示和自动 review。
-  - 初始化要点：`CodeAgent(model_group=..., need_summary=..., non_interactive=True/False, append_tools=..., rule_names=...)`，工作流和提示词在 `{(jarvis_dir / "jarvis_code_agent" / "code_agent.py").absolute()}` 与 `{(jarvis_dir / "jarvis_code_agent" / "code_agent_prompts.py").absolute()}` 中定义。
-  - 典型用法：通过 `agent.run(requirement, prefix=..., suffix=...)` 驱动代码修改流程；内部会自动处理上下文分析、补丁生成、git 提交、构建校验、lint 与 review，`run` 的返回值通常是“结果摘要字符串或 None”。
-  - 更多细节（review 流程、任务总结、返回值语义等）请直接阅读：`{(jarvis_dir / "jarvis_code_agent" / "code_agent.py").absolute()}` 与 `{(jarvis_dir / "jarvis_code_agent" / "code_agent_prompts.py").absolute()}`。
+  - 初始化要点：`CodeAgent(model_group=..., need_summary=..., non_interactive=True/False, append_tools=..., rule_names=...)`，工作流和提示词在 `{code_agent_file}` 与 `{code_agent_prompts_file}` 中定义。
+  - 典型用法：通过 `agent.run(requirement, prefix=..., suffix=...)` 驱动代码修改流程；内部会自动处理上下文分析、补丁生成、git 提交、构建校验、lint 与 review，`run` 的返回值通常是"结果摘要字符串或 None"。
+  - 更多细节（review 流程、任务总结、返回值语义等）请直接阅读：`{code_agent_file}` 与 `{code_agent_prompts_file}`。
 
 在本工具生成的新工具中，推荐：
 - 使用 Agent 负责上层的需求分析、IIRIPER 工作流以及多步骤任务编排；
@@ -237,7 +244,7 @@ class {tool_name}:
 
             # 构建增强的提示词，包含关键参考文件
             enhanced_prompt = self._build_enhanced_prompt(
-                tool_name, function_description, jarvis_dir
+                tool_name, function_description, jarvis_dir, tools_dir
             )
 
             # 使用CodeAgent生成工具代码

@@ -54,7 +54,12 @@ class StreamableMcpClient(McpClient):
         self.session.headers.update(extra_headers)
 
         # Request timeouts (connect, read) in seconds; can be overridden via config["timeout"]
-        self.timeout = config.get("timeout", (10, 300))
+        # Convert list to tuple if needed (JSON arrays become lists in Python, but requests needs tuple)
+        timeout_config = config.get("timeout", [10, 300])
+        if isinstance(timeout_config, list):
+            self.timeout = tuple(timeout_config)
+        else:
+            self.timeout = timeout_config
 
         # 请求相关属性
         self.pending_requests: Dict[
