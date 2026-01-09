@@ -82,9 +82,17 @@ def print_commands_overview() -> None:
         cmd_table.add_row("jarvis", "jvs", "通用AI代理，适用于多种任务")
         cmd_table.add_row("jarvis-agent", "ja", "AI代理基础功能，处理会话和任务")
         cmd_table.add_row(
+            "jarvis-agent-dispatcher", "jvsd", "jvs 的便捷封装，支持任务派发和交互模式"
+        )
+        cmd_table.add_row(
             "jarvis-code-agent",
             "jca",
             "专注于代码分析、修改和生成的代码代理",
+        )
+        cmd_table.add_row(
+            "jarvis-code-agent-dispatcher",
+            "jcad",
+            "jca 的便捷封装，支持任务派发和交互模式",
         )
         cmd_table.add_row("jarvis-code-review", "jcr", "智能代码审查工具")
         cmd_table.add_row(
@@ -94,6 +102,11 @@ def print_commands_overview() -> None:
         )
         cmd_table.add_row("jarvis-git-squash", "jgs", "Git提交历史整理工具")
         cmd_table.add_row(
+            "jarvis-config",
+            "jcfg",
+            "配置管理工具，基于 JSON Schema 动态生成配置 Web 页面",
+        )
+        cmd_table.add_row(
             "jarvis-platform-manager",
             "jpm",
             "管理和测试不同的大语言模型平台",
@@ -102,15 +115,24 @@ def print_commands_overview() -> None:
         cmd_table.add_row("jarvis-tool", "jt", "工具管理与调用系统")
         cmd_table.add_row("jarvis-methodology", "jm", "方法论知识库管理")
         cmd_table.add_row(
+            "jarvis-quick-config", "jqc", "快速配置 LLM 平台信息到 Jarvis 配置文件"
+        )
+        cmd_table.add_row(
             "jarvis-rag",
             "jrg",
             "构建和查询本地化的RAG知识库",
         )
         cmd_table.add_row("jarvis-smart-shell", "jss", "实验性的智能Shell功能")
         cmd_table.add_row(
+            "jarvis-sec", "jsec", "安全分析套件，结合启发式扫描和 AI 深度验证"
+        )
+        cmd_table.add_row(
             "jarvis-stats",
             "jst",
             "通用统计模块，支持记录和可视化任意指标数据",
+        )
+        cmd_table.add_row(
+            "jarvis-c2rust", "jc2r", "C→Rust 迁移套件，支持渐进式迁移和智能库替代"
         )
         cmd_table.add_row(
             "jarvis-memory-organizer",
