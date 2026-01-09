@@ -208,10 +208,10 @@ def check_and_launch_tmux(
     # tmux已安装且不在tmux中，优先查找现有 session
     existing_session = find_or_create_jarvis_session(force_create=False)
 
-    # 如果找到现有 session，在该 session 中创建新窗口执行命令
+    # 如果找到现有 session，在该 session 的当前窗口中创建 panel
     if existing_session:
         PrettyOutput.print(
-            f"ℹ️ 找到现有 session: {existing_session}，正在创建新窗口...",
+            f"ℹ️ 找到现有 session: {existing_session}，正在当前窗口创建 panel...",
             OutputType.INFO,
             timestamp=False,
         )
@@ -230,33 +230,83 @@ def check_and_launch_tmux(
         if stay_in_session_after_exit and shell_fallback:
             command += f'; exec "{user_shell}"'
 
-        # 在现有 session 中创建新窗口执行命令，并获取新窗口索引
-        new_window_index = None
-        try:
-            result = subprocess.run(
-                [
-                    "tmux",
-                    "new-window",
-                    "-F",
-                    "#{window_index}",
-                    "-t",
-                    existing_session,
-                    command,
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            new_window_index = result.stdout.strip()
-        except subprocess.CalledProcessError as e:
+        # 获取 session 的当前窗口
+        current_window = get_session_current_window(existing_session)
+        if not current_window:
             PrettyOutput.print(
-                f"⚠️ Failed to create new window in tmux session '{existing_session}': {e}",
+                f"⚠️ 无法获取 session '{existing_session}' 的当前窗口，创建新窗口...",
                 OutputType.WARNING,
                 timestamp=False,
             )
-            return
+            # 降级到创建新窗口（原有逻辑）
+            try:
+                result = subprocess.run(
+                    [
+                        "tmux",
+                        "new-window",
+                        "-F",
+                        "#{window_index}",
+                        "-t",
+                        existing_session,
+                        command,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                new_window_index = result.stdout.strip()
+            except subprocess.CalledProcessError as e:
+                PrettyOutput.print(
+                    f"⚠️ Failed to create new window in tmux session '{existing_session}': {e}",
+                    OutputType.WARNING,
+                    timestamp=False,
+                )
+                return
+        else:
+            # 在当前窗口创建 panel
+            pane_id = create_panel(
+                session_name=existing_session,
+                window_id=current_window,
+                initial_command=command,
+                split_direction="h",
+                stay_in_session_after_exit=stay_in_session_after_exit,
+                shell_fallback=shell_fallback,
+            )
+            if not pane_id:
+                PrettyOutput.print(
+                    f"⚠️ 在窗口 '{current_window}' 中创建 panel 失败，创建新窗口...",
+                    OutputType.WARNING,
+                    timestamp=False,
+                )
+                # 降级到创建新窗口（原有逻辑）
+                try:
+                    result = subprocess.run(
+                        [
+                            "tmux",
+                            "new-window",
+                            "-F",
+                            "#{window_index}",
+                            "-t",
+                            existing_session,
+                            command,
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                    )
+                    new_window_index = result.stdout.strip()
+                except subprocess.CalledProcessError as e:
+                    PrettyOutput.print(
+                        f"⚠️ Failed to create new window in tmux session '{existing_session}': {e}",
+                        OutputType.WARNING,
+                        timestamp=False,
+                    )
+                    return
+            else:
+                # panel创建成功，直接附加到当前窗口
+                new_window_index = current_window
 
-        # 直接附加到新创建的窗口（格式：session_name:window_index）
+        # 附加到session（使用当前窗口）
         attach_target = (
             f"{existing_session}:{new_window_index}"
             if new_window_index
