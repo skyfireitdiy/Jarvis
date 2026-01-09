@@ -66,6 +66,7 @@ class StreamableMcpClient(McpClient):
         self.notification_handlers: Dict[str, List[Callable]] = {}
         self.event_lock = threading.Lock()
         self.request_id_counter = 0
+        self.mcp_session_id: str = ""  # 存储 MCP 会话ID
 
         # 初始化连接
         self._initialize()
@@ -168,6 +169,13 @@ class StreamableMcpClient(McpClient):
             response = self.session.post(
                 mcp_url, json=request, stream=use_stream, timeout=self.timeout
             )
+            
+            # 保存 MCP 会话ID（如果存在）
+            if "Mcp-Session-Id" in response.headers:
+                self.mcp_session_id = response.headers["Mcp-Session-Id"]
+                # 如果后续请求需要会话ID，可以将其添加到请求头
+                if self.mcp_session_id and "Mcp-Session-Id" not in self.session.headers:
+                    self.session.headers["Mcp-Session-Id"] = self.mcp_session_id
             
             # 如果请求失败，打印详细错误信息
             if response.status_code >= 400:
