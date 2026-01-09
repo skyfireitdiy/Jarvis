@@ -53,6 +53,8 @@ from jarvis.jarvis_utils.utils import decode_output
 
 # Sentinel value to indicate that Ctrl+O was pressed
 CTRL_O_SENTINEL = "__CTRL_O_PRESSED__"
+# Sentinel value to indicate that Ctrl+X was pressed (exit program)
+CTRL_X_SENTINEL = "__CTRL_X_PRESSED__"
 # Sentinel prefix to indicate that Ctrl+F (fzf) inserted content should prefill next prompt
 FZF_INSERT_SENTINEL_PREFIX = "__FZF_INSERT__::"
 # Sentinel to request running fzf outside the prompt and then prefill next prompt
@@ -745,6 +747,11 @@ def _get_multiline_input_internal(
         """Handle Ctrl+O by exiting the prompt and returning the sentinel value."""
         event.app.exit(result=CTRL_O_SENTINEL)
 
+    @bindings.add("c-x", filter=has_focus(DEFAULT_BUFFER))
+    def _(event: KeyPressEvent) -> None:
+        """Handle Ctrl+X by exiting the prompt and requesting program exit."""
+        event.app.exit(result=CTRL_X_SENTINEL)
+
     @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER), eager=True)
     def _(event: KeyPressEvent) -> None:
         """Return a shell command like '!bash' for upper input_handler to execute."""
@@ -885,6 +892,9 @@ def _get_multiline_input_internal(
                 ("class:bt.sep", " • "),
                 ("class:bt.label", " '<Quiet>' 无人值守模式 "),
                 ("class:bt.sep", " • "),
+                ("class:bt.key", "Ctrl+X"),
+                ("class:bt.label", " 退出程序 "),
+                ("class:bt.sep", " • "),
                 ("class:bt.key", "Ctrl+C/D"),
                 ("class:bt.label", " 取消 "),
             ]
@@ -990,6 +1000,9 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             _show_history_and_copy()
             tip = "请继续输入（或按Ctrl+J/Ctrl+]确认）:"
             continue
+        if user_input == CTRL_X_SENTINEL:
+            PrettyOutput.auto_print("🛑 用户请求退出程序...")
+            raise SystemExit(0)
         elif isinstance(user_input, str) and user_input.startswith(
             FZF_REQUEST_SENTINEL_PREFIX
         ):
