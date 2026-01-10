@@ -14,6 +14,7 @@ from typing import Tuple
 import yaml
 
 from jarvis.jarvis_code_agent.builtin_rules import get_builtin_rule
+from jarvis.jarvis_code_agent.builtin_rules import render_rule_template
 from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
@@ -77,6 +78,9 @@ class RulesManager:
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
                 with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
+                # 使用jinja2渲染规则模板
+                if content:
+                    content = render_rule_template(content, os.path.dirname(rules_path))
                 return content if content else None
         except Exception:
             # 读取规则失败时忽略，不影响主流程
@@ -90,6 +94,9 @@ class RulesManager:
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
                 with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
+                # 使用jinja2渲染规则模板
+                if content:
+                    content = render_rule_template(content, os.path.dirname(rules_path))
                 return content if content else None
         except Exception:
             # 读取规则失败时忽略，不影响主流程
@@ -114,6 +121,9 @@ class RulesManager:
             if os.path.exists(rule_file_path) and os.path.isfile(rule_file_path):
                 with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
+                # 使用jinja2渲染规则模板
+                if content:
+                    content = render_rule_template(content, rules_dir)
                 return content if content else None
         except Exception:
             # 读取规则失败时忽略，不影响主流程
@@ -211,6 +221,11 @@ class RulesManager:
                                 content = rule_value.strip()
                             else:
                                 content = str(rule_value).strip()
+                            # 使用jinja2渲染规则模板
+                            if content:
+                                content = render_rule_template(
+                                    content, os.path.dirname(yaml_path)
+                                )
                             if content:
                                 return content
                     except Exception:
