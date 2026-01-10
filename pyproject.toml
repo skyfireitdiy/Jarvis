@@ -66,7 +66,7 @@ dependencies = [
 requires-python = "==3.12.*"
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "mypy", "build", "twine"]
+dev = ["pytest", "ruff", "mypy", "build", "twine", "types-requests", "types-tabulate"]
 rag = [
     "langchain",
     "langchain-community",

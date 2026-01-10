@@ -257,4 +257,4 @@ class LocalEmbeddingModel(EmbeddingInterface):
         为单个查询计算嵌入。
         查询通常不被缓存，但如果需要可以添加。
         """
-        return self.model.embed_query(text)
+        return cast(List[float], self.model.embed_query(text))

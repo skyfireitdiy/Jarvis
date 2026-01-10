@@ -11,7 +11,7 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.prompt import Prompt, Confirm
-import requests
+import requests  # type: ignore
 
 from .output import PrettyOutput
 
