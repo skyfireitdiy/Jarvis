@@ -283,12 +283,27 @@ commit信息
                 if is_large_content:
                     # 尝试生成提交信息
                     # 使用上传的文件
+                    # 格式化文件列表，如果太长则截断
+                    max_files_to_show = 20
+                    if file_count <= max_files_to_show:
+                        files_list = "\n".join(f"- {f}" for f in files)
+                    else:
+                        files_list = "\n".join(
+                            f"- {f}" for f in files[:max_files_to_show]
+                        )
+                        files_list += (
+                            f"\n- ...及其他 {file_count - max_files_to_show} 个文件"
+                        )
+
                     prompt = (
                         base_prompt
                         + f"""
 # 变更概述
 - 变更文件数量: {file_count} 个文件
 - 已上传包含完整代码差异的文件
+
+# 变更文件列表
+{files_list}
 
 请详细分析已上传的代码差异文件，生成符合上述格式的提交信息。
 """
