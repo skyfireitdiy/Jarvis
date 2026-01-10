@@ -66,18 +66,6 @@ class ClaudeModel(BasePlatform):
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
 
-    def upload_files(self, file_list: List[str]) -> bool:
-        """
-        上传文件到 Claude 平台
-
-        参数:
-            file_list: 需要上传的文件路径列表
-
-        返回:
-            bool: 上传是否成功 (当前实现始终返回False)
-        """
-        return False
-
     def get_model_list(self) -> List[Tuple[str, str]]:
         """
         获取可用的 Claude 模型列表
@@ -304,15 +292,6 @@ class ClaudeModel(BasePlatform):
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 恢复会话失败: {str(e)}")
             return False
-
-    def support_upload_files(self) -> bool:
-        """
-        检查是否支持上传文件功能
-
-        返回:
-            bool: 当前是否支持上传文件 (Claude平台始终返回False)
-        """
-        return False
 
     def trim_messages(self) -> bool:
         """裁剪消息历史以腾出token空间

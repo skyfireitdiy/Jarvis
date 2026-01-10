@@ -1,19 +1,12 @@
 # -*- coding: utf-8 -*-
-import hashlib
-import hmac
 import json
 import os
-import time
-import urllib.parse
 from typing import Any
 from typing import Dict
 from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Tuple
-from typing import cast
-
-from PIL import Image
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
@@ -61,7 +54,6 @@ class YuanbaoPlatform(BasePlatform):
         self.system_message = ""  # 系统消息，用于初始化对话
         self.first_chat = True  # 标识是否为第一次对话
         self.model_name = "deep_seek_v3"  # 默认模型名称，使用下划线保持一致
-        self.multimedia: List[Dict[str, Any]] = []
 
     def set_system_prompt(self, message: str):
         """设置系统消息"""
@@ -123,10 +115,6 @@ class YuanbaoPlatform(BasePlatform):
             PrettyOutput.auto_print(f"❌ 错误：创建会话失败：{e}")
             return False
 
-    def support_upload_files(self) -> bool:
-        """Check if platform supports upload files"""
-        return True
-
     def trim_messages(self) -> bool:
         """未实现：不支持裁剪消息历史
 
@@ -134,305 +122,6 @@ class YuanbaoPlatform(BasePlatform):
             bool: 返回False表示不支持裁剪
         """
         return False
-
-    def upload_files(self, file_list: List[str]) -> bool:
-        """上传文件到元宝平台
-
-        参数:
-            file_list: 要上传的文件路径列表
-
-        返回:
-            用于聊天消息的文件元数据字典列表
-        """
-        if not self.cookies:
-            PrettyOutput.auto_print("❌ 未设置yuanbao_cookies，无法上传文件")
-            return False
-
-        uploaded_files = []
-
-        for file_path in file_list:
-            file_name = os.path.basename(file_path)
-            log_lines: List[str] = []
-            log_lines.append(f"上传文件 {file_name}")
-            try:
-                # 1. Prepare the file information
-                log_lines.append(f"准备文件信息: {file_name}")
-                file_size = os.path.getsize(file_path)
-                file_extension = os.path.splitext(file_path)[1].lower().lstrip(".")
-
-                # Determine file_type using file extension
-                file_type = "txt"  # Default type
-
-                # Image types
-                if file_extension in ["jpg", "jpeg", "png", "webp", "bmp", "gif"]:
-                    file_type = "image"
-                # PDF type
-                elif file_extension == "pdf":
-                    file_type = "pdf"
-                # Spreadsheet types
-                elif file_extension in ["xls", "xlsx"]:
-                    file_type = "excel"
-                # Presentation types
-                elif file_extension in ["ppt", "pptx"]:
-                    file_type = "ppt"
-                # Document types
-                elif file_extension in ["doc", "docx"]:
-                    file_type = "doc"
-                # Code file types
-                elif file_extension in [
-                    "bat",
-                    "c",
-                    "cpp",
-                    "cs",
-                    "css",
-                    "go",
-                    "h",
-                    "hpp",
-                    "ini",
-                    "java",
-                    "js",
-                    "json",
-                    "log",
-                    "lua",
-                    "php",
-                    "pl",
-                    "py",
-                    "rb",
-                    "sh",
-                    "sql",
-                    "swift",
-                    "tex",
-                    "toml",
-                    "vue",
-                    "yaml",
-                    "yml",
-                    "rs",
-                ]:
-                    file_type = "code"
-
-                # 2. Generate upload information
-                log_lines.append(f"获取上传信息: {file_name}")
-                upload_info = self._generate_upload_info(file_name)
-                if not upload_info:
-                    log_lines.append(f"无法获取文件 {file_name} 的上传信息")
-                    joined_logs = "\n".join(log_lines)
-                    PrettyOutput.auto_print(f"❌ {joined_logs}")
-                    return False
-
-                # 3. Upload the file to COS
-                log_lines.append(f"上传文件到云存储: {file_name}")
-                upload_success = self._upload_file_to_cos(file_path, upload_info)
-                if not upload_success:
-                    log_lines.append(f"上传文件 {file_name} 失败")
-                    joined_logs = "\n".join(log_lines)
-                    PrettyOutput.auto_print(f"❌ {joined_logs}")
-                    return False
-
-                # 4. Create file metadata for chat
-                log_lines.append(f"生成文件元数据: {file_name}")
-                file_metadata = {
-                    "type": file_type,
-                    "docType": file_extension if file_extension else file_type,
-                    "url": upload_info.get("resourceUrl", ""),
-                    "fileName": file_name,
-                    "size": file_size,
-                    "width": 0,
-                    "height": 0,
-                }
-
-                # Get image dimensions if it's an image file
-                if file_type == "image":
-                    try:
-                        with Image.open(file_path) as img:
-                            file_metadata["width"] = img.width
-                            file_metadata["height"] = img.height
-                    except Exception as e:
-                        log_lines.append(f"无法获取图片 {file_name} 的尺寸: {str(e)}")
-
-                uploaded_files.append(file_metadata)
-                log_lines.append(f"文件 {file_name} 上传成功")
-                joined_logs = "\n".join(log_lines)
-                PrettyOutput.auto_print(f"ℹ️ {joined_logs}")
-                time.sleep(3)  # 上传成功后等待3秒
-
-            except Exception as e:
-                log_lines.append(f"上传文件 {file_path} 时出错: {str(e)}")
-                joined_logs = "\n".join(log_lines)
-                PrettyOutput.auto_print(f"❌ {joined_logs}")
-                return False
-
-        self.multimedia = uploaded_files
-        return True
-
-    def _generate_upload_info(self, file_name: str) -> Dict:
-        """从元宝API生成上传信息
-
-        参数:
-            file_name: 要上传的文件名
-
-        返回:
-            包含上传信息的字典，如果失败则返回空字典
-        """
-        url = "https://yuanbao.tencent.com/api/resource/genUploadInfo"
-
-        headers = self._get_base_headers()
-
-        payload = {"fileName": file_name, "docFrom": "localDoc", "docOpenId": ""}
-
-        try:
-            response = while_success(
-                lambda: http.post(url, headers=headers, json=payload),
-            )
-
-            if response.status_code != 200:
-                PrettyOutput.auto_print(
-                    f"❌ 获取上传信息失败，状态码: {response.status_code}"
-                )
-                if hasattr(response, "text"):
-                    PrettyOutput.auto_print(f"❌ 响应: {response.text}")
-                return {}
-
-            upload_info = response.json()
-            return cast(Dict[str, Any], upload_info)
-
-        except Exception as e:
-            PrettyOutput.auto_print(f"❌ 获取上传信息时出错: {str(e)}")
-            return {}
-
-    def _upload_file_to_cos(self, file_path: str, upload_info: Dict) -> bool:
-        """使用提供的上传信息将文件上传到腾讯COS
-
-        参数:
-            file_path: 要上传的文件路径
-            upload_info: 从generate_upload_info获取的上传信息
-
-        返回:
-            布尔值表示成功或失败
-        """
-        try:
-            # Extract required information from upload_info
-            bucket_url = f"https://{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"
-            object_path = upload_info.get("location", "")
-            url = f"{bucket_url}{object_path}"
-
-            # Security credentials
-            tmp_secret_id = upload_info.get("encryptTmpSecretId", "")
-            tmp_secret_key = upload_info.get("encryptTmpSecretKey", "")
-            token = upload_info.get("encryptToken", "")
-            start_time = upload_info.get("startTime", int(time.time()))
-            expired_time = upload_info.get("expiredTime", start_time + 600)
-            key_time = f"{start_time};{expired_time}"
-
-            # Read file content
-            with open(file_path, "rb") as file:
-                file_content = file.read()
-
-            PrettyOutput.auto_print(f"ℹ️ 上传文件大小: {len(file_content)}")
-
-            # Prepare headers for PUT request
-            host = f"{upload_info['bucketName']}.{upload_info.get('accelerateDomain', 'cos.accelerate.myqcloud.com')}"
-            headers = {
-                "Host": host,
-                "Content-Length": str(len(file_content)),
-                "Content-Type": "application/octet-stream",
-                "x-cos-security-token": token,
-            }
-
-            # Generate signature for COS request (per Tencent Cloud documentation)
-            signature = self._generate_cos_signature(
-                secret_key=tmp_secret_key,
-                method="PUT",
-                path=urllib.parse.quote(object_path),
-                params={},
-                headers={"host": host, "content-length": headers["Content-Length"]},
-                key_time=key_time,
-            )
-
-            # Add Authorization header with signature
-            headers["Authorization"] = (
-                f"q-sign-algorithm=sha1&q-ak={tmp_secret_id}&q-sign-time={key_time}&"
-                f"q-key-time={key_time}&q-header-list=content-length;host&"
-                f"q-url-param-list=&q-signature={signature}"
-            )
-
-            # Upload the file
-            response = http.put(url, headers=headers, data=file_content)
-
-            if response.status_code not in [200, 204]:
-                PrettyOutput.auto_print(
-                    f"❌ 文件上传到COS失败，状态码: {response.status_code}"
-                )
-                if hasattr(response, "text"):
-                    PrettyOutput.auto_print(f"❌ 响应: {response.text}")
-                return False
-
-            return True
-
-        except Exception as e:
-            PrettyOutput.auto_print(f"❌ 上传文件到COS时出错: {str(e)}")
-            return False
-
-    def _generate_cos_signature(
-        self,
-        secret_key: str,
-        method: str,
-        path: str,
-        params: Dict,
-        headers: Dict,
-        key_time: str,
-    ) -> str:
-        """根据腾讯云COS文档生成COS签名
-
-        参数:
-            secret_key: 临时密钥
-            method: HTTP方法(GET, PUT等)
-            path: 对象路径
-            params: URL参数
-            headers: HTTP头部
-            key_time: 签名时间范围
-
-        返回:
-            签名字符串
-        """
-        try:
-            # 1. Generate SignKey
-            sign_key = hmac.new(
-                secret_key.encode("utf-8"), key_time.encode("utf-8"), hashlib.sha1
-            ).hexdigest()
-
-            # 2. Format parameters and headers
-            formatted_params = "&".join(
-                [
-                    f"{k.lower()}={urllib.parse.quote(str(v), safe='')}"
-                    for k, v in sorted(params.items())
-                ]
-            )
-
-            formatted_headers = "&".join(
-                [
-                    f"{k.lower()}={urllib.parse.quote(str(v), safe='')}"
-                    for k, v in sorted(headers.items())
-                ]
-            )
-
-            # 3. Generate HttpString
-            http_string = (
-                f"{method.lower()}\n{path}\n{formatted_params}\n{formatted_headers}\n"
-            )
-
-            # 4. Generate StringToSign
-            string_to_sign = f"sha1\n{key_time}\n{hashlib.sha1(http_string.encode('utf-8')).hexdigest()}\n"
-
-            # 5. Generate Signature
-            signature = hmac.new(
-                sign_key.encode("utf-8"), string_to_sign.encode("utf-8"), hashlib.sha1
-            ).hexdigest()
-
-            return signature
-
-        except Exception as e:
-            PrettyOutput.auto_print(f"❌ 生成签名时出错: {str(e)}")
-            raise e
 
     def chat(self, message: str) -> Generator[str, None, None]:
         """发送消息并获取响应，可选文件附件
@@ -471,7 +160,6 @@ class YuanbaoPlatform(BasePlatform):
                     "intentionStatus": True,
                 }
             },
-            "multimedia": self.multimedia,
             "agentId": self.agent_id,
             "supportHint": 1,
             "version": "v2",
@@ -481,8 +169,6 @@ class YuanbaoPlatform(BasePlatform):
 
         if self.first_chat:
             payload["chatModelExtInfo"] = (json.dumps(chat_model_ext_info),)
-
-        self.multimedia = []
 
         # 添加系统消息（如果是第一次对话）
         if self.first_chat and self.system_message:
@@ -594,7 +280,6 @@ class YuanbaoPlatform(BasePlatform):
             "system_message": self.system_message,
             "first_chat": self.first_chat,
             "model_name": self.model_name,
-            "multimedia": self.multimedia,
         }
 
         try:
@@ -617,7 +302,6 @@ class YuanbaoPlatform(BasePlatform):
             self.system_message = state.get("system_message", "")
             self.first_chat = state.get("first_chat", True)
             self.model_name = state.get("model_name", "deep_seek_v3")
-            self.multimedia = state.get("multimedia", [])
             # 处理start_commit信息（如果存在）
             # start_commit = state.get("start_commit", None)
             # 可以根据需要使用start_commit信息

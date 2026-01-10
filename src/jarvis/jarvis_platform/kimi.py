@@ -2,7 +2,6 @@
 # Kimi 平台实现模块
 # 提供与 Moonshot AI 的 Kimi 大模型交互功能
 import json
-import mimetypes
 import os
 import time
 from typing import Any
@@ -107,10 +106,6 @@ class KimiModel(BasePlatform):
         response = while_success(lambda: http.post(url, headers=headers, data=payload))
         return cast(Dict[str, Any], response.json())
 
-    def support_upload_files(self) -> bool:
-        """Check if platform supports upload files"""
-        return True
-
     def trim_messages(self) -> bool:
         """未实现：不支持裁剪消息历史
 
@@ -192,72 +187,6 @@ class KimiModel(BasePlatform):
 
         return False
 
-    def upload_files(self, file_list: List[str]) -> bool:
-        """Upload file list and return file information"""
-        if not file_list:
-            return True
-
-        if not self.chat_id:
-            PrettyOutput.auto_print("ℹ️ 正在创建聊天会话...")
-            if not self._create_chat():
-                PrettyOutput.auto_print("❌ 创建聊天会话失败")
-                return False
-            PrettyOutput.auto_print("✅ 创建聊天会话成功")
-
-        uploaded_files = []
-        for index, file_path in enumerate(file_list, 1):
-            file_name = os.path.basename(file_path)
-            log_lines: List[str] = [f"处理文件 [{index}/{len(file_list)}]: {file_name}"]
-            try:
-                mime_type, _ = mimetypes.guess_type(file_path)
-                action = (
-                    "image" if mime_type and mime_type.startswith("image/") else "file"
-                )
-
-                # 获取预签名URL
-                log_lines.append(f"获取上传URL: {file_name}")
-                presigned_data = self._get_presigned_url(file_path, action)
-
-                # 上传文件
-                log_lines.append(f"上传文件: {file_name}")
-                if self._upload_file(file_path, presigned_data["url"]):
-                    # 获取文件信息
-                    log_lines.append(f"获取文件信息: {file_name}")
-                    file_info = self._get_file_info(presigned_data, file_name, action)
-
-                    # 只有文件需要解析
-                    if action == "file":
-                        log_lines.append(f"等待文件解析: {file_name}")
-                        if self._wait_for_parse(file_info["id"]):
-                            uploaded_files.append(file_info)
-                            log_lines.append(f"文件处理完成: {file_name}")
-                        else:
-                            log_lines.append(f"文件解析失败: {file_name}")
-                            joined_logs = "\n".join(log_lines)
-                            PrettyOutput.auto_print(f"❌ {joined_logs}")
-                            return False
-                    else:
-                        uploaded_files.append(file_info)
-                        log_lines.append(f"图片处理完成: {file_name}")
-                else:
-                    log_lines.append(f"文件上传失败: {file_name}")
-                    joined_logs = "\n".join(log_lines)
-                    PrettyOutput.auto_print(f"❌ {joined_logs}")
-                    return False
-
-                # 成功路径统一输出本文件的处理日志
-                joined_logs = "\n".join(log_lines)
-                PrettyOutput.auto_print(f"ℹ️ {joined_logs}")
-
-            except Exception as e:
-                log_lines.append(f"处理文件出错 {file_path}: {str(e)}")
-                joined_logs = "\n".join(log_lines)
-                PrettyOutput.auto_print(f"❌ {joined_logs}")
-                return False
-
-        self.uploaded_files = uploaded_files
-        return True
-
     def chat(self, message: str) -> Generator[str, None, None]:
         """发送消息并获取响应流
         参数:
@@ -271,12 +200,8 @@ class KimiModel(BasePlatform):
 
         url = f"https://kimi.moonshot.cn/api/chat/{self.chat_id}/completion/stream"
 
-        refs = []
-        refs_file = []
-        if self.uploaded_files:
-            refs = [f["id"] for f in self.uploaded_files]
-            refs_file = self.uploaded_files
-            self.uploaded_files = []
+        refs: List[str] = []
+        refs_file: List[Dict[str, Any]] = []
 
         if self.first_chat:
             message = self.system_message + "\n" + message

@@ -716,41 +716,13 @@ def execute_code_review(
                     diff_output, model_group, platform
                 )
 
-                # Upload the file to the agent's model
+                # 对于大内容，直接返回提示
                 if is_large_content:
-                    if not agent.model or not agent.model.support_upload_files():
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "代码差异太大，无法处理",
-                        }
-
-                    upload_success = agent.model.upload_files([temp_file_path])
-                    if upload_success:
-                        pass
-                    else:
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "上传代码差异文件失败",
-                        }
-
-                # Prepare the prompt based on upload status
-                if is_large_content:
-                    # When file is uploaded, reference it in the prompt
-                    complete_prompt = (
-                        user_prompt
-                        + f"""
-
-我已上传了一个包含代码差异的文件。该文件包含:
-- 审查类型: {review_type}
-- 变更文件数量: {len(file_paths)} 个文件
-- 检测到的编程语言: {", ".join(detected_languages) if detected_languages else "未检测到特定语言"}
-
-请基于上传的代码差异文件进行全面审查，并生成详细的代码审查报告。"""
-                    )
-                    # Run the agent with the prompt
-                    result = agent.run(complete_prompt)
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "代码差异太大，无法处理。请缩小审查范围或分批进行审查。",
+                    }
                 else:
                     complete_prompt = (
                         user_prompt

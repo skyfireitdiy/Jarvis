@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-import time
 import uuid
 from typing import Any
 from typing import Dict
@@ -9,7 +8,6 @@ from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Tuple
-from typing import cast
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils import http
@@ -46,7 +44,6 @@ class TongyiPlatform(BasePlatform):
         self.request_id = ""
         self.msg_id = ""
         self.model_name = ""
-        self.uploaded_file_info: List[Dict[str, Any]] = []
         self.system_message = ""  # System message for initialization
         self.first_chat = True  # Flag for first chat
 
@@ -82,10 +79,6 @@ class TongyiPlatform(BasePlatform):
 
     def _generate_request_id(self):
         self.request_id = str(uuid.uuid4()).replace("-", "")
-
-    def support_upload_files(self) -> bool:
-        """Check if platform supports upload files"""
-        return True
 
     def trim_messages(self) -> bool:
         """未实现：不支持裁剪消息历史
@@ -136,28 +129,6 @@ class TongyiPlatform(BasePlatform):
             )
             self.first_chat = False
 
-        # Add uploaded files to contents if available and clear after use
-        if self.uploaded_file_info:
-            for file_info in self.uploaded_file_info:
-                # Determine content type based on fileKey extension
-                file_ext = os.path.splitext(file_info["fileKey"])[1].lower()
-                is_image = file_ext in self.IMAGE_EXTENSIONS
-
-                contents.append(
-                    {
-                        "role": "user",
-                        "contentType": "image" if is_image else "file",
-                        "content": file_info["url"],
-                        "ext": {
-                            "fileSize": file_info.get("fileSize", 0),
-                            "batchId": file_info.get("batchId", ""),
-                            "docId": file_info.get("docId", ""),
-                        },
-                    }
-                )
-            # Clear uploaded file info after using it
-            self.uploaded_file_info = []
-
         payload: Dict[str, Any] = {
             "model": "",
             "action": "next",
@@ -176,11 +147,6 @@ class TongyiPlatform(BasePlatform):
                 "specifiedModel": "",
                 "deepThink": self.model_name == "Thinking",
                 "deepResearch": self.model_name == "Deep-Research",
-                "fileUploadBatchId": (
-                    self.uploaded_file_info[0]["batchId"]
-                    if self.uploaded_file_info
-                    else ""
-                ),
             },
             "contents": contents,
         }
@@ -262,219 +228,6 @@ class TongyiPlatform(BasePlatform):
         except Exception as e:
             raise Exception(f"Chat failed: {str(e)}")
 
-    def _get_upload_token(self) -> Dict[str, Any]:
-        """Get upload token from Tongyi API
-
-        Returns:
-            Dict[str, Any]: Upload token information including accessId, bucketName, etc.
-        """
-        url = "https://api.tongyi.com/dialog/uploadToken"
-        headers = self._get_base_headers()
-        payload: Dict[str, Any] = {}
-
-        try:
-            response = while_success(
-                lambda: http.post(url, headers=headers, json=payload)
-            )
-            if response.status_code != 200:
-                raise Exception(f"HTTP {response.status_code}: {response.text}")
-
-            result = response.json()
-            if not result.get("success"):
-                raise Exception(f"Failed to get upload token: {result.get('errorMsg')}")
-
-            return cast(Dict[str, Any], result.get("data", {}))
-
-        except Exception as e:
-            raise Exception(f"Failed to get upload token: {str(e)}")
-
-    def upload_files(self, file_list: List[str]) -> bool:
-        """Upload files to Tongyi platform and get download links
-
-        Args:
-            file_list: List of file paths to upload
-
-        Returns:
-            List[Dict[str, str]]: List of dictionaries containing file info and download URLs
-        """
-        try:
-            upload_token = self._get_upload_token()
-            uploaded_files = []
-
-            for file_path in file_list:
-                file_name = os.path.basename(file_path)
-                log_lines: List[str] = []
-                log_lines.append(f"上传文件 {file_name}")
-                try:
-                    if not os.path.exists(file_path):
-                        # 先输出已收集的日志与错误后返回
-                        log_lines.append(f"文件不存在: {file_path}")
-                        joined_logs = "\n".join(log_lines)
-                        PrettyOutput.auto_print(f"❌ {joined_logs}")
-                        return False
-
-                    # Get file name and content type
-                    content_type = self._get_content_type(file_path)
-
-                    log_lines.append(f"准备上传文件: {file_name}")
-
-                    # Prepare form data
-                    form_data = {
-                        "OSSAccessKeyId": upload_token["accessId"],
-                        "policy": upload_token["policy"],
-                        "signature": upload_token["signature"],
-                        "key": f"{upload_token['dir']}{file_name}",
-                        "dir": upload_token["dir"],
-                        "success_action_status": "200",
-                    }
-
-                    # Prepare files
-                    files = {"file": (file_name, open(file_path, "rb"), content_type)}
-
-                    log_lines.append(f"正在上传文件: {file_name}")
-
-                    # Upload file
-                    response = http.post(
-                        upload_token["host"], data=form_data, files=files
-                    )
-
-                    if response.status_code != 200:
-                        log_lines.append(
-                            f"上传失败 {file_name}: HTTP {response.status_code}"
-                        )
-                        joined_logs = "\n".join(log_lines)
-                        PrettyOutput.auto_print(f"❌ {joined_logs}")
-                        return False
-
-                    # Determine file type based on extension
-                    file_ext = os.path.splitext(file_path)[1].lower()
-                    is_image = file_ext in self.IMAGE_EXTENSIONS
-
-                    uploaded_files.append(
-                        {
-                            "fileKey": file_name,
-                            "fileType": "image" if is_image else "file",
-                            "dir": upload_token["dir"],
-                        }
-                    )
-
-                    log_lines.append(f"获取下载链接: {file_name}")
-
-                    # Get download links for uploaded files
-                    url = "https://api.tongyi.com/dialog/downloadLink/batch"
-                    headers = self._get_base_headers()
-                    payload = {
-                        "fileKeys": [f["fileKey"] for f in uploaded_files],
-                        "fileType": (
-                            "image"
-                            if any(f["fileType"] == "image" for f in uploaded_files)
-                            else "file"
-                        ),
-                        "dir": upload_token["dir"],
-                    }
-
-                    response = http.post(url, headers=headers, json=payload)
-                    if response.status_code != 200:
-                        log_lines.append(
-                            f"获取下载链接失败: HTTP {response.status_code}"
-                        )
-                        joined_logs = "\n".join(log_lines)
-                        PrettyOutput.auto_print(f"❌ {joined_logs}")
-                        return False
-
-                    result = response.json()
-                    if not result.get("success"):
-                        log_lines.append(f"获取下载链接失败: {result.get('errorMsg')}")
-                        joined_logs = "\n".join(log_lines)
-                        PrettyOutput.auto_print(f"❌ {joined_logs}")
-                        return False
-
-                    # Add files to chat
-                    self.uploaded_file_info = result.get("data", {}).get("results", [])
-                    for file_info in self.uploaded_file_info:
-                        log_lines.append(f"添加文件到对话: {file_name}")
-                        add_url = "https://api.tongyi.com/assistant/api/chat/file/add"
-                        add_payload = {
-                            "workSource": "chat",
-                            "terminal": "web",
-                            "workCode": "0",
-                            "channel": "home",
-                            "workType": "file",
-                            "module": "uploadhistory",
-                            "workName": file_info["fileKey"],
-                            "workId": file_info["docId"],
-                            "workResourcePath": file_info["url"],
-                            "sessionId": "",
-                            "batchId": str(uuid.uuid4()).replace("-", "")[
-                                :32
-                            ],  # Generate random batchId
-                            "fileSize": os.path.getsize(file_path),
-                        }
-
-                        add_response = http.post(
-                            add_url, headers=headers, json=add_payload
-                        )
-                        if add_response.status_code != 200:
-                            log_lines.append(
-                                f"添加文件到对话失败: HTTP {add_response.status_code}"
-                            )
-                            continue
-
-                        add_result = add_response.json()
-                        if not add_result.get("success"):
-                            log_lines.append(
-                                f"添加文件到对话失败: {add_result.get('errorMsg')}"
-                            )
-                            continue
-
-                        file_info.update(add_result.get("data", {}))
-
-                    log_lines.append(f"文件 {file_name} 上传成功")
-                    joined_logs = "\n".join(log_lines)
-                    PrettyOutput.auto_print(f"ℹ️ {joined_logs}")
-                    time.sleep(1)  # 短暂暂停以便用户看到成功状态
-
-                except Exception as e:
-                    log_lines.append(f"上传文件 {file_name} 时出错: {str(e)}")
-                    joined_logs = "\n".join(log_lines)
-                    PrettyOutput.auto_print(f"❌ {joined_logs}")
-                    return False
-            return True
-
-        except Exception as e:
-            PrettyOutput.auto_print(f"❌ Error uploading files: {str(e)}")
-            return False
-
-    def _get_content_type(self, file_path: str) -> str:
-        """Get content type for file
-
-        Args:
-            file_path: Path to file
-
-        Returns:
-            str: Content type
-        """
-        ext = os.path.splitext(file_path)[1].lower()
-        content_types = {
-            ".txt": "text/plain",
-            ".md": "text/markdown",
-            ".doc": "application/msword",
-            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".xls": "application/vnd.ms-excel",
-            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".pdf": "application/pdf",
-            ".epub": "application/epub+zip",
-            ".mobi": "application/x-mobipocket-ebook",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".gif": "image/gif",
-            ".webp": "image/webp",
-            ".bmp": "image/bmp",
-            ".tiff": "image/tiff",
-        }
-        return content_types.get(ext, "application/octet-stream")
-
     def name(self) -> str:
         """Get platform name
 
@@ -534,7 +287,6 @@ class TongyiPlatform(BasePlatform):
             "request_id": self.request_id,
             "msg_id": self.msg_id,
             "model_name": self.model_name,
-            "uploaded_file_info": self.uploaded_file_info,
             "system_message": self.system_message,
             "first_chat": self.first_chat,
         }
@@ -559,7 +311,6 @@ class TongyiPlatform(BasePlatform):
             self.request_id = state.get("request_id", "")
             self.msg_id = state.get("msg_id", "")
             self.model_name = state.get("model_name", "")
-            self.uploaded_file_info = state.get("uploaded_file_info", [])
             self.system_message = state.get("system_message", "")
             self.first_chat = state.get("first_chat", True)
             # 处理start_commit信息（如果存在）

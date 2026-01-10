@@ -155,8 +155,6 @@ class GitCommitTool:
             diff = decode_output(diff_bytes)
 
             try:
-                temp_diff_file_path = None
-
                 # 优先使用args中的model_group，否则使用全局模型组（不再从agent继承）
                 model_group = args.get("model_group") or get_global_model_group()
 
@@ -251,30 +249,15 @@ commit信息
 
                 # Check if content is too large
                 is_large_content = is_context_overflow(diff, model_group, platform)
-                upload_success = False
                 use_file_list = False
 
+                # 对于大内容，直接使用文件列表生成提交信息（不再支持文件上传）
                 if is_large_content:
-                    if not platform.support_upload_files():
-                        PrettyOutput.auto_print(
-                            "⚠️ 差异内容过大，将使用文件列表生成提交信息"
-                        )
-                        use_file_list = True
-                    else:
-                        # 创建临时文件并写入差异内容
-                        with tempfile.NamedTemporaryFile(
-                            mode="w", suffix=".diff", delete=False
-                        ) as temp_diff_file:
-                            temp_diff_file_path = temp_diff_file.name
-                            temp_diff_file.write(diff)
-                            temp_diff_file.flush()
+                    PrettyOutput.auto_print(
+                        "⚠️ 差异内容过大，将使用文件列表生成提交信息"
+                    )
+                    use_file_list = True
 
-                        upload_success = platform.upload_files([temp_diff_file_path])
-                        if not upload_success:
-                            PrettyOutput.auto_print(
-                                "⚠️ 上传代码差异文件失败，将使用文件列表生成提交信息"
-                            )
-                            use_file_list = True
                 # 根据上传状态准备完整的提示
                 if is_large_content and not use_file_list:
                     max_files_to_show = 20
@@ -409,16 +392,8 @@ commit信息
                         pass
 
                 commit_hash = self._get_last_commit_hash()
-
             finally:
-                # 清理临时差异文件
-                if temp_diff_file_path is not None and os.path.exists(
-                    temp_diff_file_path
-                ):
-                    try:
-                        os.unlink(temp_diff_file_path)
-                    except Exception as e:
-                        PrettyOutput.auto_print(f"⚠️ 无法删除临时文件: {str(e)}")
+                pass
 
             self.console.print(
                 Panel(
