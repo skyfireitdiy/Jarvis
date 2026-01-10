@@ -31,13 +31,16 @@ class StreamableMcpClient(McpClient):
             raise ValueError("No base_url specified in config")
         # Normalize base_url to ensure trailing slash for urljoin correctness
         self.base_url = self.base_url.rstrip("/") + "/"
+        # Get endpoint path from config, default to "mcp"
+        # If base_url already contains the endpoint, set endpoint_path to empty string
+        self.endpoint_path = config.get("endpoint_path", "mcp")
 
         # 设置HTTP客户端
         self.session = requests.Session()
         self.session.headers.update(
             {
                 "Content-Type": "application/json",
-                "Accept": "application/json",
+                "Accept": "application/json, text/event-stream",
             }
         )
 
@@ -70,15 +73,13 @@ class StreamableMcpClient(McpClient):
         """初始化MCP连接"""
         try:
             # 发送初始化请求
-            response = self._send_request(
-                "initialize",
-                {
-                    "processId": None,  # 远程客户端不需要进程ID
-                    "clientInfo": {"name": "jarvis", "version": "1.0.0"},
-                    "capabilities": {},
-                    "protocolVersion": "2025-03-26",
-                },
-            )
+            # 对于HTTP MCP服务器，不发送processId字段
+            init_params = {
+                "clientInfo": {"name": "jarvis", "version": "1.0.0"},
+                "capabilities": {},
+                "protocolVersion": "2025-03-26",
+            }
+            response = self._send_request("initialize", init_params)
 
             # 验证服务器响应
             if "result" not in response:
@@ -154,45 +155,118 @@ class StreamableMcpClient(McpClient):
             }
 
             # 发送请求到Streamable HTTP端点
-            mcp_url = urljoin(self.base_url, "mcp")
+            if self.endpoint_path:
+                mcp_url = urljoin(self.base_url, self.endpoint_path)
+            else:
+                # If endpoint_path is empty, use base_url directly (keep trailing slash if present)
+                mcp_url = self.base_url.rstrip("/") + "/"
+            
+            # 所有请求都使用流式传输，因为服务器返回SSE格式
+            use_stream = True
+            
             response = self.session.post(
-                mcp_url, json=request, stream=True, timeout=self.timeout
-            )  # 启用流式传输
-            response.raise_for_status()
-
-            # 处理流式响应
+                mcp_url, json=request, stream=use_stream, timeout=self.timeout
+            )
+            
+            # 如果请求失败，打印详细错误信息
+            if response.status_code >= 400:
+                try:
+                    # 对于错误响应，尝试读取响应体
+                    error_body = response.text
+                    if error_body:
+                        PrettyOutput.auto_print(
+                            f"❌ HTTP错误 {response.status_code}，响应内容: {error_body[:1000]}"
+                        )
+                    else:
+                        PrettyOutput.auto_print(
+                            f"❌ HTTP错误 {response.status_code}，URL: {mcp_url}"
+                        )
+                except Exception as e:
+                    PrettyOutput.auto_print(
+                        f"❌ HTTP错误 {response.status_code}，无法读取响应体: {e}"
+                    )
+                response.raise_for_status()
+            
+            # 处理响应
             result = None
             warning_lines = []
             error_lines = []
-            for line in response.iter_lines(decode_unicode=True):
-                if line:
-                    try:
-                        line_data = line
-                        if isinstance(line_data, str) and line_data.startswith("data:"):
-                            # Handle SSE-formatted lines like "data: {...}"
-                            line_data = line_data.split(":", 1)[1].strip()
-                        data = json.loads(line_data)
-                        if "id" in data and data["id"] == req_id:
-                            # 这是我们的请求响应
-                            result = data
-                            break
-                        elif "method" in data:
-                            # 这是一个通知
-                            notify_method = data.get("method", "")
-                            params = data.get("params", {})
-                            if notify_method in self.notification_handlers:
-                                for handler in self.notification_handlers[
-                                    notify_method
-                                ]:
-                                    try:
-                                        handler(params)
-                                    except Exception as e:
-                                        error_lines.append(
-                                            f"处理通知时出错 ({notify_method}): {e}"
-                                        )
-                    except Exception:
-                        warning_lines.append(f"无法解析响应: {line}")
+            
+            if use_stream:
+                # 处理流式响应（SSE格式）
+                for line in response.iter_lines(decode_unicode=True):
+                    if not line:
                         continue
+                    try:
+                        line_str = line.decode('utf-8') if isinstance(line, bytes) else line
+                        # 处理SSE格式：id:, event:, data: 等
+                        if line_str.startswith("data:"):
+                            # 提取data字段的内容
+                            line_data = line_str.split(":", 1)[1].strip()
+                            try:
+                                data = json.loads(line_data)
+                                if "id" in data and data["id"] == req_id:
+                                    # 这是我们的请求响应
+                                    result = data
+                                    break
+                                elif "method" in data:
+                                    # 这是一个通知
+                                    notify_method = data.get("method", "")
+                                    params = data.get("params", {})
+                                    if notify_method in self.notification_handlers:
+                                        for handler in self.notification_handlers[
+                                            notify_method
+                                        ]:
+                                            try:
+                                                handler(params)
+                                            except Exception as e:
+                                                error_lines.append(
+                                                    f"处理通知时出错 ({notify_method}): {e}"
+                                                )
+                            except json.JSONDecodeError:
+                                # 如果不是JSON，跳过
+                                continue
+                        # 跳过其他SSE字段（id:, event: 等）
+                        elif line_str.startswith(("id:", "event:", "retry:")):
+                            continue
+                        else:
+                            # 尝试直接解析为JSON（非SSE格式）
+                            try:
+                                data = json.loads(line_str)
+                                if "id" in data and data["id"] == req_id:
+                                    result = data
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                    except Exception as e:
+                        warning_lines.append(f"无法解析响应行: {line}, 错误: {e}")
+                        continue
+            else:
+                # 处理非流式响应（用于初始化请求）
+                # 即使是非流式请求，服务器也可能返回SSE格式的响应
+                try:
+                    # 尝试按SSE格式解析
+                    response_text = response.text
+                    for line in response_text.splitlines():
+                        if line.startswith("data:"):
+                            # 提取data字段的内容
+                            line_data = line.split(":", 1)[1].strip()
+                            try:
+                                data = json.loads(line_data)
+                                if "id" in data and data["id"] == req_id:
+                                    result = data
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                    # 如果SSE解析失败，尝试直接解析JSON
+                    if result is None:
+                        result = response.json()
+                        if "id" in result and result["id"] != req_id:
+                            # ID不匹配，可能不是我们的响应
+                            result = None
+                except (json.JSONDecodeError, AttributeError) as e:
+                    error_lines.append(f"无法解析响应: {e}")
+                    error_lines.append(f"响应内容: {response_text[:500] if 'response_text' in locals() else response.text[:500]}")
 
             if warning_lines:
                 joined_warnings = "\n".join(warning_lines)
@@ -228,7 +302,11 @@ class StreamableMcpClient(McpClient):
             notification = {"jsonrpc": "2.0", "method": method, "params": params}
 
             # 发送通知到Streamable HTTP端点
-            mcp_url = urljoin(self.base_url, "mcp")
+            if self.endpoint_path:
+                mcp_url = urljoin(self.base_url, self.endpoint_path)
+            else:
+                # If endpoint_path is empty, use base_url directly (keep trailing slash if present)
+                mcp_url = self.base_url.rstrip("/") + "/"
             response = self.session.post(
                 mcp_url, json=notification, timeout=self.timeout
             )
