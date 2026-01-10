@@ -110,7 +110,7 @@ class TongyiPlatform(BasePlatform):
                 "contentType": "text",
                 "role": "user",
                 "ext": {
-                    "searchType": "depth" if self.web else "",
+                    "searchType": "",
                     "pptGenerate": False,
                     "deepThink": self.model_name == "Thinking",
                     "deepResearch": self.model_name == "Deep-Research",
@@ -127,7 +127,7 @@ class TongyiPlatform(BasePlatform):
                     "contentType": "text",
                     "role": "system",
                     "ext": {
-                        "searchType": "depth" if self.web else "",
+                        "searchType": "",
                         "pptGenerate": False,
                         "deepThink": self.model_name == "Thinking",
                         "deepResearch": self.model_name == "Deep-Research",
@@ -169,7 +169,7 @@ class TongyiPlatform(BasePlatform):
             "parentMsgId": self.msg_id,
             "params": {
                 "agentId": "",
-                "searchType": "depth" if self.web else "",
+                "searchType": "",
                 "pptGenerate": False,
                 "bizScene": "code_chat" if self.model_name == "Code-Chat" else "",
                 "bizSceneInfo": {},
@@ -596,14 +596,6 @@ class TongyiPlatform(BasePlatform):
             ("Deep-Research", "Deep-Research"),
             ("Code-Chat", "Code-Chat"),
         ]
-
-    def support_web(self) -> bool:
-        """Check if platform supports web functionality
-
-        Returns:
-            bool: True if web is supported, False otherwise
-        """
-        return True
 
     @classmethod
     def get_required_env_keys(cls) -> List[str]:

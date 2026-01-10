@@ -305,15 +305,6 @@ class ClaudeModel(BasePlatform):
             PrettyOutput.auto_print(f"❌ 恢复会话失败: {str(e)}")
             return False
 
-    def support_web(self) -> bool:
-        """
-        检查是否支持网页访问功能
-
-        返回:
-            bool: 当前是否支持网页访问 (Claude平台始终返回False)
-        """
-        return False
-
     def support_upload_files(self) -> bool:
         """
         检查是否支持上传文件功能

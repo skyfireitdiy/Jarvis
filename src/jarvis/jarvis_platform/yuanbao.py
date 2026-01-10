@@ -454,9 +454,7 @@ class YuanbaoPlatform(BasePlatform):
         chat_model_ext_info = {
             "modelId": self.model_name,
             "subModelId": "",
-            "supportFunctions": (
-                ["openInternetSearch"] if self.web else ["autoInternetSearch"]
-            ),
+            "supportFunctions": ["autoInternetSearch"],
         }
 
         # 准备消息内容
@@ -642,10 +640,6 @@ class YuanbaoPlatform(BasePlatform):
     def platform_name(cls) -> str:
         """平台名称"""
         return "yuanbao"
-
-    def support_web(self) -> bool:
-        """Yuanbao平台支持web功能"""
-        return True
 
     @classmethod
     def get_required_env_keys(cls) -> List[str]:

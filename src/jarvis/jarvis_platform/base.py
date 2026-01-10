@@ -49,7 +49,6 @@ class BasePlatform(ABC):
     def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
         """初始化模型"""
         self.suppress_output = True  # 添加输出控制标志
-        self.web = False  # 添加web属性，默认false
         self._saved = False
         self.model_group: Optional[str] = None
         self._session_history_file: Optional[str] = None
@@ -561,10 +560,6 @@ class BasePlatform(ABC):
         """设置模型组"""
         self.model_group = model_group
 
-    def set_web(self, web: bool):
-        """设置网页标志"""
-        self.web = web
-
     def set_platform_type(self, platform_type: str):
         """设置平台类型
 
@@ -753,11 +748,6 @@ class BasePlatform(ABC):
             # 如果截断过程中出错，返回原消息（避免阻塞对话）
             PrettyOutput.auto_print(f"⚠️ 警告：检查消息长度时出错: {e}，使用原消息")
             return message
-
-    @abstractmethod
-    def support_web(self) -> bool:
-        """检查平台是否支持网页功能"""
-        return False
 
     @abstractmethod
     def trim_messages(self) -> bool:
