@@ -116,6 +116,7 @@ class CodeAgent(Agent):
             "read_code",
             "edit_file",  # 普通 search/replace 编辑
             "virtual_tty",  # 虚拟终端工具，支持交互式操作
+            "search_web",  # 网络搜索工具
         ]
         if enable_task_list_manager:
             base_tools.append("task_list_manager")  # 任务列表管理工具
