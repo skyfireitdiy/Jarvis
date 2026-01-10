@@ -2060,9 +2060,7 @@ class Agent:
             return
 
         # NOTE: 使用受保护方法以避免重复实现逻辑
-        overlap_groups = organizer._find_overlapping_memories(
-            memories, overlap_threshold=3
-        )
+        overlap_groups = organizer._find_overlapping_memories(memories, min_overlap=3)
         has_significant_overlap = any(groups for groups in overlap_groups.values())
 
         if not has_significant_overlap:

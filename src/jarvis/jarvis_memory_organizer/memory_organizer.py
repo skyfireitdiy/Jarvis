@@ -85,7 +85,7 @@ class MemoryOrganizer:
         return memories
 
     def _find_overlapping_memories(
-        self, memories: List[Dict[str, Any]], overlap_threshold: int
+        self, memories: List[Dict[str, Any]], min_overlap: int
     ) -> Dict[int, List[Set[int]]]:
         """
         查找具有重叠标签的记忆组
@@ -109,7 +109,7 @@ class MemoryOrganizer:
                 tags_j = set(memories[j].get("tags", []))
                 overlap_count = len(tags_i & tags_j)
 
-                if overlap_count >= overlap_threshold:
+                if overlap_count >= min_overlap:
                     # 查找包含这两个记忆的最大组
                     group = {i, j}
 
@@ -127,7 +127,7 @@ class MemoryOrganizer:
                                     )
                                     for m in group
                                 )
-                                if min_overlap_with_group >= overlap_threshold:
+                                if min_overlap_with_group >= min_overlap:
                                     group.add(k)
                                     changed = True
 
@@ -135,7 +135,7 @@ class MemoryOrganizer:
                     group_tuple = tuple(sorted(group))
                     if group_tuple not in processed_groups:
                         processed_groups.add(group_tuple)
-                        overlap_groups[overlap_threshold].append(set(group_tuple))
+                        overlap_groups[min_overlap].append(set(group_tuple))
 
         return overlap_groups
 
