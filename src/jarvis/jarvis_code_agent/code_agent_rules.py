@@ -249,9 +249,11 @@ class RulesManager:
                     for filename in os.listdir(rules_dir):
                         file_path = os.path.join(rules_dir, filename)
                         if os.path.isfile(file_path):
-                            # 规则名称就是文件名
-                            if filename not in result["files"]:
-                                result["files"].append(filename)
+                            # 只允许无后缀或.md后缀的文件
+                            if "." not in filename or filename.endswith(".md"):
+                                # 规则名称就是文件名
+                                if filename not in result["files"]:
+                                    result["files"].append(filename)
                 except Exception:
                     continue
 
