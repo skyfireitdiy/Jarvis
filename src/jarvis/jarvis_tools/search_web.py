@@ -195,7 +195,25 @@ class SearchWebTool:
             PrettyOutput.auto_print("\n💡 总结结果:")
             PrettyOutput.auto_print(summary)
 
-            return {"stdout": summary, "stderr": "", "success": True}
+            # 添加来源信息到总结文本中，便于LLM使用read_webpage验证
+            if visited_urls:
+                sources_text = "\n\n参考来源:\n" + "\n".join(
+                    f"- {url}" for url in visited_urls
+                )
+                summary_with_sources = summary + sources_text
+                PrettyOutput.auto_print("\n📚 参考来源:")
+                for url in visited_urls:
+                    PrettyOutput.auto_print(f"  - {url}")
+            else:
+                summary_with_sources = summary
+                visited_urls = []
+
+            return {
+                "stdout": summary_with_sources,
+                "stderr": "",
+                "success": True,
+                "sources": visited_urls,
+            }
 
         except subprocess.TimeoutExpired:
             return {
