@@ -251,39 +251,32 @@ commit信息
 
                 # Check if content is too large
                 is_large_content = is_context_overflow(diff, model_group, platform)
+                upload_success = False
+                use_file_list = False
 
                 if is_large_content:
                     if not platform.support_upload_files():
-                        PrettyOutput.auto_print("❌ 差异文件太大，无法处理")
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "错误：差异文件太大，无法处理",
-                        }
-
-                    # 创建临时文件并写入差异内容
-                    with tempfile.NamedTemporaryFile(
-                        mode="w", suffix=".diff", delete=False
-                    ) as temp_diff_file:
-                        temp_diff_file_path = temp_diff_file.name
-                        temp_diff_file.write(diff)
-                        temp_diff_file.flush()
-
-                    upload_success = platform.upload_files([temp_diff_file_path])
-                    if upload_success:
-                        pass
+                        PrettyOutput.auto_print(
+                            "⚠️ 差异内容过大，将使用文件列表生成提交信息"
+                        )
+                        use_file_list = True
                     else:
-                        PrettyOutput.auto_print("❌ 上传代码差异文件失败")
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": "错误：上传代码差异文件失败",
-                        }
+                        # 创建临时文件并写入差异内容
+                        with tempfile.NamedTemporaryFile(
+                            mode="w", suffix=".diff", delete=False
+                        ) as temp_diff_file:
+                            temp_diff_file_path = temp_diff_file.name
+                            temp_diff_file.write(diff)
+                            temp_diff_file.flush()
+
+                        upload_success = platform.upload_files([temp_diff_file_path])
+                        if not upload_success:
+                            PrettyOutput.auto_print(
+                                "⚠️ 上传代码差异文件失败，将使用文件列表生成提交信息"
+                            )
+                            use_file_list = True
                 # 根据上传状态准备完整的提示
-                if is_large_content:
-                    # 尝试生成提交信息
-                    # 使用上传的文件
-                    # 格式化文件列表，如果太长则截断
+                if is_large_content and not use_file_list:
                     max_files_to_show = 20
                     if file_count <= max_files_to_show:
                         files_list = "\n".join(f"- {f}" for f in files)
@@ -309,7 +302,35 @@ commit信息
 """
                     )
                     commit_message = platform.chat_until_success(prompt)
+                elif use_file_list:
+                    # 降级策略：使用文件列表生成提交信息
+                    # 格式化文件列表，如果太长则截断
+                    max_files_to_show = 20
+                    if file_count <= max_files_to_show:
+                        files_list = "\n".join(f"- {f}" for f in files)
+                    else:
+                        files_list = "\n".join(
+                            f"- {f}" for f in files[:max_files_to_show]
+                        )
+                        files_list += (
+                            f"\n- ...及其他 {file_count - max_files_to_show} 个文件"
+                        )
+
+                    prompt = (
+                        base_prompt
+                        + f"""
+# 变更概述
+- 变更文件数量: {file_count} 个文件
+
+# 变更文件列表
+{files_list}
+
+请根据上述文件列表生成符合格式的提交信息。
+"""
+                    )
+                    commit_message = platform.chat_until_success(prompt)
                 else:
+                    # 正常情况：直接使用 diff 内容
                     prompt = (
                         base_prompt
                         + f"""
