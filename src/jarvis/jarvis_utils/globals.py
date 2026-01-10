@@ -353,7 +353,10 @@ def get_global_model_group() -> Optional[str]:
 def get_all_memory_tags() -> Dict[str, List[str]]:
     """
     获取所有记忆类型中的标签集合。
-    每个类型最多返回200个标签，超过时随机提取。
+    每个类型最多返回200个标签。当标签数超过200时，采用混合策略：
+    - 约100个标签从最近的记忆中提取（按创建时间排序）
+    - 其余约100个标签从剩余记忆中随机提取
+    - 合并后取前200个标签返回
 
     返回:
         Dict[str, List[str]]: 按记忆类型分组的标签列表
@@ -378,47 +381,131 @@ def get_all_memory_tags() -> Dict[str, List[str]]:
         short_term_tags.update(memory.get("tags", []))
     short_term_tags_list = sorted(list(short_term_tags))
     if len(short_term_tags_list) > MAX_TAGS_PER_TYPE:
-        tags_by_type["short_term"] = sorted(
-            random.sample(short_term_tags_list, MAX_TAGS_PER_TYPE)
+        # 混合策略：一半从最近的记忆中提取，另一半随机提取
+        # 按创建时间排序记忆（最新的在前）
+        sorted_memories = sorted(
+            short_term_memories, key=lambda x: x.get("created_at", ""), reverse=True
         )
+        half_count = MAX_TAGS_PER_TYPE // 2
+
+        # 从前一半记忆中提取标签（最近使用的）
+        recent_tags = set()
+        for memory in sorted_memories[: len(sorted_memories) // 2]:
+            recent_tags.update(memory.get("tags", []))
+            if len(recent_tags) >= half_count:
+                break
+
+        # 从剩余记忆中提取标签（随机）
+        remaining_memories = sorted_memories[len(sorted_memories) // 2 :]
+        random_tags = set()
+        for memory in random.sample(
+            remaining_memories, min(len(remaining_memories), MAX_TAGS_PER_TYPE)
+        ):
+            random_tags.update(memory.get("tags", []))
+            if len(recent_tags) + len(random_tags) >= MAX_TAGS_PER_TYPE:
+                break
+
+        # 合并标签并返回前200个
+        mixed_tags = list(recent_tags | random_tags)
+        tags_by_type["short_term"] = sorted(mixed_tags)[:MAX_TAGS_PER_TYPE]
     else:
         tags_by_type["short_term"] = short_term_tags_list
 
     # 获取项目长期记忆标签
     project_memory_dir = Path(".jarvis/memory")
     if project_memory_dir.exists():
-        project_tags = set()
+        project_memories = []
         for memory_file in project_memory_dir.glob("*.json"):
             try:
                 with open(memory_file, "r", encoding="utf-8") as f:
                     memory_data = json.load(f)
-                    project_tags.update(memory_data.get("tags", []))
+                    project_memories.append(memory_data)
             except Exception:
                 pass
+
+        # 收集所有标签
+        project_tags = set()
+        for memory in project_memories:
+            project_tags.update(memory.get("tags", []))
         project_tags_list = sorted(list(project_tags))
+
         if len(project_tags_list) > MAX_TAGS_PER_TYPE:
-            tags_by_type["project_long_term"] = sorted(
-                random.sample(project_tags_list, MAX_TAGS_PER_TYPE)
+            # 混合策略：一半从最近的记忆中提取，另一半随机提取
+            # 按创建时间排序记忆（最新的在前）
+            sorted_memories = sorted(
+                project_memories, key=lambda x: x.get("created_at", ""), reverse=True
             )
+            half_count = MAX_TAGS_PER_TYPE // 2
+
+            # 从前一半记忆中提取标签（最近使用的）
+            recent_tags = set()
+            for memory in sorted_memories[: len(sorted_memories) // 2]:
+                recent_tags.update(memory.get("tags", []))
+                if len(recent_tags) >= half_count:
+                    break
+
+            # 从剩余记忆中提取标签（随机）
+            remaining_memories = sorted_memories[len(sorted_memories) // 2 :]
+            random_tags = set()
+            sample_size = min(len(remaining_memories), MAX_TAGS_PER_TYPE)
+            if sample_size > 0:
+                for memory in random.sample(remaining_memories, sample_size):
+                    random_tags.update(memory.get("tags", []))
+                    if len(recent_tags) + len(random_tags) >= MAX_TAGS_PER_TYPE:
+                        break
+
+            # 合并标签并返回前200个
+            mixed_tags = list(recent_tags | random_tags)
+            tags_by_type["project_long_term"] = sorted(mixed_tags)[:MAX_TAGS_PER_TYPE]
         else:
             tags_by_type["project_long_term"] = project_tags_list
 
     # 获取全局长期记忆标签
     global_memory_dir = Path(get_data_dir()) / "memory" / "global_long_term"
     if global_memory_dir.exists():
-        global_tags = set()
+        global_memories = []
         for memory_file in global_memory_dir.glob("*.json"):
             try:
                 with open(memory_file, "r", encoding="utf-8") as f:
                     memory_data = json.load(f)
-                    global_tags.update(memory_data.get("tags", []))
+                    global_memories.append(memory_data)
             except Exception:
                 pass
+
+        # 收集所有标签
+        global_tags = set()
+        for memory in global_memories:
+            global_tags.update(memory.get("tags", []))
         global_tags_list = sorted(list(global_tags))
+
         if len(global_tags_list) > MAX_TAGS_PER_TYPE:
-            tags_by_type["global_long_term"] = sorted(
-                random.sample(global_tags_list, MAX_TAGS_PER_TYPE)
+            # 混合策略：一半从最近的记忆中提取，另一半随机提取
+            # 按创建时间排序记忆（最新的在前）
+            sorted_memories = sorted(
+                global_memories, key=lambda x: x.get("created_at", ""), reverse=True
             )
+            half_count = MAX_TAGS_PER_TYPE // 2
+
+            # 从前一半记忆中提取标签（最近使用的）
+            recent_tags = set()
+            for memory in sorted_memories[: len(sorted_memories) // 2]:
+                recent_tags.update(memory.get("tags", []))
+                if len(recent_tags) >= half_count:
+                    break
+
+            # 从剩余记忆中提取标签（随机）
+            remaining_memories = sorted_memories[len(sorted_memories) // 2 :]
+            random_tags = set()
+            sample_size = min(len(remaining_memories), MAX_TAGS_PER_TYPE)
+            if sample_size > 0:
+                for memory in random.sample(remaining_memories, sample_size):
+                    random_tags.update(memory.get("tags", []))
+                    if len(recent_tags) + len(random_tags) >= MAX_TAGS_PER_TYPE:
+                        break
+
+            # 合并标签并返回前200个
+            mixed_tags = list(recent_tags | random_tags)
+            tags_by_type["global_long_term"] = sorted(mixed_tags)[:MAX_TAGS_PER_TYPE]
         else:
             tags_by_type["global_long_term"] = global_tags_list
 
