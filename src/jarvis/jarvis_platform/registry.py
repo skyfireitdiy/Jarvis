@@ -27,7 +27,6 @@ REQUIRED_METHODS = [
     ("set_system_prompt", ["message"]),
     ("set_model_name", ["model_name"]),
     ("get_model_list", []),
-    ("upload_files", ["file_list"]),
 ]
 
 

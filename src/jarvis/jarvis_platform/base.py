@@ -85,15 +85,6 @@ class BasePlatform(ABC):
         """执行对话"""
         raise NotImplementedError("chat is not implemented")
 
-    @abstractmethod
-    def upload_files(self, file_list: List[str]) -> bool:
-        raise NotImplementedError("upload_files is not implemented")
-
-    @abstractmethod
-    def support_upload_files(self) -> bool:
-        """检查平台是否支持文件上传"""
-        return False
-
     def _format_progress_bar(self, percent: float, width: int = 20) -> str:
         """格式化进度条字符串
 

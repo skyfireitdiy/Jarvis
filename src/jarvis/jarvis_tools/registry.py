@@ -1401,32 +1401,6 @@ class ToolRegistry(OutputHandlerProtocol):
                     tmp_file.flush()
 
                 try:
-                    if (
-                        agent_instance.model
-                        and agent_instance.model.support_upload_files()
-                    ):
-                        summary = agent_instance.generate_summary()
-                        agent_instance.clear_history()
-                        upload_success = agent_instance.model.upload_files(
-                            [output_file]
-                        )
-                        if upload_success:
-                            # 删除args的agent键（保持协议v2.0的“参数与agent分离”在可视化中的一致性）
-                            if isinstance(args, dict):
-                                args.pop("agent", None)
-                            prompt = f"""
-以下是之前对话的关键信息总结：
-
-<content>
-{summary}
-</content>
-
-上传的文件是以下工具执行结果：
-{json.dumps({"name": name, "arguments": args, "want": want}, ensure_ascii=False, indent=2)}
-
-请根据以上信息，继续完成任务。
-"""
-                            return prompt
                     # 使用上传的文件生成摘要
                     return self._truncate_output(output)
                 finally:

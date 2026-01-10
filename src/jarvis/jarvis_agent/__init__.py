@@ -1210,14 +1210,8 @@ class Agent:
         # 保存触发原因到实例变量，供后续方法使用
         self._summary_trigger_reason = trigger_reason
 
-        if self._should_use_file_upload():
-            return self._handle_history_with_file_upload()
-        else:
-            return self._handle_history_with_summary()
-
-    def _should_use_file_upload(self) -> bool:
-        """判断是否应该使用文件上传方式处理历史"""
-        return bool(self.model and self.model.support_upload_files())
+        # 不再支持文件上传，直接使用摘要方式处理历史
+        return self._handle_history_with_summary()
 
     def _handle_history_with_summary(self) -> str:
         """使用摘要方式处理历史"""
@@ -1354,62 +1348,6 @@ class Agent:
             formatted_summary += pin_section
 
         return formatted_summary
-
-    def _handle_history_with_file_upload(self) -> str:
-        """使用文件上传方式处理历史"""
-        # 显示触发原因
-        trigger_reason = getattr(self, "_summary_trigger_reason", "Token限制触发")
-        PrettyOutput.auto_print(f"🔍 开始生成对话历史摘要... (原因: {trigger_reason})")
-        # 关键流程：直接调用 memory_manager 确保记忆提示
-        try:
-            self.memory_manager._ensure_memory_prompt(agent=self)
-        except Exception:
-            pass
-
-        # 非关键流程：广播清理历史前事件（用于日志、监控等）
-        try:
-            self.event_bus.emit(BEFORE_HISTORY_CLEAR, agent=self)
-        except Exception:
-            pass
-
-        result = self.file_methodology_manager.handle_history_with_file_upload()
-        # 重置 addon_prompt 跳过轮数计数器
-        self._addon_prompt_skip_rounds = 0
-        # 重置没有工具调用的计数器
-        self._no_tool_call_count = 0
-        # 打开input handler开关，让下一轮可以处理pin_content中的特殊标记
-        self.run_input_handlers_next_turn = True
-
-        # 添加系统约束提醒
-        if result:
-            constraint_reminder = """
-
-**⚠️ 重要系统约束提醒（总结后必须严格遵守）：**
-1. **每次只能执行一个工具调用**：每个响应必须包含且仅包含一个工具调用（任务完成时除外）。同时调用多个工具会导致错误。
-2. **禁止虚构结果**：所有操作必须基于实际执行结果，禁止推测、假设或虚构任何执行结果。必须等待工具执行完成并获得实际结果后再进行下一步。
-3. **等待工具结果**：在继续下一步之前，必须等待当前工具的执行结果，不能假设工具执行的结果。
-4. **基于实际验证**：所有结论必须基于实际执行结果和验证证据，禁止基于推测或假设。
-5. **代码任务完成标准（严格执行）**：
-   - **编译/构建必须通过**：代码必须能够成功编译/构建，无编译错误、无语法错误、无链接错误
-   - **功能必须验证**：功能必须经过实际运行验证，不能仅凭代码存在就认为完成
-   - **错误必须修复**：如果存在编译错误、运行时错误、测试失败，任务必须标记为"部分完成"或"进行中"，不能标记为"已完成"
-   - **不能因为"代码已编写"就认为任务完成**：必须验证编译通过、功能正常运行、测试通过
-"""
-            result += constraint_reminder
-
-        # 添加用户固定的重要内容
-        if self.pin_content.strip():
-            pin_section = (
-                f"\n\n## 用户强调的任务目标和关键信息\n{self.pin_content.strip()}"
-            )
-            result += pin_section
-
-        # 非关键流程：广播清理历史后的事件（用于日志、监控等）
-        try:
-            self.event_bus.emit(AFTER_HISTORY_CLEAR, agent=self)
-        except Exception:
-            pass
-        return result
 
     def _format_summary_message(self, summary: str) -> str:
         """格式化摘要消息"""
