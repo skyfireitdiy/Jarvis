@@ -120,10 +120,10 @@ def run_jvs_dispatch(
         # 非 dispatch 模式或非文件模式：使用原有逻辑
         if is_task_file:
             # 如果是文件路径，使用 --task-file 参数
-            cmd = ["jvs", "-n", "-d", "--task-file", task_str]
+            cmd = ["jvs", "-n", "--task-file", task_str]
         else:
             # 如果是直接内容，使用 --task 参数
-            cmd = ["jvs", "-n", "-d", "--task", task_str]
+            cmd = ["jvs", "-n", "--task", task_str]
         try:
             # 直接执行 jvs 命令，不捕获输出，让用户直接看到 jvs 的输出
             result = subprocess.run(cmd)
