@@ -430,7 +430,9 @@ def _find_jarvis_session() -> Optional[str]:
                         suffix[0].isdigit() or suffix[0] in "abcdef0123456789"
                     ):
                         # 匹配成功：后缀以数字或UUID字符开头
-                        return session_name
+                        # 验证会话是否真正可用，避免返回异常退出的会话
+                        if has_session(session_name):
+                            return session_name
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         # 正常情况：没有活动的 tmux 会话时不打印警告
         pass
