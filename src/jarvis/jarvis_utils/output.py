@@ -182,7 +182,11 @@ class ConsoleOutputSink(OutputSink):
                     meta={"icon": "✨"},
                 ),
                 OutputType.ERROR: RichStyle(
-                    color="dark_red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
+                    color="dark_red",
+                    frame=True,
+                    bgcolor="#2b1c1c",
+                    meta={"icon": "❌"},
+                    blink=True,
                 ),
                 OutputType.INFO: RichStyle(
                     color="cyan",
@@ -296,7 +300,11 @@ class ConsoleOutputSink(OutputSink):
                 color="blue", bgcolor="#1c1c2b", frame=True, meta={"icon": "✨"}
             ),
             OutputType.ERROR: RichStyle(
-                color="dark_red", frame=True, bgcolor="#2b1c1c", meta={"icon": "❌"}
+                color="dark_red",
+                frame=True,
+                bgcolor="#2b1c1c",
+                meta={"icon": "❌"},
+                blink=True,
             ),
             OutputType.INFO: RichStyle(
                 color="cyan", frame=True, bgcolor="#2b2b1c", meta={"icon": "ℹ️"}
