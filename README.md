@@ -42,7 +42,7 @@ Jarvis 的定位是**AI应用开发SDK**，提供强大而灵活的基础组件�
 **使用 Jarvis SDK 开发:**
 
 ```python
-from jarvis import CodeAgent
+from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
 # 创建CodeAgent实例，内置代码分析、编辑、执行等能力
 agent = CodeAgent()
@@ -343,7 +343,7 @@ Jarvis SDK 可以轻松集成到您的 Python 项目中。以下是一些快速�
 #### 使用 CodeAgent 处理代码任务
 
 ```python
-from jarvis import CodeAgent
+from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
 # 创建 CodeAgent
 agent = CodeAgent()
@@ -370,7 +370,7 @@ agent.run('分析 sales.csv 数据，生成月度销售趋势图')
 #### 在 Python 脚本中使用
 
 ```python
-from jarvis import CodeAgent
+from jarvis.jarvis_code_agent.code_agent import CodeAgent
 import os
 
 # 设置工作目录
