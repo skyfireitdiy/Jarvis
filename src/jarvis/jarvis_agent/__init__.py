@@ -2060,7 +2060,9 @@ class Agent:
             return
 
         # NOTE: 使用受保护方法以避免重复实现逻辑
-        overlap_groups = organizer._find_overlapping_memories(memories, min_overlap=3)
+        overlap_groups = organizer._find_overlapping_memories(
+            memories, overlap_threshold=3
+        )
         has_significant_overlap = any(groups for groups in overlap_groups.values())
 
         if not has_significant_overlap:
@@ -2075,6 +2077,6 @@ class Agent:
             PrettyOutput.auto_print(
                 f"ℹ️ 正在开始整理 '{scope_name}' ({memory_type}) 记忆库..."
             )
-            organizer.organize_memories(memory_type, min_overlap=3)
+            organizer.organize_memories(memory_type)
         else:
             PrettyOutput.auto_print(f"ℹ️ 已取消 '{scope_name}' 记忆库整理。")
