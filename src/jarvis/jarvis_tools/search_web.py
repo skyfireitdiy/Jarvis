@@ -2,6 +2,7 @@
 
 from typing import Any
 from typing import Dict
+from typing import Optional
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -48,13 +49,18 @@ class SearchWebTool:
         self,
         query: str,
         agent: Agent,
-        site: str = None,
+        site: Optional[str] = None,
     ) -> Dict[str, Any]:
         # pylint: disable=too-many-locals, broad-except
         """使用ddgr命令执行网络搜索、抓取内容并总结结果。"""
         try:
             # 构建ddgr命令
-            cmd = ["ddgr", "--json", "--np", "-x"]  # --np 表示不提示，直接执行；-x 显示完整URL
+            cmd = [
+                "ddgr",
+                "--json",
+                "--np",
+                "-x",
+            ]  # --np 表示不提示，直接执行；-x 显示完整URL
 
             # 添加网站特定搜索参数
             if site:
@@ -90,6 +96,26 @@ class SearchWebTool:
                     "success": False,
                 }
 
+            # 先打印搜索结果
+            PrettyOutput.auto_print("\n🔍 网络搜索结果")
+            PrettyOutput.auto_print(f"📝 查询关键词: {query}")
+            PrettyOutput.auto_print(f"📊 搜索结果数: {len(results)}")
+            PrettyOutput.auto_print("\n📄 搜索摘要:")
+            for idx, r in enumerate(results[:10], 1):
+                title = r.get("title", "")
+                url = r.get("url", "")
+                abstract = r.get("abstract", "")
+                if title:
+                    PrettyOutput.auto_print(f"  {idx}. {title}")
+                    if url:
+                        PrettyOutput.auto_print(f"     URL: {url}")
+                    if abstract:
+                        PrettyOutput.auto_print(
+                            f"     摘要: {abstract[:150]}..."
+                            if len(abstract) > 150
+                            else f"     摘要: {abstract}"
+                        )
+
             full_content = ""
             visited_urls = []
             visited_count = 0
@@ -111,15 +137,23 @@ class SearchWebTool:
 
                 url = r.get("url", "")
                 if url:
+                    PrettyOutput.auto_print(
+                        f"\n⏳ 正在访问 ({visited_count + 1}/{min(10, len(results))}): {url}"
+                    )
                     try:
                         response = http_get(url, timeout=10.0, allow_redirects=True)
                         content = md(response.text, strip=["script", "style"])
                         if content:
                             # 只取前2000个字符，避免内容过长
                             content_preview = content[:2000]
-                            full_content += f"URL: {url}\n内容预览: {content_preview}\n\n"
+                            full_content += (
+                                f"URL: {url}\n内容预览: {content_preview}\n\n"
+                            )
                             visited_urls.append(url)
                             visited_count += 1
+                            PrettyOutput.auto_print(
+                                f"✅ 已抓取内容 ({len(content_preview)} 字符)"
+                            )
                     except requests.exceptions.HTTPError as e:
                         PrettyOutput.auto_print(
                             f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}"
@@ -157,6 +191,9 @@ class SearchWebTool:
             model.set_model_name(model_name)
             model.set_suppress_output(False)
             summary = model.chat_until_success(summary_prompt)
+
+            PrettyOutput.auto_print("\n💡 总结结果:")
+            PrettyOutput.auto_print(summary)
 
             return {"stdout": summary, "stderr": "", "success": True}
 
