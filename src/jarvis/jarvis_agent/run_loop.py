@@ -255,27 +255,6 @@ class AgentRunLoop:
                     )
                 except Exception:
                     pass
-                try:
-                    need_return, tool_prompt = ag._call_tools(current_response)
-                except KeyboardInterrupt:
-                    # 获取用户补充信息并继续执行
-                    addon_info = self._handle_interrupt_with_input()
-                    if addon_info:
-                        ag.session.addon_prompt = join_prompts(
-                            [ag.session.addon_prompt, addon_info]
-                        )
-                    need_return = False
-                    tool_prompt = ""
-
-                # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
-                if need_return:
-                    ag._no_tool_call_count = 0
-                    return tool_prompt
-
-                # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
-                safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
-
-                ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
                 # 打印LLM输出（过滤掉工具调用内容）
                 if current_response and current_response.strip():
@@ -299,6 +278,28 @@ class AgentRunLoop:
                             expand=True,
                         )
                         console.print(panel)
+
+                try:
+                    need_return, tool_prompt = ag._call_tools(current_response)
+                except KeyboardInterrupt:
+                    # 获取用户补充信息并继续执行
+                    addon_info = self._handle_interrupt_with_input()
+                    if addon_info:
+                        ag.session.addon_prompt = join_prompts(
+                            [ag.session.addon_prompt, addon_info]
+                        )
+                    need_return = False
+                    tool_prompt = ""
+
+                # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
+                if need_return:
+                    ag._no_tool_call_count = 0
+                    return tool_prompt
+
+                # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
+                safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
+
+                ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
                 # 关键流程：直接调用 after_tool_call 回调函数
                 try:
