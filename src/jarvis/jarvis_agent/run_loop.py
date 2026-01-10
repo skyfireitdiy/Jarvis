@@ -9,6 +9,7 @@ AgentRunLoop: 承载 Agent 的主运行循环逻辑。
 """
 
 import os
+import re
 from enum import Enum
 from typing import TYPE_CHECKING
 from typing import Any
@@ -42,6 +43,33 @@ class AgentRunLoop:
 
         # Git diff相关属性
         self._git_diff: Optional[str] = None  # 缓存git diff内容
+
+    def _filter_tool_calls_from_response(self, response: str) -> str:
+        """从响应中过滤掉工具调用内容
+
+        参数:
+            response: 原始响应内容
+
+        返回:
+            str: 过滤后的响应内容（不包含工具调用部分）
+        """
+        from jarvis.jarvis_utils.tag import ct
+        from jarvis.jarvis_utils.tag import ot
+
+        # 使用正则表达式移除所有工具调用块
+        # 匹配起始标签（ot('TOOL_CALL')）和结束标签（ct('TOOL_CALL')）
+        # 结束标签必须在行首（使用 ^ 锚点）
+        # 使用多行模式和DOTALL标志
+        pattern = rf"{re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}"
+
+        # 移除所有工具调用块（包括标签本身）
+        # 使用DOTALL标志使 . 匹配包括换行符在内的所有字符
+        filtered = re.sub(pattern, "", response, flags=re.DOTALL | re.MULTILINE)
+
+        # 清理可能留下的多余空行（超过2个连续换行符替换为2个）
+        filtered = re.sub(r"\n{3,}", "\n\n", filtered)
+
+        return filtered.strip()
 
     def _handle_interrupt_with_input(self) -> Optional[str]:
         """处理中断并获取用户补充信息
@@ -249,10 +277,14 @@ class AgentRunLoop:
 
                 ag.session.prompt = join_prompts([ag.session.prompt, safe_tool_prompt])
 
-                # 只有在没有工具调用时，才打印LLM输出
-                # safe_tool_prompt 为空表示没有工具被调用
-                if not safe_tool_prompt or not safe_tool_prompt.strip():
-                    if current_response and current_response.strip():
+                # 打印LLM输出（过滤掉工具调用内容）
+                if current_response and current_response.strip():
+                    # 过滤掉 <TOOL_CALL>...</TOOL_CALL> 标签及其内容
+                    filtered_response = self._filter_tool_calls_from_response(
+                        current_response
+                    )
+                    # 只有在过滤后仍有内容时才打印
+                    if filtered_response:
                         import jarvis.jarvis_utils.globals as G
                         from jarvis.jarvis_utils.globals import console
                         from rich.panel import Panel
@@ -260,7 +292,7 @@ class AgentRunLoop:
 
                         agent_name = ag.name if hasattr(ag, "name") else None
                         panel = Panel(
-                            current_response,
+                            filtered_response,
                             title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'}[/bold cyan]",
                             border_style="bright_blue",
                             box=box.ROUNDED,
