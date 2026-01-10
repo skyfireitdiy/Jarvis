@@ -1255,11 +1255,28 @@ def _dispatch_to_existing_jarvis_session(
     current_window = get_session_current_window(session_name)
     if not current_window:
         PrettyOutput.print(
-            f"⚠️ 无法获取 session '{session_name}' 的当前窗口",
+            f"⚠️ 无法获取 session '{session_name}' 的当前窗口，创建新session",
             OutputType.WARNING,
             timestamp=False,
         )
-        return False
+        # 无法获取当前窗口时，创建新session并以主进程启动
+        new_session = find_or_create_jarvis_session(
+            force_create=True, initial_command=command
+        )
+        if not new_session:
+            PrettyOutput.print(
+                "⚠️ 创建新session失败",
+                OutputType.WARNING,
+                timestamp=False,
+            )
+            return False
+
+        PrettyOutput.print(
+            f"✅ 成功创建新session '{new_session}' 并启动任务",
+            OutputType.SUCCESS,
+            timestamp=False,
+        )
+        return True
 
     # 在当前窗口创建 panel
     pane_id = create_panel(
