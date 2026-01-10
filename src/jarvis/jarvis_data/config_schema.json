@@ -187,7 +187,7 @@
     },
     "llm_groups": {
       "type": "object",
-      "description": "预定义的模型配置组，使用组名作为 key。每个组必须通过 normal_llm、cheap_llm、smart_llm、web_llm 引用 llms 中定义的配置，不再支持直接定义 platform、model 等参数",
+      "description": "预定义的模型配置组，使用组名作为 key。每个组必须通过 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置，不再支持直接定义 platform、model 等参数",
       "additionalProperties": {
         "type": "object",
         "properties": {
@@ -202,10 +202,6 @@
           "smart_llm": {
             "type": "string",
             "description": "引用 llms 中定义的智能操作LLM配置名称（可选）"
-          },
-          "web_llm": {
-            "type": "string",
-            "description": "引用 llms 中定义的 Web 搜索 LLM 配置名称（可选，用于网页搜索和读取）"
           },
           "ENV": {
             "type": "object",

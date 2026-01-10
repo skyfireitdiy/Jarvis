@@ -181,7 +181,7 @@ def _resolve_llm_reference(llm_name: str) -> Dict[str, Any]:
 
 def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    展开 llm_groups 中的 llm 引用（normal_llm, cheap_llm, smart_llm, web_llm）到对应的配置字段。
+    展开 llm_groups 中的 llm 引用（normal_llm, cheap_llm, smart_llm）到对应的配置字段。
 
     注意：llm_groups 中不再支持直接定义 platform、model 等参数，只能通过引用 llms 中的配置。
 
@@ -212,7 +212,7 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
     if found_forbidden:
         raise ValueError(
             f"❌ 错误：llm_groups 中不再支持直接定义以下参数: {', '.join(found_forbidden)}。"
-            f"请使用 normal_llm、cheap_llm、smart_llm、web_llm 引用 llms 中定义的配置。"
+            f"请使用 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置。"
         )
 
     # 验证至少需要 normal_llm 引用
@@ -284,28 +284,6 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
                 expanded_config["smart_llm_config"] = llm_ref["llm_config"].copy()
             expanded_config.pop("smart_llm", None)
 
-    # 处理 web_llm 引用
-    if "web_llm" in expanded_config:
-        # 跳过空值（空字符串或 None）
-        if not expanded_config.get("web_llm"):
-            expanded_config.pop("web_llm", None)
-        else:
-            llm_ref = _resolve_llm_reference(expanded_config["web_llm"])
-            if not llm_ref:
-                raise ValueError(
-                    f"❌ 错误：web_llm 引用的 '{expanded_config['web_llm']}' 在 llms 中不存在。"
-                )
-            # 直接使用引用的值
-            expanded_config["web_platform"] = llm_ref.get("platform", "openai")
-            expanded_config["web_model"] = llm_ref.get("model", "gpt-5")
-            expanded_config["web_max_input_token_count"] = llm_ref.get(
-                "max_input_token_count", 128000
-            )
-            # 合并 llm_config
-            if "llm_config" in llm_ref:
-                expanded_config["web_llm_config"] = llm_ref["llm_config"].copy()
-            expanded_config.pop("web_llm", None)
-
     return expanded_config
 
 
@@ -317,7 +295,7 @@ def _get_resolved_model_config(
 
     注意：
     - llm_groups 格式为对象：{'group_name': {...}, ...}，使用组名作为 key
-    - llm_groups 中不再支持直接定义 platform、model 等参数，只能通过 normal_llm、cheap_llm、smart_llm、web_llm 引用 llms 中定义的配置
+    - llm_groups 中不再支持直接定义 platform、model 等参数，只能通过 normal_llm、cheap_llm、smart_llm 引用 llms 中定义的配置
 
     优先级顺序:
     - 当通过 model_group_override（例如命令行 -g/--llm-group）指定组时：
@@ -362,7 +340,7 @@ def _get_resolved_model_config(
 
             sys.exit(1)
 
-    # 展开 llm 引用（normal_llm, cheap_llm, smart_llm, web_llm）
+    # 展开 llm 引用（normal_llm, cheap_llm, smart_llm）
     # 只有当 group_config 不为空时才展开引用（说明使用了 llm_groups）
     if group_config:
         group_config = _expand_llm_references(group_config)
@@ -378,13 +356,9 @@ def _get_resolved_model_config(
         "platform",
         "model",
         "max_input_token_count",
-        "web_platform",
-        "web_model",
-        "web_max_input_token_count",
         "llm_config",
         "cheap_llm_config",
         "smart_llm_config",
-        "web_llm_config",
     ]
     for key in override_keys:
         if key in GLOBAL_CONFIG_DATA:
@@ -1179,28 +1153,24 @@ def get_web_search_platform_name() -> Optional[str]:
     """
     获取Web搜索使用的平台名称。
 
-    使用 llm_groups 中 web_llm 展开后的 web_platform 配置。
+    使用 normal_llm 的平台配置。
 
     返回:
         Optional[str]: 平台名称，如果未配置则返回None
     """
-    config = _get_resolved_model_config()
-    web_platform = config.get("web_platform")
-    return str(web_platform) if web_platform else None
+    return get_normal_platform_name()
 
 
 def get_web_search_model_name() -> Optional[str]:
     """
     获取Web搜索使用的模型名称。
 
-    使用 llm_groups 中 web_llm 展开后的 web_model 配置。
+    使用 normal_llm 的模型配置。
 
     返回:
         Optional[str]: 模型名称，如果未配置则返回None
     """
-    config = _get_resolved_model_config()
-    web_model = config.get("web_model")
-    return str(web_model) if web_model else None
+    return get_normal_model_name()
 
 
 # ==============================================================================
