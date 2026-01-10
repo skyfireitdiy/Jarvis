@@ -33,7 +33,7 @@ setup(
         "pyte==0.8.2",
         "pyyaml>=5.3.1",
         "jsonnet>=0.20.0",
-        "ddgs==9.0.2",
+        "ddgr",
         "jinja2>=3.0.0",
         "lxml==6.0.0",
         "markdownify>=1.1.0",

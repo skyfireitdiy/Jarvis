@@ -6,11 +6,12 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
 
+import json
+import subprocess
 import requests  # 导入第三方库requests
 
 # pylint: disable=import-error,missing-module-docstring
 # fmt: off
-from ddgs import DDGS
 from markdownify import markdownify as md
 
 from jarvis.jarvis_agent import Agent
@@ -30,14 +31,57 @@ class SearchWebTool:
     description = "搜索互联网上的信息"
     parameters = {
         "type": "object",
-        "properties": {"query": {"type": "string", "description": "具体的问题"}},
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "搜索关键词或问题",
+            },
+            "site": {
+                "type": "string",
+                "description": "在特定网站内搜索，如 'wikipedia.org', 'github.com'",
+            },
+        },
+        "required": ["query"],
     }
 
-    def _search_with_ddgs(self, query: str, agent: Agent) -> Dict[str, Any]:
+    def _search_with_ddgr(
+        self,
+        query: str,
+        agent: Agent,
+        site: str = None,
+    ) -> Dict[str, Any]:
         # pylint: disable=too-many-locals, broad-except
-        """执行网络搜索、抓取内容并总结结果。"""
+        """使用ddgr命令执行网络搜索、抓取内容并总结结果。"""
         try:
-            results = list(DDGS().text(query, max_results=50, page=3))
+            # 构建ddgr命令
+            cmd = ["ddgr", "--json", "--np", "-x"]  # --np 表示不提示，直接执行；-x 显示完整URL
+
+            # 添加网站特定搜索参数
+            if site:
+                cmd.extend(["-w", site])
+
+            # 添加搜索关键词
+            cmd.append(query)
+
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30, check=False
+            )
+
+            if result.returncode != 0:
+                return {
+                    "stdout": "",
+                    "stderr": f"ddgr命令执行失败: {result.stderr}",
+                    "success": False,
+                }
+
+            try:
+                results = json.loads(result.stdout)
+            except json.JSONDecodeError as e:
+                return {
+                    "stdout": "",
+                    "stderr": f"解析ddgr JSON输出失败: {e}",
+                    "success": False,
+                }
 
             if not results:
                 return {
@@ -50,26 +94,38 @@ class SearchWebTool:
             visited_urls = []
             visited_count = 0
 
+            # 首先收集所有abstract作为基础内容
+            for r in results:
+                url = r.get("url", "")
+                title = r.get("title", "")
+                abstract = r.get("abstract", "")
+
+                # 添加abstract到内容中
+                if abstract:
+                    full_content += f"标题: {title}\n摘要: {abstract}\n\n"
+
+            # 然后抓取前10个URL的详细内容
             for r in results:
                 if visited_count >= 10:
                     break
 
-                url = r["href"]
-                r.get("title", url)
-
-                try:
-                    response = http_get(url, timeout=10.0, allow_redirects=True)
-                    content = md(response.text, strip=["script", "style"])
-                    if content:
-                        full_content += content + "\n\n"
-                        visited_urls.append(url)
-                        visited_count += 1
-                except requests.exceptions.HTTPError as e:
-                    PrettyOutput.auto_print(
-                        f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}"
-                    )
-                except requests.exceptions.RequestException as e:
-                    PrettyOutput.auto_print(f"⚠️ 请求错误: {e}")
+                url = r.get("url", "")
+                if url:
+                    try:
+                        response = http_get(url, timeout=10.0, allow_redirects=True)
+                        content = md(response.text, strip=["script", "style"])
+                        if content:
+                            # 只取前2000个字符，避免内容过长
+                            content_preview = content[:2000]
+                            full_content += f"URL: {url}\n内容预览: {content_preview}\n\n"
+                            visited_urls.append(url)
+                            visited_count += 1
+                    except requests.exceptions.HTTPError as e:
+                        PrettyOutput.auto_print(
+                            f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}"
+                        )
+                    except requests.exceptions.RequestException as e:
+                        PrettyOutput.auto_print(f"⚠️ 请求错误: {e}")
 
             if not full_content.strip():
                 return {
@@ -78,9 +134,11 @@ class SearchWebTool:
                     "success": False,
                 }
 
-            "\n".join(f"  - {u}" for u in visited_urls)
+            urls_list = "\n".join(f"  - {u}" for u in visited_urls)
+            if urls_list:
+                full_content = f"参考URL:\n{urls_list}\n\n{full_content}"
 
-            summary_prompt = f"请为查询“{query}”总结以下内容：\n\n{full_content}"
+            summary_prompt = f'请为查询"{query}"总结以下内容：\n\n{full_content}'
 
             # 使用normal模型进行总结
             platform_name = get_normal_platform_name(None)
@@ -102,6 +160,12 @@ class SearchWebTool:
 
             return {"stdout": summary, "stderr": "", "success": True}
 
+        except subprocess.TimeoutExpired:
+            return {
+                "stdout": "",
+                "stderr": "ddgr命令执行超时。",
+                "success": False,
+            }
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 网页搜索过程中发生错误: {e}")
             return {
@@ -114,8 +178,8 @@ class SearchWebTool:
         """
         Executes the web search.
 
-        If the agent's model supports a native web search, it uses it.
-        Otherwise, it falls back to using DuckDuckGo Search and scraping pages.
+        Uses ddgr command to search the web and scrape pages for content.
+        Supports site-specific search.
         """
         query = args.get("query")
         agent = args.get("agent")
@@ -130,7 +194,10 @@ class SearchWebTool:
                 "success": False,
             }
 
-        return self._search_with_ddgs(query, agent)
+        # 提取可选参数
+        site = args.get("site")
+
+        return self._search_with_ddgr(query=query, agent=agent, site=site)
 
     @staticmethod
     def check() -> bool:
