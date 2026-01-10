@@ -31,6 +31,29 @@ def _get_username() -> str:
         return os.environ.get("USER", "unknown")
 
 
+def _sanitize_username(username: str) -> str:
+    """清理用户名中的特殊字符，确保生成的tmux session名称合法。
+
+    Args:
+        username: 原始用户名
+
+    Returns:
+        str: 清理后的用户名
+    """
+    # 将可能导致tmux session名称不合法的字符替换为下划线
+    # tmux session名称不能包含某些特殊字符，如@、+、.等
+    import re
+
+    # 使用正则表达式替换所有非字母数字和连字符的字符为下划线
+    sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", username)
+    # 确保不以连字符或下划线开头或结尾
+    sanitized = sanitized.strip("-_")
+    # 如果清理后为空，使用'unknown'作为默认值
+    if not sanitized:
+        sanitized = "unknown"
+    return sanitized
+
+
 def _generate_session_name() -> str:
     """生成带用户名前缀的tmux session名称。
 
@@ -41,8 +64,9 @@ def _generate_session_name() -> str:
         str: 生成的session名称
     """
     username = _get_username()
+    sanitized_username = _sanitize_username(username)
     unique_suffix = uuid.uuid4().hex[:8]
-    return f"{username}-jarvis-{unique_suffix}"
+    return f"{sanitized_username}-jarvis-{unique_suffix}"
 
 
 def dispatch_to_tmux_window(
@@ -391,13 +415,14 @@ def _find_jarvis_session() -> Optional[str]:
         )
         # 获取用户名用于构建前缀
         username = _get_username()
+        sanitized_username = _sanitize_username(username)
         # 解析 session 名称：格式为 "session-name: windows (created ...)"
         for line in result.stdout.strip().split("\n"):
             if line.strip():
                 # 提取 session 名称（冒号之前的部分）
                 session_name = line.split(":")[0].strip()
                 # 匹配带用户名前缀的会话：{username}-jarvis-{uuid}
-                expected_prefix = f"{username}-jarvis-"
+                expected_prefix = f"{sanitized_username}-jarvis-"
                 if session_name.startswith(expected_prefix):
                     # 精确前缀匹配：检查去除前缀后的部分是否为数字或UUID
                     suffix = session_name[len(expected_prefix) :]
