@@ -137,3 +137,26 @@ class BuildValidationConfig:
         config["selected_build_system"] = build_system
         self._config = config
         return self._save_config()
+
+    def get_custom_build_command(self) -> Optional[str]:
+        """获取用户自定义构建命令
+
+        Returns:
+            构建命令字符串（如 "make && make test"），如果未配置则返回None
+        """
+        config = self._load_config()
+        return config.get("custom_build_command")
+
+    def set_custom_build_command(self, command: str) -> bool:
+        """保存用户自定义构建命令
+
+        Args:
+            command: 构建命令字符串（如 "make && make test"）
+
+        Returns:
+            bool: 是否成功保存配置
+        """
+        config = self._load_config()
+        config["custom_build_command"] = command
+        self._config = config
+        return self._save_config()
