@@ -101,12 +101,15 @@ class RulesManager:
 
         参数:
             rules_dir: rules 目录路径
-            rule_name: 规则名称（文件名）
+            rule_name: 规则名称（文件名，自动添加.md后缀）
 
         返回:
             str: 规则内容，如果未找到则返回 None
         """
         try:
+            # 只支持 .md 后缀的文件
+            if not rule_name.endswith(".md"):
+                rule_name = rule_name + ".md"
             rule_file_path = os.path.join(rules_dir, rule_name)
             if os.path.exists(rule_file_path) and os.path.isfile(rule_file_path):
                 with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
@@ -249,8 +252,8 @@ class RulesManager:
                     for filename in os.listdir(rules_dir):
                         file_path = os.path.join(rules_dir, filename)
                         if os.path.isfile(file_path):
-                            # 只允许无后缀或.md后缀的文件
-                            if "." not in filename or filename.endswith(".md"):
+                            # 只允许.md后缀的文件（内置的.jarvis/rule除外）
+                            if filename.endswith(".md"):
                                 # 规则名称就是文件名
                                 if filename not in result["files"]:
                                     result["files"].append(filename)
