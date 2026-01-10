@@ -32,6 +32,7 @@ class BuildSystem(Enum):
     C_MAKEFILE = "c_makefile"
     C_CMAKE = "c_cmake"
     C_MAKEFILE_CMAKE = "c_makefile_cmake"  # 同时存在Makefile和CMakeLists.txt
+    CUSTOM = "custom"  # 用户自定义构建命令
 
 
 @dataclass

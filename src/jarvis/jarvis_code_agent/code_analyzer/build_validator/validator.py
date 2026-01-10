@@ -17,6 +17,7 @@ from .base import BuildResult
 from .base import BuildSystem
 from .base import BuildValidatorBase
 from .cmake import CMakeBuildValidator
+from .custom import CustomBuildValidator
 from .detector import BuildSystemDetector
 from .fallback import FallbackBuildValidator
 from .go import GoBuildValidator
@@ -54,6 +55,7 @@ class BuildValidator:
             BuildSystem.C_CMAKE: CMakeBuildValidator(project_root, timeout),
             BuildSystem.C_MAKEFILE: MakefileBuildValidator(project_root, timeout),
             BuildSystem.C_MAKEFILE_CMAKE: CMakeBuildValidator(project_root, timeout),
+            BuildSystem.CUSTOM: CustomBuildValidator(project_root, timeout),
         }
 
         # 兜底验证器

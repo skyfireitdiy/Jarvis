@@ -12,6 +12,7 @@ from .base import BuildResult
 from .base import BuildSystem
 from .base import BuildValidatorBase
 from .cmake import CMakeBuildValidator
+from .custom import CustomBuildValidator
 from .detector import BuildSystemDetector
 from .fallback import FallbackBuildValidator
 from .go import GoBuildValidator
@@ -41,5 +42,6 @@ __all__ = [
     "GoBuildValidator",
     "CMakeBuildValidator",
     "MakefileBuildValidator",
+    "CustomBuildValidator",
     "FallbackBuildValidator",
 ]
