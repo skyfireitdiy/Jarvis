@@ -148,6 +148,7 @@ class BuildSystemDetector:
             "python (setup.py/pyproject.toml/requirements.txt等)",
             "c_cmake (CMakeLists.txt)",
             "c_makefile (Makefile)",
+            "custom (自定义构建命令)",
             "unknown (未知/未识别)",
         ]
 
@@ -527,6 +528,7 @@ Git根目录文件列表（前30项）：
                 BuildSystem.PYTHON,
                 BuildSystem.C_CMAKE,
                 BuildSystem.C_MAKEFILE,
+                BuildSystem.CUSTOM,
                 BuildSystem.UNKNOWN,
             ]
             detected_systems = all_systems
