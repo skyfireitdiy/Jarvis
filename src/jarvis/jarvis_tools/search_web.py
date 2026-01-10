@@ -17,6 +17,7 @@ from markdownify import markdownify as md
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import calculate_content_length_limit
 from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
@@ -144,8 +145,9 @@ class SearchWebTool:
                         response = http_get(url, timeout=10.0, allow_redirects=True)
                         content = md(response.text, strip=["script", "style"])
                         if content:
-                            # 只取前2000个字符，避免内容过长
-                            content_preview = content[:2000]
+                            # 根据剩余token动态计算内容长度限制
+                            content_length_limit = calculate_content_length_limit(agent)
+                            content_preview = content[:content_length_limit]
                             full_content += (
                                 f"URL: {url}\n内容预览: {content_preview}\n\n"
                             )

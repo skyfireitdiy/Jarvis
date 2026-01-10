@@ -6,6 +6,7 @@ import requests  # type: ignore  # 导入第三方库requests
 from markdownify import markdownify as md
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import calculate_content_length_limit
 from jarvis.jarvis_utils.http import get as http_get
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -63,9 +64,17 @@ class WebpageTool:
                     "stderr": "无法从网页抓取有效内容。",
                 }
 
+            # 根据剩余token动态计算内容长度限制，避免内容过长
+            content_length_limit = calculate_content_length_limit()
+            content_md_truncated = content_md[:content_length_limit]
+            if len(content_md) > content_length_limit:
+                PrettyOutput.auto_print(
+                    f"⚠️ 网页内容过长（{len(content_md)} 字符），已截断至 {content_length_limit} 字符"
+                )
+
             summary_prompt = f"""以下是网页 {url} 的内容（已转换为Markdown）：
 ----------------
-{content_md}
+{content_md_truncated}
 ----------------
 请根据用户的具体需求“{want}”进行总结与回答：
 - 使用Markdown格式

@@ -75,6 +75,47 @@ def get_max_input_token_count(model_group_override: Optional[str] = None) -> int
     return int(config.get("max_input_token_count", "128000"))
 
 
+def calculate_content_length_limit(agent: Any = None) -> int:
+    """
+    基于当前模型配置动态计算内容长度限制（字符数）
+
+    参数:
+        agent: Agent实例，用于获取模型和剩余token数量
+
+    返回:
+        int: 允许的最大字符数（基于剩余token计算，保留安全余量）
+    """
+    try:
+        # 优先使用剩余token数量
+        if agent and hasattr(agent, "model"):
+            try:
+                remaining_tokens = agent.model.get_remaining_token_count()
+                # 使用剩余token的2/3作为限制，保留1/3作为安全余量
+                # 粗略估算：1个token约等于4个字符（中文可能更少，但保守估计）
+                limit_tokens = int(remaining_tokens * 2 / 3)
+                # 转换为字符数（保守估计：1 token = 4 字符）
+                limit_chars = limit_tokens * 4
+                # 确保至少返回一个合理的值
+                if limit_chars > 0:
+                    return limit_chars
+            except Exception:
+                pass
+
+        # 回退方案：使用输入窗口的2/3
+        # 使用全局模型组
+        from jarvis.jarvis_utils.globals import get_global_model_group
+
+        model_group = get_global_model_group()
+        max_input_tokens = get_max_input_token_count(model_group)
+        # 计算2/3限制的token数，然后转换为字符数
+        limit_tokens = int(max_input_tokens * 2 / 3)
+        limit_chars = limit_tokens * 4
+        return limit_chars
+    except Exception:
+        # 如果所有方法都失败，返回默认值2000字符
+        return 2000
+
+
 def get_cheap_max_input_token_count(model_group_override: Optional[str] = None) -> int:
     """
     获取廉价模型允许的最大输入token数量。
