@@ -284,7 +284,7 @@ class KimiModel(BasePlatform):
 
         payload = {
             "messages": [{"role": "user", "content": message}],
-            "use_search": True if self.web else False,
+            "use_search": False,
             "extend": {"sidebar": True},
             "kimiplus_id": "kimi",
             "use_deep_research": False,
@@ -412,10 +412,6 @@ class KimiModel(BasePlatform):
     def platform_name(cls) -> str:
         """Platform name"""
         return "kimi"
-
-    def support_web(self) -> bool:
-        """Kimi平台支持web功能"""
-        return True
 
     @classmethod
     def get_required_env_keys(cls) -> List[str]:

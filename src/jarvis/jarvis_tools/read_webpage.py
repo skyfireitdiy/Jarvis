@@ -6,8 +6,6 @@ import requests  # 导入第三方库requests
 from markdownify import markdownify as md
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_web_search_model_name
-from jarvis.jarvis_utils.config import get_web_search_platform_name
 from jarvis.jarvis_utils.http import get as http_get
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -39,41 +37,6 @@ class WebpageTool:
 
             if not url:
                 return {"success": False, "stdout": "", "stderr": "缺少必需参数：url"}
-
-            # 1) 优先使用配置的 Web 搜索平台与模型（若支持web）
-            web_search_platform = get_web_search_platform_name()
-            web_search_model = get_web_search_model_name()
-            if web_search_platform and web_search_model:
-                model = PlatformRegistry().create_platform(web_search_platform)
-                if model:
-                    model.set_model_name(web_search_model)
-                    if model.support_web():
-                        model.set_web(True)
-                        model.set_suppress_output(False)
-                        prompt = f"""请帮我处理这个网页：{url}
-用户的具体需求是：{want}
-请按照以下要求输出结果：
-1. 使用Markdown格式
-2. 包含网页标题
-3. 根据用户需求提供准确、完整的信息"""
-                        response = model.chat_until_success(prompt)
-                        if response and response.strip():
-                            return {"success": True, "stdout": response, "stderr": ""}
-
-            # 2) 然后尝试使用cheap平台的 web 能力（适用于网页读取等简单任务）
-            model = PlatformRegistry().get_cheap_platform()
-            if model.support_web():
-                model.set_web(True)
-                model.set_suppress_output(False)
-                prompt = f"""请帮我处理这个网页：{url}
-用户的具体需求是：{want}
-请按照以下要求输出结果：
-1. 使用Markdown格式
-2. 包含网页标题
-3. 根据用户需求提供准确、完整的信息"""
-                response = model.chat_until_success(prompt)
-                if response and response.strip():
-                    return {"success": True, "stdout": response, "stderr": ""}
 
             # 3) 回退：使用 requests 抓取网页，再用模型分析
 

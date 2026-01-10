@@ -18,8 +18,6 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
-from jarvis.jarvis_utils.config import get_web_search_model_name
-from jarvis.jarvis_utils.config import get_web_search_platform_name
 from jarvis.jarvis_utils.http import get as http_get
 
 # fmt: on
@@ -131,46 +129,6 @@ class SearchWebTool:
                 "stderr": "Agent或Agent模型未找到。",
                 "success": False,
             }
-
-        # 检查是否配置了专门的 Web 搜索平台和模型
-        web_search_platform = get_web_search_platform_name()
-        web_search_model = get_web_search_model_name()
-
-        # 如果配置了专门的 Web 搜索平台和模型，优先使用
-        if web_search_platform and web_search_model:
-            model = PlatformRegistry().create_platform(web_search_platform)
-            if model:
-                model.set_model_name(web_search_model)
-                if model.support_web():
-                    model.set_web(True)
-                    model.set_suppress_output(False)
-                    response = model.chat_until_success(query)
-                    if response and response.strip():
-                        return {
-                            "stdout": response,
-                            "stderr": "",
-                            "success": True,
-                        }
-
-        # 否则使用normal模型进行web搜索（正常操作）
-        normal_platform = get_normal_platform_name(None)
-        normal_model = get_normal_model_name(None)
-        # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
-        llm_config = get_llm_config("normal", None)
-        model = PlatformRegistry().create_platform(normal_platform, llm_config)
-        if not model:
-            return {"stdout": "", "stderr": "无法创建模型。", "success": False}
-        model.set_model_name(normal_model)
-        if model.support_web():
-            model.set_web(True)
-            model.set_suppress_output(False)
-            response = model.chat_until_success(query)
-            if response and response.strip():
-                return {
-                    "stdout": response,
-                    "stderr": "",
-                    "success": True,
-                }
 
         return self._search_with_ddgs(query, agent)
 
