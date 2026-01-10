@@ -8,7 +8,6 @@ import os
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
 from typing import Any, Optional
 
 import typer
@@ -32,32 +31,30 @@ def _write_task_to_temp_file(task_content: str) -> str:
     返回:
         str: 临时文件路径
     """
-    temp_file = tempfile.NamedTemporaryFile(
-        mode="w",
+    # 使用 tempfile.mkstemp 在 /tmp 目录创建临时文件
+
+    fd, temp_path = tempfile.mkstemp(
         suffix=".txt",
         prefix="jcad_task_",
-        delete=False,
-        encoding="utf-8",
+        text=True,
+        dir="/tmp",
     )
-    try:
-        temp_file.write(task_content)
-        return temp_file.name
-    except Exception:
-        # 如果写入失败，清理临时文件
-        try:
-            temp_file.close()
-            Path(temp_file.name).unlink(missing_ok=True)
-        except Exception:
-            pass
-        raise
-    finally:
-        temp_file.close()
+
+    # 写入内容
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(task_content)
+        f.flush()
+        os.fsync(f.fileno())
+
+    PrettyOutput.auto_print(f"📝 临时文件已创建: {temp_path}")
+    return temp_path
 
 
 def run_jca_dispatch(
     task: Any,
     is_dispatch_mode: bool = False,
     stay_in_session_after_exit: bool = True,
+    force_dispatch: bool = False,
 ) -> None:
     """执行 jca -n -w --dispatch --task <task>"""
     # 确保 task 是字符串内容而非类型对象
@@ -81,19 +78,22 @@ def run_jca_dispatch(
     is_task_file = os.path.exists(task_str)
 
     # dispatch 模式下使用临时文件时，需要手动处理 tmux 和文件删除
-    if is_dispatch_mode and is_task_file:
+    # force_dispatch 强制使用 dispatch 模式（适用于临时文件场景）
+    if (is_dispatch_mode and is_task_file) or force_dispatch:
         # 构造 tmux split-window 命令
         import shlex
 
         # 获取当前工作目录
         cwd = os.getcwd()
 
-        # 安全转义路径
+        # 不使用 shlex.quote，直接使用双引号包裹路径
         quoted_cwd = shlex.quote(cwd)
-        quoted_task_file = shlex.quote(task_str)
+        # 对于任务文件路径，使用转义而非 shlex.quote
+        quoted_task_file = task_str.replace("'", "'\"'\"'")
 
-        # 构造命令：cd 到工作目录，执行 jca，然后删除临时文件
-        command = f"cd {quoted_cwd} && jca -n -w --task-file {quoted_task_file} && rm -f {quoted_task_file}"
+        # 构造命令：cd 到工作目录，执行 jca
+        # 注意：不自动删除任务文件，避免被清理机制误删
+        command = f"cd {quoted_cwd} && jca -n -w --task-file '{quoted_task_file}'"
 
         try:
             # 使用智能调度函数创建 tmux panel
@@ -157,19 +157,7 @@ def main(
         if "\n" in task:
             # 多行输入：创建临时文件
             temp_file_path = _write_task_to_temp_file(task)
-            # dispatch 模式下，临时文件由 tmux pane 中的命令负责删除
-            is_dispatch_mode = True
-            try:
-                # 使用临时文件路径作为任务参数
-                run_jca_dispatch(temp_file_path, is_dispatch_mode=is_dispatch_mode)
-            finally:
-                # 非 dispatch 模式下清理临时文件
-                # dispatch 模式下临时文件已在 tmux pane 中删除，此处不删除
-                if not is_dispatch_mode:
-                    try:
-                        Path(temp_file_path).unlink(missing_ok=True)
-                    except Exception:
-                        pass
+            run_jca_dispatch(temp_file_path, is_dispatch_mode=True, force_dispatch=True)
         else:
             # 单行输入：直接传递
             run_jca_dispatch(task)
@@ -184,19 +172,7 @@ def main(
 
         # 创建临时文件
         temp_file_path = _write_task_to_temp_file(task_content)
-        # dispatch 模式下，临时文件由 tmux pane 中的命令负责删除
-        is_dispatch_mode = True
-        try:
-            # 使用临时文件路径作为任务参数
-            run_jca_dispatch(temp_file_path, is_dispatch_mode=is_dispatch_mode)
-        finally:
-            # 非 dispatch 模式下清理临时文件
-            # dispatch 模式下临时文件已在 tmux pane 中删除，此处不删除
-            if not is_dispatch_mode:
-                try:
-                    Path(temp_file_path).unlink(missing_ok=True)
-                except Exception:
-                    pass
+        run_jca_dispatch(temp_file_path, is_dispatch_mode=True, force_dispatch=True)
 
 
 if __name__ == "__main__":
