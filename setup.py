@@ -34,6 +34,7 @@ setup(
         "pyyaml>=5.3.1",
         "jsonnet>=0.20.0",
         "ddgs==9.0.2",
+        "jinja2>=3.0.0",
         "lxml==6.0.0",
         "markdownify>=1.1.0",
         "typer",
