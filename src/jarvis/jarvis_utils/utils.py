@@ -1574,19 +1574,18 @@ def _collect_directory_config(config_data: Dict[str, Any], ask_all: bool) -> boo
 def _collect_web_search_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
     """收集Web搜索配置（已废弃）
 
-    Web搜索配置已迁移到 llm_groups 中的 web_llm 字段。
-    请在 llms 中定义 Web 搜索专用的 LLM 配置，然后在 llm_groups 中通过 web_llm 引用。
+    Web搜索配置已迁移到 llm_groups 中的 normal_llm 字段。
+    Web 搜索功能现在使用 normal_llm 配置的模型，不再有独立的 web_llm 配置。
 
     示例配置：
     ```yaml
     llms:
-      my_web_search:
+      my_model:
         platform: "openai"
-        model: "gpt-4o-search-preview"
+        model: "gpt-4o"
     llm_groups:
       default:
-        normal_llm: "my_normal"
-        web_llm: "my_web_search"  # 用于网页搜索和读取
+        normal_llm: "my_model"  # 用于所有操作，包括Web搜索
     ```
     """
     # 不再收集废弃的 web_search_platform 和 web_search_model
