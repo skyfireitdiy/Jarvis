@@ -96,7 +96,10 @@ class AgentRunLoop:
 
                 # 如果是token限制触发，打印当前token数量
                 if token_limit_triggered:
-                    max_input_tokens = get_max_input_token_count(self.agent.model_group)
+                    # 使用平台内部的实际token限制，而不是全局配置（考虑cheap/smart/normal等不同模型类型）
+                    max_input_tokens = (
+                        self.agent.model._get_platform_max_input_token_count()
+                    )
                     PrettyOutput.auto_print(
                         f"🔍 Token限制触发自动总结，当前剩余token数量: {remaining_tokens}/{max_input_tokens} (剩余 {remaining_tokens / max_input_tokens * 100:.1f}%)"
                     )
