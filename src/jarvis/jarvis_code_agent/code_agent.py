@@ -118,6 +118,9 @@ class CodeAgent(Agent):
             "virtual_tty",  # 虚拟终端工具，支持交互式操作
             "search_web",  # 网络搜索工具
             "read_webpage",  # 网页内容读取工具
+            "save_memory",  # 记忆保存工具
+            "retrieve_memory",  # 记忆召回工具
+            "clear_memory",  # 记忆删除工具
         ]
         if enable_task_list_manager:
             base_tools.append("task_list_manager")  # 任务列表管理工具
