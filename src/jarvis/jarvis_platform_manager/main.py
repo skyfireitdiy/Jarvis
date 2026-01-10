@@ -206,15 +206,10 @@ def chat_with_model(
                     ):
                         file_path = file_path[1:-1]
 
-                    if not platform.support_upload_files():
-                        PrettyOutput.auto_print("❌ 平台不支持上传文件")
-                        continue
-
-                    PrettyOutput.auto_print(f"ℹ️ 正在上传文件: {file_path}")
-                    if platform.upload_files([file_path]):
-                        PrettyOutput.auto_print("✅ 文件上传成功")
-                    else:
-                        PrettyOutput.auto_print("❌ 文件上传失败")
+                    PrettyOutput.auto_print(f"ℹ️ 尝试上传文件: {file_path}")
+                    PrettyOutput.auto_print(
+                        "⚠️ 文件上传功能已移除，平台不再支持文件上传"
+                    )
                 except Exception as exc:
                     PrettyOutput.auto_print(f"❌ 上传文件失败: {str(exc)}")
                 continue
