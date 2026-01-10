@@ -85,7 +85,7 @@ class MemoryOrganizer:
         return memories
 
     def _find_overlapping_memories(
-        self, memories: List[Dict[str, Any]], min_overlap: int
+        self, memories: List[Dict[str, Any]], overlap_threshold: int
     ) -> Dict[int, List[Set[int]]]:
         """
         查找具有重叠标签的记忆组
@@ -109,7 +109,7 @@ class MemoryOrganizer:
                 tags_j = set(memories[j].get("tags", []))
                 overlap_count = len(tags_i & tags_j)
 
-                if overlap_count >= min_overlap:
+                if overlap_count >= overlap_threshold:
                     # 查找包含这两个记忆的最大组
                     group = {i, j}
 
@@ -127,7 +127,7 @@ class MemoryOrganizer:
                                     )
                                     for m in group
                                 )
-                                if min_overlap_with_group >= min_overlap:
+                                if min_overlap_with_group >= overlap_threshold:
                                     group.add(k)
                                     changed = True
 
@@ -135,7 +135,7 @@ class MemoryOrganizer:
                     group_tuple = tuple(sorted(group))
                     if group_tuple not in processed_groups:
                         processed_groups.add(group_tuple)
-                        overlap_groups[min_overlap].append(set(group_tuple))
+                        overlap_groups[overlap_threshold].append(set(group_tuple))
 
         return overlap_groups
 
@@ -242,7 +242,6 @@ class MemoryOrganizer:
     def organize_memories(
         self,
         memory_type: str,
-        min_overlap: int = 2,
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         """
@@ -250,15 +249,12 @@ class MemoryOrganizer:
 
         参数：
             memory_type: 记忆类型
-            min_overlap: 最小标签重叠数
             dry_run: 是否只进行模拟运行
 
         返回：
             整理结果统计
         """
-        PrettyOutput.auto_print(
-            f"ℹ️ 开始整理{memory_type}类型的记忆，最小重叠标签数: {min_overlap}"
-        )
+        PrettyOutput.auto_print(f"ℹ️ 开始整理{memory_type}类型的记忆，最小重叠标签数: 2")
 
         # 加载记忆
         memories = self._load_memories(memory_type)
@@ -276,31 +272,24 @@ class MemoryOrganizer:
             "created_memories": 0,
         }
 
-        # 从高重叠度开始处理
-        max_tags = max(len(m.get("tags", [])) for m in memories)
-
+        # 使用固定的最小重叠数2
         # 创建一个标记已删除记忆的集合
         deleted_indices = set()
 
-        for overlap_count in range(min(max_tags, 5), min_overlap - 1, -1):
-            # 过滤掉已删除的记忆
-            active_memories = [
-                (i, mem) for i, mem in enumerate(memories) if i not in deleted_indices
-            ]
-            if not active_memories:
-                break
-
+        # 过滤掉已删除的记忆
+        active_memories = [
+            (i, mem) for i, mem in enumerate(memories) if i not in deleted_indices
+        ]
+        if active_memories:
             # 创建索引映射：原始索引 -> 活跃索引
             active_memory_list = [mem for _, mem in active_memories]
 
-            overlap_groups = self._find_overlapping_memories(
-                active_memory_list, overlap_count
-            )
+            overlap_groups = self._find_overlapping_memories(active_memory_list, 2)
 
-            if overlap_count in overlap_groups:
-                groups = overlap_groups[overlap_count]
+            if 2 in overlap_groups:
+                groups = overlap_groups[2]
                 PrettyOutput.auto_print(
-                    f"\nℹ️ 发现 {len(groups)} 个具有 {overlap_count} 个重叠标签的记忆组"
+                    f"\nℹ️ 发现 {len(groups)} 个具有 2 个重叠标签的记忆组"
                 )
 
                 for group in groups:
@@ -579,11 +568,6 @@ def organize(
         "--type",
         help="要整理的记忆类型（project_long_term 或 global_long_term）",
     ),
-    min_overlap: int = typer.Option(
-        2,
-        "--min-overlap",
-        help="最小标签重叠数，必须大于等于2",
-    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -598,13 +582,13 @@ def organize(
 
     示例：
 
-    # 整理项目长期记忆，最小重叠标签数为3
-    jarvis-memory-organizer organize --type project_long_term --min-overlap 3
+    # 整理项目长期记忆
+    jarvis-memory-organizer organize --type project_long_term
 
     # 整理全局长期记忆，模拟运行
     jarvis-memory-organizer organize --type global_long_term --dry-run
 
-    # 使用默认设置（最小重叠数2）整理项目记忆
+    # 使用默认设置整理项目记忆
     jarvis-memory-organizer organize
     """
     # 验证参数
@@ -614,16 +598,10 @@ def organize(
         )
         raise typer.Exit(1)
 
-    if min_overlap < 2:
-        PrettyOutput.auto_print("❌ 错误：最小重叠数必须大于等于2")
-        raise typer.Exit(1)
-
     # 创建整理器并执行
     try:
         organizer = MemoryOrganizer(llm_group=llm_group)
-        stats = organizer.organize_memories(
-            memory_type=memory_type, min_overlap=min_overlap, dry_run=dry_run
-        )
+        stats = organizer.organize_memories(memory_type=memory_type, dry_run=dry_run)
 
         # 根据结果返回适当的退出码
         if stats.get("processed_groups", 0) > 0 or dry_run:
