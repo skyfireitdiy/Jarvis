@@ -21,11 +21,11 @@ console = Console()
 
 @app.command()
 def quick_config(
-    platform: str = typer.Option(
-        ..., "--platform", "-p", help="LLM平台类型 (claude/openai)"
+    platform: Optional[str] = typer.Option(
+        None, "--platform", "-p", help="LLM平台类型 (claude/openai)"
     ),
-    base_url: str = typer.Option(..., "--url", "-u", help="API基础URL"),
-    api_key: str = typer.Option(..., "--key", "-k", help="API密钥"),
+    base_url: Optional[str] = typer.Option(None, "--url", "-u", help="API基础URL"),
+    api_key: Optional[str] = typer.Option(None, "--key", "-k", help="API密钥"),
     config_name: Optional[str] = typer.Option(
         None, "--name", "-n", help="配置名称，如果未指定将使用平台名称"
     ),
@@ -34,6 +34,14 @@ def quick_config(
     ),
 ):
     """快速配置 LLM 平台信息到 Jarvis 配置文件的 llms 部分"""
+
+    # 提示用户输入缺失的参数
+    if platform is None:
+        platform = Prompt.ask("请输入LLM平台类型 (claude/openai)")
+    if base_url is None:
+        base_url = Prompt.ask("请输入API基础URL")
+    if api_key is None:
+        api_key = Prompt.ask("请输入API密钥")
 
     # 验证平台类型
     platform = platform.lower().strip()
