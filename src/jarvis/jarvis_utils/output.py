@@ -355,6 +355,13 @@ class ConsoleOutputSink(OutputSink):
             OutputType.DEBUG: dict(bgcolor="#1c1c1c"),
             OutputType.USER: dict(bgcolor="#1c2b2b"),
             OutputType.TOOL: dict(bgcolor="#1c2b2b"),
+            OutputType.START: dict(bgcolor="#1c2b3c"),
+            OutputType.TARGET: dict(bgcolor="#2b1c3c"),
+            OutputType.STOP: dict(bgcolor="#3c1c1c"),
+            OutputType.RETRY: dict(bgcolor="#3c2b1c"),
+            OutputType.ROLLBACK: dict(bgcolor="#3c1c1c"),
+            OutputType.DIRECTORY: dict(bgcolor="#1c2b2b"),
+            OutputType.STATISTICS: dict(bgcolor="#1c1c3c"),
         }
 
         header_styles = {
