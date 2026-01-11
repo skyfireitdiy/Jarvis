@@ -157,7 +157,7 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 ```bash
 # 1. 克隆仓库（选择以下任一方式）
 # GitHub（推荐）
-git clone https://github.com/skyfireitdiy/Jarvis
+git clone https://github.com/skyfireitdiy/Jarvis.git
 
 # 或者使用 Gitee 镜像（国内访问更快）
 git clone https://gitee.com/skyfireitdiy/Jarvis.git
@@ -185,7 +185,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. 克隆仓库（选择以下任一方式）
 # GitHub（推荐）
-git clone https://github.com/skyfireitdiy/Jarvis
+git clone https://github.com/skyfireitdiy/Jarvis.git
 
 # 或者使用 Gitee 镜像（国内访问更快）
 git clone https://gitee.com/skyfireitdiy/Jarvis.git
@@ -280,7 +280,7 @@ docker run -it --rm \
 ```bash
 # 克隆仓库（选择以下任一方式）
 # GitHub（推荐）
-git clone https://github.com/skyfireitdiy/Jarvis
+git clone https://github.com/skyfireitdiy/Jarvis.git
 
 # 或者使用 Gitee 镜像（国内访问更快）
 git clone https://gitee.com/skyfireitdiy/Jarvis.git
@@ -563,7 +563,7 @@ Jarvis SDK 提供强大的可扩展能力，让您能够快速开发专业的AI�
 
 Jarvis 在 GitHub 和 Gitee 都有镜像仓库，您可以选择其中任一平台进行贡献：
 
-- **GitHub**: https://github.com/skyfireitdiy/Jarvis
+- **GitHub**: https://github.com/skyfireitdiy/Jarvis.git
 - **Gitee**: https://gitee.com/skyfireitdiy/Jarvis.git
 
 1. Fork 本仓库（选择您偏好的平台）

@@ -9,7 +9,7 @@ setup(
     description="An AI assistant that uses various tools to interact with the system",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/skyfireitdiy/Jarvis",
+    url="https://github.com/skyfireitdiy/Jarvis.git",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,

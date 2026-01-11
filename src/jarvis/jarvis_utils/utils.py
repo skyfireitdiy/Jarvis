@@ -837,7 +837,7 @@ def _show_usage_stats(welcome_str: str) -> None:
                 Align.center(Text(work_dir_info, style="dim")),
                 "",  # for a blank line
                 Align.center(Text(f"v{__version__}")),
-                Align.center(Text("https://github.com/skyfireitdiy/Jarvis")),
+                Align.center(Text("https://github.com/skyfireitdiy/Jarvis.git")),
             )
 
             welcome_panel = Panel(
