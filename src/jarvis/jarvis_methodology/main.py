@@ -14,6 +14,8 @@ from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
 import os
+from typing import Any
+
 
 import typer
 import yaml
@@ -105,9 +107,9 @@ def export_methodology(
             )
             raise typer.Exit(code=1)
 
-        # 根据scope加载方法论
+        # 根据scope加载
         if scope == "all":
-            methodologies = _load_all_methodologies()
+            methodologies: Any = _load_all_methodologies()
         elif scope == "project":
             project_dir = _get_project_methodology_directory()
             if not project_dir:
@@ -120,8 +122,14 @@ def export_methodology(
             global_dir = _get_methodology_directory()
             methodologies = _load_methodologies_from_dir(global_dir)
 
+        # 将结果转换为字典格式导出（支持 List[Tuple] 和 Dict 两种类型）
+        export_data = (
+            dict(methodologies)
+            if not isinstance(methodologies, dict)
+            else methodologies
+        )
         with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(methodologies, f, ensure_ascii=False, indent=2)
+            json.dump(export_data, f, ensure_ascii=False, indent=2)
 
         PrettyOutput.auto_print(
             f"✅ 成功导出 {len(methodologies)} 个{scope}方法论到 {output_file}"
@@ -149,9 +157,9 @@ def list_methodologies(
             )
             raise typer.Exit(code=1)
 
-        # 根据scope加载方法论
+        # 根据scope加载
         if scope == "all":
-            methodologies = _load_all_methodologies()
+            methodologies: Any = _load_all_methodologies()
         elif scope == "project":
             project_dir = _get_project_methodology_directory()
             if not project_dir:
@@ -168,8 +176,13 @@ def list_methodologies(
 
         # 先拼接再统一打印，避免在循环中逐条输出造成信息稀疏
         lines = [f"可用{scope}方法论:"]
-        for i, (problem_type, _) in enumerate(methodologies.items(), 1):
-            lines.append(f"{i}. {problem_type}")
+        # 兼容 List[Tuple] 和 Dict 两种类型
+        if isinstance(methodologies, dict):
+            for i, problem_type in enumerate(methodologies.keys(), 1):
+                lines.append(f"{i}. {problem_type}")
+        else:
+            for i, (problem_type, _) in enumerate(methodologies, 1):
+                lines.append(f"{i}. {problem_type}")
         joined_lines = "\n".join(lines)
         PrettyOutput.auto_print(f"ℹ️ {joined_lines}")
     except (OSError, ValueError) as e:
