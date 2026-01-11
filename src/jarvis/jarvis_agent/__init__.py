@@ -373,12 +373,97 @@ class Agent:
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
             allow_savesession: 是否允许使用SaveSession命令（默认False，仅jvs/jca主程序传入True）
         """
-        # 基础属性初始化（仅根据入参设置原始值；实际生效的默认回退在 _init_config 中统一解析）
+        # 基础属性初始化
+        self._init_base_attributes(
+            name,
+            description,
+            system_prompt,
+            auto_complete,
+            need_summary,
+            use_methodology,
+            use_analysis,
+            execute_tool_confirm,
+            summary_prompt,
+            force_save_memory,
+            model_group,
+            files,
+            use_tools,
+            non_interactive,
+            in_multi_agent,
+            allow_savesession,
+        )
+
+        # 核心组件初始化
+        self._init_model(model_group)
+        self._init_session()
+        self._init_handlers(multiline_inputer, output_handler, use_tools or [])
+
+        # 用户交互相关初始化（需要在 _init_handlers 之后，因为需要使用 self.multiline_inputer）
+        self._init_user_interaction(confirm_callback, non_interactive)
+
+        # 配置解析和设置
+        self._init_config(
+            use_methodology,
+            use_analysis,
+            execute_tool_confirm,
+            force_save_memory,
+            summary_prompt,
+        )
+
+        # 事件总线和管理器初始化
+        self._init_managers()
+
+        # 工具和系统提示词设置
+        self._setup_tools_and_prompt()
+
+        # 动态回调加载
+        self._load_after_tool_callbacks()
+
+    def _init_base_attributes(
+        self,
+        name: str,
+        description: str,
+        system_prompt: str,
+        auto_complete: bool,
+        need_summary: bool,
+        use_methodology: Optional[bool],
+        use_analysis: Optional[bool],
+        execute_tool_confirm: Optional[bool],
+        summary_prompt: Optional[str],
+        force_save_memory: Optional[bool],
+        model_group: Optional[str],
+        files: Optional[List[str]],
+        use_tools: Optional[List[str]],
+        non_interactive: Optional[bool],
+        in_multi_agent: Optional[bool],
+        allow_savesession: bool,
+    ) -> None:
+        """初始化基础属性
+
+        参数:
+            name: Agent名称
+            description: Agent描述
+            system_prompt: 系统提示词
+            auto_complete: 是否自动完成
+            need_summary: 是否需要总结
+            use_methodology: 是否使用方法论
+            use_analysis: 是否使用分析
+            execute_tool_confirm: 执行工具前是否需要确认
+            summary_prompt: 总结提示词
+            force_save_memory: 是否强制保存记忆
+            model_group: 模型组
+            files: 文件列表
+            use_tools: 使用的工具列表
+            non_interactive: 是否非交互模式
+            in_multi_agent: 是否在多智能体模式
+            allow_savesession: 是否允许保存会话
+        """
         # 标识与描述
         self.name = make_agent_name(name)
         self.description = description
         self.system_prompt = system_prompt
-        # 行为控制开关（原始入参值）
+
+        # 行为控制开关（原始入参值，后续会根据配置进行解析和覆盖）
         self.auto_complete = bool(auto_complete)
         self.need_summary = bool(need_summary)
         self.use_methodology = use_methodology
@@ -386,52 +471,53 @@ class Agent:
         self.execute_tool_confirm = execute_tool_confirm
         self.summary_prompt = summary_prompt
         self.force_save_memory = force_save_memory
-        # 资源与环境
+
+        # 资源与环境配置
         self.model_group = model_group
         self.files = files or []
         self.use_tools = use_tools
         self.non_interactive = non_interactive
+
         # 多智能体运行标志：用于控制非交互模式下的自动完成行为
         self.in_multi_agent = bool(in_multi_agent)
-        # 运行时状态
+
+        # 运行时状态变量
         self.first = True
         self.run_input_handlers_next_turn = False
         self.user_data: Dict[str, Any] = {}
-        # 记录固定的内容
-        self.pin_content: str = ""
-        # SaveSession 命令权限控制
-        self.allow_savesession = bool(allow_savesession)
-        # 记录连续未添加 addon_prompt 的轮数
-        self._addon_prompt_skip_rounds = 0
-        # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
-        self._no_tool_call_count = 0
+        self.pin_content: str = ""  # 记录固定的内容
+        self.original_user_input: str = ""  # 记录原始用户输入
 
+        # 权限和状态控制
+        self.allow_savesession = bool(allow_savesession)  # SaveSession 命令权限控制
+        self._addon_prompt_skip_rounds = 0  # 记录连续未添加 addon_prompt 的轮数
+        self._no_tool_call_count = 0  # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
         self._agent_type = "normal"
 
-        # 记录原始用户输入
-        self.original_user_input: str = ""
+    def _init_user_interaction(
+        self,
+        confirm_callback: Optional[Callable[[str, bool], bool]],
+        non_interactive: Optional[bool],
+    ) -> None:
+        """初始化用户交互相关组件
 
+        参数:
+            confirm_callback: 用户确认回调函数
+            non_interactive: 是否非交互模式
+        """
         # 用户确认回调：默认使用 CLI 的 user_confirm，可由外部注入以支持 TUI/GUI
         self.confirm_callback: Callable[[str, bool], bool] = (
             confirm_callback or user_confirm
         )
 
-        # 初始化模型和会话
-        self._init_model(model_group)
-        self._init_session()
-
-        # 初始化处理器
-        self._init_handlers(
-            multiline_inputer,
-            output_handler,
-            use_tools or [],
-        )
         # 初始化用户交互封装，保持向后兼容
+        # 注意：self.multiline_inputer 已在 _init_handlers 中设置
         self.user_interaction = UserInteractionHandler(
             self.multiline_inputer, self.confirm_callback
         )
         # 将确认函数指向封装后的 confirm，保持既有调用不变
         self.confirm_callback = self.user_interaction.confirm
+
         # 非交互模式参数支持：允许通过构造参数显式控制，便于其他Agent调用时设置
         # 仅作为 Agent 实例属性，不写入环境变量或全局配置，避免跨 Agent 污染
         try:
@@ -443,7 +529,24 @@ class Agent:
             # 防御式回退
             self.non_interactive = False
 
-        # 初始化配置（直接解析，不再依赖 _init_config）
+    def _init_config(
+        self,
+        use_methodology: Optional[bool],
+        use_analysis: Optional[bool],
+        execute_tool_confirm: Optional[bool],
+        force_save_memory: Optional[bool],
+        summary_prompt: Optional[str],
+    ) -> None:
+        """解析并设置配置项
+
+        参数:
+            use_methodology: 是否使用方法论
+            use_analysis: 是否使用分析
+            execute_tool_confirm: 执行工具前是否需要确认
+            force_save_memory: 是否强制保存记忆
+            summary_prompt: 总结提示词
+        """
+        # 解析 use_methodology 配置
         try:
             resolved_use_methodology = bool(
                 use_methodology if use_methodology is not None else is_use_methodology()
@@ -453,6 +556,7 @@ class Agent:
                 bool(use_methodology) if use_methodology is not None else True
             )
 
+        # 解析 use_analysis 配置
         try:
             resolved_use_analysis = bool(
                 use_analysis if use_analysis is not None else is_use_analysis()
@@ -462,6 +566,7 @@ class Agent:
                 bool(use_analysis) if use_analysis is not None else True
             )
 
+        # 解析 execute_tool_confirm 配置
         try:
             resolved_execute_tool_confirm = bool(
                 execute_tool_confirm
@@ -475,6 +580,7 @@ class Agent:
                 else False
             )
 
+        # 解析 force_save_memory 配置
         try:
             resolved_force_save_memory = bool(
                 force_save_memory
@@ -486,11 +592,14 @@ class Agent:
                 bool(force_save_memory) if force_save_memory is not None else False
             )
 
+        # 应用解析后的配置值
         self.use_methodology = resolved_use_methodology
         self.use_analysis = resolved_use_analysis
         self.execute_tool_confirm = resolved_execute_tool_confirm
         self.summary_prompt = summary_prompt or DEFAULT_SUMMARY_PROMPT
         self.force_save_memory = resolved_force_save_memory
+
+        # 根据运行模式设置 auto_complete
         # 多智能体模式下，默认不自动完成（即使是非交互），仅在明确传入 auto_complete=True 时开启
         if self.in_multi_agent:
             self.auto_complete = bool(self.auto_complete)
@@ -500,17 +609,23 @@ class Agent:
                 self.auto_complete or (self.non_interactive or False)
             )
 
-        # 初始化事件总线需先于管理器，以便管理器在构造中安全订阅事件
+    def _init_managers(self) -> None:
+        """初始化事件总线和管理器"""
+        # 初始化事件总线（需先于管理器，以便管理器在构造中安全订阅事件）
         self.event_bus = EventBus()
-        # 初始化管理器
-        self.memory_manager = MemoryManager(self)
-        self.task_analyzer = TaskAnalyzer(self)
-        self.file_methodology_manager = FileMethodologyManager(self)
-        self.prompt_manager = PromptManager(self)
+
+        # 初始化各个功能管理器
+        self.memory_manager = MemoryManager(self)  # 记忆管理器：管理长期和短期记忆
+        self.task_analyzer = TaskAnalyzer(self)  # 任务分析器：分析任务完成度和满意度
+        self.file_methodology_manager = FileMethodologyManager(self)  # 文件和方法论管理器：处理文件上传和方法论加载
+        self.prompt_manager = PromptManager(self)  # 提示词管理器：构建和管理系统提示词
+
         # 初始化任务列表管理器（使用当前工作目录作为 root_dir，如果子类已设置 root_dir 则使用子类的）
         root_dir = getattr(self, "root_dir", None) or os.getcwd()
         self.task_list_manager = TaskListManager(root_dir)
 
+    def _setup_tools_and_prompt(self) -> None:
+        """设置工具和系统提示词"""
         # 如果配置了强制保存记忆，确保 save_memory 工具可用
         if self.force_save_memory:
             self._ensure_save_memory_tool()
@@ -519,20 +634,8 @@ class Agent:
         if self.use_analysis:
             self._ensure_methodology_tool()
 
-        # 设置系统提示词
+        # 设置系统提示词（基于配置和工具列表构建）
         self._setup_system_prompt()
-
-        # 输出统计信息（包含欢迎信息）
-        # 已移除：资源概览不再单独打印，相关信息已集成到AI Assistant欢迎界面
-        # show_agent_startup_stats(
-        #     name,
-        #     self.model.name(),
-        #     self.get_tool_registry(),
-        #     platform_name=self.model.platform_name(),
-        # )
-
-        # 动态加载工具调用后回调
-        self._load_after_tool_callbacks()
 
     def _init_model(self, model_group: Optional[str]) -> None:
         """初始化模型平台（统一使用 normal 平台/模型）"""

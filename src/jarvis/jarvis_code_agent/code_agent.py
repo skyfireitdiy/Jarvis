@@ -11,7 +11,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 import subprocess
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import typer
 
@@ -82,63 +82,155 @@ class CodeAgent(Agent):
         enable_task_list_manager: bool = True,
         **kwargs: Any,
     ) -> None:
+        # CodeAgent 基础属性初始化
+        self._init_code_agent_base_attributes(tool_group, disable_review, review_max_iterations)
+
+        # 上下文管理相关初始化
+        self._init_code_agent_context_managers()
+
+        # 代码管理相关管理器初始化
+        self._init_code_agent_managers(rule_names)
+
+        # 工具列表构建
+        base_tools = self._build_code_agent_tool_list(append_tools, enable_task_list_manager)
+
+        # 父类初始化准备和调用
+        explicit_params = self._prepare_code_agent_parent_init(
+            model_group, need_summary, non_interactive, base_tools, kwargs
+        )
+        super().__init__(**explicit_params, **kwargs)
+
+        # 父类初始化后的设置
+        self._setup_code_agent_after_parent_init()
+
+    def _init_code_agent_base_attributes(
+        self,
+        tool_group: Optional[str],
+        disable_review: bool,
+        review_max_iterations: int,
+    ) -> None:
+        """初始化 CodeAgent 基础属性
+
+        参数:
+            tool_group: 工具组配置
+            disable_review: 是否禁用代码审查
+            review_max_iterations: 代码审查最大迭代次数
+        """
+        # 设置工作目录和工具组配置
         self.root_dir = os.getcwd()
         self.tool_group = tool_group
+
         # Review 相关配置
         # 注意：disable_review 仅保存配置值，实际是否执行 review 在运行时动态判断
         self.disable_review = disable_review  # 保存用户配置的 disable_review 值
         self.review_max_iterations = review_max_iterations
 
-        # 存储开始时的commit hash，用于后续git diff获取
+        # Git 相关初始化：存储开始时的 commit hash，用于后续 git diff 获取
         self.start_commit: Optional[str] = None
 
-        # 初始化上下文管理器
+    def _init_code_agent_context_managers(self) -> None:
+        """初始化 CodeAgent 上下文管理相关组件"""
+        # 初始化上下文管理器（用于代码分析和上下文追踪）
         self.context_manager = ContextManager(self.root_dir)
-        # 上下文推荐器将在Agent创建后初始化（需要LLM模型）
+        # 上下文推荐器将在父类 Agent 创建后初始化（需要 LLM 模型）
         self.context_recommender: Optional[ContextRecommender] = None
 
-        # 初始化各个管理器
-        self.rules_manager = RulesManager(self.root_dir)
+    def _init_code_agent_managers(self, rule_names: Optional[str]) -> None:
+        """初始化 CodeAgent 代码管理相关的各个管理器
 
-        # 加载rules
+        参数:
+            rule_names: 规则名称列表（逗号分隔）
+        """
+        # 规则管理器：加载和管理代码规则
+        self.rules_manager = RulesManager(self.root_dir)
+        # 加载 rules（从配置文件或指定规则名称）
         _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
 
+        # Git 管理器：处理 Git 操作和提交
         self.git_manager = GitManager(self.root_dir)
-        self.diff_manager = DiffManager(self.root_dir)
-        self.impact_manager = ImpactManager(self.root_dir, self.context_manager)
-        self.build_validation_manager = BuildValidationManager(self.root_dir)
-        self.lint_manager = LintManager(self.root_dir)
-        self.post_process_manager = PostProcessManager(self.root_dir)
-        # LLM管理器将在模型初始化后创建
-
         # 检测 git username 和 email 是否已设置
         self.git_manager.check_git_config()
+
+        # Diff 管理器：处理代码差异分析和展示
+        self.diff_manager = DiffManager(self.root_dir)
+
+        # 影响分析管理器：分析代码修改的影响范围
+        self.impact_manager = ImpactManager(self.root_dir, self.context_manager)
+
+        # 构建验证管理器：验证代码修改后的构建状态
+        self.build_validation_manager = BuildValidationManager(self.root_dir)
+
+        # Lint 管理器：执行静态代码分析
+        self.lint_manager = LintManager(self.root_dir)
+
+        # 后处理管理器：处理代码修改后的清理和优化
+        self.post_process_manager = PostProcessManager(self.root_dir)
+
+    def _build_code_agent_tool_list(
+        self,
+        append_tools: Optional[str],
+        enable_task_list_manager: bool,
+    ) -> List[str]:
+        """构建 CodeAgent 工具列表
+
+        参数:
+            append_tools: 要追加的工具列表（逗号分隔）
+            enable_task_list_manager: 是否启用任务列表管理器
+
+        返回:
+            List[str]: 构建好的工具列表
+        """
+        # 构建基础工具列表（CodeAgent 专用的代码操作工具）
         base_tools = [
-            "execute_script",
-            "read_code",
-            "edit_file",  # 普通 search/replace 编辑
-            "virtual_tty",  # 虚拟终端工具，支持交互式操作
-            "search_web",  # 网络搜索工具
-            "read_webpage",  # 网页内容读取工具
-            "save_memory",  # 记忆保存工具
-            "retrieve_memory",  # 记忆召回工具
-            "clear_memory",  # 记忆删除工具
-            "methodology",  # 方法论工具
+            "execute_script",      # 脚本执行工具
+            "read_code",           # 代码读取工具
+            "edit_file",           # 普通 search/replace 编辑工具
+            "virtual_tty",         # 虚拟终端工具，支持交互式操作
+            "search_web",          # 网络搜索工具
+            "read_webpage",        # 网页内容读取工具
+            "save_memory",         # 记忆保存工具
+            "retrieve_memory",     # 记忆召回工具
+            "clear_memory",        # 记忆删除工具
+            "methodology",         # 方法论工具
         ]
+        # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:
             base_tools.append("task_list_manager")  # 任务列表管理工具
 
+        # 处理追加的工具（从参数中解析并去重）
         if append_tools:
             additional_tools = [
                 t for t in (tool.strip() for tool in append_tools.split(",")) if t
             ]
             base_tools.extend(additional_tools)
-            # 去重
+            # 去重，保持顺序
             base_tools = list(dict.fromkeys(base_tools))
 
+        return base_tools
+
+    def _prepare_code_agent_parent_init(
+        self,
+        model_group: Optional[str],
+        need_summary: bool,
+        non_interactive: Optional[bool],
+        base_tools: List[str],
+        kwargs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """准备 CodeAgent 父类初始化的参数
+
+        参数:
+            model_group: 模型组
+            need_summary: 是否需要总结
+            non_interactive: 是否非交互模式
+            base_tools: 基础工具列表
+            kwargs: 其他关键字参数
+
+        返回:
+            Dict[str, Any]: 准备传递给父类的参数字典
+        """
+        # 获取 CodeAgent 专用的系统提示词
         code_system_prompt = get_system_prompt()
 
-        # 调用父类 Agent 的初始化
         # 从配置文件读取默认值，允许通过 kwargs 覆盖
         # 如果 kwargs 中未指定，则从配置文件读取默认值
         use_methodology = kwargs.pop("use_methodology", is_use_methodology())
@@ -165,19 +257,20 @@ class CodeAgent(Agent):
         for key in explicit_params:
             kwargs.pop(key, None)
 
-        super().__init__(
-            **explicit_params,
-            **kwargs,
-        )
+        return explicit_params
 
+    def _setup_code_agent_after_parent_init(self) -> None:
+        """CodeAgent 父类初始化后的设置"""
+        # 设置 Agent 类型标识
         self._agent_type = "code_agent"
 
-        # 建立CodeAgent与Agent的关联，便于工具获取上下文管理器
+        # 建立 CodeAgent 与 Agent 的关联，便于工具获取上下文管理器
         self._code_agent = self
 
-        # 初始化上下文推荐器（自己创建LLM模型，使用父Agent的配置）
+        # 初始化上下文推荐器（需要父类 Agent 的模型实例）
+        # 上下文推荐器用于根据用户输入智能推荐相关代码上下文
         try:
-            # 获取当前Agent的model实例
+            # 获取当前 Agent 的 model 实例
             parent_model = None
             if self.model:
                 parent_model = self.model
@@ -186,11 +279,12 @@ class CodeAgent(Agent):
                 self.context_manager, parent_model=parent_model
             )
         except Exception as e:
-            # LLM推荐器初始化失败
+            # LLM 推荐器初始化失败不影响主流程，仅跳过上下文推荐功能
             PrettyOutput.auto_print(
                 f"⚠️ 上下文推荐器初始化失败: {e}，将跳过上下文推荐功能"
             )
 
+        # 订阅工具调用后事件，用于处理代码修改后的 diff 展示和提交
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
     def get_rules_prompt(self) -> str:
