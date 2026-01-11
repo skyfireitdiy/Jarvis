@@ -198,10 +198,6 @@ def load_methodology(
 
     prompt = tool_registery.prompt() if tool_registery else ""
 
-    # 获取方法论目录
-    methodology_dir = _get_methodology_directory()
-    if not os.path.exists(methodology_dir):
-        return ""
 
     try:
         # 加载所有方法论
