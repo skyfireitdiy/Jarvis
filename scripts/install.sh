@@ -19,11 +19,11 @@ if ! command -v uv &> /dev/null; then
             echo "uv 使用 pip3 安装成功。"
         else
             echo "pip3 安装失败，回退到 curl 安装..."
-            curl -LsSf https://astral.sh/uv/install.sh | sh
+            curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
         fi
     else
         echo "未找到 pip3，使用 curl 安装 uv..."
-        curl -LsSf https://astral.sh/uv/install.sh | sh
+        curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
     fi
 
     # 尝试 source cargo env 以使 uv 在当前会话中可用
@@ -48,7 +48,6 @@ echo "发现 uv: $(uv --version)"
 GITEE_URL="https://gitee.com/skyfireitdiy/Jarvis.git"
 GITHUB_URL="https://github.com/skyfireitdiy/Jarvis.git"
 DEST_DIR="$HOME/Jarvis"
-VENV_DIR="$DEST_DIR/.venv"
 
 echo -e "\n--- 2. 克隆或更新 Jarvis 仓库 ---"
 if [ -d "$DEST_DIR" ]; then
@@ -90,75 +89,33 @@ else
     set -e
 fi
 
-echo -e "\n--- 3. 设置虚拟环境并安装 Jarvis ---"
+echo -e "\n--- 3. 全局安装 Jarvis ---"
 cd "$DEST_DIR"
 
-if [ ! -d "$VENV_DIR" ]; then
-    echo "正在 $VENV_DIR 创建虚拟环境..."
-    uv venv
-else
-    echo "虚拟环境 $VENV_DIR 已存在."
-fi
-
-echo "正在使用 uv 安装项目和依赖..."
+echo "正在使用 uv 全局安装项目和依赖..."
 
 read -r -p "是否安装 RAG 功能? (这将安装 PyTorch 等较重的依赖) [y/N]: " choice
 case "$choice" in
   y|Y )
     echo "正在安装核心功能及 RAG 依赖..."
-    uv pip install '.[rag]'
+    uv tool install '.[rag]'
     ;;
   * )
     echo "正在安装核心功能..."
-    uv pip install .
+    uv tool install .
     ;;
 esac
 
 
 echo -e "\n--- 4. 安装完成! ---"
-echo "请根据您使用的 Shell，运行以下命令激活虚拟环境:"
-echo "  - Bash / Zsh:"
-echo "    source $VENV_DIR/bin/activate"
-echo "  - Fish:"
-echo "    source $VENV_DIR/bin/activate.fish"
-echo ""
-echo "激活后，您就可以使用 'jarvis' 命令。"
+echo "Jarvis 已全局安装成功！您现在可以直接使用 jarvis 命令。"
 
-# 检测用户shell类型并询问是否自动配置
-echo -e "\n--- 5. Shell 环境配置 (可选) ---"
-current_shell=$(basename "$SHELL")
-case "$current_shell" in
-    bash|zsh|fish)
-        echo "检测到您正在使用 $current_shell，可以自动添加环境配置到您的 rc 文件。"
-        read -r -p "是否自动添加 'source $VENV_DIR/bin/activate' 到您的 ~/.${current_shell}rc 文件? [y/N]: " choice
-        case "$choice" in
-            y|Y )
-                if [ "$current_shell" = "fish" ]; then
-                    echo "source $VENV_DIR/bin/activate.fish" >> "$HOME/.config/fish/config.fish"
-                else
-                    echo "source $VENV_DIR/bin/activate" >> "$HOME/.${current_shell}rc"
-                fi
-                echo "已成功添加到 ~/.${current_shell}rc 文件。下次启动 shell 时将自动激活 Jarvis。"
-                ;;
-            * )
-                echo "跳过自动配置。"
-                ;;
-        esac
-        ;;
-    *)
-        echo "检测到您正在使用 $current_shell，暂不支持自动配置。"
-        ;;
-esac
-
-echo -e "\n--- 6. 安装自动补全 (可选) ---"
+echo -e "\n--- 5. 安装自动补全 (可选) ---"
 echo "您可以为常用命令安装自动补全功能，以提高使用效率。"
 read -r -p "是否安装命令行自动补全功能? [y/N]: " choice
 case "$choice" in
     y|Y )
         echo "正在安装自动补全..."
-        # 激活虚拟环境以执行安装命令
-        # shellcheck disable=SC1091
-        source "$VENV_DIR/bin/activate"
 
         # 使用循环来安装所有工具的自动补全
         tools=("jvs" "ja" "jca" "jcr" "jgc" "jgs" "jpm" "jma" "jt" "jm" "jss" "jst" "jmo")
