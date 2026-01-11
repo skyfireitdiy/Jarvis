@@ -729,10 +729,8 @@ class task_list_manager:
                 table.add_column("Agent类型", width=10)
                 table.add_column("依赖", width=12)
 
-                # 按任务序号（task_id）排序
-                sorted_tasks = sorted(
-                    tasks, key=lambda t: self._extract_task_number(t.task_id)
-                )
+                # 按优先级排序（优先级高的在前），相同优先级按创建时间排序
+                sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
 
                 # 状态颜色映射
                 status_colors = {
