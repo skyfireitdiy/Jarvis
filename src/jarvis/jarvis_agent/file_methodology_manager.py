@@ -7,8 +7,6 @@
 from typing import Any
 
 from jarvis.jarvis_agent.utils import join_prompts
-from jarvis.jarvis_utils.config import get_normal_model_name
-from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.methodology import load_methodology
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -49,12 +47,6 @@ class FileMethodologyManager:
         methodology = load_methodology(
             msg,
             self.agent.get_tool_registry(),
-            platform_name=get_normal_platform_name(
-                self.agent.model_group if hasattr(self.agent, "model_group") else None
-            ),
-            model_name=get_normal_model_name(
-                self.agent.model_group if hasattr(self.agent, "model_group") else None
-            ),
             model_group=self.agent.model_group
             if hasattr(self.agent, "model_group")
             else None,
