@@ -337,7 +337,6 @@ class Agent:
         description: str = "",
         model_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
-        analysis_prompt: Optional[str] = None,
         auto_complete: bool = True,
         output_handler: Optional[List[OutputHandlerProtocol]] = None,
         use_tools: Optional[List[str]] = None,
@@ -363,7 +362,6 @@ class Agent:
             description: Agent描述信息
 
             summary_prompt: 任务总结提示模板
-            analysis_prompt: 任务分析提示词（可选，不传则使用默认提示词）
             auto_complete: 是否自动完成任务
             execute_tool_confirm: 执行工具前是否需要确认
             need_summary: 是否需要生成总结
@@ -387,7 +385,6 @@ class Agent:
         self.use_analysis = use_analysis
         self.execute_tool_confirm = execute_tool_confirm
         self.summary_prompt = summary_prompt
-        self.analysis_prompt = analysis_prompt
         self.force_save_memory = force_save_memory
         # 资源与环境
         self.model_group = model_group
@@ -507,7 +504,7 @@ class Agent:
         self.event_bus = EventBus()
         # 初始化管理器
         self.memory_manager = MemoryManager(self)
-        self.task_analyzer = TaskAnalyzer(self, analysis_prompt=self.analysis_prompt)
+        self.task_analyzer = TaskAnalyzer(self)
         self.file_methodology_manager = FileMethodologyManager(self)
         self.prompt_manager = PromptManager(self)
         # 初始化任务列表管理器（使用当前工作目录作为 root_dir，如果子类已设置 root_dir 则使用子类的）
