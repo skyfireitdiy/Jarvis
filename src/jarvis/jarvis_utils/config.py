@@ -108,21 +108,6 @@ def calculate_content_token_limit(agent: Any = None) -> int:
         return 500
 
 
-def calculate_content_length_limit(agent: Any = None) -> int:
-    """
-    基于当前模型配置动态计算内容长度限制（字符数）
-
-    参数:
-        agent: Agent实例，用于获取模型和剩余token数量
-
-    返回:
-        int: 允许的最大字符数（基于剩余token计算，保留安全余量）
-
-    注意：此函数已被 calculate_content_token_limit 替代，保留以保持向后兼容性
-    """
-    return calculate_content_token_limit(agent) * 4
-
-
 def get_cheap_max_input_token_count(model_group_override: Optional[str] = None) -> int:
     """
     获取廉价模型允许的最大输入token数量。

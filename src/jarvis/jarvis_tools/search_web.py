@@ -17,7 +17,7 @@ from markdownify import markdownify as md
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import calculate_content_length_limit
+from jarvis.jarvis_utils.config import calculate_content_token_limit
 from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
@@ -133,7 +133,7 @@ class SearchWebTool:
                     full_content += f"标题: {title}\n摘要: {abstract}\n\n"
 
             # 首先计算一次内容长度限制（基于剩余token）
-            content_length_limit = calculate_content_length_limit(agent)
+            content_token_limit = calculate_content_token_limit(agent)
 
             # 然后抓取前10个URL的详细内容
             for r in results:
@@ -151,7 +151,7 @@ class SearchWebTool:
                         if content:
                             # 计算剩余可用的内容长度限制（token数）
                             remaining_limit = (
-                                content_length_limit
+                                content_token_limit
                                 - get_context_token_count(full_content)
                             )
                             # 如果剩余限制不足，跳过此URL
@@ -160,7 +160,7 @@ class SearchWebTool:
                                     f"⚠️ 内容长度已达限制，跳过: {url}"
                                 )
                                 continue
-                            # 基于token限制截取内容（保守估计：1 token ≈ 4 字符）
+                            # 基于token限制截取内容（保守估计：1 token ≈ 4 字符，用字符数保守截取）
                             content_preview = content[: remaining_limit * 4]
                             full_content += (
                                 f"URL: {url}\n内容预览: {content_preview}\n\n"
