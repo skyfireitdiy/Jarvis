@@ -708,7 +708,7 @@ class ReadCodeTool:
             # 仅打印每个文件的读取状态，不打印具体内容
             try:
                 if status_lines:
-                    PrettyOutput.auto_print("".join(status_lines))
+                    PrettyOutput.auto_print("\n".join(status_lines))
             except Exception:
                 pass
             return {
