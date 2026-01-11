@@ -191,30 +191,15 @@ pip3 install jarvis-ai-assistant
 # 1. 安装 uv (如果未安装)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. 克隆仓库（选择以下任一方式）
-# GitHub（推荐）
-git clone https://github.com/skyfireitdiy/Jarvis.git
+# 2. 使用 uv tool 安装 jarvis（推荐）
+# 从 GitHub 仓库安装
+uv tool install git+https://github.com/skyfireitdiy/Jarvis.git
 
-# 或者使用 Gitee 镜像（国内访问更快）
-git clone https://gitee.com/skyfireitdiy/Jarvis.git
-
-# 3. 进入项目目录
-cd Jarvis
-
-# 4. 创建虚拟环境并安装
-uv venv
-
-# 安装基础功能
-uv pip install .
-
-# 可选: 安装RAG功能(包含PyTorch等较重的依赖)
-# uv pip install .[rag]
+# 或从 Gitee 镜像安装（国内访问更快）
+# uv tool install git+https://gitee.com/skyfireitdiy/Jarvis.git
 ```
 
-> **提示**: 安装完成后，建议将虚拟环境激活命令添加到您的 shell 配置文件中:
->
-> - Bash/Zsh: 在 ~/.bashrc 或 ~/.zshrc 中添加 `source /path/to/Jarvis/.venv/bin/activate`
-> - Fish: 在 ~/.config/fish/config.fish 中添加 `source /path/to/Jarvis/.venv/bin/activate.fish`
+> **提示**: `uv tool` 会自动管理工具的虚拟环境，无需手动创建和激活。安装完成后，jarvis 的所有命令（如 `jvs`、`jca` 等）将立即可用。
 
 #### Docker 镜像安装 (推荐用于隔离环境)
 

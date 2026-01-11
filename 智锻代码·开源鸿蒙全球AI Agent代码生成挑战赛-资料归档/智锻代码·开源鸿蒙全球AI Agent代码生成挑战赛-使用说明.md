@@ -70,14 +70,12 @@ pip3 install jarvis-ai-assistant
 # 1. 安装 uv（如果未安装）
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. 克隆仓库
-git clone https://openatom.tech/codeforge-ai-agent/1f4e9750e7bd1838fb0127f051c18414
-cd Jarvis
-
-# 3. 创建虚拟环境并安装
-uv venv
-uv pip install .
+# 2. 使用 uv tool 安装 jarvis（推荐）
+# 从比赛仓库安装
+uv tool install git+https://openatom.tech/codeforge-ai-agent/1f4e9750e7bd1838fb0127f051c18414
 ```
+
+> **提示**: `uv tool` 会自动管理工具的虚拟环境，无需手动创建和激活。安装完成后，jarvis 的所有命令（如 `jvs`、`jca`、`jsec`、`jc2r` 等）将立即可用。
 
 #### Docker 镜像安装（推荐用于隔离环境）
 
