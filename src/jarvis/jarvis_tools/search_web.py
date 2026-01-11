@@ -21,6 +21,7 @@ from jarvis.jarvis_utils.config import calculate_content_length_limit
 from jarvis.jarvis_utils.config import get_llm_config
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
+from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.http import get as http_get
 
 # fmt: on
@@ -148,15 +149,19 @@ class SearchWebTool:
                         response = http_get(url, timeout=10.0, allow_redirects=True)
                         content = md(response.text, strip=["script", "style"])
                         if content:
-                            # 计算剩余可用的内容长度限制
-                            remaining_limit = content_length_limit - len(full_content)
+                            # 计算剩余可用的内容长度限制（token数）
+                            remaining_limit = (
+                                content_length_limit
+                                - get_context_token_count(full_content)
+                            )
                             # 如果剩余限制不足，跳过此URL
                             if remaining_limit <= 0:
                                 PrettyOutput.auto_print(
                                     f"⚠️ 内容长度已达限制，跳过: {url}"
                                 )
                                 continue
-                            content_preview = content[:remaining_limit]
+                            # 基于token限制截取内容（保守估计：1 token ≈ 4 字符）
+                            content_preview = content[: remaining_limit * 4]
                             full_content += (
                                 f"URL: {url}\n内容预览: {content_preview}\n\n"
                             )
