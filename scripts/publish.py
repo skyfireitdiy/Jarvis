@@ -79,6 +79,21 @@ def run_command(cmd: List[str], error_msg: str) -> None:
         sys.exit(1)
 
 
+def run_command_ignore_errors(cmd: List[str], error_msg: str) -> bool:
+    """运行命令，出错时忽略并返回False"""
+    try:
+        subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+        )
+        return True
+    except subprocess.CalledProcessError as e:
+        PrettyOutput.auto_print(f"⚠️  Warning: {error_msg}")
+        PrettyOutput.auto_print(f"⚠️  Stderr: {decode_output(e.stderr)}")
+        return False
+
+
 def remove_pycache_directories():
     """删除所有的 __pycache__ 目录"""
     import shutil
@@ -132,13 +147,40 @@ def main():
         PrettyOutput.auto_print("🏷️ Creating git tag...")
         run_command(["git", "tag", f"v{new_version}"], "Failed to create tag")
         # 推送到远程仓库
-        PrettyOutput.auto_print("🚀 Pushing to remote...")
-        run_command(
-            ["git", "push", "origin", "main", "--tags"], "Failed to push to remote"
+        PrettyOutput.auto_print("🚀 Pushing to all remotes...")
+        # 获取所有remotes
+        remotes_result = subprocess.run(
+            ["git", "remote"],
+            capture_output=True,
+            text=True,
+            check=True,
         )
-        PrettyOutput.auto_print(
-            "✅ Successfully tagged and pushed. The GitHub Action will now handle publishing to PyPI."
-        )
+        remotes = remotes_result.stdout.strip().split("\n")
+
+        success_count = 0
+        for remote in remotes:
+            if not remote:
+                continue
+            PrettyOutput.auto_print(f"  Pushing to {remote}...")
+            # Push main branch
+            if run_command_ignore_errors(
+                ["git", "push", remote, "main"], f"Failed to push main to {remote}"
+            ):
+                # Push tags
+                if run_command_ignore_errors(
+                    ["git", "push", remote, "--tags"],
+                    f"Failed to push tags to {remote}",
+                ):
+                    success_count += 1
+
+        if success_count > 0:
+            PrettyOutput.auto_print(
+                f"✅ Successfully pushed to {success_count}/{len(remotes)} remotes. The GitHub Action will now handle publishing to PyPI."
+            )
+        else:
+            PrettyOutput.auto_print(
+                "⚠️  Warning: Failed to push to any remote. Please check the errors above."
+            )
     except Exception as e:
         PrettyOutput.auto_print(f"❌ Error: {str(e)}")
         sys.exit(1)
