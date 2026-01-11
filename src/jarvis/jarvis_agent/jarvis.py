@@ -1143,7 +1143,8 @@ def run_cli(
 
     # 初始化环境
     init_env(
-        "欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！", config_file=config_file
+        """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！\nGitHub: https://github.com/skyfireitdiy/Jarvis\nGitee: https://gitee.com/skyfireitdiy/Jarvis.git""",
+        config_file=config_file,
     )
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
