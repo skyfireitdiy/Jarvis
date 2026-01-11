@@ -13,7 +13,6 @@ import os
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-import tempfile
 from typing import Any
 from typing import Dict
 from typing import List
@@ -183,8 +182,6 @@ def _load_all_methodologies() -> Dict[str, str]:
 def load_methodology(
     user_input: str,
     tool_registery: Optional[Any] = None,
-    platform_name: Optional[str] = None,
-    model_name: Optional[str] = None,
     model_group: Optional[str] = None,
 ) -> str:
     """
@@ -193,8 +190,7 @@ def load_methodology(
     参数：
         user_input: 用户输入文本，用于提示大模型
         tool_registery: 工具注册表，用于获取工具列表
-        platform_name (str, optional): 指定的平台名称. Defaults to None.
-        model_name (str, optional): 指定的模型名称. Defaults to None.
+        model_group (str, optional): 指定的模型组. Defaults to None.
 
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
@@ -216,25 +212,8 @@ def load_methodology(
             return ""
         PrettyOutput.auto_print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
-        if platform_name:
-            # 如果指定了平台名称，使用 get_normal_platform 获取平台实例
-            # 这样可以确保使用正确的 model_group 和配置
-            try:
-                platform = PlatformRegistry().get_normal_platform(model_group)
-                if model_name:
-                    platform.set_model_name(model_name)
-            except Exception as e:
-                # 如果获取失败，尝试直接创建（向后兼容）
-                platform_created = PlatformRegistry().create_platform(platform_name)
-                if platform_created and model_name:
-                    platform_created.set_model_name(model_name)
-                if not platform_created:
-                    PrettyOutput.auto_print(f"❌ 无法创建平台实例: {str(e)}")
-                    return ""
-                platform = platform_created
-        else:
-            # 方法论推荐使用cheap模型以降低成本
-            platform = PlatformRegistry().get_cheap_platform(model_group)
+        # 方法论推荐使用normal模型以确保质量
+        platform = PlatformRegistry().get_normal_platform(model_group)
 
         if not platform:
             PrettyOutput.auto_print("❌ 无法创建平台实例")
