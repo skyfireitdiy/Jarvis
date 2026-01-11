@@ -123,6 +123,7 @@ class CodeAgent(Agent):
             "save_memory",  # 记忆保存工具
             "retrieve_memory",  # 记忆召回工具
             "clear_memory",  # 记忆删除工具
+            "methodology",  # 方法论工具
         ]
         if enable_task_list_manager:
             base_tools.append("task_list_manager")  # 任务列表管理工具
