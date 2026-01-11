@@ -183,7 +183,11 @@ class MethodologyTool:
                         indent=2,
                     )
 
-                PrettyOutput.auto_print(f"ℹ️ 方法论已保存到 {file_path}")
+                # 根据scope区分显示项目方法论或全局方法论
+                methodology_type = "项目" if scope == "project" else "全局"
+                PrettyOutput.auto_print(
+                    f"ℹ️ 已保存{methodology_type}方法论到 {file_path}"
+                )
 
                 action = "更新" if os.path.exists(file_path) else "添加"
                 return {
