@@ -1288,6 +1288,10 @@ class ToolRegistry(OutputHandlerProtocol):
                     ]
                     param_summary = " | ".join(cleaned_parts)
 
+            # 如果有want字段，先打印出Agent的意图
+            if want:
+                PrettyOutput.auto_print(f"💡 意图: {want}")
+
             # 合并为一行输出：执行工具调用和参数摘要
             if param_summary:
                 PrettyOutput.auto_print(f"🛠️ 执行工具调用 {name} [{param_summary}]")
