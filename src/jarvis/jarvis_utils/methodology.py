@@ -17,6 +17,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_central_methodology_repo
@@ -98,15 +99,15 @@ def _load_methodologies_from_dir(directory: str) -> Dict[str, str]:
     return all_methodologies
 
 
-def _load_all_methodologies() -> Dict[str, str]:
+def _load_all_methodologies() -> List[Tuple[str, str]]:
     """
     从默认目录和配置的外部目录加载所有方法论文件。
     项目级方法论优先级高于全局方法论。
 
     返回：
-        Dict[str, str]: 方法论字典，键为问题类型，值为方法论内容。
+        List[Tuple[str, str]]: 方法论列表，每个元素为(问题类型, 方法论内容)元组。
     """
-    all_methodologies: Dict[str, str] = {}
+    all_methodologies: List[Tuple[str, str]] = []
 
     # 优先加载项目级方法论
     project_methodology_dir = _get_project_methodology_directory()
@@ -157,16 +158,18 @@ def _load_all_methodologies() -> Dict[str, str]:
             warn_dirs.append(f"警告: 方法论目录不存在或不是一个目录: {directory}")
             continue
 
-        for filepath in glob.glob(os.path.join(directory, "*.json")):
+        for filepath in sorted(
+            glob.glob(os.path.join(directory, "*.json")),
+            key=os.path.getmtime,
+            reverse=True,
+        ):
             try:
                 with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
                     methodology = json.load(f)
                     problem_type = methodology.get("problem_type", "")
                     content = methodology.get("content", "")
                     if problem_type and content:
-                        if problem_type in all_methodologies:
-                            pass
-                        all_methodologies[problem_type] = content
+                        all_methodologies.append((problem_type, content))
             except Exception as e:
                 filename = os.path.basename(filepath)
                 error_lines.append(f"加载方法论文件 {filename} 失败: {str(e)}")
@@ -198,7 +201,6 @@ def load_methodology(
 
     prompt = tool_registery.prompt() if tool_registery else ""
 
-
     try:
         # 加载所有方法论
         PrettyOutput.auto_print("📁 加载方法论文件...")
@@ -218,7 +220,7 @@ def load_methodology(
         platform.set_suppress_output(True)
 
         # 步骤1：获取所有方法论的标题
-        methodology_titles = list(methodologies.keys())
+        methodology_titles = [title for title, _ in methodologies]
 
         # 步骤2：让大模型选择相关性高的方法论
         selection_prompt = """以下是所有可用的方法论标题：
@@ -267,7 +269,7 @@ def load_methodology(
             return "没有历史方法论可参考"
 
         # 解析选择的序号
-        selected_methodologies = {}
+        selected_methodologies = []
         try:
             if selected_indices_str:
                 indices = [
@@ -276,9 +278,8 @@ def load_methodology(
                     if idx.strip().isdigit()
                 ]
                 for idx in indices:
-                    if 1 <= idx <= len(methodology_titles):
-                        title = methodology_titles[idx - 1]
-                        selected_methodologies[title] = methodologies[title]
+                    if 1 <= idx <= len(methodologies):
+                        selected_methodologies.append(methodologies[idx - 1])
         except Exception:
             # 如果解析失败，返回空结果
             return "没有历史方法论可参考"
@@ -337,7 +338,7 @@ def load_methodology(
         selected_count = 0
         total_methodology_tokens = 0
 
-        for problem_type, content in selected_methodologies.items():
+        for problem_type, content in selected_methodologies:
             methodology_text = f"## {problem_type}\n\n{content}\n\n---\n\n"
             methodology_tokens = get_context_token_count(methodology_text)
 
