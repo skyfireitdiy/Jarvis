@@ -230,9 +230,6 @@ def quick_config(
                 json.dump(config, f, indent=2, ensure_ascii=False)
 
         PrettyOutput.auto_print(f"✅ 配置已保存到 {output_file}")
-        PrettyOutput.auto_print(
-            f"💡 现在可以使用 --llm-group 或 -g 参数指定 {config_name} 配置"
-        )
 
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 保存配置失败: {e}")
