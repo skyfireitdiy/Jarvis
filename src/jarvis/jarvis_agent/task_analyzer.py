@@ -6,8 +6,6 @@
 
 from typing import Any
 
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
-
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
@@ -176,8 +174,8 @@ class TaskAnalyzer:
         satisfaction_feedback: str = ""
 
         # 如果当前是 CodeAgent，跳过满意度收集
-        if isinstance(self.agent, CodeAgent):
-            return satisfaction_feedback
+        if self.agent.agent_type() == "code_agent":
+            return ""
 
         if not auto_completed and self.agent.use_analysis:
             if self.agent.confirm_callback("您对本次任务的完成是否满意？", True):
