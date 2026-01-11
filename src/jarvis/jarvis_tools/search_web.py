@@ -131,6 +131,9 @@ class SearchWebTool:
                 if abstract:
                     full_content += f"标题: {title}\n摘要: {abstract}\n\n"
 
+            # 首先计算一次内容长度限制（基于剩余token）
+            content_length_limit = calculate_content_length_limit(agent)
+
             # 然后抓取前10个URL的详细内容
             for r in results:
                 if visited_count >= 10:
@@ -145,9 +148,15 @@ class SearchWebTool:
                         response = http_get(url, timeout=10.0, allow_redirects=True)
                         content = md(response.text, strip=["script", "style"])
                         if content:
-                            # 根据剩余token动态计算内容长度限制
-                            content_length_limit = calculate_content_length_limit(agent)
-                            content_preview = content[:content_length_limit]
+                            # 计算剩余可用的内容长度限制
+                            remaining_limit = content_length_limit - len(full_content)
+                            # 如果剩余限制不足，跳过此URL
+                            if remaining_limit <= 0:
+                                PrettyOutput.auto_print(
+                                    f"⚠️ 内容长度已达限制，跳过: {url}"
+                                )
+                                continue
+                            content_preview = content[:remaining_limit]
                             full_content += (
                                 f"URL: {url}\n内容预览: {content_preview}\n\n"
                             )
