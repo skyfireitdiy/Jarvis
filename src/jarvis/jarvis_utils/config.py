@@ -75,15 +75,15 @@ def get_max_input_token_count(model_group_override: Optional[str] = None) -> int
     return int(config.get("max_input_token_count", "128000"))
 
 
-def calculate_content_length_limit(agent: Any = None) -> int:
+def calculate_content_token_limit(agent: Any = None) -> int:
     """
-    基于当前模型配置动态计算内容长度限制（字符数）
+    基于当前模型配置动态计算内容长度限制（token数）
 
     参数:
         agent: Agent实例，用于获取模型和剩余token数量
 
     返回:
-        int: 允许的最大字符数（基于剩余token计算，保留安全余量）
+        int: 允许的最大token数（基于剩余token计算，保留安全余量）
     """
     try:
         # 优先使用剩余token数量
@@ -91,13 +91,7 @@ def calculate_content_length_limit(agent: Any = None) -> int:
             try:
                 remaining_tokens = agent.model.get_remaining_token_count()
                 # 使用剩余token的2/3作为限制，保留1/3作为安全余量
-                # 粗略估算：1个token约等于4个字符（中文可能更少，但保守估计）
-                limit_tokens = int(remaining_tokens * 2 / 3)
-                # 转换为字符数（保守估计：1 token = 4 字符）
-                limit_chars = limit_tokens * 4
-                # 确保至少返回一个合理的值
-                if limit_chars > 0:
-                    return limit_chars
+                return int(remaining_tokens * 2 / 3)
             except Exception:
                 pass
 
@@ -107,13 +101,26 @@ def calculate_content_length_limit(agent: Any = None) -> int:
 
         model_group = get_global_model_group()
         max_input_tokens = get_max_input_token_count(model_group)
-        # 计算2/3限制的token数，然后转换为字符数
-        limit_tokens = int(max_input_tokens * 2 / 3)
-        limit_chars = limit_tokens * 4
-        return limit_chars
+        # 计算2/3限制的token数
+        return int(max_input_tokens * 2 / 3)
     except Exception:
-        # 如果所有方法都失败，返回默认值2000字符
-        return 2000
+        # 如果所有方法都失败，返回默认值500 token
+        return 500
+
+
+def calculate_content_length_limit(agent: Any = None) -> int:
+    """
+    基于当前模型配置动态计算内容长度限制（字符数）
+
+    参数:
+        agent: Agent实例，用于获取模型和剩余token数量
+
+    返回:
+        int: 允许的最大字符数（基于剩余token计算，保留安全余量）
+
+    注意：此函数已被 calculate_content_token_limit 替代，保留以保持向后兼容性
+    """
+    return calculate_content_token_limit(agent) * 4
 
 
 def get_cheap_max_input_token_count(model_group_override: Optional[str] = None) -> int:
