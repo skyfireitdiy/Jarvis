@@ -180,39 +180,6 @@ def _load_all_methodologies() -> Dict[str, str]:
     return all_methodologies
 
 
-def _create_methodology_temp_file(methodologies: Dict[str, str]) -> Optional[str]:
-    """
-    创建包含所有方法论的临时文件
-
-    参数：
-        methodologies: 方法论字典，键为问题类型，值为方法论内容
-
-    返回：
-        Optional[str]: 临时文件路径，如果创建失败则返回None
-    """
-    if not methodologies:
-        return None
-
-    try:
-        # 创建临时文件
-        fd, temp_path = tempfile.mkstemp(suffix=".md", prefix="methodologies_")
-        os.close(fd)
-
-        # 写入方法论内容
-        with open(temp_path, "w", encoding="utf-8") as f:
-            f.write("# 方法论集合\n\n")
-            for problem_type, content in methodologies.items():
-                f.write(f"## {problem_type}\n\n")
-                f.write(f"{content}\n\n")
-                f.write("---\n\n")
-            f.flush()
-
-        return temp_path
-    except Exception as e:
-        PrettyOutput.auto_print(f"❌ 创建方法论临时文件失败: {str(e)}")
-        return None
-
-
 def load_methodology(
     user_input: str,
     tool_registery: Optional[Any] = None,
