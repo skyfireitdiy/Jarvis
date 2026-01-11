@@ -69,41 +69,29 @@ class CodeAgent(Agent):
     负责处理代码分析、修改和git操作。
     """
 
-    def _init_basic_attributes(
+    def __init__(
         self,
-        model_group: Optional[str],
-        rule_names: Optional[str],
-        disable_review: bool,
-        review_max_iterations: int,
+        model_group: Optional[str] = None,
+        need_summary: bool = True,
+        append_tools: Optional[str] = None,
+        tool_group: Optional[str] = None,
+        non_interactive: Optional[bool] = True,
+        rule_names: Optional[str] = None,
+        disable_review: bool = False,
+        review_max_iterations: int = 0,
+        enable_task_list_manager: bool = True,
+        **kwargs: Any,
     ) -> None:
-        """初始化基本属性。
-
-        参数:
-            model_group: 模型组名称
-            rule_names: 规则名称列表
-            disable_review: 是否禁用review
-            review_max_iterations: review最大迭代次数
-        """
-        # 基本路径和配置
         self.root_dir = os.getcwd()
-        self.tool_group: Optional[str] = None
-
+        self.tool_group = tool_group
         # Review 相关配置
         # 注意：disable_review 仅保存配置值，实际是否执行 review 在运行时动态判断
-        self.disable_review = disable_review
+        self.disable_review = disable_review  # 保存用户配置的 disable_review 值
         self.review_max_iterations = review_max_iterations
 
         # 存储开始时的commit hash，用于后续git diff获取
         self.start_commit: Optional[str] = None
 
-        self.rule_names = rule_names
-
-    def _init_managers(self, enable_task_list_manager: bool) -> None:
-        """初始化所有管理器。
-
-        参数:
-            enable_task_list_manager: 是否启用任务列表管理器
-        """
         # 初始化上下文管理器
         self.context_manager = ContextManager(self.root_dir)
         # 上下文推荐器将在Agent创建后初始化（需要LLM模型）
@@ -113,7 +101,7 @@ class CodeAgent(Agent):
         self.rules_manager = RulesManager(self.root_dir)
 
         # 加载rules
-        _, self.loaded_rule_names = self.rules_manager.load_all_rules(self.rule_names)
+        _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
 
         self.git_manager = GitManager(self.root_dir)
         self.diff_manager = DiffManager(self.root_dir)
@@ -125,19 +113,6 @@ class CodeAgent(Agent):
 
         # 检测 git username 和 email 是否已设置
         self.git_manager.check_git_config()
-
-    def _init_tools(
-        self, append_tools: Optional[str], enable_task_list_manager: bool
-    ) -> list:
-        """初始化工具列表。
-
-        参数:
-            append_tools: 要追加的工具列表（逗号分隔）
-            enable_task_list_manager: 是否启用任务列表管理器
-
-        返回:
-            list: 工具列表
-        """
         base_tools = [
             "execute_script",
             "read_code",
@@ -160,33 +135,6 @@ class CodeAgent(Agent):
             base_tools.extend(additional_tools)
             # 去重
             base_tools = list(dict.fromkeys(base_tools))
-
-        return base_tools
-
-    def _prepare_parent_init_params(
-        self,
-        model_group: Optional[str],
-        need_summary: bool,
-        non_interactive: Optional[bool],
-        tool_group: Optional[str],
-        base_tools: list,
-        kwargs: Dict[str, Any],
-    ) -> tuple:
-        """准备父类初始化参数。
-
-        参数:
-            model_group: 模型组名称
-            need_summary: 是否需要总结
-            non_interactive: 是否非交互模式
-            tool_group: 工具组名称
-            base_tools: 基础工具列表
-            kwargs: 额外参数字典
-
-        返回:
-            tuple: (explicit_params, kwargs)
-        """
-        # 设置tool_group
-        self.tool_group = tool_group
 
         code_system_prompt = get_system_prompt()
 
@@ -217,10 +165,16 @@ class CodeAgent(Agent):
         for key in explicit_params:
             kwargs.pop(key, None)
 
-        return explicit_params, kwargs
+        super().__init__(
+            **explicit_params,
+            **kwargs,
+        )
 
-    def _init_context_recommender(self) -> None:
-        """初始化上下文推荐器（需要在父类初始化后执行）."""
+        self._agent_type = "code_agent"
+
+        # 建立CodeAgent与Agent的关联，便于工具获取上下文管理器
+        self._code_agent = self
+
         # 初始化上下文推荐器（自己创建LLM模型，使用父Agent的配置）
         try:
             # 获取当前Agent的model实例
@@ -237,65 +191,7 @@ class CodeAgent(Agent):
                 f"⚠️ 上下文推荐器初始化失败: {e}，将跳过上下文推荐功能"
             )
 
-    def _subscribe_events(self) -> None:
-        """订阅事件."""
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
-
-    def __init__(
-        self,
-        model_group: Optional[str] = None,
-        need_summary: bool = True,
-        append_tools: Optional[str] = None,
-        tool_group: Optional[str] = None,
-        non_interactive: Optional[bool] = True,
-        rule_names: Optional[str] = None,
-        disable_review: bool = False,
-        review_max_iterations: int = 0,
-        enable_task_list_manager: bool = True,
-        **kwargs: Any,
-    ) -> None:
-        """初始化CodeAgent。
-
-        参数:
-            model_group: 模型组名称
-            need_summary: 是否需要总结
-            append_tools: 要追加的工具列表（逗号分隔）
-            tool_group: 工具组名称
-            non_interactive: 是否非交互模式
-            rule_names: 规则名称列表
-            disable_review: 是否禁用review
-            review_max_iterations: review最大迭代次数
-            enable_task_list_manager: 是否启用任务列表管理器
-            **kwargs: 额外参数
-        """
-        # ========== 1. 初始化基本属性 ==========
-        self._init_basic_attributes(
-            model_group, rule_names, disable_review, review_max_iterations
-        )
-
-        # ========== 2. 初始化管理器 ==========
-        self._init_managers(enable_task_list_manager)
-
-        # ========== 3. 初始化工具列表 ==========
-        base_tools = self._init_tools(append_tools, enable_task_list_manager)
-
-        # ========== 4. 准备父类初始化参数 ==========
-        explicit_params, kwargs = self._prepare_parent_init_params(
-            model_group, need_summary, non_interactive, tool_group, base_tools, kwargs
-        )
-
-        # ========== 5. 调用父类初始化 ==========
-        super().__init__(**explicit_params, **kwargs)
-
-        # 设置Agent类型和引用
-        self._agent_type = "code_agent"
-        self._code_agent = self
-
-        # ========== 6. 初始化上下文推荐器（需要在父类初始化后） ==========
-        self._init_context_recommender()
-
-        # ========== 7. 订阅事件 ==========
-        self._subscribe_events()
 
     def get_rules_prompt(self) -> str:
         """
