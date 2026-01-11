@@ -232,7 +232,7 @@ class ConsoleOutputSink(OutputSink):
                 OutputType.WARNING: RichStyle(
                     color="gold3",
                     bold=True,
-                    blink2=True,
+                    blink=True,
                     bgcolor="#2b2b1c",
                     meta={"icon": "⚠️"},
                 ),
@@ -408,7 +408,7 @@ class ConsoleOutputSink(OutputSink):
             OutputType.WARNING: RichStyle(
                 color="gold3",
                 bold=True,
-                blink2=True,
+                blink=True,
                 bgcolor="#2b2b1c",
                 meta={"icon": "⚠️"},
             ),
