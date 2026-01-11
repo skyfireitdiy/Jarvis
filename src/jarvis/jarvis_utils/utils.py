@@ -940,19 +940,19 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
 def _interactive_config_setup(config_file_path: Path) -> None:
     """交互式配置引导
 
-    直接调用 jcfg 命令启动 Web 配置界面。
+    直接调用 jqc 命令进行快速配置。
     """
-    PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！正在启动 Web 配置界面...")
+    PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！正在启动快速配置程序...")
 
     try:
-        # 构建 jcfg 命令
-        cmd = ["jcfg", "--port", "9312", "--output", str(config_file_path)]
+        # 构建 jqc 命令
+        cmd = ["jqc", "--output", str(config_file_path)]
 
-        # 直接调用 jcfg 命令
+        # 直接调用 jqc 命令
         subprocess.run(cmd)
         sys.exit(0)
     except Exception as e:
-        PrettyOutput.auto_print(f"❌ 启动配置界面失败: {e}")
+        PrettyOutput.auto_print(f"❌ 启动配置程序失败: {e}")
         sys.exit(1)
 
 
