@@ -155,8 +155,12 @@ iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercon
 #### 手动安装
 
 ```bash
-# 1. 克隆仓库
+# 1. 克隆仓库（选择以下任一方式）
+# GitHub（推荐）
 git clone https://github.com/skyfireitdiy/Jarvis
+
+# 或者使用 Gitee 镜像（国内访问更快）
+git clone https://gitee.com/skyfireitdiy/Jarvis.git
 
 # 2. 进入项目目录
 cd Jarvis
@@ -179,8 +183,12 @@ pip3 install jarvis-ai-assistant
 # 1. 安装 uv (如果未安装)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. 克隆仓库
+# 2. 克隆仓库（选择以下任一方式）
+# GitHub（推荐）
 git clone https://github.com/skyfireitdiy/Jarvis
+
+# 或者使用 Gitee 镜像（国内访问更快）
+git clone https://gitee.com/skyfireitdiy/Jarvis.git
 
 # 3. 进入项目目录
 cd Jarvis
@@ -270,8 +278,13 @@ docker run -it --rm \
 **本地构建镜像（可选）：**
 
 ```bash
-# 克隆仓库
+# 克隆仓库（选择以下任一方式）
+# GitHub（推荐）
 git clone https://github.com/skyfireitdiy/Jarvis
+
+# 或者使用 Gitee 镜像（国内访问更快）
+git clone https://gitee.com/skyfireitdiy/Jarvis.git
+
 cd Jarvis
 
 # 构建镜像
@@ -548,7 +561,12 @@ Jarvis SDK 提供强大的可扩展能力，让您能够快速开发专业的AI�
 
 我们欢迎任何形式的贡献！
 
-1. Fork 本仓库
+Jarvis 在 GitHub 和 Gitee 都有镜像仓库，您可以选择其中任一平台进行贡献：
+
+- **GitHub**: https://github.com/skyfireitdiy/Jarvis
+- **Gitee**: https://gitee.com/skyfireitdiy/Jarvis.git
+
+1. Fork 本仓库（选择您偏好的平台）
 2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
