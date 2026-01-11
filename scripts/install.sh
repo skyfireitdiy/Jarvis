@@ -118,7 +118,7 @@ case "$choice" in
         echo "正在安装自动补全..."
 
         # 使用循环来安装所有工具的自动补全
-        tools=("jvs" "ja" "jca" "jcr" "jgc" "jgs" "jpm" "jma" "jt" "jm" "jss" "jst" "jmo")
+        tools=("jvs" "jvsd" "ja" "jca" "jcad" "jcr" "jgc" "jgs" "jsec" "jc2r" "jrg" "jpm" "jma" "jcfg" "jqc" "jt" "jm" "jss" "jst" "jmo")
         for tool in "${tools[@]}"; do
             echo "正在为 $tool 安装自动补全..."
             if "$tool" --install-completion > /dev/null 2>&1; then
