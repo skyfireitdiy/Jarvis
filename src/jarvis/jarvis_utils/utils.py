@@ -390,6 +390,57 @@ def _acquire_single_instance_lock(lock_name: str = "instance.lock") -> None:
         sys.exit(1)
 
 
+def _is_installed_via_uv_tool() -> bool:
+    """检测当前jarvis是否通过uv tool安装
+
+    返回:
+        bool: 如果是通过uv tool安装返回True
+    """
+    try:
+        # 检查sys.argv[0]是否在典型的uv tool安装目录
+        argv0_path = Path(sys.argv[0]).resolve()
+
+        # uv tool安装的典型路径
+        if sys.platform == "win32":
+            uv_tool_dirs = [
+                Path(os.environ.get("LOCALAPPDATA", "")) / "uv" / "bin",
+                Path(os.environ.get("APPDATA", "")) / "uv" / "bin",
+            ]
+        else:
+            uv_tool_dirs = [
+                Path.home() / ".local" / "bin",
+                Path.home() / ".local" / "share" / "uv" / "bin",
+            ]
+
+        # 检查是否在uv tool目录中
+        for uv_dir in uv_tool_dirs:
+            try:
+                if uv_dir.exists() and argv0_path.is_relative_to(uv_dir):
+                    # 进一步验证是否真的通过uv tool安装
+                    from shutil import which as _which
+
+                    uv_exe = _which("uv")
+                    if uv_exe:
+                        try:
+                            # 执行uv tool list验证
+                            result = subprocess.run(
+                                [uv_exe, "tool", "list"],
+                                capture_output=True,
+                                timeout=10,
+                                text=True,
+                            )
+                            if result.returncode == 0:
+                                if "jarvis-ai-assistant" in result.stdout.lower():
+                                    return True
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return False
+
+
 def _check_pip_updates() -> bool:
     """检查pip安装的Jarvis是否有更新
 
@@ -432,50 +483,85 @@ def _check_pip_updates() -> bool:
                 f"ℹ️ 检测到新版本 v{latest_version} (当前版本: v{__version__})"
             )
 
-            # 检测是否在虚拟环境中
-            hasattr(sys, "real_prefix") or (
-                hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
-            )
+            # 检测是否通过uv tool安装
+            is_uv_tool_install = _is_installed_via_uv_tool()
 
-            # 检测是否可用 uv（优先使用虚拟环境内的uv，其次PATH中的uv）
-            from shutil import which as _which
+            if is_uv_tool_install:
+                # 使用 uv tool upgrade 更新
+                from shutil import which as _which
 
-            uv_executable: Optional[str] = None
-            if sys.platform == "win32":
-                venv_uv = Path(sys.prefix) / "Scripts" / "uv.exe"
-            else:
-                venv_uv = Path(sys.prefix) / "bin" / "uv"
-            if venv_uv.exists():
-                uv_executable = str(venv_uv)
-            else:
-                path_uv = _which("uv")
-                if path_uv:
-                    uv_executable = path_uv
+                uv_exe = _which("uv")
+                if uv_exe:
+                    # 注意：uv tool upgrade 不支持额外参数，只升级基础包
+                    cmd_list = [uv_exe, "tool", "upgrade", "jarvis-ai-assistant"]
+                    update_cmd = "uv tool upgrade jarvis-ai-assistant"
+                    # RAG特性需要单独安装
+                    from jarvis.jarvis_utils.utils import (
+                        is_rag_installed as _is_rag_installed,
+                    )
 
-            # 检测是否安装了 RAG 特性（更精确）
-            from jarvis.jarvis_utils.utils import (
-                is_rag_installed as _is_rag_installed,
-            )  # 延迟导入避免潜在循环依赖
+                    rag_installed = _is_rag_installed()
+                    if rag_installed:
+                        update_cmd += " && pip install jarvis-ai-assistant[rag]"
+                else:
+                    # 如果找不到uv，回退到pip方式
+                    is_uv_tool_install = False
 
-            rag_installed = _is_rag_installed()
+            if not is_uv_tool_install:
+                # 检测是否在虚拟环境中
+                hasattr(sys, "real_prefix") or (
+                    hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+                )
 
-            # 更新命令
-            package_spec = (
-                "jarvis-ai-assistant[rag]" if rag_installed else "jarvis-ai-assistant"
-            )
-            if uv_executable:
-                cmd_list = [uv_executable, "pip", "install", "--upgrade", package_spec]
-                update_cmd = f"uv pip install --upgrade {package_spec}"
-            else:
-                cmd_list = [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "--upgrade",
-                    package_spec,
-                ]
-                update_cmd = f"{sys.executable} -m pip install --upgrade {package_spec}"
+                # 检测是否可用 uv（优先使用虚拟环境内的uv，其次PATH中的uv）
+                from shutil import which as _which
+
+                uv_executable: Optional[str] = None
+                if sys.platform == "win32":
+                    venv_uv = Path(sys.prefix) / "Scripts" / "uv.exe"
+                else:
+                    venv_uv = Path(sys.prefix) / "bin" / "uv"
+                if venv_uv.exists():
+                    uv_executable = str(venv_uv)
+                else:
+                    path_uv = _which("uv")
+                    if path_uv:
+                        uv_executable = path_uv
+
+                # 检测是否安装了 RAG 特性（更精确）
+                from jarvis.jarvis_utils.utils import (
+                    is_rag_installed as _is_rag_installed,
+                )  # 延迟导入避免潜在循环依赖
+
+                rag_installed = _is_rag_installed()
+
+                # 更新命令
+                package_spec = (
+                    "jarvis-ai-assistant[rag]"
+                    if rag_installed
+                    else "jarvis-ai-assistant"
+                )
+                if uv_executable:
+                    cmd_list = [
+                        uv_executable,
+                        "pip",
+                        "install",
+                        "--upgrade",
+                        package_spec,
+                    ]
+                    update_cmd = f"uv pip install --upgrade {package_spec}"
+                else:
+                    cmd_list = [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "--upgrade",
+                        package_spec,
+                    ]
+                    update_cmd = (
+                        f"{sys.executable} -m pip install --upgrade {package_spec}"
+                    )
 
             # 自动尝试升级（失败时提供手动命令）
             try:
