@@ -260,6 +260,10 @@ class Agent:
     model: BasePlatform
     session: SessionManager
 
+    def agent_type(self) -> str:
+        """获取Agent类型"""
+        return self._agent_type
+
     def clear_history(self) -> None:
         """
         Clears the current conversation history by delegating to the session manager.
