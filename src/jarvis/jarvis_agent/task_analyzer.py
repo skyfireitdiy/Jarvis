@@ -5,6 +5,7 @@
 """
 
 from typing import Any
+from typing import Optional
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
@@ -20,14 +21,16 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class TaskAnalyzer:
     """任务分析器，负责任务分析和满意度反馈处理"""
 
-    def __init__(self, agent: Any) -> None:
+    def __init__(self, agent: Any, analysis_prompt: Optional[str] = None) -> None:
         """
         初始化任务分析器
 
         参数:
             agent: Agent实例
+            analysis_prompt: 自定义分析提示词（可选，不传则使用默认提示词）
         """
         self.agent: Any = agent
+        self.analysis_prompt: Optional[str] = analysis_prompt
         self._analysis_done: bool = False
         # 旁路集成事件订阅，失败不影响主流程
         try:
@@ -62,6 +65,10 @@ class TaskAnalyzer:
 
     def _prepare_analysis_prompt(self, satisfaction_feedback: str) -> str:
         """准备分析提示"""
+        # 优先使用自定义分析提示词
+        if self.analysis_prompt:
+            return join_prompts([self.analysis_prompt, satisfaction_feedback])
+
         # 检查是否有 save_memory 工具（工具可用性）
         has_save_memory = False
         # 检查是否有 meta_agent 工具（原 generate_new_tool，自举式工具生成器）
