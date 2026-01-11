@@ -390,6 +390,10 @@ def get_task_analysis_prompt(
 
 注意：tool_code 参数推荐使用 ||| 或 ``` 分隔符包裹多行代码，直接换行无需转义，支持保留缩进。
 3. 方法论创建（如果需要创建新方法论）:
+判断标准：
+- 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope="project"
+- 如果方法论适用于任何项目（如通用流程、最佳实践、解决方案等），使用 scope="global" 或省略该参数（默认为global）
+
 {ot("TOOL_CALL")}
 {{
   "want": "添加/更新xxxx的方法论",
@@ -397,6 +401,7 @@ def get_task_analysis_prompt(
   "arguments": {{
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
+    "scope": "可选值：'project' 或 'global'（默认）。'project' 保存到项目目录（.jarvis/methodologies/），适用于项目特定的方法论；'global' 保存为全局方法论（用户数据目录），适用于任何项目的通用方法论",
     "content": |||
 方法论内容
 可以包含多行内容
@@ -420,6 +425,10 @@ def get_task_analysis_prompt(
 2. 工具创建（如果需要创建新工具）:
 注意：如果环境支持，请使用 meta_agent 工具创建/改进新工具；如果不支持，请提供完整的工具代码和说明，用户需要手动创建工具文件。
 3. 方法论创建（如果需要创建新方法论）:
+判断标准：
+- 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope="project"
+- 如果方法论适用于任何项目（如通用流程、最佳实践、解决方案等），使用 scope="global" 或省略该参数（默认为global）
+
 {ot("TOOL_CALL")}
 {{
   "want": "添加/更新xxxx的方法论",
@@ -427,6 +436,7 @@ def get_task_analysis_prompt(
   "arguments": {{
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
+    "scope": "可选值：'project' 或 'global'（默认）。'project' 保存到项目目录（.jarvis/methodologies/），适用于项目特定的方法论；'global' 保存为全局方法论（用户数据目录），适用于任何项目的通用方法论",
     "content": |||
 方法论内容
 可以包含多行内容
