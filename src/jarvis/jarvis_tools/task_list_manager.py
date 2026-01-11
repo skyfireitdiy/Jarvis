@@ -725,12 +725,20 @@ class task_list_manager:
                 table.add_column("任务ID", style="cyan", width=12)
                 table.add_column("任务名称", style="yellow", width=30)
                 table.add_column("状态", style="bold", width=12)
-                table.add_column("优先级", justify="center", width=8)
                 table.add_column("Agent类型", width=10)
                 table.add_column("依赖", width=12)
 
-                # 按优先级排序（优先级高的在前），相同优先级按创建时间排序
-                sorted_tasks = sorted(tasks, key=lambda t: (-t.priority, t.create_time))
+                # 按task_id数字部分升序排序
+                def extract_task_number(task_id: str) -> int:
+                    """从task_id中提取数字部分"""
+                    try:
+                        return int(task_id.split("-")[1])
+                    except (IndexError, ValueError):
+                        return 999999
+
+                sorted_tasks = sorted(
+                    tasks, key=lambda t: extract_task_number(t.task_id)
+                )
 
                 # 状态颜色映射
                 status_colors = {
@@ -758,7 +766,6 @@ class task_list_manager:
                         if len(task.task_name) > 30
                         else task.task_name,
                         status_text,
-                        str(task.priority),
                         task.agent_type.value,
                         deps_text if task.dependencies else "-",
                     )
@@ -846,7 +853,6 @@ class task_list_manager:
             {{
                 "task_name": "任务1",
                 "task_desc": "任务1描述",
-                "priority": 1,
                 "expected_output": "任务1预期输出",
                 "agent_type": "main",
                 "dependencies": []
@@ -854,7 +860,6 @@ class task_list_manager:
             {{
                 "task_name": "任务2",
                 "task_desc": "任务2描述",
-                "priority": 2,
                 "expected_output": "任务2预期输出",
                 "agent_type": "sub",
                 "dependencies": ["任务1"]
@@ -977,10 +982,6 @@ class task_list_manager:
                                 "type": "string",
                                 "description": "任务描述。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
                             },
-                            "priority": {
-                                "type": "integer",
-                                "description": "优先级（1-5，5为最高）",
-                            },
                             "expected_output": {
                                 "type": "string",
                                 "description": "预期输出。**必须使用分条列出的结构化格式**，例如：1) xxx；2) yyy；3) zzz，或使用 markdown 列表 - xxx、- yyy、- zzz。后续验证 Agent 会对每一条预期输出条目分别进行验证。",
@@ -999,7 +1000,6 @@ class task_list_manager:
                         "required": [
                             "task_name",
                             "task_desc",
-                            "priority",
                             "expected_output",
                             "agent_type",
                         ],
@@ -1029,10 +1029,6 @@ class task_list_manager:
                         "task_desc": {
                             "type": "string",
                             "description": "更新后的任务描述（可选）。**必须包含以下信息**：1) **约束条件**：明确任务执行的技术约束、环境限制、性能要求等；2) **必须要求**：明确任务必须完成的具体要求、必须遵循的规范、必须实现的功能等；3) **禁止事项**：明确任务执行中禁止的操作、禁止使用的技术、禁止修改的内容等；4) **验证标准**：明确任务完成的验证方式、验收标准、测试要求等。任务描述应该清晰、具体、可执行。",
-                        },
-                        "priority": {
-                            "type": "integer",
-                            "description": "更新后的优先级（可选，1-5）",
                         },
                         "expected_output": {
                             "type": "string",
@@ -1996,7 +1992,6 @@ class task_list_manager:
 🎯 **任务信息**
    任务ID: {task_id}
    任务名称: {task.task_name}
-   优先级: {task.priority}/5
    完成时间: {completion_time}
 
 📊 **执行结果**
@@ -2483,16 +2478,6 @@ class task_list_manager:
             if "task_desc" in task_update_info:
                 new_desc = task_update_info["task_desc"]
                 update_kwargs["task_desc"] = new_desc
-
-            if "priority" in task_update_info:
-                new_priority = task_update_info["priority"]
-                if not isinstance(new_priority, int):
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"priority 必须是整数类型: {type(new_priority).__name__}",
-                    }
-                update_kwargs["priority"] = new_priority
 
             if "expected_output" in task_update_info:
                 update_kwargs["expected_output"] = task_update_info["expected_output"]

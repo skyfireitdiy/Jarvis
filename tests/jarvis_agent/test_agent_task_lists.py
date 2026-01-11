@@ -83,7 +83,6 @@ class TestAgentTaskLists:
         task_info = {
             "task_name": "Test Task",
             "task_desc": "Test task description",
-            "priority": 1,
             "expected_output": "Test expected output",
             "agent_type": "main",
         }
@@ -138,7 +137,6 @@ class TestAgentTaskLists:
         restored_task = list(restored_task_list.tasks.values())[0]
         assert restored_task.task_name == "Test Task"
         assert restored_task.task_desc == "Test task description"
-        assert restored_task.priority == 1
         assert restored_task.expected_output == "Test expected output"
         assert restored_task.agent_type == AgentType.MAIN
 
@@ -162,7 +160,6 @@ class TestAgentTaskLists:
         task_info1 = {
             "task_name": "Test Task 1",
             "task_desc": "Test task description 1",
-            "priority": 1,
             "expected_output": "Test expected output 1",
             "agent_type": "main",
         }
@@ -180,7 +177,6 @@ class TestAgentTaskLists:
         task_info2 = {
             "task_name": "Test Task 2",
             "task_desc": "Test task description 2",
-            "priority": 2,
             "expected_output": "Test expected output 2",
             "agent_type": "sub",
         }
@@ -243,7 +239,6 @@ class TestAgentTaskLists:
         task_info1 = {
             "task_name": "Test Task 1",
             "task_desc": "Test task description 1",
-            "priority": 1,
             "expected_output": "Test expected output 1",
             "agent_type": "main",
         }
@@ -256,7 +251,6 @@ class TestAgentTaskLists:
         task_info2 = {
             "task_name": "Test Task 2",
             "task_desc": "Test task description 2",
-            "priority": 2,
             "expected_output": "Test expected output 2",
             "agent_type": "main",
             "dependencies": [task_id1],  # 依赖任务1
@@ -337,7 +331,6 @@ class TestAgentTaskLists:
         task_info = {
             "task_name": "Test Task",
             "task_desc": "Test task description",
-            "priority": 1,
             "expected_output": "Test expected output",
             "agent_type": "main",
         }

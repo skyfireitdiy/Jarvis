@@ -50,7 +50,6 @@ class Task:
     task_id: str
     task_name: str
     task_desc: str
-    priority: int
     status: TaskStatus
     expected_output: str
     agent_type: AgentType
@@ -71,10 +70,6 @@ class Task:
             int(self.task_id[5:])  # 提取task-后面的数字部分
         except ValueError:
             raise ValueError(f"task_id 格式错误: {self.task_id}")
-
-        # 验证 priority 为整数类型
-        if not isinstance(self.priority, int):
-            raise ValueError(f"priority 必须是整数类型: {type(self.priority).__name__}")
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典。"""
@@ -372,7 +367,6 @@ class TaskListManager:
                 required_fields = [
                     "task_name",
                     "task_desc",
-                    "priority",
                     "expected_output",
                     "agent_type",
                 ]
@@ -390,7 +384,6 @@ class TaskListManager:
                     task_id=task_id,
                     task_name=task_info["task_name"],
                     task_desc=task_info["task_desc"],
-                    priority=task_info["priority"],
                     status=TaskStatus.PENDING,
                     expected_output=task_info["expected_output"],
                     agent_type=AgentType(task_info["agent_type"]),
@@ -442,7 +435,6 @@ class TaskListManager:
                 required_fields = [
                     "task_name",
                     "task_desc",
-                    "priority",
                     "expected_output",
                     "agent_type",
                 ]
@@ -477,7 +469,6 @@ class TaskListManager:
                         task_id=task_id,
                         task_name=task_name,
                         task_desc=task_info["task_desc"],
-                        priority=task_info["priority"],
                         status=TaskStatus.PENDING,
                         expected_output=task_info["expected_output"],
                         agent_type=AgentType(task_info["agent_type"]),
@@ -678,8 +669,15 @@ class TaskListManager:
             if not ready_tasks:
                 return None, "暂无满足依赖条件的待执行任务"
 
-            # 按优先级排序（优先级高的在前），相同优先级按创建时间排序
-            ready_tasks.sort(key=lambda t: (-t.priority, t.create_time))
+            # 按task_id数字部分升序排序
+            def extract_task_number(task_id: str) -> int:
+                """从task_id中提取数字部分"""
+                try:
+                    return int(task_id.split("-")[1])
+                except (IndexError, ValueError):
+                    return 999999
+
+            ready_tasks.sort(key=lambda t: extract_task_number(t.task_id))
 
             return ready_tasks[0], None
 
@@ -860,7 +858,6 @@ class TaskListManager:
                         "task_name": t.task_name,
                         "task_desc": t.task_desc,
                         "status": t.status.value,
-                        "priority": t.priority,
                         "agent_type": t.agent_type.value,
                         "dependencies": t.dependencies,
                         "actual_output": t.actual_output,
