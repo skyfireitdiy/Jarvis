@@ -286,21 +286,22 @@ def load_methodology(
         if not selected_methodologies:
             return "没有历史方法论可参考"
 
-        # 优先使用剩余token数量，回退到输入窗口限制
+        # 获取模型上下文窗口大小，用于限制方法论内容
         methodology_token_limit = None
         try:
-            remaining_tokens = platform.get_remaining_token_count()
-            # 使用剩余token的2/3作为限制，保留1/3作为安全余量
-            methodology_token_limit = int(remaining_tokens * 2 / 3)
+            # 直接获取模型的最大输入token数（上下文窗口）
+            max_input_tokens = platform._get_platform_max_input_token_count()
+            # 使用上下文窗口的0.75作为方法论限制，保留0.25作为安全余量
+            methodology_token_limit = int(max_input_tokens * 0.75)
             if methodology_token_limit <= 0:
                 methodology_token_limit = None
         except Exception:
             pass
 
-        # 回退方案：使用输入窗口的2/3（方法论使用cheap模型）
+        # 回退方案：使用cheap模型的输入窗口限制
         if methodology_token_limit is None:
             max_input_tokens = get_cheap_max_input_token_count()
-            methodology_token_limit = int(max_input_tokens * 2 / 3)
+            methodology_token_limit = int(max_input_tokens * 0.75)
 
         # 步骤3：将选择出来的方法论内容提供给大模型生成步骤
         # 首先构建基础提示词部分
