@@ -107,6 +107,28 @@ def quick_config(
         f"✅ 已选择 {len(selected_models)} 个模型: {', '.join(selected_models)}"
     )
 
+    # 选择默认模型
+    if len(selected_models) == 1:
+        default_model = selected_models[0]
+        PrettyOutput.auto_print(f"🎯 默认模型: {default_model}")
+    else:
+        console.print("[bold]请选择默认模型:[/]")
+        for i, model in enumerate(selected_models, 1):
+            console.print(f"  {i}. {model}")
+
+        default_choice = Prompt.ask("请输入默认模型序号")
+        try:
+            default_idx = int(default_choice.strip()) - 1
+            if 0 <= default_idx < len(selected_models):
+                default_model = selected_models[default_idx]
+                PrettyOutput.auto_print(f"🎯 默认模型: {default_model}")
+            else:
+                PrettyOutput.auto_print(f"❌ 无效的模型序号: {default_choice}")
+                raise typer.Exit(code=1)
+        except ValueError:
+            PrettyOutput.auto_print("❌ 请输入有效的数字序号")
+            raise typer.Exit(code=1)
+
     # 设置默认输出文件
     if output_file is None:
         jarvis_dir = Path.home() / ".jarvis"
@@ -132,6 +154,10 @@ def quick_config(
     # 初始化llms部分
     if "llms" not in config:
         config["llms"] = {}
+
+    # 初始化llm_groups部分
+    if "llm_groups" not in config:
+        config["llm_groups"] = {}
 
     # 为每个选择的模型创建配置
     for i, model in enumerate(selected_models):
@@ -171,7 +197,22 @@ def quick_config(
         # 添加模型配置
         config["llms"][model_config_name] = llm_config
 
+        # 如果是默认模型，创建llm_groups配置
+        if model == default_model:
+            # 使用模型名称作为组名，替换特殊字符
+            group_name = model.replace(".", "_").replace("-", "_")
+            # 创建模型组配置
+            config["llm_groups"][group_name] = {"normal_llm": model_config_name}
+            PrettyOutput.auto_print(
+                f"✅ 已创建模型组 '{group_name}'，使用 {model_config_name} 作为默认模型"
+            )
+
     PrettyOutput.auto_print(f"✅ 已为 {len(selected_models)} 个模型创建配置")
+
+    # 设置默认模型组
+    default_group_name = default_model.replace(".", "_").replace("-", "_")
+    config["llm_group"] = default_group_name
+    PrettyOutput.auto_print(f"✅ 已设置默认模型组为 '{default_group_name}'")
 
     # 保存配置文件
     try:
