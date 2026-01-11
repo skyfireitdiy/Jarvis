@@ -757,42 +757,10 @@ class ToolRegistry(OutputHandlerProtocol):
             Optional[str]: 修复后的内容，如果修复失败则返回None
         """
         try:
-            from jarvis.jarvis_agent import Agent
+            from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
 
-            agent_instance: Agent = agent
-
-            # 获取工具使用说明
-            tool_usage = agent_instance.get_tool_usage_prompt()
-
-            # 构建修复提示
-            fix_prompt = f"""你之前的工具调用格式有误，请根据工具使用说明修复以下内容。
-
-**错误信息：**
-{error_msg}
-
-**工具使用说明：**
-{tool_usage}
-
-**错误的工具调用内容：**
-{content}
-
-请修复上述工具调用内容，确保：
-1. 包含完整的 {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 标签
-2. JSON格式正确，包含 name、arguments、want 三个字段
-3. 如果使用多行字符串，推荐使用 ||| 或 ``` 分隔符包裹
-
-请直接返回修复后的完整工具调用内容，不要添加其他说明文字。"""
-
-            # 调用大模型修复
-            PrettyOutput.auto_print("🤖 尝试使用大模型修复工具调用格式...")
-            fixed_content = agent_instance.model.chat_until_success(fix_prompt)
-
-            if fixed_content:
-                PrettyOutput.auto_print("✅ 大模型修复完成")
-                return fixed_content
-            else:
-                PrettyOutput.auto_print("❌ 大模型修复失败：返回内容为空")
-                return None
+            # 调用公共函数进行修复
+            return fix_tool_call_with_llm(content, agent, error_msg)
 
         except Exception as e:
             PrettyOutput.auto_print(f"❌ 大模型修复失败：{str(e)}")

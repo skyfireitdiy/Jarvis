@@ -586,10 +586,30 @@ class AgentRunLoop:
                     else:
                         # 没有工具调用，增加计数器
                         ag._no_tool_call_count += 1
-                        # 如果连续3次没有工具调用，发送工具使用提示
-                        if ag._no_tool_call_count >= 3:
-                            tool_usage_prompt = ag.get_tool_usage_prompt()
-                            ag.set_addon_prompt(tool_usage_prompt)
+                        # 如果连续5次没有工具调用，尝试使用大模型修复
+                        if ag._no_tool_call_count >= 5:
+                            from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
+
+                            error_msg = (
+                                "连续5次对话没有工具调用，请使用工具来完成你的任务"
+                            )
+                            PrettyOutput.auto_print(f"⚠️ {error_msg}")
+
+                            # 尝试使用大模型修复
+                            fixed_content = fix_tool_call_with_llm(
+                                current_response, ag, error_msg
+                            )
+
+                            if fixed_content:
+                                # 修复成功，将修复后的内容加入prompt
+                                ag.session.addon_prompt = join_prompts(
+                                    [ag.session.addon_prompt, fixed_content]
+                                )
+                            else:
+                                # 修复失败，发送工具使用提示
+                                tool_usage_prompt = ag.get_tool_usage_prompt()
+                                ag.set_addon_prompt(tool_usage_prompt)
+
                             # 重置计数器，避免重复添加
                             ag._no_tool_call_count = 0
 
