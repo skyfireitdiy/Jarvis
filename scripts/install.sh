@@ -43,8 +43,10 @@ else
 fi
 echo "发现 uv: $(uv --version)"
 
-# Define repo URL and destination directory
-REPO_URL="https://github.com/skyfireitdiy/Jarvis.git"
+# Define repo URLs and destination directory
+# 优先尝试 Gitee 镜像（国内访问更快），失败后回退到 GitHub
+GITEE_URL="https://gitee.com/skyfireitdiy/Jarvis.git"
+GITHUB_URL="https://github.com/skyfireitdiy/Jarvis.git"
 DEST_DIR="$HOME/Jarvis"
 VENV_DIR="$DEST_DIR/.venv"
 
@@ -71,7 +73,21 @@ if [ -d "$DEST_DIR" ]; then
     fi
 else
     echo "正在克隆仓库到 $DEST_DIR..."
-    git clone "$REPO_URL" "$DEST_DIR"
+    # 临时禁用 set -e 以允许降级重试
+    set +e
+    if git clone "$GITEE_URL" "$DEST_DIR"; then
+        echo "✓ Gitee 镜像克隆成功"
+    else
+        echo "✗ Gitee 镜像克隆失败，尝试从 GitHub 克隆..."
+        if git clone "$GITHUB_URL" "$DEST_DIR"; then
+            echo "✓ GitHub 克隆成功"
+        else
+            echo "✗ GitHub 克隆也失败，请检查网络连接或手动下载"
+            set -e
+            exit 1
+        fi
+    fi
+    set -e
 fi
 
 echo -e "\n--- 3. 设置虚拟环境并安装 Jarvis ---"
