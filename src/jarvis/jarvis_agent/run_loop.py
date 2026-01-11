@@ -56,6 +56,25 @@ class AgentRunLoop:
         from jarvis.jarvis_utils.tag import ct
         from jarvis.jarvis_utils.tag import ot
 
+        # 如果</TOOL_CALL>出现在响应的末尾，但是前面没有换行符，自动插入一个换行符进行修复（忽略大小写）
+        close_tag = ct("TOOL_CALL")
+        close_tag_pattern = re.escape(close_tag)
+        match = re.search(rf"{close_tag_pattern}$", response.rstrip(), re.IGNORECASE)
+        if match:
+            pos = match.start()
+            if pos > 0 and response[pos - 1] not in ("\n", "\r"):
+                response = response[:pos] + "\n" + response[pos:]
+
+        # 如果有开始标签但没有结束标签，自动补全结束标签（与registry逻辑一致）
+        has_open = (
+            re.search(rf"(?mi)^{re.escape(ot('TOOL_CALL'))}", response) is not None
+        )
+        has_close = (
+            re.search(rf"(?mi)^{re.escape(ct('TOOL_CALL'))}", response) is not None
+        )
+        if has_open and not has_close:
+            response = response.strip() + f"\n{ct('TOOL_CALL')}"
+
         # 使用正则表达式移除所有工具调用块
         # 匹配起始标签（ot('TOOL_CALL')）和结束标签（ct('TOOL_CALL')）
         # 结束标签必须在行首（使用 ^ 锚点）
