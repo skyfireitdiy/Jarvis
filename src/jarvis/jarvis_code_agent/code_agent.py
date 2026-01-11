@@ -36,6 +36,8 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_smart_model_name
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
+from jarvis.jarvis_utils.config import is_use_analysis
+from jarvis.jarvis_utils.config import is_use_methodology
 from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.git_utils import detect_large_code_deletion
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
@@ -136,9 +138,10 @@ class CodeAgent(Agent):
         code_system_prompt = get_system_prompt()
 
         # 调用父类 Agent 的初始化
-        # 默认禁用方法论和分析，但允许通过 kwargs 覆盖
-        use_methodology = kwargs.pop("use_methodology", False)
-        use_analysis = kwargs.pop("use_analysis", False)
+        # 从配置文件读取默认值，允许通过 kwargs 覆盖
+        # 如果 kwargs 中未指定，则从配置文件读取默认值
+        use_methodology = kwargs.pop("use_methodology", is_use_methodology())
+        use_analysis = kwargs.pop("use_analysis", is_use_analysis())
         # name 使用传入的值，如果没有传入则使用默认值 "CodeAgent"
         name = kwargs.pop("name", "CodeAgent")
 
