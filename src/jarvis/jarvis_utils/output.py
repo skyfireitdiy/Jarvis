@@ -107,6 +107,13 @@ class OutputType(Enum):
         DEBUG: 调试信息
         USER: 用户输入
         TOOL: 工具调用
+        START: 任务开始
+        TARGET: 目标任务
+        STOP: 任务停止
+        RETRY: 重试操作
+        ROLLBACK: 回滚操作
+        DIRECTORY: 目录相关
+        STATISTICS: 统计信息
     """
 
     SYSTEM = "SYSTEM"
@@ -121,6 +128,13 @@ class OutputType(Enum):
     DEBUG = "DEBUG"
     USER = "USER"
     TOOL = "TOOL"
+    START = "START"
+    TARGET = "TARGET"
+    STOP = "STOP"
+    RETRY = "RETRY"
+    ROLLBACK = "ROLLBACK"
+    DIRECTORY = "DIRECTORY"
+    STATISTICS = "STATISTICS"
 
 
 @dataclass
@@ -241,6 +255,53 @@ class ConsoleOutputSink(OutputSink):
                     frame=True,
                     meta={"icon": "🔧"},
                 ),
+                OutputType.START: RichStyle(
+                    color="bright_blue",
+                    bold=True,
+                    frame=True,
+                    bgcolor="#1c2b3c",
+                    meta={"icon": "🚀"},
+                ),
+                OutputType.TARGET: RichStyle(
+                    color="bright_magenta",
+                    bold=True,
+                    frame=True,
+                    bgcolor="#2b1c3c",
+                    meta={"icon": "🎯"},
+                ),
+                OutputType.STOP: RichStyle(
+                    color="red",
+                    bold=True,
+                    frame=True,
+                    bgcolor="#3c1c1c",
+                    meta={"icon": "🛑"},
+                ),
+                OutputType.RETRY: RichStyle(
+                    color="yellow",
+                    bold=True,
+                    frame=True,
+                    bgcolor="#3c2b1c",
+                    meta={"icon": "🔄"},
+                ),
+                OutputType.ROLLBACK: RichStyle(
+                    color="dark_red",
+                    bold=True,
+                    frame=True,
+                    bgcolor="#3c1c1c",
+                    meta={"icon": "🔙"},
+                ),
+                OutputType.DIRECTORY: RichStyle(
+                    color="bright_cyan",
+                    frame=True,
+                    bgcolor="#1c2b2b",
+                    meta={"icon": "📁"},
+                ),
+                OutputType.STATISTICS: RichStyle(
+                    color="bright_blue",
+                    frame=True,
+                    bgcolor="#1c1c3c",
+                    meta={"icon": "📊"},
+                ),
             }
             style_obj = style_config.get(event.output_type, RichStyle(color="white"))
             text = Text(f"\n{event.section}\n", style=style_obj, justify="center")
@@ -271,6 +332,13 @@ class ConsoleOutputSink(OutputSink):
             OutputType.DEBUG: "grey50",
             OutputType.USER: "dark_sea_green",
             OutputType.TOOL: "dark_olive_green",
+            OutputType.START: "bright_blue",
+            OutputType.TARGET: "bright_magenta",
+            OutputType.STOP: "red",
+            OutputType.RETRY: "yellow",
+            OutputType.ROLLBACK: "dark_red",
+            OutputType.DIRECTORY: "bright_cyan",
+            OutputType.STATISTICS: "bright_blue",
         }
 
         # 背景色映射（保持原有定义）
@@ -356,6 +424,53 @@ class ConsoleOutputSink(OutputSink):
                 frame=True,
                 meta={"icon": "🔧"},
             ),
+            OutputType.START: RichStyle(
+                color="bright_blue",
+                bold=True,
+                frame=True,
+                bgcolor="#1c2b3c",
+                meta={"icon": "🚀"},
+            ),
+            OutputType.TARGET: RichStyle(
+                color="bright_magenta",
+                bold=True,
+                frame=True,
+                bgcolor="#2b1c3c",
+                meta={"icon": "🎯"},
+            ),
+            OutputType.STOP: RichStyle(
+                color="red",
+                bold=True,
+                frame=True,
+                bgcolor="#3c1c1c",
+                meta={"icon": "🛑"},
+            ),
+            OutputType.RETRY: RichStyle(
+                color="yellow",
+                bold=True,
+                frame=True,
+                bgcolor="#3c2b1c",
+                meta={"icon": "🔄"},
+            ),
+            OutputType.ROLLBACK: RichStyle(
+                color="dark_red",
+                bold=True,
+                frame=True,
+                bgcolor="#3c1c1c",
+                meta={"icon": "🔙"},
+            ),
+            OutputType.DIRECTORY: RichStyle(
+                color="bright_cyan",
+                frame=True,
+                bgcolor="#1c2b2b",
+                meta={"icon": "📁"},
+            ),
+            OutputType.STATISTICS: RichStyle(
+                color="bright_blue",
+                frame=True,
+                bgcolor="#1c1c3c",
+                meta={"icon": "📊"},
+            ),
         }
 
         Text(
@@ -438,6 +553,13 @@ class PrettyOutput:
         OutputType.DEBUG: "🔍",
         OutputType.USER: "👤",
         OutputType.TOOL: "🔧",
+        OutputType.START: "🚀",
+        OutputType.TARGET: "🎯",
+        OutputType.STOP: "🛑",
+        OutputType.RETRY: "🔄",
+        OutputType.ROLLBACK: "🔙",
+        OutputType.DIRECTORY: "📁",
+        OutputType.STATISTICS: "📊",
     }
     # 语法高亮的语言映射
     _lang_map = {
@@ -640,6 +762,14 @@ class PrettyOutput:
             "✨": OutputType.RESULT,
             "👤": OutputType.USER,
             "🔧": OutputType.TOOL,
+            "🚀": OutputType.START,
+            "🎯": OutputType.TARGET,
+            "🛑": OutputType.STOP,
+            "🔄": OutputType.RETRY,
+            "🔙": OutputType.ROLLBACK,
+            "📁": OutputType.DIRECTORY,
+            "📂": OutputType.DIRECTORY,
+            "📊": OutputType.STATISTICS,
         }
 
         # 检测emoji前缀
