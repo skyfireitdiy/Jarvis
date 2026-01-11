@@ -55,7 +55,7 @@ if (-not $uvCommand) {
 Write-Host "Found uv: $(uv --version)"
 
 # Define repo URL and destination directory
-$REPO_URL = "https://github.com/skyfireitdiy/Jarvis"
+$REPO_URL = "https://github.com/skyfireitdiy/Jarvis.git"
 $DEST_DIR = "$env:USERPROFILE\Jarvis"
 $VENV_DIR = "$DEST_DIR\.venv"
 

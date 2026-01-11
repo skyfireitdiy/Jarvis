@@ -44,7 +44,7 @@ fi
 echo "发现 uv: $(uv --version)"
 
 # Define repo URL and destination directory
-REPO_URL="https://github.com/skyfireitdiy/Jarvis"
+REPO_URL="https://github.com/skyfireitdiy/Jarvis.git"
 DEST_DIR="$HOME/Jarvis"
 VENV_DIR="$DEST_DIR/.venv"
 

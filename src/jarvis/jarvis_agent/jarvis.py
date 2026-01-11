@@ -1143,7 +1143,7 @@ def run_cli(
 
     # 初始化环境
     init_env(
-        """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！\nGitHub: https://github.com/skyfireitdiy/Jarvis\nGitee: https://gitee.com/skyfireitdiy/Jarvis.git""",
+        """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！\nGitHub: https://github.com/skyfireitdiy/Jarvis.git\nGitee: https://gitee.com/skyfireitdiy/Jarvis.git""",
         config_file=config_file,
     )
 
