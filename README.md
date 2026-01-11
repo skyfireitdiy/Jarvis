@@ -141,13 +141,21 @@ Jarvis 正是为这种工作流而设计的工具。它通过无缝的命令行�
 **Linux/macOS:**
 
 ```bash
+# GitHub（推荐）
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.sh)"
+
+# 或者使用 Gitee 镜像（国内访问更快）
+bash -c "$(curl -fsSL https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/install.sh)"
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
+# GitHub（推荐）
 iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/skyfireitdiy/Jarvis/main/scripts/install.ps1'))
+
+# 或者使用 Gitee 镜像（国内访问更快）
+iex ((New-Object System.Net.WebClient).DownloadString('https://gitee.com/skyfireitdiy/Jarvis/raw/main/scripts/install.ps1'))
 ```
 
 > 该脚本会自动检测Python环境、克隆项目、安装依赖并设置好路径。
