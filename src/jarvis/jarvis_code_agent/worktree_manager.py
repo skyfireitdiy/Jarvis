@@ -11,11 +11,11 @@ import subprocess
 from datetime import datetime
 from typing import Optional
 
+from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.git_utils import (
     has_uncommitted_changes,
-    handle_commit_workflow,
 )
 
 
@@ -45,10 +45,11 @@ class WorktreeManager:
             if has_uncommitted_changes():
                 PrettyOutput.auto_print("⚠️  检测到主仓库有未提交的更改")
                 PrettyOutput.auto_print("🔄 自动提交主仓库更改...")
-                if handle_commit_workflow():
-                    PrettyOutput.auto_print("✅ 已自动提交主仓库更改")
-                else:
-                    PrettyOutput.auto_print("⚠️  自动提交失败，可能影响 worktree 创建")
+                git_commiter = GitCommitTool()
+                git_commiter.execute({
+                    "root_dir": self.repo_root,
+                })
+                PrettyOutput.auto_print("✅ 已自动提交主仓库更改")
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  自动提交过程中出错: {str(e)}")
 
