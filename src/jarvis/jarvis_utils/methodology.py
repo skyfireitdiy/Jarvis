@@ -26,6 +26,30 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_methodology_dirs
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.utils import daily_check_git_updates
+from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
+
+
+def _get_project_methodology_directory() -> Optional[str]:
+    """
+    获取项目级方法论目录路径，如果不在Git仓库中则返回None
+
+    返回：
+        Optional[str]: 项目级方法论目录的路径，如果不在Git仓库中则返回None
+    """
+    try:
+        # 获取Git仓库根目录
+        git_root = find_git_root_and_cd(".")
+        methodology_dir = os.path.join(git_root, ".jarvis", "methodologies")
+        if not os.path.exists(methodology_dir):
+            try:
+                os.makedirs(methodology_dir, exist_ok=True)
+            except Exception as e:
+                PrettyOutput.auto_print(f"❌ 创建项目级方法论目录失败: {str(e)}")
+                return None
+        return methodology_dir
+    except Exception:
+        # 如果不是Git仓库或获取失败，返回None
+        return None
 
 
 def _get_methodology_directory() -> str:
@@ -44,15 +68,56 @@ def _get_methodology_directory() -> str:
     return methodology_dir
 
 
-def _load_all_methodologies() -> Dict[str, str]:
+def _load_methodologies_from_dir(directory: str) -> Dict[str, str]:
     """
-    从默认目录和配置的外部目录加载所有方法论文件。
+    从指定目录加载所有方法论文件。
+
+    参数：
+        directory: 方法论目录路径
 
     返回：
         Dict[str, str]: 方法论字典，键为问题类型，值为方法论内容。
     """
-    all_methodologies = {}
-    methodology_dirs = [_get_methodology_directory()] + get_methodology_dirs()
+    all_methodologies: Dict[str, str] = {}
+
+    if not os.path.isdir(directory):
+        return all_methodologies
+
+    import glob
+
+    for filepath in glob.glob(os.path.join(directory, "*.json")):
+        try:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                methodology = json.load(f)
+                problem_type = methodology.get("problem_type", "")
+                content = methodology.get("content", "")
+                if problem_type and content:
+                    all_methodologies[problem_type] = content
+        except Exception:
+            continue
+
+    return all_methodologies
+
+
+def _load_all_methodologies() -> Dict[str, str]:
+    """
+    从默认目录和配置的外部目录加载所有方法论文件。
+    项目级方法论优先级高于全局方法论。
+
+    返回：
+        Dict[str, str]: 方法论字典，键为问题类型，值为方法论内容。
+    """
+    all_methodologies: Dict[str, str] = {}
+
+    # 优先加载项目级方法论
+    project_methodology_dir = _get_project_methodology_directory()
+    if project_methodology_dir:
+        methodology_dirs = [project_methodology_dir]
+    else:
+        methodology_dirs = []
+
+    # 添加全局方法论目录（优先级较低）
+    methodology_dirs += [_get_methodology_directory()] + get_methodology_dirs()
 
     # 如果配置了中心方法论仓库，将其添加到加载路径
     central_repo = get_central_methodology_repo()

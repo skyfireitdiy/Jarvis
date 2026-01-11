@@ -20,7 +20,9 @@ import yaml
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.methodology import _get_methodology_directory
+from jarvis.jarvis_utils.methodology import _get_project_methodology_directory
 from jarvis.jarvis_utils.methodology import _load_all_methodologies
+from jarvis.jarvis_utils.methodology import _load_methodologies_from_dir
 
 app = typer.Typer(help="方法论管理工具")
 
@@ -28,35 +30,56 @@ app = typer.Typer(help="方法论管理工具")
 @app.command("import")
 def import_methodology(
     input_file: str = typer.Argument(..., help="要导入的方法论文件路径"),
+    scope: str = typer.Option(
+        "global",
+        "--scope",
+        "-s",
+        help="方法论作用域：global（全局）或project（项目级），默认为global",
+    ),
 ):
     """导入方法论文件（合并策略）"""
     try:
-        # 加载现有方法论
-        existing_methodologies = _load_all_methodologies()
+        # 验证 scope 参数
+        if scope not in ["global", "project"]:
+            PrettyOutput.auto_print(
+                f"❌ 无效的scope参数: {scope}，必须是 'global' 或 'project'"
+            )
+            raise typer.Exit(code=1)
+
+        # 根据scope选择存储目录
+        if scope == "project":
+            methodology_dir = _get_project_methodology_directory()
+            if not methodology_dir:
+                PrettyOutput.auto_print(
+                    "❌ 无法获取项目级方法论目录，请确保在Git仓库中"
+                )
+                raise typer.Exit(code=1)
+        else:
+            methodology_dir = _get_methodology_directory()
 
         # 加载要导入的方法论
         with open(input_file, "r", encoding="utf-8") as f:
             import_data = json.load(f)
 
-        # 合并方法论（新数据会覆盖旧数据）
+        # 加载现有方法论并合并（新数据覆盖旧数据）
+        existing_methodologies = _load_methodologies_from_dir(methodology_dir)
         merged_data = {**existing_methodologies, **import_data}
 
         # 保存合并后的方法论
-        methodology_dir = _get_methodology_directory()
         for problem_type, content in merged_data.items():
             safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(
-                    {"problem_type": problem_type, "content": content},
+                    {"problem_type": problem_type, "content": content, "scope": scope},
                     f,
                     ensure_ascii=False,
                     indent=2,
                 )
 
         PrettyOutput.auto_print(
-            f"✅ 成功导入 {len(import_data)} 个方法论（总计 {len(merged_data)} 个）"
+            f"✅ 成功导入 {len(import_data)} 个{scope}方法论到 {methodology_dir}"
         )
     except (ValueError, OSError) as e:
         PrettyOutput.auto_print(f"❌ 导入失败: {str(e)}")
@@ -64,16 +87,44 @@ def import_methodology(
 
 
 @app.command("export")
-def export_methodology(output_file: str = typer.Argument(..., help="导出文件路径")):
+def export_methodology(
+    output_file: str = typer.Argument(..., help="导出文件路径"),
+    scope: str = typer.Option(
+        "all",
+        "--scope",
+        "-s",
+        help="方法论作用域：global（全局）、project（项目级）或all（全部），默认为all",
+    ),
+):
     """导出当前方法论到单个文件"""
     try:
-        methodologies = _load_all_methodologies()
+        # 验证 scope 参数
+        if scope not in ["global", "project", "all"]:
+            PrettyOutput.auto_print(
+                f"❌ 无效的scope参数: {scope}，必须是 'global'、'project' 或 'all'"
+            )
+            raise typer.Exit(code=1)
+
+        # 根据scope加载方法论
+        if scope == "all":
+            methodologies = _load_all_methodologies()
+        elif scope == "project":
+            project_dir = _get_project_methodology_directory()
+            if not project_dir:
+                PrettyOutput.auto_print(
+                    "❌ 无法获取项目级方法论目录，请确保在Git仓库中"
+                )
+                raise typer.Exit(code=1)
+            methodologies = _load_methodologies_from_dir(project_dir)
+        else:  # global
+            global_dir = _get_methodology_directory()
+            methodologies = _load_methodologies_from_dir(global_dir)
 
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(methodologies, f, ensure_ascii=False, indent=2)
 
         PrettyOutput.auto_print(
-            f"✅ 成功导出 {len(methodologies)} 个方法论到 {output_file}"
+            f"✅ 成功导出 {len(methodologies)} 个{scope}方法论到 {output_file}"
         )
     except (OSError, TypeError) as e:
         PrettyOutput.auto_print(f"❌ 导出失败: {str(e)}")
@@ -81,17 +132,42 @@ def export_methodology(output_file: str = typer.Argument(..., help="导出文件
 
 
 @app.command("list")
-def list_methodologies():
+def list_methodologies(
+    scope: str = typer.Option(
+        "all",
+        "--scope",
+        "-s",
+        help="方法论作用域：global（全局）、project（项目级）或all（全部），默认为all",
+    ),
+):
     """列出所有方法论"""
     try:
-        methodologies = _load_all_methodologies()
+        # 验证 scope 参数
+        if scope not in ["global", "project", "all"]:
+            PrettyOutput.auto_print(
+                f"❌ 无效的scope参数: {scope}，必须是 'global'、'project' 或 'all'"
+            )
+            raise typer.Exit(code=1)
+
+        # 根据scope加载方法论
+        if scope == "all":
+            methodologies = _load_all_methodologies()
+        elif scope == "project":
+            project_dir = _get_project_methodology_directory()
+            if not project_dir:
+                PrettyOutput.auto_print("ℹ️ 无法获取项目级方法论目录，请确保在Git仓库中")
+                return
+            methodologies = _load_methodologies_from_dir(project_dir)
+        else:  # global
+            global_dir = _get_methodology_directory()
+            methodologies = _load_methodologies_from_dir(global_dir)
 
         if not methodologies:
-            PrettyOutput.auto_print("ℹ️ 没有找到方法论")
+            PrettyOutput.auto_print(f"ℹ️ 没有找到{scope}方法论")
             return
 
         # 先拼接再统一打印，避免在循环中逐条输出造成信息稀疏
-        lines = ["可用方法论:"]
+        lines = [f"可用{scope}方法论:"]
         for i, (problem_type, _) in enumerate(methodologies.items(), 1):
             lines.append(f"{i}. {problem_type}")
         joined_lines = "\n".join(lines)
@@ -104,9 +180,33 @@ def list_methodologies():
 @app.command("extract")
 def extract_methodology(
     input_file: str = typer.Argument(..., help="要提取方法论的文本文件路径"),
+    scope: str = typer.Option(
+        "global",
+        "--scope",
+        "-s",
+        help="方法论作用域：global（全局）或project（项目级），默认为global",
+    ),
 ):
     """从文本文件中提取方法论"""
     try:
+        # 验证 scope 参数
+        if scope not in ["global", "project"]:
+            PrettyOutput.auto_print(
+                f"❌ 无效的scope参数: {scope}，必须是 'global' 或 'project'"
+            )
+            raise typer.Exit(code=1)
+
+        # 根据scope选择存储目录
+        if scope == "project":
+            methodology_dir = _get_project_methodology_directory()
+            if not methodology_dir:
+                PrettyOutput.auto_print(
+                    "❌ 无法获取项目级方法论目录，请确保在Git仓库中"
+                )
+                raise typer.Exit(code=1)
+        else:
+            methodology_dir = _get_methodology_directory()
+
         # 读取文本文件内容
         with open(input_file, "r", encoding="utf-8") as f:
             text_content = f.read()
@@ -176,28 +276,25 @@ def extract_methodology(
             return
         PrettyOutput.auto_print("✅ 提取到有效方法论")
 
-        # 加载现有方法论
-        existing_methodologies = _load_all_methodologies()
-
-        # 合并方法论（新数据会覆盖旧数据）
+        # 加载现有方法论并合并（新数据覆盖旧数据）
+        existing_methodologies = _load_methodologies_from_dir(methodology_dir)
         merged_data = {**existing_methodologies, **extracted_methodologies}
 
         # 保存合并后的方法论
-        methodology_dir = _get_methodology_directory()
         for problem_type, content in merged_data.items():
             safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(
-                    {"problem_type": problem_type, "content": content},
+                    {"problem_type": problem_type, "content": content, "scope": scope},
                     f,
                     ensure_ascii=False,
                     indent=2,
                 )
 
         PrettyOutput.auto_print(
-            f"✅ 成功从文件提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）"
+            f"✅ 成功从文件提取 {len(extracted_methodologies)} 个{scope}方法论到 {methodology_dir}"
         )
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 提取失败: {str(e)}")
@@ -207,9 +304,33 @@ def extract_methodology(
 @app.command("extract-url")
 def extract_methodology_from_url(
     url: str = typer.Argument(..., help="要提取方法论的URL"),
+    scope: str = typer.Option(
+        "global",
+        "--scope",
+        "-s",
+        help="方法论作用域：global（全局）或project（项目级），默认为global",
+    ),
 ):
     """从URL提取方法论"""
     try:
+        # 验证 scope 参数
+        if scope not in ["global", "project"]:
+            PrettyOutput.auto_print(
+                f"❌ 无效的scope参数: {scope}，必须是 'global' 或 'project'"
+            )
+            raise typer.Exit(code=1)
+
+        # 根据scope选择存储目录
+        if scope == "project":
+            methodology_dir = _get_project_methodology_directory()
+            if not methodology_dir:
+                PrettyOutput.auto_print(
+                    "❌ 无法获取项目级方法论目录，请确保在Git仓库中"
+                )
+                raise typer.Exit(code=1)
+        else:
+            methodology_dir = _get_methodology_directory()
+
         # 获取平台实例
         platform = PlatformRegistry().get_normal_platform()
 
@@ -274,28 +395,25 @@ def extract_methodology_from_url(
             return
         PrettyOutput.auto_print("✅ 提取到有效方法论")
 
-        # 加载现有方法论
-        existing_methodologies = _load_all_methodologies()
-
-        # 合并方法论（新数据会覆盖旧数据）
+        # 加载现有方法论并合并（新数据覆盖旧数据）
+        existing_methodologies = _load_methodologies_from_dir(methodology_dir)
         merged_data = {**existing_methodologies, **extracted_methodologies}
 
         # 保存合并后的方法论
-        methodology_dir = _get_methodology_directory()
         for problem_type, content in merged_data.items():
             safe_filename = hashlib.md5(problem_type.encode("utf-8")).hexdigest()
             file_path = os.path.join(methodology_dir, f"{safe_filename}.json")
 
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(
-                    {"problem_type": problem_type, "content": content},
+                    {"problem_type": problem_type, "content": content, "scope": scope},
                     f,
                     ensure_ascii=False,
                     indent=2,
                 )
 
         PrettyOutput.auto_print(
-            f"✅ 成功从URL提取 {len(extracted_methodologies)} 个方法论（总计 {len(merged_data)} 个）"
+            f"✅ 成功从URL提取 {len(extracted_methodologies)} 个{scope}方法论到 {methodology_dir}"
         )
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 从URL提取失败: {str(e)}")
