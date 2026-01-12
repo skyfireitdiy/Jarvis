@@ -1,7 +1,3 @@
-# Builtin Rules 入口
-
-本目录包含 JARVIS 内置规则的所有规则文件。
-
 ## 规则列表
 
 1. SOLID 设计原则规则，用于指导面向对象设计的五大原则。（{{ rule_file_dir }}/solid.md）
@@ -19,20 +15,3 @@
 13. Spec 驱动开发 (SDD) 规则，用于定义 Spec-实现-验证循环。（{{ rule_file_dir }}/sdd.md）
 14. 安全编码规则，用于定义输入验证和最小权限原则。（{{ rule_file_dir }}/security.md）
 15. 测试驱动开发 (TDD) 规则，用于定义红-绿-重构循环。（{{ rule_file_dir }}/tdd.md）
-
----
-
-## 使用说明
-
-### 如何使用规则
-
-- **查看规则详情**: 点击上方路径查看具体规则内容
-- **动态路径**: 所有路径使用 `{{ rule_file_dir }}` 变量动态生成
-- **规则加载**: 详见 [规则系统最佳实践](../../docs/best_practices/rules_best_practices.md)
-
-### 可用的 Jinja2 变量
-
-- `{{ rule_file_dir }}`: 规则文件所在目录（动态生成）
-- 其他可用变量：`{{ current_dir }}`, `{{ script_dir }}`, `{{ git_root_dir }}` 等
-
-详细信息请参考 [规则占位符使用](../../docs/best_practices/rules_best_practices.md#-规则占位符的使用)
