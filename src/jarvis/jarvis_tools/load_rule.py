@@ -90,7 +90,7 @@ class LoadRuleTool:
             file_dir = os.path.dirname(abs_path)
 
             # 渲染模板
-            rendered_content = render_rule_template(content, file_dir)
+            rendered_content = render_rule_template(content, file_dir, abs_path)
 
             # 返回渲染结果
             return {
