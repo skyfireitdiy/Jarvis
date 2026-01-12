@@ -153,6 +153,11 @@ def main(
 
     if task:
         # 直接模式：传入任务字符串
+        # 判断是否为文件路径（已存在的文件不添加规则）
+        if not os.path.exists(task):
+            # 不是文件，在任务开头添加 builtin_rules
+            task = "'<rule:builtin_rules>'\n" + task
+
         # 检查是否包含多行内容（换行符）
         if "\n" in task:
             # 多行输入：创建临时文件
@@ -169,6 +174,9 @@ def main(
         if not task_content.strip():
             PrettyOutput.auto_print("ℹ️ 未输入任务内容，退出")
             sys.exit(0)
+
+        # 在任务开头添加 builtin_rules
+        task_content = "'<rule:builtin_rules>'\n" + task_content
 
         # 创建临时文件
         temp_file_path = _write_task_to_temp_file(task_content)
