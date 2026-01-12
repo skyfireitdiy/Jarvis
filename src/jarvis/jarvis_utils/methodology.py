@@ -342,6 +342,13 @@ def load_methodology(
             methodology_text = f"## {problem_type}\n\n{content}\n\n---\n\n"
             methodology_tokens = get_context_token_count(methodology_text)
 
+            # 检查是否已达到数量限制（最多10条）
+            if selected_count >= 10:
+                PrettyOutput.auto_print(
+                    f"ℹ️ 已达到方法论数量限制 ({selected_count}/10)，停止加载更多方法论"
+                )
+                break
+
             # 检查是否会超过token限制
             if total_methodology_tokens + methodology_tokens > available_tokens:
                 PrettyOutput.auto_print(
