@@ -1,4 +1,4 @@
-## 规则列表
+# 规则列表
 
 1. SOLID 设计原则规则，用于指导面向对象设计的五大原则。（{{ rule_file_dir }}/solid.md）
 2. 整洁架构规则，用于指导构建可维护、可测试的架构。（{{ rule_file_dir }}/clean_architecture.md）
@@ -15,3 +15,22 @@
 13. Spec 驱动开发 (SDD) 规则，用于定义 Spec-实现-验证循环。（{{ rule_file_dir }}/sdd.md）
 14. 安全编码规则，用于定义输入验证和最小权限原则。（{{ rule_file_dir }}/security.md）
 15. 测试驱动开发 (TDD) 规则，用于定义红-绿-重构循环。（{{ rule_file_dir }}/tdd.md）
+
+## 测试规则
+
+1. C/C++ 测试规则，用于指导 C/C++ 代码的测试框架使用和测试执行。
+   （{{ rule_file_dir }}/../test_rules/cpp_test.md）
+2. Go 测试规则，用于指导 Go 代码的测试框架使用和测试执行。
+   （{{ rule_file_dir }}/../test_rules/go_test.md）
+3. JS/TS 测试规则，用于指导 JavaScript/TypeScript 代码的测试框架使用和
+   测试执行。（{{ rule_file_dir }}/../test_rules/javascript_test.md）
+4. Java 测试规则，用于指导 Java 代码的测试框架使用和测试执行。
+   （{{ rule_file_dir }}/../test_rules/java_test.md）
+5. PHP 测试规则，用于指导 PHP 代码的测试框架使用和测试执行。
+   （{{ rule_file_dir }}/../test_rules/php_test.md）
+6. Python 测试规则，用于指导 Python 代码的测试框架使用和测试执行。
+   （{{ rule_file_dir }}/../test_rules/python_test.md）
+7. Ruby 测试规则，用于指导 Ruby 代码的测试框架使用和测试执行。
+   （{{ rule_file_dir }}/../test_rules/ruby_test.md）
+8. Rust 测试规则，用于指导 Rust 代码的测试框架使用和测试执行。
+   （{{ rule_file_dir }}/../test_rules/rust_test.md）
