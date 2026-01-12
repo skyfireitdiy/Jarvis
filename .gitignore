@@ -7,6 +7,8 @@ temp_scripts
 dist
 *egg-info.jarvis
 .jarvis
+!.jarvis/rule
+!.jarvis/rules
 jarvis_ai_assistant.egg-info
 PKG-INFO
 .jarvis-*
