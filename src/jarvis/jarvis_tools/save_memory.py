@@ -72,7 +72,9 @@ class SaveMemoryTool:
         time.sleep(0.001)  # 确保不同记忆有不同的时间戳
         return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
-    def _save_single_memory(self, memory_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _save_single_memory(
+        self, memory_data: Dict[str, Any], agent: Any = None
+    ) -> Dict[str, Any]:
         """保存单条记忆"""
         memory_type = memory_data["memory_type"]
         tags = memory_data.get("tags", [])
@@ -95,6 +97,14 @@ class SaveMemoryTool:
             # 短期记忆保存到全局变量
             add_short_term_memory(memory_obj)
 
+            # 将内容添加到agent的pin_content
+            if agent and hasattr(agent, "pin_content"):
+                if agent.pin_content:
+                    agent.pin_content += "\n" + content
+                else:
+                    agent.pin_content = content
+                PrettyOutput.auto_print("📌 已将记忆内容固定到pin_content")
+
             result = {
                 "memory_id": memory_id,
                 "memory_type": memory_type,
@@ -113,6 +123,14 @@ class SaveMemoryTool:
             with open(memory_file, "w", encoding="utf-8") as f:
                 json.dump(memory_obj, f, ensure_ascii=False, indent=2)
 
+            # 将内容添加到agent的pin_content
+            if agent and hasattr(agent, "pin_content"):
+                if agent.pin_content:
+                    agent.pin_content += "\n" + content
+                else:
+                    agent.pin_content = content
+                PrettyOutput.auto_print("📌 已将记忆内容固定到pin_content")
+
             result = {
                 "memory_id": memory_id,
                 "memory_type": memory_type,
@@ -126,6 +144,8 @@ class SaveMemoryTool:
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行保存记忆操作"""
         try:
+            # 获取agent实例（v1.0协议通过arguments注入）
+            agent = args.get("agent")
             memories = args.get("memories", [])
 
             if not memories:
@@ -142,7 +162,7 @@ class SaveMemoryTool:
             # 保存每条记忆
             for i, memory_data in enumerate(memories):
                 try:
-                    result = self._save_single_memory(memory_data)
+                    result = self._save_single_memory(memory_data, agent)
                     results.append(result)
                     success_count += 1
 
