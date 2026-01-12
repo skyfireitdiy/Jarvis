@@ -46,9 +46,11 @@ class WorktreeManager:
                 PrettyOutput.auto_print("⚠️  检测到主仓库有未提交的更改")
                 PrettyOutput.auto_print("🔄 自动提交主仓库更改...")
                 git_commiter = GitCommitTool()
-                git_commiter.execute({
-                    "root_dir": self.repo_root,
-                })
+                git_commiter.execute(
+                    {
+                        "root_dir": self.repo_root,
+                    }
+                )
                 PrettyOutput.auto_print("✅ 已自动提交主仓库更改")
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️  自动提交过程中出错: {str(e)}")
@@ -139,51 +141,116 @@ class WorktreeManager:
             raise RuntimeError(f"获取当前分支时出错: {str(e)}")
 
     def _link_jarvis_dir(self, worktree_path: str) -> None:
-        """将原仓库的 .jarvis 目录软链接到 worktree 中
+        """在worktree中设置分层.jarvis目录结构
+
+        采用分层软链接策略：
+        1. 创建独立的.jarvis目录（用于Git跟踪的配置文件）
+        2. 为运行时数据目录创建软链接（共享主仓库数据）
+
+        这样设计的原因：
+        - .jarvis/rule和.jarvis/rules/需要独立，避免分支间修改冲突
+        - .jarvis/memory/等运行时数据需要共享，避免重复和混乱
 
         参数:
             worktree_path: worktree 目录路径
 
         抛出:
-            RuntimeError: 如果创建软链接失败
+            RuntimeError: 如果创建目录或软链接失败
         """
         original_jarvis_dir = os.path.join(self.repo_root, ".jarvis")
         worktree_jarvis_dir = os.path.join(worktree_path, ".jarvis")
 
         # 检查原仓库的 .jarvis 目录是否存在
         if not os.path.exists(original_jarvis_dir):
-            PrettyOutput.auto_print("⚠️ 原仓库不存在 .jarvis 目录，跳过软链接创建")
+            PrettyOutput.auto_print("⚠️ 原仓库不存在 .jarvis 目录，跳过设置")
             return
 
-        # 获取原仓库 .jarvis 的真实路径（处理软链接链）
-        original_jarvis_real = os.path.realpath(original_jarvis_dir)
-
-        # 路径安全验证：确保软链接目标路径在 worktree 目录下
-        worktree_path_real = os.path.realpath(worktree_path)
-        worktree_jarvis_real = os.path.realpath(worktree_jarvis_dir)
-        if (
-            not os.path.commonprefix([worktree_jarvis_real, worktree_path_real])
-            == worktree_path_real
-        ):
-            raise RuntimeError(f"软链接目标路径不安全: {worktree_jarvis_dir}")
+        # 定义需要独立复制的Git跟踪文件/目录
+        # 这些文件在每个worktree中独立，避免分支间修改冲突
+        git_tracked_items = [
+            "rule",  # .jarvis/rule
+            "rules",  # .jarvis/rules/
+        ]
 
         try:
-            # 如果 worktree 中已存在 .jarvis 目录，先删除
-            if os.path.exists(worktree_jarvis_dir):
-                if os.path.islink(worktree_jarvis_dir):
-                    os.unlink(worktree_jarvis_dir)
-                else:
-                    shutil.rmtree(worktree_jarvis_dir)
+            # 步骤1：处理已存在的.jarvis目录
+            if os.path.islink(worktree_jarvis_dir):
+                # 如果是软链接（旧配置），删除它
+                PrettyOutput.auto_print("🔗 检测到旧的.jarvis软链接，准备重建...")
+                os.unlink(worktree_jarvis_dir)
+                need_create_dir = True
+            elif os.path.exists(worktree_jarvis_dir):
+                # 如果目录已存在（Git自动检出的rule和rules），不需要重建
+                PrettyOutput.auto_print("✅ .jarvis目录已存在（Git自动检出）")
+                need_create_dir = False
+            else:
+                # 目录不存在，需要创建
+                need_create_dir = True
 
-            # 创建软链接：worktree/.jarvis -> 原仓库/.jarvis（使用真实路径）
-            os.symlink(original_jarvis_real, worktree_jarvis_dir)
-            PrettyOutput.auto_print(
-                f"🔗 已创建软链接: {worktree_jarvis_dir} -> {original_jarvis_real}"
-            )
+            # 步骤2：创建独立的.jarvis目录（如果需要）
+            if need_create_dir:
+                os.makedirs(worktree_jarvis_dir, exist_ok=True)
+                PrettyOutput.auto_print(
+                    f"📁 已创建独立.jarvis目录: {worktree_jarvis_dir}"
+                )
+
+                # 步骤3：复制Git跟踪的文件到独立目录
+                for item in git_tracked_items:
+                    src_path = os.path.join(original_jarvis_dir, item)
+                    dst_path = os.path.join(worktree_jarvis_dir, item)
+
+                    if os.path.exists(src_path):
+                        if os.path.isdir(src_path):
+                            # 复制目录
+                            shutil.copytree(src_path, dst_path)
+                            PrettyOutput.auto_print(f"📋 已复制Git目录: {item}")
+                        else:
+                            # 复制文件
+                            shutil.copy2(src_path, dst_path)
+                            PrettyOutput.auto_print(f"📄 已复制Git文件: {item}")
+                    else:
+                        PrettyOutput.auto_print(f"⚠️ Git跟踪项不存在: {item}")
+
+            # 步骤4：为其他所有文件和目录创建软链接（除了rule和rules）
+            # 遍历主仓库.jarvis下的所有项目
+            for item in os.listdir(original_jarvis_dir):
+                # 跳过Git跟踪项（它们应该已经存在或已复制）
+                if item in git_tracked_items:
+                    continue
+
+                src_path = os.path.join(original_jarvis_dir, item)
+                dst_path = os.path.join(worktree_jarvis_dir, item)
+
+                # 如果软链接已存在，跳过
+                if os.path.exists(dst_path) or os.path.islink(dst_path):
+                    continue
+
+                # 创建软链接：worktree/.jarvis/item -> 原仓库/.jarvis/item
+                try:
+                    os.symlink(src_path, dst_path)
+                    item_type = "目录" if os.path.isdir(src_path) else "文件"
+                    PrettyOutput.auto_print(f"🔗 已创建{item_type}软链接: {item}")
+                except Exception as e:
+                    PrettyOutput.auto_print(f"⚠️ 创建软链接失败 {item}: {str(e)}")
+
+            PrettyOutput.auto_print("✅ .jarvis目录设置完成（分层软链接模式）")
 
         except Exception as e:
-            # 软链接创建失败应视为严重错误，因为数据共享是核心需求
-            raise RuntimeError(f"创建 .jarvis 软链接失败: {str(e)}")
+            # 发生错误时尝试回滚：删除已创建的.jarvis目录
+            PrettyOutput.auto_print(f"❌ 设置.jarvis目录时出错: {str(e)}")
+            PrettyOutput.auto_print("🧹 尝试回滚...")
+            try:
+                if os.path.exists(worktree_jarvis_dir):
+                    if os.path.islink(worktree_jarvis_dir):
+                        os.unlink(worktree_jarvis_dir)
+                    else:
+                        shutil.rmtree(worktree_jarvis_dir)
+                PrettyOutput.auto_print("✅ 回滚成功")
+            except Exception as rollback_error:
+                PrettyOutput.auto_print(f"⚠️ 回滚失败: {str(rollback_error)}")
+                PrettyOutput.auto_print(f"💡 请手动清理: {worktree_jarvis_dir}")
+
+            raise RuntimeError(f"设置.jarvis目录失败: {str(e)}")
 
     def create_worktree(self, branch_name: Optional[str] = None) -> str:
         """创建 git worktree 分支和目录
