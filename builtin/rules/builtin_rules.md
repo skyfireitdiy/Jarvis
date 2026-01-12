@@ -66,6 +66,10 @@
 
 ## 工具配置
 
+### 新增规则规范
+
+用于指导如何创建新的规则文件，包括文件位置、命名规范、格式要求和 Jinja2 变量使用。（{{ rule_file_dir }}/add_rule.md）
+
 ### 忽略所有告警
 
 用于快速验证模式，仅用于原型验证。（{{ rule_file_dir }}/ignore_all_alerts.md）
