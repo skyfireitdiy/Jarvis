@@ -933,13 +933,13 @@ def _show_usage_stats(welcome_str: str) -> None:
                 Align.center(
                     Text("🐙 GitHub: ", style="bold blue")
                     + Text.from_markup(
-                        f"[link={github_url}]skyfireitdiy/Jarvis[/link]", style="blue"
+                        f"[link={github_url}]{github_url}[/link]", style="blue"
                     )
                 ),
                 Align.center(
                     Text("🎋 Gitee: ", style="bold red")
                     + Text.from_markup(
-                        f"[link={gitee_url}]skyfireitdiy/Jarvis[/link]", style="red"
+                        f"[link={gitee_url}]{gitee_url}[/link]", style="red"
                     )
                 ),
             )
