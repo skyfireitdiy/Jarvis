@@ -16,7 +16,7 @@
 | 安装方式 | pip/uv/Docker/源码         | 官方安装包/Docker          |
 | 配置格式 | YAML                       | TOML                       |
 | SDK 支持 | ✅ Python SDK              | ❌ 无 SDK                  |
-| 首次发布 | 较早                       | 2025年                     |
+| 首次发布 | 2025年                       | 2025年                     |
 
 ---
 
@@ -225,7 +225,7 @@ default = "gpt-5-codex"
 | **会话恢复**   | ✅ `'<SaveSession>'` + `--restore-session` | ✅ `codex resume`（更强大）     |
 | **记忆检索**   | ✅ 智能检索（按类型和标签）                | ⚠️ 按会话 ID 恢复               |
 | **记忆导出**   | ✅ 支持导入导出                            | ❌ 无                           |
-| **会话时长**   | ❌ 无限制                                  | ✅ 长会话支持（7小时）          |
+| **会话时长**   | ✅ 无限制                                  | ✅ 长会话支持（7小时）          |
 
 **对比分析：**
 
@@ -286,27 +286,15 @@ default = "gpt-5-codex"
    - 沉淀成功经验为可复用方法论
    - 支持本地和中心化共享
 
-3. **安全分析套件** (`jarvis-sec`)
-   - C/C++ 和 Rust 安全扫描
-   - 启发式扫描 + AI 深度验证
-
-4. **代码迁移套件** (`jarvis-c2rust`)
-   - C→Rust 渐进式迁移
-   - 支持断点续跑和智能库替代
-
-5. **多智能体协作** (`jarvis-multi-agent`)
+3. **多智能体协作** (`jarvis-multi-agent`)
    - 多 Agent 并行协作
    - 任务派发和结果整合
 
-6. **记忆系统** (`jarvis-memory-organizer`)
+4. **记忆系统** (`jarvis-memory-organizer`)
    - 三层记忆架构
    - 记忆整理、合并、导入导出
 
-7. **统计可视化** (`jarvis-stats`)
-   - 通用统计模块
-   - 数据可视化（使用 plotext）
-
-8. **Python SDK**
+5. **Python SDK**
    - 完整的 Python API
    - 可编程构建 AI 应用
 
@@ -320,23 +308,11 @@ default = "gpt-5-codex"
    - `codex cloud` 云任务管理器
    - 支持远程执行和管理
 
-3. **MCP 协议支持**
-   - Model Context Protocol
-   - 连接额外的工具和服务
-
-4. **长会话支持**
-   - 最多 7 小时连续上下文
-   - 复杂任务无需重复上下文
-
-5. **第一方 Web 搜索**
-   - 集成网络搜索工具
-   - 搜索结果在转录中显示
-
-6. **自定义 Slash 命令**
+3. **自定义 Slash 命令**
    - 创建团队专用工作流
    - 可复用的命令模板
 
-7. **Rust 高性能**
+4. **Rust 高性能**
    - 快速启动和响应
    - 内存安全
 
