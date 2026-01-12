@@ -65,7 +65,7 @@ def cli(
         raise typer.Exit(code=2)
     # Initialize环境
     init_env(
-        """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！\nGitHub: https://github.com/skyfireitdiy/Jarvis.git\nGitee: https://gitee.com/skyfireitdiy/Jarvis.git""",
+        """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！""",
         config_file=config_file,
     )
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖

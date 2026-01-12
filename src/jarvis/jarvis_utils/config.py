@@ -43,6 +43,36 @@ def get_git_commit_prompt() -> str:
     return cast(str, GLOBAL_CONFIG_DATA.get("git_commit_prompt", ""))
 
 
+def get_jarvis_github_url() -> str:
+    """
+    获取Jarvis的GitHub仓库地址
+
+    返回:
+        str: GitHub仓库地址，如果未配置则返回默认值
+    """
+    return cast(
+        str,
+        GLOBAL_CONFIG_DATA.get(
+            "jarvis_github_url", "https://github.com/skyfireitdiy/Jarvis.git"
+        ),
+    )
+
+
+def get_jarvis_gitee_url() -> str:
+    """
+    获取Jarvis的Gitee仓库地址
+
+    返回:
+        str: Gitee仓库地址，如果未配置则返回默认值
+    """
+    return cast(
+        str,
+        GLOBAL_CONFIG_DATA.get(
+            "jarvis_gitee_url", "https://gitee.com/skyfireitdiy/Jarvis.git"
+        ),
+    )
+
+
 # 输出窗口预留大小
 INPUT_WINDOW_REVERSE_SIZE = 2048
 
