@@ -929,8 +929,19 @@ def _show_usage_stats(welcome_str: str) -> None:
                 Align.center(Text(work_dir_info, style="dim")),
                 "",  # for a blank line
                 Align.center(Text(f"v{__version__}")),
-                Align.center(Text(f"GitHub: {github_url}")),
-                Align.center(Text(f"Gitee: {gitee_url}")),
+                "",  # for a blank line
+                Align.center(
+                    Text("🐙 GitHub: ", style="bold blue")
+                    + Text.from_markup(
+                        f"[link={github_url}]skyfireitdiy/Jarvis[/link]", style="blue"
+                    )
+                ),
+                Align.center(
+                    Text("🎋 Gitee: ", style="bold red")
+                    + Text.from_markup(
+                        f"[link={gitee_url}]skyfireitdiy/Jarvis[/link]", style="red"
+                    )
+                ),
             )
 
             welcome_panel = Panel(
