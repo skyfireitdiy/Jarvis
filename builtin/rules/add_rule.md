@@ -153,7 +153,7 @@
 
 以下是一个完整的规则文件模板，可直接复制使用：
 
-````markdown
+```markdown
 # [规则名称]
 
 ## 规则简介
@@ -172,12 +172,11 @@
 
 **示例：**
 
-```python
-# 示例代码
-def example():
-    pass
-```
-````
+    ```python
+    # 示例代码
+    def example():
+        pass
+    ```
 
 ## 你必须执行的操作
 
@@ -205,8 +204,6 @@ def example():
 ## 相关资源
 
 - 参考文档：`related_rule.md`
-
-```text
 
 ```
 
@@ -237,28 +234,6 @@ def example():
 - 删除过时或不再使用的规则
 - 记录规则变更历史
 
-## 规则加载验证
-
-### 验证方法
-
-创建规则后，使用以下命令验证规则是否正确加载：
-
-```bash
-# 列出所有可用的内置规则
-jarvis rule list
-
-# 查看特定规则内容
-jarvis rule show <rule_name>
-```
-
-### 验证检查项
-
-- [ ] 规则文件名符合命名规范
-- [ ] 规则文件使用 UTF-8 编码
-- [ ] 规则文件使用 Markdown 格式
-- [ ] jinja2 变量语法正确
-- [ ] 规则内容结构完整
-- [ ] 规则可以通过 `jarvis rule show` 正确加载
 
 ## 示例：创建一个简单的规则
 
@@ -272,7 +247,7 @@ touch builtin/rules/naming_convention.md
 
 ### 步骤 2：编写内容
 
-````markdown
+```markdown
 # 命名规范规则
 
 ## 你必须遵守的命名原则
@@ -287,16 +262,15 @@ touch builtin/rules/naming_convention.md
 
 **示例：**
 
-```python
-# ✅ 正确
-user_name = "John"
-max_retry_count = 3
+    ```python
+    # ✅ 正确
+    user_name = "John"
+    max_retry_count = 3
 
-# ❌ 错误
-userName = "John"  # 应使用下划线
-x = "John"  # 应使用描述性名称
-```
-````
+    # ❌ 错误
+    userName = "John"  # 应使用下划线
+    x = "John"  # 应使用描述性名称
+    ```
 
 ### 2. 函数命名
 
@@ -308,27 +282,23 @@ x = "John"  # 应使用描述性名称
 
 **示例：**
 
-```python
-# ✅ 正确
-def get_user_name():
-    pass
+    ```python
+    # ✅ 正确
+    def get_user_name():
+        pass
 
-def calculate_total():
-    pass
+    def calculate_total():
+        pass
 
-# ❌ 错误
-def getUserName():  # 应使用下划线
-def UserName():  # 应使用动词开头
-```
+    # ❌ 错误
+    def getUserName():  # 应使用下划线
+    def UserName():  # 应使用动词开头
+    ```
 
 ### 示例检查清单
 
 - [ ] 所有变量使用小写和下划线
-
 - [ ] 所有函数使用动词开头
-
 - [ ] 所有命名具有描述性
-
-```
 
 ```
