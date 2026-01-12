@@ -103,7 +103,6 @@ class SaveMemoryTool:
                     agent.pin_content += "\n" + content
                 else:
                     agent.pin_content = content
-                PrettyOutput.auto_print("📌 已将记忆内容固定到pin_content")
 
             result = {
                 "memory_id": memory_id,
@@ -129,7 +128,6 @@ class SaveMemoryTool:
                     agent.pin_content += "\n" + content
                 else:
                     agent.pin_content = content
-                PrettyOutput.auto_print("📌 已将记忆内容固定到pin_content")
 
             result = {
                 "memory_id": memory_id,
@@ -181,6 +179,15 @@ class SaveMemoryTool:
                             "tags": memory_data.get("tags", []),
                         }
                     )
+
+            # 统一打印固定到pin_content的汇总信息
+            if (
+                agent
+                and hasattr(agent, "pin_content")
+                and agent.pin_content
+                and success_count > 0
+            ):
+                PrettyOutput.auto_print(f"📌 已固定 {success_count} 条记忆内容")
 
             # 生成总结报告
 
