@@ -1,7 +1,0 @@
-# 规则列表
-
-## 工具配置
-
-### 版本发布规则
-
-用于规范Jarvis项目的版本发布流程，确保版本号的正确性、ReleaseNote的格式一致性，以及代码变更的准确性。（{{ git_root_dir }}/.jarvis/rules/version_release.md）
