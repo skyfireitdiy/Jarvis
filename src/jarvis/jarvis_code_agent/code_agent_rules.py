@@ -14,7 +14,7 @@ from typing import Tuple
 import yaml
 
 from jarvis.jarvis_code_agent.builtin_rules import get_builtin_rule
-from jarvis.jarvis_code_agent.builtin_rules import render_rule_template
+from jarvis.jarvis_utils.template_utils import render_rule_template
 from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
