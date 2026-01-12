@@ -28,10 +28,6 @@
 
 用于定义小步快跑和保持功能不变原则。（{{ rule_file_dir }}/refactoring.md）
 
-### 规则生成指南
-
-用于指导从项目实际代码中提炼开发规则。（{{ rule_file_dir }}/generate_rules.md）
-
 ## 代码质量
 
 ### 代码审查
