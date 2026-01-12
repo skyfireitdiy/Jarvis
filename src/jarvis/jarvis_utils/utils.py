@@ -640,6 +640,8 @@ def _show_usage_stats(welcome_str: str) -> None:
 
         from jarvis.jarvis_stats.stats import StatsManager
         from jarvis.jarvis_utils.config import (
+            get_jarvis_github_url,
+            get_jarvis_gitee_url,
             get_normal_model_name,
             get_normal_platform_name,
         )
@@ -915,6 +917,10 @@ def _show_usage_stats(welcome_str: str) -> None:
             work_dir = os.getcwd()
             work_dir_info = f"📁 工作目录: {work_dir}"
 
+            # 获取仓库链接
+            github_url = get_jarvis_github_url()
+            gitee_url = get_jarvis_gitee_url()
+
             welcome_panel_content = Group(
                 Align.center(Text(jarvis_ascii_art_str, style="bold blue")),
                 Align.center(Text(welcome_str, style="bold")),
@@ -923,7 +929,8 @@ def _show_usage_stats(welcome_str: str) -> None:
                 Align.center(Text(work_dir_info, style="dim")),
                 "",  # for a blank line
                 Align.center(Text(f"v{__version__}")),
-                Align.center(Text("https://github.com/skyfireitdiy/Jarvis.git")),
+                Align.center(Text(f"GitHub: {github_url}")),
+                Align.center(Text(f"Gitee: {gitee_url}")),
             )
 
             welcome_panel = Panel(
@@ -977,6 +984,18 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
     g_config_file = config_file
     try:
         load_config()
+        # 设置默认的GitHub和Gitee链接配置，让所有工具都能访问
+        from jarvis.jarvis_utils.config import (
+            GLOBAL_CONFIG_DATA,
+            set_config,
+        )
+
+        if not GLOBAL_CONFIG_DATA.get("jarvis_github_url"):
+            set_config(
+                "jarvis_github_url", "https://github.com/skyfireitdiy/Jarvis.git"
+            )
+        if not GLOBAL_CONFIG_DATA.get("jarvis_gitee_url"):
+            set_config("jarvis_gitee_url", "https://gitee.com/skyfireitdiy/Jarvis.git")
     except Exception:
         # 静默失败，不影响正常使用
         pass
