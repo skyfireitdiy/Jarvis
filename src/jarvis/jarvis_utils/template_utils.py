@@ -19,13 +19,18 @@ from typing import Any
 import jinja2
 from jinja2 import TemplateError, TemplateSyntaxError
 
+from jarvis.jarvis_utils.output import PrettyOutput
 
-def render_rule_template(rule_content: str, rule_file_dir: str) -> str:
+
+def render_rule_template(
+    rule_content: str, rule_file_dir: str, file_path: str | None = None
+) -> str:
     """使用jinja2渲染规则模板
 
     参数:
         rule_content: 规则原始内容
         rule_file_dir: 规则文件所在目录
+        file_path: 规则文件完整路径（可选，用于打印加载成功信息）
 
     返回:
         str: 渲染后的内容，如果渲染失败则返回原始内容
@@ -46,7 +51,12 @@ def render_rule_template(rule_content: str, rule_file_dir: str) -> str:
     # 使用jinja2渲染模板
     try:
         template = jinja2.Template(rule_content)
-        return template.render(**context).strip()
+        result = template.render(**context).strip()
+        # 渲染成功，打印加载成功信息
+        if file_path:
+            rule_name = Path(file_path).stem
+            PrettyOutput.auto_print(f"✅ 加载{rule_name}规则成功")
+        return result
     except (TemplateError, TemplateSyntaxError):
         # 渲染失败时返回原始内容（向后兼容）
         return rule_content.strip()
