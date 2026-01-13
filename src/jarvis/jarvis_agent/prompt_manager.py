@@ -45,9 +45,57 @@ class PromptManager:
 
         action_prompt = self.agent.get_tool_usage_prompt()
 
+        # 检查 load_rule 工具是否可用
+        load_rule_guide = ""
+        tool_registry = self.agent.get_tool_registry()
+        if isinstance(tool_registry, ToolRegistry):
+            load_rule_tool = tool_registry.get_tool("load_rule")
+            if load_rule_tool:
+                load_rule_guide = """
+
+<rule_usage_guide>
+# 规则加载使用指南
+
+当任务涉及项目规范、编码标准、流程定义时，应该使用 `load_rule` 工具加载相关规则。
+
+**适用场景：**
+- 需要遵循特定的编码规范或开发标准
+- 执行需要标准化流程的任务（如版本发布、代码审查）
+- 应用项目特定的规则和约定
+- 需要参考已有的最佳实践文档
+
+**工具介绍：**
+- **工具名称**: load_rule
+- **功能**: 读取规则文件内容并使用 jinja2 渲染模板变量
+- **参数**: file_path（必需）- 规则文件路径（支持相对路径和绝对路径）
+
+**支持的内置变量：**
+- `current_dir`: 当前工作目录
+- `git_root_dir`: Git根目录
+- `jarvis_src_dir`: Jarvis源码目录
+- `jarvis_data_dir`: Jarvis数据目录
+- `rule_file_dir`: 规则文件所在目录
+
+**使用建议：**
+- 在任务开始前，优先使用 load_rule 加载相关规则
+- 规则文件通常位于 `.jarvis/rules/` 目录或项目的规则目录中
+- 通过加载规则可以确保代码和操作符合项目规范
+- 规则文件支持 jinja2 模板，可以使用内置变量动态生成内容
+
+**示例：**
+```json
+{
+  "name": "load_rule",
+  "arguments": {
+    "file_path": ".jarvis/rules/version_release.md"
+  }
+}
+```
+</rule_usage_guide>
+"""
+
         # 检查 task_list_manager 工具是否可用
         task_list_manager_note = ""
-        tool_registry = self.agent.get_tool_registry()
         if isinstance(tool_registry, ToolRegistry):
             task_list_tool = tool_registry.get_tool("task_list_manager")
             if task_list_tool:
@@ -98,6 +146,8 @@ class PromptManager:
 {action_prompt}
 
 {task_list_manager_note}
+
+{load_rule_guide}
 
 {system_tools_info}
 
