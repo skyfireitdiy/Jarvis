@@ -121,6 +121,7 @@ def build_generate_impl_prompt(
         "- 检查依赖函数是否已实现，未实现的需一并补齐（遵循 TDD：先测试后实现）",
         "- 使用 read_symbols/read_code 获取 C 源码",
         "- 优先处理底层依赖，确保所有测试通过",
+        "- 如依赖较多或关系复杂，可创建任务列表规划转译顺序（如：先转译全局变量→再转译类型定义→最后转译函数）",
         "",
         "【工具】",
         f'- read_symbols: {{"symbols_file": "{symbols_path}", "symbols": [...]}}',
