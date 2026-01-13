@@ -106,6 +106,19 @@ EOF
 jcad my_task.txt
 ```
 
+#### ⚠️ 重要提示：文件判断逻辑
+
+`jcad` 通过检查文件是否存在来判断输入是任务文件还是任务内容：
+
+- 如果文件 `my_task.txt` **存在** → 作为任务文件处理（使用 `--task-file` 参数）
+- 如果文件 `my_task.txt` **不存在** → 作为任务内容处理（使用 `--task` 参数，即把 `my_task.txt` 当作任务描述）
+
+**最佳实践建议**：
+
+1. **确保文件已创建**：在使用 `jcad my_task.txt` 前，请确保文件已存在
+2. **使用绝对路径**：推荐使用绝对路径，如 `jcad /path/to/my_task.txt`，避免路径问题
+3. **验证文件内容**：可以先执行 `cat my_task.txt` 确认文件内容正确
+
 **多行命令直接输入**：
 
 ```bash
@@ -208,11 +221,26 @@ Worktree 模式是 `jcad` 的核心安全特性：
 
 ### 3.4 Tmux 派发集成
 
-`jcad` 智能调度任务到 tmux panel：
+`jcad` 智能调度任务到 tmux panel，根据任务类型采用不同的调用方式：
+
+#### 多行任务或交互模式（使用 Tmux）
+
+对于多行任务或交互式输入，jcad 使用 tmux 的 `dispatch_command_to_panel` 函数创建新的 panel：
 
 ```bash
-# 内部执行的命令（示例）
+# 内部执行的命令（tmux 派发模式）
 cd /path/to/project && jca -n -w --task-file '/tmp/jcad_task_xxxxxxxx.txt'
+```
+
+**注意**：在 tmux 派发模式下，jca 命令本身不需要 `--dispatch` 参数，因为 tmux 的 panel 创建已经完成了任务派发。
+
+#### 单行任务（直接执行）
+
+对于单行任务，jcad 直接执行 jca 命令并传递 `--dispatch` 参数：
+
+```bash
+# 内部执行的命令（直接派发模式）
+jca -n -w --dispatch --task '你的任务内容'
 ```
 
 **特性**：
