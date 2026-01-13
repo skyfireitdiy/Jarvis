@@ -8,7 +8,12 @@ import subprocess
 import shutil
 from typing import Any, Dict, List, Optional
 
-from jarvis.jarvis_jck.config import get_tools_config, get_tool_config
+from jarvis.jarvis_jck.config import (
+    get_tools_config,
+    get_tool_config,
+    get_lint_tools_config,
+    get_build_tools_config,
+)
 
 
 class ToolChecker:
@@ -21,6 +26,8 @@ class ToolChecker:
     def __init__(self) -> None:
         """初始化工具检查器"""
         self.tools_config = get_tools_config()
+        self.lint_tools_config = get_lint_tools_config()
+        self.build_tools_config = get_build_tools_config()
 
     def check_tool_exists(self, command: str) -> bool:
         """检查工具命令是否存在
@@ -137,3 +144,33 @@ class ToolChecker:
             "found": found,
             "missing": missing,
         }
+
+    def check_lint_tools(self) -> List[Dict[str, Any]]:
+        """检查所有lint工具
+
+        返回:
+            包含所有lint工具检查结果的列表
+        """
+        results = []
+
+        for tool_config in self.lint_tools_config:
+            tool_name = tool_config["name"]
+            result = self.check_single_tool(tool_name)
+            results.append(result)
+
+        return results
+
+    def check_build_tools(self) -> List[Dict[str, Any]]:
+        """检查所有构建工具
+
+        返回:
+            包含所有构建工具检查结果的列表
+        """
+        results = []
+
+        for tool_config in self.build_tools_config:
+            tool_name = tool_config["name"]
+            result = self.check_single_tool(tool_name)
+            results.append(result)
+
+        return results

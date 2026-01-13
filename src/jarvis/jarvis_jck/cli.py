@@ -95,6 +95,8 @@ def check(
         None, help="要检查的工具名称（可选），不指定则检查所有工具"
     ),
     as_json: bool = typer.Option(False, "--json", "-j", help="以JSON格式输出结果"),
+    check_lint: bool = typer.Option(False, "--check-lint", "-l", help="检查lint工具"),
+    check_build: bool = typer.Option(False, "--check-build", "-b", help="检查构建工具"),
 ) -> None:
     """检查工具安装情况
 
@@ -102,13 +104,30 @@ def check(
     """
     checker = ToolChecker()
 
+    # 检查选项互斥
+    check_flags = [check_lint, check_build]
+    active_flags = sum(check_flags)
+    if active_flags > 1:
+        PrettyOutput.print(
+            "❌ 错误：--check-lint 和 --check-build 选项不能同时使用", OutputType.ERROR
+        )
+        sys.exit(1)
+
     if tool_name:
-        # 检查单个工具
+        # 检查单个工具（优先于其他选项）
         result = checker.check_single_tool(tool_name)
         results = [result]
         summary = checker.get_summary(results)
+    elif check_lint:
+        # 检查lint工具
+        results = checker.check_lint_tools()
+        summary = checker.get_summary(results)
+    elif check_build:
+        # 检查构建工具
+        results = checker.check_build_tools()
+        summary = checker.get_summary(results)
     else:
-        # 检查所有工具
+        # 检查所有工具（默认行为）
         results = checker.check_all_tools()
         summary = checker.get_summary(results)
 
