@@ -203,9 +203,11 @@ def get_tool_config(tool_name: str) -> Dict[str, str] | None:
     返回:
         工具配置字典，如果未找到则返回None
     """
-    for tool in TOOLS_CONFIG:
-        if tool["name"] == tool_name:
-            return tool
+    # 在所有配置列表中查找工具
+    for config_list in [TOOLS_CONFIG, LINT_TOOLS_CONFIG, BUILD_TOOLS_CONFIG]:
+        for tool in config_list:
+            if tool["name"] == tool_name:
+                return tool
     return None
 
 
