@@ -102,7 +102,7 @@ def run_jvs_dispatch(
             session_name = dispatch_command_to_panel(
                 command,
                 stay_in_session_after_exit=stay_in_session_after_exit,
-                shell_fallback=False,
+                shell_fallback=True,
             )
             if not session_name:
                 PrettyOutput.auto_print("❌ 错误: dispatch 模式创建 tmux panel 失败")
