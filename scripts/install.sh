@@ -87,7 +87,8 @@ if [ "$INSTALL_TYPE" = "clone" ]; then
         echo "正在拉取最新代码..."
         git pull
     fi
-else
+  fi
+  else
     echo "正在克隆仓库到 $DEST_DIR..."
     # 临时禁用 set -e 以允许降级重试
     set +e
@@ -132,11 +133,11 @@ case "$INSTALL_TYPE" in
     case "$rag_choice" in
       y|Y )
         echo "正在从仓库安装核心功能及 RAG 依赖..."
-        if uv tool install "git+$GITEE_URL[rag]"; then
+        if uv tool install "git+${GITEE_URL}[rag]"; then
           echo "✓ 从 Gitee 安装成功"
         else
           echo "✗ Gitee 安装失败，尝试从 GitHub 安装..."
-          if uv tool install "git+$GITHUB_URL[rag]"; then
+          if uv tool install "git+${GITHUB_URL}[rag]"; then
             echo "✓ 从 GitHub 安装成功"
           else
             echo "✗ GitHub 安装也失败，请检查网络连接"
