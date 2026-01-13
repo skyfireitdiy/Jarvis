@@ -74,15 +74,15 @@ npm test -- --watch       # 监视模式
 
 ```javascript
 // test/calculator.test.js
-const { add, divide } = require('../src/calculator');
+const { add, divide } = require("../src/calculator");
 
-describe('Calculator', () => {
-  test('adds two numbers', () => {
+describe("Calculator", () => {
+  test("adds two numbers", () => {
     expect(add(2, 3)).toBe(5);
   });
 
-  test('throws error on divide by zero', () => {
-    expect(() => divide(10, 0)).toThrow('Division by zero');
+  test("throws error on divide by zero", () => {
+    expect(() => divide(10, 0)).toThrow("Division by zero");
   });
 });
 ```
@@ -91,10 +91,10 @@ describe('Calculator', () => {
 
 ```typescript
 // test/calculator.test.ts
-import { add, divide } from '../src/calculator';
+import { add, divide } from "../src/calculator";
 
-describe('Calculator', () => {
-  it('adds two numbers', () => {
+describe("Calculator", () => {
+  it("adds two numbers", () => {
     expect(add(2, 3)).toBe(5);
   });
 });

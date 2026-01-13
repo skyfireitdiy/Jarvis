@@ -51,8 +51,8 @@ def _load_builtin_rules() -> None:
     # 加载通用规则（rules 目录）
     _load_rules_from_directory(builtin_dir / "rules")
 
-    # 加载测试规则（test_rules 目录）
-    _load_rules_from_directory(builtin_dir / "test_rules")
+    # 加载测试规则（testing 目录）
+    _load_rules_from_directory(builtin_dir / "rules" / "testing")
 
 
 # 在模块加载时自动加载所有规则
