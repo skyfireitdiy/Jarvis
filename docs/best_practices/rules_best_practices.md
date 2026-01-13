@@ -18,7 +18,7 @@ JARVIS 规则系统是一套基于 Markdown 的规范化指令集合，用于指
 
 ## 📚 现有规则概览
 
-JARVIS 内置了以下规则，位于 `builtin/rules/` 和 `builtin/test_rules/` 目录：
+JARVIS 内置了以下规则，位于 `builtin/rules/` 和 `builtin/rules/testing/` 目录：
 
 ### 架构设计
 
@@ -109,7 +109,7 @@ JARVIS 支持从多个位置加载规则，按优先级从高到低：
    - 存储全局共享的规则文件
 
 5. **内置规则目录**
-   - 位置：`builtin/rules/` 和 `builtin/test_rules/`
+   - 位置：`builtin/rules/` 和 `builtin/rules/testing/`
    - JARVIS 自带的规则集
 
 6. **rules.yaml 文件中的规则**
@@ -782,7 +782,7 @@ with open('file.txt', 'r') as f:
 ## 🔗 相关资源
 
 - [builtin/rules/](../../builtin/rules/) - 内置规则目录
-- [builtin/test_rules/](../../builtin/test_rules/) - 内置测试规则目录
+- [builtin/rules/testing/](../../builtin/rules/testing/) - 内置测试规则目录
 - [docs/jarvis_config.md](../jarvis_config.md) - 配置系统文档
 - [builtin_rules.py](../../src/jarvis/jarvis_code_agent/builtin_rules.py) - 加载
 - code_agent_rules.py - 管理

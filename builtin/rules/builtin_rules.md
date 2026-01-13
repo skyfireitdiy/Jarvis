@@ -51,13 +51,13 @@
 - [新增规则规范]({{ rule_file_dir }}/tool_config/add_rule.md)
 - [忽略所有告警]({{ rule_file_dir }}/tool_config/ignore_all_alerts.md)
 
-## 测试规范
+## 测试规范 (testing/)
 
-- [C/C++ 测试]({{ rule_file_dir }}/../test_rules/cpp_test.md)
-- [Go 测试]({{ rule_file_dir }}/../test_rules/go_test.md)
-- [JS/TS 测试]({{ rule_file_dir }}/../test_rules/javascript_test.md)
-- [Java 测试]({{ rule_file_dir }}/../test_rules/java_test.md)
-- [PHP 测试]({{ rule_file_dir }}/../test_rules/php_test.md)
-- [Python 测试]({{ rule_file_dir }}/../test_rules/python_test.md)
-- [Ruby 测试]({{ rule_file_dir }}/../test_rules/ruby_test.md)
-- [Rust 测试]({{ rule_file_dir }}/../test_rules/rust_test.md)
+- [C/C++ 测试]({{ rule_file_dir }}/testing/cpp_test.md)
+- [Go 测试]({{ rule_file_dir }}/testing/go_test.md)
+- [JS/TS 测试]({{ rule_file_dir }}/testing/javascript_test.md)
+- [Java 测试]({{ rule_file_dir }}/testing/java_test.md)
+- [PHP 测试]({{ rule_file_dir }}/testing/php_test.md)
+- [Python 测试]({{ rule_file_dir }}/testing/python_test.md)
+- [Ruby 测试]({{ rule_file_dir }}/testing/ruby_test.md)
+- [Rust 测试]({{ rule_file_dir }}/testing/rust_test.md)

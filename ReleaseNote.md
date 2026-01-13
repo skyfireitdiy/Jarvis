@@ -1007,8 +1007,8 @@
 - **内置规则系统重大重构**
   - **规则文件化**：将所有内置规则从硬编码改为 Markdown 文件形式组织
     - **通用规则**：位于 `src/jarvis/jarvis_code_agent/rules/` 目录，包含 9 个开发实践规则（TDD、代码审查、重构、整洁代码、错误处理、安全、性能、文档、Git工作流）
-    - **测试规则**：位于 `src/jarvis/jarvis_code_agent/test_rules/` 目录，包含 8 种语言的测试规则（Python、JavaScript、Java、Go、Rust、C/C++、Ruby、PHP）
-  - **动态加载机制**：`builtin_rules.py` 模块在初始化时自动扫描 `rules/` 和 `test_rules/` 目录，加载所有 `.md` 文件作为内置规则
+    - **测试规则**：位于 `builtin/rules/testing/` 目录，包含 8 种语言的测试规则（Python、JavaScript、Java、Go、Rust、C/C++、Ruby、PHP）
+  - **动态加载机制**：`builtin_rules.py` 模块在初始化时自动扫描 `rules/` 和 `rules/testing/` 目录，加载所有 `.md` 文件作为内置规则
   - **规则格式优化**：所有规则文件已改写为适合大模型理解和使用的指令性格式
     - 使用"必须"、"禁止"等明确指令性语言
     - 提供详细的执行要求和检查清单
