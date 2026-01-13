@@ -694,10 +694,45 @@ class BasePlatform(ABC):
                         )
                         return ""
                 else:
+                    # trim_messages失败（消息不足10条），尝试直接截断当前消息
                     PrettyOutput.auto_print(
-                        "⚠️ 警告：裁剪失败或无消息可裁剪，无法发送消息"
+                        "⚠️ 警告：裁剪失败（消息不足10条），尝试直接截断当前消息..."
                     )
-                    return ""
+                    # 计算消息的token数量
+                    message_tokens = get_context_token_count(message)
+                    # 即使remaining_tokens为0，也尝试保留消息的一部分（使用固定比例）
+                    # 使用模型最大输入token的5%作为目标
+                    max_tokens = self._get_platform_max_input_token_count()
+                    target_tokens = int(max_tokens * 0.05)  # 5% of max tokens
+                    if target_tokens <= 100:
+                        target_tokens = 100  # 至少保留100 tokens
+                    
+                    # 估算字符数（1 token ≈ 4字符）
+                    target_chars = target_tokens * 4
+                    
+                    # 如果消息长度小于目标字符数，直接返回（token估算可能有误差）
+                    if len(message) <= target_chars:
+                        PrettyOutput.auto_print(
+                            f"✅ 消息长度在可接受范围内，直接发送（约 {message_tokens} tokens）"
+                        )
+                        return message
+                    
+                    # 截断消息：保留前面的内容，添加截断提示
+                    truncated_message = message[:target_chars]
+                    # 尝试在最后一个完整句子处截断
+                    last_period = truncated_message.rfind(".")
+                    last_newline = truncated_message.rfind("\n")
+                    last_break = max(last_period, last_newline)
+                    
+                    if last_break > target_chars * 0.5:  # 如果找到的断点不太靠前
+                        truncated_message = truncated_message[: last_break + 1]
+                    
+                    truncated_message += "\n\n... (消息过长，已截断以避免超出上下文限制)"
+                    PrettyOutput.auto_print(
+                        f"✅ 消息已截断至约 {target_tokens} tokens（原始约 {message_tokens} tokens）"
+                    )
+                    
+                    return truncated_message
 
             # 计算消息的token数量
             message_tokens = get_context_token_count(message)
