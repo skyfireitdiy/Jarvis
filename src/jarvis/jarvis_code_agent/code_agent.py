@@ -189,6 +189,7 @@ class CodeAgent(Agent):
             "execute_script",  # 脚本执行工具
             "read_code",  # 代码读取工具
             "edit_file",  # 普通 search/replace 编辑工具
+            "load_rule",  # 规则加载工具
             "virtual_tty",  # 虚拟终端工具，支持交互式操作
             "search_web",  # 网络搜索工具
             "read_webpage",  # 网页内容读取工具
