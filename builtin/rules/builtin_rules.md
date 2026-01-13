@@ -14,6 +14,16 @@
 
 用于强调可读性优先和单一职责原则。（{{ rule_file_dir }}/clean_code.md）
 
+### 代码反向设计专家
+
+能够阅读给定代码并输出详细的设计方案，帮助开发者理解代码结构并实现功能对齐的开发。（{{ rule_file_dir }}/code-reverse-design-expert.md）
+
+### 架构图生成器
+
+能够阅读代码，抽象关键组件，并使用Graphviz按要求输出逻辑视图、实现
+视图、进程视图、部署视图和用例视图中的一个或多个架构图，并最终渲染成
+PNG图片。（{{ rule_file_dir }}/architecture-diagram-generator.md）
+
 ## 开发流程
 
 ### C2Rust 转译
@@ -42,11 +52,31 @@
 
 用于定义清晰性和完整性原则。（{{ rule_file_dir }}/documentation.md）
 
+### 重构检查专家
+
+重构检查专家，负责检查重构后的代码逻辑是否与原代码完全一致。（{{ rule_file_dir }}/refactor-checker.md）
+
 ## 安全规范
 
 ### 安全编码
 
 用于定义输入验证和最小权限原则。（{{ rule_file_dir }}/security.md）
+
+### 安全漏洞分析师
+
+逻辑/安全漏洞查找专家，接受用户给出的代码目录、文件，分析代码功能，如果分析其中的逻辑和安全漏洞。（{{ rule_file_dir }}/security-vulnerability-analyst.md）
+
+## 开发工具
+
+### 脚本生成专家
+
+脚本生成专家，负责根据需求生成各种类型的脚本。（{{ rule_file_dir }}/script-generator.md）
+
+## 部署规范
+
+### 开源部署专家
+
+开源部署专家，负责将开源项目部署到目标环境中。（{{ rule_file_dir }}/opensource-deployment-expert.md）
 
 ## 性能优化指南
 
