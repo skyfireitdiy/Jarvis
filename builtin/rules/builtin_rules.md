@@ -16,6 +16,10 @@
 
 ## 开发流程
 
+### C2Rust 转译
+
+用于指导 C/C++ 到 Rust 的代码转译过程，确保转译质量、功能一致性和类型安全。（{{ rule_file_dir }}/c2rust_transpiler.md）
+
 ### Spec 驱动开发 (SDD)
 
 用于定义 Spec-实现-验证循环。（{{ rule_file_dir }}/sdd.md）
