@@ -45,8 +45,8 @@ class ReadCodeTool:
             if agent and hasattr(agent, "model"):
                 try:
                     remaining_tokens = agent.model.get_remaining_token_count()
-                    # 使用剩余token的1/2作为限制，保留1/2作为安全余量
-                    limit_tokens = int(remaining_tokens * 1 / 2)
+                    # 取剩余token数量和64k中较小的值
+                    limit_tokens = min(remaining_tokens, 65536)
                     # 确保至少返回一个合理的值
                     if limit_tokens > 0:
                         return limit_tokens
