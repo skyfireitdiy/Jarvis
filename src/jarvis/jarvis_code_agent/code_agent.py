@@ -845,9 +845,6 @@ git reset --hard {start_commit}
         返回:
             str: 修复总结
         """
-        if not self.need_summary:
-            return ""
-
         try:
             # 使用父类的 generate_summary 方法
             summary = self.generate_summary(for_token_limit=False)
