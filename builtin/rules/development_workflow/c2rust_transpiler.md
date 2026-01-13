@@ -321,6 +321,6 @@ pub fn calculate(x: i32) -> i32 {
 
 ## 相关资源
 
-- 参考 TDD 规则：{{ rule_file_dir }}/tdd.md
-- 参考代码审查规则：{{ rule_file_dir }}/code_review.md
-- 参考 Rust 性能优化：{{ rule_file_dir }}/rust_performance.md
+- 参考 TDD 规则：{{ rule_file_dir }}/../development_workflow/tdd.md
+- 参考代码审查规则：{{ rule_file_dir }}/../code_quality/code_review.md
+- 参考 Rust 性能优化：{{ rule_file_dir }}/../performance/rust_performance.md

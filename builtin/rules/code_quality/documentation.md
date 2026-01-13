@@ -75,17 +75,17 @@
 ```python
 def calculate_total(items: list[Item], discount: float = 0.0) -> float:
     """计算商品总价
-    
+
     参数:
         items: 商品列表，不能为空
         discount: 折扣率，范围 0.0-1.0，默认 0.0
-    
+
     返回:
         计算后的总价，已应用折扣
-    
+
     异常:
         ValueError: 当 items 为空或 discount 不在有效范围时抛出
-    
+
     示例:
         >>> items = [Item(price=10.0), Item(price=20.0)]
         >>> calculate_total(items, discount=0.1)
