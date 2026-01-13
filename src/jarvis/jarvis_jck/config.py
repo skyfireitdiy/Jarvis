@@ -54,6 +54,16 @@ TOOLS_CONFIG: List[Dict[str, str]] = [
         "install_hint": "cargo通常随rustup一起安装，如果未安装请先安装rustup："
         "\n  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh",
     },
+    {
+        "name": "loc",
+        "command": "loc",
+        "description": "代码行数统计工具",
+        "install_hint": "访问 https://github.com/cgag/loc 安装，或使用包管理器："
+        "\n  Ubuntu/Debian: sudo apt install loc"
+        "\n  macOS: brew install loc"
+        "\n  Cargo: cargo install loc"
+        "\n  pip: pip install loc",
+    },
 ]
 
 # 获取工具配置
