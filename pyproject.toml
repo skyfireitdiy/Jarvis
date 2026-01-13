@@ -169,6 +169,8 @@ dependencies = [
     jcfg = "jarvis.jarvis_config.cli:app"
     jarvis-quick-config = "jarvis.jarvis_utils.quick_config:app"
     jqc = "jarvis.jarvis_utils.quick_config:app"
+    jarvis-check = "jarvis.jarvis_jck.cli:main"
+    jck = "jarvis.jarvis_jck.cli:main"
 
 
 
