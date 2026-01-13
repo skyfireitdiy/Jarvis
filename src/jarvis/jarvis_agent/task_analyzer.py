@@ -211,6 +211,10 @@ class TaskAnalyzer:
     def _on_before_summary(self, **payload: Any) -> None:
         if self._analysis_done:
             return
+        # 仅在非交互模式下执行任务分析
+        if not getattr(self.agent, "non_interactive", False):
+            self._analysis_done = True
+            return
         # 避免与直接调用重复
         try:
             if bool(self.agent.get_user_data("__task_analysis_done__")):
@@ -228,6 +232,10 @@ class TaskAnalyzer:
             self._analysis_done = True
 
     def _on_task_completed(self, **payload: Any) -> None:
+        # 仅在非交互模式下执行任务分析
+        if not getattr(self.agent, "non_interactive", False):
+            self._analysis_done = True
+            return
         # 当未在 before_summary 阶段执行过时，作为兜底
         if self._analysis_done:
             return
