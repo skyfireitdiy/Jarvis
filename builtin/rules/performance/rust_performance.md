@@ -430,10 +430,10 @@ let results: Vec<_> = data.par_iter().map(|x| expensive_fn(x)).collect();
    ```bash
    # 生成按 overhead 排序的性能报告
    perf report --stdio --sort=overhead,symbol > perf_report.txt
-   
+
    # 生成热点函数列表（仅显示 overhead > 5%）
    perf report --stdio --percent-limit 5 --sort=overhead > perf_hotspots.txt
-   
+
    # 生成调用链分析报告
    perf report --stdio -g graph,0.5,caller > perf_callgraph.txt
    ```
@@ -453,16 +453,16 @@ let results: Vec<_> = data.par_iter().map(|x| expensive_fn(x)).collect();
    ```bash
    # 重新采集性能数据
    perf record -F 99 -g --call-graph=dwarf ./target/release/binary
-   
+
    # 生成新的性能报告
    perf report --stdio --sort=overhead,symbol > perf_report_after.txt
-   
+
    # 对比优化前后的文本报告（手动对比或使用 diff 工具）
    diff -u perf_report_before.txt perf_report_after.txt
-   
+
    # 使用 perf diff 生成差异报告
    perf diff perf.data.before perf.data.after > perf_diff.txt
-   
+
    # 运行基准测试验证性能提升
    cargo bench
    ```
@@ -644,7 +644,7 @@ echo "性能分析完成，报告位于 $OUTPUT_DIR"
    // 优化前
    let mut vec = Vec::new();
    for item in items { vec.push(item); }
-   
+
    // 优化后
    let mut vec = Vec::with_capacity(items.len());
    for item in items { vec.push(item); }
@@ -672,6 +672,7 @@ perf diff perf.data perf_after.data > perf_diff.txt
 # 性能分析报告
 
 ## 采集信息
+
 - 二进制文件: target/release/binary
 - 采样频率: 99 Hz
 - 采样时长: 30 秒
@@ -680,6 +681,7 @@ perf diff perf.data perf_after.data > perf_diff.txt
 ## 热点函数（Overhead > 5%）
 
 ### 1. hot_function (Overhead: 25.34%)
+
 - **类型**: 用户代码循环热点
 - **位置**: src/lib.rs:123
 - **调用链**: main -> process_data -> hot_function
@@ -689,6 +691,7 @@ perf diff perf.data perf_after.data > perf_diff.txt
   2. 预分配内存避免动态扩容
 
 ### 2. alloc::vec::Vec::push (Overhead: 15.67%)
+
 - **类型**: 内存分配热点
 - **位置**: 多处调用
 - **优化建议**:
@@ -696,6 +699,7 @@ perf diff perf.data perf_after.data > perf_diff.txt
   2. 考虑使用 SmallVec 优化小容量场景
 
 ## 优化优先级
+
 1. [高优先级] hot_function - 预计可减少 15-20% 总耗时
 2. [高优先级] Vec::push 热点 - 预计可减少 10-15% 总耗时
 3. [中优先级] clone 操作 - 预计可减少 5-8% 总耗时

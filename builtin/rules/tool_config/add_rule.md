@@ -29,7 +29,7 @@
 
 **注册要求：**
 
-- **必须**：按照 `{{ rule_file_dir }}/builtin_rules.md` 的格式添加规则条目
+- **必须**：按照 `{{ rule_file_dir }}/../builtin_rules.md` 的格式添加规则条目
 - **必须**：提供规则的简短描述和文件路径
 - **必须**：将规则添加到合适的分类下（如架构设计、开发流程、代码质量等）
 
@@ -145,8 +145,8 @@
 ```markdown
 ### 相关规则
 
-- 参考代码审查规则：`{% raw %}{{ rule_file_dir }}{% endraw %}/code_review.md`
-- 参考安全规则：`{% raw %}{{ rule_file_dir }}{% endraw %}/security.md`
+- 参考代码审查规则：`{% raw %}{{ rule_file_dir }}{% endraw %}/../code_quality/code_review.md`
+- 参考安全规则：`{% raw %}{{ rule_file_dir }}{% endraw %}/../security/security.md`
 ```
 
 #### 示例 2：指定项目路径
