@@ -31,6 +31,7 @@
 ## 开发工具 (development_tools/)
 
 - [脚本生成专家]({{ rule_file_dir }}/development_tools/script-generator.md)
+- [添加技能]({{ rule_file_dir }}/development_tools/add_skills.md)
 
 ## 部署规范 (deployment/)
 
