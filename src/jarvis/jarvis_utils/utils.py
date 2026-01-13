@@ -2156,6 +2156,9 @@ def while_success(func: Callable[[], Any]) -> Any:
     result: Any = None
 
     while True:
+        # 检测中断信号，如果中断则直接返回（不清除中断标志）
+        if get_interrupt() > 0:
+            return None
         try:
             result = func()
             _reset_retry_count()  # 成功后重置计数器
@@ -2200,6 +2203,9 @@ def while_true(func: Callable[[], bool]) -> Any:
     ret: bool = False
 
     while True:
+        # 检测中断信号，如果中断则直接返回（不清除中断标志）
+        if get_interrupt() > 0:
+            return False
         try:
             ret = func()
             if ret:
