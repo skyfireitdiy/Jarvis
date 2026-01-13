@@ -66,6 +66,126 @@ TOOLS_CONFIG: List[Dict[str, str]] = [
     },
 ]
 
+# Lint工具配置列表
+LINT_TOOLS_CONFIG: List[Dict[str, str]] = [
+    {
+        "name": "ruff",
+        "command": "ruff",
+        "description": "Python代码linter和formatter",
+        "install_hint": "安装：pip install ruff"
+        "\n  或访问 https://docs.astral.sh/ruff/ 查看文档",
+    },
+    {
+        "name": "mypy",
+        "command": "mypy",
+        "description": "Python静态类型检查器",
+        "install_hint": "安装：pip install mypy"
+        "\n  或访问 https://mypy.readthedocs.io/ 查看文档",
+    },
+    {
+        "name": "pylint",
+        "command": "pylint",
+        "description": "Python代码分析工具",
+        "install_hint": "安装：pip install pylint"
+        "\n  或访问 https://pylint.org/ 查看文档",
+    },
+    {
+        "name": "shellcheck",
+        "command": "shellcheck",
+        "description": "Shell脚本静态分析工具",
+        "install_hint": "Ubuntu/Debian: sudo apt install shellcheck"
+        "\n  macOS: brew install shellcheck"
+        "\n  或访问 https://www.shellcheck.net/ 查看文档",
+    },
+    {
+        "name": "clang-tidy",
+        "command": "clang-tidy",
+        "description": "C/C++ linter和静态分析工具",
+        "install_hint": "Ubuntu/Debian: sudo apt install clang-tidy"
+        "\n  macOS: brew install llvm"
+        "\n  或访问 https://clang.llvm.org/extra/clang-tidy/ 查看文档",
+    },
+    {
+        "name": "eslint",
+        "command": "eslint",
+        "description": "JavaScript/TypeScript linter",
+        "install_hint": "安装：npm install -g eslint"
+        "\n  或访问 https://eslint.org/ 查看文档",
+    },
+    {
+        "name": "rubocop",
+        "command": "rubocop",
+        "description": "Ruby静态代码分析工具",
+        "install_hint": "安装：gem install rubocop"
+        "\n  或访问 https://docs.rubocop.org/ 查看文档",
+    },
+]
+
+# 构建工具配置列表
+BUILD_TOOLS_CONFIG: List[Dict[str, str]] = [
+    {
+        "name": "pytest",
+        "command": "pytest",
+        "description": "Python测试框架",
+        "install_hint": "安装：pip install pytest"
+        "\n  或访问 https://docs.pytest.org/ 查看文档",
+    },
+    {
+        "name": "build",
+        "command": "python -m build",
+        "description": "Python包构建工具",
+        "install_hint": "安装：pip install build"
+        "\n  或访问 https://pypa-build.readthedocs.io/ 查看文档",
+    },
+    {
+        "name": "twine",
+        "command": "twine",
+        "description": "PyPI包发布工具",
+        "install_hint": "安装：pip install twine"
+        "\n  或访问 https://twine.readthedocs.io/ 查看文档",
+    },
+    {
+        "name": "cmake",
+        "command": "cmake",
+        "description": "跨平台构建系统生成器",
+        "install_hint": "Ubuntu/Debian: sudo apt install cmake"
+        "\n  macOS: brew install cmake"
+        "\n  或访问 https://cmake.org/ 查看文档",
+    },
+    {
+        "name": "go",
+        "command": "go",
+        "description": "Go语言工具链",
+        "install_hint": "访问 https://go.dev/dl/ 下载安装，或使用包管理器："
+        "\n  Ubuntu/Debian: sudo apt install golang-go"
+        "\n  macOS: brew install go",
+    },
+    {
+        "name": "gradle",
+        "command": "gradle",
+        "description": "Java自动化构建工具",
+        "install_hint": "Ubuntu/Debian: sudo apt install gradle"
+        "\n  macOS: brew install gradle"
+        "\n  或访问 https://gradle.org/ 查看文档",
+    },
+    {
+        "name": "maven",
+        "command": "mvn",
+        "description": "Java项目管理工具",
+        "install_hint": "Ubuntu/Debian: sudo apt install maven"
+        "\n  macOS: brew install maven"
+        "\n  或访问 https://maven.apache.org/ 查看文档",
+    },
+    {
+        "name": "npm",
+        "command": "npm",
+        "description": "Node.js包管理器",
+        "install_hint": "安装Node.js时会自动包含npm"
+        "\n  访问 https://nodejs.org/ 下载安装"
+        "\n  或访问 https://docs.npmjs.com/ 查看文档",
+    },
+]
+
 # 获取工具配置
 
 
@@ -87,3 +207,13 @@ def get_tool_config(tool_name: str) -> Dict[str, str] | None:
         if tool["name"] == tool_name:
             return tool
     return None
+
+
+def get_lint_tools_config() -> List[Dict[str, str]]:
+    """获取lint工具配置列表"""
+    return LINT_TOOLS_CONFIG
+
+
+def get_build_tools_config() -> List[Dict[str, str]]:
+    """获取构建工具配置列表"""
+    return BUILD_TOOLS_CONFIG
