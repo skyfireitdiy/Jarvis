@@ -3,7 +3,6 @@
 import os
 import shutil
 
-from jarvis.jarvis_utils.config import calculate_token_limit
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -283,11 +282,6 @@ class EditFileNormalTool:
         original_content: str,
         modified_content: str,
         file_path: str,
-        match_count: int,
-        search_text: str,
-        replace_text: str,
-        agent: Optional[Any] = None,
-        token_ratio: float = 0.3,
     ) -> str:
         """生成修改后的预览diff
 
@@ -295,11 +289,6 @@ class EditFileNormalTool:
             original_content: 原始文件内容
             modified_content: 修改后的文件内容
             file_path: 文件路径
-            match_count: 匹配次数
-            search_text: 搜索文本
-            replace_text: 替换文本
-            agent: 可选的 agent 实例，用于获取剩余 token 数量
-            token_ratio: token 使用比例（默认 0.3，即 30%）
 
         Returns:
             预览diff字符串
@@ -322,41 +311,6 @@ class EditFileNormalTool:
         )
 
         diff_preview = "".join(diff)
-
-        # 根据剩余token计算最大字符数
-        max_diff_chars = None
-
-        # 优先尝试使用 agent 获取剩余 token（更准确，包含对话历史）
-        if agent:
-            try:
-                remaining_tokens = agent.get_remaining_token_count()
-                if remaining_tokens > 0:
-                    # 使用剩余token的2/3或64k的最小值，再转换为字符数
-                    max_diff_chars = int(
-                        calculate_token_limit(remaining_tokens) * token_ratio * 4
-                    )
-                    if max_diff_chars <= 0:
-                        max_diff_chars = None
-            except Exception:
-                pass
-
-        # 回退方案：使用输入窗口的指定比例转换为字符数
-        if max_diff_chars is None:
-            try:
-                from jarvis.jarvis_utils.config import get_max_input_token_count
-
-                max_input_tokens = get_max_input_token_count()
-                max_diff_chars = int(max_input_tokens * token_ratio * 4)
-            except Exception:
-                # 如果获取失败，使用默认值（约 10000 字符）
-                max_diff_chars = 10000
-
-        # 限制diff长度
-        if len(diff_preview) > max_diff_chars:
-            diff_preview = (
-                diff_preview[:max_diff_chars] + "\n... (diff 内容过长，已截断)"
-            )
-
         return diff_preview
 
     @staticmethod
@@ -396,11 +350,6 @@ class EditFileNormalTool:
                 original_content,
                 modified_content,
                 file_path,
-                match_count,
-                search_text,
-                replace_text,
-                agent=agent_instance,
-                token_ratio=0.3,  # 使用30%的剩余token用于diff预览
             )
 
             prompt = f"""检测到文件编辑操作中，search 文本在文件中存在多处匹配，需要您确认是否继续修改：
