@@ -22,6 +22,7 @@ from jarvis.jarvis_mcp.sse_mcp_client import SSEMcpClient
 from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
+from jarvis.jarvis_utils.config import calculate_token_limit
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_tool_load_dirs
 from jarvis.jarvis_utils.globals import get_global_model_group
@@ -1194,16 +1195,65 @@ class ToolRegistry(OutputHandlerProtocol):
 
         return result
 
-    def _format_tool_output(self, stdout: str, stderr: str) -> str:
+    def _format_tool_output(
+        self, stdout: str, stderr: str, platform: Any = None
+    ) -> str:
         """格式化工具输出为可读字符串
 
         Args:
             stdout: 标准输出
             stderr: 标准错误
+            platform: 平台实例，用于获取剩余token数
 
         Returns:
             str: 格式化后的输出
         """
+        # 根据剩余token数截断输出
+        if platform is not None:
+            try:
+                remaining_tokens = platform.get_remaining_token_count()
+                if remaining_tokens > 0:
+                    # 计算允许的最大字符数（与c2rust保持一致：使用calculate_token_limit并乘以4）
+                    max_allowed_tokens = calculate_token_limit(remaining_tokens)
+                    max_allowed_chars = int(max_allowed_tokens * 4)
+
+                    # 计算stdout和stderr的字符数
+                    stdout_len = len(stdout) if stdout else 0
+                    stderr_len = len(stderr) if stderr else 0
+                    total_len = stdout_len + stderr_len
+
+                    # 如果总字符数超过限制，则截断
+                    if total_len > max_allowed_chars:
+                        # 计算分配给stdout和stderr的字符数（按比例）
+                        if stdout_len > 0 and stderr_len > 0:
+                            stdout_ratio = stdout_len / total_len
+                            stderr_ratio = stderr_len / total_len
+                            max_stdout_chars = int(max_allowed_chars * stdout_ratio)
+                            max_stderr_chars = int(max_allowed_chars * stderr_ratio)
+                        elif stdout_len > 0:
+                            max_stdout_chars = max_allowed_chars
+                            max_stderr_chars = 0
+                        else:
+                            max_stdout_chars = 0
+                            max_stderr_chars = max_allowed_chars
+
+                        # 截断stdout和stderr（只保留前面部分，与c2rust保持一致）
+                        if stdout and max_stdout_chars > 0:
+                            stdout = stdout[:max_stdout_chars]
+                            if len(stdout) < stdout_len:
+                                stdout += "\n... (输出过长，已截断)"
+                        if stderr and max_stderr_chars > 0:
+                            stderr = stderr[:max_stderr_chars]
+                            if len(stderr) < stderr_len:
+                                stderr += "\n... (输出过长，已截断)"
+
+                        PrettyOutput.auto_print(
+                            f"⚠️ 工具输出过长（{total_len}字符），已根据剩余token数（{remaining_tokens}）截断"
+                        )
+            except Exception:
+                # 如果获取剩余token数失败，不截断
+                pass
+
         output_parts = []
         if stdout:
             output_parts.append(f"<stdout>\n{stdout}\n</stdout>")
@@ -1342,14 +1392,16 @@ class ToolRegistry(OutputHandlerProtocol):
                     usage_prompt = agent_instance.get_tool_usage_prompt()
                 except Exception:
                     usage_prompt = tool_call_help
+                platform = agent_instance.model if agent_instance.model else None
                 err_output = self._format_tool_output(
-                    result.get("stdout", ""), result.get("stderr", "")
+                    result.get("stdout", ""), result.get("stderr", ""), platform
                 )
                 return f"{err_output}\n\n{usage_prompt}"
 
             # 格式化输出
+            platform = agent_instance.model if agent_instance.model else None
             output = self._format_tool_output(
-                result["stdout"], result.get("stderr", "")
+                result["stdout"], result.get("stderr", ""), platform
             )
 
             # 添加执行时间信息供LLM参考
