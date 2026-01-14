@@ -752,6 +752,11 @@ def run_cli(
         "--dispatch",
         help="将任务派发到新的 tmux 窗口中执行（仅在 tmux 环境中有效），当前进程退出",
     ),
+    rule_names: Optional[str] = typer.Option(
+        None,
+        "--rule-names",
+        help="规则名称列表（逗号分隔），用于加载指定的规则",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1179,6 +1184,7 @@ def run_cli(
             use_analysis=False if disable_methodology_analysis else None,
             non_interactive=non_interactive,
             allow_savesession=True,
+            rule_names=rule_names,
             **extra_kwargs,
         )
         agent_manager.initialize()

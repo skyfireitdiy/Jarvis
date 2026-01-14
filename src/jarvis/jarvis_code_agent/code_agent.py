@@ -25,7 +25,7 @@ from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
 from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
-from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+from jarvis.jarvis_agent.rules_manager import RulesManager
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
     ContextRecommender,
@@ -83,7 +83,9 @@ class CodeAgent(Agent):
         **kwargs: Any,
     ) -> None:
         # CodeAgent 基础属性初始化
-        self._init_code_agent_base_attributes(tool_group, disable_review, review_max_iterations)
+        self._init_code_agent_base_attributes(
+            tool_group, disable_review, review_max_iterations
+        )
 
         # 上下文管理相关初始化
         self._init_code_agent_context_managers()
@@ -92,7 +94,9 @@ class CodeAgent(Agent):
         self._init_code_agent_managers(rule_names)
 
         # 工具列表构建
-        base_tools = self._build_code_agent_tool_list(append_tools, enable_task_list_manager)
+        base_tools = self._build_code_agent_tool_list(
+            append_tools, enable_task_list_manager
+        )
 
         # 父类初始化准备和调用
         explicit_params = self._prepare_code_agent_parent_init(
@@ -182,16 +186,16 @@ class CodeAgent(Agent):
         """
         # 构建基础工具列表（CodeAgent 专用的代码操作工具）
         base_tools = [
-            "execute_script",      # 脚本执行工具
-            "read_code",           # 代码读取工具
-            "edit_file",           # 普通 search/replace 编辑工具
-            "virtual_tty",         # 虚拟终端工具，支持交互式操作
-            "search_web",          # 网络搜索工具
-            "read_webpage",        # 网页内容读取工具
-            "save_memory",         # 记忆保存工具
-            "retrieve_memory",     # 记忆召回工具
-            "clear_memory",        # 记忆删除工具
-            "methodology",         # 方法论工具
+            "execute_script",  # 脚本执行工具
+            "read_code",  # 代码读取工具
+            "edit_file",  # 普通 search/replace 编辑工具
+            "virtual_tty",  # 虚拟终端工具，支持交互式操作
+            "search_web",  # 网络搜索工具
+            "read_webpage",  # 网页内容读取工具
+            "save_memory",  # 记忆保存工具
+            "retrieve_memory",  # 记忆召回工具
+            "clear_memory",  # 记忆删除工具
+            "methodology",  # 方法论工具
         ]
         # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:

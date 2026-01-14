@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""CodeAgent 内置规则模块
+"""Jarvis Agent 内置规则模块
 
 提供一些优秀的开发实践规则，如 TDD、代码审查、重构等。
 支持使用 jinja2 模板语法在规则文件中使用内置变量。
+此模块可供所有 agent 使用。
 """
 
 from pathlib import Path
@@ -24,7 +25,7 @@ def _load_rules_from_directory(directory: Path) -> None:
     if not directory.exists():
         return
 
-    for rule_file in directory.glob("*.md"):
+    for rule_file in directory.rglob("*.md"):
         rule_name = rule_file.stem  # 去掉 .md 后缀
         try:
             with open(rule_file, "r", encoding="utf-8") as f:
@@ -43,7 +44,7 @@ def _load_rules_from_directory(directory: Path) -> None:
 def _load_builtin_rules() -> None:
     """加载所有内置规则"""
     # 获取当前文件所在的项目根目录
-    # 从 src/jarvis/jarvis_code_agent/builtin_rules.py 定位到项目根
+    # 从 src/jarvis/jarvis_agent/builtin_rules.py 定位到项目根
     project_root = Path(__file__).parent.parent.parent.parent
     builtin_dir = project_root / "builtin"
 

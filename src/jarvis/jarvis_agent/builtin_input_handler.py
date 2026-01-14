@@ -20,7 +20,7 @@ def _get_rule_content(rule_name: str) -> str | None:
     try:
         import os
 
-        from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+        from jarvis.jarvis_agent.rules_manager import RulesManager
 
         # 使用当前工作目录作为root_dir
         rules_manager = RulesManager(root_dir=os.getcwd())
