@@ -13,7 +13,7 @@ from typing import Tuple
 
 import yaml
 
-from jarvis.jarvis_code_agent.builtin_rules import get_builtin_rule
+from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
 from jarvis.jarvis_utils.template_utils import render_rule_template
 from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.config import get_data_dir
@@ -252,7 +252,7 @@ class RulesManager:
                 - "files": 规则目录中的文件规则列表
                 - "yaml": rules.yaml 文件中的规则列表
         """
-        from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+        from jarvis.jarvis_agent.builtin_rules import list_builtin_rules
 
         result = {
             "builtin": list_builtin_rules(),

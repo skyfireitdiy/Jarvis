@@ -265,7 +265,7 @@ class FileCompleter(Completer):
         try:
             import os
 
-            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+            from jarvis.jarvis_agent.rules_manager import RulesManager
 
             rules_manager = RulesManager(os.getcwd())
             available_rules = rules_manager.get_all_available_rule_names()
@@ -287,7 +287,7 @@ class FileCompleter(Completer):
         except ImportError:
             # 如果无法导入，只使用内置规则
             try:
-                from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+                from jarvis.jarvis_agent.builtin_rules import list_builtin_rules
 
                 for rule_name in list_builtin_rules():
                     all_rules.append(f"<rule:{rule_name}>")
@@ -314,7 +314,7 @@ class FileCompleter(Completer):
             # 导入必要的模块
             import os
 
-            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+            from jarvis.jarvis_agent.rules_manager import RulesManager
 
             # 创建RulesManager实例
             rules_manager = RulesManager(os.getcwd())
@@ -340,7 +340,7 @@ class FileCompleter(Completer):
         except ImportError:
             # 如果无法导入，只使用内置规则
             try:
-                from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+                from jarvis.jarvis_agent.builtin_rules import list_builtin_rules
 
                 for rule_name in list_builtin_rules():
                     all_rules.append((rule_name, f"📚 内置规则: {rule_name}"))
@@ -496,7 +496,7 @@ def get_all_rules_formatted() -> List[str]:
         try:
             import os
 
-            from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+            from jarvis.jarvis_agent.rules_manager import RulesManager
 
             rules_manager = RulesManager(os.getcwd())
             available_rules = rules_manager.get_all_available_rule_names()
@@ -518,7 +518,7 @@ def get_all_rules_formatted() -> List[str]:
         except ImportError:
             # 如果无法导入RulesManager，只使用内置规则
             try:
-                from jarvis.jarvis_code_agent.builtin_rules import list_builtin_rules
+                from jarvis.jarvis_agent.builtin_rules import list_builtin_rules
 
                 for rule_name in list_builtin_rules():
                     all_rules.append(f"<rule:{rule_name}>")

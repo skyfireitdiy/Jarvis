@@ -40,6 +40,7 @@ from jarvis.jarvis_agent.events import TOOL_FILTERED
 from jarvis.jarvis_agent.file_context_handler import file_context_handler
 from jarvis.jarvis_agent.file_methodology_manager import FileMethodologyManager
 from jarvis.jarvis_agent.memory_manager import MemoryManager
+from jarvis.jarvis_agent.rules_manager import RulesManager
 
 # 本地库导入
 # jarvis_agent 相关
@@ -356,6 +357,7 @@ class Agent:
         in_multi_agent: Optional[bool] = None,
         agent_type: str = "normal",
         allow_savesession: bool = False,
+        rule_names: Optional[str] = None,
         **kwargs: Any,
     ):
         """初始化Jarvis Agent实例
@@ -376,6 +378,7 @@ class Agent:
             confirm_callback: 用户确认回调函数，签名为 (tip: str, default: bool) -> bool；默认使用CLI的user_confirm
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
             allow_savesession: 是否允许使用SaveSession命令（默认False，仅jvs/jca主程序传入True）
+            rule_names: 规则名称列表（逗号分隔），用于加载指定的规则
         """
         # 基础属性初始化
         self._init_base_attributes(
@@ -415,7 +418,7 @@ class Agent:
         )
 
         # 事件总线和管理器初始化
-        self._init_managers()
+        self._init_managers(rule_names)
 
         # 工具和系统提示词设置
         self._setup_tools_and_prompt()
@@ -495,7 +498,9 @@ class Agent:
         # 权限和状态控制
         self.allow_savesession = bool(allow_savesession)  # SaveSession 命令权限控制
         self._addon_prompt_skip_rounds = 0  # 记录连续未添加 addon_prompt 的轮数
-        self._no_tool_call_count = 0  # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
+        self._no_tool_call_count = (
+            0  # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
+        )
         self._agent_type = "normal"
 
     def _init_user_interaction(
@@ -613,20 +618,31 @@ class Agent:
                 self.auto_complete or (self.non_interactive or False)
             )
 
-    def _init_managers(self) -> None:
-        """初始化事件总线和管理器"""
+    def _init_managers(self, rule_names: Optional[str] = None) -> None:
+        """初始化事件总线和管理器
+
+        参数:
+            rule_names: 规则名称列表（逗号分隔）
+        """
         # 初始化事件总线（需先于管理器，以便管理器在构造中安全订阅事件）
         self.event_bus = EventBus()
 
         # 初始化各个功能管理器
         self.memory_manager = MemoryManager(self)  # 记忆管理器：管理长期和短期记忆
         self.task_analyzer = TaskAnalyzer(self)  # 任务分析器：分析任务完成度和满意度
-        self.file_methodology_manager = FileMethodologyManager(self)  # 文件和方法论管理器：处理文件上传和方法论加载
+        self.file_methodology_manager = FileMethodologyManager(
+            self
+        )  # 文件和方法论管理器：处理文件上传和方法论加载
         self.prompt_manager = PromptManager(self)  # 提示词管理器：构建和管理系统提示词
 
         # 初始化任务列表管理器（使用当前工作目录作为 root_dir，如果子类已设置 root_dir 则使用子类的）
         root_dir = getattr(self, "root_dir", None) or os.getcwd()
         self.task_list_manager = TaskListManager(root_dir)
+
+        # 初始化规则管理器（如果子类已经创建，则不覆盖）
+        if not hasattr(self, "rules_manager"):
+            self.rules_manager = RulesManager(root_dir)
+            _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
 
     def _setup_tools_and_prompt(self) -> None:
         """设置工具和系统提示词"""
