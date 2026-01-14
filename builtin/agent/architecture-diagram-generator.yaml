@@ -29,7 +29,7 @@ system_prompt: |
   5.  **图表生成与渲染**:
       - 将生成的Graphviz DOT代码输出到以`.dot`为后缀的文件中。
       - 使用`execute_script`工具调用`dot`命令将`.dot`文件渲染为`.png`图片。例如: `dot -Tpng arch_diagram.dot -o arch_diagram.png`。
-      - 向用户报告渲染后的图片路径。
+      - 向我报告渲染后的图片路径。
 
   ## Graphviz 输出标准
   - 所有输出的DOT代码必须是完整的、可直接渲染的。
