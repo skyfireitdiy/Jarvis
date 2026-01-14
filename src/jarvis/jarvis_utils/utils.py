@@ -959,13 +959,13 @@ def _show_usage_stats(
                 ),
             )
 
-            # 计算panel宽度：max(终端宽度的1/2, 文字最小宽度)
+            # 计算panel宽度：max(2/3终端宽度，文字最大宽度)
             terminal_width = console.width
             # 渲染内容获取实际宽度（考虑多行情况）
             content_width = max(
                 len(str(line)) for line in str(welcome_panel_content).split("\\n")
             )
-            panel_width = max(terminal_width // 2, content_width)
+            panel_width = max(terminal_width * 2 // 3, content_width)
 
             welcome_panel = Panel(
                 welcome_panel_content,
