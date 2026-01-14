@@ -97,12 +97,21 @@ class SaveMemoryTool:
             # 短期记忆保存到全局变量
             add_short_term_memory(memory_obj)
 
-            # 将内容添加到agent的pin_content
-            if agent and hasattr(agent, "pin_content"):
-                if agent.pin_content:
-                    agent.pin_content += "\n" + content
-                else:
-                    agent.pin_content = content
+            # 将内容添加到agent的recent_memories列表
+            if agent and hasattr(agent, "recent_memories"):
+                # 过滤空内容
+                if content and content.strip():
+                    agent.recent_memories.append(content.strip())
+                    # 维护最大10条限制
+                    if len(agent.recent_memories) > agent.MAX_RECENT_MEMORIES:
+                        agent.recent_memories.pop(0)
+
+            # 旧的pin_content逻辑（已废弃，保留用于向后兼容）
+            # if agent and hasattr(agent, "pin_content"):
+            #     if agent.pin_content:
+            #         agent.pin_content += "\n" + content
+            #     else:
+            #         agent.pin_content = content
 
             result = {
                 "memory_id": memory_id,
@@ -122,12 +131,21 @@ class SaveMemoryTool:
             with open(memory_file, "w", encoding="utf-8") as f:
                 json.dump(memory_obj, f, ensure_ascii=False, indent=2)
 
-            # 将内容添加到agent的pin_content
-            if agent and hasattr(agent, "pin_content"):
-                if agent.pin_content:
-                    agent.pin_content += "\n" + content
-                else:
-                    agent.pin_content = content
+            # 将内容添加到agent的recent_memories列表
+            if agent and hasattr(agent, "recent_memories"):
+                # 过滤空内容
+                if content and content.strip():
+                    agent.recent_memories.append(content.strip())
+                    # 维护最大10条限制
+                    if len(agent.recent_memories) > agent.MAX_RECENT_MEMORIES:
+                        agent.recent_memories.pop(0)
+
+            # 旧的pin_content逻辑（已废弃，保留用于向后兼容）
+            # if agent and hasattr(agent, "pin_content"):
+            #     if agent.pin_content:
+            #         agent.pin_content += "\n" + content
+            #     else:
+            #         agent.pin_content = content
 
             result = {
                 "memory_id": memory_id,
