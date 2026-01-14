@@ -154,8 +154,13 @@ class SearchWebTool:
                                 content_token_limit
                                 - get_context_token_count(full_content)
                             )
-                            # 如果剩余限制不足，跳过此URL
+                            # 如果剩余限制不足且已有成功获取的内容，停止获取后续网页
                             if remaining_limit <= 0:
+                                if visited_count > 0:
+                                    PrettyOutput.auto_print(
+                                        f"⚠️ 内容长度已达限制且已成功获取 {visited_count} 个网页内容，停止获取后续网页"
+                                    )
+                                    break
                                 PrettyOutput.auto_print(
                                     f"⚠️ 内容长度已达限制，跳过: {url}"
                                 )
