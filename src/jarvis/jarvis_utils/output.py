@@ -135,6 +135,9 @@ class OutputType(Enum):
     ROLLBACK = "ROLLBACK"
     DIRECTORY = "DIRECTORY"
     STATISTICS = "STATISTICS"
+    CHEAP_MODEL = "CHEAP_MODEL"
+    NORMAL_MODEL = "NORMAL_MODEL"
+    SMART_MODEL = "SMART_MODEL"
 
 
 @dataclass
@@ -302,6 +305,25 @@ class ConsoleOutputSink(OutputSink):
                     bgcolor="#1c1c3c",
                     meta={"icon": "📊"},
                 ),
+                OutputType.CHEAP_MODEL: RichStyle(
+                    color="green",
+                    frame=True,
+                    bgcolor="#1c2b1c",
+                    meta={"icon": "💰"},
+                ),
+                OutputType.NORMAL_MODEL: RichStyle(
+                    color="blue",
+                    frame=True,
+                    bgcolor="#1c1c2b",
+                    meta={"icon": "⭐"},
+                ),
+                OutputType.SMART_MODEL: RichStyle(
+                    color="bright_magenta",
+                    bold=True,
+                    frame=True,
+                    bgcolor="#2b1c2b",
+                    meta={"icon": "🧠"},
+                ),
             }
             style_obj = style_config.get(event.output_type, RichStyle(color="white"))
             text = Text(f"\n{event.section}\n", style=style_obj, justify="center")
@@ -339,6 +361,9 @@ class ConsoleOutputSink(OutputSink):
             OutputType.ROLLBACK: "dark_red",
             OutputType.DIRECTORY: "bright_cyan",
             OutputType.STATISTICS: "bright_blue",
+            OutputType.CHEAP_MODEL: "green",
+            OutputType.NORMAL_MODEL: "blue",
+            OutputType.SMART_MODEL: "bright_magenta",
         }
 
         # 背景色映射（保持原有定义）
@@ -478,6 +503,25 @@ class ConsoleOutputSink(OutputSink):
                 bgcolor="#1c1c3c",
                 meta={"icon": "📊"},
             ),
+            OutputType.CHEAP_MODEL: RichStyle(
+                color="green",
+                frame=True,
+                bgcolor="#1c2b1c",
+                meta={"icon": "💰"},
+            ),
+            OutputType.NORMAL_MODEL: RichStyle(
+                color="blue",
+                frame=True,
+                bgcolor="#1c1c2b",
+                meta={"icon": "⭐"},
+            ),
+            OutputType.SMART_MODEL: RichStyle(
+                color="bright_magenta",
+                bold=True,
+                frame=True,
+                bgcolor="#2b1c2b",
+                meta={"icon": "🧠"},
+            ),
         }
 
         Text(
@@ -567,6 +611,9 @@ class PrettyOutput:
         OutputType.ROLLBACK: "🔙",
         OutputType.DIRECTORY: "📁",
         OutputType.STATISTICS: "📊",
+        OutputType.CHEAP_MODEL: "💰",
+        OutputType.NORMAL_MODEL: "⭐",
+        OutputType.SMART_MODEL: "🧠",
     }
     # 语法高亮的语言映射
     _lang_map = {
@@ -777,6 +824,9 @@ class PrettyOutput:
             "📁": OutputType.DIRECTORY,
             "📂": OutputType.DIRECTORY,
             "📊": OutputType.STATISTICS,
+            "💰": OutputType.CHEAP_MODEL,
+            "⭐": OutputType.NORMAL_MODEL,
+            "🧠": OutputType.SMART_MODEL,
         }
 
         # 检测emoji前缀

@@ -647,10 +647,14 @@ def _show_usage_stats(
 
         from jarvis.jarvis_stats.stats import StatsManager
         from jarvis.jarvis_utils.config import (
-            get_jarvis_github_url,
-            get_jarvis_gitee_url,
+            get_cheap_model_name,
+            get_cheap_platform_name,
             get_normal_model_name,
             get_normal_platform_name,
+            get_smart_model_name,
+            get_smart_platform_name,
+            get_jarvis_github_url,
+            get_jarvis_gitee_url,
         )
         import os
         from jarvis.jarvis_stats.storage import StatsStorage
@@ -915,11 +919,15 @@ def _show_usage_stats(
 
             # 获取模型信息和工作目录
             try:
-                model_name = get_normal_model_name(model_group_override)
-                platform_name = get_normal_platform_name(model_group_override)
-                model_info = f"🤖 模型: {model_name} ({platform_name})"
+                cheap_model = get_cheap_model_name(model_group_override)
+                cheap_platform = get_cheap_platform_name(model_group_override)
+                normal_model = get_normal_model_name(model_group_override)
+                normal_platform = get_normal_platform_name(model_group_override)
+                smart_model = get_smart_model_name(model_group_override)
+                smart_platform = get_smart_platform_name(model_group_override)
+                model_info = f"💰 {cheap_model}({cheap_platform})  ⭐ {normal_model}({normal_platform})  🧠 {smart_model}({smart_platform})"
             except Exception:
-                model_info = "🤖 模型: 未知"
+                model_info = "💰  未知  ⭐  未知  🧠  未知"
 
             work_dir = os.getcwd()
             work_dir_info = f"📁 工作目录: {work_dir}"
