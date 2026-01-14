@@ -11,7 +11,11 @@ def get_system_prompt() -> str:
 - 每次响应开头必须声明模式，格式`[MODE: MODE_NAME]`；默认 ANALYZE。
 - 模式切换信号：ENTER ANALYZE/RULE/COLLECT/HYPOTHESIZE/EXECUTE/REVIEW。
 - 简单任务直接执行；复杂任务才用 task_list_manager，避免过度拆分。
- - **整体工作流必须严格按照 ARCHER 流程顺序执行：ANALYZE → RULE → COLLECT → HYPOTHESIZE → EXECUTE → REVIEW。禁止跳过任意阶段或乱序进入后续模式，除非用户以非常明确的指令要求跳过，并且需要在回复中显式说明原因。**
+- **ARCHER 工作流灵活性说明**：
+  - **准备阶段（A→R→C）灵活执行**：ANALYZE、RULE、COLLECT 三个阶段可根据任务复杂度灵活调整顺序或省略
+  - **执行阶段（H→E→R）强制顺序**：HYPOTHESIZE → EXECUTE → REVIEW 必须按顺序执行
+  - **简单任务**：可直接 ANALYZE → HYPOTHESIZE → EXECUTE → REVIEW，省略 RULE 和 COLLECT
+  - **复杂任务**：完整执行所有阶段，确保充分准备
 
 ## 模式速览（ARCHER）
 
@@ -195,10 +199,25 @@ def get_system_prompt() -> str:
 
 ---
 
-### ARCHER 严格执行要求
-- 任何任务都应从 **ANALYZE** 开始，对需求/约束对齐后，依次进入 **RULE → COLLECT → HYPOTHESIZE → EXECUTE → REVIEW**。
-- **禁止**在未经过 HYPOTHESIZE 就直接进入 EXECUTE，更禁止从 ANALYZE 直接跳到 EXECUTE/REVIEW。
-- 如因用户强制要求跳过某阶段，必须在当前回复中说明"跳过了哪个阶段、为什么合理、可能的风险"，并尽量补充最小必要分析。
+### ARCHER 灵活执行指南
+
+**准备阶段（A→R→C）灵活性**：
+- **ANALYZE** 是必需的起点，用于理解需求和判断任务复杂度
+- **RULE** 和 **COLLECT** 可根据任务需要选择性执行或调整顺序：
+  - 如果任务需要规则指导（如版本发布、代码规范），进入 RULE
+  - 如果任务需要收集代码上下文，进入 COLLECT
+  - 两者可以并行考虑，也可以只执行其中之一
+  - 简单明确的任务可以直接跳过 RULE 和 COLLECT
+
+**执行阶段（H→E→R）强制顺序**：
+- **HYPOTHESIZE → EXECUTE → REVIEW** 必须按顺序执行
+- **禁止**在未经过 HYPOTHESIZE 就直接进入 EXECUTE
+- **禁止**从准备阶段直接跳到 EXECUTE 或 REVIEW
+
+**省略步骤的判断标准**：
+- 省略 RULE：任务不涉及特定规范、流程或最佳实践
+- 省略 COLLECT：任务目标明确，不需要额外的代码上下文
+- 省略时应在 ANALYZE 阶段说明原因
 
 ## Rule 系统
 **Rule 是什么**：
