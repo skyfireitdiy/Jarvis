@@ -1,8 +1,14 @@
+<!-- markdownlint-disable MD029 -->
 # 版本发布规则
 
 ## 规则简介
 
-本规则用于规范Jarvis项目的版本发布流程，确保版本号的正确性、ReleaseNote的格式一致性，以及代码变更的准确性。本规则适用于所有需要发布新版本的场景。
+本规则用于规范Jarvis项目的版本发布流程，确保版本号的正确性、ReleaseNote的格式一致性，以及代码变更的准确性。
+
+本规则适用于以下场景：
+
+- **完整版本发布**：更新版本号、生成git tag、更新ReleaseNote
+- **仅更新ReleaseNote**：只更新ReleaseNote.md文件，不创建git tag（适用于阶段性文档更新）
 
 ## 你必须遵守的原则
 
@@ -42,6 +48,8 @@
 
 ### 操作1：获取最新版本号
 
+> ⚠️ **注意**：在「仅更新ReleaseNote」模式下，此步骤用于获取基准版本号，但仍需执行。
+
 **执行步骤：**
 
 1. 执行命令获取最新tag：
@@ -55,6 +63,8 @@ git describe --tags --abbrev=0
 **预期输出：** 最新版本号（如 `v1.1.1`）
 
 ### 操作2：获取当前日期
+
+> ⚠️ **注意**：在「仅更新ReleaseNote」模式下，此步骤用于生成ReleaseNote中的日期，必须执行。
 
 **执行步骤：**
 
@@ -165,7 +175,14 @@ else:
 
 ## 常见问题
 
-### Q1：如果没有git tag怎么办？
+### Q1：如何区分「完整版本发布」和「仅更新ReleaseNote」？
+
+- **完整版本发布**：适用于正式发布，需要创建git tag，更新版本号，并更新ReleaseNote
+- **仅更新ReleaseNote**：适用于阶段性文档整理或预览，只更新ReleaseNote.md文件，不创建git tag
+
+执行前必须明确用户需求，选择合适的模式。
+
+### Q2：如果没有git tag怎么办？
 
 使用默认版本号 `v1.0.0` 作为基准版本。
 
@@ -173,7 +190,11 @@ else:
 
 必须询问用户确认版本类型，不能自行推断。
 
-### Q3：ReleaseNote内容如何生成？
+### Q3：在「仅更新ReleaseNote」模式下，是否需要更新版本号？
+
+否。「仅更新ReleaseNote」模式下，仅在ReleaseNote.md中添加新版本说明，不修改项目中的版本号（如`__init__.py`、`setup.py`等），也不创建git tag。
+
+### Q4：ReleaseNote内容如何生成？
 
 根据操作3获取的代码变更，结合操作4学习的格式，人工分析并生成ReleaseNote内容。
 
@@ -181,4 +202,4 @@ else:
 
 - ReleaseNote模板：`{{ git_root_dir }}/ReleaseNote.md`
 - Git命令参考：`git diff --help`
-- 语义化版本规范：https://semver.org/lang/zh-CN/
+- 语义化版本规范：<https://semver.org/lang/zh-CN/>
