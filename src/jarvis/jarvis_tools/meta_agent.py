@@ -19,7 +19,7 @@ class meta_agent:
         "元代理（Meta-Agent）工具：用于**根据自然语言需求自动创建或改进 Jarvis 工具**，并完成注册集成。"
         "核心能力：1）调用 CodeAgent 生成完整可用的新工具代码（包含参数定义、错误处理、最佳实践模板）；"
         "2）在生成后自动写入到 data/tools 目录并注册到 ToolRegistry；"
-        "3）支持在新工具内部编排现有 Agent（通用任务编排、IIRIPER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等）；"
+        "3）支持在新工具内部编排现有 Agent（通用任务编排、ARCHER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等）；"
         "4）支持通过再次调用 meta_agent 对已有工具进行自举式改进（自我分析和演化）。"
         "调用方式：传入 tool_name（工具名/文件名）与 function_description（目标功能的清晰描述），返回值中包含生成状态和新工具文件的绝对路径。"
     )
@@ -58,7 +58,11 @@ class meta_agent:
         return True
 
     def _build_enhanced_prompt(
-        self, tool_name: str, function_description: str, jarvis_dir: Path, tools_dir: Path
+        self,
+        tool_name: str,
+        function_description: str,
+        jarvis_dir: Path,
+        tools_dir: Path,
     ) -> str:
         """构建增强的提示词，包含关键参考文件"""
 
@@ -76,7 +80,9 @@ class meta_agent:
         base_tool_file = (jarvis_dir / "jarvis_tools" / "base.py").resolve()
         agent_init_file = (jarvis_dir / "jarvis_agent" / "__init__.py").resolve()
         code_agent_file = (jarvis_dir / "jarvis_code_agent" / "code_agent.py").resolve()
-        code_agent_prompts_file = (jarvis_dir / "jarvis_code_agent" / "code_agent_prompts.py").resolve()
+        code_agent_prompts_file = (
+            jarvis_dir / "jarvis_code_agent" / "code_agent_prompts.py"
+        ).resolve()
 
         files_info = "\n".join([f"- {f}" for f in key_files_absolute])
 
@@ -97,7 +103,7 @@ class meta_agent:
 
 ### Agent / CodeAgent 关键用法（仅列核心要点，详细规则请阅读源码的绝对路径）
 - Agent（通用 Agent）：
-  - 职责：通用任务编排与对话式工作流，严格遵循 IIRIPER（INTENT → RESEARCH → INNOVATE → PLAN → EXECUTE → REVIEW）。
+  - 职责：通用任务编排与对话式工作流，严格遵循 ARCHER（ANALYZE → RULE → COLLECT → HYPOTHESIZE → EXECUTE → REVIEW）。
   - 初始化要点：`Agent(system_prompt=..., name=..., model_group=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{agent_init_file}` 中定义。
   - 典型用法：通过 `agent.run(user_input)` 启动完整闭环，内部会自动处理系统提示、工具调用、task_list_manager 调度和总结；总结与返回值行为由 `summary_prompt` 和 `need_summary` 控制。
   - 更多细节（参数含义、总结与返回值策略、事件回调等）请直接阅读：`{agent_init_file}`。
@@ -108,7 +114,7 @@ class meta_agent:
   - 更多细节（review 流程、任务总结、返回值语义等）请直接阅读：`{code_agent_file}` 与 `{code_agent_prompts_file}`。
 
 在本工具生成的新工具中，推荐：
-- 使用 Agent 负责上层的需求分析、IIRIPER 工作流以及多步骤任务编排；
+- 使用 Agent 负责上层的需求分析、ARCHER 工作流以及多步骤任务编排；
 - 使用 CodeAgent 负责具体代码层面的修改、重构和验证。
 
 生成的工具必须具备以下特性：
