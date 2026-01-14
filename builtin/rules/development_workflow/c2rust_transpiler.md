@@ -54,57 +54,62 @@ c2rust 转译是一个复杂的流程，需要根据转译规模建立不同层�
 - 任务描述：每个任务必须包含约束条件、必须要求、禁止事项、验证标准
 - 预期输出：必须使用结构化格式列出预期输出
 - 验证方法：任务完成后必须提供验证方法说明
+- **C 代码位置信息**：**必须**在每个子任务中包含原始 C 代码的行号位置信息
+  - 函数级任务：必须包含 C 函数所在的文件路径和行号范围（如：`path/to/file.c:42-67`）
+  - 文件级任务：必须包含 C 文件的路径
+  - 目录级任务：必须包含 C 目录的路径
+  - 位置信息应包含在 `background` 字段或 `task_desc` 字段中
 
 **示例：**
 
 **示例1：函数级任务列表（必须）**
 
 ```json
-// ✅ 正确：函数级任务列表
+// ✅ 正确：函数级任务列表（包含C代码行号位置信息）
 {
   "action": "add_tasks",
   "main_goal": "转译函数 foo",
-  "background": "C 函数 foo 位于 path/to/foo.c，功能是...",
+  "background": "C 函数 foo 位于 path/to/foo.c:42-67，功能是...",
   "tasks_info": [
     {
       "task_name": "规划阶段",
-      "task_desc": "为函数 foo 选择模块位置和设计 Rust 签名...",
-      "expected_output": "- 模块路径：src/foo.rs\n- Rust 签名：pub fn foo(...) ...",
+      "task_desc": "为函数 foo (path/to/foo.c:42-67) 选择模块位置和设计 Rust 签名...",
+      "expected_output": "- 模块路径：src/foo.rs\n- Rust 签名：pub fn foo(...) ...\n- C 代码位置：path/to/foo.c:42-67",
       "agent_type": "sub",
       "dependencies": []
     },
     {
       "task_name": "实现阶段",
-      "task_desc": "使用 TDD 方法实现函数 foo...",
-      "expected_output": "- 测试用例已编写\n- 实现已完成",
+      "task_desc": "使用 TDD 方法实现函数 foo (path/to/foo.c:42-67)...",
+      "expected_output": "- 测试用例已编写\n- 实现已完成\n- C 代码位置：path/to/foo.c:42-67",
       "agent_type": "sub",
       "dependencies": ["规划阶段"]
     },
     {
       "task_name": "构建阶段",
-      "task_desc": "运行 cargo test 并修复构建问题...",
-      "expected_output": "- 所有测试通过\n- 无编译错误",
+      "task_desc": "运行 cargo test 并修复构建问题（转译自 path/to/foo.c:42-67）...",
+      "expected_output": "- 所有测试通过\n- 无编译错误\n- C 代码位置：path/to/foo.c:42-67",
       "agent_type": "sub",
       "dependencies": ["实现阶段"]
     },
     {
       "task_name": "审查阶段",
-      "task_desc": "审查代码质量、功能一致性、测试完备性...",
-      "expected_output": "- 审查报告\n- 问题列表",
+      "task_desc": "审查代码质量、功能一致性、测试完备性（转译自 path/to/foo.c:42-67）...",
+      "expected_output": "- 审查报告\n- 问题列表\n- C 代码位置：path/to/foo.c:42-67",
       "agent_type": "sub",
       "dependencies": ["构建阶段"]
     },
     {
       "task_name": "优化阶段",
-      "task_desc": "修复审查发现的问题并验证...",
-      "expected_output": "- 问题已修复\n- 所有测试通过",
+      "task_desc": "修复审查发现的问题并验证（转译自 path/to/foo.c:42-67）...",
+      "expected_output": "- 问题已修复\n- 所有测试通过\n- C 代码位置：path/to/foo.c:42-67",
       "agent_type": "sub",
       "dependencies": ["审查阶段"]
     },
     {
       "task_name": "评估阶段",
-      "task_desc": "使用子agent对整体效果进行评估，检查功能对齐情况...",
-      "expected_output": "- 评估报告\n- 功能对齐检查结果\n- 如有问题，创建优化子任务",
+      "task_desc": "使用子agent对整体效果进行评估，检查功能对齐情况（转译自 path/to/foo.c:42-67）...",
+      "expected_output": "- 评估报告\n- 功能对齐检查结果\n- 如有问题，创建优化子任务\n- C 代码位置：path/to/foo.c:42-67",
       "agent_type": "sub",
       "dependencies": ["优化阶段"]
     }
@@ -115,44 +120,44 @@ c2rust 转译是一个复杂的流程，需要根据转译规模建立不同层�
 **示例2：文件级任务列表（按需）**
 
 ```json
-// ✅ 正确：文件级任务列表（转译 hash.c 文件）
+// ✅ 正确：文件级任务列表（转译 hash.c 文件，包含C代码行号位置信息）
 {
   "action": "add_tasks",
   "main_goal": "转译文件 hash.c",
-  "background": "C 文件 hash.c 包含多个哈希相关函数：hash_init, hash_update, hash_final...",
+  "background": "C 文件 hash.c 包含多个哈希相关函数：hash_init (hash.c:15-45), hash_update (hash.c:47-78), hash_final (hash.c:80-110)...",
   "tasks_info": [
     {
       "task_name": "规划阶段",
       "task_desc": "规划 hash.c 的模块位置和整体结构...",
-      "expected_output": "- 模块路径：src/hash.rs\n- 共享类型定义\n- 函数分组方案",
+      "expected_output": "- 模块路径：src/hash.rs\n- 共享类型定义\n- 函数分组方案\n- C 文件位置：hash.c",
       "agent_type": "sub",
       "dependencies": []
     },
     {
       "task_name": "转译函数 hash_init",
-      "task_desc": "转译函数 hash_init（包含规划、实现、构建、审查、优化、评估）...",
-      "expected_output": "- hash_init 函数已转译完成\n- 测试通过\n- 功能对齐验证通过",
+      "task_desc": "转译函数 hash_init (hash.c:15-45)（包含规划、实现、构建、审查、优化、评估）...",
+      "expected_output": "- hash_init 函数已转译完成\n- 测试通过\n- 功能对齐验证通过\n- C 代码位置：hash.c:15-45",
       "agent_type": "sub",
       "dependencies": ["规划阶段"]
     },
     {
       "task_name": "转译函数 hash_update",
-      "task_desc": "转译函数 hash_update（包含规划、实现、构建、审查、优化、评估）...",
-      "expected_output": "- hash_update 函数已转译完成\n- 测试通过\n- 功能对齐验证通过",
+      "task_desc": "转译函数 hash_update (hash.c:47-78)（包含规划、实现、构建、审查、优化、评估）...",
+      "expected_output": "- hash_update 函数已转译完成\n- 测试通过\n- 功能对齐验证通过\n- C 代码位置：hash.c:47-78",
       "agent_type": "sub",
       "dependencies": ["规划阶段"]
     },
     {
       "task_name": "转译函数 hash_final",
-      "task_desc": "转译函数 hash_final（包含规划、实现、构建、审查、优化、评估）...",
-      "expected_output": "- hash_final 函数已转译完成\n- 测试通过\n- 功能对齐验证通过",
+      "task_desc": "转译函数 hash_final (hash.c:80-110)（包含规划、实现、构建、审查、优化、评估）...",
+      "expected_output": "- hash_final 函数已转译完成\n- 测试通过\n- 功能对齐验证通过\n- C 代码位置：hash.c:80-110",
       "agent_type": "sub",
       "dependencies": ["规划阶段"]
     },
     {
       "task_name": "文件级集成测试",
-      "task_desc": "运行文件级集成测试，确保所有函数协同工作...",
-      "expected_output": "- 集成测试通过\n- 文件转译完成",
+      "task_desc": "运行文件级集成测试，确保所有函数协同工作（转译自 hash.c）...",
+      "expected_output": "- 集成测试通过\n- 文件转译完成\n- C 文件位置：hash.c",
       "agent_type": "sub",
       "dependencies": ["转译函数 hash_init", "转译函数 hash_update", "转译函数 hash_final"]
     }
@@ -163,7 +168,7 @@ c2rust 转译是一个复杂的流程，需要根据转译规模建立不同层�
 **示例3：目录级任务列表（按需）**
 
 ```json
-// ✅ 正确：目录级任务列表（转译 src/utils/ 目录）
+// ✅ 正确：目录级任务列表（转译 src/utils/ 目录，包含C代码行号位置信息）
 {
   "action": "add_tasks",
   "main_goal": "转译目录 src/utils/",
@@ -171,36 +176,36 @@ c2rust 转译是一个复杂的流程，需要根据转译规模建立不同层�
   "tasks_info": [
     {
       "task_name": "规划阶段",
-      "task_desc": "规划目录结构、模块组织、依赖关系...",
-      "expected_output": "- Rust 模块结构规划\n- 依赖关系图\n- 转译顺序",
+      "task_desc": "规划目录结构、模块组织、依赖关系（转译自 src/utils/）...",
+      "expected_output": "- Rust 模块结构规划\n- 依赖关系图\n- 转译顺序\n- C 目录位置：src/utils/",
       "agent_type": "sub",
       "dependencies": []
     },
     {
       "task_name": "转译文件 string.c",
-      "task_desc": "转译 string.c 文件（包含该文件的所有函数）...",
-      "expected_output": "- string.c 已转译完成\n- 所有函数测试通过\n- 功能对齐验证通过",
+      "task_desc": "转译 string.c 文件（包含该文件的所有函数，位于 src/utils/string.c）...",
+      "expected_output": "- string.c 已转译完成\n- 所有函数测试通过\n- 功能对齐验证通过\n- C 文件位置：src/utils/string.c",
       "agent_type": "sub",
       "dependencies": ["规划阶段"]
     },
     {
       "task_name": "转译文件 math.c",
-      "task_desc": "转译 math.c 文件（包含该文件的所有函数）...",
-      "expected_output": "- math.c 已转译完成\n- 所有函数测试通过\n- 功能对齐验证通过",
+      "task_desc": "转译 math.c 文件（包含该文件的所有函数，位于 src/utils/math.c）...",
+      "expected_output": "- math.c 已转译完成\n- 所有函数测试通过\n- 功能对齐验证通过\n- C 文件位置：src/utils/math.c",
       "agent_type": "sub",
       "dependencies": ["规划阶段"]
     },
     {
       "task_name": "转译文件 memory.c",
-      "task_desc": "转译 memory.c 文件（包含该文件的所有函数）...",
-      "expected_output": "- memory.c 已转译完成\n- 所有函数测试通过\n- 功能对齐验证通过",
+      "task_desc": "转译 memory.c 文件（包含该文件的所有函数，位于 src/utils/memory.c）...",
+      "expected_output": "- memory.c 已转译完成\n- 所有函数测试通过\n- 功能对齐验证通过\n- C 文件位置：src/utils/memory.c",
       "agent_type": "sub",
       "dependencies": ["规划阶段"]
     },
     {
       "task_name": "目录级集成测试",
-      "task_desc": "运行目录级集成测试，确保所有模块协同工作...",
-      "expected_output": "- 集成测试通过\n- 目录转译完成",
+      "task_desc": "运行目录级集成测试，确保所有模块协同工作（转译自 src/utils/）...",
+      "expected_output": "- 集成测试通过\n- 目录转译完成\n- C 目录位置：src/utils/",
       "agent_type": "sub",
       "dependencies": ["转译文件 string.c", "转译文件 math.c", "转译文件 memory.c"]
     }
@@ -305,21 +310,31 @@ pub fn calculate(x: i32) -> i32 {
 
 ### 阶段 1：规划阶段
 
-#### 操作1：选择模块位置
+#### 操作1：记录 C 代码位置信息
+
+- **必须**：记录原始 C 代码的位置信息
+  - 函数级：记录 C 函数所在的文件路径和行号范围（如：`path/to/file.c:42-67`）
+  - 文件级：记录 C 文件的完整路径（如：`path/to/file.c`）
+  - 目录级：记录 C 目录的路径（如：`path/to/dir/`）
+- **必须**：将位置信息包含在任务描述、背景信息或预期输出中
+- **必须**：确保位置信息准确，便于后续追溯和验证
+
+#### 操作2：选择模块位置
 
 - 分析函数的功能特性，确定所属的功能模块
 - 检查 crate 目录结构，选择或创建合适的模块文件
 - 确保模块路径位于 src/ 目录下
 - 评估是否需要创建新的子模块文件
 
-#### 操作2：设计 Rust 函数签名
+#### 操作3：设计 Rust 函数签名
 
 - 根据 C 函数签名设计 Rust 函数签名
 - 优先使用 Rust 原生类型，避免 C 风格类型
 - 考虑使用 `Result<T, E>` 或 `Option<T>` 处理错误
 - 如果是根符号，必须使用 `pub` 关键字
+- **必须**：在函数注释中记录对应的 C 代码位置信息（如：`/// 转译自 path/to/file.c:42-67`）
 
-#### 操作3：评估是否需要实现
+#### 操作4：评估是否需要实现
 
 以下情况可以跳过实现（设置 skip_implementation 为 true）：
 
@@ -469,16 +484,20 @@ pub fn calculate(x: i32) -> i32 {
 
 ### 评估范围
 - 转译对象：[函数名/文件名/目录名]
+- C 代码位置：[文件路径:行号范围]（如：path/to/file.c:42-67）
 - 评估时间：[时间戳]
 - 评估方法：[使用的评估方法]
 
 ### 功能对齐检查结果
 1. [功能点1]：✅ 对齐 / ❌ 未对齐
+   - C 实现位置：[文件路径:行号范围]
    - C 实现行为：[描述]
+   - Rust 实现位置：[文件路径:行号范围]
    - Rust 实现行为：[描述]
    - 差异分析：[如有差异，说明原因]
 
 2. [功能点2]：✅ 对齐 / ❌ 未对齐
+   - C 实现位置：[文件路径:行号范围]
    ...
 
 ### 测试覆盖检查
@@ -520,14 +539,20 @@ pub fn calculate(x: i32) -> i32 {
 - [ ] 任务列表包含所有阶段（规划、实现、构建、审查、优化、评估）
 - [ ] 任务类型正确（sub/main）
 - [ ] 任务描述完整（包含约束条件、必须要求、禁止事项、验证标准）
+- [ ] **每个子任务都包含 C 代码行号位置信息**
+- [ ] C 代码位置信息格式正确（函数级：`file.c:start-end`，文件级：`file.c`，目录级：`dir/`）
 - [ ] 预期输出结构化（使用分条列出格式）
+- [ ] 预期输出中包含 C 代码位置信息
 - [ ] 任务依赖关系正确设置
 - [ ] 已验证任务列表创建成功
 
 ### 规划阶段检查清单
 
+- [ ] 已记录 C 代码位置信息（文件路径和行号范围）
+- [ ] C 代码位置信息已包含在任务描述或背景信息中
 - [ ] 已选择合适的模块位置
 - [ ] 已设计符合 Rust 最佳实践的函数签名
+- [ ] 函数注释中包含对应的 C 代码位置信息
 - [ ] 已评估是否需要实现（如跳过，已详细说明原因）
 - [ ] 如果是根符号，签名包含 `pub` 关键字
 
@@ -539,6 +564,7 @@ pub fn calculate(x: i32) -> i32 {
 - [ ] 未使用 `todo!` 或 `unimplemented!` 占位符
 - [ ] 使用 Rust 原生类型和惯用法
 - [ ] 注释使用中文
+- [ ] 函数注释中包含 C 代码位置信息
 - [ ] 未使用 `use ...::*` 通配导入
 
 ### 构建阶段检查清单
@@ -568,10 +594,12 @@ pub fn calculate(x: i32) -> i32 {
 
 - [ ] 已使用子 agent 进行独立评估
 - [ ] 评估报告已生成，包含功能对齐检查结果
+- [ ] 评估报告中包含 C 代码位置信息
 - [ ] 功能对齐检查已完成，逐项对比 C 和 Rust 实现
 - [ ] 测试覆盖检查已完成
 - [ ] 边界情况检查已完成
 - [ ] 如发现功能未对齐问题，已创建优化子任务
+- [ ] 优化子任务包含 C 代码位置信息
 - [ ] 优化子任务已执行并修复问题
 - [ ] 修复后已重新评估，功能完全对齐
 - [ ] 评估报告确认功能完全对齐
