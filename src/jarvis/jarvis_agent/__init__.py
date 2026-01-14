@@ -494,6 +494,8 @@ class Agent:
         self.user_data: Dict[str, Any] = {}
         self.pin_content: str = ""  # 记录固定的内容
         self.original_user_input: str = ""  # 记录原始用户输入
+        self.recent_memories: List[str] = []  # 最近10条记忆内容
+        self.MAX_RECENT_MEMORIES = 10  # 最大记忆数量
 
         # 权限和状态控制
         self.allow_savesession = bool(allow_savesession)  # SaveSession 命令权限控制
@@ -1466,8 +1468,21 @@ class Agent:
             formatted_summary += task_list_info
 
         # 添加用户固定的重要内容
+        user_fixed_content = []
+
+        # 添加用户通过 <Pin> 标记固定的重要内容
         if self.pin_content.strip():
-            pin_section = f"\n\n## 用户的原始需求和要求\n{self.pin_content.strip()}"
+            user_fixed_content.append(self.pin_content.strip())
+
+        # 添加最近的记忆
+        if hasattr(self, "recent_memories") and self.recent_memories:
+            user_fixed_content.append(chr(10).join(self.recent_memories))
+
+        # 如果有任何固定内容，添加到摘要中
+        if user_fixed_content:
+            pin_section = (
+                f"\n\n## 用户的原始需求和要求\n{chr(10).join(user_fixed_content)}"
+            )
             formatted_summary += pin_section
 
         return formatted_summary
