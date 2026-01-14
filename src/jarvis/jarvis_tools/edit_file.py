@@ -3,6 +3,7 @@
 import os
 import shutil
 
+from jarvis.jarvis_utils.config import calculate_token_limit
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -330,8 +331,10 @@ class EditFileNormalTool:
             try:
                 remaining_tokens = agent.get_remaining_token_count()
                 if remaining_tokens > 0:
-                    # 使用剩余 token 的指定比例作为字符限制（1 token ≈ 4字符）
-                    max_diff_chars = int(remaining_tokens * token_ratio * 4)
+                    # 使用剩余token的2/3或64k的最小值，再转换为字符数
+                    max_diff_chars = int(
+                        calculate_token_limit(remaining_tokens) * token_ratio * 4
+                    )
                     if max_diff_chars <= 0:
                         max_diff_chars = None
             except Exception:

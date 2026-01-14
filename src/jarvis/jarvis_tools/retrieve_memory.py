@@ -6,8 +6,11 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import (
+    calculate_token_limit,
+    get_data_dir,
+    get_max_input_token_count,
+)
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -131,8 +134,8 @@ class RetrieveMemoryTool:
             if agent and hasattr(agent, "model"):
                 try:
                     remaining_tokens = agent.model.get_remaining_token_count()
-                    # 使用剩余token的2/3作为限制，保留1/3作为安全余量
-                    memory_token_limit = int(remaining_tokens * 2 / 3)
+                    # 使用剩余token的2/3或64k的最小值
+                    memory_token_limit = calculate_token_limit(remaining_tokens)
                     if memory_token_limit <= 0:
                         memory_token_limit = None
                 except Exception:
