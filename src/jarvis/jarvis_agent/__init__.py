@@ -1628,16 +1628,17 @@ class Agent:
                 safe_summary_prompt = DEFAULT_SUMMARY_PROMPT
             # 注意：不要写回 session.prompt，避免回调修改/清空后导致使用空prompt
 
-            # 关键流程：直接调用 task_analyzer 执行任务分析
-            try:
-                self.task_analyzer._on_before_summary(
-                    agent=self,
-                    prompt=safe_summary_prompt,
-                    auto_completed=auto_completed,
-                    need_summary=self.need_summary,
-                )
-            except Exception:
-                pass
+            # 关键流程：直接调用 task_analyzer 执行任务分析（仅在非交互模式下）
+            if self.non_interactive:
+                try:
+                    self.task_analyzer._on_before_summary(
+                        agent=self,
+                        prompt=safe_summary_prompt,
+                        auto_completed=auto_completed,
+                        need_summary=self.need_summary,
+                    )
+                except Exception:
+                    pass
 
             # 非关键流程：广播将要生成总结事件（用于日志、监控等）
             try:
@@ -1704,14 +1705,15 @@ class Agent:
             if self.original_user_input:
                 PrettyOutput.auto_print(f"📝 原始任务输入:\n{self.original_user_input}")
 
-        try:
-            self.task_analyzer._on_task_completed(
-                agent=self,
-                auto_completed=auto_completed,
-                need_summary=self.need_summary,
-            )
-        except Exception:
-            pass
+            # 关键流程：直接调用 task_analyzer（仅在非交互模式下）
+            try:
+                self.task_analyzer._on_task_completed(
+                    agent=self,
+                    auto_completed=auto_completed,
+                    need_summary=self.need_summary,
+                )
+            except Exception:
+                pass
 
         try:
             self.memory_manager._ensure_memory_prompt(
