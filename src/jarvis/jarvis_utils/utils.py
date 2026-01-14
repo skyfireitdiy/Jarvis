@@ -959,10 +959,21 @@ def _show_usage_stats(
                 ),
             )
 
-            welcome_panel = Panel(
-                welcome_panel_content, border_style="yellow", expand=True
+            # 计算panel宽度：max(终端宽度的1/2, 文字最小宽度)
+            terminal_width = console.width
+            # 渲染内容获取实际宽度（考虑多行情况）
+            content_width = max(
+                len(str(line)) for line in str(welcome_panel_content).split("\\n")
             )
-            console.print(welcome_panel)
+            panel_width = max(terminal_width // 2, content_width)
+
+            welcome_panel = Panel(
+                welcome_panel_content,
+                border_style="yellow",
+                expand=False,
+                width=panel_width,
+            )
+            console.print(Align.center(welcome_panel))
     except Exception as e:
         # 输出错误信息以便调试
         import traceback
