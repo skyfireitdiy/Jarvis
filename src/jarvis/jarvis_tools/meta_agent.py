@@ -104,6 +104,17 @@ class meta_agent:
 ### Agent / CodeAgent 关键用法（仅列核心要点，详细规则请阅读源码的绝对路径）
 - Agent（通用 Agent）：
   - 职责：通用任务编排与对话式工作流，严格遵循 ARCHER（ANALYZE → RULE → COLLECT → HYPOTHESIZE → EXECUTE → REVIEW）。
+  - **ARCHER 工作流说明**：
+    - **ANALYZE**（分析意图）：理解用户需求，明确任务目标，识别约束条件和边界，**主动识别可能需要的规则支撑**。
+    - **RULE**（加载规则）：加载相关的专业规则和最佳实践，为后续阶段提供指导。
+    - **COLLECT**（收集信息）：只读收集必要信息，定位相关文件和上下文，为方案设计做准备。
+    - **HYPOTHESIZE**（提出方案）：基于收集的信息，设计最优的技术方案，制定可执行的计划。
+    - **EXECUTE**（执行操作）：按照计划精准实施，确保修改正确且可回退。
+    - **REVIEW**（审查结果）：全面审查工作成果，核对完成度与影响面，确保质量。
+  - **关键特性**：
+    - 各阶段可以穿插和回退，形成迭代式闭环
+    - 在 ANALYZE 阶段主动考虑规则，避免跑偏
+    - 严格按照流程顺序推进，禁止跳步或乱序（除非用户明确要求并说明风险）
   - 初始化要点：`Agent(system_prompt=..., name=..., model_group=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{agent_init_file}` 中定义。
   - 典型用法：通过 `agent.run(user_input)` 启动完整闭环，内部会自动处理系统提示、工具调用、task_list_manager 调度和总结；总结与返回值行为由 `summary_prompt` 和 `need_summary` 控制。
   - 更多细节（参数含义、总结与返回值策略、事件回调等）请直接阅读：`{agent_init_file}`。
