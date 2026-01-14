@@ -13,7 +13,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from typing import Dict, List, Optional, Any
 
 from jarvis.jarvis_agent.task_list import TaskStatus
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import calculate_token_limit, get_max_input_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.git_utils import (
@@ -116,9 +116,9 @@ class task_list_manager:
             if agent and hasattr(agent, "model"):
                 try:
                     remaining_tokens = agent.model.get_remaining_token_count()
-                    # 使用剩余token的2/3作为限制，保留1/3作为安全余量
+                    # 使用剩余token的2/3或64k的最小值
                     # 粗略估算：1个token约等于4个字符（中文可能更少，但保守估计）
-                    limit_tokens = int(remaining_tokens * 2 / 3)
+                    limit_tokens = calculate_token_limit(remaining_tokens)
                     # 转换为字符数（保守估计：1 token = 4 字符）
                     limit_chars = limit_tokens * 4
                     # 确保至少返回一个合理的值

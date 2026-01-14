@@ -2,7 +2,7 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import calculate_token_limit, get_max_input_token_count
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -45,8 +45,8 @@ class ReadCodeTool:
             if agent and hasattr(agent, "model"):
                 try:
                     remaining_tokens = agent.model.get_remaining_token_count()
-                    # 取剩余token数量和64k中较小的值
-                    limit_tokens = min(remaining_tokens, 65536)
+                    # 使用剩余token的2/3或64k的最小值
+                    limit_tokens = calculate_token_limit(remaining_tokens)
                     # 确保至少返回一个合理的值
                     if limit_tokens > 0:
                         return limit_tokens

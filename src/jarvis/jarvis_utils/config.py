@@ -15,6 +15,25 @@ from jarvis.jarvis_utils.collections import CaseInsensitiveDict
 GLOBAL_CONFIG_DATA: CaseInsensitiveDict = CaseInsensitiveDict()
 
 
+# 上下文长度限制常量
+MAX_CONTEXT_LENGTH = 64 * 1024  # 64k token绝对上限
+
+
+def calculate_token_limit(remaining_tokens: int) -> int:
+    """
+    计算token限制：取剩余token的2/3与MAX_CONTEXT_LENGTH的最小值
+
+    Args:
+        remaining_tokens: 剩余token数量
+
+    Returns:
+        int: 允许的最大token数（剩余token的2/3或64k，取较小值）
+    """
+    if remaining_tokens <= 0:
+        return 0
+    return min(int(remaining_tokens * 2 / 3), MAX_CONTEXT_LENGTH)
+
+
 def set_global_env_data(env_data: Dict[str, Any]) -> None:
     """设置全局环境变量数据"""
     global GLOBAL_CONFIG_DATA
@@ -121,7 +140,7 @@ def calculate_content_token_limit(agent: Any = None) -> int:
             try:
                 remaining_tokens = agent.model.get_remaining_token_count()
                 # 使用剩余token的2/3作为限制，保留1/3作为安全余量
-                return int(remaining_tokens * 2 / 3)
+                return calculate_token_limit(remaining_tokens)
             except Exception:
                 pass
 

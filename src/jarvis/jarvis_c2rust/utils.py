@@ -21,7 +21,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
 from jarvis.jarvis_c2rust.constants import ORDER_JSONL
 from jarvis.jarvis_c2rust.scanner import compute_translation_order_jsonl
-from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import calculate_token_limit, get_max_input_token_count
 from jarvis.jarvis_utils.git_utils import get_diff
 from jarvis.jarvis_utils.git_utils import get_diff_file_list
 from jarvis.jarvis_utils.jsonnet_compat import loads as json5_loads
@@ -535,8 +535,10 @@ def truncate_git_diff_with_context_limit(
         try:
             remaining_tokens = agent.get_remaining_token_count()
             if remaining_tokens > 0:
-                # 使用剩余 token 的指定比例作为字符限制（1 token ≈ 4字符）
-                max_diff_chars = int(remaining_tokens * token_ratio * 4)
+                # 使用剩余token的2/3或64k的最小值，再转换为字符数
+                max_diff_chars = int(
+                    calculate_token_limit(remaining_tokens) * token_ratio * 4
+                )
                 if max_diff_chars <= 0:
                     max_diff_chars = None
         except Exception:
