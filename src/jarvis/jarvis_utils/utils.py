@@ -943,18 +943,18 @@ def _show_usage_stats(
                 Align.center(Text(model_info, style="cyan")),
                 Align.center(Text(work_dir_info, style="dim")),
                 "",  # for a blank line
-                Align.center(Text(f"v{__version__}")),
+                Align.center(Text(f"🎯 v{__version__}", style="bold green")),
                 "",  # for a blank line
                 Align.center(
-                    Text("🐙 GitHub: ", style="bold blue")
+                    Text("🐙 GitHub: ", style="bold cyan")
                     + Text.from_markup(
-                        f"[link={github_url}]{github_url}[/link]", style="blue"
+                        f"[link={github_url}]{github_url}[/link]", style="cyan"
                     )
                 ),
                 Align.center(
-                    Text("🎋 Gitee: ", style="bold red")
+                    Text("🎋 Gitee: ", style="bold cyan")
                     + Text.from_markup(
-                        f"[link={gitee_url}]{gitee_url}[/link]", style="red"
+                        f"[link={gitee_url}]{gitee_url}[/link]", style="cyan"
                     )
                 ),
             )
