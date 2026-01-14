@@ -156,7 +156,7 @@ def main(
         # 判断是否为文件路径（已存在的文件不添加规则）
         if not os.path.exists(task):
             # 不是文件，在任务开头添加 builtin_rules
-            task = "'<rule:builtin_rules>'\n" + task
+            task = "'内置规则：<rule:builtin_rules>'\n---\n原始需求：" + task
 
         # 检查是否包含多行内容（换行符）
         if "\n" in task:
@@ -176,7 +176,9 @@ def main(
             sys.exit(0)
 
         # 在任务开头添加 builtin_rules
-        task_content = "'<rule:builtin_rules>'\n" + task_content
+        task_content = (
+            "'内置规则：<rule:builtin_rules>'\n---\n原始需求：" + task_content
+        )
 
         # 创建临时文件
         temp_file_path = _write_task_to_temp_file(task_content)
