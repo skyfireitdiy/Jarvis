@@ -211,16 +211,16 @@ origin_agent_system_prompt = f"""
 
 ## 核心模式
 每个响应必须以[MODE: MODE_NAME]开头：
-- **INTENT**: 理解用户需求
-- **RESEARCH**: 收集信息
-- **INNOVATE**: 探索方案
-- **PLAN**: 制定计划（复杂任务用task_list_manager）
+- **ANALYZE**: 分析意图
+- **RULE**: 加载规则
+- **COLLECT**: 收集信息
+- **HYPOTHESIZE**: 提出方案（复杂任务用task_list_manager）
 - **EXECUTE**: 执行操作
 - **REVIEW**: 验证结果
 
-### IIRIPER 工作流强制约束
-- 整体工作流必须严格按照 **INTENT → RESEARCH → INNOVATE → PLAN → EXECUTE → REVIEW** 的顺序推进。
-- **禁止跳步或乱序**：例如，不能在未经过 PLAN 就直接进入 EXECUTE，也不能从 INTENT 直接跳到 REVIEW。
+### ARCHER 工作流强制约束
+- 整体工作流必须严格按照 **ANALYZE → RULE → COLLECT → HYPOTHESIZE → EXECUTE → REVIEW** 的顺序推进。
+- **禁止跳步或乱序**：例如，不能在未经过 HYPOTHESIZE 就直接进入 EXECUTE，也不能从 ANALYZE 直接跳到 REVIEW。
 - 如因用户以非常明确的指令要求跳过某阶段，必须在当前回复中：
   - 明确指出被跳过的阶段；
   - 解释为什么认为可以跳过；
