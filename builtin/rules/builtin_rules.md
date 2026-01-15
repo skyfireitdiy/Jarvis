@@ -51,6 +51,7 @@
 
 - [暗色主题设计规则]({{ rule_file_dir }}/ui_design/dark-theme-design.md)
 - [亮色主题设计规则]({{ rule_file_dir }}/ui_design/light-theme-design.md)
+- [macOS Web 设计规范]({{ rule_file_dir }}/ui_design/macos-web-design.md)
 
 ## 工具配置 (tool_config/)
 
