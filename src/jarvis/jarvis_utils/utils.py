@@ -1093,7 +1093,7 @@ def init_env(
 
         if not rule_file.exists():
             # 从源码目录拷贝规则说明文件
-            src_rule_file = Path(__file__).parent.parent.parent / "jarvis_data" / "rule"
+            src_rule_file = Path(__file__).parent.parent / "jarvis_data" / "rule"
             if src_rule_file.exists():
                 import shutil
 
