@@ -76,30 +76,35 @@ def _install_missing_tools(results: list) -> None:
         PrettyOutput.auto_print("ℹ️  跳过自动安装")
         return
 
-    # 逐个安装工具
+    # 批量安装工具
     PrettyOutput.auto_print("\n🚀 开始自动安装工具...")
-    for tool_info in missing_tools:
-        tool_name = tool_info["name"]
-        PrettyOutput.auto_print(f"\n正在安装 {tool_name}...")
-        try:
-            # 使用 jvs -T 命令安装工具
-            cmd = ["jvs", "-T", f"在当前环境安装{tool_name}"]
-            result = subprocess.run(cmd)
-            if result.returncode == 0:
+
+    # 构建批量安装命令
+    install_descriptions = [
+        f"在当前环境安装{tool_info['name']}" for tool_info in missing_tools
+    ]
+    combined_description = "，".join(install_descriptions)
+
+    try:
+        # 使用 jvs -T 命令批量安装工具
+        cmd = ["jvs", "-T", combined_description]
+        result = subprocess.run(cmd)
+
+        if result.returncode == 0:
+            # 批量安装成功，显示每个工具的安装结果
+            for tool_name in tool_names:
                 PrettyOutput.auto_print(f"✅ {tool_name} 安装成功")
-            else:
-                PrettyOutput.print(f"❌ {tool_name} 安装失败", OutputType.ERROR)
-        except FileNotFoundError:
-            # jvs命令不存在，无法继续安装
-            PrettyOutput.print(
-                "❌ 找不到 'jvs' 命令，无法继续安装工具", OutputType.ERROR
-            )
-            PrettyOutput.print("   请确保 jarvis 已正确安装后再试", OutputType.ERROR)
-            break
-        except Exception as e:
-            # 其他异常，继续尝试安装下一个工具
-            PrettyOutput.print(f"❌ 安装 {tool_name} 时出错: {e}", OutputType.ERROR)
-            continue
+        else:
+            # 批量安装失败，显示错误信息但仍继续重新检查状态
+            PrettyOutput.print("❌ 批量安装失败，请手动安装缺失工具", OutputType.ERROR)
+
+    except FileNotFoundError:
+        # jvs命令不存在，无法继续安装
+        PrettyOutput.print("❌ 找不到 'jvs' 命令，无法继续安装工具", OutputType.ERROR)
+        PrettyOutput.print("   请确保 jarvis 已正确安装后再试", OutputType.ERROR)
+    except Exception as e:
+        # 其他异常
+        PrettyOutput.print(f"❌ 批量安装时出错: {e}", OutputType.ERROR)
 
     PrettyOutput.auto_print("\n🔍 正在重新检查工具安装状态...")
 
