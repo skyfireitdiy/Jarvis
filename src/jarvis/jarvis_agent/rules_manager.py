@@ -130,6 +130,44 @@ class RulesManager:
             pass
         return None
 
+    def _get_builtin_rules_index(self) -> Optional[str]:
+        """读取 builtin_rules.md 索引文件的完整内容
+
+        返回:
+            str: builtin_rules.md 的完整内容，如果未找到则返回 None
+        """
+        try:
+            from jarvis.jarvis_utils.template_utils import _get_jarvis_src_dir
+
+            # 获取索引文件路径
+            jarvis_src_dir = _get_jarvis_src_dir()
+            index_file_path = os.path.join(
+                jarvis_src_dir, "builtin", "rules", "builtin_rules.md"
+            )
+
+            # 检查索引文件是否存在
+            if not os.path.exists(index_file_path) or not os.path.isfile(
+                index_file_path
+            ):
+                return None
+
+            # 读取索引文件内容
+            with open(index_file_path, "r", encoding="utf-8", errors="replace") as f:
+                index_content = f.read()
+
+            # 使用jinja2渲染规则模板
+            if index_content:
+                index_content = render_rule_template(
+                    index_content, os.path.dirname(index_file_path)
+                )
+
+            return index_content if index_content else None
+
+        except Exception as e:
+            # 读取失败时忽略，不影响主流程
+            PrettyOutput.auto_print(f"⚠️ 读取builtin_rules.md失败: {e}")
+            return None
+
     def _get_rule_from_builtin_index(self, rule_name: str) -> Optional[str]:
         """从 builtin_rules.md 索引文件中查找并加载指定名称的规则
 
@@ -397,6 +435,12 @@ class RulesManager:
         if project_rules:
             combined_parts.append(project_rules)
             loaded_rule_names.add("project_rule")
+
+        # 加载 builtin_rules.md 内置规则索引
+        builtin_rules_index = self._get_builtin_rules_index()
+        if builtin_rules_index:
+            combined_parts.append(builtin_rules_index)
+            loaded_rule_names.add("builtin_rules_index")
 
         # 如果指定了 rule_names，从 rules.yaml 文件中读取并添加多个规则
         if rule_names:
