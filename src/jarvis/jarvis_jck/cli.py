@@ -5,9 +5,11 @@
 """
 
 import sys
+import subprocess
 from typing import Optional
 
 import typer
+from typer import confirm
 
 from jarvis.jarvis_jck.core import ToolChecker
 from jarvis.jarvis_utils.output import OutputType, PrettyOutput
@@ -50,6 +52,58 @@ def _format_tool_result(result: dict) -> str:
     return "\n".join(lines)
 
 
+def _install_missing_tools(results: list) -> None:
+    """安装未安装的工具
+
+    参数:
+        results: 工具检查结果列表
+    """
+    # 找出所有未安装的工具
+    missing_tools = [r for r in results if not r["found"]]
+
+    if not missing_tools:
+        return
+
+    # 构建工具名称列表
+    tool_names = [r["name"] for r in missing_tools]
+    tool_names_str = "、".join(tool_names)
+
+    # 询问用户是否自动安装
+    PrettyOutput.auto_print(
+        f"\n⚠️  检测到 {len(missing_tools)} 个工具未安装: {tool_names_str}"
+    )
+    if not confirm("是否需要自动安装这些工具？", default=True):
+        PrettyOutput.auto_print("ℹ️  跳过自动安装")
+        return
+
+    # 逐个安装工具
+    PrettyOutput.auto_print("\n🚀 开始自动安装工具...")
+    for tool_info in missing_tools:
+        tool_name = tool_info["name"]
+        PrettyOutput.auto_print(f"\n正在安装 {tool_name}...")
+        try:
+            # 使用 jvs -T 命令安装工具
+            cmd = ["jvs", "-T", f"在当前环境安装{tool_name}"]
+            result = subprocess.run(cmd)
+            if result.returncode == 0:
+                PrettyOutput.auto_print(f"✅ {tool_name} 安装成功")
+            else:
+                PrettyOutput.print(f"❌ {tool_name} 安装失败", OutputType.ERROR)
+        except FileNotFoundError:
+            # jvs命令不存在，无法继续安装
+            PrettyOutput.print(
+                "❌ 找不到 'jvs' 命令，无法继续安装工具", OutputType.ERROR
+            )
+            PrettyOutput.print("   请确保 jarvis 已正确安装后再试", OutputType.ERROR)
+            break
+        except Exception as e:
+            # 其他异常，继续尝试安装下一个工具
+            PrettyOutput.print(f"❌ 安装 {tool_name} 时出错: {e}", OutputType.ERROR)
+            continue
+
+    PrettyOutput.auto_print("\n🔍 正在重新检查工具安装状态...")
+
+
 def _print_results(results: list, summary: dict) -> None:
     """打印检查结果
 
@@ -89,6 +143,41 @@ def _print_results(results: list, summary: dict) -> None:
         PrettyOutput.auto_print("\n✨ 所有工具都已安装！")
 
 
+def _perform_check(
+    checker: ToolChecker,
+    tool_name: Optional[str],
+    check_lint: bool,
+    check_build: bool,
+) -> tuple:
+    """执行工具检查
+
+    参数:
+        checker: ToolChecker实例
+        tool_name: 要检查的工具名称
+        check_lint: 是否检查lint工具
+        check_build: 是否检查构建工具
+
+    返回:
+        (results, summary) 元组
+    """
+    if tool_name:
+        # 检查单个工具（优先于其他选项）
+        result = checker.check_single_tool(tool_name)
+        results = [result]
+    elif check_lint:
+        # 检查lint工具
+        results = checker.check_lint_tools()
+    elif check_build:
+        # 检查构建工具
+        results = checker.check_build_tools()
+    else:
+        # 检查所有工具（默认行为）
+        results = checker.check_all_tools()
+
+    summary = checker.get_summary(results)
+    return results, summary
+
+
 @app.command()
 def check(
     tool_name: Optional[str] = typer.Argument(
@@ -113,26 +202,11 @@ def check(
         )
         sys.exit(1)
 
-    if tool_name:
-        # 检查单个工具（优先于其他选项）
-        result = checker.check_single_tool(tool_name)
-        results = [result]
-        summary = checker.get_summary(results)
-    elif check_lint:
-        # 检查lint工具
-        results = checker.check_lint_tools()
-        summary = checker.get_summary(results)
-    elif check_build:
-        # 检查构建工具
-        results = checker.check_build_tools()
-        summary = checker.get_summary(results)
-    else:
-        # 检查所有工具（默认行为）
-        results = checker.check_all_tools()
-        summary = checker.get_summary(results)
+    # 执行初始检查
+    results, summary = _perform_check(checker, tool_name, check_lint, check_build)
 
     if as_json:
-        # JSON格式输出
+        # JSON格式输出：不询问安装，直接输出结果
         import json
 
         output = {
@@ -146,6 +220,15 @@ def check(
         )
     else:
         # 友好的文本输出
+        # 如果有未安装工具，询问是否自动安装
+        if summary["missing"] > 0:
+            _install_missing_tools(results)
+            # 重新检查工具状态（使用相同的检查逻辑确保一致性）
+            results, summary = _perform_check(
+                checker, tool_name, check_lint, check_build
+            )
+
+        # 输出最终结果
         _print_results(results, summary)
 
     # 如果有工具未安装，返回非零退出码
