@@ -181,8 +181,7 @@ class BasePlatform(ABC):
                     try:
                         panel.subtitle = (
                             f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
-                            f"Token: {progress_bar} "
-                            f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
+                            f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
                         )
                     except Exception:
                         panel.subtitle = f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
@@ -193,8 +192,7 @@ class BasePlatform(ABC):
                     try:
                         panel.subtitle = (
                             f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断) | "
-                            f"Token: {progress_bar} "
-                            f"[{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
+                            f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
                         )
                     except Exception:
                         panel.subtitle = f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
