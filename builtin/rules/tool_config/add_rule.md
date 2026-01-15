@@ -15,7 +15,7 @@
 
 - **项目规则**：
   - 适用范围：仅适用于当前项目的特定规则
-  - 存放位置：`{{ git_root_dir }}/builtin/rules/` 目录下
+  - 存放位置：`{{ git_root_dir }}/.jarvis/rules/` 目录下
   - 典型场景：项目特定的架构规范、开发流程、工具配置等
 
 **选择原则：**
@@ -37,12 +37,12 @@
 
 **位置规范：**
 
-- **必须**：项目规则文件应放置在项目的 `builtin/rules/` 目录下的对应分类子目录中
+- **必须**：项目规则文件应放置在项目的 `.jarvis/rules/` 目录下的对应分类子目录中
 
 **文件路径：**
 
 ```text
-{{ git_root_dir }}/builtin/rules/<category>/<rule_name>.md
+{{ git_root_dir }}/.jarvis/rules/<category>/<rule_name>.md
 ```
 
 **分类说明：**
@@ -107,7 +107,7 @@
 
 **项目规则注册：**
 
-- **必须**：按照 `{{ rule_file_dir }}/../builtin_rules.md` 的格式添加规则条目
+- **必须**：按照 `{{ git_root_dir }}/.jarvis/rule` 的格式添加规则条目
 - **必须**：提供规则的简短描述和文件路径
 - **必须**：将规则添加到合适的分类下（如架构设计、开发流程、代码质量等）
 
