@@ -1,0 +1,5 @@
+# Jarvis内置规则文件
+
+内置规则文件位置：{{ jarvis_src_dir }}/builtin/rules/builtin_rules.md，可通过`load_rule`工具加载。
+
+
