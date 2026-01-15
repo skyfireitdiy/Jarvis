@@ -102,18 +102,10 @@ class BasePlatform(ABC):
         filled = int(width * percent / 100)
         empty = width - filled
 
-        # 根据百分比选择颜色
-        if percent >= 90:
-            color = "red"
-        elif percent >= 80:
-            color = "yellow"
-        else:
-            color = "green"
-
         # 构建进度条：使用 █ 表示已填充，░ 表示未填充
         bar = "█" * filled + "░" * empty
 
-        return f"[{color}]{bar}[/{color}]"
+        return bar
 
     def _get_token_usage_info(
         self, current_response: str = ""
