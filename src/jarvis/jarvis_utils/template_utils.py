@@ -96,7 +96,7 @@ def _get_jarvis_src_dir() -> str:
     """
     # 从当前文件位置向上定位到项目根目录
     # src/jarvis/jarvis_utils/template_utils.py -> 项目根目录
-    return str(Path(__file__).parent.parent.parent.resolve())
+    return str(Path(__file__).parent.parent.parent.parent.resolve())
 
 
 def _get_jarvis_data_dir() -> str:
