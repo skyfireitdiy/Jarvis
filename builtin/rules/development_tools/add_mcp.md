@@ -228,6 +228,6 @@ mcp:
 
 ## 相关资源
 
-- 配置管理：`src/jarvis/jarvis_utils/config.py`
-- MCP 注册实现：`src/jarvis/jarvis_tools/registry.py` (register_mcp_tool_by_config 方法)
-- MCP 客户端实现：`src/jarvis/jarvis_mcp/`
+- 配置管理：`{{ jarvis_src_dir }}/src/jarvis/jarvis_utils/config.py`
+- MCP 注册实现：`{{ jarvis_src_dir }}/src/jarvis/jarvis_tools/registry.py` (register_mcp_tool_by_config 方法)
+- MCP 客户端实现：`{{ jarvis_src_dir }}/src/jarvis/jarvis_mcp/`
