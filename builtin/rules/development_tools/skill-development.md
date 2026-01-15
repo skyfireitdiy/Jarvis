@@ -12,7 +12,7 @@
 - **Git仓库技能添加**：从远程Git仓库克隆并注册技能
 - **本地路径技能添加**：验证并注册本地技能路径
 
-技能可以是本地路径或Git仓库，添加后将在 `{{ jarvis_data_dir }}/rules/skills.md` 中注册技能信息，供后续使用。
+技能可以是本地路径或Git仓库，添加后将在 `{{ jarvis_data_dir }}/rule` 中注册技能信息，供后续使用。
 
 ## 你必须遵守的原则
 
@@ -37,7 +37,7 @@
 
 ### 3. 注册规范原则
 
-- **必须**：在`{{ jarvis_data_dir }}/rules/skills.md`中注册技能信息
+- **必须**：在`{{ jarvis_data_dir }}/rule`中注册技能信息
 - **必须**：使用统一的注册格式
 - **必须**：记录技能名称、功能描述、位置和添加时间
 - **禁止**：覆盖已存在的技能注册信息
@@ -102,7 +102,7 @@
 
 ### 阶段5：技能信息注册
 
-1. **注册文件检查**：验证`{{ jarvis_data_dir }}/rules/skills.md`是否存在
+1. **注册文件检查**：验证`{{ jarvis_data_dir }}/rule`是否存在
 2. **创建注册文件**：不存在时创建并写入标准头部：
 
    ```markdown
@@ -154,7 +154,7 @@
 
 ### 4. 注册格式规范
 
-- **注册文件位置**：`{{ jarvis_data_dir }}/rules/skills.md`
+- **注册文件位置**：`{{ jarvis_data_dir }}/rule`
 - **技能信息格式**：必须包含功能描述、位置、添加时间
 - **时间格式标准**：`YYYY-MM-DD HH:MM:SS`
 - **路径规范**：必须使用绝对路径，禁止相对路径
@@ -266,5 +266,5 @@
 ## 相关资源
 
 - **参考规则**：`{{ rule_file_dir }}/../tool_config/add_rule.md`
-- **技能注册文件**：`{{ jarvis_data_dir }}/rules/skills.md`
+- **技能注册文件**：`{{ jarvis_data_dir }}/rule`
 - **技能存储目录**：`{{ jarvis_data_dir }}/skills/`
