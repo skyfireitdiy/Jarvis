@@ -36,13 +36,6 @@ class PromptManager:
         """
         构建系统提示词，复用现有的工具使用提示生成逻辑，保持行为一致。
         """
-        from jarvis.jarvis_code_agent.code_agent import CodeAgent
-
-        rules_prompt = ""
-        if isinstance(agent_, CodeAgent):
-            code_agent: CodeAgent = agent_
-            rules_prompt = code_agent.get_rules_prompt()
-
         action_prompt = self.agent.get_tool_usage_prompt()
 
         # 获取已加载的规则内容
@@ -162,7 +155,6 @@ class PromptManager:
 
 {system_tools_info}
 
-{rules_prompt}
 """
 
     # ----------------------------
