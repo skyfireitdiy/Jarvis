@@ -25,7 +25,6 @@ from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
 from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
 from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
-from jarvis.jarvis_agent.rules_manager import RulesManager
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
     ContextRecommender,
@@ -91,7 +90,7 @@ class CodeAgent(Agent):
         self._init_code_agent_context_managers()
 
         # 代码管理相关管理器初始化
-        self._init_code_agent_managers(rule_names)
+        self._init_code_agent_managers()
 
         # 工具列表构建
         base_tools = self._build_code_agent_tool_list(
@@ -139,17 +138,8 @@ class CodeAgent(Agent):
         # 上下文推荐器将在父类 Agent 创建后初始化（需要 LLM 模型）
         self.context_recommender: Optional[ContextRecommender] = None
 
-    def _init_code_agent_managers(self, rule_names: Optional[str]) -> None:
-        """初始化 CodeAgent 代码管理相关的各个管理器
-
-        参数:
-            rule_names: 规则名称列表（逗号分隔）
-        """
-        # 规则管理器：加载和管理代码规则
-        self.rules_manager = RulesManager(self.root_dir)
-        # 加载 rules（从配置文件或指定规则名称）
-        _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
-
+    def _init_code_agent_managers(self) -> None:
+        """初始化 CodeAgent 代码管理相关的各个管理器"""
         # Git 管理器：处理 Git 操作和提交
         self.git_manager = GitManager(self.root_dir)
         # 检测 git username 和 email 是否已设置
@@ -291,13 +281,6 @@ class CodeAgent(Agent):
 
         # 订阅工具调用后事件，用于处理代码修改后的 diff 展示和提交
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
-
-    def get_rules_prompt(self) -> str:
-        """
-        获取rules加载的prompt
-        """
-        prompt, _ = self.rules_manager.load_all_rules(",".join(self.loaded_rule_names))
-        return f"\n\n<rules>\n{prompt}</rules>\n"
 
     def _init_model(self, model_group: Optional[str]) -> None:
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
@@ -1230,26 +1213,6 @@ git reset --hard {start_commit}
                     f"\n\n【第 {iteration} 轮修复总结】\n{fix_summary}"
                 )
 
-    def add_runtime_rule(self, rule_name: str) -> None:
-        """添加运行时加载的规则到跟踪列表
-
-        用于记录通过builtin_input_handler等方式动态加载的规则，
-        确保这些规则能够被后续的子代理继承。
-
-        参数:
-            rule_name: 规则名称
-        """
-        if not rule_name or not isinstance(rule_name, str):
-            return
-
-        # 同时更新完整规则集合（自动去重）
-        self.loaded_rule_names.add(rule_name)
-
-        # 防止rule_name无效
-        _, self.loaded_rule_names = self.rules_manager.load_all_rules(
-            ",".join(self.loaded_rule_names)
-        )
-
 
 @app.command()
 def cli(
@@ -1669,185 +1632,6 @@ def _handle_worktree_merge(
 
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 处理 worktree 合并时出错: {str(e)}")
-
-
-def _print_available_rules(
-    rules_manager: RulesManager, rule_names: Optional[str] = None
-) -> None:
-    """打印可用的规则信息
-
-    参数:
-        rules_manager: 规则管理器实例
-        rule_names: 用户指定的规则名称列表（逗号分隔）
-    """
-    try:
-        from rich.console import Console
-        from rich.panel import Panel
-        from rich.text import Text
-
-        console = Console()
-
-        # 获取所有可用规则
-        all_rules = rules_manager.get_all_available_rule_names()
-        builtin_rules = all_rules.get("builtin", [])
-        file_rules = all_rules.get("files", [])
-        yaml_rules = all_rules.get("yaml", [])
-
-        # 获取已加载的规则
-        loaded_rules = []
-        if rule_names:
-            rule_list = [name.strip() for name in rule_names.split(",") if name.strip()]
-            for rule_name in rule_list:
-                if rules_manager.get_named_rule(rule_name):
-                    loaded_rules.append(rule_name)
-
-        # 检查项目规则和全局规则
-        has_project_rule = rules_manager.read_project_rule() is not None
-        has_global_rule = rules_manager.read_global_rules() is not None
-
-        # 构建规则信息内容
-        content_parts = []
-
-        # 显示所有规则（按来源分类）
-        has_any_rules = False
-
-        # 内置规则
-        if builtin_rules:
-            has_any_rules = True
-            builtin_text = Text()
-            builtin_text.append("📚 内置规则 ", style="bold cyan")
-            builtin_text.append(f"({len(builtin_rules)} 个): ", style="dim")
-            for i, rule in enumerate(builtin_rules):
-                if i > 0:
-                    builtin_text.append(", ", style="dim")
-                builtin_text.append(rule, style="yellow")
-            content_parts.append(builtin_text)
-
-        # 用户自定义规则
-        user_custom_rules = file_rules + yaml_rules
-        if user_custom_rules:
-            has_any_rules = True
-            user_text = Text()
-            user_text.append("👤 用户自定义规则 ", style="bold green")
-            user_text.append(f"({len(user_custom_rules)} 个): ", style="dim")
-
-            # 分别显示文件规则和YAML规则
-            custom_rules_parts = []
-            if file_rules:
-                file_part = Text()
-                file_part.append("文件规则: ", style="blue")
-                for i, rule in enumerate(file_rules):
-                    if i > 0:
-                        file_part.append(", ", style="dim")
-                    file_part.append(rule, style="cyan")
-                custom_rules_parts.append(file_part)
-
-            if yaml_rules:
-                yaml_part = Text()
-                yaml_part.append("YAML规则: ", style="magenta")
-                for i, rule in enumerate(yaml_rules):
-                    if i > 0:
-                        yaml_part.append(", ", style="dim")
-                    yaml_part.append(rule, style="magenta")
-                custom_rules_parts.append(yaml_part)
-
-            # 合并显示自定义规则
-            for i, part in enumerate(custom_rules_parts):
-                if i > 0:
-                    user_text.append(" | ", style="dim")
-                user_text.append(part)
-
-            content_parts.append(user_text)
-
-        # 分别显示详细的文件规则和YAML规则（保留原有详细信息）
-        if file_rules:
-            has_any_rules = True
-            file_text = Text()
-            file_text.append("📄 详细文件规则 ", style="bold blue")
-            file_text.append(f"({len(file_rules)} 个): ", style="dim")
-            for i, rule in enumerate(file_rules):
-                if i > 0:
-                    file_text.append(", ", style="dim")
-                file_text.append(rule, style="cyan")
-            content_parts.append(file_text)
-
-        if yaml_rules:
-            has_any_rules = True
-            yaml_text = Text()
-            yaml_text.append("📝 详细YAML规则 ", style="bold magenta")
-            yaml_text.append(f"({len(yaml_rules)} 个): ", style="dim")
-            for i, rule in enumerate(yaml_rules):
-                if i > 0:
-                    yaml_text.append(", ", style="dim")
-                yaml_text.append(rule, style="magenta")
-            content_parts.append(yaml_text)
-
-        # 如果没有规则，显示提示
-        if not has_any_rules:
-            no_rules_text = Text()
-            no_rules_text.append("ℹ️ 当前没有可用的规则", style="dim")
-            content_parts.append(no_rules_text)
-
-        # 提示信息
-        if has_any_rules:
-            tip_text = Text()
-            tip_text.append("💡 提示: ", style="bold green")
-            tip_text.append("使用 ", style="dim")
-            tip_text.append("--rule-names", style="bold yellow")
-            tip_text.append(" 参数加载规则，例如: ", style="dim")
-            tip_text.append("--rule-names tdd,clean_code", style="bold yellow")
-            tip_text.append("\n   或使用 ", style="dim")
-            tip_text.append("@", style="bold yellow")
-            tip_text.append(" 触发规则加载，例如: ", style="dim")
-            tip_text.append("@tdd @clean_code", style="bold yellow")
-            content_parts.append(tip_text)
-
-        # 显示已加载的规则
-        if loaded_rules:
-            loaded_text = Text()
-            loaded_text.append("✅ 已加载规则: ", style="bold green")
-            for i, rule in enumerate(loaded_rules):
-                if i > 0:
-                    loaded_text.append(", ", style="dim")
-                loaded_text.append(rule, style="bold yellow")
-            content_parts.append(loaded_text)
-
-        # 显示项目规则和全局规则
-        if has_project_rule or has_global_rule:
-            rule_files_text = Text()
-            if has_project_rule:
-                rule_files_text.append("📁 项目规则: ", style="bold blue")
-                rule_files_text.append(".jarvis/rule", style="dim")
-                if has_global_rule:
-                    rule_files_text.append(" | ", style="dim")
-            if has_global_rule:
-                rule_files_text.append("🌐 全局规则: ", style="bold magenta")
-                rule_files_text.append("~/.jarvis/rule", style="dim")
-            content_parts.append(rule_files_text)
-
-        # 如果有规则信息，使用 Panel 打印
-        if content_parts:
-            from rich.console import Group
-
-            # 创建内容组
-            content_group = Group(*content_parts)
-
-            # 创建 Panel
-            panel = Panel(
-                content_group,
-                title="📋 规则信息",
-                title_align="center",
-                border_style="cyan",
-                padding=(0, 1),
-            )
-
-            console.print(panel)
-    except Exception as e:
-        # 显示错误信息而不是静默失败
-        PrettyOutput.auto_print(f"⚠️ 规则信息显示失败: {e}")
-        import traceback
-
-        traceback.print_exc()
 
 
 def main() -> None:

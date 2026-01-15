@@ -655,9 +655,10 @@ class Agent:
         # 初始化规则管理器（如果子类已经创建，则不覆盖）
         if not hasattr(self, "rules_manager"):
             self.rules_manager = RulesManager(root_dir)
-            self.loaded_rules, self.loaded_rule_names = (
-                self.rules_manager.load_all_rules(rule_names)
-            )
+        # 无条件加载规则内容（确保 loaded_rules 和 loaded_rule_names 被初始化）
+        self.loaded_rules, self.loaded_rule_names = self.rules_manager.load_all_rules(
+            rule_names
+        )
 
     def _setup_tools_and_prompt(self) -> None:
         """设置工具和系统提示词"""
