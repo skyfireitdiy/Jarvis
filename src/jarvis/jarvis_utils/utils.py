@@ -628,8 +628,15 @@ def _check_jarvis_updates() -> bool:
     return _check_pip_updates()
 
 
-def _show_usage_stats(welcome_str: str) -> None:
-    """显示Jarvis使用统计信息"""
+def _show_usage_stats(
+    welcome_str: str, model_group_override: Optional[str] = None
+) -> None:
+    """显示Jarvis使用统计信息
+
+    参数:
+        welcome_str: 欢迎信息字符串
+        model_group_override: 模型组覆盖参数，用于显示用户指定的模型组
+    """
     try:
         from rich.console import Console
         from rich.console import Group
@@ -908,8 +915,8 @@ def _show_usage_stats(welcome_str: str) -> None:
 
             # 获取模型信息和工作目录
             try:
-                model_name = get_normal_model_name()
-                platform_name = get_normal_platform_name()
+                model_name = get_normal_model_name(model_group_override)
+                platform_name = get_normal_platform_name(model_group_override)
                 model_info = f"🤖 模型: {model_name} ({platform_name})"
             except Exception:
                 model_info = "🤖 模型: 未知"
@@ -956,12 +963,17 @@ def _show_usage_stats(welcome_str: str) -> None:
         PrettyOutput.auto_print(f"❌ {traceback.format_exc()}")
 
 
-def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
+def init_env(
+    welcome_str: str = "",
+    config_file: Optional[str] = None,
+    model_group: Optional[str] = None,
+) -> None:
     """初始化Jarvis环境
 
     参数:
         welcome_str: 欢迎信息字符串
         config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
+        model_group: 模型组覆盖参数，用于显示用户指定的模型组
     """
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
     try:
@@ -1020,7 +1032,7 @@ def init_env(welcome_str: str = "", config_file: Optional[str] = None) -> None:
 
             def show_stats_async() -> None:
                 try:
-                    _show_usage_stats(welcome_str)
+                    _show_usage_stats(welcome_str, model_group)
                 except Exception:
                     pass
 

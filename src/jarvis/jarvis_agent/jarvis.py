@@ -1150,6 +1150,7 @@ def run_cli(
     init_env(
         """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！""",
         config_file=config_file,
+        model_group=model_group,
     )
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
