@@ -80,23 +80,13 @@ def _install_missing_tools(results: list) -> None:
     PrettyOutput.auto_print("\n🚀 开始自动安装工具...")
 
     # 构建批量安装命令
-    install_descriptions = [
-        f"在当前环境安装{tool_info['name']}" for tool_info in missing_tools
-    ]
-    combined_description = "，".join(install_descriptions)
+    tool_names_str = "、".join(tool_names)
+    combined_description = f"在当前的环境安装以下工具：{tool_names_str}"
 
     try:
         # 使用 jvs -T 命令批量安装工具
         cmd = ["jvs", "-T", combined_description]
-        result = subprocess.run(cmd)
-
-        if result.returncode == 0:
-            # 批量安装成功，显示每个工具的安装结果
-            for tool_name in tool_names:
-                PrettyOutput.auto_print(f"✅ {tool_name} 安装成功")
-        else:
-            # 批量安装失败，显示错误信息但仍继续重新检查状态
-            PrettyOutput.print("❌ 批量安装失败，请手动安装缺失工具", OutputType.ERROR)
+        subprocess.run(cmd)
 
     except FileNotFoundError:
         # jvs命令不存在，无法继续安装
