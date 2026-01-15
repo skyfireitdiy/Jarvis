@@ -93,7 +93,8 @@ def run_jvs_dispatch(
 
         # 构造命令：cd 到工作目录，执行 jvs
         # 注意：不自动删除任务文件，避免被清理机制误删
-        command = f"cd {quoted_cwd} && jvs -n -d --task-file '{quoted_task_file}'"
+        # 注意：不使用 -d 参数，因为 jvsd 已经通过 dispatch_command_to_panel 创建了 panel
+        command = f"cd {quoted_cwd} && jvs -n --task-file '{quoted_task_file}'"
 
         try:
             # 使用智能调度函数创建 tmux panel
