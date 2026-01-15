@@ -2,6 +2,10 @@
 
 本目录包含以下分类的规则文件，每个分类对应一个子目录。
 
+## 技能注册 (skills/)
+
+- [技能列表]({{ jarvis_data_dir }}/rules/skills.md) - 记录所有已添加到 Jarvis 系统的技能信息，包括技能名称、功能描述、位置和添加时间
+
 ## 架构设计 (architecture_design/)
 
 - [SOLID 设计原则]({{ rule_file_dir }}/architecture_design/solid.md)
