@@ -64,6 +64,14 @@ TOOLS_CONFIG: List[Dict[str, str]] = [
         "\n  Cargo: cargo install loc"
         "\n  pip: pip install loc",
     },
+    {
+        "name": "tmux",
+        "command": "tmux",
+        "description": "终端复用器",
+        "install_hint": "Ubuntu/Debian: sudo apt install tmux"
+        "\n  macOS: brew install tmux"
+        "\n  或访问 https://github.com/tmux/tmux 查看文档",
+    },
 ]
 
 # Lint工具配置列表
