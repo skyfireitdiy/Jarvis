@@ -416,7 +416,24 @@ class BasePlatform(ABC):
             end_time = time.time()
             duration = end_time - start_time
 
-            PrettyOutput.auto_print(f"✅ {self.name()}模型响应完成: {duration:.2f}秒")
+            # 获取Token使用信息
+            try:
+                usage_percent, percent_color, progress_bar = self._get_token_usage_info(
+                    response
+                )
+                max_tokens = self._get_platform_max_input_token_count()
+                if max_tokens > 0 and progress_bar:
+                    PrettyOutput.auto_print(
+                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | Token: {usage_percent:.1f}%"
+                    )
+                else:
+                    PrettyOutput.auto_print(
+                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒"
+                    )
+            except Exception:
+                PrettyOutput.auto_print(
+                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒"
+                )
         else:
             response = self._chat_with_suppressed_output(message)
 
