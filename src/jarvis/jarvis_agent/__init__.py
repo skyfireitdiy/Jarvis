@@ -655,7 +655,9 @@ class Agent:
         # 初始化规则管理器（如果子类已经创建，则不覆盖）
         if not hasattr(self, "rules_manager"):
             self.rules_manager = RulesManager(root_dir)
-            _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)
+            self.loaded_rules, self.loaded_rule_names = (
+                self.rules_manager.load_all_rules(rule_names)
+            )
 
     def _setup_tools_and_prompt(self) -> None:
         """设置工具和系统提示词"""
@@ -1840,6 +1842,13 @@ class Agent:
 
             # 将非交互模式说明添加到用户输入中
             enhanced_input = user_input + non_interactive_note
+
+            # 将已加载的规则内容添加到用户输入的最前面
+            if hasattr(self, "loaded_rules") and self.loaded_rules:
+                enhanced_input = (
+                    f"<rules>\n{self.loaded_rules}\n</rules>\n\n{enhanced_input}"
+                )
+
             self.session.prompt = enhanced_input
 
             # 关键流程：直接调用 memory_manager 重置任务状态
