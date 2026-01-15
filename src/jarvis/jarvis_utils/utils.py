@@ -1083,6 +1083,26 @@ def init_env(
         # 静默失败，不影响正常使用
         pass
 
+    # 7. 确保规则说明文件存在
+    try:
+        from jarvis.jarvis_utils.config import get_data_dir
+        from pathlib import Path
+
+        jarvis_data_dir = Path(get_data_dir())
+        rule_file = jarvis_data_dir / "rule"
+
+        if not rule_file.exists():
+            # 从源码目录拷贝规则说明文件
+            src_rule_file = Path(__file__).parent.parent.parent / "jarvis_data" / "rule"
+            if src_rule_file.exists():
+                import shutil
+
+                jarvis_data_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src_rule_file, rule_file)
+    except Exception:
+        # 静默失败，不影响正常使用
+        pass
+
 
 def _interactive_config_setup(config_file_path: Path) -> None:
     """交互式配置引导
