@@ -208,6 +208,12 @@ class ReadCodeTool:
             if context_info:
                 output += context_info
 
+            # 检测是否为规则文件，添加提示
+            normalized_path = os.path.normpath(abs_path).replace(os.sep, "/")
+            if "/rules/" in normalized_path or normalized_path.endswith("/rules"):
+                output += "\n💡 提示: 检测到此文件路径包含 'rules'，这可能是一个规则文件。"
+                output += "\n   建议使用 `load_rule` 工具加载以获取规则渲染后的完整内容。\n"
+
             if agent:
                 files = agent.get_user_data("files")
                 if files:
