@@ -1392,6 +1392,7 @@ def cli(
     init_env(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
         config_file=config_file,
+        model_group=model_group,
     )
     # CodeAgent 单实例互斥：改为按仓库维度加锁（延后至定位仓库根目录后执行）
     # 锁的获取移动到确认并切换到git根目录之后

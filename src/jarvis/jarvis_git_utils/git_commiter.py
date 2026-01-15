@@ -448,7 +448,7 @@ def cli(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
-    init_env()
+    init_env(model_group=model_group)
     tool = GitCommitTool()
     tool.execute(
         {
