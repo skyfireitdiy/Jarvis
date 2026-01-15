@@ -45,6 +45,15 @@ class PromptManager:
 
         action_prompt = self.agent.get_tool_usage_prompt()
 
+        # 获取已加载的规则内容
+        loaded_rules = ""
+        if hasattr(agent_, "loaded_rules") and agent_.loaded_rules:
+            loaded_rules = f"""\n
+<loaded_rules>
+# 已加载的规则
+\n{agent_.loaded_rules}
+</loaded_rules>"""
+
         # 检查 load_rule 工具是否可用
         load_rule_guide = ""
         tool_registry = self.agent.get_tool_registry()
@@ -148,6 +157,8 @@ class PromptManager:
 {task_list_manager_note}
 
 {load_rule_guide}
+
+{loaded_rules}
 
 {system_tools_info}
 
