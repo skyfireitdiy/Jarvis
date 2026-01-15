@@ -1439,9 +1439,9 @@ def get_conversation_turn_threshold() -> int:
     获取对话轮次阈值，用于触发总结。
 
     返回:
-        int: 对话轮次阈值，默认为50
+        int: 对话轮次阈值，默认为200
     """
-    return int(GLOBAL_CONFIG_DATA.get("conversation_turn_threshold", 50))
+    return int(GLOBAL_CONFIG_DATA.get("conversation_turn_threshold", 200))
 
 
 def get_diff_visualization_mode() -> str:

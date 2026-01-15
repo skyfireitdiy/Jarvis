@@ -1541,8 +1541,8 @@ def _collect_session_config(config_data: Dict[str, Any], ask_all: bool) -> bool:
             config_data,
             ask_all,
             "conversation_turn_threshold",
-            "对话轮次阈值（达到此轮次时触发总结，建议50-100）：",
-            50,
+            "对话轮次阈值（达到此轮次时触发总结，建议100-200）：",
+            200,
         )
         or changed
     )
