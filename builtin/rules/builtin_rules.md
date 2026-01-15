@@ -11,8 +11,8 @@
 - [SOLID 设计原则]({{ rule_file_dir }}/architecture_design/solid.md)
 - [整洁架构]({{ rule_file_dir }}/architecture_design/clean_architecture.md)
 - [整洁代码]({{ rule_file_dir }}/architecture_design/clean_code.md)
-- [代码反向设计专家]({{ rule_file_dir }}/architecture_design/code-reverse-design-expert.md)
-- [架构图生成器]({{ rule_file_dir }}/architecture_design/architecture-diagram-generator.md)
+- [代码反向设计规则]({{ rule_file_dir }}/architecture_design/code-reverse-design.md)
+- [架构图生成规则]({{ rule_file_dir }}/architecture_design/architecture-diagram-generation.md)
 
 ## 开发流程 (development_workflow/)
 
@@ -30,17 +30,17 @@
 ## 安全规范 (security/)
 
 - [安全编码]({{ rule_file_dir }}/security/security.md)
-- [安全漏洞分析师]({{ rule_file_dir }}/security/security-vulnerability-analyst.md)
+- [安全漏洞分析规则]({{ rule_file_dir }}/security/vulnerability-analysis.md)
 
 ## 开发工具 (development_tools/)
 
-- [脚本生成专家]({{ rule_file_dir }}/development_tools/script-generator.md)
-- [添加技能]({{ rule_file_dir }}/development_tools/add_skills.md)
-- [添加 MCP 工具]({{ rule_file_dir }}/development_tools/add_mcp.md)
+- [脚本生成规则]({{ rule_file_dir }}/development_tools/script-generation.md)
+- [技能开发规则]({{ rule_file_dir }}/development_tools/skill-development.md)
+- [MCP集成规则]({{ rule_file_dir }}/development_tools/mcp-integration.md)
 
 ## 部署规范 (deployment/)
 
-- [开源部署专家]({{ rule_file_dir }}/deployment/opensource-deployment-expert.md)
+- [开源部署规则]({{ rule_file_dir }}/deployment/opensource-deployment.md)
 
 ## 性能优化 (performance/)
 
@@ -49,13 +49,13 @@
 
 ## UI 设计 (ui_design/)
 
-- [Zen-iOS Hybrid 暗色主题]({{ rule_file_dir }}/ui_design/ios-dark-theme.md)
-- [Zen-iOS Hybrid 亮色主题]({{ rule_file_dir }}/ui_design/ios-light-theme.md)
+- [暗色主题设计规则]({{ rule_file_dir }}/ui_design/dark-theme-design.md)
+- [亮色主题设计规则]({{ rule_file_dir }}/ui_design/light-theme-design.md)
 
 ## 工具配置 (tool_config/)
 
 - [新增规则规范]({{ rule_file_dir }}/tool_config/add_rule.md)
-- [忽略所有告警]({{ rule_file_dir }}/tool_config/ignore_all_alerts.md)
+- [告警管理规则]({{ rule_file_dir }}/tool_config/alert-management.md)
 
 ## 测试规范 (testing/)
 
