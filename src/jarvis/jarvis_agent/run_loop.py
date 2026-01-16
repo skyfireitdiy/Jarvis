@@ -133,59 +133,6 @@ class AgentRunLoop:
                             self.agent.get_tool_usage_prompt(),
                         ]
                     )
-                # 基于剩余token数量或对话轮次的自动总结判断
-                remaining_tokens = self.agent.model.get_remaining_token_count()
-                token_limit_triggered = (
-                    remaining_tokens <= self.summary_remaining_token_threshold
-                )
-                turn_limit_triggered = current_round > self.conversation_turn_threshold
-                should_summarize = token_limit_triggered or turn_limit_triggered
-
-                # 如果是token限制触发，打印当前token数量
-                if token_limit_triggered:
-                    # 使用平台内部的实际token限制，而不是全局配置（考虑cheap/smart/normal等不同模型类型）
-                    max_input_tokens = (
-                        self.agent.model._get_platform_max_input_token_count()
-                    )
-                    PrettyOutput.auto_print(
-                        f"🔍 Token限制触发自动总结，当前剩余token数量: {remaining_tokens}/{max_input_tokens} (剩余 {remaining_tokens / max_input_tokens * 100:.1f}%)"
-                    )
-
-                if should_summarize:
-                    # 在总结前获取git diff（仅对CodeAgent类型）
-                    try:
-                        if (
-                            hasattr(self.agent, "start_commit")
-                            and self.agent.start_commit
-                        ):
-                            self._git_diff = self.get_git_diff()
-                        else:
-                            self._git_diff = None
-                    except KeyboardInterrupt:
-                        raise
-                    except Exception as e:
-                        PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
-                        self._git_diff = f"获取git diff失败: {str(e)}"
-
-                    # 确定触发原因
-                    if token_limit_triggered and turn_limit_triggered:
-                        trigger_reason = "Token和轮次双重限制触发"
-                    elif token_limit_triggered:
-                        trigger_reason = "Token限制触发"
-                    else:
-                        trigger_reason = "对话轮次限制触发"
-
-                    summary_text = self.agent._summarize_and_clear_history(
-                        trigger_reason=trigger_reason
-                    )
-                    if summary_text:
-                        # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
-                        self.agent.session.addon_prompt = join_prompts(
-                            [self.agent.session.addon_prompt, summary_text]
-                        )
-                    # 重置对话长度计数器（用于摘要触发），开始新一轮周期
-                    # 注意：对话轮次由模型内部管理，这里不需要重置
-                    self.agent.session.conversation_length = 0
 
                 ag = self.agent
 
