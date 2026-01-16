@@ -59,6 +59,7 @@
 - [新增规则规范]({{ rule_file_dir }}/tool_config/add_rule.md)
 - [告警管理规则]({{ rule_file_dir }}/tool_config/alert-management.md)
 - [自助配置规则]({{ rule_file_dir }}/tool_config/self_config.md) - 指导Agent通过自然语言智能修改Jarvis配置文件
+- [新增内置规则规范]({{ rule_file_dir }}/tool_config/add_builtin_rule.md) - 指导如何在 builtin/rules/ 目录下添加新的内置规则
 
 ## 测试规范 (testing/)
 
