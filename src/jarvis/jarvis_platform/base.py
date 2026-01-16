@@ -64,6 +64,7 @@ class BasePlatform(ABC):
         self._conversation_turn = 0  # 对话轮次计数器
         self.platform_type: str = "normal"  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
+        self._summarizing = False  # 总结标志位，防止递归调用
 
     def __enter__(self) -> Self:
         """进入上下文管理器"""
@@ -454,65 +455,85 @@ class BasePlatform(ABC):
 
         # 自动总结触发检查：基于剩余token数量或对话轮次
         if self.agent is not None:
-            try:
-                # 获取剩余token数量
-                remaining_tokens = self.get_remaining_token_count()
-                max_input_tokens = self._get_platform_max_input_token_count()
+            # 防止递归：如果正在总结中，跳过总结检查
+            if self._summarizing:
+                try:
+                    remaining_tokens = self.get_remaining_token_count()
+                    max_input_tokens = self._get_platform_max_input_token_count()
+                    PrettyOutput.auto_print(
+                        f"ℹ️ 正在总结中，跳过本次总结检查（剩余token: {remaining_tokens}/{max_input_tokens}）"
+                    )
+                except Exception:
+                    pass
+            else:
+                try:
+                    # 获取剩余token数量
+                    remaining_tokens = self.get_remaining_token_count()
+                    max_input_tokens = self._get_platform_max_input_token_count()
 
-                # 检查是否满足总结触发条件
-                # 条件1：剩余token低于25%（即已使用超过75%）
-                token_limit_triggered = (
-                    max_input_tokens > 0
-                    and remaining_tokens <= int(max_input_tokens * 0.25)
-                )
-
-                # 条件2：对话轮次超过阈值
-                conversation_turn_threshold = get_conversation_turn_threshold()
-                turn_limit_triggered = (
-                    self._conversation_turn > conversation_turn_threshold
-                )
-
-                should_summarize = token_limit_triggered or turn_limit_triggered
-
-                if should_summarize:
-                    # 确定触发原因
-                    if token_limit_triggered and turn_limit_triggered:
-                        trigger_reason = "Token和轮次双重限制触发"
-                    elif token_limit_triggered:
-                        trigger_reason = "Token限制触发"
-                    else:
-                        trigger_reason = "对话轮次限制触发"
-
-                    # 打印触发信息
-                    if token_limit_triggered:
-                        PrettyOutput.auto_print(
-                            f"🔍 {trigger_reason}，当前剩余token: {remaining_tokens}/{max_input_tokens} (剩余 {remaining_tokens / max_input_tokens * 100:.1f}%)"
-                        )
-                    else:
-                        PrettyOutput.auto_print(
-                            f"🔍 {trigger_reason}，当前对话轮次: {self._conversation_turn}/{conversation_turn_threshold}"
-                        )
-
-                    # 调用Agent的总结方法
-                    summary_text = self.agent._summarize_and_clear_history(
-                        trigger_reason=trigger_reason
+                    # 检查是否满足总结触发条件
+                    # 条件1：剩余token低于25%（即已使用超过75%）
+                    token_limit_triggered = (
+                        max_input_tokens > 0
+                        and remaining_tokens <= int(max_input_tokens * 0.25)
                     )
 
-                    if summary_text:
-                        # 将摘要加入addon_prompt，维持上下文连续性
-                        from jarvis.jarvis_agent.utils import join_prompts
+                    # 条件2：对话轮次超过阈值
+                    conversation_turn_threshold = get_conversation_turn_threshold()
+                    turn_limit_triggered = (
+                        self._conversation_turn > conversation_turn_threshold
+                    )
 
-                        self.agent.session.addon_prompt = join_prompts(
-                            [self.agent.session.addon_prompt, summary_text]
-                        )
+                    should_summarize = token_limit_triggered or turn_limit_triggered
 
-                    # 重置对话长度计数器（Agent中的计数器，与Platform的_conversation_turn不同）
-                    self.agent.session.conversation_length = 0
+                    if should_summarize:
+                        # 确定触发原因
+                        if token_limit_triggered and turn_limit_triggered:
+                            trigger_reason = "Token和轮次双重限制触发"
+                        elif token_limit_triggered:
+                            trigger_reason = "Token限制触发"
+                        else:
+                            trigger_reason = "对话轮次限制触发"
 
-                    PrettyOutput.auto_print("✅ 自动总结完成，对话上下文已更新")
-            except Exception as e:
-                # 总结失败不影响对话流程
-                PrettyOutput.auto_print(f"⚠️ 自动总结失败: {str(e)}")
+                        # 打印触发信息
+                        if token_limit_triggered:
+                            PrettyOutput.auto_print(
+                                f"🔍 {trigger_reason}，当前剩余token: {remaining_tokens}/{max_input_tokens} (剩余 {remaining_tokens / max_input_tokens * 100:.1f}%)"
+                            )
+                        else:
+                            PrettyOutput.auto_print(
+                                f"🔍 {trigger_reason}，当前对话轮次: {self._conversation_turn}/{conversation_turn_threshold}"
+                            )
+
+                        # 设置总结标志，防止递归调用
+                        self._summarizing = True
+                        try:
+                            # 调用Agent的总结方法
+                            summary_text = self.agent._summarize_and_clear_history(
+                                trigger_reason=trigger_reason
+                            )
+
+                            if summary_text:
+                                # 将摘要加入addon_prompt，维持上下文连续性
+                                from jarvis.jarvis_agent.utils import join_prompts
+
+                                self.agent.session.addon_prompt = join_prompts(
+                                    [self.agent.session.addon_prompt, summary_text]
+                                )
+
+                            # 重置对话长度计数器（Agent中的计数器，与Platform的_conversation_turn不同）
+                            self.agent.session.conversation_length = 0
+
+                            PrettyOutput.auto_print("✅ 自动总结完成，对话上下文已更新")
+                        except Exception as e:
+                            # 总结失败不影响对话流程
+                            PrettyOutput.auto_print(f"⚠️ 自动总结失败: {str(e)}")
+                        finally:
+                            # 无论总结成功失败，都清除标志位
+                            self._summarizing = False
+                except Exception as e:
+                    # 总结检查失败不影响对话流程
+                    PrettyOutput.auto_print(f"⚠️ 总结检查失败: {str(e)}")
 
         return response
 
