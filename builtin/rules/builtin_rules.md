@@ -17,6 +17,7 @@
 ## 开发流程 (development_workflow/)
 
 - [C2Rust 转译]({{ rule_file_dir }}/development_workflow/c2rust_transpiler.md)
+- [Go2Rust 转译]({{ rule_file_dir }}/development_workflow/go2rust_transpiler.md)
 - [Spec 驱动开发 (SDD)]({{ rule_file_dir }}/development_workflow/sdd.md)
 - [测试驱动开发 (TDD)]({{ rule_file_dir }}/development_workflow/tdd.md)
 - [重构]({{ rule_file_dir }}/development_workflow/refactoring.md)
