@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 from typing import List
 from typing import Optional
+from typing import cast
 
 import typer
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -114,7 +115,7 @@ def _root() -> None:
 def _load_config() -> dict:
     """
     从配置文件加载配置。
-    返回包含 root_symbols、disabled_libraries 和 additional_notes 的字典。
+    返回包含 root_symbols、disabled_libraries、additional_notes 和 enable_ffi_export_validation 的字典。
     """
     import json
 
@@ -127,6 +128,7 @@ def _load_config() -> dict:
         "root_symbols": [],
         "disabled_libraries": [],
         "additional_notes": "",
+        "enable_ffi_export_validation": False,
     }
 
     if not config_path.exists():
@@ -142,6 +144,9 @@ def _load_config() -> dict:
                 "root_symbols": config.get("root_symbols", []),
                 "disabled_libraries": config.get("disabled_libraries", []),
                 "additional_notes": config.get("additional_notes", ""),
+                "enable_ffi_export_validation": config.get(
+                    "enable_ffi_export_validation", False
+                ),
             }
     except Exception:
         return default_config
@@ -225,6 +230,12 @@ def config(
     additional_notes: Optional[str] = typer.Option(
         None, "--additional-notes", help="附加说明（将在所有 agent 的提示词中追加）"
     ),
+    enable_ffi_export_validation: Optional[bool] = typer.Option(
+        None,
+        "--enable-ffi-export-validation",
+        "--disable-ffi-export-validation",
+        help="启用/禁用 FFI 导出验证（默认禁用）",
+    ),
     show: bool = typer.Option(False, "--show", help="显示当前配置内容"),
     clear: bool = typer.Option(False, "--clear", help="清空配置（重置为默认值）"),
 ) -> None:
@@ -276,6 +287,7 @@ def config(
         "root_symbols": [],
         "disabled_libraries": [],
         "additional_notes": "",
+        "enable_ffi_export_validation": False,
     }
     current_config = default_config.copy()
 
@@ -307,8 +319,16 @@ def config(
         PrettyOutput.auto_print(f"✅ [c2rust-config] 配置已清空: {config_path}")
         return
 
+    # 处理 FFI 导出验证选项
+    if enable_ffi_export_validation is not None:
+        current_config["enable_ffi_export_validation"] = enable_ffi_export_validation
+        status = "启用" if enable_ffi_export_validation else "禁用"
+        PrettyOutput.auto_print(f"✅ [c2rust-config] 已{status} FFI 导出验证")
+
     # 读取根符号列表（从现有配置开始，以便追加而不是替换）
-    root_symbols: List[str] = list(current_config.get("root_symbols", []))
+    root_symbols: List[str] = cast(
+        List[str], current_config.get("root_symbols", []) or []
+    )
     header_exts = {".h", ".hh", ".hpp", ".hxx", ".c", ".cxx", ".cpp"}
 
     if files:
@@ -442,6 +462,7 @@ def config(
         and not root_list_syms
         and not disabled_libs
         and additional_notes is None
+        and enable_ffi_export_validation is None
     ):
         PrettyOutput.auto_print(
             "⚠️ [c2rust-config] 未提供任何参数，使用 --show 查看当前配置，或使用 --help 查看帮助"
@@ -484,11 +505,6 @@ def run(
         False,
         "--reset",
         help="重置状态，从头开始执行所有阶段",
-    ),
-    enable_ffi_export_validation: bool = typer.Option(
-        False,
-        "--enable-ffi-export-validation",
-        help="启用 FFI 导出验证：要求产物必须有 cdylib，根符号（除 main 外）必须以 FFI 接口形式命名和导出，并在构建后验证 so 文件中的符号",
     ),
 ) -> None:
     """
@@ -614,6 +630,11 @@ def run(
         # Step 3: prepare
         if not state.get("prepare", {}).get("completed", False):
             PrettyOutput.auto_print("🚀 [c2rust-run] prepare: 开始")
+            # 从配置文件读取 FFI 导出验证设置
+            config = _load_config()
+            enable_ffi_export_validation = config.get(
+                "enable_ffi_export_validation", False
+            )
             _execute_llm_plan(
                 apply=True,
                 llm_group=llm_group,
@@ -631,7 +652,11 @@ def run(
             PrettyOutput.auto_print("🚀 [c2rust-run] transpile: 开始")
             from jarvis.jarvis_c2rust.transpiler import run_transpile as _run_transpile
 
-            # 从配置文件读取配置（transpile 内部会自动读取）
+            # 从配置文件读取配置
+            config = _load_config()
+            enable_ffi_export_validation = config.get(
+                "enable_ffi_export_validation", False
+            )
             _run_transpile(
                 project_root=Path("."),
                 crate_dir=None,
