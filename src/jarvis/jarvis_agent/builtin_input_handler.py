@@ -184,19 +184,21 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 )
         elif tag.startswith("rule:"):
             # 处理 rule:xxx 格式的规则标记
-            rule_name = tag[5:]  # 去掉 "rule:" 前缀
-            rule_content = _get_rule_content(rule_name)
-            if rule_content:
-                # 记录运行时加载的规则到CodeAgent
-                from jarvis.jarvis_code_agent.code_agent import CodeAgent
+            if tag not in processed_tag:
+                rule_name = tag[5:]  # 去掉 "rule:" 前缀
+                rule_content = _get_rule_content(rule_name)
+                processed_tag.add(tag)
+                if rule_content:
+                    # 记录运行时加载的规则到CodeAgent
+                    from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
-                if agent is not None and isinstance(agent, CodeAgent):
-                    agent.add_runtime_rule(rule_name)
+                    if agent is not None and isinstance(agent, CodeAgent):
+                        agent.add_runtime_rule(rule_name)
 
-                separator = "\n" + "=" * 50 + "\n"
-                modified_input = modified_input.replace(
-                    f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
-                )
+                        separator = "\n" + "=" * 50 + "\n"
+                        modified_input = modified_input.replace(
+                            f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
+                        )
 
     # 设置附加提示词并返回处理后的内容
     agent.set_addon_prompt(add_on_prompt)
