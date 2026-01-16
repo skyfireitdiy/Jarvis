@@ -684,6 +684,9 @@ class Agent:
         self.model.set_model_group(model_group)
         self.model.set_suppress_output(False)
 
+        # 设置Agent引用，使Platform能够回调Agent方法（如自动总结）
+        self.model.agent = self
+
         # 设置全局模型组，供工具和其他组件使用
         set_global_model_group(model_group)
 
