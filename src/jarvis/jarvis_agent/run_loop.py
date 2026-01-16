@@ -590,6 +590,39 @@ class AgentRunLoop:
                 PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
                 return f"Task failed: {str(e)}"
 
+    def get_git_diff_stat(self) -> str:
+        """获取从起始commit到当前commit的git diff统计信息
+
+        返回:
+            str: git diff统计信息，如果无法获取则返回错误信息
+        """
+        try:
+            from jarvis.jarvis_utils.git_utils import get_diff_stat_between_commits
+            from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+
+            # 获取agent实例
+            agent = self.agent
+
+            # 检查agent是否有start_commit属性
+            if not hasattr(agent, "start_commit") or not agent.start_commit:
+                return "无法获取起始commit哈希值"
+
+            start_commit = agent.start_commit
+            current_commit = get_latest_commit_hash()
+
+            if not current_commit:
+                return "无法获取当前commit哈希值"
+
+            if start_commit == current_commit:
+                return "没有检测到代码变更"
+
+            # 获取diff统计
+            stat_content = get_diff_stat_between_commits(start_commit, current_commit)
+            return stat_content
+
+        except Exception as e:
+            return f"获取git diff统计失败: {str(e)}"
+
     def get_git_diff(self) -> str:
         """获取从起始commit到当前commit的git diff
 

@@ -198,6 +198,60 @@ def get_diff() -> str:
         return f"发生意外错误: {str(e)}"
 
 
+def get_diff_stat_between_commits(
+    start_hash: str, end_hash: Optional[str] = None
+) -> str:
+    """获取两个commit之间的差异统计信息
+
+    参数:
+        start_hash: 起始commit哈希值（不包含）
+        end_hash: 结束commit哈希值（包含），如果为None则使用HEAD
+
+    返回:
+        str: 差异统计信息或错误信息
+    """
+    try:
+        if end_hash is None:
+            end_hash = "HEAD"
+
+        # 检查start_hash是否存在
+        start_check = subprocess.run(
+            ["git", "rev-parse", "--verify", start_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if start_check.returncode != 0:
+            return f"起始commit不存在: {start_hash}"
+
+        # 检查end_hash是否存在
+        end_check = subprocess.run(
+            ["git", "rev-parse", "--verify", end_hash],
+            stderr=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        if end_check.returncode != 0:
+            return f"结束commit不存在: {end_hash}"
+
+        # 获取两个commit之间的差异统计信息
+        result = subprocess.run(
+            ["git", "diff", "--stat", f"{start_hash}..{end_hash}"],
+            capture_output=True,
+            text=False,
+            check=True,
+        )
+
+        try:
+            return decode_output(result.stdout)
+        except Exception as e:
+            return f"解码输出失败: {str(e)}"
+
+    except subprocess.CalledProcessError as e:
+        error_msg = decode_output(e.stderr) if e.stderr else str(e)
+        return f"获取commit差异统计失败: {error_msg}"
+    except Exception as e:
+        return f"发生意外错误: {str(e)}"
+
+
 def get_diff_between_commits(start_hash: str, end_hash: Optional[str] = None) -> str:
     """获取两个commit之间的差异
 
