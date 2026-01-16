@@ -130,6 +130,86 @@ class RulesManager:
             pass
         return None
 
+    def _get_rule_from_builtin_index(self, rule_name: str) -> Optional[str]:
+        """从 builtin_rules.md 索引文件中查找并加载指定名称的规则
+
+        该索引文件记录了内置规则的映射关系，格式为：
+        - [规则名称]({{ template_var }}/path/to/rule.md)
+
+        参数:
+            rule_name: 规则名称
+
+        返回:
+            str: 规则内容，如果未找到则返回 None
+        """
+        try:
+            from jarvis.jarvis_utils.template_utils import _get_jarvis_src_dir
+
+            # 获取索引文件路径
+            jarvis_src_dir = _get_jarvis_src_dir()
+            index_file_path = os.path.join(
+                jarvis_src_dir, "builtin", "rules", "builtin_rules.md"
+            )
+
+            # 检查索引文件是否存在
+            if not os.path.exists(index_file_path) or not os.path.isfile(
+                index_file_path
+            ):
+                return None
+
+            # 读取索引文件内容
+            with open(index_file_path, "r", encoding="utf-8", errors="replace") as f:
+                index_content = f.read()
+
+            # 解析索引文件，查找匹配的规则
+            # 格式: - [规则名称](路径)
+            import re
+
+            pattern = rf"-\s*\[{re.escape(rule_name)}\]\(([^)]+)\)"
+            match = re.search(pattern, index_content)
+
+            if not match:
+                return None
+
+            # 提取规则文件路径
+            rule_file_template = match.group(1).strip()
+
+            # 渲染模板变量（支持 {{ jarvis_src_dir }} 和 {{ rule_file_dir }}）
+            context = {
+                "jarvis_src_dir": jarvis_src_dir,
+                "rule_file_dir": os.path.dirname(index_file_path),
+            }
+
+            try:
+                from jinja2 import Template
+
+                template = Template(rule_file_template)
+                rule_file_path = template.render(**context)
+            except Exception:
+                # 模板渲染失败，直接使用原始路径
+                rule_file_path = rule_file_template
+
+            # 检查规则文件是否存在
+            if not os.path.exists(rule_file_path) or not os.path.isfile(rule_file_path):
+                return None
+
+            # 读取规则文件内容
+            with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
+                rule_content = f.read().strip()
+
+            # 使用jinja2渲染规则模板
+            if rule_content:
+                rule_content = render_rule_template(
+                    rule_content, os.path.dirname(rule_file_path)
+                )
+
+            return rule_content if rule_content else None
+
+        except Exception as e:
+            # 读取失败时忽略，不影响主流程
+            PrettyOutput.auto_print(f"⚠️ 从索引文件加载规则失败: {e}")
+            return None
+
     def _get_all_rules_dirs(self) -> List[str]:
         """获取所有规则目录（包括项目目录和配置的目录）
 
@@ -191,7 +271,8 @@ class RulesManager:
         3. 项目 rules.yaml 文件
         4. 配置的规则目录中的文件（按配置顺序，不包括中心库）
         5. 全局 rules.yaml 文件
-        6. 内置规则（最低优先级，作为后备）
+        6. builtin_rules.md 索引文件中的规则
+        7. 内置规则（最低优先级，作为后备）
 
         参数:
             rule_name: 规则名称
@@ -232,7 +313,12 @@ class RulesManager:
                         # 单个文件读取失败不影响其他文件
                         continue
 
-            # 优先级 3: 从内置规则中查找（最低优先级，作为后备）
+            # 优先级 3: 从 builtin_rules.md 索引文件中查找
+            indexed_rule = self._get_rule_from_builtin_index(rule_name)
+            if indexed_rule:
+                return indexed_rule
+
+            # 优先级 4: 从内置规则中查找（最低优先级，作为后备）
             builtin_rule = get_builtin_rule(rule_name)
             if builtin_rule:
                 return builtin_rule
