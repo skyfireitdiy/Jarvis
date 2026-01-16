@@ -26,6 +26,7 @@ from jarvis.jarvis_c2rust.library_replacer import (
 )
 from jarvis.jarvis_c2rust.llm_module_agent import execute_llm_plan as _execute_llm_plan
 from jarvis.jarvis_c2rust.scanner import run_scan as _run_scan
+from jarvis.jarvis_c2rust.verify import run_verify as _run_verify
 from jarvis.jarvis_utils.utils import init_env
 
 
@@ -700,6 +701,70 @@ def run(
         PrettyOutput.auto_print("🎉 [c2rust-run] 所有阶段已完成！")
     except Exception as e:
         PrettyOutput.auto_print(f"❌ [c2rust-run] 错误: {e}")
+        raise typer.Exit(code=1)
+
+
+@app.command("verify")
+def verify(
+    llm_group: Optional[str] = typer.Option(
+        None,
+        "-g",
+        "--llm-group",
+        help="用于 LLM 分析和优化的模型组",
+    ),
+    max_iterations: int = typer.Option(
+        10,
+        "-i",
+        "--max-iterations",
+        help="最大迭代次数（默认 10）",
+    ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        help="启用交互模式（默认非交互模式）",
+    ),
+) -> None:
+    """
+    验证转译后的 Rust 代码与原 C 代码的功能对齐性，并支持迭代优化。
+
+    工作流程:
+
+    1. 检查 c2rust 转译是否完成（transpile 和 optimize 阶段），未完成则提示并退出
+
+    2. 切换到目标 crate 目录，创建 Agent 进行功能对齐分析（强制拆分子任务）：
+       - 读取并分析 C 代码和 Rust 代码
+       - 对比函数签名和类型定义
+       - 分析函数逻辑和边界情况
+       - 检查错误处理和内存安全性
+       - 生成结构化的对齐结论
+
+    3. 如果不一致，创建 CodeAgent 基于报告优化代码，然后重新分析，直到 Agent 认为没有问题或达到最大迭代次数
+
+    示例:
+
+      # 验证功能对齐性
+      jarvis-c2rust verify
+
+      # 指定模型组和最大迭代次数
+      jarvis-c2rust verify --llm-group gpt-4 --max-iterations 5
+
+    约束:
+
+    - 必须先完成 'jarvis-c2rust run' 才能执行验证
+
+    - 验证过程会自动切换到 crate 目录进行分析和优化
+
+    - 所有分析任务会强制拆分为子任务执行，确保全面性
+    """
+    try:
+        _run_verify(
+            project_root=Path("."),
+            llm_group=llm_group,
+            max_iterations=max_iterations,
+            non_interactive=not interactive,
+        )
+    except Exception as e:
+        PrettyOutput.auto_print(f"❌ [c2rust-verify] 错误: {e}")
         raise typer.Exit(code=1)
 
 
