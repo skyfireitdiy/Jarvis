@@ -1367,10 +1367,10 @@ class Agent:
         ]
         summary = self.generate_summary(for_token_limit=is_for_token_limit)
 
-        # 获取git diff信息
-        git_diff_info = ""
+        # 获取git diff统计信息
+        git_diff_stat = ""
+        git_view_command = ""
         try:
-            # 尝试从 AgentRunLoop 获取已缓存的 git diff
             from jarvis.jarvis_agent.run_loop import AgentRunLoop
 
             if hasattr(self, "_agent_run_loop") and isinstance(
@@ -1381,39 +1381,36 @@ class Agent:
                 # 创建临时 AgentRunLoop 实例来获取 git diff
                 agent_run_loop = AgentRunLoop(self)
 
-            if agent_run_loop.has_git_diff():
-                cached_diff = agent_run_loop.get_cached_git_diff()
-                git_diff_info = cached_diff or ""
-            else:
-                # 如果还没有缓存，直接获取
-                git_diff_info = agent_run_loop.get_git_diff()
+            # 获取diff统计信息
+            git_diff_stat = agent_run_loop.get_git_diff_stat()
+
+            # 生成查看命令
+            if hasattr(self, "start_commit") and self.start_commit:
+                git_view_command = f"git diff {self.start_commit}..HEAD"
         except Exception as e:
-            git_diff_info = f"获取git diff失败: {str(e)}"
+            git_diff_stat = f"获取git diff统计失败: {str(e)}"
 
         # 先获取格式化的摘要消息
         formatted_summary = ""
         if summary:
             formatted_summary = self._format_summary_message(summary)
 
-        # 添加git diff信息到摘要中 - 只显示有效的代码变更
-        is_valid_git_diff = (
-            git_diff_info
-            and git_diff_info.strip()
+        # 添加git diff统计信息到摘要中 - 只显示有效的代码变更统计
+        is_valid_git_stat = (
+            git_diff_stat
+            and git_diff_stat.strip()
             and
             # 过滤错误信息（获取失败等）
-            not git_diff_info.startswith("获取git diff失败")
-            and not git_diff_info.startswith("Failed to get git diff")
+            not git_diff_stat.startswith("获取git diff统计失败")
             and
             # 过滤无变更提示
-            "没有检测到代码变更" not in git_diff_info
-            and "No code changes detected" not in git_diff_info
-            and
-            # 确保包含实际代码变更（diff格式）
-            "diff --git" in git_diff_info
+            "没有检测到代码变更" not in git_diff_stat
         )
 
-        if is_valid_git_diff:
-            diff_section = f"\n\n## 代码变更摘要\n```\n{git_diff_info}\n```"
+        if is_valid_git_stat:
+            diff_section = f"\n\n## 代码变更统计\n```\n{git_diff_stat}\n```"
+            if git_view_command:
+                diff_section += f"\n\n查看完整差异：```bash\n{git_view_command}\n```"
             formatted_summary += diff_section
 
         # 关键流程：直接调用 memory_manager 确保记忆提示
