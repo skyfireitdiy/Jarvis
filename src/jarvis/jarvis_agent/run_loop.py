@@ -548,9 +548,21 @@ class AgentRunLoop:
                             )
 
                             if fixed_content:
-                                # 修复成功，将修复后的内容加入prompt
-                                ag.session.addon_prompt = join_prompts(
-                                    [ag.session.addon_prompt, fixed_content]
+                                # 修复成功，直接重新解析并执行工具调用
+                                need_return, tool_prompt = ag._call_tools(fixed_content)
+
+                                # 如果工具要求立即返回结果（例如 SEND_MESSAGE 需要将字典返回给上层），直接返回该结果
+                                if need_return:
+                                    ag._no_tool_call_count = 0
+                                    return tool_prompt
+
+                                # 将上一个提示和工具提示安全地拼接起来（仅当工具结果为字符串时）
+                                safe_tool_prompt = (
+                                    tool_prompt if isinstance(tool_prompt, str) else ""
+                                )
+
+                                ag.session.prompt = join_prompts(
+                                    [ag.session.prompt, safe_tool_prompt]
                                 )
                             else:
                                 # 修复失败，发送工具使用提示
