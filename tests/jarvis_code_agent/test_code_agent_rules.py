@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-from jarvis.jarvis_code_agent.code_agent_rules import RulesManager
+from jarvis.jarvis_agent.rules_manager import RulesManager
 
 
 class TestRulesManager:
@@ -53,7 +53,7 @@ class TestRulesManager:
 
         assert result is None
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_read_global_rules_file_exists(self, mock_get_data_dir, tmp_path):
         """测试读取全局规则文件存在的情况"""
         data_dir = str(tmp_path)
@@ -66,7 +66,7 @@ class TestRulesManager:
 
         assert result == "Global rule content"
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_read_global_rules_file_not_exists(self, mock_get_data_dir, tmp_path):
         """测试全局规则文件不存在的情况"""
         mock_get_data_dir.return_value = str(tmp_path)
@@ -75,7 +75,7 @@ class TestRulesManager:
 
         assert result is None
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_read_global_rules_empty_file(self, mock_get_data_dir, tmp_path):
         """测试全局规则文件为空的情况"""
         data_dir = str(tmp_path)
@@ -88,7 +88,7 @@ class TestRulesManager:
 
         assert result is None
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_named_rule_from_global(self, mock_get_data_dir, tmp_path):
         """测试从全局 rules.yaml 获取命名规则"""
         data_dir = str(tmp_path)
@@ -103,7 +103,7 @@ class TestRulesManager:
 
         assert result == "Global rule 1"
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_named_rule_from_project(self, mock_get_data_dir, tmp_path):
         """测试从项目 rules.yaml 获取命名规则"""
         data_dir = str(tmp_path)
@@ -121,7 +121,7 @@ class TestRulesManager:
 
         assert result == "Project rule 1"
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_named_rule_project_overrides_global(self, mock_get_data_dir, tmp_path):
         """测试项目规则覆盖全局规则"""
         data_dir = str(tmp_path)
@@ -140,7 +140,7 @@ class TestRulesManager:
 
         assert result == "Project rule"
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_named_rule_not_found(self, mock_get_data_dir, tmp_path):
         """测试规则不存在的情况"""
         mock_get_data_dir.return_value = str(tmp_path)
@@ -149,7 +149,7 @@ class TestRulesManager:
 
         assert result is None
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_get_named_rule_non_string_value(self, mock_get_data_dir, tmp_path):
         """测试规则值为非字符串类型的情况"""
         data_dir = str(tmp_path)
@@ -164,7 +164,7 @@ class TestRulesManager:
         assert result1 == "123"
         assert result2 == "True"
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_no_rules(self, mock_get_data_dir, tmp_path):
         """测试没有规则的情况"""
         mock_get_data_dir.return_value = str(tmp_path)
@@ -174,7 +174,7 @@ class TestRulesManager:
         assert merged_rules == ""
         assert loaded_names == set()
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_with_global_and_project(self, mock_get_data_dir, tmp_path):
         """测试加载全局和项目规则"""
         data_dir = str(tmp_path)
@@ -196,7 +196,7 @@ class TestRulesManager:
         assert "global_rule" in loaded_names
         assert "project_rule" in loaded_names
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_with_named_rules(self, mock_get_data_dir, tmp_path):
         """测试加载命名规则"""
         data_dir = str(tmp_path)
@@ -214,7 +214,7 @@ class TestRulesManager:
         assert "rule1" in loaded_names
         assert "rule2" in loaded_names
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_with_whitespace_in_names(self, mock_get_data_dir, tmp_path):
         """测试规则名称包含空白字符的情况"""
         data_dir = str(tmp_path)
@@ -230,7 +230,7 @@ class TestRulesManager:
         # rule2 不存在，不应该被加载
         assert "rule2" not in loaded_names
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_empty_rule_names(self, mock_get_data_dir, tmp_path):
         """测试空规则名称列表"""
         mock_get_data_dir.return_value = str(tmp_path)
@@ -240,7 +240,7 @@ class TestRulesManager:
         assert merged_rules == ""
         assert loaded_names == set()
 
-    @patch("jarvis.jarvis_code_agent.code_agent_rules.get_data_dir")
+    @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_combined(self, mock_get_data_dir, tmp_path):
         """测试组合加载所有类型的规则"""
         data_dir = str(tmp_path)
