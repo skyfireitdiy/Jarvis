@@ -220,16 +220,6 @@
       "description": "执行工具前是否需要确认",
       "default": false
     },
-    "script_execution_timeout": {
-      "type": "number",
-      "description": "脚本执行的超时时间（秒），仅在非交互模式下生效。",
-      "default": 300
-    },
-    "data_path": {
-      "type": "string",
-      "description": "Jarvis数据存储目录路径",
-      "default": "~/.jarvis"
-    },
     "tool_load_dirs": {
       "type": "array",
       "description": "自定义工具加载目录",
@@ -437,18 +427,6 @@
         "required": ["template"]
       },
       "default": {}
-    },
-    "SHELL": {
-      "type": "string",
-      "description": "系统Shell路径，用于获取当前使用的shell类型",
-      "default": "/bin/bash"
-    },
-    "conversation_turn_threshold": {
-      "type": "number",
-      "description": "对话轮次阈值，用于触发总结。当对话轮次超过此值时，系统会自动触发对话总结",
-      "default": 200,
-      "minimum": 1,
-      "maximum": 1000
     }
   },
   "additionalProperties": true
