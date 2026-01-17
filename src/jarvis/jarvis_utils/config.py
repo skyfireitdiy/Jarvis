@@ -191,13 +191,8 @@ def get_shell_name() -> str:
 
     返回：
         str: Shell名称（例如bash, zsh, fish），默认为bash
-
-    获取顺序：
-    1. 先从GLOBAL_CONFIG_DATA中获取SHELL配置
-    2. 再从环境变量SHELL获取
-    3. 如果都未配置，则默认返回bash
     """
-    shell_path = GLOBAL_CONFIG_DATA.get("SHELL") or os.getenv("SHELL", "/bin/bash")
+    shell_path = os.getenv("SHELL", "/bin/bash")
     return os.path.basename(shell_path).lower()
 
 
@@ -594,12 +589,9 @@ def get_data_dir() -> str:
     获取Jarvis数据存储目录路径。
 
     返回:
-        str: 数据目录路径，优先从data_path环境变量获取，
-             如果未设置或为空，则使用~/.jarvis作为默认值
+        str: 数据目录路径，默认为 ~/.jarvis
     """
-    return os.path.expanduser(
-        cast(str, GLOBAL_CONFIG_DATA.get("data_path", "~/.jarvis")).strip()
-    )
+    return os.path.expanduser("~/.jarvis")
 
 
 def get_max_big_content_size(model_group_override: Optional[str] = None) -> int:
@@ -1324,7 +1316,7 @@ def get_script_execution_timeout() -> int:
     获取脚本执行的超时时间（秒）。
 
     返回:
-        int: 超时时间，默认为300秒（5分钟）
+        int: 超时时间（300秒/5分钟）
     """
     return 300
 
@@ -1436,9 +1428,9 @@ def get_conversation_turn_threshold() -> int:
     获取对话轮次阈值，用于触发总结。
 
     返回:
-        int: 对话轮次阈值，默认为200
+        int: 对话轮次阈值（200轮）
     """
-    return int(GLOBAL_CONFIG_DATA.get("conversation_turn_threshold", 200))
+    return 200
 
 
 def get_diff_visualization_mode() -> str:
