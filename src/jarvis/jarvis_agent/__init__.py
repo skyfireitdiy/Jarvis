@@ -1322,6 +1322,24 @@ class Agent:
                 except Exception:
                     pass
                 summary = ""
+            else:
+                # 使用 Rich Panel 打印总结内容
+                try:
+                    import jarvis.jarvis_utils.globals as G
+                    from jarvis.jarvis_utils.globals import console
+                    from rich.panel import Panel
+                    from rich import box
+
+                    agent_name = self.name if hasattr(self, "name") else None
+                    panel = Panel(
+                        summary,
+                        title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 对话总结[/bold cyan]",
+                        border_style="cyan",
+                        box=box.ROUNDED,
+                    )
+                    console.print(panel)
+                except Exception:
+                    pass
             return summary
         except Exception:
             PrettyOutput.auto_print("❌ 总结对话历史失败")
