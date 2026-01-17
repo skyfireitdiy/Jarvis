@@ -586,7 +586,7 @@ def is_confirm_before_apply_patch() -> bool:
     返回：
         bool: 如果需要确认则返回True，默认为False
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("confirm_before_apply_patch", False))
+    return False
 
 
 def get_data_dir() -> str:
@@ -620,7 +620,7 @@ def get_pretty_output() -> bool:
     返回：
         bool: 如果启用PrettyOutput则返回True，默认为True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("pretty_output", True))
+    return True
 
 
 def is_use_methodology() -> bool:
@@ -630,7 +630,7 @@ def is_use_methodology() -> bool:
     返回：
         bool: 如果启用方法论则返回True，默认为True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("use_methodology", True))
+    return True
 
 
 def is_use_analysis() -> bool:
@@ -640,7 +640,7 @@ def is_use_analysis() -> bool:
     返回：
         bool: 如果启用任务分析则返回True，默认为True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("use_analysis", True))
+    return True
 
 
 def get_tool_load_dirs() -> List[str]:
@@ -788,7 +788,7 @@ def is_print_error_traceback() -> bool:
     返回：
         bool: 如果打印回溯则返回True，默认为False（不打印）
     """
-    return GLOBAL_CONFIG_DATA.get("print_error_traceback", False) is True
+    return False
 
 
 def is_force_save_memory() -> bool:
@@ -798,7 +798,7 @@ def is_force_save_memory() -> bool:
     返回：
         bool: 如果强制保存记忆则返回True，默认为False
     """
-    return GLOBAL_CONFIG_DATA.get("force_save_memory", False) is True
+    return False
 
 
 def is_enable_static_analysis() -> bool:
@@ -808,7 +808,7 @@ def is_enable_static_analysis() -> bool:
     返回：
         bool: 如果启用静态代码分析则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("enable_static_analysis", True) is True
+    return True
 
 
 def is_enable_build_validation() -> bool:
@@ -818,7 +818,7 @@ def is_enable_build_validation() -> bool:
     返回：
         bool: 如果启用构建验证则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("enable_build_validation", True) is True
+    return True
 
 
 def is_enable_impact_analysis() -> bool:
@@ -828,7 +828,7 @@ def is_enable_impact_analysis() -> bool:
     返回：
         bool: 如果启用影响范围分析则返回True，默认为True
     """
-    return GLOBAL_CONFIG_DATA.get("enable_impact_analysis", True) is True
+    return True
 
 
 def get_build_validation_timeout() -> int:
@@ -1316,7 +1316,7 @@ def get_tool_filter_threshold() -> int:
     返回:
         int: 当工具数量超过此阈值时，触发AI筛选。默认为30
     """
-    return int(GLOBAL_CONFIG_DATA.get("tool_filter_threshold", 30))
+    return 30
 
 
 def get_script_execution_timeout() -> int:
@@ -1326,7 +1326,7 @@ def get_script_execution_timeout() -> int:
     返回:
         int: 超时时间，默认为300秒（5分钟）
     """
-    return int(GLOBAL_CONFIG_DATA.get("script_execution_timeout", 300))
+    return 300
 
 
 def is_enable_git_repo_jca_switch() -> bool:
@@ -1360,7 +1360,7 @@ def is_immediate_abort() -> bool:
     是否启用立即中断：当在对话过程中检测到用户中断信号时，立即停止输出并返回。
     默认关闭
     """
-    return GLOBAL_CONFIG_DATA.get("immediate_abort", True) is True
+    return True
 
 
 def is_non_interactive() -> bool:
@@ -1408,10 +1408,7 @@ def get_addon_prompt_threshold() -> int:
     返回:
         int: 触发阈值，默认为1024
     """
-    try:
-        return int(GLOBAL_CONFIG_DATA.get("addon_prompt_threshold", 1024))
-    except Exception:
-        return 1024
+    return 1024
 
 
 def is_enable_intent_recognition() -> bool:
@@ -1421,7 +1418,7 @@ def is_enable_intent_recognition() -> bool:
     返回:
         bool: 是否启用意图识别，默认为True（可通过 GLOBAL_CONFIG_DATA['enable_intent_recognition'] 配置）
     """
-    return GLOBAL_CONFIG_DATA.get("enable_intent_recognition", True) is True
+    return True
 
 
 def is_enable_memory_organizer() -> bool:
@@ -1431,7 +1428,7 @@ def is_enable_memory_organizer() -> bool:
     返回:
         bool: 是否启用自动记忆整理，默认为False（可通过 GLOBAL_CONFIG_DATA['enable_memory_organizer'] 配置）
     """
-    return GLOBAL_CONFIG_DATA.get("enable_memory_organizer", False) is True
+    return False
 
 
 def get_conversation_turn_threshold() -> int:
@@ -1452,7 +1449,7 @@ def get_diff_visualization_mode() -> str:
         str: diff 可视化模式，可选值: "unified", "syntax", "compact", "side_by_side", "default"
         默认为 "unified"
     """
-    return cast(str, GLOBAL_CONFIG_DATA.get("diff_visualization_mode", "side_by_side"))
+    return "side_by_side"
 
 
 def get_diff_show_line_numbers() -> bool:
@@ -1462,7 +1459,7 @@ def get_diff_show_line_numbers() -> bool:
     返回:
         bool: 是否显示行号，默认为 True
     """
-    return cast(bool, GLOBAL_CONFIG_DATA.get("diff_show_line_numbers", True))
+    return True
 
 
 def get_diff_large_file_threshold() -> int:
@@ -1472,4 +1469,4 @@ def get_diff_large_file_threshold() -> int:
     返回:
         int: 大文件阈值，默认为 300
     """
-    return int(GLOBAL_CONFIG_DATA.get("diff_large_file_threshold", 300))
+    return 300
