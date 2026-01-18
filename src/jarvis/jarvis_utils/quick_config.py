@@ -37,11 +37,11 @@ def quick_config(
 
     # 提示用户输入缺失的参数
     if platform is None:
-        platform = get_single_line_input("请输入LLM平台类型 (claude/openai)")
+        platform = get_single_line_input("请输入LLM平台类型 (claude/openai):")
     if base_url is None:
-        base_url = get_single_line_input("请输入API基础URL")
+        base_url = get_single_line_input("请输入API基础URL:")
     if api_key is None:
-        api_key = get_single_line_input("请输入API密钥")
+        api_key = get_single_line_input("请输入API密钥:")
 
     # 验证平台类型
     platform = platform.lower().strip()
@@ -84,7 +84,7 @@ def quick_config(
             selected_models = models
         else:
             model_choices = get_single_line_input(
-                "请输入要配置的模型序号（用逗号分隔）"
+                "请输入要配置的模型序号（用逗号分隔）:"
             )
             try:
                 indices = [int(x.strip()) - 1 for x in model_choices.split(",")]
@@ -118,7 +118,7 @@ def quick_config(
         for i, model in enumerate(selected_models, 1):
             console.print(f"  {i}. {model}")
 
-        default_choice = get_single_line_input("请输入默认模型序号")
+        default_choice = get_single_line_input("请输入默认模型序号:")
         try:
             default_idx = int(default_choice.strip()) - 1
             if 0 <= default_idx < len(selected_models):
