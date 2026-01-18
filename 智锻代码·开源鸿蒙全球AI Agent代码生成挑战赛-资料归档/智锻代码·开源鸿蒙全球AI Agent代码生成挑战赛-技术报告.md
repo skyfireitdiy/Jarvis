@@ -346,7 +346,7 @@ MainEntry --> Agent : 代理入口
   - 源码位置：Agent模块
 - **AgentRunLoop**（主循环）
   - 图型：活动图（循环判定、自动摘要阈值、工具调用与中断分支）
-  - 聚焦：进入/跳出循环条件；基于token数量的自动摘要触发；need_return 的短路返回；工具提醒轮次机制
+  - 聚焦：进入/跳出循环条件；基于剩余token数量的自动摘要触发（剩余token低于输入窗口的25%）；need_return 的短路返回；工具提醒轮次机制
   - 源码位置：AgentRunLoop模块
 - **SessionManager**（会话管理）
   - 图型：状态图（Active↔Persisted(file)；Clear 重置）或活动图（save/restore/clear）
@@ -403,8 +403,8 @@ MainEntry --> Agent : 代理入口
   - 职责：根据自然语言需求**自动创建或改进 Jarvis 工具**，并完成注册与集成，是一个"可以生成和改造工具的工具"
   - 聚焦：调用 CodeAgent/Agent 生成完整可用的新工具代码（包含参数定义、错误处理、最佳实践模板），写入 `data/tools/<tool_name>.py` 并通过 ToolRegistry 自动注册
   - 关键特性：
-    - 支持在生成的新工具内部编排现有 Agent（通用任务编排、IIRIPER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等）
-    - 支持对已有工具进行自举式演化（再次调用 meta_agent，为指定工具生成“_improved” 版本）
+    - 支持在生成的新工具内部编排现有 Agent（通用任务编排、ARCHER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等）
+    - 支持对已有工具进行自举式演化（再次调用 meta_agent，为指定工具生成"_improved" 版本）
     - 输入参数：
       - `tool_name`：要生成或改进的工具名，同时作为文件名和类名
       - `function_description`：清晰描述工具的目标功能、输入/输出、约束条件以及是否需要编排 Agent/CodeAgent
@@ -551,7 +551,7 @@ MainEntry --> Agent : 代理入口
   - 驱动"模型思考 → 工具执行 → 结果拼接/中断处理 → 下一轮"的迭代
   - 统一处理工具返回协议与异常兜底，支持自动完成
   - 工具提醒机制：每工具提醒轮次间隔轮（默认20）注入工具使用提示
-  - 自动摘要token控制：当对话累计token超过输入窗口的80%时触发摘要与历史清理，重置对话长度计数
+  - 自动摘要token控制：当剩余token低于输入窗口的25%时触发摘要与历史清理，重置对话长度计数
 - **SessionManager**（会话状态）
   - 管理 prompt、附加提示、会话长度计数、用户数据；负责保存/恢复/清理历史
 - **PromptManager**（提示管理）
@@ -807,7 +807,7 @@ stop
   - 首轮初始化（由 Agent._first_run 触发）后循环执行：
     1) 轮次计数递增（conversation_rounds，用于工具提醒）
     2) 工具提醒机制：每工具提醒轮次间隔轮（默认20）注入工具使用提示
-    3) 自动摘要检查：当对话累计token超过输入窗口的80%时触发摘要与历史清理，重置对话长度计数
+    3) 自动摘要检查：当剩余token低于输入窗口的25%时触发摘要与历史清理，重置对话长度计数
        - **Git diff 集成优化**：在触发总结前，如果 Agent 是 CodeAgent 类型（有 `start_commit` 属性），自动获取并缓存 git diff 信息
     4) 更新输入处理器标志（run_input_handlers_next_turn）
     5) 首次运行处理（Agent._first_run：工具筛选、文件/方法论处理）
@@ -824,7 +824,7 @@ stop
 - 关键参数：
   - `conversation_rounds`：当前对话轮次计数（用于工具提醒）
   - `tool_reminder_rounds`：工具提醒轮次间隔（环境变量 JARVIS_TOOL_REMINDER_ROUNDS，默认20）
-  - `summary_token_threshold`：自动摘要触发阈值（输入窗口的80%，基于token数量）
+  - `summary_remaining_token_threshold`：自动摘要触发阈值（剩余token低于输入窗口的25%，基于剩余token数量）
   - `_git_diff`：缓存的 git diff 内容，避免重复获取
 - **Git diff 传递优化机制**：
   - **缓存策略**：AgentRunLoop 在总结触发时（调用 `_summarize_and_clear_history()` 之前）获取 git diff 并存储在 `_git_diff` 属性中，然后在 `_handle_history_with_summary` 中复用，避免重复计算
@@ -850,7 +850,7 @@ start
 if (达到工具提醒轮次?) then (是)
   :注入工具使用提示到 addon_prompt;
 endif
-if (对话token超过输入窗口80%?) then (是)
+if (剩余token低于输入窗口25%?) then (是)
   :触发摘要与历史清理;
   :重置轮次计数与对话长度;
   :将摘要注入 addon_prompt;
@@ -2196,7 +2196,19 @@ CLI --> CodeAgent : 入口与参数传递
      - 严格模式（默认）：任一缺失则退出，提示配置命令
      - 警告模式（JARVIS_GIT_CHECK_MODE=warn）：仅提示警告，继续运行
   4) 构建工具白名单：
-     - 基础工具：脚本执行工具、网络搜索工具、代码读取工具、记忆保存工具、记忆检索工具、记忆清除工具、子代码代理工具
+     - 基础工具列表：
+       - `execute_script`：脚本执行工具，用于执行 shell/脚本命令
+       - `read_code`：代码读取工具，读取源代码文件的指定行号范围
+       - `edit_file`：文件编辑工具，基于 search/replace 的普通文本编辑
+       - `load_rule`：规则加载工具，加载相关规则和最佳实践
+       - `virtual_tty`：虚拟终端工具，支持交互式操作
+       - `search_web`：网络搜索工具，检索外部信息
+       - `read_webpage`：网页内容读取工具，读取网页内容
+       - `save_memory`：记忆保存工具，保存项目约定和架构决策
+       - `retrieve_memory`：记忆召回工具，检索相关记忆
+       - `clear_memory`：记忆删除工具，清理记忆
+       - `methodology`：方法论工具，加载和使用方法论
+       - `task_list_manager`：任务列表管理工具（可选，通过 `enable_task_list_manager` 参数控制）
      - 追加工具：通过追加工具参数（逗号分隔）追加，自动去重
   5) 读取规则文件（按优先级顺序加载，动态加载机制）：
      - **规则文件组织**：规则以 Markdown 文件形式组织，统一存储在 `.jarvis` 目录下：
