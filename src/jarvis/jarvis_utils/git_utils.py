@@ -32,15 +32,19 @@ from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import is_rag_installed
 
 
-def find_git_root_and_cd(start_dir: str = ".") -> str:
+def find_git_root_and_cd(start_dir: str = ".", allow_init: bool = False) -> str:
     """
-    切换到给定路径的Git根目录，如果不是Git仓库则初始化。
+    切换到给定路径的Git根目录。
 
     参数:
         start_dir (str): 起始查找目录，默认为当前目录。
+        allow_init (bool): 如果不是Git仓库，是否允许初始化新的Git仓库。默认为False。
 
     返回:
-        str: Git仓库根目录路径。如果目录不是Git仓库，则会初始化一个新的Git仓库。
+        str: Git仓库根目录路径。
+
+    异常:
+        subprocess.CalledProcessError: 如果不是Git仓库且不允许初始化。
     """
     os.chdir(start_dir)
     try:
@@ -52,12 +56,20 @@ def find_git_root_and_cd(start_dir: str = ".") -> str:
         )
         git_root = decode_output(result.stdout).strip()
         if not git_root:
+            if allow_init:
+                subprocess.run(["git", "init"], check=True)
+                git_root = os.path.abspath(".")
+            else:
+                raise subprocess.CalledProcessError(
+                    1, ["git", "rev-parse", "--show-toplevel"]
+                )
+    except subprocess.CalledProcessError:
+        # 如果不是Git仓库
+        if allow_init:
             subprocess.run(["git", "init"], check=True)
             git_root = os.path.abspath(".")
-    except subprocess.CalledProcessError:
-        # 如果不是Git仓库，初始化一个新的
-        subprocess.run(["git", "init"], check=True)
-        git_root = os.path.abspath(".")
+        else:
+            raise
     os.chdir(git_root)
     return git_root
 
