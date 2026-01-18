@@ -490,7 +490,7 @@ def execute_code_review(
 
 <commands>
 # 推荐命令
-- Python: `pylint <file_path>`, `flake8 <file_path>`, `mypy <file_path>`
+- Python: `ruff check <file_path>`, `mypy <file_path>`
 - JavaScript/TypeScript: `eslint <file_path>`, `tsc --noEmit <file_path>`
 - Java: `checkstyle <file_path>`, `pmd -d <file_path>`
 - C/C++: `cppcheck <file_path>`, `clang-tidy <file_path>`
