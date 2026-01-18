@@ -155,22 +155,55 @@ class AgentRunLoop:
                 if ag.first:
                     ag._first_run()
 
-                # 在调用模型前，检查是否需要滑动窗口压缩
-                # 如果剩余token低于阈值，先尝试滑动窗口压缩（比完整摘要压缩更轻量）
+                # 在调用模型前，检查是否需要压缩
+                # 如果剩余token低于阈值，使用自适应压缩策略（根据任务类型选择）
                 try:
                     remaining_tokens = ag.model.get_remaining_token_count()
                     if (
                         remaining_tokens > 0
                         and remaining_tokens < self.summary_remaining_token_threshold
                     ):
-                        # 尝试滑动窗口压缩（保留最近对话，压缩更早的）
-                        compression_success = ag._sliding_window_compression()
+                        # 使用自适应压缩：根据任务类型自动选择最适合的压缩策略
+                        compression_success = ag._adaptive_compression()
                         if compression_success:
-                            # 压缩成功后重新计算剩余token
                             remaining_tokens = ag.model.get_remaining_token_count()
-                            # 如果压缩后仍然不足，继续执行后续的完整摘要逻辑
+                            # 如果自适应压缩后仍然不足，继续尝试其他策略
+                            if remaining_tokens < self.summary_remaining_token_threshold:
+                                # 尝试其他未使用的策略
+                                # 先尝试重要性评分压缩（通用策略）
+                                compression_success = ag._importance_scoring_compression()
+                                if compression_success:
+                                    remaining_tokens = ag.model.get_remaining_token_count()
+                                # 如果仍不足，尝试滑动窗口压缩
+                                if remaining_tokens < self.summary_remaining_token_threshold:
+                                    compression_success = ag._sliding_window_compression()
+                                    if compression_success:
+                                        remaining_tokens = ag.model.get_remaining_token_count()
+                        else:
+                            # 如果自适应压缩失败，回退到固定策略顺序
+                            compression_success = ag._importance_scoring_compression()
+                            if compression_success:
+                                remaining_tokens = ag.model.get_remaining_token_count()
+                                if remaining_tokens < self.summary_remaining_token_threshold:
+                                    compression_success = ag._key_event_extraction_compression()
+                                    if compression_success:
+                                        remaining_tokens = ag.model.get_remaining_token_count()
+                                        if remaining_tokens < self.summary_remaining_token_threshold:
+                                            compression_success = ag._incremental_summarization_compression()
+                                            if compression_success:
+                                                remaining_tokens = ag.model.get_remaining_token_count()
+                                                if remaining_tokens < self.summary_remaining_token_threshold:
+                                                    compression_success = ag._sliding_window_compression()
+                                                    if compression_success:
+                                                        remaining_tokens = ag.model.get_remaining_token_count()
+                            else:
+                                # 如果重要性评分压缩也失败，尝试其他策略
+                                compression_success = ag._sliding_window_compression()
+                                if compression_success:
+                                    remaining_tokens = ag.model.get_remaining_token_count()
+                        # 如果压缩后仍然不足，继续执行后续的完整摘要逻辑
                 except Exception as e:
-                    # 滑动窗口压缩失败不影响主流程
+                    # 压缩失败不影响主流程
                     pass
 
                 # 调用模型获取响应
