@@ -2170,16 +2170,22 @@ def _read_old_config_file(config_file: Union[str, Path]) -> None:
 # 线程本地存储，用于共享重试计数器
 _retry_context = threading.local()
 
+# 独立的线程本地存储，用于 while_success 的重试计数器
+_retry_context_success = threading.local()
+
+# 独立的线程本地存储，用于 while_true 的重试计数器
+_retry_context_true = threading.local()
+
 
 def _get_retry_count() -> int:
-    """获取当前线程的重试计数"""
+    """获取当前线程的重试计数（已废弃，保留向后兼容）"""
     if not hasattr(_retry_context, "count"):
         _retry_context.count = 0
     return int(_retry_context.count)
 
 
 def _increment_retry_count() -> int:
-    """增加重试计数并返回新的计数值"""
+    """增加重试计数并返回新的计数值（已废弃，保留向后兼容）"""
     if not hasattr(_retry_context, "count"):
         _retry_context.count = 0
     _retry_context.count += 1
@@ -2187,8 +2193,50 @@ def _increment_retry_count() -> int:
 
 
 def _reset_retry_count() -> None:
-    """重置重试计数"""
+    """重置重试计数（已废弃，保留向后兼容）"""
     _retry_context.count = 0
+
+
+# while_success 专用的计数器函数
+def _get_retry_count_success() -> int:
+    """获取当前线程的 while_success 重试计数"""
+    if not hasattr(_retry_context_success, "count"):
+        _retry_context_success.count = 0
+    return int(_retry_context_success.count)
+
+
+def _increment_retry_count_success() -> int:
+    """增加 while_success 重试计数并返回新的计数值"""
+    if not hasattr(_retry_context_success, "count"):
+        _retry_context_success.count = 0
+    _retry_context_success.count += 1
+    return int(_retry_context_success.count)
+
+
+def _reset_retry_count_success() -> None:
+    """重置 while_success 重试计数"""
+    _retry_context_success.count = 0
+
+
+# while_true 专用的计数器函数
+def _get_retry_count_true() -> int:
+    """获取当前线程的 while_true 重试计数"""
+    if not hasattr(_retry_context_true, "count"):
+        _retry_context_true.count = 0
+    return int(_retry_context_true.count)
+
+
+def _increment_retry_count_true() -> int:
+    """增加 while_true 重试计数并返回新的计数值"""
+    if not hasattr(_retry_context_true, "count"):
+        _retry_context_true.count = 0
+    _retry_context_true.count += 1
+    return int(_retry_context_true.count)
+
+
+def _reset_retry_count_true() -> None:
+    """重置 while_true 重试计数"""
+    _retry_context_true.count = 0
 
 
 def while_success(func: Callable[[], Any]) -> Any:
@@ -2201,7 +2249,7 @@ def while_success(func: Callable[[], Any]) -> Any:
     函数执行结果
 
     注意：
-    与while_true共享重试计数器，累计重试6次，使用指数退避（第一次等待1s）
+    使用独立的重试计数器，累计重试6次，使用指数退避（第一次等待1s）
     """
     MAX_RETRIES = 6
     result: Any = None
@@ -2212,10 +2260,10 @@ def while_success(func: Callable[[], Any]) -> Any:
             return None
         try:
             result = func()
-            _reset_retry_count()  # 成功后重置计数器
+            _reset_retry_count_success()  # 成功后重置计数器
             break
         except Exception as e:
-            retry_count = _increment_retry_count()
+            retry_count = _increment_retry_count_success()
             if retry_count <= MAX_RETRIES:
                 # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
                 sleep_time = 2 ** (retry_count - 1)
@@ -2228,10 +2276,10 @@ def while_success(func: Callable[[], Any]) -> Any:
                     PrettyOutput.auto_print(
                         f"⚠️ 发生异常:\n{e}\n已达到最大重试次数 ({retry_count}/{MAX_RETRIES})"
                     )
-                    _reset_retry_count()
+                    _reset_retry_count_success()
                     raise
             else:
-                _reset_retry_count()
+                _reset_retry_count_success()
                 raise
     return result
 
@@ -2248,7 +2296,7 @@ def while_true(func: Callable[[], bool]) -> Any:
     注意:
         与while_success不同，此函数只检查返回是否为True，
         不捕获异常，异常会直接抛出。
-        与while_success共享重试计数器，累计重试6次，使用指数退避（第一次等待1s）
+        使用独立的重试计数器，累计重试6次，使用指数退避（第一次等待1s）
     """
     MAX_RETRIES = 6
     ret: bool = False
@@ -2260,14 +2308,14 @@ def while_true(func: Callable[[], bool]) -> Any:
         try:
             ret = func()
             if ret:
-                _reset_retry_count()  # 成功后重置计数器
+                _reset_retry_count_true()  # 成功后重置计数器
                 break
         except Exception:
             # 异常直接抛出，不捕获
-            _reset_retry_count()
+            _reset_retry_count_true()
             raise
 
-        retry_count = _increment_retry_count()
+        retry_count = _increment_retry_count_true()
         if retry_count <= MAX_RETRIES:
             # 指数退避：第1次等待1s (2^0)，第2次等待2s (2^1)，第3次等待4s (2^2)，第4次等待8s (2^3)，第6次等待32s (2^5)
             sleep_time = 2 ** (retry_count - 1)
@@ -2280,10 +2328,10 @@ def while_true(func: Callable[[], bool]) -> Any:
                 PrettyOutput.auto_print(
                     f"⚠️ 返回空值，已达到最大重试次数 ({retry_count}/{MAX_RETRIES})"
                 )
-                _reset_retry_count()
+                _reset_retry_count_true()
                 break
         else:
-            _reset_retry_count()
+            _reset_retry_count_true()
             break
     return ret
 
