@@ -91,13 +91,6 @@ LINT_TOOLS_CONFIG: List[Dict[str, str]] = [
         "\n  或访问 https://mypy.readthedocs.io/ 查看文档",
     },
     {
-        "name": "pylint",
-        "command": "pylint",
-        "description": "Python代码分析工具",
-        "install_hint": "安装：pip install pylint"
-        "\n  或访问 https://pylint.org/ 查看文档",
-    },
-    {
         "name": "shellcheck",
         "command": "shellcheck",
         "description": "Shell脚本静态分析工具",
