@@ -98,6 +98,9 @@ class AgentRunLoop:
         # 清理可能留下的多余空行（超过2个连续换行符替换为2个）
         filtered = re.sub(r"\n{3,}", "\n\n", filtered)
 
+        # 过滤掉 [MODE:xxx] 模式标记
+        filtered = re.sub(r"\[MODE:[^\]]+\]", "", filtered)
+
         return filtered.strip()
 
     def _handle_interrupt_with_input(self) -> Optional[str]:
@@ -168,41 +171,74 @@ class AgentRunLoop:
                         if compression_success:
                             remaining_tokens = ag.model.get_remaining_token_count()
                             # 如果自适应压缩后仍然不足，继续尝试其他策略
-                            if remaining_tokens < self.summary_remaining_token_threshold:
+                            if (
+                                remaining_tokens
+                                < self.summary_remaining_token_threshold
+                            ):
                                 # 尝试其他未使用的策略
                                 # 先尝试重要性评分压缩（通用策略）
-                                compression_success = ag._importance_scoring_compression()
+                                compression_success = (
+                                    ag._importance_scoring_compression()
+                                )
                                 if compression_success:
-                                    remaining_tokens = ag.model.get_remaining_token_count()
+                                    remaining_tokens = (
+                                        ag.model.get_remaining_token_count()
+                                    )
                                 # 如果仍不足，尝试滑动窗口压缩
-                                if remaining_tokens < self.summary_remaining_token_threshold:
-                                    compression_success = ag._sliding_window_compression()
+                                if (
+                                    remaining_tokens
+                                    < self.summary_remaining_token_threshold
+                                ):
+                                    compression_success = (
+                                        ag._sliding_window_compression()
+                                    )
                                     if compression_success:
-                                        remaining_tokens = ag.model.get_remaining_token_count()
+                                        remaining_tokens = (
+                                            ag.model.get_remaining_token_count()
+                                        )
                         else:
                             # 如果自适应压缩失败，回退到固定策略顺序
                             compression_success = ag._importance_scoring_compression()
                             if compression_success:
                                 remaining_tokens = ag.model.get_remaining_token_count()
-                                if remaining_tokens < self.summary_remaining_token_threshold:
-                                    compression_success = ag._key_event_extraction_compression()
+                                if (
+                                    remaining_tokens
+                                    < self.summary_remaining_token_threshold
+                                ):
+                                    compression_success = (
+                                        ag._key_event_extraction_compression()
+                                    )
                                     if compression_success:
-                                        remaining_tokens = ag.model.get_remaining_token_count()
-                                        if remaining_tokens < self.summary_remaining_token_threshold:
+                                        remaining_tokens = (
+                                            ag.model.get_remaining_token_count()
+                                        )
+                                        if (
+                                            remaining_tokens
+                                            < self.summary_remaining_token_threshold
+                                        ):
                                             compression_success = ag._incremental_summarization_compression()
                                             if compression_success:
-                                                remaining_tokens = ag.model.get_remaining_token_count()
-                                                if remaining_tokens < self.summary_remaining_token_threshold:
-                                                    compression_success = ag._sliding_window_compression()
+                                                remaining_tokens = (
+                                                    ag.model.get_remaining_token_count()
+                                                )
+                                                if (
+                                                    remaining_tokens
+                                                    < self.summary_remaining_token_threshold
+                                                ):
+                                                    compression_success = (
+                                                        ag._sliding_window_compression()
+                                                    )
                                                     if compression_success:
                                                         remaining_tokens = ag.model.get_remaining_token_count()
                             else:
                                 # 如果重要性评分压缩也失败，尝试其他策略
                                 compression_success = ag._sliding_window_compression()
                                 if compression_success:
-                                    remaining_tokens = ag.model.get_remaining_token_count()
+                                    remaining_tokens = (
+                                        ag.model.get_remaining_token_count()
+                                    )
                         # 如果压缩后仍然不足，继续执行后续的完整摘要逻辑
-                except Exception as e:
+                except Exception:
                     # 压缩失败不影响主流程
                     pass
 
