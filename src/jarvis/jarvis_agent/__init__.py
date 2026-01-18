@@ -1502,20 +1502,30 @@ class Agent:
         # 添加用户固定的重要内容
         user_fixed_content = []
 
-        # 添加用户通过 <Pin> 标记固定的重要内容
-        if self.pin_content.strip():
-            user_fixed_content.append(self.pin_content.strip())
+        # 优先添加原始任务目标（确保长期运行时不丢失）
+        # 如果pin_content为空，使用original_user_input作为备选
+        original_task = self.pin_content.strip() if self.pin_content.strip() else (
+            self.original_user_input.strip() if hasattr(self, "original_user_input") and self.original_user_input else ""
+        )
+        
+        if original_task:
+            user_fixed_content.append(f"**原始任务目标**：\n{original_task}")
+
+        # 添加用户通过 <Pin> 标记固定的其他重要内容（如果与原始任务目标不同）
+        if self.pin_content.strip() and self.pin_content.strip() != original_task:
+            user_fixed_content.append(f"**用户固定内容**：\n{self.pin_content.strip()}")
 
         # 添加最近的记忆
         if hasattr(self, "recent_memories") and self.recent_memories:
-            user_fixed_content.append(chr(10).join(self.recent_memories))
+            user_fixed_content.append(f"**最近记忆**：\n{chr(10).join(self.recent_memories)}")
 
-        # 如果有任何固定内容，添加到摘要中
+        # 如果有任何固定内容，添加到摘要中（放在最前面，确保优先级）
         if user_fixed_content:
             pin_section = (
-                f"\n\n## 用户的原始需求和要求\n{chr(10).join(user_fixed_content)}"
+                f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
             )
-            formatted_summary += pin_section
+            # 将原始任务目标放在最前面，确保最高优先级
+            formatted_summary = pin_section + formatted_summary
 
         return formatted_summary
 
@@ -1564,6 +1574,9 @@ class Agent:
    - **功能必须验证**：功能必须经过实际运行验证，不能仅凭代码存在就认为完成
    - **错误必须修复**：如果存在编译错误、运行时错误、测试失败，任务必须标记为"部分完成"或"进行中"，不能标记为"已完成"
    - **不能因为"代码已编写"就认为任务完成**：必须验证编译通过、功能正常运行、测试通过
+
+**🎯 核心任务目标提醒**：
+请始终牢记用户的原始任务目标（已在"用户的原始需求和要求"部分明确列出）。所有操作都应该围绕完成原始任务目标进行。如果当前进度偏离了原始目标，请及时调整方向。
 
 请基于以上信息继续完成任务。请注意，这是之前对话的摘要，上下文长度已超过限制而被重置。请直接继续任务，无需重复已完成的步骤。如有需要，可以询问用户以获取更多信息。{session_file_info}{initial_commit_info}
         """
@@ -1837,8 +1850,16 @@ class Agent:
             # 延迟导入CodeAgent以避免循环依赖
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
-            if not self.original_user_input:
+            # 保存原始任务目标（用于长期运行时的上下文保持）
+            # 如果是第一次运行或用户输入了新的任务，更新原始任务目标
+            if not self.original_user_input or (
+                user_input.strip()
+                and user_input.strip() != self.original_user_input.strip()
+            ):
                 self.original_user_input = user_input
+                # 同时更新pin_content，确保原始任务目标被固定保存
+                # 这样在总结后也能保留原始任务目标
+                self.pin_content = user_input
 
             # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
             if not isinstance(self, CodeAgent):
@@ -1849,12 +1870,13 @@ class Agent:
                     "\n\n[系统说明]\n"
                     "本次会话处于**非交互模式**：\n"
                     "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
-                    "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问“是否继续”；\n"
+                    "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问'是否继续'；\n"
                     "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
                 )
 
-                # 如果是非交互模式，可以假设用户输入的是完整的需求
-                self.pin_content = user_input
+                # 如果是非交互模式，确保pin_content被设置（已在上面统一设置）
+                if not self.pin_content:
+                    self.pin_content = user_input
 
             # 将非交互模式说明添加到用户输入中
             enhanced_input = user_input + non_interactive_note
