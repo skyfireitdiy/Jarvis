@@ -18,12 +18,13 @@ class TestGetSystemPrompt:
         """测试提示词包含关键元素"""
         result = get_system_prompt()
 
-        # 检查是否包含 RIPER-5 协议相关内容
-        assert "RIPER-5" in result or "RESEARCH" in result
+        # 检查是否包含 ARCHER 工作流相关内容
+        assert "ARCHER" in result
         assert "MODE" in result
 
         # 检查是否包含工作流程
-        assert "工作流程" in result or "工作" in result
+        assert "ANALYZE" in result or "分析" in result
+        assert "EXECUTE" in result or "执行" in result
 
         # 检查是否包含工具使用规范
         assert "工具" in result
@@ -32,10 +33,13 @@ class TestGetSystemPrompt:
         """测试包含模式定义"""
         result = get_system_prompt()
 
-        # 检查是否包含各个模式
-        assert "RESEARCH" in result or "研究" in result
+        # 检查是否包含 ARCHER 各个模式
+        assert "ANALYZE" in result or "分析" in result
+        assert "RULE" in result or "规则" in result
+        assert "COLLECT" in result or "收集" in result
+        assert "HYPOTHESIZE" in result or "方案" in result
         assert "EXECUTE" in result or "执行" in result
-        assert "PLAN" in result or "规划" in result
+        assert "REVIEW" in result or "审查" in result
 
     def test_get_system_prompt_non_empty(self):
         """测试提示词不为空"""
