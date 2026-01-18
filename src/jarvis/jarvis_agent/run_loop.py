@@ -76,14 +76,24 @@ class AgentRunLoop:
             response = response.strip() + f"\n{ct('TOOL_CALL')}"
 
         # 使用正则表达式移除所有工具调用块
-        # 匹配起始标签（ot('TOOL_CALL')）和结束标签（ct('TOOL_CALL')）
-        # 结束标签必须在行首（使用 ^ 锚点）
-        # 使用多行模式和DOTALL标志
-        pattern = rf"{re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}"
+        # 与registry.py的检测逻辑保持一致：
+        # 1. 先尝试标准模式：结束标签必须在行首（使用 ^ 锚点）
+        # 2. 再尝试宽松模式：结束标签不一定在行首
+        # 使用 (?msi) 标志：多行、DOTALL、忽略大小写
+        filtered = response
 
-        # 移除所有工具调用块（包括标签本身）
-        # 使用DOTALL标志使 . 匹配包括换行符在内的所有字符
-        filtered = re.sub(pattern, "", response, flags=re.DOTALL | re.MULTILINE)
+        # 标准模式：结束标签必须在行首（与registry.py第855行的标准提取模式一致）
+        standard_pattern = (
+            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?)^{re.escape(ct('TOOL_CALL'))}"
+        )
+        filtered = re.sub(standard_pattern, "", filtered)
+
+        # 宽松模式：结束标签不一定在行首（与registry.py第910行的宽松提取模式一致）
+        # 用于匹配标准模式可能遗漏的情况
+        lenient_pattern = (
+            rf"(?msi){re.escape(ot('TOOL_CALL'))}(.*?){re.escape(ct('TOOL_CALL'))}"
+        )
+        filtered = re.sub(lenient_pattern, "", filtered)
 
         # 清理可能留下的多余空行（超过2个连续换行符替换为2个）
         filtered = re.sub(r"\n{3,}", "\n\n", filtered)
