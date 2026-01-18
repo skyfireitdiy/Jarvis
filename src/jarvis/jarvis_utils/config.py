@@ -1440,7 +1440,7 @@ def get_sliding_window_size() -> int:
     返回:
         int: 滑动窗口大小（保留最近的对话轮数，默认5轮）
     """
-    return int(os.environ.get("sliding_window_size", 5))
+    return 5
 
 
 def get_importance_score_threshold() -> float:
@@ -1450,7 +1450,7 @@ def get_importance_score_threshold() -> float:
     返回:
         float: 重要性评分阈值（低于此阈值的消息将被压缩，默认3.0）
     """
-    return float(os.environ.get("importance_score_threshold", 3.0))
+    return 3.0
 
 
 def get_incremental_summary_chunk_size() -> int:
@@ -1460,7 +1460,7 @@ def get_incremental_summary_chunk_size() -> int:
     返回:
         int: chunk大小（每个chunk包含的对话轮数，默认20轮）
     """
-    return int(os.environ.get("incremental_summary_chunk_size", 20))
+    return 20
 
 
 def get_diff_visualization_mode() -> str:
