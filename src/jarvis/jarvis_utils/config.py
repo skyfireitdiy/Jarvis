@@ -1438,9 +1438,9 @@ def get_sliding_window_size() -> int:
     获取滑动窗口大小，用于滑动窗口压缩策略。
 
     返回:
-        int: 滑动窗口大小（保留最近的对话轮数，默认20轮）
+        int: 滑动窗口大小（保留最近的对话轮数，默认5轮）
     """
-    return int(os.environ.get("sliding_window_size", 20))
+    return int(os.environ.get("sliding_window_size", 5))
 
 
 def get_importance_score_threshold() -> float:
