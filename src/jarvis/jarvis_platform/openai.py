@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import os
+import re
 from typing import Any
 from typing import Dict
 from typing import Generator
@@ -13,6 +14,7 @@ from openai.types.chat import ChatCompletionMessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import PrettyOutput
+from jarvis.jarvis_utils.tag import ot, ct
 
 
 class OpenAIModel(BasePlatform):
@@ -112,6 +114,25 @@ class OpenAIModel(BasePlatform):
         self.messages: List[ChatCompletionMessageParam] = []
         self.system_message = ""
 
+    def _filter_think_tags(self, content: str) -> str:
+        """过滤 think 标签内容
+
+        参数:
+            content: 原始内容
+
+        返回:
+            str: 过滤后的内容
+        """
+        # 过滤 <think> 标签
+        content = re.sub(
+            ot("think") + r".*?" + ct("think"), "", content, flags=re.DOTALL
+        )
+        # 过滤 <thinking> 标签
+        content = re.sub(
+            ot("thinking") + r".*?" + ct("thinking"), "", content, flags=re.DOTALL
+        )
+        return content
+
     def get_model_list(self) -> List[Tuple[str, str]]:
         """
         获取可用的OpenAI模型列表
@@ -169,8 +190,9 @@ class OpenAIModel(BasePlatform):
             当API调用失败时会抛出异常并打印错误信息
         """
         try:
-            # Add user message to history
-            self.messages.append({"role": "user", "content": message})
+            # Add user message to history (过滤 think 标签)
+            filtered_message = self._filter_think_tags(message)
+            self.messages.append({"role": "user", "content": filtered_message})
 
             # 累计完整响应
             accumulated_response = ""
@@ -226,8 +248,11 @@ class OpenAIModel(BasePlatform):
                     continue
                 else:
                     # 正常结束（stop、null 或其他原因）
-                    # 将完整响应添加到消息历史
+                    # 将完整响应添加到消息历史（过滤 think 标签）
                     if accumulated_response:
+                        filtered_response = self._filter_think_tags(
+                            accumulated_response
+                        )
                         if (
                             self.messages
                             and self.messages[-1].get("role") == "assistant"
@@ -236,20 +261,20 @@ class OpenAIModel(BasePlatform):
                             last_content = self.messages[-1]["content"]
                             if isinstance(last_content, str):
                                 self.messages[-1]["content"] = (
-                                    last_content + full_response
+                                    last_content + filtered_response
                                 )
                             else:
                                 # 如果content不是字符串，创建新的消息
                                 self.messages.append(
                                     {
                                         "role": "assistant",
-                                        "content": accumulated_response,
+                                        "content": filtered_response,
                                     }
                                 )
                         else:
                             # 创建新的 assistant 消息，使用累计的完整响应
                             self.messages.append(
-                                {"role": "assistant", "content": accumulated_response}
+                                {"role": "assistant", "content": filtered_response}
                             )
                     break
 
