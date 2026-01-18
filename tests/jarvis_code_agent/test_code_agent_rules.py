@@ -166,13 +166,14 @@ class TestRulesManager:
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_no_rules(self, mock_get_data_dir, tmp_path):
-        """测试没有规则的情况"""
+        """测试没有规则的情况（ builtin_rules_index 会自动加载）"""
         mock_get_data_dir.return_value = str(tmp_path)
         manager = RulesManager("/tmp/test")
         merged_rules, loaded_names = manager.load_all_rules()
 
-        assert merged_rules == ""
-        assert loaded_names == set()
+        # builtin_rules_index 会自动加载
+        assert "builtin_rules_index" in loaded_names
+        assert "# Jarvis 内置规则列表" in merged_rules
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_with_global_and_project(self, mock_get_data_dir, tmp_path):
@@ -232,13 +233,14 @@ class TestRulesManager:
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_empty_rule_names(self, mock_get_data_dir, tmp_path):
-        """测试空规则名称列表"""
+        """测试空规则名称列表（ builtin_rules_index 会自动加载）"""
         mock_get_data_dir.return_value = str(tmp_path)
         manager = RulesManager("/tmp/test")
         merged_rules, loaded_names = manager.load_all_rules("")
 
-        assert merged_rules == ""
-        assert loaded_names == set()
+        # builtin_rules_index 会自动加载
+        assert "builtin_rules_index" in loaded_names
+        assert "# Jarvis 内置规则列表" in merged_rules
 
     @patch("jarvis.jarvis_agent.rules_manager.get_data_dir")
     def test_load_all_rules_combined(self, mock_get_data_dir, tmp_path):
@@ -263,7 +265,9 @@ class TestRulesManager:
         assert "Global rule" in merged_rules
         assert "Project rule" in merged_rules
         assert "Named rule" in merged_rules
-        assert len(loaded_names) == 3
+        # builtin_rules_index 会自动加载，所以有4个规则
+        assert len(loaded_names) == 4
         assert "global_rule" in loaded_names
         assert "project_rule" in loaded_names
         assert "named1" in loaded_names
+        assert "builtin_rules_index" in loaded_names
