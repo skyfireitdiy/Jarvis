@@ -73,14 +73,14 @@ class TestToolExecutor:
 
         # 验证结果
         assert result[0] is False
-        assert "检测到多个操作" in result[1]
+        assert "检测到多个不同类型的操作" in result[1]
         assert "Tool1" in result[1]
         assert "Tool2" in result[1]
 
         # 验证警告输出
         mock_print.assert_called_once()
         args = mock_print.call_args[0]
-        assert "检测到多个操作" in args[0]
+        assert "检测到多个不同类型的操作" in args[0]
 
     @patch("jarvis.jarvis_agent.tool_executor.user_confirm")
     def test_execution_with_confirmation_yes(
