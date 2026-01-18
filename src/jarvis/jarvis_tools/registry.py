@@ -152,7 +152,7 @@ class ToolRegistry(OutputHandlerProtocol):
     def handle(self, response: str, agent_: Any) -> Tuple[bool, Any]:
         try:
             # 传递agent给_extract_tool_calls，以便在解析失败时调用大模型修复
-            tool_call, err_msg, auto_completed = self._extract_tool_calls(
+            tool_calls, err_msg, auto_completed = self._extract_tool_calls(
                 response, agent_
             )
             if err_msg:
@@ -166,7 +166,46 @@ class ToolRegistry(OutputHandlerProtocol):
                 except Exception:
                     # 兼容处理：无法获取Agent或ToolUsage时，至少返回工具系统帮助信息
                     return False, f"{err_msg}\n\n{tool_call_help}"
-            result = self.handle_tool_calls(tool_call, agent_)
+            
+            # 处理多个工具调用
+            # 检查是否是多个工具调用的格式（字典的键是工具名称，值是工具调用信息）
+            # 单个工具调用时，返回的是 {"name": ..., "arguments": ...}
+            # 多个工具调用时，返回的是 {tool_name: {"name": ..., "arguments": ...}, ...}
+            if isinstance(tool_calls, dict):
+                # 检查是否是多个工具调用的格式
+                # 判断标准：如果字典的值是字典且包含 "name" 和 "arguments"，则是多个工具调用格式
+                # 否则，如果字典直接包含 "name" 和 "arguments"，则是单个工具调用格式
+                if len(tool_calls) > 1:
+                    # 多个键，检查第一个值是否是工具调用信息字典
+                    first_value = list(tool_calls.values())[0]
+                    if isinstance(first_value, dict) and "name" in first_value and "arguments" in first_value:
+                        # 多个工具调用格式
+                        result = self.handle_multiple_tool_calls(tool_calls, agent_)
+                    else:
+                        # 可能是格式错误，尝试作为单个工具调用处理
+                        result = self.handle_tool_calls(tool_calls, agent_)
+                elif len(tool_calls) == 1:
+                    # 单个键，检查值是否是工具调用信息字典
+                    first_value = list(tool_calls.values())[0]
+                    if isinstance(first_value, dict) and "name" in first_value and "arguments" in first_value:
+                        # 多个工具调用格式，但只有一个
+                        result = self.handle_tool_calls(first_value, agent_)
+                    elif "name" in tool_calls and "arguments" in tool_calls:
+                        # 单个工具调用格式（直接包含 name 和 arguments）
+                        result = self.handle_tool_calls(tool_calls, agent_)
+                    else:
+                        # 向后兼容：尝试作为单个工具调用处理
+                        result = self.handle_tool_calls(tool_calls, agent_)
+                elif "name" in tool_calls and "arguments" in tool_calls:
+                    # 单个工具调用格式（直接包含 name 和 arguments，但 len == 0 的情况不应该发生）
+                    result = self.handle_tool_calls(tool_calls, agent_)
+                else:
+                    # 空字典或格式错误
+                    result = self.handle_tool_calls(tool_calls, agent_)
+            else:
+                # 非字典格式，直接调用 handle_tool_calls
+                result = self.handle_tool_calls(tool_calls, agent_)
+            
             if auto_completed:
                 # 如果自动补全了结束标签，在结果中添加说明信息
                 result = f"检测到工具调用缺少结束标签，已自动补全{ct('TOOL_CALL')}。请确保后续工具调用包含完整的开始和结束标签。\n\n{result}"
@@ -780,44 +819,9 @@ class ToolRegistry(OutputHandlerProtocol):
         返回:
             Tuple[Optional[str], bool]:
                 - 第一个元素：如果检测到多个工具调用，返回错误消息；否则返回None
-                - 第二个元素：是否检测到多个工具调用
+                - 第二个元素：是否检测到多个工具调用（现在总是返回False，因为支持多个工具调用）
         """
-        if len(blocks) <= 1:
-            return None, False
-
-        # 尝试解析每个块，收集所有成功解析的工具调用
-        parsed_tools = []
-        for item in blocks:
-            try:
-                cleaned_item = ToolRegistry._clean_extra_markers(item)
-                msg = json_loads(cleaned_item)
-                if "name" in msg and "arguments" in msg:
-                    parsed_tools.append(msg)
-            except Exception:
-                # 如果某个块解析失败，可能是格式问题，继续检查其他块
-                pass
-
-        # 如果成功解析了多个工具调用，返回明确的错误信息
-        if len(parsed_tools) > 1:
-            tool_names = [
-                tool_call.get("name", "未知工具") for tool_call in parsed_tools
-            ]
-            error_msg = f"""检测到多个工具调用（共 {len(parsed_tools)} 个），请一次只处理一个工具调用。
-
-检测到的工具调用：
-{chr(10).join(f"  - {i + 1}. {name}" for i, name in enumerate(tool_names))}
-
-失败原因：
-系统要求每次只能执行一个工具调用，等待结果后再进行下一步操作。同时调用多个工具会导致：
-1. 无法确定工具执行的顺序和依赖关系
-2. 无法正确处理工具之间的交互
-3. 可能导致资源竞争和状态不一致
-
-请修改工具调用，确保每次只包含一个 {ot("TOOL_CALL")}...{ct("TOOL_CALL")} 块。
-
-{tool_call_help}"""
-            return error_msg, True
-
+        # 现在支持多个工具调用，不再返回错误
         return None, False
 
     @staticmethod
@@ -1077,9 +1081,25 @@ class ToolRegistry(OutputHandlerProtocol):
                     error_msg,
                     False,
                 )
-        if len(ret) > 1:
-            return {}, "检测到多个工具调用，请一次只处理一个工具调用。", False
-        return ret[0] if ret else {}, "", auto_completed
+        # 支持多个工具调用：返回所有工具调用的字典
+        if len(ret) == 0:
+            return {}, "", auto_completed
+        elif len(ret) == 1:
+            return ret[0], "", auto_completed
+        else:
+            # 多个工具调用：构建字典，键为工具名称，值为工具调用信息
+            tool_calls_dict = {}
+            for tool_call in ret:
+                name = tool_call.get("name", "unknown")
+                # 如果同名工具调用多次，使用索引区分
+                if name in tool_calls_dict:
+                    base_name = name
+                    index = 1
+                    while f"{base_name}_{index}" in tool_calls_dict:
+                        index += 1
+                    name = f"{base_name}_{index}"
+                tool_calls_dict[name] = tool_call
+            return tool_calls_dict, "", auto_completed
 
     def register_tool(
         self,
@@ -1456,3 +1476,40 @@ class ToolRegistry(OutputHandlerProtocol):
             except Exception:
                 usage_prompt = tool_call_help
             return f"工具调用失败: {str(e)}\n\n{usage_prompt}"
+
+    def handle_multiple_tool_calls(
+        self, tool_calls: Dict[str, Dict[str, Any]], agent: Any
+    ) -> str:
+        """处理多个工具调用
+
+        参数:
+            tool_calls: 工具调用字典，键为工具名称（可能带索引），值为工具调用信息
+            agent: Agent实例
+
+        返回:
+            str: 所有工具调用的结果，用分隔符连接
+        """
+        results = []
+        total_count = len(tool_calls)
+        
+        PrettyOutput.auto_print(f"🛠️ 准备执行 {total_count} 个工具调用")
+        
+        for idx, (tool_key, tool_call) in enumerate(tool_calls.items(), 1):
+            name = tool_call.get("name", tool_key)
+            PrettyOutput.auto_print(f"\n[{idx}/{total_count}] 执行工具: {name}")
+            
+            try:
+                result = self.handle_tool_calls(tool_call, agent)
+                results.append(f"=== 工具调用 {idx}/{total_count}: {name} ===\n{result}")
+            except Exception as e:
+                error_msg = f"工具调用 {name} 执行失败: {str(e)}"
+                PrettyOutput.auto_print(f"❌ {error_msg}")
+                results.append(f"=== 工具调用 {idx}/{total_count}: {name} ===\n❌ {error_msg}")
+        
+        # 合并所有结果
+        separator = "\n\n" + "=" * 80 + "\n\n"
+        combined_result = separator.join(results)
+        
+        PrettyOutput.auto_print(f"\n✅ 完成 {total_count} 个工具调用")
+        
+        return combined_result
