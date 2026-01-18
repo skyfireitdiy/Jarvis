@@ -1503,17 +1503,21 @@ class Agent:
         user_fixed_content = []
 
         # 优先添加原始任务目标（确保长期运行时不丢失）
-        # 如果pin_content为空，使用original_user_input作为备选
-        original_task = self.pin_content.strip() if self.pin_content.strip() else (
-            self.original_user_input.strip() if hasattr(self, "original_user_input") and self.original_user_input else ""
-        )
+        # 始终使用 original_user_input 作为原始任务目标，确保交互模式下也能保持
+        original_task = ""
+        if hasattr(self, "original_user_input") and self.original_user_input:
+            original_task = self.original_user_input.strip()
         
         if original_task:
             user_fixed_content.append(f"**原始任务目标**：\n{original_task}")
 
         # 添加用户通过 <Pin> 标记固定的其他重要内容（如果与原始任务目标不同）
-        if self.pin_content.strip() and self.pin_content.strip() != original_task:
-            user_fixed_content.append(f"**用户固定内容**：\n{self.pin_content.strip()}")
+        # pin_content 可能包含用户通过 <Pin> 标记追加的内容，这些内容作为补充
+        if self.pin_content.strip():
+            pin_content_stripped = self.pin_content.strip()
+            # 如果 pin_content 与原始任务目标不同，说明用户追加了内容
+            if not original_task or pin_content_stripped != original_task:
+                user_fixed_content.append(f"**用户固定内容**：\n{pin_content_stripped}")
 
         # 添加最近的记忆
         if hasattr(self, "recent_memories") and self.recent_memories:
@@ -1851,15 +1855,14 @@ class Agent:
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
             # 保存原始任务目标（用于长期运行时的上下文保持）
-            # 如果是第一次运行或用户输入了新的任务，更新原始任务目标
-            if not self.original_user_input or (
-                user_input.strip()
-                and user_input.strip() != self.original_user_input.strip()
-            ):
+            # 只在第一次运行时设置原始任务目标，确保交互模式下后续输入不会覆盖原始目标
+            if not self.original_user_input:
                 self.original_user_input = user_input
                 # 同时更新pin_content，确保原始任务目标被固定保存
                 # 这样在总结后也能保留原始任务目标
-                self.pin_content = user_input
+                # 注意：pin_content 可能会被用户通过 <Pin> 标记追加内容，但原始任务目标不会被覆盖
+                if not self.pin_content:
+                    self.pin_content = user_input
 
             # 如果是CodeAgent实例，则跳过注册，由CodeAgent.run自行管理
             if not isinstance(self, CodeAgent):
