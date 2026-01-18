@@ -155,6 +155,24 @@ class AgentRunLoop:
                 if ag.first:
                     ag._first_run()
 
+                # 在调用模型前，检查是否需要滑动窗口压缩
+                # 如果剩余token低于阈值，先尝试滑动窗口压缩（比完整摘要压缩更轻量）
+                try:
+                    remaining_tokens = ag.model.get_remaining_token_count()
+                    if (
+                        remaining_tokens > 0
+                        and remaining_tokens < self.summary_remaining_token_threshold
+                    ):
+                        # 尝试滑动窗口压缩（保留最近对话，压缩更早的）
+                        compression_success = ag._sliding_window_compression()
+                        if compression_success:
+                            # 压缩成功后重新计算剩余token
+                            remaining_tokens = ag.model.get_remaining_token_count()
+                            # 如果压缩后仍然不足，继续执行后续的完整摘要逻辑
+                except Exception as e:
+                    # 滑动窗口压缩失败不影响主流程
+                    pass
+
                 # 调用模型获取响应
                 try:
                     current_response = ag._call_model(

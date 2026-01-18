@@ -1345,6 +1345,121 @@ class Agent:
             PrettyOutput.auto_print("❌ 总结对话历史失败")
             return ""
 
+    def _sliding_window_compression(
+        self, window_size: Optional[int] = None
+    ) -> bool:
+        """滑动窗口压缩：保留最近的N轮对话，压缩更早的对话
+
+        参数:
+            window_size: 滑动窗口大小（保留最近的对话轮数），如果为None则使用配置值
+
+        返回:
+            bool: 如果成功执行压缩返回True，否则返回False
+
+        注意:
+            - 只压缩用户和助手消息，系统消息始终保留
+            - 如果消息数量不足，不执行压缩
+            - 压缩后的历史摘要会作为一条用户消息插入到历史中
+        """
+        from jarvis.jarvis_utils.config import get_sliding_window_size
+
+        if window_size is None:
+            window_size = get_sliding_window_size()
+
+        try:
+            # 获取对话历史
+            history = self.model.get_conversation_history()
+            if not history:
+                return False
+
+            # 分离系统消息和其他消息
+            system_messages = []
+            other_messages = []
+            for msg in history:
+                role = msg.get("role", "").lower()
+                if role == "system":
+                    system_messages.append(msg)
+                else:
+                    other_messages.append(msg)
+
+            # 如果其他消息数量不足窗口大小的2倍，不需要压缩
+            # （需要至少2倍，因为压缩后还需要保留窗口）
+            if len(other_messages) <= window_size * 2:
+                return False
+
+            # 分离最近的消息和更早的消息
+            recent_messages = other_messages[-window_size:]
+            old_messages = other_messages[:-window_size]
+
+            if not old_messages:
+                return False
+
+            # 压缩更早的消息
+            try:
+                # 构建压缩提示
+                old_content = "\n\n".join(
+                    [
+                        f"[{msg.get('role', 'unknown').upper()}]: {msg.get('content', '')}"
+                        for msg in old_messages
+                    ]
+                )
+
+                compression_prompt = f"""请将以下对话历史压缩为简洁的摘要，保留关键信息、重要决策和任务进展：
+
+{old_content}
+
+请生成一个简洁的摘要，保留：
+1. 关键任务目标和进展
+2. 重要决策和原因
+3. 遇到的错误和解决方案
+4. 关键工具调用和结果
+
+摘要："""
+
+                # 使用临时模型压缩（避免污染当前对话）
+                compressed_summary = self._create_temp_model(
+                    "你是一个对话历史压缩助手，擅长提取关键信息。"
+                ).chat_until_success(compression_prompt)
+
+                if not compressed_summary or not compressed_summary.strip():
+                    PrettyOutput.auto_print(
+                        "⚠️ 滑动窗口压缩：生成摘要失败，跳过压缩"
+                    )
+                    return False
+
+                # 构建压缩后的消息（作为用户消息插入）
+                compressed_msg = {
+                    "role": "user",
+                    "content": f"[历史摘要] {compressed_summary.strip()}",
+                }
+
+                # 重建消息列表：系统消息 + 压缩摘要 + 最近的消息
+                new_history = system_messages + [compressed_msg] + recent_messages
+
+                # 更新模型的消息历史
+                if hasattr(self.model, "messages"):
+                    self.model.messages = new_history
+                    PrettyOutput.auto_print(
+                        f"✅ 滑动窗口压缩完成：压缩了 {len(old_messages)} 条消息，"
+                        f"保留了最近 {len(recent_messages)} 轮对话"
+                    )
+                    return True
+                else:
+                    PrettyOutput.auto_print(
+                        "⚠️ 滑动窗口压缩：模型不支持消息历史管理"
+                    )
+                    return False
+
+            except Exception as e:
+                PrettyOutput.auto_print(
+                    f"⚠️ 滑动窗口压缩失败: {str(e)}，将回退到完整摘要压缩"
+                )
+                return False
+
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 滑动窗口压缩出错: {str(e)}")
+            return False
+
     def _summarize_and_clear_history(
         self, trigger_reason: str = "Token限制触发"
     ) -> str:
