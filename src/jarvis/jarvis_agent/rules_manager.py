@@ -309,9 +309,10 @@ class RulesManager:
 
         规则名称格式：前缀:规则名
         前缀说明：
-        - central: - 中心规则仓库文件
+        - builtin: - 内置规则目录（jarvis源码/builtin/rules）
         - project: - 项目 .jarvis/rules 目录文件
         - global: - 全局 ~/.jarvis/rules 目录文件
+        - central: - 中心规则仓库文件
         - config1:, config2: - 配置的规则目录文件
         - central_yaml: - 中心库 rules.yaml
         - project_yaml: - 项目 rules.yaml
@@ -331,18 +332,51 @@ class RulesManager:
                 if not actual_name:
                     return None
 
-                # 处理 files 规则
-                if prefix in ["central", "project", "global"] or prefix.startswith(
-                    "config"
-                ):
+                # 处理 builtin 前缀
+                if prefix == "builtin":
+                    try:
+                        from jarvis.jarvis_utils.template_utils import (
+                            _get_jarvis_src_dir,
+                        )
+
+                        jarvis_src_dir = _get_jarvis_src_dir()
+                        builtin_rules_dir = os.path.join(
+                            jarvis_src_dir, "builtin", "rules"
+                        )
+                        if os.path.exists(builtin_rules_dir) and os.path.isdir(
+                            builtin_rules_dir
+                        ):
+                            return self._read_rule_from_dir(
+                                builtin_rules_dir, actual_name
+                            )
+                    except Exception:
+                        pass
+                    return None
+
+                # 处理 project 前缀
+                if prefix == "project":
+                    project_rules_dir = os.path.join(self.root_dir, ".jarvis", "rules")
+                    if os.path.exists(project_rules_dir) and os.path.isdir(
+                        project_rules_dir
+                    ):
+                        return self._read_rule_from_dir(project_rules_dir, actual_name)
+                    return None
+
+                # 处理 global 前缀
+                if prefix == "global":
+                    global_rules_dir = os.path.join(get_data_dir(), "rules")
+                    if os.path.exists(global_rules_dir) and os.path.isdir(
+                        global_rules_dir
+                    ):
+                        return self._read_rule_from_dir(global_rules_dir, actual_name)
+                    return None
+
+                # 处理 central 和 config 前缀
+                if prefix == "central" or prefix.startswith("config"):
                     all_rules_dirs = self._get_all_rules_dirs()
                     target_idx = -1
                     if prefix == "central" and len(all_rules_dirs) > 0:
                         target_idx = 0
-                    elif prefix == "project" and len(all_rules_dirs) > 1:
-                        target_idx = 1
-                    elif prefix == "global" and len(all_rules_dirs) > 2:
-                        target_idx = 2
                     elif prefix.startswith("config"):
                         try:
                             config_num = int(prefix[6:])
