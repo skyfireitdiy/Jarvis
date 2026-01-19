@@ -164,6 +164,43 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             PrettyOutput.auto_print("🔇 已切换到无人值守模式（非交互模式）")
             modified_input = modified_input.replace("'<Quiet>'", "")
             continue
+        elif tag == "FixToolCall":
+            # 处理修复工具调用的命令
+            if not agent._last_response_content:
+                PrettyOutput.auto_print("⚠️ 没有找到需要修复的工具调用内容")
+                return "", True
+
+            PrettyOutput.auto_print("🔧 正在尝试修复工具调用...")
+            error_msg = "用户请求手动修复工具调用"
+
+            # 导入修复函数
+            from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
+
+            # 尝试修复
+            fixed_content = fix_tool_call_with_llm(
+                agent._last_response_content, agent, error_msg
+            )
+
+            if fixed_content:
+                # 修复成功，直接重新解析并执行工具调用
+                need_return, tool_prompt = agent._call_tools(fixed_content)
+
+                if need_return:
+                    return tool_prompt, True
+
+                # 将上一个提示和工具提示安全地拼接起来
+                from jarvis.jarvis_agent.utils import join_prompts
+
+                safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
+
+                agent.session.prompt = join_prompts(
+                    [agent.session.prompt, safe_tool_prompt]
+                )
+                PrettyOutput.auto_print("✅ 工具调用修复并执行成功")
+            else:
+                PrettyOutput.auto_print("❌ 工具调用修复失败")
+
+            return "", True
         elif tag == "Pin":
             # Pin标记已在前面处理，跳过
             continue

@@ -305,6 +305,8 @@ class Agent:
         self._addon_prompt_skip_rounds = 0
         # 重置没有工具调用的计数器
         self._no_tool_call_count = 0
+        # 重置最近一次LLM响应内容
+        self._last_response_content = ""
 
         # 提示用户会话文件位置
         if Path(session_file_path).exists():
@@ -513,6 +515,9 @@ class Agent:
         self._addon_prompt_skip_rounds = 0  # 记录连续未添加 addon_prompt 的轮数
         self._no_tool_call_count = (
             0  # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
+        )
+        self._last_response_content = (
+            ""  # 记录最近一次LLM响应内容（用于手动修复等操作）
         )
         self._agent_type = "normal"
 
@@ -1345,9 +1350,7 @@ class Agent:
             PrettyOutput.auto_print("❌ 总结对话历史失败")
             return ""
 
-    def _sliding_window_compression(
-        self, window_size: Optional[int] = None
-    ) -> bool:
+    def _sliding_window_compression(self, window_size: Optional[int] = None) -> bool:
         """滑动窗口压缩：保留最近的N轮对话，压缩更早的对话
 
         参数:
@@ -1422,9 +1425,7 @@ class Agent:
                 ).chat_until_success(compression_prompt)
 
                 if not compressed_summary or not compressed_summary.strip():
-                    PrettyOutput.auto_print(
-                        "⚠️ 滑动窗口压缩：生成摘要失败，跳过压缩"
-                    )
+                    PrettyOutput.auto_print("⚠️ 滑动窗口压缩：生成摘要失败，跳过压缩")
                     return False
 
                 # 构建压缩后的消息（作为用户消息插入）
@@ -1445,9 +1446,7 @@ class Agent:
                     )
                     return True
                 else:
-                    PrettyOutput.auto_print(
-                        "⚠️ 滑动窗口压缩：模型不支持消息历史管理"
-                    )
+                    PrettyOutput.auto_print("⚠️ 滑动窗口压缩：模型不支持消息历史管理")
                     return False
 
             except Exception as e:
@@ -1507,7 +1506,9 @@ class Agent:
             "警告",
         ]
         content_lower = content.lower()
-        keyword_count = sum(1 for keyword in important_keywords if keyword.lower() in content_lower)
+        keyword_count = sum(
+            1 for keyword in important_keywords if keyword.lower() in content_lower
+        )
         score += keyword_count * 0.5  # 每个关键词加0.5分
 
         # 工具调用相关加分
@@ -1515,11 +1516,16 @@ class Agent:
             score += 2.0  # 工具调用相关消息重要
 
         # 错误和修复相关加分
-        if any(word in content_lower for word in ["错误", "失败", "异常", "bug", "修复"]):
+        if any(
+            word in content_lower for word in ["错误", "失败", "异常", "bug", "修复"]
+        ):
             score += 2.0  # 错误和修复信息重要
 
         # 任务完成相关加分
-        if any(word in content_lower for word in ["完成", "成功", "!!!complete!!!", "任务完成"]):
+        if any(
+            word in content_lower
+            for word in ["完成", "成功", "!!!complete!!!", "任务完成"]
+        ):
             score += 1.5  # 任务完成信息重要
 
         # 用户明确标记的重要内容加分
@@ -1619,9 +1625,7 @@ class Agent:
                 ).chat_until_success(compression_prompt)
 
                 if not compressed_summary or not compressed_summary.strip():
-                    PrettyOutput.auto_print(
-                        "⚠️ 重要性评分压缩：生成摘要失败，跳过压缩"
-                    )
+                    PrettyOutput.auto_print("⚠️ 重要性评分压缩：生成摘要失败，跳过压缩")
                     return False
 
                 # 构建压缩后的消息（作为用户消息插入）
@@ -1632,7 +1636,11 @@ class Agent:
 
                 # 重建消息列表：系统消息 + 高分消息 + 压缩摘要 + 最近的低分消息（保留一些上下文）
                 # 保留最近5条低分消息作为上下文
-                recent_low_score = low_score_messages[-5:] if len(low_score_messages) > 5 else low_score_messages
+                recent_low_score = (
+                    low_score_messages[-5:]
+                    if len(low_score_messages) > 5
+                    else low_score_messages
+                )
                 new_history = (
                     system_messages
                     + high_score_messages
@@ -1649,9 +1657,7 @@ class Agent:
                     )
                     return True
                 else:
-                    PrettyOutput.auto_print(
-                        "⚠️ 重要性评分压缩：模型不支持消息历史管理"
-                    )
+                    PrettyOutput.auto_print("⚠️ 重要性评分压缩：模型不支持消息历史管理")
                     return False
 
             except Exception as e:
@@ -1799,9 +1805,7 @@ class Agent:
                     )
                     return True
                 else:
-                    PrettyOutput.auto_print(
-                        "⚠️ 增量摘要压缩：模型不支持消息历史管理"
-                    )
+                    PrettyOutput.auto_print("⚠️ 增量摘要压缩：模型不支持消息历史管理")
                     return False
 
             except Exception as e:
@@ -1834,14 +1838,17 @@ class Agent:
         role = message.get("role", "").lower()
 
         # 任务开始/完成标记
-        if any(marker in content for marker in [
-            "!!!complete!!!",
-            "!!!summary!!!",
-            "任务完成",
-            "任务开始",
-            "开始执行",
-            "完成",
-        ]):
+        if any(
+            marker in content
+            for marker in [
+                "!!!complete!!!",
+                "!!!summary!!!",
+                "任务完成",
+                "任务开始",
+                "开始执行",
+                "完成",
+            ]
+        ):
             return True
 
         # 重要决策点
@@ -1886,25 +1893,31 @@ class Agent:
             return True
 
         # 工具执行结果（包含成功/失败信息）
-        if any(indicator in content for indicator in [
-            "执行工具调用",
-            "工具调用成功",
-            "工具调用失败",
-            "✅",
-            "❌",
-            "成功",
-            "失败",
-        ]):
+        if any(
+            indicator in content
+            for indicator in [
+                "执行工具调用",
+                "工具调用成功",
+                "工具调用失败",
+                "✅",
+                "❌",
+                "成功",
+                "失败",
+            ]
+        ):
             return True
 
         # 用户明确标记的重要内容
-        if any(marker in message.get("content", "") for marker in [
-            "<Pin>",
-            "重要",
-            "关键",
-            "必须",
-            "注意",
-        ]):
+        if any(
+            marker in message.get("content", "")
+            for marker in [
+                "<Pin>",
+                "重要",
+                "关键",
+                "必须",
+                "注意",
+            ]
+        ):
             return True
 
         # 用户输入通常都是关键事件
@@ -2005,15 +2018,15 @@ class Agent:
                 # 重建消息列表：系统消息 + 关键事件（按时间顺序）+ 压缩摘要 + 最近的非关键消息
                 # 需要保持时间顺序，所以先按原始顺序排列，然后插入压缩摘要
                 new_history = system_messages.copy()
-                
+
                 # 按原始顺序添加关键事件
                 for msg in other_messages:
                     if self._is_key_event(msg):
                         new_history.append(msg)
-                
+
                 # 添加压缩摘要
                 new_history.append(compressed_msg)
-                
+
                 # 添加最近的非关键消息
                 new_history.extend(recent_non_key)
 
@@ -2073,32 +2086,38 @@ class Agent:
                 role = msg.get("role", "").lower()
 
                 # 代码相关工具
-                if any(tool in content for tool in [
-                    "edit_file",
-                    "read_code",
-                    "execute_script",
-                    "git",
-                    "code",
-                    "文件",
-                    "修改",
-                    "创建",
-                    "删除",
-                ]):
+                if any(
+                    tool in content
+                    for tool in [
+                        "edit_file",
+                        "read_code",
+                        "execute_script",
+                        "git",
+                        "code",
+                        "文件",
+                        "修改",
+                        "创建",
+                        "删除",
+                    ]
+                ):
                     code_tools += 1
 
                 # 分析相关工具
-                if any(tool in content for tool in [
-                    "search",
-                    "rg",
-                    "fd",
-                    "grep",
-                    "find",
-                    "query",
-                    "retrieve_memory",
-                    "分析",
-                    "检索",
-                    "查询",
-                ]):
+                if any(
+                    tool in content
+                    for tool in [
+                        "search",
+                        "rg",
+                        "fd",
+                        "grep",
+                        "find",
+                        "query",
+                        "retrieve_memory",
+                        "分析",
+                        "检索",
+                        "查询",
+                    ]
+                ):
                     analysis_tools += 1
 
                 # 对话相关指标
@@ -2115,10 +2134,15 @@ class Agent:
             if code_tools > analysis_tools and code_tools > conversation_indicators:
                 return "code"
             # 如果分析工具占主导
-            elif analysis_tools > code_tools and analysis_tools > conversation_indicators:
+            elif (
+                analysis_tools > code_tools and analysis_tools > conversation_indicators
+            ):
                 return "analysis"
             # 如果对话指标占主导
-            elif conversation_indicators > code_tools and conversation_indicators > analysis_tools:
+            elif (
+                conversation_indicators > code_tools
+                and conversation_indicators > analysis_tools
+            ):
                 return "conversation"
             # 混合类型
             else:
@@ -2375,7 +2399,7 @@ class Agent:
         original_task = ""
         if hasattr(self, "original_user_input") and self.original_user_input:
             original_task = self.original_user_input.strip()
-        
+
         if original_task:
             user_fixed_content.append(f"**原始任务目标**：\n{original_task}")
 
@@ -2389,13 +2413,13 @@ class Agent:
 
         # 添加最近的记忆
         if hasattr(self, "recent_memories") and self.recent_memories:
-            user_fixed_content.append(f"**最近记忆**：\n{chr(10).join(self.recent_memories)}")
+            user_fixed_content.append(
+                f"**最近记忆**：\n{chr(10).join(self.recent_memories)}"
+            )
 
         # 如果有任何固定内容，添加到摘要中（放在最前面，确保优先级）
         if user_fixed_content:
-            pin_section = (
-                f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
-            )
+            pin_section = f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
             # 将原始任务目标放在最前面，确保最高优先级
             formatted_summary = pin_section + formatted_summary
 

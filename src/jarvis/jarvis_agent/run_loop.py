@@ -622,6 +622,9 @@ class AgentRunLoop:
                 # 检查是否有工具调用：如果tool_prompt不为空，说明有工具被调用
                 has_tool_call = bool(safe_tool_prompt and safe_tool_prompt.strip())
 
+                # 保存当前响应内容供用户手动修复工具调用
+                ag._last_response_content = current_response
+
                 # 在非交互模式下，跟踪连续没有工具调用的次数
                 if ag.non_interactive:
                     if has_tool_call:
@@ -638,6 +641,9 @@ class AgentRunLoop:
                                 "连续5次对话没有工具调用，请使用工具来完成你的任务"
                             )
                             PrettyOutput.auto_print(f"⚠️ {error_msg}")
+
+                            # 保存最近一次失败的工具调用内容（供手动修复使用）
+                            ag._last_failed_tool_call_content = current_response
 
                             # 尝试使用大模型修复
                             fixed_content = fix_tool_call_with_llm(
