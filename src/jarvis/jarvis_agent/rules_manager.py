@@ -486,19 +486,33 @@ class RulesManager:
         all_rules_dirs = self._get_all_rules_dirs()
         for idx, rules_dir in enumerate(all_rules_dirs):
             if os.path.exists(rules_dir) and os.path.isdir(rules_dir):
-                # 确定来源前缀
-                if idx == 0:
-                    # 中心规则仓库（如果存在）
+                # 确定来源前缀（根据实际来源动态判断）
+                # 检查是否为中心规则仓库
+                is_central = False
+                if self.central_repo_path:
+                    central_rules_dir = os.path.join(self.central_repo_path, "rules")
+                    if (
+                        rules_dir == central_rules_dir
+                        or rules_dir == self.central_repo_path
+                    ):
+                        is_central = True
+
+                # 检查是否为项目规则目录
+                project_rules_dir = os.path.join(self.root_dir, ".jarvis", "rules")
+                is_project = rules_dir == project_rules_dir
+
+                # 根据实际来源分配前缀
+                if is_central:
                     prefix = "central:"
-                elif idx == 1:
-                    # 项目规则目录
+                elif is_project:
                     prefix = "project:"
-                elif idx == 2:
-                    # 全局规则目录
+                elif idx >= 2 or (self.central_repo_path and idx == 1):
+                    # 全局规则目录（在中心库和项目库之后）
                     prefix = "global:"
                 else:
                     # 配置的规则目录
-                    prefix = f"config{idx - 2}:"
+                    config_idx = idx - (2 if self.central_repo_path else 1)
+                    prefix = f"config{config_idx}:"
 
                 try:
                     for root, dirs, files in os.walk(rules_dir):
