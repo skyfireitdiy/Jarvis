@@ -176,21 +176,21 @@ class AgentRunLoop:
                                 < self.summary_remaining_token_threshold
                             ):
                                 # 尝试其他未使用的策略
-                                # 先尝试重要性评分压缩（通用策略）
+                                # 优先尝试滑动窗口压缩
                                 compression_success = (
-                                    ag._importance_scoring_compression()
+                                    ag._sliding_window_compression()
                                 )
                                 if compression_success:
                                     remaining_tokens = (
                                         ag.model.get_remaining_token_count()
                                     )
-                                # 如果仍不足，尝试滑动窗口压缩
+                                # 如果仍不足，尝试重要性评分压缩
                                 if (
                                     remaining_tokens
                                     < self.summary_remaining_token_threshold
                                 ):
                                     compression_success = (
-                                        ag._sliding_window_compression()
+                                        ag._importance_scoring_compression()
                                     )
                                     if compression_success:
                                         remaining_tokens = (
@@ -198,7 +198,8 @@ class AgentRunLoop:
                                         )
                         else:
                             # 如果自适应压缩失败，回退到固定策略顺序
-                            compression_success = ag._importance_scoring_compression()
+                            # 优先使用滑动窗口压缩
+                            compression_success = ag._sliding_window_compression()
                             if compression_success:
                                 remaining_tokens = ag.model.get_remaining_token_count()
                                 if (
@@ -206,7 +207,7 @@ class AgentRunLoop:
                                     < self.summary_remaining_token_threshold
                                 ):
                                     compression_success = (
-                                        ag._key_event_extraction_compression()
+                                        ag._importance_scoring_compression()
                                     )
                                     if compression_success:
                                         remaining_tokens = (
@@ -216,7 +217,9 @@ class AgentRunLoop:
                                             remaining_tokens
                                             < self.summary_remaining_token_threshold
                                         ):
-                                            compression_success = ag._incremental_summarization_compression()
+                                            compression_success = (
+                                                ag._key_event_extraction_compression()
+                                            )
                                             if compression_success:
                                                 remaining_tokens = (
                                                     ag.model.get_remaining_token_count()
@@ -225,14 +228,12 @@ class AgentRunLoop:
                                                     remaining_tokens
                                                     < self.summary_remaining_token_threshold
                                                 ):
-                                                    compression_success = (
-                                                        ag._sliding_window_compression()
-                                                    )
+                                                    compression_success = ag._incremental_summarization_compression()
                                                     if compression_success:
                                                         remaining_tokens = ag.model.get_remaining_token_count()
                             else:
-                                # 如果重要性评分压缩也失败，尝试其他策略
-                                compression_success = ag._sliding_window_compression()
+                                # 如果滑动窗口压缩也失败，尝试其他策略
+                                compression_success = ag._importance_scoring_compression()
                                 if compression_success:
                                     remaining_tokens = (
                                         ag.model.get_remaining_token_count()

@@ -1351,16 +1351,17 @@ class Agent:
             return ""
 
     def _sliding_window_compression(self, window_size: Optional[int] = None) -> bool:
-        """滑动窗口压缩：保留最近的N轮对话，压缩更早的对话
+        """滑动窗口压缩：保留最近的用户/工具消息和助手消息各5条，压缩更早的对话
 
         参数:
-            window_size: 滑动窗口大小（保留最近的对话轮数），如果为None则使用配置值
+            window_size: 滑动窗口大小（保留的消息总数，默认10条：用户/工具5条+助手5条），如果为None则使用配置值
 
         返回:
             bool: 如果成功执行压缩返回True，否则返回False
 
         注意:
             - 只压缩用户和助手消息，系统消息始终保留
+            - 保留最近的用户/工具消息5条和助手消息5条（共10条）
             - 如果消息数量不足，不执行压缩
             - 压缩后的历史摘要会作为一条用户消息插入到历史中
         """
@@ -1368,6 +1369,10 @@ class Agent:
 
         if window_size is None:
             window_size = get_sliding_window_size()
+
+        # 用户/工具消息和助手消息各保留5条
+        user_tool_count = 5
+        assistant_count = 5
 
         try:
             # 获取对话历史
@@ -1385,14 +1390,41 @@ class Agent:
                 else:
                     other_messages.append(msg)
 
+            # 从后往前分离用户/工具消息和助手消息，记录它们的索引
+            user_tool_indices = []
+            assistant_indices = []
+            
+            # 从后往前遍历，分别收集用户/工具消息和助手消息的索引
+            for i in range(len(other_messages) - 1, -1, -1):
+                msg = other_messages[i]
+                role = msg.get("role", "").lower()
+                if role in ["user", "tool"]:
+                    if len(user_tool_indices) < user_tool_count:
+                        user_tool_indices.insert(0, i)  # 保持时间顺序
+                elif role == "assistant":
+                    if len(assistant_indices) < assistant_count:
+                        assistant_indices.insert(0, i)  # 保持时间顺序
+
+            # 合并所有要保留的消息索引（按时间顺序）
+            recent_indices = sorted(set(user_tool_indices + assistant_indices))
+            
+            # 如果保留的消息数量不足，说明历史太短，不需要压缩
+            if len(recent_indices) < user_tool_count + assistant_count:
+                return False
+
             # 如果其他消息数量不足窗口大小的2倍，不需要压缩
             # （需要至少2倍，因为压缩后还需要保留窗口）
             if len(other_messages) <= window_size * 2:
                 return False
 
-            # 分离最近的消息和更早的消息
-            recent_messages = other_messages[-window_size:]
-            old_messages = other_messages[:-window_size]
+            # 按原始顺序提取要保留的消息
+            recent_messages = [other_messages[i] for i in recent_indices]
+            
+            # 分离更早的消息（不在保留列表中的消息）
+            old_messages = [
+                msg for i, msg in enumerate(other_messages) 
+                if i not in recent_indices
+            ]
 
             if not old_messages:
                 return False
@@ -1442,7 +1474,7 @@ class Agent:
                     self.model.messages = new_history
                     PrettyOutput.auto_print(
                         f"✅ 滑动窗口压缩完成：压缩了 {len(old_messages)} 条消息，"
-                        f"保留了最近 {len(recent_messages)} 轮对话"
+                        f"保留了最近 {len(user_tool_indices)} 条用户/工具消息和 {len(assistant_indices)} 条助手消息（共 {len(recent_messages)} 条）"
                     )
                     return True
                 else:
@@ -2159,11 +2191,12 @@ class Agent:
             bool: 如果成功执行压缩返回True，否则返回False
 
         策略选择:
-        - 代码任务：优先使用关键事件提取（保留代码变更和工具调用）
-        - 分析任务：优先使用重要性评分压缩（保留数据和结论）
-        - 对话任务：优先使用滑动窗口压缩（保留问答对）
-        - 混合任务：使用增量摘要压缩（分块压缩）
-        - 未知类型：使用重要性评分压缩（通用策略）
+        - 所有任务类型：优先使用滑动窗口压缩（保留最近的完整上下文）
+        - 代码任务：滑动窗口 -> 关键事件提取 -> 增量摘要
+        - 分析任务：滑动窗口 -> 重要性评分 -> 增量摘要
+        - 对话任务：滑动窗口 -> 重要性评分 -> 增量摘要
+        - 混合任务：滑动窗口 -> 增量摘要 -> 重要性评分
+        - 未知类型：滑动窗口 -> 重要性评分 -> 增量摘要
         """
         try:
             task_type = self._detect_task_type()
@@ -2173,28 +2206,29 @@ class Agent:
             )
 
             # 根据任务类型选择压缩策略
+            # 所有任务类型优先使用滑动窗口压缩
             if task_type == "code":
-                # 代码任务：优先保留代码变更和工具调用
-                # 策略顺序：关键事件提取 -> 增量摘要 -> 滑动窗口
+                # 代码任务：优先使用滑动窗口，保留最近的完整上下文
+                # 策略顺序：滑动窗口 -> 关键事件提取 -> 增量摘要
+                compression_success = self._sliding_window_compression()
+                if compression_success:
+                    return True
                 compression_success = self._key_event_extraction_compression()
                 if compression_success:
                     return True
                 compression_success = self._incremental_summarization_compression()
-                if compression_success:
-                    return True
-                compression_success = self._sliding_window_compression()
                 return compression_success
 
             elif task_type == "analysis":
-                # 分析任务：优先保留数据和结论
-                # 策略顺序：重要性评分 -> 增量摘要 -> 滑动窗口
+                # 分析任务：优先使用滑动窗口，保留最近的完整上下文
+                # 策略顺序：滑动窗口 -> 重要性评分 -> 增量摘要
+                compression_success = self._sliding_window_compression()
+                if compression_success:
+                    return True
                 compression_success = self._importance_scoring_compression()
                 if compression_success:
                     return True
                 compression_success = self._incremental_summarization_compression()
-                if compression_success:
-                    return True
-                compression_success = self._sliding_window_compression()
                 return compression_success
 
             elif task_type == "conversation":
@@ -2210,24 +2244,24 @@ class Agent:
                 return compression_success
 
             elif task_type == "mixed":
-                # 混合任务：使用增量摘要压缩
-                # 策略顺序：增量摘要 -> 重要性评分 -> 滑动窗口
+                # 混合任务：优先使用滑动窗口，保留最近的完整上下文
+                # 策略顺序：滑动窗口 -> 增量摘要 -> 重要性评分
+                compression_success = self._sliding_window_compression()
+                if compression_success:
+                    return True
                 compression_success = self._incremental_summarization_compression()
                 if compression_success:
                     return True
                 compression_success = self._importance_scoring_compression()
-                if compression_success:
-                    return True
-                compression_success = self._sliding_window_compression()
                 return compression_success
 
             else:
-                # 未知类型：使用通用策略（重要性评分）
-                # 策略顺序：重要性评分 -> 滑动窗口 -> 增量摘要
-                compression_success = self._importance_scoring_compression()
+                # 未知类型：优先使用滑动窗口（通用策略）
+                # 策略顺序：滑动窗口 -> 重要性评分 -> 增量摘要
+                compression_success = self._sliding_window_compression()
                 if compression_success:
                     return True
-                compression_success = self._sliding_window_compression()
+                compression_success = self._importance_scoring_compression()
                 if compression_success:
                     return True
                 compression_success = self._incremental_summarization_compression()
