@@ -969,7 +969,7 @@ def _show_usage_stats(
 
             welcome_panel = Panel(
                 welcome_panel_content,
-                border_style="yellow",
+                border_style="cyan",
                 expand=False,
                 width=panel_width,
             )

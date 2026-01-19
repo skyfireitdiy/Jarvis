@@ -94,7 +94,7 @@ class StatsVisualizer:
                     title="[bold]数据统计[/bold]",
                     expand=False,
                     style="dim",
-                    border_style="blue",
+                    border_style="cyan",
                 )
             )
             stats_panel_str = string_io.getvalue()

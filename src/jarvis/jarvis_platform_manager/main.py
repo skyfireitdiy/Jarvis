@@ -355,7 +355,7 @@ def chat_with_model(
                     panel = Panel(
                         response,
                         title=f"[bold cyan]{platform_name} · {model_name}[/bold cyan]",
-                        border_style="bright_blue",
+                        border_style="cyan",
                         box=box.ROUNDED,
                         expand=True,
                     )

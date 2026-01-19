@@ -240,7 +240,7 @@ class BasePlatform(ABC):
             text_content,
             title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.name()}[/bold cyan]",
             subtitle="[yellow]正在回答... (按 Ctrl+C 中断)[/yellow]",
-            border_style="bright_blue",
+            border_style="cyan",
             box=box.ROUNDED,
             expand=True,
         )
