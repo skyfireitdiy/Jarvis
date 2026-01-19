@@ -108,7 +108,7 @@ class RulesManager:
 
         参数:
             rules_dir: rules 目录路径
-            rule_name: 规则名称（文件名，自动添加.md后缀）
+            rule_name: 规则名称（支持相对路径，如 deployment/version_release.md）
 
         返回:
             str: 规则内容，如果未找到则返回 None
@@ -117,13 +117,17 @@ class RulesManager:
             # 只支持 .md 后缀的文件
             if not rule_name.endswith(".md"):
                 rule_name = rule_name + ".md"
+            # 支持相对路径（如 deployment/version_release.md）
             rule_file_path = os.path.join(rules_dir, rule_name)
             if os.path.exists(rule_file_path) and os.path.isfile(rule_file_path):
                 with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read().strip()
                 # 使用jinja2渲染规则模板
                 if content:
-                    content = render_rule_template(content, rules_dir)
+                    # 使用规则文件所在目录作为模板渲染的上下文
+                    content = render_rule_template(
+                        content, os.path.dirname(rule_file_path)
+                    )
                 return content if content else None
         except Exception:
             # 读取规则失败时忽略，不影响主流程
@@ -384,18 +388,20 @@ class RulesManager:
             "yaml": [],
         }
 
-        # 收集规则目录中的文件规则
+        # 收集规则目录中的文件规则（支持递归遍历子目录）
         for rules_dir in self._get_all_rules_dirs():
             if os.path.exists(rules_dir) and os.path.isdir(rules_dir):
                 try:
-                    for filename in os.listdir(rules_dir):
-                        file_path = os.path.join(rules_dir, filename)
-                        if os.path.isfile(file_path):
-                            # 只允许.md后缀的文件（内置的.jarvis/rule除外）
+                    for root, dirs, files in os.walk(rules_dir):
+                        for filename in files:
                             if filename.endswith(".md"):
-                                # 规则名称就是文件名
-                                if filename not in result["files"]:
-                                    result["files"].append(filename)
+                                file_path = os.path.join(root, filename)
+                                if os.path.isfile(file_path):
+                                    # 计算相对于规则目录的路径作为规则名称
+                                    rel_path = os.path.relpath(file_path, rules_dir)
+                                    # 规则名称使用相对路径（如 deployment/version_release.md）
+                                    if rel_path not in result["files"]:
+                                        result["files"].append(rel_path)
                 except Exception:
                     continue
 
