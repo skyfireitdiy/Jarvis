@@ -345,147 +345,14 @@ class ConsoleOutputSink(OutputSink):
         }
 
         # 背景色映射（已移除硬编码背景色，使用终端默认背景）
-        styles: Dict[OutputType, Dict[str, Any]] = {
-            OutputType.SYSTEM: dict(),
-            OutputType.CODE: dict(),
-            OutputType.RESULT: dict(),
-            OutputType.ERROR: dict(),
-            OutputType.INFO: dict(meta={"icon": "ℹ️"}),
-            OutputType.PLANNING: dict(),
-            OutputType.PROGRESS: dict(),
-            OutputType.SUCCESS: dict(),
-            OutputType.WARNING: dict(),
-            OutputType.DEBUG: dict(),
-            OutputType.USER: dict(),
-            OutputType.TOOL: dict(),
-            OutputType.START: dict(),
-            OutputType.TARGET: dict(),
-            OutputType.STOP: dict(),
-            OutputType.RETRY: dict(),
-            OutputType.ROLLBACK: dict(),
-            OutputType.DIRECTORY: dict(),
-            OutputType.STATISTICS: dict(),
-        }
+        # 删除未使用的header_styles和styles字典
 
-        header_styles = {
-            OutputType.SYSTEM: RichStyle(color="cyan", frame=True, meta={"icon": "🤖"}),
-            OutputType.CODE: RichStyle(color="green", frame=True, meta={"icon": "📝"}),
-            OutputType.RESULT: RichStyle(color="blue", frame=True, meta={"icon": "✨"}),
-            OutputType.ERROR: RichStyle(
-                color="red",
-                frame=True,
-                meta={"icon": "❌"},
-                blink=True,
-            ),
-            OutputType.INFO: RichStyle(color="cyan", frame=True, meta={"icon": "ℹ️"}),
-            OutputType.PLANNING: RichStyle(
-                color="magenta",
-                bold=True,
-                frame=True,
-                meta={"icon": "📋"},
-            ),
-            OutputType.PROGRESS: RichStyle(
-                color="bright_black",
-                encircle=True,
-                frame=True,
-                meta={"icon": "⏳"},
-            ),
-            OutputType.SUCCESS: RichStyle(
-                color="green",
-                bold=True,
-                strike=False,
-                meta={"icon": "✅"},
-            ),
-            OutputType.WARNING: RichStyle(
-                color="yellow",
-                bold=True,
-                blink=True,
-                meta={"icon": "⚠️"},
-            ),
-            OutputType.DEBUG: RichStyle(
-                color="grey50",
-                dim=True,
-                conceal=True,
-                meta={"icon": "🔍"},
-            ),
-            OutputType.USER: RichStyle(
-                color="green",
-                frame=True,
-                meta={"icon": "👤"},
-            ),
-            OutputType.TOOL: RichStyle(
-                color="green",
-                frame=True,
-                meta={"icon": "🔧"},
-            ),
-            OutputType.START: RichStyle(
-                color="bright_blue",
-                bold=True,
-                frame=True,
-                meta={"icon": "🚀"},
-            ),
-            OutputType.TARGET: RichStyle(
-                color="bright_magenta",
-                bold=True,
-                frame=True,
-                meta={"icon": "🎯"},
-            ),
-            OutputType.STOP: RichStyle(
-                color="red",
-                bold=True,
-                frame=True,
-                meta={"icon": "🛑"},
-            ),
-            OutputType.RETRY: RichStyle(
-                color="yellow",
-                bold=True,
-                frame=True,
-                meta={"icon": "🔄"},
-            ),
-            OutputType.ROLLBACK: RichStyle(
-                color="red",
-                bold=True,
-                frame=True,
-                meta={"icon": "🔙"},
-            ),
-            OutputType.DIRECTORY: RichStyle(
-                color="cyan",
-                frame=True,
-                meta={"icon": "📁"},
-            ),
-            OutputType.STATISTICS: RichStyle(
-                color="blue",
-                frame=True,
-                meta={"icon": "📊"},
-            ),
-            OutputType.CHEAP_MODEL: RichStyle(
-                color="green",
-                frame=True,
-                meta={"icon": "💰"},
-            ),
-            OutputType.NORMAL_MODEL: RichStyle(
-                color="blue",
-                frame=True,
-                meta={"icon": "⭐"},
-            ),
-            OutputType.SMART_MODEL: RichStyle(
-                color="bright_magenta",
-                bold=True,
-                frame=True,
-                meta={"icon": "🧠"},
-            ),
-        }
-
-        Text(
-            PrettyOutput._format(event.output_type, event.timestamp),
-            style=header_styles[event.output_type],
-        )
         content = Syntax(
             event.text,
             lang,
             theme="monokai",
             word_wrap=True,
-            background_color=styles[event.output_type]["bgcolor"],
+            # 使用终端默认背景色
         )
         # 直接输出带背景色的内容，不再使用Panel包装
         agent_name = PrettyOutput._format(event.output_type, event.timestamp)
