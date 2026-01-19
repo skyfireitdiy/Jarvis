@@ -1034,6 +1034,24 @@ git reset --hard {start_commit}
             "need_re_review": True,
         }
 
+    def _check_and_get_git_diff(self) -> Optional[str]:
+        """检查并获取 git diff，如果没有变更则返回 None
+
+        返回:
+            git_diff 字符串，如果没有变更则返回 None
+        """
+        current_commit = get_latest_commit_hash()
+        if self.start_commit is None or current_commit == self.start_commit:
+            git_diff = get_diff()  # 获取未提交的更改
+        else:
+            git_diff = get_diff_between_commits(self.start_commit, current_commit)
+
+        if not git_diff or not git_diff.strip():
+            PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
+            return None
+
+        return git_diff
+
     def _review_and_fix(
         self,
         user_input: str,
@@ -1051,19 +1069,11 @@ git reset --hard {start_commit}
             suffix: 后缀
         """
         # 获取从开始到当前的 git diff（提前检测是否有代码修改）
-        current_commit = get_latest_commit_hash()
-        if self.start_commit is None or current_commit == self.start_commit:
-            git_diff = get_diff()  # 获取未提交的更改
-        else:
-            git_diff = get_diff_between_commits(self.start_commit, current_commit)
-
-        if not git_diff or not git_diff.strip():
-            PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
+        git_diff = self._check_and_get_git_diff()
+        if git_diff is None:
             return
 
-        if self.disable_review or not user_confirm(
-                "是否进行代码审查？", default=True
-            ):
+        if self.disable_review or not user_confirm("是否进行代码审查？", default=True):
             PrettyOutput.auto_print("ℹ️ 跳过代码审查（当前模式或配置不支持）")
             return
 
@@ -1081,14 +1091,8 @@ git reset --hard {start_commit}
             iteration += 1
 
             # 获取从开始到当前的 git diff（提前检测是否有代码修改）
-            current_commit = get_latest_commit_hash()
-            if self.start_commit is None or current_commit == self.start_commit:
-                git_diff = get_diff()  # 获取未提交的更改
-            else:
-                git_diff = get_diff_between_commits(self.start_commit, current_commit)
-
-            if not git_diff or not git_diff.strip():
-                PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
+            git_diff = self._check_and_get_git_diff()
+            if git_diff is None:
                 return
 
             # 每轮审查开始前显示清晰的提示信息
