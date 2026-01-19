@@ -126,7 +126,7 @@ class ScriptTool:
                 panel = Panel(
                     syntax,
                     title=f"📜 执行脚本 ({interpreter})",
-                    border_style="bright_blue",
+                    border_style="cyan",
                 )
                 console.print(panel)
 
