@@ -18,6 +18,7 @@ from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import get_commits_between
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
+from jarvis.jarvis_utils.git_utils import reset_confirm_add_new_files_flag
 from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType
@@ -391,6 +392,9 @@ class GitManager:
         4. 如果用户拒绝添加大量文件，提示修改.gitignore并重新检测
         5. 暂存并提交所有修改
         """
+        # 重置全局标记，允许在此流程中重新进行文件确认
+        reset_confirm_add_new_files_flag()
+
         if has_uncommitted_changes():
             # 获取代码变更统计
             try:

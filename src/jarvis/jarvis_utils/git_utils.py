@@ -31,6 +31,19 @@ from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import is_rag_installed
 
+# 全局标记：记录 confirm_add_new_files 是否已在当前流程中被调用
+# 用于避免在同一流程中重复询问用户是否添加新文件/二进制文件/大代码
+_confirm_add_new_files_called = False
+
+
+def reset_confirm_add_new_files_flag() -> None:
+    """重置 confirm_add_new_files 的全局标记
+
+    用于在新的流程开始时重置标记，允许重新进行文件确认
+    """
+    global _confirm_add_new_files_called
+    _confirm_add_new_files_called = False
+
 
 def find_git_root_and_cd(start_dir: str = ".", allow_init: bool = False) -> str:
     """
@@ -882,6 +895,13 @@ def _get_new_files() -> List[str]:
 
 def confirm_add_new_files() -> None:
     """确认新增文件、代码行数和二进制文件"""
+    global _confirm_add_new_files_called
+
+    # 如果已经确认过，直接返回，避免重复询问
+    if _confirm_add_new_files_called:
+        return
+
+    _confirm_add_new_files_called = True
 
     def _get_added_lines() -> int:
         """获取新增代码行数"""
