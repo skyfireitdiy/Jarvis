@@ -65,6 +65,20 @@ FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 # Persistent hint marker for multiline input (shown only once across runs)
 _MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
 
+# 内置命令标记列表（用于自动补全和 fzf）
+BUILTIN_COMMANDS = [
+    ("Summary", "总结"),
+    ("Pin", "固定/置顶内容"),
+    ("Clear", "清除历史"),
+    ("ToolUsage", "工具使用说明"),
+    ("ReloadConfig", "重新加载配置"),
+    ("SaveSession", "保存当前会话"),
+    ("RestoreSession", "恢复会话"),
+    ("ListSessions", "列出所有会话"),
+    ("Quiet", "无人值守模式"),
+    ("FixToolCall", "修复工具调用"),
+]
+
 
 def _display_width(s: str) -> int:
     """计算字符串在终端中的可打印宽度(处理宽字符)。"""
@@ -383,20 +397,7 @@ class FileCompleter(Completer):
         all_completions.extend(
             [(ot(tag), self._get_description(tag)) for tag in self.replace_map.keys()]
         )
-        all_completions.extend(
-            [
-                (ot("Summary"), "总结"),
-                (ot("Pin"), "固定/置顶内容"),
-                (ot("Clear"), "清除历史"),
-                (ot("ToolUsage"), "工具使用说明"),
-                (ot("ReloadConfig"), "重新加载配置"),
-                (ot("SaveSession"), "保存当前会话"),
-                (ot("RestoreSession"), "恢复会话"),
-                (ot("ListSessions"), "列出所有会话"),
-                (ot("Quiet"), "无人值守模式"),
-                (ot("FixToolCall"), "修复工具调用"),
-            ]
-        )
+        all_completions.extend([(ot(cmd), desc) for cmd, desc in BUILTIN_COMMANDS])
         # 添加所有规则（包括内置规则、文件规则、YAML规则）到补全列表
         rules = self._get_all_rules()
         for rule_name, rule_desc in rules:
@@ -567,18 +568,7 @@ def _get_fzf_completion_items(specials: List[str], files: List[str]) -> List[str
         items.extend(builtin_tags)
 
         # 添加内置命令标记
-        builtin_commands = [
-            ot("Summary"),
-            ot("Pin"),
-            ot("Clear"),
-            ot("ToolUsage"),
-            ot("ReloadConfig"),
-            ot("SaveSession"),
-            ot("RestoreSession"),
-            ot("ListSessions"),
-            ot("Quiet"),
-            ot("FixToolCall"),
-        ]
+        builtin_commands = [ot(cmd) for cmd, _ in BUILTIN_COMMANDS]
         items.extend(builtin_commands)
     except Exception:
         # 标签获取失败时跳过
