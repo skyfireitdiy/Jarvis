@@ -502,17 +502,18 @@ class RulesManager:
                 is_project = rules_dir == project_rules_dir
 
                 # 根据实际来源分配前缀
+                global_rules_dir = os.path.join(get_data_dir(), "rules")
+
                 if is_central:
                     prefix = "central:"
                 elif is_project:
                     prefix = "project:"
-                elif idx >= 2 or (self.central_repo_path and idx == 1):
-                    # 全局规则目录（在中心库和项目库之后）
+                elif rules_dir == global_rules_dir:
+                    # 全局规则目录
                     prefix = "global:"
                 else:
                     # 配置的规则目录
-                    config_idx = idx - (2 if self.central_repo_path else 1)
-                    prefix = f"config{config_idx}:"
+                    prefix = "config0:"
 
                 try:
                     for root, dirs, files in os.walk(rules_dir):
