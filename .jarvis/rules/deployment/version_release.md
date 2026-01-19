@@ -76,7 +76,52 @@ date +%Y-%m-%d
 
 **预期输出：** 日期字符串（如 `2026-01-12`）
 
-### 操作3：获取代码变更
+### 操作3：检查wechat.png文件修改时间
+
+> ⚠️ **重要**：此检查必须在版本发布前完成。如果wechat.png修改时间超过7天，必须先更新该文件，否则拒绝版本升级。
+
+**执行步骤：**
+
+1. 检查文件是否存在：
+
+```bash
+ls -lh docs/images/wechat.png
+```
+
+2. 获取文件修改时间（Unix时间戳）：
+
+```bash
+stat -c %Y docs/images/wechat.png
+```
+
+3. 获取当前时间戳：
+
+```bash
+date +%s
+```
+
+4. 计算文件修改天数：
+
+```python
+# 使用Python计算天数差
+import time
+
+file_mtime = int(<文件修改时间戳>)
+current_time = int(<当前时间戳>)
+days_diff = (current_time - file_mtime) // 86400
+print(f"wechat.png修改天数: {days_diff}天")
+```
+
+5. 判断检查结果：
+   - 如果 `days_diff > 7`：**拒绝版本升级**，提示用户：`⚠️ wechat.png文件已超过{days_diff}天未更新，请先更新该文件后再进行版本发布`
+   - 如果 `days_diff <= 7`：继续执行后续操作
+
+**预期输出：**
+
+- 文件存在且修改时间未超过7天：继续流程
+- 文件不存在或修改时间超过7天：停止流程并提示更新
+
+### 操作4：获取代码变更
 
 **执行步骤：**
 
@@ -97,7 +142,7 @@ git diff <latest_tag> HEAD
 - `<latest_tag>` 替换为操作1获取的版本号
 - 如果输出过大，可以限制行数（如 `| head -n 500`）
 
-### 操作4：学习ReleaseNote格式
+### 操作5：学习ReleaseNote格式
 
 **执行步骤：**
 
@@ -114,7 +159,7 @@ head -n 200 {{ git_root_dir }}/ReleaseNote.md
    - 子分类格式：`#### **分类名称**`
    - 条目格式：`- **标题**` + 详细说明
 
-### 操作5：生成新版本ReleaseNote
+### 操作6：生成新版本ReleaseNote
 
 **执行步骤：**
 
@@ -167,6 +212,7 @@ else:
 
 - [ ] 最新版本号获取成功（格式正确：vX.Y.Z）
 - [ ] 日期获取成功（格式正确：YYYY-MM-DD）
+- [ ] wechat.png修改时间检查通过（未超过7天）
 - [ ] 代码变更已获取（使用了git diff而非git log）
 - [ ] ReleaseNote格式已学习（了解分类和图标使用）
 - [ ] 新版本号计算正确（根据版本类型）
@@ -186,17 +232,21 @@ else:
 
 使用默认版本号 `v1.0.0` 作为基准版本。
 
-### Q2：如何确定版本类型（major/minor/patch）？
+### Q3：如何确定版本类型（major/minor/patch）？
 
 必须询问用户确认版本类型，不能自行推断。
 
-### Q3：在「仅更新ReleaseNote」模式下，是否需要更新版本号？
+### Q4：在「仅更新ReleaseNote」模式下，是否需要更新版本号？
 
 否。「仅更新ReleaseNote」模式下，仅在ReleaseNote.md中添加新版本说明，不修改项目中的版本号（如`__init__.py`、`setup.py`等），也不创建git tag。
 
-### Q4：ReleaseNote内容如何生成？
+### Q5：ReleaseNote内容如何生成？
 
-根据操作3获取的代码变更，结合操作4学习的格式，人工分析并生成ReleaseNote内容。
+根据操作4获取的代码变更，结合操作5学习的格式，人工分析并生成ReleaseNote内容。
+
+### Q6：为什么要检查wechat.png文件的修改时间？
+
+为确保项目宣传材料的时效性，要求 `docs/images/wechat.png` 文件必须在7天内更新过。如果文件修改时间超过7天，必须先更新该文件（如截图新的二维码、更新联系信息等），否则拒绝版本发布。此检查在「完整版本发布」和「仅更新ReleaseNote」两种模式下都必须执行。
 
 ## 相关资源
 
