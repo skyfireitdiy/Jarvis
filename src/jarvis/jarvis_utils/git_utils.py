@@ -95,7 +95,7 @@ def has_uncommitted_changes() -> bool:
 
     # 静默添加所有更改
     subprocess.run(
-        ["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        ["git", "add", "-A"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
 
     # 检查工作目录更改

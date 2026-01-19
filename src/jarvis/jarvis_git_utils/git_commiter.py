@@ -89,7 +89,7 @@ class GitCommitTool:
         """Stage all changes for commit"""
 
         subprocess.Popen(
-            ["git", "add", "."], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            ["git", "add", "-A"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         ).wait()
 
     def execute(self, args: Dict) -> Dict[str, Any]:
