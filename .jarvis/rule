@@ -5,3 +5,9 @@
 ### 版本发布规则
 
 用于规范Jarvis项目的版本发布流程，确保版本号的正确性、ReleaseNote的格式一致性，以及代码变更的准确性。（{{ git_root_dir }}/.jarvis/rules/deployment/version_release.md）
+
+## 开发工具
+
+### 添加内置快捷命令规则
+
+说明如何添加 @ 触发的内置快捷命令。（{{ git_root_dir }}/.jarvis/rules/development_tools/add_builtin_command.md）
