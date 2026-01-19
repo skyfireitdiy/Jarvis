@@ -39,13 +39,13 @@
   ↓
   ├─ 成功？
   │   ├─ 是 → 检查剩余token
-  │   │        ├─ 仍不足 → 尝试其他策略（重要性评分 → 滑动窗口）
+  │   │        ├─ 仍不足 → 尝试其他策略（滑动窗口 → 重要性评分）
   │   │        └─ 足够 → 继续执行
   │   └─ 否 → 回退到固定策略顺序
+  │            ├─ 滑动窗口压缩（优先）
   │            ├─ 重要性评分压缩
   │            ├─ 关键事件提取压缩
-  │            ├─ 增量摘要压缩
-  │            └─ 滑动窗口压缩
+  │            └─ 增量摘要压缩
   ↓
 调用模型
 ```
@@ -59,34 +59,36 @@
 - 混合任务（mixed）：包含多种类型的工具调用
 - 未知类型（unknown）：无法明确识别
 
-**策略选择**：
-- **代码任务**: 关键事件提取 → 增量摘要 → 滑动窗口
-- **分析任务**: 重要性评分 → 增量摘要 → 滑动窗口
+**策略选择**（优先使用滑动窗口压缩）：
+- **代码任务**: 滑动窗口 → 关键事件提取 → 增量摘要
+- **分析任务**: 滑动窗口 → 重要性评分 → 增量摘要
 - **对话任务**: 滑动窗口 → 重要性评分 → 增量摘要
-- **混合任务**: 增量摘要 → 重要性评分 → 滑动窗口
-- **未知类型**: 重要性评分 → 滑动窗口 → 增量摘要
+- **混合任务**: 滑动窗口 → 增量摘要 → 重要性评分
+- **未知类型**: 滑动窗口 → 重要性评分 → 增量摘要
 
 #### 1.2 回退策略（如果自适应压缩失败）
 
-如果自适应压缩失败或仍不足，按以下顺序尝试：
+如果自适应压缩失败或仍不足，按以下顺序尝试（优先使用滑动窗口）：
 
-1. **重要性评分压缩**
+1. **滑动窗口压缩**（优先）
+   - 保留最近的用户/工具消息5条和助手消息5条（共10条）
+   - 压缩更早的对话为摘要
+   - 保留最近的完整上下文
+
+2. **重要性评分压缩**
    - 根据消息重要性评分，保留高分消息
    - 压缩低分消息为摘要
    - 保留最近5条低分消息作为上下文
 
-2. **关键事件提取压缩**
+3. **关键事件提取压缩**
    - 提取关键事件（任务完成、错误修复、工具调用等）
    - 压缩非关键事件为摘要
    - 保留最近5条非关键消息作为上下文
 
-3. **增量摘要压缩**
+4. **增量摘要压缩**
    - 将历史分成多个chunk
    - 压缩前面的chunks为摘要
    - 保留最后一个chunk的完整内容
-
-4. **滑动窗口压缩**
-   - 保留最近的N轮对话（默认20轮）
    - 压缩更早的对话为摘要
 
 ### 阶段2：完整摘要压缩（最后手段）
@@ -156,18 +158,18 @@ def _adaptive_compression():
     # 1. 检测任务类型
     task_type = _detect_task_type()
     
-    # 2. 根据任务类型选择策略
+    # 2. 根据任务类型选择策略（优先使用滑动窗口）
     if task_type == "code":
-        # 代码任务：关键事件提取 → 增量摘要 → 滑动窗口
-        return _key_event_extraction_compression() or
-               _incremental_summarization_compression() or
-               _sliding_window_compression()
+        # 代码任务：滑动窗口 → 关键事件提取 → 增量摘要
+        return _sliding_window_compression() or
+               _key_event_extraction_compression() or
+               _incremental_summarization_compression()
     
     elif task_type == "analysis":
-        # 分析任务：重要性评分 → 增量摘要 → 滑动窗口
-        return _importance_scoring_compression() or
-               _incremental_summarization_compression() or
-               _sliding_window_compression()
+        # 分析任务：滑动窗口 → 重要性评分 → 增量摘要
+        return _sliding_window_compression() or
+               _importance_scoring_compression() or
+               _incremental_summarization_compression()
     
     elif task_type == "conversation":
         # 对话任务：滑动窗口 → 重要性评分 → 增量摘要
@@ -256,7 +258,7 @@ def _summarize_and_clear_history():
 
 ### 环境变量配置
 
-- `sliding_window_size`: 滑动窗口大小（默认20轮）
+- `sliding_window_size`: 滑动窗口大小（默认10条：用户/工具消息5条+助手消息5条）
 - `importance_score_threshold`: 重要性评分阈值（默认3.0）
 - `incremental_summary_chunk_size`: 增量摘要chunk大小（默认20轮）
 - `conversation_turn_threshold`: 对话轮次阈值（默认200轮）
