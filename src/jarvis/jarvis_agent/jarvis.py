@@ -24,6 +24,7 @@ from jarvis.jarvis_agent.agent_manager import AgentManager
 from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_agent.config_editor import ConfigEditor
 from jarvis.jarvis_agent.methodology_share_manager import MethodologyShareManager
+from jarvis.jarvis_agent.rule_share_manager import RuleShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
 from jarvis.jarvis_utils.config import get_agent_definition_dirs
 from jarvis.jarvis_utils.config import get_data_dir
@@ -172,6 +173,16 @@ def handle_share_tool_option(share_tool: bool, config_file: Optional[str]) -> bo
         init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
         tool_manager = ToolShareManager()
         tool_manager.run()
+        return True
+    return False
+
+
+def handle_share_rule_option(share_rule: bool, config_file: Optional[str]) -> bool:
+    """处理规则分享选项，返回是否已处理并需提前结束。"""
+    if share_rule:
+        init_env("", config_file=config_file)  # 初始化配置但不显示欢迎信息
+        rule_manager = RuleShareManager()
+        rule_manager.run()
         return True
     return False
 
@@ -705,6 +716,9 @@ def run_cli(
     share_tool: bool = typer.Option(
         False, "--share-tool", help="分享本地工具到中心工具仓库"
     ),
+    share_rule: bool = typer.Option(
+        False, "--share-rule", help="分享本地规则到中心规则仓库"
+    ),
     interactive_config: bool = typer.Option(
         False,
         "-I",
@@ -866,6 +880,10 @@ def run_cli(
 
     # 处理工具分享
     if handle_share_tool_option(share_tool, config_file):
+        return
+
+    # 处理规则分享
+    if handle_share_rule_option(share_rule, config_file):
         return
 
     # 交互式配置（基于现有配置补充设置）
