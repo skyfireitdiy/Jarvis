@@ -391,7 +391,10 @@ class FileCompleter(Completer):
                 (ot("ToolUsage"), "工具使用说明"),
                 (ot("ReloadConfig"), "重新加载配置"),
                 (ot("SaveSession"), "保存当前会话"),
+                (ot("RestoreSession"), "恢复会话"),
+                (ot("ListSessions"), "列出所有会话"),
                 (ot("Quiet"), "无人值守模式"),
+                (ot("FixToolCall"), "修复工具调用"),
             ]
         )
         # 添加所有规则（包括内置规则、文件规则、YAML规则）到补全列表
@@ -562,6 +565,21 @@ def _get_fzf_completion_items(specials: List[str], files: List[str]) -> List[str
             if isinstance(tag, str) and tag.strip()
         ]
         items.extend(builtin_tags)
+
+        # 添加内置命令标记
+        builtin_commands = [
+            ot("Summary"),
+            ot("Pin"),
+            ot("Clear"),
+            ot("ToolUsage"),
+            ot("ReloadConfig"),
+            ot("SaveSession"),
+            ot("RestoreSession"),
+            ot("ListSessions"),
+            ot("Quiet"),
+            ot("FixToolCall"),
+        ]
+        items.extend(builtin_commands)
     except Exception:
         # 标签获取失败时跳过
         pass
