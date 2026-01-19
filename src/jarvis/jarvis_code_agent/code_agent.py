@@ -47,6 +47,7 @@ from jarvis.jarvis_utils.git_utils import get_diff_file_list
 from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 from jarvis.jarvis_utils.git_utils import handle_commit_workflow
 from jarvis.jarvis_utils.git_utils import revert_change
+from jarvis.jarvis_utils.git_utils import reset_confirm_add_new_files_flag
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
@@ -467,6 +468,8 @@ git reset --hard {start_commit}
         **kwargs: Any,
     ) -> None:
         """工具调用后回调函数。"""
+        # 重置全局标记，允许在此流程中重新进行文件确认
+        reset_confirm_add_new_files_flag()
 
         final_ret = ""
         diff = get_diff()
