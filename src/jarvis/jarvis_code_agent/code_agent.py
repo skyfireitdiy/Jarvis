@@ -1080,6 +1080,17 @@ git reset --hard {start_commit}
         while is_infinite or iteration < max_iterations:
             iteration += 1
 
+            # 获取从开始到当前的 git diff（提前检测是否有代码修改）
+            current_commit = get_latest_commit_hash()
+            if self.start_commit is None or current_commit == self.start_commit:
+                git_diff = get_diff()  # 获取未提交的更改
+            else:
+                git_diff = get_diff_between_commits(self.start_commit, current_commit)
+
+            if not git_diff or not git_diff.strip():
+                PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
+                return
+
             # 每轮审查开始前显示清晰的提示信息
             if is_infinite:
                 PrettyOutput.auto_print(
