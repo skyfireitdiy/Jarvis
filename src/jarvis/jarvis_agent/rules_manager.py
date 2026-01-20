@@ -448,13 +448,69 @@ class RulesManager:
                 # 未知前缀
                 return None
 
-            # 无前缀：按原有逻辑查找（builtin_rules.md 和内置规则）
-            # 优先级 1: 从 builtin_rules.md 索引文件中查找
+            # 无前缀：按优先级查找（项目 rules.yaml > 全局 rules.yaml > builtin_rules.md > 内置规则）
+            # 优先级 1: 从项目 rules.yaml 文件中查找
+            for desc, yaml_path in self._get_all_rules_yaml_files():
+                if desc == "项目":
+                    if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
+                        try:
+                            with open(
+                                yaml_path,
+                                "r",
+                                encoding="utf-8",
+                                errors="replace",
+                            ) as f:
+                                rules = yaml.safe_load(f) or {}
+                            if rule_name in rules:
+                                rule_value = rules[rule_name]
+                                if isinstance(rule_value, str):
+                                    content = rule_value.strip()
+                                else:
+                                    content = str(rule_value).strip()
+                                # 使用jinja2渲染规则模板
+                                if content:
+                                    content = render_rule_template(
+                                        content, os.path.dirname(yaml_path)
+                                    )
+                                if content:
+                                    return content
+                        except Exception:
+                            continue
+            
+            # 优先级 2: 从全局 rules.yaml 文件中查找
+            for desc, yaml_path in self._get_all_rules_yaml_files():
+                if desc == "全局":
+                    if os.path.exists(yaml_path) and os.path.isfile(yaml_path):
+                        try:
+                            with open(
+                                yaml_path,
+                                "r",
+                                encoding="utf-8",
+                                errors="replace",
+                            ) as f:
+                                rules = yaml.safe_load(f) or {}
+                            if rule_name in rules:
+                                rule_value = rules[rule_name]
+                                if isinstance(rule_value, str):
+                                    content = rule_value.strip()
+                                else:
+                                    content = str(rule_value).strip()
+                                # 使用jinja2渲染规则模板
+                                if content:
+                                    content = render_rule_template(
+                                        content, os.path.dirname(yaml_path)
+                                    )
+                                if content:
+                                    return content
+                        except Exception:
+                            continue
+            
+            # 优先级 3: 从 builtin_rules.md 索引文件中查找
             indexed_rule = self._get_rule_from_builtin_index(rule_name)
             if indexed_rule:
                 return indexed_rule
 
-            # 优先级 2: 从内置规则中查找
+            # 优先级 4: 从内置规则中查找
             builtin_rule = get_builtin_rule(rule_name)
             if builtin_rule:
                 return builtin_rule
