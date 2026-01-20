@@ -1351,17 +1351,17 @@ class Agent:
             return ""
 
     def _sliding_window_compression(self, window_size: Optional[int] = None) -> bool:
-        """滑动窗口压缩：保留最近的用户/工具消息和助手消息各5条，压缩更早的对话
+        """滑动窗口压缩：保留最近的用户/工具消息4条和助手消息5条，压缩更早的对话
 
         参数:
-            window_size: 滑动窗口大小（保留的消息总数，默认10条：用户/工具5条+助手5条），如果为None则使用配置值
+            window_size: 滑动窗口大小（保留的消息总数，默认9条：用户/工具4条+助手5条），如果为None则使用配置值
 
         返回:
             bool: 如果成功执行压缩返回True，否则返回False
 
         注意:
             - 只压缩用户和助手消息，系统消息始终保留
-            - 保留最近的用户/工具消息5条和助手消息5条（共10条）
+            - 保留最近的用户/工具消息4条和助手消息5条（共9条，奇数以避免连续的同role消息）
             - 如果消息数量不足，不执行压缩
             - 压缩后的历史摘要会作为一条用户消息插入到历史中
         """
@@ -1370,8 +1370,9 @@ class Agent:
         if window_size is None:
             window_size = get_sliding_window_size()
 
-        # 用户/工具消息和助手消息各保留5条
-        user_tool_count = 5
+        # 用户/工具消息和助手消息保留奇数条（避免连续的同role消息）
+        # 保留用户/工具消息4条，助手消息5条，共9条（奇数）
+        user_tool_count = 4
         assistant_count = 5
 
         try:
