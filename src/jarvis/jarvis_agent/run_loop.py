@@ -165,8 +165,7 @@ class AgentRunLoop:
                     remaining_tokens = ag.model.get_remaining_token_count()
                     if (
                         remaining_tokens > 0
-                        and remaining_tokens
-                        < self.summary_remaining_token_threshold
+                        and remaining_tokens < self.summary_remaining_token_threshold
                     ):
                         # 使用自适应压缩：根据任务类型自动选择最适合的压缩策略
                         compression_success = ag._adaptive_compression()
@@ -179,9 +178,7 @@ class AgentRunLoop:
                             ):
                                 # 尝试其他未使用的策略
                                 # 优先尝试滑动窗口压缩
-                                compression_success = (
-                                    ag._sliding_window_compression()
-                                )
+                                compression_success = ag._sliding_window_compression()
                                 if compression_success:
                                     remaining_tokens = (
                                         ag.model.get_remaining_token_count()
@@ -203,9 +200,7 @@ class AgentRunLoop:
                             # 优先使用滑动窗口压缩
                             compression_success = ag._sliding_window_compression()
                             if compression_success:
-                                remaining_tokens = (
-                                    ag.model.get_remaining_token_count()
-                                )
+                                remaining_tokens = ag.model.get_remaining_token_count()
                                 if (
                                     remaining_tokens
                                     < self.summary_remaining_token_threshold
@@ -221,9 +216,13 @@ class AgentRunLoop:
                                             remaining_tokens
                                             < self.summary_remaining_token_threshold
                                         ):
-                                            compression_success = ag._key_event_extraction_compression()
+                                            compression_success = (
+                                                ag._key_event_extraction_compression()
+                                            )
                                             if compression_success:
-                                                remaining_tokens = ag.model.get_remaining_token_count()
+                                                remaining_tokens = (
+                                                    ag.model.get_remaining_token_count()
+                                                )
                                                 if (
                                                     remaining_tokens
                                                     < self.summary_remaining_token_threshold
@@ -256,6 +255,8 @@ class AgentRunLoop:
                         ag.session.addon_prompt = join_prompts(
                             [ag.session.addon_prompt, addon_info]
                         )
+                    # 在中断后，设置标志以在下一轮执行input handler
+                    ag.run_input_handlers_next_turn = True
                     continue
 
                 ag.session.prompt = ""
@@ -353,6 +354,8 @@ class AgentRunLoop:
                         ag.session.addon_prompt = join_prompts(
                             [ag.session.addon_prompt, addon_info]
                         )
+                    # 在中断后，设置标志以在下一轮执行input handler
+                    ag.run_input_handlers_next_turn = True
                     need_return = False
                     tool_prompt = ""
 
@@ -444,6 +447,8 @@ class AgentRunLoop:
                                         ag.session.addon_prompt = join_prompts(
                                             [ag.session.addon_prompt, addon_info]
                                         )
+                                    # 在中断后，设置标志以在下一轮执行input handler
+                                    ag.run_input_handlers_next_turn = True
                                     should_auto_complete = False
                                     continue
 
@@ -578,6 +583,8 @@ class AgentRunLoop:
                                         ag.session.addon_prompt = join_prompts(
                                             [ag.session.addon_prompt, addon_info]
                                         )
+                                    # 在中断后，设置标志以在下一轮执行input handler
+                                    ag.run_input_handlers_next_turn = True
                                     should_auto_complete = False
                                     continue
 
@@ -687,6 +694,8 @@ class AgentRunLoop:
                         ag.session.addon_prompt = join_prompts(
                             [ag.session.addon_prompt, addon_info]
                         )
+                    # 在中断后，设置标志以在下一轮执行input handler
+                    ag.run_input_handlers_next_turn = True
                     continue
                 action = normalize_next_action(next_action)
                 if action == "continue":
@@ -702,6 +711,8 @@ class AgentRunLoop:
                     ag.session.addon_prompt = join_prompts(
                         [ag.session.addon_prompt, addon_info]
                     )
+                # 在中断后，设置标志以在下一轮执行input handler
+                ag.run_input_handlers_next_turn = True
                 continue
             except Exception as e:
                 PrettyOutput.auto_print(f"❌ 任务失败: {str(e)}")
