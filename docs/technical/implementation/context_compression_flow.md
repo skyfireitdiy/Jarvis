@@ -71,7 +71,7 @@
 如果自适应压缩失败或仍不足，按以下顺序尝试（优先使用滑动窗口）：
 
 1. **滑动窗口压缩**（优先）
-   - 保留最近的用户/工具消息5条和助手消息5条（共10条）
+   - 保留最近的用户/工具消息4条和助手消息5条（共9条，奇数以避免连续的同role消息）
    - 压缩更早的对话为摘要
    - 保留最近的完整上下文
 
@@ -258,7 +258,7 @@ def _summarize_and_clear_history():
 
 ### 环境变量配置
 
-- `sliding_window_size`: 滑动窗口大小（默认10条：用户/工具消息5条+助手消息5条）
+- `sliding_window_size`: 滑动窗口大小（默认9条：用户/工具消息4条+助手消息5条，奇数以避免连续的同role消息）
 - `importance_score_threshold`: 重要性评分阈值（默认3.0）
 - `incremental_summary_chunk_size`: 增量摘要chunk大小（默认20轮）
 - `conversation_turn_threshold`: 对话轮次阈值（默认200轮）
