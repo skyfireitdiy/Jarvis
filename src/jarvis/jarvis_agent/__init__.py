@@ -1460,10 +1460,13 @@ class Agent:
                     PrettyOutput.auto_print("⚠️ 滑动窗口压缩：生成摘要失败，跳过压缩")
                     return False
 
+                # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
+                formatted_summary = self._format_compressed_summary(compressed_summary.strip())
+
                 # 构建压缩后的消息（作为用户消息插入）
                 compressed_msg = {
                     "role": "user",
-                    "content": f"[历史摘要] {compressed_summary.strip()}",
+                    "content": formatted_summary,
                 }
 
                 # 重建消息列表：系统消息 + 压缩摘要 + 最近的消息
@@ -1490,6 +1493,133 @@ class Agent:
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 滑动窗口压缩出错: {str(e)}")
             return False
+
+    def _format_compressed_summary(self, compressed_summary: str) -> str:
+        """格式化压缩后的摘要，添加Pin、记忆、Git diff等额外信息
+
+        参数:
+            compressed_summary: 压缩后的摘要内容
+
+        返回:
+            str: 格式化后的完整摘要内容
+        """
+        formatted_summary = f"[历史摘要] {compressed_summary}"
+
+        # 添加用户固定的重要内容
+        user_fixed_content = []
+
+        # 优先添加原始任务目标（确保长期运行时不丢失）
+        original_task = ""
+        if hasattr(self, "original_user_input") and self.original_user_input:
+            original_task = self.original_user_input.strip()
+
+        if original_task:
+            user_fixed_content.append(f"**原始任务目标**：\n{original_task}")
+
+        # 添加用户通过 <Pin> 标记固定的其他重要内容（如果与原始任务目标不同）
+        if self.pin_content.strip():
+            pin_content_stripped = self.pin_content.strip()
+            if not original_task or pin_content_stripped != original_task:
+                user_fixed_content.append(f"**用户固定内容**：\n{pin_content_stripped}")
+
+        # 添加最近的记忆
+        if hasattr(self, "recent_memories") and self.recent_memories:
+            user_fixed_content.append(
+                f"**最近记忆**：\n{chr(10).join(self.recent_memories)}"
+            )
+
+        # 如果有任何固定内容，添加到摘要中（放在最前面，确保优先级）
+        if user_fixed_content:
+            pin_section = f"\n\n## 🎯 用户的原始需求和要求（必须始终牢记）\n{chr(10).join(user_fixed_content)}"
+            formatted_summary = pin_section + "\n\n" + formatted_summary
+
+        # 获取git diff统计信息
+        git_diff_stat = ""
+        git_view_command = ""
+        try:
+            from jarvis.jarvis_agent.run_loop import AgentRunLoop
+
+            if hasattr(self, "_agent_run_loop") and isinstance(
+                self._agent_run_loop, AgentRunLoop
+            ):
+                agent_run_loop = self._agent_run_loop
+            else:
+                # 创建临时 AgentRunLoop 实例来获取 git diff
+                agent_run_loop = AgentRunLoop(self)
+
+            # 获取diff统计信息
+            git_diff_stat = agent_run_loop.get_git_diff_stat()
+
+            # 生成查看命令
+            if hasattr(self, "start_commit") and self.start_commit:
+                git_view_command = f"git diff {self.start_commit}..HEAD"
+        except Exception:
+            # 非关键流程，失败时不影响主要功能
+            pass
+
+        # 添加git diff统计信息到摘要中 - 只显示有效的代码变更统计
+        is_valid_git_stat = (
+            git_diff_stat
+            and git_diff_stat.strip()
+            and not git_diff_stat.startswith("获取git diff统计失败")
+            and "没有检测到代码变更" not in git_diff_stat
+        )
+
+        if is_valid_git_stat:
+            diff_section = f"\n\n## 代码变更统计\n```\n{git_diff_stat}\n```"
+            if git_view_command:
+                diff_section += f"\n\n查看完整差异：```bash\n{git_view_command}\n```"
+            formatted_summary += diff_section
+
+        # 获取任务列表信息
+        task_list_info = ""
+        try:
+            # 获取所有任务列表的摘要信息
+            task_lists_summary: List[Dict[str, Any]] = []
+            for task_list_id, task_list in self.task_list_manager.task_lists.items():
+                summary_dict = self.task_list_manager.get_task_list_summary(
+                    task_list_id
+                )
+                if summary_dict and isinstance(summary_dict, dict):
+                    task_lists_summary.append(summary_dict)
+
+            if task_lists_summary:
+                task_list_info = "\n\n## 任务列表状态\n"
+                for summary_dict in task_lists_summary:
+                    task_list_info += (
+                        f"\n- 目标: {summary_dict.get('main_goal', '未知')}"
+                    )
+                    task_list_info += (
+                        f"\n- 总任务数: {summary_dict.get('total_tasks', 0)}"
+                    )
+                    task_list_info += f"\n- 待执行: {summary_dict.get('pending', 0)}"
+                    task_list_info += f"\n- 执行中: {summary_dict.get('running', 0)}"
+                    task_list_info += f"\n- 已完成: {summary_dict.get('completed', 0)}"
+                    task_list_info += f"\n- 失败: {summary_dict.get('failed', 0)}"
+                    task_list_info += (
+                        f"\n- 已放弃: {summary_dict.get('abandoned', 0)}\n"
+                    )
+        except Exception:
+            # 非关键流程，失败时不影响主要功能
+            pass
+
+        # 将任务列表信息添加到摘要中
+        if task_list_info:
+            formatted_summary += task_list_info
+
+        # 获取初始 commit 信息（仅对 CodeAgent）
+        initial_commit_info = ""
+        try:
+            if hasattr(self, "start_commit") and self.start_commit:
+                initial_commit_info = f"\n\n**🔖 初始 Git Commit（安全回退点）**：\n本次任务开始时的初始 commit 是：`{self.start_commit}`\n\n**⚠️ 重要提示**：如果文件被破坏得很严重无法恢复，可以使用以下命令重置到这个初始 commit：\n```bash\ngit reset --hard {self.start_commit}\n```\n这将丢弃所有未提交的更改，将工作区恢复到任务开始时的状态。请谨慎使用此命令，确保这是你真正想要的操作。"
+        except Exception:
+            # 非关键流程，失败时不影响主要功能
+            pass
+
+        if initial_commit_info:
+            formatted_summary += initial_commit_info
+
+        return formatted_summary
 
     def _score_message_importance(self, message: Dict[str, str]) -> float:
         """计算消息的重要性评分
@@ -1660,10 +1790,17 @@ class Agent:
                     PrettyOutput.auto_print("⚠️ 重要性评分压缩：生成摘要失败，跳过压缩")
                     return False
 
+                # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
+                formatted_summary = self._format_compressed_summary(compressed_summary.strip())
+                # 添加低重要性标记
+                formatted_summary = formatted_summary.replace(
+                    "[历史摘要]", "[低重要性历史摘要]", 1
+                )
+
                 # 构建压缩后的消息（作为用户消息插入）
                 compressed_msg = {
                     "role": "user",
-                    "content": f"[低重要性历史摘要] {compressed_summary.strip()}",
+                    "content": formatted_summary,
                 }
 
                 # 重建消息列表：系统消息 + 高分消息 + 压缩摘要 + 最近的低分消息（保留一些上下文）
@@ -1816,11 +1953,23 @@ class Agent:
 
                 # 构建压缩后的消息列表
                 compressed_messages = []
-                for summary in compressed_summaries:
+                for idx, summary in enumerate(compressed_summaries):
+                    # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
+                    # 注意：对于增量摘要，只在第一个chunk添加额外信息，避免重复
+                    if idx == 0:
+                        formatted_summary = self._format_compressed_summary(summary)
+                        # 添加chunk标记
+                        formatted_summary = formatted_summary.replace(
+                            "[历史摘要]", f"[历史摘要 - Chunk {idx + 1}]", 1
+                        )
+                    else:
+                        # 其他chunk只添加chunk标记，不重复添加额外信息
+                        formatted_summary = f"[历史摘要 - Chunk {idx + 1}] {summary}"
+                    
                     compressed_messages.append(
                         {
                             "role": "user",
-                            "content": f"[历史摘要 - Chunk {compressed_summaries.index(summary) + 1}] {summary}",
+                            "content": formatted_summary,
                         }
                     )
 
@@ -2036,10 +2185,17 @@ class Agent:
                     )
                     return False
 
+                # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
+                formatted_summary = self._format_compressed_summary(compressed_summary.strip())
+                # 添加非关键事件标记
+                formatted_summary = formatted_summary.replace(
+                    "[历史摘要]", "[非关键事件摘要]", 1
+                )
+
                 # 构建压缩后的消息（作为用户消息插入）
                 compressed_msg = {
                     "role": "user",
-                    "content": f"[非关键事件摘要] {compressed_summary.strip()}",
+                    "content": formatted_summary,
                 }
 
                 # 保留最近5条非关键消息作为上下文
