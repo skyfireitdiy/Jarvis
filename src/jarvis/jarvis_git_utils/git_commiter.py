@@ -24,6 +24,8 @@ from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import decode_output
 from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.utils import is_context_overflow
+from jarvis.jarvis_utils.embedding import get_context_token_count
+from jarvis.jarvis_utils.config import get_max_input_token_count
 
 app = typer.Typer(help="Git提交工具")
 
@@ -65,6 +67,131 @@ class GitCommitTool:
             # 直接返回原始内容，仅去除外围空白
             return r.group(1).strip()
         return None
+
+    def _truncate_diff_for_commit(
+        self,
+        git_diff: str,
+        base_prompt: str,
+        model_group: Optional[str] = None,
+        platform: Optional[Any] = None,
+        token_ratio: float = 0.5,
+    ) -> str:
+        """截断 git diff 以适应 token 限制（用于提交信息生成）
+
+        参数:
+            git_diff: 原始的 git diff 内容
+            base_prompt: 基础提示词内容
+            model_group: 模型组名称（可选）
+            platform: 平台实例（可选），如果提供则使用剩余token数量判断
+            token_ratio: token 使用比例（默认 0.5，即 50%，考虑 base_prompt 和响应空间）
+
+        返回:
+            str: 截断后的 git diff（如果超出限制则截断并添加提示和文件列表）
+        """
+        if not git_diff or not git_diff.strip():
+            return git_diff
+
+        # 计算 base_prompt 的 token 数量
+        base_prompt_tokens = get_context_token_count(base_prompt)
+
+        # 获取最大输入 token 数量
+        try:
+            if platform is not None:
+                # 优先使用剩余 token 数量（更准确，考虑对话历史）
+                try:
+                    remaining_tokens = platform.get_remaining_token_count()
+                    if remaining_tokens > 0:
+                        # 预留 20% 给响应，使用剩余 token 的 50% 给 diff
+                        max_diff_tokens = int(remaining_tokens * token_ratio)
+                        # 确保 diff 不超过剩余 token 减去 base_prompt
+                        max_diff_tokens = min(
+                            max_diff_tokens, remaining_tokens - base_prompt_tokens - 1000
+                        )
+                        if max_diff_tokens <= 0:
+                            # 如果剩余 token 不足，使用文件列表策略
+                            return ""
+                except Exception:
+                    pass
+
+            # 回退方案：使用输入窗口限制
+            max_input_tokens = get_max_input_token_count(model_group)
+            # 预留一部分给 base_prompt 和响应，使用指定比例作为 diff 的限制
+            max_diff_tokens = int(max_input_tokens * token_ratio)
+            # 确保 diff 不超过输入窗口减去 base_prompt
+            max_diff_tokens = min(
+                max_diff_tokens, max_input_tokens - base_prompt_tokens - 2000
+            )
+            if max_diff_tokens <= 0:
+                # 如果输入窗口不足，使用文件列表策略
+                return ""
+        except Exception:
+            # 如果获取失败，使用默认值（约 50000 tokens）
+            max_input_tokens = 50000
+            max_diff_tokens = int(max_input_tokens * token_ratio)
+            max_diff_tokens = min(
+                max_diff_tokens, max_input_tokens - base_prompt_tokens - 2000
+            )
+            if max_diff_tokens <= 0:
+                return ""
+
+        # 计算 diff 的 token 数量
+        diff_token_count = get_context_token_count(git_diff)
+
+        if diff_token_count <= max_diff_tokens:
+            return git_diff
+
+        # 如果 diff 内容太大，进行截断
+        # 先提取修改的文件列表
+        files = set()
+        # 匹配 "diff --git a/path b/path" 格式
+        pattern = r"^diff --git a/([^\s]+) b/([^\s]+)$"
+        for line in git_diff.split("\n"):
+            match = re.match(pattern, line)
+            if match:
+                file_a = match.group(1)
+                file_b = match.group(2)
+                files.add(file_b)
+                if file_a != file_b:
+                    files.add(file_a)
+        modified_files = sorted(list(files))
+
+        lines = git_diff.split("\n")
+        truncated_lines = []
+        current_tokens = 0
+
+        for line in lines:
+            line_tokens = get_context_token_count(line)
+            if current_tokens + line_tokens > max_diff_tokens:
+                # 添加截断提示
+                truncated_lines.append("")
+                truncated_lines.append(
+                    "# ⚠️ diff内容过大，已截断显示（提交信息生成需要更多上下文）"
+                )
+                truncated_lines.append(
+                    f"# 原始diff共 {len(lines)} 行，{diff_token_count} tokens"
+                )
+                truncated_lines.append(
+                    f"# 显示前 {len(truncated_lines)} 行，约 {current_tokens} tokens"
+                )
+                truncated_lines.append(
+                    f"# 限制: {max_diff_tokens} tokens (输入窗口的 {token_ratio * 100:.0f}%，已考虑 base_prompt)"
+                )
+
+                # 添加完整修改文件列表
+                if modified_files:
+                    truncated_lines.append("")
+                    truncated_lines.append(
+                        f"# 完整修改文件列表（共 {len(modified_files)} 个文件）："
+                    )
+                    for file_path in modified_files:
+                        truncated_lines.append(f"#   - {file_path}")
+
+                break
+
+            truncated_lines.append(line)
+            current_tokens += line_tokens
+
+        return "\n".join(truncated_lines)
 
     def _get_last_commit_hash(self) -> str:
         process = subprocess.Popen(
@@ -257,6 +384,26 @@ commit信息
                         "⚠️ 差异内容过大，将使用文件列表生成提交信息"
                     )
                     use_file_list = True
+
+                # 即使 is_large_content 为 False，也需要检查 base_prompt + diff 的总长度
+                # 对 diff 进行截断处理，确保不会超出上下文限制
+                if not use_file_list:
+                    truncated_diff = self._truncate_diff_for_commit(
+                        diff, base_prompt, model_group, platform, token_ratio=0.5
+                    )
+                    if not truncated_diff or truncated_diff != diff:
+                        if not truncated_diff:
+                            # 如果截断后为空，降级到文件列表策略
+                            PrettyOutput.auto_print(
+                                "⚠️ 差异内容过大（考虑 base_prompt 后），将使用文件列表生成提交信息"
+                            )
+                            use_file_list = True
+                        else:
+                            # 如果被截断，使用截断后的 diff
+                            diff = truncated_diff
+                            PrettyOutput.auto_print(
+                                "⚠️ 差异内容已截断以适应上下文限制"
+                            )
 
                 # 根据上传状态准备完整的提示
                 if is_large_content and not use_file_list:

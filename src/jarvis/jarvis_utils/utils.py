@@ -26,8 +26,7 @@ from rich.align import Align
 
 
 from jarvis import __version__
-from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_max_big_content_size
+from jarvis.jarvis_utils.config import get_data_dir, get_max_input_token_count
 from jarvis.jarvis_utils.config import set_global_env_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_in_chat
@@ -2420,7 +2419,7 @@ def is_context_overflow(
         estimated_tokens = len(content) // 3.5
 
         # 获取最大token限制
-        max_tokens = get_max_big_content_size(model_group_override)
+        max_tokens = get_max_input_token_count(model_group_override)
 
         # 如果预估token数超过限制的150%，直接认为超出（避免精确计算）
         if estimated_tokens > max_tokens * 1.5:
@@ -2445,7 +2444,7 @@ def is_context_overflow(
             pass
 
     # 回退方案：使用输入窗口限制
-    return content_tokens > get_max_big_content_size(model_group_override)
+    return content_tokens > get_max_input_token_count(model_group_override)
 
 
 def get_loc_stats() -> str:

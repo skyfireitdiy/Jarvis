@@ -594,17 +594,6 @@ def get_data_dir() -> str:
     return os.path.expanduser("~/.jarvis")
 
 
-def get_max_big_content_size(model_group_override: Optional[str] = None) -> int:
-    """
-    获取最大大内容大小。
-
-    返回：
-        int: 最大大内容大小，为最大输入token数量的5倍
-    """
-    max_input_tokens = get_max_input_token_count(model_group_override)
-    return max_input_tokens * 5
-
-
 def get_pretty_output() -> bool:
     """
     获取是否启用PrettyOutput。
