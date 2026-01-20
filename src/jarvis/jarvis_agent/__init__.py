@@ -1391,41 +1391,20 @@ class Agent:
                 else:
                     other_messages.append(msg)
 
-            # 从后往前分离用户/工具消息和助手消息，记录它们的索引
-            user_tool_indices = []
-            assistant_indices = []
-            
-            # 从后往前遍历，分别收集用户/工具消息和助手消息的索引
-            for i in range(len(other_messages) - 1, -1, -1):
-                msg = other_messages[i]
-                role = msg.get("role", "").lower()
-                if role in ["user", "tool"]:
-                    if len(user_tool_indices) < user_tool_count:
-                        user_tool_indices.insert(0, i)  # 保持时间顺序
-                elif role == "assistant":
-                    if len(assistant_indices) < assistant_count:
-                        assistant_indices.insert(0, i)  # 保持时间顺序
-
-            # 合并所有要保留的消息索引（按时间顺序）
-            recent_indices = sorted(set(user_tool_indices + assistant_indices))
-            
-            # 如果保留的消息数量不足，说明历史太短，不需要压缩
-            if len(recent_indices) < user_tool_count + assistant_count:
+            # 直接截取最后9条消息（正常消息是交替的）
+            if len(other_messages) < window_size:
                 return False
+            
+            # 截取最后window_size条消息
+            recent_messages = other_messages[-window_size:]
 
             # 如果其他消息数量不足窗口大小的2倍，不需要压缩
             # （需要至少2倍，因为压缩后还需要保留窗口）
             if len(other_messages) <= window_size * 2:
                 return False
-
-            # 按原始顺序提取要保留的消息
-            recent_messages = [other_messages[i] for i in recent_indices]
             
             # 分离更早的消息（不在保留列表中的消息）
-            old_messages = [
-                msg for i, msg in enumerate(other_messages) 
-                if i not in recent_indices
-            ]
+            old_messages = other_messages[:-window_size]
 
             if not old_messages:
                 return False
@@ -1476,9 +1455,12 @@ class Agent:
                 # 更新模型的消息历史
                 if hasattr(self.model, "messages"):
                     self.model.messages = new_history
+                    # 统计保留的消息类型
+                    user_tool_count_kept = sum(1 for msg in recent_messages if msg.get("role", "").lower() in ["user", "tool"])
+                    assistant_count_kept = sum(1 for msg in recent_messages if msg.get("role", "").lower() == "assistant")
                     PrettyOutput.auto_print(
                         f"✅ 滑动窗口压缩完成：压缩了 {len(old_messages)} 条消息，"
-                        f"保留了最近 {len(user_tool_indices)} 条用户/工具消息和 {len(assistant_indices)} 条助手消息（共 {len(recent_messages)} 条）"
+                        f"保留了最近 {user_tool_count_kept} 条用户/工具消息和 {assistant_count_kept} 条助手消息（共 {len(recent_messages)} 条）"
                     )
                     return True
                 else:
