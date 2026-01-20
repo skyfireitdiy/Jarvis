@@ -423,9 +423,7 @@ git reset --hard {start_commit}
             self.git_manager.handle_uncommitted_changes()
 
             # 如果启用了 review，执行 review 和修复循环
-            if not self.disable_review and user_confirm(
-                "是否进行代码审查？", default=True
-            ):
+            if not self.disable_review:
                 self._review_and_fix(
                     user_input=user_input,
                     enhanced_input=enhanced_input,
@@ -1054,7 +1052,9 @@ git reset --hard {start_commit}
         """
         # 动态判断是否执行 review：根据运行时的 non_interactive 状态和用户配置
         # 只在非交互模式下才执行 review（用户明确禁用时除外）
-        if self.disable_review or not self.non_interactive:
+        if self.disable_review or not user_confirm(
+                "是否进行代码审查？", default=True
+            ):
             PrettyOutput.auto_print("ℹ️ 跳过代码审查（当前模式或配置不支持）")
             return
 
