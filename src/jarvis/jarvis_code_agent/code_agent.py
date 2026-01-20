@@ -1050,8 +1050,17 @@ git reset --hard {start_commit}
             prefix: 前缀
             suffix: 后缀
         """
-        # 动态判断是否执行 review：根据运行时的 non_interactive 状态和用户配置
-        # 只在非交互模式下才执行 review（用户明确禁用时除外）
+        # 获取从开始到当前的 git diff（提前检测是否有代码修改）
+        current_commit = get_latest_commit_hash()
+        if self.start_commit is None or current_commit == self.start_commit:
+            git_diff = get_diff()  # 获取未提交的更改
+        else:
+            git_diff = get_diff_between_commits(self.start_commit, current_commit)
+
+        if not git_diff or not git_diff.strip():
+            PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
+            return
+
         if self.disable_review or not user_confirm(
                 "是否进行代码审查？", default=True
             ):
@@ -1070,17 +1079,6 @@ git reset --hard {start_commit}
 
         while is_infinite or iteration < max_iterations:
             iteration += 1
-
-            # 获取从开始到当前的 git diff（提前检测是否有代码修改）
-            current_commit = get_latest_commit_hash()
-            if self.start_commit is None or current_commit == self.start_commit:
-                git_diff = get_diff()  # 获取未提交的更改
-            else:
-                git_diff = get_diff_between_commits(self.start_commit, current_commit)
-
-            if not git_diff or not git_diff.strip():
-                PrettyOutput.auto_print("ℹ️ 没有代码修改，跳过审查")
-                return
 
             # 每轮审查开始前显示清晰的提示信息
             if is_infinite:
