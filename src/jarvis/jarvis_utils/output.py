@@ -13,6 +13,7 @@ from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+import re
 from typing import Any
 from typing import Dict
 from typing import List
@@ -174,6 +175,59 @@ class ConsoleOutputSink(OutputSink):
     """
     默认控制台输出实现，保持与原 PrettyOutput 行为一致。
     """
+
+    @staticmethod
+    def _highlight_progress_text(
+        text: str, output_type: OutputType, text_colors: Dict[OutputType, str]
+    ) -> Text:
+        """
+        检测并高亮文本中的进度信息（如"第 X 轮"或"第 X/Y 轮"）。
+        
+        参数：
+            text: 要处理的文本
+            output_type: 输出类型
+            text_colors: 颜色映射字典
+            
+        返回：
+            Text: 格式化后的文本对象
+        """
+        progress_pattern = r"第\s*(\d+)(?:/(\d+))?\s*轮"
+        if re.search(progress_pattern, text):
+            # 包含进度信息，高亮数字
+            parts = re.split(progress_pattern, text)
+            colored_text = Text()
+            for i, part in enumerate(parts):
+                if i % 3 == 0:  # 普通文本
+                    colored_text.append(
+                        part,
+                        style=RichStyle(
+                            color=_safe_color_get(text_colors[output_type], "white")
+                        ),
+                    )
+                elif i % 3 == 1:  # 第一个数字（当前轮次）
+                    colored_text.append(
+                        part,
+                        style=RichStyle(
+                            color=_safe_color_get(text_colors[output_type], "white"),
+                            bold=True
+                        ),
+                    )
+                elif i % 3 == 2 and part:  # 第二个数字（总轮次，如果有）
+                    colored_text.append(
+                        f"/{part}",
+                        style=RichStyle(
+                            color=_safe_color_get(text_colors[output_type], "white")
+                        ),
+                    )
+            return colored_text
+        else:
+            # 普通文本
+            return Text(
+                text,
+                style=RichStyle(
+                    color=_safe_color_get(text_colors[output_type], "white")
+                ),
+            )
 
     def emit(self, event: OutputEvent) -> None:
         # 章节输出
@@ -359,21 +413,77 @@ class ConsoleOutputSink(OutputSink):
         agent_name = PrettyOutput._format(event.output_type, event.timestamp)
         header_text = Text(
             agent_name,
-            style=RichStyle(color="grey58"),
+            style=RichStyle(color="grey58", dim=True),
         )
         if get_pretty_output():
-            # 合并header和content在同一行显示，应用文字颜色
-            combined_text = Text()
-            combined_text.append(header_text)
-            combined_text.append(" ")  # 添加空格分隔
-            colored_content = Text(
-                event.text,
-                style=RichStyle(
-                    color=_safe_color_get(text_colors[event.output_type], "white")
-                ),
+            # 检测是否为多行文本，如果是则使用更好的格式化
+            lines = event.text.split("\n")
+            is_multiline = len(lines) > 1
+            
+            # 检测是否包含列表项（以数字、-、* 开头）
+            is_list = any(
+                line.strip().startswith(("- ", "* ", "• ")) or 
+                (line.strip() and line.strip()[0].isdigit() and ". " in line.strip()[:5])
+                for line in lines
             )
-            combined_text.append(colored_content)
-            console.print(combined_text)
+            
+            # 检测是否包含缩进内容（可能是子项或代码块）
+            has_indent = any(line.startswith(("   ", "  ", "\t")) for line in lines)
+            
+            if is_multiline and (is_list or has_indent):
+                # 多行列表或缩进内容：第一行显示header，后续行使用缩进
+                combined_text = Text()
+                combined_text.append(header_text)
+                combined_text.append(" ")
+                
+                # 第一行：检测并高亮进度信息
+                first_line = lines[0]
+                colored_first_line = self._highlight_progress_text(
+                    first_line, event.output_type, text_colors
+                )
+                
+                combined_text.append(colored_first_line)
+                console.print(combined_text)
+                
+                # 后续行使用缩进，保持视觉层次
+                for line in lines[1:]:
+                    if line.strip():  # 非空行
+                        # 检测列表项标记并适当格式化
+                        line_stripped = line.strip()
+                        is_list_item = (
+                            line_stripped.startswith(("- ", "* ", "• ")) or
+                            (line_stripped and line_stripped[0].isdigit() and ". " in line_stripped[:5])
+                        )
+                        
+                        # 如果已经是缩进的，保持原样；否则添加缩进
+                        if line.startswith(("   ", "  ", "\t")):
+                            display_line = line
+                        else:
+                            display_line = f"   {line}"
+                        
+                        indented_line = Text(
+                            display_line,
+                            style=RichStyle(
+                                color=_safe_color_get(text_colors[event.output_type], "white"),
+                                dim=not is_list_item and line.startswith(("   ", "  ", "\t"))  # 已缩进的非列表项稍微变暗
+                            ),
+                        )
+                        console.print(indented_line)
+                    else:
+                        console.print()  # 空行保持原样
+            else:
+                # 单行或简单多行：合并header和content在同一行显示
+                combined_text = Text()
+                combined_text.append(header_text)
+                combined_text.append(" ")
+                
+                # 检测并高亮进度信息（单行情况）
+                colored_content = self._highlight_progress_text(
+                    event.text, event.output_type, text_colors
+                )
+                combined_text.append(colored_content)
+                
+                console.print(combined_text)
         else:
             console.print(content)
         if event.traceback or (
@@ -506,7 +616,8 @@ class PrettyOutput:
 
         if timestamp:
             current_time = datetime.now().strftime("%H:%M:%S")
-            return f"[{current_time}] {agent_info}"
+            # 使用更美观的时间戳格式，添加分隔符
+            return f"⏰ {current_time} │ {agent_info}"
         else:
             return agent_info
 
@@ -651,10 +762,18 @@ class PrettyOutput:
 
         # 检测emoji前缀
         output_type = OutputType.INFO  # 默认类型
+        detected_emoji = None
         for emoji, type_enum in emoji_mapping.items():
             if text.startswith(emoji):
                 output_type = type_enum
+                detected_emoji = emoji
                 break
+
+        # 优化文本格式：确保emoji和文本之间有适当的间距
+        if detected_emoji:
+            # 如果emoji后没有空格，添加一个空格
+            if len(text) > len(detected_emoji) and text[len(detected_emoji)] != " ":
+                text = f"{detected_emoji} {text[len(detected_emoji):].lstrip()}"
 
         # 使用现有的print方法进行着色输出
         PrettyOutput.print(text=text, output_type=output_type, timestamp=timestamp)
