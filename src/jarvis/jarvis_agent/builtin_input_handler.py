@@ -197,10 +197,10 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     [agent.session.prompt, safe_tool_prompt]
                 )
                 PrettyOutput.auto_print("✅ 工具调用修复并执行成功")
+                return "", False  # 继续执行，让 LLM 处理工具执行结果
             else:
                 PrettyOutput.auto_print("❌ 工具调用修复失败")
-
-            return "", True
+                return "", True  # 修复失败，跳过本轮
         elif tag == "Pin":
             # Pin标记已在前面处理，跳过
             continue
