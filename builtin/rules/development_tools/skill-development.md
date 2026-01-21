@@ -14,6 +14,49 @@
 
 技能可以是本地路径或Git仓库，添加后将在 `{{ jarvis_data_dir }}/rule` 中注册技能信息，供后续使用。
 
+## Jinja2 变量使用指南
+
+### 可用的内置变量
+
+技能文档文件中可以使用以下 Jinja2 模板变量：
+
+| 变量名                                       | 说明                 | 示例值                   |
+| -------------------------------------------- | -------------------- | ------------------------ |
+| `{% raw %}{{ rule_file_dir }}{% endraw %}`   | 当前规则文件所在目录 | `/path/to/builtin/rules` |
+| `{% raw %}{{ git_root_dir }}{% endraw %}`    | Git 仓库根目录       | `/home/user/project`     |
+| `{% raw %}{{ current_dir }}{% endraw %}`     | 当前工作目录         | `/home/user/project/src` |
+| `{% raw %}{{ jarvis_src_dir }}{% endraw %}`  | Jarvis 源码目录      | `/home/user/jarvis`      |
+| `{% raw %}{{ jarvis_data_dir }}{% endraw %}` | Jarvis 数据目录      | `/home/user/.jarvis`     |
+
+### 变量使用示例
+
+#### 示例 1：在技能文档中引用路径
+
+```markdown
+### 技能文件位置
+
+技能文件位于：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/skills/my_skill/`
+```
+
+#### 示例 2：动态生成路径
+
+```markdown
+### 文档路径
+
+- 技能文档：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/rules/[skill_name].md`
+- 技能目录：`{% raw %}{{ jarvis_data_dir }}{% endraw %}/skills/[skill_name]/`
+```
+
+#### 示例 3：在代码示例中使用变量
+
+```markdown
+### 安装命令
+
+`` `bash
+cd {% raw %}{{ jarvis_data_dir }}{% endraw %}/skills/my_skill/
+pip install -r requirements.txt `` `
+```
+
 ## 你必须遵守的原则
 
 ### 1. 路径验证原则
@@ -100,6 +143,21 @@
 - 文档缺失时基于目录结构推断
 - 推断困难时使用基础描述：`[技能名称] - 功能待完善`
 
+### 阶段4.5：创建技能文档文件
+
+1. **检查规则目录**：验证`{{ jarvis_data_dir }}/rules`目录是否存在，不存在则创建
+2. **创建技能文档文件**：在`{{ jarvis_data_dir }}/rules`目录下创建`[skill_name].md`文件
+3. **编写文档内容**：在文件中详细记录技能的详细介绍和使用方法
+
+   文档内容应包含：
+   - 技能名称和功能概述
+   - 详细的功能描述
+   - 使用方法和示例
+   - 适用场景
+   - 其他必要说明
+
+4. **验证文档格式**：确保Markdown格式正确
+
 ### 阶段5：技能信息注册
 
 1. **注册文件检查**：验证`{{ jarvis_data_dir }}/rule`是否存在
@@ -118,7 +176,7 @@
 
    - **功能描述**：[技能的核心功能描述]
    - **位置**：[技能的完整路径]
-   - **添加时间**：[YYYY-MM-DD HH:MM:SS]
+   - **规则文件**：`{{ jarvis_data_dir }}/rules/[skill_name].md`
    ```
 
 4. **格式验证**：确保Markdown格式正确
@@ -155,8 +213,8 @@
 ### 4. 注册格式规范
 
 - **注册文件位置**：`{{ jarvis_data_dir }}/rule`
-- **技能信息格式**：必须包含功能描述、位置、添加时间
-- **时间格式标准**：`YYYY-MM-DD HH:MM:SS`
+- **技能信息格式**：必须包含功能描述、位置、规则文件
+- **技能文档位置**：`{{ jarvis_data_dir }}/rules/[skill_name].md`
 - **路径规范**：必须使用绝对路径，禁止相对路径
 
 ### 5. 错误处理规范
@@ -213,9 +271,10 @@
 
 ### 注册规范检查
 
+- [ ] 技能文档文件创建成功（`{{ jarvis_data_dir }}/rules/[skill_name].md`）
+- [ ] 技能文档内容完整详细
 - [ ] 注册文件存在或创建成功
 - [ ] 技能信息格式符合标准
-- [ ] 时间格式使用正确（YYYY-MM-DD HH:MM:SS）
 - [ ] 路径信息使用绝对路径
 
 ### 质量控制检查
@@ -267,4 +326,5 @@
 
 - **参考规则**：`{{ rule_file_dir }}/../tool_config/add_rule.md`
 - **技能注册文件**：`{{ jarvis_data_dir }}/rule`
+- **技能文档目录**：`{{ jarvis_data_dir }}/rules/`
 - **技能存储目录**：`{{ jarvis_data_dir }}/skills/`
