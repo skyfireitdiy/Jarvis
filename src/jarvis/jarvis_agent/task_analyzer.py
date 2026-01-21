@@ -211,10 +211,6 @@ class TaskAnalyzer:
     def _on_before_summary(self, **payload: Any) -> None:
         if self._analysis_done:
             return
-        # 仅在非交互模式下执行任务分析
-        if not getattr(self.agent, "non_interactive", False):
-            self._analysis_done = True
-            return
         # 避免与直接调用重复
         try:
             if bool(self.agent.get_user_data("__task_analysis_done__")):
@@ -222,20 +218,32 @@ class TaskAnalyzer:
                 return
         except Exception:
             pass
+        
+        # 检查是否启用了任务分析
+        if not getattr(self.agent, "use_analysis", False):
+            self._analysis_done = True
+            return
+        
+        # 交互模式下询问用户是否执行任务分析
+        is_non_interactive = getattr(self.agent, "non_interactive", False)
+        if not is_non_interactive:
+            # 交互模式：询问用户是否执行任务分析（默认True）
+            if not self.agent.confirm_callback(
+                "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？", True
+            ):
+                self._analysis_done = True
+                return
+        
+        # 非交互模式或用户确认后执行任务分析
         auto_completed = bool(payload.get("auto_completed", False))
         try:
             feedback = self.collect_satisfaction_feedback(auto_completed)
-            if getattr(self.agent, "use_analysis", False):
-                self.analysis_task(feedback)
+            self.analysis_task(feedback)
         except Exception:
             # 忽略事件处理异常，保证主流程
             self._analysis_done = True
 
     def _on_task_completed(self, **payload: Any) -> None:
-        # 仅在非交互模式下执行任务分析
-        if not getattr(self.agent, "non_interactive", False):
-            self._analysis_done = True
-            return
         # 当未在 before_summary 阶段执行过时，作为兜底
         if self._analysis_done:
             return
@@ -245,10 +253,26 @@ class TaskAnalyzer:
                 return
         except Exception:
             pass
+        
+        # 检查是否启用了任务分析
+        if not getattr(self.agent, "use_analysis", False):
+            self._analysis_done = True
+            return
+        
+        # 交互模式下询问用户是否执行任务分析
+        is_non_interactive = getattr(self.agent, "non_interactive", False)
+        if not is_non_interactive:
+            # 交互模式：询问用户是否执行任务分析（默认True）
+            if not self.agent.confirm_callback(
+                "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？", True
+            ):
+                self._analysis_done = True
+                return
+        
+        # 非交互模式或用户确认后执行任务分析
         auto_completed = bool(payload.get("auto_completed", False))
         try:
             feedback = self.collect_satisfaction_feedback(auto_completed)
-            if getattr(self.agent, "use_analysis", False):
-                self.analysis_task(feedback)
+            self.analysis_task(feedback)
         except Exception:
             self._analysis_done = True
