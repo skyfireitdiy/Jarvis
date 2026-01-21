@@ -15,11 +15,11 @@ _LANGUAGE_EXTRACTORS: dict[str, Callable[[], Optional[Any]]] = {}
 
 def is_text_file(filepath: str) -> bool:
     """
-    Check if a file is a text file.
+    检查文件是否为文本文件。
     """
     try:
         with open(filepath, "r", encoding="utf-8") as f:
-            f.read(1024)  # Try to read a small chunk
+            f.read(1024)  # 尝试读取一小块
         return True
     except (UnicodeDecodeError, IOError):
         return False
@@ -27,7 +27,7 @@ def is_text_file(filepath: str) -> bool:
 
 def count_lines(filepath: str) -> int:
     """
-    Count the number of lines in a file.
+    统计文件中的行数。
     """
     try:
         with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
@@ -41,35 +41,35 @@ def register_language_extractor(
     extractor_factory: Optional[Callable[[], Optional[Any]]] = None,
 ) -> Optional[Callable[[Callable[[], Optional[Any]]], Callable[[], Optional[Any]]]]:
     """
-    Register a symbol extractor for one or more file extensions.
+    为一个或多个文件扩展名注册符号提取器。
 
-    Can be used as a decorator or as a regular function.
+    可以用作装饰器或普通函数。
 
     Args:
-        extensions: List of file extensions (e.g., ['.py', '.pyw']) or single extension string.
-                   If used as decorator, this is the first argument.
-        extractor_factory: A callable that returns an extractor instance or None if unavailable.
-                          The extractor must have an extract_symbols(file_path: str, content: str) method
-                          that returns a list of Symbol objects.
-                          If used as decorator, this is the decorated function.
+        extensions: 文件扩展名列表（例如：['.py', '.pyw']）或单个扩展名字符串。
+                   如果用作装饰器，这是第一个参数。
+        extractor_factory: 一个可调用对象，返回提取器实例，如果不可用则返回 None。
+                          提取器必须具有 extract_symbols(file_path: str, content: str) 方法
+                          该方法返回 Symbol 对象列表。
+                          如果用作装饰器，这是被装饰的函数。
 
     Examples:
-        # As decorator:
+        # 作为装饰器使用：
         @register_language_extractor(['.py', '.pyw'])
         def create_python_extractor():
             from jarvis.jarvis_code_agent.code_analyzer.languages.python_language import PythonSymbolExtractor
             return PythonSymbolExtractor()
 
-        # As regular function:
+        # 作为普通函数使用：
         def create_java_extractor():
-            # ... create extractor ...
+            # ... 创建提取器 ...
             return JavaExtractor()
 
         register_language_extractor('.java', create_java_extractor)
     """
-    # Support both decorator and function call syntax
+    # 支持装饰器和函数调用两种语法
     if extractor_factory is None:
-        # Used as decorator: @register_language_extractor(['.ext'])
+        # 用作装饰器：@register_language_extractor(['.ext'])
         def decorator(func: Callable[[], Optional[Any]]) -> Callable[[], Optional[Any]]:
             if isinstance(extensions, str):
                 exts = [extensions]
@@ -86,7 +86,7 @@ def register_language_extractor(
 
         return decorator
     else:
-        # Used as regular function: register_language_extractor(['.ext'], factory)
+        # 用作普通函数：register_language_extractor(['.ext'], factory)
         if isinstance(extensions, str):
             extensions = [extensions]
 
@@ -99,10 +99,10 @@ def register_language_extractor(
 
 
 def _get_symbol_extractor(filepath: str) -> Optional[Any]:
-    """Get appropriate symbol extractor for the file based on extension"""
+    """根据文件扩展名获取适合的符号提取器"""
     ext = os.path.splitext(filepath)[1].lower()
 
-    # Check registered extractors
+    # 检查已注册的提取器
     if ext in _LANGUAGE_EXTRACTORS:
         try:
             return _LANGUAGE_EXTRACTORS[ext]()
@@ -112,8 +112,8 @@ def _get_symbol_extractor(filepath: str) -> Optional[Any]:
     return None
 
 
-# Initialize built-in extractors on module load
-# Import language_extractors module to trigger automatic registration
+# 模块加载时初始化内置提取器
+# 导入 language_extractors 模块以触发自动注册
 try:
     import jarvis.jarvis_agent.language_extractors  # noqa: F401
 except (ImportError, Exception):
@@ -121,7 +121,7 @@ except (ImportError, Exception):
 
 
 def extract_symbols_from_file(filepath: str) -> list[dict[str, Any]]:
-    """Extract symbols from a file using tree-sitter or AST"""
+    """使用 tree-sitter 或 AST 从文件中提取符号"""
     extractor = _get_symbol_extractor(filepath)
     if not extractor:
         return []
@@ -132,7 +132,7 @@ def extract_symbols_from_file(filepath: str) -> list[dict[str, Any]]:
 
         symbols = extractor.extract_symbols(filepath, content)
 
-        # Convert Symbol objects to dict format
+        # 将 Symbol 对象转换为字典格式
         result = []
         for symbol in symbols:
             result.append(
@@ -150,11 +150,11 @@ def extract_symbols_from_file(filepath: str) -> list[dict[str, Any]]:
 
 
 def format_symbols_output(filepath: str, symbols: list[dict[str, Any]]) -> str:
-    """Format symbols list as output string"""
+    """将符号列表格式化为输出字符串"""
     if not symbols:
         return ""
 
-    # Group symbols by type
+    # 按类型分组符号
     by_type: dict[str, list[dict[str, Any]]] = {}
     for symbol in symbols:
         symbol_type = symbol["type"]
@@ -162,7 +162,7 @@ def format_symbols_output(filepath: str, symbols: list[dict[str, Any]]) -> str:
             by_type[symbol_type] = []
         by_type[symbol_type].append(symbol)
 
-    # Sort symbols within each type by line number
+    # 在每个类型内按行号排序符号
     for symbol_type in by_type:
         by_type[symbol_type].sort(key=lambda x: x["line"])
 
@@ -202,20 +202,18 @@ def format_symbols_output(filepath: str, symbols: list[dict[str, Any]]) -> str:
 
 def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """
-    Extracts file paths from the input, extracts symbols from those files,
-    and appends the symbol list to the input.
+    从输入中提取文件路径，从这些文件中提取符号，并将符号列表附加到输入中。
 
     Args:
-        user_input: The user's input string.
-        agent_: The agent instance.
+        user_input: 用户输入字符串。
+        agent_: Agent 实例。
 
     Returns:
-        A tuple containing the modified user input and a boolean indicating if
-        further processing should be skipped.
+        包含修改后的用户输入和布尔值的元组，布尔值指示是否应跳过进一步处理。
     """
-    # Regex to find paths in single quotes
+    # 正则表达式查找单引号中的路径
     raw_paths = re.findall(r"'([^']+)'", user_input)
-    # Convert to absolute paths and de-duplicate by absolute path while preserving order
+    # 转换为绝对路径并按绝对路径去重，同时保持顺序
     abs_to_raws: dict[str, list[str]] = {}
     file_paths = []
     for _raw in raw_paths:
@@ -232,12 +230,12 @@ def file_context_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
     for abs_path in file_paths:
         if os.path.isfile(abs_path) and is_text_file(abs_path):
-            # Extract symbols from the file
+            # 从文件中提取符号
             symbols = extract_symbols_from_file(abs_path)
 
             if symbols:
-                # Keep the original path tokens and append symbol information as supplementary context
-                # This preserves the user's original reference to the file while adding symbol details
+                # 保留原始路径标记并将符号信息作为补充上下文附加
+                # 这样在添加符号详细信息的同时保留了用户对文件的原始引用
                 added_context += format_symbols_output(abs_path, symbols)
 
     if added_context:
