@@ -21,12 +21,6 @@ from jarvis.jarvis_utils.git_utils import (
     get_diff_between_commits,
 )
 
-from jarvis.jarvis_utils.tmux_wrapper import (
-    has_session,
-    create_panel,
-    get_current_window_index,
-    get_current_session_name,
-)
 
 
 class DependencyValidationError(Exception):
@@ -95,12 +89,6 @@ class task_list_manager:
     """任务列表管理工具，供 LLM 调用"""
 
     name = "task_list_manager"
-
-    # tmux窗口最大pane数量
-    MAX_PANES_PER_WINDOW = 4
-
-    # 批量执行相关常量
-    BATCH_EXECUTION_ERROR_PREFIX = "批量执行验证失败"
 
     def _get_max_output_length(self, agent: Any = None) -> int:
         """获取基于剩余token数量的最大输出长度（字符数）
@@ -795,7 +783,7 @@ class task_list_manager:
 
     @property
     def description(self) -> str:
-        """动态生成工具描述，根据tmux环境决定是否包含批量执行功能
+        """生成工具描述
 
         Returns:
             str: 工具描述
@@ -803,24 +791,17 @@ class task_list_manager:
         return self._get_description()
 
     def _get_description(self) -> str:
-        """根据环境动态生成工具描述
+        """生成工具描述
 
         Returns:
             str: 工具描述
         """
-        # 根据tmux环境决定是否包含批量执行功能
-        if self._is_in_tmux():
-            batch_execution_line = """- `execute_batch_tasks`: 批量执行多个sub类型任务（要求：所有任务都是sub类型、状态为pending、依赖已完成、任务之间彼此独立）
-"""
-        else:
-            batch_execution_line = ""
-
         description = f"""任务列表管理工具，供LLM管理复杂任务拆分和执行。
 
 **核心功能：**
 - `add_tasks`: 批量添加任务（推荐PLAN阶段使用）
 - `execute_task`: 执行任务（自动创建子Agent）
-{batch_execution_line}- `get_task_list_summary`: 查看任务状态
+- `get_task_list_summary`: 查看任务状态
 
 **任务类型选择：**
 - `main`: 简单任务（1-3步、单文件）由主Agent直接执行
@@ -883,28 +864,6 @@ class task_list_manager:
 }}
 {ct("TOOL_CALL")}
 ```
-"""
-
-        # 如果在tmux环境，添加批量执行示例
-        if self._is_in_tmux():
-            description += f"""
-
-批量执行任务（仅在tmux环境支持）：
-```
-{ot("TOOL_CALL")}
-{{
-    "name": "task_list_manager",
-    "arguments": {{
-        "action": "execute_batch_tasks",
-        "task_ids": ["task-1", "task-2", "task-3"],
-        "additional_info": "批量执行的公共附加信息"
-    }}
-}}
-{ct("TOOL_CALL")}
-```
-"""
-
-        description += f"""
 
 更新任务状态：
 ```
@@ -930,7 +889,7 @@ class task_list_manager:
 
     @property
     def parameters(self) -> dict:
-        """动态生成工具参数，根据tmux环境决定是否支持批量执行
+        """生成工具参数
 
         Returns:
             dict: 工具参数定义
@@ -938,7 +897,7 @@ class task_list_manager:
         return self._get_parameters()
 
     def _get_parameters(self) -> dict:
-        """根据环境动态生成工具参数
+        """生成工具参数
 
         Returns:
             dict: 工具参数定义
@@ -950,10 +909,6 @@ class task_list_manager:
             "execute_task",
             "update_task",
         ]
-
-        # 只有在 tmux 环境下才支持批量执行
-        if self._is_in_tmux():
-            action_enum.insert(4, "execute_batch_tasks")
 
         return {
             "type": "object",
@@ -1009,14 +964,9 @@ class task_list_manager:
                     "type": "string",
                     "description": "任务ID（execute_task/update_task/get_task_detail 需要）",
                 },
-                "task_ids": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "任务ID列表（execute_batch_tasks 需要）。批量执行多个任务，每个任务必须满足：1) 都是sub类型；2) 状态为pending；3) 依赖任务都已completed；4) 任务之间彼此无依赖关系。",
-                },
                 "additional_info": {
                     "type": "string",
-                    "description": "附加信息（**仅在 execute_task 和 execute_batch_tasks 时必填**）。必须提供任务的详细上下文信息，包括任务背景、关键信息、约束条件、预期结果等。不能为空字符串或None。",
+                    "description": "附加信息（**仅在 execute_task 时必填**）。必须提供任务的详细上下文信息，包括任务背景、关键信息、约束条件、预期结果等。不能为空字符串或None。",
                 },
                 "task_update_info": {
                     "type": "object",
@@ -1141,12 +1091,6 @@ class task_list_manager:
 
             elif action == "execute_task":
                 result = self._handle_execute_task(
-                    args, task_list_manager, agent_id, is_main_agent, agent
-                )
-                task_list_id_for_status = self._get_task_list_id(agent)
-
-            elif action == "execute_batch_tasks":
-                result = self._handle_execute_batch_tasks(
                     args, task_list_manager, agent_id, is_main_agent, agent
                 )
                 task_list_id_for_status = self._get_task_list_id(agent)
@@ -2038,374 +1982,6 @@ class task_list_manager:
                 "stderr": f"执行任务失败: {str(e)}",
             }
 
-    def _validate_batch_execution_conditions(
-        self,
-        task_list_manager: Any,
-        task_list_id: str,
-        task_ids: List[str],
-        agent_id: str,
-        is_main_agent: bool,
-    ) -> tuple[bool, Optional[str], List[Any]]:
-        """验证批量执行的前置条件。
-
-        参数:
-            task_list_manager: 任务列表管理器
-            task_list_id: 任务列表 ID
-            task_ids: 要批量执行的任务 ID 列表
-            agent_id: Agent ID
-            is_main_agent: 是否为主 Agent
-
-        返回:
-            Tuple[是否通过, 错误信息, 任务对象列表]
-        """
-        if not task_ids:
-            return False, f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务ID列表为空", []
-
-        tasks = []
-        task_id_set = set(task_ids)
-
-        # 验证每个任务的基本条件
-        for task_id in task_ids:
-            task, success, error_msg = task_list_manager.get_task_detail(
-                task_list_id=task_list_id,
-                task_id=task_id,
-                agent_id=agent_id,
-                is_main_agent=is_main_agent,
-            )
-
-            if not success or not task:
-                return (
-                    False,
-                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} 不存在或无权访问",
-                    [],
-                )
-
-            # 检查任务类型必须是 sub
-            if task.agent_type.value != "sub":
-                return (
-                    False,
-                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} ({task.task_name}) 的类型不是 sub（当前为 {task.agent_type.value}）",
-                    [],
-                )
-
-            # 检查任务状态必须是 pending
-            if task.status.value != "pending":
-                return (
-                    False,
-                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} ({task.task_name}) 状态不是 pending（当前为 {task.status.value}）",
-                    [],
-                )
-
-            # 验证依赖任务都已完成
-            dep_check_result = self._check_dependencies_completed(
-                task_list_manager=task_list_manager,
-                task_list_id=task_list_id,
-                dependencies=task.dependencies,
-                agent_id=agent_id,
-                is_main_agent=is_main_agent,
-            )
-
-            if not dep_check_result["success"]:
-                return (
-                    False,
-                    f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task_id} ({task.task_name}) 的依赖验证未通过: {dep_check_result['stderr']}",
-                    [],
-                )
-
-            tasks.append(task)
-
-        # 验证任务之间彼此无依赖关系
-        # 只需检查每个任务的依赖是否在任务列表中即可
-        # 如果存在依赖关系，必然有一方的依赖在另一方
-        for task in tasks:
-            for dep_id in task.dependencies:
-                if dep_id in task_id_set:
-                    return (
-                        False,
-                        f"{self.BATCH_EXECUTION_ERROR_PREFIX}: 任务 {task.task_id} ({task.task_name}) 依赖于任务 {dep_id}，批量执行要求任务之间彼此独立",
-                        [],
-                    )
-
-        return True, None, tasks
-
-    def _handle_execute_batch_tasks(
-        self,
-        args: Dict[str, Any],
-        task_list_manager: Any,
-        agent_id: str,
-        is_main_agent: bool,
-        parent_agent: Any,
-    ) -> Dict[str, Any]:
-        """处理批量执行任务。
-
-        参数:
-            args: 调用参数
-            task_list_manager: 任务列表管理器
-            agent_id: Agent ID
-            is_main_agent: 是否为主 Agent
-            parent_agent: 父 Agent 实例
-
-        返回:
-            Dict: 执行结果
-        """
-        task_list_id = self._get_task_list_id(parent_agent)
-        if not task_list_id:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "Agent 还没有任务列表，请先使用 add_tasks 添加任务（会自动创建任务列表）",
-            }
-
-        task_ids = args.get("task_ids")
-        additional_info = args.get("additional_info")
-
-        if not task_ids:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "缺少 task_ids 参数",
-            }
-
-        if not isinstance(task_ids, list):
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "task_ids 必须是数组",
-            }
-
-        if additional_info is None:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "缺少 additional_info 参数",
-            }
-
-        if not additional_info or not str(additional_info).strip():
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "additional_info 参数不能为空",
-            }
-
-        # 检查是否有正在运行的任务
-        try:
-            from jarvis.jarvis_utils.output import PrettyOutput
-
-            task_list = task_list_manager.get_task_list(task_list_id)
-            if task_list:
-                for task_obj in task_list.tasks.values():
-                    if task_obj.status.value == "running":
-                        return {
-                            "success": False,
-                            "stdout": "",
-                            "stderr": f"检测到任务 {task_obj.task_id} ({task_obj.task_name}) 正在运行，请先完成该任务后再执行批量任务",
-                        }
-        except Exception as e:
-            PrettyOutput.auto_print(
-                f"⚠️ 检查运行中任务时发生异常: {str(e)}，继续执行批量任务"
-            )
-
-        # 验证批量执行的前置条件
-        (
-            validation_passed,
-            validation_error,
-            tasks,
-        ) = self._validate_batch_execution_conditions(
-            task_list_manager=task_list_manager,
-            task_list_id=task_list_id,
-            task_ids=task_ids,
-            agent_id=agent_id,
-            is_main_agent=is_main_agent,
-        )
-
-        if not validation_passed:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"批量执行验证失败: {validation_error}",
-            }
-
-        # 检测tmux环境，使用并行执行模式
-        if self._is_in_tmux():
-            from jarvis.jarvis_utils.output import PrettyOutput
-
-            PrettyOutput.auto_print("🖥️  检测到tmux环境，使用并行执行模式")
-            return self._execute_batch_tasks_in_tmux(
-                tasks=tasks,
-                task_list_manager=task_list_manager,
-                task_list_id=task_list_id,
-                agent_id=agent_id,
-                is_main_agent=is_main_agent,
-                parent_agent=parent_agent,
-                additional_info=additional_info,
-            )
-
-        # 非tmux环境，使用顺序执行模式
-        results = []
-        completed_count = 0
-        failed_count = 0
-
-        from jarvis.jarvis_utils.output import PrettyOutput
-
-        PrettyOutput.auto_print(f"🚀 开始批量执行 {len(tasks)} 个任务...")
-
-        for idx, task in enumerate(tasks):
-            PrettyOutput.auto_print(
-                f"📋 [{idx + 1}/{len(tasks)}] 执行任务: {task.task_name} ({task.task_id})"
-            )
-
-            # 复用单任务执行逻辑
-            execute_args = {
-                "task_id": task.task_id,
-                "additional_info": additional_info,
-            }
-
-            result = self._handle_execute_task(
-                execute_args,
-                task_list_manager,
-                agent_id,
-                is_main_agent,
-                parent_agent,
-            )
-
-            # 记录结果
-            task_result = {
-                "task_id": task.task_id,
-                "task_name": task.task_name,
-                "success": result.get("success", False),
-            }
-
-            if result.get("success"):
-                task_result["status"] = "completed"
-                task_result["output"] = result.get("stdout", "")[:500]  # 截断输出
-                completed_count += 1
-                PrettyOutput.auto_print(f"✅ 任务 {task.task_name} 执行成功")
-            else:
-                task_result["status"] = "failed"
-                task_result["error"] = result.get("stderr", "未知错误")
-                failed_count += 1
-                PrettyOutput.auto_print(
-                    f"❌ 任务 {task.task_name} 执行失败: {result.get('stderr', '未知错误')[:200]}"
-                )
-
-            results.append(task_result)
-
-        # 构建汇总结果
-        import datetime
-
-        completion_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        summary = f"""📊 **批量执行完成报告**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎯 **执行概览**
-   任务总数: {len(tasks)}
-   ✅ 成功: {completed_count}
-   ❌ 失败: {failed_count}
-   完成时间: {completion_time}
-
-📋 **详细结果**
-"""
-
-        for idx, result in enumerate(results):
-            status_icon = "✅" if result["success"] else "❌"
-            summary += f"\n{idx + 1}. {status_icon} {result['task_name']} ({result['task_id']})\n"
-            summary += f"   状态: {result['status']}\n"
-            if result["success"]:
-                summary += f"   输出摘要: {result.get('output', '')}\n"
-            else:
-                summary += f"   错误信息: {result.get('error', '')}\n"
-
-        summary += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-        return {
-            "success": True,
-            "stdout": summary,
-            "stderr": "",
-            "_internal": {
-                "total": len(tasks),
-                "completed": completed_count,
-                "failed": failed_count,
-                "results": results,
-            },
-        }
-
-    def _check_dependencies_completed(
-        self,
-        task_list_manager: Any,
-        task_list_id: str,
-        dependencies: List[str],
-        agent_id: str,
-        is_main_agent: bool,
-    ) -> Dict[str, Any]:
-        """验证依赖任务状态。
-
-        参数:
-            task_list_manager: 任务列表管理器
-            task_list_id: 任务列表 ID
-            dependencies: 依赖任务 ID 列表
-            agent_id: Agent ID
-            is_main_agent: 是否为主 Agent
-
-        返回:
-            Dict: 验证结果，包含 success 状态和错误信息
-        """
-        if not dependencies:
-            return {"success": True, "stdout": "", "stderr": ""}
-
-        incomplete_deps = []
-        failed_deps = []
-        not_found_deps = []
-
-        for dep_id in dependencies:
-            dep_task, dep_success, error_msg = task_list_manager.get_task_detail(
-                task_list_id=task_list_id,
-                task_id=dep_id,
-                agent_id=agent_id,
-                is_main_agent=is_main_agent,
-            )
-
-            if not dep_success or not dep_task:
-                not_found_deps.append(dep_id)
-                continue
-
-            if dep_task.status == TaskStatus.COMPLETED:
-                continue  # 依赖已完成，继续检查下一个
-            elif dep_task.status in (TaskStatus.FAILED, TaskStatus.ABANDONED):
-                failed_deps.append((dep_id, dep_task.task_name, dep_task.status.value))
-            else:  # PENDING 或 RUNNING
-                incomplete_deps.append(
-                    (dep_id, dep_task.task_name, dep_task.status.value)
-                )
-
-        # 构建错误信息
-        error_messages = []
-
-        if not_found_deps:
-            error_messages.append(f"依赖任务不存在: {', '.join(not_found_deps)}")
-
-        if failed_deps:
-            for dep_id, task_name, status in failed_deps:
-                error_messages.append(
-                    f"依赖任务 [{task_name}] 状态为 {status}，无法执行"
-                )
-
-        if incomplete_deps:
-            for dep_id, task_name, status in incomplete_deps:
-                error_messages.append(
-                    f"依赖任务 [{task_name}] 状态为 {status}，需要为 completed"
-                )
-
-        if error_messages:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "任务执行失败：依赖验证未通过\n"
-                + "\n".join(f"- {msg}" for msg in error_messages),
-            }
-
-        return {"success": True, "stdout": "", "stderr": ""}
-
     def _handle_update_task(
         self,
         args: Dict[str, Any],
@@ -2655,424 +2231,3 @@ class task_list_manager:
                 "stdout": "",
                 "stderr": f"更新任务失败: {str(e)}",
             }
-
-    def _is_in_tmux(self) -> bool:
-        """检测当前是否在tmux环境中运行。
-
-        Returns:
-            bool: 如果在tmux环境中返回True，否则返回False
-        """
-        import os
-
-        # 检查配置中是否启用了tmux
-        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
-
-        if not GLOBAL_CONFIG_DATA.get("enable_tmux", True):
-            return False
-
-        return "TMUX" in os.environ
-
-    def _get_tmux_session_name(self) -> Optional[str]:
-        """获取当前tmux session名称。
-
-        Returns:
-            Optional[str]: 如果在tmux环境返回session名称，否则返回None
-        """
-        return get_current_session_name()
-
-    def _is_code_agent(self, agent: Any) -> bool:
-        """判断父agent是否为CodeAgent类型。
-
-        Args:
-            agent: Agent实例
-
-        Returns:
-            bool: 如果是CodeAgent返回True，否则返回False
-        """
-        try:
-            from jarvis.jarvis_code_agent.code_agent import CodeAgent
-
-            return isinstance(agent, CodeAgent)
-        except ImportError:
-            return False
-
-    def _write_task_file(
-        self,
-        batch_dir: Any,
-        task: Any,
-        task_content: str,
-        background: str,
-        is_code_task: bool,
-    ) -> Any:
-        """将任务信息写入临时JSON文件。
-
-        Args:
-            batch_dir: 批量任务临时目录（Path对象）
-            task: 任务对象
-            task_content: 任务内容
-            background: 背景信息
-            is_code_task: 是否为代码任务（未使用但保留参数兼容性）
-
-        Returns:
-            Path: 临时文件路径
-        """
-        import json
-
-        # 创建状态文件路径，与任务ID对应
-        status_file_path = batch_dir / f"task_{task.task_id}.status"
-
-        task_data = {
-            "task_desc": task_content,
-            "background": background,
-            "status_file": str(status_file_path),
-        }
-
-        task_file = batch_dir / f"task_{task.task_id}.json"
-        task_file.write_text(
-            json.dumps(task_data, ensure_ascii=False), encoding="utf-8"
-        )
-
-        return task_file
-
-    def _wait_for_subprocesses(
-        self, task_ids: List[str], batch_dir: Any, check_interval: int = 5
-    ) -> Dict[str, bool]:
-        """等待所有子进程完成。
-
-        Args:
-            task_ids: 任务ID列表
-            batch_dir: 批量任务临时目录（Path对象）
-            check_interval: 检查间隔（秒）
-
-        Returns:
-            Dict[str, bool]: 每个任务是否完成
-        """
-        completed = {task_id: False for task_id in task_ids}
-        import json
-        import time
-        from jarvis.jarvis_utils.output import PrettyOutput
-
-        while not all(completed.values()):
-            try:
-                time.sleep(check_interval)
-
-                for task_id in task_ids:
-                    if completed[task_id]:
-                        continue
-
-                    status_file = batch_dir / f"task_{task_id}.status"
-                    if status_file.exists():
-                        try:
-                            data = json.loads(status_file.read_text(encoding="utf-8"))
-                            if data.get("status") in ("completed", "failed"):
-                                completed[task_id] = True
-                                PrettyOutput.auto_print(
-                                    f"✅ 子任务 [{task_id}] 已完成: {data.get('status')}"
-                                )
-                        except Exception:
-                            pass
-            except (KeyboardInterrupt, Exception) as e:
-                # 忽略所有异常（包括 Ctrl+C），继续等待子进程完成
-                if isinstance(e, KeyboardInterrupt):
-                    PrettyOutput.auto_print("⚠️ 检测到 Ctrl+C，继续等待子进程完成...")
-                continue
-
-        return completed
-
-    def _execute_batch_tasks_in_tmux(
-        self,
-        tasks: List[Any],
-        task_list_manager: Any,
-        task_list_id: str,
-        agent_id: str,
-        is_main_agent: bool,
-        parent_agent: Any,
-        additional_info: str,
-    ) -> Dict[str, Any]:
-        """在tmux环境下批量执行任务（并行执行）。
-
-        Args:
-            tasks: 任务对象列表
-            task_list_manager: 任务列表管理器
-            task_list_id: 任务列表ID
-            agent_id: Agent ID
-            is_main_agent: 是否为主Agent
-            parent_agent: 父Agent实例
-            additional_info: 附加信息
-
-        Returns:
-            Dict: 执行结果
-        """
-        import json
-        import uuid
-        from pathlib import Path
-        from jarvis.jarvis_utils.output import PrettyOutput
-        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
-
-        # 检测tmux环境
-        if not self._is_in_tmux():
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "不在tmux环境中，无法使用并行执行模式",
-            }
-
-        # 获取tmux session名称
-        session_name = self._get_tmux_session_name()
-        if not session_name:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": "无法获取tmux session名称",
-            }
-
-        PrettyOutput.auto_print(f"🖥️  检测到tmux环境: {session_name}")
-        PrettyOutput.auto_print(f"🚀 开始并行执行 {len(tasks)} 个任务...")
-
-        # 创建临时目录
-        batch_id = uuid.uuid4().hex[:8]
-        batch_dir = Path(f"/tmp/jarvis_batch_{batch_id}")
-        try:
-            batch_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"创建临时目录失败: {str(e)}",
-            }
-
-        try:
-            # 获取配置参数
-            model_group = GLOBAL_CONFIG_DATA.get("llm_group")
-            tool_group = GLOBAL_CONFIG_DATA.get("tool_group")
-            config_file = GLOBAL_CONFIG_DATA.get("config_file")
-
-            # 判断agent类型
-            is_code_agent = self._is_code_agent(parent_agent)
-            cmd_prefix = "jca" if is_code_agent else "jvs"
-            # 统一使用 --task-file 参数（jca 和 jvs 参数已对齐）
-            file_param = "--task-file"
-
-            PrettyOutput.auto_print(f"📝 使用命令: {cmd_prefix} {file_param}")
-
-            # 简化策略：在当前窗口为每个任务创建panel
-            task_panes: List[str] = []  # 存储每个任务分配的pane ID
-
-            # 检查session是否存在
-            if not has_session(session_name):
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f'tmux session "{session_name}" 不存在',
-                }
-
-            # 获取当前窗口索引
-            current_window = get_current_window_index()
-            if not current_window:
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": "无法获取当前窗口索引",
-                }
-
-            PrettyOutput.auto_print(f"📋 使用当前窗口: {current_window}")
-
-            # 为每个任务创建临时文件
-            task_files: List[Path] = []
-            for idx, task in enumerate(tasks):
-                PrettyOutput.auto_print(
-                    f"📋 [{idx + 1}/{len(tasks)}] 准备任务: {task.task_name} ({task.task_id})"
-                )
-
-                # 构建任务内容
-                task_content = self._build_task_content(task, additional_info)
-
-                # 构建背景信息
-                background = self._build_task_background(
-                    task_list_manager=task_list_manager,
-                    task_list_id=task_list_id,
-                    task=task,
-                    agent_id=agent_id,
-                    is_main_agent=is_main_agent,
-                    include_completed_summary=True,
-                )
-
-                # 写入任务文件
-                task_file = self._write_task_file(
-                    batch_dir, task, task_content, background, is_code_agent
-                )
-                task_files.append(task_file)
-
-                # 构建命令
-                cmd = [cmd_prefix, file_param, str(task_file), "-n"]
-                if is_code_agent:
-                    cmd.extend(["--worktree"])
-                if model_group:
-                    cmd.extend(["-g", model_group])
-                if tool_group:
-                    cmd.extend(["-G", tool_group])
-                if config_file:
-                    cmd.extend(["-f", config_file])
-
-                # 将命令列表转换为字符串
-                cmd_str = " ".join(f'"{arg}"' if " " in arg else arg for arg in cmd)
-
-                # 在当前窗口创建新panel并执行命令
-                pane_id = create_panel(
-                    session_name=session_name,
-                    window_id=current_window,
-                    initial_command=cmd_str,
-                    split_direction="h",
-                )
-
-                if pane_id:
-                    task_panes.append(pane_id)
-                    PrettyOutput.auto_print(
-                        f"✅ 为任务 [{task.task_name}] 创建panel {pane_id}"
-                    )
-                else:
-                    # 创建panel失败
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": f"为任务 [{task.task_name}] 创建tmux panel失败",
-                    }
-
-            PrettyOutput.auto_print(f"📊 已为 {len(tasks)} 个任务创建panel")
-
-            # 等待所有子进程完成
-            PrettyOutput.auto_print("⏳ 等待所有子任务完成...")
-            task_ids = [task.task_id for task in tasks]
-            self._wait_for_subprocesses(task_ids, batch_dir)
-
-            # 收集执行结果
-            results = []
-            completed_count = 0
-
-            for task in tasks:
-                task_id = task.task_id
-                status_file = batch_dir / f"task_{task_id}.status"
-                output_file = batch_dir / f"task_{task_id}.output"
-                error_file = batch_dir / f"task_{task_id}.error"
-
-                task_result = {
-                    "task_id": task_id,
-                    "task_name": task.task_name,
-                }
-
-                try:
-                    # 读取状态
-                    if status_file.exists():
-                        status_data = json.loads(
-                            status_file.read_text(encoding="utf-8")
-                        )
-                        task_status = status_data.get("status", "unknown")
-                    else:
-                        task_status = "unknown"
-
-                    # 读取输出
-                    if output_file.exists():
-                        output = output_file.read_text(encoding="utf-8")
-                    else:
-                        output = ""
-
-                    # 读取错误
-                    if error_file.exists():
-                        error = error_file.read_text(encoding="utf-8")
-                    else:
-                        error = ""
-
-                    # 更新任务状态为completed（跳过验证）
-                    if task_status == "completed":
-                        task_list_manager.update_task_status(
-                            task_list_id=task_list_id,
-                            task_id=task_id,
-                            status="completed",
-                            agent_id=agent_id,
-                            is_main_agent=is_main_agent,
-                            actual_output=output,
-                        )
-                        task_result["status"] = "completed"
-                        task_result["success"] = True
-                        task_result["output"] = output[:500]  # 截断输出
-                        completed_count += 1
-                    else:
-                        task_list_manager.update_task_status(
-                            task_list_id=task_list_id,
-                            task_id=task_id,
-                            status="completed",
-                            agent_id=agent_id,
-                            is_main_agent=is_main_agent,
-                            actual_output=f"任务完成但有警告: {error[:500]}",
-                        )
-                        task_result["status"] = "completed_with_warning"
-                        task_result["success"] = True
-                        task_result["error"] = error[:500]
-                        completed_count += 1
-                except Exception as e:
-                    # 读取失败也标记为completed
-                    task_list_manager.update_task_status(
-                        task_list_id=task_list_id,
-                        task_id=task_id,
-                        status="completed",
-                        agent_id=agent_id,
-                        is_main_agent=is_main_agent,
-                        actual_output=f"任务完成，但读取结果失败: {str(e)}",
-                    )
-                    task_result["status"] = "completed"
-                    task_result["success"] = True
-                    task_result["error"] = str(e)
-                    completed_count += 1
-
-                results.append(task_result)
-
-            # 构建汇总结果
-            import datetime
-
-            completion_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            summary = f"""📊 **批量执行完成报告（tmux并行模式）**
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🎯 **执行概览**
-   任务总数: {len(tasks)}
-   ✅ 成功: {completed_count}
-   完成时间: {completion_time}
-   执行模式: tmux并行执行
-
-📋 **详细结果**
-"""
-
-            for idx, result in enumerate(results):
-                status_icon = "✅" if result["success"] else "❌"
-                summary += f"\n{idx + 1}. {status_icon} {result['task_name']} ({result['task_id']})\n"
-                summary += f"   状态: {result['status']}\n"
-                if result.get("output"):
-                    summary += f"   输出摘要: {result.get('output', '')}\n"
-                if result.get("error"):
-                    summary += f"   错误信息: {result.get('error', '')}\n"
-
-            summary += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            summary += "\n💡 提示: 所有子任务已在tmux新窗口中并行执行完成，请使用验证工具检查结果。"
-
-            return {
-                "success": True,
-                "stdout": summary,
-                "stderr": "",
-                "_internal": {
-                    "total": len(tasks),
-                    "completed": completed_count,
-                    "failed": 0,
-                    "results": results,
-                },
-            }
-
-        finally:
-            # 清理临时文件
-            try:
-                import shutil
-
-                shutil.rmtree(batch_dir, ignore_errors=True)
-                PrettyOutput.auto_print(f"🧹 已清理临时目录: {batch_dir}")
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 清理临时目录失败: {str(e)}")
