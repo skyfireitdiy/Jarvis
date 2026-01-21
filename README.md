@@ -5,7 +5,7 @@
 </p>
 <div align="center">
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 _您的智能开发和系统交互助手_
 
@@ -129,7 +129,7 @@ Jarvis 正是为这种工作流而设计的工具。它通过无缝的命令行�
 
 - **操作系统**: Jarvis 的许多核心工具依赖于Linux环境，因此目前主要支持在 **Linux** 系统下使用。
 - **Windows用户**: 虽然未经原生测试，但 Windows 10/11 用户可以通过 **WSL (Windows Subsystem for Linux)** 来完整地体验 Jarvis 的所有功能。
-- **Python版本**: 需要 Python 3.9 或更高版本（支持 3.9-3.12）。
+- **Python版本**: 需要 Python 3.12。
 - **Docker**（可选）: 支持通过 Docker 镜像使用，无需本地安装 Python/Rust 环境。
 
 ### 安装
