@@ -2,9 +2,7 @@
 
 本目录包含以下分类的规则文件，每个分类对应一个子目录。
 
-## 技能注册 (skills/)
-
-- [技能列表]({{ jarvis_data_dir }}/rules/skills.md) - 记录所有已添加到 Jarvis 系统的技能信息，包括技能名称、功能描述、位置和添加时间
+> **注意**：本文档仅列出通用规则索引。特定领域的规则（如转译规则、语言特定规则、UI设计规则等）仍然存在于对应目录中，可通过 `load_rule` 工具直接加载使用。
 
 ## 架构设计 (architecture_design/)
 
@@ -16,8 +14,6 @@
 
 ## 开发流程 (development_workflow/)
 
-- [C2Rust 转译]({{ rule_file_dir }}/development_workflow/c2rust_transpiler.md)
-- [Go2Rust 转译]({{ rule_file_dir }}/development_workflow/go2rust_transpiler.md)
 - [Spec 驱动开发 (SDD)]({{ rule_file_dir }}/development_workflow/sdd.md)
 - [测试驱动开发 (TDD)]({{ rule_file_dir }}/development_workflow/tdd.md)
 - [重构]({{ rule_file_dir }}/development_workflow/refactoring.md)
@@ -36,38 +32,7 @@
 ## 开发工具 (development_tools/)
 
 - [脚本生成规则]({{ rule_file_dir }}/development_tools/script-generation.md)
-- [技能开发规则]({{ rule_file_dir }}/development_tools/skill-development.md)
-- [MCP集成规则]({{ rule_file_dir }}/development_tools/mcp-integration.md)
-
-## 部署规范 (deployment/)
-
-- [开源部署规则]({{ rule_file_dir }}/deployment/opensource-deployment.md)
 
 ## 性能优化 (performance/)
 
 - [性能优化]({{ rule_file_dir }}/performance/performance.md)
-- [Rust 性能优化]({{ rule_file_dir }}/performance/rust_performance.md)
-
-## UI 设计 (ui_design/)
-
-- [暗色主题设计规则]({{ rule_file_dir }}/ui_design/dark-theme-design.md)
-- [亮色主题设计规则]({{ rule_file_dir }}/ui_design/light-theme-design.md)
-- [macOS Web 设计规范]({{ rule_file_dir }}/ui_design/macos-web-design.md)
-
-## 工具配置 (tool_config/)
-
-- [新增规则规范]({{ rule_file_dir }}/tool_config/add_rule.md)
-- [告警管理规则]({{ rule_file_dir }}/tool_config/alert-management.md)
-- [自助配置规则]({{ rule_file_dir }}/tool_config/self_config.md) - 指导Agent通过自然语言智能修改Jarvis配置文件
-- [新增内置规则规范]({{ rule_file_dir }}/tool_config/add_builtin_rule.md) - 指导如何在 builtin/rules/ 目录下添加新的内置规则
-
-## 测试规范 (testing/)
-
-- [C/C++ 测试]({{ rule_file_dir }}/testing/cpp_test.md)
-- [Go 测试]({{ rule_file_dir }}/testing/go_test.md)
-- [JS/TS 测试]({{ rule_file_dir }}/testing/javascript_test.md)
-- [Java 测试]({{ rule_file_dir }}/testing/java_test.md)
-- [PHP 测试]({{ rule_file_dir }}/testing/php_test.md)
-- [Python 测试]({{ rule_file_dir }}/testing/python_test.md)
-- [Ruby 测试]({{ rule_file_dir }}/testing/ruby_test.md)
-- [Rust 测试]({{ rule_file_dir }}/testing/rust_test.md)
