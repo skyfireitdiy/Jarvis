@@ -465,24 +465,18 @@ llms:
       openai_api_base: "https://api.openai.com/v1" # API基础地址，可用于代理
       openai_extra_headers: '{"X-Source": "jarvis"}' # 额外的HTTP头（可选）
 
-# ====== 环境变量配置 ======
-# 旧版配置方式（仍支持，但推荐使用上面的 llm_config）
-ENV:
-  # 腾讯元宝
-  YUANBAO_COOKIES: "在此处粘贴您的元宝Cookies"
+  claude-opus-4: # Claude 配置示例
+    platform: claude # 平台类型
+    model: claude-opus-4-20250514 # 模型名称
+    max_input_token_count: 200000 # 模型最大输入token数
 
-  # Kimi
-  KIMI_API_KEY: ""
-
-  # 通义千问
-  TONGYI_COOKIES: ""
-
-  # OpenAI
-  OPENAI_API_KEY: ""
-  OPENAI_API_BASE: ""
+    # Claude 特定配置 (llm_config)
+    llm_config:
+      anthropic_api_key: "your-api-key-here" # 替换为你的API密钥
+      anthropic_base_url: "https://api.anthropic.com" # API基础地址，可用于代理
 ```
 
-> **注意**: 新版本推荐使用 `llm_groups` 和 `llms` 配置方式，它提供了更灵活的模型管理能力。`ENV` 配置方式仍然支持，但建议迁移到新的配置方式。
+> **注意**: 推荐使用 `llm_groups` 和 `llms` 配置方式，它提供了更灵活的模型管理能力。
 
 提示：错误回溯输出控制
 
