@@ -430,8 +430,21 @@ class FileCompleter(Completer):
                 if self._all_files_cache is None:
                     files: List[str] = []
                     for root, dirs, fnames in _os.walk(".", followlinks=False):
-                        # Exclude .git directory
-                        dirs[:] = [d for d in dirs if d != ".git"]
+                        # Explicitly include hidden directories (starting with .), but exclude .git, __pycache__, .pytest_cache, etc.
+                        dirs[:] = [
+                            d
+                            for d in dirs
+                            if d
+                            not in {
+                                ".git",
+                                "__pycache__",
+                                ".pytest_cache",
+                                ".mypy_cache",
+                                ".ruff_cache",
+                                "node_modules",
+                                "target",
+                            }
+                        ]
                         for name in fnames:
                             files.append(
                                 _os.path.relpath(_os.path.join(root, name), ".")
