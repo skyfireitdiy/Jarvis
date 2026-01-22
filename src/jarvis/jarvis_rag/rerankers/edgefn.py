@@ -51,7 +51,7 @@ class EdgeFnReranker(OnlineReranker):
             包含 (索引, 分数) 元组的列表，按分数降序排序。
         """
         try:
-            import requests  # type: ignore  # 导入第三方库requests
+            import requests
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
