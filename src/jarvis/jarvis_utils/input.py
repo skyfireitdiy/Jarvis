@@ -773,9 +773,13 @@ def _get_multiline_input_internal(
         """Handle Ctrl+X by exiting the prompt and requesting program exit."""
         event.app.exit(result=CTRL_X_SENTINEL)
 
-    @bindings.add("c-t", filter=has_focus(DEFAULT_BUFFER), eager=True)
+    @bindings.add("c-t", eager=True)
     def _(event: KeyPressEvent) -> None:
-        """Return a shell command like '!bash' for upper input_handler to execute."""
+        """Return a shell command like '!bash' for upper input_handler to execute.
+        
+        This binding works globally (without focus filter) so it can be triggered
+        even when LLM is outputting or after interrupting output with Ctrl+C.
+        """
 
         def _gen_shell_cmd() -> str:
             try:

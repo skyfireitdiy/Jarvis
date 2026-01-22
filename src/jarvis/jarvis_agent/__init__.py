@@ -3128,11 +3128,19 @@ class Agent:
             # 用户输入为空，完成任务
             return self._complete_task(auto_completed=False)
 
+        # 处理输入（包括 shell 命令等），让 input_handler 有机会处理
+        processed_input = self._process_input(user_input)
+        
+        # 如果输入处理器返回了空字符串或标记需要返回，说明已经被处理（如 shell 命令）
+        if not processed_input or self._last_handler_returned:
+            # 输入已被处理器处理（如执行了 shell 命令），不需要继续
+            return LoopAction.SKIP_TURN
+
         if any(handler.can_handle(current_response) for handler in self.output_handler):
             if self.confirm_callback("检测到有工具调用，是否继续处理工具调用？", False):
                 self.session.prompt = join_prompts(
                     [
-                        f"被用户中断，用户补充信息为：{user_input}",
+                        f"被用户中断，用户补充信息为：{processed_input}",
                         "用户同意继续工具调用。",
                     ]
                 )
@@ -3140,13 +3148,13 @@ class Agent:
             else:
                 self.session.prompt = join_prompts(
                     [
-                        f"被用户中断，用户补充信息为：{user_input}",
+                        f"被用户中断，用户补充信息为：{processed_input}",
                         "检测到有工具调用，但被用户拒绝执行。请根据用户的补充信息重新考虑下一步操作。",
                     ]
                 )
                 return LoopAction.SKIP_TURN  # 请求主循环 continue
         else:
-            self.session.prompt = f"被用户中断，用户补充信息为：{user_input}"
+            self.session.prompt = f"被用户中断，用户补充信息为：{processed_input}"
             return LoopAction.SKIP_TURN  # 请求主循环 continue
 
     def _get_next_user_action(self) -> Union[str, "LoopAction"]:
@@ -3160,7 +3168,15 @@ class Agent:
         )
 
         if user_input:
-            self.session.prompt = user_input
+            # 处理输入（包括 shell 命令等），让 input_handler 有机会处理
+            processed_input = self._process_input(user_input)
+            
+            # 如果输入处理器返回了空字符串或标记需要返回，说明已经被处理（如 shell 命令）
+            if not processed_input or self._last_handler_returned:
+                # 输入已被处理器处理（如执行了 shell 命令），继续获取下一个输入
+                return LoopAction.CONTINUE
+            
+            self.session.prompt = processed_input
             # 使用显式动作信号，保留返回类型注释以保持兼容
             return LoopAction.CONTINUE
         else:
