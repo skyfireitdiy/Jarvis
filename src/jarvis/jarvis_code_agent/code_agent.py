@@ -554,10 +554,8 @@ git reset --hard {start_commit}
                 except subprocess.CalledProcessError:
                     pass
 
-                # 统计修改次数
-                from jarvis.jarvis_stats.stats import StatsManager
-
-                StatsManager.increment("code_modifications", group="code_agent")
+                # 统计修改次数（已废弃，jarvis-stats功能已移除）
+                pass
 
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()

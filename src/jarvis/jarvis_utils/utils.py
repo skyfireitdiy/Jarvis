@@ -98,8 +98,6 @@ COMMAND_MAPPING = {
     "jm": "jarvis-methodology",
     # RAG
     "jrg": "jarvis-rag",
-    # 统计
-    "jst": "jarvis-stats",
     # 记忆整理
     "jmo": "jarvis-memory-organizer",
     # 安全分析
@@ -630,7 +628,7 @@ def _check_jarvis_updates() -> bool:
 def _show_usage_stats(
     welcome_str: str, model_group_override: Optional[str] = None
 ) -> None:
-    """显示Jarvis使用统计信息
+    """显示Jarvis欢迎信息
 
     参数:
         welcome_str: 欢迎信息字符串
@@ -641,10 +639,10 @@ def _show_usage_stats(
         from rich.console import Group
         from rich.panel import Panel
         from rich.text import Text
+        from rich.align import Align
 
         console = Console()
 
-        from jarvis.jarvis_stats.stats import StatsManager
         from jarvis.jarvis_utils.config import (
             get_cheap_model_name,
             get_cheap_platform_name,
@@ -656,255 +654,6 @@ def _show_usage_stats(
             get_jarvis_gitee_url,
         )
         import os
-        from jarvis.jarvis_stats.storage import StatsStorage
-
-        # 获取所有可用的指标
-        all_metrics = StatsManager.list_metrics()
-
-        # 根据指标名称和标签自动分类
-        categorized_stats: Dict[str, Dict[str, Any]] = {
-            "tool": {"title": "🔧 工具调用", "metrics": {}, "suffix": "次"},
-            "code": {"title": "📝 代码修改", "metrics": {}, "suffix": "次"},
-            "lines": {"title": "📊 代码行数", "metrics": {}, "suffix": "行"},
-            "commit": {"title": "💾 提交统计", "metrics": {}, "suffix": "个"},
-            "command": {"title": "📱 命令使用", "metrics": {}, "suffix": "次"},
-            "adoption": {"title": "🎯 采纳情况", "metrics": {}, "suffix": ""},
-            "other": {"title": "📦 其他指标", "metrics": {}, "suffix": ""},
-        }
-
-        # 复用存储实例，避免重复创建
-        storage = StatsStorage()
-
-        # 一次性读取元数据，避免重复读取
-        try:
-            meta = storage._load_json(storage.meta_file)
-            metrics_info = meta.get("metrics", {})
-        except Exception:
-            metrics_info = {}
-
-        # 批量读取所有总量文件，避免逐个文件操作
-        metric_totals: Dict[str, float] = {}
-        totals_dir = storage.totals_dir
-        if totals_dir.exists():
-            try:
-                for total_file in totals_dir.glob("*"):
-                    if total_file.is_file():
-                        try:
-                            with open(total_file, "r", encoding="utf-8") as f:
-                                total = float((f.read() or "0").strip() or "0")
-                                if total > 0:
-                                    metric_totals[total_file.name] = total
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-
-        # 遍历所有指标，使用批量读取的数据
-        for metric in all_metrics:
-            # 从批量读取的数据中获取总量
-            total = metric_totals.get(metric, 0.0)
-
-            if not total or total <= 0:
-                continue
-
-            # 从已加载的元数据中获取分组信息，避免重复读取
-            try:
-                info = metrics_info.get(metric, {})
-                group = info.get("group", "other")
-            except Exception:
-                group = "other"
-
-            if group == "tool":
-                categorized_stats["tool"]["metrics"][metric] = int(total)
-            elif group == "code_agent":
-                # 根据指标名称细分
-                if metric.startswith("code_lines_"):
-                    categorized_stats["lines"]["metrics"][metric] = int(total)
-                elif "commit" in metric:
-                    categorized_stats["commit"]["metrics"][metric] = int(total)
-                else:
-                    categorized_stats["code"]["metrics"][metric] = int(total)
-            elif group == "command":
-                categorized_stats["command"]["metrics"][metric] = int(total)
-            else:
-                categorized_stats["other"]["metrics"][metric] = int(total)
-
-        # 合并长短命令的历史统计数据
-        command_stats = categorized_stats["command"]["metrics"]
-        if command_stats:
-            merged_stats: Dict[str, int] = {}
-            for metric, count in command_stats.items():
-                long_command = COMMAND_MAPPING.get(metric, metric)
-                merged_stats[long_command] = merged_stats.get(long_command, 0) + count
-            categorized_stats["command"]["metrics"] = merged_stats
-
-        # 计算采纳率并添加到统计中
-        commit_stats = categorized_stats["commit"]["metrics"]
-        # 使用精确的指标名称
-        generated_commits = commit_stats.get("commits_generated", 0)
-        accepted_commits = commit_stats.get("commits_accepted", 0)
-
-        # 如果有 generated，则计算采纳率
-        if generated_commits > 0:
-            adoption_rate = (accepted_commits / generated_commits) * 100
-            categorized_stats["adoption"]["metrics"]["adoption_rate"] = (
-                f"{adoption_rate:.1f}%"
-            )
-            categorized_stats["adoption"]["metrics"]["commits_status"] = (
-                f"{accepted_commits}/{generated_commits}"
-            )
-
-        # 右侧内容：总体表现 + 使命与愿景
-        summary_content: list[str] = []
-
-        # 计算总体表现的摘要数据
-        # 总结统计
-        total_tools = sum(
-            count
-            for _, stats in categorized_stats["tool"]["metrics"].items()
-            for metric, count in {
-                k: v
-                for k, v in categorized_stats["tool"]["metrics"].items()
-                if isinstance(v, (int, float))
-            }.items()
-        )
-        total_tools = sum(
-            count
-            for metric, count in categorized_stats["tool"]["metrics"].items()
-            if isinstance(count, (int, float))
-        )
-
-        total_changes = sum(
-            count
-            for metric, count in categorized_stats["code"]["metrics"].items()
-            if isinstance(count, (int, float))
-        )
-
-        # 统计代码行数
-        lines_stats = categorized_stats["lines"]["metrics"]
-        total_lines_added = lines_stats.get(
-            "code_lines_inserted", lines_stats.get("code_lines_added", 0)
-        )
-        total_lines_deleted = lines_stats.get("code_lines_deleted", 0)
-        total_lines_modified = total_lines_added + total_lines_deleted
-
-        # 构建总体表现内容
-        if total_tools > 0 or total_changes > 0 or total_lines_modified > 0:
-            parts = []
-            if total_tools > 0:
-                parts.append(f"工具调用 {total_tools:,} 次")
-            if total_changes > 0:
-                parts.append(f"代码修改 {total_changes:,} 次")
-            if total_lines_modified > 0:
-                parts.append(f"修改代码行数 {total_lines_modified:,} 行")
-
-            if parts:
-                summary_content.append(f"📈 总计: {', '.join(parts)}")
-
-            # 添加代码采纳率显示
-            adoption_metrics = categorized_stats["adoption"]["metrics"]
-            if "adoption_rate" in adoption_metrics:
-                summary_content.append(
-                    f"✅ 代码采纳率: {adoption_metrics['adoption_rate']}"
-                )
-
-            # 计算节省的时间
-            time_saved_seconds: float = 0.0
-            tool_stats = categorized_stats["tool"]["metrics"]
-            code_agent_changes = categorized_stats["code"]["metrics"]
-            lines_stats = categorized_stats["lines"]["metrics"]
-            commit_stats = categorized_stats["commit"]["metrics"]
-            command_stats = categorized_stats["command"]["metrics"]
-
-            # 统一的工具使用时间估算（每次调用节省2分钟）
-            DEFAULT_TOOL_TIME_SAVINGS = 2 * 60  # 秒
-
-            # 计算所有工具的时间节省
-            for tool_name, count in tool_stats.items():
-                if isinstance(count, (int, float)):
-                    time_saved_seconds += count * DEFAULT_TOOL_TIME_SAVINGS
-
-            # 其他类型的时间计算
-            total_code_agent_calls: float = float(
-                sum(
-                    v
-                    for v in code_agent_changes.values()
-                    if isinstance(v, (int, float))
-                )
-            )
-            time_saved_seconds += total_code_agent_calls * 10 * 60
-            time_saved_seconds += lines_stats.get("code_lines_added", 0) * 0.8 * 60
-            time_saved_seconds += lines_stats.get("code_lines_deleted", 0) * 0.2 * 60
-            time_saved_seconds += (
-                sum(v for v in commit_stats.values() if isinstance(v, (int, float)))
-                * 10
-                * 60
-            )
-            time_saved_seconds += (
-                sum(v for v in command_stats.values() if isinstance(v, (int, float)))
-                * 1
-                * 60
-            )
-
-            if time_saved_seconds > 0:
-                total_minutes = int(time_saved_seconds / 60)
-                seconds = int(time_saved_seconds % 60)
-                hours = total_minutes // 60
-                minutes = total_minutes % 60
-
-                # 只显示小时和分钟
-                if hours > 0:
-                    time_str = f"{hours} 小时 {minutes} 分钟"
-                elif total_minutes > 0:
-                    time_str = f"{minutes} 分钟 {seconds} 秒"
-                else:
-                    time_str = f"{seconds} 秒"
-
-                summary_content.append(f"⏱️  节省时间: 约 {time_str}")
-
-                # 计算时间节省的鼓励信息
-                total_work_days = hours // 8
-                work_years = total_work_days // 240
-                remaining_days_after_years = total_work_days % 240
-                work_months = remaining_days_after_years // 20
-                remaining_days_after_months = remaining_days_after_years % 20
-                work_days = remaining_days_after_months
-                remaining_hours = int(hours % 8)
-
-                time_parts = []
-                encouragement = None
-                if work_years > 0:
-                    time_parts.append(f"{work_years} 年")
-                if work_months > 0:
-                    time_parts.append(f"{work_months} 个月")
-                if work_days > 0:
-                    time_parts.append(f"{work_days} 个工作日")
-                if remaining_hours > 0:
-                    time_parts.append(f"{remaining_hours} 小时")
-
-                if time_parts:
-                    time_description = "、".join(time_parts)
-                    if work_years >= 1:
-                        encouragement = (
-                            f"🎉 相当于节省了 {time_description} 的工作时间！"
-                        )
-                    elif work_months >= 1:
-                        encouragement = (
-                            f"🚀 相当于节省了 {time_description} 的工作时间！"
-                        )
-                    elif work_days >= 1:
-                        encouragement = (
-                            f"💪 相当于节省了 {time_description} 的工作时间！"
-                        )
-                    else:
-                        encouragement = (
-                            f"✨ 相当于节省了 {time_description} 的工作时间！"
-                        )
-                elif hours >= 1:
-                    encouragement = f"⭐ 相当于节省了 {int(hours)} 小时的工作时间，积少成多，继续保持！"
-
-                if encouragement:
-                    summary_content.append(encouragement)
 
         # 欢迎信息 Panel
         if welcome_str:
@@ -974,11 +723,8 @@ def _show_usage_stats(
             )
             console.print(Align.center(welcome_panel))
     except Exception as e:
-        # 输出错误信息以便调试
-        import traceback
-
-        PrettyOutput.auto_print(f"❌ 统计显示出错: {str(e)}")
-        PrettyOutput.auto_print(f"❌ {traceback.format_exc()}")
+        # 静默失败，不影响正常使用
+        pass
 
 
 def init_env(
@@ -2378,24 +2124,9 @@ def get_file_line_count(filename: str) -> int:
 
 
 def count_cmd_usage() -> None:
-    """统计当前命令的使用次数"""
-    import os
-    import sys
-
-    from jarvis.jarvis_stats.stats import StatsManager
-
-    # 从完整路径中提取命令名称
-    cmd_path = sys.argv[0]
-    cmd_name = os.path.basename(cmd_path)
-
-    # 如果是短命令，映射到长命令
-    if cmd_name in COMMAND_MAPPING:
-        metric_name = COMMAND_MAPPING[cmd_name]
-    else:
-        metric_name = cmd_name
-
-    # 使用 StatsManager 记录命令使用统计
-    StatsManager.increment(metric_name, group="command")
+    """统计当前命令的使用次数（已废弃，保留函数以兼容旧代码）"""
+    # jarvis-stats 功能已移除，此函数不再执行任何操作
+    pass
 
 
 def is_context_overflow(

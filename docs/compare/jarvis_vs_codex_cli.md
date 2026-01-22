@@ -63,7 +63,6 @@
 | `jarvis-methodology`           | `jm`     | 方法论知识库管理           |
 | `jarvis-rag`                   | `jrg`    | 本地化 RAG 知识库          |
 | `jarvis-smart-shell`           | `jss`    | 智能 Shell 功能            |
-| `jarvis-stats`                 | `jst`    | 统计模块，支持数据可视化   |
 | `jarvis-memory-organizer`      | `jmo`    | 记忆管理，支持导入导出     |
 | `jarvis-sec`                   | `jsec`   | 安全分析套件 (C/C++/Rust)  |
 | `jarvis-c2rust`                | `jc2r`   | C→Rust 迁移套件            |
