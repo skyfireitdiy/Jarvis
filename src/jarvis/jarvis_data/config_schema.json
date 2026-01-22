@@ -299,7 +299,7 @@
     "enable_tmux": {
       "type": "boolean",
       "description": "是否启用tmux功能",
-      "default": true
+      "default": false
     },
     "build_validation_timeout": {
       "type": "number",
