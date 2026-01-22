@@ -366,13 +366,25 @@ def handle_builtin_config_selector(
             # 查找可用的 builtin 目录（支持多候选）
             builtin_dirs: List[Path] = []
             try:
+                from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+                # 使用辅助函数查找 builtin 目录
+                builtin_dir = _get_builtin_dir()
+                if builtin_dir is not None:
+                    builtin_dirs.append(builtin_dir)
+            except Exception:
+                pass
+            
+            # 向后兼容：也尝试从文件位置向上查找（开发环境）
+            try:
                 ancestors = list(Path(__file__).resolve().parents)
                 for anc in ancestors[:8]:
                     p = anc / "builtin"
-                    if p.exists():
+                    if p.exists() and p.is_dir():
                         builtin_dirs.append(p)
             except Exception:
                 pass
+            
             # 去重，保留顺序
             _seen = set()
             _unique: List[Path] = []

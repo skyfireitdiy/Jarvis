@@ -99,6 +99,57 @@ def _get_jarvis_src_dir() -> str:
     return str(Path(__file__).parent.parent.parent.parent.resolve())
 
 
+def _get_builtin_dir() -> Path | None:
+    """获取 builtin 目录路径
+
+    此函数会尝试从多个位置查找 builtin 目录：
+    1. 从安装后的包位置查找（如果使用 uv tool install 等工具安装）
+    2. 从源码位置查找（开发环境）
+
+    返回:
+        Path: builtin 目录的路径，如果未找到则返回 None
+    """
+    # 方法1: 尝试从当前文件位置向上查找 builtin 目录
+    # 这对于开发环境和某些安装方式有效
+    current_file = Path(__file__).resolve()
+    for parent in current_file.parents:
+        builtin_dir = parent / "builtin"
+        if builtin_dir.exists() and builtin_dir.is_dir():
+            return builtin_dir
+    
+    # 方法2: 尝试从 jarvis 包安装位置查找
+    # 如果使用 uv tool install，builtin 可能被安装到包数据目录
+    try:
+        import importlib.resources
+        
+        # 尝试从 jarvis 包中查找 builtin 目录
+        try:
+            # 检查是否有 builtin 作为包数据
+            with importlib.resources.path("jarvis", "__init__.py") as jarvis_init:
+                jarvis_pkg_dir = jarvis_init.parent
+                # 尝试在包目录的父目录查找 builtin
+                for parent in jarvis_pkg_dir.parents:
+                    builtin_dir = parent / "builtin"
+                    if builtin_dir.exists() and builtin_dir.is_dir():
+                        return builtin_dir
+        except (ImportError, ModuleNotFoundError, TypeError):
+            pass
+    except ImportError:
+        pass
+    
+    # 方法3: 尝试从项目根目录查找（通过 git 或向上遍历）
+    try:
+        git_root = _get_git_root()
+        if git_root:
+            builtin_dir = Path(git_root) / "builtin"
+            if builtin_dir.exists() and builtin_dir.is_dir():
+                return builtin_dir
+    except Exception:
+        pass
+    
+    return None
+
+
 def _get_jarvis_data_dir() -> str:
     """获取jarvis数据目录
 

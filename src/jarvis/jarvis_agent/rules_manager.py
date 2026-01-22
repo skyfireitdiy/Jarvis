@@ -141,18 +141,17 @@ class RulesManager:
             str: builtin_rules.md 的完整内容，如果未找到则返回 None
         """
         try:
-            from jarvis.jarvis_utils.template_utils import _get_jarvis_src_dir
+            from jarvis.jarvis_utils.template_utils import _get_builtin_dir
 
-            # 获取索引文件路径
-            jarvis_src_dir = _get_jarvis_src_dir()
-            index_file_path = os.path.join(
-                jarvis_src_dir, "builtin", "rules", "builtin_rules.md"
-            )
+            # 获取 builtin 目录路径
+            builtin_dir = _get_builtin_dir()
+            if builtin_dir is None:
+                return None
+
+            index_file_path = builtin_dir / "rules" / "builtin_rules.md"
 
             # 检查索引文件是否存在
-            if not os.path.exists(index_file_path) or not os.path.isfile(
-                index_file_path
-            ):
+            if not index_file_path.exists() or not index_file_path.is_file():
                 return None
 
             # 读取索引文件内容
@@ -162,7 +161,7 @@ class RulesManager:
             # 使用jinja2渲染规则模板
             if index_content:
                 index_content = render_rule_template(
-                    index_content, os.path.dirname(index_file_path)
+                    index_content, str(index_file_path.parent)
                 )
 
             return index_content if index_content else None
@@ -185,18 +184,20 @@ class RulesManager:
             str: 规则内容，如果未找到则返回 None
         """
         try:
-            from jarvis.jarvis_utils.template_utils import _get_jarvis_src_dir
-
-            # 获取索引文件路径
-            jarvis_src_dir = _get_jarvis_src_dir()
-            index_file_path = os.path.join(
-                jarvis_src_dir, "builtin", "rules", "builtin_rules.md"
+            from jarvis.jarvis_utils.template_utils import (
+                _get_builtin_dir,
+                _get_jarvis_src_dir,
             )
 
+            # 获取 builtin 目录路径
+            builtin_dir = _get_builtin_dir()
+            if builtin_dir is None:
+                return None
+
+            index_file_path = builtin_dir / "rules" / "builtin_rules.md"
+
             # 检查索引文件是否存在
-            if not os.path.exists(index_file_path) or not os.path.isfile(
-                index_file_path
-            ):
+            if not index_file_path.exists() or not index_file_path.is_file():
                 return None
 
             # 读取索引文件内容
@@ -217,9 +218,11 @@ class RulesManager:
             rule_file_template = match.group(1).strip()
 
             # 渲染模板变量（支持 {{ jarvis_src_dir }} 和 {{ rule_file_dir }}）
+            # 为了向后兼容，仍然提供 jarvis_src_dir（指向 builtin 目录的父目录）
+            jarvis_src_dir = str(builtin_dir.parent) if builtin_dir else _get_jarvis_src_dir()
             context = {
                 "jarvis_src_dir": jarvis_src_dir,
-                "rule_file_dir": os.path.dirname(index_file_path),
+                "rule_file_dir": str(index_file_path.parent),
             }
 
             try:
@@ -335,20 +338,15 @@ class RulesManager:
                 # 处理 builtin 前缀
                 if prefix == "builtin":
                     try:
-                        from jarvis.jarvis_utils.template_utils import (
-                            _get_jarvis_src_dir,
-                        )
+                        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
 
-                        jarvis_src_dir = _get_jarvis_src_dir()
-                        builtin_rules_dir = os.path.join(
-                            jarvis_src_dir, "builtin", "rules"
-                        )
-                        if os.path.exists(builtin_rules_dir) and os.path.isdir(
-                            builtin_rules_dir
-                        ):
-                            return self._read_rule_from_dir(
-                                builtin_rules_dir, actual_name
-                            )
+                        builtin_dir = _get_builtin_dir()
+                        if builtin_dir is not None:
+                            builtin_rules_dir = builtin_dir / "rules"
+                            if builtin_rules_dir.exists() and builtin_rules_dir.is_dir():
+                                return self._read_rule_from_dir(
+                                    str(builtin_rules_dir), actual_name
+                                )
                     except Exception:
                         pass
                     return None

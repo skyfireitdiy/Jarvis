@@ -8,7 +8,7 @@
 
 from pathlib import Path
 
-from jarvis.jarvis_utils.template_utils import render_rule_template
+from jarvis.jarvis_utils.template_utils import _get_builtin_dir, render_rule_template
 
 
 # 内置规则字典：规则名称 -> 规则内容
@@ -43,10 +43,12 @@ def _load_rules_from_directory(directory: Path) -> None:
 
 def _load_builtin_rules() -> None:
     """加载所有内置规则"""
-    # 获取当前文件所在的项目根目录
-    # 从 src/jarvis/jarvis_agent/builtin_rules.py 定位到项目根
-    project_root = Path(__file__).parent.parent.parent.parent
-    builtin_dir = project_root / "builtin"
+    # 使用辅助函数查找 builtin 目录
+    # 支持从安装后的位置和源码位置查找
+    builtin_dir = _get_builtin_dir()
+    if builtin_dir is None:
+        # 如果找不到 builtin 目录，静默返回（可能是开发环境或安装不完整）
+        return
 
     # 加载通用规则（rules 目录）
     _load_rules_from_directory(builtin_dir / "rules")
