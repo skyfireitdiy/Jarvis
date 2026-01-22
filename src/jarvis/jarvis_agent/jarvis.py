@@ -128,11 +128,6 @@ def print_commands_overview() -> None:
             "jarvis-sec", "jsec", "安全分析套件，结合启发式扫描和 AI 深度验证"
         )
         cmd_table.add_row(
-            "jarvis-stats",
-            "jst",
-            "通用统计模块，支持记录和可视化任意指标数据",
-        )
-        cmd_table.add_row(
             "jarvis-c2rust", "jc2r", "C→Rust 迁移套件，支持渐进式迁移和智能库替代"
         )
         cmd_table.add_row(

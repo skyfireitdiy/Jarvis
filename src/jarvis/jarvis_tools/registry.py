@@ -250,43 +250,14 @@ class ToolRegistry(OutputHandlerProtocol):
         self._apply_tool_config_filter()
 
     def _get_tool_stats(self) -> Dict[str, int]:
-        """从数据目录获取工具调用统计"""
-        from datetime import datetime
-
-        from jarvis.jarvis_stats.stats import StatsManager
-
-        # 获取所有工具的统计数据
-        tool_stats = {}
-        tools = self.get_all_tools()
-
-        # 获取所有历史数据（从很早的时间开始）
-        end_time = datetime.now()
-        start_time = datetime(2000, 1, 1)  # 使用一个足够早的时间
-
-        for tool in tools:
-            tool_name = tool["name"]
-            # 获取该工具的统计数据
-            stats_data = StatsManager.get_stats(
-                metric_name=tool_name,
-                start_time=start_time,
-                end_time=end_time,
-                tags={"group": "tool"},
-            )
-
-            # 计算总调用次数
-            if stats_data and "records" in stats_data:
-                total_count = sum(record["value"] for record in stats_data["records"])
-                tool_stats[tool_name] = int(total_count)
-            else:
-                tool_stats[tool_name] = 0
-
-        return tool_stats
+        """从数据目录获取工具调用统计（已废弃，jarvis-stats功能已移除）"""
+        # jarvis-stats 功能已移除，返回空字典
+        return {}
 
     def _update_tool_stats(self, name: str) -> None:
-        """更新工具调用统计"""
-        from jarvis.jarvis_stats.stats import StatsManager
-
-        StatsManager.increment(name, group="tool")
+        """更新工具调用统计（已废弃，jarvis-stats功能已移除）"""
+        # jarvis-stats 功能已移除，此函数不再执行任何操作
+        pass
 
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
@@ -1218,15 +1189,8 @@ class ToolRegistry(OutputHandlerProtocol):
                 args_to_call["agent"] = agent
             result = tool.execute(args_to_call)
         finally:
-            # 记录工具执行耗时
-            try:
-                elapsed_time = time.perf_counter() - start_time
-                from jarvis.jarvis_stats.stats import StatsManager
-
-                StatsManager.increment(name, elapsed_time, unit="seconds", group="tool")
-            except Exception:
-                # 避免统计失败影响工具执行
-                pass
+            # 记录工具执行耗时（已废弃，jarvis-stats功能已移除）
+            pass
 
         return result
 

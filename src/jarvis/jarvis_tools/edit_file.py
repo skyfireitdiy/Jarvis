@@ -510,13 +510,8 @@ class EditFileNormalTool:
             # 获取 agent 实例（v1.0 协议中 agent 在 args 中）
             agent = args.get("agent")
 
-            # 记录 PATCH 操作调用统计
-            try:
-                from jarvis.jarvis_stats.stats import StatsManager
-
-                StatsManager.increment("patch_normal", group="tool")
-            except Exception:
-                pass
+            # 记录 PATCH 操作调用统计（已废弃，jarvis-stats功能已移除）
+            pass
 
             all_results = []
             overall_success = True

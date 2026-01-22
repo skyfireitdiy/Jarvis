@@ -359,30 +359,13 @@ class GitManager:
             )
 
     def record_code_changes_stats(self, diff_text: str) -> None:
-        """记录代码变更的统计信息。
+        """记录代码变更的统计信息（已废弃，jarvis-stats功能已移除）
 
         Args:
             diff_text: git diff的文本输出
         """
-        import re
-
-        from jarvis.jarvis_stats.stats import StatsManager
-
-        # 匹配插入行数
-        insertions_match = re.search(r"(\d+)\s+insertions?\(\+\)", diff_text)
-        if insertions_match:
-            insertions = int(insertions_match.group(1))
-            StatsManager.increment(
-                "code_lines_inserted", amount=insertions, group="code_agent"
-            )
-
-        # 匹配删除行数
-        deletions_match = re.search(r"(\d+)\s+deletions?\(\-\)", diff_text)
-        if deletions_match:
-            deletions = int(deletions_match.group(1))
-            StatsManager.increment(
-                "code_lines_deleted", amount=deletions, group="code_agent"
-            )
+        # jarvis-stats 功能已移除，此函数不再执行任何操作
+        pass
 
     def handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
@@ -466,10 +449,8 @@ class GitManager:
             commits = []
 
         if commits:
-            # 统计生成的commit数量
-            from jarvis.jarvis_stats.stats import StatsManager
-
-            StatsManager.increment("commits_generated", group="code_agent")
+            # 统计生成的commit数量（已废弃，jarvis-stats功能已移除）
+            pass
 
             commit_messages = "检测到以下提交记录:\n" + "\n".join(
                 f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits
@@ -488,10 +469,8 @@ class GitManager:
     ) -> None:
         """处理提交确认和可能的重置"""
         if commits and user_confirm("是否接受以上提交记录？", True):
-            # 统计接受的commit数量
-            from jarvis.jarvis_stats.stats import StatsManager
-
-            StatsManager.increment("commits_accepted", group="code_agent")
+            # 统计接受的commit数量（已废弃，jarvis-stats功能已移除）
+            pass
 
             subprocess.run(
                 ["git", "reset", "--mixed", str(start_commit)],
