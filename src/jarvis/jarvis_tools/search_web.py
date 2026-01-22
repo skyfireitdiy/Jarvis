@@ -8,7 +8,9 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 
 import json
+import shutil
 import subprocess
+import sys
 import requests  # 导入第三方库requests
 
 # pylint: disable=import-error,missing-module-docstring
@@ -47,6 +49,30 @@ class SearchWebTool:
         "required": ["query"],
     }
 
+    def _get_ddgr_command(self) -> list[str]:
+        """获取 ddgr 命令，支持多种调用方式
+        
+        返回:
+            list[str]: ddgr 命令列表
+        """
+        # 方法1: 尝试直接使用 ddgr 命令（如果它在 PATH 中）
+        ddgr_path = shutil.which("ddgr")
+        if ddgr_path:
+            return [ddgr_path]
+        
+        # 方法2: 尝试使用 python -m ddgr（适用于 uv tool install 等安装方式）
+        try:
+            # 检查 ddgr 模块是否可用
+            import importlib.util
+            spec = importlib.util.find_spec("ddgr")
+            if spec is not None:
+                return [sys.executable, "-m", "ddgr"]
+        except Exception:
+            pass
+        
+        # 方法3: 回退到直接使用 ddgr（让 subprocess 处理错误）
+        return ["ddgr"]
+
     def _search_with_ddgr(
         self,
         query: str,
@@ -56,9 +82,11 @@ class SearchWebTool:
         # pylint: disable=too-many-locals, broad-except
         """使用ddgr命令执行网络搜索、抓取内容并总结结果。"""
         try:
+            # 获取 ddgr 命令
+            ddgr_cmd = self._get_ddgr_command()
+            
             # 构建ddgr命令
-            cmd = [
-                "ddgr",
+            cmd = ddgr_cmd + [
                 "--json",
                 "--np",
                 "-x",
