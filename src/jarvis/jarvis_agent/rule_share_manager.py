@@ -61,13 +61,20 @@ class RuleShareManager(ShareManager):
         existing_rules = self.get_existing_resources()
 
         # 获取所有规则目录
+        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
         from jarvis.jarvis_utils.utils import get_git_root_dir
 
         git_root = get_git_root_dir()
         rule_dirs = [
             os.path.join(git_root, ".jarvis", "rules"),
-            os.path.join(git_root, "builtin", "rules"),
         ] + get_rules_load_dirs()
+        
+        # 添加 builtin 目录（如果存在）
+        builtin_dir = _get_builtin_dir()
+        if builtin_dir is not None:
+            builtin_rules_dir = builtin_dir / "rules"
+            if builtin_rules_dir.exists() and builtin_rules_dir.is_dir():
+                rule_dirs.append(str(builtin_rules_dir))
 
         # 收集所有规则文件（排除中心仓库目录和已存在的规则）
         rule_files = []
