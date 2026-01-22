@@ -1169,7 +1169,8 @@ def run_cli(
         handle_builtin_config_selector(model_group, tool_group, config_file, task)
 
     # 检测tmux并在需要时启动（在参数解析之后）
-    check_and_launch_tmux()
+    # 传入 config_file 以便在检查前加载配置
+    check_and_launch_tmux(config_file=config_file)
 
     # 初始化环境
     init_env(

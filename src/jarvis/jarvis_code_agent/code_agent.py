@@ -1362,7 +1362,8 @@ def cli(
             raise typer.Exit(code=1)
 
     # 检测tmux并在需要时启动（在参数解析之后）
-    check_and_launch_tmux()
+    # 传入 config_file 以便在检查前加载配置
+    check_and_launch_tmux(config_file=config_file)
 
     init_env(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",

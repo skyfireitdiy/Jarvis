@@ -97,7 +97,7 @@ def dispatch_to_tmux_window(
     # 检查配置中是否启用了tmux
     from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
 
-    if not GLOBAL_CONFIG_DATA.get("enable_tmux", True):
+    if not GLOBAL_CONFIG_DATA.get("enable_tmux", False):
         return False
 
     # 检查tmux是否安装
@@ -200,21 +200,51 @@ def dispatch_to_tmux_window(
 def check_and_launch_tmux(
     stay_in_session_after_exit: bool = True,
     shell_fallback: bool = True,
+    config_file: Optional[str] = None,
 ) -> None:
     """检测tmux并在需要时启动tmux会话。
 
     Args:
         stay_in_session_after_exit: 命令执行结束后是否保持会话活动（True表示启动shell保持会话，False表示直接退出）
         shell_fallback: 命令执行结束后是否启动shell作为fallback（True表示启动shell，False表示不启动shell，直接以进程为入口）
+        config_file: 配置文件路径，如果提供则先加载配置
 
     注意:
         此函数使用subprocess.execvp替换当前进程，如果成功则不会返回。
         Session名称统一使用 {username}-jarvis-{uuid} 格式。
     """
     # 检查配置中是否启用了tmux
-    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+    # 使用模块引用而不是导入，确保获取最新的 GLOBAL_CONFIG_DATA
+    import jarvis.jarvis_utils.config as config_module
+    
+    # 如果配置尚未加载，尝试加载配置
+    if not config_module.GLOBAL_CONFIG_DATA:
+        try:
+            from jarvis.jarvis_utils.utils import load_config as _load_config
+            import jarvis.jarvis_utils.utils as utils_module
+            
+            # 如果提供了 config_file，临时设置全局配置文件名
+            if config_file is not None:
+                original_config_file = getattr(utils_module, 'g_config_file', None)
+                utils_module.g_config_file = config_file
+                try:
+                    _load_config()
+                finally:
+                    # 恢复原始配置文件名
+                    if original_config_file is not None:
+                        utils_module.g_config_file = original_config_file
+                    else:
+                        utils_module.g_config_file = None
+            else:
+                # 如果没有提供 config_file，使用默认路径加载
+                _load_config()
+        except Exception:
+            # 如果加载失败，继续执行，使用默认值
+            pass
 
-    if not GLOBAL_CONFIG_DATA.get("enable_tmux", True):
+    # 检查 enable_tmux 配置（使用模块引用确保获取最新值）
+    enable_tmux = config_module.GLOBAL_CONFIG_DATA.get("enable_tmux", False)
+    if not enable_tmux:
         return
 
     # 检查tmux是否安装
