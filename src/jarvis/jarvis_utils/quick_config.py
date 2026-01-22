@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 import typer
 from rich.console import Console
-import requests  # type: ignore
+import requests
 
 from .output import PrettyOutput
 from .input import get_single_line_input, user_confirm

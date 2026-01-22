@@ -51,7 +51,7 @@ class EdgeFnEmbeddingModel(OnlineEmbeddingModel):
             嵌入向量列表。
         """
         try:
-            import requests  # type: ignore  # 导入第三方库requests
+            import requests
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",

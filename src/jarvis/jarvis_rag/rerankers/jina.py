@@ -44,7 +44,7 @@ class JinaReranker(OnlineReranker):
         调用 Jina API 获取重排分数。
         """
         try:
-            import requests  # type: ignore  # 导入第三方库requests
+            import requests
 
             headers = {
                 "Content-Type": "application/json",
