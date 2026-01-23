@@ -731,6 +731,7 @@ def init_env(
     welcome_str: str = "",
     config_file: Optional[str] = None,
     model_group: Optional[str] = None,
+    auto_upgrade: bool = True,
 ) -> None:
     """初始化Jarvis环境
 
@@ -738,6 +739,7 @@ def init_env(
         welcome_str: 欢迎信息字符串
         config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
         model_group: 模型组覆盖参数，用于显示用户指定的模型组
+        auto_upgrade: 是否自动检查并升级Jarvis，默认为True
     """
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
     try:
@@ -807,13 +809,14 @@ def init_env(
             pass
 
     # 5. 检查Jarvis更新（异步执行，避免阻塞）
-    try:
-        if _check_jarvis_updates():
-            os.execv(sys.executable, [sys.executable] + sys.argv)
-            sys.exit(0)
-    except Exception:
-        # 静默失败，不影响正常使用
-        pass
+    if auto_upgrade:
+        try:
+            if _check_jarvis_updates():
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+                sys.exit(0)
+        except Exception:
+            # 静默失败，不影响正常使用
+            pass
 
     # 6. 设置tmux窗口平铺布局（统一管理）
     try:
