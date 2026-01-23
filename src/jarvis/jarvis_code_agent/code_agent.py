@@ -1092,7 +1092,7 @@ git reset --hard {start_commit}
         if git_diff is None:
             return
 
-        if self.disable_review or not user_confirm("是否进行代码审查？", default=True):
+        if self.disable_review or not user_confirm("是否进行代码审查？", default=True if self.non_interactive else False):
             PrettyOutput.auto_print("ℹ️ 跳过代码审查（当前模式或配置不支持）")
             return
 
