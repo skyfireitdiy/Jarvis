@@ -229,7 +229,7 @@ class TaskAnalyzer:
             "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？", True if self.agent.non_interactive else False
         ):
             self._analysis_done = True
-                return
+            return
         
         # 非交互模式或用户确认后执行任务分析
         auto_completed = bool(payload.get("auto_completed", False))
