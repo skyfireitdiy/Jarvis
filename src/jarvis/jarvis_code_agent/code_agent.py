@@ -24,7 +24,10 @@ from jarvis.jarvis_code_agent.code_agent_git import GitManager
 from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
 from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
-from jarvis.jarvis_code_agent.code_agent_prompts import get_system_prompt
+from jarvis.jarvis_code_agent.code_agent_prompts import (
+    classify_user_request,
+    get_system_prompt,
+)
 from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
     ContextRecommender,
@@ -314,6 +317,21 @@ class CodeAgent(Agent):
         try:
             set_current_agent(self.name, self)
 
+            # 需求分类：使用 normal_llm 对用户需求进行分类
+            scenario = classify_user_request(
+                user_input, model_group=self.model.model_group if self.model else None
+            )
+
+            # 根据分类结果获取对应的系统提示词并更新
+            scenario_system_prompt = get_system_prompt(scenario)
+            if scenario_system_prompt != self.system_prompt:
+                self.system_prompt = scenario_system_prompt
+                # 更新模型的系统提示词
+                if self.model:
+                    # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                    prompt_text = self.prompt_manager.build_system_prompt(self)
+                    self.model.set_system_prompt(prompt_text)
+
             # 根据当前模式生成额外说明，供 LLM 感知执行策略
             prev_dir = os.getcwd()
             non_interactive_note = ""
@@ -322,7 +340,7 @@ class CodeAgent(Agent):
                     "\n\n[系统说明]\n"
                     "本次会话处于**非交互模式**：\n"
                     "- 在 PLAN 模式中给出清晰、可执行的详细计划后，应**自动进入 EXECUTE 模式执行计划**，不要等待用户额外确认；\n"
-                    "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问“是否继续”；\n"
+                    "- 在 EXECUTE 模式中，保持一步一步的小步提交和可回退策略，但不需要向用户反复询问"是否继续"；\n"
                     "- 如遇信息严重不足，可以在 RESEARCH 模式中自行补充必要分析，而不是卡在等待用户输入。\n"
                 )
 
