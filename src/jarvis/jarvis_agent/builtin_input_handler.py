@@ -170,37 +170,22 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("⚠️ 没有找到需要修复的工具调用内容")
                 return "", True
 
-            PrettyOutput.auto_print("🔧 正在尝试修复工具调用...")
+            PrettyOutput.auto_print("🔧 正在构造修复提示词...")
             error_msg = "用户请求手动修复工具调用"
 
-            # 导入修复函数
-            from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
+            # 导入提示词构造函数
+            from jarvis.jarvis_agent.utils import build_fix_prompt
 
-            # 尝试修复
-            fixed_content = fix_tool_call_with_llm(
-                agent._last_response_content, agent, error_msg
+            # 获取工具使用说明
+            tool_usage = agent.get_tool_usage_prompt()
+
+            # 构造修复提示词
+            fix_prompt = build_fix_prompt(
+                agent._last_response_content, error_msg, tool_usage
             )
 
-            if fixed_content:
-                # 修复成功，直接重新解析并执行工具调用
-                need_return, tool_prompt = agent._call_tools(fixed_content)
+            return fix_prompt, False
 
-                if need_return:
-                    return tool_prompt, True
-
-                # 将上一个提示和工具提示安全地拼接起来
-                from jarvis.jarvis_agent.utils import join_prompts
-
-                safe_tool_prompt = tool_prompt if isinstance(tool_prompt, str) else ""
-
-                agent.session.prompt = join_prompts(
-                    [agent.session.prompt, safe_tool_prompt]
-                )
-                PrettyOutput.auto_print("✅ 工具调用修复并执行成功")
-                return "", False  # 继续执行，让 LLM 处理工具执行结果
-            else:
-                PrettyOutput.auto_print("❌ 工具调用修复失败")
-                return "", True  # 修复失败，跳过本轮
         elif tag == "Pin":
             # Pin标记已在前面处理，跳过
             continue

@@ -64,23 +64,18 @@ def normalize_next_action(next_action: Any) -> str:
         return ""
 
 
-def fix_tool_call_with_llm(content: str, agent: Any, error_msg: str) -> Optional[str]:
-    """使用大模型修复工具调用格式
+def build_fix_prompt(content: str, error_msg: str, tool_usage: str) -> str:
+    """构建修复工具调用的提示词
 
     参数:
         content: 包含错误工具调用的内容
-        agent: Agent实例，用于调用大模型
         error_msg: 错误消息
+        tool_usage: 工具使用说明
 
     返回:
-        Optional[str]: 修复后的内容，如果修复失败则返回None
+        str: 构建好的提示字符串
     """
-    try:
-        # 获取工具使用说明
-        tool_usage = agent.get_tool_usage_prompt()
-
-        # 构建修复提示
-        fix_prompt = f"""你之前的工具调用格式有误，请根据工具使用说明修复以下内容。
+    return f"""你之前的工具调用格式有误，请根据工具使用说明修复以下内容。
 
 **错误信息：**
 {error_msg}
@@ -97,6 +92,25 @@ def fix_tool_call_with_llm(content: str, agent: Any, error_msg: str) -> Optional
 3. 如果使用多行字符串，推荐使用 ||| 或 ``` 分隔符包裹
 
 请直接返回修复后的完整工具调用内容，不要添加其他说明文字。"""
+
+
+def fix_tool_call_with_llm(content: str, agent: Any, error_msg: str) -> Optional[str]:
+    """使用大模型修复工具调用格式
+
+    参数:
+        content: 包含错误工具调用的内容
+        agent: Agent实例，用于调用大模型
+        error_msg: 错误消息
+
+    返回:
+        Optional[str]: 修复后的内容，如果修复失败则返回None
+    """
+    try:
+        # 获取工具使用说明
+        tool_usage = agent.get_tool_usage_prompt()
+
+        # 构建修复提示
+        fix_prompt = build_fix_prompt(content, error_msg, tool_usage)
 
         # 调用大模型修复
         PrettyOutput.auto_print("🤖 尝试使用大模型修复工具调用格式...")
