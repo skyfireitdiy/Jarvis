@@ -749,7 +749,7 @@ class EditFileNormalTool:
 
                     # 检查文件是否不在当前工作目录的子级目录下
                     # 如果不在，生成并打印 diff
-                    if not EditFileNormalTool._is_file_in_workspace_subdir(file_path):
+                    if not (EditFileNormalTool._is_file_in_workspace_subdir(file_path) and agent.agent_type == "code_agent"):
                         try:
                             # 生成 diff
                             diff_text = EditFileNormalTool._generate_diff_preview(
