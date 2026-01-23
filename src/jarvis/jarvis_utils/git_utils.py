@@ -670,6 +670,36 @@ def check_and_update_git_repo(repo_path: str) -> bool:
             PrettyOutput.auto_print(
                 f"ℹ️ 检测到新版本tag {remote_tag}，正在更新Jarvis..."
             )
+
+            # 检查是否为主版本升级(主版本号不同)
+            local_tag = decode_output(local_tag_result.stdout).strip()
+            try:
+                from packaging import version
+
+                # 移除tag前缀'v'后比较
+                local_ver = version.parse(local_tag.lstrip("v"))
+                remote_ver = version.parse(remote_tag.lstrip("v"))
+                is_major_upgrade = remote_ver.major != local_ver.major
+
+                if is_major_upgrade:
+                    PrettyOutput.auto_print(
+                        f"⚠️ 主版本升级警告: v{local_ver} -> v{remote_ver}"
+                    )
+                    PrettyOutput.auto_print(
+                        "主版本升级可能包含不兼容的API变更,建议查看发布说明。"
+                    )
+                    if not user_confirm("是否继续升级? (默认为升级)", default=True):
+                        PrettyOutput.auto_print(
+                            "ℹ️ 已取消升级,将在下次启动时再次检查更新。"
+                        )
+                        # 更新检查日期,避免重复提示
+                        os.chdir(curr_dir)
+                        with open(last_check_file, "w") as f:
+                            f.write(today_str)
+                        return False
+            except Exception:
+                # 版本解析失败时,保持原有行为继续升级
+                pass
             subprocess.run(
                 ["git", "checkout", remote_tag],
                 cwd=git_root,
