@@ -278,6 +278,33 @@ class EditFileNormalTool:
         return content.count(search_text)
 
     @staticmethod
+    def _is_file_in_workspace_subdir(file_path: str) -> bool:
+        """检查文件是否在当前工作目录的子级目录下
+
+        Args:
+            file_path: 文件路径（可以是绝对路径或相对路径）
+
+        Returns:
+            True 如果文件在当前工作目录的子级目录下，False 否则
+        """
+        try:
+            abs_file_path = os.path.abspath(file_path)
+            abs_workspace_path = os.path.abspath(os.getcwd())
+            
+            # 检查文件路径是否以工作目录路径开头
+            # 使用 os.path.commonpath 来正确处理路径
+            try:
+                common_path = os.path.commonpath([abs_file_path, abs_workspace_path])
+                # 如果公共路径等于工作目录路径，说明文件在工作目录或其子目录下
+                return os.path.abspath(common_path) == abs_workspace_path
+            except ValueError:
+                # 如果路径不在同一驱动器上（Windows），commonpath 会抛出 ValueError
+                return False
+        except Exception:
+            # 如果出现任何异常，默认返回 False
+            return False
+
+    @staticmethod
     def _generate_diff_preview(
         original_content: str,
         modified_content: str,
@@ -719,6 +746,36 @@ class EditFileNormalTool:
                             os.remove(backup_path)
                         except Exception:
                             pass
+
+                    # 检查文件是否不在当前工作目录的子级目录下
+                    # 如果不在，生成并打印 diff
+                    if not EditFileNormalTool._is_file_in_workspace_subdir(file_path):
+                        try:
+                            # 生成 diff
+                            diff_text = EditFileNormalTool._generate_diff_preview(
+                                original_content,
+                                result_or_error,
+                                file_path,
+                            )
+                            
+                            # 打印 diff（使用 diff_visualizer）
+                            from jarvis.jarvis_code_agent.diff_visualizer import visualize_diff_enhanced
+                            visualize_diff_enhanced(
+                                diff_text,
+                                file_path=file_path,
+                                mode="side_by_side",
+                                show_line_numbers=True,
+                                context_lines=3,
+                            )
+                            
+                            # 将 diff 添加到 stdout
+                            all_results.append(f"\n📝 {file_path} 的 diff（文件不在当前工作目录的子级目录下）:")
+                            all_results.append(diff_text)
+                        except Exception as diff_error:
+                            # diff 生成或打印失败不影响主流程
+                            PrettyOutput.auto_print(
+                                f"⚠️ 生成 diff 时出错: {str(diff_error)}"
+                            )
 
                     # 检查是否是部分成功（有失败的 diff）
                     failed_diffs = [dr for dr in diff_results if not dr.get("success")]
