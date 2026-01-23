@@ -1,0 +1,40 @@
+# CodeAgent 场景类型定义
+# 每个场景包含：
+#   - name: 场景的中文名称
+#   - description: 场景的描述，用于分类提示词
+
+performance:
+  name: "性能优化"
+  description: "涉及性能提升、优化响应时间、减少资源消耗、提升吞吐量等"
+
+bug_fix:
+  name: "Bug修复"
+  description: "修复代码错误、异常处理、逻辑缺陷、边界条件问题等"
+
+warning:
+  name: "告警消除"
+  description: "消除编译警告、静态分析警告、代码检查告警等"
+
+refactor:
+  name: "代码重构"
+  description: "代码结构优化、设计模式应用、代码质量提升、技术债务清理等"
+
+feature:
+  name: "功能开发"
+  description: "新增功能、实现新需求、扩展现有功能等"
+
+code_analysis:
+  name: "代码分析"
+  description: "代码审查、代码理解、架构分析、依赖分析、代码质量评估等"
+
+troubleshooting:
+  name: "故障排查"
+  description: "问题诊断、错误分析、日志分析、系统故障排查、性能问题定位等"
+
+deployment:
+  name: "软件部署"
+  description: "部署配置、环境搭建、CI/CD配置、容器化、发布流程等"
+
+default:
+  name: "通用开发"
+  description: "无法明确归类到以上场景的其他开发任务"
