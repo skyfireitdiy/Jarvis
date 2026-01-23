@@ -9,7 +9,7 @@
 - [SOLID 设计原则]({{ rule_file_dir }}/architecture_design/solid.md)
 - [整洁架构]({{ rule_file_dir }}/architecture_design/clean_architecture.md)
 - [整洁代码]({{ rule_file_dir }}/architecture_design/clean_code.md)
-- [代码反向设计规则]({{ rule_file_dir }}/architecture_design/code-reverse-design.md)
+- [反向工程规则]({{ rule_file_dir }}/architecture_design/reverse_engineering.md)
 - [架构图生成规则]({{ rule_file_dir }}/architecture_design/architecture-diagram-generation.md)
 
 ## 开发流程 (development_workflow/)

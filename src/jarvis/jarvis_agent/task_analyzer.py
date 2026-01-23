@@ -224,14 +224,11 @@ class TaskAnalyzer:
             self._analysis_done = True
             return
         
-        # 交互模式下询问用户是否执行任务分析
-        is_non_interactive = getattr(self.agent, "non_interactive", False)
-        if not is_non_interactive:
-            # 交互模式：询问用户是否执行任务分析（默认True）
-            if not self.agent.confirm_callback(
-                "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？", True if not is_non_interactive else False
-            ):
-                self._analysis_done = True
+        # 交互模式：询问用户是否执行任务分析（默认True）
+        if not self.agent.confirm_callback(
+            "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？", True if self.agent.non_interactive else False
+        ):
+            self._analysis_done = True
                 return
         
         # 非交互模式或用户确认后执行任务分析
@@ -259,15 +256,12 @@ class TaskAnalyzer:
             self._analysis_done = True
             return
         
-        # 交互模式下询问用户是否执行任务分析
-        is_non_interactive = getattr(self.agent, "non_interactive", False)
-        if not is_non_interactive:
-            # 交互模式：询问用户是否执行任务分析（默认True）
-            if not self.agent.confirm_callback(
-                "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？", True if not is_non_interactive else False
-            ):
-                self._analysis_done = True
-                return
+        # 交互模式：询问用户是否执行任务分析（默认True）
+        if not self.agent.confirm_callback(
+            "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？", True if self.agent.non_interactive else False
+        ):
+            self._analysis_done = True
+            return
         
         # 非交互模式或用户确认后执行任务分析
         auto_completed = bool(payload.get("auto_completed", False))
