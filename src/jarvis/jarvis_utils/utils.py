@@ -480,6 +480,24 @@ def _check_pip_updates() -> bool:
                 f"ℹ️ 检测到新版本 v{latest_version} (当前版本: v{__version__})"
             )
 
+            # 检查是否为主版本升级(主版本号不同)
+            is_major_upgrade = latest_ver.major != current_ver.major
+            if is_major_upgrade:
+                # 主版本升级可能包含不兼容变更,询问用户确认
+                from jarvis.jarvis_utils.input import user_confirm
+
+                PrettyOutput.auto_print(
+                    f"⚠️ 主版本升级警告: v{current_ver} -> v{latest_ver}"
+                )
+                PrettyOutput.auto_print(
+                    "主版本升级可能包含不兼容的API变更,建议查看发布说明。"
+                )
+                if not user_confirm("是否继续升级? (默认为升级)", default=True):
+                    PrettyOutput.auto_print("ℹ️ 已取消升级,将在下次启动时再次检查更新。")
+                    # 更新检查日期,避免重复提示
+                    last_check_file.write_text(today_str)
+                    return False
+
             # 检测是否通过uv tool安装
             is_uv_tool_install = _is_installed_via_uv_tool()
 
