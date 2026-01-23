@@ -445,7 +445,7 @@ def request_command(
 
 def cli():
     """Typer application entry point"""
-    init_env("")
+    init_env("", auto_upgrade=False)
     set_config("print_prompt", "false")
     app()
 
