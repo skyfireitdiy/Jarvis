@@ -2,7 +2,7 @@
 """jarvis_tools.registry 模块单元测试"""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from jarvis.jarvis_tools.registry import ToolRegistry
 from jarvis.jarvis_tools.base import Tool
@@ -84,8 +84,7 @@ class TestToolRegistry:
         assert tool_dict["name"] == "test_tool"
         assert tool_dict["description"] == "Test tool"
 
-    @patch("jarvis.jarvis_stats.stats.StatsManager")
-    def test_execute_tool_success(self, mock_stats_manager, registry, sample_tool):
+    def test_execute_tool_success(self, registry, sample_tool):
         """测试成功执行工具"""
         registry.register_tool(
             sample_tool.name,
@@ -104,10 +103,7 @@ class TestToolRegistry:
         assert "stderr" in result
         assert "不存在" in result["stderr"]
 
-    @patch("jarvis.jarvis_stats.stats.StatsManager")
-    def test_execute_tool_with_agent_v1(
-        self, mock_stats_manager, registry, sample_tool
-    ):
+    def test_execute_tool_with_agent_v1(self, registry, sample_tool):
         """测试使用 v1.0 协议执行工具（带 agent）"""
         registry.register_tool(
             sample_tool.name,
@@ -121,8 +117,7 @@ class TestToolRegistry:
         )
         assert result["success"] is True
 
-    @patch("jarvis.jarvis_stats.stats.StatsManager")
-    def test_execute_tool_with_agent_v2(self, mock_stats_manager, registry):
+    def test_execute_tool_with_agent_v2(self, registry):
         """测试使用 v2.0 协议执行工具"""
 
         def v2_tool_func(args, agent):
@@ -141,8 +136,7 @@ class TestToolRegistry:
         assert result["success"] is True
         assert result["stdout"] == "v2 output"
 
-    @patch("jarvis.jarvis_stats.stats.StatsManager")
-    def test_execute_tool_exception(self, mock_stats_manager, registry):
+    def test_execute_tool_exception(self, registry):
         """测试工具执行异常"""
 
         def failing_tool(args):
