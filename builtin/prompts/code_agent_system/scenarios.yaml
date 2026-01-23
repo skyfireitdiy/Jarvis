@@ -31,6 +31,10 @@ troubleshooting:
   name: "故障排查"
   description: "问题诊断、错误分析、日志分析、系统故障排查、性能问题定位等"
 
+config_modification:
+  name: "配置修改"
+  description: "配置文件修改、参数调整、配置项添加/删除、配置文件格式更新、配置迁移等"
+
 deployment:
   name: "软件部署"
   description: "部署配置、环境搭建、CI/CD配置、容器化、发布流程等"
