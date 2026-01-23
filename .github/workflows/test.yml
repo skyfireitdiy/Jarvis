@@ -45,5 +45,5 @@ jobs:
       - name: Verify installation
         run: |
           set -euo pipefail
-          test -x "$HOME/Jarvis/.venv/bin/jarvis"
+          test -x "$HOME/.local/bin/jarvis"
           
