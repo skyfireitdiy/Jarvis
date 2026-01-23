@@ -178,24 +178,18 @@ def _load_prompt_from_file(scenario: str) -> str:
 def get_system_prompt(scenario: str = "default") -> str:
     """根据场景类型获取对应的系统提示词
     
-    从文件加载提示词。对于非default场景，会将场景特定内容追加到default提示词后面。
+    从文件加载完整的提示词。每个场景的提示词文件都包含完整的提示词内容，
+    包括基础的 ARCHER 流程和场景特定的指导，可以根据场景调整 ARCHER 流程的要求。
     
     参数:
-        scenario: 场景类型（performance/bug_fix/warning/refactor/feature/code_analysis/troubleshooting/deployment/default）
+        scenario: 场景类型（performance/bug_fix/warning/refactor/feature/code_analysis/troubleshooting/deployment/config_modification/default）
         
     返回:
-        str: 对应场景的系统提示词
+        str: 对应场景的完整系统提示词
         
     异常:
         FileNotFoundError: 如果提示词文件不存在
         IOError: 如果文件读取失败
     """
-    # 从文件加载场景特定提示词
-    file_content = _load_prompt_from_file(scenario)
-    
-    # 对于非default场景，需要追加到default提示词后面
-    if scenario != "default":
-        default_content = _load_prompt_from_file("default")
-        return default_content + "\n\n" + file_content
-    else:
-        return file_content
+    # 直接从文件加载完整的提示词
+    return _load_prompt_from_file(scenario)
