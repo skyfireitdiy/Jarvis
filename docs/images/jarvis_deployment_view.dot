@@ -35,10 +35,9 @@ digraph G {
     style = "filled";
     color = "#e8e8e8";
     node [fillcolor="#D5E8D4", color="#82B366"];
-    llm_yuanbao [label="Yuanbao 平台\n(HTTPS + 流式API)"];
-    llm_tongyi [label="Tongyi 平台\n(HTTPS + SSE/流式)"];
     llm_openai [label="OpenAI 平台\n(HTTPS + 流式)"];
-    { rank=same; llm_yuanbao; llm_tongyi; llm_openai; }
+    llm_claude [label="Claude 平台\n(HTTPS + 流式)"];
+    { rank=same; llm_openai; llm_claude; }
   }
 
   // 远端MCP服务
@@ -79,13 +78,8 @@ digraph G {
   agent_proc -> data_project [xlabel="项目记忆/.jarvis"];
 
   // LLM平台通信（HTTPS/流式）
-  agent_proc -> llm_yuanbao [xlabel="HTTPS (stream_post)"];
-  agent_proc -> llm_tongyi [xlabel="HTTPS + SSE"];
   agent_proc -> llm_openai [xlabel="HTTPS (OpenAI API)"];
-
-  // 文件上传（受平台支持）
-  {agent_proc; tool_registry} -> llm_yuanbao [xlabel="文件上传(支持)"];
-  {agent_proc; tool_registry} -> llm_tongyi [xlabel="文件上传(支持)"];
+  agent_proc -> llm_claude [xlabel="HTTPS (Claude API)"];
 
   // MCP远端通信
   tool_registry -> mcp_sse_srv [xlabel="HTTPS SSE 通道"];
@@ -101,7 +95,7 @@ digraph G {
   tool_registry -> internet [xlabel="search_web 抓取/访问", style=dashed];
 
   // 对齐
-  { rank=same; llm_yuanbao; llm_tongyi; llm_openai; }
+  { rank=same; llm_openai; llm_claude; }
   { rank=same; mcp_sse_srv; mcp_stream_srv; }
   { rank=same; central_tool_repo; central_method_repo; internet; }
 }

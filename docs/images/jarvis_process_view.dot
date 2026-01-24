@@ -22,9 +22,8 @@ digraph G {
     style = "filled";
     color = "#e8e8e8";
     node [fillcolor="#D5E8D4", color="#82B366"];
-    model_yuanbao [label="Yuanbao平台\nHTTP流（stream_post）"];
-    model_tongyi [label="Tongyi平台\nSSE流（stream_post）"];
     model_openai [label="OpenAI平台\nAPI流（client.stream）"];
+    model_claude [label="Claude平台\nAPI流（client.stream）"];
     system_prompt [label="系统提示注入"];
     file_upload [label="文件上传（支持平台）"];
   }
@@ -71,19 +70,15 @@ digraph G {
 
   // 每轮：组装提示 -> 模型调用（流式）
   agent_loop -> system_prompt [xlabel="构建系统/附加提示"];
-  system_prompt -> model_yuanbao [xlabel="chat_until_success"];
-  system_prompt -> model_tongyi [xlabel="chat_until_success"];
   system_prompt -> model_openai [xlabel="chat_until_success"];
+  system_prompt -> model_claude [xlabel="chat_until_success"];
 
   // 文件上传（上下文超限或方法论/文件分析）
   agent_loop -> file_upload [xlabel="需要上传时"];
-  file_upload -> model_yuanbao [xlabel="上传附件"];
-  file_upload -> model_tongyi [xlabel="上传附件"];
 
   // 流式响应返回到主循环
-  model_yuanbao -> agent_loop [xlabel="流式响应"];
-  model_tongyi -> agent_loop [xlabel="流式响应"];
   model_openai -> agent_loop [xlabel="流式响应"];
+  model_claude -> agent_loop [xlabel="流式响应"];
 
   // 工具调用路径
   agent_loop -> tool_registry [xlabel="检测/解析工具块"];
@@ -117,6 +112,6 @@ digraph G {
   tool_registry -> tools_repo [xlabel="扫描加载工具/方法论", style=dashed];
 
   // 对齐
-  { rank=same; model_yuanbao; model_tongyi; model_openai; }
+  { rank=same; model_openai; model_claude; }
   { rank=same; execute_script_proc; virtual_tty_sess; mcp_stdio; mcp_sse; mcp_stream; }
 }

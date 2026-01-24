@@ -123,8 +123,8 @@ class TestLoadRoleConfig:
                 {
                     "name": "role2",
                     "description": "Role 2",
-                    "platform": "kimi",
-                    "model": "moonshot-v1-8k",
+                    "platform": "claude",
+                    "model": "claude-3-sonnet-20240229",
                 },
             ]
         }

@@ -11,7 +11,7 @@ digraph G {
     color = "#dddddd";
     node [shape=box, fillcolor="#FFE6CC", color="#D79B00"];
     actor_user [label="CLI用户（终端使用者）"];
-    actor_llm [label="LLM平台（Yuanbao/Tongyi/OpenAI）"];
+    actor_llm [label="LLM平台（OpenAI/Claude）"];
     actor_mcp [label="MCP服务提供者（外部工具）"];
     actor_git [label="Git仓库/本地项目"];
     actor_web [label="互联网/Web资源"];

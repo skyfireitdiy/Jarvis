@@ -63,10 +63,9 @@ digraph G {
     color = "#e8e8e8";
     node [group=platform, fillcolor="#D5E8D4", color="#82B366"];
     platform_registry [label="平台注册表（PlatformRegistry）"];
-    p_yuanbao [label="平台：Yuanbao（支持Web/文件）"];
-    p_tongyi [label="平台：Tongyi（支持Web/文件）"];
     p_openai [label="平台：OpenAI（基础对话）"];
-    { rank=same; p_yuanbao; p_tongyi; p_openai; }
+    p_claude [label="平台：Claude（基础对话）"];
+    { rank=same; p_openai; p_claude; }
   }
 
   // 数据与外部资源层
@@ -112,12 +111,10 @@ digraph G {
   tool_registry -> t_methodology;
   // 平台交互
   agent -> platform_registry [label="创建平台实例"];
-  platform_registry -> p_yuanbao;
-  platform_registry -> p_tongyi;
   platform_registry -> p_openai;
-  run_loop -> p_yuanbao [label="对话/流式输出"];
-  run_loop -> p_tongyi [label="对话/流式输出"];
+  platform_registry -> p_claude;
   run_loop -> p_openai [label="对话/流式输出"];
+  run_loop -> p_claude [label="对话/流式输出"];
   // 数据与外部资源交互
   memory_mgr -> memory_store [label="读/写记忆"];
   t_save_memory -> memory_store [label="写入"];
@@ -125,8 +122,6 @@ digraph G {
   t_methodology -> tools_repo [label="方法论文件"];
   tool_registry -> tools_repo [label="加载工具/方法论"];
   t_search_web -> web_internet [label="抓取/总结"];
-  t_file_analyzer -> p_yuanbao [label="文件上传/分析"];
-  t_file_analyzer -> p_tongyi [label="文件上传/分析"];
   t_execute_script -> web_internet [label="外部命令/网络"];
   tool_registry -> mcp_servers [label="加载MCP工具"];
   t_sub_agent -> agent [label="子任务编排", style=dashed];
