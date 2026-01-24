@@ -11,20 +11,10 @@ import json
 import shutil
 import subprocess
 import sys
-import requests  # 导入第三方库requests
 
 # pylint: disable=import-error,missing-module-docstring
-# fmt: off
-from markdownify import markdownify as md
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import calculate_content_token_limit
-from jarvis.jarvis_utils.config import get_llm_config
-from jarvis.jarvis_utils.config import get_normal_model_name
-from jarvis.jarvis_utils.config import get_normal_platform_name
-from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.http import get as http_get
 
 # fmt: on
 
@@ -51,7 +41,7 @@ class SearchWebTool:
 
     def _get_ddgr_command(self) -> list[str]:
         """获取 ddgr 命令，支持多种调用方式
-        
+
         返回:
             list[str]: ddgr 命令列表
         """
@@ -59,17 +49,18 @@ class SearchWebTool:
         ddgr_path = shutil.which("ddgr")
         if ddgr_path:
             return [ddgr_path]
-        
+
         # 方法2: 尝试使用 python -m ddgr（适用于 uv tool install 等安装方式）
         try:
             # 检查 ddgr 模块是否可用
             import importlib.util
+
             spec = importlib.util.find_spec("ddgr")
             if spec is not None:
                 return [sys.executable, "-m", "ddgr"]
         except Exception:
             pass
-        
+
         # 方法3: 回退到直接使用 ddgr（让 subprocess 处理错误）
         return ["ddgr"]
 
@@ -84,7 +75,7 @@ class SearchWebTool:
         try:
             # 获取 ddgr 命令
             ddgr_cmd = self._get_ddgr_command()
-            
+
             # 构建ddgr命令
             cmd = ddgr_cmd + [
                 "--json",
@@ -131,14 +122,21 @@ class SearchWebTool:
             PrettyOutput.auto_print(f"📝 查询关键词: {query}")
             PrettyOutput.auto_print(f"📊 搜索结果数: {len(results)}")
             PrettyOutput.auto_print("\n📄 搜索摘要:")
+
+            # 收集搜索结果并格式化输出
+            results_text = ""
+            visited_urls = []
+
             for idx, r in enumerate(results[:10], 1):
                 title = r.get("title", "")
                 url = r.get("url", "")
                 abstract = r.get("abstract", "")
+
                 if title:
                     PrettyOutput.auto_print(f"  {idx}. {title}")
                     if url:
                         PrettyOutput.auto_print(f"     URL: {url}")
+                        visited_urls.append(url)
                     if abstract:
                         PrettyOutput.auto_print(
                             f"     摘要: {abstract[:150]}..."
@@ -146,119 +144,26 @@ class SearchWebTool:
                             else f"     摘要: {abstract}"
                         )
 
-            full_content = ""
-            visited_urls = []
-            visited_count = 0
+                    # 添加到返回文本
+                    results_text += f"{idx}. {title}\n"
+                    if url:
+                        results_text += f"   URL: {url}\n"
+                    if abstract:
+                        results_text += f"   摘要: {abstract}\n"
+                    results_text += "\n"
 
-            # 首先收集所有abstract作为基础内容
-            for r in results:
-                url = r.get("url", "")
-                title = r.get("title", "")
-                abstract = r.get("abstract", "")
-
-                # 添加abstract到内容中
-                if abstract:
-                    full_content += f"标题: {title}\n摘要: {abstract}\n\n"
-
-            # 首先计算一次内容长度限制（基于剩余token）
-            content_token_limit = calculate_content_token_limit(agent)
-
-            # 然后抓取前10个URL的详细内容
-            for r in results:
-                if visited_count >= 10:
-                    break
-
-                url = r.get("url", "")
-                if url:
-                    PrettyOutput.auto_print(
-                        f"\n⏳ 正在访问 ({visited_count + 1}/{min(10, len(results))}): {url}"
-                    )
-                    try:
-                        response = http_get(url, timeout=10.0, allow_redirects=True)
-                        content = md(response.text, strip=["script", "style"])
-                        if content:
-                            # 计算剩余可用的内容长度限制（token数）
-                            remaining_limit = (
-                                content_token_limit
-                                - get_context_token_count(full_content)
-                            )
-                            # 如果剩余限制不足且已有成功获取的内容，停止获取后续网页
-                            if remaining_limit <= 0:
-                                if visited_count > 0:
-                                    PrettyOutput.auto_print(
-                                        f"⚠️ 内容长度已达限制且已成功获取 {visited_count} 个网页内容，停止获取后续网页"
-                                    )
-                                    break
-                                PrettyOutput.auto_print(
-                                    f"⚠️ 内容长度已达限制，跳过: {url}"
-                                )
-                                continue
-                            # 基于token限制截取内容（保守估计：1 token ≈ 4 字符，用字符数保守截取）
-                            content_preview = content[: remaining_limit * 4]
-                            full_content += (
-                                f"URL: {url}\n内容预览: {content_preview}\n\n"
-                            )
-                            visited_urls.append(url)
-                            visited_count += 1
-                            PrettyOutput.auto_print(
-                                f"✅ 已抓取内容 ({len(content_preview)} 字符)"
-                            )
-                    except requests.exceptions.HTTPError as e:
-                        PrettyOutput.auto_print(
-                            f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}"
-                        )
-                    except requests.exceptions.RequestException as e:
-                        PrettyOutput.auto_print(f"⚠️ 请求错误: {e}")
-
-            if not full_content.strip():
-                return {
-                    "stdout": "无法从任何URL抓取有效内容。",
-                    "stderr": "抓取内容失败。",
-                    "success": False,
-                }
-
-            urls_list = "\n".join(f"  - {u}" for u in visited_urls)
-            if urls_list:
-                full_content = f"参考URL:\n{urls_list}\n\n{full_content}"
-
-            summary_prompt = f'请为查询"{query}"总结以下内容：\n\n{full_content}'
-
-            # 使用normal模型进行总结
-            platform_name = get_normal_platform_name(None)
-            model_name = get_normal_model_name(None)
-            # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
-            llm_config = get_llm_config("normal", None)
-
-            model = PlatformRegistry().create_platform(platform_name, llm_config)
-            if not model:
-                return {
-                    "stdout": "",
-                    "stderr": "无法创建用于总结的模型。",
-                    "success": False,
-                }
-
-            model.set_model_name(model_name)
-            model.set_suppress_output(False)
-            summary = model.chat_until_success(summary_prompt)
-
-            PrettyOutput.auto_print("\n💡 总结结果:")
-            PrettyOutput.auto_print(summary)
-
-            # 添加来源信息到总结文本中，便于LLM使用read_webpage验证
+            # 添加参考来源
             if visited_urls:
-                sources_text = "\n\n参考来源:\n" + "\n".join(
+                sources_text = "\n参考来源:\n" + "\n".join(
                     f"- {url}" for url in visited_urls
                 )
-                summary_with_sources = summary + sources_text
+                results_text += sources_text
                 PrettyOutput.auto_print("\n📚 参考来源:")
                 for url in visited_urls:
                     PrettyOutput.auto_print(f"  - {url}")
-            else:
-                summary_with_sources = summary
-                visited_urls = []
 
             return {
-                "stdout": summary_with_sources,
+                "stdout": results_text,
                 "stderr": "",
                 "success": True,
                 "sources": visited_urls,
