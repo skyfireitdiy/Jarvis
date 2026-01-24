@@ -70,7 +70,7 @@ def find_git_root_and_cd(start_dir: str = ".", allow_init: bool = False) -> str:
         git_root = decode_output(result.stdout).strip()
         if not git_root:
             if allow_init:
-                subprocess.run(["git", "init"], check=True)
+                subprocess.run(["git", "init"], check=True, capture_output=True)
                 git_root = os.path.abspath(".")
             else:
                 raise subprocess.CalledProcessError(
@@ -79,7 +79,7 @@ def find_git_root_and_cd(start_dir: str = ".", allow_init: bool = False) -> str:
     except subprocess.CalledProcessError:
         # 如果不是Git仓库
         if allow_init:
-            subprocess.run(["git", "init"], check=True)
+            subprocess.run(["git", "init"], check=True, capture_output=True)
             git_root = os.path.abspath(".")
         else:
             raise
@@ -140,7 +140,9 @@ def has_uncommitted_changes() -> bool:
     for file_path in manually_staged_files:
         if os.path.exists(file_path):
             # 使用 -f 参数强制添加被 .gitignore 忽略的文件
-            subprocess.run(["git", "add", "-f", file_path], check=False)
+            subprocess.run(
+                ["git", "add", "-f", file_path], check=False, capture_output=True
+            )
 
     return working_changes or staged_changes
 
@@ -205,7 +207,7 @@ def get_diff() -> str:
             )
         else:
             # 暂存新增文件
-            subprocess.run(["git", "add", "-N", "."], check=True)
+            subprocess.run(["git", "add", "-N", "."], check=True, capture_output=True)
 
             # 获取所有差异（包括新增文件）
             result = subprocess.run(
@@ -213,7 +215,7 @@ def get_diff() -> str:
             )
 
             # 重置暂存区
-            subprocess.run(["git", "reset"], check=True)
+            subprocess.run(["git", "reset"], check=True, capture_output=True)
 
         return decode_output(result.stdout)
 
@@ -342,11 +344,17 @@ def revert_file(filepath: str) -> None:
             text=False,  # 禁用自动文本解码
         )
         if result.returncode == 0:
-            subprocess.run(["git", "checkout", "HEAD", "--", filepath], check=True)
+            subprocess.run(
+                ["git", "checkout", "HEAD", "--", filepath],
+                check=True,
+                capture_output=True,
+            )
         else:
             if os.path.exists(filepath):
                 os.remove(filepath)
-        subprocess.run(["git", "clean", "-f", "--", filepath], check=True)
+        subprocess.run(
+            ["git", "clean", "-f", "--", filepath], check=True, capture_output=True
+        )
     except subprocess.CalledProcessError as e:
         error_msg = decode_output(e.stderr) if e.stderr else str(e)
         PrettyOutput.auto_print(f"❌ 恢复文件失败: {error_msg}")
@@ -367,8 +375,10 @@ def revert_change() -> None:
             stdout=subprocess.PIPE,
         )
         if head_check.returncode == 0:
-            subprocess.run(["git", "reset", "--hard", "HEAD"], check=True)
-        subprocess.run(["git", "clean", "-fd"], check=True)
+            subprocess.run(
+                ["git", "reset", "--hard", "HEAD"], check=True, capture_output=True
+            )
+        subprocess.run(["git", "clean", "-fd"], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         PrettyOutput.auto_print(f"❌ 恢复更改失败: {str(e)}")
 
@@ -505,7 +515,9 @@ def handle_commit_workflow() -> bool:
         commit_count = int(decode_output(commit_result.stdout).strip())
 
         # 暂存所有修改
-        subprocess.run(["git", "add", "."], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "add", "."], check=True, capture_output=True, stderr=subprocess.PIPE
+        )
 
         # 提交变更
         subprocess.run(
@@ -637,7 +649,9 @@ def check_and_update_git_repo(repo_path: str) -> bool:
             return False
 
         # 获取远程tag更新
-        subprocess.run(["git", "fetch", "--tags"], cwd=git_root, check=True)
+        subprocess.run(
+            ["git", "fetch", "--tags"], cwd=git_root, check=True, capture_output=True
+        )
         # 获取最新本地tag
         local_tag_result = subprocess.run(
             ["git", "describe", "--tags", "--abbrev=0"],
@@ -706,6 +720,7 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                 ["git", "checkout", remote_tag],
                 cwd=git_root,
                 check=True,
+                stderr=subprocess.PIPE,
             )
             PrettyOutput.auto_print(f"✅ Jarvis已更新到tag {remote_tag}")
 
@@ -814,7 +829,7 @@ def get_diff_file_list() -> List[str]:
         confirm_add_new_files()
 
         # 暂存新增文件
-        subprocess.run(["git", "add", "-N", "."], check=True)
+        subprocess.run(["git", "add", "-N", "."], check=True, capture_output=True)
 
         # 获取所有差异文件（包括新增文件）
         result = subprocess.run(
@@ -822,7 +837,7 @@ def get_diff_file_list() -> List[str]:
         )
 
         # 重置暂存区
-        subprocess.run(["git", "reset"], check=True)
+        subprocess.run(["git", "reset"], check=True, capture_output=True)
 
         if result.returncode != 0:
             PrettyOutput.auto_print(
