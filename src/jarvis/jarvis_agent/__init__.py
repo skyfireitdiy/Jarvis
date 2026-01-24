@@ -1513,34 +1513,40 @@ class Agent:
 
         try:
             # 获取对话历史
-            history = self.model.get_conversation_history()
+            history = self.model.get_messages()
             if not history:
                 return False
 
-            # 分离系统消息和其他消息
-            system_messages = []
-            other_messages = []
-            for msg in history:
-                role = msg.get("role", "").lower()
-                if role == "system":
-                    system_messages.append(msg)
-                else:
-                    other_messages.append(msg)
-
-            # 直接截取最后9条消息（正常消息是交替的）
-            if len(other_messages) < window_size:
+            # 找到系统消息的结束位置（系统消息通常在开头，需要保留）
+            system_end_idx = 0
+            for i, msg in enumerate(history):
+                if msg.get("role", "").lower() != "system":
+                    system_end_idx = i
+                    break
+            else:
+                # 如果所有消息都是系统消息，无法压缩
                 return False
 
-            # 截取最后window_size条消息
-            recent_messages = other_messages[-window_size:]
+            # 系统消息（需要保留）
+            system_messages = history[:system_end_idx]
+            # 非系统消息（需要压缩的部分）
+            non_system_messages = history[system_end_idx:]
 
-            # 如果其他消息数量不足窗口大小的2倍，不需要压缩
+            # 只对非系统消息进行窗口压缩
+            if len(non_system_messages) < window_size:
+                return False
+
+            # 截取最后window_size条非系统消息
+            recent_messages = non_system_messages[-window_size:]
+
+            # 如果非系统消息数量不足窗口大小的2倍，不需要压缩
             # （需要至少2倍，因为压缩后还需要保留窗口）
-            if len(other_messages) <= window_size * 2:
+            if len(non_system_messages) <= window_size * 2:
                 return False
 
-            # 分离更早的消息（不在保留列表中的消息）
-            old_messages = other_messages[:-window_size]
+            # 分离更早的非系统消息（不在保留列表中的消息）
+            # 多截取一条，是因为 s u a u a u a u a u a u a
+            old_messages = non_system_messages[:-window_size+1]
 
             if not old_messages:
                 return False
@@ -1550,8 +1556,7 @@ class Agent:
                 # 创建临时模型（不传入系统提示词，因为会通过 set_messages 设置）
                 temp_model = self._create_temp_model()
 
-                # 使用 set_messages 设置对话历史，让模型能正确理解对话结构
-                # 注意：必须包含系统消息，否则模型没有系统提示词会返回空值
+                # 使用 set_messages 设置对话历史，包含系统消息和需要压缩的旧消息
                 messages_to_set = system_messages + old_messages
                 temp_model.set_messages(messages_to_set)
 
@@ -1581,7 +1586,7 @@ class Agent:
                     "content": formatted_summary,
                 }
 
-                # 重建消息列表：系统消息 + 压缩摘要 + 最近的消息
+                # 重建消息列表：系统消息 + 压缩摘要 + 最近的非系统消息
                 new_history = system_messages + [compressed_msg] + recent_messages
 
                 # 更新模型的消息历史，使用 set_messages 方法确保正确更新 conversation_turn

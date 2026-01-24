@@ -15,7 +15,7 @@ class TestSlidingWindowCompression:
         """创建模拟的模型对象"""
         model = Mock()
         model.messages = []
-        model.get_conversation_history = Mock(return_value=[])
+        model.get_messages = Mock(return_value=[])
         model.get_remaining_token_count = Mock(return_value=1000)
         model.chat_until_success = Mock(return_value="压缩后的摘要内容")
 
@@ -86,7 +86,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=10, assistant_count=10, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -119,7 +119,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=10, assistant_count=10, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -140,7 +140,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=5, assistant_count=5, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -156,7 +156,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=9, assistant_count=9, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -172,7 +172,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=10, assistant_count=10, system_count=3
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -194,7 +194,7 @@ class TestSlidingWindowCompression:
             user_count=10, assistant_count=10, system_count=1
         )
         messages.append({"role": "tool", "content": "tool返回的内容"})
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -216,7 +216,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=10, assistant_count=10, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -246,7 +246,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=10, assistant_count=10, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
@@ -268,7 +268,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=10, assistant_count=10, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 模拟临时模型返回空摘要
@@ -288,7 +288,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=15, assistant_count=15, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩，使用自定义窗口大小5
@@ -306,7 +306,7 @@ class TestSlidingWindowCompression:
         messages = self._create_messages(
             user_count=10, assistant_count=10, system_count=1
         )
-        mock_model.get_conversation_history.return_value = messages
+        mock_model.get_messages.return_value = messages
         mock_model.messages = messages.copy()
 
         # 执行压缩
