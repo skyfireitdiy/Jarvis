@@ -770,18 +770,6 @@ class BasePlatform(ABC):
             # Do not break chat flow if writing history fails
             pass
 
-    def get_conversation_history(self) -> List[Dict[str, str]]:
-        """获取当前对话历史
-
-        返回:
-            List[Dict[str, str]]: 对话历史列表，每个元素包含 role 和 content
-
-        注意:
-            默认实现检查是否有 messages 属性，子类可以重写此方法以提供自定义实现
-        """
-        if hasattr(self, "messages"):
-            return getattr(self, "messages", [])
-        return []
 
     def get_used_token_count(self) -> int:
         """计算当前对话历史使用的token数量
@@ -789,7 +777,7 @@ class BasePlatform(ABC):
         返回:
             int: 当前对话历史使用的token数量
         """
-        history = self.get_conversation_history()
+        history = self.get_messages()
         if not history:
             return 0
 

@@ -204,6 +204,7 @@ class OpenAIModel(BasePlatform):
         说明:
             设置后会立即添加到消息历史中
         """
+        self.messages = []
         self.system_message = message
         self.messages.append({"role": "system", "content": self.system_message})
 
@@ -220,6 +221,9 @@ class OpenAIModel(BasePlatform):
         异常:
             当API调用失败时会抛出异常并打印错误信息
         """
+        # 记录添加用户消息前的消息列表长度，用于失败时回滚
+        messages_before_user = len(self.messages)
+        
         try:
             # Add user message to history (过滤 think 标签)
             filtered_message = self._filter_think_tags(message)
@@ -312,6 +316,9 @@ class OpenAIModel(BasePlatform):
             return None
 
         except Exception as e:
+            # 失败时回滚：移除已添加的用户消息
+            if len(self.messages) > messages_before_user:
+                self.messages = self.messages[:messages_before_user]
             PrettyOutput.auto_print(f"❌ 对话失败：{str(e)}")
             raise Exception(f"Chat failed: {str(e)}")
 
