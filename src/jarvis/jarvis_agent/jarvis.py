@@ -778,6 +778,12 @@ def run_cli(
         "--rule-names",
         help="规则名称列表（逗号分隔），用于加载指定的规则",
     ),
+    optimize_system_prompt: bool = typer.Option(
+        False,
+        "-o",
+        "--optimize-system-prompt",
+        help="自动优化系统提示词：根据用户需求使用大模型优化系统提示词",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1212,6 +1218,7 @@ def run_cli(
             non_interactive=non_interactive,
             allow_savesession=True,
             rule_names=rule_names,
+            optimize_system_prompt=optimize_system_prompt,
             **extra_kwargs,
         )
         agent_manager.initialize()
