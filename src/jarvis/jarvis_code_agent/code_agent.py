@@ -105,7 +105,7 @@ class CodeAgent(Agent):
 
         # 父类初始化准备和调用
         explicit_params = self._prepare_code_agent_parent_init(
-            model_group, need_summary, non_interactive, base_tools, kwargs
+            model_group, need_summary, non_interactive, base_tools, optimize_system_prompt, kwargs
         )
         super().__init__(**explicit_params, **kwargs)
 
@@ -215,6 +215,7 @@ class CodeAgent(Agent):
         need_summary: bool,
         non_interactive: Optional[bool],
         base_tools: List[str],
+        optimize_system_prompt: bool,
         kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
         """准备 CodeAgent 父类初始化的参数
@@ -224,6 +225,7 @@ class CodeAgent(Agent):
             need_summary: 是否需要总结
             non_interactive: 是否非交互模式
             base_tools: 基础工具列表
+            optimize_system_prompt: 是否优化系统提示词
             kwargs: 其他关键字参数
 
         返回:
@@ -251,6 +253,7 @@ class CodeAgent(Agent):
             "use_analysis": use_analysis,
             "non_interactive": non_interactive,
             "use_tools": base_tools,
+            "optimize_system_prompt": optimize_system_prompt,
         }
 
         # 自动移除所有显式传递的参数，避免重复传递错误
