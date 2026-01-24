@@ -401,20 +401,11 @@ class BasePlatform(ABC):
         )
         return response
 
-    def _chat(self, message: str):
-        import time
+    def _check_and_compress_context(self) -> None:
+        """检查并压缩对话上下文
 
-        start_time = time.time()
-
-        # 当输入为空白字符串时，打印警告并直接返回空字符串
-        if message.strip() == "":
-            PrettyOutput.auto_print("⚠️ 输入为空白字符串，已忽略本次请求")
-            return ""
-
-        # 检查并截断消息以避免超出剩余token限制
-        message = self._truncate_message_if_needed(message)
-
-        # 自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
+        自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
+        """
         if self.agent is not None:
             # 防止递归：如果正在压缩中，跳过压缩检查
             if self._summarizing:
@@ -442,8 +433,8 @@ class BasePlatform(ABC):
                     # 条件2：对话轮次超过阈值（检查当前轮次+1，因为本次调用会增加一轮）
                     conversation_turn_threshold = get_conversation_turn_threshold()
                     turn_limit_triggered = (
-                        (self._conversation_turn + 1) > conversation_turn_threshold
-                    )
+                        self._conversation_turn + 1
+                    ) > conversation_turn_threshold
 
                     should_compress = token_limit_triggered or turn_limit_triggered
 
@@ -471,15 +462,19 @@ class BasePlatform(ABC):
                         try:
                             # 使用自适应压缩：根据任务类型动态选择压缩策略
                             compression_success = self.agent._adaptive_compression()
-                            
+
                             if compression_success:
                                 # 自适应压缩成功，摘要已作为消息插入到历史中
                                 # 重置对话长度计数器（Agent中的计数器，与Platform的_conversation_turn不同）
                                 self.agent.session.conversation_length = 0
-                                PrettyOutput.auto_print("✅ 自适应压缩完成，对话上下文已更新")
+                                PrettyOutput.auto_print(
+                                    "✅ 自适应压缩完成，对话上下文已更新"
+                                )
                             else:
                                 # 自适应压缩失败，回退到完整摘要压缩
-                                PrettyOutput.auto_print("⚠️ 自适应压缩失败，回退到完整摘要压缩")
+                                PrettyOutput.auto_print(
+                                    "⚠️ 自适应压缩失败，回退到完整摘要压缩"
+                                )
                                 summary_text = self.agent._summarize_and_clear_history(
                                     trigger_reason=trigger_reason
                                 )
@@ -494,7 +489,9 @@ class BasePlatform(ABC):
 
                                 # 重置对话长度计数器
                                 self.agent.session.conversation_length = 0
-                                PrettyOutput.auto_print("✅ 完整摘要压缩完成，对话上下文已更新")
+                                PrettyOutput.auto_print(
+                                    "✅ 完整摘要压缩完成，对话上下文已更新"
+                                )
                         except Exception as e:
                             # 压缩失败不影响对话流程
                             PrettyOutput.auto_print(f"⚠️ 自动压缩失败: {str(e)}")
@@ -504,6 +501,22 @@ class BasePlatform(ABC):
                 except Exception as e:
                     # 压缩检查失败不影响对话流程
                     PrettyOutput.auto_print(f"⚠️ 压缩检查失败: {str(e)}")
+
+    def _chat(self, message: str):
+        import time
+
+        start_time = time.time()
+
+        # 当输入为空白字符串时，打印警告并直接返回空字符串
+        if message.strip() == "":
+            PrettyOutput.auto_print("⚠️ 输入为空白字符串，已忽略本次请求")
+            return ""
+
+        # 检查并截断消息以避免超出剩余token限制
+        message = self._truncate_message_if_needed(message)
+
+        # 自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
+        self._check_and_compress_context()
 
         # 根据输出模式选择不同的处理方式
         if not self.suppress_output:
@@ -905,4 +918,3 @@ class BasePlatform(ABC):
             bool: 如果成功腾出空间返回True，否则返回False
         """
         raise NotImplementedError("trim_messages is not implemented")
-
