@@ -33,7 +33,7 @@ REQUIRED_METHODS = [
 class PlatformRegistry:
     """Platform registry"""
 
-    global_platform_name: str = "yuanbao"
+    global_platform_name: str = "openai"
     global_platform_registry: Optional["PlatformRegistry"] = None
 
     @staticmethod
