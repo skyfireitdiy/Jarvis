@@ -3262,16 +3262,13 @@ class Agent:
     def _create_temp_model(self, system_prompt: str) -> BasePlatform:
         """创建一个用于执行一次性任务的临时模型实例，以避免污染主会话。
 
-        筛选操作使用cheap模型以降低成本。
+        使用与调用方相同的模型配置。
         """
-        from jarvis.jarvis_utils.config import get_cheap_model_name
-        from jarvis.jarvis_utils.config import get_cheap_platform_name
-
-        # 筛选操作使用cheap模型
-        platform_name = get_cheap_platform_name(None)
-        model_name = get_cheap_model_name(None)
-        # 获取 cheap_llm 的 llm_config，确保使用正确的 API base 和 API key
-        llm_config = get_llm_config("cheap", None)
+        # 使用与调用方相同的模型配置
+        platform_name = self.model.platform_name()
+        model_name = self.model.name()
+        # 获取当前模型的 llm_config，确保使用正确的 API base 和 API key
+        llm_config = get_llm_config(platform_name, self.model_group)
 
         temp_model = PlatformRegistry().create_platform(platform_name, llm_config)
         if not temp_model:
