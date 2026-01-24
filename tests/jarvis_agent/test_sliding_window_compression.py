@@ -317,3 +317,144 @@ class TestSlidingWindowCompression:
         agent._create_temp_model.assert_called_once()
         temp_model = agent._create_temp_model.return_value
         temp_model.chat_until_success.assert_called_once()
+
+    def _is_alternating_roles(self, messages: list) -> bool:
+        """验证消息列表的 role 是否交叉
+
+        交叉模式定义：
+        - system 可以在开头（多个system也可以）
+        - 之后必须是 user 和 assistant 交替出现
+        - 不能有连续相同的 role（system 除外）
+        """
+        if not messages:
+            return True
+
+        roles = [msg.get("role", "").lower() for msg in messages]
+
+        # 找到第一个非 system 消息的索引
+        first_non_system = 0
+        for i, role in enumerate(roles):
+            if role != "system":
+                first_non_system = i
+                break
+        else:
+            return True
+
+        # 检查非 system 消息是否交叉
+        non_system_roles = roles[first_non_system:]
+
+        for i in range(len(non_system_roles) - 1):
+            current_role = non_system_roles[i]
+            next_role = non_system_roles[i + 1]
+
+            if current_role == next_role:
+                return False
+
+            if current_role not in ["user", "assistant"]:
+                return False
+            if next_role not in ["user", "assistant"]:
+                return False
+
+        return True
+
+    def _simulate_compression_slice(self, messages: list, window_size: int) -> dict:
+        """模拟滑动窗口压缩的切片逻辑"""
+        # 找到系统消息的结束位置
+        system_end_idx = 0
+        for i, msg in enumerate(messages):
+            if msg.get("role", "").lower() != "system":
+                system_end_idx = i
+                break
+        else:
+            return {
+                "system_messages": messages,
+                "old_messages": [],
+                "recent_messages": [],
+            }
+
+        # 分离系统消息和非系统消息
+        system_messages = messages[:system_end_idx]
+        non_system_messages = messages[system_end_idx:]
+
+        # 截取最近的消息
+        recent_messages = non_system_messages[-window_size:]
+
+        # 分离更早的消息（多截取一条）
+        old_messages = non_system_messages[: -window_size + 1]
+
+        return {
+            "system_messages": system_messages,
+            "old_messages": old_messages,
+            "recent_messages": recent_messages,
+        }
+
+    def test_first_set_messages_alternating_roles(self):
+        """验证第一次 set_messages 调用（system_messages + old_messages）满足交叉模式"""
+        for window_size in [3, 5, 7, 9]:
+            messages = self._create_messages(
+                user_count=20, assistant_count=20, system_count=1
+            )
+            slices = self._simulate_compression_slice(messages, window_size)
+            first_set_messages = slices["system_messages"] + slices["old_messages"]
+            assert self._is_alternating_roles(first_set_messages), (
+                f"window_size={window_size}: 第一次 set_messages 不满足交叉模式\n"
+                f"roles: {[msg['role'] for msg in first_set_messages]}"
+            )
+
+    def test_second_set_messages_alternating_roles(self):
+        """验证第二次 set_messages 调用（system_messages + compressed_msg + recent_messages）满足交叉模式"""
+        for window_size in [3, 5, 7, 9]:
+            messages = self._create_messages(
+                user_count=20, assistant_count=20, system_count=1
+            )
+            slices = self._simulate_compression_slice(messages, window_size)
+            compressed_msg = {"role": "user", "content": "[压缩摘要]"}
+            second_set_messages = (
+                slices["system_messages"] + [compressed_msg] + slices["recent_messages"]
+            )
+            assert self._is_alternating_roles(second_set_messages), (
+                f"window_size={window_size}: 第二次 set_messages 不满足交叉模式\n"
+                f"roles: {[msg['role'] for msg in second_set_messages]}"
+            )
+
+    def test_compressed_msg_not_consecutive_with_recent(self):
+        """验证 compressed_msg（role=user）和 recent_messages[0] 不会连续"""
+        for window_size in [3, 5, 7, 9]:
+            messages = self._create_messages(
+                user_count=20, assistant_count=20, system_count=1
+            )
+            slices = self._simulate_compression_slice(messages, window_size)
+            if slices["recent_messages"]:
+                first_recent_role = slices["recent_messages"][0]["role"]
+                assert first_recent_role == "assistant", (
+                    f"window_size={window_size}: recent_messages[0] 应该是 assistant，"
+                    f"实际是 {first_recent_role}"
+                )
+
+    def test_multiple_system_messages_alternating_roles(self):
+        """验证多个系统消息时，set_messages 调用仍然满足交叉模式"""
+        for window_size in [3, 5, 7, 9]:
+            for system_count in [1, 2, 3]:
+                messages = self._create_messages(
+                    user_count=20, assistant_count=20, system_count=system_count
+                )
+                slices = self._simulate_compression_slice(messages, window_size)
+
+                # 第一次 set_messages
+                first_set_messages = slices["system_messages"] + slices["old_messages"]
+                assert self._is_alternating_roles(first_set_messages), (
+                    f"system_count={system_count}, window_size={window_size}: "
+                    f"第一次 set_messages 不满足交叉模式"
+                )
+
+                # 第二次 set_messages
+                compressed_msg = {"role": "user", "content": "[压缩摘要]"}
+                second_set_messages = (
+                    slices["system_messages"]
+                    + [compressed_msg]
+                    + slices["recent_messages"]
+                )
+                assert self._is_alternating_roles(second_set_messages), (
+                    f"system_count={system_count}, window_size={window_size}: "
+                    f"第二次 set_messages 不满足交叉模式"
+                )
