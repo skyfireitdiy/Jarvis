@@ -222,6 +222,7 @@ class PlatformRegistry:
                 f"model_group={model_group_override}, llm_config keys={list(llm_config.keys())}"
             )
         platform.set_model_name(model_name)
+        platform.set_model_group(model_group_override)
         return platform
 
     def get_cheap_platform(
@@ -238,6 +239,7 @@ class PlatformRegistry:
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
             )
         platform.set_model_name(model_name)
+        platform.set_model_group(model_group_override)
         platform.set_platform_type("cheap")
         return platform
 
@@ -255,6 +257,7 @@ class PlatformRegistry:
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
             )
         platform.set_model_name(model_name)
+        platform.set_model_group(model_group_override)
         platform.set_platform_type("smart")
         return platform
 

@@ -763,7 +763,6 @@ class Agent:
         if model_name:
             self.model.set_model_name(model_name)
 
-        self.model.set_model_group(model_group)
         self.model.set_suppress_output(False)
 
         # 设置Agent引用，使Platform能够回调Agent方法（如自动总结）
@@ -1499,7 +1498,7 @@ class Agent:
             # 直接截取最后9条消息（正常消息是交替的）
             if len(other_messages) < window_size:
                 return False
-            
+
             # 截取最后window_size条消息
             recent_messages = other_messages[-window_size:]
 
@@ -1507,7 +1506,7 @@ class Agent:
             # （需要至少2倍，因为压缩后还需要保留窗口）
             if len(other_messages) <= window_size * 2:
                 return False
-            
+
             # 分离更早的消息（不在保留列表中的消息）
             old_messages = other_messages[:-window_size]
 
@@ -1546,7 +1545,9 @@ class Agent:
                     return False
 
                 # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
-                formatted_summary = self._format_compressed_summary(compressed_summary.strip())
+                formatted_summary = self._format_compressed_summary(
+                    compressed_summary.strip()
+                )
 
                 # 构建压缩后的消息（作为用户消息插入）
                 compressed_msg = {
@@ -1561,8 +1562,16 @@ class Agent:
                 if hasattr(self.model, "messages"):
                     self.model.messages = new_history
                     # 统计保留的消息类型
-                    user_tool_count_kept = sum(1 for msg in recent_messages if msg.get("role", "").lower() in ["user", "tool"])
-                    assistant_count_kept = sum(1 for msg in recent_messages if msg.get("role", "").lower() == "assistant")
+                    user_tool_count_kept = sum(
+                        1
+                        for msg in recent_messages
+                        if msg.get("role", "").lower() in ["user", "tool"]
+                    )
+                    assistant_count_kept = sum(
+                        1
+                        for msg in recent_messages
+                        if msg.get("role", "").lower() == "assistant"
+                    )
                     PrettyOutput.auto_print(
                         f"✅ 滑动窗口压缩完成：压缩了 {len(old_messages)} 条消息，"
                         f"保留了最近 {user_tool_count_kept} 条用户/工具消息和 {assistant_count_kept} 条助手消息（共 {len(recent_messages)} 条）"
@@ -1879,7 +1888,9 @@ class Agent:
                     return False
 
                 # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
-                formatted_summary = self._format_compressed_summary(compressed_summary.strip())
+                formatted_summary = self._format_compressed_summary(
+                    compressed_summary.strip()
+                )
                 # 添加低重要性标记
                 formatted_summary = formatted_summary.replace(
                     "[历史摘要]", "[低重要性历史摘要]", 1
@@ -2053,7 +2064,7 @@ class Agent:
                     else:
                         # 其他chunk只添加chunk标记，不重复添加额外信息
                         formatted_summary = f"[历史摘要 - Chunk {idx + 1}] {summary}"
-                    
+
                     compressed_messages.append(
                         {
                             "role": "user",
@@ -2274,7 +2285,9 @@ class Agent:
                     return False
 
                 # 格式化压缩摘要，添加Pin、记忆、Git diff等额外信息
-                formatted_summary = self._format_compressed_summary(compressed_summary.strip())
+                formatted_summary = self._format_compressed_summary(
+                    compressed_summary.strip()
+                )
                 # 添加非关键事件标记
                 formatted_summary = formatted_summary.replace(
                     "[历史摘要]", "[非关键事件摘要]", 1
@@ -3020,11 +3033,14 @@ class Agent:
             4. 自动加载相关方法论(如果是首次运行)
         """
         # 如果需要延迟优化系统提示词，在第一次运行时进行优化
-        if self._optimize_system_prompt_on_first_run and not self._system_prompt_optimized:
+        if (
+            self._optimize_system_prompt_on_first_run
+            and not self._system_prompt_optimized
+        ):
             if user_input and user_input.strip():
                 self.optimize_system_prompt(user_input.strip())
                 self._system_prompt_optimized = True
-        
+
         # 根据当前模式生成额外说明，供 LLM 感知执行策略
         try:
             # 延迟导入CodeAgent以避免循环依赖
@@ -3173,7 +3189,7 @@ class Agent:
 
         # 处理输入（包括 shell 命令等），让 input_handler 有机会处理
         processed_input = self._process_input(user_input)
-        
+
         # 如果输入处理器返回了空字符串或标记需要返回，说明已经被处理（如 shell 命令）
         if not processed_input or self._last_handler_returned:
             # 输入已被处理器处理（如执行了 shell 命令），不需要继续
@@ -3213,12 +3229,12 @@ class Agent:
         if user_input:
             # 处理输入（包括 shell 命令等），让 input_handler 有机会处理
             processed_input = self._process_input(user_input)
-            
+
             # 如果输入处理器返回了空字符串或标记需要返回，说明已经被处理（如 shell 命令）
             if not processed_input or self._last_handler_returned:
                 # 输入已被处理器处理（如执行了 shell 命令），继续获取下一个输入
                 return LoopAction.CONTINUE
-            
+
             self.session.prompt = processed_input
             # 使用显式动作信号，保留返回类型注释以保持兼容
             return LoopAction.CONTINUE
