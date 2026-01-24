@@ -43,11 +43,16 @@
 - **必须**：在同一系列的图表中，相同组件的表示应保持一致
 - **禁止**：在图表中体现具体实现名称或路径，必须使用抽象的职责或角色命名
 
-### 图表清晰性原则
+### 图表清晰性与视觉美感原则
 
-- **必须**：图表必须简单明了，易于理解
-- **必须**：避免组件间过于密集的连线，保持图表清晰
-- **必须**：确保图表颜色搭配合理，布局清晰
+- **必须**：图表必须简单明了，易于理解，具有专业的外观
+- **必须**：避免组件间过于密集的连线，保持图表清晰，留白充足
+- **必须**：使用协调统一的配色方案，不同层级使用不同色系，确保视觉层次分明
+- **必须**：节点样式统一（圆角矩形、填充色、边框色），提升整体美观度
+- **必须**：字体大小适中，标签文字清晰可读，避免文字重叠或过小
+- **必须**：连线样式统一，使用合适的箭头样式和线条粗细，重要关系可加粗显示
+- **必须**：子图（cluster）使用柔和的背景色和清晰的边框，增强分组视觉效果
+- **必须**：整体布局平衡，节点分布均匀，避免局部过于拥挤或稀疏
 
 ### 专业性原则
 
@@ -69,47 +74,115 @@
   中设置 `nodesep` 和 `ranksep` 属性来增大节点和层级间距，
   例如 `nodesep=0.6, ranksep=1.0`。同时可设置 `overlap=false` 禁止
   重叠。
-- 使用graph、node和edge属性来美化图表。推荐使用以下基础样式：
+- 使用graph、node和edge属性来美化图表。推荐使用以下专业且美观的样式规范：
 
 ```dot
 digraph G {
     // --- Global Settings ---
-    // rankdir="TB" for top-to-bottom hierarchical layout
-    graph [rankdir="TB", splines=ortho, fontname="Sans-serif",
-      label="图表标题：[在此处填写视图名称]", labelloc="t",
-      newrank=true, nodesep=0.6, ranksep=1.0, overlap=false];
-    node [shape=box, style="rounded,filled", fillcolor="#EFEFEF", fontname="Sans-serif"];
-    edge [fontname="Sans-serif"];
+    // 使用专业的全局样式设置，确保图表美观统一
+    graph [rankdir="TB", 
+           splines=ortho,                    // 使用正交连线，更专业
+           fontname="Sans-serif", 
+           fontsize=11,                      // 合适的字体大小
+           label="图表标题：[在此处填写视图名称]", 
+           labelloc="t", 
+           fontcolor="#333333",              // 标题文字颜色
+           newrank=true, 
+           nodesep=0.8,                      // 节点间距，避免拥挤
+           ranksep=1.2,                      // 层级间距，层次分明
+           overlap=false,                    // 禁止重叠
+           bgcolor="#FFFFFF",                // 背景色为白色
+           pad=0.5];                         // 边距，留白充足
+    
+    // --- Default Node Style ---
+    // 默认节点样式：圆角矩形，柔和填充，清晰边框
+    node [shape=box, 
+          style="rounded,filled", 
+          fillcolor="#F5F5F5",               // 浅灰填充，柔和舒适
+          color="#666666",                    // 深灰边框，清晰不突兀
+          fontname="Sans-serif",
+          fontsize=10,
+          fontcolor="#333333",                // 文字颜色，确保可读性
+          penwidth=1.5];                      // 边框粗细适中
+    
+    // --- Default Edge Style ---
+    // 默认连线样式：清晰简洁
+    edge [fontname="Sans-serif",
+          fontsize=9,
+          fontcolor="#555555",                // 标签文字颜色
+          color="#888888",                    // 连线颜色，不抢夺注意力
+          penwidth=1.2,                       // 连线粗细
+          arrowsize=0.8];                     // 箭头大小适中
 
-    // --- Define top-level node (entry point) ---
-    node [group=interface, shape=cds, fillcolor="#FFE6CC", color="#D79B00"];
+    // --- Interface/Entry Point Nodes ---
+    // 接口层/入口节点：使用醒目的暖色调
+    node [group=interface, 
+          shape=cds,                         // 圆角矩形，表示接口
+          fillcolor="#FFE6CC",               // 温暖的橙色填充
+          color="#D79B00",                    // 深橙色边框
+          penwidth=2.0];                      // 稍粗的边框，突出重要性
     api_gateway [label="API网关"];
 
-    // --- Subgraphs for grouping middle layer ---
+    // --- Service Layer Subgraph ---
+    // 服务层子图：使用专业的蓝色系，清晰分组
     subgraph cluster_services {
         label = "业务服务层";
-        style = "filled";
-        color = "#dddddd";
-        node [group=service, fillcolor="#DAE8FC", color="#6C8EBF"];
+        style = "filled,rounded";            // 填充+圆角，更美观
+        fillcolor="#F0F4F8",                 // 浅蓝灰背景，柔和专业
+        color="#6C8EBF",                      // 蓝色边框，与节点呼应
+        fontname="Sans-serif";
+        fontsize=11;
+        fontcolor="#4A5568";                  // 深灰文字，清晰可读
+        penwidth=2.0;                         // 边框稍粗，突出分组
+        
+        node [group=service, 
+              fillcolor="#DAE8FC",            // 浅蓝色填充
+              color="#6C8EBF",                // 蓝色边框
+              penwidth=1.8];                  // 边框粗细
         service_A [label="服务A"];
         service_B [label="服务B"];
     }
 
-    // --- Define bottom-level node (data layer) ---
-    node [group=database, shape=cylinder, fillcolor="#D5E8D4", color="#82B366"];
+    // --- Data Layer ---
+    // 数据层：使用绿色系，表示存储和持久化
+    node [group=database, 
+          shape=cylinder,                      // 圆柱形，表示数据库
+          fillcolor="#D5E8D4",                // 浅绿色填充
+          color="#82B366",                    // 深绿色边框
+          penwidth=2.0];                      // 边框稍粗，突出重要性
     database_A [label="数据库"];
 
-    // --- Define relationships to form hierarchy ---
-    api_gateway -> service_A;
-    api_gateway -> service_B;
-    service_A -> database_A [label="读写"];
-    service_B -> database_A [label="读"];
+    // --- Relationships ---
+    // 关系连线：使用清晰的标签和样式
+    api_gateway -> service_A [label="路由", 
+                               color="#6C8EBF",    // 使用服务层颜色
+                               penwidth=1.5];
+    api_gateway -> service_B [label="路由", 
+                               color="#6C8EBF",
+                               penwidth=1.5];
+    service_A -> database_A [label="读写", 
+                             color="#82B366",     // 使用数据层颜色
+                             penwidth=1.5];
+    service_B -> database_A [label="读", 
+                             color="#82B366",
+                             penwidth=1.5,
+                             style="dashed"];      // 只读关系使用虚线
 
-    // --- Enforce horizontal alignment using rank ---
-    // In a TB layout, this aligns nodes horizontally.
+    // --- Horizontal Alignment ---
+    // 水平对齐：确保同级节点在同一水平线上
     { rank=same; service_A; service_B; }
 }
 ```
+
+**样式美化要点**：
+
+- **配色方案**：使用协调的色系，接口层用暖色（橙/黄），服务层用冷色（蓝），数据层用绿色，外部系统用紫色
+- **字体规范**：统一使用 Sans-serif 字体，标题11pt，节点标签10pt，连线标签9pt
+- **边框样式**：重要节点使用稍粗边框（penwidth=2.0），普通节点1.5-1.8
+- **填充效果**：使用柔和的浅色填充，避免过于鲜艳，确保专业感
+- **连线样式**：重要关系使用实线加粗，次要关系使用虚线，不同层级使用对应颜色
+- **子图美化**：使用圆角填充背景（style="filled,rounded"），柔和的背景色，清晰的边框
+- **留白设计**：通过 nodesep 和 ranksep 控制间距，pad 控制边距，确保图表不拥挤
 
 - 根据不同的视图，使用合适的形状和样式。
 - 模块节点尽量使用矩形（shape=box）；除数据库、外部系统、消息队列等特殊组件外，避免用其它形状表示"模块"。
@@ -144,13 +217,105 @@ digraph G {
 - **部署视图**：适用于展示系统在物理环境中的部署拓扑
 - **用例视图**：适用于展示用户与系统的交互场景
 
-### Graphviz 使用技巧
+### Graphviz 使用技巧与美化指南
 
-- **布局选择**：层次结构使用`rankdir="TB"`，流程关系使用`rankdir="LR"`
-- **节点对齐**：使用`{ rank=same; node1; node2; }`实现水平对齐
-- **间距调整**：通过`nodesep`和`ranksep`属性调整节点间距避免重叠
-- **颜色搭配**：使用协调的颜色方案，不同层级使用不同色系
-- **形状规范**：接口用`shape=cds`，数据库用`shape=cylinder`，服务用默认矩形
+#### 布局与对齐技巧
+
+- **布局选择**：
+  - 层次结构使用`rankdir="TB"`（从上到下），适合展示分层架构
+  - 流程关系使用`rankdir="LR"`（从左到右），适合展示数据流或调用链
+  - 复杂关系可尝试`rankdir="BT"`或`rankdir="RL"`，根据内容选择最佳方向
+
+- **节点对齐**：
+  - 使用`{ rank=same; node1; node2; }`实现同级节点的水平对齐
+  - 对于重要节点，可使用`rank=source`或`rank=sink`将其置于顶层或底层
+  - 使用`group`属性将相关节点分组，自动对齐
+
+- **间距调整**：
+  - `nodesep=0.8-1.2`：控制同级节点间距，避免拥挤
+  - `ranksep=1.0-1.5`：控制不同层级间距，层次分明
+  - `pad=0.5-1.0`：控制图表边距，留白充足
+  - `overlap=false`：禁止节点重叠，确保清晰
+
+#### 颜色与视觉美化
+
+- **配色方案**（推荐专业配色）：
+  - **接口层/入口**：暖色调 `#FFE6CC`（浅橙）填充，`#D79B00`（深橙）边框
+  - **服务层/业务逻辑**：冷色调 `#DAE8FC`（浅蓝）填充，`#6C8EBF`（深蓝）边框
+  - **数据层/存储**：绿色系 `#D5E8D4`（浅绿）填充，`#82B366`（深绿）边框
+  - **外部系统**：紫色系 `#E1D5E7`（浅紫）填充，`#9673A6`（深紫）边框
+  - **工具/工具层**：红色系 `#F8CECC`（浅红）填充，`#B85450`（深红）边框
+  - **事件/消息**：黄色系 `#FFF2CC`（浅黄）填充，`#B57800`（深黄）边框
+
+- **颜色使用原则**：
+  - 同一层级使用相同色系，保持视觉一致性
+  - 填充色使用浅色（#F0-F8范围），边框使用深色（#4-9范围），形成层次
+  - 避免使用过于鲜艳的颜色（如纯红、纯蓝），使用柔和的中间色调
+  - 背景色统一为白色（`bgcolor="#FFFFFF"`），确保专业感
+
+#### 节点样式美化
+
+- **形状规范**：
+  - 接口/API：`shape=cds`（圆角矩形），突出入口特性
+  - 服务/模块：`shape=box, style="rounded,filled"`（圆角填充矩形），标准样式
+  - 数据库：`shape=cylinder`（圆柱形），传统表示方法
+  - 外部系统：`shape=box, style="rounded,filled,dashed"`（虚线边框），区分外部
+  - 队列/消息：`shape=box, style="rounded,filled"`，可用特殊颜色区分
+
+- **节点美化技巧**：
+  - 使用`penwidth=1.5-2.0`控制边框粗细，重要节点稍粗
+  - 使用`fillcolor`设置柔和的填充色，避免纯白或纯黑
+  - 使用`fontsize=10-11`确保文字清晰可读
+  - 使用`fontcolor="#333333"`设置深色文字，确保对比度
+
+#### 连线样式美化
+
+- **连线样式**：
+  - 重要关系：`penwidth=1.5-2.0`，实线，使用对应层级颜色
+  - 次要关系：`penwidth=1.0-1.2`，虚线（`style="dashed"`）
+  - 数据流：可使用箭头样式`arrowhead=normal`或`arrowhead=vee`
+  - 双向关系：使用`dir=both`，两端都有箭头
+
+- **连线标签**：
+  - 使用简洁的标签文字，避免过长
+  - `fontsize=9`，确保不抢夺节点注意力
+  - `fontcolor="#555555"`，使用中等灰色，清晰但不突兀
+
+#### 子图（Cluster）美化
+
+- **子图样式**：
+  - 使用`style="filled,rounded"`，填充+圆角，更美观
+  - 背景色使用对应层级的浅色版本（如服务层用`#F0F4F8`）
+  - 边框使用对应层级的深色（如服务层用`#6C8EBF`）
+  - `penwidth=2.0`，边框稍粗，突出分组
+  - 标签使用`fontsize=11`，清晰标识分组
+
+#### 字体与文字美化
+
+- **字体选择**：
+  - 统一使用`fontname="Sans-serif"`，现代简洁
+  - 标题：`fontsize=11-12`，加粗显示
+  - 节点标签：`fontsize=10`，清晰可读
+  - 连线标签：`fontsize=9`，不抢夺注意力
+
+- **文字颜色**：
+  - 标题：`fontcolor="#333333"`（深灰）
+  - 节点标签：`fontcolor="#333333"`（深灰）
+  - 连线标签：`fontcolor="#555555"`（中灰）
+
+#### 整体视觉效果
+
+- **专业感提升**：
+  - 使用统一的样式规范，确保整体协调
+  - 避免过度装饰，保持简洁专业
+  - 合理使用留白，避免拥挤
+  - 确保颜色对比度足够，文字清晰可读
+
+- **层次感营造**：
+  - 通过颜色深浅区分层级
+  - 通过边框粗细突出重要性
+  - 通过间距大小体现关系紧密程度
+  - 通过子图分组明确模块边界
 
 ## 渲染步骤
 
@@ -177,9 +342,14 @@ digraph G {
 
 - [ ] 选择了合适的视图类型来展示系统架构
 - [ ] 使用了正确的Graphviz语法和DOT语言格式
-- [ ] 遵循了统一的样式规范和颜色搭配
-- [ ] 图表布局清晰，易于理解
+- [ ] 遵循了统一的样式规范和颜色搭配，使用了专业的配色方案
+- [ ] 图表布局清晰，易于理解，留白充足，节点分布均匀
 - [ ] 组件命名抽象，没有暴露具体实现细节
+- [ ] 节点样式统一（圆角、填充、边框），视觉效果专业美观
+- [ ] 连线样式合理（粗细、颜色、虚实），重要关系突出显示
+- [ ] 子图分组清晰，背景色和边框协调，标签清晰可读
+- [ ] 字体大小适中，文字颜色对比度足够，确保可读性
+- [ ] 整体配色协调，层次分明，具有专业的外观
 
 在生成和渲染图表时，你必须确认：
 
@@ -194,3 +364,7 @@ digraph G {
 - [ ] 图表符合架构设计的最佳实践
 - [ ] 所有组件和关系都正确表示
 - [ ] 图片质量清晰，适合展示和分享
+- [ ] 图表具有专业美观的外观，配色协调，样式统一
+- [ ] 视觉层次分明，重要组件突出，整体布局平衡
+- [ ] 文字清晰可读，颜色对比度足够，无重叠或拥挤
+- [ ] 符合企业级架构图的视觉标准，适合正式文档和演示
