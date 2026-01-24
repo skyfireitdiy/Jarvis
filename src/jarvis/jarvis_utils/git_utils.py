@@ -505,11 +505,13 @@ def handle_commit_workflow() -> bool:
         commit_count = int(decode_output(commit_result.stdout).strip())
 
         # 暂存所有修改
-        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "add", "."], check=True, capture_output=True)
 
         # 提交变更
         subprocess.run(
-            ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"], check=True
+            ["git", "commit", "-m", f"CheckPoint #{commit_count + 1}"],
+            check=True,
+            capture_output=True,
         )
         return True
     except subprocess.CalledProcessError:
