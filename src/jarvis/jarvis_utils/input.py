@@ -460,23 +460,37 @@ class FileCompleter(Completer):
             pass
 
         if token:
-            scored_items = process.extract(
-                token,
-                [item[0] for item in all_completions],
-                limit=self.max_suggestions,
-            )
-            scored_items = [
-                (item[0], item[1]) for item in scored_items if item[1] > self.min_score
-            ]
-            completion_map = {item[0]: item[1] for item in all_completions}
-            for t, score in scored_items:
-                display_text = f"{t} ({score}%)" if score < 100 else t
-                yield Completion(
-                    text=f"'{t}'",
-                    start_position=-replace_length,
-                    display=display_text,
-                    display_meta=completion_map.get(t, ""),
+            # Check if token contains only punctuation/special characters
+            # This prevents fuzzywuzzy processor from reducing it to empty string
+            token_stripped = token.strip()
+            if token_stripped and not any(c.isalnum() for c in token_stripped):
+                # Token contains only punctuation/special chars, skip fuzzy matching
+                # to avoid warning from fuzzywuzzy processor
+                for t, desc in all_completions[: self.max_suggestions]:
+                    yield Completion(
+                        text=f"'{t}'",
+                        start_position=-replace_length,
+                        display=t,
+                        display_meta=desc,
+                    )
+            else:
+                scored_items = process.extract(
+                    token,
+                    [item[0] for item in all_completions],
+                    limit=self.max_suggestions,
                 )
+                scored_items = [
+                    (item[0], item[1]) for item in scored_items if item[1] > self.min_score
+                ]
+                completion_map = {item[0]: item[1] for item in all_completions}
+                for t, score in scored_items:
+                    display_text = f"{t} ({score}%)" if score < 100 else t
+                    yield Completion(
+                        text=f"'{t}'",
+                        start_position=-replace_length,
+                        display=display_text,
+                        display_meta=completion_map.get(t, ""),
+                    )
         else:
             for t, desc in all_completions[: self.max_suggestions]:
                 yield Completion(
