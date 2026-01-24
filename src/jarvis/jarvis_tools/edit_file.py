@@ -755,7 +755,7 @@ class EditFileNormalTool:
 
                     if not (
                         agent
-                        and getattr(agent, "agent_type", None) == "code_agent"
+                        and agent.agent_type() == "code_agent"
                         and in_workspace
                     ):
                         try:
