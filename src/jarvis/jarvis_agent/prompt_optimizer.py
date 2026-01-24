@@ -29,6 +29,7 @@ def optimize_system_prompt(
         PrettyOutput.auto_print("🔄 正在优化系统提示词...")
 
         # 获取 smart_llm 平台（使用智能模型进行优化）
+        # get_smart_platform 内部已经设置了 model_name 和 model_group，无需再次设置
         platform = PlatformRegistry().get_smart_platform(model_group)
 
         # 构建优化提示词
