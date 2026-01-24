@@ -30,7 +30,9 @@ def optimize_system_prompt(
 
         # 获取 smart_llm 平台（使用智能模型进行优化）
         # get_smart_platform 内部已经设置了 model_name 和 model_group，无需再次设置
-        platform = PlatformRegistry().get_smart_platform(model_group)
+        platform = PlatformRegistry().get_normal_platform(model_group)
+
+        platform.set_suppress_output(False)
 
         # 构建优化提示词
         optimization_prompt = f"""你是一个专业的系统提示词优化专家。请根据当前的系统提示词和用户需求，有针对性地优化系统提示词。
