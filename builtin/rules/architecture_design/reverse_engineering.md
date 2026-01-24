@@ -246,7 +246,7 @@
    - 标注数据流和控制流
 
 3. **创建文档目录结构**
-   - **必须**：在 `{{ git_root_dir }}/.jarvis/rules/` 目录下创建文档目录树
+   - **必须**：在 `{{ git_root_dir }}/.jarvis/rules/project_info/` 目录下创建文档目录树
    - **必须**：目录结构应反映项目的模块层次结构
    - **必须**：为每个子模块创建对应的目录和文件
    - **目录命名规范**：使用小写字母和下划线，与模块名称保持一致
@@ -258,7 +258,7 @@
    - **文件内容**：包含该模块的完整设计信息（见"模块文档格式要求"）
 
 5. **生成项目总览文档**
-   - **必须**：在 `{{ git_root_dir }}/.jarvis/rules/` 目录下生成项目总览文档 `README.md`
+   - **必须**：在 `{{ git_root_dir }}/.jarvis/rules/project_info/` 目录下生成项目总览文档 `README.md`
    - **文档内容**：包含项目概述、整体架构设计、模块索引、依赖关系图等
    - **模块索引**：提供所有模块文档的链接和导航
 
@@ -272,7 +272,7 @@
 **文档目录结构示例：**
 
 ```text
-{{ git_root_dir }}/.jarvis/rules/
+{{ git_root_dir }}/.jarvis/rules/project_info/
 ├── README.md                    # 项目总览文档
 ├── core_business/               # 核心业务逻辑模块目录
 │   ├── user_management.md      # 用户管理子模块文档
@@ -325,9 +325,9 @@
 
 **必须遵守：**
 
-- **文档根目录**：`{{ git_root_dir }}/.jarvis/rules/`
-- **项目总览文档**：`{{ git_root_dir }}/.jarvis/rules/README.md`
-- **模块文档**：`{{ git_root_dir }}/.jarvis/rules/<module_path>/<module_name>.md`
+- **文档根目录**：`{{ git_root_dir }}/.jarvis/rules/project_info/`
+- **项目总览文档**：`{{ git_root_dir }}/.jarvis/rules/project_info/README.md`
+- **模块文档**：`{{ git_root_dir }}/.jarvis/rules/project_info/<module_path>/<module_name>.md`
 - **目录结构**：必须反映项目的模块层次结构
 
 **目录命名规范：**
@@ -356,7 +356,7 @@
 
 ### 模块位置
 - 代码位置：`{{ git_root_dir }}/<module_path>`
-- 文档位置：`{{ git_root_dir }}/.jarvis/rules/<module_path>/<module_name>.md`
+- 文档位置：`{{ git_root_dir }}/.jarvis/rules/project_info/<module_path>/<module_name>.md`
 
 ## 模块结构
 
@@ -840,7 +840,7 @@ module_b ──┘
 
 - [ ] 已汇总所有模块分析结果
 - [ ] 已构建整体架构图
-- [ ] 已在 `{{ git_root_dir }}/.jarvis/rules/` 目录下创建文档目录结构
+- [ ] 已在 `{{ git_root_dir }}/.jarvis/rules/project_info/` 目录下创建文档目录结构
 - [ ] 目录结构反映项目的模块层次结构
 - [ ] 已为每个子模块生成独立的 Markdown 文档文件
 - [ ] 每个模块文档文件命名规范（小写字母和下划线）
