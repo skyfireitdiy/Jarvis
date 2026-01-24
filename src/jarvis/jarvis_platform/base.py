@@ -508,28 +508,37 @@ class BasePlatform(ABC):
                         # 设置总结标志，防止递归调用
                         self._summarizing = True
                         try:
-                            # 调用Agent的总结方法
-                            summary_text = self.agent._summarize_and_clear_history(
-                                trigger_reason=trigger_reason
-                            )
-
-                            if summary_text:
-                                # 将摘要加入addon_prompt，维持上下文连续性
-                                from jarvis.jarvis_agent.utils import join_prompts
-
-                                self.agent.session.addon_prompt = join_prompts(
-                                    [self.agent.session.addon_prompt, summary_text]
+                            # 使用自适应压缩：根据任务类型动态选择压缩策略
+                            compression_success = self.agent._adaptive_compression()
+                            
+                            if compression_success:
+                                # 自适应压缩成功，摘要已作为消息插入到历史中
+                                # 重置对话长度计数器（Agent中的计数器，与Platform的_conversation_turn不同）
+                                self.agent.session.conversation_length = 0
+                                PrettyOutput.auto_print("✅ 自适应压缩完成，对话上下文已更新")
+                            else:
+                                # 自适应压缩失败，回退到完整摘要压缩
+                                PrettyOutput.auto_print("⚠️ 自适应压缩失败，回退到完整摘要压缩")
+                                summary_text = self.agent._summarize_and_clear_history(
+                                    trigger_reason=trigger_reason
                                 )
 
-                            # 重置对话长度计数器（Agent中的计数器，与Platform的_conversation_turn不同）
-                            self.agent.session.conversation_length = 0
+                                if summary_text:
+                                    # 将摘要加入addon_prompt，维持上下文连续性
+                                    from jarvis.jarvis_agent.utils import join_prompts
 
-                            PrettyOutput.auto_print("✅ 自动总结完成，对话上下文已更新")
+                                    self.agent.session.addon_prompt = join_prompts(
+                                        [self.agent.session.addon_prompt, summary_text]
+                                    )
+
+                                # 重置对话长度计数器
+                                self.agent.session.conversation_length = 0
+                                PrettyOutput.auto_print("✅ 完整摘要压缩完成，对话上下文已更新")
                         except Exception as e:
-                            # 总结失败不影响对话流程
-                            PrettyOutput.auto_print(f"⚠️ 自动总结失败: {str(e)}")
+                            # 压缩失败不影响对话流程
+                            PrettyOutput.auto_print(f"⚠️ 自动压缩失败: {str(e)}")
                         finally:
-                            # 无论总结成功失败，都清除标志位
+                            # 无论压缩成功失败，都清除标志位
                             self._summarizing = False
                 except Exception as e:
                     # 总结检查失败不影响对话流程

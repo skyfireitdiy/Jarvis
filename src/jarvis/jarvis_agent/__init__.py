@@ -1447,8 +1447,14 @@ class Agent:
                         box=box.ROUNDED,
                     )
                     console.print(panel)
-                except Exception:
-                    pass
+                except Exception as e:
+                    # 如果 Rich Panel 打印失败，使用普通方式打印总结
+                    try:
+                        PrettyOutput.auto_print(f"📋 对话总结:\n{summary}")
+                    except Exception:
+                        # 如果普通打印也失败，至少打印一个提示
+                        PrettyOutput.auto_print(f"⚠️ 总结已生成但打印失败: {str(e)}")
+                        PrettyOutput.auto_print(f"📋 总结内容（前500字符）: {summary[:500]}...")
             return summary
         except Exception:
             PrettyOutput.auto_print("❌ 总结对话历史失败")
