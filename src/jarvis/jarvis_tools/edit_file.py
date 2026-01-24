@@ -749,13 +749,8 @@ class EditFileNormalTool:
 
                     # 检查文件是否不在当前工作目录的子级目录下
                     # 如果不在，生成并打印 diff
-                    # 调试：打印 agent 信息
-                    agent_info = f"agent={agent}, agent_type={getattr(agent, 'agent_type', None) if agent else None}"
                     in_workspace = EditFileNormalTool._is_file_in_workspace_subdir(
-                        file_path
-                    )
-                    PrettyOutput.auto_print(
-                        f"🔍 Debug: file_path={file_path}, in_workspace={in_workspace}, {agent_info}"
+                        abs_path
                     )
 
                     if not (
