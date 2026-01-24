@@ -56,12 +56,6 @@ def create_llm_model(
         registry = PlatformRegistry.get_global_platform_registry()
         model = registry.get_smart_platform(llm_group)
 
-        # 设置 model_group（如果支持）
-        try:
-            model.set_model_group(llm_group)
-        except Exception:
-            pass
-
         # 确保模型没有控制台输出（与 code_agent.py 保持一致）
         try:
             model.set_suppress_output(False)

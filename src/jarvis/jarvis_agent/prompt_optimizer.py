@@ -7,8 +7,6 @@
 from typing import Optional
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_smart_model_name
-from jarvis.jarvis_utils.config import get_smart_platform_name
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
@@ -31,23 +29,18 @@ def optimize_system_prompt(
         PrettyOutput.auto_print("🔄 正在优化系统提示词...")
 
         # 获取 smart_llm 平台（使用智能模型进行优化）
-        platform_name = get_smart_platform_name(model_group)
-        model_name = get_smart_model_name(model_group)
-
         platform = PlatformRegistry().get_smart_platform(model_group)
-
-        if model_name:
-            platform.set_model_name(model_name)
-        platform.set_model_group(model_group)
 
         # 构建优化提示词
         optimization_prompt = f"""你是一个专业的系统提示词优化专家。请根据当前的系统提示词和用户需求，有针对性地优化系统提示词。
 
-【当前系统提示词】
+<current_system_prompt>
 {current_system_prompt}
+</current_system_prompt>
 
-【用户需求】
+<user_requirement>
 {user_requirement}
+</user_requirement>
 
 【优化要求】
 1. 保持原有系统提示词的核心功能和架构不变
