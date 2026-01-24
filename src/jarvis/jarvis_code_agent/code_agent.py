@@ -84,6 +84,7 @@ class CodeAgent(Agent):
         disable_review: bool = False,
         review_max_iterations: int = 0,
         enable_task_list_manager: bool = True,
+        optimize_system_prompt: bool = False,
         **kwargs: Any,
     ) -> None:
         # CodeAgent 基础属性初始化
@@ -1310,6 +1311,12 @@ def cli(
         "--dispatch",
         help="将任务派发到新的 tmux 窗口中执行（仅在 tmux 环境中有效），当前进程退出",
     ),
+    optimize_system_prompt: bool = typer.Option(
+        False,
+        "-o",
+        "--optimize-system-prompt",
+        help="自动优化系统提示词：根据用户需求使用大模型优化系统提示词",
+    ),
 ) -> None:
     """Jarvis主入口点。"""
     # 处理任务描述：优先从文件读取
@@ -1485,6 +1492,7 @@ def cli(
             disable_review=disable_review,
             review_max_iterations=review_max_iterations,
             allow_savesession=True,
+            optimize_system_prompt=optimize_system_prompt,
         )
 
         # 尝试恢复会话

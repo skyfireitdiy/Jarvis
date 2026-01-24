@@ -439,6 +439,7 @@ class Agent:
         agent_type: str = "normal",
         allow_savesession: bool = False,
         rule_names: Optional[str] = None,
+        optimize_system_prompt: bool = False,
         **kwargs: Any,
     ):
         """初始化Jarvis Agent实例
@@ -460,6 +461,7 @@ class Agent:
             non_interactive: 是否以非交互模式运行（优先级最高，覆盖环境变量与配置）
             allow_savesession: 是否允许使用SaveSession命令（默认False，仅jvs/jca主程序传入True）
             rule_names: 规则名称列表（逗号分隔），用于加载指定的规则
+            optimize_system_prompt: 如果为True，将在第一次run()时使用用户输入来优化系统提示词
         """
         # 基础属性初始化
         self._init_base_attributes(
@@ -503,6 +505,10 @@ class Agent:
 
         # 工具和系统提示词设置
         self._setup_tools_and_prompt()
+
+        # 设置延迟优化标志（将在第一次run()时优化）
+        self._optimize_system_prompt_on_first_run = optimize_system_prompt
+        self._system_prompt_optimized = False
 
         # 动态回调加载
         self._load_after_tool_callbacks()
@@ -794,6 +800,37 @@ class Agent:
         """设置系统提示词"""
         prompt_text = self.prompt_manager.build_system_prompt(self)
         self.model.set_system_prompt(prompt_text)
+
+    def optimize_system_prompt(self, user_requirement: str) -> None:
+        """根据用户需求优化系统提示词
+
+        参数:
+            user_requirement: 用户需求描述，用于优化系统提示词
+        """
+        try:
+            from jarvis.jarvis_agent.prompt_optimizer import optimize_system_prompt
+
+            # 获取当前系统提示词
+            current_prompt = self.system_prompt
+
+            # 优化系统提示词
+            optimized_prompt = optimize_system_prompt(
+                current_system_prompt=current_prompt,
+                user_requirement=user_requirement,
+                model_group=self.model_group if hasattr(self, "model_group") else None,
+            )
+
+            # 更新系统提示词
+            if optimized_prompt and optimized_prompt != current_prompt:
+                self.system_prompt = optimized_prompt
+                # 重新设置系统提示词到模型
+                self._setup_system_prompt()
+        except Exception as e:
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            PrettyOutput.auto_print(
+                f"⚠️ 系统提示词优化失败: {str(e)}，继续使用原始系统提示词"
+            )
 
     def set_user_data(self, key: str, value: Any) -> None:
         """Sets user data in the session."""
@@ -2982,6 +3019,12 @@ class Agent:
             3. 包含错误处理和恢复逻辑
             4. 自动加载相关方法论(如果是首次运行)
         """
+        # 如果需要延迟优化系统提示词，在第一次运行时进行优化
+        if self._optimize_system_prompt_on_first_run and not self._system_prompt_optimized:
+            if user_input and user_input.strip():
+                self.optimize_system_prompt(user_input.strip())
+                self._system_prompt_optimized = True
+        
         # 根据当前模式生成额外说明，供 LLM 感知执行策略
         try:
             # 延迟导入CodeAgent以避免循环依赖
