@@ -131,7 +131,7 @@ class TaskAnalyzer:
         """
         set_interrupt(False)
         user_input = self.agent._multiline_input(
-            "分析任务期间被中断，请输入用户干预信息：", False
+            "分析任务期间被中断，请输入用户干预信息", False
         )
 
         if not user_input:
@@ -182,7 +182,7 @@ class TaskAnalyzer:
                 satisfaction_feedback = "用户对本次任务的完成表示满意。"
             else:
                 feedback = self.agent._multiline_input(
-                    "请提供您的反馈意见（可留空直接回车）:", False
+                    "请提供您的反馈意见（可留空直接回车）", False
                 )
                 if feedback:
                     satisfaction_feedback = (
