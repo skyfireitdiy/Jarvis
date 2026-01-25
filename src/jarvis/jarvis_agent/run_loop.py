@@ -199,28 +199,18 @@ class AgentRunLoop:
                     except Exception as e:
                         PrettyOutput.auto_print(f"⚠️ 获取git diff失败: {str(e)}")
                         self._git_diff = f"获取git diff失败: {str(e)}"
-                    # 使用自适应压缩：根据任务类型动态选择压缩策略
-                    compression_success = ag._adaptive_compression()
-                    
-                    if compression_success:
-                        # 自适应压缩成功，摘要已作为消息插入到历史中
-                        # 重置对话长度计数器（用于摘要触发），开始新一轮周期
-                        # 注意：对话轮次由模型内部管理，这里不需要重置
-                        ag.session.conversation_length = 0
-                    else:
-                        # 自适应压缩失败，回退到完整摘要压缩
-                        PrettyOutput.auto_print("⚠️ 自适应压缩失败，回退到完整摘要压缩")
-                        summary_text = ag._summarize_and_clear_history(
-                            trigger_reason="手动触发"
+                    # 直接使用全量总结
+                    summary_text = ag._summarize_and_clear_history(
+                        trigger_reason="手动触发"
+                    )
+                    if summary_text:
+                        # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
+                        ag.session.addon_prompt = join_prompts(
+                            [ag.session.addon_prompt, summary_text]
                         )
-                        if summary_text:
-                            # 将摘要作为下一轮的附加提示加入，从而维持上下文连续性
-                            ag.session.addon_prompt = join_prompts(
-                                [ag.session.addon_prompt, summary_text]
-                            )
-                        # 重置对话长度计数器（用于摘要触发），开始新一轮周期
-                        # 注意：对话轮次由模型内部管理，这里不需要重置
-                        ag.session.conversation_length = 0
+                    # 重置对话长度计数器（用于摘要触发），开始新一轮周期
+                    # 注意：对话轮次由模型内部管理，这里不需要重置
+                    ag.session.conversation_length = 0
                     # 如果响应中还有其他内容，继续处理；否则继续下一轮
                     if not current_response:
                         continue
