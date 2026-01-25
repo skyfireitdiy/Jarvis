@@ -181,7 +181,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 except Exception:
                     # 兼容处理：无法获取Agent或ToolUsage时，至少返回工具系统帮助信息
                     return False, f"{err_msg}\n\n{tool_call_help}"
-            
+
             # 处理多个工具调用
             # 检查是否是多个工具调用的格式（字典的键是工具名称，值是工具调用信息）
             # 单个工具调用时，返回的是 {"name": ..., "arguments": ...}
@@ -193,7 +193,11 @@ class ToolRegistry(OutputHandlerProtocol):
                 if len(tool_calls) > 1:
                     # 多个键，检查第一个值是否是工具调用信息字典
                     first_value = list(tool_calls.values())[0]
-                    if isinstance(first_value, dict) and "name" in first_value and "arguments" in first_value:
+                    if (
+                        isinstance(first_value, dict)
+                        and "name" in first_value
+                        and "arguments" in first_value
+                    ):
                         # 多个工具调用格式
                         result = self.handle_multiple_tool_calls(tool_calls, agent_)
                     else:
@@ -202,7 +206,11 @@ class ToolRegistry(OutputHandlerProtocol):
                 elif len(tool_calls) == 1:
                     # 单个键，检查值是否是工具调用信息字典
                     first_value = list(tool_calls.values())[0]
-                    if isinstance(first_value, dict) and "name" in first_value and "arguments" in first_value:
+                    if (
+                        isinstance(first_value, dict)
+                        and "name" in first_value
+                        and "arguments" in first_value
+                    ):
                         # 多个工具调用格式，但只有一个
                         result = self.handle_tool_calls(first_value, agent_)
                     elif "name" in tool_calls and "arguments" in tool_calls:
@@ -220,7 +228,7 @@ class ToolRegistry(OutputHandlerProtocol):
             else:
                 # 非字典格式，直接调用 handle_tool_calls
                 result = self.handle_tool_calls(tool_calls, agent_)
-            
+
             if auto_completed:
                 # 如果自动补全了结束标签，在结果中添加说明信息
                 result = f"检测到工具调用缺少结束标签，已自动补全{ct('TOOL_CALL')}。请确保后续工具调用包含完整的开始和结束标签。\n\n{result}"
@@ -1162,9 +1170,6 @@ class ToolRegistry(OutputHandlerProtocol):
         # 更新工具调用统计
         self._update_tool_stats(name)
 
-        # 记录开始时间
-        start_time = time.perf_counter()
-
         # 根据工具实现声明的协议版本分发调用方式
         try:
             result = None
@@ -1339,7 +1344,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 如果有want字段，先打印出Agent的意图
             if want:
-                PrettyOutput.auto_print(f"💡 意图: {want}")
+                PrettyOutput.auto_print(f"💡 {want}")
 
             # 合并为一行输出：执行工具调用和参数摘要
             if param_summary:
@@ -1470,25 +1475,29 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         results = []
         total_count = len(tool_calls)
-        
+
         PrettyOutput.auto_print(f"🛠️ 准备执行 {total_count} 个工具调用")
-        
+
         for idx, (tool_key, tool_call) in enumerate(tool_calls.items(), 1):
             name = tool_call.get("name", tool_key)
             PrettyOutput.auto_print(f"\n[{idx}/{total_count}] 执行工具: {name}")
-            
+
             try:
                 result = self.handle_tool_calls(tool_call, agent)
-                results.append(f"=== 工具调用 {idx}/{total_count}: {name} ===\n{result}")
+                results.append(
+                    f"=== 工具调用 {idx}/{total_count}: {name} ===\n{result}"
+                )
             except Exception as e:
                 error_msg = f"工具调用 {name} 执行失败: {str(e)}"
                 PrettyOutput.auto_print(f"❌ {error_msg}")
-                results.append(f"=== 工具调用 {idx}/{total_count}: {name} ===\n❌ {error_msg}")
-        
+                results.append(
+                    f"=== 工具调用 {idx}/{total_count}: {name} ===\n❌ {error_msg}"
+                )
+
         # 合并所有结果
         separator = "\n\n" + "=" * 80 + "\n\n"
         combined_result = separator.join(results)
-        
+
         PrettyOutput.auto_print(f"\n✅ 完成 {total_count} 个工具调用")
-        
+
         return combined_result
