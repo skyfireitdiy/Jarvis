@@ -1,3 +1,49 @@
+### Release Note - v1.2.8 (2026-01-25)
+
+#### **🚀 新功能**
+
+#### **📌 修复**
+
+- **🔧 压缩逻辑架构调整**
+  - **逻辑上移**：将压缩检查逻辑从 Platform 层（base.py）移回 AgentRunLoop 层，避免压缩过程中的递归调用问题
+  - **移除递归检查**：删除 Platform 层的 `_summarizing` 标志位和相关递归检查代码，简化压缩流程
+- **🔧 模型配置获取优化**
+  - **类型替代平台**：使用 `_model_type`（normal/cheap/smart）替代平台名称（openai/claude等）获取 llm_config，确保临时模型使用正确的配置
+  - **CodeAgent 类型设置**：CodeAgent 初始化时设置 `_model_type = "smart"`，确保临时模型使用 smart 平台配置
+- **🔧 对话轮次计算修复**
+  - **空格修复**：修复 `get_conversation_turn()` 方法中的空格问题，确保轮次计算准确性
+- **🔧 切片表达式空格修复**
+  - **代码规范化**：修复 `non_system_messages[:-window_size+1]` 切片表达式的空格问题，提升代码可读性
+
+#### **🔧 优化与重构**
+
+- **🎯 输入模块重构**
+  - **函数拆分**：将 FZF 文件选择相关逻辑拆分为独立函数（`_get_git_files`、`_get_all_files`、`_get_files_for_fzf`、`_parse_fzf_payload`、`_run_fzf_for_selection`、`_insert_file_path`、`_clear_previous_prompt`），提升代码可维护性
+  - **模块导入优化**：使用别名避免内置模块冲突（`_os`、`_subprocess`、`_shutil`），防止循环导入问题
+  - **函数抽取**：抽取 `_get_non_interactive_response` 和 `_get_agent_hint` 函数，简化 `get_multiline_input` 函数逻辑
+  - **代码简化**：简化 FZF 请求处理逻辑，统一使用抽取的函数，减少重复代码
+- **🎯 输出模块重构**
+  - **样式配置统一**：提取输出类型图标和样式配置到模块级常量（`OUTPUT_ICONS`、`EMOJI_TO_OUTPUT_TYPE`），便于统一管理和维护
+  - **Panel 打印统一**：新增 `print_markdown()` 方法，统一使用 Rich Panel 打带 markdown 高亮的内容，替换原有的直接 Panel 创建代码
+  - **样式字典提取**：将章节样式和文字颜色配置提取为类属性（`_SECTION_STYLES`、`_TEXT_COLORS`），避免重复定义
+  - **Emoji 映射优化**：优化 emoji 到 OutputType 的映射逻辑，使用统一的 `EMOJI_TO_OUTPUT_TYPE` 字典
+- **🎯 对话摘要打印优化**
+  - **统一打印接口**：对话总结、压缩摘要、任务总结统一使用 `PrettyOutput.print_markdown()` 方法打印，保持输出样式一致性
+  - **代码简化**：移除重复的 Rich Panel 创建代码，使用统一的打印方法
+
+#### **📚 文档更新**
+
+#### **🧪 测试增强**
+
+- **🎯 输入模块测试完善**
+  - **新增测试文件**：新增 `tests/jarvis_utils/test_input.py`（+1102行），提供完整的输入模块测试覆盖
+  - **测试覆盖**：覆盖 display_width、calc_prompt_rows、multiline_hint、get_single_line_input、FileCompleter、get_all_rules_formatted、user_confirm、非交互模式、FZF 选择等核心功能
+- **🎯 输出模块测试扩展**
+  - **测试扩展**：扩展 `tests/jarvis_utils/test_output.py`（+568行），新增大量测试用例
+  - **测试覆盖**：覆盖 \_safe_color_get、\_highlight_progress_text、ConsoleOutputSink、PrettyOutput、emit_output 等核心类和方法
+
+---
+
 ### Release Note - v1.2.7 (2026-01-25)
 
 #### **🚀 新功能**
