@@ -2394,7 +2394,7 @@ class Agent:
             self.set_non_interactive(False)
 
         user_input = self._multiline_input(
-            "模型交互期间被中断，请输入用户干预信息：", False
+            "模型交互期间被中断，请输入用户干预信息", False
         )
         # 广播中断事件（包含用户输入，可能为空字符串）
         try:
@@ -2449,7 +2449,7 @@ class Agent:
             LoopAction.CONTINUE 或 LoopAction.COMPLETE（兼容旧字符串值 "continue"/"complete"）
         """
         user_input = self._multiline_input(
-            f"{self.name}: 请输入，或输入空行来结束当前任务：", False
+            f"{self.name}: 请输入，或输入空行来结束当前任务", False
         )
 
         if user_input:
