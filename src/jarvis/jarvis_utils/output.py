@@ -803,5 +803,9 @@ class PrettyOutput:
             if len(text) > len(detected_emoji) and text[len(detected_emoji)] != " ":
                 text = f"{detected_emoji} {text[len(detected_emoji) :].lstrip()}"
 
+        # 如果打印的内容中有换行，就在要打印的内容开头添加一个换行
+        if "\n" in text:
+            text = f"\n{text}"
+
         # 使用现有的print方法进行着色输出
         PrettyOutput.print(text=text, output_type=output_type, timestamp=timestamp)
