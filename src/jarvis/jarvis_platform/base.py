@@ -555,16 +555,19 @@ class BasePlatform(ABC):
                 )
                 max_tokens = self._get_platform_max_input_token_count()
                 if max_tokens > 0 and progress_bar:
+                    threshold = get_conversation_turn_threshold()
                     PrettyOutput.auto_print(
-                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | Token: {usage_percent:.1f}%"
+                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self._conversation_turn}/{threshold} | Token: {usage_percent:.1f}%"
                     )
                 else:
+                    threshold = get_conversation_turn_threshold()
                     PrettyOutput.auto_print(
-                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒"
+                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self._conversation_turn}/{threshold}"
                     )
             except Exception:
+                threshold = get_conversation_turn_threshold()
                 PrettyOutput.auto_print(
-                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒"
+                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self._conversation_turn}/{threshold}"
                 )
         else:
             response = self._chat_with_suppressed_output(message)
@@ -769,7 +772,6 @@ class BasePlatform(ABC):
         except Exception:
             # Do not break chat flow if writing history fails
             pass
-
 
     def get_used_token_count(self) -> int:
         """计算当前对话历史使用的token数量
