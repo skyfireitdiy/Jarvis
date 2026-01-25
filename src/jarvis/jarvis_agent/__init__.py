@@ -1508,7 +1508,7 @@ class Agent:
             window_size = get_sliding_window_size()
 
         # 用户/工具消息和助手消息保留奇数条（避免连续的同role消息）
-        # 保留用户/工具消息4条，助手消息5条，共9条（奇数）
+        # 保留用户/工具消息2条，助手消息3条，共5条（奇数）
         # 注：实际保留数量由 window_size 参数控制
 
         try:
