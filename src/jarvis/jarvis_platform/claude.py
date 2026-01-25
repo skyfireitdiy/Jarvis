@@ -27,25 +27,34 @@ class ClaudeModel(BasePlatform):
         self.system_message = ""
         llm_config = llm_config or {}
 
-        # API Key 配置
+        # 如果传入了 llm_config（非空字典），优先从 llm_config 读取，避免环境变量污染
+        # 只有在 llm_config 中没有对应键时才从环境变量读取（向后兼容）
+        # 注意：如果 llm_config 中某个键存在但值为 None 或空字符串，也使用该值，不从环境变量读取
         if llm_config:
+            # 传入了 llm_config，优先使用 llm_config 中的值
+            # 使用 get() 方法，如果键不存在返回 None，然后才从环境变量读取
+            # 但是，如果 llm_config 是空字典 {}，说明是显式传入的空配置，应该从环境变量读取
+            # 如果 llm_config 中有键但值为 None，也应该使用 None，不从环境变量读取
             if "anthropic_api_key" in llm_config:
+                # 键存在，使用 llm_config 中的值（即使为 None 或空字符串）
                 self.api_key = llm_config.get("anthropic_api_key")
             else:
+                # 键不存在，从环境变量读取（向后兼容）
                 self.api_key = os.getenv("ANTHROPIC_API_KEY")
-        else:
-            self.api_key = os.getenv("ANTHROPIC_API_KEY")
 
-        # Base URL 配置
-        if llm_config:
             if "anthropic_base_url" in llm_config:
+                # 键存在，使用 llm_config 中的值（即使为 None 或空字符串）
                 self.base_url = llm_config.get("anthropic_base_url")
             else:
+                # 键不存在，从环境变量读取（向后兼容）
                 self.base_url = os.getenv("ANTHROPIC_BASE_URL")
         else:
+            # 没有传入 llm_config，从环境变量读取（向后兼容）
+            self.api_key = os.getenv("ANTHROPIC_API_KEY")
             self.base_url = os.getenv("ANTHROPIC_BASE_URL")
 
-        # API Key 警告
+        # 只有当 llm_config 不为空但其中没有 anthropic_api_key，且环境变量也没有设置时，才打印警告
+        # 如果 llm_config 为空字典，说明可能是配置还未加载完成，不打印警告（避免第一轮误报）
         if not self.api_key and llm_config:
             PrettyOutput.auto_print("⚠️ ANTHROPIC_API_KEY 未设置")
 
@@ -239,14 +248,13 @@ class ClaudeModel(BasePlatform):
                 self.messages.append(
                     {"role": "assistant", "content": accumulated_response}
                 )
-
-            return None
+            else:
+                raise Exception("No response from model")
 
         except Exception as e:
             # 失败时回滚：移除已添加的用户消息（如果存在）
             if len(self.messages) > messages_before_user:
                 self.messages = self.messages[:messages_before_user]
-            PrettyOutput.auto_print(f"❌ 对话失败：{str(e)}")
             raise Exception(f"Chat failed: {str(e)}")
 
     def name(self) -> str:
@@ -285,30 +293,10 @@ class ClaudeModel(BasePlatform):
         return True
 
     def save(self, file_path: str) -> bool:
-        """
-        Save chat session to a file.
-
-        参数:
-            file_path: 保存会话文件的路径
-
-        返回:
-            bool: 保存是否成功
-        """
-        # 从 messages 中提取系统消息，确保同步
-        system_content = ""
-        for msg in self.messages:
-            if msg.get("role") == "system":
-                system_content = msg.get("content", "")
-                break
-        
-        # 如果 messages 中有系统消息，更新 system_message 属性
-        if system_content:
-            self.system_message = system_content
-        
+        """Save chat session to a file."""
         state: Dict[str, Any] = {
             "messages": self.messages,
             "model_name": self.model_name,
-            "system_message": self.system_message,  # 保留用于向后兼容
         }
 
         try:
@@ -322,45 +310,17 @@ class ClaudeModel(BasePlatform):
             return False
 
     def restore(self, file_path: str) -> bool:
-        """
-        Restore chat session from a file.
-
-        参数:
-            file_path: 要恢复会话文件的路径
-
-        返回:
-            bool: 恢复是否成功
-        """
+        """Restore chat session from a file."""
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 state = json.load(f)
 
             self.messages = state.get("messages", [])
             self.model_name = state.get("model_name", "claude-3-5-sonnet-20241022")
-            
-            # 从 messages 中提取系统消息（如果存在）
-            # 同时支持向后兼容：如果 state 中有 system_message 但 messages 中没有，则添加
-            system_message_from_state = state.get("system_message", "")
-            has_system_in_messages = any(
-                msg.get("role") == "system" for msg in self.messages
-            )
-            
-            if system_message_from_state and not has_system_in_messages:
-                # 向后兼容：如果 messages 中没有系统消息，但 state 中有，则添加
-                self.messages.insert(0, {"role": "system", "content": system_message_from_state})
-                self.system_message = system_message_from_state
-            else:
-                # 从 messages 中提取系统消息
-                for msg in self.messages:
-                    if msg.get("role") == "system":
-                        self.system_message = msg.get("content", "")
-                        break
-                else:
-                    self.system_message = ""
-            
             # 处理start_commit信息（如果存在）
             # start_commit = state.get("start_commit", None)
             # 可以根据需要使用start_commit信息
+            # atexit.register(self.delete_chat)
             self._saved = True
 
             PrettyOutput.auto_print(f"✅ 从 {file_path} 成功恢复会话")
@@ -405,7 +365,7 @@ class ClaudeModel(BasePlatform):
         remaining_tokens = self.get_remaining_token_count()
         if remaining_tokens > 0:
             PrettyOutput.auto_print(
-                f"✅ 裁剪成功：丢弃了{trimmed_count}条消息，剩余token: {remaining_tokens}"
+                f"✅ 裁剪成功：丢弃了{trimmed_count}条非system消息，剩余token: {remaining_tokens}"
             )
             return True
         else:
