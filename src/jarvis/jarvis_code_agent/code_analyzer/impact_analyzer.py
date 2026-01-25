@@ -14,6 +14,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Set
+from typing import Tuple
 
 from jarvis.jarvis_utils.utils import decode_output
 
@@ -290,7 +291,8 @@ class ImpactAnalyzer:
             ImpactReport: 影响分析报告
         """
         impacts: List[Impact] = []
-        affected_symbols: Set[Symbol] = set()
+        # 使用字典来去重 Symbol 对象（因为 Symbol 不可哈希）
+        affected_symbols_map: Dict[Tuple[str, str, int], Symbol] = {}
         affected_files: Set[str] = {file_path}
         interface_changes: List[InterfaceChange] = []
 
@@ -299,7 +301,10 @@ class ImpactAnalyzer:
             # 分析符号影响
             symbols_in_edit = self._find_symbols_in_edit(file_path, edit)
             for symbol in symbols_in_edit:
-                affected_symbols.add(symbol)
+                # 使用元组作为键来去重 Symbol 对象
+                symbol_key = (symbol.file_path, symbol.name, symbol.line_start)
+                if symbol_key not in affected_symbols_map:
+                    affected_symbols_map[symbol_key] = symbol
                 symbol_impacts = self._analyze_symbol_impact(symbol, edit)
                 impacts.extend(symbol_impacts)
 
@@ -345,7 +350,7 @@ class ImpactAnalyzer:
 
         return ImpactReport(
             affected_files=list(affected_files),
-            affected_symbols=list(affected_symbols),
+            affected_symbols=list(affected_symbols_map.values()),
             affected_tests=test_files,
             interface_changes=interface_changes,
             impacts=impacts,
