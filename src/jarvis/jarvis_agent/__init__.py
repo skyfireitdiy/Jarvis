@@ -1547,13 +1547,22 @@ class Agent:
 
             # 压缩更早的消息
             try:
-                # 创建临时模型
-                temp_model = self._create_temp_model(
-                    "你是一个对话历史压缩助手，请根据用户的要求对对话历史进行压缩。"
-                )
+                # 创建临时模型（不传入系统提示词，因为会通过 set_messages 设置）
+                temp_model = self._create_temp_model()
 
                 # 使用 set_messages 设置对话历史，让模型能正确理解对话结构
-                temp_model.set_messages(old_messages)
+                # 注意：必须包含系统消息，否则模型没有系统提示词会返回空值
+                messages_to_set = system_messages + old_messages
+                temp_model.set_messages(messages_to_set)
+
+                # 调试打印：确认消息内容
+                PrettyOutput.auto_print(
+                    f"🔍 滑动窗口压缩调试: 系统消息数={len(system_messages)}, "
+                    f"旧消息数={len(old_messages)}, 总消息数={len(messages_to_set)}"
+                )
+                if system_messages:
+                    sys_content = system_messages[0].get('content', '')[:100]
+                    PrettyOutput.auto_print(f"🔍 系统提示词前100字符: {sys_content}...")
 
                 # 使用 SUMMARY_REQUEST_PROMPT 进行压缩（避免污染当前对话）
                 compressed_summary = temp_model.chat_until_success(
@@ -2489,10 +2498,14 @@ class Agent:
 
         self.first = False
 
-    def _create_temp_model(self, system_prompt: str) -> BasePlatform:
+    def _create_temp_model(self, system_prompt: str = "") -> BasePlatform:
         """创建一个用于执行一次性任务的临时模型实例，以避免污染主会话。
 
         使用与调用方相同的模型配置。
+
+        参数:
+            system_prompt: 系统提示词，可选。如果调用方会通过 set_messages 设置包含系统消息的对话历史，
+                          则无需传入此参数（set_messages 会覆盖此处设置的系统提示词）。
         """
         # 使用与调用方相同的模型配置
         platform_name = self.model.platform_name()
@@ -2505,7 +2518,8 @@ class Agent:
             raise RuntimeError("创建临时模型失败。")
 
         temp_model.set_model_name(model_name)
-        temp_model.set_system_prompt(system_prompt)
+        if system_prompt:
+            temp_model.set_system_prompt(system_prompt)
         temp_model.set_suppress_output(False)  # 关闭抑制输出，显示压缩过程
         return temp_model
 

@@ -73,12 +73,23 @@ class ClaudeModel(BasePlatform):
             messages: 新的对话历史列表，每个元素包含 role 和 content
 
         注意:
-            会根据 messages 重新计算 conversation_turn（统计非 system 消息中的 user 消息数量）
+            - 会根据 messages 重新计算 conversation_turn（统计非 system 消息中的 user 消息数量）
+            - 如果消息列表包含系统消息，会同时更新 system_message 属性
+            - Claude 的 system_message 单独存储，不在 messages 列表中
         """
-        self.messages = messages
+        # 如果消息列表包含系统消息，提取并更新 system_message 属性
+        # Claude 的 system_message 需要单独存储，不能放在 messages 中
+        non_system_messages = []
+        for msg in messages:
+            if msg.get("role") == "system":
+                self.system_message = msg.get("content", "")
+            else:
+                non_system_messages.append(msg)
 
-        # 计算 conversation_turn：统计非 system 消息中的 user 消息数量
-        non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
+        # Claude 的 messages 不包含系统消息
+        self.messages = non_system_messages
+
+        # 计算 conversation_turn：统计 user 消息数量
         self._conversation_turn = sum(
             1 for msg in non_system_messages if msg.get("role") == "user"
         )
