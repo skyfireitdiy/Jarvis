@@ -1454,7 +1454,9 @@ class Agent:
                     except Exception:
                         # 如果普通打印也失败，至少打印一个提示
                         PrettyOutput.auto_print(f"⚠️ 总结已生成但打印失败: {str(e)}")
-                        PrettyOutput.auto_print(f"📋 总结内容（前500字符）: {summary[:500]}...")
+                        PrettyOutput.auto_print(
+                            f"📋 总结内容（前500字符）: {summary[:500]}..."
+                        )
             return summary
         except Exception:
             PrettyOutput.auto_print("❌ 总结对话历史失败")
@@ -1694,8 +1696,7 @@ class Agent:
 
         # 用户/工具消息和助手消息保留奇数条（避免连续的同role消息）
         # 保留用户/工具消息4条，助手消息5条，共9条（奇数）
-        user_tool_count = 4
-        assistant_count = 5
+        # 注：实际保留数量由 window_size 参数控制
 
         try:
             # 获取对话历史
@@ -1773,9 +1774,9 @@ class Agent:
                 # 重建消息列表：系统消息 + 压缩摘要 + 最近的消息
                 new_history = system_messages + [compressed_msg] + recent_messages
 
-                # 更新模型的消息历史
-                if hasattr(self.model, "messages"):
-                    self.model.messages = new_history
+                # 更新模型的消息历史，使用 set_messages 方法确保正确更新 conversation_turn
+                if hasattr(self.model, "set_messages"):
+                    self.model.set_messages(new_history)
                     # 统计保留的消息类型
                     user_tool_count_kept = sum(
                         1
@@ -1793,7 +1794,9 @@ class Agent:
                     )
                     return True
                 else:
-                    PrettyOutput.auto_print("⚠️ 滑动窗口压缩：模型不支持消息历史管理")
+                    PrettyOutput.auto_print(
+                        "⚠️ 滑动窗口压缩：模型不支持 set_messages 方法"
+                    )
                     return False
 
             except Exception as e:
@@ -2129,15 +2132,17 @@ class Agent:
                 )
 
                 # 更新模型的消息历史
-                if hasattr(self.model, "messages"):
-                    self.model.messages = new_history
+                if hasattr(self.model, "set_messages"):
+                    self.model.set_messages(new_history)
                     PrettyOutput.auto_print(
                         f"✅ 重要性评分压缩完成：压缩了 {len(low_score_messages)} 条低分消息，"
                         f"保留了 {len(high_score_messages)} 条高分消息"
                     )
                     return True
                 else:
-                    PrettyOutput.auto_print("⚠️ 重要性评分压缩：模型不支持消息历史管理")
+                    PrettyOutput.auto_print(
+                        "⚠️ 重要性评分压缩：模型不支持 set_messages 方法"
+                    )
                     return False
 
             except Exception as e:
@@ -2285,8 +2290,8 @@ class Agent:
                 new_history = system_messages + compressed_messages + last_chunk
 
                 # 更新模型的消息历史
-                if hasattr(self.model, "messages"):
-                    self.model.messages = new_history
+                if hasattr(self.model, "set_messages"):
+                    self.model.set_messages(new_history)
                     total_compressed = sum(len(chunk) for chunk in chunks_to_compress)
                     PrettyOutput.auto_print(
                         f"✅ 增量摘要压缩完成：压缩了 {len(chunks_to_compress)} 个chunk（共 {total_compressed} 条消息），"
@@ -2294,7 +2299,9 @@ class Agent:
                     )
                     return True
                 else:
-                    PrettyOutput.auto_print("⚠️ 增量摘要压缩：模型不支持消息历史管理")
+                    PrettyOutput.auto_print(
+                        "⚠️ 增量摘要压缩：模型不支持 set_messages 方法"
+                    )
                     return False
 
             except Exception as e:
@@ -2526,8 +2533,8 @@ class Agent:
                 new_history.extend(recent_non_key)
 
                 # 更新模型的消息历史
-                if hasattr(self.model, "messages"):
-                    self.model.messages = new_history
+                if hasattr(self.model, "set_messages"):
+                    self.model.set_messages(new_history)
                     PrettyOutput.auto_print(
                         f"✅ 关键事件提取压缩完成：提取了 {len(key_events)} 个关键事件，"
                         f"压缩了 {len(non_key_events)} 条非关键消息"
@@ -2535,7 +2542,7 @@ class Agent:
                     return True
                 else:
                     PrettyOutput.auto_print(
-                        "⚠️ 关键事件提取压缩：模型不支持消息历史管理"
+                        "⚠️ 关键事件提取压缩：模型不支持 set_messages 方法"
                     )
                     return False
 
