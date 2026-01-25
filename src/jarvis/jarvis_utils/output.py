@@ -142,6 +142,61 @@ class OutputType(Enum):
     SMART_MODEL = "SMART_MODEL"
 
 
+# 输出类型图标映射（统一的图标定义）
+OUTPUT_ICONS = {
+    OutputType.SYSTEM: "🤖",
+    OutputType.CODE: "📝",
+    OutputType.RESULT: "✨",
+    OutputType.ERROR: "❌",
+    OutputType.INFO: "ℹ️",
+    OutputType.PLANNING: "📋",
+    OutputType.PROGRESS: "⏳",
+    OutputType.SUCCESS: "✅",
+    OutputType.WARNING: "⚠️",
+    OutputType.DEBUG: "🔍",
+    OutputType.USER: "👤",
+    OutputType.TOOL: "🔧",
+    OutputType.START: "🚀",
+    OutputType.TARGET: "🎯",
+    OutputType.STOP: "🛑",
+    OutputType.RETRY: "🔄",
+    OutputType.ROLLBACK: "🔙",
+    OutputType.DIRECTORY: "📁",
+    OutputType.STATISTICS: "📊",
+    OutputType.CHEAP_MODEL: "💰",
+    OutputType.NORMAL_MODEL: "⭐",
+    OutputType.SMART_MODEL: "🧠",
+}
+
+
+# Emoji 到输出类型的反向映射（包含别名）
+EMOJI_TO_OUTPUT_TYPE = {
+    "🤖": OutputType.SYSTEM,
+    "📝": OutputType.CODE,
+    "✨": OutputType.RESULT,
+    "❌": OutputType.ERROR,
+    "ℹ️": OutputType.INFO,
+    "📋": OutputType.PLANNING,
+    "⏳": OutputType.PROGRESS,
+    "✅": OutputType.SUCCESS,
+    "⚠️": OutputType.WARNING,
+    "🔍": OutputType.DEBUG,
+    "👤": OutputType.USER,
+    "🔧": OutputType.TOOL,
+    "🚀": OutputType.START,
+    "🎯": OutputType.TARGET,
+    "🛑": OutputType.STOP,
+    "🔄": OutputType.RETRY,
+    "🔙": OutputType.ROLLBACK,
+    "📁": OutputType.DIRECTORY,
+    "📂": OutputType.DIRECTORY,  # 别名
+    "📊": OutputType.STATISTICS,
+    "💰": OutputType.CHEAP_MODEL,
+    "⭐": OutputType.NORMAL_MODEL,
+    "🧠": OutputType.SMART_MODEL,
+}
+
+
 @dataclass
 class OutputEvent:
     """
@@ -176,6 +231,147 @@ class ConsoleOutputSink(OutputSink):
     """
     默认控制台输出实现，保持与原 PrettyOutput 行为一致。
     """
+
+    # 章节样式配置（使用统一的图标）
+    _SECTION_STYLES = {
+        OutputType.SYSTEM: RichStyle(
+            color="cyan", frame=True, meta={"icon": OUTPUT_ICONS[OutputType.SYSTEM]}
+        ),
+        OutputType.CODE: RichStyle(
+            color="green", frame=True, meta={"icon": OUTPUT_ICONS[OutputType.CODE]}
+        ),
+        OutputType.RESULT: RichStyle(
+            color="blue", frame=True, meta={"icon": OUTPUT_ICONS[OutputType.RESULT]}
+        ),
+        OutputType.ERROR: RichStyle(
+            color="bright_red",
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.ERROR]},
+            blink=True,
+            bold=True,
+        ),
+        OutputType.INFO: RichStyle(
+            color="grey70", frame=True, meta={"icon": OUTPUT_ICONS[OutputType.INFO]}
+        ),
+        OutputType.PLANNING: RichStyle(
+            color="magenta",
+            bold=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.PLANNING]},
+        ),
+        OutputType.PROGRESS: RichStyle(
+            color="grey50",
+            encircle=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.PROGRESS]},
+        ),
+        OutputType.SUCCESS: RichStyle(
+            color="bright_green",
+            bold=True,
+            strike=False,
+            meta={"icon": OUTPUT_ICONS[OutputType.SUCCESS]},
+        ),
+        OutputType.WARNING: RichStyle(
+            color="bright_yellow",
+            bold=True,
+            blink=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.WARNING]},
+        ),
+        OutputType.DEBUG: RichStyle(
+            color="grey50",
+            dim=True,
+            conceal=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.DEBUG]},
+        ),
+        OutputType.USER: RichStyle(
+            color="bright_green",
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.USER]},
+        ),
+        OutputType.TOOL: RichStyle(
+            color="green", frame=True, meta={"icon": OUTPUT_ICONS[OutputType.TOOL]}
+        ),
+        OutputType.START: RichStyle(
+            color="bright_cyan",
+            bold=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.START]},
+        ),
+        OutputType.TARGET: RichStyle(
+            color="bright_magenta",
+            bold=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.TARGET]},
+        ),
+        OutputType.STOP: RichStyle(
+            color="bright_red",
+            bold=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.STOP]},
+        ),
+        OutputType.RETRY: RichStyle(
+            color="grey70",
+            bold=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.RETRY]},
+        ),
+        OutputType.ROLLBACK: RichStyle(
+            color="grey70",
+            bold=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.ROLLBACK]},
+        ),
+        OutputType.DIRECTORY: RichStyle(
+            color="cyan", frame=True, meta={"icon": OUTPUT_ICONS[OutputType.DIRECTORY]}
+        ),
+        OutputType.STATISTICS: RichStyle(
+            color="grey58",
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.STATISTICS]},
+        ),
+        OutputType.CHEAP_MODEL: RichStyle(
+            color="grey58",
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.CHEAP_MODEL]},
+        ),
+        OutputType.NORMAL_MODEL: RichStyle(
+            color="bright_blue",
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.NORMAL_MODEL]},
+        ),
+        OutputType.SMART_MODEL: RichStyle(
+            color="bright_magenta",
+            bold=True,
+            frame=True,
+            meta={"icon": OUTPUT_ICONS[OutputType.SMART_MODEL]},
+        ),
+    }
+
+    # 文字颜色映射
+    _TEXT_COLORS = {
+        OutputType.SYSTEM: "cyan",
+        OutputType.CODE: "green",
+        OutputType.RESULT: "blue",
+        OutputType.ERROR: "bright_red",
+        OutputType.INFO: "grey70",
+        OutputType.PLANNING: "magenta",
+        OutputType.PROGRESS: "grey50",
+        OutputType.SUCCESS: "bright_green",
+        OutputType.WARNING: "bright_yellow",
+        OutputType.DEBUG: "grey30",
+        OutputType.USER: "bright_green",
+        OutputType.TOOL: "green",
+        OutputType.START: "bright_cyan",
+        OutputType.TARGET: "bright_magenta",
+        OutputType.STOP: "bright_red",
+        OutputType.RETRY: "grey70",
+        OutputType.ROLLBACK: "grey70",
+        OutputType.DIRECTORY: "cyan",
+        OutputType.STATISTICS: "grey58",
+        OutputType.CHEAP_MODEL: "grey58",
+        OutputType.NORMAL_MODEL: "bright_blue",
+        OutputType.SMART_MODEL: "bright_magenta",
+    }
 
     @staticmethod
     def _highlight_progress_text(
@@ -234,132 +430,9 @@ class ConsoleOutputSink(OutputSink):
         # 章节输出
         if event.section is not None:
             # 使用带背景色和样式的Text替代Panel
-            style_config = {
-                OutputType.SYSTEM: RichStyle(
-                    color="cyan",
-                    frame=True,
-                    meta={"icon": "🤖"},
-                ),
-                OutputType.CODE: RichStyle(
-                    color="green",
-                    frame=True,
-                    meta={"icon": "📝"},
-                ),
-                OutputType.RESULT: RichStyle(
-                    color="blue",
-                    frame=True,
-                    meta={"icon": "✨"},
-                ),
-                OutputType.ERROR: RichStyle(
-                    color="bright_red",
-                    frame=True,
-                    meta={"icon": "❌"},
-                    blink=True,
-                    bold=True,
-                ),
-                OutputType.INFO: RichStyle(
-                    color="grey70",
-                    frame=True,
-                    meta={"icon": "ℹ️"},
-                ),
-                OutputType.PLANNING: RichStyle(
-                    color="magenta",
-                    bold=True,
-                    frame=True,
-                    meta={"icon": "📋"},
-                ),
-                OutputType.PROGRESS: RichStyle(
-                    color="grey50",
-                    encircle=True,
-                    frame=True,
-                    meta={"icon": "⏳"},
-                ),
-                OutputType.SUCCESS: RichStyle(
-                    color="bright_green",
-                    bold=True,
-                    strike=False,
-                    meta={"icon": "✅"},
-                ),
-                OutputType.WARNING: RichStyle(
-                    color="bright_yellow",
-                    bold=True,
-                    blink=True,
-                    meta={"icon": "⚠️"},
-                ),
-                OutputType.DEBUG: RichStyle(
-                    color="grey50",
-                    dim=True,
-                    conceal=True,
-                    meta={"icon": "🔍"},
-                ),
-                OutputType.USER: RichStyle(
-                    color="bright_green",
-                    frame=True,
-                    meta={"icon": "👤"},
-                ),
-                OutputType.TOOL: RichStyle(
-                    color="green",
-                    frame=True,
-                    meta={"icon": "🔧"},
-                ),
-                OutputType.START: RichStyle(
-                    color="bright_cyan",
-                    bold=True,
-                    frame=True,
-                    meta={"icon": "🚀"},
-                ),
-                OutputType.TARGET: RichStyle(
-                    color="bright_magenta",
-                    bold=True,
-                    frame=True,
-                    meta={"icon": "🎯"},
-                ),
-                OutputType.STOP: RichStyle(
-                    color="bright_red",
-                    bold=True,
-                    frame=True,
-                    meta={"icon": "🛑"},
-                ),
-                OutputType.RETRY: RichStyle(
-                    color="grey70",
-                    bold=True,
-                    frame=True,
-                    meta={"icon": "🔄"},
-                ),
-                OutputType.ROLLBACK: RichStyle(
-                    color="grey70",
-                    bold=True,
-                    frame=True,
-                    meta={"icon": "🔙"},
-                ),
-                OutputType.DIRECTORY: RichStyle(
-                    color="cyan",
-                    frame=True,
-                    meta={"icon": "📁"},
-                ),
-                OutputType.STATISTICS: RichStyle(
-                    color="grey58",
-                    frame=True,
-                    meta={"icon": "📊"},
-                ),
-                OutputType.CHEAP_MODEL: RichStyle(
-                    color="grey58",
-                    frame=True,
-                    meta={"icon": "💰"},
-                ),
-                OutputType.NORMAL_MODEL: RichStyle(
-                    color="bright_blue",
-                    frame=True,
-                    meta={"icon": "⭐"},
-                ),
-                OutputType.SMART_MODEL: RichStyle(
-                    color="bright_magenta",
-                    bold=True,
-                    frame=True,
-                    meta={"icon": "🧠"},
-                ),
-            }
-            style_obj = style_config.get(event.output_type, RichStyle(color="white"))
+            style_obj = self._SECTION_STYLES.get(
+                event.output_type, RichStyle(color="white")
+            )
             text = Text(f"\n{event.section}\n", style=style_obj, justify="center")
             if get_pretty_output():
                 console.print(text)
@@ -373,35 +446,6 @@ class ConsoleOutputSink(OutputSink):
             if event.lang is not None
             else PrettyOutput._detect_language(event.text, default_lang="markdown")
         )
-
-        # 文字颜色映射 - 使用柔和的标准颜色
-        text_colors = {
-            OutputType.SYSTEM: "cyan",
-            OutputType.CODE: "green",
-            OutputType.RESULT: "blue",
-            OutputType.ERROR: "bright_red",
-            OutputType.INFO: "grey70",
-            OutputType.PLANNING: "magenta",
-            OutputType.PROGRESS: "grey50",
-            OutputType.SUCCESS: "bright_green",
-            OutputType.WARNING: "bright_yellow",
-            OutputType.DEBUG: "grey30",
-            OutputType.USER: "bright_green",
-            OutputType.TOOL: "green",
-            OutputType.START: "bright_cyan",
-            OutputType.TARGET: "bright_magenta",
-            OutputType.STOP: "bright_red",
-            OutputType.RETRY: "grey70",
-            OutputType.ROLLBACK: "grey70",
-            OutputType.DIRECTORY: "cyan",
-            OutputType.STATISTICS: "grey58",
-            OutputType.CHEAP_MODEL: "grey58",
-            OutputType.NORMAL_MODEL: "bright_blue",
-            OutputType.SMART_MODEL: "bright_magenta",
-        }
-
-        # 背景色映射（已移除硬编码背景色，使用终端默认背景）
-        # 删除未使用的header_styles和styles字典
 
         content = Syntax(
             event.text,
@@ -444,7 +488,7 @@ class ConsoleOutputSink(OutputSink):
                 # 第一行：检测并高亮进度信息
                 first_line = lines[0]
                 colored_first_line = self._highlight_progress_text(
-                    first_line, event.output_type, text_colors
+                    first_line, event.output_type, self._TEXT_COLORS
                 )
 
                 combined_text.append(colored_first_line)
@@ -471,7 +515,7 @@ class ConsoleOutputSink(OutputSink):
                             display_line,
                             style=RichStyle(
                                 color=_safe_color_get(
-                                    text_colors[event.output_type], "white"
+                                    self._TEXT_COLORS[event.output_type], "white"
                                 ),
                                 dim=not is_list_item
                                 and line.startswith(
@@ -490,7 +534,7 @@ class ConsoleOutputSink(OutputSink):
 
                 # 检测并高亮进度信息（单行情况）
                 colored_content = self._highlight_progress_text(
-                    event.text, event.output_type, text_colors
+                    event.text, event.output_type, self._TEXT_COLORS
                 )
                 combined_text.append(colored_content)
 
@@ -531,31 +575,6 @@ class PrettyOutput:
     - 渐进显示的流式输出
     """
 
-    # 不同输出类型的图标
-    _ICONS = {
-        OutputType.SYSTEM: "🤖",
-        OutputType.CODE: "📝",
-        OutputType.RESULT: "✨",
-        OutputType.ERROR: "❌",
-        OutputType.INFO: "ℹ️",
-        OutputType.PLANNING: "📋",
-        OutputType.PROGRESS: "⏳",
-        OutputType.SUCCESS: "✅",
-        OutputType.WARNING: "⚠️",
-        OutputType.DEBUG: "🔍",
-        OutputType.USER: "👤",
-        OutputType.TOOL: "🔧",
-        OutputType.START: "🚀",
-        OutputType.TARGET: "🎯",
-        OutputType.STOP: "🛑",
-        OutputType.RETRY: "🔄",
-        OutputType.ROLLBACK: "🔙",
-        OutputType.DIRECTORY: "📁",
-        OutputType.STATISTICS: "📊",
-        OutputType.CHEAP_MODEL: "💰",
-        OutputType.NORMAL_MODEL: "⭐",
-        OutputType.SMART_MODEL: "🧠",
-    }
     # 语法高亮的语言映射
     _lang_map = {
         "Python": "python",
@@ -761,37 +780,10 @@ class PrettyOutput:
             text: 要打印的文本
             timestamp: 是否显示时间戳
         """
-        # 定义emoji到OutputType的映射
-        emoji_mapping = {
-            "⚠️": OutputType.WARNING,
-            "❌": OutputType.ERROR,
-            "✅": OutputType.SUCCESS,
-            "ℹ️": OutputType.INFO,
-            "📋": OutputType.PLANNING,
-            "⏳": OutputType.PROGRESS,
-            "🔍": OutputType.DEBUG,
-            "🤖": OutputType.SYSTEM,
-            "📝": OutputType.CODE,
-            "✨": OutputType.RESULT,
-            "👤": OutputType.USER,
-            "🔧": OutputType.TOOL,
-            "🚀": OutputType.START,
-            "🎯": OutputType.TARGET,
-            "🛑": OutputType.STOP,
-            "🔄": OutputType.RETRY,
-            "🔙": OutputType.ROLLBACK,
-            "📁": OutputType.DIRECTORY,
-            "📂": OutputType.DIRECTORY,
-            "📊": OutputType.STATISTICS,
-            "💰": OutputType.CHEAP_MODEL,
-            "⭐": OutputType.NORMAL_MODEL,
-            "🧠": OutputType.SMART_MODEL,
-        }
-
-        # 检测emoji前缀
+        # 检测emoji前缀（使用统一的emoji映射）
         output_type = OutputType.INFO  # 默认类型
         detected_emoji = None
-        for emoji, type_enum in emoji_mapping.items():
+        for emoji, type_enum in EMOJI_TO_OUTPUT_TYPE.items():
             if text.startswith(emoji):
                 output_type = type_enum
                 detected_emoji = emoji
