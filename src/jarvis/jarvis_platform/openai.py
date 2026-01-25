@@ -120,9 +120,16 @@ class OpenAIModel(BasePlatform):
             messages: 新的对话历史列表，每个元素包含 role 和 content
 
         注意:
-            会根据 messages 重新计算 conversation_turn（统计非 system 消息中的 user 消息数量）
+            - 会根据 messages 重新计算 conversation_turn（统计非 system 消息中的 user 消息数量）
+            - 如果消息列表包含系统消息，会同时更新 system_message 属性
         """
         self.messages = messages
+
+        # 如果消息列表包含系统消息，更新 system_message 属性
+        for msg in messages:
+            if msg.get("role") == "system":
+                self.system_message = msg.get("content", "")
+                break
 
         # 计算 conversation_turn：统计非 system 消息中的 user 消息数量
         non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
