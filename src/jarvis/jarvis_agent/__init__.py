@@ -1455,7 +1455,6 @@ class Agent:
         """
         try:
             import jarvis.jarvis_utils.globals as G
-            from jarvis.jarvis_utils.output import PrettyOutput
 
             agent_name = self.name if hasattr(self, "name") else None
             title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} {compression_type}摘要[/bold cyan]"
