@@ -19,6 +19,10 @@ refactor:
   name: "代码重构"
   description: "代码结构优化、设计模式应用、代码质量提升、技术债务清理等"
 
+research:
+  name: "技术研究"
+  description: "技术调研、方案对比、架构分析、技术选型、可行性研究、竞品分析、文献调研、原型验证等"
+
 feature:
   name: "功能开发"
   description: "新增功能、实现新需求、扩展现有功能等"
