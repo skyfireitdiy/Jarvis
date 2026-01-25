@@ -516,7 +516,7 @@ def handle_commit_workflow() -> bool:
 
         # 暂存所有修改
         subprocess.run(
-            ["git", "add", "."], check=True, capture_output=True, stderr=subprocess.PIPE
+            ["git", "add", "."], check=True, capture_output=True
         )
 
         # 提交变更

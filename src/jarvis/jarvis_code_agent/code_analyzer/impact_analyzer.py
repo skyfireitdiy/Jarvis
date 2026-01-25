@@ -713,7 +713,6 @@ def parse_git_diff_to_edits(file_path: str, project_root: str) -> List[Edit]:
                 cwd=project_root,
                 check=True,
                 capture_output=True,
-                stderr=subprocess.DEVNULL,
             )
         except (subprocess.CalledProcessError, FileNotFoundError):
             # 不是git仓库或git不可用，返回空列表
