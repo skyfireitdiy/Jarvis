@@ -61,10 +61,13 @@ class BasePlatform(ABC):
         self._saved = False
         self.model_group: Optional[str] = None
         self._session_history_file: Optional[str] = None
-        self._conversation_turn = 0  # 对话轮次计数器
         self.platform_type: str = "normal"  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
         self._summarizing = False  # 总结标志位，防止递归调用
+
+    def get_conversation_turn(self) -> int:
+        """获取当前对话轮次数"""
+        return len(self.get_messages())//2
 
     def __enter__(self) -> Self:
         """进入上下文管理器"""
@@ -99,7 +102,6 @@ class BasePlatform(ABC):
         """重置模型"""
         self.delete_chat()
         self._session_history_file = None
-        self._conversation_turn = 0  # 重置对话轮次计数器
 
     @abstractmethod
     def chat(self, message: str) -> Generator[str, None, None]:
@@ -191,30 +193,30 @@ class BasePlatform(ABC):
                 if max_tokens > 0 and progress_bar:
                     try:
                         panel.subtitle = (
-                            f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
+                            f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒 | "
                             f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/bold green]"
                         )
                     except Exception:
-                        panel.subtitle = f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                        panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
                 else:
-                    panel.subtitle = f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                    panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
             else:
                 if max_tokens > 0 and progress_bar:
                     try:
                         panel.subtitle = (
-                            f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断) | "
+                            f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断) | "
                             f"Token: [{percent_color}]{progress_bar} {usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}][/yellow]"
                         )
                     except Exception:
-                        panel.subtitle = f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
+                        panel.subtitle = f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
                 else:
-                    panel.subtitle = f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
+                    panel.subtitle = f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
         except Exception:
             threshold = get_conversation_turn_threshold()
             if is_completed:
-                panel.subtitle = f"[bold green]✓ {current_time} | ({self._conversation_turn}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
+                panel.subtitle = f"[bold green]✓ {current_time} | ({self.get_conversation_turn()}/{threshold}) | 对话完成耗时: {duration:.2f}秒[/bold green]"
             else:
-                panel.subtitle = f"[yellow]{current_time} | ({self._conversation_turn}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
+                panel.subtitle = f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
 
     def _chat_with_pretty_output(self, message: str, start_time: float) -> str:
         """使用 pretty output 模式进行聊天
@@ -314,7 +316,7 @@ class BasePlatform(ABC):
             buffer = ""
             last_update_time = time.time()
             update_interval = 1
-            min_buffer_size = 20
+            min_buffer_size = 1
 
             def _flush_buffer():
                 nonlocal buffer, last_update_time
@@ -452,7 +454,7 @@ class BasePlatform(ABC):
                     # 条件2：对话轮次超过阈值（检查当前轮次+1，因为本次调用会增加一轮）
                     conversation_turn_threshold = get_conversation_turn_threshold()
                     turn_limit_triggered = (
-                        self._conversation_turn + 1
+                        self.get_conversation_turn() + 1
                     ) > conversation_turn_threshold
 
                     should_compress = token_limit_triggered or turn_limit_triggered
@@ -473,7 +475,7 @@ class BasePlatform(ABC):
                             )
                         else:
                             PrettyOutput.auto_print(
-                                f"🔍 {trigger_reason}，当前对话轮次: {self._conversation_turn + 1}/{conversation_turn_threshold}"
+                                f"🔍 {trigger_reason}，当前对话轮次: {self.get_conversation_turn() + 1}/{conversation_turn_threshold}"
                             )
 
                         # 设置压缩标志，防止递归调用
@@ -484,8 +486,6 @@ class BasePlatform(ABC):
 
                             if compression_success:
                                 # 自适应压缩成功，摘要已作为消息插入到历史中
-                                # 重置对话长度计数器（Agent中的计数器，与Platform的_conversation_turn不同）
-                                self.agent.session.conversation_length = 0
                                 PrettyOutput.auto_print(
                                     "✅ 自适应压缩完成，对话上下文已更新"
                                 )
@@ -506,8 +506,6 @@ class BasePlatform(ABC):
                                         [self.agent.session.addon_prompt, summary_text]
                                     )
 
-                                # 重置对话长度计数器
-                                self.agent.session.conversation_length = 0
                                 PrettyOutput.auto_print(
                                     "✅ 完整摘要压缩完成，对话上下文已更新"
                                 )
@@ -557,17 +555,17 @@ class BasePlatform(ABC):
                 if max_tokens > 0 and progress_bar:
                     threshold = get_conversation_turn_threshold()
                     PrettyOutput.auto_print(
-                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self._conversation_turn}/{threshold} | Token: {usage_percent:.1f}%"
+                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold} | Token: {usage_percent:.1f}%"
                     )
                 else:
                     threshold = get_conversation_turn_threshold()
                     PrettyOutput.auto_print(
-                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self._conversation_turn}/{threshold}"
+                        f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold}"
                     )
             except Exception:
                 threshold = get_conversation_turn_threshold()
                 PrettyOutput.auto_print(
-                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self._conversation_turn}/{threshold}"
+                    f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold}"
                 )
         else:
             response = self._chat_with_suppressed_output(message)
@@ -575,9 +573,6 @@ class BasePlatform(ABC):
         # 处理响应并保存会话历史
         response = self._process_response(response)
         self._append_session_history(message, response)
-
-        # 增加对话轮次计数
-        self._conversation_turn += 1
 
         return response
 
@@ -612,14 +607,6 @@ class BasePlatform(ABC):
             return result
         finally:
             set_in_chat(False)
-
-    def get_conversation_turn(self) -> int:
-        """获取当前对话轮次数
-
-        返回:
-            int: 当前对话轮次数
-        """
-        return self._conversation_turn
 
     @abstractmethod
     def name(self) -> str:

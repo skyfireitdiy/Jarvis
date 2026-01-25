@@ -194,27 +194,6 @@ class PromptManager:
 </system_info>"""
         )
 
-    # ----------------------------
-    # 附加提示词构建
-    # ----------------------------
-    def _format_token_metadata(self) -> str:
-        """
-        格式化token元数据信息，包括已用token和剩余token。
-
-        返回:
-            str: 格式化的token元数据字符串，如果无法获取则返回空字符串
-        """
-        try:
-            used_tokens = self.agent.session.conversation_length
-            remaining_tokens = self.agent.get_remaining_token_count()
-
-            # 如果无法获取有效数据，返回空字符串
-            if used_tokens == 0 and remaining_tokens == 0:
-                return ""
-
-            return f"[Agent元数据] 已用token: {used_tokens} | 剩余token: {remaining_tokens}"
-        except Exception:
-            return ""
 
     def build_default_addon_prompt(self, need_complete: bool) -> str:
         """
@@ -239,13 +218,9 @@ class PromptManager:
             "", tool_registry if isinstance(tool_registry, ToolRegistry) else None
         )
 
-        # 获取token元数据
-        token_metadata = self._format_token_metadata()
-        token_metadata_prompt = f"{token_metadata}\n" if token_metadata else ""
-
         addon_prompt = f"""
 <system_prompt>
-{token_metadata_prompt}    请判断是否已经完成任务，如果已经完成：
+    请判断是否已经完成任务，如果已经完成：
     {complete_prompt if complete_prompt else f"- 直接输出完成原因，不需要再有新的操作，不要输出{ot('TOOL_CALL')}标签"}
     如果没有完成，请进行下一步操作：
     - 仅包含一个操作

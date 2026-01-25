@@ -223,98 +223,34 @@ class OpenAIModel(BasePlatform):
         """
         # 记录添加用户消息前的消息列表长度，用于失败时回滚
         messages_before_user = len(self.messages)
+
+        for msg in self.messages:
+            PrettyOutput.auto_print(f"DEUBG [{msg.get('role')}] {msg.get('content')[:20]}...")
         
         try:
-            # Add user message to history (过滤 think 标签)
-            filtered_message = self._filter_think_tags(message)
-            self.messages.append({"role": "user", "content": filtered_message})
+            self.messages.append({"role": "user", "content": message})
 
-            # 累计完整响应
-            accumulated_response = ""
 
             # 循环处理，直到不是因为长度限制而结束
-            while True:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,  # Use the configured model name
-                    messages=self.messages,  # type: ignore[arg-type]
-                    stream=True,
-                )
+            response = self.client.chat.completions.create(
+                model=self.model_name,  # Use the configured model name
+                messages=self.messages,  # type: ignore[arg-type]
+                stream=True,
+            )
 
-                full_response = ""
-                finish_reason = None
+            full_response = ""
 
-                for chunk in response:
-                    if chunk.choices and len(chunk.choices) > 0:
-                        choice = chunk.choices[0]
+            for chunk in response:
+                if chunk.choices and len(chunk.choices) > 0:
+                    choice = chunk.choices[0]
 
-                        # 检查 finish_reason（通常在最后一个 chunk 中）
-                        if choice.finish_reason:
-                            finish_reason = choice.finish_reason
-
-                        # 获取内容增量
-                        if choice.delta and choice.delta.content:
-                            text = choice.delta.content
-                            full_response += text
-                            accumulated_response += text
-                            yield text
-
-                # 如果是因为长度限制而结束，继续获取剩余内容
-                if finish_reason == "length":
-                    # 将已获取的内容追加到消息历史中，以便下次请求时模型知道已生成的内容
-                    if self.messages and self.messages[-1].get("role") == "assistant":
-                        # 追加到现有的 assistant 消息
-                        last_content = self.messages[-1]["content"]
-                        if isinstance(last_content, str):
-                            self.messages[-1]["content"] = last_content + full_response
-                        else:
-                            # 如果content不是字符串，创建新的消息
-                            self.messages.append(
-                                {"role": "assistant", "content": full_response}
-                            )
-                    else:
-                        # 创建新的 assistant 消息
-                        self.messages.append(
-                            {"role": "assistant", "content": full_response}
-                        )
-
-                    # 添加一个继续请求的用户消息，让模型继续生成
-                    self.messages.append({"role": "user", "content": "请继续。"})
-                    # 继续循环，获取剩余内容
-                    continue
-                else:
-                    # 正常结束（stop、null 或其他原因）
-                    # 将完整响应添加到消息历史（过滤 think 标签）
-                    if accumulated_response:
-                        filtered_response = self._filter_think_tags(
-                            accumulated_response
-                        )
-                        if (
-                            self.messages
-                            and self.messages[-1].get("role") == "assistant"
-                        ):
-                            # 如果最后一条是 assistant 消息，追加本次的内容
-                            last_content = self.messages[-1]["content"]
-                            if isinstance(last_content, str):
-                                self.messages[-1]["content"] = (
-                                    last_content + filtered_response
-                                )
-                            else:
-                                # 如果content不是字符串，创建新的消息
-                                self.messages.append(
-                                    {
-                                        "role": "assistant",
-                                        "content": filtered_response,
-                                    }
-                                )
-                        else:
-                            # 创建新的 assistant 消息，使用累计的完整响应
-                            self.messages.append(
-                                {"role": "assistant", "content": filtered_response}
-                            )
-                    break
-
+                    # 获取内容增量
+                    if choice.delta and choice.delta.content:
+                        text = choice.delta.content
+                        full_response += text
+                        yield text
+            self.messages.append({"role": "assistant", "content": full_response})
             return None
-
         except Exception as e:
             # 失败时回滚：移除已添加的用户消息
             if len(self.messages) > messages_before_user:
