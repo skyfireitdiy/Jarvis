@@ -224,12 +224,8 @@ class OpenAIModel(BasePlatform):
         # 记录添加用户消息前的消息列表长度，用于失败时回滚
         messages_before_user = len(self.messages)
 
-        for msg in self.messages:
-            PrettyOutput.auto_print(f"DEUBG [{msg.get('role')}] {msg.get('content')[:20]}...")
-        
         try:
             self.messages.append({"role": "user", "content": message})
-
 
             # 循环处理，直到不是因为长度限制而结束
             response = self.client.chat.completions.create(
@@ -252,11 +248,11 @@ class OpenAIModel(BasePlatform):
             if full_response:
                 self.messages.append({"role": "assistant", "content": full_response})
             else:
-                raise Exception("No response from model")   
+                raise Exception("No response from model")
         except Exception as e:
             # 失败时回滚：移除已添加的用户消息
             if len(self.messages) > messages_before_user:
-                self.messages = self.messages[:messages_before_user]   
+                self.messages = self.messages[:messages_before_user]
             raise Exception(f"Chat failed: {str(e)}")
 
     def name(self) -> str:
