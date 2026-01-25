@@ -411,10 +411,13 @@ class BasePlatform(ABC):
         )
         return response
 
-    def _check_and_compress_context(self) -> None:
+    def _check_and_compress_context(self, message: str) -> None:
         """检查并压缩对话上下文
 
         自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
+
+        Args:
+            message: 即将发送的当前消息内容
         """
         if self.agent is not None:
             # 防止递归：如果正在压缩中，跳过压缩检查
@@ -432,6 +435,12 @@ class BasePlatform(ABC):
                     # 获取剩余token数量
                     remaining_tokens = self.get_remaining_token_count()
                     max_input_tokens = self._get_platform_max_input_token_count()
+
+                    # 计算当前消息的token数并从剩余token中减去
+                    current_message_tokens = (
+                        get_context_token_count(message) if message else 0
+                    )
+                    remaining_tokens -= current_message_tokens
 
                     # 检查是否满足压缩触发条件
                     # 条件1：剩余token低于25%（即已使用超过75%）
@@ -526,7 +535,7 @@ class BasePlatform(ABC):
         message = self._truncate_message_if_needed(message)
 
         # 自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
-        self._check_and_compress_context()
+        self._check_and_compress_context(message)
 
         # 根据输出模式选择不同的处理方式
         if not self.suppress_output:
