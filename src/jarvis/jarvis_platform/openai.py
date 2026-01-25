@@ -10,7 +10,6 @@ from typing import Optional
 from typing import Tuple
 
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
 
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -111,8 +110,25 @@ class OpenAIModel(BasePlatform):
                 PrettyOutput.auto_print(
                     "⚠️ 当前 OpenAI SDK 不支持 default_headers，未能注入额外 HTTP 头"
                 )
-        self.messages: List[ChatCompletionMessageParam] = []
+        self.messages: List[Dict[str, str]] = []
         self.system_message = ""
+
+    def set_messages(self, messages: List[Dict[str, str]]) -> None:
+        """替换对话历史
+
+        参数:
+            messages: 新的对话历史列表，每个元素包含 role 和 content
+
+        注意:
+            会根据 messages 重新计算 conversation_turn（统计非 system 消息中的 user 消息数量）
+        """
+        self.messages = messages
+
+        # 计算 conversation_turn：统计非 system 消息中的 user 消息数量
+        non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
+        self._conversation_turn = sum(
+            1 for msg in non_system_messages if msg.get("role") == "user"
+        )
 
     def _filter_think_tags(self, content: str) -> str:
         """过滤 think 标签内容
@@ -201,7 +217,7 @@ class OpenAIModel(BasePlatform):
             while True:
                 response = self.client.chat.completions.create(
                     model=self.model_name,  # Use the configured model name
-                    messages=self.messages,
+                    messages=self.messages,  # type: ignore[arg-type]
                     stream=True,
                 )
 
