@@ -1332,7 +1332,6 @@ class Agent:
             pass
         return message
 
-
     def _invoke_model(self, message: str) -> str:
         """实际调用模型获取响应"""
         if not self.model:
@@ -1425,18 +1424,13 @@ class Agent:
                 # 使用 Rich Panel 打印总结内容
                 try:
                     import jarvis.jarvis_utils.globals as G
-                    from jarvis.jarvis_utils.globals import console
-                    from rich.panel import Panel
-                    from rich import box
+                    from jarvis.jarvis_utils.output import PrettyOutput
 
                     agent_name = self.name if hasattr(self, "name") else None
-                    panel = Panel(
-                        summary,
-                        title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 对话总结[/bold cyan]",
-                        border_style="cyan",
-                        box=box.ROUNDED,
+                    title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 对话总结[/bold cyan]"
+                    PrettyOutput.print_markdown(
+                        summary, title=title, border_style="cyan"
                     )
-                    console.print(panel)
                 except Exception as e:
                     # 如果 Rich Panel 打印失败，使用普通方式打印总结
                     try:
@@ -1461,18 +1455,11 @@ class Agent:
         """
         try:
             import jarvis.jarvis_utils.globals as G
-            from jarvis.jarvis_utils.globals import console
-            from rich.panel import Panel
-            from rich import box
+            from jarvis.jarvis_utils.output import PrettyOutput
 
             agent_name = self.name if hasattr(self, "name") else None
-            panel = Panel(
-                summary,
-                title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} {compression_type}摘要[/bold cyan]",
-                border_style="cyan",
-                box=box.ROUNDED,
-            )
-            console.print(panel)
+            title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} {compression_type}摘要[/bold cyan]"
+            PrettyOutput.print_markdown(summary, title=title, border_style="cyan")
         except Exception:
             # 如果格式化输出失败，回退到简单打印
             PrettyOutput.auto_print(f"📋 {compression_type}摘要:\n{summary}")
@@ -1536,7 +1523,7 @@ class Agent:
 
             # 分离更早的非系统消息（不在保留列表中的消息）
             # 多截取一条，是因为 s u a u a u a u a u a u a
-            old_messages = non_system_messages[:-window_size+1]
+            old_messages = non_system_messages[: -window_size + 1]
 
             if not old_messages:
                 return False
@@ -1549,7 +1536,6 @@ class Agent:
                 # 使用 set_messages 设置对话历史，包含系统消息和需要压缩的旧消息
                 messages_to_set = system_messages + old_messages
                 temp_model.set_messages(messages_to_set)
-
 
                 # 使用 SUMMARY_REQUEST_PROMPT 进行压缩（避免污染当前对话）
                 compressed_summary = temp_model.chat_until_success(
@@ -2129,19 +2115,13 @@ class Agent:
             if ret and ret.strip():
                 try:
                     import jarvis.jarvis_utils.globals as G
-                    from jarvis.jarvis_utils.globals import console
-                    from rich.panel import Panel
-                    from rich import box
+                    from jarvis.jarvis_utils.output import PrettyOutput
 
                     agent_name = self.name if hasattr(self, "name") else None
-                    panel = Panel(
-                        ret,
-                        title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 任务总结[/bold cyan]",
-                        border_style="bright_green",
-                        box=box.ROUNDED,
-                        expand=True,
+                    title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 任务总结[/bold cyan]"
+                    PrettyOutput.print_markdown(
+                        ret, title=title, border_style="bright_green"
                     )
-                    console.print(panel)
                 except Exception:
                     # 如果格式化输出失败，回退到简单打印
                     PrettyOutput.auto_print(f"📋 任务总结:\n{ret}")
