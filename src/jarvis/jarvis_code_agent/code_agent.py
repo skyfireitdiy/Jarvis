@@ -304,6 +304,9 @@ class CodeAgent(Agent):
         # get_smart_platform 内部会处理配置获取和平台创建
         self.model = PlatformRegistry().get_smart_platform(model_group)
 
+        # 设置模型类型为 smart，用于 _create_temp_model 获取正确的 llm_config
+        self._model_type = "smart"
+
         if model_name:
             self.model.set_model_name(model_name)
 

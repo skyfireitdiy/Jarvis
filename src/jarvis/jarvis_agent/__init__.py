@@ -594,6 +594,7 @@ class Agent:
             ""  # 记录最近一次LLM响应内容（用于手动修复等操作）
         )
         self._agent_type = "normal"
+        self._model_type = "normal"  # 模型类型：normal/cheap/smart
 
     def _init_user_interaction(
         self,
@@ -825,8 +826,6 @@ class Agent:
                 # 重新设置系统提示词到模型
                 self._setup_system_prompt()
         except Exception as e:
-            from jarvis.jarvis_utils.output import PrettyOutput
-
             PrettyOutput.auto_print(
                 f"⚠️ 系统提示词优化失败: {str(e)}，继续使用原始系统提示词"
             )
@@ -1424,7 +1423,6 @@ class Agent:
                 # 使用 Rich Panel 打印总结内容
                 try:
                     import jarvis.jarvis_utils.globals as G
-                    from jarvis.jarvis_utils.output import PrettyOutput
 
                     agent_name = self.name if hasattr(self, "name") else None
                     title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 对话总结[/bold cyan]"
@@ -2114,7 +2112,6 @@ class Agent:
             if ret and ret.strip():
                 try:
                     import jarvis.jarvis_utils.globals as G
-                    from jarvis.jarvis_utils.output import PrettyOutput
 
                     agent_name = self.name if hasattr(self, "name") else None
                     title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 任务总结[/bold cyan]"
@@ -2477,7 +2474,8 @@ class Agent:
         platform_name = self.model.platform_name()
         model_name = self.model.name()
         # 获取当前模型的 llm_config，确保使用正确的 API base 和 API key
-        llm_config = get_llm_config(platform_name, self.model_group)
+        # 使用 _model_type（normal/cheap/smart）而不是 platform_name（openai/claude等）
+        llm_config = get_llm_config(self._model_type, self.model_group)
 
         temp_model = PlatformRegistry().create_platform(platform_name, llm_config)
         if not temp_model:
