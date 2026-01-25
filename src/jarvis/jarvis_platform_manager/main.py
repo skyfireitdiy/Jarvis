@@ -350,16 +350,11 @@ def chat_with_model(
                 if not response:
                     PrettyOutput.auto_print("⚠️ 没有有效的回复")
                 else:
-                    # 使用 Panel 打印 LLM 响应
-                    console = Console()
-                    panel = Panel(
-                        response,
-                        title=f"[bold cyan]{platform_name} · {model_name}[/bold cyan]",
-                        border_style="cyan",
-                        box=box.ROUNDED,
-                        expand=True,
+                    # 使用 PrettyOutput.print_markdown 打印 LLM 响应（带markdown高亮）
+                    title = f"[bold cyan]{platform_name} · {model_name}[/bold cyan]"
+                    PrettyOutput.print_markdown(
+                        response, title=title, border_style="cyan"
                     )
-                    console.print(panel)
                     conversation_history.append(
                         {"role": "assistant", "content": response}
                     )  # 记录模型回复

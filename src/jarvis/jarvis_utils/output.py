@@ -809,3 +809,30 @@ class PrettyOutput:
 
         # 使用现有的print方法进行着色输出
         PrettyOutput.print(text=text, output_type=output_type, timestamp=timestamp)
+
+    @staticmethod
+    def print_markdown(
+        content: str,
+        title: Optional[str] = None,
+        border_style: str = "bright_blue",
+        theme: str = "monokai",
+    ) -> None:
+        """
+        使用Panel显示带markdown语法高亮的内容。
+
+        参数：
+            content: 要显示的markdown格式内容
+            title: Panel标题（可选）
+            border_style: 边框样式（默认"bright_blue"）
+            theme: markdown高亮主题（默认"monokai"）
+        """
+        from rich.panel import Panel
+
+        # 创建markdown语法高亮对象
+        syntax = Syntax(content, "markdown", theme=theme, word_wrap=True)
+
+        # 创建Panel包装Syntax对象
+        panel = Panel(syntax, title=title, border_style=border_style, expand=True)
+
+        # 打印Panel
+        console.print(panel)

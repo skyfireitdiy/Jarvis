@@ -246,19 +246,12 @@ class AgentRunLoop:
                     # 只有在过滤后仍有内容时才打印
                     if filtered_response:
                         import jarvis.jarvis_utils.globals as G
-                        from jarvis.jarvis_utils.globals import console
-                        from rich.panel import Panel
-                        from rich import box
 
                         agent_name = ag.name if hasattr(ag, "name") else None
-                        panel = Panel(
-                            filtered_response,
-                            title=f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'}[/bold cyan]",
-                            border_style="bright_blue",
-                            box=box.ROUNDED,
-                            expand=True,
+                        title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'}[/bold cyan]"
+                        PrettyOutput.print_markdown(
+                            filtered_response, title=title, border_style="bright_blue"
                         )
-                        console.print(panel)
 
                 try:
                     need_return, tool_prompt = ag._call_tools(current_response)
