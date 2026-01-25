@@ -574,6 +574,37 @@ class BasePlatform(ABC):
         response = self._process_response(response)
         self._append_session_history(message, response)
 
+        # 确保消息被正确添加到 messages 中（特别是中断的情况下）
+        # 如果发生中断，chat() 方法可能没有完成，导致助手的消息没加到 messages 中
+        if response:  # 只有在有响应时才检查
+            try:
+                messages = self.get_messages()
+                # 检查最后一条消息是否是助手消息
+                if messages:
+                    last_message = messages[-1]
+                    if last_message.get("role") != "assistant":
+                        # 最后一条消息不是助手消息，需要手动添加
+                        # 检查最后一条消息是否是用户消息（且内容匹配）
+                        if last_message.get("role") == "user" and last_message.get("content") == message:
+                            # 最后一条是用户消息，只需要添加助手响应
+                            messages.append({"role": "assistant", "content": response})
+                        else:
+                            # 最后一条不是用户消息，需要添加用户消息和助手响应
+                            messages.append({"role": "user", "content": message})
+                            messages.append({"role": "assistant", "content": response})
+                        # 更新消息列表
+                        self.set_messages(messages)
+                else:
+                    # messages 为空，直接添加用户消息和助手响应
+                    messages = [
+                        {"role": "user", "content": message},
+                        {"role": "assistant", "content": response},
+                    ]
+                    self.set_messages(messages)
+            except Exception as e:
+                # 如果更新消息失败，不影响对话流程，只打印警告
+                PrettyOutput.auto_print(f"⚠️ 警告：更新消息列表失败: {e}")
+
         return response
 
     def chat_until_success(self, message: str) -> str:
