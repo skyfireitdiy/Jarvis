@@ -63,11 +63,10 @@ class BasePlatform(ABC):
         self._session_history_file: Optional[str] = None
         self.platform_type: str = "normal"  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
-        self._summarizing = False  # 总结标志位，防止递归调用
 
     def get_conversation_turn(self) -> int:
         """获取当前对话轮次数"""
-        return len(self.get_messages())//2
+        return len(self.get_messages()) // 2
 
     def __enter__(self) -> Self:
         """进入上下文管理器"""
@@ -413,112 +412,6 @@ class BasePlatform(ABC):
         )
         return response
 
-    def _check_and_compress_context(self, message: str) -> None:
-        """检查并压缩对话上下文
-
-        自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
-
-        Args:
-            message: 即将发送的当前消息内容
-        """
-        if self.agent is not None:
-            # 防止递归：如果正在压缩中，跳过压缩检查
-            if self._summarizing:
-                try:
-                    remaining_tokens = self.get_remaining_token_count()
-                    max_input_tokens = self._get_platform_max_input_token_count()
-                    PrettyOutput.auto_print(
-                        f"ℹ️ 正在压缩中，跳过本次压缩检查（剩余token: {remaining_tokens}/{max_input_tokens}）"
-                    )
-                except Exception:
-                    pass
-            else:
-                try:
-                    # 获取剩余token数量
-                    remaining_tokens = self.get_remaining_token_count()
-                    max_input_tokens = self._get_platform_max_input_token_count()
-
-                    # 计算当前消息的token数并从剩余token中减去
-                    current_message_tokens = (
-                        get_context_token_count(message) if message else 0
-                    )
-                    remaining_tokens -= current_message_tokens
-
-                    # 检查是否满足压缩触发条件
-                    # 条件1：剩余token低于25%（即已使用超过75%）
-                    token_limit_triggered = (
-                        max_input_tokens > 0
-                        and remaining_tokens <= int(max_input_tokens * 0.25)
-                    )
-
-                    # 条件2：对话轮次超过阈值（检查当前轮次+1，因为本次调用会增加一轮）
-                    conversation_turn_threshold = get_conversation_turn_threshold()
-                    turn_limit_triggered = (
-                        self.get_conversation_turn() + 1
-                    ) > conversation_turn_threshold
-
-                    should_compress = token_limit_triggered or turn_limit_triggered
-
-                    if should_compress:
-                        # 确定触发原因
-                        if token_limit_triggered and turn_limit_triggered:
-                            trigger_reason = "Token和轮次双重限制触发"
-                        elif token_limit_triggered:
-                            trigger_reason = "Token限制触发"
-                        else:
-                            trigger_reason = "对话轮次限制触发"
-
-                        # 打印触发信息
-                        if token_limit_triggered:
-                            PrettyOutput.auto_print(
-                                f"🔍 {trigger_reason}，当前剩余token: {remaining_tokens}/{max_input_tokens} (剩余 {remaining_tokens / max_input_tokens * 100:.1f}%)"
-                            )
-                        else:
-                            PrettyOutput.auto_print(
-                                f"🔍 {trigger_reason}，当前对话轮次: {self.get_conversation_turn() + 1}/{conversation_turn_threshold}"
-                            )
-
-                        # 设置压缩标志，防止递归调用
-                        self._summarizing = True
-                        try:
-                            # 使用自适应压缩：根据任务类型动态选择压缩策略
-                            compression_success = self.agent._adaptive_compression()
-
-                            if compression_success:
-                                # 自适应压缩成功，摘要已作为消息插入到历史中
-                                PrettyOutput.auto_print(
-                                    "✅ 自适应压缩完成，对话上下文已更新"
-                                )
-                            else:
-                                # 自适应压缩失败，回退到完整摘要压缩
-                                PrettyOutput.auto_print(
-                                    "⚠️ 自适应压缩失败，回退到完整摘要压缩"
-                                )
-                                summary_text = self.agent._summarize_and_clear_history(
-                                    trigger_reason=trigger_reason
-                                )
-
-                                if summary_text:
-                                    # 将摘要加入addon_prompt，维持上下文连续性
-                                    from jarvis.jarvis_agent.utils import join_prompts
-
-                                    self.agent.session.addon_prompt = join_prompts(
-                                        [self.agent.session.addon_prompt, summary_text]
-                                    )
-
-                                PrettyOutput.auto_print(
-                                    "✅ 完整摘要压缩完成，对话上下文已更新"
-                                )
-                        except Exception as e:
-                            # 压缩失败不影响对话流程
-                            PrettyOutput.auto_print(f"⚠️ 自动压缩失败: {str(e)}")
-                        finally:
-                            # 无论压缩成功失败，都清除标志位
-                            self._summarizing = False
-                except Exception as e:
-                    # 压缩检查失败不影响对话流程
-                    PrettyOutput.auto_print(f"⚠️ 压缩检查失败: {str(e)}")
-
     def _chat(self, message: str):
         import time
 
@@ -531,9 +424,6 @@ class BasePlatform(ABC):
 
         # 检查并截断消息以避免超出剩余token限制
         message = self._truncate_message_if_needed(message)
-
-        # 自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
-        self._check_and_compress_context(message)
 
         # 根据输出模式选择不同的处理方式
         if not self.suppress_output:
@@ -585,7 +475,10 @@ class BasePlatform(ABC):
                     if last_message.get("role") != "assistant":
                         # 最后一条消息不是助手消息，需要手动添加
                         # 检查最后一条消息是否是用户消息（且内容匹配）
-                        if last_message.get("role") == "user" and last_message.get("content") == message:
+                        if (
+                            last_message.get("role") == "user"
+                            and last_message.get("content") == message
+                        ):
                             # 最后一条是用户消息，只需要添加助手响应
                             messages.append({"role": "assistant", "content": response})
                         else:

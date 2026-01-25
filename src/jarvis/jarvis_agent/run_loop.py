@@ -25,6 +25,7 @@ from jarvis.jarvis_utils.config import get_conversation_turn_threshold
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
+from jarvis.jarvis_utils.utils import get_context_token_count
 
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
@@ -132,6 +133,87 @@ class AgentRunLoop:
                 raise  # 用户再次中断，直接退出
         return None
 
+    def check_and_compress_context(
+        self,
+        model_instance,
+        current_message_tokens: int = 0,
+    ) -> None:
+        """检查并压缩对话上下文
+
+        自动压缩触发检查：在调用模型前检查（基于剩余token数量或对话轮次）
+
+        Args:
+            model_instance: 平台模型实例（BasePlatform子类实例）
+            current_message_tokens: 当前消息的token数
+        """
+        conversation_turn = model_instance.get_conversation_turn()
+        try:
+            # 获取剩余token数量
+            remaining_tokens = model_instance.get_remaining_token_count()
+            max_input_tokens = model_instance._get_platform_max_input_token_count()
+
+            # 从剩余token中减去当前消息的token数
+            remaining_tokens -= current_message_tokens
+
+            # 检查是否满足压缩触发条件
+            # 条件1：剩余token低于25%（即已使用超过75%）
+            token_limit_triggered = max_input_tokens > 0 and remaining_tokens <= int(
+                max_input_tokens * 0.25
+            )
+
+            # 条件2：对话轮次超过阈值（检查当前轮次+1，因为本次调用会增加一轮）
+            conversation_turn_threshold = get_conversation_turn_threshold()
+            turn_limit_triggered = (conversation_turn + 1) > conversation_turn_threshold
+
+            should_compress = token_limit_triggered or turn_limit_triggered
+
+            if should_compress:
+                # 确定触发原因
+                if token_limit_triggered and turn_limit_triggered:
+                    trigger_reason = "Token和轮次双重限制触发"
+                elif token_limit_triggered:
+                    trigger_reason = "Token限制触发"
+                else:
+                    trigger_reason = "对话轮次限制触发"
+
+                # 打印触发信息
+                if token_limit_triggered:
+                    PrettyOutput.auto_print(
+                        f"🔍 {trigger_reason}，当前剩余token: {remaining_tokens}/{max_input_tokens} (剩余 {remaining_tokens / max_input_tokens * 100:.1f}%)"
+                    )
+                else:
+                    PrettyOutput.auto_print(
+                        f"🔍 {trigger_reason}，当前对话轮次: {conversation_turn + 1}/{conversation_turn_threshold}"
+                    )
+
+                try:
+                    # 使用自适应压缩：根据任务类型动态选择压缩策略
+                    compression_success = self.agent._adaptive_compression()
+
+                    if compression_success:
+                        # 自适应压缩成功，摘要已作为消息插入到历史中
+                        PrettyOutput.auto_print("✅ 自适应压缩完成，对话上下文已更新")
+                    else:
+                        # 自适应压缩失败，回退到完整摘要压缩
+                        PrettyOutput.auto_print("⚠️ 自适应压缩失败，回退到完整摘要压缩")
+                        summary_text = self.agent._summarize_and_clear_history(
+                            trigger_reason=trigger_reason
+                        )
+
+                        if summary_text:
+                            # 将摘要加入addon_prompt，维持上下文连续性
+                            self.agent.session.addon_prompt = join_prompts(
+                                [self.agent.session.addon_prompt, summary_text]
+                            )
+
+                        PrettyOutput.auto_print("✅ 完整摘要压缩完成，对话上下文已更新")
+                except Exception as e:
+                    # 压缩失败不影响对话流程
+                    PrettyOutput.auto_print(f"⚠️ 自动压缩失败: {str(e)}")
+        except Exception as e:
+            # 压缩检查失败不影响对话流程
+            PrettyOutput.auto_print(f"⚠️ 压缩检查失败: {str(e)}")
+
     def run(self) -> Any:
         """主运行循环（委派到传入的 agent 实例的方法与属性）"""
         run_input_handlers = True
@@ -158,8 +240,17 @@ class AgentRunLoop:
                 if ag.first:
                     ag._first_run()
 
-                # 注意：压缩检查已移至 Platform 层（base.py 的 _chat() 方法中）
-                # 在调用模型前自动检查并执行压缩，无需在此处重复检查
+                # 在调用模型前检查并执行压缩
+                # 计算当前消息的token数
+                current_message_tokens = (
+                    get_context_token_count(ag.session.prompt)
+                    if ag.session.prompt
+                    else 0
+                )
+                self.check_and_compress_context(
+                    model_instance=ag.model,
+                    current_message_tokens=current_message_tokens,
+                )
 
                 # 调用模型获取响应
                 try:
