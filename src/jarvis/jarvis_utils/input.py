@@ -480,7 +480,9 @@ class FileCompleter(Completer):
                     limit=self.max_suggestions,
                 )
                 scored_items = [
-                    (item[0], item[1]) for item in scored_items if item[1] > self.min_score
+                    (item[0], item[1])
+                    for item in scored_items
+                    if item[1] > self.min_score
                 ]
                 completion_map = {item[0]: item[1] for item in all_completions}
                 for t, score in scored_items:
@@ -790,7 +792,7 @@ def _get_multiline_input_internal(
     @bindings.add("c-t", eager=True)
     def _(event: KeyPressEvent) -> None:
         """Return a shell command like '!bash' for upper input_handler to execute.
-        
+
         This binding works globally (without focus filter) so it can be triggered
         even when LLM is outputting or after interrupting output with Ctrl+C.
         """
@@ -911,8 +913,6 @@ def _get_multiline_input_internal(
     def _bottom_toolbar() -> Any:
         return FormattedText(
             [
-                ("class:bt.tip", f" {tip} "),
-                ("class:bt.sep", " • "),
                 ("class:bt.label", "快捷键: "),
                 ("class:bt.key", "@"),
                 ("class:bt.label", " 文件补全 "),
@@ -950,7 +950,7 @@ def _get_multiline_input_internal(
         mouse_support=False,
     )
 
-    # Tip is shown in bottom toolbar; avoid extra print
+    # Tip is shown in placeholder; avoid extra print
     prompt = FormattedText([("class:prompt", "👤 > ")])
 
     def _pre_run() -> None:
@@ -971,6 +971,7 @@ def _get_multiline_input_internal(
             style=style,
             pre_run=_pre_run,
             bottom_toolbar=_bottom_toolbar,
+            placeholder=tip,
             default=(preset or ""),
         )
         return str(result).strip() if result else ""
