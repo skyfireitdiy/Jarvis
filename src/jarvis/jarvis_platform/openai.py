@@ -130,6 +130,14 @@ class OpenAIModel(BasePlatform):
             1 for msg in non_system_messages if msg.get("role") == "user"
         )
 
+    def get_messages(self) -> List[Dict[str, str]]:
+        """获取对话历史
+
+        返回:
+            List[Dict[str, str]]: 对话历史列表，每个元素包含 role 和 content
+        """
+        return self.messages
+
     def _filter_think_tags(self, content: str) -> str:
         """过滤 think 标签内容
 

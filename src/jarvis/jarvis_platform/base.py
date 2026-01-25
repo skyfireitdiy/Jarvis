@@ -86,6 +86,11 @@ class BasePlatform(ABC):
         raise NotImplementedError("set_messages is not implemented")
 
     @abstractmethod
+    def get_messages(self) -> List[Dict[str, str]]:
+        """获取对话历史"""
+        raise NotImplementedError("get_messages is not implemented")
+
+    @abstractmethod
     def set_model_name(self, model_name: str):
         """设置模型名称"""
         raise NotImplementedError("set_model_name is not implemented")
