@@ -30,7 +30,7 @@ def render_rule_template(
     参数:
         rule_content: 规则原始内容
         rule_file_dir: 规则文件所在目录
-        file_path: 规则文件完整路径（可选，用于打印加载成功信息）
+        file_path: 规则文件完整路径（可选，用于打印加载成功信息和添加路径注释）
 
     返回:
         str: 渲染后的内容，如果渲染失败则返回原始内容
@@ -47,6 +47,12 @@ def render_rule_template(
         "git_root_dir": _get_git_root(),
         "rule_file_dir": rule_file_dir,  # 当前规则文件所在目录
     }
+
+    # 如果提供了 file_path，添加 rule_file_path 到上下文
+    if file_path:
+        context["rule_file_path"] = (
+            os.path.abspath(file_path) if not os.path.isabs(file_path) else file_path
+        )
 
     # 使用jinja2渲染模板
     try:
@@ -116,12 +122,12 @@ def _get_builtin_dir() -> Path | None:
         builtin_dir = parent / "builtin"
         if builtin_dir.exists() and builtin_dir.is_dir():
             return builtin_dir
-    
+
     # 方法2: 尝试从 jarvis 包安装位置查找
     # 如果使用 uv tool install，builtin 可能被安装到包数据目录
     try:
         import importlib.resources
-        
+
         # 尝试从 jarvis 包中查找 builtin 目录
         try:
             # 检查是否有 builtin 作为包数据
@@ -136,7 +142,7 @@ def _get_builtin_dir() -> Path | None:
             pass
     except ImportError:
         pass
-    
+
     # 方法3: 尝试从项目根目录查找（通过 git 或向上遍历）
     try:
         git_root = _get_git_root()
@@ -146,7 +152,7 @@ def _get_builtin_dir() -> Path | None:
                 return builtin_dir
     except Exception:
         pass
-    
+
     return None
 
 

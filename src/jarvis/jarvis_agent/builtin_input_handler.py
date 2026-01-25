@@ -24,8 +24,113 @@ def _get_rule_content(rule_name: str) -> str | None:
 
         # 使用当前工作目录作为root_dir
         rules_manager = RulesManager(root_dir=os.getcwd())
-        return rules_manager.get_named_rule(rule_name)
+        rule_content = rules_manager.get_named_rule(rule_name)
+
+        if rule_content:
+            # 尝试查找规则文件路径
+            rule_file_path = _find_rule_file_path(rules_manager, rule_name)
+            if rule_file_path:
+                # 在规则内容前添加路径注释
+                path_comment = f"<!-- 规则文件路径: {rule_file_path} -->\n"
+                return path_comment + rule_content
+
+        return rule_content
     except ImportError:
+        return None
+
+
+def _find_rule_file_path(rules_manager: Any, rule_name: str) -> str | None:
+    """查找规则文件的绝对路径
+
+    参数:
+        rules_manager: RulesManager 实例
+        rule_name: 规则名称
+
+    返回:
+        str | None: 规则文件绝对路径，如果未找到则返回 None
+    """
+    import os
+
+    try:
+        # 按优先级查找规则文件
+        # 优先级 1: 项目 rules.yaml 文件
+        project_rules_yaml = os.path.join(
+            rules_manager.root_dir, ".jarvis", "rules.yaml"
+        )
+        if os.path.exists(project_rules_yaml):
+            import yaml
+
+            with open(project_rules_yaml, "r", encoding="utf-8") as f:
+                rules = yaml.safe_load(f) or {}
+            if rule_name in rules:
+                # 从 rules.yaml 读取的规则，文件路径就是 yaml 文件路径
+                return os.path.abspath(project_rules_yaml)
+
+        # 优先级 2: 项目 rules 目录
+        project_rules_dir = os.path.join(rules_manager.root_dir, ".jarvis", "rules")
+        if os.path.exists(project_rules_dir) and os.path.isdir(project_rules_dir):
+            rule_file = os.path.join(project_rules_dir, rule_name + ".md")
+            if os.path.exists(rule_file):
+                return os.path.abspath(rule_file)
+
+        # 优先级 3: 全局 rules.yaml 文件
+        from jarvis.jarvis_utils.config import get_data_dir
+
+        global_rules_yaml = os.path.join(get_data_dir(), "rules.yaml")
+        if os.path.exists(global_rules_yaml):
+            import yaml
+
+            with open(global_rules_yaml, "r", encoding="utf-8") as f:
+                rules = yaml.safe_load(f) or {}
+            if rule_name in rules:
+                return os.path.abspath(global_rules_yaml)
+
+        # 优先级 4: 全局 rules 目录
+        global_rules_dir = os.path.join(get_data_dir(), "rules")
+        if os.path.exists(global_rules_dir) and os.path.isdir(global_rules_dir):
+            rule_file = os.path.join(global_rules_dir, rule_name + ".md")
+            if os.path.exists(rule_file):
+                return os.path.abspath(rule_file)
+
+        # 优先级 5: 中心规则仓库
+        if rules_manager.central_repo_path and os.path.exists(
+            rules_manager.central_repo_path
+        ):
+            central_rules_dir = os.path.join(rules_manager.central_repo_path, "rules")
+            if os.path.exists(central_rules_dir) and os.path.isdir(central_rules_dir):
+                rule_file = os.path.join(central_rules_dir, rule_name + ".md")
+                if os.path.exists(rule_file):
+                    return os.path.abspath(rule_file)
+            else:
+                rule_file = os.path.join(
+                    rules_manager.central_repo_path, rule_name + ".md"
+                )
+                if os.path.exists(rule_file):
+                    return os.path.abspath(rule_file)
+
+        # 优先级 6: 内置规则
+        from jarvis.jarvis_utils.template_utils import _get_builtin_dir
+
+        builtin_dir = _get_builtin_dir()
+        if builtin_dir:
+            # 在 builtin/rules 目录中查找
+            from pathlib import Path
+
+            builtin_rules_dir = builtin_dir / "rules"
+            if builtin_rules_dir.exists() and builtin_rules_dir.is_dir():
+                builtin_rule_file: Path = builtin_rules_dir / (rule_name + ".md")
+                if builtin_rule_file.exists() and builtin_rule_file.is_file():
+                    return str(builtin_rule_file.absolute())
+
+            # 在 builtin/rules/testing 目录中查找
+            testing_rules_dir = builtin_rules_dir / "testing"
+            if testing_rules_dir.exists() and testing_rules_dir.is_dir():
+                builtin_rule_file = testing_rules_dir / (rule_name + ".md")
+                if builtin_rule_file.exists() and builtin_rule_file.is_file():
+                    return str(builtin_rule_file.absolute())
+
+        return None
+    except Exception:
         return None
 
 
@@ -83,7 +188,7 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
         if tag == "Summary":
             # 使用自适应压缩：根据任务类型动态选择压缩策略
             compression_success = agent._adaptive_compression()
-            
+
             if compression_success:
                 # 自适应压缩成功，摘要已作为消息插入到历史中
                 memory_tags_prompt = agent.memory_manager.prepare_memory_tags_prompt()
@@ -92,7 +197,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             else:
                 # 自适应压缩失败，回退到完整摘要压缩
                 PrettyOutput.auto_print("⚠️ 自适应压缩失败，回退到完整摘要压缩")
-                summary = agent._summarize_and_clear_history(trigger_reason="用户指令触发")
+                summary = agent._summarize_and_clear_history(
+                    trigger_reason="用户指令触发"
+                )
                 memory_tags_prompt = agent.memory_manager.prepare_memory_tags_prompt()
                 prompt = ""
                 if summary:
