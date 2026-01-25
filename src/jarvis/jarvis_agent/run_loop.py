@@ -208,9 +208,6 @@ class AgentRunLoop:
                         ag.session.addon_prompt = join_prompts(
                             [ag.session.addon_prompt, summary_text]
                         )
-                    # 重置对话长度计数器（用于摘要触发），开始新一轮周期
-                    # 注意：对话轮次由模型内部管理，这里不需要重置
-                    ag.session.conversation_length = 0
                     # 如果响应中还有其他内容，继续处理；否则继续下一轮
                     if not current_response:
                         continue

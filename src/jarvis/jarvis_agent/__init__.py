@@ -1256,9 +1256,6 @@ class Agent:
         # 添加附加提示
         message = self._add_addon_prompt(message, need_complete)
 
-        # 管理对话长度
-        message = self._manage_conversation_length(message)
-
         # 调用模型
         response = self._invoke_model(message)
 
@@ -1335,11 +1332,6 @@ class Agent:
             pass
         return message
 
-    def _manage_conversation_length(self, message: str) -> str:
-        """管理对话长度计数；摘要触发由剩余token数量在 AgentRunLoop 中统一处理（剩余token低于20%时触发）。"""
-        self.session.conversation_length += get_context_token_count(message)
-
-        return message
 
     def _invoke_model(self, message: str) -> str:
         """实际调用模型获取响应"""
@@ -1375,8 +1367,6 @@ class Agent:
             )
         except Exception:
             pass
-
-        self.session.conversation_length += get_context_token_count(response)
 
         return response
 
@@ -1488,17 +1478,17 @@ class Agent:
             PrettyOutput.auto_print(f"📋 {compression_type}摘要:\n{summary}")
 
     def _sliding_window_compression(self, window_size: Optional[int] = None) -> bool:
-        """滑动窗口压缩：保留最近的用户/工具消息4条和助手消息5条，压缩更早的对话
+        """滑动窗口压缩：保留最近的用户/工具消息2条和助手消息3条，压缩更早的对话
 
         参数:
-            window_size: 滑动窗口大小（保留的消息总数，默认9条：用户/工具4条+助手5条），如果为None则使用配置值
+            window_size: 滑动窗口大小（保留的消息总数，默认5条：用户/工具2条+助手3条），如果为None则使用配置值
 
         返回:
             bool: 如果成功执行压缩返回True，否则返回False
 
         注意:
             - 只压缩用户和助手消息，系统消息始终保留
-            - 保留最近的用户/工具消息4条和助手消息5条（共9条，奇数以避免连续的同role消息）
+            - 保留最近的用户/工具消息2条和助手消息3条（共5条，奇数以避免连续的同role消息）
             - 如果消息数量不足，不执行压缩
             - 压缩后的历史摘要会作为一条用户消息插入到历史中
         """

@@ -29,7 +29,6 @@ class SessionManager:
         self.agent_name = agent_name
         self.agent = agent  # 添加agent引用
         self.prompt: str = ""
-        self.conversation_length: int = 0
         self.user_data: Dict[str, Any] = {}
         self.addon_prompt: str = ""
         self.last_restored_session: Optional[str] = None  # 记录最后恢复的会话文件路径
@@ -219,7 +218,6 @@ class SessionManager:
         """
         self.prompt = ""
         self.model.reset()
-        self.conversation_length = 0
 
     def clear(self) -> None:
         """
