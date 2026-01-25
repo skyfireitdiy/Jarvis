@@ -67,7 +67,7 @@ def cli(
         final_input = (
             user_input
             if user_input is not None
-            else get_multiline_input("请输入内容（输入空行结束）：")
+            else get_multiline_input("请输入内容（输入空行结束）")
         )
         if not final_input:
             return

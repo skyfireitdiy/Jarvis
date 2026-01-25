@@ -98,7 +98,7 @@ class TaskManager:
                         "需要为此任务添加补充信息吗？", default=False
                     )
                     if need_additional:
-                        additional_input = get_multiline_input("请输入补充信息：")
+                        additional_input = get_multiline_input("请输入补充信息")
                         if additional_input:
                             selected_task = join_prompts(
                                 [selected_task, f"补充信息:\n{additional_input}"]
@@ -127,7 +127,7 @@ class TaskManager:
                         "需要为此任务添加补充信息吗？", default=False
                     )
                     if need_additional:
-                        additional_input = get_multiline_input("请输入补充信息：")
+                        additional_input = get_multiline_input("请输入补充信息")
                         if additional_input:
                             selected_task = join_prompts(
                                 [selected_task, f"补充信息:\n{additional_input}"]
