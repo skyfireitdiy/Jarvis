@@ -131,6 +131,180 @@ def _calc_prompt_rows(prev_text: str) -> int:
     return max(1, total_rows)
 
 
+def _get_git_files() -> List[str]:
+    """获取Git仓库中的文件列表。"""
+    files = []
+    try:
+        r = _subprocess.run(
+            ["git", "ls-files"],
+            stdout=_subprocess.PIPE,
+            stderr=_subprocess.PIPE,
+            text=False,
+        )
+        if r.returncode == 0:
+            files = [
+                line for line in decode_output(r.stdout).splitlines() if line.strip()
+            ]
+    except Exception:
+        files = []
+    return files
+
+
+def _get_all_files(exclude_git: bool = False) -> List[str]:
+    """获取所有文件列表。
+
+    Args:
+        exclude_git: 是否排除.git目录
+    """
+    files = []
+    try:
+        import os as _os
+
+        for root, dirs, fnames in _os.walk(".", followlinks=False):
+            if exclude_git:
+                # Exclude .git directories
+                dirs[:] = [d for d in dirs if d != ".git"]
+            for name in fnames:
+                files.append(_os.path.relpath(_os.path.join(root, name), "."))
+            if len(files) > 10000:
+                break
+    except Exception:
+        files = []
+    return files
+
+
+def _get_files_for_fzf(use_git: bool = True) -> List[str]:
+    """为FZF获取文件列表。
+
+    Args:
+        use_git: 是否优先使用git文件列表（失败则fallback到os.walk）
+    """
+    if use_git:
+        files = _get_git_files()
+        if files:
+            return files
+    return _get_all_files(exclude_git=True)
+
+
+def _parse_fzf_payload(
+    user_input: str, prefix: str
+) -> Tuple[Optional[int], Optional[str]]:
+    """解析FZF请求payload。
+
+    Args:
+        user_input: 用户输入，包含FZF前缀和payload
+        prefix: FZF前缀（如FZF_REQUEST_SENTINEL_PREFIX）
+
+    Returns:
+        (cursor, text) 元组，解析失败时返回 (None, None)
+    """
+    try:
+        payload = user_input[len(prefix) :]
+        sep_index = payload.find(":")
+        cursor = int(payload[:sep_index])
+        text = base64.b64decode(payload[sep_index + 1 :].encode("ascii")).decode(
+            "utf-8"
+        )
+        return cursor, text
+    except Exception:
+        return None, None
+
+
+def _run_fzf_for_selection(files: List[str], prompt_text: str) -> Optional[str]:
+    """运行FZF获取用户选择。
+
+    Args:
+        files: 文件列表
+        prompt_text: FZF提示文本
+
+    Returns:
+        选中的文件路径，取消或错误时返回None
+    """
+    if _shutil.which("fzf") is None:
+        PrettyOutput.auto_print("⚠️ 未检测到 fzf，无法打开文件选择器。")
+        return None
+
+    if not files:
+        PrettyOutput.auto_print("ℹ️ 未找到可选择的文件。")
+        return None
+
+    try:
+        specials = [
+            ot("Summary"),
+            ot("Pin"),
+            ot("Clear"),
+            ot("ToolUsage"),
+            ot("ReloadConfig"),
+            ot("SaveSession"),
+            ot("Quiet"),
+        ]
+    except Exception:
+        specials = []
+
+    items = _get_fzf_completion_items(specials, files)
+    proc = _subprocess.run(
+        [
+            "fzf",
+            "--prompt",
+            prompt_text,
+            "--height",
+            "40%",
+            "--border",
+        ],
+        input="\n".join(items),
+        stdout=_subprocess.PIPE,
+        stderr=_subprocess.PIPE,
+        text=True,
+    )
+    sel = proc.stdout.strip()
+    return sel if sel else None
+
+
+def _insert_file_path(
+    text: str, cursor: int, path: str, symbol: str
+) -> Tuple[str, int]:
+    """插入文件路径到文本中。
+
+    Args:
+        text: 原始文本
+        cursor: 光标位置
+        path: 要插入的文件路径
+        symbol: 触发符号（'@' 或 '#'）
+
+    Returns:
+        (new_text, new_cursor) 元组
+    """
+    text_before = text[:cursor]
+    last_symbol = text_before.rfind(symbol)
+    if last_symbol != -1 and " " not in text_before[last_symbol + 1 :]:
+        # Replace @... or #... segment
+        inserted = f"'{path}'"
+        new_text = text[:last_symbol] + inserted + text[cursor:]
+        new_cursor = last_symbol + len(inserted)
+    else:
+        # Plain insert
+        inserted = f"'{path}'"
+        new_text = text[:cursor] + inserted + text[cursor:]
+        new_cursor = cursor + len(inserted)
+    return new_text, new_cursor
+
+
+def _clear_previous_prompt(text: str) -> None:
+    """清除上一条输入行。
+
+    Args:
+        text: 上一次的输入文本
+    """
+    try:
+        rows_total = _calc_prompt_rows(text)
+        for _ in range(rows_total):
+            sys.stdout.write("\x1b[1A")  # 光标上移一行
+            sys.stdout.write("\x1b[2K\r")  # 清除整行
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
 def _multiline_hint_already_shown() -> bool:
     """检查是否已显示过多行输入提示(持久化存储)。"""
     try:
@@ -658,6 +832,53 @@ def _is_auto_complete_for_current_agent() -> bool:
         return False
 
 
+def _get_agent_hint() -> str:
+    """获取当前Agent的提示信息（可用智能体列表）。"""
+    try:
+        ag = _get_current_agent_for_input()
+        ohs = getattr(ag, "output_handler", [])
+        available_agents: List[str] = []
+        for oh in ohs or []:
+            cfgs = getattr(oh, "agents_config", None)
+            if isinstance(cfgs, list):
+                for c in cfgs:
+                    try:
+                        name = c.get("name")
+                    except Exception:
+                        name = None
+                    if isinstance(name, str) and name.strip():
+                        available_agents.append(name.strip())
+        if available_agents:
+            # 去重但保留顺序
+            seen = set()
+            ordered = []
+            for n in available_agents:
+                if n not in seen:
+                    seen.add(n)
+                    ordered.append(n)
+            return (
+                "\n当前可用智能体: "
+                + ", ".join(ordered)
+                + f"\n如需将任务交给其他智能体，请使用 {ot('SEND_MESSAGE')} 块。"
+            )
+    except Exception:
+        pass
+    return ""
+
+
+def _get_non_interactive_response(auto_complete: bool) -> str:
+    """获取非交互模式下的响应文本。"""
+    hint = _get_agent_hint()
+    if auto_complete:
+        base_msg = (
+            "当前是非交互模式，所有的事情你都自我决策，如果无法决策，就完成任务。输出"
+            + ot("!!!COMPLETE!!!")
+        )
+        return base_msg + hint
+    else:
+        return "当前是非交互模式，所有的事情你都自我决策" + hint
+
+
 def user_confirm(tip: str, default: bool = True) -> bool:
     """提示用户确认是/否问题（按当前Agent优先判断非交互）"""
     try:
@@ -978,45 +1199,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
     while True:
         # 基于“当前Agent”精确判断非交互与自动完成，避免多Agent相互干扰
         if _is_non_interactive_for_current_agent():
-            # 在多Agent系统中，无论是否启用自动完成，均提示可用智能体并建议使用 SEND_MESSAGE 转移控制权
-            hint = ""
-            try:
-                ag = _get_current_agent_for_input()
-                ohs = getattr(ag, "output_handler", [])
-                available_agents: List[str] = []
-                for oh in ohs or []:
-                    cfgs = getattr(oh, "agents_config", None)
-                    if isinstance(cfgs, list):
-                        for c in cfgs:
-                            try:
-                                name = c.get("name")
-                            except Exception:
-                                name = None
-                            if isinstance(name, str) and name.strip():
-                                available_agents.append(name.strip())
-                if available_agents:
-                    # 去重但保留顺序
-                    seen = set()
-                    ordered = []
-                    for n in available_agents:
-                        if n not in seen:
-                            seen.add(n)
-                            ordered.append(n)
-                    hint = (
-                        "\n当前可用智能体: "
-                        + ", ".join(ordered)
-                        + f"\n如需将任务交给其他智能体，请使用 {ot('SEND_MESSAGE')} 块。"
-                    )
-            except Exception:
-                hint = ""
-            if _is_auto_complete_for_current_agent():
-                base_msg = (
-                    "当前是非交互模式，所有的事情你都自我决策，如果无法决策，就完成任务。输出"
-                    + ot("!!!COMPLETE!!!")
-                )
-                return base_msg + hint
-            else:
-                return "当前是非交互模式，所有的事情你都自我决策" + hint
+            return _get_non_interactive_response(_is_auto_complete_for_current_agent())
         user_input = _get_multiline_input_internal(
             tip, preset=preset, preset_cursor=preset_cursor
         )
@@ -1032,228 +1215,59 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             FZF_REQUEST_SENTINEL_PREFIX
         ):
             # Handle fzf request outside the prompt, then prefill new text.
-            try:
-                payload = user_input[len(FZF_REQUEST_SENTINEL_PREFIX) :]
-                sep_index = payload.find(":")
-                cursor = int(payload[:sep_index])
-                text = base64.b64decode(
-                    payload[sep_index + 1 :].encode("ascii")
-                ).decode("utf-8")
-            except Exception:
+            cursor, text = _parse_fzf_payload(user_input, FZF_REQUEST_SENTINEL_PREFIX)
+            if cursor is None or text is None:
                 # Malformed payload; just continue without change.
                 preset = None
                 tip = "FZF 预填失败，继续输入:"
                 continue
 
             # Run fzf to get a file selection synchronously (outside prompt)
-            selected_path = ""
-            try:
-                if _shutil.which("fzf") is None:
-                    PrettyOutput.auto_print("⚠️ 未检测到 fzf，无法打开文件选择器。")
-                else:
-                    files = []
-                    try:
-                        r = _subprocess.run(
-                            ["git", "ls-files"],
-                            stdout=_subprocess.PIPE,
-                            stderr=_subprocess.PIPE,
-                            text=False,
-                        )
-                        if r.returncode == 0:
-                            files = [
-                                line
-                                for line in decode_output(r.stdout).splitlines()
-                                if line.strip()
-                            ]
-                    except Exception:
-                        files = []
-
-                    if not files:
-                        import os as _os
-
-                        for root, _, fnames in _os.walk(".", followlinks=False):
-                            for name in fnames:
-                                files.append(
-                                    _os.path.relpath(_os.path.join(root, name), ".")
-                                )
-                            if len(files) > 10000:
-                                break
-
-                    if not files:
-                        PrettyOutput.auto_print("ℹ️ 未找到可选择的文件。")
-                    else:
-                        try:
-                            specials = [
-                                ot("Summary"),
-                                ot("Pin"),
-                                ot("Clear"),
-                                ot("ToolUsage"),
-                                ot("ReloadConfig"),
-                                ot("SaveSession"),
-                                ot("Quiet"),
-                            ]
-                        except Exception:
-                            specials = []
-                        items = _get_fzf_completion_items(specials, files)
-                        proc = _subprocess.run(
-                            [
-                                "fzf",
-                                "--prompt",
-                                "Files> ",
-                                "--height",
-                                "40%",
-                                "--border",
-                            ],
-                            input="\n".join(items),
-                            stdout=_subprocess.PIPE,
-                            stderr=_subprocess.PIPE,
-                            text=True,
-                        )
-                        sel = proc.stdout.strip()
-                        if sel:
-                            selected_path = sel
-            except Exception as e:
-                PrettyOutput.auto_print(f"❌ FZF 执行失败: {e}")
+            files = _get_files_for_fzf(use_git=True)
+            selected_path = _run_fzf_for_selection(files, "Files> ")
 
             # Compute new text based on selection (or keep original if none)
             if selected_path:
-                text_before = text[:cursor]
-                last_at = text_before.rfind("@")
-                if last_at != -1 and " " not in text_before[last_at + 1 :]:
-                    # Replace @... segment
-                    inserted = f"'{selected_path}'"
-                    new_text = text[:last_at] + inserted + text[cursor:]
-                    new_cursor = last_at + len(inserted)
-                else:
-                    # Plain insert
-                    inserted = f"'{selected_path}'"
-                    new_text = text[:cursor] + inserted + text[cursor:]
-                    new_cursor = cursor + len(inserted)
-                preset = new_text
-                preset_cursor = new_cursor
+                preset, preset_cursor = _insert_file_path(
+                    text, cursor, selected_path, "@"
+                )
                 tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
             else:
                 # No selection; keep original text and cursor
                 preset = text
                 preset_cursor = cursor
                 tip = "未选择文件或已取消，继续编辑:"
-            # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
-            try:
-                rows_total = _calc_prompt_rows(text)
-                for _ in range(rows_total):
-                    sys.stdout.write("\x1b[1A")  # 光标上移一行
-                    sys.stdout.write("\x1b[2K\r")  # 清除整行
-                sys.stdout.flush()
-            except Exception:
-                pass
+            _clear_previous_prompt(text)
             continue
         elif isinstance(user_input, str) and user_input.startswith(
             FZF_REQUEST_ALL_SENTINEL_PREFIX
         ):
             # Handle fzf request (all-files mode, excluding .git) outside the prompt, then prefill new text.
-            try:
-                payload = user_input[len(FZF_REQUEST_ALL_SENTINEL_PREFIX) :]
-                sep_index = payload.find(":")
-                cursor = int(payload[:sep_index])
-                text = base64.b64decode(
-                    payload[sep_index + 1 :].encode("ascii")
-                ).decode("utf-8")
-            except Exception:
+            cursor, text = _parse_fzf_payload(
+                user_input, FZF_REQUEST_ALL_SENTINEL_PREFIX
+            )
+            if cursor is None or text is None:
                 # Malformed payload; just continue without change.
                 preset = None
                 tip = "FZF 预填失败，继续输入:"
                 continue
 
             # Run fzf to get a file selection synchronously (outside prompt) with all files (exclude .git)
-            selected_path = ""
-            try:
-                if _shutil.which("fzf") is None:
-                    PrettyOutput.auto_print("⚠️ 未检测到 fzf，无法打开文件选择器。")
-                else:
-                    files = []
-                    try:
-                        import os as _os
-
-                        for root, dirs, fnames in _os.walk(".", followlinks=False):
-                            # Exclude .git directories
-                            dirs[:] = [d for d in dirs if d != ".git"]
-                            for name in fnames:
-                                files.append(
-                                    _os.path.relpath(_os.path.join(root, name), ".")
-                                )
-                                if len(files) > 10000:
-                                    break
-                            if len(files) > 10000:
-                                break
-                    except Exception:
-                        files = []
-
-                    if not files:
-                        PrettyOutput.auto_print("ℹ️ 未找到可选择的文件。")
-                    else:
-                        try:
-                            specials = [
-                                ot("Summary"),
-                                ot("Pin"),
-                                ot("Clear"),
-                                ot("ToolUsage"),
-                                ot("ReloadConfig"),
-                                ot("SaveSession"),
-                            ]
-                        except Exception:
-                            specials = []
-                        items = _get_fzf_completion_items(specials, files)
-                        proc = _subprocess.run(
-                            [
-                                "fzf",
-                                "--prompt",
-                                "Files(all)> ",
-                                "--height",
-                                "40%",
-                                "--border",
-                            ],
-                            input="\n".join(items),
-                            stdout=_subprocess.PIPE,
-                            stderr=_subprocess.PIPE,
-                            text=True,
-                        )
-                        sel = proc.stdout.strip()
-                        if sel:
-                            selected_path = sel
-            except Exception as e:
-                PrettyOutput.auto_print(f"❌ FZF 执行失败: {e}")
+            files = _get_all_files(exclude_git=True)
+            selected_path = _run_fzf_for_selection(files, "Files(all)> ")
 
             # Compute new text based on selection (or keep original if none)
             if selected_path:
-                text_before = text[:cursor]
-                last_hash = text_before.rfind("#")
-                if last_hash != -1 and " " not in text_before[last_hash + 1 :]:
-                    # Replace #... segment
-                    inserted = f"'{selected_path}'"
-                    new_text = text[:last_hash] + inserted + text[cursor:]
-                    new_cursor = last_hash + len(inserted)
-                else:
-                    # Plain insert
-                    inserted = f"'{selected_path}'"
-                    new_text = text[:cursor] + inserted + text[cursor:]
-                    new_cursor = cursor + len(inserted)
-                preset = new_text
-                preset_cursor = new_cursor
+                preset, preset_cursor = _insert_file_path(
+                    text, cursor, selected_path, "#"
+                )
                 tip = "已插入文件，继续编辑或按Ctrl+J/Ctrl+]确认:"
             else:
                 # No selection; keep original text and cursor
                 preset = text
                 preset_cursor = cursor
                 tip = "未选择文件或已取消，继续编辑:"
-            # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
-            try:
-                rows_total = _calc_prompt_rows(text)
-                for _ in range(rows_total):
-                    sys.stdout.write("\x1b[1A")
-                    sys.stdout.write("\x1b[2K\r")
-                sys.stdout.flush()
-            except Exception:
-                pass
+            _clear_previous_prompt(text)
             continue
         elif isinstance(user_input, str) and user_input.startswith(
             FZF_INSERT_SENTINEL_PREFIX
