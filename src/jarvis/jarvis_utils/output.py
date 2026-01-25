@@ -31,6 +31,7 @@ from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.config import is_print_error_traceback
 from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_agent_list
+from jarvis.jarvis_utils.globals import get_in_chat
 
 
 # Rich支持的标准颜色列表
@@ -182,12 +183,12 @@ class ConsoleOutputSink(OutputSink):
     ) -> Text:
         """
         检测并高亮文本中的进度信息（如"第 X 轮"或"第 X/Y 轮"）。
-        
+
         参数：
             text: 要处理的文本
             output_type: 输出类型
             text_colors: 颜色映射字典
-            
+
         返回：
             Text: 格式化后的文本对象
         """
@@ -209,7 +210,7 @@ class ConsoleOutputSink(OutputSink):
                         part,
                         style=RichStyle(
                             color=_safe_color_get(text_colors[output_type], "white"),
-                            bold=True
+                            bold=True,
                         ),
                     )
                 elif i % 3 == 2 and part:  # 第二个数字（总轮次，如果有）
@@ -419,53 +420,63 @@ class ConsoleOutputSink(OutputSink):
             # 检测是否为多行文本，如果是则使用更好的格式化
             lines = event.text.split("\n")
             is_multiline = len(lines) > 1
-            
+
             # 检测是否包含列表项（以数字、-、* 开头）
             is_list = any(
-                line.strip().startswith(("- ", "* ", "• ")) or 
-                (line.strip() and line.strip()[0].isdigit() and ". " in line.strip()[:5])
+                line.strip().startswith(("- ", "* ", "• "))
+                or (
+                    line.strip()
+                    and line.strip()[0].isdigit()
+                    and ". " in line.strip()[:5]
+                )
                 for line in lines
             )
-            
+
             # 检测是否包含缩进内容（可能是子项或代码块）
             has_indent = any(line.startswith(("   ", "  ", "\t")) for line in lines)
-            
+
             if is_multiline and (is_list or has_indent):
                 # 多行列表或缩进内容：第一行显示header，后续行使用缩进
                 combined_text = Text()
                 combined_text.append(header_text)
                 combined_text.append(" ")
-                
+
                 # 第一行：检测并高亮进度信息
                 first_line = lines[0]
                 colored_first_line = self._highlight_progress_text(
                     first_line, event.output_type, text_colors
                 )
-                
+
                 combined_text.append(colored_first_line)
                 console.print(combined_text)
-                
+
                 # 后续行使用缩进，保持视觉层次
                 for line in lines[1:]:
                     if line.strip():  # 非空行
                         # 检测列表项标记并适当格式化
                         line_stripped = line.strip()
-                        is_list_item = (
-                            line_stripped.startswith(("- ", "* ", "• ")) or
-                            (line_stripped and line_stripped[0].isdigit() and ". " in line_stripped[:5])
+                        is_list_item = line_stripped.startswith(("- ", "* ", "• ")) or (
+                            line_stripped
+                            and line_stripped[0].isdigit()
+                            and ". " in line_stripped[:5]
                         )
-                        
+
                         # 如果已经是缩进的，保持原样；否则添加缩进
                         if line.startswith(("   ", "  ", "\t")):
                             display_line = line
                         else:
                             display_line = f"   {line}"
-                        
+
                         indented_line = Text(
                             display_line,
                             style=RichStyle(
-                                color=_safe_color_get(text_colors[event.output_type], "white"),
-                                dim=not is_list_item and line.startswith(("   ", "  ", "\t"))  # 已缩进的非列表项稍微变暗
+                                color=_safe_color_get(
+                                    text_colors[event.output_type], "white"
+                                ),
+                                dim=not is_list_item
+                                and line.startswith(
+                                    ("   ", "  ", "\t")
+                                ),  # 已缩进的非列表项稍微变暗
                             ),
                         )
                         console.print(indented_line)
@@ -476,13 +487,13 @@ class ConsoleOutputSink(OutputSink):
                 combined_text = Text()
                 combined_text.append(header_text)
                 combined_text.append(" ")
-                
+
                 # 检测并高亮进度信息（单行情况）
                 colored_content = self._highlight_progress_text(
                     event.text, event.output_type, text_colors
                 )
                 combined_text.append(colored_content)
-                
+
                 console.print(combined_text)
         else:
             console.print(content)
@@ -613,6 +624,21 @@ class PrettyOutput:
         agent_info = get_agent_list()
         if not agent_info:
             return ""
+
+        # 根据交互状态选择emoji
+        emoji = "🔊" if get_in_chat() else "🔇"
+        # 在每个agent名字后添加emoji
+        # agent_info格式: "[1]agent_name1, agent_name2"
+        # 提取agent名字列表（去掉前面的数量标识）
+        match = re.match(r"^\[(\d+)\](.+)$", agent_info)
+        if match:
+            count = match.group(1)
+            agent_names = match.group(2).strip()
+            # 为每个agent名字添加emoji
+            agent_names_with_emoji = ", ".join(
+                f"{name.strip()}{emoji}" for name in agent_names.split(", ")
+            )
+            agent_info = f"[{count}]{agent_names_with_emoji}"
 
         if timestamp:
             current_time = datetime.now().strftime("%H:%M:%S")
@@ -773,7 +799,7 @@ class PrettyOutput:
         if detected_emoji:
             # 如果emoji后没有空格，添加一个空格
             if len(text) > len(detected_emoji) and text[len(detected_emoji)] != " ":
-                text = f"{detected_emoji} {text[len(detected_emoji):].lstrip()}"
+                text = f"{detected_emoji} {text[len(detected_emoji) :].lstrip()}"
 
         # 使用现有的print方法进行着色输出
         PrettyOutput.print(text=text, output_type=output_type, timestamp=timestamp)
