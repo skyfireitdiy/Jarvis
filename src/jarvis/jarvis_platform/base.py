@@ -81,6 +81,11 @@ class BasePlatform(ABC):
             self.delete_chat()
 
     @abstractmethod
+    def set_messages(self, messages: List[Dict[str, str]]) -> None:
+        """设置对话历史"""
+        raise NotImplementedError("set_messages is not implemented")
+
+    @abstractmethod
     def set_model_name(self, model_name: str):
         """设置模型名称"""
         raise NotImplementedError("set_model_name is not implemented")
