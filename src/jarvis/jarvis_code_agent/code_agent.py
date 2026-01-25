@@ -105,7 +105,12 @@ class CodeAgent(Agent):
 
         # 父类初始化准备和调用
         explicit_params = self._prepare_code_agent_parent_init(
-            model_group, need_summary, non_interactive, base_tools, optimize_system_prompt, kwargs
+            model_group,
+            need_summary,
+            non_interactive,
+            base_tools,
+            optimize_system_prompt,
+            kwargs,
         )
         super().__init__(**explicit_params, **kwargs)
 
@@ -1096,7 +1101,9 @@ git reset --hard {start_commit}
         if git_diff is None:
             return
 
-        if self.disable_review or not user_confirm("是否进行代码审查？", default=True if self.non_interactive else False):
+        if self.disable_review or not user_confirm(
+            "是否进行代码审查？", default=True if self.non_interactive else False
+        ):
             PrettyOutput.auto_print("ℹ️ 跳过代码审查（当前模式或配置不支持）")
             return
 
@@ -1485,28 +1492,6 @@ def cli(
             PrettyOutput.auto_print(f"❌ 创建 worktree 失败: {str(e)}")
             sys.exit(1)
     try:
-        agent = CodeAgent(
-            model_group=model_group,
-            need_summary=False,
-            append_tools=append_tools,
-            tool_group=tool_group,
-            non_interactive=non_interactive,
-            rule_names=rule_names,
-            disable_review=disable_review,
-            review_max_iterations=review_max_iterations,
-            allow_savesession=True,
-            optimize_system_prompt=optimize_system_prompt,
-        )
-
-        # 尝试恢复会话
-        if restore_session:
-            if agent.restore_session():
-                PrettyOutput.auto_print("✅ 已从 .jarvis/saved_session.json 恢复会话。")
-            else:
-                PrettyOutput.auto_print(
-                    "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
-                )
-
         output_content: Optional[str] = ""
         import json
 
@@ -1515,16 +1500,70 @@ def cli(
             error_message = ""
             try:
                 if task:
+                    # 单次任务模式：创建agent并执行
+                    agent = CodeAgent(
+                        model_group=model_group,
+                        need_summary=False,
+                        append_tools=append_tools,
+                        tool_group=tool_group,
+                        non_interactive=non_interactive,
+                        rule_names=rule_names,
+                        disable_review=disable_review,
+                        review_max_iterations=review_max_iterations,
+                        allow_savesession=True,
+                        optimize_system_prompt=optimize_system_prompt,
+                    )
+
+                    # 尝试恢复会话
+                    if restore_session:
+                        if agent.restore_session():
+                            PrettyOutput.auto_print(
+                                "✅ 已从 .jarvis/saved_session.json 恢复会话。"
+                            )
+                        else:
+                            PrettyOutput.auto_print(
+                                "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
+                            )
+
                     output_content = agent.run(task, prefix=prefix, suffix=suffix)
                     if agent.non_interactive:
                         raise typer.Exit(code=0)
                 else:
+                    # 循环任务模式：每次迭代创建新的agent实例，避免任务间污染
+                    is_first_iteration = True
                     while True:
                         user_input = get_multiline_input(
                             "请输入你的需求（输入空行退出）:"
                         )
                         if not user_input:
                             raise typer.Exit(code=0)
+
+                        # 每次循环创建新的agent实例
+                        agent = CodeAgent(
+                            model_group=model_group,
+                            need_summary=False,
+                            append_tools=append_tools,
+                            tool_group=tool_group,
+                            non_interactive=non_interactive,
+                            rule_names=rule_names,
+                            disable_review=disable_review,
+                            review_max_iterations=review_max_iterations,
+                            allow_savesession=True,
+                            optimize_system_prompt=optimize_system_prompt,
+                        )
+
+                        # 仅在第一次迭代时恢复会话
+                        if is_first_iteration and restore_session:
+                            if agent.restore_session():
+                                PrettyOutput.auto_print(
+                                    "✅ 已从 .jarvis/saved_session.json 恢复会话。"
+                                )
+                            else:
+                                PrettyOutput.auto_print(
+                                    "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
+                                )
+                            is_first_iteration = False
+
                         output_content = agent.run(
                             user_input, prefix=prefix, suffix=suffix
                         )
