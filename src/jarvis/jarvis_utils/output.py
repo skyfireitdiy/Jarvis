@@ -31,7 +31,7 @@ from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.config import is_print_error_traceback
 from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_agent_list
-from jarvis.jarvis_utils.globals import get_in_chat
+from jarvis.jarvis_utils.globals import get_agent
 
 
 # Rich支持的标准颜色列表
@@ -625,20 +625,22 @@ class PrettyOutput:
         if not agent_info:
             return ""
 
-        # 根据交互状态选择emoji
-        emoji = "🔊" if get_in_chat() else "🔇"
-        # 在每个agent名字后添加emoji
-        # agent_info格式: "[1]agent_name1, agent_name2"
         # 提取agent名字列表（去掉前面的数量标识）
         match = re.match(r"^\[(\d+)\](.+)$", agent_info)
         if match:
             count = match.group(1)
             agent_names = match.group(2).strip()
-            # 为每个agent名字添加emoji
-            agent_names_with_emoji = ", ".join(
-                f"{name.strip()}{emoji}" for name in agent_names.split(", ")
-            )
-            agent_info = f"[{count}]{agent_names_with_emoji}"
+            # 为每个agent名字添加对应的emoji（根据其non_interactive状态）
+            agent_names_with_emoji = []
+            for name in agent_names.split(", "):
+                name = name.strip()
+                agent = get_agent(name)
+                if agent and getattr(agent, "non_interactive", False):
+                    emoji = "🔇"  # 非交互模式
+                else:
+                    emoji = "🔊"  # 交互模式
+                agent_names_with_emoji.append(f"{name}{emoji}")
+            agent_info = f"[{count}]{', '.join(agent_names_with_emoji)}"
 
         if timestamp:
             current_time = datetime.now().strftime("%H:%M:%S")
