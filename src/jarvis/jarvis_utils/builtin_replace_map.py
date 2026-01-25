@@ -61,7 +61,7 @@ arguments:
 """,
         "description": "执行静态代码检查",
     },
-    "sdd/spec": {
+    "sdd/1.spec": {
         "append": False,
         "template": """
 请执行SDD规范阶段（Specification）- 需求澄清与规范编写：
@@ -155,7 +155,7 @@ arguments:
 """,
         "description": "SDD规范阶段：编写功能规范",
     },
-    "sdd/plan": {
+    "sdd/2.plan": {
         "append": False,
         "template": """
 请执行SDD规划阶段（Planning）- 技术决策与实现规划：
@@ -257,7 +257,7 @@ arguments:
 """,
         "description": "SDD规划阶段：技术决策与实现规划",
     },
-    "sdd/task": {
+    "sdd/3.task": {
         "append": False,
         "template": """
 请执行SDD任务阶段（Tasks）- 任务分解与执行清单：
@@ -363,7 +363,7 @@ arguments:
 """,
         "description": "SDD任务阶段：任务分解与执行清单",
     },
-    "sdd/code": {
+    "sdd/4.code": {
         "append": False,
         "template": """
 请执行SDD实现阶段（Code Generation）- 基于规范编码：
@@ -473,7 +473,7 @@ arguments:
 """,
         "description": "SDD实现阶段：基于规范编码",
     },
-    "sdd/verify": {
+    "sdd/5.verify": {
         "append": False,
         "template": """
 请执行SDD验证阶段（Verification）- 验证符合规范：
@@ -604,7 +604,7 @@ arguments:
 """,
         "description": "SDD验证阶段：验证符合规范",
     },
-    "sdd/feedback": {
+    "sdd/6.feedback": {
         "append": False,
         "template": """
 请执行SDD反馈循环阶段（Feedback Loop）- 持续迭代优化：
