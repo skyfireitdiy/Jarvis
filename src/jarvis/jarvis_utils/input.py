@@ -10,11 +10,11 @@
 
 import base64
 import os
+import sys
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
-import sys
 from typing import Iterable
 from typing import List
 from typing import Any
@@ -50,6 +50,12 @@ from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.globals import get_message_history
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import decode_output
+
+# 在文件顶部导入需要在函数内部使用的模块
+# (使用别名避免与内置模块冲突)
+import os as _os
+import subprocess as _subprocess
+import shutil as _shutil
 
 # Sentinel value to indicate that Ctrl+O was pressed
 CTRL_O_SENTINEL = "__CTRL_O_PRESSED__"
@@ -277,8 +283,6 @@ class FileCompleter(Completer):
         """
         all_rules = []
         try:
-            import os
-
             from jarvis.jarvis_agent.rules_manager import RulesManager
 
             rules_manager = RulesManager(os.getcwd())
@@ -326,8 +330,6 @@ class FileCompleter(Completer):
 
         try:
             # 导入必要的模块
-            import os
-
             from jarvis.jarvis_agent.rules_manager import RulesManager
 
             # 创建RulesManager实例
@@ -406,13 +408,11 @@ class FileCompleter(Completer):
         # File path candidates
         try:
             if current_sym == "@":
-                import subprocess
-
                 if self._git_files_cache is None:
-                    result = subprocess.run(
+                    result = _subprocess.run(
                         ["git", "ls-files"],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        stdout=_subprocess.PIPE,
+                        stderr=_subprocess.PIPE,
                         text=False,
                     )
                     if result.returncode == 0:
@@ -425,8 +425,6 @@ class FileCompleter(Completer):
                         self._git_files_cache = []
                 paths: List[str] = self._git_files_cache or []
             else:
-                import os as _os
-
                 if self._all_files_cache is None:
                     files: List[str] = []
                     for root, dirs, fnames in _os.walk(".", followlinks=False):
@@ -527,8 +525,6 @@ def get_all_rules_formatted() -> List[str]:
     all_rules = []
     try:
         try:
-            import os
-
             from jarvis.jarvis_agent.rules_manager import RulesManager
 
             rules_manager = RulesManager(os.getcwd())
@@ -799,13 +795,10 @@ def _get_multiline_input_internal(
 
         def _gen_shell_cmd() -> str:
             try:
-                import os
-                import shutil
-
-                if os.name == "nt":
+                if _os.name == "nt":
                     # Prefer PowerShell if available, otherwise fallback to cmd
                     for name in ("pwsh", "powershell", "cmd"):
-                        if name == "cmd" or shutil.which(name):
+                        if name == "cmd" or _shutil.which(name):
                             if name == "cmd":
                                 # Keep session open with /K and set env for the spawned shell
                                 return "!cmd /K set terminal=1"
@@ -819,7 +812,7 @@ def _get_multiline_input_internal(
                         if base:
                             return f"!env terminal=1 {base}"
                     for name in ("fish", "zsh", "bash", "sh"):
-                        if shutil.which(name):
+                        if _shutil.which(name):
                             return f"!env terminal=1 {name}"
                     return "!env terminal=1 bash"
             except Exception:
@@ -839,10 +832,8 @@ def _get_multiline_input_internal(
         - 若不存在 fzf 或发生异常，则直接插入 '@' 并触发补全
         """
         try:
-            import shutil
-
             buf = event.current_buffer
-            if shutil.which("fzf") is None:
+            if _shutil.which("fzf") is None:
                 buf.insert_text("@")
                 # 手动触发补全，以便显示 rule 和其他补全选项
                 buf.start_completion(select_first=False)
@@ -872,10 +863,8 @@ def _get_multiline_input_internal(
         使用 # 触发 fzf（当 fzf 存在），以“全量文件模式”进行选择（排除 .git）；否则仅插入 # 启用内置补全
         """
         try:
-            import shutil
-
             buf = event.current_buffer
-            if shutil.which("fzf") is None:
+            if _shutil.which("fzf") is None:
                 buf.insert_text("#")
                 # 手动触发补全，以便显示 rule 和其他补全选项
                 buf.start_completion(select_first=False)
@@ -1059,18 +1048,15 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             # Run fzf to get a file selection synchronously (outside prompt)
             selected_path = ""
             try:
-                import shutil
-                import subprocess
-
-                if shutil.which("fzf") is None:
+                if _shutil.which("fzf") is None:
                     PrettyOutput.auto_print("⚠️ 未检测到 fzf，无法打开文件选择器。")
                 else:
                     files = []
                     try:
-                        r = subprocess.run(
+                        r = _subprocess.run(
                             ["git", "ls-files"],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            stdout=_subprocess.PIPE,
+                            stderr=_subprocess.PIPE,
                             text=False,
                         )
                         if r.returncode == 0:
@@ -1109,7 +1095,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         except Exception:
                             specials = []
                         items = _get_fzf_completion_items(specials, files)
-                        proc = subprocess.run(
+                        proc = _subprocess.run(
                             [
                                 "fzf",
                                 "--prompt",
@@ -1119,8 +1105,8 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                                 "--border",
                             ],
                             input="\n".join(items),
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            stdout=_subprocess.PIPE,
+                            stderr=_subprocess.PIPE,
                             text=True,
                         )
                         sel = proc.stdout.strip()
@@ -1181,10 +1167,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             # Run fzf to get a file selection synchronously (outside prompt) with all files (exclude .git)
             selected_path = ""
             try:
-                import shutil
-                import subprocess
-
-                if shutil.which("fzf") is None:
+                if _shutil.which("fzf") is None:
                     PrettyOutput.auto_print("⚠️ 未检测到 fzf，无法打开文件选择器。")
                 else:
                     files = []
@@ -1220,7 +1203,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                         except Exception:
                             specials = []
                         items = _get_fzf_completion_items(specials, files)
-                        proc = subprocess.run(
+                        proc = _subprocess.run(
                             [
                                 "fzf",
                                 "--prompt",
@@ -1230,8 +1213,8 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
                                 "--border",
                             ],
                             input="\n".join(items),
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
+                            stdout=_subprocess.PIPE,
+                            stderr=_subprocess.PIPE,
                             text=True,
                         )
                         sel = proc.stdout.strip()
