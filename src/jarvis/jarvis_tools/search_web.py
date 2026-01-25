@@ -152,21 +152,10 @@ class SearchWebTool:
                         results_text += f"   摘要: {abstract}\n"
                     results_text += "\n"
 
-            # 添加参考来源
-            if visited_urls:
-                sources_text = "\n参考来源:\n" + "\n".join(
-                    f"- {url}" for url in visited_urls
-                )
-                results_text += sources_text
-                PrettyOutput.auto_print("\n📚 参考来源:")
-                for url in visited_urls:
-                    PrettyOutput.auto_print(f"  - {url}")
-
             return {
                 "stdout": results_text,
                 "stderr": "",
                 "success": True,
-                "sources": visited_urls,
             }
 
         except subprocess.TimeoutExpired:
