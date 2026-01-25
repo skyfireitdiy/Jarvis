@@ -31,6 +31,7 @@ class SessionManager:
         self.prompt: str = ""
         self.user_data: Dict[str, Any] = {}
         self.addon_prompt: str = ""
+        self.conversation_length: int = 0
         self.last_restored_session: Optional[str] = None  # 记录最后恢复的会话文件路径
         self.non_interactive: bool = False  # 是否为非交互模式
 
@@ -217,6 +218,7 @@ class SessionManager:
         Clears conversation history but keeps the system prompt by resetting the model state.
         """
         self.prompt = ""
+        self.conversation_length = 0
         self.model.reset()
 
     def clear(self) -> None:
