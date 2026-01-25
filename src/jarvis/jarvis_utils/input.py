@@ -907,7 +907,7 @@ def _get_multiline_input_internal(
             "bt.sep": "fg:#ffb3de",
             "bt.key": "bg:#d7005f #ffffff bold",
             "bt.label": "fg:#ffd6ff",
-            "placeholder": "fg:#888888",
+            "placeholder": "italic fg:#888888",
         }
     )
 
@@ -967,7 +967,7 @@ def _get_multiline_input_internal(
             style=style,
             pre_run=_pre_run,
             bottom_toolbar=_bottom_toolbar,
-            placeholder=tip,
+            placeholder=FormattedText([("class:placeholder", tip)]),
             default=(preset or ""),
         )
         return str(result).strip() if result else ""
