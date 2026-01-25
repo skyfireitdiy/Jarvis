@@ -1555,14 +1555,6 @@ class Agent:
                 messages_to_set = system_messages + old_messages
                 temp_model.set_messages(messages_to_set)
 
-                # 调试打印：确认消息内容
-                PrettyOutput.auto_print(
-                    f"🔍 滑动窗口压缩调试: 系统消息数={len(system_messages)}, "
-                    f"旧消息数={len(old_messages)}, 总消息数={len(messages_to_set)}"
-                )
-                if system_messages:
-                    sys_content = system_messages[0].get('content', '')[:100]
-                    PrettyOutput.auto_print(f"🔍 系统提示词前100字符: {sys_content}...")
 
                 # 使用 SUMMARY_REQUEST_PROMPT 进行压缩（避免污染当前对话）
                 compressed_summary = temp_model.chat_until_success(
