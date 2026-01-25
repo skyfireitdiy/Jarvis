@@ -249,13 +249,14 @@ class OpenAIModel(BasePlatform):
                         text = choice.delta.content
                         full_response += text
                         yield text
-            self.messages.append({"role": "assistant", "content": full_response})
-            return None
+            if full_response:
+                self.messages.append({"role": "assistant", "content": full_response})
+            else:
+                raise Exception("No response from model")   
         except Exception as e:
             # 失败时回滚：移除已添加的用户消息
             if len(self.messages) > messages_before_user:
-                self.messages = self.messages[:messages_before_user]
-            PrettyOutput.auto_print(f"❌ 对话失败：{str(e)}")
+                self.messages = self.messages[:messages_before_user]   
             raise Exception(f"Chat failed: {str(e)}")
 
     def name(self) -> str:
