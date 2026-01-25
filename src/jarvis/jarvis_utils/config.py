@@ -1429,7 +1429,7 @@ def get_sliding_window_size() -> int:
     返回:
         int: 滑动窗口大小（保留最近的用户/工具消息4条和助手消息5条，共9条，奇数以避免连续的同role消息）
     """
-    return 9
+    return 5
 
 
 def get_importance_score_threshold() -> float:
