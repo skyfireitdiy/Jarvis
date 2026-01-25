@@ -290,7 +290,7 @@ class EditFileNormalTool:
         try:
             abs_file_path = os.path.abspath(file_path)
             abs_workspace_path = os.path.abspath(os.getcwd())
-            
+
             # 检查文件路径是否以工作目录路径开头
             # 使用 os.path.commonpath 来正确处理路径
             try:
@@ -749,7 +749,20 @@ class EditFileNormalTool:
 
                     # 检查文件是否不在当前工作目录的子级目录下
                     # 如果不在，生成并打印 diff
-                    if not (EditFileNormalTool._is_file_in_workspace_subdir(file_path) and agent.agent_type == "code_agent"):
+                    # 调试：打印 agent 信息
+                    agent_info = f"agent={agent}, agent_type={getattr(agent, 'agent_type', None) if agent else None}"
+                    in_workspace = EditFileNormalTool._is_file_in_workspace_subdir(
+                        file_path
+                    )
+                    PrettyOutput.auto_print(
+                        f"🔍 Debug: file_path={file_path}, in_workspace={in_workspace}, {agent_info}"
+                    )
+
+                    if not (
+                        agent
+                        and getattr(agent, "agent_type", None) == "code_agent"
+                        and in_workspace
+                    ):
                         try:
                             # 生成 diff
                             diff_text = EditFileNormalTool._generate_diff_preview(
@@ -757,9 +770,12 @@ class EditFileNormalTool:
                                 result_or_error,
                                 file_path,
                             )
-                            
+
                             # 打印 diff（使用 diff_visualizer）
-                            from jarvis.jarvis_code_agent.diff_visualizer import visualize_diff_enhanced
+                            from jarvis.jarvis_code_agent.diff_visualizer import (
+                                visualize_diff_enhanced,
+                            )
+
                             visualize_diff_enhanced(
                                 diff_text,
                                 file_path=file_path,
@@ -767,9 +783,11 @@ class EditFileNormalTool:
                                 show_line_numbers=True,
                                 context_lines=3,
                             )
-                            
+
                             # 将 diff 添加到 stdout
-                            all_results.append(f"\n📝 {file_path} 的 diff（文件不在当前工作目录的子级目录下）:")
+                            all_results.append(
+                                f"\n📝 {file_path} 的 diff（文件不在当前工作目录的子级目录下）:"
+                            )
                             all_results.append(diff_text)
                         except Exception as diff_error:
                             # diff 生成或打印失败不影响主流程
