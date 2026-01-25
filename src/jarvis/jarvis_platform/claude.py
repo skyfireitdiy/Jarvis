@@ -66,6 +66,23 @@ class ClaudeModel(BasePlatform):
         self.messages: List[Dict[str, str]] = []
         self.system_message = ""
 
+    def set_messages(self, messages: List[Dict[str, str]]) -> None:
+        """替换对话历史
+
+        参数:
+            messages: 新的对话历史列表，每个元素包含 role 和 content
+
+        注意:
+            会根据 messages 重新计算 conversation_turn（统计非 system 消息中的 user 消息数量）
+        """
+        self.messages = messages
+
+        # 计算 conversation_turn：统计非 system 消息中的 user 消息数量
+        non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
+        self._conversation_turn = sum(
+            1 for msg in non_system_messages if msg.get("role") == "user"
+        )
+
     def get_model_list(self) -> List[Tuple[str, str]]:
         """
         获取可用的 Claude 模型列表
