@@ -1533,7 +1533,7 @@ def cli(
                     is_first_iteration = True
                     while True:
                         user_input = get_multiline_input(
-                            "请输入你的需求（输入空行退出）:"
+                            "请输入你的需求（输入空行退出）"
                         )
                         if not user_input:
                             raise typer.Exit(code=0)

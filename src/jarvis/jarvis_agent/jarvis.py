@@ -369,7 +369,7 @@ def handle_builtin_config_selector(
                     builtin_dirs.append(builtin_dir)
             except Exception:
                 pass
-            
+
             # 向后兼容：也尝试从文件位置向上查找（开发环境）
             try:
                 ancestors = list(Path(__file__).resolve().parents)
@@ -379,7 +379,7 @@ def handle_builtin_config_selector(
                         builtin_dirs.append(p)
             except Exception:
                 pass
-            
+
             # 去重，保留顺序
             _seen = set()
             _unique: List[Path] = []
@@ -1397,7 +1397,7 @@ def run_cli(
 
                 # 获取用户输入，循环直到需要传递给 agent
                 while True:
-                    user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
+                    user_input = get_multiline_input("请输入你的任务（输入空行退出）")
                     if not user_input:
                         break
                     # 先经过 builtin_input_handler 处理

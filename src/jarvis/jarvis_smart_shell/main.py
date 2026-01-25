@@ -430,7 +430,7 @@ def request_command(
     should_run = False
     if not request:
         # 检查是否在交互式终端中运行
-        request = get_multiline_input(tip="请输入您要执行的功能：")
+        request = get_multiline_input(tip="请输入您要执行的功能")
         should_run = True
 
     # 处理请求

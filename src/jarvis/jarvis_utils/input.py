@@ -907,6 +907,7 @@ def _get_multiline_input_internal(
             "bt.sep": "fg:#ffb3de",
             "bt.key": "bg:#d7005f #ffffff bold",
             "bt.label": "fg:#ffd6ff",
+            "placeholder": "fg:#888888",
         }
     )
 

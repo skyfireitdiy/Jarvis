@@ -99,7 +99,7 @@ def cli(
             return
 
         try:
-            user_input = get_multiline_input("请输入你的任务（输入空行退出）:")
+            user_input = get_multiline_input("请输入你的任务（输入空行退出）")
             if not user_input:
                 return
             agent.set_addon_prompt(
