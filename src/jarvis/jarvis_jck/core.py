@@ -33,18 +33,25 @@ class ToolChecker:
         """检查工具命令是否存在
 
         参数:
-            command: 工具命令名称
+            command: 工具命令名称（可以是简单命令或复合命令如 'python -m build'）
 
         返回:
             bool: 工具是否存在
         """
-        return shutil.which(command) is not None
+        # 检查是否为复合命令（包含空格，如 'python -m build'）
+        if " " in command:
+            # 复合命令：提取基础命令进行检测
+            base_command = command.split()[0]
+            return shutil.which(base_command) is not None
+        else:
+            # 简单命令：直接检测
+            return shutil.which(command) is not None
 
     def get_tool_version(self, command: str) -> Optional[str]:
         """获取工具版本信息
 
         参数:
-            command: 工具命令名称
+            command: 工具命令名称（可以是简单命令或复合命令如 'python -m build'）
 
         返回:
             版本字符串，如果获取失败则返回None
@@ -52,13 +59,13 @@ class ToolChecker:
         if not self.check_tool_exists(command):
             return None
 
-        # 常见的版本获取参数
-        version_args = ["--version", "version", "-V", "-v"]
-
-        for arg in version_args:
+        # 检查是否为复合命令
+        if " " in command:
+            # 复合命令：直接执行完整命令获取版本
             try:
+                cmd_parts = command.split()
                 result = subprocess.run(
-                    [command, arg],
+                    cmd_parts + ["--version"],
                     capture_output=True,
                     text=True,
                     timeout=5,
@@ -68,9 +75,28 @@ class ToolChecker:
                     version = result.stdout.strip().split("\n")[0]
                     return version
             except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-                continue
+                pass
+            return None
+        else:
+            # 简单命令：尝试常见的版本获取参数
+            version_args = ["--version", "version", "-V", "-v"]
 
-        return None
+            for arg in version_args:
+                try:
+                    result = subprocess.run(
+                        [command, arg],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if result.returncode == 0 and result.stdout:
+                        # 只返回第一行版本信息
+                        version = result.stdout.strip().split("\n")[0]
+                        return version
+                except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+                    continue
+
+            return None
 
     def check_single_tool(self, tool_name: str) -> Dict[str, Any]:
         """检索单个工具
