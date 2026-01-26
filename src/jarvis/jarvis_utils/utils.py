@@ -96,8 +96,6 @@ COMMAND_MAPPING = {
     "jt": "jarvis-tool",
     # 方法论
     "jm": "jarvis-methodology",
-    # RAG
-    "jrg": "jarvis-rag",
     # 记忆整理
     "jmo": "jarvis-memory-organizer",
     # 安全分析
@@ -106,40 +104,6 @@ COMMAND_MAPPING = {
     "jc2r": "jarvis-c2rust",
 }
 
-# RAG 依赖检测工具函数（更精确）
-_RAG_REQUIRED_MODULES = [
-    "langchain",
-    "langchain_community",
-    "chromadb",
-    "sentence_transformers",
-    "rank_bm25",
-    "unstructured",
-]
-_RAG_OPTIONAL_MODULES = [
-    "langchain_huggingface",
-]
-
-
-def get_missing_rag_modules() -> List[str]:
-    """
-    返回缺失的 RAG 关键依赖模块列表。
-    仅检查必要模块，不导入模块，避免副作用。
-    """
-    try:
-        from importlib.util import find_spec
-
-        missing = [m for m in _RAG_REQUIRED_MODULES if find_spec(m) is None]
-        return missing
-    except Exception:
-        # 任何异常都视为无法确认，保持保守策略
-        return _RAG_REQUIRED_MODULES[:]  # 视为全部缺失
-
-
-def is_rag_installed() -> bool:
-    """
-    更准确的 RAG 安装检测：确认关键依赖模块均可用。
-    """
-    return len(get_missing_rag_modules()) == 0
 
 
 def is_editable_install() -> bool:
@@ -510,14 +474,6 @@ def _check_pip_updates() -> bool:
                     # 注意：uv tool upgrade 不支持额外参数，只升级基础包
                     cmd_list = [uv_exe, "tool", "upgrade", "jarvis-ai-assistant"]
                     update_cmd = "uv tool upgrade jarvis-ai-assistant"
-                    # RAG特性需要单独安装
-                    from jarvis.jarvis_utils.utils import (
-                        is_rag_installed as _is_rag_installed,
-                    )
-
-                    rag_installed = _is_rag_installed()
-                    if rag_installed:
-                        update_cmd += " && pip install jarvis-ai-assistant[rag]"
                 else:
                     # 如果找不到uv，回退到pip方式
                     is_uv_tool_install = False
@@ -543,19 +499,8 @@ def _check_pip_updates() -> bool:
                     if path_uv:
                         uv_executable = path_uv
 
-                # 检测是否安装了 RAG 特性（更精确）
-                from jarvis.jarvis_utils.utils import (
-                    is_rag_installed as _is_rag_installed,
-                )  # 延迟导入避免潜在循环依赖
-
-                rag_installed = _is_rag_installed()
-
                 # 更新命令
-                package_spec = (
-                    "jarvis-ai-assistant[rag]"
-                    if rag_installed
-                    else "jarvis-ai-assistant"
-                )
+                package_spec = "jarvis-ai-assistant"
                 if uv_executable:
                     cmd_list = [
                         uv_executable,

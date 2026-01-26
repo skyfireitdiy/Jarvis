@@ -29,7 +29,6 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.utils import decode_output
-from jarvis.jarvis_utils.utils import is_rag_installed
 
 # 全局标记：记录 confirm_add_new_files 是否已在当前流程中被调用
 # 用于避免在同一流程中重复询问用户是否添加新文件/二进制文件/大代码
@@ -749,34 +748,18 @@ def check_and_update_git_repo(repo_path: str) -> bool:
                         uv_executable = path_uv
 
                 # 根据环境选择安装命令
-                # 检测是否安装了 RAG 特性（更精确）
-                rag_installed = is_rag_installed()
-
-                # 根据 uv 可用性与 RAG 特性选择安装命令（优先使用 uv）
+                # 根据 uv 可用性选择安装命令（优先使用 uv）
                 if uv_executable:
-                    if rag_installed:
-                        install_cmd = [uv_executable, "pip", "install", "-e", ".[rag]"]
-                    else:
-                        install_cmd = [uv_executable, "pip", "install", "-e", "."]
+                    install_cmd = [uv_executable, "pip", "install", "-e", "."]
                 else:
-                    if rag_installed:
-                        install_cmd = [
-                            sys.executable,
-                            "-m",
-                            "pip",
-                            "install",
-                            "-e",
-                            ".[rag]",
-                        ]
-                    else:
-                        install_cmd = [
-                            sys.executable,
-                            "-m",
-                            "pip",
-                            "install",
-                            "-e",
-                            ".",
-                        ]
+                    install_cmd = [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        "-e",
+                        ".",
+                    ]
 
                 # 尝试安装
                 result = subprocess.run(install_cmd, cwd=git_root, capture_output=True)

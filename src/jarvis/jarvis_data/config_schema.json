@@ -122,64 +122,6 @@
       },
       "default": {}
     },
-    "embeddings": {
-      "type": "object",
-      "description": "可复用的嵌入模型配置定义，可以在rag_groups中通过引用名称来使用",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "embedding_model": {
-            "type": "string",
-            "description": "嵌入模型的名称"
-          },
-          "embedding_type": {
-            "type": "string",
-            "description": "嵌入模型的实现类型，如 'LocalEmbeddingModel', 'OpenAIEmbeddingModel', 'CohereEmbeddingModel', 'EdgeFnEmbeddingModel' 等"
-          },
-          "embedding_max_length": {
-            "type": "number",
-            "description": "嵌入模型的最大输入长度（token数），用于文档分割"
-          },
-          "embedding_config": {
-            "type": "object",
-            "description": "嵌入模型的额外配置参数，会传递给模型的构造函数",
-            "additionalProperties": true,
-            "default": {}
-          }
-        },
-        "required": ["embedding_model", "embedding_type"]
-      },
-      "default": {}
-    },
-    "rerankers": {
-      "type": "object",
-      "description": "可复用的重排模型配置定义，可以在rag_groups中通过引用名称来使用",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "rerank_model": {
-            "type": "string",
-            "description": "重排模型的名称"
-          },
-          "reranker_type": {
-            "type": "string",
-            "description": "重排模型的实现类型，如 'LocalReranker', 'CohereReranker', 'JinaReranker', 'EdgeFnReranker' 等"
-          },
-          "reranker_max_length": {
-            "type": "number",
-            "description": "重排模型的最大输入长度（token数）"
-          },
-          "reranker_config": {
-            "type": "object",
-            "description": "重排模型的额外配置参数，会传递给模型的构造函数",
-            "additionalProperties": true,
-            "default": {}
-          }
-        },
-        "required": ["rerank_model", "reranker_type"]
-      },
-      "default": {}
-    },
     "llm_group": {
       "type": "string",
       "description": "选择一个预定义的模型组",
@@ -355,52 +297,6 @@
               }
             }
           }
-        }
-      }
-    },
-    "rag_group": {
-      "type": "string",
-      "description": "选择一个预定义的RAG配置组",
-      "default": ""
-    },
-    "rag_groups": {
-      "type": "object",
-      "description": "预定义的RAG配置组，使用组名作为 key。每个组必须通过 embedding 引用 embeddings 中定义的配置，可选通过 reranker 引用 rerankers 中定义的配置，不再支持直接定义 embedding_model、embedding_type 等参数",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "embedding": {
-            "type": "string",
-            "description": "引用 embeddings 中定义的嵌入模型配置名称（必需）"
-          },
-          "reranker": {
-            "type": "string",
-            "description": "引用 rerankers 中定义的重排模型配置名称（可选）"
-          },
-          "use_bm25": {
-            "type": "boolean",
-            "default": true,
-            "description": "是否使用BM25进行检索"
-          },
-          "use_rerank": {
-            "type": "boolean",
-            "default": true,
-            "description": "是否使用重排模型"
-          }
-        },
-        "required": ["embedding"]
-      },
-      "default": {
-        "text": {
-          "embedding": "default-text-embedding",
-          "reranker": "default-text-reranker",
-          "use_bm25": true,
-          "use_rerank": true
-        },
-        "code": {
-          "embedding": "default-code-embedding",
-          "use_bm25": false,
-          "use_rerank": false
         }
       }
     },

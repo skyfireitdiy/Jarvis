@@ -3988,11 +3988,6 @@
 
 #### **新功能 (Features)**
 
-- **RAG 增强**:
-  - 新增 `jrg retrieve` 命令，允许用户仅从知识库检索文档，而不生成答案，便于快速查阅资料。
-  - 新增 RAG 配置组 (`JARVIS_RAG_GROUPS`) 功能，支持在不同的 RAG 方案（如文本 vs 代码）之间快速切换。
-  - 查询重写功能得到增强，现已支持多语言查询，并提升了在复杂问题下的鲁棒性。
-  - RAG 流程新增了对 BM25 稀疏检索和重排（Rerank）功能的控制开关，用户可根据需求定制检索策略。
 - **功能扩展与文档**:
   - 新增了全面的《功能扩展》文档，详细介绍了如何开发标准工具、集成 MCP 工具以及扩展新的 LLM 平台。
   - 引入了方法论（Methodology）共享机制，允许团队通过 Git 仓库共享和自动更新最佳实践，沉淀知识资产。
@@ -4169,7 +4164,6 @@
     `多标准决策分析(MCDA)` 等。
 - **命令行工具功能增强**:
   - **会话管理**: 为 `jarvis` 和 `jarvis-code-agent` 新增 `--restore-session` 功能；为 `jarvis-platform-manager` 聊天模式增加了 `/save_session` 和 `/load_session` 命令。
-  - **知识库(RAG)增强**: `jarvis-rag` 新增 `list-docs` 子命令，并为常用选项增加了简写形式和 `--batch-size` 选项。
 
 - **模型更新**:
   - 在 `src/jarvis/jarvis_platform/kimi.py` 中，更新了 Kimi 平台的模型列表，以匹配最新的版本名称 (`k1.5`, `k1.5-thinking`, `k2-thinking`)。
@@ -4188,7 +4182,7 @@
 #### **文档更新 (Documentation)**
 
 - **更新 `README.md`**:
-  - 全面更新了 `jarvis`, `jarvis-code-agent`, `jarvis-agent`, `jarvis-platform-manager`, 和 `jarvis-rag` 等所有命令行工具的参数和功能说明，以反映最新的功能变更。
+  - 全面更新了 `jarvis`, `jarvis-code-agent`, `jarvis-agent`, `jarvis-platform-manager` 等所有命令行工具的参数和功能说明，以反映最新的功能变更。
 
 本次更新的核心是引入了结构化的“问题解决多智能体”工作流，并通过重构实现了智能体懒加载和中心化协调，大幅提升了系统的性能和可扩展性。同时，显著增强了AI教练的专业能力和命令行工具的易用性。
 
@@ -4197,7 +4191,6 @@
 #### **新功能 (Features)**
 
 - 为所有主要命令添加了快捷别名 (e.g., `jvs`, `jca`, `jcr`)，提升使用效率。
-- 新增 `jarvis-rag` (`jrg`) 命令，提供独立的RAG功能入口。
 - 新增 "GROW模型分析专家" 角色，用于结构化目标设定和问题解决。
 - 新增 `JARVIS_ENABLE_STATIC_ANALYSIS` 配置项，允许用户控制是否在代码修改后执行静态分析。
 - Kimi平台新增 "k2" 深度思考模型支持。
@@ -4246,9 +4239,7 @@
 
 #### **文档更新 (Documentation)**
 
-- (jarvis_rag): 将模块文档和注释翻译为中文
 - (docs): 修复技术文档中的标题格式和章节编号
-- (config): 添加 JARVIS_RAG 配置项文档
 - (cli): 更新CLI文档中嵌入模型参数名称
 - (docs): 优化技术文档中的图表
 - (rag): 补充 RAG 实现方案的技术文档
@@ -4263,9 +4254,6 @@
 
 #### **新功能 (Features)**
 
-- **新增 RAG 框架 (`jarvis-rag`)**: 引入了一个全新的 `jarvis-rag` 命令行工具，用于构建、管理和查询本地化的RAG（检索增强生成）知识库。
-  - `jarvis-rag add`: 支持添加文件、目录或通配符模式的文档到知识库。
-  - `jarvis-rag query`: 支持向知识库提问，并可指定不同的大语言模型进行回答。
 - **支持 Python 3.12**: 项目现已正式支持 Python 3.12 版本。
 
 #### **修复 (Fixes)**
@@ -4280,11 +4268,10 @@
 
 #### **文档更新 (Documentation)**
 
-- **README更新**: 详细更新了 `README.md` 文件，增加了 `jarvis-rag` 工具的完整使用说明和示例。
+- **README更新**: 详细更新了 `README.md` 文件。
 
 #### **其他 (Miscellaneous)**
 
-- **项目配置**: 在 `pyproject.toml` 和 `setup.py` 中添加了 RAG 功能所需的新依赖项，并注册了新的 `jarvis-rag` 命令。
 - **配置结构**: 在 `config_schema.json` 中添加了 `JARVIS_RAG` 的相关配置项，用于RAG功能的详细设置。
 
 本次更新主要围绕 **本地化RAG知识库** 这一核心功能展开，极大地增强了Jarvis在特定领域知识问答和代码理解方面的能力。同时，通过对核心Agent的优化和依赖库的升级，提升了整体的稳定性和可维护性。

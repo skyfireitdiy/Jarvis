@@ -48,7 +48,7 @@ def create_llm_model(
     if not model_available:
         return None
     try:
-        # 参考 jarvis_rag/llm_interface.py 的实现：使用全局 PlatformRegistry 实例
+        # 使用全局 PlatformRegistry 实例
         from jarvis.jarvis_platform.registry import PlatformRegistry
 
         # 使用全局 PlatformRegistry 实例，确保平台已正确加载

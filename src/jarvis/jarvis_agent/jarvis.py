@@ -118,11 +118,6 @@ def print_commands_overview() -> None:
         cmd_table.add_row(
             "jarvis-quick-config", "jqc", "快速配置 LLM 平台信息到 Jarvis 配置文件"
         )
-        cmd_table.add_row(
-            "jarvis-rag",
-            "jrg",
-            "构建和查询本地化的RAG知识库",
-        )
         cmd_table.add_row("jarvis-smart-shell", "jss", "实验性的智能Shell功能")
         cmd_table.add_row(
             "jarvis-sec", "jsec", "安全分析套件，结合启发式扫描和 AI 深度验证"
