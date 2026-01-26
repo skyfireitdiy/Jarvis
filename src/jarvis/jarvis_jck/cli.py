@@ -6,6 +6,7 @@
 
 import sys
 import subprocess
+import json
 from typing import Optional
 
 import typer
@@ -64,7 +65,7 @@ def _install_missing_tools(results: list) -> None:
     if not missing_tools:
         return
 
-    # 构建工具名称列表
+    # 构建工具名称列表（用于用户显示）
     tool_names = [r["name"] for r in missing_tools]
     tool_names_str = "、".join(tool_names)
 
@@ -79,12 +80,32 @@ def _install_missing_tools(results: list) -> None:
     # 批量安装工具
     PrettyOutput.auto_print("\n🚀 开始自动安装工具...")
 
-    # 构建批量安装命令
-    tool_names_str = "、".join(tool_names)
-    combined_description = f"在当前的环境安装以下工具：{tool_names_str}"
+    # 构建包含完整工具配置的描述
+
+    # 构建结构化的工具信息，便于大模型理解
+    tools_info = []
+    for tool in missing_tools:
+        tools_info.append(
+            {
+                "name": tool["name"],
+                "description": tool["description"],
+                "install_hint": tool["install_hint"],
+            }
+        )
+
+    # 将工具信息格式化为清晰的描述
+    tools_json = json.dumps(tools_info, ensure_ascii=False, indent=2)
+    combined_description = (
+        f"请帮我安装以下 {len(missing_tools)} 个工具：\n\n"
+        f"工具信息：\n"
+        f"```json\n"
+        f"{tools_json}\n"
+        f"```\n\n"
+        f"请根据每个工具的 install_hint 信息执行安装命令。"
+    )
 
     try:
-        # 使用 jvs -T 命令批量安装工具
+        # 使用 jvs -T 命令批量安装工具，传递完整的工具配置信息
         cmd = ["jvs", "-T", combined_description]
         subprocess.run(cmd)
 
@@ -202,7 +223,6 @@ def check(
 
     if as_json:
         # JSON格式输出：不询问安装，直接输出结果
-        import json
 
         output = {
             "summary": summary,
