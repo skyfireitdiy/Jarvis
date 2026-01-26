@@ -76,7 +76,6 @@ digraph G {
     node [group=data, shape=cylinder, fillcolor="#E1D5E7", color="#9673A6"];
     memory_store [label="记忆库\n(~/.jarvis / 项目.memory)"];
     tools_repo [label="工具与方法论仓库\n(中心Git/本地目录)"];
-    rag_cache [label="RAG缓存/向量库\n(.jarvis/rag)"];
     node [group=external, shape=box, fillcolor="#F5F5F5", color="#888888"];
     web_internet [label="互联网/HTTP资源"];
     mcp_servers [label="MCP服务（外部工具提供者）"];

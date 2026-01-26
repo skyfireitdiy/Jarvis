@@ -315,7 +315,6 @@ Jarvis 包含一系列专注于不同任务的工具。以下是主要命令及�
 | `jarvis-multi-agent`           | `jma`    | 多智能体协作系统                                                         |
 | `jarvis-tool`                  | `jt`     | 工具管理与调用系统                                                       |
 | `jarvis-methodology`           | `jm`     | 方法论知识库管理                                                         |
-| `jarvis-rag`                   | `jrg`    | 构建和查询本地化的RAG知识库                                              |
 | `jarvis-smart-shell`           | `jss`    | 实验性的智能Shell功能                                                    |
 | `jarvis-memory-organizer`      | `jmo`    | 记忆管理工具，支持整理、合并、导入导出记忆                               |
 | `jarvis-sec`                   | `jsec`   | 安全分析套件，结合启发式扫描和 AI 深度验证，支持 C/C++ 和 Rust 语言      |
