@@ -152,6 +152,9 @@ class SearchWebTool:
                         results_text += f"   摘要: {abstract}\n"
                     results_text += "\n"
 
+            # 添加提示信息
+            results_text += "💡 提示：如果想要获取详细信息，可以调用read_webpage工具\n"
+
             return {
                 "stdout": results_text,
                 "stderr": "",
