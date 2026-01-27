@@ -105,7 +105,6 @@ COMMAND_MAPPING = {
 }
 
 
-
 def is_editable_install() -> bool:
     """
     检测当前 Jarvis 是否以可编辑模式安装（pip/uv install -e .）。
@@ -836,21 +835,122 @@ def _interactive_config_setup(config_file_path: Path) -> None:
 
 def load_config() -> None:
     config_file = g_config_file
-    config_file_path = (
-        Path(config_file)
-        if config_file is not None
-        else Path(os.path.expanduser("~/.jarvis/config.yaml"))
-    )
 
-    # 加载配置文件
-    if not config_file_path.exists():
-        old_config_file = config_file_path.parent / "env"
-        if old_config_file.exists():  # 旧的配置文件存在
-            _read_old_config_file(old_config_file)
+    # 如果用户显式指定了配置文件，仍然只加载该文件（向后兼容）
+    if config_file is not None:
+        config_file_path = Path(config_file)
+        if not config_file_path.exists():
+            old_config_file = config_file_path.parent / "env"
+            if old_config_file.exists():  # 旧的配置文件存在
+                _read_old_config_file(old_config_file)
+            else:
+                _interactive_config_setup(config_file_path)
         else:
-            _interactive_config_setup(config_file_path)
+            _load_and_process_config(
+                str(config_file_path.parent), str(config_file_path)
+            )
     else:
-        _load_and_process_config(str(config_file_path.parent), str(config_file_path))
+        # 从当前目录开始逐层向上查找所有 .jarvis/config.yaml 文件
+        config_files = _find_all_config_files(os.getcwd())
+
+        if not config_files:
+            # 如果没有找到任何配置文件，使用默认路径
+            config_file_path = Path(os.path.expanduser("~/.jarvis/config.yaml"))
+            if not config_file_path.exists():
+                old_config_file = config_file_path.parent / "env"
+                if old_config_file.exists():  # 旧的配置文件存在
+                    _read_old_config_file(old_config_file)
+                else:
+                    _interactive_config_setup(config_file_path)
+            else:
+                _load_and_process_config(
+                    str(config_file_path.parent), str(config_file_path)
+                )
+        elif len(config_files) == 1:
+            # 只找到一个配置文件，直接加载
+            config_file_path = Path(config_files[0])
+            _load_and_process_config(
+                str(config_file_path.parent), str(config_file_path)
+            )
+        else:
+            # 找到多个配置文件，合并配置（底层覆盖上层）
+            content, merged_config = _merge_configs(config_files)
+            # 使用最底层的配置文件（最后一个）作为主配置文件
+            main_config_file = config_files[-1]
+            main_config_dir = str(Path(main_config_file).parent)
+
+            try:
+                _ensure_schema_declaration(
+                    main_config_dir, main_config_file, content, merged_config
+                )
+                set_global_env_data(merged_config)
+                _process_env_variables(merged_config)
+            except Exception:
+                from jarvis.jarvis_utils.input import user_confirm as get_yes_no
+
+                PrettyOutput.auto_print("❌ 加载配置文件失败")
+                if get_yes_no("配置文件格式错误，是否删除并重新配置？"):
+                    try:
+                        os.remove(main_config_file)
+                        PrettyOutput.auto_print(
+                            "✅ 已删除损坏的配置文件，请重启Jarvis以重新配置。"
+                        )
+                    except Exception:
+                        PrettyOutput.auto_print("❌ 删除配置文件失败")
+                sys.exit(1)
+
+
+def _find_all_config_files(start_dir: str) -> List[str]:
+    """从指定目录开始逐层向上查找所有 .jarvis/config.yaml 文件
+
+    参数:
+        start_dir: 起始目录路径
+
+    返回:
+        List[str]: 按从上层到下层顺序排列的配置文件路径列表
+    """
+    config_files = []
+    current_dir = Path(start_dir).resolve()
+    root_dir = Path("/").resolve()
+    max_levels = 20  # 最多向上查找20层，防止无限循环
+    level = 0
+
+    while current_dir != root_dir and level < max_levels:
+        config_path = current_dir / ".jarvis" / "config.yaml"
+        if config_path.exists():
+            config_files.append(str(config_path))
+        current_dir = current_dir.parent
+        level += 1
+
+    # 检查根目录
+    config_path = root_dir / ".jarvis" / "config.yaml"
+    if config_path.exists():
+        config_files.append(str(config_path))
+
+    # 反转列表，使得上层配置在前，下层配置在后
+    config_files.reverse()
+    return config_files
+
+
+def _merge_configs(config_files: List[str]) -> Tuple[str, Dict[str, Any]]:
+    """按顺序加载多个配置文件并合并（底层覆盖上层）
+
+    参数:
+        config_files: 配置文件路径列表（从上层到下层）
+
+    返回:
+        Tuple[str, dict]: (最后一个配置文件的原始内容, 合并后的配置字典)
+    """
+    merged_config = {}
+    last_content = ""
+
+    for config_file in config_files:
+        content, config_data = _load_config_file(config_file)
+        if isinstance(config_data, dict):
+            merged_config.update(config_data)
+        last_content = content  # 保存最后一个配置文件的内容
+
+    return last_content, merged_config
 
 
 def _load_config_file(config_file: str) -> Tuple[str, Dict[str, Any]]:
