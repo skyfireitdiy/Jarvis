@@ -1582,9 +1582,7 @@ class Agent:
                     )
                     return True
                 else:
-                    PrettyOutput.auto_print(
-                        "⚠️ 滑动窗口压缩：模型不支持 set_messages 方法"
-                    )
+                    # 模型不支持 set_messages 方法，压缩失败
                     return False
 
             except Exception as e:
@@ -1731,7 +1729,6 @@ class Agent:
             bool: 如果成功执行压缩返回True，否则返回False
         """
         try:
-            PrettyOutput.auto_print("🔍 执行滑动窗口压缩...")
             return self._sliding_window_compression()
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 自适应压缩出错: {str(e)}")
