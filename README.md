@@ -79,8 +79,8 @@ agent = Agent(
 agent.run('分析README.md，补充用户群体和应用场景信息')
 
 # 继续迭代文档
-agent.run('在READM增加一个工作流对比示例')
-E中
+agent.run('在README中增加一个工作流对比示例')
+
 # Agent会自动：
 # 1. 使用read_code读取文档内容
 # 2. 分析现有结构和风格
