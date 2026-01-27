@@ -92,10 +92,6 @@ def get_jarvis_gitee_url() -> str:
     )
 
 
-# 输出窗口预留大小
-INPUT_WINDOW_REVERSE_SIZE = 2048
-
-
 @lru_cache(maxsize=None)
 def get_replace_map() -> Dict[str, Any]:
     """
@@ -830,8 +826,6 @@ def get_mcp_config() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: MCP配置项列表，如果未配置则返回空列表
     """
     return cast(List[Dict[str, Any]], GLOBAL_CONFIG_DATA.get("mcp", []))
-
-
 
 
 # ==============================================================================
