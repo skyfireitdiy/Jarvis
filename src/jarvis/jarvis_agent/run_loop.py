@@ -338,8 +338,14 @@ class AgentRunLoop:
                     if filtered_response:
                         import jarvis.jarvis_utils.globals as G
 
-                        agent_name = ag.name if hasattr(ag, "name") else None
-                        title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'}[/bold cyan]"
+                        # 获取模型名称：优先使用model.get_model_name()，如果不存在则回退到'LLM'
+                        model_name = (
+                            ag.model.get_model_name()
+                            if hasattr(ag.model, "get_model_name")
+                            and hasattr(ag.model, "model_name")
+                            else "LLM"
+                        )
+                        title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{model_name}[/bold cyan]"
                         PrettyOutput.print_markdown(
                             filtered_response, title=title, border_style="bright_blue"
                         )
