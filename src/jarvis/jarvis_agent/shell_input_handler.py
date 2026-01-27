@@ -42,10 +42,20 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
                 agent,
             )
             if user_confirm("是否将执行结果反馈给Agent？", default=True):
+                # 只过滤掉带有 JARVIS-NOCONFIRM 标记的命令（Ctrl+T 自动生成的）
+                # 保留用户手动输入的普通 shell 命令，让 Agent 能了解完整上下文
+                marker = "# JARVIS-NOCONFIRM"
+                filtered_input = "\n".join(
+                    [
+                        line
+                        for line in user_input.splitlines()
+                        if not (line.startswith("!") and marker in line)
+                    ]
+                )
                 return (
                     join_prompts(
                         [
-                            user_input,
+                            filtered_input,
                             f"用户执行以下脚本：\n{script}",
                             f"执行结果：\n{output}",
                         ]
