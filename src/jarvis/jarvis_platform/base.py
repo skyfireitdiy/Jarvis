@@ -273,6 +273,9 @@ class BasePlatform(ABC):
                 max_text_height = console.height - 5
                 if max_text_height <= 0:
                     max_text_height = 1
+                # 最大高度限制为10行
+                if max_text_height > 10:
+                    max_text_height = 10
 
                 lines = text_content.wrap(
                     console,
