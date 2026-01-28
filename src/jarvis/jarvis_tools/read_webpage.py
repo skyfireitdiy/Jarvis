@@ -114,9 +114,14 @@ class WebpageTool:
 
     @staticmethod
     def check() -> bool:
-        """工具可用性检查：检查Playwright是否可用。"""
+        """工具可用性检查：检查Playwright是否可用。
+
+        如果浏览器驱动未安装，会自动尝试安装。
+
+        Returns:
+            bool: Playwright是否可用
+        """
         try:
-            # 尝试导入 playwright 并检查浏览器是否安装
             from playwright.sync_api import sync_playwright
 
             with sync_playwright() as p:
@@ -124,10 +129,25 @@ class WebpageTool:
                 browser.close()
             return True
         except ImportError:
-            PrettyOutput.auto_print(
-                "❌ Playwright未安装，请运行: pip install playwright && playwright install"
-            )
+            PrettyOutput.auto_print("❌ Playwright Python包未安装")
+            PrettyOutput.auto_print("💡 请运行: pip install playwright")
             return False
         except Exception as e:
-            PrettyOutput.auto_print(f"❌ Playwright不可用: {e}")
-            return False
+            error_msg = str(e)
+            # 检测是否是浏览器驱动未安装
+            if "executable doesn't exist" in error_msg or "driver" in error_msg.lower():
+                PrettyOutput.auto_print("🔧 检测到浏览器驱动未安装，正在自动安装...")
+                try:
+                    from jarvis.scripts.install_playwright import install_chromium
+
+                    install_chromium()
+                    PrettyOutput.auto_print("✅ 浏览器驱动安装成功，正在重试...")
+                    # 重试检查
+                    return WebpageTool.check()
+                except Exception as install_error:
+                    PrettyOutput.auto_print(f"❌ 自动安装失败: {install_error}")
+                    PrettyOutput.auto_print("💡 请手动运行: install-playwright")
+                    return False
+            else:
+                PrettyOutput.auto_print(f"❌ Playwright不可用: {e}")
+                return False
