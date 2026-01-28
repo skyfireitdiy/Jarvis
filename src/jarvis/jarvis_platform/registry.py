@@ -10,13 +10,9 @@ from typing import Optional
 from typing import Type
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_cheap_model_name
 from jarvis.jarvis_utils.config import get_cheap_platform_name
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_llm_config
-from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
-from jarvis.jarvis_utils.config import get_smart_model_name
 from jarvis.jarvis_utils.config import get_smart_platform_name
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -189,40 +185,19 @@ class PlatformRegistry:
     ) -> BasePlatform:
         """获取正常操作的平台实例"""
         platform_name = get_normal_platform_name(model_group_override)
-        model_name = get_normal_model_name(model_group_override)
-        llm_config = get_llm_config("normal", model_group_override)
-
-        # 调试：检查配置中是否包含 API key
-        if not llm_config.get("openai_api_key") and platform_name in (
-            "openai",
-            "deepseek",
-            "anthropic",
-        ):
-            import os
-
-            env_key = (
-                os.getenv("OPENAI_API_KEY")
-                or os.getenv("DEEPSEEK_API_KEY")
-                or os.getenv("ANTHROPIC_API_KEY")
-            )
-            if not env_key:
-                from jarvis.jarvis_utils.output import PrettyOutput
-
-                PrettyOutput.auto_print(
-                    f"⚠️ 警告: 创建平台 '{platform_name}' 时，配置中未找到 API key，"
-                    f"环境变量中也未设置。model_group={model_group_override}, "
-                    f"llm_config keys={list(llm_config.keys())}"
-                )
 
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
-        platform = self.create_platform(platform_name, llm_config, silent=True)
+        platform = self.create_platform(
+            platform_name,
+            platform_type="normal",
+            model_group=model_group_override,
+            silent=True,
+        )
         if platform is None:
             raise RuntimeError(
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）。"
-                f"model_group={model_group_override}, llm_config keys={list(llm_config.keys())}"
+                f"model_group={model_group_override}"
             )
-        platform.set_model_name(model_name)
-        platform.set_model_group(model_group_override)
         return platform
 
     def get_cheap_platform(
@@ -230,17 +205,18 @@ class PlatformRegistry:
     ) -> BasePlatform:
         """获取廉价操作的平台实例"""
         platform_name = get_cheap_platform_name(model_group_override)
-        model_name = get_cheap_model_name(model_group_override)
-        llm_config = get_llm_config("cheap", model_group_override)
+
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
-        platform = self.create_platform(platform_name, llm_config, silent=True)
+        platform = self.create_platform(
+            platform_name,
+            platform_type="cheap",
+            model_group=model_group_override,
+            silent=True,
+        )
         if platform is None:
             raise RuntimeError(
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
             )
-        platform.set_model_name(model_name)
-        platform.set_model_group(model_group_override)
-        platform.set_platform_type("cheap")
         return platform
 
     def get_smart_platform(
@@ -248,17 +224,18 @@ class PlatformRegistry:
     ) -> BasePlatform:
         """获取智能操作的平台实例"""
         platform_name = get_smart_platform_name(model_group_override)
-        model_name = get_smart_model_name(model_group_override)
-        llm_config = get_llm_config("smart", model_group_override)
+
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
-        platform = self.create_platform(platform_name, llm_config, silent=True)
+        platform = self.create_platform(
+            platform_name,
+            platform_type="smart",
+            model_group=model_group_override,
+            silent=True,
+        )
         if platform is None:
             raise RuntimeError(
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）"
             )
-        platform.set_model_name(model_name)
-        platform.set_model_group(model_group_override)
-        platform.set_platform_type("smart")
         return platform
 
     def register_platform(self, name: str, platform_class: Type[BasePlatform]) -> None:
@@ -273,14 +250,16 @@ class PlatformRegistry:
     def create_platform(
         self,
         name: str,
-        llm_config: Optional[Dict[str, Any]] = None,
+        platform_type: str = "normal",
+        model_group: Optional[str] = None,
         silent: bool = False,
     ) -> Optional[BasePlatform]:
         """Create platform instance
 
         Args:
             name: Platform name
-            llm_config: LLM配置字典，包含平台特定的配置参数（如 api_key, base_url 等）
+            platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
+            model_group: 模型组名称，用于从配置中获取对应的 llm_config
             silent: 如果为 True，失败时不打印错误信息（默认 False，保持向后兼容）
 
         Returns:
@@ -292,7 +271,9 @@ class PlatformRegistry:
             return None
 
         try:
-            platform = self.platforms[name](llm_config=llm_config or {})
+            platform = self.platforms[name](
+                platform_type=platform_type, model_group=model_group
+            )
             return platform
         except Exception as e:
             if not silent:

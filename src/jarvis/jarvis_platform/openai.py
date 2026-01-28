@@ -17,16 +17,21 @@ from jarvis.jarvis_utils.tag import ot, ct
 
 
 class OpenAIModel(BasePlatform):
-    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        platform_type: str = "normal",
+        model_group: Optional[str] = None,
+    ):
         """
         Initialize OpenAI model
 
         参数:
-            llm_config: LLM配置字典，包含 openai_api_key, openai_api_base, openai_extra_headers 等
+            platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
+            model_group: 模型组名称，用于从配置中获取对应的 llm_config
         """
-        super().__init__()
+        super().__init__(platform_type=platform_type, model_group=model_group)
         self.system_message = ""
-        llm_config = llm_config or {}
+        llm_config = self._llm_config or {}
 
         # 如果传入了 llm_config（非空字典），优先从 llm_config 读取，避免环境变量污染
         # 只有在 llm_config 中没有对应键时才从环境变量读取（向后兼容）
@@ -61,7 +66,7 @@ class OpenAIModel(BasePlatform):
         if not self.api_key and llm_config:
             PrettyOutput.auto_print("⚠️ OPENAI_API_KEY 未设置")
 
-        self.model_name = os.getenv("model") or "gpt-4o"
+        # model_name 已在基类 BasePlatform.__init__ 中根据 platform_type 设置
 
         # Optional: Inject extra HTTP headers via llm_config or environment variable
         # Expected format: openai_extra_headers='{"Header-Name": "value", "X-Trace": "abc"}'

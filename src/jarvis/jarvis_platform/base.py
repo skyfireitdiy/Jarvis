@@ -28,6 +28,10 @@ from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.config import get_pretty_output
 from jarvis.jarvis_utils.config import get_smart_max_input_token_count
+from jarvis.jarvis_utils.config import get_llm_config
+from jarvis.jarvis_utils.config import get_normal_model_name
+from jarvis.jarvis_utils.config import get_cheap_model_name
+from jarvis.jarvis_utils.config import get_smart_model_name
 from jarvis.jarvis_utils.config import is_immediate_abort
 from jarvis.jarvis_utils.config import is_print_prompt
 from jarvis.jarvis_utils.config import is_save_session_history
@@ -48,21 +52,34 @@ class BasePlatform(ABC):
 
     def __init__(
         self,
-        llm_config: Optional[Dict[str, Any]] = None,
+        platform_type: str = "normal",
+        model_group: Optional[str] = None,
         agent: Optional[Any] = None,
     ):
         """初始化模型
 
         参数:
-            llm_config: LLM配置字典
+            platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
+            model_group: 模型组名称，用于从配置中获取对应的 llm_config
             agent: Agent实例，用于回调触发总结等功能
         """
         self.suppress_output = True  # 添加输出控制标志
         self._saved = False
-        self.model_group: Optional[str] = None
+        self.model_group: Optional[str] = model_group
         self._session_history_file: Optional[str] = None
-        self.platform_type: str = "normal"  # 平台类型：normal/cheap/smart
+        self.platform_type: str = platform_type  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
+
+        # 根据 platform_type 获取对应的 model_name
+        if platform_type == "cheap":
+            self.model_name = get_cheap_model_name(model_group)
+        elif platform_type == "smart":
+            self.model_name = get_smart_model_name(model_group)
+        else:
+            self.model_name = get_normal_model_name(model_group)
+
+        # 获取 llm_config 供子类使用
+        self._llm_config = get_llm_config(platform_type, model_group)
 
     def get_conversation_turn(self) -> int:
         """获取当前对话轮次数"""
