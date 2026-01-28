@@ -121,7 +121,7 @@ dependencies = [
 
     [project.scripts]
     # Playwright 浏览器驱动安装脚本
-    install-playwright = "scripts.install_playwright:install_chromium"
+    install-playwright = "jarvis.scripts.install_playwright:install_chromium"
     jarvis = "jarvis.jarvis_agent.jarvis:main"
     jarvis-agent-dispatcher = "jarvis.jarvis_agent.jvsd_cli:app"
     jvs = "jarvis.jarvis_agent.jarvis:main"
