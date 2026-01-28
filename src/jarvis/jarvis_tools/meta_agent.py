@@ -266,10 +266,10 @@ class {tool_name}:
 
             # 使用CodeAgent生成工具代码
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
-            from jarvis.jarvis_utils.globals import get_global_model_group
+            from jarvis.jarvis_utils.config import get_model_group
 
-            # 使用全局模型组和标准配置创建CodeAgent
-            model_group = get_global_model_group()
+            # 使用当前模型组和标准配置创建CodeAgent
+            model_group = get_model_group()
             agent = CodeAgent(
                 model_group=model_group,
                 need_summary=True,

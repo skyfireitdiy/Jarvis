@@ -2,9 +2,12 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from jarvis.jarvis_utils.config import calculate_token_limit, get_max_input_token_count
+from jarvis.jarvis_utils.config import (
+    calculate_token_limit,
+    get_max_input_token_count,
+    get_model_group,
+)
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.globals import get_global_model_group
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
@@ -54,8 +57,8 @@ class ReadCodeTool:
                     pass
 
             # 回退方案：使用输入窗口的2/3
-            # 使用全局模型组（不再从 agent 继承）
-            model_group = get_global_model_group()
+            # 使用当前模型组（不再从 agent 继承）
+            model_group = get_model_group()
 
             max_input_tokens = get_max_input_token_count(model_group)
             # 计算1/2限制的token数
@@ -211,8 +214,12 @@ class ReadCodeTool:
             # 检测是否为规则文件，添加提示
             normalized_path = os.path.normpath(abs_path).replace(os.sep, "/")
             if "/rules/" in normalized_path or normalized_path.endswith("/rules"):
-                output += "\n💡 提示: 检测到此文件路径包含 'rules'，这可能是一个规则文件。"
-                output += "\n   建议使用 `load_rule` 工具加载以获取规则渲染后的完整内容。\n"
+                output += (
+                    "\n💡 提示: 检测到此文件路径包含 'rules'，这可能是一个规则文件。"
+                )
+                output += (
+                    "\n   建议使用 `load_rule` 工具加载以获取规则渲染后的完整内容。\n"
+                )
 
             if agent:
                 files = agent.get_user_data("files")

@@ -82,7 +82,7 @@ from jarvis.jarvis_utils.globals import clear_current_agent
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.globals import make_agent_name
-from jarvis.jarvis_utils.globals import set_global_model_group
+from jarvis.jarvis_utils.config import set_model_group
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -769,8 +769,8 @@ class Agent:
         # 设置Agent引用，使Platform能够回调Agent方法（如自动总结）
         self.model.agent = self
 
-        # 设置全局模型组，供工具和其他组件使用
-        set_global_model_group(model_group)
+        # 设置当前模型组，供工具和其他组件使用
+        set_model_group(model_group)
 
     def _init_session(self) -> None:
         """初始化会话管理器"""

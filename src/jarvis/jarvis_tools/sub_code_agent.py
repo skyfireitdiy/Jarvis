@@ -13,7 +13,7 @@ sub_code_agent 工具
 from typing import Any, Dict, List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_utils.globals import get_global_model_group
+from jarvis.jarvis_utils.config import get_model_group
 
 
 class SubCodeAgentTool:
@@ -94,8 +94,8 @@ class SubCodeAgentTool:
                 if parent_agent is not None
                 else None
             )
-            # 使用全局模型组（不再从 parent_agent 继承）
-            model_group = get_global_model_group()
+            # 使用当前模型组（不再从 parent_agent 继承）
+            model_group = get_model_group()
             use_tools: List[str] = []
             try:
                 if parent_agent is not None:
