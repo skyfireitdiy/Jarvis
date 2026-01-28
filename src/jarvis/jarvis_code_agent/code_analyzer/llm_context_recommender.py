@@ -18,7 +18,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_cheap_model_name
 from jarvis.jarvis_utils.config import get_cheap_platform_name
-from jarvis.jarvis_utils.globals import get_global_model_group
+from jarvis.jarvis_utils.config import get_model_group
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
 from .context_manager import ContextManager
@@ -52,8 +52,8 @@ class ContextRecommender:
         # 保存配置信息，用于后续创建 LLM 实例
         self._platform_name = None
         self._model_name = None
-        # 使用全局模型组（不再从 parent_model 继承）
-        self._model_group = get_global_model_group()
+        # 使用当前模型组（不再从 parent_model 继承）
+        self._model_group = get_model_group()
 
         # 根据 model_group 获取配置
         # 使用cheap平台，筛选操作可以降低成本

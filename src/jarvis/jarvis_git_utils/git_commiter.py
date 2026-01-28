@@ -17,7 +17,7 @@ from jarvis.jarvis_utils.config import get_git_commit_prompt
 from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
-from jarvis.jarvis_utils.globals import get_global_model_group
+from jarvis.jarvis_utils.config import get_model_group
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
@@ -105,7 +105,8 @@ class GitCommitTool:
                         max_diff_tokens = int(remaining_tokens * token_ratio)
                         # 确保 diff 不超过剩余 token 减去 base_prompt
                         max_diff_tokens = min(
-                            max_diff_tokens, remaining_tokens - base_prompt_tokens - 1000
+                            max_diff_tokens,
+                            remaining_tokens - base_prompt_tokens - 1000,
                         )
                         if max_diff_tokens <= 0:
                             # 如果剩余 token 不足，使用文件列表策略
@@ -282,8 +283,8 @@ class GitCommitTool:
             diff = decode_output(diff_bytes)
 
             try:
-                # 优先使用args中的model_group，否则使用全局模型组（不再从agent继承）
-                model_group = args.get("model_group") or get_global_model_group()
+                # 优先使用args中的model_group，否则使用当前模型组（不再从agent继承）
+                model_group = args.get("model_group") or get_model_group()
 
                 # Get platform and model based on model_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import get_normal_model_name
@@ -401,9 +402,7 @@ commit信息
                         else:
                             # 如果被截断，使用截断后的 diff
                             diff = truncated_diff
-                            PrettyOutput.auto_print(
-                                "⚠️ 差异内容已截断以适应上下文限制"
-                            )
+                            PrettyOutput.auto_print("⚠️ 差异内容已截断以适应上下文限制")
 
                 # 根据上传状态准备完整的提示
                 if is_large_content and not use_file_list:

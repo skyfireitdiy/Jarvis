@@ -18,7 +18,7 @@ from jarvis.jarvis_utils.output import PrettyOutput
 # -*- coding: utf-8 -*-
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_utils.globals import get_global_model_group
+from jarvis.jarvis_utils.config import get_model_group
 
 
 class SubAgentTool:
@@ -118,8 +118,8 @@ class SubAgentTool:
 
             # 基于父Agent（如有）继承部分配置后创建子Agent
             parent_agent = args.get("agent", None)
-            # 使用全局模型组（不再从 parent_agent 继承）
-            parent_model_group = get_global_model_group()
+            # 使用当前模型组（不再从 parent_agent 继承）
+            parent_model_group = get_model_group()
             parent_execute_tool_confirm = None
             parent_multiline_inputer = None
             parent_use_methodology = None

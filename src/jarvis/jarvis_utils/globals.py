@@ -18,8 +18,6 @@ from typing import Optional
 
 message_history: List[str] = []
 
-# 全局模型组
-_global_model_group: Optional[str] = None
 MAX_HISTORY_SIZE = 50
 
 # 短期记忆存储
@@ -329,25 +327,6 @@ def clear_short_term_memories() -> None:
     """
     global short_term_memories
     short_term_memories.clear()
-
-
-def set_global_model_group(model_group: Optional[str]) -> None:
-    """设置全局模型组
-
-    参数:
-        model_group: 模型组名称
-    """
-    global _global_model_group
-    _global_model_group = model_group
-
-
-def get_global_model_group() -> Optional[str]:
-    """获取全局模型组
-
-    返回:
-        Optional[str]: 全局模型组名称，如果未设置则返回None
-    """
-    return _global_model_group
 
 
 def get_all_memory_tags() -> Dict[str, List[str]]:

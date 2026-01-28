@@ -13,14 +13,16 @@ from jarvis.jarvis_utils.output import PrettyOutput
 from typing import Dict, List, Optional, Any
 
 from jarvis.jarvis_agent.task_list import TaskStatus
-from jarvis.jarvis_utils.config import calculate_token_limit, get_max_input_token_count
-from jarvis.jarvis_utils.globals import get_global_model_group
+from jarvis.jarvis_utils.config import (
+    calculate_token_limit,
+    get_max_input_token_count,
+    get_model_group,
+)
 from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.git_utils import (
     get_latest_commit_hash,
     get_diff_between_commits,
 )
-
 
 
 class DependencyValidationError(Exception):
@@ -64,15 +66,15 @@ def _calculate_default_max_output_length(agent: Any = None) -> int:
                 max_input_tokens = (
                     agent.model.get_max_input_token_count()
                     if hasattr(agent.model, "get_max_input_token_count")
-                    else get_max_input_token_count(get_global_model_group())
+                    else get_max_input_token_count(get_model_group())
                 )
             except Exception:
-                # 如果通过agent获取失败，使用全局配置
-                model_group = get_global_model_group()
+                # 如果通过agent获取失败，使用当前配置
+                model_group = get_model_group()
                 max_input_tokens = get_max_input_token_count(model_group)
         else:
-            # 没有agent时使用全局配置
-            model_group = get_global_model_group()
+            # 没有agent时使用当前配置
+            model_group = get_model_group()
             max_input_tokens = get_max_input_token_count(model_group)
 
         # 计算1/3限制的token数（更保守的回退方案），然后转换为字符数
@@ -116,8 +118,8 @@ class task_list_manager:
                     pass
 
             # 回退方案：使用输入窗口的2/3
-            # 使用全局模型组（不再从 agent 继承）
-            model_group = get_global_model_group()
+            # 使用当前模型组（不再从 agent 继承）
+            model_group = get_model_group()
 
             max_input_tokens = get_max_input_token_count(model_group)
             # 计算2/3限制的token数，然后转换为字符数
@@ -307,7 +309,7 @@ class task_list_manager:
             Agent: 验证 Agent 实例
         """
         from jarvis.jarvis_agent import Agent
-        from jarvis.jarvis_utils.globals import get_global_model_group
+        from jarvis.jarvis_utils.config import get_model_group
 
         # 构建验证方法说明部分
         verification_method_section = ""
@@ -390,9 +392,9 @@ class task_list_manager:
         except Exception:
             pass
 
-        # 如果父 Agent 没有 model_group，才使用全局模型组
+        # 如果父 Agent 没有 model_group，才使用当前模型组
         if model_group is None:
-            model_group = get_global_model_group()
+            model_group = get_model_group()
 
         verification_agent = Agent(
             system_prompt=verification_system_prompt,
@@ -1773,19 +1775,22 @@ class task_list_manager:
                         should_verify = True
                         if iteration == 1:
                             # 第一次迭代时，交互模式下询问用户
-                            is_interactive = not getattr(parent_agent, "non_interactive", True)
+                            is_interactive = not getattr(
+                                parent_agent, "non_interactive", True
+                            )
                             if is_interactive:
                                 from jarvis.jarvis_utils.input import user_confirm
+
                                 should_verify = user_confirm(
                                     f"是否验证任务 [{task.task_name}] 的完成情况？",
-                                    default=False
+                                    default=False,
                                 )
                                 if not should_verify:
                                     user_skipped_verification = True
                         else:
                             # 后续迭代：如果用户之前选择跳过验证，则不再验证；否则继续验证
                             should_verify = not user_skipped_verification
-                        
+
                         # 验证任务是否真正完成
                         if should_verify:
                             verification_passed, verification_result = (
@@ -2135,15 +2140,15 @@ class task_list_manager:
                         if is_interactive:
                             from jarvis.jarvis_utils.input import user_confirm
                             from jarvis.jarvis_utils.output import PrettyOutput
-                            
+
                             PrettyOutput.auto_print(
                                 f"🔍 准备验证 main 类型任务 [{task.task_name}] 的完成情况..."
                             )
                             should_verify = user_confirm(
                                 f"是否验证任务 [{task.task_name}] 的完成情况？",
-                                default=False
+                                default=False,
                             )
-                        
+
                         if should_verify:
                             # 使用公共方法构建任务内容
                             task_content = self._build_task_content(task)
@@ -2178,7 +2183,7 @@ class task_list_manager:
                         else:
                             # 用户选择不验证，直接标记为通过
                             from jarvis.jarvis_utils.output import PrettyOutput
-                            
+
                             verification_passed = True
                             verification_result = "用户选择跳过验证"
                             PrettyOutput.auto_print(
