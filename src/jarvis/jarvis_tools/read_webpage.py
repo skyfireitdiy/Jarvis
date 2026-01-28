@@ -101,6 +101,14 @@ class WebpageTool:
             else:
                 content_md_truncated = content_md
 
+            # 使用print_markdown打印网页内容
+            PrettyOutput.print_markdown(
+                content_md_truncated,
+                title=f"📄 网页内容: {url}",
+                border_style="bright_blue",
+                theme="monokai",
+            )
+
             # 直接返回Markdown格式的网页内容
             return {"success": True, "stdout": content_md_truncated, "stderr": ""}
 
