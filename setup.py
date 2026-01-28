@@ -1,5 +1,29 @@
 # -*- coding: utf-8 -*-
+import subprocess
+import sys
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+
+
+class PostInstallCommand(install):
+    """自定义安装命令，安装后自动安装 Playwright 浏览器驱动"""
+
+    def run(self):
+        install.run(self)
+        # 尝试安装 Playwright 浏览器驱动
+        try:
+            print("\n正在安装 Playwright 浏览器驱动...")
+            subprocess.check_call(
+                [sys.executable, "-m", "playwright", "install", "chromium"]
+            )
+            print("✅ Playwright 浏览器驱动安装成功！")
+        except subprocess.CalledProcessError:
+            print(
+                "⚠️  Playwright 浏览器驱动安装失败，您也可以稍后手动运行: python -m playwright install chromium"
+            )
+        except Exception as e:
+            print(f"⚠️  安装 Playwright 浏览器驱动时出错: {e}")
+
 
 setup(
     name="jarvis-ai-assistant",
@@ -18,6 +42,7 @@ setup(
     },
     install_requires=[
         "requests==2.32.3",
+        "playwright==1.48.0",
         "colorama==0.4.6",
         "prompt_toolkit==3.0.50",
         "pygments==2.19.1",
@@ -59,6 +84,9 @@ setup(
         "tree-sitter-php==0.24.1",
         "tree-sitter-sql==0.3.11",
     ],
+    cmdclass={
+        "install": PostInstallCommand,
+    },
     extras_require={
         "dev": ["pytest", "ruff", "mypy", "build", "twine"],
         "clang16": ["clang==16.*"],
