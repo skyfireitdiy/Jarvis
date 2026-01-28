@@ -2,18 +2,17 @@
 from typing import Any
 from typing import Dict
 
-import requests  # 导入第三方库requests
+from playwright.sync_api import sync_playwright
 from markdownify import markdownify as md
 
 from jarvis.jarvis_utils.config import calculate_content_token_limit
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.http import get as http_get
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class WebpageTool:
     name = "read_webpage"
-    description = "读取网页内容，将HTML转换为Markdown格式返回"
+    description = "使用无头浏览器读取网页内容，支持JavaScript动态渲染，将HTML转换为Markdown格式返回"
     parameters = {
         "type": "object",
         "properties": {
@@ -24,7 +23,8 @@ class WebpageTool:
 
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """
-        读取网页内容，将HTML转换为Markdown格式返回。
+        使用无头浏览器读取网页内容，将HTML转换为Markdown格式返回。
+        支持JavaScript动态渲染的内容。
         """
         try:
             url = str(args.get("url", "")).strip()
@@ -32,23 +32,37 @@ class WebpageTool:
             if not url:
                 return {"success": False, "stdout": "", "stderr": "缺少必需参数：url"}
 
-            # 使用 requests 抓取网页内容并转换为 Markdown
-
+            # 使用 Playwright 无头浏览器抓取网页内容
             try:
-                resp = http_get(url, timeout=10.0, allow_redirects=True)
-                content_md = md(resp.text, strip=["script", "style"])
-            except requests.exceptions.HTTPError as e:
-                PrettyOutput.auto_print(
-                    f"⚠️ HTTP错误 {e.response.status_code} 访问 {url}"
-                )
+                with sync_playwright() as p:
+                    # 启动无头浏览器
+                    browser = p.chromium.launch(headless=True)
+                    page = browser.new_page()
+
+                    # 设置超时时间为30秒
+                    page.set_default_timeout(30000)
+
+                    PrettyOutput.auto_print(f"🌐 正在使用无头浏览器访问: {url}")
+
+                    # 访问页面并等待加载
+                    page.goto(url, wait_until="networkidle")
+
+                    # 获取渲染后的HTML内容
+                    html_content = page.content()
+
+                    # 关闭浏览器
+                    browser.close()
+
+                # 将HTML转换为Markdown
+                content_md = md(html_content, strip=["script", "style"])
+
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 无头浏览器错误: {e}")
                 return {
                     "success": False,
                     "stdout": "",
-                    "stderr": f"HTTP错误：{e.response.status_code}",
+                    "stderr": f"无头浏览器错误：{e}",
                 }
-            except requests.exceptions.RequestException as e:
-                PrettyOutput.auto_print(f"⚠️ 请求错误: {e}")
-                return {"success": False, "stdout": "", "stderr": f"请求错误：{e}"}
 
             if not content_md or not content_md.strip():
                 return {
@@ -100,5 +114,20 @@ class WebpageTool:
 
     @staticmethod
     def check() -> bool:
-        """工具可用性检查：始终可用。"""
-        return True
+        """工具可用性检查：检查Playwright是否可用。"""
+        try:
+            # 尝试导入 playwright 并检查浏览器是否安装
+            from playwright.sync_api import sync_playwright
+
+            with sync_playwright() as p:
+                browser = p.chromium.launch()
+                browser.close()
+            return True
+        except ImportError:
+            PrettyOutput.auto_print(
+                "❌ Playwright未安装，请运行: pip install playwright && playwright install"
+            )
+            return False
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ Playwright不可用: {e}")
+            return False

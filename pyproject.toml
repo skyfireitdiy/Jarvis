@@ -20,6 +20,7 @@ classifiers = [
 keywords = ["jarvis", "ai", "assistant", "tools", "automation"]
 dependencies = [
     "requests==2.32.3",
+    "playwright==1.48.0",
     "colorama==0.4.6",
     "prompt_toolkit==3.0.50",
     "pygments==2.19.1",
@@ -67,6 +68,7 @@ dependencies = [
 
     [project.optional-dependencies]
     dev = ["pytest", "ruff", "mypy", "build", "twine"]
+    browser = ["playwright==1.48.0"]
     clang16 = ["clang==16.*"]
     clang17 = ["clang==17.*"]
     clang18 = ["clang==18.*"]
@@ -118,6 +120,8 @@ dependencies = [
     ignore_missing_imports = true
 
     [project.scripts]
+    # Playwright 浏览器驱动安装脚本
+    install-playwright = "scripts.install_playwright:install_chromium"
     jarvis = "jarvis.jarvis_agent.jarvis:main"
     jarvis-agent-dispatcher = "jarvis.jarvis_agent.jvsd_cli:app"
     jvs = "jarvis.jarvis_agent.jarvis:main"
