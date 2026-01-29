@@ -20,6 +20,7 @@ from typing import Optional
 from typing import cast
 
 import typer
+from jarvis.jarvis_utils.config import set_llm_group
 from jarvis.jarvis_utils.output import PrettyOutput
 
 from jarvis.jarvis_c2rust.library_replacer import (
@@ -525,6 +526,7 @@ def run(
     """
 
     try:
+        set_llm_group(llm_group)
         # 加载状态文件
         if reset:
             # 重置状态
