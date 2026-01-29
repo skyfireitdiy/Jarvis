@@ -62,7 +62,7 @@ from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.globals import clear_current_agent
-from jarvis.jarvis_utils.config import set_model_group
+from jarvis.jarvis_utils.config import set_llm_group
 
 app = typer.Typer(help="Jarvis 代码助手")
 
@@ -307,12 +307,12 @@ class CodeAgent(Agent):
         if model_name:
             self.model.set_model_name(model_name)
 
-        self.model.set_model_group(model_group)
+        self.model.set_llm_group(model_group)
         self.model.set_suppress_output(False)
 
         self.model.agent = self
 
-        set_model_group(model_group)
+        set_llm_group(model_group)
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理.

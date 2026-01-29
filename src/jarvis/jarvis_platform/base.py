@@ -627,7 +627,7 @@ class BasePlatform(ABC):
         """设置是否抑制输出"""
         self.suppress_output = suppress
 
-    def set_model_group(self, model_group: Optional[str]):
+    def set_llm_group(self, model_group: Optional[str]):
         """设置模型组"""
         self.model_group = model_group
 

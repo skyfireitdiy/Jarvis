@@ -16,7 +16,7 @@ from jarvis.jarvis_agent.task_list import TaskStatus
 from jarvis.jarvis_utils.config import (
     calculate_token_limit,
     get_max_input_token_count,
-    get_model_group,
+    get_llm_group,
 )
 from jarvis.jarvis_utils.tag import ot, ct
 from jarvis.jarvis_utils.git_utils import (
@@ -66,15 +66,15 @@ def _calculate_default_max_output_length(agent: Any = None) -> int:
                 max_input_tokens = (
                     agent.model.get_max_input_token_count()
                     if hasattr(agent.model, "get_max_input_token_count")
-                    else get_max_input_token_count(get_model_group())
+                    else get_max_input_token_count(get_llm_group())
                 )
             except Exception:
                 # 如果通过agent获取失败，使用当前配置
-                model_group = get_model_group()
+                model_group = get_llm_group()
                 max_input_tokens = get_max_input_token_count(model_group)
         else:
             # 没有agent时使用当前配置
-            model_group = get_model_group()
+            model_group = get_llm_group()
             max_input_tokens = get_max_input_token_count(model_group)
 
         # 计算1/3限制的token数（更保守的回退方案），然后转换为字符数
@@ -119,7 +119,7 @@ class task_list_manager:
 
             # 回退方案：使用输入窗口的2/3
             # 使用当前模型组（不再从 agent 继承）
-            model_group = get_model_group()
+            model_group = get_llm_group()
 
             max_input_tokens = get_max_input_token_count(model_group)
             # 计算2/3限制的token数，然后转换为字符数
@@ -309,7 +309,7 @@ class task_list_manager:
             Agent: 验证 Agent 实例
         """
         from jarvis.jarvis_agent import Agent
-        from jarvis.jarvis_utils.config import get_model_group
+        from jarvis.jarvis_utils.config import get_llm_group
 
         # 构建验证方法说明部分
         verification_method_section = ""
@@ -394,7 +394,7 @@ class task_list_manager:
 
         # 如果父 Agent 没有 model_group，才使用当前模型组
         if model_group is None:
-            model_group = get_model_group()
+            model_group = get_llm_group()
 
         verification_agent = Agent(
             system_prompt=verification_system_prompt,

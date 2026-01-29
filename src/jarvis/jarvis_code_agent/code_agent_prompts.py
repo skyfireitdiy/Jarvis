@@ -93,7 +93,7 @@ def classify_user_request(user_input: str, model_group: Optional[str] = None) ->
         
         if model_name:
             platform.set_model_name(model_name)
-        platform.set_model_group(model_group)
+        platform.set_llm_group(model_group)
         
         # 从文件加载场景类型定义
         scenarios = _load_scenario_types()

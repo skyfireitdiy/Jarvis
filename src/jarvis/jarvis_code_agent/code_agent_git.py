@@ -19,7 +19,7 @@ from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import get_commits_between
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
 from jarvis.jarvis_utils.git_utils import reset_confirm_add_new_files_flag
-from jarvis.jarvis_utils.config import get_model_group
+from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import OutputType
 
@@ -241,7 +241,7 @@ class GitManager:
                     "suffix": suffix,
                     "agent": agent,
                     # 使用当前模型组（不再从 agent 继承）
-                    "model_group": get_model_group(),
+                    "model_group": get_llm_group(),
                 }
             )
 
@@ -493,7 +493,7 @@ class GitManager:
                     "suffix": suffix,
                     "agent": agent,
                     # 使用当前模型组（不再从 agent 继承）
-                    "model_group": get_model_group(),
+                    "model_group": get_llm_group(),
                 }
             )
 

@@ -17,7 +17,7 @@ from jarvis.jarvis_utils.config import get_git_commit_prompt
 from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
-from jarvis.jarvis_utils.config import get_model_group
+from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
@@ -284,7 +284,7 @@ class GitCommitTool:
 
             try:
                 # 优先使用args中的model_group，否则使用当前模型组（不再从agent继承）
-                model_group = args.get("model_group") or get_model_group()
+                model_group = args.get("model_group") or get_llm_group()
 
                 # Get platform and model based on model_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import get_normal_model_name
@@ -314,7 +314,7 @@ class GitCommitTool:
                         platform.set_model_name(model_name)
                     if platform and model_group:
                         try:
-                            platform.set_model_group(model_group)
+                            platform.set_llm_group(model_group)
                         except Exception:
                             # 兼容早期实现
                             platform.model_group = model_group
