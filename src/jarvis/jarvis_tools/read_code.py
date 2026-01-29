@@ -57,10 +57,7 @@ class ReadCodeTool:
                     pass
 
             # 回退方案：使用输入窗口的2/3
-            # 使用当前模型组（不再从 agent 继承）
-            llm_group = get_llm_group()
-
-            max_input_tokens = get_max_input_token_count(llm_group)
+            max_input_tokens = get_max_input_token_count()
             # 计算1/2限制的token数
             limit_tokens = int(max_input_tokens * 1 / 2)
             return limit_tokens
