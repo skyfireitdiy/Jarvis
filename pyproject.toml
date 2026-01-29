@@ -67,7 +67,7 @@ dependencies = [
     requires-python = "==3.12.*"
 
     [project.optional-dependencies]
-    dev = ["pytest", "ruff", "mypy", "build", "twine"]
+    dev = ["pytest", "pytest-cov", "coverage", "pytest-xdist", "pytest-benchmark", "pytest-asyncio", "ruff", "mypy", "bandit", "build", "twine"]
     browser = ["playwright==1.48.0"]
     clang16 = ["clang==16.*"]
     clang17 = ["clang==17.*"]
@@ -118,6 +118,24 @@ dependencies = [
 
     [tool.mypy]
     ignore_missing_imports = true
+
+    [tool.pytest.ini_options]
+    minversion = "7.0"
+    addopts = "-ra -q --strict-markers --cov=src --cov-report=html --cov-report=term --cov-report=xml"
+    testpaths = ["tests"]
+    python_files = ["test_*.py", "*_test.py"]
+    python_classes = ["Test*"]
+    python_functions = ["test_*"]
+    markers = [
+        "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+        "integration: marks tests as integration tests",
+        "unit: marks tests as unit tests",
+        "smoke: marks tests as smoke tests",
+        "security: marks tests as security tests",
+        "performance: marks tests as performance tests",
+        "regression: marks tests as regression tests",
+        "monitoring: marks tests as monitoring tests",
+    ]
 
     [project.scripts]
     # Playwright 浏览器驱动安装脚本
