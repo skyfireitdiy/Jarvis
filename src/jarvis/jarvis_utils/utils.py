@@ -26,7 +26,11 @@ from rich.align import Align
 
 
 from jarvis import __version__
-from jarvis.jarvis_utils.config import get_data_dir, get_max_input_token_count
+from jarvis.jarvis_utils.config import (
+    get_data_dir,
+    get_max_input_token_count,
+    set_llm_group,
+)
 from jarvis.jarvis_utils.config import set_global_config_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_in_chat
@@ -750,6 +754,8 @@ def init_env(
     except Exception:
         # 静默失败，不影响正常使用
         pass
+
+    set_llm_group(llm_group)
 
     # 4. 显示历史统计数据（仅在显示欢迎信息时显示）
     # 使用延迟加载，避免阻塞初始化

@@ -80,28 +80,18 @@ def _get_scenario_types() -> Dict[str, str]:
 SCENARIO_TYPES = _get_scenario_types()
 
 
-def classify_user_request(user_input: str, llm_group: Optional[str] = None) -> str:
+def classify_user_request(user_input: str) -> str:
     """使用 normal_llm 对用户需求进行分类
 
     参数:
         user_input: 用户输入的需求描述
-        llm_group: 模型组配置
 
     返回:
         str: 场景类型（performance/bug_fix/warning/refactor/feature/default）
     """
     try:
         # 获取 normal_llm 平台
-        platform_name = get_normal_platform_name(llm_group)
-        model_name = get_normal_model_name(llm_group)
-        from jarvis.jarvis_utils.config import get_llm_config
-
-        llm_config = get_llm_config("normal", llm_group)
-        platform = PlatformRegistry().get_normal_platform(llm_group)
-
-        if model_name:
-            platform.set_model_name(model_name)
-        platform.set_llm_group(llm_group)
+        platform = PlatformRegistry().get_normal_platform()
 
         # 从文件加载场景类型定义
         scenarios = _load_scenario_types()
