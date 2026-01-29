@@ -20,7 +20,6 @@ class AgentManager:
 
     def __init__(
         self,
-        llm_group: Optional[str] = None,
         tool_group: Optional[str] = None,
         restore_session: bool = False,
         use_methodology: Optional[bool] = None,
@@ -32,7 +31,6 @@ class AgentManager:
         rule_names: Optional[str] = None,
         optimize_system_prompt: bool = False,
     ):
-        self.llm_group = llm_group
         self.tool_group = tool_group
         self.restore_session = restore_session
         self.use_methodology = use_methodology
@@ -56,7 +54,6 @@ class AgentManager:
 
         self.agent = Agent(
             system_prompt=origin_agent_system_prompt,
-            llm_group=self.llm_group,
             need_summary=False,
             use_methodology=self.use_methodology,
             use_analysis=self.use_analysis,

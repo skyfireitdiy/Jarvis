@@ -925,7 +925,6 @@ def run_cli(
     # 运行主流程
     try:
         agent_manager = AgentManager(
-            llm_group=llm_group,
             tool_group=tool_group,
             restore_session=restore_session,
             use_methodology=False if disable_methodology_analysis else None,
