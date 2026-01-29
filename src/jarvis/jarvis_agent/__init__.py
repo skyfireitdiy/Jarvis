@@ -754,6 +754,9 @@ class Agent:
 
     def _init_model(self, llm_group: Optional[str]) -> None:
         """初始化模型平台（统一使用 normal 平台/模型）"""
+        # 设置当前模型组，供工具和其他组件使用
+        set_llm_group(llm_group)
+        
         model_name = get_normal_model_name(llm_group)
 
         # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
@@ -767,9 +770,6 @@ class Agent:
 
         # 设置Agent引用，使Platform能够回调Agent方法（如自动总结）
         self.model.agent = self
-
-        # 设置当前模型组，供工具和其他组件使用
-        set_llm_group(llm_group)
 
     def _init_session(self) -> None:
         """初始化会话管理器"""
