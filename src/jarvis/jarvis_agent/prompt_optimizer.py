@@ -4,8 +4,6 @@
 该模块提供根据用户需求自动优化系统提示词的功能。
 """
 
-from typing import Optional
-
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.output import PrettyOutput

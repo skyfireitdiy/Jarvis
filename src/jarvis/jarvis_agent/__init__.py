@@ -65,11 +65,9 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 
 # jarvis_utils 相关
-from jarvis.jarvis_utils.config import get_addon_prompt_threshold, get_llm_group
+from jarvis.jarvis_utils.config import get_addon_prompt_threshold
 from jarvis.jarvis_utils.config import get_after_tool_call_cb_dirs
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_llm_config
-from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.config import get_tool_filter_threshold
 from jarvis.jarvis_utils.config import is_enable_memory_organizer

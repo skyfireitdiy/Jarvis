@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """jarvis_utils.utils 模块单元测试"""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from jarvis.jarvis_utils.utils import (
     is_editable_install,
