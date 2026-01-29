@@ -6,7 +6,7 @@ run.sh
 temp_scripts
 dist
 *egg-info.jarvis
-.jarvis
+# .jarvis
 !.jarvis/rule
 !.jarvis/rules
 jarvis_ai_assistant.egg-info
@@ -152,3 +152,9 @@ obj/
 
 # .NET
 /obj/
+coverage.xml
+.jarvis/build_validation_config.yaml
+.jarvis/.last_memory_organizer_check
+.jarvis/symbol_cache
+# General
+.jarvis
