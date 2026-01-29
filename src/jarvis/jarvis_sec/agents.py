@@ -86,7 +86,7 @@ def create_analysis_agent(
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
     if llm_group:
-        agent_kwargs["model_group"] = llm_group
+        agent_kwargs["llm_group"] = llm_group
     return Agent(**agent_kwargs)
 
 
@@ -113,7 +113,7 @@ def create_review_agent(
         use_tools=["read_code", "execute_script", "retrieve_memory", "save_memory"],
     )
     if llm_group:
-        review_agent_kwargs["model_group"] = llm_group
+        review_agent_kwargs["llm_group"] = llm_group
     return Agent(**review_agent_kwargs)
 
 
@@ -142,5 +142,5 @@ def create_cluster_agent(
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
     if llm_group:
-        agent_kwargs_cluster["model_group"] = llm_group
+        agent_kwargs_cluster["llm_group"] = llm_group
     return Agent(**agent_kwargs_cluster)

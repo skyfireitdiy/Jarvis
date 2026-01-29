@@ -968,7 +968,7 @@
 #### **🚀 新功能 (Features)**
 
 - **🎯 模型配置增强**
-  - **模型组参数支持**：为各 CLI 模块（jarvis、jarvis-code-agent、jarvis-multi-agent、jarvis-git-commiter）添加 model_group 参数支持，允许在命令行直接指定使用的模型组，覆盖配置文件中的设置，提升配置灵活性
+  - **模型组参数支持**：为各 CLI 模块（jarvis、jarvis-code-agent、jarvis-multi-agent、jarvis-git-commiter）添加 llm_group 参数支持，允许在命令行直接指定使用的模型组，覆盖配置文件中的设置，提升配置灵活性
   - **模型类型输出**：新增模型类型输出支持，在输出系统中添加模型类型相关的输出类型（START、TARGET、STOP、RETRY、ROLLBACK、DIRECTORY、STATISTICS），丰富输出样式和语义，提升输出可读性
 
 #### **🔧 优化与重构 (Refactors & Improvements)**
@@ -1678,7 +1678,7 @@
 #### **🔧 优化与重构 (Refactors & Improvements)**
 
 - **平台与配置系统重构**
-  - **模型平台初始化优化**：移除冗余的 `get_llm_config` 调用和平台名称变量，直接使用 PlatformRegistry 的统一接口；调整方法论加载逻辑以支持传入 `model_group` 参数，确保模型选择与配置一致性；统一平台获取方式，使用 `get_*_platform` 方法替代直接 `create_platform`
+  - **模型平台初始化优化**：移除冗余的 `get_llm_config` 调用和平台名称变量，直接使用 PlatformRegistry 的统一接口；调整方法论加载逻辑以支持传入 `llm_group` 参数，确保模型选择与配置一致性；统一平台获取方式，使用 `get_*_platform` 方法替代直接 `create_platform`
   - **配置处理逻辑改进**：移除模型配置环境变量覆盖功能，简化配置处理逻辑；重构配置处理流程，优先从 `llm_config` 直接获取配置而不污染环境变量；统一为所有模型创建流程注入 `llm_config`，确保 PlatformRegistry.create_platform 时传入正确的 API base 与 API key
 
 - **代码质量提升**
@@ -1686,7 +1686,7 @@
   - **系统提示词统一**：统一系统提示词构建逻辑并清理冗余代码，简化模型平台初始化逻辑，直接使用 `get_normal_platform` 替代原来的创建回退逻辑
 
 - **任务列表管理器优化**
-  - **模型组获取优化**：优化模型组获取逻辑，优先从父 Agent 获取 `model_group`，解决全局模型组可能存在的时序问题；只有当父 Agent 不存在 `model_group` 时才回退到全局模型组
+  - **模型组获取优化**：优化模型组获取逻辑，优先从父 Agent 获取 `llm_group`，解决全局模型组可能存在的时序问题；只有当父 Agent 不存在 `llm_group` 时才回退到全局模型组
   - **任务内容构建重构**：重构任务内容构建逻辑并统一验证流程，提升代码可维护性
 
 #### **📚 文档更新 (Documentation)**
@@ -3151,7 +3151,7 @@
 - 新增命令行参数 `--disable-methodology-analysis`（简写 `-D`），支持一键禁用方法论和任务分析功能
 - Agent 启动统计信息新增展示平台名称，提升多平台使用时的识别度
 - 子 Agent（sub_agent/sub_code_agent）新增模型有效性校验与自动回退机制，增强模型兼容性
-- Git 提交工具新增对 `model_group` 参数的支持，完善代码代理的模型上下文传递
+- Git 提交工具新增对 `llm_group` 参数的支持，完善代码代理的模型上下文传递
 
 #### **修复 (Fixes)**
 
@@ -4038,7 +4038,7 @@
   - 修复文件锁兼容性问题，使用临时文件+原子重命名替代fcntl
   - 修复编码问题，为所有subprocess调用添加encoding和errors参数
   - 修复 Windows 下 PrettyOutput 配置问题
-- 修正命令行参数名称从 `--model_group` 到 `--llm_group`
+- 修正命令行参数名称从 `--llm_group` 到 `--llm_group`
 
 #### **优化与重构 (Refactors & Improvements)**
 
@@ -4160,7 +4160,7 @@
 #### **优化与重构 (Refactors & Improvements)**
 
 - **配置加载逻辑重构**: 重构了底层的配置加载系统，以完全支持LLM组的优先级覆盖规则（独立配置 > LLM组配置 > 默认值）。
-- **Agent初始化流程优化**: 优化了 `Agent` 和 `CodeAgent` 的初始化逻辑，现在会根据指定的 `model_group` 来加载对应的平台、模型和Token配置。
+- **Agent初始化流程优化**: 优化了 `Agent` 和 `CodeAgent` 的初始化逻辑，现在会根据指定的 `llm_group` 来加载对应的平台、模型和Token配置。
 - **全局Agent管理**: 改进了全局Agent的注册机制，现在可以获取到Agent实例本身，使得内部模块（如代码审查、Git提交）可以继承和使用调用方Agent的模型配置。
 
 #### **文档更新 (Documentation)**

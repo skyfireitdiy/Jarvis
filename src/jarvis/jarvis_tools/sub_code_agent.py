@@ -95,7 +95,7 @@ class SubCodeAgentTool:
                 else None
             )
             # 使用当前模型组（不再从 parent_agent 继承）
-            model_group = get_llm_group()
+            llm_group = get_llm_group()
             use_tools: List[str] = []
             try:
                 if parent_agent is not None:
@@ -156,7 +156,7 @@ class SubCodeAgentTool:
             try:
                 code_agent = CodeAgent(
                     name=agent_name,
-                    model_group=model_group,
+                    llm_group=llm_group,
                     need_summary=True,
                     append_tools=append_tools,
                     tool_group=tool_group,

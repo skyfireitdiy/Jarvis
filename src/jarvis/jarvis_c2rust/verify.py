@@ -338,7 +338,7 @@ def _run_alignment_analysis(
     agent = Agent(
         name="C2Rust-VerificationAgent",
         non_interactive=non_interactive,
-        model_group=llm_group,
+        llm_group=llm_group,
         system_prompt=system_prompt,
         summary_prompt=summary_prompt,
     )
@@ -611,7 +611,7 @@ def _run_optimization(
         name="C2Rust-OptimizationAgent",
         need_summary=False,
         non_interactive=non_interactive,
-        model_group=llm_group,
+        llm_group=llm_group,
         append_tools="read_symbols",  # 添加 read_symbols 工具用于读取 C 符号信息
     )
 

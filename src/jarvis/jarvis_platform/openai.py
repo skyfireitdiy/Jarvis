@@ -20,16 +20,16 @@ class OpenAIModel(BasePlatform):
     def __init__(
         self,
         platform_type: str = "normal",
-        model_group: Optional[str] = None,
+        llm_group: Optional[str] = None,
     ):
         """
         Initialize OpenAI model
 
         参数:
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
-            model_group: 模型组名称，用于从配置中获取对应的 llm_config
+            llm_group: 模型组名称，用于从配置中获取对应的 llm_config
         """
-        super().__init__(platform_type=platform_type, model_group=model_group)
+        super().__init__(platform_type=platform_type, llm_group=llm_group)
         self.system_message = ""
         llm_config = self._llm_config or {}
 

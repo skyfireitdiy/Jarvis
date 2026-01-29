@@ -185,7 +185,7 @@ def _load_all_methodologies() -> List[Tuple[str, str]]:
 def load_methodology(
     user_input: str,
     tool_registery: Optional[Any] = None,
-    model_group: Optional[str] = None,
+    llm_group: Optional[str] = None,
 ) -> str:
     """
     加载方法论并上传到大模型。
@@ -193,7 +193,7 @@ def load_methodology(
     参数：
         user_input: 用户输入文本，用于提示大模型
         tool_registery: 工具注册表，用于获取工具列表
-        model_group (str, optional): 指定的模型组. Defaults to None.
+        llm_group (str, optional): 指定的模型组. Defaults to None.
 
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串
@@ -211,7 +211,7 @@ def load_methodology(
         PrettyOutput.auto_print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
         # 方法论推荐使用normal模型以确保质量
-        platform = PlatformRegistry().get_normal_platform(model_group)
+        platform = PlatformRegistry().get_normal_platform(llm_group)
 
         if not platform:
             PrettyOutput.auto_print("❌ 无法创建平台实例")

@@ -317,7 +317,7 @@ class PlanningManager:
                 agent = Agent(
                     system_prompt=sys_p,
                     name=agent_name,
-                    model_group=self.llm_group,
+                    llm_group=self.llm_group,
                     summary_prompt=sum_p,
                     need_summary=True,
                     auto_complete=True,

@@ -190,13 +190,13 @@ class PlatformRegistry:
         platform = self.create_platform(
             platform_name,
             platform_type="normal",
-            model_group=model_group_override,
+            llm_group=model_group_override,
             silent=True,
         )
         if platform is None:
             raise RuntimeError(
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）。"
-                f"model_group={model_group_override}"
+                f"llm_group={model_group_override}"
             )
         return platform
 
@@ -210,7 +210,7 @@ class PlatformRegistry:
         platform = self.create_platform(
             platform_name,
             platform_type="cheap",
-            model_group=model_group_override,
+            llm_group=model_group_override,
             silent=True,
         )
         if platform is None:
@@ -229,7 +229,7 @@ class PlatformRegistry:
         platform = self.create_platform(
             platform_name,
             platform_type="smart",
-            model_group=model_group_override,
+            llm_group=model_group_override,
             silent=True,
         )
         if platform is None:
@@ -251,7 +251,7 @@ class PlatformRegistry:
         self,
         name: str,
         platform_type: str = "normal",
-        model_group: Optional[str] = None,
+        llm_group: Optional[str] = None,
         silent: bool = False,
     ) -> Optional[BasePlatform]:
         """Create platform instance
@@ -259,7 +259,7 @@ class PlatformRegistry:
         Args:
             name: Platform name
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
-            model_group: 模型组名称，用于从配置中获取对应的 llm_config
+            llm_group: 模型组名称，用于从配置中获取对应的 llm_config
             silent: 如果为 True，失败时不打印错误信息（默认 False，保持向后兼容）
 
         Returns:
@@ -272,7 +272,7 @@ class PlatformRegistry:
 
         try:
             platform = self.platforms[name](
-                platform_type=platform_type, model_group=model_group
+                platform_type=platform_type, llm_group=llm_group
             )
             return platform
         except Exception as e:

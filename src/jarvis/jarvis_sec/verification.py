@@ -582,7 +582,7 @@ def process_verification_batch(
                     use_tools=["read_code", "execute_script", "retrieve_memory"],
                 )
                 if llm_group:
-                    verification_agent_kwargs["model_group"] = llm_group
+                    verification_agent_kwargs["llm_group"] = llm_group
                 verification_agent = Agent(**verification_agent_kwargs)
 
                 # 构造验证任务上下文

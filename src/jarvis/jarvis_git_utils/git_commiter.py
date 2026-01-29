@@ -72,7 +72,7 @@ class GitCommitTool:
         self,
         git_diff: str,
         base_prompt: str,
-        model_group: Optional[str] = None,
+        llm_group: Optional[str] = None,
         platform: Optional[Any] = None,
         token_ratio: float = 0.5,
     ) -> str:
@@ -81,7 +81,7 @@ class GitCommitTool:
         参数:
             git_diff: 原始的 git diff 内容
             base_prompt: 基础提示词内容
-            model_group: 模型组名称（可选）
+            llm_group: 模型组名称（可选）
             platform: 平台实例（可选），如果提供则使用剩余token数量判断
             token_ratio: token 使用比例（默认 0.5，即 50%，考虑 base_prompt 和响应空间）
 
@@ -115,7 +115,7 @@ class GitCommitTool:
                     pass
 
             # 回退方案：使用输入窗口限制
-            max_input_tokens = get_max_input_token_count(model_group)
+            max_input_tokens = get_max_input_token_count(llm_group)
             # 预留一部分给 base_prompt 和响应，使用指定比例作为 diff 的限制
             max_diff_tokens = int(max_input_tokens * token_ratio)
             # 确保 diff 不超过输入窗口减去 base_prompt
@@ -284,20 +284,20 @@ class GitCommitTool:
 
             try:
                 # 优先使用args中的model_group，否则使用当前模型组（不再从agent继承）
-                model_group = args.get("model_group") or get_llm_group()
+                llm_group = args.get("llm_group") or get_llm_group()
 
-                # Get platform and model based on model_group (thinking mode removed)
+                # Get platform and model based on llm_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import get_normal_model_name
                 from jarvis.jarvis_utils.config import get_normal_platform_name
                 from jarvis.jarvis_utils.config import get_llm_config
 
                 # 始终使用normal模型生成提交信息，不从agent.model获取（避免使用smart模型）
-                # 优先根据 model_group 获取（确保配置一致性）
-                if model_group:
-                    platform_name = get_normal_platform_name(model_group)
-                    model_name = get_normal_model_name(model_group)
+                # 优先根据 llm_group 获取（确保配置一致性）
+                if llm_group:
+                    platform_name = get_normal_platform_name(llm_group)
+                    model_name = get_normal_model_name(llm_group)
                     # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
-                    llm_config = get_llm_config("normal", model_group)
+                    llm_config = get_llm_config("normal", llm_group)
                 else:
                     # 如果没有提供 model_group，直接使用配置文件中的默认normal模型
                     platform_name = get_normal_platform_name(None)
@@ -312,12 +312,12 @@ class GitCommitTool:
                     )
                     if platform and model_name:
                         platform.set_model_name(model_name)
-                    if platform and model_group:
+                    if platform and llm_group:
                         try:
-                            platform.set_llm_group(model_group)
+                            platform.set_llm_group(llm_group)
                         except Exception:
                             # 兼容早期实现
-                            platform.model_group = model_group
+                            platform.llm_group = llm_group
                 else:
                     platform = PlatformRegistry().get_normal_platform()
 
@@ -376,7 +376,7 @@ commit信息
                 upload_success = False
 
                 # Check if content is too large
-                is_large_content = is_context_overflow(diff, model_group, platform)
+                is_large_content = is_context_overflow(diff, llm_group, platform)
                 use_file_list = False
 
                 # 对于大内容，直接使用文件列表生成提交信息（不再支持文件上传）
@@ -390,7 +390,7 @@ commit信息
                 # 对 diff 进行截断处理，确保不会超出上下文限制
                 if not use_file_list:
                     truncated_diff = self._truncate_diff_for_commit(
-                        diff, base_prompt, model_group, platform, token_ratio=0.5
+                        diff, base_prompt, llm_group, platform, token_ratio=0.5
                     )
                     if not truncated_diff or truncated_diff != diff:
                         if not truncated_diff:
@@ -590,18 +590,18 @@ def cli(
         "--suffix",
         help="提交信息后缀（用换行分隔）",
     ),
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
 ):
-    init_env(model_group=model_group)
+    init_env(llm_group=llm_group)
     tool = GitCommitTool()
     tool.execute(
         {
             "root_dir": root_dir,
             "prefix": prefix,
             "suffix": suffix,
-            "model_group": model_group,
+            "llm_group": llm_group,
         }
     )
 

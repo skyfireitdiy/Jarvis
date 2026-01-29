@@ -27,7 +27,7 @@ from rich.align import Align
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import get_data_dir, get_max_input_token_count
-from jarvis.jarvis_utils.config import set_global_env_data
+from jarvis.jarvis_utils.config import set_global_config_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_in_chat
 from jarvis.jarvis_utils.globals import get_interrupt
@@ -692,7 +692,7 @@ def _show_usage_stats(
 def init_env(
     welcome_str: str = "",
     config_file: Optional[str] = None,
-    model_group: Optional[str] = None,
+    llm_group: Optional[str] = None,
     auto_upgrade: bool = True,
 ) -> None:
     """初始化Jarvis环境
@@ -700,7 +700,7 @@ def init_env(
     参数:
         welcome_str: 欢迎信息字符串
         config_file: 配置文件路径，默认为None(使用~/.jarvis/config.yaml)
-        model_group: 模型组覆盖参数，用于显示用户指定的模型组
+        llm_group: 模型组覆盖参数，用于显示用户指定的模型组
         auto_upgrade: 是否自动检查并升级Jarvis，默认为True
     """
     # 0. 检查是否处于Jarvis打开的终端环境，避免嵌套
@@ -760,7 +760,7 @@ def init_env(
 
             def show_stats_async() -> None:
                 try:
-                    _show_usage_stats(welcome_str, model_group)
+                    _show_usage_stats(welcome_str, llm_group)
                 except Exception:
                     pass
 
@@ -883,7 +883,7 @@ def load_config() -> None:
                 _ensure_schema_declaration(
                     main_config_dir, main_config_file, content, merged_config
                 )
-                set_global_env_data(merged_config)
+                set_global_config_data(merged_config)
                 _process_env_variables(merged_config)
             except Exception:
                 from jarvis.jarvis_utils.input import user_confirm as get_yes_no
@@ -1024,7 +1024,7 @@ def _load_and_process_config(jarvis_dir: str, config_file: str) -> None:
     try:
         content, config_data = _load_config_file(config_file)
         _ensure_schema_declaration(jarvis_dir, config_file, content, config_data)
-        set_global_env_data(config_data)
+        set_global_config_data(config_data)
         _process_env_variables(config_data)
     except Exception:
         PrettyOutput.auto_print("❌ 加载配置文件失败")
@@ -1197,7 +1197,7 @@ def _read_old_config_file(config_file: Union[str, Path]) -> None:
         os.environ.update(
             {str(k): str(v) for k, v in config_data.items() if v is not None}
         )
-        set_global_env_data(config_data)
+        set_global_config_data(config_data)
     PrettyOutput.auto_print(
         "⚠️ 检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式"
     )

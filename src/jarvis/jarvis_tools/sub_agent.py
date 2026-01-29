@@ -144,7 +144,7 @@ class SubAgentTool:
                 system_prompt=system_prompt,
                 name=agent_name,
                 description="Temporary sub agent for executing a subtask",
-                model_group=parent_model_group,
+                llm_group=parent_model_group,
                 summary_prompt=summary_prompt,
                 auto_complete=True,
                 use_tools=None,
