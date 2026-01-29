@@ -188,7 +188,6 @@ class PlatformRegistry:
 
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
         platform = self.create_platform(
-            platform_name,
             platform_type="normal",
             silent=True,
         )
@@ -206,7 +205,6 @@ class PlatformRegistry:
 
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
         platform = self.create_platform(
-            platform_name,
             platform_type="cheap",
             silent=True,
         )
@@ -224,7 +222,6 @@ class PlatformRegistry:
 
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
         platform = self.create_platform(
-            platform_name,
             platform_type="smart",
             silent=True,
         )
@@ -245,7 +242,6 @@ class PlatformRegistry:
 
     def create_platform(
         self,
-        name: str,
         platform_type: str = "normal",
         silent: bool = False,
     ) -> Optional[BasePlatform]:
@@ -260,10 +256,12 @@ class PlatformRegistry:
         Returns:
             BasePlatform: Platform instance
         """
-        if name not in self.platforms:
-            if not silent:
-                PrettyOutput.auto_print(f"⚠️ 未找到平台: {name}")
-            return None
+        if platform_type == "smart":
+            name = get_smart_platform_name()
+        elif platform_type == "cheap":
+            name = get_cheap_platform_name()
+        else:
+            name = get_normal_platform_name()
 
         try:
             platform = self.platforms[name](

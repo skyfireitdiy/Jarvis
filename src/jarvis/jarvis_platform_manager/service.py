@@ -124,7 +124,7 @@ def start_service(
         """Get or create a platform instance."""
         key = f"{platform_name}:{model_name}"
         if key not in platform_instances:
-            platform = registry.create_platform(platform_name)
+            platform = registry.get_normal_platform()
             if not platform:
                 raise HTTPException(
                     status_code=400, detail=f"Platform {platform_name} not found"
@@ -167,7 +167,7 @@ def start_service(
         # Only get models for the currently set platform
         if default_platform:
             try:
-                platform = registry.create_platform(default_platform)
+                platform = registry.get_normal_platform()
                 if platform:
                     models = platform.get_model_list()
                     if models:

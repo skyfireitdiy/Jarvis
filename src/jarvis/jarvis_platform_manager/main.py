@@ -22,7 +22,12 @@ import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.service import start_service
-from jarvis.jarvis_utils.config import get_llm_config, get_llm_group, get_smart_platform_name, set_llm_group
+from jarvis.jarvis_utils.config import (
+    get_llm_config,
+    get_llm_group,
+    get_smart_platform_name,
+    set_llm_group,
+)
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.fzf import fzf_select
@@ -61,9 +66,7 @@ def list_platforms(
 
         # 使用配置创建平台实例并显示详细信息
         try:
-            platform_instance = registry.create_platform(
-                platform_name, "normal"
-            )
+            platform_instance = registry.create_platform("normal")
             if platform_instance:
                 models = platform_instance.get_model_list()
                 PrettyOutput.auto_print(f"✅ {platform_name}")
@@ -92,9 +95,7 @@ def list_platforms(
 
         # 显示默认平台的详细信息
         try:
-            platform_instance = registry.create_platform(
-                platform_name, "normal"
-            )
+            platform_instance = registry.create_platform("normal")
             if platform_instance:
                 models = platform_instance.get_model_list()
                 PrettyOutput.auto_print(f"✅ {platform_name} 平台详情")
@@ -132,7 +133,7 @@ def chat_with_model(
     model_name = get_normal_model_name()
 
     # Create platform instance
-    platform = registry.create_platform(platform_name, "normal")
+    platform = registry.create_platform("normal")
     if platform:
         platform.set_model_name(model_name)
 
