@@ -1,0 +1,2 @@
+# yaml-language-server: $schema=../src/jarvis/jarvis_data/config_schema.json
+enable_tmux: true
