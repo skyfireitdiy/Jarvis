@@ -194,7 +194,6 @@ class PromptManager:
 </system_info>"""
         )
 
-
     def build_default_addon_prompt(self, need_complete: bool) -> str:
         """
         构建默认附加提示词（与 Agent.make_default_addon_prompt 行为保持一致）。

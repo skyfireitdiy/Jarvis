@@ -810,8 +810,7 @@ class Agent:
 
             # 优化系统提示词
             optimized_prompt = optimize_system_prompt(
-                current_system_prompt=current_prompt,
-                user_requirement=user_requirement
+                current_system_prompt=current_prompt, user_requirement=user_requirement
             )
 
             # 更新系统提示词
@@ -2463,7 +2462,9 @@ class Agent:
         """
         # 使用与调用方相同的模型配置
 
-        temp_model = PlatformRegistry().create_platform(self.model.platform_name(), self.model.platform_type, self.model.llm_group)
+        temp_model = PlatformRegistry().create_platform(
+            self.model.platform_name(), self.model.platform_type, self.model.llm_group
+        )
         if not temp_model:
             raise RuntimeError("创建临时模型失败。")
 
@@ -2471,37 +2472,6 @@ class Agent:
             temp_model.set_system_prompt(system_prompt)
         temp_model.set_suppress_output(False)  # 关闭抑制输出，显示压缩过程
         return temp_model
-
-    def _build_child_agent_params(self, name: str, description: str) -> Dict[str, Any]:
-        """构建子Agent参数，尽量继承父Agent配置，并确保子Agent非交互自动完成。"""
-        use_tools_param: Optional[List[str]] = None
-        try:
-            tr = self.get_tool_registry()
-            if isinstance(tr, ToolRegistry):
-                selected_tools = tr.get_all_tools()
-                use_tools_param = [t["name"] for t in selected_tools]
-        except Exception:
-            use_tools_param = None
-
-        return {
-            "system_prompt": origin_agent_system_prompt,
-            "name": name,
-            "description": description,
-            "llm_group": self.llm_group,
-            "summary_prompt": self.summary_prompt,
-            "auto_complete": True,
-            "use_tools": use_tools_param,
-            "execute_tool_confirm": self.execute_tool_confirm,
-            "need_summary": self.need_summary,
-            "multiline_inputer": self.multiline_inputer,
-            "use_methodology": self.use_methodology,
-            "use_analysis": self.use_analysis,
-            "force_save_memory": self.force_save_memory,
-            "files": self.files,
-            "confirm_callback": self.confirm_callback,
-            "non_interactive": True,
-            "in_multi_agent": True,
-        }
 
     def _filter_tools_if_needed(self, task: str) -> None:
         """如果工具数量超过阈值，使用大模型筛选相关工具

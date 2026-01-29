@@ -754,9 +754,7 @@ class EditFileNormalTool:
                     )
 
                     if not (
-                        agent
-                        and agent.agent_type() == "code_agent"
-                        and in_workspace
+                        agent and agent.agent_type() == "code_agent" and in_workspace
                     ):
                         try:
                             # 生成 diff

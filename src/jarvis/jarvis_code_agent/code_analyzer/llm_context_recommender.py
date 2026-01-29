@@ -33,9 +33,7 @@ class ContextRecommender:
     完全基于LLM实现，提供语义级别的推荐，而非简单的关键词匹配。
     """
 
-    def __init__(
-        self, context_manager: ContextManager
-    ):
+    def __init__(self, context_manager: ContextManager):
         """初始化上下文推荐器
 
         Args:

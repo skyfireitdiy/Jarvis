@@ -216,16 +216,16 @@ def check_and_launch_tmux(
     # 检查配置中是否启用了tmux
     # 使用模块引用而不是导入，确保获取最新的 GLOBAL_CONFIG_DATA
     import jarvis.jarvis_utils.config as config_module
-    
+
     # 如果配置尚未加载，尝试加载配置
     if not config_module.GLOBAL_CONFIG_DATA:
         try:
             from jarvis.jarvis_utils.utils import load_config as _load_config
             import jarvis.jarvis_utils.utils as utils_module
-            
+
             # 如果提供了 config_file，临时设置全局配置文件名
             if config_file is not None:
-                original_config_file = getattr(utils_module, 'g_config_file', None)
+                original_config_file = getattr(utils_module, "g_config_file", None)
                 utils_module.g_config_file = config_file
                 try:
                     _load_config()

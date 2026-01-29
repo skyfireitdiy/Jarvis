@@ -135,7 +135,7 @@ def chat_with_model(
     llm_config = get_llm_config("normal", llm_group)
 
     # Create platform instance
-    platform = registry.create_platform(platform_name, llm_config)
+    platform = registry.create_platform(platform_name, "normal", llm_group)
     if platform:
         platform.set_model_name(model_name)
 
