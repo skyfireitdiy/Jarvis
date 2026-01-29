@@ -179,9 +179,7 @@ class PlatformRegistry:
             ) in PlatformRegistry.load_platform_from_dir(platform_dir).items():
                 self.register_platform(platform_name, platform_class)
 
-    def get_normal_platform(
-        self, model_group_override: Optional[str] = None
-    ) -> BasePlatform:
+    def get_normal_platform(self) -> BasePlatform:
         """获取正常操作的平台实例"""
         platform_name = get_normal_platform_name()
 
@@ -196,11 +194,9 @@ class PlatformRegistry:
             )
         return platform
 
-    def get_cheap_platform(
-        self, model_group_override: Optional[str] = None
-    ) -> BasePlatform:
+    def get_cheap_platform(self) -> BasePlatform:
         """获取廉价操作的平台实例"""
-        platform_name = get_cheap_platform_name(model_group_override)
+        platform_name = get_cheap_platform_name()
 
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
         platform = self.create_platform(
@@ -213,11 +209,9 @@ class PlatformRegistry:
             )
         return platform
 
-    def get_smart_platform(
-        self, model_group_override: Optional[str] = None
-    ) -> BasePlatform:
+    def get_smart_platform(self) -> BasePlatform:
         """获取智能操作的平台实例"""
-        platform_name = get_smart_platform_name(model_group_override)
+        platform_name = get_smart_platform_name()
 
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
         platform = self.create_platform(
