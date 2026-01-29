@@ -339,12 +339,7 @@ class AgentRunLoop:
                         import jarvis.jarvis_utils.globals as G
 
                         # 获取模型名称：优先使用model.get_model_name()，如果不存在则回退到'LLM'
-                        model_name = (
-                            ag.model.get_model_name()
-                            if hasattr(ag.model, "get_model_name")
-                            and hasattr(ag.model, "model_name")
-                            else "LLM"
-                        )
+                        model_name = ag.model.model_name
                         title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{model_name}[/bold cyan]"
                         PrettyOutput.print_markdown(
                             filtered_response, title=title, border_style="bright_blue"

@@ -1406,8 +1406,7 @@ class Agent:
                 try:
                     import jarvis.jarvis_utils.globals as G
 
-                    agent_name = self.name if hasattr(self, "name") else None
-                    title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 对话总结[/bold cyan]"
+                    title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.model.model_name or 'LLM'} 对话总结[/bold cyan]"
                     PrettyOutput.print_markdown(
                         summary, title=title, border_style="cyan"
                     )
@@ -1436,8 +1435,7 @@ class Agent:
         try:
             import jarvis.jarvis_utils.globals as G
 
-            agent_name = self.name if hasattr(self, "name") else None
-            title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} {compression_type}摘要[/bold cyan]"
+            title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.model.model_name or 'LLM'} {compression_type}摘要[/bold cyan]"
             PrettyOutput.print_markdown(summary, title=title, border_style="cyan")
         except Exception:
             # 如果格式化输出失败，回退到简单打印
@@ -2092,8 +2090,7 @@ class Agent:
                 try:
                     import jarvis.jarvis_utils.globals as G
 
-                    agent_name = self.name if hasattr(self, "name") else None
-                    title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{agent_name or 'LLM'} 任务总结[/bold cyan]"
+                    title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{self.model.model_name or 'LLM'} 任务总结[/bold cyan]"
                     PrettyOutput.print_markdown(
                         ret, title=title, border_style="bright_green"
                     )
