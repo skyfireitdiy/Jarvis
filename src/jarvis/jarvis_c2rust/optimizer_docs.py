@@ -104,7 +104,6 @@ class DocsOptimizer:
                 name="DocumentationAgent",
                 need_summary=False,
                 non_interactive=self.options.non_interactive,
-                
                 enable_task_list_manager=False,
                 disable_review=True,
             )

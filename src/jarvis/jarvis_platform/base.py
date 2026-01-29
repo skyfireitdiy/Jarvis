@@ -626,7 +626,6 @@ class BasePlatform(ABC):
         """设置是否抑制输出"""
         self.suppress_output = suppress
 
-
     def set_platform_type(self, platform_type: str):
         """设置平台类型
 

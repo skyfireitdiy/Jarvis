@@ -506,7 +506,6 @@ def get_modified_files_from_git(
 def truncate_git_diff_with_context_limit(
     git_diff: str,
     agent: Optional[Any] = None,
-    
     token_ratio: float = 0.3,
     base_commit: Optional[str] = None,
     crate_dir: Optional[Path] = None,

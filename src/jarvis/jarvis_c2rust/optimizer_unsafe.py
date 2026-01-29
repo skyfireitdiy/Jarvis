@@ -193,7 +193,6 @@ class UnsafeOptimizer:
                     name=f"UnsafeCleanupAgent-iter{iteration}",
                     need_summary=False,
                     non_interactive=self.options.non_interactive,
-                    
                     enable_task_list_manager=False,
                     disable_review=True,
                 )
