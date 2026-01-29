@@ -594,7 +594,6 @@ class Agent:
             ""  # 记录最近一次LLM响应内容（用于手动修复等操作）
         )
         self._agent_type = "normal"
-        self._model_type = "normal"  # 模型类型：normal/cheap/smart
 
     def _init_user_interaction(
         self,
@@ -2468,17 +2467,11 @@ class Agent:
                           则无需传入此参数（set_messages 会覆盖此处设置的系统提示词）。
         """
         # 使用与调用方相同的模型配置
-        platform_name = self.model.platform_name()
-        model_name = self.model.name()
-        # 获取当前模型的 llm_config，确保使用正确的 API base 和 API key
-        # 使用 _model_type（normal/cheap/smart）而不是 platform_name（openai/claude等）
-        llm_config = get_llm_config(self._model_type, self.model_group)
 
-        temp_model = PlatformRegistry().create_platform(platform_name, llm_config)
+        temp_model = PlatformRegistry().create_platform(self.model.platform_name(), self.model.platform_type, self.model.model_group)
         if not temp_model:
             raise RuntimeError("创建临时模型失败。")
 
-        temp_model.set_model_name(model_name)
         if system_prompt:
             temp_model.set_system_prompt(system_prompt)
         temp_model.set_suppress_output(False)  # 关闭抑制输出，显示压缩过程
