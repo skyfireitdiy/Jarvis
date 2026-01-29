@@ -18,7 +18,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
 from jarvis.jarvis_utils.config import get_cheap_model_name
 from jarvis.jarvis_utils.config import get_cheap_platform_name
-from jarvis.jarvis_utils.config import get_model_group
+from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
 
 from .context_manager import ContextManager
@@ -53,7 +53,7 @@ class ContextRecommender:
         self._platform_name = None
         self._model_name = None
         # 使用当前模型组（不再从 parent_model 继承）
-        self._model_group = get_model_group()
+        self._model_group = get_llm_group()
 
         # 根据 model_group 获取配置
         # 使用cheap平台，筛选操作可以降低成本
@@ -547,7 +547,7 @@ class ContextRecommender:
             # 先设置模型组（如果从父Agent获取到），因为 model_group 可能会影响模型名称的解析
             if self._model_group:
                 try:
-                    llm_model.set_model_group(self._model_group)
+                    llm_model.set_llm_group(self._model_group)
                 except Exception:
                     pass
 

@@ -24,7 +24,7 @@ from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import calculate_token_limit
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_model_group
+from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.config import get_tool_load_dirs
 
 # -*- coding: utf-8 -*-
@@ -1415,7 +1415,7 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 检查内容是否过大
             # 使用当前模型组（不再从 agent 继承）
-            model_group = get_model_group()
+            model_group = get_llm_group()
             platform = agent_instance.model if agent_instance.model else None
             is_large_content = is_context_overflow(output, model_group, platform)
 

@@ -45,7 +45,7 @@ def set_config(key: str, value: Any) -> None:
     GLOBAL_CONFIG_DATA[key] = value
 
 
-def get_model_group() -> Optional[str]:
+def get_llm_group() -> Optional[str]:
     """获取当前模型组名称
 
     返回:
@@ -55,7 +55,7 @@ def get_model_group() -> Optional[str]:
     return cast(Optional[str], value)
 
 
-def set_model_group(model_group: Optional[str]) -> None:
+def set_llm_group(model_group: Optional[str]) -> None:
     """设置当前模型组
 
     参数:
@@ -163,7 +163,7 @@ def calculate_content_token_limit(agent: Any = None) -> int:
 
         # 回退方案：使用输入窗口的2/3
         # 使用当前模型组
-        model_group = get_model_group()
+        model_group = get_llm_group()
         max_input_tokens = get_max_input_token_count(model_group)
         # 计算2/3限制的token数
         return int(max_input_tokens * 2 / 3)

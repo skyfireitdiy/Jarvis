@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 from jarvis.jarvis_utils.config import (
     calculate_token_limit,
     get_max_input_token_count,
-    get_model_group,
+    get_llm_group,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -58,7 +58,7 @@ class ReadCodeTool:
 
             # 回退方案：使用输入窗口的2/3
             # 使用当前模型组（不再从 agent 继承）
-            model_group = get_model_group()
+            model_group = get_llm_group()
 
             max_input_tokens = get_max_input_token_count(model_group)
             # 计算1/2限制的token数
