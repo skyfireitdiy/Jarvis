@@ -104,7 +104,7 @@ class VisibilityOptimizer:
                 name="VisibilityOptimizer",
                 need_summary=False,
                 non_interactive=self.options.non_interactive,
-                llm_group=self.options.llm_group,
+                
                 enable_task_list_manager=False,
                 disable_review=True,
             )

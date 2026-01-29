@@ -411,7 +411,7 @@ def _get_resolved_model_config(
     from jarvis.jarvis_utils.output import PrettyOutput
 
     group_config = {}
-    model_group_name = model_group_override or GLOBAL_CONFIG_DATA.get("llm_group")
+    model_group_name = model_group_override or get_llm_group()
     # The format is an object: {'group_name': {...}, ...}
     model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
 

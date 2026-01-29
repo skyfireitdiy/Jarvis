@@ -53,7 +53,6 @@ class BasePlatform(ABC):
     def __init__(
         self,
         platform_type: str = "normal",
-        llm_group: Optional[str] = None,
         agent: Optional[Any] = None,
     ):
         """初始化模型
@@ -65,21 +64,21 @@ class BasePlatform(ABC):
         """
         self.suppress_output = True  # 添加输出控制标志
         self._saved = False
-        self.llm_group: Optional[str] = llm_group
+
         self._session_history_file: Optional[str] = None
         self.platform_type: str = platform_type  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
 
         # 根据 platform_type 获取对应的 model_name
         if platform_type == "cheap":
-            self.model_name = get_cheap_model_name(llm_group)
+            self.model_name = get_cheap_model_name()
         elif platform_type == "smart":
-            self.model_name = get_smart_model_name(llm_group)
+            self.model_name = get_smart_model_name()
         else:
-            self.model_name = get_normal_model_name(llm_group)
+            self.model_name = get_normal_model_name()
 
         # 获取 llm_config 供子类使用
-        self._llm_config = get_llm_config(platform_type, llm_group)
+        self._llm_config = get_llm_config(platform_type)
 
     def get_conversation_turn(self) -> int:
         """获取当前对话轮次数"""
@@ -643,11 +642,11 @@ class BasePlatform(ABC):
             int: 模型能处理的最大输入token数量
         """
         if self.platform_type == "cheap":
-            return get_cheap_max_input_token_count(self.llm_group)
+            return get_cheap_max_input_token_count()
         elif self.platform_type == "smart":
-            return get_smart_max_input_token_count(self.llm_group)
+            return get_smart_max_input_token_count()
         else:
-            return get_max_input_token_count(self.llm_group)
+            return get_max_input_token_count()
 
     def _append_session_history(self, user_input: str, model_output: str) -> None:
         """

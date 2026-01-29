@@ -742,12 +742,7 @@ git reset --hard {start_commit}
         from jarvis.jarvis_utils.config import get_max_input_token_count
 
         # 获取最大输入 token 数量
-        llm_group = self.model.llm_group if self.model else None
-        try:
-            max_input_tokens = get_max_input_token_count(llm_group)
-        except Exception:
-            # 如果获取失败，使用默认值（约 100000 tokens）
-            max_input_tokens = 100000
+        max_input_tokens = get_max_input_token_count()
 
         # 使用指定比例作为 diff 的 token 限制
         max_diff_tokens = int(max_input_tokens * token_ratio)
@@ -1133,7 +1128,6 @@ git reset --hard {start_commit}
             review_agent = Agent(
                 system_prompt=sys_prompt,
                 name=f"CodeReview-Agent-{iteration}",
-                llm_group=self.model.llm_group if self.model else None,
                 summary_prompt=sum_prompt,
                 need_summary=True,
                 auto_complete=True,

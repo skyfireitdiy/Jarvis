@@ -29,7 +29,7 @@ class PlanningManager:
         project_root: Path,
         crate_dir: Path,
         data_dir: Path,
-        llm_group: Optional[str],
+        
         plan_max_retries: int,
         non_interactive: bool,
         disabled_libraries: List[str],
@@ -49,7 +49,7 @@ class PlanningManager:
         self.project_root = project_root
         self.crate_dir = crate_dir
         self.data_dir = data_dir
-        self.llm_group = llm_group
+        
         self.plan_max_retries = plan_max_retries
         self.non_interactive = non_interactive
         self.disabled_libraries = disabled_libraries
@@ -317,7 +317,7 @@ class PlanningManager:
                 agent = Agent(
                     system_prompt=sys_p,
                     name=agent_name,
-                    llm_group=self.llm_group,
+                    
                     summary_prompt=sum_p,
                     need_summary=True,
                     auto_complete=True,

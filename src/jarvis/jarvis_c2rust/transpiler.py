@@ -53,6 +53,7 @@ from jarvis.jarvis_c2rust.transpiler_symbols import SymbolMapper
 from jarvis.jarvis_c2rust.utils import check_and_handle_test_deletion
 from jarvis.jarvis_c2rust.utils import default_crate_dir
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_utils.config import get_llm_group
 
 
 class Transpiler:
@@ -60,7 +61,7 @@ class Transpiler:
         self,
         project_root: Union[str, Path] = ".",
         crate_dir: Optional[Union[str, Path]] = None,
-        llm_group: Optional[str] = None,
+        
         plan_max_retries: int = DEFAULT_PLAN_MAX_RETRIES,  # 规划阶段最大重试次数（0表示无限重试）
         max_retries: int = 0,  # 兼容旧接口，如未设置则使用 check_max_retries 和 test_max_retries
         check_max_retries: Optional[
@@ -85,7 +86,7 @@ class Transpiler:
         self.config_path = self.data_dir / CONFIG_JSON
         # JSONL 路径
         self.symbol_map_path = self.data_dir / SYMBOL_MAP_JSONL
-        self.llm_group = llm_group
+        
         self.plan_max_retries = plan_max_retries
         # 兼容旧接口：如果只设置了 max_retries，则同时用于 check 和 test
         if max_retries > 0 and check_max_retries is None and test_max_retries is None:
@@ -169,7 +170,7 @@ class Transpiler:
         self.agent_manager = AgentManager(
             self.crate_dir,
             self.project_root,
-            self.llm_group,
+            
             self.non_interactive,
             self.fn_index_by_id,
             self._get_crate_commit_hash,
@@ -182,7 +183,7 @@ class Transpiler:
             self.project_root,
             self.crate_dir,
             self.data_dir,
-            self.llm_group,
+            
             self.plan_max_retries,
             self.non_interactive,
             self.disabled_libraries,
@@ -225,7 +226,7 @@ class Transpiler:
         self.review_manager = ReviewManager(
             self.crate_dir,
             self.data_dir,
-            self.llm_group,
+            
             self.non_interactive,
             self.review_max_iterations,
             self.disabled_libraries,
@@ -253,7 +254,7 @@ class Transpiler:
         from jarvis.jarvis_utils.output import PrettyOutput
 
         PrettyOutput.auto_print(
-            f"📋 [c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={self.llm_group} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive} enable_ffi_export_validation={self.enable_ffi_export_validation}"
+            f"📋 [c2rust-transpiler][init] 初始化参数: project_root={self.project_root} crate_dir={self.crate_dir} llm_group={get_llm_group()} plan_max_retries={self.plan_max_retries} check_max_retries={self.check_max_retries} test_max_retries={self.test_max_retries} review_max_iterations={self.review_max_iterations} disabled_libraries={self.disabled_libraries} root_symbols={self.root_symbols} non_interactive={self.non_interactive} enable_ffi_export_validation={self.enable_ffi_export_validation}"
         )
         # 使用 JSONL 存储的符号映射
         self.symbol_map = _SymbolMapJsonl(self.symbol_map_path)
@@ -885,7 +886,6 @@ class Transpiler:
 def run_transpile(
     project_root: Union[str, Path] = ".",
     crate_dir: Optional[Union[str, Path]] = None,
-    llm_group: Optional[str] = None,
     plan_max_retries: int = DEFAULT_PLAN_MAX_RETRIES_ENTRY,
     max_retries: int = 0,  # 兼容旧接口
     check_max_retries: Optional[int] = None,
@@ -907,7 +907,6 @@ def run_transpile(
     t = Transpiler(
         project_root=project_root,
         crate_dir=crate_dir,
-        llm_group=llm_group,
         plan_max_retries=plan_max_retries,
         max_retries=max_retries,
         check_max_retries=check_max_retries,

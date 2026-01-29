@@ -25,8 +25,6 @@ class TestReadCodeTool:
         # 使用字典存储用户数据
         agent._user_data = {}
 
-        # 显式设置 llm_group 为 None，避免 MagicMock 自动创建属性
-        agent.llm_group = None
 
         # 显式设置 model 为 None，避免 MagicMock 自动创建属性导致 get_remaining_token_count 返回 MagicMock
         agent.model = None

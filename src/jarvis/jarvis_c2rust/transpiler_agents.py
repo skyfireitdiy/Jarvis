@@ -27,7 +27,7 @@ class AgentManager:
         self,
         crate_dir: Path,
         project_root: Path,
-        llm_group: Optional[str],
+        
         non_interactive: bool,
         fn_index_by_id: Dict[int, FnRecord],
         get_crate_commit_hash_func: Callable[[], str],
@@ -35,7 +35,7 @@ class AgentManager:
     ) -> None:
         self.crate_dir = crate_dir
         self.project_root = project_root
-        self.llm_group = llm_group
+        
         self.non_interactive = non_interactive
         self.fn_index_by_id = fn_index_by_id
         self.get_crate_commit_hash = get_crate_commit_hash_func
@@ -69,7 +69,7 @@ class AgentManager:
             name=agent_name,
             need_summary=False,
             non_interactive=self.non_interactive,
-            llm_group=self.llm_group,
+            
             append_tools="read_symbols",
             use_methodology=True,
             use_analysis=True,
@@ -140,7 +140,7 @@ class AgentManager:
             need_summary=need_summary,
             summary_prompt=summary_prompt,
             non_interactive=self.non_interactive,
-            llm_group=self.llm_group,
+            
             append_tools="read_symbols",
             use_methodology=True,
             use_analysis=True,
@@ -194,7 +194,7 @@ class AgentManager:
             name=agent_name,
             need_summary=False,
             non_interactive=self.non_interactive,
-            llm_group=self.llm_group,
+            
             append_tools="read_symbols",
             use_methodology=True,
             use_analysis=True,
