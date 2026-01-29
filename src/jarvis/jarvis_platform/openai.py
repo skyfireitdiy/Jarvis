@@ -8,6 +8,7 @@ from typing import Generator
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import cast
 
 from openai import OpenAI
 
@@ -241,8 +242,12 @@ class OpenAIModel(BasePlatform):
             full_response = ""
 
             for chunk in response:
-                if chunk.choices and len(chunk.choices) > 0:
-                    choice = chunk.choices[0]
+                # 使用类型注解明确chunk的类型，避免union类型错误
+                from openai.types.chat import ChatCompletionChunk
+
+                chunk_typed: ChatCompletionChunk = cast(ChatCompletionChunk, chunk)
+                if chunk_typed.choices and len(chunk_typed.choices) > 0:
+                    choice = chunk_typed.choices[0]
 
                     # 获取内容增量
                     if choice.delta and choice.delta.content:

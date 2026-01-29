@@ -79,8 +79,8 @@ def list_platforms(
         return
     else:
         # 获取默认模型组配置
-        platform_name = get_normal_platform_name(None)
-        default_model = get_normal_model_name(None)
+        platform_name = get_normal_platform_name()
+        default_model = get_normal_model_name()
 
         # 显示默认配置信息
         PrettyOutput.auto_print("✅ 默认配置信息:")
@@ -220,8 +220,8 @@ def chat_command(
     """与指定平台和模型聊天。"""
     # 从config获取默认值
     set_llm_group(llm_group)
-    platform = get_normal_platform_name(llm_group)
-    model = get_normal_model_name(llm_group)
+    platform = get_normal_platform_name()
+    model = get_normal_model_name()
 
     if not validate_platform_model(platform, model):
         return

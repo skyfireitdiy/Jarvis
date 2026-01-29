@@ -114,10 +114,7 @@ class task_list_manager:
                     pass
 
             # 回退方案：使用输入窗口的2/3
-            # 使用当前模型组（不再从 agent 继承）
-            llm_group = get_llm_group()
-
-            max_input_tokens = get_max_input_token_count(llm_group)
+            max_input_tokens = get_max_input_token_count()
             # 计算2/3限制的token数，然后转换为字符数
             limit_tokens = int(max_input_tokens * 2 / 3)
             limit_chars = limit_tokens * 4

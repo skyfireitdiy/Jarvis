@@ -53,13 +53,12 @@ class ContextRecommender:
 
         # 根据 llm_group 获取配置
         # 使用cheap平台，筛选操作可以降低成本
-        if self._model_group:
-            try:
-                self._platform_name = get_cheap_platform_name(self._model_group)
-                self._model_name = get_cheap_model_name(self._model_group)
-            except Exception:
-                # 如果从 llm_group 解析失败，使用默认配置
-                pass
+        try:
+            self._platform_name = get_cheap_platform_name()
+            self._model_name = get_cheap_model_name()
+        except Exception:
+            # 如果解析失败，使用默认配置
+            pass
 
     def recommend_context(
         self,
@@ -532,10 +531,8 @@ class ContextRecommender:
             registry = PlatformRegistry.get_global_platform_registry()
 
             # 创建平台实例（筛选操作始终使用cheap平台以降低成本）
-            # 如果没有指定平台，直接使用 get_cheap_platform
-            # 如果指定了平台，也直接使用 get_cheap_platform（因为筛选操作应该使用cheap平台）
-            # 这样可以避免先调用 create_platform 再回退导致的重复错误信息
-            llm_model = registry.get_cheap_platform(self._model_group)
+            # 使用 get_cheap_platform 获取平台实例
+            llm_model = registry.get_cheap_platform()
 
             if not llm_model:
                 raise ValueError("无法创建LLM模型实例")
