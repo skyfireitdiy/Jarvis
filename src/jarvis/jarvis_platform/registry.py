@@ -264,9 +264,7 @@ class PlatformRegistry:
             name = get_normal_platform_name()
 
         try:
-            platform = self.platforms[name](
-                platform_type=platform_type
-            )
+            platform = self.platforms[name](platform_type=platform_type)
             return platform
         except Exception as e:
             if not silent:
