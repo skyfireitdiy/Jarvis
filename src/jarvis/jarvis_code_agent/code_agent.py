@@ -298,6 +298,8 @@ class CodeAgent(Agent):
 
     def _init_model(self, llm_group: Optional[str]) -> None:
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
+        set_llm_group(llm_group)
+
         model_name = get_smart_model_name(llm_group)
 
         # 直接使用 get_smart_platform，避免先调用 create_platform 再回退导致的重复错误信息
@@ -311,8 +313,6 @@ class CodeAgent(Agent):
         self.model.set_suppress_output(False)
 
         self.model.agent = self
-
-        set_llm_group(llm_group)
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理.
