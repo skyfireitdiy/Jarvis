@@ -22,7 +22,7 @@ import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.service import start_service
-from jarvis.jarvis_utils.config import get_llm_config
+from jarvis.jarvis_utils.config import get_llm_config, get_llm_group
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.fzf import fzf_select
@@ -50,24 +50,23 @@ def list_platforms(
     # 获取默认模型组配置，或使用指定的模型组
     current_llm_group = llm_group
     if current_llm_group:
-        platform_from_config = get_normal_platform_name(current_llm_group)
-        model_from_config = get_normal_model_name(current_llm_group)
-        llm_config = get_llm_config("normal", current_llm_group)  # 获取完整配置
+        platform_name = get_normal_platform_name(current_llm_group)
+        model_name = get_normal_model_name(current_llm_group)
         PrettyOutput.auto_print(f"✅ 从模型组 '{current_llm_group}' 获取的配置信息:")
-        PrettyOutput.auto_print(f"  平台: {platform_from_config}")
-        PrettyOutput.auto_print(f"  模型: {model_from_config}")
+        PrettyOutput.auto_print(f"  平台: {platform_name}")
+        PrettyOutput.auto_print(f"  模型: {model_name}")
 
         # 只显示配置中指定的平台信息
-        platform_names = [platform_from_config]
+        platform_names = [platform_name]
 
         # 使用配置创建平台实例并显示详细信息
         try:
             platform_instance = registry.create_platform(
-                platform_from_config, llm_config
+                platform_name, "normal", current_llm_group
             )
             if platform_instance:
                 models = platform_instance.get_model_list()
-                PrettyOutput.auto_print(f"✅ {platform_from_config}")
+                PrettyOutput.auto_print(f"✅ {platform_name}")
                 if models:
                     for model_name, description in models:
                         if description:
@@ -77,29 +76,28 @@ def list_platforms(
                 else:
                     PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
             else:
-                PrettyOutput.auto_print(f"⚠️ 创建 {platform_from_config} 平台失败")
+                PrettyOutput.auto_print(f"⚠️ 创建 {platform_name} 平台失败")
         except Exception:
-            PrettyOutput.auto_print(f"⚠️ 创建 {platform_from_config} 平台失败")
+            PrettyOutput.auto_print(f"⚠️ 创建 {platform_name} 平台失败")
         return
     else:
         # 获取默认模型组配置
-        default_llm_group = get_normal_platform_name(None)
+        platform_name = get_normal_platform_name(None)
         default_model = get_normal_model_name(None)
 
         # 显示默认配置信息
         PrettyOutput.auto_print("✅ 默认配置信息:")
-        PrettyOutput.auto_print(f"  平台: {default_llm_group}")
+        PrettyOutput.auto_print(f"  平台: {platform_name}")
         PrettyOutput.auto_print(f"  模型: {default_model}")
 
         # 显示默认平台的详细信息
         try:
-            default_llm_config = get_llm_config("normal", None)
             platform_instance = registry.create_platform(
-                default_llm_group, default_llm_config
+                platform_name, "normal", get_llm_group()
             )
             if platform_instance:
                 models = platform_instance.get_model_list()
-                PrettyOutput.auto_print(f"✅ {default_llm_group} 平台详情")
+                PrettyOutput.auto_print(f"✅ {platform_name} 平台详情")
                 if models:
                     for model_name, description in models:
                         if description:
@@ -109,9 +107,9 @@ def list_platforms(
                 else:
                     PrettyOutput.auto_print("⚠️   • 没有可用的模型信息")
             else:
-                PrettyOutput.auto_print(f"⚠️ 创建 {default_llm_group} 平台失败")
+                PrettyOutput.auto_print(f"⚠️ 创建 {platform_name} 平台失败")
         except Exception:
-            PrettyOutput.auto_print(f"⚠️ 创建 {default_llm_group} 平台失败")
+            PrettyOutput.auto_print(f"⚠️ 创建 {platform_name} 平台失败")
         return
 
 
