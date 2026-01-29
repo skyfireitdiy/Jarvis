@@ -66,16 +66,12 @@ def _calculate_default_max_output_length(agent: Any = None) -> int:
                 max_input_tokens = (
                     agent.model.get_max_input_token_count()
                     if hasattr(agent.model, "get_max_input_token_count")
-                    else get_max_input_token_count(get_llm_group())
+                    else get_max_input_token_count()
                 )
             except Exception:
-                # 如果通过agent获取失败，使用当前配置
-                llm_group = get_llm_group()
-                max_input_tokens = get_max_input_token_count(llm_group)
+                max_input_tokens = get_max_input_token_count()
         else:
-            # 没有agent时使用当前配置
-            llm_group = get_llm_group()
-            max_input_tokens = get_max_input_token_count(llm_group)
+            max_input_tokens = get_max_input_token_count()
 
         # 计算1/3限制的token数（更保守的回退方案），然后转换为字符数
         limit_tokens = int(max_input_tokens * 1 / 3)
@@ -400,7 +396,6 @@ class task_list_manager:
             system_prompt=verification_system_prompt,
             name=f"verification_agent_{task.task_id}_{verification_iteration}",
             description="Task verification agent",
-            llm_group=llm_group,
             summary_prompt=verification_summary_prompt,
             auto_complete=True,
             need_summary=True,

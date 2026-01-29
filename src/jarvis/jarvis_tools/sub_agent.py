@@ -119,7 +119,7 @@ class SubAgentTool:
             # 基于父Agent（如有）继承部分配置后创建子Agent
             parent_agent = args.get("agent", None)
             # 使用当前模型组（不再从 parent_agent 继承）
-            parent_model_group = get_llm_group()
+            get_llm_group()
             parent_execute_tool_confirm = None
             parent_multiline_inputer = None
             parent_use_methodology = None
@@ -144,7 +144,6 @@ class SubAgentTool:
                 system_prompt=system_prompt,
                 name=agent_name,
                 description="Temporary sub agent for executing a subtask",
-                llm_group=parent_model_group,
                 summary_prompt=summary_prompt,
                 auto_complete=True,
                 use_tools=None,

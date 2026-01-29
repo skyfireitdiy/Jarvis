@@ -13,7 +13,6 @@ sub_code_agent 工具
 from typing import Any, Dict, List
 
 from jarvis.jarvis_code_agent.code_agent import CodeAgent
-from jarvis.jarvis_utils.config import get_llm_group
 
 
 class SubCodeAgentTool:
@@ -94,8 +93,7 @@ class SubCodeAgentTool:
                 if parent_agent is not None
                 else None
             )
-            # 使用当前模型组（不再从 parent_agent 继承）
-            llm_group = get_llm_group()
+
             use_tools: List[str] = []
             try:
                 if parent_agent is not None:
@@ -156,7 +154,6 @@ class SubCodeAgentTool:
             try:
                 code_agent = CodeAgent(
                     name=agent_name,
-                    llm_group=llm_group,
                     need_summary=True,
                     append_tools=append_tools,
                     tool_group=tool_group,

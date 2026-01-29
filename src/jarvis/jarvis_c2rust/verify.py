@@ -20,7 +20,6 @@ import json
 from pathlib import Path
 from typing import Any
 from typing import Dict
-from typing import Optional
 
 from jarvis.jarvis_c2rust.constants import CONFIG_JSON
 from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
@@ -84,7 +83,6 @@ def load_config(project_root: Path) -> Dict[str, Any]:
 
 def run_verify(
     project_root: Path,
-    llm_group: Optional[str] = None,
     max_iterations: int = 10,
     non_interactive: bool = True,
 ) -> None:
@@ -93,7 +91,6 @@ def run_verify(
 
     参数:
         project_root: 项目根目录
-        llm_group: LLM 模型组
         max_iterations: 最大迭代次数
         non_interactive: 是否非交互模式
     """
@@ -142,7 +139,6 @@ def run_verify(
             crate_dir=crate_dir,
             project_root=project_root,
             config=config,
-            llm_group=llm_group,
             non_interactive=non_interactive,
         )
 
@@ -176,7 +172,6 @@ def run_verify(
                 project_root=project_root,
                 report=alignment_result.get("report", ""),
                 config=config,
-                llm_group=llm_group,
                 non_interactive=non_interactive,
             )
 
@@ -186,7 +181,6 @@ def run_verify(
                 crate_dir=crate_dir,
                 project_root=project_root,
                 config=config,
-                llm_group=llm_group,
                 non_interactive=non_interactive,
             )
     finally:
@@ -197,7 +191,6 @@ def _run_alignment_analysis(
     crate_dir: Path,
     project_root: Path,
     config: Dict[str, Any],
-    llm_group: Optional[str],
     non_interactive: bool,
 ) -> Dict[str, Any]:
     """
@@ -338,7 +331,6 @@ def _run_alignment_analysis(
     agent = Agent(
         name="C2Rust-VerificationAgent",
         non_interactive=non_interactive,
-        llm_group=llm_group,
         system_prompt=system_prompt,
         summary_prompt=summary_prompt,
     )
@@ -591,7 +583,6 @@ def _run_optimization(
     project_root: Path,
     report: str,
     config: Dict[str, Any],
-    llm_group: Optional[str],
     non_interactive: bool,
 ) -> None:
     """
@@ -611,7 +602,6 @@ def _run_optimization(
         name="C2Rust-OptimizationAgent",
         need_summary=False,
         non_interactive=non_interactive,
-        llm_group=llm_group,
         append_tools="read_symbols",  # 添加 read_symbols 工具用于读取 C 符号信息
     )
 

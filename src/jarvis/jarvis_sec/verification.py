@@ -297,7 +297,6 @@ def process_verification_batch(
     total_batches: int,
     entry_path: str,
     langs: List[str],
-    llm_group: Optional[str],
     status_mgr: Any,
     _progress_append: Any,
     _append_report: Any,
@@ -370,9 +369,7 @@ def process_verification_batch(
         pass
 
     # 创建分析Agent
-    agent = create_analysis_agent(
-        task_id, llm_group, force_save_memory=force_save_memory
-    )
+    agent = create_analysis_agent(task_id, force_save_memory=force_save_memory)
 
     # 构建任务上下文
     per_task = build_analysis_task_context(batch, entry_path, langs)
@@ -581,8 +578,6 @@ def process_verification_batch(
                     output_handler=[ToolRegistry()],
                     use_tools=["read_code", "execute_script", "retrieve_memory"],
                 )
-                if llm_group:
-                    verification_agent_kwargs["llm_group"] = llm_group
                 verification_agent = Agent(**verification_agent_kwargs)
 
                 # 构造验证任务上下文
@@ -853,7 +848,6 @@ def process_verification_phase(
     cluster_batches: List[List[Dict[str, Any]]],
     entry_path: str,
     langs: List[str],
-    llm_group: Optional[str],
     sec_dir: Any,
     status_mgr: Any,
     _progress_append: Any,
@@ -1051,7 +1045,6 @@ def process_verification_phase(
             actual_total_batches,  # 使用实际需要处理的总批次数
             entry_path,
             langs,
-            llm_group,
             status_mgr,
             _progress_append,
             _append_report,

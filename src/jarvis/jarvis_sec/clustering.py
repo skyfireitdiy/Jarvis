@@ -1067,7 +1067,6 @@ def process_cluster_chunk(
     file: str,
     entry_path: str,
     langs: List[str],
-    llm_group: Optional[str],
     cluster_batches: List[List[Dict[str, Any]]],
     cluster_records: List[Dict[str, Any]],
     invalid_clusters_for_review: List[Dict[str, Any]],
@@ -1094,7 +1093,7 @@ def process_cluster_chunk(
 
     # 创建聚类Agent
     cluster_agent = create_cluster_agent(
-        file, chunk_idx, llm_group, force_save_memory=force_save_memory
+        file, chunk_idx, force_save_memory=force_save_memory
     )
 
     # 构建任务上下文
@@ -1119,7 +1118,7 @@ def process_cluster_chunk(
             file,
             cluster_summary,
             create_agent_func=lambda: create_cluster_agent(
-                file, chunk_idx, llm_group, force_save_memory=force_save_memory
+                file, chunk_idx, force_save_memory=force_save_memory
             ),
         )
 
@@ -1136,7 +1135,7 @@ def process_cluster_chunk(
         except Exception:
             pass
         cluster_agent = create_cluster_agent(
-            file, chunk_idx, llm_group, force_save_memory=force_save_memory
+            file, chunk_idx, force_save_memory=force_save_memory
         )
 
     # 处理聚类结果
@@ -1247,7 +1246,6 @@ def process_file_clustering(
     entry_path: str,
     langs: List[str],
     cluster_limit: int,
-    llm_group: Optional[str],
     _progress_append: Any,
     _write_cluster_batch_snapshot: Any,
     force_save_memory: bool = False,
@@ -1289,7 +1287,6 @@ def process_file_clustering(
             file,
             entry_path,
             langs,
-            llm_group,
             cluster_batches,
             cluster_records,
             invalid_clusters_for_review,
@@ -1393,7 +1390,6 @@ def execute_clustering_for_files(
     entry_path: str,
     langs: List[str],
     cluster_limit: int,
-    llm_group: Optional[str],
     status_mgr: Any,
     _progress_append: Any,
     _write_cluster_batch_snapshot: Any,
@@ -1430,7 +1426,6 @@ def execute_clustering_for_files(
             entry_path,
             langs,
             cluster_limit,
-            llm_group,
             _progress_append,
             _write_cluster_batch_snapshot,
             force_save_memory=force_save_memory,
@@ -1520,7 +1515,6 @@ def process_clustering_phase(
     entry_path: str,
     langs: List[str],
     cluster_limit: int,
-    llm_group: Optional[str],
     sec_dir: Path,
     status_mgr: Any,
     _progress_append: Any,
@@ -1557,7 +1551,6 @@ def process_clustering_phase(
             entry_path,
             langs,
             cluster_limit,
-            llm_group,
             status_mgr,
             _progress_append,
             _write_cluster_batch_snapshot,
@@ -1576,7 +1569,6 @@ def process_clustering_phase(
         invalid_clusters_for_review,
         entry_path,
         langs,
-        llm_group,
         status_mgr,
         _progress_append,
         cluster_batches,

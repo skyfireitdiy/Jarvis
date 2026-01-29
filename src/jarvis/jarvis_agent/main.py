@@ -7,7 +7,7 @@ import typer
 import yaml
 
 from jarvis.jarvis_agent import Agent
-from jarvis.jarvis_utils.config import set_config
+from jarvis.jarvis_utils.config import set_llm_group
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
@@ -67,12 +67,11 @@ def cli(
     init_env(
         """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！""",
         config_file=config_file,
-        llm_group=llm_group,
     )
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
         if llm_group:
-            set_config("llm_group", str(llm_group))
+            set_llm_group(str(llm_group))
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass
