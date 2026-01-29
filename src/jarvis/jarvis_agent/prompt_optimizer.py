@@ -7,13 +7,13 @@
 from typing import Optional
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
 def optimize_system_prompt(
     current_system_prompt: str,
     user_requirement: str,
-    llm_group: Optional[str] = None,
 ) -> str:
     """根据用户需求优化系统提示词
 
@@ -30,7 +30,7 @@ def optimize_system_prompt(
 
         # 获取 smart_llm 平台（使用智能模型进行优化）
         # get_smart_platform 内部已经设置了 model_name 和 llm_group，无需再次设置
-        platform = PlatformRegistry().get_normal_platform(llm_group)
+        platform = PlatformRegistry().get_normal_platform(get_llm_group())
 
         platform.set_suppress_output(False)
 
