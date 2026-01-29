@@ -45,9 +45,7 @@ class MemoryOrganizer:
 
         # 获取当前配置的平台实例
         registry = PlatformRegistry.get_global_platform_registry()
-        self.platform = registry.create_platform(platform_name)
-        if self.platform and model_name:
-            self.platform.set_model_name(model_name)
+        self.platform = registry.get_normal_platform()
 
     def _get_memory_files(self, memory_type: str) -> List[Path]:
         """获取指定类型的所有记忆文件"""

@@ -22,7 +22,7 @@ import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.service import start_service
-from jarvis.jarvis_utils.config import get_llm_config, get_llm_group
+from jarvis.jarvis_utils.config import get_llm_config, get_llm_group, get_smart_platform_name, set_llm_group
 from jarvis.jarvis_utils.config import get_normal_model_name
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.fzf import fzf_select
@@ -48,11 +48,11 @@ def list_platforms(
         return
 
     # 获取默认模型组配置，或使用指定的模型组
-    current_llm_group = llm_group
-    if current_llm_group:
-        platform_name = get_normal_platform_name(current_llm_group)
-        model_name = get_normal_model_name(current_llm_group)
-        PrettyOutput.auto_print(f"✅ 从模型组 '{current_llm_group}' 获取的配置信息:")
+    set_llm_group(llm_group)
+    if llm_group:
+        platform_name = get_normal_platform_name()
+        model_name = get_normal_model_name()
+        PrettyOutput.auto_print(f"✅ 从模型组 '{llm_group}' 获取的配置信息:")
         PrettyOutput.auto_print(f"  平台: {platform_name}")
         PrettyOutput.auto_print(f"  模型: {model_name}")
 
@@ -62,7 +62,7 @@ def list_platforms(
         # 使用配置创建平台实例并显示详细信息
         try:
             platform_instance = registry.create_platform(
-                platform_name, "normal", current_llm_group
+                platform_name, "normal"
             )
             if platform_instance:
                 models = platform_instance.get_model_list()
@@ -93,7 +93,7 @@ def list_platforms(
         # 显示默认平台的详细信息
         try:
             platform_instance = registry.create_platform(
-                platform_name, "normal", get_llm_group()
+                platform_name, "normal"
             )
             if platform_instance:
                 models = platform_instance.get_model_list()
@@ -114,10 +114,7 @@ def list_platforms(
 
 
 def chat_with_model(
-    platform_name: str,
-    model_name: str,
     system_prompt: str,
-    llm_group: Optional[str] = None,
 ) -> None:
     """与指定平台和模型进行对话。
 
@@ -131,11 +128,11 @@ def chat_with_model(
     registry = PlatformRegistry.get_global_platform_registry()
     conversation_history: List[Dict[str, str]] = []  # 存储对话记录
 
-    # 获取 llm_config，确保传递 api_key 等配置
-    llm_config = get_llm_config("normal", llm_group)
+    platform_name = get_normal_platform_name()
+    model_name = get_normal_model_name()
 
     # Create platform instance
-    platform = registry.create_platform(platform_name, "normal", llm_group)
+    platform = registry.create_platform(platform_name, "normal")
     if platform:
         platform.set_model_name(model_name)
 
@@ -227,12 +224,13 @@ def chat_command(
 ) -> None:
     """与指定平台和模型聊天。"""
     # 从config获取默认值
+    set_llm_group(llm_group)
     platform = get_normal_platform_name(llm_group)
     model = get_normal_model_name(llm_group)
 
     if not validate_platform_model(platform, model):
         return
-    chat_with_model(platform, model, "", llm_group)
+    chat_with_model("")
 
 
 @app.command("service")
@@ -284,6 +282,8 @@ def role_command(
     ),
 ) -> None:
     """加载角色配置文件并开始对话。"""
+    set_llm_group(llm_group)
+
     config_path = os.path.expanduser(config_file)
     config = load_role_config(config_path)
     if not config or "roles" not in config:
@@ -328,30 +328,11 @@ def role_command(
             PrettyOutput.auto_print("❌ 无效的选择")
             return
 
-    # 初始化平台和模型
-    # 如果提供了 llm_group，则从配置中获取
-    # 否则使用角色配置中的platform和model
-    if llm_group:
-        platform_name = get_normal_platform_name(llm_group)
-    else:
-        platform_name = selected_role.get("platform")
-        if not platform_name:
-            # 如果角色配置中没有platform，使用默认配置
-            platform_name = get_normal_platform_name()
-
-    if llm_group:
-        model_name = get_normal_model_name(llm_group)
-    else:
-        model_name = selected_role.get("model")
-        if not model_name:
-            # 如果角色配置中没有model，使用默认配置
-            model_name = get_normal_model_name()
-
     system_prompt = selected_role.get("system_prompt", "")
 
     # 开始对话
     PrettyOutput.auto_print(f"✅ 已选择角色: {selected_role['name']}")
-    chat_with_model(platform_name, model_name, system_prompt, llm_group)
+    chat_with_model(system_prompt)
 
 
 def main() -> None:
