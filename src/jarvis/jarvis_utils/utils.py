@@ -595,7 +595,6 @@ def _show_usage_stats(welcome_str: str) -> None:
 
     参数:
         welcome_str: 欢迎信息字符串
-        model_group_override: 模型组覆盖参数，用于显示用户指定的模型组
     """
     try:
         from rich.console import Console
@@ -1431,7 +1430,6 @@ def is_context_overflow(
 
     参数:
         content: 要检查的内容
-        model_group_override: 模型组覆盖（可选）
         platform: 平台实例（可选），如果提供则使用剩余token数量判断
 
     返回:
