@@ -1,0 +1,8 @@
+{
+  "id": "20260111_182812_357844",
+  "type": "project_long_term",
+  "tags": ["configuration", "jarvis-tools", "jqc", "jcfg", "cli"],
+  "content": "Jarvis 项目提供两个配置工具：\n1. jqc (jarvis-quick-config)：命令行交互式配置工具，用于快速配置 LLM 平台信息，需要提供 --platform, --url, --key 参数，支持 --output 指定配置文件路径\n2. jcfg：Web 配置界面工具，支持 --port 指定端口号（默认9312），--output 指定配置文件路径\n两者默认配置文件路径为 ~/.jarvis/config.yaml\n入口：pyproject.toml 中定义为 jarvis-quick-config 和 jqc，都指向 jarvis.jarvis_utils.quick_config:app",
+  "created_at": "2026-01-11T18:28:12.357861",
+  "updated_at": "2026-01-11T18:28:12.357864"
+}

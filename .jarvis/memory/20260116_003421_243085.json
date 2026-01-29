@@ -1,0 +1,14 @@
+{
+  "id": "20260116_003421_243085",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_platform",
+    "auto_summary",
+    "token_limit",
+    "bug",
+    "agent_init"
+  ],
+  "content": "Agent初始化时agent引用设置确认：\n\n找到关键代码（src/jarvis/jarvis_agent/__init__.py 第676-691行）：\n\ndef _init_model(self, model_group: Optional[str]) -> None:\n    \"\"\"初始化模型平台（统一使用 normal 平台/模型）\"\"\"\n    model_name = get_normal_model_name(model_group)\n    self.model = PlatformRegistry().get_normal_platform(model_group)\n    \n    if model_name:\n        self.model.set_model_name(model_name)\n    \n    self.model.set_model_group(model_group)\n    self.model.set_suppress_output(False)\n    \n    # 设置Agent引用，使Platform能够回调Agent方法（如自动总结）\n    self.model.agent = self  # ← 第691行，确实设置了agent引用！\n\n结论：\n- self.agent 不为 None（已在 _init_model 中正确设置）\n- 排除了\"agent参数未传递\"这个可能原因\n\n剩余可能原因：\n1. 触发总结时发生异常，被第513-515行的异常捕获默默处理了\n2. token 计算逻辑问题：显示93% vs 判断条件基于历史78%的差异\n3. 其他未知问题\n\n需要进一步调查：\n- 检查日志中是否有\"⚠️ 自动总结失败\"的输出\n- 验证 get_remaining_token_count() 的实际返回值\n- 确认是否有其他代码路径跳过了自动总结逻辑",
+  "created_at": "2026-01-16T00:34:21.243104",
+  "updated_at": "2026-01-16T00:34:21.243106"
+}

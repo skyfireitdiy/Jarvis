@@ -1,0 +1,8 @@
+{
+  "id": "20260114_003356_117419",
+  "type": "project_long_term",
+  "tags": ["system_prompt", "load_rule", "code_agent_prompts", "提示词优化"],
+  "content": "系统提示词文件位置：src/jarvis/jarvis_code_agent/code_agent_prompts.py，包含 agent 的核心行为规范和工作流程定义。",
+  "created_at": "2026-01-14T00:33:56.117437",
+  "updated_at": "2026-01-14T00:33:56.117440"
+}

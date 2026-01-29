@@ -1,0 +1,8 @@
+{
+  "id": "20260125_222459_336260",
+  "type": "project_long_term",
+  "tags": ["代码重构", "input.py", "任务完成", "执行方案"],
+  "content": "## input.py 优化重构完成总结\n\n**重构目标**：优化 src/jarvis/jarvis_utils/input.py，消除代码重复，简化长函数，提升代码质量\n\n**重构成果**：\n1. 代码行数：1279 → 1287行（+8行，新增辅助函数但消除了更多重复代码）\n2. 主业务函数：get_multiline_input 从312行减少到100行（-212行，-68%）\n3. 新增辅助函数：9个\n4. 消除重复代码：约140行\n5. 测试覆盖：68个测试全部通过\n\n**新增辅助函数**：\n1. _get_git_files() - 获取Git仓库文件列表\n2. _get_all_files() - 获取所有文件列表\n3. _get_files_for_fzf() - 统一的文件列表获取入口\n4. _parse_fzf_payload() - 解析FZF请求payload\n5. _run_fzf_for_selection() - 运行FZF选择\n6. _insert_file_path() - 插入文件路径到文本\n7. _clear_previous_prompt() - 清除上一条输入提示\n8. _get_agent_hint() - 获取Agent提示信息\n9. _get_non_interactive_response() - 获取非交互模式响应\n\n**重构阶段**：\n- 阶段1（测试补充）：任务1-4 - ✅ 完成\n- 阶段2（代码优化）：任务5-7 - ✅ 完成\n- 阶段3（验证检查）：任务8 - ✅ 完成\n\n**验收标准达成**：\n- ✅ 所有测试通过（68个）\n- ✅ 主业务函数<150行（get_multiline_input: 100行）\n- ✅ 消除代码重复\n- ✅ 提升代码可读性和可维护性\n- ✅ API保持不变，向后兼容\n\n**修改文件**：\n- src/jarvis/jarvis_utils/input.py\n- tests/jarvis_utils/test_input.py",
+  "created_at": "2026-01-25T22:24:59.336282",
+  "updated_at": "2026-01-25T22:24:59.336285"
+}

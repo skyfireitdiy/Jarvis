@@ -1,0 +1,18 @@
+{
+  "content": "Jarvis 多Agent系统配置增强与用户交互优化\n\n【多Agent摘要策略配置（2025-10-15）】\n\n【新增配置】\n- 配置键：JARVIS_MULTI_AGENT_SUMMARY_ON_SEND（bool，默认true）\n- 动机：控制多智能体在发送消息时是否生成上下文摘要，默认启用以增强协作交接的清晰性；可关闭以减少模型调用成本\n\n【实施方案】\n1) 在 jarvis_utils/config.py 增加接口 is_multi_agent_summary_on_send() -> bool，默认 True\n2) 在 jarvis_multi_agent/__init__.py 的 MultiAgent.run 中，生成摘要逻辑前读取该配置，若为 False 则跳过模型摘要生成（summary_text=\"\"）\n3) 在 jarvis_data/config_schema.json 增加该配置项，type boolean，default true，并补充说明\n4) 在 docs/jarvis_book/9.附录.md 的配置表中新增该项并说明用途与默认值\n\n【影响评估】\n- 仅新增可选配置与条件逻辑，不改变默认行为\n- 关闭时减少一次直呼模型的成本\n- 对现有功能无破坏性\n\n【用户交互优化（2025-10-14）】\n\n【功能增强】\n在 src/jarvis/jarvis_utils/input.py 的 get_multiline_input 中，优化了非交互模式提示逻辑：\n- 不再受 auto_complete 开关限制，只要是非交互模式，都会尝试收集并提示\"可用智能体列表\"，并指引使用 SEND_MESSAGE 将任务转交其他智能体\n\n【具体实现】\n- 在 _is_non_interactive_for_current_agent() 为 True 时，先收集 ag.output_handler.agents_config 中的 name 作为可用智能体\n- 去重保序后生成提示文本\n- 若启用 auto_complete，则在\"自动完成并输出 !!!COMPLETE!!!\"语句后拼接智能体提示\n- 否则在\"我无法与你交互，所有的事情你都自我决策\"后同样拼接提示\n\n【设计目标】\n- 满足\"无论是否自动完成，如果是多Agent，都要增加可用的智能体提示\"的需求\n- 对单Agent（无可用列表）不产生额外噪音\n\n【系统集成】\n- 配置管理：提供可配置的摘要生成策略\n- 交互优化：增强非交互模式下的智能体协作指引\n- 用户体验：平衡功能完整性与操作效率\n- 向后兼容：不改变现有默认行为\n\n【设计原则】\n- 可配置性：支持功能的开启与关闭\n- 智能提示：在合适时机提供有用的指引信息\n- 最小侵入：保持现有架构稳定\n- 用户中心：提升多Agent环境下的用户体验\n- 成本控制：提供减少模型调用的选项\n\n【预期效果】\n- 提供灵活的摘要生成策略配置\n- 增强非交互模式下的智能体协作体验\n- 减少不必要的模型调用成本\n- 保持系统的向后兼容性\n- 建立可配置的多Agent协作机制",
+  "tags": [
+    "jarvis_multi_agent",
+    "configuration",
+    "user_interaction",
+    "summary_policy",
+    "agent_io",
+    "input_optimization",
+    "multiagent_collaboration",
+    "configurable_behavior",
+    "user_experience"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251015_201325_894325", "20251014_235448_522143"],
+  "id": "merged_382fad80",
+  "created_at": "2025-11-12T23:49:09.818321"
+}

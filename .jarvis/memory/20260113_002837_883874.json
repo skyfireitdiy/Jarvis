@@ -1,0 +1,14 @@
+{
+  "id": "20260113_002837_883874",
+  "type": "project_long_term",
+  "tags": [
+    "tool",
+    "load_rule",
+    "jarvis_tools",
+    "file-reading",
+    "jinja2-rendering"
+  ],
+  "content": "新工具 load_rule：位于 src/jarvis/jarvis_tools/load_rule.py，用于读取规则文件并渲染 jinja2 模板。工具参数：file_path（必需）。功能：读取文件内容，使用 render_rule_template 渲染 jinja2 变量，返回渲染结果。支持所有内置变量（current_dir, git_root_dir, jarvis_data_dir, jarvis_src_dir, rule_file_dir）。错误处理：文件不存在、非文件、空文件、渲染失败等都有完善的错误处理。",
+  "created_at": "2026-01-13T00:28:37.883931",
+  "updated_at": "2026-01-13T00:28:37.883939"
+}

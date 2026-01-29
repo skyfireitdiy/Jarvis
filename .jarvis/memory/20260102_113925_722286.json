@@ -1,0 +1,8 @@
+{
+  "id": "20260102_113925_722286",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "llm_config", "configuration_management"],
+  "content": "Jarvis项目的LLM配置同步规则：\n1. llm_groups中不再支持直接定义platform、model等参数\n2. 必须通过引用llms中定义的配置，使用normal_llm、cheap_llm、smart_llm、web_llm等引用\n3. 配置处理函数包括_get_resolved_model_config、_expand_llm_references等",
+  "created_at": "2026-01-02T11:39:25.722330",
+  "updated_at": "2026-01-02T11:39:25.722335"
+}

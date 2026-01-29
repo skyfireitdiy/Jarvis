@@ -1,0 +1,8 @@
+{
+  "id": "20251229_232308_020560",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "api", "configure_by_tui"],
+  "content": "jarvis_config 核心 API 设计：\n- configure_by_tui(schema, defaults=None, title='Configuration') -> Optional[Dict]\n  * 根据 JSON Schema 自动生成 Textual TUI 配置界面\n  * 支持默认值填充\n  * 用户提交后返回配置字典，取消返回 None\n  * 完整的文档字符串和使用示例\n- 支持的导出：configure_by_tui, SchemaValidator, ValidationError, ValidationResult, create_validator, SchemaParser, parse_schema, FieldFactory, create_field_factory, run_tui_form",
+  "created_at": "2025-12-29T23:23:08.020580",
+  "updated_at": "2025-12-29T23:23:08.020583"
+}

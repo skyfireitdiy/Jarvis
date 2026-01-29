@@ -1,0 +1,13 @@
+{
+  "id": "20260108_233016_925923",
+  "type": "project_long_term",
+  "tags": [
+    "KeyboardInterrupt",
+    "exception_handling",
+    "run_loop",
+    "code_review"
+  ],
+  "content": "在run_loop.py中处理Ctrl+C（KeyboardInterrupt）的规范：\n1. 关键步骤需要添加try-except KeyboardInterrupt：_call_model()、_call_tools()、_get_next_user_action()\n2. 内层处理方式：捕获KeyboardInterrupt后直接raise，重新抛出给外层\n3. 外层处理：在主循环的except块中，在Exception之前单独捕获KeyboardInterrupt，打印友好提示\"\\n⚠ 用户中断，正在退出...\"，然后raise\n4. 这样确保Ctrl+C不会显示\"任务失败\"的错误信息，而是优雅退出",
+  "created_at": "2026-01-08T23:30:16.925955",
+  "updated_at": "2026-01-08T23:30:16.925959"
+}

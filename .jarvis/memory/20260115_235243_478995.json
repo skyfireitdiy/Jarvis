@@ -1,0 +1,8 @@
+{
+  "id": "20260115_235243_478995",
+  "type": "project_long_term",
+  "tags": ["rule_loading", "builtin_rules", "load_all_rules", "rules_manager"],
+  "content": "规则加载机制增强：在RulesManager.load_all_rules()方法中添加了自动加载builtin_rules.md的功能。新增_get_builtin_rules_index()方法，读取builtin/rules/builtin_rules.md文件的完整内容，并使用jinja2渲染模板变量。现在默认情况下会自动加载3个规则文件：1) ~/.jarvis/rule（全局规则）2) {root_dir}/.jarvis/rule（项目规则）3) builtin/rules/builtin_rules.md（内置规则索引）。这些规则内容会被自动添加到第一条给大模型的提示词中，使用<rules>标签包裹。",
+  "created_at": "2026-01-15T23:52:43.479011",
+  "updated_at": "2026-01-15T23:52:43.479013"
+}

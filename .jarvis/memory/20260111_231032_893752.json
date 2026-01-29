@@ -1,0 +1,14 @@
+{
+  "id": "20260111_231032_893752",
+  "type": "project_long_term",
+  "tags": [
+    "uv-tool",
+    "uv-tool-install",
+    "auto-update",
+    "installation",
+    "update-mechanism"
+  ],
+  "content": "Jarvis自动更新机制已扩展支持uv tool安装场景。新增_is_installed_via_uv_tool()函数用于检测是否通过uv tool安装，该函数使用双重检测机制：1) 路径检测（检查sys.argv[0]是否在典型的uv tool安装目录）；2) 命令验证（执行'uv tool list'验证jarvis-ai-assistant是否在已安装工具列表中）。检测到uv tool安装后，使用'uv tool upgrade jarvis-ai-assistant'命令进行更新，同时考虑RAG特性需要单独安装的情况。",
+  "created_at": "2026-01-11T23:10:32.893783",
+  "updated_at": "2026-01-11T23:10:32.893786"
+}

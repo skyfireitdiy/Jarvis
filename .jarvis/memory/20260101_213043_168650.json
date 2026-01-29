@@ -1,0 +1,8 @@
+{
+  "id": "20260101_213043_168650",
+  "type": "project_long_term",
+  "tags": ["jarvis_sec", "encoding-compatibility", "subprocess", "utils.py"],
+  "content": "jarvis_sec/utils.py 编码问题修复验证完成：\n- 文件路径：src/jarvis/jarvis_sec/utils.py\n- 修复内容：2处 subprocess.run 调用（第28、41行）\n- 修改方式：text=True → text=False，使用 decode_output() 解码 stdout\n- 导入语句：from jarvis.jarvis_utils.utils import decode_output（第9行）\n- 验证结果：ruff check 通过，无 text=True 残留\n- 关键代码位置：\n  * 第25-30行：git status --porcelain 调用\n  * 第37-42行：git checkout -- . 调用\n  * 第34行：decode_output(proc.stdout) 解码输出\n",
+  "created_at": "2026-01-01T21:30:43.168669",
+  "updated_at": "2026-01-01T21:30:43.168672"
+}

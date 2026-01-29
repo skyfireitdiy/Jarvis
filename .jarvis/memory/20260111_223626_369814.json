@@ -1,0 +1,8 @@
+{
+  "id": "20260111_223626_369814",
+  "type": "project_long_term",
+  "tags": ["auto_print", "output", "extension", "workflow"],
+  "content": "为 auto_print 函数添加新的 emoji 前缀支持的完整流程：\n\n必须同步更新以下 4 个位置（缺一不可）：\n1. OutputType 枚举（第 93-135 行）：添加新的枚举成员\n2. PrettyOutput._ICONS 字典（第 456-474 行）：为每个新类型添加 emoji 图标映射\n3. ConsoleOutputSink.emit 方法中的样式配置：\n   - style_config 字典（第 186-306 行）：添加 RichStyle 配置\n   - text_colors 字典（第 322-342 行）：添加文字颜色\n   - header_styles 字典（第 360-427 行）：添加头部样式\n4. auto_print 函数中的 emoji_mapping 字典（第 752-765 行）：添加 emoji 到 OutputType 的映射\n\n注意事项：\n- 所有配置必须保持一致性，emoji 图标、样式颜色、映射关系要语义匹配\n- 配色方案应与现有风格协调，避免过于突兀\n- 一个 OutputType 可以支持多个 emoji（如 DIRECTORY 支持 📁 和 📂）\n- 修改后必须进行语法验证和功能验证",
+  "created_at": "2026-01-11T22:36:26.369841",
+  "updated_at": "2026-01-11T22:36:26.369845"
+}

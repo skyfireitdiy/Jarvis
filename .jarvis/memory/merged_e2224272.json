@@ -1,0 +1,20 @@
+{
+  "content": "开源鸿蒙AI安全演进多Agent系统（oh-sec）架构设计与模块实现\n\n【新增模块】\n- src/jarvis/oh_sec_multi_agent\n  - __init__.py:\n    - 提供 create_oh_sec_multi_agent() 构建多Agent系统（主Agent：Orchestrator）\n    - 提供 run_oh_sec_scan(target_repo, target_name, model_group, auto_complete) 启动编排\n    - 内置7个角色的系统提示：\n      1) Orchestrator：全局规划、调度与质控（通过 SEND_MESSAGE 编排）\n      2) SyntaxAnalyzer：仓库盘点与语法层清单（rg/tree/fd/wc 回退 read_code）\n      3) SemanticAnalyzer：语义与数据/控制流要点（函数摘要表+证据）\n      4) SecurityScanner：安全检出（内存/并发/生命周期/整数溢出；cppcheck/clang-tidy/cargo clippy/rg 回退静态规则）\n      5) DecisionPlanner：风险量化与改造路线图（局部修复 vs Rust重写）\n      6) RustRewriter：Rust安全重写建议/骨架（最小unsafe，FFI说明）\n      7) ReportGenerator：汇总输出最终Markdown报告\n    - 共同约束 COMMON_SYSTEM_PROMPT：一次一操作、证据可复现、工具不可用回退策略、C/C++/Rust三语言聚焦\n  - cli.py:\n    - Typer CLI：python -m jarvis.oh_sec_multi_agent.cli scan --target <repo> --name <project> [-g <llm-group>]\n    - 在屏幕输出最终报告或中间结果\n\n【核心组件】\n- Orchestrator、Registry、ArtifactStore、Logger\n- 功能模块：IngestBuild、CodeGraph、StaticAnalysis、RuntimeValidation、LLMAnalysis、RiskPrioritization、FixPlanning、FixRefactor、RustRewrite、Integration、TestGeneration、Benchmark、Reporting、Archive\n- 工具适配层：adapters/*\n- 产物目录：.jarvis/artifacts/{graphs,reports,patches,tests,coverage,benchmark,compatibility}\n\n【集成说明】\n- 复用现有 jarvis.jarvis_multi_agent.MultiAgent 能力（SEND_MESSAGE 处理、代理创建、工具注册），不修改任何既有文件\n- 每个子Agent通过 ToolRegistry 调用内置工具（execute_script/read_code等）\n- 目标仓库路径通过 run_oh_sec_scan 的用户输入传递给各子Agent；执行shell命令时建议使用\"cd <target_repo> && ...\"形式（后续可在提示中强化）\n\n【构建统一CLI】\n- oh-sec init/scan/plan/fix/rewrite/test/bench/report\n\n【工具链】\n- clang/llvm、clang-tidy/cppcheck/scan-build/Infer、sanitizers、valgrind、c2rust、bindgen、cargo-llvm-cov、nextest、AFL/LibFuzzer\n\n【下一步扩展建议】\n- 增加 adapters：bzip2 与至少1个 OH 库（如 commonlibrary_c_utils），提供典型扫描命令与文件列表收集辅助\n- 在 Orchestrator 提示中显式要求\"所有shell命令以目标仓库目录为工作目录（cd <target_repo> && ...）\"，减少出错率\n- 增加测试用例：bzip2最少3个，生成报告并校验关键字段\n- 文档：README片段与评测操作说明（命令、依赖、回退策略）\n\n【设计约束】\n- 需在 src/jarvis/jarvis_agent/__init__.py 与 src/jarvis/jarvis_multi_agent/__init__.py 基础上扩展\n- 多Agent角色覆盖：采集构建、语法语义分析、静态分析、运行时验证、LLM语义分析、风险量化、决策规划、重构修复、Rust重写、集成跨语言、测试生成、性能基准、报告人机协作、产物归档",
+  "tags": [
+    "oh-sec",
+    "multi_agent",
+    "architecture",
+    "modules",
+    "orchestrator",
+    "jarvis_multi_agent",
+    "cli",
+    "artifact_store",
+    "registry",
+    "security_analysis",
+    "code_migration"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251019_092731_061943", "20251019_094826_390720"],
+  "id": "merged_e2224272",
+  "created_at": "2025-11-12T23:41:38.921211"
+}

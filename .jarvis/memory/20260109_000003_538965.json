@@ -1,0 +1,13 @@
+{
+  "id": "20260109_000003_538965",
+  "type": "project_long_term",
+  "tags": [
+    "run_loop",
+    "KeyboardInterrupt",
+    "exception_handling",
+    "user_interaction"
+  ],
+  "content": "run_loop.py中的KeyboardInterrupt处理模式：在关键步骤（_call_model, _call_tools, _get_next_user_action等）添加try-except KeyboardInterrupt，捕获用户中断后调用_handle_interrupt_with_input()方法。该方法允许用户输入补充信息，或选择跳过/完全退出。用户补充信息会被添加到session.addon_prompt中，影响后续LLM交互。",
+  "created_at": "2026-01-09T00:00:03.538986",
+  "updated_at": "2026-01-09T00:00:03.538989"
+}

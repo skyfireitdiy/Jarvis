@@ -1,0 +1,15 @@
+{
+  "id": "20260102_132623_108370",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis-agent",
+    "print",
+    "PrettyOutput",
+    "outputhandler",
+    "auto_print",
+    "refactoring"
+  ],
+  "content": "在Jarvis项目中，所有表格和控制台输出应使用统一的PrettyOutput进行输出，而不是直接使用Console().print。正确的模式是：1) 使用Console将表格渲染到StringIO缓冲区 2) 通过PrettyOutput.print()统一输出 3) 保持输出风格一致。这确保了输出的一致性和可维护性。",
+  "created_at": "2026-01-02T13:26:23.108406",
+  "updated_at": "2026-01-02T13:26:23.108409"
+}

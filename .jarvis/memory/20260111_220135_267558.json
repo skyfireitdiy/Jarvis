@@ -1,0 +1,14 @@
+{
+  "id": "20260111_220135_267558",
+  "type": "project_long_term",
+  "tags": [
+    "entry_points",
+    "pyproject.toml",
+    "命令行工具",
+    "scripts",
+    "自动补全"
+  ],
+  "content": "项目命令行工具配置：\n1. pyproject.toml 的 [project.scripts] 部分定义了所有命令行工具（共40个）\n2. 包括完整名称和简短别名：如 jarvis/jvs, jarvis-code-agent/jca, jarvis-git-commit/jgc 等\n3. install.sh 第121行的 tools 数组用于安装自动补全，需要与 pyproject.toml 中的短命令列表保持同步\n4. 当前 install.sh 已包含所有20个短命令：jvs, jvsd, ja, jca, jcad, jcr, jgc, jgs, jsec, jc2r, jrg, jpm, jma, jcfg, jqc, jt, jm, jss, jst, jmo",
+  "created_at": "2026-01-11T22:01:35.267615",
+  "updated_at": "2026-01-11T22:01:35.267621"
+}

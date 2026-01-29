@@ -1,0 +1,8 @@
+{
+  "id": "20260118_005105_746695",
+  "type": "project_long_term",
+  "tags": ["c_checker", "rules", "architecture", "TDD"],
+  "content": "### C/C++安全检查规则库架构决策\n\n在c_checker.py重构过程中，将所有正则表达式规则独立到c_checker_rules.py模块中，按功能类别组织为9个规则类：\n1. BaseRules: 基础不安全API（4个规则）\n2. FormatCommandRules: 格式化字符串和命令执行（6个规则）\n3. ThreadRules: pthread线程和同步（7个规则）\n4. CppLockRules: C++标准库锁（9个规则）\n5. DataRaceRules: 数据竞争检测（5个规则）\n6. DangerousUsageRules: 危险用法（7个规则）\n7. MemoryHelperRules: 内存管理辅助规则（13个规则）\n8. CppSpecificRules: C++特定模式（25个规则）\n9. HelperRules: 辅助规则（6个规则）\n\n总共82个使用re.compile()编译的正则表达式规则，严格遵循TDD流程开发，所有规则均保持原有的编译标志（如re.IGNORECASE）不变。",
+  "created_at": "2026-01-18T00:51:05.746712",
+  "updated_at": "2026-01-18T00:51:05.746715"
+}

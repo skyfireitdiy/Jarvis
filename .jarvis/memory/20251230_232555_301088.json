@@ -1,0 +1,8 @@
+{
+  "id": "20251230_232555_301088",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "json_schema", "documentation", "zen-ios-hybrid"],
+  "content": "jarvis_config 工具特性：基于 JSON Schema 动态生成配置 Web 页面，支持 Draft-07 规范。核心模块：cli.py（命令行接口）、schema_parser.py（Schema 解析）、web_app.py（Web 应用）。支持的字段类型：string, number, integer, boolean, array, object。支持的约束：enum, default, minimum, maximum, minLength, maxLength, pattern, exclusiveMinimum, exclusiveMaximum, format, minItems, maxItems, items, properties。命令行接口：jarvis-config web <schema_file> <output_file> [OPTIONS]，选项包括 --port/-p（端口）、--no-browser（禁用自动打开浏览器）。",
+  "created_at": "2025-12-30T23:25:55.301103",
+  "updated_at": "2025-12-30T23:25:55.301105"
+}

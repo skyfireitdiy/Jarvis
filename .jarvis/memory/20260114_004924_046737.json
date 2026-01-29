@@ -1,0 +1,8 @@
+{
+  "id": "20260114_004924_046737",
+  "type": "project_long_term",
+  "tags": ["jcad", "jvsd", "shell_fallback", "bug_fix", "tmux", "panel"],
+  "content": "修复jcad和jvsd命令执行完成后直接退出panel的问题：\n1. 问题原因：两个命令在调用dispatch_command_to_panel时都使用了shell_fallback=False，导致即使stay_in_session_after_exit=True也不会启动shell\n2. 解决方案：将jcad_cli.py和jvsd_cli.py中的shell_fallback=False改为shell_fallback=True\n3. 影响范围：仅影响jcad和jvsd命令的行为，不影响其他功能\n4. 提交记录：22cab61 (jcad), e95e7aa (jvsd)",
+  "created_at": "2026-01-14T00:49:24.046758",
+  "updated_at": "2026-01-14T00:49:24.046762"
+}

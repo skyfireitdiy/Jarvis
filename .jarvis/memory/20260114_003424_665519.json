@@ -1,0 +1,14 @@
+{
+  "id": "20260114_003424_665519",
+  "type": "project_long_term",
+  "tags": [
+    "code_agent",
+    "prompt",
+    "load_rule",
+    "rule_loading",
+    "tool_usage_guide"
+  ],
+  "content": "在code_agent_prompts.py中的系统提示词已更新，强调了load_rule工具的重要性：\n1. 在关键流程第1步中添加了：'任务涉及项目规范、编码标准、流程定义时，必须优先使用 load_rule 工具加载相关规则'\n2. 在工具与质量部分添加了：'load_rule：任务涉及项目规范、编码标准、流程定义时，必须优先调用；支持 jinja2 模板变量渲染'\n此修改符合用户需求，强调了load_rule工具在处理项目规范、编码标准和流程定义任务时的重要性。load_rule工具确实支持jinja2模板渲染功能。",
+  "created_at": "2026-01-14T00:34:24.665541",
+  "updated_at": "2026-01-14T00:34:24.665543"
+}

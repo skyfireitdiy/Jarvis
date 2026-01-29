@@ -1,0 +1,8 @@
+{
+  "id": "20260118_101831_452335",
+  "type": "project_long_term",
+  "tags": ["refactoring", "utils", "spec", "modularization"],
+  "content": "utils.py 重构 Spec (utils_spec.md):\n- 当前代码: 2555行，包含11种不同职责\n- 目标: 拆分为多个独立模块\n- 模块列表: utils.py(兼容层), encoding.py, command_mapper.py, installation_detector.py, update_checker.py, config_manager/(5个子模块), retry.py, file_ops.py, stats_display.py, context_manager.py\n- 验收标准: 每个模块<300行，测试覆盖率≥80%，保持向后兼容\n- 原始文件: src/jarvis/jarvis_utils/utils.py",
+  "created_at": "2026-01-18T10:18:31.452355",
+  "updated_at": "2026-01-18T10:18:31.452358"
+}

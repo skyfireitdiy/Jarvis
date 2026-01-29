@@ -1,0 +1,18 @@
+{
+  "id": "20251027_000111_260286",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_tools",
+    "registry",
+    "error_handling",
+    "tool_usage_prompt",
+    "outputhandler",
+    "tool_call",
+    "format_error",
+    "parse_error",
+    "not_found"
+  ],
+  "content": "规范更新：对于任何工具调用出现异常或失败（如格式错误、解析失败、工具不存在等），系统返回时必须附带完整的 agent 的 OutputHandler 提示（使用 agent.get_tool_usage_prompt()；若获取失败则回退到 tool_call_help），以引导模型下次按正确格式调用工具。\n",
+  "created_at": "2025-10-27T00:01:11.260302",
+  "updated_at": "2025-10-27T00:01:11.260304"
+}

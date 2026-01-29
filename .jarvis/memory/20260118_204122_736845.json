@@ -1,0 +1,8 @@
+{
+  "id": "20260118_204122_736845",
+  "type": "project_long_term",
+  "tags": ["refactoring", "task_list_manager", "task_utils", "progress"],
+  "content": "task_list_manager.py重构进度：已完成1)编写测试用例 2)创建task_utils.py提取7个工具函数。已提交多个checkpoint：e2d606d, bfe49d3, 67fe779, b4ec88e, 86581ba, 4423159, 27d5c8f。剩余8个任务待完成：AgentStateManager、DependencyValidator、TaskListManager、TaskExecutor、TaskVerifier、TaskListTool拆分，以及清理和最终验证。",
+  "created_at": "2026-01-18T20:41:22.736946",
+  "updated_at": "2026-01-18T20:41:22.736953"
+}

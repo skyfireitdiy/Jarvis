@@ -1,0 +1,14 @@
+{
+  "id": "20260116_210117_704013",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "auto_summary",
+    "optimization",
+    "git_diff",
+    "context_optimization"
+  ],
+  "content": "## 自动总结功能优化 - Git Diff展示优化\n\n### 问题描述\n在长时间运行任务时，自动总结功能会将从start_commit到当前的完整git diff信息包含在摘要中，随着代码修改越来越多，diff内容越来越大，导致上下文持续增长。\n\n### 解决方案\n采用方案2：使用git diff统计信息替代完整diff内容\n\n### 实施细节\n\n1. **新增函数**：\n   - `git_utils.py` 新增 `get_diff_stat_between_commits()` 函数，使用 `git diff --stat` 获取统计信息\n   - `run_loop.py` 新增 `get_git_diff_stat()` 方法\n\n2. **修改函数**：\n   - `__init__.py` 的 `_handle_history_with_summary()` 函数：\n     - 将完整diff改为统计信息（文件列表、行数统计）\n     - 添加查看命令：`git diff {start_commit}..HEAD`\n\n### 优化效果\n- 原本可能几千行的完整diff缩减为几行的统计信息\n- 大幅减少上下文token占用（从可能数千行到通常不到20行）\n- 保留关键信息：变更文件列表、行数统计\n- 提供完整查看命令，需要时可查看详细diff\n\n### 相关文件\n- src/jarvis/jarvis_utils/git_utils.py\n- src/jarvis/jarvis_agent/run_loop.py\n- src/jarvis/jarvis_agent/__init__.py",
+  "created_at": "2026-01-16T21:01:17.704032",
+  "updated_at": "2026-01-16T21:01:17.704034"
+}

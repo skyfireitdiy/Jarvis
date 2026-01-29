@@ -1,0 +1,14 @@
+{
+  "id": "20260110_224337_353901",
+  "type": "project_long_term",
+  "tags": [
+    "search_web",
+    "read_webpage",
+    "dynamic_calculation",
+    "remaining_tokens",
+    "content_length_limit"
+  ],
+  "content": "在Jarvis项目中，已将search_web和read_webpage工具中的固定2000字符限制替换为基于剩余token的动态计算机制。在config.py中新增了calculate_content_length_limit函数，该函数：1) 优先使用agent.model.get_remaining_token_count()获取剩余token；2) 使用剩余token的2/3作为限制，保留1/3安全余量；3) 转换为字符数（1 token = 4 字符）；4) 回退方案使用输入窗口的2/3；5) 最终回退到默认值2000字符。修改涉及的文件：src/jarvis/jarvis_utils/config.py（新增函数）、src/jarvis/jarvis_tools/search_web.py（第148行）、src/jarvis/jarvis_tools/read_webpage.py（第68行）",
+  "created_at": "2026-01-10T22:43:37.353917",
+  "updated_at": "2026-01-10T22:43:37.353920"
+}

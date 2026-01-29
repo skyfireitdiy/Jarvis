@@ -1,0 +1,8 @@
+{
+  "id": "20260125_212543_221967",
+  "type": "project_long_term",
+  "tags": ["input.py分析", "优化方案", "重构", "代码质量"],
+  "content": "# input.py文件分析报告\n\n## 文件基本信息\n- 文件路径: src/jarvis/jarvis_utils/input.py\n- 文件大小: 1296行代码\n- 导入语句: 63个\n\n## 功能模块\n1. **单行输入功能**: get_single_line_input\n2. **多行输入功能**: get_multiline_input, _get_multiline_input_internal\n3. **选择功能**: get_choice\n4. **文件补全功能**: FileCompleter类\n5. **历史记录管理**: _multiline_hint_already_shown, _mark_multiline_hint_shown\n6. **fzf集成**: 处理@和#触发的fzf选择\n7. **用户确认**: user_confirm\n8. **历史复制**: _show_history_and_copy\n9. **代理判定**: _get_current_agent_for_input, _is_non_interactive_for_current_agent, _is_auto_complete_for_current_agent\n10. **工具函数**: _display_width, _calc_prompt_rows, get_all_rules_formatted, _get_fzf_completion_items\n\n## 潜在优化点\n1. **内部重复导入** - 文件中有多个函数内部重复导入相同的模块 (os, subprocess, shutil)\n2. **代码结构** - 功能过于集中，可拆分为多个模块\n3. **可读性** - 某些函数较长，可拆分\n4. **常量定义** - 可以统一管理\n\n## 公共接口\n- get_single_line_input: 返回单行输入\n- get_choice: 返回用户选择\n- get_multiline_input: 返回多行输入\n- user_confirm: 返回布尔确认值\n- FileCompleter: 文件路径补全器类\n- get_all_rules_formatted: 获取格式化规则列表\n\n## 测试需求\n- 需要为每个公共函数和类编写单元测试\n- 需要测试边界条件和异常处理\n- 需要测试与外部依赖的集成",
+  "created_at": "2026-01-25T21:25:43.221986",
+  "updated_at": "2026-01-25T21:25:43.221989"
+}

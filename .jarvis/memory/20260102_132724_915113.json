@@ -1,0 +1,16 @@
+{
+  "id": "20260102_132724_915113",
+  "type": "project_long_term",
+  "tags": [
+    "print",
+    "PrettyOutput",
+    "Console",
+    "output",
+    "migration",
+    "code_optimization",
+    "jarvis-agent"
+  ],
+  "content": "在Jarvis项目中，需要将所有Console().print或rich console打印调用替换为统一的PrettyOutput方法，以保持输出风格一致。具体要求：\n1. 将Console().print(table)替换为PrettyOutput.print(table_str, output_type=OutputType.INFO, lang=\"markdown\")\n2. 保持原有功能逻辑不变，特别是表格显示功能\n3. 确保OutputType已正确导入\n4. 移除不必要的调试打印，但保留重要的错误或警告信息",
+  "created_at": "2026-01-02T13:27:24.915148",
+  "updated_at": "2026-01-02T13:27:24.915152"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260111_121757_567373",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "methodology",
+    "export_methodology",
+    "refactoring",
+    "type_adapter"
+  ],
+  "content": "在jarvis_methodology/main.py中，export_methodology函数被修改以适配_load_all_methodologies函数的新返回类型List[Tuple[str, str]]。原方法返回Dict[str, str]，现在返回List[Tuple[str, str]]。export_methodology函数通过使用isinstance检查和条件表达式'export_data = dict(methodologies) if not isinstance(methodologies, dict) else methodologies'来兼容两种类型，确保导出功能正常工作。",
+  "created_at": "2026-01-11T12:17:57.567391",
+  "updated_at": "2026-01-11T12:17:57.567393"
+}

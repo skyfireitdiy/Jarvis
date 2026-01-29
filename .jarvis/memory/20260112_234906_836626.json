@@ -1,0 +1,8 @@
+{
+  "id": "20260112_234906_836626",
+  "type": "project_long_term",
+  "tags": ["rule-file", "add_rule.md", "规则注册"],
+  "content": "已更新 builtin/rules/add_rule.md 文件：1) 添加了规则注册章节，要求创建规则文件后必须将规则注册到 .jarvis/rule 文件；2) 参照 builtin_rules.md 的格式添加规则条目；3) 更新了检查清单，包含规则注册的验证项。注意：位置规范和注册要求中的变量不使用 raw 标签，但代码块示例中的变量需要使用 raw 标签。",
+  "created_at": "2026-01-12T23:49:06.836646",
+  "updated_at": "2026-01-12T23:49:06.836649"
+}

@@ -208,7 +208,16 @@ class GitManager:
         # 计算缺失项并准备追加内容
         new_lines: List[str] = []
         for name, patterns in sections.items():
-            missing = [p for p in patterns if p not in existing_set]
+            missing = []
+            for p in patterns:
+                if p == ".jarvis":
+                    # 特殊处理：如果 .gitignore 中已包含 .jarvis 字符串，则跳过
+                    if ".jarvis" not in existing_content:
+                        missing.append(p)
+                else:
+                    # 其他规则保持精确匹配
+                    if p not in existing_set:
+                        missing.append(p)
             if missing:
                 new_lines.append(f"# {name}")
                 new_lines.extend(missing)

@@ -1,0 +1,8 @@
+{
+  "id": "20260101_191926_511849",
+  "type": "project_long_term",
+  "tags": ["decode_output", "utils", "encoding-utility"],
+  "content": "decode_output 函数位于 src/jarvis/jarvis_utils/utils.py，用于处理命令输出编码问题。使用方式：decode_output(result.stdout)，自动尝试 UTF-8、GBK、latin-1 编码。",
+  "created_at": "2026-01-01T19:19:26.511887",
+  "updated_at": "2026-01-01T19:19:26.511891"
+}

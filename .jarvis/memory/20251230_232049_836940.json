@@ -1,0 +1,8 @@
+{
+  "id": "20251230_232049_836940",
+  "type": "project_long_term",
+  "tags": ["FastAPI", "testing", "TestClient", "jarvis_config"],
+  "content": "FastAPI 测试最佳实践：1) 使用 TestClient 而非启动 uvicorn 服务器；2) 测试覆盖包括应用创建、GET/POST 端点、健康检查、错误处理；3) 测试场景应包含成功和失败场景（验证失败、类型错误、缺少必填字段、枚举验证）；4) 使用 tmp_path fixture 创建临时文件避免污染文件系统；5) 测试类命名遵循 Test* 模式",
+  "created_at": "2025-12-30T23:20:49.836954",
+  "updated_at": "2025-12-30T23:20:49.836956"
+}

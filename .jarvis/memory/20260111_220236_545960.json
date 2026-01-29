@@ -1,0 +1,8 @@
+{
+  "id": "20260111_220236_545960",
+  "type": "project_long_term",
+  "tags": ["code-review", "alignment-check", "verification"],
+  "content": "验证了install.sh中的tools数组与pyproject.toml中的[project.scripts]部分对齐的修改。通过检查pyproject.toml的131-171行，确认了所有项目脚本命令都已包含在install.sh的自动补全安装数组中。",
+  "created_at": "2026-01-11T22:02:36.546001",
+  "updated_at": "2026-01-11T22:02:36.546005"
+}

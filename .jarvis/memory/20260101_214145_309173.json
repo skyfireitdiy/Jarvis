@@ -1,0 +1,14 @@
+{
+  "id": "20260101_214145_309173",
+  "type": "project_long_term",
+  "tags": [
+    "subprocess",
+    "decode_output",
+    "text=False",
+    "git ls-files",
+    "input.py"
+  ],
+  "content": "在input.py文件中，get_multiline_input函数的subprocess.run调用已从text=True修改为text=False，并配合使用decode_output函数进行解码。这种修改是为了保持项目中subprocess调用的一致性，所有subprocess调用都应使用text=False + decode_output模式。",
+  "created_at": "2026-01-01T21:41:45.309220",
+  "updated_at": "2026-01-01T21:41:45.309224"
+}

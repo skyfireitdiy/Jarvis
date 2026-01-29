@@ -1,0 +1,13 @@
+{
+  "id": "20260118_211541_129712",
+  "type": "project_long_term",
+  "tags": [
+    "task_list_manager",
+    "refactoring",
+    "task_output_formatter",
+    "progress"
+  ],
+  "content": "TaskListManager 重构进度（2026-01-18）：\n已完成拆分：\n1. TaskListUtils (task_utils.py) - 7个工具函数\n2. AgentStateManager (agent_state_manager.py) - 6个状态管理方法\n3. DependencyValidator (dependency_validator.py) - 2个验证方法+4个异常类\n4. TaskOutputFormatter (task_output_formatter.py) - 2个输出格式化方法\n\n文件行数变化：\n- 原文件 task_list_manager.py: 3078 → 2632 行（减少 446 行）\n- 新增4个模块：task_utils.py(184行)、agent_state_manager.py(136行)、dependency_validator.py(176行)、task_output_formatter.py(140行)\n\n测试状态：17/18 通过（1个失败与拆分无关）\n\n剩余待拆分：TaskVerifier、TaskExecutor、TaskListTool",
+  "created_at": "2026-01-18T21:15:41.129744",
+  "updated_at": "2026-01-18T21:15:41.129747"
+}

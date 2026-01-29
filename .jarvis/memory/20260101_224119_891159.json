@@ -1,0 +1,8 @@
+{
+  "id": "20260101_224119_891159",
+  "type": "project_long_term",
+  "tags": ["web_terminal", "cli", "pyproject_toml"],
+  "content": "Web Terminal CLI配置:\n\n在pyproject.toml中添加了两个命令行入口点：\n1. jarvis-web-terminal = jarvis.jarvis_web_terminal.quick_start:main\n2. jwt = jarvis.jarvis_web_terminal.quick_start:main (缩写)\n\n这两个入口点都指向同一个快速启动脚本，提供了以下CLI参数：\n--host: Web服务主机地址 (默认: 127.0.0.1)\n--port: Web服务端口 (默认: 8766)\n--layout: 分屏布局类型，支持quad/horizontal/vertical (默认: quad)\n--terminal_count: 终端数量 (仅在horizontal和vertical布局中有效, 默认: 4)",
+  "created_at": "2026-01-01T22:41:19.891185",
+  "updated_at": "2026-01-01T22:41:19.891189"
+}

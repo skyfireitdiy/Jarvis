@@ -1,0 +1,8 @@
+{
+  "id": "20251229_232308_021845",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "validation", "error_handling"],
+  "content": "jarvis_config 验证错误处理：\n- ValidationError 类：包含 field_path, message, error_type 属性，提供友好的字符串表示\n- ValidationResult 类：包含 is_valid 标志和错误列表，支持 add_error() 和 get_error_messages()\n- 错误类型：type, required, enum, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength, pattern, minItems, maxItems, uniqueItems\n- 错误消息清晰友好，包含期望值和实际值",
+  "created_at": "2025-12-29T23:23:08.021871",
+  "updated_at": "2025-12-29T23:23:08.021873"
+}

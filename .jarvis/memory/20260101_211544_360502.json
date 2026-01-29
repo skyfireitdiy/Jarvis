@@ -1,0 +1,8 @@
+{
+  "id": "20260101_211544_360502",
+  "type": "project_long_term",
+  "tags": ["subprocess", "encoding", "decode_output", "windows_compatibility"],
+  "content": "Jarvis项目Windows编码兼容性修复模式：所有subprocess调用必须使用text=False + decode_output()解码。decode_output函数位于jarvis.jarvis_utils.utils模块，能自动处理UTF-8/GBK编码。修改模式：subprocess.run([...], text=False) + decode_output(result.stdout)。已修复文件：git_commiter.py、code_agent_git.py、code_agent_diff.py、jarvis.py",
+  "created_at": "2026-01-01T21:15:44.360579",
+  "updated_at": "2026-01-01T21:15:44.360589"
+}

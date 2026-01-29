@@ -1,0 +1,8 @@
+{
+  "id": "20260116_000023_337653",
+  "type": "project_long_term",
+  "tags": ["rule-loading", "prompt_manager", "loaded_rules", "system_prompt"],
+  "content": "修复规则内容不显示在第一条提示词中的问题：在prompt_manager.py的build_system_prompt()方法中添加获取agent_.loaded_rules的逻辑，并将其包含在返回的系统提示词中。修改位置：第48-55行添加loaded_rules获取逻辑，第161行将loaded_rules添加到返回字符串。规则内容用<loaded_rules>标签包裹，标题为'已加载的规则'。",
+  "created_at": "2026-01-16T00:00:23.337669",
+  "updated_at": "2026-01-16T00:00:23.337681"
+}

@@ -1,0 +1,5 @@
+{
+  "problem_type": "Token校准功能实现",
+  "content": "## 问题重述\n需要实现Token校准功能，使用Claude和OpenAI平台API返回的实际token消耗数据，校准本地token统计的准确性，确保本地估算与实际API计费保持一致。\n\n## 可复用解决流程\n1. 分析当前本地token统计实现：\n   - 检查src/jarvis/jarvis_utils/embedding.py中的get_context_token_count函数\n   - 了解当前使用tiktoken库及cl100k_base编码的统计方式\n   - 确认是否存在10/7的调整系数\n\n2. 实现平台API token用量获取：\n   - 在ClaudeModel类中添加get_actual_token_usage方法，使用非流式API获取usage信息\n   - 在OpenAIModel类中添加get_actual_token_usage方法，使用非流式API获取usage信息\n   - 注意流式响应不包含usage信息\n\n3. 实现校准系数计算：\n   - 创建calibrate_token_count方法对比本地估算与实际值\n   - 计算校准系数（实际token / 本地估算）\n   - 添加日志输出显示校准结果\n\n4. 实现校准系数存储管理：\n   - 创建token_calibration.yaml配置文件\n   - 按模型和平台分别存储校准系数\n   - 实现动态更新校准系数的机制\n\n5. 集成到现有系统：\n   - 在对话流程中适时调用校准功能\n   - 使用滑动窗口平均法更新校准系数\n   - 确保不影响正常对话流程\n\n## 注意事项\n1. 性能影响：获取实际token使用量需要额外的API调用，会增加延迟和成本\n2. 流式响应限制：流式API响应中不包含usage信息，必须使用非流式调用\n3. 模型差异：不同模型可能需要不同的校准系数\n4. API限制：频繁的校准调用可能触发API速率限制\n5. 上下文影响：token计费可能受到消息历史、系统提示等因素影响\n\n## 可选步骤\n1. 实现采样校准策略，避免每次调用都进行校准\n2. 添加成本估算功能，使用校准后的系数进行更准确的成本计算\n3. 创建校准测试脚本，便于定期验证校准效果\n4. 实现校准系数版本管理，支持回退功能",
+  "scope": "project"
+}

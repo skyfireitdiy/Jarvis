@@ -1,0 +1,14 @@
+{
+  "id": "20260102_141030_760158",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "data_processing",
+    "schema_parser",
+    "json_yaml",
+    "validation"
+  ],
+  "content": "Jarvis项目数据处理规范维度的AI开发指导规则：\n\n1. 数据格式支持：优先支持JSON和YAML格式的数据处理，使用json和yaml模块进行序列化和反序列化，对于配置文件支持JSON Schema验证，处理大文件时使用流式处理或分块读取\n\n2. 数据验证：实现完整的数据验证机制，包括类型、范围、格式验证，使用JSON Schema进行结构验证，验证失败时提供详细的错误信息，支持对嵌套数据结构的递归验证\n\n3. 数据转换：支持不同数据类型之间的安全转换，实现类型转换失败时的优雅处理，提供数据格式标准化功能，保持数据精度和格式的一致性\n\n4. 编码兼容性处理：优先使用UTF-8编码处理文本数据，自动检测和处理其他编码（如GBK、latin-1），对于无法识别的编码使用latin-1作为最后回退，在数据传输过程中保持编码一致性\n\n关键实现文件：\n- src/jarvis/jarvis_config/schema_parser.py：JSON Schema解析和验证\n- src/jarvis/jarvis_utils/utils.py：编码处理和数据操作工具\n- src/jarvis/jarvis_config/web_app.py：配置文件的保存和加载",
+  "created_at": "2026-01-02T14:10:30.760192",
+  "updated_at": "2026-01-02T14:10:30.760196"
+}

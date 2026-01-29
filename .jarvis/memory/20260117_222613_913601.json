@@ -1,0 +1,8 @@
+{
+  "id": "20260117_222613_913601",
+  "type": "project_long_term",
+  "tags": ["SDD", "spec-driven-development", "refactoring", "c_checker"],
+  "content": "在Jarvis项目中遵循SDD（Spec驱动开发）流程进行模块重构。首先编写详细的功能规范文档（Spec），Spec必须包含功能概述、接口定义、输入输出说明、边界条件、异常处理、验收标准等完整章节。重构c_checker模块时，将规则库与检查逻辑分离，将正则表达式规则组织到独立的规则类中，按功能类别分组（如BaseRules、FormatCommandRules等），实现规则与逻辑解耦，提高代码可维护性和扩展性。",
+  "created_at": "2026-01-17T22:26:13.913619",
+  "updated_at": "2026-01-17T22:26:13.913621"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260111_223626_371102",
+  "type": "project_long_term",
+  "tags": ["output", "style", "color", "configuration"],
+  "content": "auto_print 样式配色参考方案：\n\n语义化配色原则：\n- START/启动类型：bright_blue（明亮的蓝色，表示开始）\n- TARGET/目标类型：bright_magenta（洋红色，突出重点）\n- STOP/停止类型：red（红色，表示停止）\n- RETRY/重试类型：yellow（黄色，表示警告/等待）\n- ROLLBACK/回滚类型：dark_red（深红色，表示严重操作）\n- DIRECTORY/目录类型：bright_cyan（青色，表示文件夹）\n- STATISTICS/统计类型：bright_blue（蓝色，表示信息）\n\n背景色配色原则：\n- 使用 #1c2b3c、#2b1c3c 等深色系背景\n- 保持与现有背景色风格一致\n- 前景色与背景色对比度适中，确保可读性",
+  "created_at": "2026-01-11T22:36:26.371119",
+  "updated_at": "2026-01-11T22:36:26.371121"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260111_232406_821348",
+  "type": "project_long_term",
+  "tags": ["task_list", "sorting", "refactoring", "priority", "task_id"],
+  "content": "在jarvis项目中，任务列表的排序逻辑已从按优先级排序改为按task_id数字部分升序排序。具体修改包括：1) 移除了Task类中的priority属性 2) 移除了所有与priority相关的验证、初始化和使用代码 3) 排序算法改为使用extract_task_number函数从task_id中提取数字部分进行升序排序 4) 相关的测试用例、API接口、UI显示等都已相应更新。这种重构简化了任务管理逻辑，使任务执行顺序更直观（按ID递增）",
+  "created_at": "2026-01-11T23:24:06.821389",
+  "updated_at": "2026-01-11T23:24:06.821393"
+}

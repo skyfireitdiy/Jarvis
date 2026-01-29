@@ -1,0 +1,13 @@
+{
+  "id": "20251111_001536_620290",
+  "type": "project_long_term",
+  "tags": [
+    "release-note-final",
+    "promotion-copy-final",
+    "jarvis-release",
+    "v0.7.2"
+  ],
+  "content": "### Release Note - v0.7.2 2025-11-11\n\n#### **修复 (Fixes)**  \n- 修复子Agent自动完成模式可能无法正确启用的问题\n\n#### **优化与重构 (Refactors & Improvements)**  \n- 在TaskPlanner中增加双重保障机制，确保子Agent的auto_complete属性正确设置\n- 通过初始化参数和实例属性双重设置，提高代码鲁棒性\n\n#### **其他 (Miscellaneous)**  \n- 优化子任务执行器的创建流程，避免因配置缺失导致子任务无法自动完成\n\n本次更新主要解决了子Agent自动完成模式的可靠性问题，通过双重保障机制确保功能正常运行。\n\n---\n\n### 朋友圈推广文案\n\n#### 1. 技术专业风格\n🚀 **Jarvis v0.7.2 发布** 🚀\n修复了子Agent自动完成模式的关键问题！通过双重保障机制确保子任务执行器的可靠性，让AI协作更加流畅。#AI开发 #自动化 #Jarvis\n\n#### 2. 轻松幽默风格\n🤖 Jarvis又双叒叕升级啦！v0.7.2来报到~\n这次给子Agent装上了\"双保险\"，再也不怕它偷懒不自动完成了！代码更可靠，妈妈再也不用担心我的AI助手啦！😄\n\n#### 3. 极简风格\nJarvis v0.7.2\n- 修复子Agent自动完成问题\n- 增强代码可靠性\n- 双重保障机制\n\n#### 4. 营销风格\n🔥 重磅更新！Jarvis v0.7.2 正式发布！\n✨ 突破性改进：子Agent自动完成100%可靠！\n💡 双重保障机制，让AI协作零故障！\n立即体验更智能的开发助手！\n\n#### 5. 朋友圈日常风格\n今天给Jarvis打了个小补丁，v0.7.2来啦！主要是让子Agent更听话，自动完成模式现在有双重保险，不会掉链子了～程序员的日常，修修补补又一版！💻\n\n**版本信息：**\n- 最新tag: v0.7.1\n- 新版本: v0.7.2\n- 发布日期: 2025-11-11\n- 主要变更: 在src/jarvis/jarvis_agent/task_planner.py中增加了子Agent自动完成的双重保障机制\n- 提交信息: fix(jarvis_agent): 确保子Agent自动完成模式正确启用\n",
+  "created_at": "2025-11-11T00:15:36.620312",
+  "updated_at": "2025-11-11T00:15:36.620314"
+}

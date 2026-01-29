@@ -1,0 +1,8 @@
+{
+  "id": "20260130_002404_389659",
+  "type": "project_long_term",
+  "tags": ["evolution", "phase0", "self_verification", "testing_framework"],
+  "content": "阶段0自我验证机制测试框架已完成：1) 回归测试套件（tests/regression/）- 包含关键功能导入测试，使用regression marker；2) 性能测试框架（tests/performance/）- 包含基准测试，使用performance marker，配置性能阈值（响应时间≤1s、内存≤100MB、CPU≤80%）；3) 安全测试框架（tests/security/）- 包含bandit扫描和敏感词检查，使用security marker。所有测试套件已通过验证运行，工具已安装（pytest-cov, coverage, pytest-xdist, pytest-benchmark, pytest-asyncio, bandit）。",
+  "created_at": "2026-01-30T00:24:04.389679",
+  "updated_at": "2026-01-30T00:24:04.389682"
+}

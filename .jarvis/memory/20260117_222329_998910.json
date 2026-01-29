@@ -1,0 +1,14 @@
+{
+  "id": "20260117_222329_998910",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_sec",
+    "c_checker",
+    "refactoring",
+    "规则库分离",
+    "architecture"
+  ],
+  "content": "c_checker 规则库分离重构方案：\n- 原文件：src/jarvis/jarvis_sec/checkers/c_checker.py (2988行)\n- 规则库文件：src/jarvis/jarvis_sec/checkers/c_checker_rules.py\n- 规则分类：9个类别（BaseRules、FormatCommandRules、ThreadRules、CppLockRules、DataRaceRules、DangerousUsageRules、MemoryHelperRules、CppSpecificRules、HelperRules）\n- 总计：78个正则表达式规则\n- 重构目标：保持功能不变，实现规则与检查逻辑解耦\n- 验收标准：所有测试通过、分析结果一致、代码行数减少、规则库独立",
+  "created_at": "2026-01-17T22:23:29.998930",
+  "updated_at": "2026-01-17T22:23:29.998933"
+}

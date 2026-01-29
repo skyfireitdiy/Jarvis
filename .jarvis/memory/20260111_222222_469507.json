@@ -1,0 +1,14 @@
+{
+  "id": "20260111_222222_469507",
+  "type": "project_long_term",
+  "tags": [
+    "token_calculation",
+    "refactoring",
+    "calculate_content_length_limit",
+    "calculate_content_token_limit",
+    "unit_migration"
+  ],
+  "content": "项目已从基于字符的计算迁移到基于token的计算。关键变更：\n1. calculate_content_length_limit() 函数已被删除（返回字符数 token×4）\n2. 使用 calculate_content_token_limit() 替代（返回token数）\n3. 变量命名应准确反映单位：content_token_limit vs content_length_limit\n4. 保守估计：1 token ≈ 4字符，用于字符数到token的近似转换\n5. 所有内容长度计算统一使用get_context_token_count()获取token数\n相关文件：src/jarvis/jarvis_utils/config.py, src/jarvis/jarvis_tools/search_web.py",
+  "created_at": "2026-01-11T22:22:22.469538",
+  "updated_at": "2026-01-11T22:22:22.469541"
+}

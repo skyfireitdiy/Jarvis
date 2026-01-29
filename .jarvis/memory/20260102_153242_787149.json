@@ -1,0 +1,14 @@
+{
+  "id": "20260102_153242_787149",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "task_list_manager",
+    "context_window",
+    "token_limit",
+    "dynamic_calculation"
+  ],
+  "content": "在Jarvis项目中，task_list_manager.py文件实现了基于LLM上下文窗口动态计算输出长度限制的机制。关键实现包括：\n1. _calculate_default_max_output_length函数：根据agent的模型配置动态计算最大输出长度\n2. 优先使用剩余token数量，回退到输入窗口大小的2/3或1/3\n3. token到字符的转换使用1:4的粗略估算比例\n4. 包含多层异常处理和安全回退机制\n5. 在diff大小限制和任务输出长度限制中应用该机制",
+  "created_at": "2026-01-02T15:32:42.787183",
+  "updated_at": "2026-01-02T15:32:42.787186"
+}

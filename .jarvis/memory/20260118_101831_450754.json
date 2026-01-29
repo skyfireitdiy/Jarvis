@@ -1,0 +1,8 @@
+{
+  "id": "20260118_101831_450754",
+  "type": "project_long_term",
+  "tags": ["refactoring", "task_list_manager", "spec", "modularization"],
+  "content": "Task List Manager 重构 Spec (task_list_manager_spec.md): \n- 当前代码: 3078行，职责过多\n- 目标: 拆分为9个独立模块\n- 模块列表: TaskListManager(~400行), DependencyValidator(~300行), TaskExecutor(~500行), TaskVerifier(~300行), TmuxExecutor(~400行), AgentFactory(~200行), OutputProcessor(~200行), TokenCalculator(~150行), TaskListManagerTool(~400行)\n- 验收标准: 每个模块<1000行，测试覆盖率≥80%，所有现有测试通过\n- 原始文件: src/jarvis/jarvis_tools/task_list_manager.py",
+  "created_at": "2026-01-18T10:18:31.450790",
+  "updated_at": "2026-01-18T10:18:31.450794"
+}

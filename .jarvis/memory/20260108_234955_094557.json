@@ -1,0 +1,13 @@
+{
+  "id": "20260108_234955_094557",
+  "type": "project_long_term",
+  "tags": [
+    "code_review",
+    "exception_handling",
+    "keyboard_interrupt",
+    "run_loop"
+  ],
+  "content": "run_loop.py代码审查经验：当用户需求是'让ctrl+c在任何时候都能正常介入'时，需要明确'正常介入'的具体含义。当前实现使用_handle_interrupt_with_input()捕获中断并请求用户输入补充信息后继续执行，这可能不是用户期望的行为。实际需求可能是让Ctrl+C能够立即优雅退出，而不是继续执行。代码审查时应注意验证总结与实际代码的一致性，特别是异常处理逻辑。",
+  "created_at": "2026-01-08T23:49:55.094575",
+  "updated_at": "2026-01-08T23:49:55.094577"
+}

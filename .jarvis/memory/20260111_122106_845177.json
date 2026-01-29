@@ -1,0 +1,8 @@
+{
+  "id": "20260111_122106_845177",
+  "type": "project_long_term",
+  "tags": ["methodology", "type-system", "refactoring"],
+  "content": "方法论加载系统类型结构：_load_all_methodologies 函数返回类型从 Dict[str, str] 改为 List[Tuple[str, str]]，保持按文件修改时间排序的特性（使用 sorted(glob.glob(...), key=os.path.getmtime, reverse=True)）。当需要兼容不同返回类型时，使用 Any 类型声明 + isinstance 类型判断的处理模式。",
+  "created_at": "2026-01-11T12:21:06.845197",
+  "updated_at": "2026-01-11T12:21:06.845201"
+}

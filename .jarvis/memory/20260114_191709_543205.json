@@ -1,0 +1,15 @@
+{
+  "id": "20260114_191709_543205",
+  "type": "project_long_term",
+  "tags": [
+    "auto_print",
+    "emoji_prefix",
+    "model_display",
+    "cheap",
+    "normal",
+    "smart"
+  ],
+  "content": "在欢迎页面添加了cheap、normal、smart三种模型类型的emoji前缀显示：\n1. OutputType枚举新增：CHEAP_MODEL(💰绿色)、NORMAL_MODEL(⭐蓝色)、SMART_MODEL(🧠紫色)\n2. 样式配置：cheap使用绿色、normal使用蓝色、smart使用亮紫色并加粗\n3. 欢迎页面在一行显示三种模型信息，格式为：💰 模型名(平台)  ⭐ 模型名(平台)  🧠 模型名(平台)\n4. 修改文件：src/jarvis/jarvis_utils/output.py、src/jarvis/jarvis_utils/utils.py\n5. 配置函数：get_cheap_model_name、get_cheap_platform_name、get_smart_model_name、get_smart_platform_name",
+  "created_at": "2026-01-14T19:17:09.543233",
+  "updated_at": "2026-01-14T19:17:09.543237"
+}

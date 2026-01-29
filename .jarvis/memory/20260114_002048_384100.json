@@ -1,0 +1,8 @@
+{
+  "id": "20260114_002048_384100",
+  "type": "project_long_term",
+  "tags": ["version-release", "pyproject.toml", "markdownlint", "ReleaseNote"],
+  "content": "Jarvis项目版本发布配置：\n1. 版本号位置：pyproject.toml 第7行，格式为 version = \"x.y.z\"\n2. ReleaseNote格式：使用三级标题（###）开头，标题格式为 \"### Release Note - vx.y.z (YYYY-MM-DD)\"\n3. ReleaseNote章节：包含新功能(Features)、修复、优化与重构、文档更新、测试增强、删除等章节\n4. markdownlint配置：需要在.markdownlint.json中禁用MD013(行长度)、MD024(重复标题)、MD041(首行标题)规则以适配ReleaseNote格式\n5. 版本发布流程：更新pyproject.toml版本号 → 更新ReleaseNote.md → 创建git标签 → 推送标签到远程",
+  "created_at": "2026-01-14T00:20:48.384124",
+  "updated_at": "2026-01-14T00:20:48.384127"
+}

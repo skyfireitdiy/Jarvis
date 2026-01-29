@@ -1,0 +1,14 @@
+{
+  "id": "20260111_125542_816281",
+  "type": "project_long_term",
+  "tags": [
+    "analysis_prompt",
+    "methodology",
+    "task_analyzer",
+    "prompts",
+    "jarvis_agent"
+  ],
+  "content": "任务分析提示词优化（2026-01-11）：在 src/jarvis/jarvis_agent/prompts.py 的 get_task_analysis_prompt() 函数中，为 solution_step 添加了方法论加载优先级指导。优化内容包括：1) 在两个分支（has_generate_new_tool=True/False）中都添加了第一步'优先加载相关方法论'；2) 明确说明项目级方法论存储在 .jarvis/methodologies/ 目录，全局方法论可跨项目共享。这使得任务分析过程能够主动参考项目方法论，提高分析质量和一致性。",
+  "created_at": "2026-01-11T12:55:42.816312",
+  "updated_at": "2026-01-11T12:55:42.816315"
+}

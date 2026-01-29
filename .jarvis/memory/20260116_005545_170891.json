@@ -1,0 +1,8 @@
+{
+  "id": "20260116_005545_170891",
+  "type": "project_long_term",
+  "tags": ["builtin_rules", "jarvis_src_dir", "rule_loading", "bug_fix"],
+  "content": "修复jarvis_src_dir路径计算错误：_get_jarvis_src_dir()函数原为.parent.parent.parent（指向src目录），改为.parent.parent.parent.parent（指向项目根目录）。这导致builtin_rules.md无法被找到，因为实际路径在项目根目录的builtin/rules/下。修复后，builtin_rules.md会被正确加载并添加到初始提示词中，显示完整的内置规则列表（包括架构设计、开发流程、代码质量、安全规范等9个分类）。",
+  "created_at": "2026-01-16T00:55:45.170911",
+  "updated_at": "2026-01-16T00:55:45.170914"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260102_140742_352061",
+  "type": "project_long_term",
+  "tags": ["jarvis", "error_handling", "pretty_output"],
+  "content": "Jarvis项目中使用PrettyOutput类进行错误日志输出，具有多种输出类型，其中OutputType.ERROR用于错误信息输出。PrettyOutput.auto_print方法会根据文本前缀的emoji自动判断输出类型并进行相应格式化输出。",
+  "created_at": "2026-01-02T14:07:42.352071",
+  "updated_at": "2026-01-02T14:07:42.352073"
+}

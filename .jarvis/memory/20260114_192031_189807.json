@@ -1,0 +1,8 @@
+{
+  "id": "20260114_192031_189807",
+  "type": "project_long_term",
+  "tags": ["jarvis", "token_calibration", "token_stat"],
+  "content": "Jarvis项目中Token校准功能的实现方式：\n1. 本地token统计使用tiktoken库，位于src/jarvis/jarvis_utils/embedding.py\n2. BasePlatform基类中提供了get_used_token_count()和get_remaining_token_count()方法\n3. 通过get_context_token_count()函数获取文本的token数量，使用cl100k_base编码并应用10/7调整系数\n4. Claude和OpenAI平台类都继承自BasePlatform\n5. token_calibration.md规则文件已添加到builtin/rules/tool_config/目录下\n6. 项目中存在jarvis_data目录用于存储配置文件和tiktoken缓存",
+  "created_at": "2026-01-14T19:20:31.189829",
+  "updated_at": "2026-01-14T19:20:31.189833"
+}

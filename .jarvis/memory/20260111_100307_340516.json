@@ -1,0 +1,13 @@
+{
+  "id": "20260111_100307_340516",
+  "type": "project_long_term",
+  "tags": [
+    "methodology",
+    "methodology-scope",
+    "jarvis-tools",
+    "MethodologyTool"
+  ],
+  "content": "MethodologyTool工具已支持项目级和全局级方法论管理。关键实现：1) 在parameters中添加scope参数（可选值global/project，默认global）；2) __init__保持无参数，避免registry创建实例时的问题；3) execute方法动态处理scope，通过_get_methodology_dir方法选择目录；4) 复用jarvis_utils.methodology._get_project_methodology_directory函数；5) 保存的JSON文件包含scope字段。项目级方法论存储在.git/methodologies，全局方法论存储在用户数据目录。",
+  "created_at": "2026-01-11T10:03:07.340544",
+  "updated_at": "2026-01-11T10:03:07.340548"
+}
