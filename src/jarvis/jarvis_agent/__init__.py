@@ -65,7 +65,7 @@ from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_tools.registry import ToolRegistry
 
 # jarvis_utils 相关
-from jarvis.jarvis_utils.config import get_addon_prompt_threshold
+from jarvis.jarvis_utils.config import get_addon_prompt_threshold, get_llm_group
 from jarvis.jarvis_utils.config import get_after_tool_call_cb_dirs
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_llm_config
@@ -77,7 +77,6 @@ from jarvis.jarvis_utils.config import is_execute_tool_confirm
 from jarvis.jarvis_utils.config import is_force_save_memory
 from jarvis.jarvis_utils.config import is_use_analysis
 from jarvis.jarvis_utils.config import is_use_methodology
-from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import clear_current_agent
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import get_short_term_memories
@@ -475,7 +474,6 @@ class Agent:
             execute_tool_confirm,
             summary_prompt,
             force_save_memory,
-            llm_group,
             files,
             use_tools,
             non_interactive,
@@ -525,7 +523,6 @@ class Agent:
         execute_tool_confirm: Optional[bool],
         summary_prompt: Optional[str],
         force_save_memory: Optional[bool],
-        llm_group: Optional[str],
         files: Optional[List[str]],
         use_tools: Optional[List[str]],
         non_interactive: Optional[bool],
@@ -567,7 +564,6 @@ class Agent:
         self.force_save_memory = force_save_memory
 
         # 资源与环境配置
-        self.llm_group = llm_group
         self.files = files or []
         self.use_tools = use_tools
         self.non_interactive = non_interactive
@@ -756,7 +752,7 @@ class Agent:
         """初始化模型平台（统一使用 normal 平台/模型）"""
         # 设置当前模型组，供工具和其他组件使用
         set_llm_group(llm_group)
-        
+
         model_name = get_normal_model_name(llm_group)
 
         # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
@@ -815,8 +811,7 @@ class Agent:
             # 优化系统提示词
             optimized_prompt = optimize_system_prompt(
                 current_system_prompt=current_prompt,
-                user_requirement=user_requirement,
-                llm_group=self.llm_group if hasattr(self, "llm_group") else None,
+                user_requirement=user_requirement
             )
 
             # 更新系统提示词
