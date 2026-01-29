@@ -277,16 +277,12 @@ def plan_crate_json_text(
     """
     # 若外层已处理清理确认，则跳过本函数的清理与确认（避免重复询问）
     if skip_cleanup:
-        agent = LLMRustCratePlannerAgent(
-            project_root=project_root, db_path=db_path
-        )
+        agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
         return agent.plan_crate_json_text()
 
     perform_pre_cleanup_for_planner(project_root)
 
-    agent = LLMRustCratePlannerAgent(
-        project_root=project_root, db_path=db_path
-    )
+    agent = LLMRustCratePlannerAgent(project_root=project_root, db_path=db_path)
     return agent.plan_crate_json_text()
 
 

@@ -35,7 +35,7 @@ from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_smart_model_name
+from jarvis.jarvis_utils.config import get_llm_config, get_smart_model_name
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
 from jarvis.jarvis_utils.config import is_use_analysis
@@ -75,7 +75,6 @@ class CodeAgent(Agent):
 
     def __init__(
         self,
-        llm_group: Optional[str] = None,
         need_summary: bool = True,
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
@@ -105,7 +104,6 @@ class CodeAgent(Agent):
 
         # 父类初始化准备和调用
         explicit_params = self._prepare_code_agent_parent_init(
-            llm_group,
             need_summary,
             non_interactive,
             base_tools,
@@ -216,7 +214,6 @@ class CodeAgent(Agent):
 
     def _prepare_code_agent_parent_init(
         self,
-        llm_group: Optional[str],
         need_summary: bool,
         non_interactive: Optional[bool],
         base_tools: List[str],
@@ -226,7 +223,6 @@ class CodeAgent(Agent):
         """准备 CodeAgent 父类初始化的参数
 
         参数:
-            llm_group: 模型组
             need_summary: 是否需要总结
             non_interactive: 是否非交互模式
             base_tools: 基础工具列表
@@ -252,7 +248,6 @@ class CodeAgent(Agent):
             "system_prompt": code_system_prompt,
             "name": name,
             "auto_complete": False,
-            "llm_group": llm_group,
             "need_summary": need_summary,
             "use_methodology": use_methodology,
             "use_analysis": use_analysis,
@@ -289,22 +284,10 @@ class CodeAgent(Agent):
         # 订阅工具调用后事件，用于处理代码修改后的 diff 展示和提交
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
-    def _init_model(self, llm_group: Optional[str]) -> None:
+    def _init_model(self) -> None:
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
-        set_llm_group(llm_group)
-
-        model_name = get_smart_model_name(llm_group)
-
-        # 直接使用 get_smart_platform，避免先调用 create_platform 再回退导致的重复错误信息
-        # get_smart_platform 内部会处理配置获取和平台创建
-        self.model = PlatformRegistry().get_smart_platform(llm_group)
-
-        if model_name:
-            self.model.set_model_name(model_name)
-
-        self.model.set_llm_group(llm_group)
+        self.model = PlatformRegistry().get_smart_platform()
         self.model.set_suppress_output(False)
-
         self.model.agent = self
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
@@ -320,9 +303,7 @@ class CodeAgent(Agent):
             set_current_agent(self.name, self)
 
             # 需求分类：使用 normal_llm 对用户需求进行分类
-            scenario = classify_user_request(
-                user_input, llm_group=self.model.llm_group if self.model else None
-            )
+            scenario = classify_user_request(user_input)
 
             # 根据分类结果获取对应的系统提示词并更新
             scenario_system_prompt = get_system_prompt(scenario)
@@ -1398,6 +1379,7 @@ def cli(
         config_file=config_file,
         llm_group=llm_group,
     )
+
     # CodeAgent 单实例互斥：改为按仓库维度加锁（延后至定位仓库根目录后执行）
     # 锁的获取移动到确认并切换到git根目录之后
 

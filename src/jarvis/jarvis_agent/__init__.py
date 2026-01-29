@@ -81,7 +81,6 @@ from jarvis.jarvis_utils.globals import clear_current_agent
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.globals import make_agent_name
-from jarvis.jarvis_utils.config import set_llm_group
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.input import get_multiline_input
@@ -420,7 +419,6 @@ class Agent:
         system_prompt: str,
         name: str = "Jarvis",
         description: str = "",
-        llm_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
         auto_complete: bool = True,
         output_handler: Optional[List[OutputHandlerProtocol]] = None,
@@ -482,7 +480,7 @@ class Agent:
         )
 
         # 核心组件初始化
-        self._init_model(llm_group)
+        self._init_model()
         self._init_session()
         self._init_handlers(multiline_inputer, output_handler, use_tools or [])
 
@@ -748,19 +746,12 @@ class Agent:
         # 设置系统提示词（基于配置和工具列表构建）
         self._setup_system_prompt()
 
-    def _init_model(self, llm_group: Optional[str]) -> None:
+    def _init_model(self) -> None:
         """初始化模型平台（统一使用 normal 平台/模型）"""
-        # 设置当前模型组，供工具和其他组件使用
-        set_llm_group(llm_group)
-
-        model_name = get_normal_model_name(llm_group)
 
         # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
         # get_normal_platform 内部会处理配置获取和平台创建
-        self.model = PlatformRegistry().get_normal_platform(llm_group)
-
-        if model_name:
-            self.model.set_model_name(model_name)
+        self.model = PlatformRegistry().get_normal_platform()
 
         self.model.set_suppress_output(False)
 

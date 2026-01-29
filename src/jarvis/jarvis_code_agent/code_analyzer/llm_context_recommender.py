@@ -542,20 +542,6 @@ class ContextRecommender:
             if not llm_model:
                 raise ValueError("无法创建LLM模型实例")
 
-            # 先设置模型组（如果从父Agent获取到），因为 llm_group 可能会影响模型名称的解析
-            if self._model_group:
-                try:
-                    llm_model.set_llm_group(self._model_group)
-                except Exception:
-                    pass
-
-            # 然后设置模型名称（如果从父Agent或model_group获取到）
-            if self._model_name:
-                try:
-                    llm_model.set_model_name(self._model_name)
-                except Exception:
-                    pass
-
             # 设置抑制输出，因为这是后台任务
             llm_model.set_suppress_output(True)
 
