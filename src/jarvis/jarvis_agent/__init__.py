@@ -2463,7 +2463,7 @@ class Agent:
         # 使用与调用方相同的模型配置
 
         temp_model = PlatformRegistry().create_platform(
-            self.model.platform_name(), self.model.platform_type, self.model.llm_group
+            self.model.platform_name(), self.model.platform_type
         )
         if not temp_model:
             raise RuntimeError("创建临时模型失败。")

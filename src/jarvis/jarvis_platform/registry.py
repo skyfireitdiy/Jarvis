@@ -10,7 +10,7 @@ from typing import Optional
 from typing import Type
 
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_cheap_platform_name
+from jarvis.jarvis_utils.config import get_cheap_platform_name, get_llm_group
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.config import get_smart_platform_name
@@ -184,19 +184,17 @@ class PlatformRegistry:
         self, model_group_override: Optional[str] = None
     ) -> BasePlatform:
         """获取正常操作的平台实例"""
-        platform_name = get_normal_platform_name(model_group_override)
+        platform_name = get_normal_platform_name()
 
         # 使用 silent=True 避免重复的错误信息，因为失败时会抛出异常
         platform = self.create_platform(
             platform_name,
             platform_type="normal",
-            llm_group=model_group_override,
             silent=True,
         )
         if platform is None:
             raise RuntimeError(
                 f"无法创建平台实例: 平台 '{platform_name}' 创建失败，请检查配置（如 API key 等）。"
-                f"llm_group={model_group_override}"
             )
         return platform
 
@@ -210,7 +208,6 @@ class PlatformRegistry:
         platform = self.create_platform(
             platform_name,
             platform_type="cheap",
-            llm_group=model_group_override,
             silent=True,
         )
         if platform is None:
@@ -229,7 +226,6 @@ class PlatformRegistry:
         platform = self.create_platform(
             platform_name,
             platform_type="smart",
-            llm_group=model_group_override,
             silent=True,
         )
         if platform is None:
@@ -251,7 +247,6 @@ class PlatformRegistry:
         self,
         name: str,
         platform_type: str = "normal",
-        llm_group: Optional[str] = None,
         silent: bool = False,
     ) -> Optional[BasePlatform]:
         """Create platform instance
@@ -272,7 +267,7 @@ class PlatformRegistry:
 
         try:
             platform = self.platforms[name](
-                platform_type=platform_type, llm_group=llm_group
+                platform_type=platform_type, llm_group=get_llm_group()
             )
             return platform
         except Exception as e:
