@@ -1,0 +1,8 @@
+{
+  "id": "20260108_231122_329719",
+  "type": "project_long_term",
+  "tags": ["tests", "pytest", "test_status"],
+  "content": "Jarvis项目pytest测试执行情况（2026-01-08）：共758个测试用例，全部通过，1个跳过，执行时间11.41秒。测试环境：Python 3.12.11，pytest 9.0.2，Linux-WSL2。所有测试位于tests/目录下，覆盖jarvis_agent、jarvis_c2rust、jarvis_code_agent等模块。",
+  "created_at": "2026-01-08T23:11:22.329736",
+  "updated_at": "2026-01-08T23:11:22.329739"
+}

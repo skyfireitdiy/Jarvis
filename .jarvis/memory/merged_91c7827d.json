@@ -1,0 +1,19 @@
+{
+  "content": "Jarvis C2Rust 模块架构设计与转译子命令实施方案\n\n【总体目标】\n构建完整的 C/C++ -> Rust 渐进迁移系统，包含模块架构设计、单一Rust工程管理与函数级转译能力。\n\n【核心架构决策】\n1) 单一Rust工程：仅保留 .jarvis/c2rust/rustlib 为唯一crate，使用 cargo init --vcs none 初始化；强制 [lib] crate-type=[\"staticlib\"]；src/lib.rs 提供 #[no_mangle] c2rust_hello() -> 42\n2) 清理策略：ensure_rust_project 在运行时清理误创建的 .jarvis/c2rust/Cargo.toml、.jarvis/c2rust/src 以及嵌套 .jarvis/c2rust/.git，避免父目录crate与嵌套git仓库\n3) 测试脚本生成：.jarvis/c2rust/test.sh 由 create_test_sh 生成为实体文件（若是符号链接则替换为普通文件）；始终包含\"受保护的Rust静态库构建段\"（存在 rustlib/Cargo.toml 时才构建）；设置 PYTHONPATH=src 保证导入路径稳定\n4) 测试容错：若探测包含 pytest，则在 test.sh 中注入\"安装pytest（best-effort）+ 无pytest时降级到最小导入检查（import jarvis ok）\"的逻辑，避免在干净环境下硬失败\n5) 运行保护：run_test_sh_loop 若发现 test.sh 是符号链接会重建为正常文件，避免指向placeholder；并在失败时按需安装pytest进行基础自愈\n\n【转译子命令架构】\n- 位置与命名：在 src/jarvis/jarvis_c2rust 下新增模块 transpiler.py，在 cli.py 中新增子命令 transpile，与现有 scan/plan 并列\n\n【数据输入】\n- 依赖 scanner 产物：<root>/.jarvis/c2rust/functions.jsonl（含函数位置信息、调用关系、拓扑顺序）与 types.jsonl（如有）\n- 源码根目录：默认当前工作目录或从扫描记录推断\n\n【转译流程（按 scanner 生成的函数顺序）】\n1) 为每个待转函数创建一个 LLM Agent（模块选择与签名生成Agent）：\n   - 输入：原C函数源码片段（通过位置信息读取）、位置信息（文件、起止行列）、被调用函数清单（若已转：提供已转 Rust 模块/路径；未转：提供原C函数位置信息）\n   - 输入：当前 crate 目录结构（模块树、已存在mod.rs）\n   - 产出：建议落盘目标Rust模块路径、函数签名（summary中输出），并将当前函数进度写入进度JSON\n\n2) 生成实现：\n   - 创建 CodeAgent 作为执行体，上下文包含：目标模块、函数签名、C源码片段、依赖函数信息、crate结构、放置位置建议\n   - 让 CodeAgent 生成/更新对应Rust文件中的函数实现\n\n3) 构建与修复：\n   - 调用 cargo build（或项目构建命令）尝试编译\n   - 若失败：收集错误、相关上下文，创建 CodeAgent 进行修复，迭代直到构建通过（设定失败重试上限，避免死循环）\n\n4) 代码审查与优化：\n   - 创建审查Agent进行代码审查；若summary指出问题，则再次创建 CodeAgent 优化，直至通过\n\n5) 标记与映射：\n   - 将该函数标记为\"已转换\"，记录C符号到Rust符号/模块路径的映射到 symbol_map.json\n\n【产物与状态记录】\n- 进度文件：<root>/.jarvis/c2rust/progress.json（记录当前处理到的函数、状态、建议模块、签名等）\n- 映射文件：<root>/.jarvis/c2rust/symbol_map.json（记录 C 符号 -> Rust 符号/模块路径）\n\n【CLI 参数建议】\n- --root 指定项目根；--llm-group 指定模型组；--resume 续跑；--max-retries 构建修复最大次数；--only 函数过滤；--dry-run 仅规划不落盘\n\n【失败策略】\n- 连续构建失败超过阈值时暂停当前函数并记录错误详情，继续下一个或退出（提供 --max-retries 选项）\n\n【设计原则】\n- 单一工程管理：避免多crate冲突与嵌套仓库问题\n- 渐进转译：按函数顺序逐个处理，支持断点续跑\n- 自动修复：构建失败时自动创建修复Agent\n- 状态追踪：完整的进度与映射记录机制\n- 容错设计：测试脚本具备环境适应能力\n\n【预期效果】\n- 建立清晰的C2Rust模块架构与工程管理规范\n- 提供完整的函数级转译能力与状态管理\n- 确保测试框架的稳定性与环境适应性\n- 支持可中断、可恢复的渐进迁移流程",
+  "tags": [
+    "jarvis_c2rust",
+    "c2rust",
+    "transpile",
+    "architecture",
+    "rustlib",
+    "subcommand",
+    "migration_system",
+    "progressive_transformation",
+    "error_handling",
+    "state_management"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251024_004920_607524", "20251019_210847_798084"],
+  "id": "merged_91c7827d",
+  "created_at": "2025-11-12T23:46:30.994265"
+}

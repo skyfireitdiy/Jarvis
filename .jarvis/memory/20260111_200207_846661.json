@@ -1,0 +1,14 @@
+{
+  "id": "20260111_200207_846661",
+  "type": "project_long_term",
+  "tags": [
+    "jgc-commit",
+    "code_review",
+    "quick_config",
+    "prompt_removal",
+    "user_requirements"
+  ],
+  "content": "代码审查记录：移除jqc命令中的提示信息'💡 现在可以使用 --llm-group 或 -g 参数指定 {config_name} 配置'，修改位于src/jarvis/jarvis_utils/quick_config.py文件233-235行，仅移除提示文本不影响功能",
+  "created_at": "2026-01-11T20:02:07.846679",
+  "updated_at": "2026-01-11T20:02:07.846682"
+}

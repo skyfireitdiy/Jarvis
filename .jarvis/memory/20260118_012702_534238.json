@@ -1,0 +1,8 @@
+{
+  "id": "20260118_012702_534238",
+  "type": "project_long_term",
+  "tags": ["c_checker", "refactoring", "rule_replacement", "TDD"],
+  "content": "在c_checker.py重构过程中，将本地规则引用替换为规则库引用的关键步骤：\n1. 从c_checker.py中删除第32-189行的本地规则定义（约78个RE_*正则表达式）\n2. 将所有规则引用替换为规则类属性（如RE_UNSAFE_API → BaseRules.RE_UNSAFE_API）\n3. 添加规则库导入语句：from jarvis.jarvis_sec.checkers.c_checker_rules import (BaseRules, FormatCommandRules, ThreadRules, CppLockRules, DataRaceRules, DangerousUsageRules, MemoryHelperRules, CppSpecificRules, HelperRules)\n4. 规则分类映射：BaseRules（基础API安全）、FormatCommandRules（格式化命令）、ThreadRules（线程相关）、CppLockRules（C++锁相关）、DataRaceRules（数据竞争）、DangerousUsageRules（危险用法）、MemoryHelperRules（内存管理助手）、CppSpecificRules（C++特定）、HelperRules（辅助规则）",
+  "created_at": "2026-01-18T01:27:02.534340",
+  "updated_at": "2026-01-18T01:27:02.534347"
+}

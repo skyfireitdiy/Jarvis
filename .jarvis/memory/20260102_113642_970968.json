@@ -1,0 +1,14 @@
+{
+  "id": "20260102_113642_970968",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "configuration",
+    "llm_groups",
+    "llms",
+    "reference_mechanism"
+  ],
+  "content": "Jarvis系统中的LLM配置引用机制：\n1. llms配置：定义可复用的LLM配置项，包含platform、model、max_input_token_count、llm_config等参数\n2. llm_groups配置：通过引用方式使用llms中定义的配置，支持normal_llm、cheap_llm、smart_llm、web_llm四种引用类型\n3. 禁止直接定义：llm_groups中不再支持直接定义platform、model等参数，必须通过引用方式\n4. 引用处理：通过_expand_llm_references函数实现引用解析和配置展开\n5. 验证机制：在代码和Schema中都明确验证引用机制的正确使用",
+  "created_at": "2026-01-02T11:36:42.970988",
+  "updated_at": "2026-01-02T11:36:42.970991"
+}

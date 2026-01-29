@@ -1,0 +1,13 @@
+{
+  "id": "20260119_224852_163598",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "duplicate_prompt",
+    "confirm_add_new_files",
+    "global_flag"
+  ],
+  "content": "修复了二进制文件/超大代码增加时重复询问用户的问题\n\n问题原因：在 _on_after_tool_call 流程中，get_diff_file_list() 和 handle_commit_workflow() 都会调用 confirm_add_new_files()，导致重复询问。\n\n解决方案：使用全局标记机制避免重复询问\n1. 在 git_utils.py 中添加全局变量 _confirm_add_new_files_called\n2. 添加 reset_confirm_add_new_files_flag() 辅助函数\n3. 在 confirm_add_new_files() 中检查标记，已确认过则直接返回\n4. 在流程开始时重置标记：\n   - code_agent.py 的 _on_after_tool_call\n   - code_agent_git.py 的 handle_uncommitted_changes\n\n修改文件：\n- src/jarvis/jarvis_utils/git_utils.py\n- src/jarvis/jarvis_code_agent/code_agent.py\n- src/jarvis/jarvis_code_agent/code_agent_git.py",
+  "created_at": "2026-01-19T22:48:52.163626",
+  "updated_at": "2026-01-19T22:48:52.163631"
+}

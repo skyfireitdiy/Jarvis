@@ -1,0 +1,13 @@
+{
+  "id": "20260101_211936_461974",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "encoding-compatibility",
+    "subprocess",
+    "windows-compatibility"
+  ],
+  "content": "Jarvis 项目 subprocess 编码修复规范：\n- 问题：Windows 系统上 subprocess 使用 text=True 但未指定 encoding，导致使用系统默认编码（GBK），遇到非 GBK 字符时抛出 UnicodeDecodeError\n- 解决方案：text=True 改为 text=False，使用 decode_output() 函数解码 stdout/stderr\n- decode_output 位置：jarvis.jarvis_utils.utils 模块\n- 验证标准：ruff check 通过 + 无 text=True 残留 + 所有输出使用 decode_output() 解码",
+  "created_at": "2026-01-01T21:19:36.461998",
+  "updated_at": "2026-01-01T21:19:36.462000"
+}

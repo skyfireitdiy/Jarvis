@@ -1,0 +1,8 @@
+{
+  "id": "20251230_230518_002831",
+  "type": "project_long_term",
+  "tags": ["code_quality", "ruff", "mypy", "jarvis_config"],
+  "content": "jarvis_config 代码质量标准：\n- 使用 ruff 进行代码风格检查\n- 使用 mypy 进行类型检查\n- 必须通过所有静态检查才能交付",
+  "created_at": "2025-12-30T23:05:18.002847",
+  "updated_at": "2025-12-30T23:05:18.002849"
+}

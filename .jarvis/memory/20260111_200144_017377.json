@@ -1,0 +1,8 @@
+{
+  "id": "20260111_200144_017377",
+  "type": "project_long_term",
+  "tags": ["jqc", "quick_config", "代码位置", "提示信息"],
+  "content": "jqc（quick_config）命令实现位置：src/jarvis/jarvis_utils/quick_config.py。配置保存成功后会有提示信息（现已删除 --llm-group 参数提示）。jqc 命令会自动配置 llms 和 llm_groups，并设置默认模型组。",
+  "created_at": "2026-01-11T20:01:44.017402",
+  "updated_at": "2026-01-11T20:01:44.017405"
+}

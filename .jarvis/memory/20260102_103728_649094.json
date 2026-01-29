@@ -1,0 +1,8 @@
+{
+  "id": "20260102_103728_649094",
+  "type": "project_long_term",
+  "tags": ["parallel_execution", "tmux", "jvs_command", "task_list_manager"],
+  "content": "在task_list_manager中实现了并行执行机制，包含以下关键组件：\n1. _is_codeagent_running方法：检测当前是否为CodeAgent运行环境\n2. _is_tmux_environment方法：检测当前是否在tmux环境中运行\n3. _identify_parallelizable_tasks方法：识别可以并行执行的任务列表，分析任务依赖关系\n4. _execute_parallel_tasks方法：在tmux环境中并行执行多个任务，使用jvs命令启动任务\n5. 并行执行只在非CodeAgent且在tmux环境中启用，不影响原有串行执行逻辑\n6. 实现了任务同步机制，等待并行任务完成并收集结果",
+  "created_at": "2026-01-02T10:37:28.649115",
+  "updated_at": "2026-01-02T10:37:28.649117"
+}

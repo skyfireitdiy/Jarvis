@@ -1,0 +1,8 @@
+{
+  "id": "20260111_215718_694792",
+  "type": "project_long_term",
+  "tags": ["search_web", "token_calculation", "bug_fix", "loop_optimization"],
+  "content": "search_web工具token计算bug修复经验：\n- 问题：在循环中每次调用calculate_content_length_limit()计算剩余token，导致返回值总是最大值（因为还未实际消耗）\n- 解决方案：在循环开始前计算一次content_length_limit，然后在循环中通过remaining_limit = content_length_limit - len(full_content)动态计算剩余可用限制\n- 修复文件：src/jarvis/jarvis_tools/search_web.py\n- 关键原则：涉及累积消耗的计算，应该在循环外初始化基准值，循环内通过减法更新剩余量，而非重复计算",
+  "created_at": "2026-01-11T21:57:18.694828",
+  "updated_at": "2026-01-11T21:57:18.694832"
+}

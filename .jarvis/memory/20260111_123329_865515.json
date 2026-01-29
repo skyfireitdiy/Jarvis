@@ -1,0 +1,8 @@
+{
+  "id": "20260111_123329_865515",
+  "type": "project_long_term",
+  "tags": ["jarvis", "registry", "tool_call", "自动补全", "解析逻辑"],
+  "content": "registry.py中的ToolRegistry类有两个关键的tool_call处理逻辑：\n1. 在_extract_tool_calls_from_content方法中，会检查</TOOL_CALL>标签是否在内容末尾且前面没有换行符，如果有则自动插入换行符\n2. 如果检测到有开始标签但没有结束标签，会自动补全结束标签以修复内容\n这些逻辑确保了工具调用内容的正确解析",
+  "created_at": "2026-01-11T12:33:29.865535",
+  "updated_at": "2026-01-11T12:33:29.865537"
+}

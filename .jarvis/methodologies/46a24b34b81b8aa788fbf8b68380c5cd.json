@@ -1,0 +1,5 @@
+{
+  "problem_type": "Agent初始化函数重构",
+  "content": "1. **提取_init_basic_attributes方法**：将376-417行的基础属性初始化逻辑提取为独立方法\n2. **提取_resolve_config方法**：将446-501行的配置解析逻辑提取为独立方法，包含use_methodology、use_analysis、execute_tool_confirm、force_save_memory、auto_complete的解析\n3. **提取_init_managers方法**：将504-512行的事件总线和管理器初始化提取为独立方法\n4. **提取_ensure_tools方法**：将515-520行的工具确保逻辑提取为独立方法\n5. **在__init__中添加清晰的分组注释**：使用分隔线注释标识每个初始化阶段\n6. **保持向后兼容**：所有提取的方法都作为私有方法，不影响公共接口",
+  "scope": "project"
+}

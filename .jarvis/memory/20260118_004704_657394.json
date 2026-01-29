@@ -1,0 +1,8 @@
+{
+  "id": "20260118_004704_657394",
+  "type": "project_long_term",
+  "tags": ["c_checker", "规则库分离", "refactoring"],
+  "content": "c_checker_rules.py已成功创建，包含9个规则类共82个正则表达式规则。规则分类：BaseRules(4)、FormatCommandRules(6)、ThreadRules(7)、CppLockRules(9)、DataRaceRules(5)、DangerousUsageRules(7)、MemoryHelperRules(12)、CppSpecificRules(24)、HelperRules(6)。所有规则使用re.compile()编译，保持re.IGNORECASE等编译标志不变。测试文件test_c_checker_rules.py的82个测试全部通过。",
+  "created_at": "2026-01-18T00:47:04.657436",
+  "updated_at": "2026-01-18T00:47:04.657439"
+}

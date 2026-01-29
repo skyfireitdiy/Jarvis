@@ -1,0 +1,13 @@
+{
+  "id": "20260112_231936_226278",
+  "type": "project_long_term",
+  "tags": [
+    "version-release",
+    "rule-file",
+    "ReleaseNote",
+    "semantic-versioning"
+  ],
+  "content": "Jarvis版本发布规则文件：\n- 文件路径：/home/skyfire/code/Jarvis/.jarvis/rules/version_release.md\n- 版本号格式：语义化版本 vX.Y.Z（如 v1.1.1）\n- ReleaseNote.md位置：项目根目录\n- 版本发布流程：1)获取最新tag(git describe --tags --abbrev=0) 2)获取当前日期(date +%Y-%m-%d) 3)获取代码变更(git diff <tag> HEAD) 4)学习ReleaseNote格式 5)生成新版本内容并插入头部\n- 关键原则：必须使用git diff获取真实代码变更，不使用commit信息；版本类型由用户确认(major/minor/patch)",
+  "created_at": "2026-01-12T23:19:36.226293",
+  "updated_at": "2026-01-12T23:19:36.226296"
+}

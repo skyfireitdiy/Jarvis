@@ -1,0 +1,8 @@
+{
+  "id": "20260118_003159_172860",
+  "type": "project_long_term",
+  "tags": ["c_checker", "jarvis_sec", "testing", "rules"],
+  "content": "c_checker.py包含78个正则表达式规则，分布在9个类别中：BaseRules(4个)、FormatCommandRules(6个)、ThreadRules(7个)、CppLockRules(8个)、DataRaceRules(5个)、DangerousUsageRules(7个)、MemoryHelperRules(12个)、CppSpecificRules(24个)、HelperRules(6个)。测试文件tests/jarvis_sec/test_c_checker_rules.py已创建，包含80个测试用例，所有测试通过。",
+  "created_at": "2026-01-18T00:31:59.172876",
+  "updated_at": "2026-01-18T00:31:59.172878"
+}

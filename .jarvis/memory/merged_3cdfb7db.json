@@ -1,0 +1,19 @@
+{
+  "content": "Jarvis 多Agent系统架构扩展与集成框架设计\n\n【总体目标】\n在现有 Jarvis 框架基础上构建完整的多Agent系统，支持复杂任务编排、产物管理与工具链集成，确保可扩展性与系统稳定性。\n\n【核心架构扩展（2025-10-19）】\n\n【与现有框架映射与扩展】\n- 扩展 src/jarvis/jarvis_agent/__init__.py 与 src/jarvis/jarvis_multi_agent/__init__.py\n- 新增 orchestrator、agents、adapters、schemas、cli 模块\n- 注册子Agent与消息契约\n- 结构化日志接入\n- 错误处理和重试策略\n\n【实施约束与设计锚点】\n- 需在 src/jarvis/jarvis_agent/__init__.py 与 src/jarvis/jarvis_multi_agent/__init__.py 基础上扩展\n- 新增 Orchestrator/TaskRegistry/ArtifactStore\n- 多Agent角色覆盖：\n  * 采集构建、语法语义分析、静态分析\n  * 运行时验证、LLM语义分析\n  * 风险量化、决策规划\n  * 重构修复、Rust重写\n  * 集成跨语言、测试生成\n  * 性能基准、报告人机协作、产物归档\n\n【统一CLI设计】\n- 构建统一CLI：oh-sec init/scan/plan/fix/rewrite/test/bench/report\n- 支持完整的任务生命周期管理\n\n【产物管理体系】\n- 产物目录：.jarvis/artifacts/{graphs,reports,patches,tests,bench}\n- 结构化存储与索引机制\n- 支持产物的版本控制与回溯\n\n【工具链集成】\n- 静态分析：clang/llvm、clang-tidy/cppcheck/scan-build/Infer\n- 运行时检测：sanitizers、valgrind\n- 语言转换：c2rust、bindgen\n- 测试覆盖：cargo-llvm-cov、nextest\n- 模糊测试：AFL/LibFuzzer\n\n【扩展点设计】\n- 模块化架构：支持功能模块的独立开发与集成\n- 消息契约：标准化Agent间通信协议\n- 适配器模式：支持不同工具与格式的集成\n- 可插拔设计：支持功能的动态加载与卸载\n\n【设计原则】\n- 最小侵入：在现有框架基础上扩展，不破坏原有结构\n- 模块化设计：各功能模块独立，便于维护与测试\n- 标准化接口：统一的消息格式与API设计\n- 可扩展性：支持未来功能的平滑添加\n- 错误恢复：完善的重试与回退机制\n\n【预期效果】\n- 建立完整的多Agent系统架构\n- 提供统一的CLI接口与产物管理\n- 支持复杂任务的编排与执行\n- 确保系统的可扩展性与稳定性\n- 实现工具链的统一集成与管理\n- 建立标准化的扩展框架",
+  "tags": [
+    "jarvis_agent",
+    "jarvis_multi_agent",
+    "architecture",
+    "cli",
+    "artifacts",
+    "extension_points",
+    "integration_framework",
+    "orchestration_system",
+    "modular_design",
+    "toolchain_integration"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251019_092234_728204", "20251019_092731_066897"],
+  "id": "merged_3cdfb7db",
+  "created_at": "2025-11-12T23:48:25.938632"
+}

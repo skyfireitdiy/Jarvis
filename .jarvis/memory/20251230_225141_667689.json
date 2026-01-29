@@ -1,0 +1,8 @@
+{
+  "id": "20251230_225141_667689",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "zen-ios-hybrid", "design-spec"],
+  "content": "Zen-iOS Hybrid 前端设计规范要点：\n1. 底色：iOS 系统级灰 #F2F2F7 或冷灰 #F9F9FB，禁止纯白\n2. 毛玻璃：backdrop-blur 40-60px，背景色 White/40-60\n3. 双层物理描边：内边框 white/60 + 外边框 gray-200/40（必须同时使用）\n4. 阴影：悬浮组件 0 24px 48px -12px rgba(0,0,0,0.08)，凹陷组件 shadow-inset\n5. 主按钮：深空黑 #1C1C1E，次级按钮带投影白色块\n6. 触觉反馈：active:scale-95 或 active:scale-[0.98]\n7. 圆角：大容器 40-50px，功能块 28px，小组件 16px\n8. 字体：Inter 或 SF Pro Display，标题 Font-Extrabold + Tracking-tight\n9. 标签：Uppercase + Tracking-widest，Font-Bold + text-[10px]\n10. 图标：Lucide-React，线条粗细 1.5 或 2\n质量检查清单共15项，位于 builtin/rules/ios-front-style.md",
+  "created_at": "2025-12-30T22:51:41.667723",
+  "updated_at": "2025-12-30T22:51:41.667726"
+}

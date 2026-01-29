@@ -1,0 +1,8 @@
+{
+  "id": "20251111_005631_355338",
+  "type": "project_long_term",
+  "tags": ["git-diff-analysis", "v0.7.2", "code-changes"],
+  "content": "## Git Diff分析结果 (v0.7.1..HEAD)\n\n### 主要修改文件：\n1. final_release_note_and_promotion.md - 新增的Release Note和推广文案文件\n2. src/jarvis/jarvis_agent/__init__.py - Agent类核心改进\n3. src/jarvis/jarvis_agent/task_analyzer.py - TaskAnalyzer类改进  \n4. src/jarvis/jarvis_agent/task_planner.py - TaskPlanner类重大改进\n\n### 关键技术改进：\n\n#### Agent类改进：\n- 使用临时模型生成summary，避免污染主会话历史\n- 清理summary中的!!!COMPLETE!!!标记，防止重复触发完成流程\n- 为子Agent添加特殊处理：广播事件前清空session.prompt和addon_prompt\n- 避免重复执行任务规划：检查__task_planning_done__标记\n\n#### TaskPlanner类改进：\n- 添加双重保障机制确保子Agent的auto_complete属性正确设置\n- 通过初始化参数和实例属性双重设置提高代码鲁棒性\n- 禁用任务分析避免重复执行：设置use_analysis=False\n- 添加子Agent标记机制：__is_child_agent__\n- 临时禁用TaskAnalyzer的事件订阅避免额外逻辑触发\n- 清理summary中的!!!COMPLETE!!!标记保留实际内容\n- 标记父Agent已完成规划避免重复执行\n\n#### TaskAnalyzer类改进：\n- 清空session.prompt避免分析完成后再次触发执行\n- 标记已完成分析避免事件回调重复执行：_analysis_done=True\n\n### 问题解决：\n- 修复子Agent自动完成模式可能无法正确启用的问题\n- 修复summary生成过程中可能污染主会话历史的问题  \n- 修复TaskAnalyzer在完成时可能触发额外逻辑导致重复执行的问题\n- 优化子任务执行器的创建流程，避免因配置缺失导致子任务无法自动完成\n\n### 新增功能：\n- 子Agent标记机制便于后续判断和处理\n- 双重保障机制提高代码可靠性\n- 临时模型创建用于summary生成\n- 任务规划完成标记避免重复执行\n\n### 版本信息：\n- 基础版本：v0.7.1\n- 新版本：v0.7.2\n- 当前日期：2025-11-11\n",
+  "created_at": "2025-11-11T00:56:31.355370",
+  "updated_at": "2025-11-11T00:56:31.355374"
+}

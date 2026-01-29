@@ -1,0 +1,8 @@
+{
+  "id": "20260113_234128_078287",
+  "type": "project_long_term",
+  "tags": ["task_analyzer", "事件机制", "交互模式", "non_interactive"],
+  "content": "Jarvis 任务分析器的事件订阅机制：\n- task_analyzer 订阅 TASK_COMPLETED 和 BEFORE_SUMMARY 事件\n- 通过事件驱动解耦，但需要在事件处理器内部进行控制判断\n- non_interactive 属性控制交互/非交互模式，默认 False（交互模式）\n- 交互模式下应跳过任务分析，避免不必要的处理\n\n相关文件：\n- src/jarvis/jarvis_agent/task_analyzer.py：任务分析器实现\n- src/jarvis/jarvis_agent/__init__.py：Agent 主类，事件广播位置\n\n关键事件：\n- TASK_COMPLETED：任务完成时触发\n- BEFORE_SUMMARY：生成总结前触发\n\n修复历史：\n- 提交 3ba327d：修复了直接调用路径，但忽略了事件触发路径\n- 提交 1ef4796：在事件处理器内部添加交互模式判断",
+  "created_at": "2026-01-13T23:41:28.078311",
+  "updated_at": "2026-01-13T23:41:28.078315"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260111_123329_864211",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "run_loop",
+    "tool_call",
+    "registry",
+    "自动补全",
+    "解析逻辑"
+  ],
+  "content": "在run_loop.py的_filter_tool_calls_from_response函数中，新增了与registry一致的tool_call内容解析逻辑：\n1. 检测并修复末尾的TOOL_CALL关闭标签前缺少换行符的问题\n2. 当有开始标签但没有结束标签时，自动补全结束标签\n3. 这些逻辑与registry中的处理方式保持一致，确保在run_loop显示提示词时能正确处理不完整的tool_call标签",
+  "created_at": "2026-01-11T12:33:29.864233",
+  "updated_at": "2026-01-11T12:33:29.864236"
+}

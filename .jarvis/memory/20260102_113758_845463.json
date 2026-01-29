@@ -1,0 +1,16 @@
+{
+  "id": "20260102_113758_845463",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "config_schema",
+    "llm_groups",
+    "normal_llm",
+    "cheap_llm",
+    "smart_llm",
+    "web_llm"
+  ],
+  "content": "llm_groups配置验证规则：\n1. 每个llm_groups中的组必须至少定义normal_llm引用\n2. 可选定义cheap_llm、smart_llm、web_llm引用\n3. 不再支持直接在组中定义platform、model、max_input_token_count等参数\n4. 引用的LLM配置必须在llms配置项中定义\n5. 代码中通过_expand_llm_references函数实现引用展开逻辑",
+  "created_at": "2026-01-02T11:37:58.845482",
+  "updated_at": "2026-01-02T11:37:58.845485"
+}

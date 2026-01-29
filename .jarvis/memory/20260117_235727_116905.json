@@ -1,0 +1,8 @@
+{
+  "id": "20260117_235727_116905",
+  "type": "project_long_term",
+  "tags": ["architecture", "task_list", "TaskList", "TaskListManager"],
+  "content": "任务列表管理架构：TaskList 类（位于 src/jarvis/jarvis_agent/task_list.py）是数据模型类，负责存储任务数据；TaskListManager 类（位于 src/jarvis/jarvis_tools/task_list/task_list_manager.py）是管理类，负责任务的 CRUD 操作、权限管理和依赖验证。关键区别：_validate_dependencies 方法属于 TaskListManager 而非 TaskList；TaskList 没有 agent_id 属性（权限相关属性由 TaskListManager 的 agent_task_mapping 管理）。",
+  "created_at": "2026-01-17T23:57:27.116940",
+  "updated_at": "2026-01-17T23:57:27.116945"
+}

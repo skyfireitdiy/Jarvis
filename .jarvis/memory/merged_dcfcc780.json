@@ -1,0 +1,18 @@
+{
+  "content": "版本发布自动化流程最佳实践与Jarvis项目实施实例（v0.7.2发布案例）\n\n【核心流程】\n1. 检测未提交代码并使用jgc命令提交\n2. 获取最新tag版本号: git describe --tags $(git rev-list --tags --max-count=1)\n3. 获取当前日期: date +\"%Y-%m-%d\"\n4. 获取代码变更: git diff <tag>..HEAD | cat -\n5. 基于实际git diff信息生成release note和推广文案\n6. 版本号递增规则: 基于HEAD相对于最新tag的变更确定新版本号\n\n【版本发布检查清单】\n1. ✅ 检查未提交代码：使用 `git status --porcelain` 检测，如有则用 `jgc` 提交\n2. ✅ 获取最新tag：使用 `git describe --tags --abbrev=0`\n3. ✅ 获取当前时间：使用 `date +\"%Y-%m-%d\"`\n4. ✅ 获取代码变更：使用 `git diff <tag>..HEAD | cat -` 获取详细变更信息\n5. ✅ 获取提交信息：使用 `git log --oneline -1` 确认提交分类\n6. ✅ 验证变更准确性：对比实际git diff与生成内容的一致性\n7. ✅ 保存最终文档：将release note和推广文案保存到文件和记忆系统\n\n【关键工具和命令】\n- jgc命令：自动化Git提交工具\n- git diff分析：获取详细的代码变更信息\n- 版本号确定：基于最新tag的增量版本（如v0.7.1 → v0.7.2）\n- git describe --tags --abbrev=0：获取最新tag\n- git log --oneline -1：确认提交分类\n- git rev-list --tags --max-count=1：获取最新tag的另一种方式\n\n【Release Note生成标准】\n- 根据提交信息分类（fix/feat等）\n- 基于实际代码变更内容\n- 包含修复、优化、文档等分类\n- 版本号格式：v{major}.{minor}.{patch}\n- 按标准Markdown格式输出\n\n【朋友圈文案风格模板】\n1. 技术专业风格：突出技术价值和改进\n2. 轻松幽默风格：拟人化表达，增加亲和力\n3. 极简风格：简洁明了的核心信息\n4. 营销风格：强调突破性和用户体验\n5. 朋友圈日常风格：生活化表达，程序员日常\n\n【Jarvis项目v0.7.2版本发布实例】\n- 当前版本：v0.7.2 (2025-11-11)\n- 上一版本：v0.7.1\n- 发布时间：2025-11-10\n- 主要变更：TaskPlanner子Agent自动完成双重保障机制\n- 变更文件：src/jarvis/jarvis_agent/task_planner.py\n\n【具体修复内容】\n- 检测并提交了未提交的代码：fix(task_planner): 过滤子任务结果中的完成标记避免重复触发完成逻辑\n- 修复了多智能体模式下的auto_complete逻辑\n- 修复了run_loop中的重复完成问题\n- 修复了task_planner中的子任务结果过滤问题\n\n【关键检查点】\n- 版本号确定：基于当前HEAD相对于最新tag的变更\n- 变更分类：根据提交信息（如fix/feat等）进行准确分类\n- 内容验证：实际git diff信息与生成内容的一致性验证\n\n【自动化流程执行结果】\n- 已完成Jarvis项目的发布流程自动化任务\n- 执行了完整的git工作流检查和提交\n- 生成了标准化的release note\n- 创建了多风格的朋友圈推广文案\n- 建立了版本变更的完整记录和追溯机制\n\n【设计原则】\n- 自动化优先：使用jgc等工具减少手动操作\n- 标准化输出：确保release note和文案格式统一\n- 变更透明：基于实际git diff确保内容准确性\n- 多渠道适配：生成不同风格的推广文案适应不同场景\n- 可追溯性：完整的版本记录和变更历史\n\n【预期效果】\n- 提高发布流程的效率和一致性\n- 确保版本变更信息的准确传达\n- 支持多场景的推广需求\n- 建立可持续的版本管理机制\n- 减少人为错误和遗漏",
+  "tags": [
+    "release-automation",
+    "git-workflow",
+    "version-management",
+    "jarvis-release",
+    "release-process",
+    "automated-workflow",
+    "version-control",
+    "release-note-generation",
+    "version-release-system"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_9f718621", "merged_1c7e9326"],
+  "id": "merged_dcfcc780",
+  "created_at": "2025-11-12T23:39:08.718027"
+}

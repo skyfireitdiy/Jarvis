@@ -1,0 +1,16 @@
+{
+  "id": "20251019_092731_060719",
+  "type": "project_long_term",
+  "tags": [
+    "competition",
+    "constraints",
+    "languages",
+    "bzip2",
+    "OpenHarmony",
+    "goals",
+    "metrics"
+  ],
+  "content": "竞赛关键约束：\n- 语言范围：C/C++/Rust；必选基准库：bzip2；至少1个OpenHarmony库（如 commonlibrary_c_utils / hiviewdfx_hilog）需有问题检出\n- 目标：安全免疫力提升、智能创新、持续演进；量化指标：检出率≥90%、建议采纳率≥75%、安全代码质量≥90分且unsafe<5%、效率提升≥10倍、增量分析\n- 评审：初赛（安全检出/代码质量/创新/工程/文档）、复赛（bzip2迁移70%API+2个OH库改进）、决赛（完整迁移+性能对比+未知片段实战）\n- 环境：Linux Ubuntu 20.04+、Rust 1.70.0+、GCC9+/Clang10+、统一Docker；建议云端推理API\n",
+  "created_at": "2025-10-19T09:27:31.060733",
+  "updated_at": "2025-10-19T09:27:31.060735"
+}

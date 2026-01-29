@@ -1,0 +1,14 @@
+{
+  "id": "20260118_093234_121267",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "retry_mechanism",
+    "while_true",
+    "while_success",
+    "token_leak"
+  ],
+  "content": "修复重试计数器无限循环bug：while_success和while_true共享同一个重试计数器，导致在chat_until_success嵌套调用时，计数器被while_success每次成功后重置，永远无法递增，造成无限循环和token浪费。修复方案：为两个函数创建独立的线程本地存储计数器(_retry_context_success和_retry_context_true)及对应的专用函数。",
+  "created_at": "2026-01-18T09:32:34.121330",
+  "updated_at": "2026-01-18T09:32:34.121334"
+}

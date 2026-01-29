@@ -1,0 +1,8 @@
+{
+  "id": "20260102_094040_691254",
+  "type": "project_long_term",
+  "tags": ["web_terminal", "html_structure", "control_panel", "layout"],
+  "content": "在web终端项目中添加左侧控制栏的实现方案：\n1. HTML结构修改：添加<div class=\"control-panel\">作为左侧控制栏区域\n2. CSS样式调整：使用flex-direction: row布局实现左右分栏，控制栏固定宽度200px\n3. 功能实现：添加\"新增终端\"按钮，通过JavaScript调用API端点添加新终端\n4. API端点：添加POST /api/add_terminal端点，后端实现_add_new_terminal方法\n5. 前端逻辑：实现addNewTerminal()函数，动态创建终端元素和WebSocket连接\n6. 保持兼容性：原有终端功能和WebSocket连接逻辑保持不变",
+  "created_at": "2026-01-02T09:40:40.691273",
+  "updated_at": "2026-01-02T09:40:40.691276"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260117_204918_263619",
+  "type": "project_long_term",
+  "tags": ["refactoring", "tdd", "stats.py", "code-quality"],
+  "content": "stats.py重构实践（辅助方法提取）：\n1. 识别重复代码模式：时间范围计算、时间格式化等\n2. 提取静态方法：_calculate_period_label()、_format_last_updated_time()\n3. 应用到多处：_show_metrics_summary() 方法中使用\n4. 遵循TDD流程：先写测试（红）→ 实现功能（绿）→ 应用重构\n5. 验证：运行完整测试套件确保功能不变\n成果：消除13行重复代码，提升可维护性，93个测试全部通过",
+  "created_at": "2026-01-17T20:49:18.263639",
+  "updated_at": "2026-01-17T20:49:18.263642"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260118_211832_568713",
+  "type": "project_long_term",
+  "tags": ["task_list_manager", "refactoring", "modularization"],
+  "content": "TaskListManager重构项目：按照SDD+TDD流程进行重构，拆分顺序为TaskListUtils -> AgentStateManager -> DependencyValidator -> TaskListManager -> TaskExecutor -> TaskVerifier -> TaskListTool。已完成前3个类的拆分，当前在进行TaskListManager核心管理器的拆分。TaskListManager类位于src/jarvis/jarvis_agent/task_list.py中，包含create_task_list、add_tasks、update_task、get_task_list、delete_task_list、get_task_status等方法。",
+  "created_at": "2026-01-18T21:18:32.568747",
+  "updated_at": "2026-01-18T21:18:32.568751"
+}

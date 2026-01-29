@@ -1,0 +1,8 @@
+{
+  "id": "20260102_113642_972237",
+  "type": "project_long_term",
+  "tags": ["jarvis", "config_schema", "validation"],
+  "content": "Jarvis配置系统一致性验证要点：\n1. Python代码（config.py）和JSON Schema（config_schema.json）必须保持结构和描述一致\n2. 特别是LLM相关的配置项定义、引用机制、错误处理逻辑必须完全同步\n3. 所有配置项的文档描述应在两个文件中保持一致\n4. 引用机制的实现应确保代码和Schema描述相同的功能",
+  "created_at": "2026-01-02T11:36:42.972255",
+  "updated_at": "2026-01-02T11:36:42.972258"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260114_202636_971687",
+  "type": "project_long_term",
+  "tags": [
+    "search_web",
+    "token限制",
+    "early_termination",
+    "content_length_limit"
+  ],
+  "content": "在search_web工具中实现了一个早期终止机制：当内容长度达到token限制且已有成功获取的网页内容时，停止获取后续网页。具体实现是在检查remaining_limit <= 0时，如果visited_count > 0则使用break语句终止循环，否则仅跳过当前URL继续处理后续URL。",
+  "created_at": "2026-01-14T20:26:36.971711",
+  "updated_at": "2026-01-14T20:26:36.971714"
+}

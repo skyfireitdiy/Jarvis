@@ -1,0 +1,8 @@
+{
+  "id": "20260102_141030_762853",
+  "type": "project_long_term",
+  "tags": ["jarvis", "decode_output", "encoding_compat", "utf8_gbk"],
+  "content": "Jarvis项目的编码兼容性处理采用了多层回退策略：\n\n1. 优先尝试UTF-8解码（严格模式）\n2. 失败后回退到GBK（Windows常用编码）\n3. 最后尝试latin-1（不会失败，但可能有乱码）\n4. 如果不是字节类型，则转换为字符串\n\n实现函数为decode_output(data: bytes) -> str，位于src/jarvis/jarvis_utils/utils.py第46-72行。这种设计确保了在各种环境下的编码兼容性。",
+  "created_at": "2026-01-02T14:10:30.762872",
+  "updated_at": "2026-01-02T14:10:30.762875"
+}

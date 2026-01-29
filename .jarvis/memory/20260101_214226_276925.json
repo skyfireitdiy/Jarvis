@@ -1,0 +1,8 @@
+{
+  "id": "20260101_214226_276925",
+  "type": "project_long_term",
+  "tags": ["input.py", "subprocess", "decode_output", "encoding"],
+  "content": "在Jarvis项目中，为了保持subprocess输出处理的一致性，所有subprocess.run调用应使用text=False参数，然后使用decode_output函数对结果进行解码，而不是直接使用text=True。这样可以确保在不同系统和编码环境下的兼容性。",
+  "created_at": "2026-01-01T21:42:26.276951",
+  "updated_at": "2026-01-01T21:42:26.276954"
+}

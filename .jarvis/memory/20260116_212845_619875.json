@@ -1,0 +1,8 @@
+{
+  "id": "20260116_212845_619875",
+  "type": "project_long_term",
+  "tags": ["jarvis_c2rust", "verify", "功能对齐验证", "子命令", "cli"],
+  "content": "为 jarvis_c2rust CLI 添加了 verify 子命令，用于验证 C 代码转译为 Rust 代码后的功能对齐性。\n\n实现文件：\n- src/jarvis/jarvis_c2rust/verify.py（新增）：核心验证逻辑\n- src/jarvis/jarvis_c2rust/cli.py（修改）：添加 verify 子命令\n\n核心功能：\n1. 状态检查：读取 .jarvis/c2rust/run_state.json，检查 transpile 和 optimize 阶段是否完成\n2. 功能对齐分析：切换到 crate 目录，创建 Agent 进行分析（强制使用 task_list_manager 拆分子任务）\n3. 结构化结论：返回包含 is_aligned、summary、report 的字典\n4. 迭代优化：如果不一致，创建 CodeAgent 优化代码，重新验证，直到通过或达到最大迭代次数\n\nCLI 命令：\n- jarvis-c2rust verify [--llm-group TEXT] [--max-iterations INTEGER] [--interactive]\n\n使用场景：\n- 在完成 jarvis-c2rust run 后，验证转译质量\n- 自动化验证和优化转译后的 Rust 代码\n- 支持 LLM 指定的模型组和自定义迭代次数",
+  "created_at": "2026-01-16T21:28:45.619892",
+  "updated_at": "2026-01-16T21:28:45.619895"
+}

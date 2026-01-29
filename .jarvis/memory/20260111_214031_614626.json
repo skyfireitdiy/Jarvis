@@ -1,0 +1,8 @@
+{
+  "id": "20260111_214031_614626",
+  "type": "project_long_term",
+  "tags": ["repository", "github", "gitee", "mirrors"],
+  "content": "Jarvis项目有两个远程仓库镜像：\n1. GitHub主仓库: https://github.com/skyfireitdiy/Jarvis\n2. Gitee镜像仓库: https://gitee.com/skyfireitdiy/Jarvis.git\n\n更新策略：\n- 配置文件（setup.py、pyproject.toml）保持GitHub为主URL（符合PyPI标准）\n- 文档和README中的克隆命令同时提供GitHub和Gitee选项\n- Gitee适合国内用户访问，标注说明\n- 安装脚本、配置schema等保持GitHub raw引用",
+  "created_at": "2026-01-11T21:40:31.614657",
+  "updated_at": "2026-01-11T21:40:31.614661"
+}

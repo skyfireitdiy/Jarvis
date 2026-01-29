@@ -1,0 +1,8 @@
+{
+  "id": "20260114_001556_089498",
+  "type": "project_long_term",
+  "tags": ["skills", "anthropics-skills", "add_skills", "skill-registration"],
+  "content": "anthropics/skills 仓库已成功集成到 Jarvis（2026-01-14）。克隆位置：/home/skyfire/.jarvis/skills/anthropics-skills。包含17个技能集：创意设计（算法艺术、品牌指南、画布设计、前端设计）、技术开发（MCP服务器生成、Web应用测试、Web工件构建）、企业通信（文档协作、内部沟通、Slack GIF创建）、文档技能（DOCX、PDF、PPTX、XLSX处理）。注册信息已写入：/home/skyfire/.jarvis/rules/skills.md。许可证：Apache 2.0（文档技能为 source-available）。技能采用 SKILL.md 格式定义，包含 YAML 前置元数据和 Markdown 指令。",
+  "created_at": "2026-01-14T00:15:56.089515",
+  "updated_at": "2026-01-14T00:15:56.089518"
+}

@@ -1,0 +1,19 @@
+{
+  "content": "Jarvis Agent 任务规划器深度限制与步骤约束优化\n\n【总体目标】\n优化 TaskPlanner 的规划行为，实施深度限制与步骤数量约束，防止过度拆分与无限递归，提升规划效率与执行效果。\n\n【步骤数量约束（2025-10-24）】\n任务规划器(TaskPlanner)的规划提示需增加约束：不要将步骤拆分太细，一般不要超过4个步骤。后续所有规划遵循该上限。\n\n【深度限制架构决策（2025-10-20）】\n在达到规划深度上限时禁止继续规划，且将 plan_depth/plan_max_depth 作为 TaskPlanner 构造参数传入，避免在规划器内部直接从 Agent 获取。\n\n【实现细节】\n1) TaskPlanner 增加构造参数：\n   - __init__(self, agent, plan_depth: int = 0, plan_max_depth: int = 2)\n   - 内部使用 self.plan_depth/self.plan_max_depth，不再从 agent 读取\n   - 在 maybe_plan_and_dispatch 开始处增加深度检查：current_depth >= max_depth 时直接返回并打印提示\n\n2) Agent 中实例化与回退逻辑更新：\n   - self.task_planner = TaskPlanner(self, plan_depth=self.plan_depth, plan_max_depth=self.plan_max_depth)\n   - 回退创建同样传入 plan_depth/plan_max_depth\n\n3) 子Agent链路保持一致：\n   - _build_child_agent_params 仍传入 plan_depth=self.plan_depth+1, plan_max_depth=self.plan_max_depth\n   - 子Agent初始化时将这些值传递给其 TaskPlanner，确保多层规划受限\n\n【修改文件】\n- src/jarvis/jarvis_agent/task_planner.py：构造函数签名与深度检查逻辑\n- src/jarvis/jarvis_agent/__init__.py：TaskPlanner 实例化与回退路径传参\n\n【设计原则】\n- 防止过度拆分：通过步骤数量限制（≤4步）控制规划粒度\n- 避免无限递归：通过深度限制（默认max_depth=2）控制嵌套层级\n- 参数解耦：将规划参数作为构造参数传入，提升模块独立性\n- 一致性保证：确保主Agent与子Agent链路使用相同的限制规则\n\n【影响】\n- 在 plan_depth 达到 plan_max_depth 时，本层将不再触发规划流程，避免无限拆分\n- 规划器与 Agent 解耦更清晰，便于测试与复用\n- 提升规划效率，减少不必要的步骤拆分\n- 建立可控的多层规划架构，支持复杂任务的结构化处理\n\n【预期效果】\n- 减少过度细化的规划步骤，提升执行效率\n- 防止深度无限增长导致的系统不稳定\n- 建立清晰的规划边界与约束机制\n- 支持可预测的规划行为与系统调试",
+  "tags": [
+    "task_planner",
+    "jarvis_agent",
+    "depth_limit",
+    "plan_limit",
+    "planning",
+    "constructor_params",
+    "guidelines",
+    "planning_optimization",
+    "execution_control",
+    "hierarchical_planning"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251024_004731_981217", "20251020_232413_872468"],
+  "id": "merged_6a5a1e8c",
+  "created_at": "2025-11-12T23:46:13.013968"
+}

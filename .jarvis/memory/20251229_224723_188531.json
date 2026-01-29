@@ -1,0 +1,8 @@
+{
+  "id": "20251229_224723_188531",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "json_schema", "parser", "schema_parser"],
+  "content": "jarvis_config 模块的 JSON Schema 解析器实现：\n- 文件位置: /home/skyfire/code/Jarvis/src/jarvis/jarvis_config/schema_parser.py\n- 类名: SchemaParser\n- 支持完整的 JSON Schema Draft 7+ 规范\n- 支持类型: string, number, integer, boolean, object, array, null\n- 支持约束: required, enum, minimum, maximum, minLength, maxLength, pattern, default, description\n- 核心方法: parse_schema(), get_field_type(), is_required(), get_default_value(), get_field_description()\n- 支持嵌套 object 和 array 结构\n- 测试文件: /home/skyfire/code/Jarvis/tests/jarvis_config/test_schema_parser.py (36个测试全部通过)",
+  "created_at": "2025-12-29T22:47:23.188594",
+  "updated_at": "2025-12-29T22:47:23.188602"
+}

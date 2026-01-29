@@ -1,0 +1,13 @@
+{
+  "id": "20260111_220414_243025",
+  "type": "project_long_term",
+  "tags": [
+    "search_web",
+    "token_calculation",
+    "read_webpage",
+    "calculate_content_length_limit"
+  ],
+  "content": "search_web 和 read_webpage 工具的上下文长度计算已从字符改为 token：1) calculate_content_length_limit 直接返回 token 数而非字符数（移除了 *4 转换）；2) search_web.py 使用 get_context_token_count(full_content) 计算已用 token，使用 content[:remaining_limit * 4] 截取内容；3) read_webpage.py 使用 get_context_token_count(content_md) 计算 token 数量。所有修改确保上下文限制基于实际 token 数量而非粗略的字符估算。",
+  "created_at": "2026-01-11T22:04:14.243058",
+  "updated_at": "2026-01-11T22:04:14.243063"
+}

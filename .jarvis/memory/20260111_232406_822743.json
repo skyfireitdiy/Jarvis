@@ -1,0 +1,8 @@
+{
+  "id": "20260111_232406_822743",
+  "type": "project_long_term",
+  "tags": ["sorting", "task_list_manager", "algorithm"],
+  "content": "任务列表排序算法：使用extract_task_number函数从task_id中提取数字部分进行排序。函数实现：int(task_id.split('-')[1])，对于格式不符合要求的task_id返回默认值999999，确保其排在最后。",
+  "created_at": "2026-01-11T23:24:06.822771",
+  "updated_at": "2026-01-11T23:24:06.822775"
+}

@@ -1,0 +1,18 @@
+{
+  "content": "Jarvis_sec 安全分析系统提示词优化：多告警联合分析与中文输出规范\n\n【多告警联合分析指引】\n在单Agent安全分析的系统提示词中新增一条指引：当多条告警在同一文件中且行号相距不远时，允许同时对这些相邻告警进行联合分析（可一次读取相邻代码上下文集中判断），以提高效率并减少重复IO；但仍需避免无关扩展与大范围遍历，保持只读分析约束。\n\n【中文输出强制规范】\n在jarvis_sec安全分析与报告链路中（Planner/SourceCollector/CAnalyzer/RustAnalyzer/Aggregator），所有输出中的描述（description）与建议（suggestion）必须使用中文；Markdown报告正文也必须使用中文。\n\n【实施要求】\n- 在相关提示词中加入明确约束与校验提示，确保生成内容不出现英文描述或建议\n- 系统需具备中英文内容检测与纠正机制\n- 报告生成阶段进行语言一致性检查\n\n【设计原则】\n- 效率优先：通过相邻告警联合分析减少重复上下文读取\n- 语言统一：确保安全分析报告的中文输出一致性\n- 约束保持：维持只读分析约束，避免大范围代码遍历\n- 用户友好：提供符合中文用户习惯的安全分析报告\n\n【预期效果】\n- 提升多告警场景下的分析效率\n- 减少不必要的IO操作\n- 确保安全分析报告的语言一致性\n- 增强中文用户的安全分析体验",
+  "tags": [
+    "jarvis_sec",
+    "system_prompt",
+    "prompts",
+    "multi_alert",
+    "zh_CN",
+    "language_guideline",
+    "security_analysis",
+    "efficiency_optimization",
+    "report_generation"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251104_235300_820479", "20251019_161604_929158"],
+  "id": "merged_4d23feb7",
+  "created_at": "2025-11-12T23:44:04.978132"
+}

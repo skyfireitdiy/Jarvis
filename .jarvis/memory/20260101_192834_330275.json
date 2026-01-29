@@ -1,0 +1,14 @@
+{
+  "id": "20260101_192834_330275",
+  "type": "project_long_term",
+  "tags": [
+    "encoding",
+    "subprocess",
+    "code_review.py",
+    "windows-compatibility",
+    "decode_output"
+  ],
+  "content": "code_review.py 中的 subprocess.check_output 调用已全部修改为使用 decode_output 函数进行编码处理。decode_output 位于 jarvis.jarvis_utils.utils，采用UTF-8优先，失败后回退到GBK的策略。涉及6处调用（行273, 288, 314, 329, 359, 374），所有调用都移除了 text=True、encoding 和 errors 参数，改为返回字节流后用 decode_output 解码。",
+  "created_at": "2026-01-01T19:28:34.330310",
+  "updated_at": "2026-01-01T19:28:34.330314"
+}

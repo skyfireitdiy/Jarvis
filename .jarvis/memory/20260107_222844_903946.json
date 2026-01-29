@@ -1,0 +1,8 @@
+{
+  "id": "20260107_222844_903946",
+  "type": "project_long_term",
+  "tags": ["jarvis", "c2rust", "translator", "refactoring", "tdd"],
+  "content": "在Jarvis项目中实施了通用语言转换框架重构，将C2Rust中与语言无关的函数移动到公共模块。具体包括：\n1. 创建了src/jarvis/jarvis_translator/utils.py模块，包含通用工具函数如read_json、write_json、dir_tree、extract_json_from_summary等\n2. 在原有的c2rust/utils.py中保留了向后兼容性，通过导入新模块中的函数\n3. 遵循TDD原则，先编写了完整的测试用例再进行重构\n4. 所有移动的函数都有对应的测试，确保功能正确性和向后兼容性\n5. 现有的c2rust测试仍然全部通过，验证重构成功",
+  "created_at": "2026-01-07T22:28:44.903962",
+  "updated_at": "2026-01-07T22:28:44.903965"
+}

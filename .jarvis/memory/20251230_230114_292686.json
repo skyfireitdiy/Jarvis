@@ -1,0 +1,8 @@
+{
+  "id": "20251230_230114_292686",
+  "type": "project_long_term",
+  "tags": ["zen-ios-hybrid", "design-style", "frontend", "web-app"],
+  "content": "Zen-iOS Hybrid 设计风格核心要点：\n1. 全局底色：iOS 系统级灰 #F2F2F7（禁止纯白背景）\n2. 毛玻璃效果：backdrop-blur-40px 到 60px，背景 White/40-60 半透明\n3. 双层物理描边：内边框 1px border-white/60 + 外边框 1px border-gray-200/40\n4. 阴影：悬浮组件 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.08)]，凹陷组件 shadow-inner\n5. 圆角：大容器 40-50px，功能块 28px，小组件 xl\n6. 按钮：主按钮深空黑 #1C1C1E，次级按钮白色带投影\n7. 触觉反馈：所有可点击项 active:scale-95 或 scale-0.98\n8. 字体：Inter/SF Pro Display，标题 Extrabold + Tracking-tight，标签 Uppercase + Tracking-widest\n9. 布局：大间距 p-6/p-8，模块化层级堆叠\n\n位置：builtin/rules/ios-front-style.md",
+  "created_at": "2025-12-30T23:01:14.292702",
+  "updated_at": "2025-12-30T23:01:14.292705"
+}

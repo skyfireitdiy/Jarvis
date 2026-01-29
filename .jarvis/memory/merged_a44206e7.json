@@ -1,0 +1,22 @@
+{
+  "content": "Jarvis安全分析系统架构与多Agent扩展框架设计\n\n【Jarvis_sec 模块架构】\njarvis_sec 模块是一个专注于代码安全分析的系统，采用\"直扫→单Agent验证→聚合\"的混合工作流，支持 C/C++ 与 Rust 语言的安全问题检测与报告生成。\n\n【模块结构与职责】\n- __init__.py：提供 run_security_analysis（混合模式：直扫→单Agent验证→聚合），含聚类与批次处理逻辑；仅使用只读工具（read_code/execute_script），禁用写操作；支持断点续扫与工作区保护（git checkout -- .）\n- workflow.py：实现 direct_scan（可复现直扫基线，调用 analyze_c_files/analyze_rust_files）、format_markdown_report、run_security_analysis_fast（直扫→统一聚合器）、run_with_agent（委托到 __init__.py 的 run_security_analysis）\n- checkers/rust_checker.py：Rust 启发式规则实现（unsafe、raw_ptr、transmute、MaybeUninit/assume_init、unwrap/expect、extern \"C\"、unsafe impl Send/Sync、ignored_result、mem::forget），输出 Issue dataclass\n- checkers/c_checker.py：C/C++ 检查器（独立模块，近期拆分）\n- report.py：aggregate_issues、format_markdown_report、build_json_and_markdown\n- types.py：Issue 数据结构定义\n- cli.py：CLI 参数与回退策略\n\n【核心工作流（单Agent验证模式）】\n1) direct_scan 生成启发式候选（issues + summary），写入 .jarvis/sec/heuristic_issues.jsonl（支持断点恢复）\n2) 候选精简为 compact_candidates（含 gid 全局编号），按文件分组并进行单Agent聚类（每文件按 cluster_limit 分批），聚类摘要以 <CLUSTERS>…</CLUSTERS> 的 YAML 格式（verification+gids），快照写入 .jarvis/sec/cluster_report.jsonl\n3) 按聚类批次创建单Agent 进行验证，摘要以 <REPORT>…</REPORT> 的 YAML 数组（gid, has_risk, preconditions, trigger_path, consequences, suggestions），增量写入 .jarvis/sec/agent_issues.jsonl（仅记录 has_risk=true 的问题；误报明确标识）\n4) 记录进度至 .jarvis/sec/progress.jsonl（task_status/batch_status），最终通过 jarvis.jarvis_sec.report.build_json_and_markdown 聚合为 JSON+Markdown 报告\n\n【产物与路径（JSONL 为主）】\n- .jarvis/sec/heuristic_issues.jsonl：直扫候选（断点恢复）\n- .jarvis/sec/progress.jsonl：批次/任务进度\n- .jarvis/sec/cluster_report.jsonl：聚类快照（file, verification, gids, batch_index）\n- .jarvis/sec/agent_issues.jsonl：确认问题增量输出（仅 has_risk=true）\n- 最终报告：通过 build_json_and_markdown 生成（字符串返回）\n\n【约束与策略】\n- 工具只读：仅使用 read_code/execute_script；禁止文件写操作（但本模块内部仅写自己产物）\n- 单Agent 聚类与验证；不使用 MultiAgent 编排\n- 报告解析容错：支持 YAML/JSON 解析，严格字段校验（gid>=1、has_risk为bool、四元组文本非空）\n- 可回退与保护：检测工作区变更后执行 git checkout -- . 恢复\n- 语言范围默认：c, cpp, h, hpp, rs；目录排除 .git/build/out/target/third_party/vendor\n- 直扫基线可离线复现：优先使用 ripgrep，失败时回退 Python 实现\n\n【文档对齐任务】\n- 重新编写 docs/架构设计/jarvis-sec系统架构设计.md，使其与 src/jarvis/jarvis_sec 当前实现严格对齐\n- 需体现近期变更：单Agent 聚类分批验证关键路径、聚类报告改为 JSONL、agent_issues.jsonl 仅记录 has_risk=true、日志汉化与工作区保护、C/C++ 与 Rust 检查器拆分、直扫基线离线复现能力\n- 待核对模块：__init__.py、workflow.py、report.py、types.py、checkers/c_checker.py、checkers/rust_checker.py、cli.py\n\n【多Agent扩展框架设计】\n- 实施约束：需在 src/jarvis/jarvis_agent/__init__.py 与 src/jarvis/jarvis_multi_agent/__init__.py 基础上扩展，新增 Orchestrator/TaskRegistry/ArtifactStore\n- 多Agent角色覆盖：采集构建、语法语义分析、静态分析、运行时验证、LLM语义分析、风险量化、决策规划、重构修复、Rust重写、集成跨语言、测试生成、性能基准、报告人机协作、产物归档\n- 构建统一CLI：oh-sec init/scan/plan/fix/rewrite/test/bench/report\n- 产物目录：.jarvis/artifacts/{graphs,reports,patches,tests,bench}\n- 工具链：clang/llvm、clang-tidy/cppcheck/scan-build/Infer、sanitizers、valgrind、c2rust、bindgen、cargo-llvm-cov、nextest、AFL/LibFuzzer\n\n【设计原则】\n- 模块化架构：安全分析与多Agent系统各自独立但可集成\n- 工具约束：jarvis_sec 严格只读，多Agent系统支持读写操作\n- 产物标准化：JSONL格式为主，支持断点恢复与增量处理\n- 可扩展性：两个系统均可独立演进与功能增强\n- 文档对齐：确保实现与文档保持同步更新",
+  "tags": [
+    "jarvis_sec",
+    "jarvis_multi_agent",
+    "architecture",
+    "workflow",
+    "JSONL",
+    "single_agent",
+    "clustering",
+    "direct_scan",
+    "security_analysis",
+    "multi_agent_framework",
+    "artifact_management",
+    "agent_orchestration",
+    "documentation_alignment"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["20251019_092234_728204", "merged_ba02fb0e"],
+  "id": "merged_a44206e7",
+  "created_at": "2025-11-12T23:44:49.288762"
+}

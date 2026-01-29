@@ -1,0 +1,8 @@
+{
+  "id": "20251230_225813_750659",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "schema-parser", "dynamic-form"],
+  "content": "jarvis_config 模块支持动态表单生成：字段类型包括 text/number/textarea/select/checkbox/radio/switch + 嵌套对象/数组。核心函数：createFieldHTML（生成字段HTML）、createArrayHTML（数组字段）、createObjectHTML（嵌套对象）、collectFieldValue（数据收集）。表单验证：前端实时错误提示 + 后端 SchemaParser 验证。数据提交：POST /api/save 保存为 JSON 文件。",
+  "created_at": "2025-12-30T22:58:13.750674",
+  "updated_at": "2025-12-30T22:58:13.750676"
+}

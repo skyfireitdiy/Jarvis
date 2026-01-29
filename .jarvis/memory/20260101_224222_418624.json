@@ -1,0 +1,8 @@
+{
+  "id": "20260101_224222_418624",
+  "type": "project_long_term",
+  "tags": ["web_terminal", "terminal", "pty", "websocket", "xterm"],
+  "content": "Web Terminal模块实现了支持前端自动分屏的web终端程序，主要包含以下组件：\n1. WebTerminalServer类：处理WebSocket连接和pty终端转发\n2. WebTerminalConfig类：管理配置参数\n3. run_web_terminal_server函数：启动服务的入口点\n4. quick_start.py：命令行启动脚本，支持jwt别名\n\n关键功能：\n- 支持quad/horizontal/vertical三种分屏布局\n- 使用pty创建实际终端并与WebSocket进行双向数据转发\n- 实现终端大小调整功能\n- 包含进程管理和资源清理机制\n\n入口点：jarvis-web-terminal = jarvis.jarvis_web_terminal.quick_start:main\n别名：jwt = jarvis.jarvis_web_terminal.quick_start:jwt",
+  "created_at": "2026-01-01T22:42:22.418653",
+  "updated_at": "2026-01-01T22:42:22.418656"
+}

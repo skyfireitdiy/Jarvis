@@ -1,0 +1,8 @@
+{
+  "id": "20260113_005202_602374",
+  "type": "project_long_term",
+  "tags": ["git", "worktree", "jarvis", "symlink", "configuration"],
+  "content": "Git Worktree中.jarvis目录软链接问题解决方案：\n\n问题：.jarvis通过软链接共享，但其中的Git跟踪文件（.jarvis/rule和.jarvis/rules/version_release.md）在多个worktree间共享，导致分支间修改冲突。\n\n目录结构：\n- Git跟踪：.jarvis/rule, .jarvis/rules/version_release.md\n- 运行时数据：.jarvis/memory/, .jarvis/task_lists/, .jarvis/c2rust/等\n\n推荐方案：分层软链接\n1. 每个worktree创建独立的.jarvis目录（不是软链接）\n2. 独立.jarvis中包含Git跟踪文件（rule, rules）\n3. 运行时目录通过软链接指向原仓库（memory, task_lists等）\n\n优点：运行时数据共享节省空间，配置文件独立互不影响，代码无需修改路径，保持.jarvis语义。",
+  "created_at": "2026-01-13T00:52:02.602397",
+  "updated_at": "2026-01-13T00:52:02.602400"
+}

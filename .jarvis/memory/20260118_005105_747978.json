@@ -1,0 +1,8 @@
+{
+  "id": "20260118_005105_747978",
+  "type": "project_long_term",
+  "tags": ["c_checker", "rules", "TDD", "testing"],
+  "content": "### 规则库测试覆盖\n\nc_checker_rules.py模块包含82个正则表达式规则，对应的测试套件tests/jarvis_sec/test_c_checker_rules.py包含82个测试用例，实现100%测试覆盖率。测试按规则类别组织为9个测试类，与规则库的9个规则类一一对应。每个正则表达式规则都有对应的测试用例验证其正确性。",
+  "created_at": "2026-01-18T00:51:05.747995",
+  "updated_at": "2026-01-18T00:51:05.747998"
+}

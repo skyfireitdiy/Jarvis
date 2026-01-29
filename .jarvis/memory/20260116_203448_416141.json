@@ -1,0 +1,8 @@
+{
+  "id": "20260116_203448_416141",
+  "type": "project_long_term",
+  "tags": ["go2rust", "transpilation", "rule-creation"],
+  "content": "创建 Go2Rust 转译规则文件，参考 c2rust_transpiler.md 结构。主要差异：Go 语言特性包括 goroutines（协程）、channels（通道）、interfaces（接口）、structs（结构体）、slices（切片）、maps（映射）、error handling（错误处理）、defer（延迟执行）、packages（包）、go modules（模块系统）等，需要映射到 Rust 的对应概念（async/await、channels、traits、structs、slices、HashMap、Result<T,E>、Drop trait、modules、cargo packages）",
+  "created_at": "2026-01-16T20:34:48.416158",
+  "updated_at": "2026-01-16T20:34:48.416161"
+}

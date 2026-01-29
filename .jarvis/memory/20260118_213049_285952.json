@@ -1,0 +1,8 @@
+{
+  "id": "20260118_213049_285952",
+  "type": "project_long_term",
+  "tags": ["architecture", "refactoring", "task_list_manager", "task_manager"],
+  "content": "TaskListManager核心管理器已从jarvis_agent/task_list.py拆分到jarvis_tools/task_manager.py（694行）。原task_list.py现在只保留数据模型（Task、TaskList、TaskStatus、AgentType），193行。拆分遵循职责单一原则，将核心管理逻辑与数据模型分离。",
+  "created_at": "2026-01-18T21:30:49.285984",
+  "updated_at": "2026-01-18T21:30:49.285987"
+}

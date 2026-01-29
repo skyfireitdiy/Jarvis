@@ -1,0 +1,8 @@
+{
+  "id": "20251024_232146_272038",
+  "type": "project_long_term",
+  "tags": ["jarvis_c2rust", "pruner", "pruning_logic", "overview"],
+  "content": "模块: src/jarvis/jarvis_c2rust/pruner.py 的 evaluate_third_party_replacements\n目的: 使用 Agent 评估 C/C++ 函数是否可由 Rust 标准库或成熟第三方 crate 的单个 API 替代，并据此剪枝函数图。\n关键点:\n- 剪枝模式: lib(保守，仅移除当前函数) 与 bin(激进，不动点扩展，移除所有“父级均在已移除集合”的后继)。\n- 图构建: 从 symbols.jsonl 读取，函数内邻接基于记录中的 ref(字符串名称) 映射到 name_to_id；parents_map 用于 bin 模式判断。\n- 遍历根: 使用 find_root_function_ids 识别根函数；若为空则退化为所有函数；按从根可达集合估算总量。\n- 评估: 每次创建新 Agent 避免上下文污染；解析 <yaml> 块得到 replaceable/library/function/confidence；失败回退为不可替代。\n- 跳过: 显式跳过 main 函数。\n- 断点续跑: third_party_pruner_state.json 保存 visited/pruned/replacements/eval_count，与 symbols.jsonl 的 mtime/size 绑定校验。\n- 输出: 生成 pruned 后的 symbols_third_party_pruned.jsonl 与 third_party_replacements.jsonl；完成后清理断点。\n- 上下文注入: 根据 data_dir 推断 project_root 与 crate_dir，传入 Agent 提示。\n",
+  "created_at": "2025-10-24T23:21:46.272056",
+  "updated_at": "2025-10-24T23:21:46.272058"
+}

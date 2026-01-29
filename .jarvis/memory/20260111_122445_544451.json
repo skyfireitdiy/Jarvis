@@ -1,0 +1,8 @@
+{
+  "id": "20260111_122445_544451",
+  "type": "project_long_term",
+  "tags": ["run_loop", "tool_call", "自动补全", "registry", "代码修改"],
+  "content": "2026-01-11：在run_loop.py的_filter_tool_calls_from_response方法中实现了与registry相同的tool_call自动补全逻辑。修改位置：src/jarvis/jarvis_agent/run_loop.py行59-72。实现内容：1) 如果结束标签在末尾但前面没有换行符，自动插入换行符；2) 如果有开始标签但没有结束标签，自动补全结束标签。使用与registry相同的正则表达式和标志（re.IGNORECASE、(?mi)）。提交ID：2bfed34。",
+  "created_at": "2026-01-11T12:24:45.544473",
+  "updated_at": "2026-01-11T12:24:45.544476"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260118_001939_723648",
+  "type": "project_long_term",
+  "tags": ["task_list_manager", "refactoring", "TDD", "SDD"],
+  "content": "task_list_manager模块重构完成情况：\n\n1. 已完成的部分：\n- 创建了完整的测试用例文件（tests/jarvis_tools/task_list/test_*.py）\n- 拆分了原有3078行代码为多个职责单一的模块：\n  * TaskListManager (391行): 任务列表管理器，负责任务的增删改查\n  * DependencyValidator (256行): 依赖关系验证器\n  * TaskExecutor (419行): 任务执行协调器\n  * TaskVerifier (150行): 任务验证器\n  * OutputProcessor (307行): 输出处理器\n  * AgentFactory (247行): Agent工厂\n  * TmuxExecutor (438行): tmux并行执行器\n  * TokenCalculator (103行): Token长度计算器\n\n2. 未完成的部分：\n- 原src/jarvis/jarvis_tools/task_list_manager.py文件仍包含3078行原始代码，未简化为协调器\n- 需要进一步重构原文件，使其成为调用新模块的协调器\n\n3. 重构原则：\n- 遵循TDD（测试驱动开发）方法，先编写测试后实现\n- 遵循SDD（Spec驱动开发）流程，基于Spec文档进行重构\n- 保持原有功能不变，确保所有测试通过\n- 每个新模块遵循单一职责原则，代码行数<1000行\n\n4. 模块职责分工：\n- TaskListManager: 管理任务生命周期\n- DependencyValidator: 验证任务依赖关系\n- TaskExecutor: 执行任务协调\n- TaskVerifier: 验证任务完成情况\n- OutputProcessor: 格式化输出\n- AgentFactory: 创建各类Agent\n- TmuxExecutor: 并行执行任务\n- TokenCalculator: 计算输出长度限制",
+  "created_at": "2026-01-18T00:19:39.723662",
+  "updated_at": "2026-01-18T00:19:39.723664"
+}

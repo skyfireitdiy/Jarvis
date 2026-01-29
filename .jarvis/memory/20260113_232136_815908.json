@@ -1,0 +1,8 @@
+{
+  "id": "20260113_232136_815908",
+  "type": "project_long_term",
+  "tags": ["prompt_manager", "tool_usage_guide", "agent_prompt"],
+  "content": "在Agent系统提示词中添加工具使用指南的模式：在prompt_manager.py的build_system_prompt方法中，通过tool_registry.get_tool(tool_name)检查工具是否可用，如果可用则添加使用指南。参考实现：task_list_manager_guide和rule_usage_guide，都是在工具可用时才插入对应的<tool_name_guide>标签包裹的指南内容，包含适用场景、工具介绍、参数说明、使用建议和示例。指南内容应与task_list_manager_guide风格保持一致。",
+  "created_at": "2026-01-13T23:21:36.815937",
+  "updated_at": "2026-01-13T23:21:36.815941"
+}

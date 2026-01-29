@@ -1,0 +1,8 @@
+{
+  "id": "20260118_210148_916116",
+  "type": "project_long_term",
+  "tags": ["testing", "refactoring", "mock"],
+  "content": "在重构过程中，当原方法被拆分到新类中时，测试代码中的mock需要同步更新。具体来说：\n- 原方法名：_check_dependencies_completed\n- 新方法名：check_dependencies_completed（在DependencyValidator类中）\n- 测试代码需要将mock对象设置为新的方法路径，例如：dependency_validator.check_dependencies_completed\n- 否则会导致测试逻辑错误，虽然功能正常但断言失败。",
+  "created_at": "2026-01-18T21:01:48.916151",
+  "updated_at": "2026-01-18T21:01:48.916154"
+}

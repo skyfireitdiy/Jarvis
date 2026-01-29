@@ -1,0 +1,15 @@
+{
+  "id": "20260102_133058_230404",
+  "type": "project_long_term",
+  "tags": [
+    "output",
+    "PrettyOutput",
+    "Console",
+    "Panel",
+    "migration",
+    "refactoring"
+  ],
+  "content": "在Jarvis项目中，统一使用PrettyOutput替代Console和Panel进行输出显示。具体做法是将self.console.print(Panel(...))调用替换为PrettyOutput.print方法，并使用OutputType枚举指定输出类型。这样可以保持输出风格一致，符合项目的全局约束条件。",
+  "created_at": "2026-01-02T13:30:58.230440",
+  "updated_at": "2026-01-02T13:30:58.230443"
+}

@@ -1,0 +1,8 @@
+{
+  "id": "20260114_004659_018185",
+  "type": "project_long_term",
+  "tags": ["code_agent_prompts", "jinja2", "prompt-optimization"],
+  "content": "根据用户要求，在 code_agent_prompts.py 中删除了所有关于 jinja2 的提及。修改位置：1) 第32行（Rule 系统部分）：将'支持 jinja2 模板变量渲染'改为'支持模板变量渲染'；2) 第59行（工具与质量部分）：将'支持 jinja2 模板变量渲染'改为'支持模板变量渲染'。提交ID: b67adde。修改原因：agent 并不需要接触 jinja2 实现细节，只需知道支持模板变量渲染功能即可。",
+  "created_at": "2026-01-14T00:46:59.018206",
+  "updated_at": "2026-01-14T00:46:59.018209"
+}

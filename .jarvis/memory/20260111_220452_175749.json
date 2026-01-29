@@ -1,0 +1,8 @@
+{
+  "id": "20260111_220452_175749",
+  "type": "project_long_term",
+  "tags": ["read_webpage", "token_limit", "truncation"],
+  "content": "read_webpage 工具（src/jarvis/jarvis_tools/read_webpage.py）已更新为基于 token 数进行内容截断，而不是字符数。截断逻辑使用分块累加 token 的方式，确保截断后的内容不超过 token_limit，同时避免破坏文本结构。当内容超过限制时，会打印 token 数量的提示信息。",
+  "created_at": "2026-01-11T22:04:52.175766",
+  "updated_at": "2026-01-11T22:04:52.175769"
+}

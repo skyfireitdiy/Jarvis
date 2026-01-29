@@ -1,0 +1,8 @@
+{
+  "id": "20260118_013409_962591",
+  "type": "project_long_term",
+  "tags": ["c_checker", "refactoring", "rule_separation", "TDD", "SDD"],
+  "content": "使用TDD重构c_checker的验证情况：\n1. 规则库独立到c_checker_rules.py已完成\n2. 规则引用替换为规则类引用已完成（114处替换）\n3. 对应的测试文件test_c_checker_rules.py已创建并测试通过（82个测试项）\n4. c_checker.py文件虽进行了规则库分离，但行数未减少（仍为2862行），未达到<1000行的简化要求\n5. 所有规则按功能归类为9个规则类：BaseRules, FormatCommandRules, ThreadRules, CppLockRules, DataRaceRules, DangerousUsageRules, MemoryHelperRules, CppSpecificRules, HelperRules",
+  "created_at": "2026-01-18T01:34:09.962621",
+  "updated_at": "2026-01-18T01:34:09.962625"
+}

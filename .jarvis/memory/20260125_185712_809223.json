@@ -1,0 +1,8 @@
+{
+  "id": "20260125_185712_809223",
+  "type": "project_long_term",
+  "tags": ["bug_fix", "SessionManager", "conversation_length", "pytest"],
+  "content": "Bug修复记录：\n问题描述：SessionManager类缺少conversation_length属性，导致3个测试用例失败\n修复内容：\n1. 在__init__方法中添加self.conversation_length = 0初始化\n2. 在clear_history()方法中添加self.conversation_length = 0重置逻辑\n测试结果：701 passed, 1 skipped, 0 failed\n影响文件：src/jarvis/jarvis_agent/session_manager.py",
+  "created_at": "2026-01-25T18:57:12.809240",
+  "updated_at": "2026-01-25T18:57:12.809244"
+}

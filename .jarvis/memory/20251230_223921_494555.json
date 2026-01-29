@@ -1,0 +1,8 @@
+{
+  "id": "20251230_223921_494555",
+  "type": "project_long_term",
+  "tags": ["jarvis_config", "FastAPI", "web_app", "architecture"],
+  "content": "jarvis_config 模块的 web_app.py 实现了基于 FastAPI 的配置表单 Web 服务。关键设计：使用工厂函数 create_app(schema_path, output_path) 创建应用实例；使用全局变量存储 _schema_parser 和 _output_path；实现了三个核心接口：GET / (返回 HTML), GET /api/schema (返回解析后的 schema 数据), POST /api/save (接收表单数据并保存为 JSON)；使用内联 HTML 模板（get_html_template 函数），不使用外部模板引擎；通过 CORSMiddleware 启用 CORS；使用 Pydantic 的 SaveConfigRequest(BaseModel) 定义请求模型；集成了 schema_parser 进行配置验证",
+  "created_at": "2025-12-30T22:39:21.494572",
+  "updated_at": "2025-12-30T22:39:21.494575"
+}

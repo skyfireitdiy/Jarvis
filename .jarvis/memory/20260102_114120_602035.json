@@ -1,0 +1,15 @@
+{
+  "id": "20260102_114120_602035",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "web_search",
+    "llm_groups",
+    "web_platform",
+    "web_model",
+    "reference_mechanism"
+  ],
+  "content": "在Jarvis项目中，web_search相关配置通过llm_groups中的web_llm引用机制实现。具体配置项包括：\n1. config.py中的get_web_search_platform_name()和get_web_search_model_name()函数，使用_get_resolved_model_config()获取配置\n2. config_schema.json中llm_groups包含web_llm字段，用于引用llms中定义的Web搜索LLM配置\n3. 文档中web_platform和web_model配置项说明，通过web_llm引用展开生成\n\n这是llm_groups配置的统一引用机制的一部分，与normal_llm、cheap_llm、smart_llm共用同一套引用体系",
+  "created_at": "2026-01-02T11:41:20.602064",
+  "updated_at": "2026-01-02T11:41:20.602067"
+}

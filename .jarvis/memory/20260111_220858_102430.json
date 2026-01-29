@@ -1,0 +1,8 @@
+{
+  "id": "20260111_220858_102430",
+  "type": "project_long_term",
+  "tags": ["mypy", "type_checking", "best_practice"],
+  "content": "mypy 类型处理技巧：当函数返回 Any 类型但签名要求具体类型时，可以使用 from typing import cast 和 cast(类型, 值) 进行类型断言。示例：return cast(Optional[str], fixed_content)。",
+  "created_at": "2026-01-11T22:08:58.102452",
+  "updated_at": "2026-01-11T22:08:58.102455"
+}

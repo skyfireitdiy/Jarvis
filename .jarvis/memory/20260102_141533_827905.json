@@ -1,0 +1,8 @@
+{
+  "id": "20260102_141533_827905",
+  "type": "project_long_term",
+  "tags": ["performance", "caching", "resource_management", "jarvis"],
+  "content": "# Jarvis项目性能与资源规范维度规则\n\n## 缓存机制\n1. 使用@lru_cache装饰器缓存函数结果\n2. 合理设置缓存大小以平衡内存和性能\n3. 仅对纯函数或结果稳定的函数使用缓存\n4. 监控缓存命中率以评估有效性\n\n## 资源管理\n1. 使用上下文管理器确保资源正确释放\n2. 实现资源池以减少创建和销毁开销\n3. 及时关闭文件、网络连接等资源\n4. 使用weakref避免循环引用\n\n## 内存管理\n1. 避免创建不必要的中间对象\n2. 使用生成器处理大量数据\n3. 及时删除不再需要的大对象\n4. 使用__slots__减少对象内存占用\n\n## 性能优化\n1. 优先优化性能瓶颈而非全面优化\n2. 使用性能分析工具定位热点代码\n3. 避免过早优化，先确保功能正确\n4. 实现性能监控和度量机制\n\n## 项目代码参考\n- 缓存机制: src/jarvis/jarvis_utils/config.py 第50行使用@lru_cache装饰器缓存get_replace_map函数\n- 资源管理: src/jarvis/jarvis_git_utils/git_commiter.py 在finally块中清理临时文件\n- 性能监控: src/jarvis/jarvis_stats/stats.py 实现了完整的统计管理器\n- 内存管理: src/jarvis/jarvis_utils/config.py 通过全局字典管理配置数据，避免重复加载\n- 生成器使用: 项目中多处使用生成器模式处理大量数据",
+  "created_at": "2026-01-02T14:15:33.827953",
+  "updated_at": "2026-01-02T14:15:33.827957"
+}

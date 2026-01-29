@@ -1,0 +1,14 @@
+{
+  "id": "20260110_220443_538030",
+  "type": "project_long_term",
+  "tags": [
+    "memory_retrieval",
+    "tag_extraction",
+    "mixed_strategy",
+    "recent_memory",
+    "random_memory"
+  ],
+  "content": "在jarvis的get_all_memory_tags函数中实现了混合策略来提取记忆标签。当标签数量超过MAX_TAGS_PER_TYPE(200)时：\n1. 约一半(100)的标签从最近的记忆中提取（按created_at时间排序）\n2. 另一半(100)的标签从剩余记忆中随机提取\n3. 合并后取前200个标签返回\n该策略适用于三种记忆类型：short_term、project_long_term和global_long_term。",
+  "created_at": "2026-01-10T22:04:43.538049",
+  "updated_at": "2026-01-10T22:04:43.538052"
+}

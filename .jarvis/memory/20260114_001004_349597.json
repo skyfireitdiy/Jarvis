@@ -1,0 +1,8 @@
+{
+  "id": "20260114_001004_349597",
+  "type": "project_long_term",
+  "tags": ["code_agent", "load_rule", "tool_update", "base_tools"],
+  "content": "CodeAgent已添加load_rule工具：在src/jarvis/jarvis_code_agent/code_agent.py的_build_code_agent_tool_list方法中，将\"load_rule\"添加到base_tools列表。位置在第192行，按字母顺序位于\"edit_file\"之后。load_rule工具实现位于src/jarvis/jarvis_tools/load_rule.py，支持读取规则文件并渲染jinja2模板。提交ID: 6c2f78a",
+  "created_at": "2026-01-14T00:10:04.349614",
+  "updated_at": "2026-01-14T00:10:04.349617"
+}

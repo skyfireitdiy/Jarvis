@@ -156,5 +156,4 @@ coverage.xml
 .jarvis/build_validation_config.yaml
 .jarvis/.last_memory_organizer_check
 .jarvis/symbol_cache
-# General
-.jarvis
+

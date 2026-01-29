@@ -1,0 +1,19 @@
+{
+  "content": "Jarvis Agent 系统增强：自动总结机制优化与文件编辑控制配置\n\n【自动总结机制增强（2025-11-12）】\n\n【总体目标】\n将自动总结的触发条件从基于token阈值改为基于对话轮次，提升长会话稳定性与可预测性，增加参数 auto_summary_rounds，支持构造参数与配置文件双重配置，保持向后兼容。\n\n【核心变更】\n1) 新增轮次阈值机制\n   - 在 jarvis_agent/run_loop.py 中引入 self.auto_summary_rounds，默认值30，可通过环境变量 JARVIS_AUTO_SUMMARY_ROUNDS 覆盖\n   - 触发逻辑：在每轮循环开始处递增 conversation_rounds，达到阈值时调用 agent._summarize_and_clear_history()，并将生成的摘要以 addon_prompt 形式注入，随后将 conversation_rounds 重置为0\n\n2) 参数化配置支持\n   - 在 Agent.__init__ 新增构造参数 auto_summary_rounds，默认值为 None\n   - 语义：当为 None 时，使用配置文件（AgentConfig）中的默认值；否则优先使用传入值\n   - 贯通到 AgentConfig.resolve_defaults，并确保 AgentRunLoop 读取的生效值来自同一配置源\n\n3) 兼容性保障\n   - 保留原基于token的逻辑但默认关闭；如需启用，设置环境变量 JARVIS_ENABLE_TOKEN_SUMMARY=true\n   - 相关改动在 jarvis_agent/__init__.py 的 _manage_conversation_length 中完成\n   - 保持向后兼容，默认不改变既有行为；仅在显式传入时覆盖配置\n\n【影响范围】\n- 影响文件：\n  • src/jarvis/jarvis_agent/__init__.py（Agent 类、_manage_conversation_length 方法）\n  • src/jarvis/jarvis_agent/config.py（AgentConfig.resolve_defaults）\n  • src/jarvis/jarvis_agent/run_loop.py（轮次触发摘要逻辑）\n\n【文件编辑控制配置（2025-10-25）】\n\n【新增参数】\n- 参数：disable_file_edit，默认False\n- 功能：为True时禁用文件编辑相关输出处理器\n\n【实施细节】\n1) Agent.__init__ 增加入参 disable_file_edit 并保存为 self.disable_file_edit\n\n2) _init_handlers 中根据 disable_file_edit 按需构建 output_handler：\n   - 默认仅包含 ToolRegistry；当 disable_file_edit 为 False 时追加 EditFileHandler 和 RewriteFileHandler\n   - 若外部传入 output_handler，也会在 disable_file_edit 为 True 时过滤掉 EditFileHandler/RewriteFileHandler\n\n3) _build_child_agent_params 透传 disable_file_edit 给子Agent\n\n【结果】\n- 当 disable_file_edit 为 True 时，Agent不会加载或触发 PATCH/REWRITE 文件编辑处理器\n- 系统提示中对应操作也不会出现\n- 提供安全模式，防止意外的文件修改\n\n【设计原则】\n- 风险控制：最小改动优先，保持现有行为不变\n- 配置统一：构造参数与配置文件使用同一解析路径\n- 可预测性：固定轮次触发有利于节奏稳定，减少token超限导致的突发清理\n- 可配置性：支持环境变量、构造参数、配置文件多级覆盖，便于按需调整策略\n- 安全控制：提供文件编辑的开关控制，支持安全执行模式\n- 模块化设计：各功能独立配置，互不影响\n\n【系统集成】\n- 总结机制：基于轮次的自动总结，提升长会话稳定性\n- 编辑控制：可配置的文件编辑开关，提供安全执行模式\n- 配置体系：统一的配置管理，支持多层级覆盖\n- 兼容性：完整的向后兼容，不影响现有调用方\n\n【预期效果】\n- 减少长会话中因token超限导致的突发清理\n- 提供稳定的总结节奏（默认每30轮）\n- 支持灵活配置以适应不同场景需求\n- 提供安全模式，防止意外的文件修改\n- 保持完整的向后兼容性，不影响现有调用方\n- 建立可配置的Agent行为控制系统",
+  "tags": [
+    "jarvis_agent",
+    "auto_summary_rounds",
+    "disable_file_edit",
+    "configuration",
+    "summary_policy",
+    "context_continuity",
+    "editing_strategy",
+    "agent_optimization",
+    "safety_control",
+    "configurable_behavior"
+  ],
+  "type": "project_long_term",
+  "merged_from": ["merged_36c771c2", "20251025_233243_432711"],
+  "id": "merged_2f697715",
+  "created_at": "2025-11-12T23:48:14.174314"
+}

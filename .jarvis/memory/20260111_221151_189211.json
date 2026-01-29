@@ -1,0 +1,8 @@
+{
+  "id": "20260111_221151_189211",
+  "type": "project_long_term",
+  "tags": ["jarvis", "read_webpage", "calculate_content_token_limit"],
+  "content": "在jarvis项目中，read_webpage工具已从基于字符长度的截断改为基于token的截断。主要变更包括：1) 使用calculate_content_token_limit()替代calculate_content_length_limit()；2) 引入get_context_token_count()进行token计数；3) 实现基于100字符块的逐块token累加截断算法；4) 保留向后兼容的calculate_content_length_limit()函数。",
+  "created_at": "2026-01-11T22:11:51.189234",
+  "updated_at": "2026-01-11T22:11:51.189237"
+}
