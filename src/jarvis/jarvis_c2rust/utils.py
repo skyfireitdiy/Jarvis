@@ -506,7 +506,7 @@ def get_modified_files_from_git(
 def truncate_git_diff_with_context_limit(
     git_diff: str,
     agent: Optional[Any] = None,
-    llm_group: Optional[str] = None,
+    
     token_ratio: float = 0.3,
     base_commit: Optional[str] = None,
     crate_dir: Optional[Path] = None,
@@ -547,7 +547,7 @@ def truncate_git_diff_with_context_limit(
     # 回退方案：使用输入窗口的指定比例转换为字符数
     if max_diff_chars is None:
         try:
-            max_input_tokens = get_max_input_token_count(llm_group)
+            max_input_tokens = get_max_input_token_count()
             max_diff_chars = int(max_input_tokens * token_ratio * 4)
         except Exception:
             # 如果获取失败，使用默认值（约 10000 字符）

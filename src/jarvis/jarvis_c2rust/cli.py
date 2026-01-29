@@ -601,7 +601,6 @@ def run(
             ret = _apply_library_replacement(
                 db_path=Path("."),
                 library_name=library,
-                llm_group=llm_group,
                 candidates=candidates_list,  # None 表示自动检测全部根
                 out_symbols_path=None,
                 out_mapping_path=None,
@@ -639,7 +638,6 @@ def run(
             )
             _execute_llm_plan(
                 apply=True,
-                llm_group=llm_group,
                 non_interactive=not interactive,
                 enable_ffi_export_validation=enable_ffi_export_validation,
             )
@@ -662,7 +660,6 @@ def run(
             _run_transpile(
                 project_root=Path("."),
                 crate_dir=None,
-                llm_group=llm_group,
                 max_retries=max_retries,
                 disabled_libraries=None,  # 从配置文件恢复
                 root_symbols=None,  # 从配置文件恢复

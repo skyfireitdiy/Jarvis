@@ -19,7 +19,7 @@ class ClaudeModel(BasePlatform):
     def __init__(
         self,
         platform_type: str = "normal",
-        llm_group: Optional[str] = None,
+        agent: Optional[Any] = None,
     ):
         """
         Initialize Claude model
@@ -28,7 +28,7 @@ class ClaudeModel(BasePlatform):
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
             llm_group: 模型组名称，用于从配置中获取对应的 llm_config
         """
-        super().__init__(platform_type=platform_type, llm_group=llm_group)
+        super().__init__(platform_type=platform_type, agent=agent)
         self.system_message = ""
         llm_config = self._llm_config or {}
 

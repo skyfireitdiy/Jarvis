@@ -31,7 +31,7 @@ class ReviewManager:
         self,
         crate_dir: Path,
         data_dir: Path,
-        llm_group: Optional[str],
+        
         non_interactive: bool,
         review_max_iterations: int,
         disabled_libraries: List[str],
@@ -57,7 +57,7 @@ class ReviewManager:
     ) -> None:
         self.crate_dir = crate_dir
         self.data_dir = data_dir
-        self.llm_group = llm_group
+        
         self.non_interactive = non_interactive
         self.review_max_iterations = review_max_iterations
         self.disabled_libraries = disabled_libraries
@@ -181,7 +181,7 @@ class ReviewManager:
                         # 使用50%的比例，因为review阶段需要更多的上下文信息
                         commit_diff = truncate_git_diff_with_context_limit(
                             commit_diff,
-                            llm_group=self.llm_group,
+                            
                             token_ratio=0.5,
                             base_commit=base_commit,
                             crate_dir=self.crate_dir,
@@ -647,7 +647,7 @@ class ReviewManager:
             review_agent = Agent(
                 system_prompt=sys_p_init,
                 name=agent_name,
-                llm_group=self.llm_group,
+                
                 summary_prompt=sum_p_init,
                 need_summary=True,
                 auto_complete=True,
@@ -1052,7 +1052,7 @@ class ReviewManager:
                         git_diff = truncate_git_diff_with_context_limit(
                             git_diff,
                             agent=ca,
-                            llm_group=self.llm_group,
+                            
                             token_ratio=0.3,
                             base_commit=base_commit,
                             crate_dir=self.crate_dir,
