@@ -185,7 +185,6 @@ def _load_all_methodologies() -> List[Tuple[str, str]]:
 def load_methodology(
     user_input: str,
     tool_registery: Optional[Any] = None,
-    llm_group: Optional[str] = None,
 ) -> str:
     """
     加载方法论并上传到大模型。
@@ -211,7 +210,7 @@ def load_methodology(
         PrettyOutput.auto_print(f"✅ 加载方法论文件完成 (共 {len(methodologies)} 个)")
 
         # 方法论推荐使用normal模型以确保质量
-        platform = PlatformRegistry().get_normal_platform(llm_group)
+        platform = PlatformRegistry().get_normal_platform()
 
         if not platform:
             PrettyOutput.auto_print("❌ 无法创建平台实例")
