@@ -26,7 +26,6 @@ class ClaudeModel(BasePlatform):
 
         参数:
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
-            llm_group: 模型组名称，用于从配置中获取对应的 llm_config
         """
         super().__init__(platform_type=platform_type, agent=agent)
         self.system_message = ""

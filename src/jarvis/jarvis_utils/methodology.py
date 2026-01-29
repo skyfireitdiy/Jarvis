@@ -192,7 +192,6 @@ def load_methodology(
     参数：
         user_input: 用户输入文本，用于提示大模型
         tool_registery: 工具注册表，用于获取工具列表
-        llm_group (str, optional): 指定的模型组. Defaults to None.
 
     返回：
         str: 相关的方法论提示，如果未找到方法论则返回空字符串

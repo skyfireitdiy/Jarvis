@@ -59,7 +59,6 @@ class BasePlatform(ABC):
 
         参数:
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
-            llm_group: 模型组名称，用于从配置中获取对应的 llm_config
             agent: Agent实例，用于回调触发总结等功能
         """
         self.suppress_output = True  # 添加输出控制标志
