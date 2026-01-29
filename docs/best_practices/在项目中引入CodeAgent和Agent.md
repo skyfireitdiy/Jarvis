@@ -43,7 +43,7 @@ from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
 # 创建 CodeAgent 实例
 agent = CodeAgent(
-    model_group="smart",
+    llm_group="smart",
     non_interactive=False,
     rule_names="clean_code,security"
 )
@@ -56,7 +56,7 @@ agent.run("创建用户认证模块")
 
 ```python
 agent = CodeAgent(
-    model_group="smart",              # 模型组
+    llm_group="smart",              # 模型组
     need_summary=True,                # 是否需要总结
     non_interactive=False,            # 是否非交互模式
     rule_names="clean_code,security", # 规则名称（逗号分隔）
@@ -77,7 +77,7 @@ from jarvis.jarvis_agent import Agent
 
 # 创建 Agent 实例
 agent = Agent(
-    model_group="smart",
+    llm_group="smart",
     system_prompt="你是一个有用的 AI 助手",
     use_tools=["search_web", "read_file"]
 )
@@ -90,7 +90,7 @@ agent.run("搜索 Python 最佳实践")
 
 ```python
 agent = Agent(
-    model_group="smart",              # 模型组
+    llm_group="smart",              # 模型组
     system_prompt="你是一个有用的 AI 助手",  # 系统提示词
     use_tools=["search_web", "read_file"],    # 工具列表
     need_summary=True,                # 是否需要总结
@@ -113,7 +113,7 @@ from jarvis.jarvis_code_agent.code_agent import CodeAgent
 def main():
     # 创建 CodeAgent
     agent = CodeAgent(
-        model_group="smart",
+        llm_group="smart",
         non_interactive=True,
         rule_names="clean_code,security"
     )
@@ -143,7 +143,7 @@ from jarvis.jarvis_code_agent.code_agent import CodeAgent
 
 def auto_fix_code():
     agent = CodeAgent(
-        model_group="smart",
+        llm_group="smart",
         non_interactive=True,
         rule_names="code_review"
     )
@@ -170,7 +170,7 @@ from jarvis.jarvis_agent import Agent
 
 def test_with_agent():
     agent = Agent(
-        model_group="smart",
+        llm_group="smart",
         use_tools=["read_file", "execute_script"]
     )
     

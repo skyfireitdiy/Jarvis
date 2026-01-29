@@ -421,7 +421,7 @@ class Agent:
         system_prompt: str,
         name: str = "Jarvis",
         description: str = "",
-        model_group: Optional[str] = None,
+        llm_group: Optional[str] = None,
         summary_prompt: Optional[str] = None,
         auto_complete: bool = True,
         output_handler: Optional[List[OutputHandlerProtocol]] = None,
@@ -475,7 +475,7 @@ class Agent:
             execute_tool_confirm,
             summary_prompt,
             force_save_memory,
-            model_group,
+            llm_group,
             files,
             use_tools,
             non_interactive,
@@ -484,7 +484,7 @@ class Agent:
         )
 
         # 核心组件初始化
-        self._init_model(model_group)
+        self._init_model(llm_group)
         self._init_session()
         self._init_handlers(multiline_inputer, output_handler, use_tools or [])
 
@@ -525,7 +525,7 @@ class Agent:
         execute_tool_confirm: Optional[bool],
         summary_prompt: Optional[str],
         force_save_memory: Optional[bool],
-        model_group: Optional[str],
+        llm_group: Optional[str],
         files: Optional[List[str]],
         use_tools: Optional[List[str]],
         non_interactive: Optional[bool],
@@ -545,7 +545,7 @@ class Agent:
             execute_tool_confirm: 执行工具前是否需要确认
             summary_prompt: 总结提示词
             force_save_memory: 是否强制保存记忆
-            model_group: 模型组
+            llm_group: 模型组
             files: 文件列表
             use_tools: 使用的工具列表
             non_interactive: 是否非交互模式
@@ -567,7 +567,7 @@ class Agent:
         self.force_save_memory = force_save_memory
 
         # 资源与环境配置
-        self.model_group = model_group
+        self.llm_group = llm_group
         self.files = files or []
         self.use_tools = use_tools
         self.non_interactive = non_interactive
@@ -752,13 +752,13 @@ class Agent:
         # 设置系统提示词（基于配置和工具列表构建）
         self._setup_system_prompt()
 
-    def _init_model(self, model_group: Optional[str]) -> None:
+    def _init_model(self, llm_group: Optional[str]) -> None:
         """初始化模型平台（统一使用 normal 平台/模型）"""
-        model_name = get_normal_model_name(model_group)
+        model_name = get_normal_model_name(llm_group)
 
         # 直接使用 get_normal_platform，避免先调用 create_platform 再回退导致的重复错误信息
         # get_normal_platform 内部会处理配置获取和平台创建
-        self.model = PlatformRegistry().get_normal_platform(model_group)
+        self.model = PlatformRegistry().get_normal_platform(llm_group)
 
         if model_name:
             self.model.set_model_name(model_name)
@@ -769,7 +769,7 @@ class Agent:
         self.model.agent = self
 
         # 设置当前模型组，供工具和其他组件使用
-        set_llm_group(model_group)
+        set_llm_group(llm_group)
 
     def _init_session(self) -> None:
         """初始化会话管理器"""
@@ -816,7 +816,7 @@ class Agent:
             optimized_prompt = optimize_system_prompt(
                 current_system_prompt=current_prompt,
                 user_requirement=user_requirement,
-                model_group=self.model_group if hasattr(self, "model_group") else None,
+                llm_group=self.llm_group if hasattr(self, "llm_group") else None,
             )
 
             # 更新系统提示词
@@ -2468,7 +2468,7 @@ class Agent:
         """
         # 使用与调用方相同的模型配置
 
-        temp_model = PlatformRegistry().create_platform(self.model.platform_name(), self.model.platform_type, self.model.model_group)
+        temp_model = PlatformRegistry().create_platform(self.model.platform_name(), self.model.platform_type, self.model.llm_group)
         if not temp_model:
             raise RuntimeError("创建临时模型失败。")
 
@@ -2492,7 +2492,7 @@ class Agent:
             "system_prompt": origin_agent_system_prompt,
             "name": name,
             "description": description,
-            "model_group": self.model_group,
+            "llm_group": self.llm_group,
             "summary_prompt": self.summary_prompt,
             "auto_complete": True,
             "use_tools": use_tools_param,

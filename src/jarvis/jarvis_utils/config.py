@@ -34,7 +34,7 @@ def calculate_token_limit(remaining_tokens: int) -> int:
     return min(int(remaining_tokens * 2 / 3), MAX_CONTEXT_LENGTH)
 
 
-def set_global_env_data(env_data: Dict[str, Any]) -> None:
+def set_global_config_data(env_data: Dict[str, Any]) -> None:
     """设置全局环境变量数据"""
     global GLOBAL_CONFIG_DATA
     GLOBAL_CONFIG_DATA = CaseInsensitiveDict(env_data)
@@ -55,15 +55,15 @@ def get_llm_group() -> Optional[str]:
     return cast(Optional[str], value)
 
 
-def set_llm_group(model_group: Optional[str]) -> None:
+def set_llm_group(llm_group: Optional[str]) -> None:
     """设置当前模型组
 
     参数:
-        model_group: 模型组名称，如果为 None 则不修改现有配置
+        llm_group: 模型组名称，如果为 None 则不修改现有配置
     """
-    # 只有当 model_group 不为 None 时才设置，避免覆盖配置文件中的 llm_group
-    if model_group is not None:
-        GLOBAL_CONFIG_DATA["llm_group"] = model_group
+    # 只有当 llm_group 不为 None 时才设置，避免覆盖配置文件中的 llm_group
+    if llm_group is not None:
+        GLOBAL_CONFIG_DATA["llm_group"] = llm_group
 
 
 """配置管理模块。
@@ -163,8 +163,8 @@ def calculate_content_token_limit(agent: Any = None) -> int:
 
         # 回退方案：使用输入窗口的2/3
         # 使用当前模型组
-        model_group = get_llm_group()
-        max_input_tokens = get_max_input_token_count(model_group)
+        llm_group = get_llm_group()
+        max_input_tokens = get_max_input_token_count(llm_group)
         # 计算2/3限制的token数
         return int(max_input_tokens * 2 / 3)
     except Exception:

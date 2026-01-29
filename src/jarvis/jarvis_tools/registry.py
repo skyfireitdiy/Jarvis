@@ -1415,9 +1415,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
             # 检查内容是否过大
             # 使用当前模型组（不再从 agent 继承）
-            model_group = get_llm_group()
+            llm_group = get_llm_group()
             platform = agent_instance.model if agent_instance.model else None
-            is_large_content = is_context_overflow(output, model_group, platform)
+            is_large_content = is_context_overflow(output, llm_group, platform)
 
             if is_large_content:
                 # 创建临时文件

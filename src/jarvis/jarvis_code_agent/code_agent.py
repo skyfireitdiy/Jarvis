@@ -75,7 +75,7 @@ class CodeAgent(Agent):
 
     def __init__(
         self,
-        model_group: Optional[str] = None,
+        llm_group: Optional[str] = None,
         need_summary: bool = True,
         append_tools: Optional[str] = None,
         tool_group: Optional[str] = None,
@@ -105,7 +105,7 @@ class CodeAgent(Agent):
 
         # 父类初始化准备和调用
         explicit_params = self._prepare_code_agent_parent_init(
-            model_group,
+            llm_group,
             need_summary,
             non_interactive,
             base_tools,
@@ -216,7 +216,7 @@ class CodeAgent(Agent):
 
     def _prepare_code_agent_parent_init(
         self,
-        model_group: Optional[str],
+        llm_group: Optional[str],
         need_summary: bool,
         non_interactive: Optional[bool],
         base_tools: List[str],
@@ -226,7 +226,7 @@ class CodeAgent(Agent):
         """准备 CodeAgent 父类初始化的参数
 
         参数:
-            model_group: 模型组
+            llm_group: 模型组
             need_summary: 是否需要总结
             non_interactive: 是否非交互模式
             base_tools: 基础工具列表
@@ -252,7 +252,7 @@ class CodeAgent(Agent):
             "system_prompt": code_system_prompt,
             "name": name,
             "auto_complete": False,
-            "model_group": model_group,
+            "llm_group": llm_group,
             "need_summary": need_summary,
             "use_methodology": use_methodology,
             "use_analysis": use_analysis,
@@ -296,23 +296,23 @@ class CodeAgent(Agent):
         # 订阅工具调用后事件，用于处理代码修改后的 diff 展示和提交
         self.event_bus.subscribe(AFTER_TOOL_CALL, self._on_after_tool_call)
 
-    def _init_model(self, model_group: Optional[str]) -> None:
+    def _init_model(self, llm_group: Optional[str]) -> None:
         """初始化模型平台（CodeAgent使用smart平台，适用于代码生成等复杂场景）"""
-        model_name = get_smart_model_name(model_group)
+        model_name = get_smart_model_name(llm_group)
 
         # 直接使用 get_smart_platform，避免先调用 create_platform 再回退导致的重复错误信息
         # get_smart_platform 内部会处理配置获取和平台创建
-        self.model = PlatformRegistry().get_smart_platform(model_group)
+        self.model = PlatformRegistry().get_smart_platform(llm_group)
 
         if model_name:
             self.model.set_model_name(model_name)
 
-        self.model.set_llm_group(model_group)
+        self.model.set_llm_group(llm_group)
         self.model.set_suppress_output(False)
 
         self.model.agent = self
 
-        set_llm_group(model_group)
+        set_llm_group(llm_group)
 
     def run(self, user_input: str, prefix: str = "", suffix: str = "") -> Optional[str]:
         """使用给定的用户输入运行代码代理.
@@ -328,7 +328,7 @@ class CodeAgent(Agent):
 
             # 需求分类：使用 normal_llm 对用户需求进行分类
             scenario = classify_user_request(
-                user_input, model_group=self.model.model_group if self.model else None
+                user_input, llm_group=self.model.llm_group if self.model else None
             )
 
             # 根据分类结果获取对应的系统提示词并更新
@@ -768,9 +768,9 @@ git reset --hard {start_commit}
         from jarvis.jarvis_utils.config import get_max_input_token_count
 
         # 获取最大输入 token 数量
-        model_group = self.model.model_group if self.model else None
+        llm_group = self.model.llm_group if self.model else None
         try:
-            max_input_tokens = get_max_input_token_count(model_group)
+            max_input_tokens = get_max_input_token_count(llm_group)
         except Exception:
             # 如果获取失败，使用默认值（约 100000 tokens）
             max_input_tokens = 100000
@@ -1159,7 +1159,7 @@ git reset --hard {start_commit}
             review_agent = Agent(
                 system_prompt=sys_prompt,
                 name=f"CodeReview-Agent-{iteration}",
-                model_group=self.model.model_group if self.model else None,
+                llm_group=self.model.llm_group if self.model else None,
                 summary_prompt=sum_prompt,
                 need_summary=True,
                 auto_complete=True,
@@ -1257,7 +1257,7 @@ git reset --hard {start_commit}
 
 @app.command()
 def cli(
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     tool_group: Optional[str] = typer.Option(
@@ -1403,15 +1403,15 @@ def cli(
     init_env(
         "欢迎使用 Jarvis-CodeAgent，您的代码工程助手已准备就绪！",
         config_file=config_file,
-        model_group=model_group,
+        llm_group=llm_group,
     )
     # CodeAgent 单实例互斥：改为按仓库维度加锁（延后至定位仓库根目录后执行）
     # 锁的获取移动到确认并切换到git根目录之后
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
-        if model_group:
-            set_config("llm_group", str(model_group))
+        if llm_group:
+            set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
         if restore_session:
@@ -1502,7 +1502,7 @@ def cli(
                 if task:
                     # 单次任务模式：创建agent并执行
                     agent = CodeAgent(
-                        model_group=model_group,
+                        llm_group=llm_group,
                         need_summary=False,
                         append_tools=append_tools,
                         tool_group=tool_group,
@@ -1540,7 +1540,7 @@ def cli(
 
                         # 每次循环创建新的agent实例
                         agent = CodeAgent(
-                            model_group=model_group,
+                            llm_group=llm_group,
                             need_summary=False,
                             append_tools=append_tools,
                             tool_group=tool_group,

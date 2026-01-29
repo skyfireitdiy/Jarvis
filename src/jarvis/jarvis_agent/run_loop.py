@@ -788,8 +788,8 @@ class AgentRunLoop:
             diff_content = get_diff_between_commits(start_commit, current_commit)
 
             # 检查并处理token数量限制
-            model_group = agent.model_group
-            return self._check_diff_token_limit(diff_content, model_group)
+            llm_group = agent.llm_group
+            return self._check_diff_token_limit(diff_content, llm_group)
 
         except Exception as e:
             return f"获取git diff失败: {str(e)}"
@@ -811,13 +811,13 @@ class AgentRunLoop:
         return self._git_diff is not None and bool(self._git_diff.strip())
 
     def _check_diff_token_limit(
-        self, diff_content: str, model_group: Optional[str]
+        self, diff_content: str, llm_group: Optional[str]
     ) -> str:
         """检查diff内容的token限制并返回适当的diff内容
 
         参数:
             diff_content: 原始的diff内容
-            model_group: 模型组名称，可为空
+            llm_group: 模型组名称，可为空
 
         返回:
             str: 处理后的diff内容（可能是原始内容或截断后的内容）
@@ -825,7 +825,7 @@ class AgentRunLoop:
         from jarvis.jarvis_utils.embedding import get_context_token_count
 
         # 检查token数量限制
-        max_input_tokens = get_max_input_token_count(model_group)
+        max_input_tokens = get_max_input_token_count(llm_group)
         # 预留一部分token用于其他内容，使用10%作为diff的限制
         max_diff_tokens = int(max_input_tokens * 0.1)
 

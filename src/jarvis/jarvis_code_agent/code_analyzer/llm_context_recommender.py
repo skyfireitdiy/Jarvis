@@ -55,14 +55,14 @@ class ContextRecommender:
         # 使用当前模型组（不再从 parent_model 继承）
         self._model_group = get_llm_group()
 
-        # 根据 model_group 获取配置
+        # 根据 llm_group 获取配置
         # 使用cheap平台，筛选操作可以降低成本
         if self._model_group:
             try:
                 self._platform_name = get_cheap_platform_name(self._model_group)
                 self._model_name = get_cheap_model_name(self._model_group)
             except Exception:
-                # 如果从 model_group 解析失败，使用默认配置
+                # 如果从 llm_group 解析失败，使用默认配置
                 pass
 
     def recommend_context(
@@ -544,7 +544,7 @@ class ContextRecommender:
             if not llm_model:
                 raise ValueError("无法创建LLM模型实例")
 
-            # 先设置模型组（如果从父Agent获取到），因为 model_group 可能会影响模型名称的解析
+            # 先设置模型组（如果从父Agent获取到），因为 llm_group 可能会影响模型名称的解析
             if self._model_group:
                 try:
                     llm_model.set_llm_group(self._model_group)

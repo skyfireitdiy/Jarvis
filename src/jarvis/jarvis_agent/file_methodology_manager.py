@@ -43,12 +43,12 @@ class FileMethodologyManager:
         from jarvis.jarvis_agent.memory_manager import MemoryManager
 
         MemoryManager(self.agent)
-        # 使用normal模型加载方法论，传递 Agent 的 model_group 以确保使用正确的配置
+        # 使用normal模型加载方法论，传递 Agent 的 llm_group 以确保使用正确的配置
         methodology = load_methodology(
             msg,
             self.agent.get_tool_registry(),
-            model_group=self.agent.model_group
-            if hasattr(self.agent, "model_group")
+            llm_group=self.agent.llm_group
+            if hasattr(self.agent, "llm_group")
             else None,
         )
         self.agent.session.prompt = join_prompts(

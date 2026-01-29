@@ -602,13 +602,13 @@ def execute_code_review(
 我将分析上传的代码差异文件，进行全面的代码审查。
 </code_review_guide>"""
 
-            # Get model_group from args (thinking mode removed)
-            model_group = args.get("model_group")
+            # Get llm_group from args (thinking mode removed)
+            llm_group = args.get("llm_group")
 
             agent = Agent(
                 system_prompt=system_prompt,
                 name="Code Review Agent",
-                model_group=model_group,
+                llm_group=llm_group,
                 use_methodology=False,
                 summary_prompt=f"""<code_review_report>
 <overview>
@@ -677,7 +677,7 @@ def execute_code_review(
                 auto_complete=args.get("auto_complete", False),
             )
 
-            # Agent将基于传入的 model_group 自动初始化模型，无需手动注入
+            # Agent将基于传入的 llm_group 自动初始化模型，无需手动注入
 
             # Determine if we need to split the diff due to size
             max_diff_size = 100 * 1024 * 1024  # Limit to 100MB
@@ -713,7 +713,7 @@ def execute_code_review(
                 # Check if content is too large
                 platform = agent.model if agent and agent.model else None
                 is_large_content = is_context_overflow(
-                    diff_output, model_group, platform
+                    diff_output, llm_group, platform
                 )
 
                 # 对于大内容，直接返回提示
@@ -763,7 +763,7 @@ def extract_code_report(result: str) -> str:
 def review_commit(
     commit: str = typer.Argument(..., help="要审查的提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     auto_complete: bool = typer.Option(
@@ -778,7 +778,7 @@ def review_commit(
         "review_type": "commit",
         "commit_sha": commit,
         "root_dir": root_dir,
-        "model_group": model_group,
+        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }
@@ -794,7 +794,7 @@ def review_commit(
 @app.command("current")
 def review_current(
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     auto_complete: bool = typer.Option(
@@ -808,7 +808,7 @@ def review_current(
     tool_args = {
         "review_type": "current",
         "root_dir": root_dir,
-        "model_group": model_group,
+        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }
@@ -826,7 +826,7 @@ def review_range(
     start_commit: str = typer.Argument(..., help="起始提交SHA"),
     end_commit: str = typer.Argument(..., help="结束提交SHA"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     auto_complete: bool = typer.Option(
@@ -842,7 +842,7 @@ def review_range(
         "start_commit": start_commit,
         "end_commit": end_commit,
         "root_dir": root_dir,
-        "model_group": model_group,
+        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }
@@ -859,7 +859,7 @@ def review_range(
 def review_file(
     file: str = typer.Argument(..., help="要审查的文件路径"),
     root_dir: str = typer.Option(".", "--root-dir", help="代码库根目录路径"),
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     auto_complete: bool = typer.Option(
@@ -874,7 +874,7 @@ def review_file(
         "review_type": "file",
         "file_path": file,
         "root_dir": root_dir,
-        "model_group": model_group,
+        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }

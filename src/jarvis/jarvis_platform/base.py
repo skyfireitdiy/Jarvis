@@ -53,33 +53,33 @@ class BasePlatform(ABC):
     def __init__(
         self,
         platform_type: str = "normal",
-        model_group: Optional[str] = None,
+        llm_group: Optional[str] = None,
         agent: Optional[Any] = None,
     ):
         """初始化模型
 
         参数:
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
-            model_group: 模型组名称，用于从配置中获取对应的 llm_config
+            llm_group: 模型组名称，用于从配置中获取对应的 llm_config
             agent: Agent实例，用于回调触发总结等功能
         """
         self.suppress_output = True  # 添加输出控制标志
         self._saved = False
-        self.model_group: Optional[str] = model_group
+        self.llm_group: Optional[str] = llm_group
         self._session_history_file: Optional[str] = None
         self.platform_type: str = platform_type  # 平台类型：normal/cheap/smart
         self.agent = agent  # 保存Agent引用，用于回调
 
         # 根据 platform_type 获取对应的 model_name
         if platform_type == "cheap":
-            self.model_name = get_cheap_model_name(model_group)
+            self.model_name = get_cheap_model_name(llm_group)
         elif platform_type == "smart":
-            self.model_name = get_smart_model_name(model_group)
+            self.model_name = get_smart_model_name(llm_group)
         else:
-            self.model_name = get_normal_model_name(model_group)
+            self.model_name = get_normal_model_name(llm_group)
 
         # 获取 llm_config 供子类使用
-        self._llm_config = get_llm_config(platform_type, model_group)
+        self._llm_config = get_llm_config(platform_type, llm_group)
 
     def get_conversation_turn(self) -> int:
         """获取当前对话轮次数"""
@@ -627,9 +627,9 @@ class BasePlatform(ABC):
         """设置是否抑制输出"""
         self.suppress_output = suppress
 
-    def set_llm_group(self, model_group: Optional[str]):
+    def set_llm_group(self, llm_group: Optional[str]):
         """设置模型组"""
-        self.model_group = model_group
+        self.llm_group = llm_group
 
     def set_platform_type(self, platform_type: str):
         """设置平台类型
@@ -646,11 +646,11 @@ class BasePlatform(ABC):
             int: 模型能处理的最大输入token数量
         """
         if self.platform_type == "cheap":
-            return get_cheap_max_input_token_count(self.model_group)
+            return get_cheap_max_input_token_count(self.llm_group)
         elif self.platform_type == "smart":
-            return get_smart_max_input_token_count(self.model_group)
+            return get_smart_max_input_token_count(self.llm_group)
         else:
-            return get_max_input_token_count(self.model_group)
+            return get_max_input_token_count(self.llm_group)
 
     def _append_session_history(self, user_input: str, model_output: str) -> None:
         """

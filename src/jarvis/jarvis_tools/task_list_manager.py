@@ -70,12 +70,12 @@ def _calculate_default_max_output_length(agent: Any = None) -> int:
                 )
             except Exception:
                 # 如果通过agent获取失败，使用当前配置
-                model_group = get_llm_group()
-                max_input_tokens = get_max_input_token_count(model_group)
+                llm_group = get_llm_group()
+                max_input_tokens = get_max_input_token_count(llm_group)
         else:
             # 没有agent时使用当前配置
-            model_group = get_llm_group()
-            max_input_tokens = get_max_input_token_count(model_group)
+            llm_group = get_llm_group()
+            max_input_tokens = get_max_input_token_count(llm_group)
 
         # 计算1/3限制的token数（更保守的回退方案），然后转换为字符数
         limit_tokens = int(max_input_tokens * 1 / 3)
@@ -119,9 +119,9 @@ class task_list_manager:
 
             # 回退方案：使用输入窗口的2/3
             # 使用当前模型组（不再从 agent 继承）
-            model_group = get_llm_group()
+            llm_group = get_llm_group()
 
-            max_input_tokens = get_max_input_token_count(model_group)
+            max_input_tokens = get_max_input_token_count(llm_group)
             # 计算2/3限制的token数，然后转换为字符数
             limit_tokens = int(max_input_tokens * 2 / 3)
             limit_chars = limit_tokens * 4
@@ -383,24 +383,24 @@ class task_list_manager:
 """
 
         # 获取父 Agent 的模型组
-        # 优先使用父 Agent 的 model_group，因为全局模型组可能还没有被正确设置（时序问题）
-        model_group = None
+        # 优先使用父 Agent 的 llm_group，因为全局模型组可能还没有被正确设置（时序问题）
+        llm_group = None
         try:
             if parent_agent is not None:
-                # 优先从父 Agent 获取 model_group
-                model_group = getattr(parent_agent, "model_group", None)
+                # 优先从父 Agent 获取 llm_group
+                llm_group = getattr(parent_agent, "llm_group", None)
         except Exception:
             pass
 
-        # 如果父 Agent 没有 model_group，才使用当前模型组
-        if model_group is None:
-            model_group = get_llm_group()
+        # 如果父 Agent 没有 llm_group，才使用当前模型组
+        if llm_group is None:
+            llm_group = get_llm_group()
 
         verification_agent = Agent(
             system_prompt=verification_system_prompt,
             name=f"verification_agent_{task.task_id}_{verification_iteration}",
             description="Task verification agent",
-            model_group=model_group,
+            llm_group=llm_group,
             summary_prompt=verification_summary_prompt,
             auto_complete=True,
             need_summary=True,

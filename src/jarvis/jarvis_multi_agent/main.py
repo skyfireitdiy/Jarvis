@@ -19,7 +19,7 @@ def cli(
     user_input: Optional[str] = typer.Option(
         None, "--input", "-i", help="用户输入（可选）"
     ),
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     non_interactive: bool = typer.Option(
@@ -36,12 +36,12 @@ def cli(
             "❌ 非交互模式已启用：必须使用 --input 传入任务内容，因多行输入不可用。"
         )
         raise typer.Exit(code=2)
-    init_env(model_group=model_group)
+    init_env(llm_group=llm_group)
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
-        if model_group:
-            set_config("llm_group", str(model_group))
+        if llm_group:
+            set_config("llm_group", str(llm_group))
     except Exception:
         # 静默忽略同步异常，不影响主流程
         pass

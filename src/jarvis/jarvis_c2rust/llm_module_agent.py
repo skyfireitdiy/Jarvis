@@ -185,7 +185,7 @@ class LLMRustCratePlannerAgent:
                 agent = Agent(
                     system_prompt=system_prompt,
                     name="C2Rust-LLM-Module-Planner",
-                    model_group=self.llm_group,
+                    llm_group=self.llm_group,
                     summary_prompt=summary_prompt,
                     need_summary=True,
                     auto_complete=True,

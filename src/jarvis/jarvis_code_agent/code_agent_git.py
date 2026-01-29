@@ -241,7 +241,7 @@ class GitManager:
                     "suffix": suffix,
                     "agent": agent,
                     # 使用当前模型组（不再从 agent 继承）
-                    "model_group": get_llm_group(),
+                    "llm_group": get_llm_group(),
                 }
             )
 
@@ -493,7 +493,7 @@ class GitManager:
                     "suffix": suffix,
                     "agent": agent,
                     # 使用当前模型组（不再从 agent 继承）
-                    "model_group": get_llm_group(),
+                    "llm_group": get_llm_group(),
                 }
             )
 

@@ -183,7 +183,7 @@ def execute_llm_plan(
                 agent = CodeAgent(
                     need_summary=False,
                     non_interactive=non_interactive,
-                    model_group=llm_group,
+                    llm_group=llm_group,
                     enable_task_list_manager=False,
                     disable_review=True,
                 )
@@ -270,7 +270,7 @@ def execute_llm_plan(
                     repair_agent = CodeAgent(
                         need_summary=False,
                         non_interactive=non_interactive,
-                        model_group=llm_group,
+                        llm_group=llm_group,
                         enable_task_list_manager=False,
                         disable_review=True,
                     )

@@ -297,7 +297,7 @@ def preload_config_for_flags(config_file: Optional[str]) -> None:
 
 
 def try_switch_to_jca_if_git_repo(
-    model_group: Optional[str],
+    llm_group: Optional[str],
     tool_group: Optional[str],
     config_file: Optional[str],
     restore_session: bool,
@@ -323,8 +323,8 @@ def try_switch_to_jca_if_git_repo(
                     ):
                         # 构建并切换到 jarvis-code-agent 命令，传递兼容参数
                         args = ["jarvis-code-agent"]
-                        if model_group:
-                            args += ["-g", model_group]
+                        if llm_group:
+                            args += ["-g", llm_group]
                         if tool_group:
                             args += ["-G", tool_group]
                         if config_file:
@@ -343,7 +343,7 @@ def try_switch_to_jca_if_git_repo(
 
 
 def handle_builtin_config_selector(
-    model_group: Optional[str],
+    llm_group: Optional[str],
     tool_group: Optional[str],
     config_file: Optional[str],
     task: Optional[str],
@@ -613,8 +613,8 @@ def handle_builtin_config_selector(
                             if sel["category"] == "agent":
                                 # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
                                 args = [str(sel["cmd"]), "-c", str(sel["file"])]
-                                if model_group:
-                                    args += ["-g", str(model_group)]
+                                if llm_group:
+                                    args += ["-g", str(llm_group)]
                                 if config_file:
                                     args += ["-f", str(config_file)]
                                 if task:
@@ -624,8 +624,8 @@ def handle_builtin_config_selector(
                                 # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
                                 # 同时传递 -g/--llm-group 以继承 jvs 的模型组选择
                                 args = [str(sel["cmd"]), "-c", str(sel["file"])]
-                                if model_group:
-                                    args += ["-g", str(model_group)]
+                                if llm_group:
+                                    args += ["-g", str(llm_group)]
                                 if task:
                                     args += ["-i", str(task)]
 
@@ -637,8 +637,8 @@ def handle_builtin_config_selector(
                                     "-c",
                                     str(sel["file"]),
                                 ]
-                                if model_group:
-                                    args += ["-g", str(model_group)]
+                                if llm_group:
+                                    args += ["-g", str(llm_group)]
 
                             if args:
                                 PrettyOutput.auto_print(f"ℹ️ 正在启动: {' '.join(args)}")
@@ -695,7 +695,7 @@ def run_cli(
     task_file: Optional[str] = typer.Option(
         None, "--task-file", help="从文件读取任务内容"
     ),
-    model_group: Optional[str] = typer.Option(
+    llm_group: Optional[str] = typer.Option(
         None, "-g", "--llm-group", help="使用的模型组，覆盖配置文件中的设置"
     ),
     tool_group: Optional[str] = typer.Option(
@@ -816,8 +816,8 @@ def run_cli(
 
     # 同步其他 CLI 选项到全局配置，确保后续模块读取一致
     try:
-        if model_group:
-            set_config("llm_group", str(model_group))
+        if llm_group:
+            set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
         if disable_methodology_analysis:
@@ -887,14 +887,14 @@ def run_cli(
     # 如果指定了 -T/--task 参数，跳过切换提示
     if not non_interactive and not task:
         try_switch_to_jca_if_git_repo(
-            model_group, tool_group, config_file, restore_session, task
+            llm_group, tool_group, config_file, restore_session, task
         )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
     # 非交互模式下跳过内置角色/配置选择
     # 如果指定了 -T/--task 参数，跳过配置选择
     if not non_interactive and not task:
-        handle_builtin_config_selector(model_group, tool_group, config_file, task)
+        handle_builtin_config_selector(llm_group, tool_group, config_file, task)
 
     # 检测tmux并在需要时启动（在参数解析之后）
     # 传入 config_file 以便在检查前加载配置
@@ -904,13 +904,13 @@ def run_cli(
     init_env(
         """欢迎使用 Jarvis AI 助手，您的智能助理已准备就绪！""",
         config_file=config_file,
-        model_group=model_group,
+        llm_group=llm_group,
     )
 
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
-        if model_group:
-            set_config("llm_group", str(model_group))
+        if llm_group:
+            set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
         if disable_methodology_analysis:
@@ -925,7 +925,7 @@ def run_cli(
     # 运行主流程
     try:
         agent_manager = AgentManager(
-            model_group=model_group,
+            llm_group=llm_group,
             tool_group=tool_group,
             restore_session=restore_session,
             use_methodology=False if disable_methodology_analysis else None,

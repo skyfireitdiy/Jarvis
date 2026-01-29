@@ -647,7 +647,7 @@ class ReviewManager:
             review_agent = Agent(
                 system_prompt=sys_p_init,
                 name=agent_name,
-                model_group=self.llm_group,
+                llm_group=self.llm_group,
                 summary_prompt=sum_p_init,
                 need_summary=True,
                 auto_complete=True,

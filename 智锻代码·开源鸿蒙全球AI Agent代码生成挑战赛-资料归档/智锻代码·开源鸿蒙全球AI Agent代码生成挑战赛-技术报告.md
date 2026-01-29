@@ -1656,7 +1656,7 @@ end
 - system_prompt: 系统提示词，定义 Agent 行为准则（必要）
 - name: Agent 名称，默认 "Jarvis"，用于全局登记与交互提示
 - description: Agent 描述信息
-- model_group: 模型组标识，用于按组选择平台与模型（get_normal_platform_name/get_normal_model_name/get_cheap_platform_name/get_smart_platform_name）
+- llm_group: 模型组标识，用于按组选择平台与模型（get_normal_platform_name/get_normal_model_name/get_cheap_platform_name/get_smart_platform_name）
 - summary_prompt: 任务总结提示词；为空时回退 DEFAULT_SUMMARY_PROMPT 或 SUMMARY_REQUEST_PROMPT
 - auto_complete: 自动完成开关；非交互模式默认开启；多智能体模式下仅在显式 True 时开启
 - output_handler: 输出处理器列表；默认 [ToolRegistry]（包含 edit_file/rewrite_file 等工具）
@@ -2544,7 +2544,7 @@ end
      - 解析 CLI 参数（模型组/工具组/需求/非交互/恢复会话/提交前后缀等）
   2) 环境初始化：
      - 调用 `init_env` 初始化配置与欢迎信息
-     - 同步 CLI 选项到全局配置（model_group/tool_group/restore_session/non_interactive）
+     - 同步 CLI 选项到全局配置（llm_group/tool_group/restore_session/non_interactive）
   3) Git 仓库校验与初始化：
      - 检查是否为 git 仓库（`git rev-parse --git-dir`）
      - 若非仓库：交互式或非交互模式下提示初始化新仓库
@@ -2553,7 +2553,7 @@ end
      - 按仓库维度加锁：基于 `repo_root` 的 md5 哈希生成锁文件名（`code_agent_{md5}.lock`）
      - 回退策略：加锁失败时回退到全局锁（`code_agent.lock`）
   5) CodeAgent 构造与初始化：
-     - 创建 CodeAgent 实例（传入 model_group/tool_group/append_tools/non_interactive）
+     - 创建 CodeAgent 实例（传入 llm_group/tool_group/append_tools/non_interactive）
      - CodeAgent 内部执行：git 配置检查、工具白名单构建、规则加载、调用父类 Agent 初始化（super().**init**）、事件订阅
   6) 会话恢复（可选）：
      - 若 `restore_session=True`，调用 `agent.restore_session()`
@@ -2979,7 +2979,7 @@ CA -> CA : 显示提交历史并处理确认
 #### 5. 参数与配置说明（外层）
 
 - CodeAgent 构造参数（**init**）
-  - model_group：模型组标识（可选）
+  - llm_group：模型组标识（可选）
   - need_summary：是否在完成阶段生成总结（默认 True，代码场景通常关闭）
   - append_tools：追加工具白名单（逗号分隔，自动去重）
   - tool_group：工具组标识（可选）
