@@ -249,7 +249,6 @@ class PlatformRegistry:
         Args:
             name: Platform name
             platform_type: 平台类型，可选值为 'normal'、'cheap' 或 'smart'
-            llm_group: 模型组名称，用于从配置中获取对应的 llm_config
             silent: 如果为 True，失败时不打印错误信息（默认 False，保持向后兼容）
 
         Returns:

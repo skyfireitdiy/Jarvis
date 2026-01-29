@@ -813,7 +813,6 @@ class AgentRunLoop:
 
         参数:
             diff_content: 原始的diff内容
-            llm_group: 模型组名称，可为空
 
         返回:
             str: 处理后的diff内容（可能是原始内容或截断后的内容）

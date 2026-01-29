@@ -18,7 +18,6 @@ def optimize_system_prompt(
     参数:
         current_system_prompt: 当前的系统提示词
         user_requirement: 用户需求描述
-        llm_group: 模型组配置，用于选择优化时使用的大模型
 
     返回:
         str: 优化后的系统提示词
