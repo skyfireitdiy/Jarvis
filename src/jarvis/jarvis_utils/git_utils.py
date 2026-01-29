@@ -514,9 +514,7 @@ def handle_commit_workflow() -> bool:
         commit_count = int(decode_output(commit_result.stdout).strip())
 
         # 暂存所有修改
-        subprocess.run(
-            ["git", "add", "."], check=True, capture_output=True
-        )
+        subprocess.run(["git", "add", "."], check=True, capture_output=True)
 
         # 提交变更
         subprocess.run(

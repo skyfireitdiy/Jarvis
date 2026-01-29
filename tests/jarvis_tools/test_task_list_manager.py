@@ -287,4 +287,3 @@ class TestDependencyValidationIntegration:
         # 验证依赖验证失败，任务不能执行
         assert result["success"] is False
         assert "依赖任务 'failed_dep' 执行失败" in result["stderr"]
-

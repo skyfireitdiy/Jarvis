@@ -288,41 +288,11 @@ class GitCommitTool:
 
                 # Get platform and model based on llm_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import get_normal_model_name
-                from jarvis.jarvis_utils.config import get_normal_platform_name
-                from jarvis.jarvis_utils.config import get_llm_config
 
-                # 始终使用normal模型生成提交信息，不从agent.model获取（避免使用smart模型）
-                # 优先根据 llm_group 获取（确保配置一致性）
-                if llm_group:
-                    platform_name = get_normal_platform_name(llm_group)
-                    model_name = get_normal_model_name(llm_group)
-                    # 获取 normal_llm 的 llm_config，确保使用正确的 API base 和 API key
-                    llm_config = get_llm_config("normal", llm_group)
-                else:
-                    # 如果没有提供 model_group，直接使用配置文件中的默认normal模型
-                    platform_name = get_normal_platform_name(None)
-                    model_name = get_normal_model_name(None)
-                    llm_config = get_llm_config("normal", None)
-
-                # Create a new platform instance
-                if platform_name:
-                    # 传入 normal_llm 的 llm_config，确保 API base 和 API key 与 model 匹配
-                    platform = PlatformRegistry().create_platform(
-                        platform_name, llm_config
-                    )
-                    if platform and model_name:
-                        platform.set_model_name(model_name)
-                    if platform and llm_group:
-                        try:
-                            platform.set_llm_group(llm_group)
-                        except Exception:
-                            # 兼容早期实现
-                            platform.llm_group = llm_group
-                else:
-                    platform = PlatformRegistry().get_normal_platform()
+                platform = PlatformRegistry().get_normal_platform()
 
                 # 生成提交信息
-                model_display_name = model_name or (
+                model_display_name = get_normal_model_name() or (
                     platform.name() if platform else "AI"
                 )
                 PrettyOutput.auto_print(

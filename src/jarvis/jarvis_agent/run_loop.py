@@ -21,7 +21,7 @@ from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_agent.utils import is_auto_complete
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.utils import normalize_next_action
-from jarvis.jarvis_utils.config import get_conversation_turn_threshold
+from jarvis.jarvis_utils.config import get_conversation_turn_threshold, get_llm_group
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
@@ -787,9 +787,7 @@ class AgentRunLoop:
             # 获取diff
             diff_content = get_diff_between_commits(start_commit, current_commit)
 
-            # 检查并处理token数量限制
-            llm_group = agent.llm_group
-            return self._check_diff_token_limit(diff_content, llm_group)
+            return self._check_diff_token_limit(diff_content)
 
         except Exception as e:
             return f"获取git diff失败: {str(e)}"
@@ -810,9 +808,7 @@ class AgentRunLoop:
         """
         return self._git_diff is not None and bool(self._git_diff.strip())
 
-    def _check_diff_token_limit(
-        self, diff_content: str, llm_group: Optional[str]
-    ) -> str:
+    def _check_diff_token_limit(self, diff_content: str) -> str:
         """检查diff内容的token限制并返回适当的diff内容
 
         参数:
@@ -825,7 +821,7 @@ class AgentRunLoop:
         from jarvis.jarvis_utils.embedding import get_context_token_count
 
         # 检查token数量限制
-        max_input_tokens = get_max_input_token_count(llm_group)
+        max_input_tokens = get_max_input_token_count(get_llm_group())
         # 预留一部分token用于其他内容，使用10%作为diff的限制
         max_diff_tokens = int(max_input_tokens * 0.1)
 

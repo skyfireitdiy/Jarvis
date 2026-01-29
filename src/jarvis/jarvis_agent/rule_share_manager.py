@@ -67,7 +67,7 @@ class RuleShareManager(ShareManager):
         rule_dirs = [
             os.path.join(git_root, ".jarvis", "rules"),
         ] + get_rules_load_dirs()
-        
+
         # 添加 builtin 目录（如果存在）
         builtin_dir = _get_builtin_dir()
         if builtin_dir is not None:

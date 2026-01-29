@@ -56,7 +56,9 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
             # 多个工具调用
             PrettyOutput.auto_print(f"🔧 准备执行 {len(tool_infos)} 个工具调用:")
             for idx, tool_info in enumerate(tool_infos, 1):
-                PrettyOutput.auto_print(f"  [{idx}] {tool_info.get('name', '未知工具')}")
+                PrettyOutput.auto_print(
+                    f"  [{idx}] {tool_info.get('name', '未知工具')}"
+                )
                 if tool_info.get("param_summary"):
                     PrettyOutput.auto_print(f"      参数: {tool_info['param_summary']}")
         elif tool_infos:
@@ -81,7 +83,9 @@ def execute_tool_call(response: str, agent: "Agent") -> Tuple[bool, Any]:
     return False, ""
 
 
-def _parse_tool_call_info(response: str, handler_name: str) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+def _parse_tool_call_info(
+    response: str, handler_name: str
+) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
     """从响应中解析工具调用信息
 
     Args:
@@ -111,6 +115,7 @@ def _parse_tool_call_info(response: str, handler_name: str) -> Union[Dict[str, A
                 # 解析 JSON
                 try:
                     from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
+
                     tool_call = json_loads(match_content)
                 except Exception:
                     tool_call = json.loads(match_content)

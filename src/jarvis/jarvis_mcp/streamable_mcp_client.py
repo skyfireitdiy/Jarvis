@@ -167,21 +167,21 @@ class StreamableMcpClient(McpClient):
             else:
                 # If endpoint_path is empty, use base_url directly (keep trailing slash if present)
                 mcp_url = self.base_url.rstrip("/") + "/"
-            
+
             # 所有请求都使用流式传输，因为服务器返回SSE格式
             use_stream = True
-            
+
             response = self.session.post(
                 mcp_url, json=request, stream=use_stream, timeout=self.timeout
             )
-            
+
             # 保存 MCP 会话ID（如果存在）
             if "Mcp-Session-Id" in response.headers:
                 self.mcp_session_id = response.headers["Mcp-Session-Id"]
                 # 如果后续请求需要会话ID，可以将其添加到请求头
                 if self.mcp_session_id and "Mcp-Session-Id" not in self.session.headers:
                     self.session.headers["Mcp-Session-Id"] = self.mcp_session_id
-            
+
             # 如果请求失败，打印详细错误信息
             if response.status_code >= 400:
                 try:
@@ -200,19 +200,21 @@ class StreamableMcpClient(McpClient):
                         f"❌ HTTP错误 {response.status_code}，无法读取响应体: {e}"
                     )
                 response.raise_for_status()
-            
+
             # 处理响应
             result = None
             warning_lines = []
             error_lines = []
-            
+
             if use_stream:
                 # 处理流式响应（SSE格式）
                 for line in response.iter_lines(decode_unicode=True):
                     if not line:
                         continue
                     try:
-                        line_str = line.decode('utf-8') if isinstance(line, bytes) else line
+                        line_str = (
+                            line.decode("utf-8") if isinstance(line, bytes) else line
+                        )
                         # 处理SSE格式：id:, event:, data: 等
                         if line_str.startswith("data:"):
                             # 提取data字段的内容
@@ -280,7 +282,9 @@ class StreamableMcpClient(McpClient):
                             result = None
                 except (json.JSONDecodeError, AttributeError) as e:
                     error_lines.append(f"无法解析响应: {e}")
-                    error_lines.append(f"响应内容: {response_text[:500] if 'response_text' in locals() else response.text[:500]}")
+                    error_lines.append(
+                        f"响应内容: {response_text[:500] if 'response_text' in locals() else response.text[:500]}"
+                    )
 
             if warning_lines:
                 joined_warnings = "\n".join(warning_lines)

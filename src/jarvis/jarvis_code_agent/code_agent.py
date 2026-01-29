@@ -279,9 +279,7 @@ class CodeAgent(Agent):
         # 初始化上下文推荐器（需要父类 Agent 的模型实例）
         # 上下文推荐器用于根据用户输入智能推荐相关代码上下文
         try:
-            self.context_recommender = ContextRecommender(
-                self.context_manager
-            )
+            self.context_recommender = ContextRecommender(self.context_manager)
         except Exception as e:
             # LLM 推荐器初始化失败不影响主流程，仅跳过上下文推荐功能
             PrettyOutput.auto_print(

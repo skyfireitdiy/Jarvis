@@ -219,7 +219,9 @@ class RulesManager:
 
             # 渲染模板变量（支持 {{ jarvis_src_dir }} 和 {{ rule_file_dir }}）
             # 为了向后兼容，仍然提供 jarvis_src_dir（指向 builtin 目录的父目录）
-            jarvis_src_dir = str(builtin_dir.parent) if builtin_dir else _get_jarvis_src_dir()
+            jarvis_src_dir = (
+                str(builtin_dir.parent) if builtin_dir else _get_jarvis_src_dir()
+            )
             context = {
                 "jarvis_src_dir": jarvis_src_dir,
                 "rule_file_dir": str(index_file_path.parent),
@@ -343,7 +345,10 @@ class RulesManager:
                         builtin_dir = _get_builtin_dir()
                         if builtin_dir is not None:
                             builtin_rules_dir = builtin_dir / "rules"
-                            if builtin_rules_dir.exists() and builtin_rules_dir.is_dir():
+                            if (
+                                builtin_rules_dir.exists()
+                                and builtin_rules_dir.is_dir()
+                            ):
                                 return self._read_rule_from_dir(
                                     str(builtin_rules_dir), actual_name
                                 )
@@ -474,7 +479,7 @@ class RulesManager:
                                     return content
                         except Exception:
                             continue
-            
+
             # 优先级 2: 从全局 rules.yaml 文件中查找
             for desc, yaml_path in self._get_all_rules_yaml_files():
                 if desc == "全局":
@@ -502,7 +507,7 @@ class RulesManager:
                                     return content
                         except Exception:
                             continue
-            
+
             # 优先级 3: 从 builtin_rules.md 索引文件中查找
             indexed_rule = self._get_rule_from_builtin_index(rule_name)
             if indexed_rule:
