@@ -35,7 +35,6 @@ from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_llm_config, get_smart_model_name
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
 from jarvis.jarvis_utils.config import is_use_analysis
@@ -62,7 +61,6 @@ from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.globals import set_current_agent
 from jarvis.jarvis_utils.globals import clear_current_agent
-from jarvis.jarvis_utils.config import set_llm_group
 
 app = typer.Typer(help="Jarvis 代码助手")
 

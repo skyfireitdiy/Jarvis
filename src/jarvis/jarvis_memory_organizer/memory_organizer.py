@@ -40,8 +40,8 @@ class MemoryOrganizer:
         model_name_func = get_normal_model_name
 
         # 确定平台和模型
-        platform_name = platform_name_func(model_group_override=llm_group)
-        model_name = model_name_func(model_group_override=llm_group)
+        platform_name_func(model_group_override=llm_group)
+        model_name_func(model_group_override=llm_group)
 
         # 获取当前配置的平台实例
         registry = PlatformRegistry.get_global_platform_registry()

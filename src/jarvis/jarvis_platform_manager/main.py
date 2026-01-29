@@ -6,9 +6,6 @@
 import os
 import sys
 
-from rich import box
-from rich.panel import Panel
-from rich.console import Console
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -23,9 +20,6 @@ import typer
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform_manager.service import start_service
 from jarvis.jarvis_utils.config import (
-    get_llm_config,
-    get_llm_group,
-    get_smart_platform_name,
     set_llm_group,
 )
 from jarvis.jarvis_utils.config import get_normal_model_name

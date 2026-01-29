@@ -1,15 +1,12 @@
 # -*- coding: utf-8 -*-
 """CodeAgent 系统提示词模块"""
 
-import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 import yaml
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_normal_model_name
-from jarvis.jarvis_utils.config import get_normal_platform_name
 from jarvis.jarvis_utils.output import PrettyOutput
 
 
@@ -137,7 +134,7 @@ def classify_user_request(user_input: str) -> str:
                 return scenario_type
 
         # 如果无法识别，返回默认类型
-        PrettyOutput.auto_print(f"📋 需求分类结果: 通用开发 (default)")
+        PrettyOutput.auto_print("📋 需求分类结果: 通用开发 (default)")
         return "default"
 
     except Exception as e:

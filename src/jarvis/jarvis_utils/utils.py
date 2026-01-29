@@ -22,7 +22,6 @@ from typing import Tuple
 from typing import Union
 
 import yaml
-from rich.align import Align
 
 
 from jarvis import __version__
@@ -688,7 +687,7 @@ def _show_usage_stats(
                 width=panel_width,
             )
             console.print(Align.center(welcome_panel))
-    except Exception as e:
+    except Exception:
         # 静默失败，不影响正常使用
         pass
 
