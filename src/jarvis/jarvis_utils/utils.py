@@ -590,9 +590,7 @@ def _check_jarvis_updates() -> bool:
     return _check_pip_updates()
 
 
-def _show_usage_stats(
-    welcome_str: str, model_group_override: Optional[str] = None
-) -> None:
+def _show_usage_stats(welcome_str: str) -> None:
     """显示Jarvis欢迎信息
 
     参数:
@@ -632,12 +630,12 @@ def _show_usage_stats(
 
             # 获取模型信息和工作目录
             try:
-                cheap_model = get_cheap_model_name(model_group_override)
-                cheap_platform = get_cheap_platform_name(model_group_override)
-                normal_model = get_normal_model_name(model_group_override)
-                normal_platform = get_normal_platform_name(model_group_override)
-                smart_model = get_smart_model_name(model_group_override)
-                smart_platform = get_smart_platform_name(model_group_override)
+                cheap_model = get_cheap_model_name()
+                cheap_platform = get_cheap_platform_name()
+                normal_model = get_normal_model_name()
+                normal_platform = get_normal_platform_name()
+                smart_model = get_smart_model_name()
+                smart_platform = get_smart_platform_name()
                 model_info = f"💰 {cheap_model}({cheap_platform})  ⭐ {normal_model}({normal_platform})  🧠 {smart_model}({smart_platform})"
             except Exception:
                 model_info = "💰  未知  ⭐  未知  🧠  未知"
@@ -765,7 +763,7 @@ def init_env(
 
             def show_stats_async() -> None:
                 try:
-                    _show_usage_stats(welcome_str, llm_group)
+                    _show_usage_stats(welcome_str)
                 except Exception:
                     pass
 
@@ -1427,7 +1425,6 @@ def count_cmd_usage() -> None:
 
 def is_context_overflow(
     content: str,
-    model_group_override: Optional[str] = None,
     platform: Optional[Any] = None,
 ) -> bool:
     """判断文件内容是否超出上下文限制
@@ -1446,7 +1443,7 @@ def is_context_overflow(
         estimated_tokens = len(content) // 3.5
 
         # 获取最大token限制
-        max_tokens = get_max_input_token_count(model_group_override)
+        max_tokens = get_max_input_token_count()
 
         # 如果预估token数超过限制的150%，直接认为超出（避免精确计算）
         if estimated_tokens > max_tokens * 1.5:
@@ -1471,7 +1468,7 @@ def is_context_overflow(
             pass
 
     # 回退方案：使用输入窗口限制
-    return content_tokens > get_max_input_token_count(model_group_override)
+    return content_tokens > get_max_input_token_count()
 
 
 def get_loc_stats() -> str:

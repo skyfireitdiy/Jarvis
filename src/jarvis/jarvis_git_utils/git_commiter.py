@@ -17,7 +17,6 @@ from jarvis.jarvis_utils.config import get_git_commit_prompt
 from jarvis.jarvis_utils.git_utils import confirm_add_new_files
 from jarvis.jarvis_utils.git_utils import find_git_root_and_cd
 from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
-from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
@@ -72,7 +71,6 @@ class GitCommitTool:
         self,
         git_diff: str,
         base_prompt: str,
-        llm_group: Optional[str] = None,
         platform: Optional[Any] = None,
         token_ratio: float = 0.5,
     ) -> str:
@@ -115,7 +113,7 @@ class GitCommitTool:
                     pass
 
             # 回退方案：使用输入窗口限制
-            max_input_tokens = get_max_input_token_count(llm_group)
+            max_input_tokens = get_max_input_token_count()
             # 预留一部分给 base_prompt 和响应，使用指定比例作为 diff 的限制
             max_diff_tokens = int(max_input_tokens * token_ratio)
             # 确保 diff 不超过输入窗口减去 base_prompt
@@ -283,9 +281,6 @@ class GitCommitTool:
             diff = decode_output(diff_bytes)
 
             try:
-                # 优先使用args中的model_group，否则使用当前模型组（不再从agent继承）
-                llm_group = args.get("llm_group") or get_llm_group()
-
                 # Get platform and model based on llm_group (thinking mode removed)
                 from jarvis.jarvis_utils.config import get_normal_model_name
 
@@ -346,7 +341,7 @@ commit信息
                 upload_success = False
 
                 # Check if content is too large
-                is_large_content = is_context_overflow(diff, llm_group, platform)
+                is_large_content = is_context_overflow(diff, platform)
                 use_file_list = False
 
                 # 对于大内容，直接使用文件列表生成提交信息（不再支持文件上传）
@@ -360,7 +355,7 @@ commit信息
                 # 对 diff 进行截断处理，确保不会超出上下文限制
                 if not use_file_list:
                     truncated_diff = self._truncate_diff_for_commit(
-                        diff, base_prompt, llm_group, platform, token_ratio=0.5
+                        diff, base_prompt, platform, token_ratio=0.5
                     )
                     if not truncated_diff or truncated_diff != diff:
                         if not truncated_diff:
@@ -571,7 +566,6 @@ def cli(
             "root_dir": root_dir,
             "prefix": prefix,
             "suffix": suffix,
-            "llm_group": llm_group,
         }
     )
 

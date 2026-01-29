@@ -21,27 +21,17 @@ from typing import Set
 import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_normal_model_name
-from jarvis.jarvis_utils.config import get_normal_platform_name
+from jarvis.jarvis_utils.config import get_data_dir, set_llm_group
 from jarvis.jarvis_utils.utils import init_env
 
 
 class MemoryOrganizer:
     """记忆整理器，用于合并具有相似标签的记忆"""
 
-    def __init__(self, llm_group: Optional[str] = None):
+    def __init__(self):
         """初始化记忆整理器"""
         self.project_memory_dir = Path(".jarvis/memory")
         self.global_memory_dir = Path(get_data_dir()) / "memory"
-
-        # 统一使用 normal 平台与模型
-        platform_name_func = get_normal_platform_name
-        model_name_func = get_normal_model_name
-
-        # 确定平台和模型
-        platform_name_func(model_group_override=llm_group)
-        model_name_func(model_group_override=llm_group)
 
         # 获取当前配置的平台实例
         registry = PlatformRegistry.get_global_platform_registry()
@@ -590,6 +580,7 @@ def organize(
     jarvis-memory-organizer organize
     """
     # 验证参数
+    set_llm_group(llm_group)
     if memory_type not in ["project_long_term", "global_long_term"]:
         PrettyOutput.auto_print(
             f"❌ 错误：不支持的记忆类型 '{memory_type}'，请选择 'project_long_term' 或 'global_long_term'"
@@ -598,7 +589,7 @@ def organize(
 
     # 创建整理器并执行
     try:
-        organizer = MemoryOrganizer(llm_group=llm_group)
+        organizer = MemoryOrganizer()
         stats = organizer.organize_memories(memory_type=memory_type, dry_run=dry_run)
 
         # 根据结果返回适当的退出码

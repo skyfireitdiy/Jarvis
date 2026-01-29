@@ -3,6 +3,7 @@
 import os
 import subprocess
 
+from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -22,7 +23,6 @@ def execute_llm_plan(
     out: Optional[Union[Path, str]] = None,
     apply: bool = False,
     crate_name: Optional[Union[Path, str]] = None,
-    llm_group: Optional[str] = None,
     non_interactive: bool = True,
     enable_ffi_export_validation: bool = False,
 ) -> List:
@@ -160,20 +160,20 @@ def execute_llm_plan(
             PrettyOutput.auto_print(
                 f"[c2rust-llm-planner] 已切换到 crate 目录: {os.getcwd()}，执行 CodeAgent 初始化"
             )
-            if llm_group:
-                PrettyOutput.auto_print(f"[c2rust-llm-planner] 使用模型组: {llm_group}")
+            PrettyOutput.auto_print(
+                f"[c2rust-llm-planner] 使用模型组: {get_llm_group()}"
+            )
             try:
                 # 验证模型配置在切换目录后是否仍然有效
                 # CodeAgent 使用 smart 模型，所以这里也使用 smart 配置来显示正确的模型信息
                 from jarvis.jarvis_utils.config import get_smart_model_name
                 from jarvis.jarvis_utils.config import get_smart_platform_name
 
-                if llm_group:
-                    resolved_model = get_smart_model_name(llm_group)
-                    resolved_platform = get_smart_platform_name(llm_group)
-                    PrettyOutput.auto_print(
-                        f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}"
-                    )
+                resolved_model = get_smart_model_name()
+                resolved_platform = get_smart_platform_name()
+                PrettyOutput.auto_print(
+                    f"[c2rust-llm-planner] 解析的模型配置: 平台={resolved_platform}, 模型={resolved_model}"
+                )
             except Exception as e:
                 PrettyOutput.auto_print(
                     f"[c2rust-llm-planner] 警告: 无法验证模型配置: {e}"
@@ -183,7 +183,6 @@ def execute_llm_plan(
                 agent = CodeAgent(
                     need_summary=False,
                     non_interactive=non_interactive,
-                    llm_group=llm_group,
                     enable_task_list_manager=False,
                     disable_review=True,
                 )
@@ -205,7 +204,7 @@ def execute_llm_plan(
                         f"[c2rust-llm-planner] 模型配置错误: {error_msg}"
                     )
                     PrettyOutput.auto_print(
-                        f"[c2rust-llm-planner] 提示: 请检查模型组 '{llm_group}' 的配置是否正确"
+                        f"[c2rust-llm-planner] 提示: 请检查模型组 '{get_llm_group()}' 的配置是否正确"
                     )
                     PrettyOutput.auto_print(
                         f"[c2rust-llm-planner] 当前工作目录: {os.getcwd()}"
@@ -215,10 +214,9 @@ def execute_llm_plan(
                         from jarvis.jarvis_utils.config import get_smart_model_name
                         from jarvis.jarvis_utils.config import get_smart_platform_name
 
-                        if llm_group:
-                            PrettyOutput.auto_print(
-                                f"[c2rust-llm-planner] 当前解析的模型: {get_smart_platform_name(llm_group)}/{get_smart_model_name(llm_group)}"
-                            )
+                        PrettyOutput.auto_print(
+                            f"[c2rust-llm-planner] 当前解析的模型: {get_smart_platform_name()}/{get_smart_model_name()}"
+                        )
                     except Exception:
                         pass
                 raise
@@ -262,15 +260,13 @@ def execute_llm_plan(
                     ]
                 )
 
-                if llm_group:
-                    PrettyOutput.auto_print(
-                        f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {llm_group}"
-                    )
+                PrettyOutput.auto_print(
+                    f"[c2rust-llm-planner][iter={iter_count}] 使用模型组: {get_llm_group()}"
+                )
                 try:
                     repair_agent = CodeAgent(
                         need_summary=False,
                         non_interactive=non_interactive,
-                        llm_group=llm_group,
                         enable_task_list_manager=False,
                         disable_review=True,
                     )
@@ -286,7 +282,7 @@ def execute_llm_plan(
                             f"[c2rust-llm-planner][iter={iter_count}] 模型配置错误: {error_msg}"
                         )
                         PrettyOutput.auto_print(
-                            f"[c2rust-llm-planner][iter={iter_count}] 提示: 请检查模型组 '{llm_group}' 的配置"
+                            f"[c2rust-llm-planner][iter={iter_count}] 提示: 请检查模型组 '{get_llm_group()}' 的配置"
                         )
                     raise
                 # 不切换目录，保持在原始工作目录

@@ -115,12 +115,12 @@ class meta_agent:
     - 各阶段可以穿插和回退，形成迭代式闭环
     - 在 ANALYZE 阶段主动考虑规则，避免跑偏
     - 严格按照流程顺序推进，禁止跳步或乱序（除非我明确要求并说明风险）
-  - 初始化要点：`Agent(system_prompt=..., name=..., llm_group=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{agent_init_file}` 中定义。
+  - 初始化要点：`Agent(system_prompt=..., name=..., use_tools=[...], non_interactive=...)`，大部分默认行为（记忆、方法论、工具过滤等）在 `{agent_init_file}` 中定义。
   - 典型用法：通过 `agent.run(user_input)` 启动完整闭环，内部会自动处理系统提示、工具调用、task_list_manager 调度和总结；总结与返回值行为由 `summary_prompt` 和 `need_summary` 控制。
   - 更多细节（参数含义、总结与返回值策略、事件回调等）请直接阅读：`{agent_init_file}`。
 - CodeAgent（代码 Agent）：
   - 职责：代码分析与修改、git 操作、构建验证、lint、diff 展示和自动 review。
-  - 初始化要点：`CodeAgent(llm_group=..., need_summary=..., non_interactive=True/False, append_tools=..., rule_names=...)`，工作流和提示词在 `{code_agent_file}` 与 `{code_agent_prompts_file}` 中定义。
+  - 初始化要点：`CodeAgent(need_summary=..., non_interactive=True/False, append_tools=..., rule_names=...)`，工作流和提示词在 `{code_agent_file}` 与 `{code_agent_prompts_file}` 中定义。
   - 典型用法：通过 `agent.run(requirement, prefix=..., suffix=...)` 驱动代码修改流程；内部会自动处理上下文分析、补丁生成、git 提交、构建校验、lint 与 review，`run` 的返回值通常是"结果摘要字符串或 None"。
   - 更多细节（review 流程、任务总结、返回值语义等）请直接阅读：`{code_agent_file}` 与 `{code_agent_prompts_file}`。
 
@@ -266,12 +266,8 @@ class {tool_name}:
 
             # 使用CodeAgent生成工具代码
             from jarvis.jarvis_code_agent.code_agent import CodeAgent
-            from jarvis.jarvis_utils.config import get_llm_group
 
-            # 使用当前模型组和标准配置创建CodeAgent
-            llm_group = get_llm_group()
             agent = CodeAgent(
-                llm_group=llm_group,
                 need_summary=True,
                 non_interactive=True,
             )

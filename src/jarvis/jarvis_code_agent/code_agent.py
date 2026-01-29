@@ -1469,7 +1469,6 @@ def cli(
                 if task:
                     # 单次任务模式：创建agent并执行
                     agent = CodeAgent(
-                        llm_group=llm_group,
                         need_summary=False,
                         append_tools=append_tools,
                         tool_group=tool_group,
@@ -1507,7 +1506,6 @@ def cli(
 
                         # 每次循环创建新的agent实例
                         agent = CodeAgent(
-                            llm_group=llm_group,
                             need_summary=False,
                             append_tools=append_tools,
                             tool_group=tool_group,

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Agent创建和订阅模块"""
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_sec.prompts import build_summary_prompt
@@ -36,9 +36,7 @@ def subscribe_summary_event(agent: Agent) -> Dict[str, str]:
     return summary_container
 
 
-def create_analysis_agent(
-    task_id: str, llm_group: Optional[str], force_save_memory: bool = False
-) -> Agent:
+def create_analysis_agent(task_id: str, force_save_memory: bool = False) -> Agent:
     """创建分析Agent"""
     system_prompt = f"""
 # 单Agent安全分析约束
@@ -85,14 +83,11 @@ def create_analysis_agent(
         force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
-    if llm_group:
-        agent_kwargs["llm_group"] = llm_group
     return Agent(**agent_kwargs)
 
 
 def create_review_agent(
     current_review_num: int,
-    llm_group: Optional[str],
 ) -> Agent:
     """创建复核Agent"""
     review_system_prompt = get_review_system_prompt()
@@ -112,15 +107,12 @@ def create_review_agent(
         output_handler=[ToolRegistry()],
         use_tools=["read_code", "execute_script", "retrieve_memory", "save_memory"],
     )
-    if llm_group:
-        review_agent_kwargs["llm_group"] = llm_group
     return Agent(**review_agent_kwargs)
 
 
 def create_cluster_agent(
     file: str,
     chunk_idx: int,
-    llm_group: Optional[str],
     force_save_memory: bool = False,
 ) -> Agent:
     """创建聚类Agent"""
@@ -141,6 +133,4 @@ def create_cluster_agent(
         force_save_memory=force_save_memory,
         use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
     )
-    if llm_group:
-        agent_kwargs_cluster["llm_group"] = llm_group
     return Agent(**agent_kwargs_cluster)

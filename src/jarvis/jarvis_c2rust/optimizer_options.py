@@ -26,7 +26,6 @@ class OptimizeOptions:
     build_fix_retries: int = 3  # 构建失败时的修复重试次数
     # Git 保护：优化前快照 commit，失败时自动 reset 回快照
     git_guard: bool = True
-    llm_group: Optional[str] = None
     cargo_test_timeout: int = 300  # cargo test 超时（秒）
     non_interactive: bool = True
 

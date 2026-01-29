@@ -288,7 +288,6 @@ def format_markdown_report(result_json: Dict[str, Any]) -> str:
 def run_with_agent(
     entry_path: str,
     languages: Optional[List[str]] = None,
-    llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
     cluster_limit: int = 50,
     exclude_dirs: Optional[List[str]] = None,
@@ -303,7 +302,6 @@ def run_with_agent(
     - 聚合为最终报告（JSON + Markdown）返回
 
     其他：
-    - llm_group: 本次分析使用的模型组（仅透传给 Agent，不修改全局配置）
     - report_file: JSONL 报告文件路径（可选，透传）
     - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
     - exclude_dirs: 要排除的目录列表（可选），默认已包含构建产物（build, out, target, dist, bin, obj）、依赖目录（third_party, vendor, deps, dependencies, libs, libraries, external, node_modules）、测试目录（test, tests, __tests__, spec, testsuite, testdata）、性能测试目录（benchmark, benchmarks, perf, performance, bench, benches, profiling, profiler）、示例目录（example, examples）、临时/缓存（tmp, temp, cache, .cache）、文档（docs, doc, documentation）、生成代码（generated, gen）和其他（mocks, fixtures, samples, sample, playground, sandbox）
@@ -314,7 +312,6 @@ def run_with_agent(
     return run_security_analysis(
         entry_path,
         languages=languages,
-        llm_group=llm_group,
         report_file=report_file,
         cluster_limit=cluster_limit,
         exclude_dirs=exclude_dirs,

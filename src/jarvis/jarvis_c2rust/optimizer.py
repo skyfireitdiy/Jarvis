@@ -320,7 +320,6 @@ def optimize_project(
     reset_progress: bool = False,
     build_fix_retries: int = 3,
     git_guard: bool = True,
-    llm_group: Optional[str] = None,
     cargo_test_timeout: int = 300,
     non_interactive: bool = True,
 ) -> Dict:
@@ -361,7 +360,6 @@ def optimize_project(
         reset_progress=reset_progress,
         build_fix_retries=build_fix_retries,
         git_guard=git_guard,
-        llm_group=llm_group,
         cargo_test_timeout=cargo_test_timeout,
         non_interactive=non_interactive,
     )

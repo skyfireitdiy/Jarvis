@@ -690,7 +690,6 @@ def run(
                 res = _optimize_project(
                     project_root=project_root,
                     crate_dir=crate_dir,
-                    llm_group=llm_group,
                     non_interactive=not interactive,
                 )
                 summary = (
@@ -783,7 +782,6 @@ def verify(
     try:
         _run_verify(
             project_root=Path("."),
-            llm_group=llm_group,
             max_iterations=max_iterations,
             non_interactive=not interactive,
         )

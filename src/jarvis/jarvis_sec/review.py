@@ -382,7 +382,6 @@ def process_review_phase(
     invalid_clusters_for_review: List[Dict[str, Any]],
     entry_path: str,
     langs: List[str],
-    llm_group: Optional[str],
     status_mgr: Any,
     _progress_append: Any,
     cluster_batches: List[List[Dict[str, Any]]],
@@ -438,7 +437,7 @@ def process_review_phase(
         review_task = build_review_task(review_batch, entry_path, langs)
 
         # 创建复核Agent
-        review_agent = create_review_agent(current_review_num, llm_group)
+        review_agent = create_review_agent(current_review_num)
 
         # 订阅复核Agent的摘要
         review_summary_container = subscribe_summary_event(review_agent)

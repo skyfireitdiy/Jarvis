@@ -13,6 +13,7 @@ import typer
 from jarvis.jarvis_agent import Agent
 from jarvis.jarvis_code_analysis.checklists.loader import get_language_checklist
 from jarvis.jarvis_tools.read_code import ReadCodeTool
+from jarvis.jarvis_utils.config import set_llm_group
 from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
@@ -602,13 +603,9 @@ def execute_code_review(
 我将分析上传的代码差异文件，进行全面的代码审查。
 </code_review_guide>"""
 
-            # Get llm_group from args (thinking mode removed)
-            llm_group = args.get("llm_group")
-
             agent = Agent(
                 system_prompt=system_prompt,
                 name="Code Review Agent",
-                llm_group=llm_group,
                 use_methodology=False,
                 summary_prompt=f"""<code_review_report>
 <overview>
@@ -677,8 +674,6 @@ def execute_code_review(
                 auto_complete=args.get("auto_complete", False),
             )
 
-            # Agent将基于传入的 llm_group 自动初始化模型，无需手动注入
-
             # Determine if we need to split the diff due to size
             max_diff_size = 100 * 1024 * 1024  # Limit to 100MB
 
@@ -712,7 +707,7 @@ def execute_code_review(
             try:
                 # Check if content is too large
                 platform = agent.model if agent and agent.model else None
-                is_large_content = is_context_overflow(diff_output, llm_group, platform)
+                is_large_content = is_context_overflow(diff_output, platform)
 
                 # 对于大内容，直接返回提示
                 if is_large_content:
@@ -771,12 +766,12 @@ def review_commit(
         None, "--review-rule", help="自定义审查规则文件（可多次指定）"
     ),
 ):
+    set_llm_group(llm_group)
     """审查指定的提交"""
     tool_args = {
         "review_type": "commit",
         "commit_sha": commit,
         "root_dir": root_dir,
-        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }
@@ -803,10 +798,10 @@ def review_current(
     ),
 ):
     """审查当前的变更"""
+    set_llm_group(llm_group)
     tool_args = {
         "review_type": "current",
         "root_dir": root_dir,
-        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }
@@ -835,12 +830,12 @@ def review_range(
     ),
 ):
     """审查提交范围"""
+    set_llm_group(llm_group)
     tool_args = {
         "review_type": "range",
         "start_commit": start_commit,
         "end_commit": end_commit,
         "root_dir": root_dir,
-        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }
@@ -868,11 +863,11 @@ def review_file(
     ),
 ):
     """审查指定的文件"""
+    set_llm_group(llm_group)
     tool_args = {
         "review_type": "file",
         "file_path": file,
         "root_dir": root_dir,
-        "llm_group": llm_group,
         "auto_complete": auto_complete,
         "review_rule": review_rule,
     }

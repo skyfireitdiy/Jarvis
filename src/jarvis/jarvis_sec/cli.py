@@ -87,7 +87,6 @@ def agent(
     try:
         text = run_with_agent(
             path,
-            llm_group=llm_group,
             cluster_limit=cluster_limit,
             enable_verification=enable_verification,
             force_save_memory=force_save_memory,

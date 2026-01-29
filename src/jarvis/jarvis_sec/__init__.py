@@ -57,7 +57,6 @@ from jarvis.jarvis_sec.workflow import run_with_agent
 def run_security_analysis(
     entry_path: str,
     languages: Optional[List[str]] = None,
-    llm_group: Optional[str] = None,
     report_file: Optional[str] = None,
     cluster_limit: int = 50,
     exclude_dirs: Optional[List[str]] = None,
@@ -82,7 +81,6 @@ def run_security_analysis(
     - 最终报告（字符串），由 Aggregator 生成（JSON + Markdown）
 
     其他：
-    - llm_group: 模型组名称（仅在当前调用链内生效，不覆盖全局配置），将直接传入 Agent 用于选择模型
     - report_file: 增量报告文件路径（JSONL）。当每个子任务检测到 issues 时，立即将一条记录追加到该文件；
       若未指定，则默认写入 entry_path/.jarvis/sec/agent_issues.jsonl
     - cluster_limit: 聚类时每批次最多处理的告警数（默认 50），当单个文件告警过多时按批次进行聚类
@@ -175,7 +173,6 @@ def run_security_analysis(
         entry_path,
         langs,
         cluster_limit,
-        llm_group,
         sec_dir,
         status_mgr,
         _progress_append,
@@ -188,7 +185,6 @@ def run_security_analysis(
         cluster_batches,
         entry_path,
         langs,
-        llm_group,
         sec_dir,
         status_mgr,
         _progress_append,
