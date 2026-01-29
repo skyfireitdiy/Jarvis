@@ -53,7 +53,6 @@ class LLMRustCratePlannerAgent:
         self,
         project_root: Union[Path, str] = ".",
         db_path: Optional[Union[Path, str]] = None,
-        llm_group: Optional[str] = None,
     ):
         self.project_root = Path(project_root).resolve()
         self.db_path = (
@@ -61,7 +60,6 @@ class LLMRustCratePlannerAgent:
             if db_path is not None
             else (self.project_root / ".jarvis" / "c2rust" / "symbols.jsonl")
         )
-        self.llm_group = llm_group
         self.loader = GraphLoader(self.db_path, self.project_root)
         # 读取附加说明
         self.additional_notes = self._load_additional_notes()
@@ -185,7 +183,6 @@ class LLMRustCratePlannerAgent:
                 agent = Agent(
                     system_prompt=system_prompt,
                     name="C2Rust-LLM-Module-Planner",
-                    llm_group=self.llm_group,
                     summary_prompt=summary_prompt,
                     need_summary=True,
                     auto_complete=True,
@@ -270,7 +267,6 @@ class LLMRustCratePlannerAgent:
 def plan_crate_json_text(
     project_root: Union[Path, str] = ".",
     db_path: Optional[Union[Path, str]] = None,
-    llm_group: Optional[str] = None,
     skip_cleanup: bool = False,
 ) -> str:
     """
@@ -282,14 +278,14 @@ def plan_crate_json_text(
     # 若外层已处理清理确认，则跳过本函数的清理与确认（避免重复询问）
     if skip_cleanup:
         agent = LLMRustCratePlannerAgent(
-            project_root=project_root, db_path=db_path, llm_group=llm_group
+            project_root=project_root, db_path=db_path
         )
         return agent.plan_crate_json_text()
 
     perform_pre_cleanup_for_planner(project_root)
 
     agent = LLMRustCratePlannerAgent(
-        project_root=project_root, db_path=db_path, llm_group=llm_group
+        project_root=project_root, db_path=db_path
     )
     return agent.plan_crate_json_text()
 

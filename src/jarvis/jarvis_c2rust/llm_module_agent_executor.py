@@ -34,7 +34,7 @@ def execute_llm_plan(
     # 延迟导入以避免循环依赖
     from jarvis.jarvis_c2rust.llm_module_agent import plan_crate_json_text
 
-    json_text = plan_crate_json_text(llm_group=llm_group, skip_cleanup=False)
+    json_text = plan_crate_json_text(skip_cleanup=False)
     entries, parse_error = parse_project_json_entries(json_text)
     if parse_error:
         raise ValueError(f"JSON解析失败: {parse_error}")
