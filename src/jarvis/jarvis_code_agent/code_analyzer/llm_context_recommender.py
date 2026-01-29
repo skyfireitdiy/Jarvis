@@ -34,7 +34,7 @@ class ContextRecommender:
     """
 
     def __init__(
-        self, context_manager: ContextManager, parent_model: Optional[Any] = None
+        self, context_manager: ContextManager
     ):
         """初始化上下文推荐器
 
