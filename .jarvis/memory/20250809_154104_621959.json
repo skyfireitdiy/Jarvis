@@ -1,0 +1,11 @@
+{
+  "id": "20250809_154104_621959",
+  "type": "project_long_term",
+  "tags": [
+    "doubao",
+    "authentication"
+  ],
+  "content": "Doubao平台认证方式：1) 使用浏览器Cookie认证而非API Key；2) Cookie需从开发者工具Network面板获取；3) 需要包含完整的Cookie字符串",
+  "created_at": "2025-08-09T15:41:04.621993",
+  "updated_at": "2025-08-09T15:41:04.621997"
+}

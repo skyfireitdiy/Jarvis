@@ -1,0 +1,12 @@
+{
+  "id": "20260112_121217_673932",
+  "type": "project_long_term",
+  "tags": [
+    "rules_best_practices",
+    "文档格式",
+    "行长度限制"
+  ],
+  "content": "在JARVIS项目的文档中，表格中的示例值需要符合MD013行长度限制规范，过长的路径示例需要简化表示（如使用省略号）。例如在占位符变量表格中：`{{ script_dir }}`的示例值从`/path/to/jarvis/src/jarvis/jarvis_code_agent`简化为`/path/to/jarvis/...`，`{{ rule_file_dir }}`的示例值从`/home/user/myproject/.jarvis/rules`简化为`/home/user/...`。",
+  "created_at": "2026-01-12T12:12:17.673956",
+  "updated_at": "2026-01-12T12:12:17.673959"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20251230_141321_281896",
+  "type": "project_long_term",
+  "tags": [
+    "TUI",
+    "MountError",
+    "ScrollableContainer",
+    "on_mount",
+    "架构决策"
+  ],
+  "content": "TUI组件挂载错误修复方案：在构建TUI表单时，ScrollableContainer 必须在框架挂载后才能调用 mount() 方法挂载子组件。解决方案是将表单内容的挂载操作从 _build_form() 延迟到 on_mount() 阶段执行。具体实现：_build_form() 只创建空容器并返回，新增 _populate_form_container() 方法在 on_mount() 中调用，此时容器已挂载可以安全调用 mount()。",
+  "created_at": "2025-12-30T14:13:21.281935",
+  "updated_at": "2025-12-30T14:13:21.281939"
+}

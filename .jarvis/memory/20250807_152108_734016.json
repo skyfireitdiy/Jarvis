@@ -1,0 +1,13 @@
+{
+  "id": "20250807_152108_734016",
+  "type": "project_long_term",
+  "tags": [
+    "installation",
+    "uv",
+    "dependency_management",
+    "scripting"
+  ],
+  "content": "项目安装脚本（install.sh, install.ps1）已标准化 uv 的安装流程。脚本会优先尝试通过 `pip3 install uv --user` 进行安装，如果失败或 pip3 不可用，则回退到官方的 curl/irm 安装脚本。这增强了安装过程的自动化和鲁棒性。\n",
+  "created_at": "2025-08-07T15:21:08.734053",
+  "updated_at": "2025-08-07T15:21:08.734058"
+}

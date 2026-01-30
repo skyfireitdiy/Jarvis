@@ -1,0 +1,12 @@
+{
+  "id": "20260119_134321_410675",
+  "type": "project_long_term",
+  "tags": [
+    "FixToolCall",
+    "builtin_commands",
+    "auto_complete"
+  ],
+  "content": "在 input.py 的自动补全功能中添加了内置命令：FixToolCall、RestoreSession、ListSessions。修改位置：1) get_completions 方法（第386-396行）添加到 prompt_toolkit 补全列表；2) _get_fzf_completion_items 函数（第565-579行）添加到 fzf 补全列表。现在用户可以通过 @ 符号触发自动补全，选择后会自动补全为 '<FixToolCall>' 格式。",
+  "created_at": "2026-01-19T13:43:21.410707",
+  "updated_at": "2026-01-19T13:43:21.410711"
+}

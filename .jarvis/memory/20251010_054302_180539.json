@@ -1,0 +1,15 @@
+{
+  "id": "20251010_054302_180539",
+  "type": "project_long_term",
+  "tags": [
+    "agent",
+    "analysis",
+    "methodology",
+    "execute_script",
+    "policy",
+    "global_defaults"
+  ],
+  "content": "全局策略：为所有Agent禁用分析（use_analysis=false）、禁用方法论（use_methodology=false），并启用execute_script工具。优先通过默认配置与代码层全局开关实现，必要时同步更新各多智能体YAML配置，确保一致性与可回退。\n",
+  "created_at": "2025-10-10T05:43:02.180559",
+  "updated_at": "2025-10-10T05:43:02.180563"
+}

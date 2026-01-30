@@ -1,0 +1,14 @@
+{
+  "id": "20250930_073017_901659",
+  "type": "project_long_term",
+  "tags": [
+    "cosight",
+    "enhancement",
+    "base_agent",
+    "chat_llm",
+    "message_stream"
+  ],
+  "content": "面向 Co-Sight 的增强与落地路线：\n- 受控模式开关：在 app/cosight/agent/base/base_agent.py: BaseAgent.execute 增加 policy=strict_single，单工具执行、可选用户确认、白名单。\n- 会话预算与摘要：在 app/cosight/llm/chat_llm.py 引入 max_token_count 与摘要清理；在 MessageStream.to_text 增加历史裁剪策略。\n- 风险与回放：在 _push_tool_event 记录输入/输出快照与幂等键；引入 Dry-Run/预览，支持一键回放。\n- 工具治理：持久化 FUNCTION_ARG_MAPPING，完善参数 schema 与键名映射的测试覆盖。",
+  "created_at": "2025-09-30T07:30:17.901702",
+  "updated_at": "2025-09-30T07:30:17.901707"
+}

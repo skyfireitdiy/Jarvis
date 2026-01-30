@@ -1,0 +1,13 @@
+{
+  "id": "20260120_105813_639156",
+  "type": "project_long_term",
+  "tags": [
+    "icenter",
+    "skill",
+    "cli",
+    "authentication"
+  ],
+  "content": "iCenter CLI 工具已创建并注册到 Jarvis 系统。位置：/home/wangmaobin/code/icenter-cli。功能：支持用户认证、Token 获取、文档创建到 iCenter 平台。使用 typer 框架，依赖 typer[all]>=0.9.0 和 requests>=2.31.0。认证接口：POST http://uac.zte.com.cn/uaccommauth/auth/comm/verify.serv，使用 MD5 签名。文档创建接口：POST https://icenterapi.zte.com.cn/zte-rd-icenter-contents/content/。",
+  "created_at": "2026-01-20T10:58:13.639178",
+  "updated_at": "2026-01-20T10:58:13.639182"
+}

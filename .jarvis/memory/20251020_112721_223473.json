@@ -1,0 +1,14 @@
+{
+  "id": "20251020_112721_223473",
+  "type": "project_long_term",
+  "tags": [
+    "plan",
+    "task_planner",
+    "refactoring",
+    "jarvis_agent",
+    "architecture"
+  ],
+  "content": "重构摘要：将 Agent 的计划与子任务调度逻辑封装为独立类 TaskPlanner，并抽取到新文件 src/jarvis/jarvis_agent/task_planner.py；Agent 通过 _maybe_plan_and_dispatch 委托给 TaskPlanner，保持向后兼容。\n\n主要改动：\n1) 新增文件：src/jarvis/jarvis_agent/task_planner.py\n   - 新类 TaskPlanner(agent): 提供 maybe_plan_and_dispatch(task_text) 方法\n   - 职责：判断是否需要拆分、解析 <SUB_TASK>、为每个子任务创建子Agent执行、汇总 <RESULT_SUMMARY> 并写回父Agent上下文\n\n2) 修改 src/jarvis/jarvis_agent/__init__.py\n   - 导入 TaskPlanner：from jarvis.jarvis_agent.task_planner import TaskPlanner\n   - 在 Agent.__init__ 中创建 self.task_planner = TaskPlanner(self)\n   - 将 _maybe_plan_and_dispatch 重写为委托调用 TaskPlanner.maybe_plan_and_dispatch(task_text)，保留异常防护与向后兼容\n   - 保持原有 run 流程，当 plan=True 时仍在主循环前触发规划与子任务执行\n\n行为保持：\n- 子任务执行时传入完整上下文（父任务、子任务规划块、前置子任务结果、当前子任务描述）\n- 所有子任务完成后自动生成 <RESULT_SUMMARY> 汇总，并让父Agent继续整合输出\n- sub_agent/sub_code_agent 不再从父Agent session.prompt 补背景，需调用方显式传入\n\n影响与后续：\n- 更易维护与复用任务规划逻辑\n- 若需要在 CodeAgent 或其他 Agent 类型复用规划，可通过注入 TaskPlanner 或适配其依赖方法签名\n- 如后续出现上下文过长问题，可在 TaskPlanner 中集中实现摘要/截断策略\n",
+  "created_at": "2025-10-20T11:27:21.223497",
+  "updated_at": "2025-10-20T11:27:21.223500"
+}

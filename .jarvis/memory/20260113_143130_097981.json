@@ -1,0 +1,13 @@
+{
+  "id": "20260113_143130_097981",
+  "type": "project_long_term",
+  "tags": [
+    "c2rust",
+    "transpiler",
+    "rule",
+    "task_list_manager"
+  ],
+  "content": "C2Rust转译规则已创建并注册到规则系统。核心原则：1)任务管理原则（核心）- 必须使用task_list_manager管理每个函数转译；2)TDD开发原则 - 先测试后实现；3)功能一致性原则 - 允许安全改进；4)模块化设计原则；5)类型安全原则。转译流程包含5个阶段：规划、实现、构建、审查、优化。规则文件位置：builtin/rules/c2rust_transpiler.md",
+  "created_at": "2026-01-13T14:31:30.098008",
+  "updated_at": "2026-01-13T14:31:30.098012"
+}

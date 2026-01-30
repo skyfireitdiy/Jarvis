@@ -1,0 +1,15 @@
+{
+  "id": "20250820_170246_200663",
+  "type": "project_long_term",
+  "tags": [
+    "output",
+    "verbosity_reduction",
+    "utils.py",
+    "PrettyOutput",
+    "jarvis_tools",
+    "policy"
+  ],
+  "content": "输出策略（长期）：采用“没有消息就是好消息”原则，默认尽量减少对外过程性细节输出。\n- 保留：用户交互友好提示（如输入提示、必要的确认）、错误/异常/警告信息、关键结果/必要产出。\n- 去除或降级：过程细节、内部步骤日志、临时诊断信息，除非在显式 verbose/debug 模式下。\n- 统一通过 PrettyOutput 控制输出级别，支持全局 verbosity 开关（如 quiet/normal/verbose/debug）。\n- 工具模块（execute_script、read_code、virtual_tty 等）默认不打印内部执行细节，除非开启 verbose。\n- 成功路径默认静默，只有在有“有用结果”时才输出内容；失败路径输出清晰错误信息与必要的上下文。\n",
+  "created_at": "2025-08-20T17:02:46.200715",
+  "updated_at": "2025-08-20T17:02:46.200724"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260115_174547_227192",
+  "type": "project_long_term",
+  "tags": [
+    "base.py",
+    "token",
+    "get_remaining_token_count",
+    "bug",
+    "bug_fix"
+  ],
+  "content": "base.py剩余token为0问题分析：\n1. 计算公式：remaining = max_tokens - used_tokens\n2. get_remaining_token_count调用_get_platform_max_input_token_count和get_used_token_count\n3. get_used_token_count遍历对话历史，使用get_context_token_count计算每条消息的token\n4. get_context_token_count使用tiktoken计算并乘以10/7倍调整\n5. 可能原因：配置未设置/过小、对话历史累积过多、token计算偏大\n6. get_max_input_token_count默认值为'128000'字符串，依赖int()转换",
+  "created_at": "2026-01-15T17:45:47.227245",
+  "updated_at": "2026-01-15T17:45:47.227249"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260113_131047_057093",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "jarvis-check",
+    "lint",
+    "build-tools",
+    "feature"
+  ],
+  "content": "jck模块功能扩展完成：\n1. 新增 LINT_TOOLS_CONFIG 包含7个lint工具：ruff, mypy, pylint, shellcheck, clang-tidy, eslint, rubocop\n2. 新增 BUILD_TOOLS_CONFIG 包含8个构建工具：pytest, build, twine, cmake, go, gradle, maven, npm\n3. 新增 --check-lint/-l 选项：检查lint工具\n4. 新增 --check-build/-b 选项：检查构建工具\n5. 保持向后兼容，默认行为检查系统工具\n6. 选项互斥检查：同时指定--check-lint和--check-build时提示错误\n\n修改文件：\n- src/jarvis/jarvis_jck/config.py\n- src/jarvis/jarvis_jck/core.py\n- src/jarvis/jarvis_jck/cli.py",
+  "created_at": "2026-01-13T13:10:47.057117",
+  "updated_at": "2026-01-13T13:10:47.057120"
+}

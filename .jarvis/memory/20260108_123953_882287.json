@@ -1,0 +1,12 @@
+{
+  "id": "20260108_123953_882287",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "create_window",
+    "function_implementation"
+  ],
+  "content": "在tmux_wrapper.py中实现了create_window函数，用于在指定的tmux session中创建一个新的window。函数参数包括session_name、window_name（可选）、working_dir（可选）和initial_command（可选）。函数返回新创建的window ID（失败返回None）。关键特性：创建的window是detached状态，使用shlex.quote处理目录路径以确保安全，包含超时和异常处理机制。",
+  "created_at": "2026-01-08T12:39:53.882312",
+  "updated_at": "2026-01-08T12:39:53.882316"
+}

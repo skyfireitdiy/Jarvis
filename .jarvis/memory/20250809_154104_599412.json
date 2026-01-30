@@ -1,0 +1,11 @@
+{
+  "id": "20250809_154104_599412",
+  "type": "project_long_term",
+  "tags": [
+    "config_schema",
+    "platform_integration"
+  ],
+  "content": "平台认证信息统一规范：1) Cookie认证的平台统一使用'_COOKIES'后缀命名；2) API Key认证的使用'_API_KEY'后缀；3) 所有认证字段必须包含清晰的用途说明",
+  "created_at": "2025-08-09T15:41:04.599454",
+  "updated_at": "2025-08-09T15:41:04.599458"
+}

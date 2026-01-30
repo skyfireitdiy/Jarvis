@@ -1,0 +1,14 @@
+{
+  "id": "20260109_152219_070022",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "input",
+    "shortcut",
+    "Ctrl+X",
+    "exit"
+  ],
+  "content": "在src/jarvis/jarvis_utils/input.py文件中添加了Ctrl+X快捷键来退出程序的功能：\n1. 添加了CTRL_X_SENTINEL常量：\"__CTRL_X_PRESSED__\"\n2. 添加了Ctrl+X按键绑定：@bindings.add(\"c-x\", filter=has_focus(DEFAULT_BUFFER))\n3. 在帮助信息中添加了Ctrl+X快捷键说明：\"退出程序\"\n4. 在get_multiline_input函数中添加了处理逻辑：当收到CTRL_X_SENTINEL时，打印退出信息并raise SystemExit(0)",
+  "created_at": "2026-01-09T15:22:19.070048",
+  "updated_at": "2026-01-09T15:22:19.070052"
+}

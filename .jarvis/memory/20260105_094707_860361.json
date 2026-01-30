@@ -1,0 +1,13 @@
+{
+  "id": "20260105_094707_860361",
+  "type": "project_long_term",
+  "tags": [
+    "api",
+    "api_integration",
+    "frontend_backend",
+    "fastapi"
+  ],
+  "content": "前后端API集成模式：API文档定义了与后端FastAPI服务兼容的接口，包含请求方法、路径、参数格式和返回值结构的完整描述。文档中包含了对MCP配置、oneOf类型切换等特殊场景的注意事项，确保前后端集成的一致性。",
+  "created_at": "2026-01-05T09:47:07.860380",
+  "updated_at": "2026-01-05T09:47:07.860383"
+}

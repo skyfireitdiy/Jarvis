@@ -1,0 +1,13 @@
+{
+  "id": "20260105_094039_866557",
+  "type": "project_long_term",
+  "tags": [
+    "eslint",
+    "code-quality",
+    "javascript",
+    "config"
+  ],
+  "content": "在项目根目录下创建了.eslintrc.json配置文件，包含基本ESLint配置：\n{\n  \"env\": {\n    \"browser\": true,\n    \"es2021\": true\n  },\n  \"extends\": \"eslint:recommended\",\n  \"parserOptions\": {\n    \"ecmaVersion\": \"latest\",\n    \"sourceType\": \"module\"\n  },\n  \"rules\": {}\n}",
+  "created_at": "2026-01-05T09:40:39.866586",
+  "updated_at": "2026-01-05T09:40:39.866590"
+}

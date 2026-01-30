@@ -1,0 +1,13 @@
+{
+  "id": "20260110_123553_775322",
+  "type": "project_long_term",
+  "tags": [
+    "code_review",
+    "platform_removal",
+    "documentation",
+    "issue"
+  ],
+  "content": "在审查中发现，虽然git diff显示对9.附录.md的ENV行进行了修改（YUANBAO_COOKIES -> OPENAI_API_KEY），但文档中仍保留着通义千问(tongyi)的配置示例内容，这些内容应该也要被删除以符合用户需求：删除文档中处理openai和claude平台以外的平台介绍和描述。",
+  "created_at": "2026-01-10T12:35:53.775354",
+  "updated_at": "2026-01-10T12:35:53.775359"
+}

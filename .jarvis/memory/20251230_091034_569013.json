@@ -1,0 +1,12 @@
+{
+  "id": "20251230_091034_569013",
+  "type": "project_long_term",
+  "tags": [
+    "ArrayField",
+    "实现细节",
+    "jarvis_config"
+  ],
+  "content": "ArrayField 类实现细节：\n- 位置：src/jarvis/jarvis_config/field_factory.py 第305-467行\n- 核心方法：\n  * _add_item() (389-395): 添加新的数组项\n  * _remove_item(index) (397-410): 移除指定索引的项\n  * _reindex_items() (412-434): 重新索引所有项\n  * get_value() (451-453): 获取数组值\n  * set_value(value) (455-467): 设置数组值\n\nArrayItemField 类实现细节：\n- 位置：src/jarvis/jarvis_config/field_factory.py 第722-900行\n- 支持基本类型和对象类型的数组项\n- 对象类型使用编辑按钮触发模态窗口\n- 核心方法：\n  * get_value() (824-853): 获取数组项值\n  * set_value(value) (855-880): 设置数组项值\n  * _open_edit_modal() (895-900): 打开对象编辑模态窗口",
+  "created_at": "2025-12-30T09:10:34.569030",
+  "updated_at": "2025-12-30T09:10:34.569033"
+}

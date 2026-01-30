@@ -1,0 +1,15 @@
+{
+  "id": "20260105_094707_858970",
+  "type": "project_long_term",
+  "tags": [
+    "api",
+    "api_design",
+    "jarvis_config",
+    "fastapi",
+    "schema",
+    "config"
+  ],
+  "content": "Jarvis配置工具API接口设计：包含三个核心接口 - GET /api/schema（获取配置Schema结构）、POST /api/save（保存配置）、GET /api/config（获取当前配置）。API文档位于frontend/src/api/api.md，后端实现位于src/jarvis/jarvis_config/web_app.py。所有接口与FastAPI后端兼容，参数和返回值定义清晰，包含详细的请求示例和响应示例。",
+  "created_at": "2026-01-05T09:47:07.858998",
+  "updated_at": "2026-01-05T09:47:07.859001"
+}

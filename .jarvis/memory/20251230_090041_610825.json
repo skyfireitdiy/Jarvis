@@ -1,0 +1,13 @@
+{
+  "id": "20251230_090041_610825",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "ArrayField",
+    "textual",
+    "动态数组管理"
+  ],
+  "content": "ArrayField 类位于 src/jarvis/jarvis_config/field_factory.py（约第306-469行），实现了动态数组管理功能。关键特性：1) 使用 Vertical 容器显示数组项；2) 每个数组项是 ArrayItemField；3) 底部有'添加项'按钮；4) 核心方法包括 _add_item（添加新项）、_remove_item（删除项）、get_value（收集值）、set_value（设置值）、_reindex_items（重新索引）；5) __init__ 方法接收 items_schema 参数并维护 _items 列表；6) compose 方法创建 Vertical 容器和添加按钮；7) on_mount 方法根据默认值初始化数组项",
+  "created_at": "2025-12-30T09:00:41.610890",
+  "updated_at": "2025-12-30T09:00:41.610897"
+}

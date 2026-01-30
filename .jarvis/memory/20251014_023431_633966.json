@@ -1,0 +1,13 @@
+{
+  "id": "20251014_023431_633966",
+  "type": "project_long_term",
+  "tags": [
+    "novel_generator",
+    "change_request",
+    "remove_polish_proofread",
+    "final_output_first"
+  ],
+  "content": "修改 builtin/multi_agent/novel_generator.yaml 的多智能体流程：删除 ChapterPolisher 与 ChapterProofreader 角色与相关阶段；将章节产出流程调整为 plot -> final（由 ChapterWriter 直接产出成品，无独立润色/校对阶段）。建议 ChapterWriter 直接写入 chapter_{NNNN}_proofread.md 作为最终稿，并保留用户对最终稿的审阅确认；相应更新所有命名、状态推断与跨章读取规则。",
+  "created_at": "2025-10-14T02:34:31.633988",
+  "updated_at": "2025-10-14T02:34:31.633992"
+}

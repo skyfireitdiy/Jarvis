@@ -1,0 +1,13 @@
+{
+  "id": "20260109_170942_821783",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_platform",
+    "interface_removal",
+    "verification",
+    "ruff_check"
+  ],
+  "content": "验证接口删除任务的方法：使用grep命令检查目标文件是否还包含待删除的方法定义，使用ruff check命令验证文件语法是否正确。",
+  "created_at": "2026-01-09T17:09:42.821802",
+  "updated_at": "2026-01-09T17:09:42.821805"
+}

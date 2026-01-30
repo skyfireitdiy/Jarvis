@@ -1,0 +1,12 @@
+{
+  "id": "20260113_125637_155434",
+  "type": "project_long_term",
+  "tags": [
+    "测试模块",
+    "test",
+    "项目结构"
+  ],
+  "content": "Jarvis项目测试模块分布：\n- jarvis_utils: 18个测试文件（工具函数、JSONnet兼容性、配置等）\n- jarvis_agent: 6个测试文件（任务管理、会话管理、工具执行等）\n- jarvis_c2rust: 5个测试文件（转译器工具、模型、LLM模块代理等）\n- jarvis_code_agent: 5个测试文件（代码代理规则、构建验证、提示词等）\n- jarvis_stats: 4个测试文件（统计、存储、可视化等）\n- 其他模块: 各1-2个测试文件（安全、RAG、配置、平台管理等）",
+  "created_at": "2026-01-13T12:56:37.155458",
+  "updated_at": "2026-01-13T12:56:37.155462"
+}

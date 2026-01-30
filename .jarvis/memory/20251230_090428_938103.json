@@ -1,0 +1,13 @@
+{
+  "id": "20251230_090428_938103",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "tui_app",
+    "数组管理",
+    "实现细节"
+  ],
+  "content": "tui_app.py 的 _build_object_form 方法（第182-234行）负责构建对象类型的表单，现在已支持数组类型字段的处理。实现要点：1）使用 self.parser.get_field_type(field_path) 获取字段类型；2）如果类型是 SchemaParser.TYPE_ARRAY，调用 factory.create_field 创建 ArrayField；3）将创建的字段挂载到 container 并添加到 self.fields 字典；4）数组类型的判断在 object 类型之前进行（第201行）",
+  "created_at": "2025-12-30T09:04:28.938137",
+  "updated_at": "2025-12-30T09:04:28.938141"
+}

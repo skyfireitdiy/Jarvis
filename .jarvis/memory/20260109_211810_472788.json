@@ -1,0 +1,13 @@
+{
+  "id": "20260109_211810_472788",
+  "type": "project_long_term",
+  "tags": [
+    "mcp",
+    "configuration",
+    "glm-camp",
+    "jarvis"
+  ],
+  "content": "在 ~/.jarvis/config.yaml 中成功添加了 glm-camp MCP 服务器配置。配置详情:\n- type: streamable\n- name: glm-camp\n- url: https://open.bigmodel.cn/api/mcp/glm_camp/mcp\n- headers: Authorization: Bearer your_api_key\n- enable: true\n\n根据代码分析，MCP工具通过 _load_mcp_tools() 方法加载，优先从配置获取，其次从目录扫描。register_mcp_tool_by_config() 方法负责注册MCP工具，支持stdio、sse和streamable三种客户端类型。",
+  "created_at": "2026-01-09T21:18:10.472822",
+  "updated_at": "2026-01-09T21:18:10.472826"
+}

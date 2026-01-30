@@ -1,0 +1,15 @@
+{
+  "id": "20250918_084547_823946",
+  "type": "project_long_term",
+  "tags": [
+    "uv",
+    "pip",
+    "auto_update",
+    "bug",
+    "virtual_environment",
+    "dependency_management"
+  ],
+  "content": "当前出现自动更新失败：虚拟环境由 uv 创建但无 pip，触发 python -m pip 导致 No module named pip。应在所有自动更新/安装路径优先使用“uv pip”，仅在 uv 不可用时再尝试 pip。重点审计与修改位置：jarvis_utils/utils.py::_check_pip_updates 与 jarvis_utils/git_utils.py::check_and_update_git_repo 中的安装逻辑，以及工具创建流程 jarvis_tools/generate_new_tool.py 的 pip 调用，确保无 pip 时也能工作。",
+  "created_at": "2025-09-18T08:45:47.824004",
+  "updated_at": "2025-09-18T08:45:47.824012"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260120_105346_075266",
+  "type": "project_long_term",
+  "tags": [
+    "icenter",
+    "cli",
+    "python",
+    "authentication",
+    "token"
+  ],
+  "content": "iCenter CLI工具实现方案：\n1. 使用typer框架构建命令行界面\n2. 使用requests库进行HTTP请求\n3. 实现UAC认证接口调用（POST http://uac.zte.com.cn/uaccommauth/auth/comm/verify.serv）\n4. 实现MD5签名生成算法\n5. 实现iCenter文档创建接口调用（POST https://icenterapi.zte.com.cn/zte-rd-icenter-contents/content/）\n6. 支持交互式和命令行参数两种方式输入用户名密码\n7. 包含适当的错误处理机制\n8. 遵循安全原则，不硬编码用户名密码",
+  "created_at": "2026-01-20T10:53:46.075295",
+  "updated_at": "2026-01-20T10:53:46.075298"
+}

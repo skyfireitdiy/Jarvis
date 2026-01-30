@@ -1,0 +1,13 @@
+{
+  "id": "20251010_061321_609175",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "output_handler",
+    "rewrite_file_handler",
+    "spec"
+  ],
+  "content": "实现并接入 RewriteFileHandler（输出处理器），用于整文件重写：\n- 触发标签与格式：\n  <REWRITE file=文件路径>\n  新的文件完整内容（无CONTENT标签）\n  </REWRITE>\n- 解析规则：支持 file 参数单/双引号或无引号；多块 REWRITE 顺序解析。\n- 行首规则：<REWRITE ...> 与 </REWRITE> 必须位于行首（使用 ot/ct 包装）。\n- 执行行为：委派 jarvis.jarvis_tools.rewrite_file.FileRewriteTool 执行，具备原子回滚；记录 StatsManager(\"rewrite_file\", group=\"tool\")。\n- 集成点：在 Agent._init_handlers 中注册至 output_handler 列表 [ToolRegistry(), EditFileHandler(), RewriteFileHandler()]。\n- 操作名：handler.name() 返回 \"REWRITE_FILE\"，用于系统“操作列表”展示。",
+  "created_at": "2025-10-10T06:13:21.609215",
+  "updated_at": "2025-10-10T06:13:21.609218"
+}

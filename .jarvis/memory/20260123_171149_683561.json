@@ -1,0 +1,12 @@
+{
+  "id": "20260123_171149_683561",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "module_analysis",
+    "architecture"
+  ],
+  "content": "Jarvis Agent 模块是 Jarvis 项目的核心组件，提供了一个完整的 AI 代理系统。主要包含以下组件：\n\n1. 核心组件：agent_manager.py, jarvis.py, main.py, run_loop.py, session_manager.py\n2. 任务与执行组件：task_manager.py, tool_executor.py 等\n3. 记忆与规则组件：memory_manager.py, rules_manager.py 等\n4. 事件系统组件：events.py, event_bus.py\n5. 提示词系统组件：prompt_manager.py, prompt_builder.py 等\n6. 输入处理组件：builtin_input_handler.py 等\n7. 语言支持组件：language_extractors 目录及 file_context_handler.py\n\n模块采用事件驱动架构，使用组合模式和协议模式，支持插件化扩展。核心功能包括代理管理、任务处理、工具调用、记忆管理、规则管理、会话管理和多语言支持。",
+  "created_at": "2026-01-23T17:11:49.683582",
+  "updated_at": "2026-01-23T17:11:49.683587"
+}

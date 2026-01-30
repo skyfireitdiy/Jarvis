@@ -1,0 +1,13 @@
+{
+  "id": "20260115_102049_024016",
+  "type": "project_long_term",
+  "tags": [
+    "read_code",
+    "工具增强",
+    "规则文件检测",
+    "功能特性"
+  ],
+  "content": "read_code工具已添加规则文件路径检测功能：当读取文件路径中包含'rules'时，会在返回结果末尾添加提示信息，建议用户使用load_rule工具加载规则以获取渲染后的完整内容。实现位置在src/jarvis/jarvis_tools/read_code.py的_handle_single_file方法中，检测逻辑检查normalized_path是否包含'/rules/'或以'/rules'结尾。",
+  "created_at": "2026-01-15T10:20:49.024038",
+  "updated_at": "2026-01-15T10:20:49.024041"
+}

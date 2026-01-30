@@ -1,0 +1,13 @@
+{
+  "id": "20250804_212034_612420",
+  "type": "project_long_term",
+  "tags": [
+    "configuration",
+    "config.py",
+    "memory_system",
+    "force_save_memory"
+  ],
+  "content": "A new configuration option `JARVIS_FORCE_SAVE_MEMORY` has been added in `src/jarvis/jarvis_utils/config.py`. It's a boolean that defaults to `True`. When `True`, Jarvis will prompt the user to save important information before summarizing conversation history or at the end of a task. This can be disabled by setting `JARVIS_FORCE_SAVE_MEMORY: false` in the `config.yaml` file.\n",
+  "created_at": "2025-08-04T21:20:34.612452",
+  "updated_at": "2025-08-04T21:20:34.612459"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20251231_135618_476030",
+  "type": "project_long_term",
+  "tags": [
+    "web_search_config",
+    "config_migration",
+    "utils.py"
+  ],
+  "content": "Web搜索配置迁移完成验证（2024-12-31）\n\n废弃配置：web_search_platform 和 web_search_model\n新配置位置：llm_groups.web_llm（引用 llms 中定义的 Web 搜索专用 LLM）\n\n_collect_web_search_config 函数修改（src/jarvis/jarvis_utils/utils.py 第1844行）：\n- 不再收集废弃配置\n- 返回 False\n- 添加详细迁移提示文档字符串，包含 YAML 配置示例\n- 保持向后兼容性\n\n配置示例：\nllms:\n  my_web_search:\n    platform: \"openai\"\n    model: \"gpt-4o-search-preview\"\nllm_groups:\n  default:\n    web_llm: \"my_web_search\"",
+  "created_at": "2025-12-31T13:56:18.476080",
+  "updated_at": "2025-12-31T13:56:18.476084"
+}

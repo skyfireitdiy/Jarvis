@@ -1,0 +1,13 @@
+{
+  "id": "20260108_142539_652143",
+  "type": "project_long_term",
+  "tags": [
+    "token_management",
+    "trim_messages",
+    "message_history",
+    "platform_base"
+  ],
+  "content": "在jarvis项目中实现了消息历史裁剪功能，当剩余token为0时自动裁剪消息历史以腾出空间。具体实现包括：\n1. 在BasePlatform中添加了trim_messages()抽象方法\n2. OpenAI平台实现：保留system消息，丢弃开头的10条非system消息\n3. Claude平台实现：丢弃开头的10条消息（system消息单独存储）\n4. 其他平台留空实现，返回False表示不支持裁剪\n5. 在_truncate_message_if_needed中调用此方法处理token不足的情况",
+  "created_at": "2026-01-08T14:25:39.652169",
+  "updated_at": "2026-01-08T14:25:39.652173"
+}

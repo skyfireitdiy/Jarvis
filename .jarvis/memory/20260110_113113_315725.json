@@ -1,0 +1,13 @@
+{
+  "id": "20260110_113113_315725",
+  "type": "project_long_term",
+  "tags": [
+    "config_schema",
+    "web_llm",
+    "llm_groups",
+    "JSON_schema"
+  ],
+  "content": "在config_schema.json中删除了web_llm定义：1) 从llm_groups的description中移除web_llm引用 2) 删除web_llm属性定义(原第206-209行) 3) 验证JSON格式正确性",
+  "created_at": "2026-01-10T11:31:13.315791",
+  "updated_at": "2026-01-10T11:31:13.315796"
+}

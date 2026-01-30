@@ -1,0 +1,12 @@
+{
+  "id": "20251024_115350_192125",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "agent_tool_mapping",
+    "tool_selection"
+  ],
+  "content": "C2Rust Agents 工具选择方案（依据源码扫描结果）\n范围: /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_c2rust\n\n1) pruner.py: evaluate_third_party_replacements -> Agent (line ~155)\n- 目标: 评估 C/C++ 函数是否可被 Rust std/crate 单个 API 直接替代\n- 建议工具:\n  • search_web: 检索 crates.io/文档以辅助确认替代 API\n  • retrieve_memory: 复用已记录的替代案例与库偏好\n  • save_memory: 将新确认的替代映射与评估结果持久化\n  • ask_user: 当模型多次不确定或存在语义歧义时进行人工决策\n- 约束: 非交互、无需运行命令；不建议使用 execute_script/virtual_tty\n\n2) transpiler.py\n2.1 Agent (line ~696) — 任务规划/签名与模块位置建议\n- 建议工具:\n  • read_code: 读取相关 C/C++ 源片段与上下文\n  • retrieve_memory: 读取历史模块规划/命名约定/项目偏好\n  • save_memory: 持久化规划决策（crate结构、模块命名、签名约定）\n  • ask_user: 当需要用户确认模块边界或命名规范\n- 约束: 非交互为主；运行命令非必需\n\n2.2 CodeAgent (lines ~772, ~852, ~886) — 代码生成/转换子步骤\n- 建议工具:\n  • read_code: 读取源文件与生成文件片段\n  • execute_script: 非交互执行如 rustfmt/cargo check（若流程需要）\n  • retrieve_memory: 复用风格约定/生成策略\n  • save_memory: 记录生成结果与失败原因（便于回溯）\n- 约束: 非交互环境优先使用 execute_script；避免 virtual_tty\n\n2.3 Agent (line ~918) — 审查/修正建议\n- 建议工具:\n  • read_code: 聚焦待审查的 Rust 片段\n  • retrieve_memory: 读取审查 checklist 与项目规范\n  • ask_user: 需要确认取舍或风格冲突时\n  • save_memory: 记录审查结论与后续行动\n- 约束: 不需运行命令\n\n2.4 CodeAgent 变量 ca (line ~960) — 批量写入/整合\n- 建议工具:\n  • read_code: 确认写入位置与上下文\n  • execute_script: 执行格式化或静态检查（如需要）\n  • save_memory: 记录批量操作结果与异常\n  • retrieve_memory: 读取生成策略与命名规划\n- 约束: 非交互；可选执行命令\n\n3) llm_module_agent.py\n3.1 Agent (line ~575) — LLMRustCratePlannerAgent 调用前的系统规划\n- 建议工具:\n  • retrieve_memory: 读取项目架构与既有规划\n  • save_memory: 固化 crate 规划、模块边界与依赖\n  • methodology: 引入/更新规划方法论（阶段产出、约束）\n  • ask_user: 不确定的架构取舍时征询\n- 约束: 不需执行命令\n\n3.2 LLMRustCratePlannerAgent 初始化 (lines ~645, ~650, ~667, ~672)\n- 建议工具:\n  • retrieve_memory/save_memory: 贯穿式读取与固化规划决策\n  • ask_user: 需求变更/边界不清晰时\n- 约束: 依赖内部实现；不推荐外部命令工具\n\n3.3 CodeAgent (lines ~1180, ~1218) — 修复/生成子流程\n- 建议工具:\n  • read_code: 读取待修复/生成片段\n  • execute_script: 触发编译/格式化/静态检查（如流程允许）\n  • retrieve_memory: 复用修复策略与规范\n  • save_memory: 记录修复结果与失败样例\n- 约束: 非交互；避免 virtual_tty\n\n总体原则\n- 优先使用 read_code/retrieve_memory/save_memory/ask_user；在需要命令执行时使用 execute_script；默认不使用 virtual_tty\n- 保持非交互模式与稳定性；仅在必要时引入 search_web\n- 针对替代评估（pruner）强调可靠性与可回溯：检索-评估-固化闭环\n",
+  "created_at": "2025-10-24T11:53:50.192148",
+  "updated_at": "2025-10-24T11:53:50.192151"
+}

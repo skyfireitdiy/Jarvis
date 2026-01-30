@@ -1,0 +1,14 @@
+{
+  "id": "20250923_094535_195318",
+  "type": "project_long_term",
+  "tags": [
+    "security_vulnerability_analyst",
+    "solidrust",
+    "metrics",
+    "effectiveness",
+    "documentation"
+  ],
+  "content": "真实数据与量化效益（SecurityVulnerabilityAnalyst）\n- 扫描对象：SolidRust\n- 发现问题总数：181 个\n- 准确率：>90%（经抽样或复核）\n- 需修改的问题：51 个（占28%），代表“高可行动性”的有效缺陷\n",
+  "created_at": "2025-09-23T09:45:35.195375",
+  "updated_at": "2025-09-23T09:45:35.195382"
+}

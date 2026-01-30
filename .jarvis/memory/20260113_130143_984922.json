@@ -1,0 +1,13 @@
+{
+  "id": "20260113_130143_984922",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "jarvis-check",
+    "loc",
+    "tool-checker"
+  ],
+  "content": "jck（jarvis-check）模块支持loc工具检查。loc是代码行数统计工具，可用于统计代码、注释、空行等。\n\n配置位置：src/jarvis/jarvis_jck/config.py\n\nloc工具配置：\n- name: loc\n- command: loc\n- description: 代码行数统计工具\n- 支持安装方式：apt (Ubuntu/Debian), brew (macOS), cargo, pip\n\njck模块目前已支持的工具：git, ripgrep, fd-find, fzf, rustup, cargo, loc\n\n使用方式：\n- 检查所有工具：jck check\n- 检查单个工具：jck check <tool_name>\n- JSON输出：jck check --json",
+  "created_at": "2026-01-13T13:01:43.984943",
+  "updated_at": "2026-01-13T13:01:43.984946"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260106_185251_844314",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "code_agent",
+    "print_format",
+    "code_quality"
+  ],
+  "content": "在jarvis_code_agent模块中，需要移除打印语句中字符串开头的\\n符号，以规范输出格式。涉及的打印函数包括：print(), rprint(), console.print(), PrettyOutput.print(), PrettyOutput.auto_print()。修改规则：只删除字符串开头的\\n，保持字符串中间和末尾的\\n不变。验证标准：使用grep验证目录下不再存在打印语句中字符串以\\n开头的情况。",
+  "created_at": "2026-01-06T18:52:51.844342",
+  "updated_at": "2026-01-06T18:52:51.844346"
+}

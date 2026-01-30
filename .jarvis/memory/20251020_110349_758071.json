@@ -1,0 +1,13 @@
+{
+  "id": "20251020_110349_758071",
+  "type": "project_long_term",
+  "tags": [
+    "system_info",
+    "os_version",
+    "linux",
+    "ubuntu"
+  ],
+  "content": "本机操作系统详细信息：\n- 发行版：Ubuntu 20.04.6 LTS (Focal Fossa)\n- 内核版本：5.4.0-52-generic\n- 系统架构：x86_64\n- 主机名：XA-OSS-XA1\n- 编译信息：gcc version 9.3.0\n- 构建时间：2020-10-15\n- Linux版本：5.4.0-52-generic #57-Ubuntu SMP\n- 检查命令：uname -a, cat /etc/os-release, cat /proc/version, arch\n",
+  "created_at": "2025-10-20T11:03:49.758101",
+  "updated_at": "2025-10-20T11:03:49.758105"
+}

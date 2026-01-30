@@ -1,0 +1,13 @@
+{
+  "id": "20260115_111114_644505",
+  "type": "project_long_term",
+  "tags": [
+    "deployment_rules",
+    "opensource_deployment",
+    "environment_detection",
+    "deployment_checklist"
+  ],
+  "content": "开源部署规则核心要素：\n- 6项专业原则：需求理解、文档优先、清晰指导、问题解决、优化改进、环境适配\n- 6步工作流程：方法论查找→项目研究→环境检测→部署执行→错误处理→持续改进\n- 详细环境检测要求：Python(uv/virtualenv)、Node.js、Go、Rust、系统依赖、网络连接\n- 4阶段检查清单：部署前(5项)→部署过程(5项)→部署后(5项)→持续改进(4项)\n- 实用指导：渐进式部署、备份优先、环境一致性、监控预埋、回滚准备",
+  "created_at": "2026-01-15T11:11:14.644538",
+  "updated_at": "2026-01-15T11:11:14.644541"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260109_142322_160637",
+  "type": "project_long_term",
+  "tags": [
+    "virtual_tty_usage",
+    "code_agent",
+    "jarvis_tools"
+  ],
+  "content": "CodeAgent类默认工具列表中已添加virtual_tty工具，用于支持交互式操作。该工具通过VirtualTTYTool类实现，支持launch、send_keys、output、close、get_screen、list等操作类型，可以用于ssh、sftp、gdb等交互式操作场景。",
+  "created_at": "2026-01-09T14:23:22.160660",
+  "updated_at": "2026-01-09T14:23:22.160663"
+}

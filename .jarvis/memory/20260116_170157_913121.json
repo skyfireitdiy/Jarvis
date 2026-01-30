@@ -1,0 +1,14 @@
+{
+  "id": "20260116_170157_913121",
+  "type": "project_long_term",
+  "tags": [
+    "base.py",
+    "jarvis_platform",
+    "递归",
+    "总结",
+    "bug_fix"
+  ],
+  "content": "BasePlatform._chat方法中的自动总结存在递归问题：\n\n问题原因：\n1. 当token或对话轮次达到阈值时，调用self.agent._summarize_and_clear_history()进行总结\n2. 总结操作内部会再次调用LLM进行对话，触发_chat方法\n3. 由于_conversation_turn在每次对话后都递增（不重置），总结后的对话会再次满足总结条件\n4. 形成无限递归\n\n解决方案：\n在BasePlatform类中添加一个标志位_summarizing，在调用总结方法前设置为True，总结完成后设置为False。在进行总结检查前，先检查这个标志位，如果正在总结则跳过检查，防止递归。",
+  "created_at": "2026-01-16T17:01:57.913145",
+  "updated_at": "2026-01-16T17:01:57.913149"
+}

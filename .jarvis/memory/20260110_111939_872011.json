@@ -1,0 +1,14 @@
+{
+  "id": "20260110_111939_872011",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "code_agent",
+    "rules",
+    "file_extension",
+    "md_format"
+  ],
+  "content": "在jarvis的code_agent_rules.py中，对规则文件格式进行了限制，仅支持.md后缀的文件。修改包括：1) 在_read_rule_from_dir方法中自动为规则名称添加.md后缀；2) 在规则目录遍历中只允许.md后缀的文件，移除了对无后缀文件的支持（内置的.jarvis/rule除外）。",
+  "created_at": "2026-01-10T11:19:39.872034",
+  "updated_at": "2026-01-10T11:19:39.872038"
+}

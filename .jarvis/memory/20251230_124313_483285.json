@@ -1,0 +1,13 @@
+{
+  "id": "20251230_124313_483285",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "data_structure",
+    "llm_config",
+    "config_schema"
+  ],
+  "content": "Jarvis配置数据结构（基于config_schema.json）：\n- ENV: 环境变量字典，类型object，默认{}\n- platform: 常规操作平台名称，类型string，默认\"openai\"\n- model: 常规操作模型名称，类型string，默认\"gpt-5\"\n- llms: LLM配置对象字典（可复用），键为LLM名称，值为配置对象\n  * 每个LLM配置包含：\n    - platform: 平台名称（必需）\n    - model: 模型名称（必需）\n    - max_input_token_count: 最大输入token数量，默认32000\n    - llm_config: LLM特定配置参数，类型object，默认{}\n- llm_groups: 模型组配置字典，通过引用llms中定义的配置\n  * 每个组包含：\n    - normal_llm: 引用llms中的常规操作LLM配置名称（必需）\n    - cheap_llm: 引用llms中的廉价操作LLM配置名称（可选）\n    - smart_llm: 引用llms中的智能操作LLM配置名称（可选）\n    - ENV: 该模型组特定的环境变量（可选）\n- llm_group: 选择的模型组名称，默认\"\"\n\n数据提取路径：\n1. 第一个LLM配置：first_llm_name = next(iter(config_data.get(\"llms\", {}).keys()))\n2. 默认llm_group：config_data.get(\"llm_group\", \"default\")\n3. 平台和模型：从第一个LLM配置中提取，或使用顶层platform和model字段\n",
+  "created_at": "2025-12-30T12:43:13.483319",
+  "updated_at": "2025-12-30T12:43:13.483322"
+}

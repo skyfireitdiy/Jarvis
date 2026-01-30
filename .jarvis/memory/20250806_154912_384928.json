@@ -1,0 +1,13 @@
+{
+  "id": "20250806_154912_384928",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "agent_model",
+    "platform_usage",
+    "code_pattern"
+  ],
+  "content": "Jarvis 项目中 Agent 模型使用规范\n\n重要约定：\n1. 不直接共享 Agent 的 platform 实例\n2. 需要使用其他 Agent 的模型时，创建独立的 platform 实例\n\n已应用此模式的模块：\n- jarvis_code_analysis/code_review.py - CodeReviewTool\n- jarvis_git_utils/git_commiter.py - GitCommitTool\n\n注意事项：\n- Agent 初始化时不接受 model 参数，需要在创建后设置：agent.model = platform\n- 使用 is_context_overflow 时，传入 platform.model_group 而不是 model_group 变量\n- 创建 platform 后要检查是否为 None，避免类型错误\n\n相关类和方法：\n- PlatformRegistry().create_platform(platform_name) - 创建平台实例\n- BasePlatform.platform_name() - 获取平台名称（类方法）\n- BasePlatform.name() - 获取模型名称（实例方法）\n- BasePlatform.set_model_name(name) - 设置模型名称\n",
+  "created_at": "2025-08-06T15:49:12.384956",
+  "updated_at": "2025-08-06T15:49:12.384961"
+}

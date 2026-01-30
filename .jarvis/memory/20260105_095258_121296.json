@@ -1,0 +1,11 @@
+{
+  "id": "20260105_095258_121296",
+  "type": "project_long_term",
+  "tags": [
+    "array_component",
+    "form_generator"
+  ],
+  "content": "ArrayFieldComponent.vue实现细节:\n- 支持动态添加/删除数组项\n- 根据数组项类型渲染对应组件\n- 支持对象类型、oneOf类型、简单类型的数组项\n- 创建默认数组项时考虑schema结构和默认值\n- 每个数组项包含索引标识和删除按钮",
+  "created_at": "2026-01-05T09:52:58.121311",
+  "updated_at": "2026-01-05T09:52:58.121314"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260112_153511_364411",
+  "type": "project_long_term",
+  "tags": [
+    "rule_format",
+    "jinja2",
+    "builtin_rules"
+  ],
+  "content": "Jarvis 规则系统：规则文件使用 .md 后缀，支持 jinja2 模板变量（{{ rule_file_dir }}, {{ git_root_dir }}, {{ current_dir }}, {{ jarvis_src_dir }}, {{ jarvis_data_dir }}）。规则加载优先级：中心库 > 项目 rules 目录 > 配置目录 > 内置规则。规则文件应包含标题、简介、原则、示例、检查清单等结构化内容。",
+  "created_at": "2026-01-12T15:35:11.364438",
+  "updated_at": "2026-01-12T15:35:11.364442"
+}

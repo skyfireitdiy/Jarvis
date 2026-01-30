@@ -1,0 +1,12 @@
+{
+  "id": "20260115_112716_932527",
+  "type": "project_long_term",
+  "tags": [
+    "architecture_diagram",
+    "rule_refactor",
+    "builtin_rules"
+  ],
+  "content": "架构图生成规则文件重构完成：从角色定义格式转换为规则文档格式，包含5个核心章节（工作流程、原则、要求、实践指导、检查清单），使用必须/禁止规范性语言，保持Graphviz标准和渲染流程完整性。文件路径：builtin/rules/architecture_design/architecture-diagram-generation.md",
+  "created_at": "2026-01-15T11:27:16.932564",
+  "updated_at": "2026-01-15T11:27:16.932568"
+}

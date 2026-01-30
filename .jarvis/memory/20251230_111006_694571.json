@@ -1,0 +1,13 @@
+{
+  "id": "20251230_111006_694571",
+  "type": "project_long_term",
+  "tags": [
+    "tui_app",
+    "function_signature",
+    "参数传递",
+    "config"
+  ],
+  "content": "_run_tui_config_form 函数签名：def _run_tui_config_form(platform_name: str, model_name: str, env_vars: Dict[str, Any], llm_config: Dict[str, Any], max_input_token_count: int) -> Optional[Dict[str, Any]]",
+  "created_at": "2025-12-30T11:10:06.694592",
+  "updated_at": "2025-12-30T11:10:06.694595"
+}

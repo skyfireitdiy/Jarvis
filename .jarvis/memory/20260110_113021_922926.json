@@ -1,0 +1,13 @@
+{
+  "id": "20260110_113021_922926",
+  "type": "project_long_term",
+  "tags": [
+    "PrettyOutput",
+    "OutputType.ERROR",
+    "blink",
+    "error_display"
+  ],
+  "content": "在output.py文件中，OutputType.ERROR类型的RichStyle已添加blink=True属性，使错误信息显示时带有闪烁效果。修改涉及两个位置：第185行（章节样式）和第299行（普通内容头部样式）。PrettyOutput.auto_print方法会将带有❌图标的输出自动映射到OutputType.ERROR，因此使用PrettyOutput.auto_print(f\"❌ ...\")的错误提示现在会以闪烁形式显示，更醒目。",
+  "created_at": "2026-01-10T11:30:21.922972",
+  "updated_at": "2026-01-10T11:30:21.922977"
+}

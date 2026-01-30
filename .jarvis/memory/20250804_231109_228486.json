@@ -1,0 +1,12 @@
+{
+  "id": "20250804_231109_228486",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "architecture",
+    "core_components"
+  ],
+  "content": "Jarvis核心组件位置和职责：\n\n1. Jarvis Agent (src/jarvis/jarvis_agent/)\n   - 系统指挥中心，协调所有操作\n   - 主要方法：__init__（初始化）、run（主运行循环）\n   - 负责任务理解、工具调用、状态管理、人机交互\n\n2. ToolRegistry (src/jarvis/jarvis_tools/registry.py)\n   - 动态工具加载器和执行器\n   - 加载来源：内置工具、用户工具(~/.jarvis/tools/)、MCP工具\n   - 负责工具发现、验证、执行和结果格式化\n\n3. PlatformRegistry (src/jarvis/jarvis_platform/registry.py)\n   - 管理不同LLM平台的交互\n   - 动态加载内置和外部平台适配器\n   - 所有平台必须继承BasePlatform类\n\n4. 记忆系统\n   - 三层架构：短期记忆(内存)、项目长期记忆(.jarvis/memory)、全局长期记忆(~/.jarvis/data/memory)\n   - 核心工具：save_memory、retrieve_memory、clear_memory\n   - 支持标签化检索和批量操作\n",
+  "created_at": "2025-08-04T23:11:09.228561",
+  "updated_at": "2025-08-04T23:11:09.228565"
+}

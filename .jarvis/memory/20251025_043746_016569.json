@@ -1,0 +1,12 @@
+{
+  "id": "20251025_043746_016569",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "workspace_policy",
+    "cargo"
+  ],
+  "content": "去除workspace策略：不再在当前目录创建/修改 Cargo.toml 的 [workspace] 成员来包含crate；后续构建不依赖workspace。",
+  "created_at": "2025-10-25T04:37:46.016601",
+  "updated_at": "2025-10-25T04:37:46.016606"
+}

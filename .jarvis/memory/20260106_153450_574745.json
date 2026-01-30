@@ -1,0 +1,12 @@
+{
+  "id": "20260106_153450_574745",
+  "type": "project_long_term",
+  "tags": [
+    "jca",
+    "code_review",
+    "parameter_documentation"
+  ],
+  "content": "在jarvis_code_agent中，review_max_iterations参数的默认值为0，表示无限次代码审查迭代。当该值为0时，代码中的is_infinite标志被设置为True，允许无限循环进行代码审查。此参数的文档说明已从'默认3次'修正为'默认0次，表示无限'。",
+  "created_at": "2026-01-06T15:34:50.574768",
+  "updated_at": "2026-01-06T15:34:50.574772"
+}

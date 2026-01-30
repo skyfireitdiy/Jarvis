@@ -1,0 +1,11 @@
+{
+  "id": "20250809_145957_686765",
+  "type": "project_long_term",
+  "tags": [
+    "stats",
+    "implementation"
+  ],
+  "content": "Jarvis统计模块实现细节：1. 数据按天存储为JSON文件 2. 元数据单独存储在stats_meta.json 3. 使用临时文件+重命名实现原子写入",
+  "created_at": "2025-08-09T14:59:57.686807",
+  "updated_at": "2025-08-09T14:59:57.686813"
+}

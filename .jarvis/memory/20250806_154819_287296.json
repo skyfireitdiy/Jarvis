@@ -1,0 +1,13 @@
+{
+  "id": "20250806_154819_287296",
+  "type": "project_long_term",
+  "tags": [
+    "platform_registry",
+    "code_review",
+    "git_commiter",
+    "jarvis"
+  ],
+  "content": "代码修改模式：不直接使用 agent 的 platform 实例\n\n修改要点：\n1. 从 agent.model 中获取 platform_name 和 model_name\n2. 使用 PlatformRegistry().create_platform(platform_name) 创建新的平台实例\n3. 使用 platform.set_model_name(model_name) 设置模型名称\n\n已修改的文件：\n- /src/jarvis/jarvis_code_analysis/code_review.py：修改了 CodeReviewTool.execute 方法\n- /src/jarvis/jarvis_git_utils/git_commiter.py：修改了 GitCommitTool.execute 方法\n\n示例代码：\n```python\n# 获取 platform_name 和 model_name\nplatform_name = None\nmodel_name = None\n\nif agent and hasattr(agent, \"model\") and agent.model:\n    platform_name = agent.model.platform_name()\n    model_name = agent.model.name()\n\n# 创建新的平台实例\nif platform_name:\n    platform = PlatformRegistry().create_platform(platform_name)\n    if platform and model_name:\n        platform.set_model_name(model_name)\n```\n",
+  "created_at": "2025-08-06T15:48:19.287325",
+  "updated_at": "2025-08-06T15:48:19.287330"
+}

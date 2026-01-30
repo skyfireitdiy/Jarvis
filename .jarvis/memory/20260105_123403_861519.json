@@ -1,0 +1,14 @@
+{
+  "id": "20260105_123403_861519",
+  "type": "project_long_term",
+  "tags": [
+    "authentication",
+    "fastapi",
+    "web_server",
+    "basic_auth",
+    "websocket_auth"
+  ],
+  "content": "Jarvis Web Server 认证实现细节：\n1. start_web_server 函数新增三个认证参数：auth_enabled: bool = False, auth_username: Optional[str] = None, auth_password: Optional[str] = None\n2. 使用 HTTPBasic 和 HTTPBasicCredentials 实现 Basic Authentication\n3. 创建 get_current_user 认证依赖函数\n4. HTTP 路由添加认证依赖：async def index(username: str = Depends(get_current_user)) -> str\n5. WebSocket 端点添加认证验证逻辑，通过 query parameter 'auth' 传递 base64 编码的凭据\n6. 当 auth_enabled=False 时，认证逻辑不生效，确保向后兼容\n7. 所有 WebSocket 端点 (/stdio, /control, /terminal) 都需要验证认证信息",
+  "created_at": "2026-01-05T12:34:03.861545",
+  "updated_at": "2026-01-05T12:34:03.861549"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260120_152805_936904",
+  "type": "project_long_term",
+  "tags": [
+    "input_handler",
+    "interrupt",
+    "run_loop",
+    "run_input_handlers_next_turn"
+  ],
+  "content": "在run_loop.py的AgentRunLoop类中，当发生中断后，需要设置ag.run_input_handlers_next_turn = True来确保下一轮执行input handler。当前代码在中断处理后没有设置此标志，导致下一轮循环中输入处理器不会运行。",
+  "created_at": "2026-01-20T15:28:05.936943",
+  "updated_at": "2026-01-20T15:28:05.936948"
+}

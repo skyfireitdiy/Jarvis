@@ -1,0 +1,11 @@
+{
+  "id": "20250805_124254_486968",
+  "type": "project_long_term",
+  "tags": [
+    "cli_design",
+    "parameter_naming"
+  ],
+  "content": "项目CLI参数短选项命名规范：\n1. llm_type: 使用 -t (type的首字母)\n2. llm_group: 使用 -g (group的首字母) \n3. tool_group: 使用 -G (大写G表示Global tool group)\n4. task: 使用 -T (大写T，避免与llm_type冲突)\n此规范已在所有核心模块(jarvis_agent, code_agent, platform_manager)中统一应用\n",
+  "created_at": "2025-08-05T12:42:54.487001",
+  "updated_at": "2025-08-05T12:42:54.487005"
+}

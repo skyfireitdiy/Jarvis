@@ -1,0 +1,12 @@
+{
+  "id": "20250807_091044_599368",
+  "type": "project_long_term",
+  "tags": [
+    "uv",
+    "installation",
+    "virtual_environment"
+  ],
+  "content": "To update the application within a `uv`-managed virtual environment, the system checks for the existence of the `uv` executable in `sys.prefix` (`bin` for Unix, `Scripts` for Windows). If found, it uses the command `uv pip install -e .` for installation, otherwise, it falls back to the standard `python -m pip install -e .`. This logic is implemented in `src/jarvis/jarvis_utils/git_utils.py`.\n",
+  "created_at": "2025-08-07T09:10:44.599392",
+  "updated_at": "2025-08-07T09:10:44.599396"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260115_121929_427680",
+  "type": "project_long_term",
+  "tags": [
+    "dark-theme-design",
+    "rule_refactoring",
+    "completed_tasks"
+  ],
+  "content": "成功完成dark-theme-design.md重构任务：将Zen-iOS Hybrid暗色主题设计指南从角色定义格式转换为标准规则文档格式。重构过程保持了核心设计要素：iOS系统级深灰底色、毛玻璃效果、双层物理描边、高对比交互、iOS连续曲率、层级堆叠布局、Inter/SF Pro Display字体、Lucide-React图标库。使用五章节结构重新组织内容，采用必须/禁止规范性语言，添加了详细的工作流程、原则、要求、实践指导和三阶段检查清单。",
+  "created_at": "2026-01-15T12:19:29.427697",
+  "updated_at": "2026-01-15T12:19:29.427700"
+}

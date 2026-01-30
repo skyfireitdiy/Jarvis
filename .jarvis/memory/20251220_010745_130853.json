@@ -1,0 +1,12 @@
+{
+  "id": "20251220_010745_130853",
+  "type": "project_long_term",
+  "tags": [
+    "code_agent",
+    "config_inheritance",
+    "pending_tasks"
+  ],
+  "content": "SubCodeAgent的disable_review配置继承未实现，需在execute方法中添加：1)getattr(parent_agent,'disable_review',False) 2)传递给CodeAgent构造函数",
+  "created_at": "2025-12-20T01:07:45.130881",
+  "updated_at": "2025-12-20T01:07:45.130884"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260104_152516_768860",
+  "type": "project_long_term",
+  "tags": [
+    "configuration",
+    "rag_config",
+    "config_structure",
+    "jarvis"
+  ],
+  "content": "在Jarvis项目中，RAG配置管理逻辑已修改，移除了顶层RAG配置处理逻辑，只保留rag_groups级别的配置。修改涉及以下关键点：\n1. _get_resolved_rag_config函数不再处理顶层rag配置\n2. 优先级顺序已更新：rag_group中通过引用展开的组配置 -> 代码中的默认值\n3. rag_groups配置处理逻辑保持完整，支持embedding和reranker引用机制\n4. 其他配置功能保持不变\n5. 代码能正常编译",
+  "created_at": "2026-01-04T15:25:16.768913",
+  "updated_at": "2026-01-04T15:25:16.768917"
+}

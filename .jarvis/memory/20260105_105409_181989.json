@@ -1,0 +1,13 @@
+{
+  "id": "20260105_105409_181989",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "max_input_token_count",
+    "documentation",
+    "jarvis_book"
+  ],
+  "content": "在Jarvis项目的9.附录.md文档中，max_input_token_count的默认值已从32000修改为128000。修改位置为文件第13行配置参数说明表。",
+  "created_at": "2026-01-05T10:54:09.182016",
+  "updated_at": "2026-01-05T10:54:09.182019"
+}

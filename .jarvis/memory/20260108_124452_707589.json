@@ -1,0 +1,13 @@
+{
+  "id": "20260108_124452_707589",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "panel",
+    "dispatch",
+    "jarvis_utils"
+  ],
+  "content": "在tmux_wrapper.py中新增了dispatch_command_to_panel函数，用于将shell命令派发到合适的tmux panel中执行。该函数会：1) 查找或创建{username}-jarvis-前缀的tmux session；2) 获取session的所有window；3) 遍历windows查找panel数量不足4个的第一个window；4) 如果找到可用window，在其中创建panel执行命令；5) 如果没找到可用window，创建新window后再创建panel执行命令。",
+  "created_at": "2026-01-08T12:44:52.707613",
+  "updated_at": "2026-01-08T12:44:52.707617"
+}

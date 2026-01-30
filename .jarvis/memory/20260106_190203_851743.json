@@ -1,0 +1,13 @@
+{
+  "id": "20260106_190203_851743",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_tools",
+    "printing",
+    "code_formatting",
+    "PrettyOutput"
+  ],
+  "content": "在jarvis_tools模块中，已移除所有打印语句（包括print(), rprint(), console.print(), PrettyOutput.print(), PrettyOutput.auto_print()）中字符串开头的\\n字符。修改涉及以下文件：\n1. src/jarvis/jarvis_tools/cli/main.py\n2. src/jarvis/jarvis_tools/read_code.py\n3. src/jarvis/jarvis_tools/read_symbols.py\n\n修改原则：只删除字符串开头的\\n，保持字符串中间和末尾的\\n不变，以确保代码逻辑正常。",
+  "created_at": "2026-01-06T19:02:03.851776",
+  "updated_at": "2026-01-06T19:02:03.851780"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260108_124847_001400",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "panel_management",
+    "split_direction_logic"
+  ],
+  "content": "在tmux_wrapper.py中，分割方向的选择逻辑：\n- 当pane_count=1或3时，使用水平分割(h)：这样可以保持相对平衡的布局\n- 当pane_count=2时，使用垂直分割(v)：这样可以避免一个方向上过度分割\n- 在新window中首次创建panel时，使用水平分割(h)\n- 所有分割方向参数在create_panel函数中验证为'h'或'v'之一\n- 该逻辑确保了面板布局的合理性和可读性",
+  "created_at": "2026-01-08T12:48:47.001419",
+  "updated_at": "2026-01-08T12:48:47.001439"
+}

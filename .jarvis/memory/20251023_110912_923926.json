@@ -1,0 +1,15 @@
+{
+  "id": "20251023_110912_923926",
+  "type": "project_long_term",
+  "tags": [
+    "c2rust",
+    "persistence",
+    "jsonl",
+    "migration",
+    "scanner",
+    "llm_module_agent"
+  ],
+  "content": "决策：将 c2rust 模块的持久化从 SQLite 迁移到 JSONL/JSON，删除 SQLite 实现。\n存储位置：<project_root>/.jarvis/c2rust/\n文件设计：\n1) functions.jsonl\n   - 每行一个函数对象，字段：\n     id, name, qualified_name, signature, return_type, params(List[{name,type}]), calls(List[str]),\n     file, start_line, start_col, end_line, end_col, language, created_at, updated_at\n   - id 为本次扫描过程中的自增整数，稳定性仅限单次扫描。\n2) types.jsonl\n   - 每行一个类型对象，字段：\n     id, name, qualified_name, kind, underlying_type, file, start_line, start_col, end_line, end_col, language, created_at, updated_at\n3) meta.json（可选）\n   - 统计信息与版本，例如 {\"functions\": N, \"types\": M, \"generated_at\": \"...\", \"schema_version\": 1}\n读写规范：\n- 扫描完成后一次性写入 JSONL，避免频繁 IO；若出现异常不中断整体扫描。\n- 路径保持原目录：<root>/.jarvis/c2rust/\nAPI/行为变更：\n- scanner.scan_directory：不再创建 SQLite；改为输出 functions.jsonl 与 types.jsonl，并返回输出目录路径或 functions.jsonl 路径\n- scanner.find_root_function_ids(db_path) 将改为从 functions.jsonl 读取，参数名后续统一为 data_dir 或 jsonl_path\n- scanner.generate_dot_from_db/export_root_subgraphs_to_dir 将重命名/改造以从 JSONL 读取\n- 删除 ensure_output_db/insert_function/insert_type 等 SQLite 相关函数\n- llm_module_agent._GraphLoader 改为从 JSONL 读取并构建内存图索引\n兼容策略（分步改造）：\n- 第一步先改 scanner.py 输出 JSONL 并提供等价的读取函数；保留 find_root_function_ids 名称但实现切至 JSONL\n- 第二步改 llm_module_agent 读取 JSONL，移除 sqlite3 依赖\n- 第三步清理残留的 sqlite3 import、注释与文档\n产物名称：\n- functions.jsonl, types.jsonl, meta.json（可选）\nDOT/子图：\n- generate_dot_from_jsonl、export_root_subgraphs_to_dir_from_jsonl（或沿用原名但内部改为 JSONL）",
+  "created_at": "2025-10-23T11:09:12.923955",
+  "updated_at": "2025-10-23T11:09:12.923959"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "20250805_155537_683371",
+  "type": "project_long_term",
+  "tags": [
+    "testing",
+    "visualization"
+  ],
+  "content": "测试文件test_visualizer.py中需要更新所有plot_bar_chart调用的测试用例，确保传入show_values参数以匹配修改后的方法签名。",
+  "created_at": "2025-08-05T15:55:37.683393",
+  "updated_at": "2025-08-05T15:55:37.683398"
+}

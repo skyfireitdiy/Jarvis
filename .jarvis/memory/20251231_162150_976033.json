@@ -1,0 +1,13 @@
+{
+  "id": "20251231_162150_976033",
+  "type": "project_long_term",
+  "tags": [
+    "config_validation",
+    "type_conversion",
+    "schema_parser",
+    "jarvis_config"
+  ],
+  "content": "schema_parser.py 配置验证器支持类型转换机制：\n1. validate_config 方法现在在验证通过后会调用 _convert_types 进行类型转换\n2. _convert_types 方法递归处理配置对象，根据 Schema 定义转换字段类型\n3. _try_convert 方法支持 string/number/integer/boolean 之间的相互转换\n4. 类型转换在验证通过后执行，确保只转换有效的配置值\n5. 支持 oneOf/anyOf 复杂 Schema 结构的类型识别和转换",
+  "created_at": "2025-12-31T16:21:50.976088",
+  "updated_at": "2025-12-31T16:21:50.976093"
+}

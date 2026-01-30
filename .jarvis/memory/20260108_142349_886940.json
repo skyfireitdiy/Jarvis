@@ -1,0 +1,14 @@
+{
+  "id": "20260108_142349_886940",
+  "type": "project_long_term",
+  "tags": [
+    "platform_integration",
+    "trim_messages",
+    "token_management",
+    "base_platform",
+    "abstract_method"
+  ],
+  "content": "在Jarvis项目中，为BasePlatform添加了trim_messages抽象方法，用于在token不足时裁剪消息历史。OpenAI和Claude平台实现了具体的裁剪逻辑（保留system消息，丢弃开头的10条非system消息），而其他平台（tongyi.py, yuanbao.py, kimi.py, human.py）实现了空的trim_messages方法，直接返回False并添加注释说明未实现。这是为了在token不足时提供统一的接口，但只在支持的平台上实际裁剪消息历史。",
+  "created_at": "2026-01-08T14:23:49.886967",
+  "updated_at": "2026-01-08T14:23:49.886971"
+}

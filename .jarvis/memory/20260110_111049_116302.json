@@ -1,0 +1,12 @@
+{
+  "id": "20260110_111049_116302",
+  "type": "project_long_term",
+  "tags": [
+    "rules_manager",
+    "file_extension_filter",
+    "code_agent_rules"
+  ],
+  "content": "在RulesManager类的get_all_available_rule_names方法中，对规则目录中的文件进行了后缀限制，只允许无后缀或.md后缀的文件被识别为规则文件。修改位于src/jarvis/jarvis_code_agent/code_agent_rules.py第252-256行，添加了条件判断：if '.' not in filename or filename.endswith('.md')",
+  "created_at": "2026-01-10T11:10:49.116329",
+  "updated_at": "2026-01-10T11:10:49.116332"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260113_191721_881475",
+  "type": "project_long_term",
+  "tags": [
+    "架构设计",
+    "Agent基类",
+    "规则系统",
+    "代码迁移"
+  ],
+  "content": "规则系统下沉到 Agent 基类的实现方式：\n\n1. **迁移策略**：将 CodeAgent 独有的规则功能下沉到 Agent 基类，使所有 agent 都可以使用规则功能\n\n2. **关键实现点**：\n   - Agent.__init__ 添加 rule_names: Optional[str] = None 参数\n   - _init_managers() 中初始化 RulesManager：\n     ```python\n     if not hasattr(self, \"rules_manager\"):\n         self.rules_manager = RulesManager(root_dir)\n         _, self.loaded_rule_names = self.rules_manager.load_all_rules(rule_names)\n     ```\n   - 使用 hasattr 条件判断避免覆盖子类的规则管理器\n\n3. **参数传递链**：命令行参数 → run_cli → AgentManager → Agent._init_managers → RulesManager\n\n4. **兼容性设计**：\n   - 所有新参数默认值为 None，保持向后兼容\n   - 条件初始化确保子类（如 CodeAgent）的管理器不会被覆盖",
+  "created_at": "2026-01-13T19:17:21.881506",
+  "updated_at": "2026-01-13T19:17:21.881510"
+}

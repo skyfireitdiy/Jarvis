@@ -1,0 +1,13 @@
+{
+  "id": "20250805_160210_928230",
+  "type": "project_long_term",
+  "tags": [
+    "testing",
+    "pytest",
+    "jarvis_stats",
+    "concurrency"
+  ],
+  "content": "## Jarvis项目pytest测试相关信息\n\n**测试框架**：pytest 8.4.1\n\n**测试统计**：\n- 总测试用例：97个\n- 测试分布：\n  - jarvis_agent: 测试提示构建、会话管理、工具执行\n  - jarvis_code_agent: 测试lint工具配置\n  - jarvis_stats: 测试统计功能、存储、可视化\n\n**并发测试修复**：\n- 文件：src/jarvis/jarvis_stats/storage.py\n- 修复内容：_save_json方法中使用UUID生成唯一临时文件名\n- 影响测试：test_concurrent_operations, test_concurrent_increment\n\n**安装方式**：\n```bash\npython -m pip install pytest\n# 或安装开发依赖\npip install -e \".[dev]\"\n```\n",
+  "created_at": "2025-08-05T16:02:10.928260",
+  "updated_at": "2025-08-05T16:02:10.928266"
+}

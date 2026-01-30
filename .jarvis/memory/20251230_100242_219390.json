@@ -1,0 +1,14 @@
+{
+  "id": "20251230_100242_219390",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "config",
+    "integration",
+    "TUI",
+    "configure_by_tui"
+  ],
+  "content": "jarvis 配置系统集成方案（方案B - 混合集成）：\n目标：将 jarvis_config 模块集成到 utils.py 的交互式配置功能中\n核心改动：\n1. 保留平台选择、API密钥配置、模型选择、测试配置等动态逻辑\n2. 将 _collect_optional_config_interactively 及其调用的所有 _collect_*_config 函数替换为 configure_by_tui\n3. 利用 config_schema.json 作为 TUI 的 schema\n\n约束条件：\n- 必须保持向后兼容\n- 只替换静态配置的收集逻辑\n- 配置数据必须正确合并：动态配置（ENV、llms、llm_groups）+ TUI 返回的配置\n- TUI schema 需要排除已由动态逻辑处理的字段\n- 禁止修改 config_schema.json 文件\n\n验证标准：配置流程完整，格式正确，用户取消 TUI 时能正确处理",
+  "created_at": "2025-12-30T10:02:42.219413",
+  "updated_at": "2025-12-30T10:02:42.219416"
+}
