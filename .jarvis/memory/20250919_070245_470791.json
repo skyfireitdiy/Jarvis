@@ -1,0 +1,14 @@
+{
+  "id": "20250919_070245_470791",
+  "type": "project_long_term",
+  "tags": [
+    "design_decision",
+    "events",
+    "jarvis_agent",
+    "run_loop",
+    "code_agent"
+  ],
+  "content": "设计决策：统一工具调用后的处理逻辑到事件总线（event_bus）机制，弃用分散在 run_loop.py 和 code_agent.py 的 after_tool_call_cb 内联实现，改为在 event_bus 中订阅相关事件，实现解耦与单一职责。",
+  "created_at": "2025-09-19T07:02:45.470845",
+  "updated_at": "2025-09-19T07:02:45.470851"
+}

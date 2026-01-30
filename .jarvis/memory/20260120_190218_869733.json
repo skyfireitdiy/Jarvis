@@ -1,0 +1,12 @@
+{
+  "id": "20260120_190218_869733",
+  "type": "project_long_term",
+  "tags": [
+    "linker_wrapper",
+    "page_update",
+    "compilation"
+  ],
+  "content": "用户希望更新iCenter页面，强调所有编译都需要链接器包装，不仅是交叉编译。需要明确更新的目标页面、具体修改内容和用户权限。",
+  "created_at": "2026-01-20T19:02:18.869770",
+  "updated_at": "2026-01-20T19:02:18.869774"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260115_130359_991431",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_rules",
+    "refactor_complete",
+    "naming_standard",
+    "rule_document_format"
+  ],
+  "content": "builtin/rules目录重构任务完成总结：\n\n## 完成的任务\n✅ 重命名10个不符合规范的文件：\n- 角色定义类：code-reverse-design-expert.md→code-reverse-design.md, security-vulnerability-analyst.md→vulnerability-analysis.md, opensource-deployment-expert.md→opensource-deployment.md\n- 工具生成器类：architecture-diagram-generator.md→architecture-diagram-generation.md, script-generator.md→script-generation.md  \n- 操作指南类：add_skills.md→skill-development.md, add_mcp.md→mcp-integration.md, ignore_all_alerts.md→alert-management.md\n- 主题设计类：ios-dark-theme.md→dark-theme-design.md, ios-light-theme.md→light-theme-design.md\n\n✅ 重构7个文件内容结构：从角色定义格式转换为规则文档格式，参考sdd.md模板，包含工作流程、原则、要求、实践指导、检查清单五要素\n\n✅ 更新builtin_rules.md索引：所有文件链接正确更新，描述文本同步，无死链\n\n## 命名规范\n- 全小写字母\n- 连字符(-)分隔单词\n- 描述性名称，反映规则内容\n- 禁止使用大写字母、下划线或空格\n\n## 内容结构标准（基于sdd.md模板）\n1. 标题（规则名称）\n2. 你必须遵循的工作流程\n3. 你必须遵守的原则  \n4. 具体要求和规范\n5. 实践指导\n6. 执行检查清单\n\n## 关键经验\n- 使用git mv保持版本历史\n- 角色定义→规则文档：核心能力→原则，任务流程→工作流程，输出要求→具体要求\n- 使用必须/禁止规范性语言\n- 保持原有功能意图完整",
+  "created_at": "2026-01-15T13:03:59.991463",
+  "updated_at": "2026-01-15T13:03:59.991466"
+}

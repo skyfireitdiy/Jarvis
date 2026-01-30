@@ -1,0 +1,12 @@
+{
+  "id": "20260113_151358_578767",
+  "type": "project_long_term",
+  "tags": [
+    "agent转换",
+    "builtin规则",
+    "规范"
+  ],
+  "content": "agent到规则的转换规范：1) 将YAML格式的agent转换为Markdown格式的规则文件；2) name作为规则的主标题（#）；3) description作为简述放在标题下；4) system_prompt内容转换为规则的详细内容；5) 不包含use_tools字段；6) 文件命名使用小写字母和连字符",
+  "created_at": "2026-01-13T15:13:58.578796",
+  "updated_at": "2026-01-13T15:13:58.578799"
+}

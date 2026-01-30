@@ -1,0 +1,12 @@
+{
+  "id": "20260108_131120_481503",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "tmux_wrapper",
+    "dispatch_command_to_panel"
+  ],
+  "content": "在jarvis项目中实现了一个智能tmux面板调度系统。主要包含以下关键函数：\n1. dispatch_command_to_panel(shell_command: str, max_panes_per_window: int = 4): 智能调度命令到tmux panel中执行，首先检测是否存在{用户名}-jarvis-前缀的tmux session，如果没有则创建，然后检查所有window的panel数量，如果有window的panel数量少于max_panes_per_window，则在该window中创建panel并运行shell命令，否则创建新的window。\n2. 该系统还包含has_session, send_command_to_window, create_window, get_current_window_index, list_session_windows, get_window_pane_count, get_current_session_name等辅助函数，用于全面管理tmux会话。\n3. 在jvsd_cli.py和jcad_cli.py中，dispatch模式已从直接使用subprocess.run(['tmux', 'split-window', ...])替换为使用dispatch_command_to_panel函数。\n4. 在task_list_manager.py中，多个tmux操作已替换为使用新封装的函数。",
+  "created_at": "2026-01-08T13:11:20.481532",
+  "updated_at": "2026-01-08T13:11:20.481535"
+}

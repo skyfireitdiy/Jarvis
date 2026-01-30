@@ -1,0 +1,13 @@
+{
+  "id": "20260109_154542_311486",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "check_and_launch_tmux",
+    "session_management",
+    "new_window"
+  ],
+  "content": "在tmux_wrapper.py的check_and_launch_tmux函数中，当找到现有tmux session时，不再直接attach到该session，而是创建新窗口执行命令。具体实现：\n1. 使用`tmux new-window -F #{window_index} -t {session_name} {command}`创建新窗口并获取窗口索引\n2. 构造attach目标为`{session_name}:{window_index}`格式\n3. 使用os.execvp附加到新创建的窗口\n4. 包含完整的错误处理和命令构造逻辑，支持shell fallback功能",
+  "created_at": "2026-01-09T15:45:42.311509",
+  "updated_at": "2026-01-09T15:45:42.311513"
+}

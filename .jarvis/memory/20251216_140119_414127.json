@@ -1,0 +1,13 @@
+{
+  "id": "20251216_140119_414127",
+  "type": "project_long_term",
+  "tags": [
+    "mypy_analysis",
+    "type_checking",
+    "static_analysis",
+    "python"
+  ],
+  "content": "项目mypy全面扫描结果：\n1. 扫描文件总数：425个Python文件，实际检查277个源文件\n2. 发现错误总数：181个错误分布在49个文件中\n3. 主要错误类型：\n   - 函数缺少返回类型注解 [no-untyped-def] - 最常见\n   - 未使用的\"type: ignore\"注释 [unused-ignore]\n   - 不可达代码 [unreachable]\n   - 泛型类型缺少类型参数 [type-arg]\n   - 参数缺失类型注解\n4. 关键问题文件：\n   - jarvis_sec/clustering.py: 大量泛型类型缺少类型参数\n   - jarvis_jarvis_code_agent/code_analyzer/: 多个__init__方法缺少返回类型\n   - jarvis_c2rust/: transpiler相关模块有大量类型注解缺失",
+  "created_at": "2025-12-16T14:01:19.414160",
+  "updated_at": "2025-12-16T14:01:19.414163"
+}

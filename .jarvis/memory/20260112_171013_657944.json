@@ -1,0 +1,13 @@
+{
+  "id": "20260112_171013_657944",
+  "type": "project_long_term",
+  "tags": [
+    "jcad",
+    "documentation",
+    "implementation",
+    "dispatch"
+  ],
+  "content": "jcad 的两种派发模式：1) Tmux派发模式（多行任务/交互模式）：使用 dispatch_command_to_panel 函数创建 tmux panel，执行 jca -n -w --task-file <file>（不带 --dispatch 参数）；2) 直接派发模式（单行任务）：直接执行 jca 命令，执行 jca -n -w --dispatch --task <content>（带 --dispatch 参数）。关键区别在于是否使用 tmux 的 panel 创建机制。",
+  "created_at": "2026-01-12T17:10:13.657974",
+  "updated_at": "2026-01-12T17:10:13.657978"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20251230_123250_724271",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "tui",
+    "architecture_decision",
+    "utils.py",
+    "config_policy"
+  ],
+  "content": "TUI 配置强制使用策略：修改了 _run_tui_config_form 函数（位于 src/jarvis/jarvis_utils/utils.py），移除了回退机制。关键变更：1) textual 未安装时打印错误并使用 sys.exit(1) 退出；2) schema 加载失败时打印错误并使用 sys.exit(1) 退出；3) TUI 运行失败（包括用户取消）时打印错误并使用 sys.exit(1) 退出。函数不再返回 None，返回类型为 Dict[str, Any]。这意味着 TUI 配置是强制性的，如果不可用或运行失败，整个程序会终止而不是降级到其他配置方式。",
+  "created_at": "2025-12-30T12:32:50.724320",
+  "updated_at": "2025-12-30T12:32:50.724324"
+}

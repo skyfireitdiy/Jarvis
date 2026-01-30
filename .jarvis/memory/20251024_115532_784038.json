@@ -1,0 +1,13 @@
+{
+  "id": "20251024_115532_784038",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "agent_tool_mapping",
+    "tool_selection",
+    "execute_script_policy"
+  ],
+  "content": "C2Rust Agents 工具选择方案（更新：所有 Agent/CodeAgent 默认建议包含 execute_script，用于列举目录、文件检查等非交互命令）\n范围: /home/wangmaobin/code/Jarvis/src/jarvis/jarvis_c2rust\n\n通用说明\n- 新增政策：所有 Agent/CodeAgent 场景均建议启用 execute_script 以支持非交互式 shell 操作（如 ls、rg、tree、stat、wc、cargo/rustfmt 检查等）。\n- 仍保持非交互环境，默认不使用 virtual_tty。\n- 其他工具建议保持不变，execute_script 作为通用补充能力。\n\n1) pruner.py: evaluate_third_party_replacements -> Agent (~155)\n- 目标: 评估 C/C++ 函数是否可被 Rust std/crate 单个 API 直接替代\n- 建议工具:\n  • execute_script: 列举/读取符号目录结构、统计/采样 jsonl 文件、快速 grep 验证等非交互命令\n  • search_web: 检索 crates.io/文档以辅助确认替代 API\n  • retrieve_memory: 复用已记录的替代案例与库偏好\n  • save_memory: 将新确认的替代映射与评估结果持久化\n  • ask_user: 模型不确定或存在语义歧义时进行人工决策\n- 约束: 仅非交互命令；避免 virtual_tty\n\n2) transpiler.py\n2.1 Agent (~696) — 任务规划/签名与模块位置建议\n- 建议工具:\n  • execute_script: 列举项目目录、定位 C/C++/Rust 文件、统计代码行数/大小等\n  • read_code: 读取相关源片段与上下文\n  • retrieve_memory: 读取历史模块规划/命名约定/项目偏好\n  • save_memory: 持久化规划决策（crate 结构、模块命名、签名约定）\n  • ask_user: 需要用户确认模块边界或命名规范\n\n2.2 CodeAgent (~772, ~852, ~886) — 代码生成/转换子步骤\n- 建议工具:\n  • execute_script: rustfmt/cargo check/目录与文件检查、正则搜集上下文\n  • read_code: 读取源文件与生成文件片段\n  • retrieve_memory: 复用风格约定/生成策略\n  • save_memory: 记录生成结果与失败原因（便于回溯）\n\n2.3 Agent (~918) — 审查/修正建议\n- 建议工具:\n  • execute_script: 快速比对/统计/定位问题点（如 rg/grep/wc）\n  • read_code: 聚焦待审查的 Rust 片段\n  • retrieve_memory: 读取审查 checklist 与项目规范\n  • ask_user: 需要确认取舍或风格冲突时\n  • save_memory: 记录审查结论与后续行动\n\n2.4 CodeAgent 变量 ca (~960) — 批量写入/整合\n- 建议工具:\n  • execute_script: 执行格式化/静态检查、目录扫描与批量操作验证\n  • read_code: 确认写入位置与上下文\n  • save_memory: 记录批量操作结果与异常\n  • retrieve_memory: 读取生成策略与命名规划\n\n3) llm_module_agent.py\n3.1 Agent (~575) — LLMRustCratePlannerAgent 调用前的系统规划\n- 建议工具:\n  • execute_script: 获取项目目录结构与文件清单、统计规模与分布\n  • retrieve_memory: 读取项目架构与既有规划\n  • save_memory: 固化 crate 规划、模块边界与依赖\n  • methodology: 引入/更新规划方法论（阶段产出、约束）\n  • ask_user: 不确定的架构取舍时征询\n\n3.2 LLMRustCratePlannerAgent 初始化 (~645, ~650, ~667, ~672)\n- 建议工具:\n  • execute_script: 辅助收集项目结构/依赖现状作为输入\n  • retrieve_memory/save_memory: 贯穿式读取与固化规划决策\n  • ask_user: 需求变更/边界不清晰时\n\n3.3 CodeAgent (~1180, ~1218) — 修复/生成子流程\n- 建议工具:\n  • execute_script: 触发编译/格式化/静态检查、定位文件与比对\n  • read_code: 读取待修复/生成片段\n  • retrieve_memory: 复用修复策略与规范\n  • save_memory: 记录修复结果与失败样例\n\n总体原则（更新版）\n- execute_script: 默认建议开启，满足列举目录/文件、快速静态检查与信息收集等需求；严格保持非交互与安全边界\n- virtual_tty: 默认不用\n- read_code/retrieve_memory/save_memory/ask_user: 继续作为核心工具组合\n",
+  "created_at": "2025-10-24T11:55:32.784074",
+  "updated_at": "2025-10-24T11:55:32.784078"
+}

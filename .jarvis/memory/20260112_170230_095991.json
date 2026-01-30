@@ -1,0 +1,13 @@
+{
+  "id": "20260112_170230_095991",
+  "type": "project_long_term",
+  "tags": [
+    "jcad",
+    "best_practices",
+    "documentation",
+    "code_agent"
+  ],
+  "content": "jcad（Jarvis Code Agent Dispatcher）是 jarvis-code-agent-dispatcher 命令的快捷别名，是代码代理的便捷派发工具。核心特性：自动启用非交互模式（-n）、自动启用工作树模式（--worktree）、自动启用任务派发（--dispatch）、支持多行任务输入、使用 tmux 进行任务派发。与 jca 的关系：jcad 是便捷封装自动启用多个参数，jca 需要手动指定参数更灵活。文档位置：docs/best_practices/jcad最佳实践.md",
+  "created_at": "2026-01-12T17:02:30.096031",
+  "updated_at": "2026-01-12T17:02:30.096036"
+}

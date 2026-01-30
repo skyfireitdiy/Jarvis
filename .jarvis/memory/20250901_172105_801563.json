@@ -1,0 +1,14 @@
+{
+  "id": "20250901_172105_801563",
+  "type": "project_long_term",
+  "tags": [
+    "sub_agent",
+    "jarvis_tools",
+    "parameters",
+    "design_decision",
+    "__init__.py"
+  ],
+  "content": "计划变更：扩展 jarvis_tools/sub_agent.py 的 SubAgentTool，新增支持以下参数并在执行时生效：\n- system_prompt: 覆盖子Agent系统提示词；默认使用 origin_agent_system_prompt\n- summary_prompt: 覆盖子Agent总结提示词；默认继承父Agent的 summary_prompt 或全局默认\n- use_tools: 限制子Agent可用工具名称列表；默认继承父Agent当前可用工具集\n\n参数覆盖优先级：\nuser-provided > parent_agent inherited > default\n\n执行逻辑调整：\n- 从 args 读取 system_prompt/summary_prompt/use_tools，若提供则覆盖对应变量\n- use_tools 支持数组（优先）或逗号分隔字符串（兼容处理）\n- Agent 初始化使用覆盖后的 system_prompt/summary_prompt\n- 若最终 use_tools 非空，则调用 agent.set_use_tools(use_tools)\n\n文档更新：\n- 更新文件头部约定说明，将“仅接收一个参数：task”改为“必填参数：task；可选参数：background, system_prompt, summary_prompt, use_tools”\n\n参考实现与一致性：\n- 参考 jarvis_agent/__init__.py 中 system_prompt、summary_prompt、use_tools 的使用方式，保持默认行为与继承逻辑一致\n",
+  "created_at": "2025-09-01T17:21:05.801608",
+  "updated_at": "2025-09-01T17:21:05.801613"
+}

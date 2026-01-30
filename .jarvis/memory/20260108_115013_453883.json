@@ -1,0 +1,12 @@
+{
+  "id": "20260108_115013_453883",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "tmux_pane_allocation",
+    "jarvis_tools"
+  ],
+  "content": "修复了tmux窗口pane分配问题：原代码存在pane复用逻辑复杂性，导致在window达到4个pane时不会创建新window的问题。修复方式是采用简化策略，为每个任务创建独立窗口，避免了pane数量限制问题。",
+  "created_at": "2026-01-08T11:50:13.453915",
+  "updated_at": "2026-01-08T11:50:13.453919"
+}

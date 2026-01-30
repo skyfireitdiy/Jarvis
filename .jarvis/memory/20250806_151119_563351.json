@@ -1,0 +1,13 @@
+{
+  "id": "20250806_151119_563351",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "platform_registry",
+    "model_group",
+    "architecture"
+  ],
+  "content": "Jarvis项目中Platform和model_group的架构设计：\n\n1. 获取platform的两种方式：\n   - 通过agent获取：`agent.model`（包含model_group属性）\n   - 通过PlatformRegistry创建：需要手动设置model_name和model_group\n\n2. model_group的作用：\n   - 用于is_context_overflow检查，判断内容是否超过模型上下文限制\n   - 可以通过命令行参数覆盖配置文件中的默认设置\n   - 影响platform_name和model_name的选择\n\n3. 配置函数支持model_group_override参数：\n   - get_normal_platform_name(model_group_override)\n   - get_normal_model_name(model_group_override)\n   - get_thinking_platform_name(model_group_override)\n   - get_thinking_model_name(model_group_override)\n",
+  "created_at": "2025-08-06T15:11:19.563389",
+  "updated_at": "2025-08-06T15:11:19.563396"
+}

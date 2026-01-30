@@ -1,0 +1,14 @@
+{
+  "id": "20260115_103549_435032",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_rules",
+    "deployment",
+    "环境检测",
+    "uv",
+    "opensource-deployment-expert"
+  ],
+  "content": "开源部署专家规则已更新：在任务处理流程中添加了步骤1.5本地环境检测，包括Python环境检测（uv环境、Python版本、虚拟环境）、其他语言环境检测（Node.js、Go、Rust）、系统依赖检测（操作系统、磁盘空间、网络连接）以及环境适配建议。文件位置：builtin/rules/deployment/opensource-deployment-expert.md",
+  "created_at": "2026-01-15T10:35:49.435055",
+  "updated_at": "2026-01-15T10:35:49.435058"
+}

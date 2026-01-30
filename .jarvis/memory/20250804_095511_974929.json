@@ -1,0 +1,11 @@
+{
+  "id": "20250804_095511_974929",
+  "type": "project_long_term",
+  "tags": [
+    "build_pdf_script",
+    "auto_output_filename"
+  ],
+  "content": "在处理 Markdown 文件到 PDF 的转换过程中，我们实现了自动化输出文件命名的功能。如果用户没有提供输出文件名，则默认使用输入文件的基础名加上 .pdf 后缀作为输出文件名。这通过在脚本中添加条件判断和使用 `basename` 命令来实现。\n",
+  "created_at": "2025-08-04T09:55:11.974957",
+  "updated_at": "2025-08-04T09:55:11.974962"
+}

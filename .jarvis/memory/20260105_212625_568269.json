@@ -1,0 +1,12 @@
+{
+  "id": "20260105_212625_568269",
+  "type": "project_long_term",
+  "tags": [
+    "task_list",
+    "TaskListManager",
+    "to_dict"
+  ],
+  "content": "TaskListManager.task_lists属性存储了task_list_id到TaskList对象的映射。TaskList类具有to_dict方法，返回格式：{\"main_goal\": ..., \"tasks\": {task_id: task.to_dict()}, \"max_active_tasks\": ..., \"version\": ...}。Task类的to_dict方法使用dataclasses.asdict并转换枚举值为字符串。",
+  "created_at": "2026-01-05T21:26:25.568294",
+  "updated_at": "2026-01-05T21:26:25.568298"
+}

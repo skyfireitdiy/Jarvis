@@ -1,0 +1,13 @@
+{
+  "id": "20251230_093519_884345",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_config",
+    "ArrayField",
+    "测试",
+    "Mock"
+  ],
+  "content": "jarvis_config 模块的 ArrayField 测试结构：\n1. TestArrayFieldNewFeatures：测试 ArrayField 新增功能（items_schema、各种类型数组项）\n2. TestArrayItemField：测试 ArrayItemField 的各种类型（string、number、boolean、object）\n3. TestObjectEditModal：测试 ObjectEditModal 的初始化和 collect_values\n4. TestArrayFieldMethods：测试 ArrayField 的 get_value/set_value/items_management\n5. TestArrayItemFieldMethods：测试 ArrayItemField 的 get_value/set_value/on_remove_callback\n6. TestArrayFieldIntegration：使用 Mock 测试添加项、删除项、重新索引、get_value、set_value\n7. TestObjectEditModalIntegration：测试模态窗口初始化和 dismiss 结果\n\n使用 Mock 模拟 Textual Widget 环境的技巧：\n- Mock 容器（Vertical）和 mount 方法\n- Mock query_one 方法避免 NoMatches 错误\n- Mock ArrayItemField 的 get_value 方法\n- 使用 patch 模拟父类方法\n",
+  "created_at": "2025-12-30T09:35:19.884407",
+  "updated_at": "2025-12-30T09:35:19.884413"
+}

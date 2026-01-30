@@ -1,0 +1,12 @@
+{
+  "id": "20251024_130654_920040",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "naming_convention",
+    "design_decision"
+  ],
+  "content": "Crate 命名约定更新：默认 crate 名由目录名派生，统一使用下划线后缀 “_rs”（如 foo_rs），不再使用连字符 “-rs”。",
+  "created_at": "2025-10-24T13:06:54.920048",
+  "updated_at": "2025-10-24T13:06:54.920050"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "20260108_143922_377004",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "set_window_tiled_layout",
+    "function_implementation"
+  ],
+  "content": "set_window_tiled_layout函数实现细节：\n1. 函数定义：def set_window_tiled_layout(session_name: str, window_id: Optional[str] = None) -> bool\n2. 功能：设置指定 tmux session 的 window 布局为 tiled（平铺）\n3. 参数：session_name（tmux session 名称），window_id（window 标识，可以是索引或'index: name'格式，如果为 None 则设置当前 window）\n4. 实现：使用 subprocess.run 执行 ['tmux', 'select-layout', '-t', target, 'tiled'] 命令\n5. 异常处理：使用 CalledProcessError 和 TimeoutExpired 异常处理，超时时间为5秒\n6. 返回值：成功返回 True，失败返回 False",
+  "created_at": "2026-01-08T14:39:22.377040",
+  "updated_at": "2026-01-08T14:39:22.377045"
+}

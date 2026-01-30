@@ -1,0 +1,13 @@
+{
+  "id": "20260108_144641_888420",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "create_window",
+    "window_id",
+    "bug_fix"
+  ],
+  "content": "在tmux_wrapper.py的create_window函数中，为tmux new-window命令添加-P参数以解决window_id返回为空的问题。-P参数用于打印新创建的window信息，配合-F参数指定的输出格式可以正确获取窗口ID。根据tmux手册：-P选项会在创建新窗口后打印其信息，默认格式为'#{session_name}:#{window_index}'，但可通过-F指定不同的格式。",
+  "created_at": "2026-01-08T14:46:41.888448",
+  "updated_at": "2026-01-08T14:46:41.888452"
+}

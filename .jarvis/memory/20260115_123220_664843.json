@@ -1,0 +1,13 @@
+{
+  "id": "20260115_123220_664843",
+  "type": "project_long_term",
+  "tags": [
+    "token",
+    "base.py",
+    "get_token_usage_info",
+    "code_review"
+  ],
+  "content": "在BasePlatform类中，修改了模型响应完成的输出逻辑，添加了token使用信息的显示。主要变更：\n1. 调用self._get_token_usage_info(response)获取token使用百分比、颜色和进度条\n2. 获取最大token数和总使用token数\n3. 如果max_tokens > 0且有进度条，则显示完整token信息，格式为：'✅ {model_name}模型响应完成: {duration:.2f}秒 | Token: {progress_bar} [{percent_color}]{usage_percent:.1f}% ({total_tokens}/{max_tokens})[/{percent_color}]'\n4. 否则显示原始信息：'✅ {model_name}模型响应完成: {duration:.2f}秒'\n\n相关方法存在：\n- _get_token_usage_info: 返回(usage_percent, percent_color, progress_bar)\n- get_used_token_count: 获取历史token计数\n- _get_platform_max_input_token_count: 获取平台最大输入token数\n- _format_progress_bar: 格式化进度条\n- get_context_token_count (from jarvis.jarvis_utils.embedding): 计算上下文token数",
+  "created_at": "2026-01-15T12:32:20.664868",
+  "updated_at": "2026-01-15T12:32:20.664872"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20260117_101200_378679",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "run_loop",
+    "fix_tool_call_with_llm",
+    "bug_fix",
+    "工具调用",
+    "代码修复"
+  ],
+  "content": "fix_tool_call_with_llm修复问题：当连续5次没有工具调用时，使用LLM修复工具调用格式后，修复成功应该直接调用_call_tools重新解析并执行工具调用，而不是将修复内容加入addon_prompt。修复位置：run_loop.py第546-558行。修复逻辑：if fixed_content: need_return, tool_prompt = ag._call_tools(fixed_content); 然后按正常流程处理返回结果。",
+  "created_at": "2026-01-17T10:12:00.378704",
+  "updated_at": "2026-01-17T10:12:00.378708"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260115_113413_081757",
+  "type": "project_long_term",
+  "tags": [
+    "jca",
+    "cli",
+    "documentation",
+    "code_review"
+  ],
+  "content": "jca命令参数文档修复验证：在code_agent.py中发现jca CLI命令实际参数定义，确认文档中新增的-T/--task、--task-file、-w/--worktree、-d/--dispatch参数均真实存在，review-max-iterations参数描述已修正为'默认0表示无限审查模式'",
+  "created_at": "2026-01-15T11:34:13.081801",
+  "updated_at": "2026-01-15T11:34:13.081806"
+}

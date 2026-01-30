@@ -1,0 +1,15 @@
+{
+  "id": "20251101_035923_972283",
+  "type": "project_long_term",
+  "tags": [
+    "agent",
+    "architecture",
+    "components",
+    "events",
+    "parameters",
+    "plantuml"
+  ],
+  "content": "Agent 关键组件与交互要点（用于撰写文档的纲要）:\n- 核心组件: EventBus, MemoryManager, TaskAnalyzer, FileMethodologyManager, PromptManager, SessionManager, ToolRegistry(默认输出处理器), EditFileHandler/RewriteFileHandler(可禁用), TaskPlanner(规划与子任务), AgentRunLoop(主循环), PlatformRegistry/BasePlatform(模型/平台适配)\n- 关键事件: TASK_STARTED, BEFORE_MODEL_CALL, AFTER_MODEL_CALL, BEFORE_ADDON_PROMPT, AFTER_ADDON_PROMPT, BEFORE_HISTORY_CLEAR, AFTER_HISTORY_CLEAR, BEFORE_SUMMARY, AFTER_SUMMARY, INTERRUPT_TRIGGERED, BEFORE_TOOL_FILTER, TOOL_FILTERED, AFTER_TOOL_CALL\n- 典型流程: 初始化组件 -> 构建系统提示 -> 首轮处理(工具筛选、文件/方法论) -> 循环(模型决策 -> 工具执行 -> 结果拼接 -> 中断处理) -> 完成与总结 -> 记忆整理\n- 参数要点: auto_complete, need_summary, use_methodology, use_analysis, execute_tool_confirm, force_save_memory, non_interactive, in_multi_agent, plan, plan_max_depth, plan_depth, use_tools, disable_file_edit, files, model_group, summary_prompt, auto_summary_rounds, multiline_inputer, confirm_callback\n- 交互外部系统: LLM 平台(API)、MCP/外部工具进程、文件上传(平台能力)、记忆存储(.jarvis/memory 与数据目录)、Git 同步方法论/工具库\n",
+  "created_at": "2025-11-01T03:59:23.972322",
+  "updated_at": "2025-11-01T03:59:23.972326"
+}

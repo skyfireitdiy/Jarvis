@@ -1,0 +1,12 @@
+{
+  "id": "20260113_144128_699970",
+  "type": "project_long_term",
+  "tags": [
+    "architecture_diagram_generator",
+    "rule_conversion",
+    "builtin_rules"
+  ],
+  "content": "将builtin/agent/architecture-diagram-generator.yaml转换为规则文件builtin/rules/architecture_diagram_generator.md，并已成功添加到builtin/rules/builtin_rules.md文档中。架构图生成器规则包含完整的功能描述、核心职责、工作流程、Graphviz输出标准和工具使用说明，符合架构设计类别。",
+  "created_at": "2026-01-13T14:41:28.699999",
+  "updated_at": "2026-01-13T14:41:28.700003"
+}

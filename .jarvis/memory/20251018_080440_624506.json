@@ -1,0 +1,14 @@
+{
+  "id": "20251018_080440_624506",
+  "type": "project_long_term",
+  "tags": [
+    "cli_parameter",
+    "code_review",
+    "jarvis_code_analysis",
+    "auto_complete",
+    "design_decision"
+  ],
+  "content": "为代码审查CLI新增布尔参数 --auto-complete/--no-auto-complete，用于控制Agent是否自动完成。默认值为False以保持兼容性。\n实施要点：\n1) 在 src/jarvis/jarvis_code_analysis/code_review.py 的四个子命令（commit/current/range/file）增加 Typer 选项 auto_complete: bool = typer.Option(False, \"--auto-complete/--no-auto-complete\", help=\"是否自动完成\")\n2) 在 tool_args 中传递 \"auto_complete\": auto_complete\n3) 在 CodeReviewTool.execute 中读取 args.get(\"auto_complete\", False)，并在 Agent(...) 构造时设置 auto_complete=该值\n4) 在 CodeReviewTool.parameters 中补充 auto_complete 的schema定义（type: boolean, description: 是否自动完成, default: false）\n",
+  "created_at": "2025-10-18T08:04:40.624542",
+  "updated_at": "2025-10-18T08:04:40.624545"
+}

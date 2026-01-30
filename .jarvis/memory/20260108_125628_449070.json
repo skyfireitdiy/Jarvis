@@ -1,0 +1,12 @@
+{
+  "id": "20260108_125628_449070",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "refactoring",
+    "code_migration"
+  ],
+  "content": "在jarvis项目中，需要将所有tmux直接操作替换为dispatch_command_to_panel函数，但目前task_list_manager.py中仍存在直接使用tmux命令的情况，需要进一步迁移。目前jvsd_cli.py和jcad_cli.py已完成迁移，但task_list_manager.py、jarvis.py和code_agent.py中的dispatch_to_tmux_window函数也需要考虑使用新函数替换。",
+  "created_at": "2026-01-08T12:56:28.449102",
+  "updated_at": "2026-01-08T12:56:28.449107"
+}

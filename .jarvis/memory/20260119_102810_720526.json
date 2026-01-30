@@ -1,0 +1,12 @@
+{
+  "id": "20260119_102810_720526",
+  "type": "project_long_term",
+  "tags": [
+    "rule-loading",
+    "rules_manager",
+    "naming-convention"
+  ],
+  "content": "规则命名规范更新：为解决规则命名冲突问题，规则名称现在使用来源前缀格式。前缀说明：central: - 中心规则仓库文件；project: - 项目 .jarvis/rules 目录文件；global: - 全局 ~/.jarvis/rules 目录文件；config1:, config2: - 配置的规则目录文件；central_yaml: - 中心库 rules.yaml；project_yaml: - 项目 rules.yaml；global_yaml: - 全局 rules.yaml；无前缀 - 内置规则或 builtin_rules.md 索引文件中的规则。示例：project:deployment/version_release.md。修改文件：src/jarvis/jarvis_agent/rules_manager.py。",
+  "created_at": "2026-01-19T10:28:10.720554",
+  "updated_at": "2026-01-19T10:28:10.720558"
+}

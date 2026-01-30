@@ -1,0 +1,16 @@
+{
+  "id": "20260124_183916_668523",
+  "type": "project_long_term",
+  "tags": [
+    "adaptive_compression",
+    "sliding_window_compression",
+    "incremental_summarization_compression",
+    "bug_fix",
+    "GLM-4.7",
+    "临时模型",
+    "压缩提示词"
+  ],
+  "content": "## 自适应压缩返回空值问题修复\n\n### 问题描述\nGLM-4.7 模型在执行自适应压缩（滑动窗口压缩、增量摘要压缩、重要性评分压缩、关键事件提取压缩）时连续返回空值，导致所有压缩策略都失败。\n\n### 问题根因\n1. 原始的 `_build_compression_prompt` 方法生成的压缩提示词过长（约 180 行），包含大量格式要求和示例\n2. 临时模型（`_create_temp_model`）是空会话，只有系统提示词，没有对话历史\n3. 当临时模型收到超长的压缩提示词时，某些模型（如 GLM-4.7）可能无法正确处理，返回空值\n4. 完整摘要压缩成功是因为它使用当前会话（`self.model.chat_until_success`），模型可以看到完整的对话历史\n\n### 修复方案\n1. 添加简化版压缩提示词方法 `_build_simple_compression_prompt`，生成更简洁的提示词（约 20 行）\n2. 修改所有使用临时模型的压缩方法，使用简化版提示词：\n   - `_sliding_window_compression`\n   - `_importance_scoring_compression`\n   - `_incremental_summarization_compression`\n   - `_key_event_extraction_compression`\n\n### 关键代码位置\n- 简化版提示词方法：`src/jarvis/jarvis_agent/__init__.py` 第 1652 行\n- 滑动窗口压缩：第 1782 行\n- 重要性评分压缩：第 2125 行\n- 增量摘要压缩：第 2269 行\n- 关键事件提取压缩：第 2520 行\n\n### 经验总结\n- 临时模型（空会话）对提示词的复杂度敏感，应使用简洁的提示词\n- 不同模型对超长提示词的处理能力不同，需要考虑兼容性\n- 当模型返回空值时，应检查提示词是否过于复杂",
+  "created_at": "2026-01-24T18:39:16.668542",
+  "updated_at": "2026-01-24T18:39:16.668546"
+}

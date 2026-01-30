@@ -1,0 +1,13 @@
+{
+  "id": "20251110_062312_745983",
+  "type": "project_long_term",
+  "tags": [
+    "feature_complete",
+    "force_save_memory",
+    "auto_add_save_memory",
+    "agent_enhancement"
+  ],
+  "content": "任务完成：Agent如果配置了强制保存记忆，判断是否有save_memory工具，如果没有，自动添加\n\n实现细节：\n1. ✅ 修改了Agent._init_handlers()方法，在工具初始化后检查force_save_memory配置\n2. ✅ 添加了新的Agent._ensure_save_memory_tool()方法，用于自动注册save_memory工具\n3. ✅ 使用ToolRegistry.register_tool()方法动态添加save_memory工具\n4. ✅ 保持向后兼容，只在force_save_memory=True时自动添加\n5. ✅ 添加了适当的错误处理和用户提示\n\n代码修改文件：\n- src/jarvis/jarvis_agent/__init__.py: 添加自动检查和注册逻辑\n- 保持MemoryManager._has_save_memory_tool()检查不变，因为工具已自动添加\n\n验证结果：\n- ✅ 语法检查通过\n- ✅ 方法结构验证通过\n- ✅ MemoryManager相关逻辑保持完整\n- ✅ 工具注册逻辑正确\n\n这个功能确保了当用户启用force_save_memory时，即使工具列表中没有save_memory工具，系统也会自动添加，保证了记忆保存功能的完整性。\n",
+  "created_at": "2025-11-10T06:23:12.746012",
+  "updated_at": "2025-11-10T06:23:12.746016"
+}

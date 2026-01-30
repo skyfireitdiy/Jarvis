@@ -1,0 +1,12 @@
+{
+  "id": "20250805_144059_701555",
+  "type": "project_long_term",
+  "tags": [
+    "documentation",
+    "installation",
+    "uv"
+  ],
+  "content": "项目安装文档应包含以下内容：\n1. 三种安装方式：源码安装、PyPI安装、uv安装\n2. uv安装流程：\n   - 先安装uv工具\n   - 创建虚拟环境\n   - 基础安装(uv pip install .)\n   - 可选RAG功能安装(uv pip install .[rag])\n3. 建议将虚拟环境激活命令添加到shell配置文件\n",
+  "created_at": "2025-08-05T14:40:59.701584",
+  "updated_at": "2025-08-05T14:40:59.701589"
+}

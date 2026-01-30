@@ -1,0 +1,16 @@
+{
+  "id": "20250820_150503_811628",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "ui_convention",
+    "cli",
+    "optimization",
+    "interaction",
+    "input.py",
+    "__init__.py"
+  ],
+  "content": "交互方式优化（v1）：\n- 变更点：\n  1) jarvis_utils/input.py: get_multiline_input 新增可选参数 print_on_empty: bool = True，用于控制当用户输入为空字符串时是否打印“输入已取消”提示，默认保持原行为（打印）。\n  2) jarvis_agent/__init__.py: 新增 Agent._multiline_input 包装器，优先以关键字参数 print_on_empty 调用 multiline_inputer；若自定义输入器不支持该参数，回退为仅传递 tip（保持兼容）。\n  3) 应用位置：\n     - _handle_run_interrupt：调用 _multiline_input(..., False)，避免中断时用户直接回车导致的噪声提示。\n     - _get_next_user_action：调用 _multiline_input(..., False)，用户直接回车表示“完成”，不再打印“输入已取消”。\n- 目的：消除将“空输入”作为控制信号时的多余提示，改善交互体验，避免噪声信息干扰。\n- 兼容性：\n  - 新增参数有默认值，旧调用不受影响。\n  - 对于外部/自定义 multiline_inputer（仅接受一个参数）通过 TypeError 回退，保持兼容。\n- 影响文件：\n  - src/jarvis/jarvis_utils/input.py\n  - src/jarvis/jarvis_agent/__init__.py\n- 后续可考虑的优化（未实现）：\n  - 在 _get_next_user_action 使用 get_choice 提供“继续/完成”等显式选项的可滚动选择菜单。\n  - 在中断处理场景增加更多快捷选项（例如继续工具调用/修改输入/取消）。\n",
+  "created_at": "2025-08-20T15:05:03.811664",
+  "updated_at": "2025-08-20T15:05:03.811669"
+}

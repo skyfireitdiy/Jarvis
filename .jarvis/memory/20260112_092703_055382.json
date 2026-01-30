@@ -1,0 +1,14 @@
+{
+  "id": "20260112_092703_055382",
+  "type": "project_long_term",
+  "tags": [
+    "rules",
+    "jinja2",
+    "templates",
+    "builtin_rules",
+    "rules_manager"
+  ],
+  "content": "JARVIS 规则系统使用 Jinja2 模板语法实现动态规则渲染。可用的占位符变量包括：{{ current_dir }}（当前工作目录）、{{ script_dir }}（脚本所在目录）、{{ jarvis_data_dir }}（jarvis 数据目录）、{{ jarvis_src_dir }}（jarvis 源码目录）、{{ git_root_dir }}（Git 仓库根目录）、{{ rule_file_dir }}（规则文件所在目录）。规则加载优先级：1) 中心规则仓库 2) 项目规则目录 3) 配置的规则目录 4) 全局规则目录 5) 内置规则目录 6) rules.yaml 文件中的规则。",
+  "created_at": "2026-01-12T09:27:03.055415",
+  "updated_at": "2026-01-12T09:27:03.055418"
+}

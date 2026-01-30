@@ -1,0 +1,13 @@
+{
+  "id": "20260108_123729_843578",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_wrapper",
+    "create_panel",
+    "code_review",
+    "function_implementation"
+  ],
+  "content": "用户需求：增加一个函数，在指定的tmux session、window中创建一个panel并指定入口初始进程。\n\n实现结果：在src/jarvis/jarvis_utils/tmux_wrapper.py中新增了create_panel函数，具有以下特点：\n1. 函数签名：create_panel(session_name, window_id, initial_command, split_direction=\"h\", working_dir=None, pane_percentage=None)\n2. 参数验证：对split_direction和pane_percentage参数进行验证\n3. 工作目录处理：支持指定工作目录，默认使用当前工作目录\n4. Shell保持：命令执行后启动用户默认shell保持panel活动\n5. 错误处理：包含subprocess异常处理和超时控制\n6. 返回值：成功返回pane ID，失败返回None\n\n代码质量：\n- 完整的文档字符串，包含参数说明、返回值和注意事项\n- 适当的错误提示和警告输出\n- 使用shlex.quote()进行安全转义，防止shell注入\n- 符合现有代码风格和最佳实践",
+  "created_at": "2026-01-08T12:37:29.843601",
+  "updated_at": "2026-01-08T12:37:29.843605"
+}

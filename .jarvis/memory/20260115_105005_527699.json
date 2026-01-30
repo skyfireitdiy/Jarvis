@@ -1,0 +1,13 @@
+{
+  "id": "20260115_105005_527699",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "auto-install",
+    "tool-checker",
+    "builtin_rules"
+  ],
+  "content": "jck命令自动安装工具功能实现细节：\n1. 新增 _install_missing_tools() 函数 (第55-102行)：检测到未安装工具时询问用户是否自动安装，使用 jvs -T '在当前环境安装{tool_name}' 命令安装工具\n2. 新增 _perform_check() 辅助函数 (第144-176行)：统一检查逻辑，支持单个工具、lint工具、构建工具或所有工具的检查\n3. 修改 check() 函数 (第179-235行)：非JSON模式下检测到未安装工具时调用 _install_missing_tools()，安装完成后重新检查工具状态\n4. JSON模式保持原有行为，不询问用户安装\n5. 正确处理异常情况，包括jvs命令不存在等场景",
+  "created_at": "2026-01-15T10:50:05.527727",
+  "updated_at": "2026-01-15T10:50:05.527730"
+}

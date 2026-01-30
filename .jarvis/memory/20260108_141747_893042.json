@@ -1,0 +1,14 @@
+{
+  "id": "20260108_141747_893042",
+  "type": "project_long_term",
+  "tags": [
+    "tmux",
+    "dispatch",
+    "error_handling",
+    "exception_handling",
+    "function_return_value"
+  ],
+  "content": "在tmux_wrapper.py中修复dispatch_command_to_panel函数的关键修改：\n\n1. 问题：dispatch_command_to_panel函数在create_panel成功后，由于set_window_tiled_layout可能失败导致整个函数返回None，但实际上panel已经成功创建\n\n2. 解决方案：\n   - 在create_window和create_panel函数中添加了通用异常处理（except Exception as e）\n   - 在dispatch_command_to_panel函数中，对set_window_tiled_layout调用添加try-catch包装\n   - 确保即使布局设置失败，也不影响主流程的返回值\n\n3. 最佳实践：\n   - 当函数有多个步骤时，需要区分关键步骤和非关键步骤\n   - 非关键步骤（如设置布局）的失败不应影响关键功能的返回值\n   - 异常处理应提供有用的错误信息，同时保持函数行为的一致性",
+  "created_at": "2026-01-08T14:17:47.893079",
+  "updated_at": "2026-01-08T14:17:47.893083"
+}

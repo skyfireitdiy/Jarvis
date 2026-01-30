@@ -1,0 +1,14 @@
+{
+  "id": "20250806_151119_512522",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "cli_parameter",
+    "llm_group",
+    "git_commiter",
+    "typer_cli"
+  ],
+  "content": "在Jarvis项目中添加-g/--llm_group参数的标准实现模式：\n\n1. 参数定义格式：\n```python\nllm_group: Optional[str] = typer.Option(\n    None, \"-g\", \"--llm_group\", help=\"使用的模型组，覆盖配置文件中的设置\"\n)\n```\n\n2. 使用model_group需要导入的函数：\n```python\nfrom jarvis.jarvis_utils.config import get_normal_platform_name, get_normal_model_name\n```\n\n3. 根据llm_group创建platform的标准方法：\n```python\nplatform_name = get_normal_platform_name(llm_group)\nmodel_name = get_normal_model_name(llm_group)\nplatform = PlatformRegistry().create_platform(platform_name)\nif platform:\n    platform.set_model_name(model_name)\nmodel_group = llm_group\n```\n\n4. 在git_commiter.py中的具体实现位置：\n- CLI参数定义：cli函数\n- 参数传递：通过execute方法的args字典\n- 使用逻辑：在获取platform时，如果指定了llm_group则覆盖默认配置\n",
+  "created_at": "2025-08-06T15:11:19.512550",
+  "updated_at": "2025-08-06T15:11:19.512554"
+}

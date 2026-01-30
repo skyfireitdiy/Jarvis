@@ -1,0 +1,12 @@
+{
+  "id": "20260108_130538_252775",
+  "type": "project_long_term",
+  "tags": [
+    "tmux_integration",
+    "code_review",
+    "dispatch_command_to_panel"
+  ],
+  "content": "在tmux_wrapper.py中新增了dispatch_command_to_panel函数，实现了智能调度shell命令到tmux panel的功能：\n1. 检测并创建{用户名}-jarvis-前缀的session\n2. 检查window的pane数量（最多4个），复用或创建pane\n3. 在jvsd_cli.py和jcad_cli.py中已替换原有tmux调用\n4. 但在task_list_manager.py的_find_window_with_available_panes函数和其他一些函数中仍保留直接的tmux调用，未完全替换为新函数\n\n建议：为了代码一致性，应将所有tmux操作都迁移到tmux_wrapper.py中的统一函数中",
+  "created_at": "2026-01-08T13:05:38.252800",
+  "updated_at": "2026-01-08T13:05:38.252804"
+}

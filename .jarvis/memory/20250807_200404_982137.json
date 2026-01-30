@@ -1,0 +1,13 @@
+{
+  "id": "20250807_200404_982137",
+  "type": "project_long_term",
+  "tags": [
+    "platform_registry",
+    "platform_usage",
+    "architecture",
+    "create_platform"
+  ],
+  "content": "在Jarvis项目中，获取和实例化大模型平台的核心是 `PlatformRegistry` 类。\n\n1.  **获取默认平台**: 调用 `PlatformRegistry().get_normal_platform()` 可以获取在系统配置中定义的常规平台实例。这适用于大多数通用场景。\n\n2.  **获取指定平台**:\n    - 如果需要根据动态参数（如Agent的当前配置）来决定使用哪个平台，应该使用 `PlatformRegistry().create_platform(platform_name: str)` 方法。\n    - 该方法接收平台名称作为参数，并返回一个对应的平台实例。\n    - 获得平台实例后，可以调用 `platform.set_model_name(model_name: str)` 来进一步指定要使用的具体模型。\n\n这个模式允许代码根据上下文灵活地选择和配置大模型，而不是全局使用单一的默认模型。\n",
+  "created_at": "2025-08-07T20:04:04.982173",
+  "updated_at": "2025-08-07T20:04:04.982180"
+}

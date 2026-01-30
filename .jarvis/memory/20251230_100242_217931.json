@@ -1,0 +1,14 @@
+{
+  "id": "20251230_100242_217931",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "utils.py",
+    "config",
+    "refactor",
+    "function_analysis"
+  ],
+  "content": "jarvis/utils.py 配置收集函数分析结果：\n需要删除的 _ask_config_* 辅助函数（5个）：\n- _ask_config_bool (1301-1318)\n- _ask_config_str (1320-1338)\n- _ask_config_optional_str (1340-1360)\n- _ask_config_int (1362-1386)\n- _ask_config_list (1388-1417)\n\n需要删除的 _collect_*_config 函数（14个）：\n- _collect_basic_switches (1419-1443)\n- _collect_ui_experience_config (1445-1504)\n- _collect_analysis_config (1506-1550)\n- _collect_agent_features_config (1552-1586)\n- _collect_session_config (1588-1632)\n- _collect_safety_config (1634-1658)\n- _collect_data_and_token_config (1660-1715)\n- _collect_advanced_config (1717-1751)\n- _collect_directory_config (1753-1811)\n- _collect_web_search_config (1813-1835)\n- _collect_git_config (1837-1850)\n- _collect_rag_config (1852-1945)\n- _collect_central_repo_config (1947-1971)\n- _collect_shell_config (1973-1993)\n\n调用关系：\n- _ask_config_* 函数仅被 _collect_*_config 函数调用\n- _collect_*_config 函数仅被 _collect_optional_config_interactively 调用\n- _collect_optional_config_interactively 被 utils.py:1202 和 jarvis_agent/jarvis.py:173 调用\n- 所有函数可以安全删除",
+  "created_at": "2025-12-30T10:02:42.217974",
+  "updated_at": "2025-12-30T10:02:42.217978"
+}

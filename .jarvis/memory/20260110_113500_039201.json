@@ -1,0 +1,12 @@
+{
+  "id": "20260110_113500_039201",
+  "type": "project_long_term",
+  "tags": [
+    "documentation",
+    "web_search_removal",
+    "jarvis_book"
+  ],
+  "content": "已完成对Jarvis文档中web搜索功能相关描述的删除审查。修改涉及以下文件：\n1. docs/jarvis_book/4.使用指南.md - 删除了search_web工具的使用示例和相关描述\n2. docs/jarvis_book/5.功能扩展.md - 删除了support_web方法的描述\n3. docs/jarvis_book/6.高级主题.md - 删除了触发网页搜索的标签描述和配置\n4. docs/jarvis_book/8.常见问题.md - 删除了工具组中search_web的配置\n5. docs/jarvis_book/9.附录.md - 删除了web_llm相关配置说明和web平台模型配置\n\n所有修改都已验证，确认删除了所有web搜索功能相关的文档描述。",
+  "created_at": "2026-01-10T11:35:00.039229",
+  "updated_at": "2026-01-10T11:35:00.039233"
+}

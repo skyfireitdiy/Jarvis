@@ -1,0 +1,11 @@
+{
+  "id": "20250809_153457_524534",
+  "type": "project_long_term",
+  "tags": [
+    "platform_implementation",
+    "code_structure"
+  ],
+  "content": "平台实现的通用模式：1) 继承BasePlatform；2) 实现核心chat方法；3) 处理会话生命周期；4) 支持保存和恢复会话状态；5) 提供环境变量配置指导",
+  "created_at": "2025-08-09T15:34:57.524580",
+  "updated_at": "2025-08-09T15:34:57.524586"
+}

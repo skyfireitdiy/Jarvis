@@ -1,0 +1,12 @@
+{
+  "id": "20250806_175526_902602",
+  "type": "project_long_term",
+  "tags": [
+    "cli",
+    "cli_design",
+    "cli_parameter"
+  ],
+  "content": "Jarvis项目具有特定的命令行别名和参数：\n- 通用代理: `jvs` (或 `jarvis`)，使用 `-t` 提供任务。\n- 代码代理: `jca` (或 `jarvis-code-agent`)，使用 `-r` 提供需求。\n- 代码审查: `jcr` (或 `jarvis-code-review`)，子命令如 `commit`, `current`。\n- 切换模型组: 通用参数 `-g` 或 `--llm_group`。\n",
+  "created_at": "2025-08-06T17:55:26.902624",
+  "updated_at": "2025-08-06T17:55:26.902628"
+}

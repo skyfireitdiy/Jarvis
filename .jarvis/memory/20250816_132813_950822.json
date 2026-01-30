@@ -1,0 +1,14 @@
+{
+  "id": "20250816_132813_950822",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_tools",
+    "tool_registry",
+    "todo",
+    "P0",
+    "analysis"
+  ],
+  "content": "Jarvis 本地Agent工具集关键改进要点（P0/近期优先）：\n- 参数校验：在 execute_tool 前基于 tool.parameters 做 JSON Schema 校验，统一报错格式。\n- 调用格式与文档：tool_call_help 中拼写修复 script_cotent -> script_content；YAML 解析失败需提供行列与片段。\n- 工具调用处理：OutputHandler.handle 返回值语义核对（成功应返回 True）；_extract_tool_calls 类型标注与注释对齐；缺失闭合标签的“自动修复”需 user_confirm 确认。\n- 参数污染：禁止将 agent 注入 args 污染工具参数，改为显式上下文传递/签名调整。\n- 工具加载：register_tool_by_file 放宽约束（允许同文件多工具，name 不强绑文件名）；使用 importlib.spec_from_file_location 按路径加载并清理缓存，避免 sys.path 污染。\n- 统计：区分 attempt/success/failure 计数或仅成功计数，补充失败计数。\n- 启动与性能：Registry 初始化懒加载/fast-start，跳过非必要 daily_check_git_updates；prompt() 工具参数拼装缓存。\n- 交互与稳定性：多工具调用时给出可选项提示；大输出摘要/清理历史前征询用户。\n近期里程碑（M1约1周）：修复拼写/类型标注、参数Schema校验、YAML错误定位、agent传参方式调整、关键路径单测。\n",
+  "created_at": "2025-08-16T13:28:13.950864",
+  "updated_at": "2025-08-16T13:28:13.950870"
+}

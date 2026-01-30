@@ -1,0 +1,15 @@
+{
+  "id": "20251020_121011_004188",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_book",
+    "docs",
+    "documentation",
+    "paths",
+    "core_concepts",
+    "architecture"
+  ],
+  "content": "文档目录定位结果：\n- 存在文档根目录：./docs\n- 存在 Jarvis Book 目录：./docs/jarvis_book\n- 未在仓库根目录深度<=3内发现 mkdocs.yml/mkdocs.yaml 或 Sphinx conf.py\n- 未发现已构建站点目录 docs/site\n结论：Jarvis 文档位于 docs/jarvis_book 下，后续应在该目录中查找“核心概念”和“架构”相关页面。\n",
+  "created_at": "2025-10-20T12:10:11.004218",
+  "updated_at": "2025-10-20T12:10:11.004223"
+}

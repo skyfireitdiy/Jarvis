@@ -1,0 +1,12 @@
+{
+  "id": "20260110_113318_629125",
+  "type": "project_long_term",
+  "tags": [
+    "base.py",
+    "abstract_methods",
+    "platform_interface"
+  ],
+  "content": "平台基类中的文件上传相关抽象方法upload_files和support_upload_files已被移除，所有平台实现不再需要支持文件上传功能。",
+  "created_at": "2026-01-10T11:33:18.629174",
+  "updated_at": "2026-01-10T11:33:18.629179"
+}

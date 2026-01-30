@@ -1,0 +1,11 @@
+{
+  "id": "20251220_011221_477880",
+  "type": "project_long_term",
+  "tags": [
+    "sub_code_agent",
+    "config_inheritance"
+  ],
+  "content": "SubCodeAgentTool实现了从父agent继承disable_review配置的逻辑：1) 通过hasattr检查父agent是否有该属性 2) 使用getattr读取值并设置默认值 3) 将值传递给子agent构造函数",
+  "created_at": "2025-12-20T01:12:21.477920",
+  "updated_at": "2025-12-20T01:12:21.477926"
+}

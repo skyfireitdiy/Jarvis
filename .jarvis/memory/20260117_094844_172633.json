@@ -1,0 +1,12 @@
+{
+  "id": "20260117_094844_172633",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis-architecture",
+    "agent-system",
+    "code-structure"
+  ],
+  "content": "# Jarvis项目架构概览\n\n## 核心模块\n1. **jarvis_agent**: 核心Agent框架，提供基础的AI代理功能\n   - Agent类：主要的代理实现，包含运行循环、工具调用、记忆管理等功能\n   - run_loop.py：代理的主运行循环\n   - tool_executor.py：工具执行器\n   - input_handlers：内置、shell输入处理器\n\n2. **jarvis_code_agent**: 代码专用Agent\n   - 基于jarvis_agent构建，专为代码任务优化\n   - 提供代码分析、符号查找、精确编辑等功能\n\n3. **jarvis_sec**: 安全分析模块\n   - 提供代码安全扫描和分析功能\n\n## 数据流\n用户输入 → 输入处理器 → Agent运行循环 → 模型调用 → 工具调用 → 结果返回\n\n## 关键组件\n- ToolRegistry：工具注册和执行系统\n- MemoryManager：三层记忆管理（短期、项目长期、全局长期）\n- PlatformRegistry：各种LLM平台的适配器\n- SessionManager：会话管理\n\n## Agent运行循环\n1. 初始化：设置系统提示词、模型、会话等\n2. 输入处理：处理用户输入和输入处理器\n3. 模型调用：调用AI模型获取响应\n4. 工具处理：解析和执行工具调用\n5. 响应输出：打印非工具调用部分的响应\n6. 循环控制：处理自动完成、中断等\n\n## 主要事件\n- BEFORE_TOOL_CALL / AFTER_TOOL_CALL：工具调用前后\n- TASK_STARTED / TASK_COMPLETED：任务开始/完成\n- BEFORE_SUMMARY / AFTER_SUMMARY：总结前后\n- BEFORE_HISTORY_CLEAR / AFTER_HISTORY_CLEAR：历史清理前后",
+  "created_at": "2026-01-17T09:48:44.172660",
+  "updated_at": "2026-01-17T09:48:44.172663"
+}

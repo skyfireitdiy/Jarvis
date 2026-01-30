@@ -1,0 +1,13 @@
+{
+  "id": "20260113_114036_387473",
+  "type": "project_long_term",
+  "tags": [
+    "read_code",
+    "token",
+    "limit",
+    "configuration"
+  ],
+  "content": "read_code工具token限制策略：_get_max_token_limit方法返回min(remaining_tokens, 65536)，即取agent剩余token数量和64k中较小的值。不再使用之前的1/2安全余量计算方式，确保更充分利用token预算。",
+  "created_at": "2026-01-13T11:40:36.387504",
+  "updated_at": "2026-01-13T11:40:36.387507"
+}

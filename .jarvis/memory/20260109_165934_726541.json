@@ -1,0 +1,12 @@
+{
+  "id": "20260109_165934_726541",
+  "type": "project_long_term",
+  "tags": [
+    "python",
+    "static_analysis",
+    "verification"
+  ],
+  "content": "验证Python代码修改的完整流程包括：1)使用read_code检查特定方法是否已删除；2)使用grep搜索确认方法定义不存在；3)使用python3 -m py_compile进行语法检查；4)确认代码结构调整正确（如方法顺序）。",
+  "created_at": "2026-01-09T16:59:34.726559",
+  "updated_at": "2026-01-09T16:59:34.726562"
+}

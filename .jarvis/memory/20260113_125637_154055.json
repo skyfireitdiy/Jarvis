@@ -1,0 +1,13 @@
+{
+  "id": "20260113_125637_154055",
+  "type": "project_long_term",
+  "tags": [
+    "pytest",
+    "测试",
+    "项目结构",
+    "代码质量"
+  ],
+  "content": "Jarvis项目pytest测试状态：\n1. 测试总数：758个用例（758 passed, 1 skipped）\n2. 测试组织方式：tests目录下按模块组织，如tests/jarvis_utils、tests/jarvis_agent、tests/jarvis_c2rust等\n3. 测试文件命名规范：test_*.py或*_test.py\n4. 测试配置文件：pyproject.toml位于项目根目录\n5. 最近测试执行结果（2026-01-13）：所有测试通过，无失败用例",
+  "created_at": "2026-01-13T12:56:37.154076",
+  "updated_at": "2026-01-13T12:56:37.154080"
+}

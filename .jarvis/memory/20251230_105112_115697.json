@@ -1,0 +1,12 @@
+{
+  "id": "20251230_105112_115697",
+  "type": "project_long_term",
+  "tags": [
+    "code_agent",
+    "llm_context",
+    "model_usage"
+  ],
+  "content": "CodeAgent在询问大模型判断大量代码删除时，应该使用self.model（当前agent的模型实例）而非创建新模型，以保留完整的对话上下文，避免因上下文缺失导致的误判。ask_llm_about_large_deletion方法直接调用self.model.chat_until_success(prompt)实现这一需求。",
+  "created_at": "2025-12-30T10:51:12.115733",
+  "updated_at": "2025-12-30T10:51:12.115737"
+}

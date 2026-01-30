@@ -1,0 +1,13 @@
+{
+  "id": "20251025_043746_019310",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "cwd_policy",
+    "build_policy",
+    "agent_runtime"
+  ],
+  "content": "构建与运行Agent/CodeAgent前先切换当前目录到crate目录，构建使用“cargo build -q”，运行完毕后恢复到原工作目录。此前不再使用“cargo build -p <pkg>”在工作区根构建。",
+  "created_at": "2025-10-25T04:37:46.019326",
+  "updated_at": "2025-10-25T04:37:46.019329"
+}

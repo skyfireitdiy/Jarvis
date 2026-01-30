@@ -1,0 +1,14 @@
+{
+  "id": "20260120_190135_970336",
+  "type": "project_long_term",
+  "tags": [
+    "linker_wrapper",
+    "compilation",
+    "cross_compilation",
+    "rust",
+    "dynamic_library"
+  ],
+  "content": "根据iCenter页面'中游so发布方法指南'，链接器包装不仅适用于交叉编译，所有编译都需要包装链接器。关键信息：\n\n1. 链接器包装脚本的用途：在交叉编译环境中，Rust编译器生成的dylib会遇到符号版本兼容性问题，解决方案是创建链接器包装脚本，过滤掉导致问题的参数。\n\n2. 链接器包装脚本示例 (aarch64-linker.sh)：过滤--version-script*和--no-undefined-version参数，防止Rust编译器的版本脚本与工具链冲突。\n\n3. .cargo/config.toml配置：使用linker参数指定包装脚本作为链接器 -C linker=./aarch64-linker.sh\n\n4. 页面8.3节明确提到'链接器包装脚本的通用性'适用于：交叉编译环境、使用较老版本的GNU ld（如2.34）、工具链的符号版本机制与Rust编译器不兼容。这表明链接器包装不仅限于交叉编译，只要存在符号版本兼容性问题就需要使用。\n\n5. 页面8.4节提到'交叉编译特定注意事项'：'所有crate都需要使用链接器包装脚本'，这确认了在交叉编译场景下所有crate都需要使用链接器包装。",
+  "created_at": "2026-01-20T19:01:35.970379",
+  "updated_at": "2026-01-20T19:01:35.970384"
+}

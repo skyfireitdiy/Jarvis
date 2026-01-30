@@ -1,0 +1,13 @@
+{
+  "id": "20250923_043507_846448",
+  "type": "project_long_term",
+  "tags": [
+    "migration",
+    "jarvis_agent",
+    "git_updates",
+    "rust_integration"
+  ],
+  "content": "已在 src/jarvis/jarvis_agent/jarvis.py 中用 _jarvis_native.git_* 封装实现 _daily_check_git_updates，并替换原 jutils.daily_check_git_updates 调用，保证每日自动更新逻辑走 Rust 原生 Git 封装。",
+  "created_at": "2025-09-23T04:35:07.846524",
+  "updated_at": "2025-09-23T04:35:07.846531"
+}

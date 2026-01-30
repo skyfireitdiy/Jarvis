@@ -1,0 +1,11 @@
+{
+  "id": "20250809_153457_479879",
+  "type": "project_long_term",
+  "tags": [
+    "doubao_implementation",
+    "api_integration"
+  ],
+  "content": "Doubao平台实现的关键点：1) 使用Cookie认证而非API Key；2) 本地生成会话和消息ID；3) 非首轮请求需要包含conversation_id和section_id；4) 删除会话需要调用/samantha/thread/delete接口",
+  "created_at": "2025-08-09T15:34:57.479919",
+  "updated_at": "2025-08-09T15:34:57.479924"
+}

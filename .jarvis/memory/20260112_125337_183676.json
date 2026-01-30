@@ -1,0 +1,14 @@
+{
+  "id": "20260112_125337_183676",
+  "type": "project_long_term",
+  "tags": [
+    "builtin_rules",
+    "documentation",
+    "test_rules",
+    "rules_list",
+    "md_format"
+  ],
+  "content": "代码修改审查完成：将builtin/test_rules中的测试规则添加到了builtin/rules/builtin_rules.md中。修改内容包括：1. 将原文件的标题从'## 规则列表'改为'# 规则列表' 2. 在文件末尾添加了'## 测试规则'章节，包含了8个测试规则（C/C++, Go, JS/TS, Java, PHP, Python, Ruby, Rust），每个规则都使用了正确的路径变量格式'{{ rule_file_dir }}/../test_rules/xxx.md'。修改符合用户需求，功能完整且格式正确。",
+  "created_at": "2026-01-12T12:53:37.183700",
+  "updated_at": "2026-01-12T12:53:37.183704"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "20260112_202225_507743",
+  "type": "project_long_term",
+  "tags": [
+    "sdd",
+    "software_design_document",
+    "rules",
+    "builtin_rules",
+    "spec_location"
+  ],
+  "content": "在 builtin/rules/sdd.md 中新增了 Spec 文件位置要求：\n1. Spec 文件必须放置在项目的 .jarvis/spec/ 目录\n2. 使用 jinja2 语法 {{ git_root_dir }}/.jarvis/spec/<spec_name>.md\n3. 命名规范：小写字母、下划线分隔、.md 后缀\n4. 在检查清单中添加了验证项",
+  "created_at": "2026-01-12T20:22:25.507775",
+  "updated_at": "2026-01-12T20:22:25.507779"
+}

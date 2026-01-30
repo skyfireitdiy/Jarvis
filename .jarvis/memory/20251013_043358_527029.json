@@ -1,0 +1,14 @@
+{
+  "id": "20251013_043358_527029",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_agent",
+    "__init__.py",
+    "initialization",
+    "parameter_mapping",
+    "refactoring"
+  ],
+  "content": "已整理 jarvis_agent.Agent.__init__ 中入参与属性的初始化：\n- 仅在入口处按分类写入“原始入参值”，不做默认分辨；默认与回退在 _init_config 中统一解析与回填，保持单一事实来源。\n- 分类顺序：\n  1) 标识与描述：name(经 make_agent_name)、description、system_prompt\n  2) 行为控制（原始值）：auto_complete(bools)、need_summary(bools)、use_methodology、use_analysis、execute_tool_confirm、summary_prompt、force_save_memory\n  3) 资源与环境：model_group、files、use_tools、non_interactive\n  4) 运行时状态：first、run_input_handlers_next_turn、user_data\n- 保留后续非交互模式逻辑：优先构造参数，其次环境变量，同步到全局配置 set_config（若提供）。\n- 目的：初始化结构清晰、职责单一，避免多处散落的默认处理，降低维护成本。\n",
+  "created_at": "2025-10-13T04:33:58.527059",
+  "updated_at": "2025-10-13T04:33:58.527065"
+}

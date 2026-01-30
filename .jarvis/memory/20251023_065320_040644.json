@@ -1,0 +1,15 @@
+{
+  "id": "20251023_065320_040644",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "module_agent",
+    "c2rust",
+    "agent",
+    "rust",
+    "planning"
+  ],
+  "content": "新增模块: src/jarvis/jarvis_c2rust/module_agent.py\n\n功能:\n- 定义 RustCratePlannerAgent，基于 scanner.sqlite 数据库与根函数子图规划 Rust crate 模块结构。\n- 复用 scanner.find_root_function_ids 和相同的邻接遍历策略，收集“以根函数为起点”的调用子图。\n- 生成 YAML 格式的 crate 目录结构和概要信息（无第三方依赖，内置轻量 YAML 序列化）。\n\n主要API:\n- class RustCratePlannerAgent(project_root: Path, db_path: Optional[Path] = None)\n  - plan_crate_structure() -> Dict[str, Any]: 返回结构化目录建议\n  - plan_crate_yaml() -> str: 返回 YAML 字符串\n- function plan_crate_yaml(project_root: Union[Path, str] = \".\", db_path: Optional[Union[Path, str]] = None) -> str\n  便捷函数，直接生成 YAML 文本\n\n设计/输出:\n- 默认数据库路径: <project_root>/.jarvis/c2rust/functions.db\n- 以“无内部调用者”的函数作为根，每个根 -> 一个顶层模块: root_<root_name>\n- 模块内部按顶层命名空间分组（C 代码归类为 'c'）\n- 汇总外部调用（不在DB）到建议 ffi 模块\n- 输出 YAML 关键字段:\n  - crate_name: 建议的crate名（由项目目录名净化得到）\n  - src_tree: 建议 src 目录树（lib.rs、ffi/、roots/）\n  - lib_rs.modules: 需要在 lib.rs 中声明的模块列表（包含 ffi 时）\n  - modules: 每个模块的 name/path/root_function/namespaces/source_files/externals\n  - summary: roots_count、externals_count\n\n使用示例:\n- Python:\n    from jarvis.jarvis_c2rust.module_agent import plan_crate_yaml\n    print(plan_crate_yaml(\".\"))  # 需先扫描生成DB: jarvis-c2rust scan\n- 调试 CLI（仅模块自带，不在主 CLI 暴露）:\n    python -m jarvis.jarvis_c2rust.module_agent -r .    # 或 --db 指定DB\n\n依赖:\n- scanner.find_root_function_ids\n- SQLite functions 表字段: id,name,qualified_name,signature,file,calls_json\n",
+  "created_at": "2025-10-23T06:53:20.040680",
+  "updated_at": "2025-10-23T06:53:20.040684"
+}

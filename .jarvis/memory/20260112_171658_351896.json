@@ -1,0 +1,13 @@
+{
+  "id": "20260112_171658_351896",
+  "type": "project_long_term",
+  "tags": [
+    "jcad",
+    "file_judgment",
+    "os.path.exists",
+    "task_file"
+  ],
+  "content": "jcad 的文件判断逻辑：通过 os.path.exists(task_str) 判断输入是任务文件还是任务内容。如果文件存在 → 作为任务文件处理（使用 --task-file 参数）；如果文件不存在 → 作为任务内容处理（使用 --task 参数）。最佳实践：1) 确保文件已创建再使用；2) 推荐使用绝对路径；3) 可以先用 cat 验证文件内容。",
+  "created_at": "2026-01-12T17:16:58.351942",
+  "updated_at": "2026-01-12T17:16:58.351947"
+}

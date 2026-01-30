@@ -1,0 +1,12 @@
+{
+  "id": "20251025_043746_017974",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "git_policy",
+    "initialization"
+  ],
+  "content": "在crate目录内执行git初始化（git init && git add -A && git commit -m \"init crate\"），不再在工作区根提交。",
+  "created_at": "2025-10-25T04:37:46.017996",
+  "updated_at": "2025-10-25T04:37:46.017999"
+}

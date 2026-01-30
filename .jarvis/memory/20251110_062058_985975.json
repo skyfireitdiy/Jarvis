@@ -1,0 +1,14 @@
+{
+  "id": "20251110_062058_985975",
+  "type": "project_long_term",
+  "tags": [
+    "agent",
+    "memory",
+    "force_save_memory",
+    "save_memory_tool",
+    "auto_add_tool"
+  ],
+  "content": "任务分析：当Agent配置了force_save_memory=True时，如果工具列表中没有save_memory工具，需要自动添加它。\n\n实现方案：\n1. 在Agent初始化阶段检查force_save_memory配置\n2. 在MemoryManager.prepare_memory_tags_prompt()或相关方法中检查save_memory工具是否存在\n3. 如果不存在且force_save_memory=True，则自动注册save_memory工具\n4. 最佳位置：在Agent._init_handlers()方法中处理工具注册后，检查并添加save_memory工具\n\n相关文件：\n- src/jarvis/jarvis_agent/__init__.py: Agent类\n- src/jarvis/jarvis_agent/memory_manager.py: MemoryManager类\n- src/jarvis/jarvis_tools/save_memory.py: save_memory工具实现\n- src/jarvis/jarvis_tools/registry.py: ToolRegistry类\n",
+  "created_at": "2025-11-10T06:20:58.985999",
+  "updated_at": "2025-11-10T06:20:58.986003"
+}

@@ -1,0 +1,15 @@
+{
+  "id": "20251230_142842_121582",
+  "type": "project_long_term",
+  "tags": [
+    "TUI",
+    "Textual框架",
+    "MountError",
+    "on_mount",
+    "组件挂载",
+    "bug_fix"
+  ],
+  "content": "TUI组件MountError修复方案：\n问题：在Textual框架中，尝试在容器组件被框架挂载之前向其mount子组件会抛出MountError。\n根本原因：compose()方法返回的容器对象此时还未被框架挂载。\n解决方案：将子组件的挂载操作延迟到on_mount()生命周期方法中执行。\n修复模式：\n1. compose()方法中只返回容器对象（如ScrollableContainer、Horizontal）\n2. 在on_mount()中使用query_one()获取容器引用\n3. 在on_mount()中调用container.mount()挂载子组件\n\n已发现的问题位置：\n- src/jarvis/jarvis_config/tui_app.py:\n  - on_mount()方法已正确实现form-container的填充（第160-166行）\n  - _build_buttons()方法存在MountError（第261-262行），需要修复\n\n注意事项：\n- 所有需要在容器内动态挂载子组件的操作都应在on_mount()中完成\n- compose()方法应使用yield模式返回静态组件，或返回容器对象\n- 避免在compose()返回的容器对象上直接调用mount()",
+  "created_at": "2025-12-30T14:28:42.121645",
+  "updated_at": "2025-12-30T14:28:42.121650"
+}

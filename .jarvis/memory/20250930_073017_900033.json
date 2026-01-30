@@ -1,0 +1,14 @@
+{
+  "id": "20250930_073017_900033",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "enhancement",
+    "tool_registry",
+    "run_loop",
+    "param_sanitizer"
+  ],
+  "content": "面向 Jarvis 的增强与落地路线：\n- 执行策略：在 src/jarvis/jarvis_tools/registry.py: ToolRegistry.handle 与 src/jarvis/jarvis_agent/run_loop.py 引入 strict_single（默认）/auto_function_call 开关（CLI & YAML 配置）。\n- 参数修复层：在 src/jarvis/jarvis_agent/tool_executor.py 前置 ParamSanitizer（新增 jarvis_tools/param_sanitizer.py），清理 fenced code/单引号/尾逗号、失败兜底 {}、inspect.signature 键名映射。\n- 并发与副作用控制：为幂等工具启用 ThreadPoolExecutor；工具元数据增加 side_effect 与 rate_limit；file_saver 类工具限频+确认。\n- 事件与可视：在 ToolRegistry.handle 与 tool_executor 前后发布 tool_event 到 EventBus，导出 JSONL/HTTP 订阅，便于前端可视。",
+  "created_at": "2025-09-30T07:30:17.900109",
+  "updated_at": "2025-09-30T07:30:17.900118"
+}

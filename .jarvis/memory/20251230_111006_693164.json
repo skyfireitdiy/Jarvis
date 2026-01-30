@@ -1,0 +1,14 @@
+{
+  "id": "20251230_111006_693164",
+  "type": "project_long_term",
+  "tags": [
+    "tui_app",
+    "config",
+    "utils.py",
+    "integration",
+    "降级处理"
+  ],
+  "content": "TUI 配置表单集成方案：在 src/jarvis/jarvis_utils/utils.py 中创建 _run_tui_config_form 辅助函数，用于加载 config_schema.json、准备默认值、调用 run_tui_form 并处理返回结果。",
+  "created_at": "2025-12-30T11:10:06.693195",
+  "updated_at": "2025-12-30T11:10:06.693199"
+}

@@ -1,0 +1,16 @@
+{
+  "id": "20260105_094417_824865",
+  "type": "project_long_term",
+  "tags": [
+    "api",
+    "api_design",
+    "fastapi",
+    "jarvis_config",
+    "schema",
+    "save_config",
+    "get_config"
+  ],
+  "content": "Jarvis配置工具API接口设计：\n\n1. 当前后端API（src/jarvis/jarvis_config/web_app.py）包含以下接口：\n   - GET /api/schema: 获取配置schema结构\n   - POST /api/save: 保存配置到文件\n   - GET /api/health: 健康检查\n   - POST /api/shutdown: 关闭服务器\n\n2. 缺失的API：\n   - GET /api/config: 获取当前配置（前端需要但后端未实现）\n\n3. 前端API文档（frontend/src/api/api.md）包含与后端一致的接口，但同样缺少GET /api/config\n\n4. 当前后端使用_existing_config全局变量来存储现有配置，并在获取schema时将现有配置值作为默认值返回，但没有直接获取现有配置的独立API。\n\n5. 为实现完整的配置管理功能，需要添加GET /api/config接口以便前端能够直接获取当前配置值。",
+  "created_at": "2026-01-05T09:44:17.824889",
+  "updated_at": "2026-01-05T09:44:17.824893"
+}

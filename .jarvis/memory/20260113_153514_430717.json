@@ -1,0 +1,12 @@
+{
+  "id": "20260113_153514_430717",
+  "type": "project_long_term",
+  "tags": [
+    "rule_system",
+    "directory_structure",
+    "rules_management"
+  ],
+  "content": "builtin/rules目录结构已按功能分类整理：\n- architecture_design/ (架构设计)\n- development_workflow/ (开发流程)\n- code_quality/ (代码质量)\n- security/ (安全规范)\n- development_tools/ (开发工具)\n- deployment/ (部署规范)\n- performance/ (性能优化)\n- ui_design/ (UI设计)\n- tool_config/ (工具配置)\n\ntest_rules目录单独存在，包含各种语言的测试规则文件。规则文件已按功能归类到相应子目录中。",
+  "created_at": "2026-01-13T15:35:14.430742",
+  "updated_at": "2026-01-13T15:35:14.430745"
+}

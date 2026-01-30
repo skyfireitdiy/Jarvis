@@ -1,0 +1,13 @@
+{
+  "id": "20260115_105020_058478",
+  "type": "project_long_term",
+  "tags": [
+    "jck",
+    "auto-install",
+    "implementation",
+    "code_review"
+  ],
+  "content": "jck命令自动安装工具功能代码审查要点：\n1. 功能完整性：代码正确实现了检测到未安装工具时询问用户是否自动安装的功能\n2. 交互逻辑：使用typer.confirm()实现用户交互，非JSON模式下才会询问\n3. 命令执行：使用subprocess.run()执行jvs -T '在当前环境安装{tool_name}'命令\n4. 异常处理：正确处理FileNotFoundError（jvs命令不存在）和其他异常\n5. 重新检查：安装完成后重新检查工具状态，确保显示最终结果\n6. 退出码：根据最终工具状态返回正确的退出码",
+  "created_at": "2026-01-15T10:50:20.058504",
+  "updated_at": "2026-01-15T10:50:20.058507"
+}

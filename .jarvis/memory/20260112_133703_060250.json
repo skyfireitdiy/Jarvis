@@ -1,0 +1,12 @@
+{
+  "id": "20260112_133703_060250",
+  "type": "project_long_term",
+  "tags": [
+    "规则文档",
+    "文档结构",
+    "规则分类"
+  ],
+  "content": "项目规则文档结构：\n- 规则入口文档：builtin/rules/builtin_rules.md（按分类组织）\n- 规则最佳实践文档：docs/best_practices/rules_best_practices.md\n\n规则分类体系：\n1. 架构设计：solid.md, clean_architecture.md, clean_code.md\n2. 开发流程：sdd.md, tdd.md, refactoring.md, generate_rules.md\n3. 代码质量：code_review.md, documentation.md\n4. 安全规范：security.md\n5. 性能优化：performance.md, rust_performance.md\n6. UI设计：ios-dark-theme.md, ios-light-theme.md\n7. 工具配置：ignore_all_alerts.md\n8. 测试规范：cpp_test.md, go_test.md, javascript_test.md, java_test.md, php_test.md, python_test.md, ruby_test.md, rust_test.md（位于builtin/test_rules/）",
+  "created_at": "2026-01-12T13:37:03.060275",
+  "updated_at": "2026-01-12T13:37:03.060280"
+}

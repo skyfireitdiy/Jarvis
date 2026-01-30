@@ -1,0 +1,13 @@
+{
+  "id": "20260112_150933_652564",
+  "type": "project_long_term",
+  "tags": [
+    "config_system",
+    "GLOBAL_CONFIG_DATA",
+    "configuration",
+    "架构设计"
+  ],
+  "content": "Jarvis配置系统架构：\n1. 全局配置存储在GLOBAL_CONFIG_DATA（CaseInsensitiveDict类型）中\n2. 通过set_config(key, value)设置配置项\n3. 通过get_xxx()函数获取配置，如get_jarvis_github_url()\n4. get_xxx()函数从GLOBAL_CONFIG_DATA读取，未配置时返回默认值\n5. 在init_env()中统一初始化默认配置，确保所有工具都能访问\n6. 配置项可以在用户配置文件(~/.jarvis/config.yaml)中覆盖",
+  "created_at": "2026-01-12T15:09:33.652604",
+  "updated_at": "2026-01-12T15:09:33.652609"
+}

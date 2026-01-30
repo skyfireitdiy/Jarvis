@@ -1,0 +1,13 @@
+{
+  "id": "20250930_073017_903127",
+  "type": "project_long_term",
+  "tags": [
+    "flows",
+    "function_location",
+    "call_flow",
+    "run_loop"
+  ],
+  "content": "典型主干流程与关键文件：\n- Co-Sight：入口（cosight_server/deep_research/main.py、CoSight.py）→ 规划（app/cosight/agent/task_plannr_agent.py）→ 主循环（app/cosight/agent/base/base_agent.py: execute）→ 模型与工具（app/cosight/llm/chat_llm.py: create_with_tools；_execute_tool_call/_execute_mcp_tool）→ 事件上报（_push_tool_event → plan_report_event_manager.publish）。\n- Jarvis：入口（jarvis_agent/main.py、jarvis_multi_agent/main.py）→ 运行循环（src/jarvis/jarvis_agent/run_loop.py: AgentRunLoop.run）→ 模型调用（src/jarvis/jarvis_agent/__init__.py: Agent._call_model）→ 工具解析与执行（src/jarvis/jarvis_tools/registry.py: ToolRegistry.handle；src/jarvis/jarvis_agent/tool_executor.py: execute_tool_call）→ 事件与统计（AFTER_TOOL_CALL、jarvis_stats）。",
+  "created_at": "2025-09-30T07:30:17.903170",
+  "updated_at": "2025-09-30T07:30:17.903176"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260115_124352_060379",
+  "type": "project_long_term",
+  "tags": [
+    "rule_refactor",
+    "document_standardization",
+    "sdd_template",
+    "builtin_rules"
+  ],
+  "content": "Jarvis规则文档重构项目：成功将7个文件从角色定义/操作指南格式转换为统一规则文档格式。关键经验：1)采用sdd.md五章节模板（工作流程、原则、要求、实践指导、检查清单）；2)统一使用'必须/禁止'规范性语言；3)保持功能完整性同时优化结构；4)通过markdownlint验证确保格式正确。重构文件包括：architecture-diagram-generation.md、script-generation.md、skill-development.md、mcp-integration.md、alert-management.md、dark-theme-design.md、light-theme-design.md。",
+  "created_at": "2026-01-15T12:43:52.060406",
+  "updated_at": "2026-01-15T12:43:52.060410"
+}

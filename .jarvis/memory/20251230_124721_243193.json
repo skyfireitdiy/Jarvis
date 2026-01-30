@@ -1,0 +1,14 @@
+{
+  "id": "20251230_124721_243193",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "config_structure",
+    "llm_config",
+    "jarvis_config",
+    "handle_interactive_config_option"
+  ],
+  "content": "Jarvis 配置文件结构（~/.jarvis/config.yaml）：\n1. ENV：顶层字段，包含环境变量键值对\n2. llms：顶层字段，包含多个 LLM 配置的字典\n   - 每个 LLM 包含：platform（平台名称）、model（模型名称）、max_input_token_count（最大 token 数量）、llm_config（LLM 特定配置）\n3. llm_groups：顶层字段，包含多个 LLM 分组配置\n   - 每个分组包含：normal_llm（普通模型）、smart_llm（智能模型，可选）、cheap_llm（廉价模型，可选）\n4. llm_group：顶层字段，指定默认使用的分组名称\n\n数据提取路径（handle_interactive_config_option 函数）：\n- 获取 llm_group：config_data.get(\"llm_group\", \"default\")\n- 获取 llm_groups：config_data.get(\"llm_groups\", {})\n- 获取 normal_llm：llm_group.get(\"normal_llm\")\n- 降级策略：如果 normal_llm 不存在，使用 llms 字典的第一个键\n- 提取 LLM 配置：llms.get(llm_name, {}) 然后获取 platform, model, max_input_token_count, llm_config\n- 提取环境变量：config_data.get(\"ENV\", {})",
+  "created_at": "2025-12-30T12:47:21.243249",
+  "updated_at": "2025-12-30T12:47:21.243253"
+}

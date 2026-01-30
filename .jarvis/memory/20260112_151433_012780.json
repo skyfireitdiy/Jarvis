@@ -1,0 +1,12 @@
+{
+  "id": "20260112_151433_012780",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_cli",
+    "codex_cli",
+    "comparison_documentation"
+  ],
+  "content": "Jarvis CLI是一个AI应用开发SDK，提供Python SDK、多模型支持、记忆系统、方法论系统、安全分析和代码迁移等专业功能。Codex CLI是OpenAI的代码生成助手，具有现代化终端体验、Rust高性能实现、图像输入支持和云服务集成等特点。两者在定位和功能上有明显差异，适用于不同场景。",
+  "created_at": "2026-01-12T15:14:33.012807",
+  "updated_at": "2026-01-12T15:14:33.012811"
+}

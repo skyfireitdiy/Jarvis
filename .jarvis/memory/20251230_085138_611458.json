@@ -1,0 +1,14 @@
+{
+  "id": "20251230_085138_611458",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis",
+    "jarvis_config",
+    "ObjectEditModal",
+    "textual",
+    "ModalScreen"
+  ],
+  "content": "jarvis_config 模块的 ObjectEditModal 类实现位置：src/jarvis/jarvis_config/field_factory.py (第622-734行)\n\n功能特性：\n- 继承自 textual.app.ModalScreen\n- 接收 schema 和 initial_value 参数\n- 使用 SchemaParser 和 FieldFactory 复用表单构建逻辑\n- 提供确认和取消按钮\n- 确认时通过 self.dismiss(result) 返回编辑数据\n- 取消时通过 self.dismiss(None) 返回 None\n\n关键方法：\n- compose(): 构建模态窗口界面\n- _populate_form(): 使用 SchemaParser 和 FieldFactory 填充表单字段\n- _collect_values(): 从表单收集编辑后的值\n- on_confirm_pressed(): 确认按钮事件处理\n- on_cancel_pressed(): 取消按钮事件处理\n\n该类是数组项为对象时弹出编辑窗口的核心组件。",
+  "created_at": "2025-12-30T08:51:38.611493",
+  "updated_at": "2025-12-30T08:51:38.611497"
+}

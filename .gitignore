@@ -157,3 +157,8 @@ coverage.xml
 .jarvis/.last_memory_organizer_check
 .jarvis/symbol_cache
 
+.jarvis/history
+.jarvis/rag
+.jarvis/task_lists
+.jarvis/memory
+.jarvis/methodologies

@@ -1,0 +1,13 @@
+{
+  "id": "20251024_081904_582570",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_c2rust",
+    "llm_module_agent.py",
+    "todo",
+    "output_validation"
+  ],
+  "content": "后续改进建议：在 _get_project_yaml_text 中增加严格“块外无字符”验证（校验 summary_output 在去除换行后仅包含 <PROJECT> ... </PROJECT>），若不满足则将原因（块外有字符）纳入重试反馈，进一步提升对输出规范的约束力。\n",
+  "created_at": "2025-10-24T08:19:04.582596",
+  "updated_at": "2025-10-24T08:19:04.582599"
+}
