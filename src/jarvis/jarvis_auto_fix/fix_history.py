@@ -87,7 +87,9 @@ class FixHistory:
             history_file = os.path.join(data_dir, "fix_history.json")
 
         self.history_file: str = history_file
-        self._lock: threading.Lock = threading.Lock()
+        self._lock: threading.RLock = (
+            threading.RLock()
+        )  # Use RLock to allow reentrant locking
         self._ensure_history_file()
 
     def _ensure_history_file(self) -> None:
