@@ -1,0 +1,13 @@
+{
+  "id": "20260130_232619_831345",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_auto_fix",
+    "refactoring",
+    "extract_class",
+    "实现完成"
+  ],
+  "content": "## ExtractClassRefactorer实现完成\n\n**文件位置**：\n- 实现：src/jarvis/jarvis_auto_fix/refactoring/extract_class.py (~460行)\n- 测试：tests/jarvis_auto_fix/test_extract_class.py (24个测试用例)\n\n**核心类**：\n- ClassMemberInfo：类成员信息数据类\n- ExtractionPlan：提取计划数据类\n- ClassExtractionResult：提取结果数据类\n- ClassMemberAnalyzer：AST分析器，分析类成员和依赖\n- ExtractClassRefactorer：主重构器类\n\n**关键方法**：\n- extract_class()：主入口，提取方法到新类\n- _analyze_method()：分析方法定义\n- _analyze_dependencies()：分析方法间依赖\n- _generate_new_class()：生成新类代码\n- _modify_original_class()：修改原类\n- analyze_class_cohesion()：分析类内聚性\n\n**测试覆盖率**：95%（超过80%要求）",
+  "created_at": "2026-01-30T23:26:19.831358",
+  "updated_at": "2026-01-30T23:26:19.831362"
+}

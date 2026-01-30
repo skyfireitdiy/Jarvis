@@ -1,0 +1,13 @@
+{
+  "id": "20260130_225419_834762",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_auto_fix",
+    "refactoring",
+    "extract_function",
+    "架构"
+  ],
+  "content": "jarvis_auto_fix模块的重构功能架构：\n\n1. 目录结构：\n   - src/jarvis/jarvis_auto_fix/refactoring/ - 重构功能目录\n   - src/jarvis/jarvis_auto_fix/refactoring/extract_function.py - 提取函数重构器\n\n2. ExtractFunctionRefactorer类功能：\n   - extract_function(): 将指定行范围的代码提取为独立函数\n   - _analyze_variables(): 分析代码块的变量依赖（输入、输出、局部变量）\n   - _generate_function(): 生成新函数代码\n   - _generate_call(): 生成函数调用语句\n   - _apply_refactoring(): 应用重构到文件\n   - analyze_extraction_candidates(): 分析文件中的提取候选\n\n3. 与FixHistory集成：所有重构操作都记录到FixHistory，支持回滚",
+  "created_at": "2026-01-30T22:54:19.834785",
+  "updated_at": "2026-01-30T22:54:19.834788"
+}

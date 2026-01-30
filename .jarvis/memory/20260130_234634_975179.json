@@ -1,0 +1,12 @@
+{
+  "id": "20260130_234634_975179",
+  "type": "project_long_term",
+  "tags": [
+    "inline_function",
+    "task_verification",
+    "refactoring"
+  ],
+  "content": "任务2.3内联函数重构器验证：需要验证4条预期输出：1)创建inline_function.py文件 2)实现InlineFunctionRefactorer类 3)创建test_inline_function.py且至少8个测试用例 4)测试覆盖率≥80%",
+  "created_at": "2026-01-30T23:46:34.975196",
+  "updated_at": "2026-01-30T23:46:34.975199"
+}
