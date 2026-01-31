@@ -1,0 +1,8 @@
+{
+  "id": "20260131_193916_661222",
+  "type": "project_long_term",
+  "tags": ["规则系统", "rule_generator", "设计文档", "阶段2", "知识自主积累"],
+  "content": "## 规则自动生成算法设计文档\n\n### 1. 设计目标\n创建能够从代码模式、项目实践中自动生成规则的系统。\n\n### 2. 触发条件\n**自动触发**：代码审查发现重复模式（≥3次）、识别最佳实践、发现架构模式、用户请求、代码重构\n**排除条件**：已有相似规则（≥80%）、模式过于简单、模式过于特定\n\n### 3. 代码模式识别\n```python\n@dataclass\nclass CodePattern:\n    pattern_type: str  # design_pattern, coding_style, architecture, best_practice\n    pattern_name: str\n    description: str\n    code_examples: List[str]\n    file_paths: List[str]\n    occurrence_count: int\n    context: str\n```\n识别方法：AST分析、文本匹配、LLM分析、用户标注\n\n### 4. 规则生成模板\n```markdown\n# {{ rule_name }}\n## 规则简介\n## 你必须遵循的工作流程\n## 你必须遵守的原则\n## 实践指导\n## 代码示例\n## 执行检查清单\n```\n支持jinja2模板变量：current_dir, git_root_dir, jarvis_src_dir, jarvis_data_dir, rule_file_dir\n\n### 5. 冲突检测机制\n- 名称冲突：自动添加后缀\n- 内容相似（≥70%）：提示合并或覆盖\n- 原则矛盾：拒绝生成\n\n### 6. 质量评估（满分100分）\n- 完整性（25分）\n- 可执行性（25分）\n- 通用性（20分）\n- 独特性（15分）\n- 代码示例（15分）\n质量阈值：≥70分\n\n### 7. 模块结构\n```\nsrc/jarvis/jarvis_rule_generator/\n├── __init__.py\n├── rule_generator.py      # 主生成器\n├── pattern_detector.py    # 代码模式检测\n├── conflict_detector.py   # 冲突检测\n└── quality_evaluator.py   # 质量评估\n```\n\n### 8. 核心接口\n- detect_patterns(): 检测代码模式\n- generate_rule_content(): 生成规则内容\n- detect_conflicts(): 检测规则冲突\n- evaluate_quality(): 评估规则质量\n- save_rule(): 保存规则文件\n\n### 9. 实现计划\nPhase 1: 基础框架和generate_rule_content\nPhase 2: PatternDetector\nPhase 3: ConflictDetector\nPhase 4: QualityEvaluator\nPhase 5: 集成测试",
+  "created_at": "2026-01-31T19:39:16.661237",
+  "updated_at": "2026-01-31T19:39:16.661240"
+}

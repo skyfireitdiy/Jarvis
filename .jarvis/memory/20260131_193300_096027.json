@@ -1,0 +1,14 @@
+{
+  "id": "20260131_193300_096027",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_methodology_generator",
+    "methodology",
+    "自动提取",
+    "知识自主积累",
+    "阶段2"
+  ],
+  "content": "## 方法论自动生成器模块实现\n\n### 模块位置\n- 源代码：`src/jarvis/jarvis_methodology_generator/`\n- 测试：`tests/jarvis_methodology_generator/`\n\n### 核心类\n1. **TaskContext** - 任务上下文数据类\n   - task_description: 任务描述\n   - execution_steps: 执行步骤\n   - tool_calls: 工具调用记录\n   - decisions: 关键决策\n   - verification_steps: 验证步骤\n   - success: 任务是否成功\n\n2. **MethodologyQualityScore** - 质量评分\n   - completeness: 完整性（30分）\n   - executability: 可执行性（30分）\n   - generality: 通用性（20分）\n   - uniqueness: 独特性（20分）\n   - 质量阈值：70分\n\n3. **MethodologyGenerator** - 方法论生成器\n   - extract_methodology_from_task(): 从任务上下文提取方法论\n   - generate_methodology_content(): 生成方法论内容\n   - evaluate_methodology_quality(): 评估方法论质量\n\n### 方法论模板格式\n```markdown\n# {problem_type}方法论\n## 规则简介\n## 你必须遵守的原则\n## 你必须执行的操作\n## 实践指导\n## 检查清单\n```\n\n### 测试覆盖率\n- __init__.py: 100%\n- methodology_generator.py: 97%",
+  "created_at": "2026-01-31T19:33:00.096043",
+  "updated_at": "2026-01-31T19:33:00.096047"
+}

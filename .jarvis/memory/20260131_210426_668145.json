@@ -1,0 +1,8 @@
+{
+  "id": "20260131_210426_668145",
+  "type": "project_long_term",
+  "tags": ["methodology", "自动提取", "task_analyzer", "配置", "阶段2"],
+  "content": "## 方法论自动提取功能实现\n\n### 配置项\n- `is_enable_auto_methodology_extraction()` 在 `src/jarvis/jarvis_utils/config.py`\n- 默认关闭，通过配置 `auto_methodology_extraction: true` 启用\n\n### 实现位置\n- `src/jarvis/jarvis_agent/task_analyzer.py` 中的 `TaskAnalyzer` 类\n- 新增方法：\n  - `_try_extract_methodology()` - 尝试提取方法论的入口\n  - `_extract_and_save_methodology()` - 执行提取和保存\n  - `_collect_execution_steps()` - 从对话历史收集执行步骤\n  - `_collect_tool_calls_as_dicts()` - 收集工具调用记录\n  - `_get_existing_methodologies()` - 获取现有方法论列表\n  - `_save_methodology()` - 保存提取的方法论\n\n### 触发时机\n- 在 `_on_task_completed` 事件处理中触发\n- 任务完成后自动执行（如果启用）\n\n### 保存位置\n- 使用 `MethodologyTool` 保存到 `.jarvis/methodologies/` 目录\n- 保存为项目级方法论（scope='project'）",
+  "created_at": "2026-01-31T21:04:26.668193",
+  "updated_at": "2026-01-31T21:04:26.668200"
+}

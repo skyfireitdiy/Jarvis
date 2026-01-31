@@ -15,12 +15,29 @@ from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import get_short_term_memories
 from jarvis.jarvis_utils.output import PrettyOutput
 
+# 延迟导入 SmartRetriever 以避免循环依赖
+_smart_retriever = None
+
+
+def _get_smart_retriever():
+    """延迟获取 SmartRetriever 实例"""
+    global _smart_retriever
+    if _smart_retriever is None:
+        from jarvis.jarvis_memory_organizer.smart_retrieval import SmartRetriever
+
+        _smart_retriever = SmartRetriever()
+    return _smart_retriever
+
 
 class RetrieveMemoryTool:
     """检索记忆工具，用于从长短期记忆系统中检索信息"""
 
     name = "retrieve_memory"
-    description = "从长短期记忆系统中检索信息。支持按类型（project_long_term/global_long_term/short_term/all）和标签过滤，标签建议不超过10个。"
+    description = """从长短期记忆系统中检索信息。支持按类型（project_long_term/global_long_term/short_term/all）和标签过滤，标签建议不超过10个。
+
+支持两种检索模式：
+1. 标签过滤模式（默认）：通过 tags 参数过滤记忆
+2. 智能语义检索模式：设置 smart_search=True 并提供 query 参数，基于语义相似度检索相关记忆"""
 
     parameters = {
         "type": "object",
@@ -41,12 +58,21 @@ class RetrieveMemoryTool:
             "tags": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "用于过滤的标签列表（可选）",
+                "description": "用于过滤的标签列表（可选，标签过滤模式使用）",
             },
             "limit": {
                 "type": "integer",
                 "description": "返回结果的最大数量（可选，默认返回所有）",
                 "minimum": 1,
+            },
+            "smart_search": {
+                "type": "boolean",
+                "description": "是否启用智能语义检索模式（可选，默认 False）。启用后将基于 query 参数进行语义相似度检索",
+                "default": False,
+            },
+            "query": {
+                "type": "string",
+                "description": "语义检索的查询文本（当 smart_search=True 时必填）。系统将基于此文本的语义含义检索相关记忆",
             },
         },
         "required": ["memory_types"],
@@ -108,6 +134,12 @@ class RetrieveMemoryTool:
             memory_types = args.get("memory_types", [])
             tags = args.get("tags", [])
             limit = args.get("limit", None)
+            smart_search = args.get("smart_search", False)
+            query = args.get("query", "")
+
+            # 如果启用智能检索模式
+            if smart_search:
+                return self._execute_smart_search(args, memory_types, query, limit)
 
             # 确定要检索的记忆类型
             if "all" in memory_types:
@@ -232,5 +264,78 @@ class RetrieveMemoryTool:
 
         except Exception as e:
             error_msg = f"检索记忆失败: {str(e)}"
+            PrettyOutput.auto_print(f"❌ {error_msg}")
+            return {"success": False, "stdout": "", "stderr": error_msg}
+
+    def _execute_smart_search(
+        self,
+        args: Dict[str, Any],
+        memory_types: List[str],
+        query: str,
+        limit: Optional[int],
+    ) -> Dict[str, Any]:
+        """执行智能语义检索"""
+        try:
+            if not query:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "智能检索模式需要提供 query 参数",
+                }
+
+            # 确定要检索的记忆类型（智能检索不支持 short_term）
+            if "all" in memory_types:
+                types_to_search = ["project_long_term", "global_long_term"]
+            else:
+                types_to_search = [
+                    t
+                    for t in memory_types
+                    if t in ["project_long_term", "global_long_term"]
+                ]
+
+            if not types_to_search:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "智能检索模式仅支持 project_long_term 和 global_long_term 类型",
+                }
+
+            # 使用 SmartRetriever 进行语义检索
+            retriever = _get_smart_retriever()
+            search_limit = limit if limit else 10
+            memories = retriever.semantic_search(
+                query=query,
+                memory_types=types_to_search,
+                limit=search_limit,
+            )
+
+            # 格式化为Markdown输出
+            markdown_output = "# 智能语义检索结果\n\n"
+            markdown_output += f"**查询**: {query}\n\n"
+            markdown_output += f"**检索到 {len(memories)} 条相关记忆**\n\n"
+            markdown_output += f"**记忆类型**: {', '.join(types_to_search)}\n\n"
+            markdown_output += "---\n\n"
+
+            # 输出所有记忆
+            for i, memory in enumerate(memories):
+                markdown_output += f"## {i + 1}. {memory.id}\n\n"
+                markdown_output += f"**类型**: {memory.type}\n\n"
+                markdown_output += f"**标签**: {', '.join(memory.tags)}\n\n"
+                markdown_output += f"**创建时间**: {memory.created_at}\n\n"
+
+                # 内容部分
+                if memory.content:
+                    markdown_output += f"**内容**:\n\n{memory.content}\n\n"
+
+                markdown_output += "---\n\n"
+
+            return {
+                "success": True,
+                "stdout": markdown_output,
+                "stderr": "",
+            }
+
+        except Exception as e:
+            error_msg = f"智能检索失败: {str(e)}"
             PrettyOutput.auto_print(f"❌ {error_msg}")
             return {"success": False, "stdout": "", "stderr": error_msg}

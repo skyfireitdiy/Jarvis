@@ -1,0 +1,13 @@
+{
+  "id": "20260131_203746_004770",
+  "type": "project_long_term",
+  "tags": [
+    "retrieve_memory",
+    "smart_retrieval",
+    "tool_integration",
+    "jarvis_tools"
+  ],
+  "content": "## retrieve_memory 工具智能检索功能增强\n\n### 新增参数\n- `smart_search: bool = False` - 是否启用智能语义检索模式\n- `query: str` - 语义检索的查询文本（当 smart_search=True 时必填）\n\n### 实现方式\n1. 使用延迟导入避免循环依赖：`_get_smart_retriever()` 函数\n2. 当 `smart_search=True` 时，调用 `SmartRetriever.semantic_search()` 进行语义检索\n3. 当 `smart_search=False`（默认）时，保持原有标签过滤行为\n4. 智能检索仅支持 `project_long_term` 和 `global_long_term` 类型，不支持 `short_term`\n\n### 关键文件\n- 工具实现：`src/jarvis/jarvis_tools/retrieve_memory.py`\n- 智能检索模块：`src/jarvis/jarvis_memory_organizer/smart_retrieval.py`\n- 测试文件：`tests/jarvis_tools/test_retrieve_memory.py`\n\n### 测试覆盖率\n- 16个测试用例全部通过\n- 覆盖率达到79%",
+  "created_at": "2026-01-31T20:37:46.004796",
+  "updated_at": "2026-01-31T20:37:46.004799"
+}
