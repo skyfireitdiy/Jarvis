@@ -160,5 +160,3 @@ coverage.xml
 .jarvis/history
 .jarvis/rag
 .jarvis/task_lists
-.jarvis/memory
-.jarvis/methodologies

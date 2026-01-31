@@ -190,6 +190,28 @@ class DiffManager:
             adds, dels = _get_file_numstat(f)
             total_changes = adds + dels
 
+            # .jarvis 文件：只返回统计信息，不影响 visualizer 显示
+            if ".jarvis" in f:
+                # visualizer 正常显示
+                if visualizer:
+                    file_diff = self.get_file_diff(f)
+                    if file_diff.strip():
+                        if visualization_mode == "unified":
+                            visualizer.visualize_unified_diff(
+                                file_diff, f, show_line_numbers=show_line_numbers
+                            )
+                        elif visualization_mode == "syntax":
+                            visualizer.visualize_syntax_highlighted(file_diff, f)
+                        elif visualization_mode == "compact":
+                            visualizer.visualize_compact(file_diff, f)
+                        else:
+                            visualizer.visualize_unified_diff(
+                                file_diff, f, show_line_numbers=show_line_numbers
+                            )
+                # 返回值只包含统计摘要
+                lines.append(f"- {f} 新增{adds}行/删除{dels}行")
+                continue
+
             # 删除文件：不展示diff，仅提示（附带删除行数信息如果可用）
             if (status.startswith("D")) or (not os.path.exists(f)):
                 if dels > 0:
