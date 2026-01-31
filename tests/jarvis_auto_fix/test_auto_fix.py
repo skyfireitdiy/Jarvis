@@ -230,6 +230,9 @@ class TestFixHistory:
                 fix_applied="Fixed formatting",
             )
 
+            # Record the fix in history
+            fix_history.record_fix(record)
+
             # Apply the fix manually
             with open(temp_file, "w") as f:
                 f.write(record.fixed_content)

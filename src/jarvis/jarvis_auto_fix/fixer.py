@@ -149,7 +149,11 @@ class AutoFixer:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
+        except (UnicodeDecodeError, OSError):
+            # Skip files with encoding issues or other IO errors
+            return issues
 
+        try:
             tree = ast.parse(content)
 
             for node in ast.walk(tree):
@@ -235,6 +239,10 @@ class AutoFixer:
                 ruff_output = json.loads(result.stdout)
 
                 for item in ruff_output:
+                    # Safely extract fix suggestion (fix field may be None)
+                    fix_data = item.get("fix")
+                    suggestion = fix_data.get("message") if fix_data else None
+
                     issues.append(
                         Issue(
                             issue_type=self.ISSUE_FORMAT_ISSUE,
@@ -242,7 +250,7 @@ class AutoFixer:
                             line_number=item.get("location", {}).get("row", 0),
                             severity=self._ruff_code_to_severity(item.get("code", "W")),
                             message=item.get("message", "Unknown format issue"),
-                            suggestion=item.get("fix", {}).get("message") or None,
+                            suggestion=suggestion,
                             fixable=bool(item.get("fix")),
                         )
                     )
