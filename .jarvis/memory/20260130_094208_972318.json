@@ -1,0 +1,12 @@
+{
+  "id": "20260130_094208_972318",
+  "type": "project_long_term",
+  "tags": [
+    "code_quality",
+    "standards",
+    "jarvis"
+  ],
+  "content": "【Jarvis代码质量检查标准】\n- ruff：代码风格检查，必须通过\n- mypy：类型检查，必须通过\n- bandit：安全检查，通过（低严重性问题可接受）\n- pytest：单元测试框架\n- 覆盖率要求：≥80%\n- 所有检查通过是代码提交的前提",
+  "created_at": "2026-01-30T09:42:08.972362",
+  "updated_at": "2026-01-30T09:42:08.972367"
+}

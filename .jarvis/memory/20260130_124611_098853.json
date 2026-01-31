@@ -1,0 +1,13 @@
+{
+  "id": "20260130_124611_098853",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_arch_analyzer",
+    "duplication",
+    "代码重复度",
+    "架构设计"
+  ],
+  "content": "## jarvis_arch_analyzer 代码重复度分析器实现\n\n### 核心架构\n1. **数据类设计**：\n   - DuplicatedBlock: 重复代码块信息\n   - DuplicationPair: 重复对信息（包含相似度）\n   - DuplicationReport: 分析报告\n\n2. **核心组件**：\n   - FunctionExtractor: AST访问器，提取函数定义\n   - DuplicationAnalyzer: 主分析器\n\n3. **集成方式**：\n   - 在analyzer.py的_analyze_duplication方法中调用\n   - 返回AnalysisResult格式\n   - 评分规则：重复率<5% pass, 5-15% warning, >15% fail\n\n### 技术实现要点\n- 使用ast.FunctionDef提取函数\n- 代码标准化：去除注释、空行\n- 相似度算法：difflib.SequenceMatcher\n- 优化：哈希快速分组，避免O(n²)\n- 阈值：默认相似度0.85，最小5行\n\n### 测试覆盖\n- 测试覆盖率91%\n- 14个测试用例\n- ruff/mypy/bandit全通过\n\n### 文件位置\n- 实现：src/jarvis/jarvis_arch_analyzer/duplication.py (396行)\n- 测试：tests/jarvis_arch_analyzer/test_duplication.py (369行)",
+  "created_at": "2026-01-30T12:46:11.098880",
+  "updated_at": "2026-01-30T12:46:11.098884"
+}

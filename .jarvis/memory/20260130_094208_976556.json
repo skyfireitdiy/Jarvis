@@ -1,0 +1,12 @@
+{
+  "id": "20260130_094208_976556",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_auto_fix",
+    "implementation",
+    "architecture"
+  ],
+  "content": "【jarvis_auto_fix模块架构】\n位置：src/jarvis/jarvis_auto_fix/\n核心文件：\n- __init__.py：导出AutoFixer、FixHistory\n- fixer.py：代码检测和修复核心逻辑\n  - 使用ast检测语法错误\n  - 使用subprocess调用ruff检测和修复格式问题\n  - 检测导入错误（尝试import）\n- fix_history.py：修复历史管理\n  - FixRecord数据类存储修复信息\n  - FixHistory类管理JSON历史文件\n  - 线程安全的CRUD操作\n  - 支持回滚功能\n技术约束：\n- 轻量级实现，避免重依赖\n- 禁止自动提交代码\n- 禁止修改业务逻辑",
+  "created_at": "2026-01-30T09:42:08.976580",
+  "updated_at": "2026-01-30T09:42:08.976583"
+}

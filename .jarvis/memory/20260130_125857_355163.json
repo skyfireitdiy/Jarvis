@@ -1,0 +1,14 @@
+{
+  "id": "20260130_125857_355163",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_arch_analyzer",
+    "report",
+    "health_report",
+    "architecture_analysis",
+    "code_quality"
+  ],
+  "content": "架构健康度报告生成模块实现详情：\n\n1. 核心文件：src/jarvis/jarvis_arch_analyzer/report.py\n2. 主要类：\n   - ArchitectureHealthReport：架构健康度报告数据类\n   - HealthScoreCalculator：健康度评分计算器\n   - ReportGenerator：报告生成器\n   - RiskLevel：风险等级枚举\n   - Priority：优先级枚举\n   - HealthDimension：健康度维度\n   - ImprovementSuggestion：改进建议\n\n3. 功能特点：\n   - 支持JSON、Markdown、HTML格式输出\n   - 默认权重配置：代码复杂度分析(0.30)，依赖关系分析(0.35)，代码重复度分析(0.35)\n   - 风险等级：HEALTHY(90-100), GOOD(70-89), WARNING(50-69), DANGER(<50)\n   - 优先级：P0(关键问题)，P1(重要问题)，P2(一般问题)\n\n4. 集成位置：ArchitectureAnalyzer.analyze_project_health()方法\n\n5. 测试文件：tests/jarvis_arch_analyzer/test_report.py，包含25个测试用例，覆盖率达到96%",
+  "created_at": "2026-01-30T12:58:57.355181",
+  "updated_at": "2026-01-30T12:58:57.355185"
+}

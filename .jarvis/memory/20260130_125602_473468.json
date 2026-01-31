@@ -1,0 +1,13 @@
+{
+  "id": "20260130_125602_473468",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_arch_analyzer",
+    "report",
+    "健康度报告",
+    "task_completion"
+  ],
+  "content": "## 架构健康度报告生成模块完成\n\n### 实现内容\n- 创建report.py模块（590行，覆盖率96%）\n- 实现HealthScoreCalculator：健康度评分计算器\n- 实现ReportGenerator：报告生成器\n- 支持JSON、Markdown、HTML三种报告格式\n- 实现ArchitectureHealthReport：健康度报告数据类\n- 集成到analyzer.py的analyze_project_health方法\n\n### 核心功能\n1. **评分算法**：加权平均（复杂度30%、依赖35%、重复度35%）\n2. **风险等级**：健康(90-100)、良好(70-89)、警告(50-69)、危险(<50)\n3. **优先级建议**：P0/P1/P2三级分类\n4. **多格式输出**：JSON/Markdown/HTML\n\n### 验证结果\n- ✅ 67个测试全部通过\n- ✅ 覆盖率96%（超过80%要求）\n- ✅ ruff检查通过\n- ✅ mypy类型检查通过\n- ✅ bandit安全检查通过（仅2个低风险误报）\n\n### 文件位置\n- 实现：src/jarvis/jarvis_arch_analyzer/report.py\n- 测试：tests/jarvis_arch_analyzer/test_report.py\n- 集成：src/jarvis/jarvis_arch_analyzer/analyzer.py\n\n### 使用示例\n```python\nfrom jarvis.jarvis_arch_analyzer import ArchitectureAnalyzer\n\nanalyzer = ArchitectureAnalyzer()\nhealth_report = analyzer.analyze_project_health(\"src/jarvis\")\nprint(health_report.to_markdown())\n```",
+  "created_at": "2026-01-30T12:56:02.473492",
+  "updated_at": "2026-01-30T12:56:02.473497"
+}

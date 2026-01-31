@@ -1,0 +1,15 @@
+{
+  "id": "20260130_112645_615485",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_arch_analyzer",
+    "complexity",
+    "代码复杂度",
+    "圈复杂度",
+    "认知复杂度",
+    "AST分析"
+  ],
+  "content": "## jarvis_arch_analyzer 代码复杂度分析器\n\n### 核心功能\n- 圈复杂度计算（Cyclomatic Complexity）\n- 认知复杂度计算（Cognitive Complexity）\n- 高复杂度函数识别（阈值>10）\n- 复杂度报告生成\n\n### 圈复杂度计算规则\n- 基础值：1\n- 决策点 +1：if, for, while, try, with, ExceptHandler\n- 逻辑运算符：BoolOp每个and/or +1\n- Lambda表达式：+1\n\n### 认知复杂度计算规则\n- 基础值：0\n- 嵌套层级：每层 +2（nesting_level + 1）\n- 逻辑运算符：每个and/or +1\n- 分支跳转：break/continue +1\n\n### 实现位置\n- 模块：src/jarvis/jarvis_arch_analyzer/complexity.py\n- 集成：src/jarvis/jarvis_arch_analyzer/analyzer.py的_analyze_complexity方法\n- 测试：tests/jarvis_arch_analyzer/test_complexity.py\n\n### 验证标准\n- 测试覆盖率：90%（110行代码中11行未覆盖）\n- 代码质量：ruff/mypy/bandit全部通过\n- 测试用例：12个测试全部通过",
+  "created_at": "2026-01-30T11:26:45.615513",
+  "updated_at": "2026-01-30T11:26:45.615517"
+}
