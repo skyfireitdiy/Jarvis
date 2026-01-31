@@ -1,0 +1,15 @@
+{
+  "id": "20260131_162626_576587",
+  "type": "project_long_term",
+  "tags": [
+    "dependency_injection",
+    "refactoring",
+    "phase1",
+    "evolution",
+    "implementation",
+    "completed"
+  ],
+  "content": "## DependencyInjectionRefactorer实现完成\n\n**完成时间**：2026-02-01\n\n**文件位置**：\n- 实现：src/jarvis/jarvis_auto_fix/refactoring/dependency_injection.py (~556行)\n- 测试：tests/jarvis_auto_fix/test_dependency_injection.py (20个测试用例)\n- 模块导出：src/jarvis/jarvis_auto_fix/refactoring/__init__.py\n\n**核心类**：\n- DependencyInfo：依赖信息数据类\n- InjectionResult：注入结果数据类\n- DependencyInjectionAnalyzer：AST分析器，检测硬编码依赖\n- DependencyInjectionRefactorer：主重构器类\n\n**核心功能**：\n- analyze_dependencies()：分析源代码中的硬编码依赖\n- refactor_to_constructor_injection()：将类重构为构造函数依赖注入\n- _modify_constructor()：修改构造函数添加依赖参数\n- _generate_dependency_container()：生成依赖注入容器\n\n**安全检查**：\n- 检测硬编码依赖（self.attr = Class()模式）\n- 支持保持默认实例化（keep_defaults参数）\n- 生成类型注解（Database | None）\n- 支持参数化依赖\n- 与FixHistory集成，支持回滚\n\n**测试覆盖率**：100%（20个测试全部通过），包含错误处理、边界条件、集成测试\n\n**验收标准达成**：\n✅ 创建dependency_injection.py文件\n✅ 实现DependencyInjectionRefactorer类\n✅ 20个测试用例（超过16个要求）\n✅ 测试覆盖率100%（超过80%要求）\n✅ 所有测试通过\n✅ 与FixHistory集成，支持回滚\n✅ 代码风格与现有重构器一致\n✅ 静态扫描通过（ruff、mypy）\n\n**依赖注入重构特性**：\n- 支持构造函数注入模式\n- 可选保持向后兼容的默认实例化\n- 生成依赖注入容器类\n- 完整的类型注解支持\n- 支持async方法\n- 参数化依赖处理",
+  "created_at": "2026-01-31T16:26:26.576615",
+  "updated_at": "2026-01-31T16:26:26.576620"
+}
