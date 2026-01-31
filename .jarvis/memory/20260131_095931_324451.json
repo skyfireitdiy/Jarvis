@@ -1,0 +1,12 @@
+{
+  "id": "20260131_095931_324451",
+  "type": "project_long_term",
+  "tags": [
+    "pytest",
+    "bug_fix",
+    "jarvis_auto_fix"
+  ],
+  "content": "## pytest测试修复完成 (2026-01-31)\n\n### 修复的问题\n1. **test_detect_syntax_errors** - fixer.py:245的None引用问题\n   - 原因：ruff输出中item.get(\"fix\")可能为None\n   - 修复：先检查fix_data是否为None，再调用get方法\n\n2. **test_file_with_encoding_issues** - UnicodeDecodeError\n   - 原因：_detect_import_errors未处理编码异常\n   - 修复：在except块中添加UnicodeDecodeError和OSError处理\n\n3. **test_rollback_fix** - 测试代码缺陷\n   - 原因：测试创建了FixRecord但忘记调用record_fix记录\n   - 修复：在测试中添加fix_history.record_fix(record)调用\n\n### 修改的文件\n- src/jarvis/jarvis_auto_fix/fixer.py (2处修改)\n- tests/jarvis_auto_fix/test_auto_fix.py (1处修改)\n\n### 验证结果\n✅ 所有3个测试用例通过",
+  "created_at": "2026-01-31T09:59:31.324480",
+  "updated_at": "2026-01-31T09:59:31.324486"
+}
