@@ -1,0 +1,13 @@
+{
+  "id": "20260201_012626_061773",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_digital_twin",
+    "user_profile",
+    "preference_learner",
+    "architecture"
+  ],
+  "content": "PreferenceLearner模块架构设计：\n\n文件位置：src/jarvis/jarvis_digital_twin/user_profile/preference_learner.py\n\n核心数据类：\n1. PreferenceConfidence - 偏好置信度，包含value(0-1)、sample_count、last_updated，支持update()方法动态调整\n2. CodeStyleDetail - 代码风格详细偏好（preferred_style枚举、indentation、indent_size、max_line_length、prefer_type_hints、prefer_docstrings、naming_convention）\n3. TechStackPreference - 技术栈偏好（preferred_languages、preferred_frameworks、preferred_tools、avoided_technologies）\n4. InteractionStyleDetail - 交互风格偏好（preferred_style枚举、verbosity_level、prefer_examples、prefer_explanations、response_language）\n5. UserPreference - 综合用户偏好，包含上述三类偏好和custom_preferences，支持to_dict()/from_dict()序列化\n6. InteractionData - 交互数据类，用于传递交互信息给学习器\n\n核心类PreferenceLearner：\n- 关键词映射：CODE_STYLE_KEYWORDS、LANGUAGE_KEYWORDS、FRAMEWORK_KEYWORDS、TOOL_KEYWORDS、INTERACTION_STYLE_KEYWORDS\n- 核心方法：learn_from_interaction()、get_code_style_preference()、get_tech_preference()、update_preference()、get_preference_confidence()、get_overall_confidence()、reset_preference()、export_preference()、import_preference()\n\n测试文件：tests/jarvis_digital_twin/test_preference_learner.py（40个测试用例）",
+  "created_at": "2026-02-01T01:26:26.061796",
+  "updated_at": "2026-02-01T01:26:26.061799"
+}

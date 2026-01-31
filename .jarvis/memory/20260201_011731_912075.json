@@ -1,0 +1,13 @@
+{
+  "id": "20260201_011731_912075",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_digital_twin",
+    "user_profile",
+    "history_analyzer",
+    "architecture"
+  ],
+  "content": "jarvis_digital_twin模块结构：\n- src/jarvis/jarvis_digital_twin/__init__.py - 数字孪生主模块\n- src/jarvis/jarvis_digital_twin/user_profile/__init__.py - 用户画像子模块\n- src/jarvis/jarvis_digital_twin/user_profile/history_analyzer.py - 交互历史分析器\n\nHistoryAnalyzer类核心功能：\n1. analyze_interactions() - 分析交互记录，返回InteractionPattern\n2. extract_patterns() - 提取模式并返回字典格式\n3. get_work_schedule() - 推断用户工作时间表\n4. get_common_commands() - 获取常用命令列表\n\n数据类：TimePattern、CommandPattern、QuestionPattern、InteractionPattern、WorkSchedule、InteractionRecord",
+  "created_at": "2026-02-01T01:17:31.912095",
+  "updated_at": "2026-02-01T01:17:31.912099"
+}

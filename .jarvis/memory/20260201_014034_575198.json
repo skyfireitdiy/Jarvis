@@ -1,0 +1,8 @@
+{
+  "id": "20260201_014034_575198",
+  "type": "project_long_term",
+  "tags": ["jarvis_digital_twin", "user_profile", "aggregator", "architecture"],
+  "content": "## UserProfileAggregator模块架构\n\n**文件位置**: `src/jarvis/jarvis_digital_twin/user_profile/aggregator.py`\n\n**核心数据类**:\n- `ProfileMetadata`: 画像元数据（版本、时间戳、数据源、置信度）\n- `ProfileSummary`: 画像摘要（主要语言、框架、目标统计等）\n- `DigitalTwinProfile`: 完整用户画像（整合InteractionPattern、UserPreference、TrackedGoal）\n\n**UserProfileAggregator类**:\n- 构造函数: `__init__(user_id, history_analyzer?, preference_learner?, goal_tracker?)`\n- 核心方法:\n  - `build_profile()`: 构建用户画像，整合三个组件的数据\n  - `get_profile_summary()`: 获取画像摘要\n  - `save_profile(file_path?)`: 保存画像到JSON文件\n  - `load_profile(file_path?)`: 加载画像\n  - `update_profile(interaction_data?, goal_context?)`: 更新画像\n  - `get_profile_versions()`: 获取所有版本信息\n  - `delete_profile_version(version)`: 删除指定版本\n\n**依赖组件接口**:\n- `HistoryAnalyzer.analyze_interactions()` → `InteractionPattern`（注意：不是extract_patterns）\n- `PreferenceLearner.preference` 属性 → `UserPreference`（注意：不是get_preferences方法）\n- `GoalTracker()` 无参数构造函数\n- `PreferenceLearner.learn_from_interaction(InteractionData)` 需要InteractionData类型参数\n\n**测试文件**: `tests/jarvis_digital_twin/test_aggregator.py`（23个测试用例）",
+  "created_at": "2026-02-01T01:40:34.575216",
+  "updated_at": "2026-02-01T01:40:34.575219"
+}
