@@ -14,6 +14,11 @@ from jarvis.jarvis_auto_fix.refactoring.extract_function import (
     ExtractionResult,
     VariableInfo,
 )
+from jarvis.jarvis_auto_fix.refactoring.extract_interface import (
+    ExtractInterfaceRefactorer,
+    InterfaceExtractionResult,
+    InterfaceInfo,
+)
 from jarvis.jarvis_auto_fix.refactoring.inline_function import (
     InlineFunctionRefactorer,
     InlineResult,
@@ -24,6 +29,13 @@ from jarvis.jarvis_auto_fix.refactoring.move_method import (
     MoveResult,
     MethodInfo,
 )
+from jarvis.jarvis_auto_fix.refactoring.split_module import (
+    SplitModuleRefactorer,
+    ModuleSplitResult,
+    SplitPlan,
+    ModuleInfo,
+    SplitGroup,
+)
 
 __all__ = [
     "ExtractFunctionRefactorer",
@@ -33,10 +45,18 @@ __all__ = [
     "ClassExtractionResult",
     "ClassMemberInfo",
     "ExtractionPlan",
+    "ExtractInterfaceRefactorer",
+    "InterfaceExtractionResult",
+    "InterfaceInfo",
     "InlineFunctionRefactorer",
     "InlineResult",
     "FunctionInfo",
     "MoveMethodRefactorer",
     "MoveResult",
     "MethodInfo",
+    "SplitModuleRefactorer",
+    "ModuleSplitResult",
+    "SplitPlan",
+    "ModuleInfo",
+    "SplitGroup",
 ]
