@@ -794,6 +794,19 @@ def is_enable_impact_analysis() -> bool:
     return True
 
 
+def is_enable_auto_methodology_extraction() -> bool:
+    """
+    获取是否启用方法论自动提取。
+
+    当启用时，任务完成后会自动从任务执行过程中提取方法论并保存。
+    默认关闭，可通过配置文件设置 auto_methodology_extraction: true 启用。
+
+    返回：
+        bool: 如果启用方法论自动提取则返回True，默认为False
+    """
+    return bool(GLOBAL_CONFIG_DATA.get("auto_methodology_extraction", False))
+
+
 def get_build_validation_timeout() -> int:
     """
     获取构建验证的超时时间（秒）。

@@ -1,0 +1,15 @@
+{
+  "id": "20260131_194013_191405",
+  "type": "project_long_term",
+  "tags": [
+    "记忆系统",
+    "smart_retrieval",
+    "设计文档",
+    "阶段2",
+    "知识自主积累",
+    "语义检索"
+  ],
+  "content": "## 知识智能检索算法设计文档\n\n### 1. 设计目标\n增强现有记忆系统的检索能力：语义检索、知识推荐、相关知识关联、性能优化。\n\n### 2. 语义检索增强方案\n```python\n@dataclass\nclass SemanticQuery:\n    query_text: str\n    extracted_keywords: List[str]\n    expanded_tags: List[str]\n    intent: str\n    context: Optional[str]\n```\n检索流程：查询分析→标签扩展→候选检索→语义排序→结果返回\n\n### 3. 知识推荐算法\n推荐场景：任务开始时、执行过程中、遇到问题时\n相关性得分：标签匹配度30%+内容语义相似度40%+时间新鲜度15%+使用频率15%\n\n### 4. 相关知识自动关联机制\n关联类型：标签关联（≥2个共享标签）、内容关联（相似度≥60%）、时间关联、引用关联\n存储位置：.jarvis/memory/relations.json\n\n### 5. 检索性能优化\n索引机制：tag_index、keyword_index、time_index\n缓存策略：LRU缓存（100条）、热门记忆缓存（Top 50）\n\n### 6. 模块结构\n```\nsrc/jarvis/jarvis_memory_organizer/\n├── smart_retrieval.py    # 智能检索\n│   ├── SmartRetriever\n│   ├── SemanticSearcher\n│   ├── KnowledgeRecommender\n│   └── RelationManager\n└── memory_index.py       # 索引管理\n```\n\n### 7. 核心接口\n- semantic_search(): 语义检索\n- recommend_knowledge(): 知识推荐\n- find_related(): 查找相关知识\n\n### 8. 实现计划\nPhase 1: SmartRetriever基础框架和semantic_search\nPhase 2: KnowledgeRecommender和recommend_knowledge\nPhase 3: RelationManager和find_related\nPhase 4: MemoryIndex和缓存机制\nPhase 5: 集成测试和性能优化\n\n### 9. 验收标准\n- 语义检索相关性提升50%+\n- 知识推荐准确率≥70%\n- 检索响应时间<500ms\n- 测试覆盖率≥80%",
+  "created_at": "2026-01-31T19:40:13.191423",
+  "updated_at": "2026-01-31T19:40:13.191426"
+}
