@@ -36,6 +36,12 @@ from jarvis.jarvis_auto_fix.refactoring.split_module import (
     ModuleInfo,
     SplitGroup,
 )
+from jarvis.jarvis_auto_fix.refactoring.dependency_injection import (
+    DependencyInjectionAnalyzer,
+    DependencyInjectionRefactorer,
+    DependencyInfo,
+    InjectionResult,
+)
 
 __all__ = [
     "ExtractFunctionRefactorer",
@@ -59,4 +65,8 @@ __all__ = [
     "SplitPlan",
     "ModuleInfo",
     "SplitGroup",
+    "DependencyInjectionAnalyzer",
+    "DependencyInjectionRefactorer",
+    "DependencyInfo",
+    "InjectionResult",
 ]
