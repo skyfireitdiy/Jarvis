@@ -1,0 +1,8 @@
+{
+  "id": "20260201_004911_340700",
+  "type": "project_long_term",
+  "tags": ["codebase_analysis", "statistics"],
+  "content": "# Jarvis 项目代码库统计\n\n## Python 代码\n- 主要源代码文件数量（排除虚拟环境和测试）：619 个\n- 主要源代码行数（排除虚拟环境和测试）：196,038 行\n\n## 其他代码语言\n- 其他语言文件数量（JS/TS/C++/C/Java/Go/Rust/php/Ruby/SQL等）：8 个\n- 其他语言代码行数：735 行\n\n## 全部Python代码（包括测试）\n- Python文件总数：753 个\n- Python代码总行数：223,886 行\n\n## 主要代码目录\n- src/：主要源代码\n- tests/：测试代码\n- builtin/：内置功能\n- scripts/：脚本文件\n- .jarvis/：配置文件\n\n## 代码行数统计说明\n- 排除了 .venv/ 和 venv/ 虚拟环境目录\n- 源代码行数统计使用 cat + wc -l 方式计算",
+  "created_at": "2026-02-01T00:49:11.340721",
+  "updated_at": "2026-02-01T00:49:11.340724"
+}
