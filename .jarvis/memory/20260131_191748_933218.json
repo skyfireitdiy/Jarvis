@@ -1,0 +1,8 @@
+{
+  "id": "20260131_191748_933218",
+  "type": "project_long_term",
+  "tags": ["架构演进", "版本化API", "jarvis_api_version"],
+  "content": "## 版本化API机制 (jarvis_api_version)\n\n**位置**: src/jarvis/jarvis_api_version/\n**测试**: tests/jarvis_api_version/ (36个测试)\n\n**核心组件**:\n- APIVersion: 版本信息（major.minor.patch）\n- APIVersionManager: 版本管理器\n- VersionStatus: 版本状态（active/deprecated/retired）\n\n**功能**: 版本注册、路由、兼容性检查、版本协商、弃用/退役管理",
+  "created_at": "2026-01-31T19:17:48.933231",
+  "updated_at": "2026-01-31T19:17:48.933233"
+}
