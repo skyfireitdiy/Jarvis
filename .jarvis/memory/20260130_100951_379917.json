@@ -1,0 +1,12 @@
+{
+  "id": "20260130_100951_379917",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_dependency_manager",
+    "技术决策",
+    "依赖管理"
+  ],
+  "content": "jarvis_dependency_manager 模块技术决策：\n1. 使用标准库：tomllib 解析 pyproject.toml，urllib 查询 PyPI，避免额外依赖\n2. 使用项目已有的 packaging 库进行版本比较（可靠性高）\n3. 实现响应缓存机制（1小时）减少 PyPI API 调用\n4. 使用 JSON 文件存储历史记录，简单可靠\n5. 缓存目录设计：在指定路径下创建 jarvis_dep_cache 子目录，使用 tempfile.gettempdir() 获取安全临时目录",
+  "created_at": "2026-01-30T10:09:51.379961",
+  "updated_at": "2026-01-30T10:09:51.379966"
+}
