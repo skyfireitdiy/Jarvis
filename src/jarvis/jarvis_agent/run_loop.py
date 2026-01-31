@@ -24,6 +24,7 @@ from jarvis.jarvis_agent.utils import normalize_next_action
 from jarvis.jarvis_utils.config import get_conversation_turn_threshold
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.config import is_enable_autonomous
+from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import get_context_token_count
@@ -67,9 +68,9 @@ class AgentRunLoop:
             self._emotion_recognizer = EmotionRecognizer()
             self._proactive_assistant = ProactiveAssistant()
             self._ambiguity_resolver = AmbiguityResolver()
-            PrettyOutput.print("智能增强组件已启用", style="info")
+            PrettyOutput.print("智能增强组件已启用", OutputType.INFO)
         except ImportError as e:
-            PrettyOutput.print(f"智能增强组件加载失败: {e}", style="warning")
+            PrettyOutput.print(f"智能增强组件加载失败: {e}", OutputType.WARNING)
             self._autonomous_enabled = False
 
     def _preprocess_user_input(self, user_input: str) -> str:
