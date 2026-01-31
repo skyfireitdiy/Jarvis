@@ -23,6 +23,7 @@ from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_agent.utils import normalize_next_action
 from jarvis.jarvis_utils.config import get_conversation_turn_threshold
 from jarvis.jarvis_utils.config import get_max_input_token_count
+from jarvis.jarvis_utils.config import is_enable_autonomous
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import get_context_token_count
@@ -44,6 +45,107 @@ class AgentRunLoop:
 
         # Git diff相关属性
         self._git_diff: Optional[str] = None  # 缓存git diff内容
+
+        # 智能增强组件（可选启用）
+        self._autonomous_enabled = is_enable_autonomous()
+        self._dialogue_manager = None
+        self._emotion_recognizer = None
+        self._proactive_assistant = None
+        self._ambiguity_resolver = None
+        if self._autonomous_enabled:
+            self._init_autonomous_components()
+
+    def _init_autonomous_components(self) -> None:
+        """初始化智能增强组件（仅在启用时调用）"""
+        try:
+            from jarvis.jarvis_autonomous.interaction import DialogueManager
+            from jarvis.jarvis_autonomous.interaction import AmbiguityResolver
+            from jarvis.jarvis_autonomous.interaction import ProactiveAssistant
+            from jarvis.jarvis_autonomous.empathy import EmotionRecognizer
+
+            self._dialogue_manager = DialogueManager()
+            self._emotion_recognizer = EmotionRecognizer()
+            self._proactive_assistant = ProactiveAssistant()
+            self._ambiguity_resolver = AmbiguityResolver()
+            PrettyOutput.print("智能增强组件已启用", style="info")
+        except ImportError as e:
+            PrettyOutput.print(f"智能增强组件加载失败: {e}", style="warning")
+            self._autonomous_enabled = False
+
+    def _preprocess_user_input(self, user_input: str) -> str:
+        """预处理用户输入（智能增强）
+
+        Args:
+            user_input: 原始用户输入
+
+        Returns:
+            处理后的用户输入（可能包含增强信息）
+        """
+        if not self._autonomous_enabled:
+            return user_input
+
+        enhanced_input = user_input
+
+        # 1. 记录对话轮次
+        if self._dialogue_manager:
+            self._dialogue_manager.add_turn("user", user_input)
+
+        # 2. 情绪识别
+        if self._emotion_recognizer:
+            try:
+                emotion_result = self._emotion_recognizer.recognize(user_input)
+                if emotion_result and emotion_result.emotion_type.value not in (
+                    "neutral",
+                    "unknown",
+                ):
+                    # 将情绪信息作为上下文提示
+                    emotion_hint = f"[用户情绪: {emotion_result.emotion_type.value}, 置信度: {emotion_result.confidence:.2f}]"
+                    enhanced_input = f"{emotion_hint}\n{user_input}"
+            except Exception:
+                pass  # 情绪识别失败不影响主流程
+
+        # 3. 歧义检测
+        if self._ambiguity_resolver:
+            try:
+                ambiguity_result = self._ambiguity_resolver.detect_ambiguity(user_input)
+                if ambiguity_result and ambiguity_result.has_ambiguity:
+                    # 提示存在歧义
+                    ambiguity_hint = (
+                        f"[检测到歧义: {ambiguity_result.ambiguity_type.value}]"
+                    )
+                    enhanced_input = f"{ambiguity_hint}\n{enhanced_input}"
+            except Exception:
+                pass  # 歧义检测失败不影响主流程
+
+        return enhanced_input
+
+    def _postprocess_response(self, response: str) -> str:
+        """后处理响应（智能增强）
+
+        Args:
+            response: 原始响应
+
+        Returns:
+            处理后的响应
+        """
+        if not self._autonomous_enabled:
+            return response
+
+        # 记录助手响应
+        if self._dialogue_manager:
+            self._dialogue_manager.add_turn("assistant", response)
+
+        # 检查是否需要主动交互（暂不修改响应，仅记录）
+        if self._proactive_assistant:
+            try:
+                # 获取对话历史用于分析
+                if self._dialogue_manager:
+                    context = self._dialogue_manager.get_context_summary()
+                    self._proactive_assistant.analyze_context(context)
+            except Exception:
+                pass  # 主动交互分析失败不影响主流程
+
+        return response
 
     def _filter_tool_calls_from_response(self, response: str) -> str:
         """从响应中过滤掉工具调用内容
@@ -252,10 +354,17 @@ class AgentRunLoop:
                     current_message_tokens=current_message_tokens,
                 )
 
+                # 智能增强：预处理用户输入
+                processed_prompt = (
+                    self._preprocess_user_input(ag.session.prompt)
+                    if ag.session.prompt
+                    else ag.session.prompt
+                )
+
                 # 调用模型获取响应
                 try:
                     current_response = ag._call_model(
-                        ag.session.prompt, True, run_input_handlers
+                        processed_prompt, True, run_input_handlers
                     )
                 except KeyboardInterrupt:
                     # 获取用户补充信息并继续下一轮
@@ -270,6 +379,9 @@ class AgentRunLoop:
 
                 ag.session.prompt = ""
                 run_input_handlers = False
+
+                # 智能增强：后处理响应
+                current_response = self._postprocess_response(current_response)
 
                 if ot("!!!SUMMARY!!!") in current_response:
                     PrettyOutput.auto_print(

@@ -1032,6 +1032,16 @@ def is_enable_memory_organizer() -> bool:
     return False
 
 
+def is_enable_autonomous() -> bool:
+    """
+    获取是否启用智能增强功能（情绪识别、歧义检测、对话管理、主动交互）。
+
+    返回:
+        bool: 是否启用智能增强功能，默认为False
+    """
+    return GLOBAL_CONFIG_DATA.get("enable_autonomous", False) is True
+
+
 def get_conversation_turn_threshold() -> int:
     """
     获取对话轮次阈值，用于触发总结。
