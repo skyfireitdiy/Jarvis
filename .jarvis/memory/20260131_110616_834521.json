@@ -1,0 +1,13 @@
+{
+  "id": "20260131_110616_834521",
+  "type": "project_long_term",
+  "tags": [
+    "evolution",
+    "phase1",
+    "refactoring",
+    "split_module"
+  ],
+  "content": "SplitModuleRefactorer类提供了模块拆分功能，通过ModuleDependencyAnalyzer分析模块内的类、函数依赖关系和复杂度，使用_find_dependency_clusters方法发现组件间的聚类关系，能够生成SplitPlan并执行模块拆分操作。",
+  "created_at": "2026-01-31T11:06:16.834548",
+  "updated_at": "2026-01-31T11:06:16.834551"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "20260131_100528_324137",
+  "type": "project_long_term",
+  "tags": [
+    "evolution",
+    "phase1",
+    "refactoring",
+    "auto_fix"
+  ],
+  "content": "## 阶段1任务2：自动重构能力开发 - 当前状态 (2026-01-31)\n\n### 已完成功能（50%）\n**基础代码自动重构** - 92个测试，全部通过 ✅\n1. **提取函数** - 20个测试\n   - 文件：src/jarvis/jarvis_auto_fix/refactoring/extract_function.py\n   - 功能：从代码块中提取函数，分析变量依赖关系\n\n2. **提取类** - 24个测试\n   - 文件：src/jarvis/jarvis_auto_fix/refactoring/extract_class.py\n   - 功能：从类中提取相关成员到新类\n\n3. **内联函数** - 24个测试\n   - 文件：src/jarvis/jarvis_auto_fix/refactoring/inline_function.py\n   - 功能：将函数调用内联到调用处\n\n4. **移动方法** - 24个测试\n   - 文件：src/jarvis/jarvis_auto_fix/refactoring/move_method.py\n   - 功能：将方法从一个类移动到另一个类\n\n### 待开发功能（50%）\n1. **模块自动拆分** - 将大模块拆分为多个小模块\n2. **接口自动提取** - 从实现类中提取接口\n3. **依赖注入改造** - 将硬编码依赖改为依赖注入\n\n### 验收标准进度\n- [x] 能自动识别代码质量问题（已完成：92%平均覆盖率）\n- [ ] 能自动执行安全的重构操作（成功率≥95%）- 待验证\n- [ ] 模块热插拔机制可用 - 未开始\n- [ ] 灰度发布机制可用 - 未开始\n- [ ] 代码质量提升30%+ - 待评估",
+  "created_at": "2026-01-31T10:05:28.324169",
+  "updated_at": "2026-01-31T10:05:28.324175"
+}
