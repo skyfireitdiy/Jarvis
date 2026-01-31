@@ -194,6 +194,8 @@ class CodeAgent(Agent):
             "retrieve_memory",  # 记忆召回工具
             "clear_memory",  # 记忆删除工具
             "methodology",  # 方法论工具
+            "smart_advisor_tool",  # 智能顾问工具（问答、代码审查、架构决策、最佳实践）
+            "knowledge_graph_tool",  # 知识图谱工具（知识管理、关联查询）
         ]
         # 如果启用了任务列表管理器，添加相应工具
         if enable_task_list_manager:
