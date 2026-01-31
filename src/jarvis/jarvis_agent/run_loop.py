@@ -32,6 +32,10 @@ from jarvis.jarvis_utils.utils import get_context_token_count
 if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
     from . import Agent
+    from jarvis.jarvis_autonomous.interaction import DialogueManager
+    from jarvis.jarvis_autonomous.interaction import AmbiguityResolver
+    from jarvis.jarvis_autonomous.interaction import ProactiveAssistant
+    from jarvis.jarvis_autonomous.empathy import EmotionRecognizer
 
 
 class AgentRunLoop:
@@ -49,10 +53,10 @@ class AgentRunLoop:
 
         # 智能增强组件（可选启用）
         self._autonomous_enabled = is_enable_autonomous()
-        self._dialogue_manager = None
-        self._emotion_recognizer = None
-        self._proactive_assistant = None
-        self._ambiguity_resolver = None
+        self._dialogue_manager: Optional["DialogueManager"] = None
+        self._emotion_recognizer: Optional["EmotionRecognizer"] = None
+        self._proactive_assistant: Optional["ProactiveAssistant"] = None
+        self._ambiguity_resolver: Optional["AmbiguityResolver"] = None
         if self._autonomous_enabled:
             self._init_autonomous_components()
 
@@ -89,7 +93,7 @@ class AgentRunLoop:
 
         # 1. 记录对话轮次
         if self._dialogue_manager:
-            self._dialogue_manager.add_turn("user", user_input)
+            self._dialogue_manager.add_turn("default", "user", user_input)
 
         # 2. 情绪识别
         if self._emotion_recognizer:
@@ -134,15 +138,17 @@ class AgentRunLoop:
 
         # 记录助手响应
         if self._dialogue_manager:
-            self._dialogue_manager.add_turn("assistant", response)
+            self._dialogue_manager.add_turn("default", "assistant", response)
 
         # 检查是否需要主动交互（暂不修改响应，仅记录）
         if self._proactive_assistant:
             try:
                 # 获取对话历史用于分析
                 if self._dialogue_manager:
-                    context = self._dialogue_manager.get_context_summary()
-                    self._proactive_assistant.analyze_context(context)
+                    context = self._dialogue_manager.summarize_context("default")
+                    self._proactive_assistant.analyze_for_proactive_action(
+                        {"context": context}
+                    )
             except Exception:
                 pass  # 主动交互分析失败不影响主流程
 
