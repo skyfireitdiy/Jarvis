@@ -321,14 +321,13 @@ class AgentRunLoop:
                         experience_recorded = learning_result.get(
                             "experience_recorded", False
                         )
+                        experience_count = 1 if experience_recorded else 0
                         total_learned = (
-                            knowledge_count
-                            + skills_count
-                            + (1 if experience_recorded else 0)
+                            knowledge_count + skills_count + experience_count
                         )
                         if total_learned > 0:
                             PrettyOutput.auto_print(
-                                f"📚 持续学习: 知识+{knowledge_count}, 技能+{skills_count}, 经验+{experience_recorded}"
+                                f"📚 持续学习: 知识+{knowledge_count}, 技能+{skills_count}, 经验+{experience_count}"
                             )
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 持续学习异常: {e}")

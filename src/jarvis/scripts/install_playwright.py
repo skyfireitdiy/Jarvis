@@ -7,12 +7,14 @@
 import subprocess
 import sys
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 
 def install_chromium() -> None:
     """安装 Playwright Chromium 浏览器驱动"""
-    print("🔧 正在安装 Playwright Chromium 浏览器驱动...")
-    print("这可能需要几分钟时间，请耐心等待...")
-    print()
+    PrettyOutput.auto_print("🔧 正在安装 Playwright Chromium 浏览器驱动...")
+    PrettyOutput.auto_print("这可能需要几分钟时间，请耐心等待...")
+    PrettyOutput.auto_print("")
 
     try:
         # 使用 sys.executable 确保使用正确的 Python 解释器
@@ -23,17 +25,17 @@ def install_chromium() -> None:
             text=True,
         )
 
-        print("✅ Playwright Chromium 浏览器驱动安装成功！")
+        PrettyOutput.auto_print("✅ Playwright Chromium 浏览器驱动安装成功！")
         if result.stdout:
-            print(result.stdout)
+            PrettyOutput.auto_print(result.stdout)
 
     except subprocess.CalledProcessError as e:
-        print(f"❌ 安装失败，返回码: {e.returncode}")
+        PrettyOutput.auto_print(f"❌ 安装失败，返回码: {e.returncode}")
         if e.stderr:
-            print(f"错误信息: {e.stderr}")
+            PrettyOutput.auto_print(f"错误信息: {e.stderr}")
         sys.exit(1)
     except Exception as e:
-        print(f"❌ 安装过程中发生错误: {e}")
+        PrettyOutput.auto_print(f"❌ 安装过程中发生错误: {e}")
         sys.exit(1)
 
 

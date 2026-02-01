@@ -7,6 +7,8 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 from jarvis.jarvis_digital_twin.continuous_learning.adaptive_engine import (
     AdaptiveEngine,
 )
@@ -223,8 +225,9 @@ class ContinuousLearningManager:
         k_count = len(result.get("knowledge_learned", []))
         s_count = len(result.get("skills_learned", []))
         e_recorded = result.get("experience_recorded", False)
-        print(
-            f"🧠 持续学习: 知识+{k_count}, 技能+{s_count}, 经验+{e_recorded} (模式: {mode})"
+        e_count = 1 if e_recorded else 0
+        PrettyOutput.auto_print(
+            f"🧠 持续学习: 知识+{k_count}, 技能+{s_count}, 经验+{e_count} (模式: {mode})"
         )
 
         return result
@@ -330,8 +333,10 @@ class ContinuousLearningManager:
         e_recorded = learning_result.get("experience_recorded", False)
         m_extracted = learning_result.get("methodology_extracted", False)
         a_count = len(learning_result.get("adaptations_made", []))
-        print(
-            f"🧠 持续学习: 经验+{e_recorded}, 方法论+{m_extracted}, 适应+{a_count} (模式: {mode})"
+        e_count = 1 if e_recorded else 0
+        m_count = 1 if m_extracted else 0
+        PrettyOutput.auto_print(
+            f"🧠 持续学习: 经验+{e_count}, 方法论+{m_count}, 适应+{a_count} (模式: {mode})"
         )
 
         return learning_result
