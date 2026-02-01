@@ -23,6 +23,8 @@ from ..intelligence.llm_reasoning import ReasoningContext
 from ..intelligence.llm_reasoning import ReasoningType
 from ..intelligence.rule_learner import LearnedRule
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 
 class InteractionStyle(Enum):
     """交互风格枚举"""
@@ -330,25 +332,44 @@ class PersonalityAdapter(HybridEngine[AdaptedResponse]):
         # 先尝试快速规则适配
         quick_result = self._quick_adapt(content, profile)
         if quick_result and quick_result.confidence >= 0.7:
+            PrettyOutput.auto_print(
+                f"🎨 个性适配: 适配风格={quick_result.style_applied.value} "
+                f"(置信度: {quick_result.confidence:.2f}, 模式: 规则快路径)"
+            )
             return quick_result
 
         # 使用双轨制推理
         result = self.infer(content, profile=profile)
 
         if result.success and result.output:
-            return result.output
+            adapted = result.output
+            mode_str = "LLM" if result.llm_used else "规则"
+            PrettyOutput.auto_print(
+                f"🎨 个性适配: 适配风格={adapted.style_applied.value} "
+                f"(置信度: {adapted.confidence:.2f}, 模式: {mode_str})"
+            )
+            return adapted
 
         # 回退到快速适配结果或默认值
         if quick_result:
+            PrettyOutput.auto_print(
+                f"🎨 个性适配: 适配风格={quick_result.style_applied.value} "
+                f"(置信度: {quick_result.confidence:.2f}, 模式: 规则降级)"
+            )
             return quick_result
 
-        return AdaptedResponse(
+        default_result = AdaptedResponse(
             original_content=content,
             adapted_content=content,
             style_applied=profile.preferred_style,
             confidence=0.5,
             source="default",
         )
+        PrettyOutput.auto_print(
+            f"🎨 个性适配: 适配风格={default_result.style_applied.value} "
+            f"(置信度: {default_result.confidence:.2f}, 模式: 默认值)"
+        )
+        return default_result
 
     def _quick_adapt(self, content: str, profile: UserProfile) -> AdaptedResponse:
         """快速规则适配"""

@@ -14,6 +14,8 @@ from typing import Any, Optional
 from ..intelligence.hybrid_engine import HybridEngine, InferenceMode
 from ..intelligence.llm_reasoning import ReasoningContext, ReasoningType
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 
 class ActionType(Enum):
     """主动行为类型"""
@@ -102,6 +104,15 @@ class ProactiveAssistant(HybridEngine):
                         priority=ActionPriority.MEDIUM,
                     )
                 )
+
+        # 打印主动服务结果
+        mode_str = "LLM" if result.llm_used else "规则"
+        if actions:
+            action_types = [a.action_type.value for a in actions]
+            PrettyOutput.auto_print(
+                f"💡 主动服务: 触发 {len(actions)} 个服务 {action_types} (模式: {mode_str})"
+            )
+
         self._pending_actions.extend(actions)
         return actions
 
