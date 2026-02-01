@@ -18,6 +18,7 @@ from typing import Optional
 
 from ..intelligence.hybrid_engine import HybridEngine
 from ..intelligence.hybrid_engine import InferenceMode
+from ..intelligence.llm_reasoning import LLMClient
 from ..intelligence.llm_reasoning import ReasoningContext
 from ..intelligence.llm_reasoning import ReasoningType
 from ..intelligence.rule_learner import LearnedRule
@@ -68,8 +69,12 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
     2. 慢路径：使用LLM进行深度情感分析
     """
 
-    def __init__(self, mode: InferenceMode = InferenceMode.HYBRID):
-        super().__init__(llm_client=None, mode=mode, enable_learning=True)
+    def __init__(
+        self,
+        llm_client: Optional[LLMClient] = None,
+        mode: InferenceMode = InferenceMode.HYBRID,
+    ):
+        super().__init__(llm_client=llm_client, mode=mode, enable_learning=True)
         self._init_emotion_patterns()
         self._init_predefined_rules()
 

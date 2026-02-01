@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
 
-from ..intelligence.hybrid_engine import HybridEngine
+from ..intelligence.hybrid_engine import HybridEngine, InferenceMode
 from ..intelligence.llm_reasoning import ReasoningContext, ReasoningType
 
 
@@ -54,8 +54,12 @@ class AmbiguityResult:
 class AmbiguityResolver(HybridEngine):
     """歧义消解器"""
 
-    def __init__(self, llm_client: Any = None):
-        super().__init__(llm_client)
+    def __init__(
+        self,
+        llm_client: Any = None,
+        mode: InferenceMode = InferenceMode.HYBRID,
+    ):
+        super().__init__(llm_client=llm_client, mode=mode, enable_learning=True)
         self._ambiguous_patterns = {
             "referential": [
                 "它",
