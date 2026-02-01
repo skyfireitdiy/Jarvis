@@ -906,18 +906,6 @@ def run_cli(
         config_file=config_file,
     )
 
-    # 显示Persona欢迎消息（仅在交互模式下）
-    if not non_interactive:
-        try:
-            from jarvis.jarvis_persona import JarvisPersona
-
-            persona = JarvisPersona()
-            welcome_msg = persona.get_welcome_message()
-            if welcome_msg:
-                PrettyOutput.auto_print(welcome_msg)
-        except Exception:
-            pass  # 静默忽略Persona加载失败
-
     # 在初始化环境后同步 CLI 选项到全局配置，避免被 init_env 覆盖
     try:
         if llm_group:
