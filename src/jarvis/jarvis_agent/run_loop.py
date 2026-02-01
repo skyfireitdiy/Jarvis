@@ -248,8 +248,9 @@ class AgentRunLoop:
                 service_count = 0
                 for result in results:
                     if result.status == ServiceStatus.COMPLETED:
+                        service_name = result.service_name or "主动服务"
                         enhanced_input = (
-                            f"[主动服务: {result.message}]\n{enhanced_input}"
+                            f"[{service_name}: {result.message}]\n{enhanced_input}"
                         )
                         service_count += 1
             except Exception:
