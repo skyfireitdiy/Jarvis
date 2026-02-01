@@ -82,6 +82,52 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
 
     def _init_emotion_patterns(self) -> None:
         """初始化情绪识别模式"""
+        # 正则表达式模式库（新增）
+        self._emotion_patterns: Dict[EmotionType, List[str]] = {
+            EmotionType.POSITIVE: [
+                r"太好了|真棒|完美|excellent|great",
+                r"!{2,}$",  # 多个感叹号结尾
+                r"非常.{0,5}(好|棒|满意|开心)",  # "非常" + 情绪词
+            ],
+            EmotionType.NEGATIVE: [
+                r"太.{0,3}了|糟糕|失败|terrible",
+                r"不.{0,3}(行|好|满意)",  # 否定词 + 情绪词
+                r"真.{0,2}(差|烂)",
+                r"(真的?|太|很).{0,3}(糟糕|差|烂)",  # 强调词 + 负面评价
+            ],
+            EmotionType.FRUSTRATED: [
+                r"(又|还)是?不?行",  # "还是不行"/"又不行"
+                r"搞不定|放弃|崩溃",
+                r"(怎么|为什么).{0,10}不行",  # 疑问句 + 不行
+            ],
+            EmotionType.CONFUSED: [
+                r"(不|没)(明白|懂|理解)",
+                r"什么意思|怎么回事",
+                r"\?{2,}$",  # 多个问号结尾
+                r"(不|没)(明白|懂).{0,10}(错误|问题|怎么)",  # 组合模式：不明白+错误/问题
+            ],
+            EmotionType.EXCITED: [
+                r"(终|太).{0,3}了|期待|迫不及待",
+                r"!{2,}",  # 多个感叹号
+                r"真的?(太|很).{0,3}",
+            ],
+            EmotionType.ANXIOUS: [
+                r"(紧急|着急|赶紧|快)",
+                r"(deadline|urgent|asap|hurry)",
+                r"来不及|快到了",
+            ],
+            EmotionType.GRATEFUL: [
+                r"非常.{0,3}感谢|多谢|谢谢",
+                r"(thank|grateful|appreciate)",
+                r"帮.{0,3}(忙|救命)",
+            ],
+            EmotionType.IMPATIENT: [
+                r"(快点|赶紧|催|马上)",
+                r"(hurry|slow|come on)",
+                r"怎么这么.{0,3}(慢|久)",
+            ],
+        }
+
         # 情绪关键词映射
         self._emotion_keywords: Dict[EmotionType, List[str]] = {
             EmotionType.POSITIVE: [
@@ -337,7 +383,9 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
         """
         # 先尝试快速规则匹配
         quick_result = self._quick_rule_match(text)
-        if quick_result and quick_result.confidence >= 0.7:
+        if (
+            quick_result and quick_result.confidence >= 0.65
+        ):  # 降低阈值从0.7到0.65，增加规则覆盖率
             PrettyOutput.auto_print(
                 f"🎭 情绪识别: {quick_result.emotion_type.value} "
                 f"(置信度: {quick_result.confidence:.2f}, 模式: 规则快路径)"
@@ -380,10 +428,32 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
         return default_result
 
     def _quick_rule_match(self, text: str) -> Optional[EmotionResult]:
-        """快速规则匹配（不使用LLM）"""
+        """快速规则匹配（不使用LLM）
+
+        优化后的多维度匹配策略：
+        1. 正则表达式模式匹配（高置信度）
+        2. 关键词匹配（中置信度）
+        3. 标点符号分析（置信度加成）
+        4. 上下文特征分析（否定词、强度修饰词）
+        """
         text_lower = text.lower()
         detected_emotions: List[tuple] = []
 
+        # 阶段1: 正则表达式模式匹配（优先级最高）
+        for emotion_type, patterns in self._emotion_patterns.items():
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        # 正则匹配给予高置信度
+                        confidence = 0.75
+                        detected_emotions.append(
+                            (emotion_type, confidence, [f"regex:{pattern}"])
+                        )
+                        break  # 每个情绪类型只匹配一次正则
+                except re.error:
+                    continue  # 忽略无效的正则表达式
+
+        # 阶段2: 关键词匹配（补充匹配）
         for emotion_type, keywords in self._emotion_keywords.items():
             matched_keywords = []
             for keyword in keywords:
@@ -391,23 +461,48 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
                     matched_keywords.append(keyword)
 
             if matched_keywords:
-                confidence = min(0.5 + len(matched_keywords) * 0.15, 0.95)
-                detected_emotions.append((emotion_type, confidence, matched_keywords))
+                # 关键词匹配给予中等置信度
+                keyword_confidence = min(0.45 + len(matched_keywords) * 0.12, 0.70)
+                detected_emotions.append(
+                    (emotion_type, keyword_confidence, matched_keywords)
+                )
 
         if not detected_emotions:
             return None
 
-        # 选择置信度最高的情绪
+        # 阶段3: 选择置信度最高的情绪
         detected_emotions.sort(key=lambda x: x[1], reverse=True)
         best_emotion, confidence, indicators = detected_emotions[0]
 
-        # 检查否定词
+        # 阶段4: 标点符号分析（置信度加成）
+        # 多个感叹号增加兴奋/积极情绪的置信度
+        if text.count("!") >= 2 and best_emotion in [
+            EmotionType.POSITIVE,
+            EmotionType.EXCITED,
+        ]:
+            confidence = min(confidence + 0.15, 0.95)
+        # 多个问号增加困惑情绪的置信度
+        if text.count("?") >= 2 and best_emotion == EmotionType.CONFUSED:
+            confidence = min(confidence + 0.10, 0.90)
+
+        # 阶段5: 上下文特征分析
+        # 检查否定词（在积极/兴奋情绪前时转为消极）
         has_negation = any(neg in text_lower for neg in self._negation_words)
         if has_negation and best_emotion in [EmotionType.POSITIVE, EmotionType.EXCITED]:
             best_emotion = EmotionType.NEGATIVE
-            confidence *= 0.8
+            confidence *= 0.85  # 降低一些置信度
 
-        # 计算强度
+        # 检查重复词语（表达强烈情绪）
+        words = text_lower.split()
+        if len(words) > 0:
+            word_counts: Dict[str, int] = {}
+            for word in words:
+                word_counts[word] = word_counts.get(word, 0) + 1
+            max_repeat = max(word_counts.values())
+            if max_repeat >= 2:  # 有词语重复
+                confidence = min(confidence + 0.08, 0.95)
+
+        # 阶段6: 计算情绪强度
         intensity = 0.5
         for modifier, factor in self._intensity_modifiers.items():
             if modifier.lower() in text_lower:

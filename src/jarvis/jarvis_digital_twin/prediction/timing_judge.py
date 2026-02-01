@@ -69,7 +69,7 @@ class RuleBasedJudge:
     基于预定义规则进行时机判断。
     """
 
-    # 用户状态判断规则
+    # 【优化】用户状态判断规则 - 扩展关键词库
     STATE_INDICATORS: Dict[UserState, Dict[str, List[str]]] = {
         UserState.STUCK: {
             "keywords": [
@@ -81,62 +81,239 @@ class RuleBasedJudge:
                 "卡住",
                 "帮助",
                 "错误",
+                # 新增：更多表达困惑和需要帮助的词汇
+                "不知道",
+                "不会",
+                "不懂",
+                "怎么办",
+                "怎么",
+                "how",
+                "不知道怎么办",
+                "搞不懂",
+                "弄不明白",
+                "不会做",
+                "做不出来",
+                "解决不了",
+                "无法",
+                "unable",
+                "confused",
+                "lost",
+                "不懂怎么",
+                "不会用",
+                "不知道怎么",
+                "不会弄",
             ],
             "patterns": ["repeated_attempts", "long_pause", "error_state"],
         },
         UserState.BUSY: {
-            "keywords": ["working", "implementing", "coding", "正在", "实现", "编写"],
+            "keywords": [
+                "working",
+                "implementing",
+                "coding",
+                "正在",
+                "实现",
+                "编写",
+                # 新增：更多表达正在工作的词汇
+                "写代码",
+                "开发中",
+                "正在写",
+                "正在做",
+                "忙着",
+                "开发",
+                "implement",
+                "developing",
+                "writing",
+                "正在开发",
+            ],
             "patterns": ["frequent_edits", "active_coding", "multiple_files"],
         },
         UserState.EXPLORING: {
-            "keywords": ["what", "how", "why", "explore", "什么", "如何", "为什么"],
+            "keywords": [
+                "what",
+                "how",
+                "why",
+                "explore",
+                "什么",
+                "如何",
+                "为什么",
+                # 新增：更多表达探索和询问的词汇
+                "想知道",
+                "想了解",
+                "了解一下",
+                "什么意思",
+                "干嘛",
+                "为什么",
+                "怎么才能",
+                "想问",
+                "请问",
+                "了解一下",
+                "learn",
+                "understand",
+                "想知道怎么",
+            ],
             "patterns": ["browsing_files", "reading_docs", "asking_questions"],
         },
         UserState.FOCUSED: {
-            "keywords": ["focus", "concentrate", "deep", "专注", "集中"],
+            "keywords": [
+                "focus",
+                "concentrate",
+                "deep",
+                "专注",
+                "集中",
+                # 新增：更多表达专注的词汇
+                "专心",
+                "正在改",
+                "改这个",
+                "在弄",
+                "在改",
+                "专注在",
+                "focusing",
+                "修改中",
+            ],
             "patterns": ["single_file_edit", "continuous_work", "no_questions"],
         },
         UserState.IDLE: {
-            "keywords": [],
+            "keywords": [
+                # 新增：表达空闲的词汇
+                "等",
+                "waiting",
+                "等一下",
+                "稍等",
+            ],
             "patterns": ["no_activity", "long_idle", "session_start"],
         },
     }
 
-    # 紧急程度判断规则
+    # 【优化】紧急程度判断规则 - 扩展关键词库
     URGENCY_INDICATORS: Dict[UrgencyLevel, Dict[str, Any]] = {
         UrgencyLevel.CRITICAL: {
-            "keywords": ["critical", "urgent", "crash", "紧急", "崩溃", "严重"],
+            "keywords": [
+                "critical",
+                "urgent",
+                "crash",
+                "紧急",
+                "崩溃",
+                "严重",
+                # 新增：更多表达紧急和严重的词汇
+                "马上",
+                "立刻",
+                "赶紧",
+                "急",
+                "救命",
+                "不行了",
+                "完蛋",
+                "立刻",
+                "马上",
+                "blocking",
+                "blocked",
+                "无法继续",
+                "不能继续",
+                "紧急",
+                "严重错误",
+            ],
             "conditions": ["has_errors", "build_failed", "tests_failing"],
         },
         UrgencyLevel.HIGH: {
-            "keywords": ["important", "asap", "deadline", "重要", "尽快"],
+            "keywords": [
+                "important",
+                "asap",
+                "deadline",
+                "重要",
+                "尽快",
+                # 新增：更多表达高优先级的词汇
+                "优先",
+                "先",
+                "赶快",
+                "快点",
+                "希望",
+                "想快点",
+                "urgent",
+                "priority",
+                "重要的事情",
+                "必须",
+                "一定",
+                "尽快完成",
+            ],
             "conditions": ["approaching_deadline", "blocking_issue"],
         },
         UrgencyLevel.MEDIUM: {
-            "keywords": ["should", "need", "want", "应该", "需要", "想要"],
+            "keywords": [
+                "should",
+                "need",
+                "want",
+                "应该",
+                "需要",
+                "想要",
+                # 新增：更多表达中等优先级的词汇
+                "想",
+                "要",
+                "可以",
+                "能不能",
+                "是否可以",
+                "try",
+                "attempt",
+                "希望可以",
+                "想要实现",
+                "需要做",
+            ],
             "conditions": ["normal_development", "feature_request"],
         },
         UrgencyLevel.LOW: {
-            "keywords": ["maybe", "later", "optional", "也许", "稍后", "可选"],
+            "keywords": [
+                "maybe",
+                "later",
+                "optional",
+                "也许",
+                "稍后",
+                "可选",
+                # 新增：更多表达低优先级的词汇
+                "有空",
+                "有时间",
+                "不急",
+                "不着急",
+                "慢慢",
+                "有时间再",
+                "no rush",
+                "when free",
+                "不着急",
+            ],
             "conditions": ["nice_to_have", "exploration"],
         },
     }
 
-    # 帮助决策矩阵：(用户状态, 紧急程度) -> (决策, 基础置信度)
+    # 【优化】帮助决策矩阵 - 调整置信度阈值以提高规则覆盖率
+    # 策略：
+    # 1. 对OFFER_HELP决策降低阈值要求（0.9→0.75），让规则更容易触发主动服务
+    # 2. 对STAY_SILENT决策提高阈值要求（0.5→0.6），避免过度保守
     HELP_DECISION_MATRIX: Dict[tuple, tuple] = {
-        # 卡住状态
+        # 卡住状态 - 用户明显需要帮助，积极提供
         (UserState.STUCK, UrgencyLevel.CRITICAL): (TimingDecision.OFFER_HELP, 0.95),
-        (UserState.STUCK, UrgencyLevel.HIGH): (TimingDecision.OFFER_HELP, 0.9),
-        (UserState.STUCK, UrgencyLevel.MEDIUM): (TimingDecision.OFFER_HELP, 0.8),
-        (UserState.STUCK, UrgencyLevel.LOW): (TimingDecision.ASK_CONFIRMATION, 0.7),
+        (UserState.STUCK, UrgencyLevel.HIGH): (
+            TimingDecision.OFFER_HELP,
+            0.85,
+        ),  # 降低0.9→0.85
+        (UserState.STUCK, UrgencyLevel.MEDIUM): (
+            TimingDecision.OFFER_HELP,
+            0.75,
+        ),  # 降低0.8→0.75
+        (UserState.STUCK, UrgencyLevel.LOW): (
+            TimingDecision.ASK_CONFIRMATION,
+            0.65,
+        ),  # 降低0.7→0.65
         (UserState.STUCK, UrgencyLevel.NONE): (TimingDecision.ASK_CONFIRMATION, 0.6),
-        # 忙碌状态
+        # 忙碌状态 - 谨慎打扰，但紧急情况除外
         (UserState.BUSY, UrgencyLevel.CRITICAL): (TimingDecision.OFFER_HELP, 0.85),
         (UserState.BUSY, UrgencyLevel.HIGH): (TimingDecision.ASK_CONFIRMATION, 0.7),
-        (UserState.BUSY, UrgencyLevel.MEDIUM): (TimingDecision.STAY_SILENT, 0.6),
-        (UserState.BUSY, UrgencyLevel.LOW): (TimingDecision.STAY_SILENT, 0.7),
+        (UserState.BUSY, UrgencyLevel.MEDIUM): (
+            TimingDecision.STAY_SILENT,
+            0.65,
+        ),  # 提高0.6→0.65
+        (UserState.BUSY, UrgencyLevel.LOW): (
+            TimingDecision.STAY_SILENT,
+            0.75,
+        ),  # 提高0.7→0.75
         (UserState.BUSY, UrgencyLevel.NONE): (TimingDecision.STAY_SILENT, 0.8),
-        # 探索状态
+        # 探索状态 - 适时提供帮助
         (UserState.EXPLORING, UrgencyLevel.CRITICAL): (TimingDecision.OFFER_HELP, 0.9),
         (UserState.EXPLORING, UrgencyLevel.HIGH): (TimingDecision.OFFER_HELP, 0.75),
         (UserState.EXPLORING, UrgencyLevel.MEDIUM): (
@@ -151,13 +328,13 @@ class RuleBasedJudge:
             TimingDecision.WAIT_FOR_MORE_CONTEXT,
             0.7,
         ),
-        # 专注状态
+        # 专注状态 - 避免打扰，除非紧急
         (UserState.FOCUSED, UrgencyLevel.CRITICAL): (TimingDecision.OFFER_HELP, 0.8),
         (UserState.FOCUSED, UrgencyLevel.HIGH): (TimingDecision.ASK_CONFIRMATION, 0.65),
         (UserState.FOCUSED, UrgencyLevel.MEDIUM): (TimingDecision.STAY_SILENT, 0.7),
         (UserState.FOCUSED, UrgencyLevel.LOW): (TimingDecision.STAY_SILENT, 0.8),
         (UserState.FOCUSED, UrgencyLevel.NONE): (TimingDecision.STAY_SILENT, 0.85),
-        # 空闲状态
+        # 空闲状态 - 可以提供帮助
         (UserState.IDLE, UrgencyLevel.CRITICAL): (TimingDecision.OFFER_HELP, 0.9),
         (UserState.IDLE, UrgencyLevel.HIGH): (TimingDecision.OFFER_HELP, 0.8),
         (UserState.IDLE, UrgencyLevel.MEDIUM): (TimingDecision.OFFER_HELP, 0.7),
@@ -166,7 +343,7 @@ class RuleBasedJudge:
             TimingDecision.WAIT_FOR_MORE_CONTEXT,
             0.5,
         ),
-        # 未知状态
+        # 未知状态 - 保守策略
         (UserState.UNKNOWN, UrgencyLevel.CRITICAL): (TimingDecision.OFFER_HELP, 0.85),
         (UserState.UNKNOWN, UrgencyLevel.HIGH): (TimingDecision.ASK_CONFIRMATION, 0.7),
         (UserState.UNKNOWN, UrgencyLevel.MEDIUM): (
@@ -175,9 +352,12 @@ class RuleBasedJudge:
         ),
         (UserState.UNKNOWN, UrgencyLevel.LOW): (
             TimingDecision.WAIT_FOR_MORE_CONTEXT,
-            0.5,
+            0.55,  # 提高0.5→0.55
         ),
-        (UserState.UNKNOWN, UrgencyLevel.NONE): (TimingDecision.STAY_SILENT, 0.5),
+        (UserState.UNKNOWN, UrgencyLevel.NONE): (
+            TimingDecision.STAY_SILENT,
+            0.55,
+        ),  # 提高0.5→0.55
     }
 
     def analyze_user_state(self, context: PredictionContext) -> UserStateAnalysis:
@@ -607,6 +787,7 @@ class TimingJudge:
         """判断是否应该主动提供帮助
 
         基于用户状态和紧急程度判断是否应该主动提供帮助。
+        规则引擎优先，LLM作为兜底增强。
 
         Args:
             context: 预测上下文
@@ -614,68 +795,7 @@ class TimingJudge:
         Returns:
             时机判断结果
         """
-        # 尝试使用LLM判断
-        llm_result = self._llm_judge_timing(context)
-
-        if llm_result:
-            # LLM判断成功
-            try:
-                # 解析LLM结果
-                user_state_str = llm_result["user_state"]
-                urgency_str = llm_result["urgency_level"]
-                should_interact = llm_result["should_interact"]
-                reasoning = llm_result["reasoning"]
-                confidence = llm_result["confidence"]
-
-                # 转换为枚举类型
-                llm_user_state = UserState(UserState[user_state_str.upper()])
-                llm_urgency = UrgencyLevel(UrgencyLevel[urgency_str.upper()])
-
-                # 根据should_interact决定决策
-                if should_interact:
-                    if llm_urgency in (UrgencyLevel.CRITICAL, UrgencyLevel.HIGH):
-                        decision = TimingDecision.OFFER_HELP
-                    else:
-                        decision = TimingDecision.ASK_CONFIRMATION
-                else:
-                    decision = TimingDecision.STAY_SILENT
-
-                # 应用策略调整
-                decision, confidence = self._apply_strategy_adjustment(
-                    decision, confidence, "offer_help"
-                )
-
-                # 应用用户偏好调整
-                decision, confidence = self._apply_user_preference_adjustment(
-                    context, decision, confidence
-                )
-
-                # 生成建议行动
-                suggested_action = self._get_suggested_action(
-                    decision, llm_user_state, llm_urgency
-                )
-
-                # 计算延迟时间
-                delay = self._get_delay(decision, llm_urgency)
-
-                # 过程打印
-                PrettyOutput.auto_print(
-                    f"⏰  时机判断: 用户状态={llm_user_state.value}, 紧急度={llm_urgency.value} (模式: LLM)"
-                )
-
-                return TimingResult(
-                    decision=decision,
-                    confidence_score=confidence,
-                    reasoning=reasoning,
-                    suggested_action=suggested_action,
-                    delay_seconds=delay,
-                )
-
-            except Exception:
-                # LLM结果解析失败，降级到规则模式
-                pass
-
-        # LLM判断失败或未提供，使用规则模式
+        # 【优化】优先使用规则引擎判断
         # 分析用户状态
         user_state = self._rule_judge.analyze_user_state(context)
 
@@ -697,6 +817,120 @@ class TimingJudge:
             context, decision, confidence
         )
 
+        # 【优化】规则引擎置信度足够高时，直接返回（规则优先）
+        RULE_CONFIDENCE_THRESHOLD = 0.6
+        if confidence >= RULE_CONFIDENCE_THRESHOLD:
+            # 生成建议行动
+            suggested_action = self._get_suggested_action(
+                decision, user_state.state, urgency.level
+            )
+
+            # 计算延迟时间
+            delay = self._get_delay(decision, urgency.level)
+
+            # 过程打印
+            PrettyOutput.auto_print(
+                f"⏰  时机判断: 用户状态={user_state.state.value}, 紧急度={urgency.level.value} "
+                f"(模式: 规则, 置信度={confidence:.2f})"
+            )
+
+            return TimingResult(
+                decision=decision,
+                confidence_score=confidence,
+                reasoning=reasoning,
+                suggested_action=suggested_action,
+                delay_seconds=delay,
+            )
+
+        # 【兜底】规则引擎置信度不足时，尝试LLM增强（如果可用）
+        llm_result = self._llm_judge_timing(context)
+
+        if llm_result:
+            # LLM判断成功，使用LLM结果增强规则判断
+            try:
+                # 解析LLM结果
+                # user_state_str = llm_result["user_state"]  # 保留规则引擎的user_state
+                urgency_str = llm_result["urgency_level"]
+                should_interact = llm_result["should_interact"]
+                llm_reasoning = llm_result["reasoning"]
+                llm_confidence = llm_result["confidence"]
+
+                # 转换为枚举类型
+                # llm_user_state = UserState(UserState[user_state_str.upper()])  # 保留规则引擎的user_state
+                llm_urgency = UrgencyLevel(UrgencyLevel[urgency_str.upper()])
+
+                # 根据should_interact决定决策
+                if should_interact:
+                    if llm_urgency in (UrgencyLevel.CRITICAL, UrgencyLevel.HIGH):
+                        llm_decision = TimingDecision.OFFER_HELP
+                    else:
+                        llm_decision = TimingDecision.ASK_CONFIRMATION
+                else:
+                    llm_decision = TimingDecision.STAY_SILENT
+
+                # 综合规则和LLM的判断（加权平均）
+                # 给予规则结果更高权重（0.6），因为规则更稳定
+                final_confidence = confidence * 0.6 + llm_confidence * 0.4
+
+                # 如果LLM和规则决策一致，增强置信度
+                if llm_decision == decision:
+                    final_confidence = min(1.0, final_confidence + 0.1)
+                    reasoning = f"{reasoning} | LLM增强: {llm_reasoning}"
+                else:
+                    # 如果不一致，保留规则的决策（更保守）
+                    reasoning = (
+                        f"{reasoning} | LLM建议: {llm_decision.value} ({llm_reasoning})"
+                    )
+
+                # 重新应用调整（使用综合后的置信度）
+                decision, final_confidence = self._apply_strategy_adjustment(
+                    decision, final_confidence, "offer_help"
+                )
+
+                # 生成建议行动
+                suggested_action = self._get_suggested_action(
+                    decision, user_state.state, urgency.level
+                )
+
+                # 计算延迟时间
+                delay = self._get_delay(decision, urgency.level)
+
+                # 过程打印
+                PrettyOutput.auto_print(
+                    f"⏰  时机判断: 用户状态={user_state.state.value}, 紧急度={urgency.level.value} "
+                    f"(模式: 混合, 规则={confidence:.2f}, LLM={llm_confidence:.2f})"
+                )
+
+                return TimingResult(
+                    decision=decision,
+                    confidence_score=final_confidence,
+                    reasoning=reasoning,
+                    suggested_action=suggested_action,
+                    delay_seconds=delay,
+                )
+
+            except Exception:
+                # LLM结果解析失败，继续使用规则结果
+                pass
+
+        # LLM不可用或失败，直接使用规则结果
+        # 【优化】在PROACTIVE策略下，提高规则结果的置信度，使其更容易达到阈值
+        if self._strategy == JudgmentStrategy.PROACTIVE:
+            # PROACTIVE策略：提高置信度，让规则更容易触发
+            confidence = min(1.0, confidence + 0.15)
+            # 如果是STAY_SILENT决策，尝试改为更主动的决策
+            if decision == TimingDecision.STAY_SILENT:
+                # 根据用户状态决定是否改为ASK_CONFIRMATION
+                # PROACTIVE策略：除了FOCUSED状态外，其他状态都应该主动询问
+                if user_state.state in (
+                    UserState.EXPLORING,
+                    UserState.IDLE,
+                    UserState.UNKNOWN,
+                    UserState.BUSY,  # 添加BUSY状态
+                ):
+                    decision = TimingDecision.ASK_CONFIRMATION
+                    reasoning += " | PROACTIVE策略：主动询问确认"
+
         # 生成建议行动
         suggested_action = self._get_suggested_action(
             decision, user_state.state, urgency.level
@@ -704,6 +938,12 @@ class TimingJudge:
 
         # 计算延迟时间
         delay = self._get_delay(decision, urgency.level)
+
+        # 过程打印
+        PrettyOutput.auto_print(
+            f"⏰  时机判断: 用户状态={user_state.state.value}, 紧急度={urgency.level.value} "
+            f"(模式: 规则兜底, 置信度={confidence:.2f})"
+        )
 
         return TimingResult(
             decision=decision,
