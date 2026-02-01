@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Jarvis AI 助手主入口模块"""
 
+import json
 import os
 import shutil
 import subprocess
@@ -43,6 +44,14 @@ from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
 
 # 导入quick_config模块用于--quick-config参数
 from jarvis.jarvis_utils import quick_config as qc
+
+# 导入jck模块用于--check参数
+from jarvis.jarvis_jck.core import ToolChecker
+from jarvis.jarvis_jck.cli import (
+    _install_missing_tools,
+    _print_results,
+    _perform_check,
+)
 
 
 def _normalize_backup_data_argv(argv: List[str]) -> None:
@@ -774,6 +783,33 @@ def run_cli(
         "--quick-config",
         help="启动快速配置向导：快速配置 LLM 平台信息（Claude/OpenAI）",
     ),
+    # 工具检查相关参数（原 jck 命令功能）
+    # 这些参数会自动触发检查模式，不需要额外加 --check
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="检查所有工具的安装情况（原 jck 命令）",
+    ),
+    check_lint: bool = typer.Option(
+        False,
+        "--check-lint",
+        help="检查lint工具（原 jck --check-lint）",
+    ),
+    check_build: bool = typer.Option(
+        False,
+        "--check-build",
+        help="检查构建工具（原 jck --check-build）",
+    ),
+    check_json: bool = typer.Option(
+        False,
+        "--check-json",
+        help="以JSON格式输出检查结果（配合其他check选项使用）",
+    ),
+    check_tool_name: Optional[str] = typer.Option(
+        None,
+        "--check-tool",
+        help="检查指定工具（原 jck <tool_name>）",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -782,6 +818,61 @@ def run_cli(
     # 处理 --quick-config 参数：启动快速配置向导
     if quick_config:
         qc.app()
+        return
+
+    # 处理工具检查参数（原 jck 命令功能）
+    # 任何一个 check 相关参数都会触发检查
+    is_check_mode = check or check_lint or check_build or check_tool_name is not None
+
+    if is_check_mode:
+        from jarvis.jarvis_utils.output import OutputType
+
+        # 检查选项互斥性
+        check_flags = [check_lint, check_build]
+        active_flags = sum(check_flags)
+        if active_flags > 1:
+            PrettyOutput.auto_print(
+                "❌ 错误：--check-lint 和 --check-build 选项不能同时使用"
+            )
+            raise typer.Exit(code=1)
+
+        # 确定检查类型
+        do_check_lint = check_lint
+        do_check_build = check_build
+
+        # 执行工具检查
+        checker = ToolChecker()
+        results, summary = _perform_check(
+            checker, check_tool_name, do_check_lint, do_check_build
+        )
+
+        if check_json:
+            # JSON格式输出
+            output = {
+                "summary": summary,
+                "results": results,
+            }
+            PrettyOutput.print(
+                json.dumps(output, ensure_ascii=False, indent=2),
+                output_type=OutputType.CODE,
+                lang="json",
+            )
+        else:
+            # 友好的文本输出
+            # 如果有未安装工具，询问是否自动安装
+            if summary["missing"] > 0:
+                _install_missing_tools(results)
+                # 重新检查工具状态
+                results, summary = _perform_check(
+                    checker, check_tool_name, do_check_lint, do_check_build
+                )
+
+            # 输出最终结果
+            _print_results(results, summary)
+
+        # 如果有工具未安装，返回非零退出码
+        if summary["missing"] > 0:
+            raise typer.Exit(code=1)
         return
 
     # 处理任务内容：优先从文件读取
@@ -794,8 +885,6 @@ def run_cli(
 
     if task_file:
         try:
-            import json
-
             with open(task_file, "r", encoding="utf-8") as file_handle:
                 file_content = file_handle.read()
 
@@ -979,7 +1068,6 @@ def run_cli(
         output_content = ""
         exit_code = 0
         error_message = ""
-        import json
 
         try:
             # 初始化agent并运行任务，捕获输出
@@ -1061,8 +1149,6 @@ def run_cli(
         finally:
             # 如果是tmux并行任务，写入状态文件
             if status_file_path:
-                import json
-
                 try:
                     # 写入状态文件
                     status_data = {
