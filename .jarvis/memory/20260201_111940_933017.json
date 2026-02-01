@@ -1,0 +1,8 @@
+{
+  "id": "20260201_111940_933017",
+  "type": "project_long_term",
+  "tags": ["digital_twin", "proactive_service", "service_executor", "阶段5.3"],
+  "content": "## ServiceExecutor 服务执行器模块\n\n**文件位置**：src/jarvis/jarvis_digital_twin/proactive_service/service_executor.py\n**测试文件**：tests/jarvis_digital_twin/test_service_executor.py（41个测试，94%覆盖率）\n\n**核心类**：\n- ServiceExecutor：服务执行器，管理处理器和执行历史\n- SuggestionHandler：建议类服务处理器\n- ReminderHandler：提醒类服务处理器\n- InformationHandler：信息提供类服务处理器\n- ClarificationHandler：澄清请求类服务处理器\n\n**核心方法**：\n- register_handler(service_type, handler)：注册服务处理器\n- unregister_handler(service_type)：取消注册处理器\n- execute(service, context)：执行单个服务\n- execute_plan(plan, context)：执行执行计划\n- get_execution_history(service_id, limit)：获取执行历史\n- clear_history()：清除执行历史\n\n**设计模式**：使用 ServiceHandlerProtocol 定义处理器接口，支持依赖注入",
+  "created_at": "2026-02-01T11:19:40.933038",
+  "updated_at": "2026-02-01T11:19:40.933040"
+}

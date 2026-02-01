@@ -1,0 +1,8 @@
+{
+  "id": "20260201_114341_462917",
+  "type": "project_long_term",
+  "tags": ["digital_twin", "continuous_learning", "types", "阶段5.4"],
+  "content": "## 阶段5.4 持续学习系统类型定义\n\n**目录位置**：src/jarvis/jarvis_digital_twin/continuous_learning/\n\n**文件结构**：\n- __init__.py - 模块初始化，导出所有公共类\n- types.py - 类型定义\n\n**枚举类型**：\n1. KnowledgeType: CONCEPT, PATTERN, RULE, FACT, PROCEDURE\n2. SkillType: TOOL_USAGE, LANGUAGE, FRAMEWORK, METHODOLOGY, DOMAIN\n3. ExperienceType: SUCCESS, FAILURE, INSIGHT, LESSON\n4. LearningStatus: PENDING, LEARNING, LEARNED, VERIFIED, DEPRECATED\n\n**数据类**：\n1. Knowledge: id, type, content, source, confidence, created_at, updated_at, metadata\n2. Skill: id, type, name, description, proficiency, examples, created_at, metadata\n3. Experience: id, type, context, outcome, lessons, created_at, metadata\n4. LearningResult: success, items_learned, errors, duration, knowledge_items, skill_items, experience_items\n\n**Protocol接口**：\n1. KnowledgeSourceProtocol: extract(context) -> List[Knowledge]\n2. SkillEvaluatorProtocol: evaluate(skill) -> float\n3. ExperienceMatcherProtocol: match(context) -> List[Experience]",
+  "created_at": "2026-02-01T11:43:41.462937",
+  "updated_at": "2026-02-01T11:43:41.462940"
+}
