@@ -239,6 +239,7 @@ class ServiceExecutor:
         if handler is None:
             result = ServiceResult(
                 service_id=service.service_id,
+                service_name=service.name,
                 status=ServiceStatus.FAILED,
                 message=f"未找到服务类型 {service.service_type.value} 的处理器",
                 executed_at=datetime.now(),
@@ -257,6 +258,7 @@ class ServiceExecutor:
             # 创建结果
             result = ServiceResult(
                 service_id=service.service_id,
+                service_name=service.name,
                 status=handler_result.status,
                 message=handler_result.message,
                 data=handler_result.data,
@@ -268,6 +270,7 @@ class ServiceExecutor:
             duration_ms = int((time.time() - start_time) * 1000)
             result = ServiceResult(
                 service_id=service.service_id,
+                service_name=service.name,
                 status=ServiceStatus.FAILED,
                 message=f"执行失败: {str(e)}",
                 executed_at=datetime.now(),

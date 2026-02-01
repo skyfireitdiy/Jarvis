@@ -1,0 +1,8 @@
+{
+  "id": "20260201_181802_158752",
+  "type": "project_long_term",
+  "tags": ["主动服务", "中文名称", "ServiceResult", "功能完成"],
+  "content": "## 主动服务中文名称显示功能完成\n\n**修改时间**：2026-02-01\n\n**需求**：主动服务触发时显示的服务名字使用中文\n\n**实现方案**：\n1. ServiceResult 添加 service_name 字段（默认空字符串）\n2. ServiceExecutor.execute() 传入 service.name\n3. run_loop.py 显示时使用 result.service_name\n\n**修改文件**：\n- src/jarvis/jarvis_digital_twin/proactive_service/types.py\n- src/jarvis/jarvis_digital_twin/proactive_service/service_executor.py\n- src/jarvis/jarvis_agent/run_loop.py\n\n**测试结果**：\n- test_service_executor.py: 41个测试通过\n- test_proactive_service_manager.py: 26个测试通过\n- test_service_trigger.py: 47个测试通过\n- test_service_orchestrator.py: 40个测试通过\n- 总计：154个测试全部通过\n\n**显示效果**：\n- 修改前：`[主动服务: 建议已生成]`\n- 修改后：`[代码建议服务: 建议已生成]`",
+  "created_at": "2026-02-01T18:18:02.158775",
+  "updated_at": "2026-02-01T18:18:02.158778"
+}

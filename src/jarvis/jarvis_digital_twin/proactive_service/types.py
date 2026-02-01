@@ -123,6 +123,8 @@ class ServiceResult:
     message: str
     # 结果数据
     data: Optional[Dict[str, Any]] = None
+    # 服务名称（中文）
+    service_name: str = ""
     # 执行时间
     executed_at: datetime = field(default_factory=datetime.now)
     # 执行耗时（毫秒）
