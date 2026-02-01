@@ -89,6 +89,8 @@ class arch_analyzer_tool:
                 "overall_score": report.overall_score,
                 "summary": report.summary,
                 "timestamp": report.timestamp,
+                "stdout": f"项目分析完成\n路径: {report.project_path}\n总体评分: {report.overall_score}\n摘要: {report.summary}",
+                "stderr": "",
             }
 
             if include_details:
@@ -96,7 +98,7 @@ class arch_analyzer_tool:
 
             return result
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": str(e), "stdout": "", "stderr": str(e)}
 
     def _handle_analyze_complexity(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理复杂度分析"""
@@ -114,6 +116,8 @@ class arch_analyzer_tool:
                 "average_cyclomatic": report.average_cyclomatic,
                 "average_cognitive": report.average_cognitive,
                 "high_complexity_count": len(report.high_complexity_functions),
+                "stdout": f"复杂度分析完成\n总函数数: {report.total_functions}\n平均圈复杂度: {report.average_cyclomatic:.2f}\n平均认知复杂度: {report.average_cognitive:.2f}\n高复杂度函数数: {len(report.high_complexity_functions)}",
+                "stderr": "",
             }
 
             if include_details and report.high_complexity_functions:
@@ -129,7 +133,7 @@ class arch_analyzer_tool:
 
             return result
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": str(e), "stdout": "", "stderr": str(e)}
 
     def _handle_analyze_dependency(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理依赖分析"""
@@ -152,6 +156,8 @@ class arch_analyzer_tool:
                 "total_dependencies": total_deps,
                 "circular_dependency_count": len(report.circular_dependencies),
                 "average_coupling": report.average_coupling,
+                "stdout": f"依赖分析完成\n总模块数: {report.total_modules}\n总依赖数: {total_deps}\n循环依赖数: {len(report.circular_dependencies)}\n平均耦合度: {report.average_coupling:.2f}",
+                "stderr": "",
             }
 
             if include_details:
@@ -177,7 +183,7 @@ class arch_analyzer_tool:
 
             return result
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": str(e), "stdout": "", "stderr": str(e)}
 
     def _handle_analyze_duplication(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理重复度分析"""
@@ -196,6 +202,8 @@ class arch_analyzer_tool:
                 "duplication_pairs_count": len(report.duplication_pairs),
                 "duplication_rate": report.duplication_rate,
                 "total_duplicated_lines": report.total_duplicated_lines,
+                "stdout": f"重复度分析完成\n总函数数: {report.total_functions}\n重复函数数: {report.duplicated_functions}\n重复对数: {len(report.duplication_pairs)}\n重复率: {report.duplication_rate:.2%}\n重复代码行数: {report.total_duplicated_lines}",
+                "stderr": "",
             }
 
             if include_details and report.duplication_pairs:
@@ -211,4 +219,4 @@ class arch_analyzer_tool:
 
             return result
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": str(e), "stdout": "", "stderr": str(e)}
