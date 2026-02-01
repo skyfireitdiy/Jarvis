@@ -32,10 +32,9 @@ JARVIS 内置了以下规则，位于 `builtin/rules/` 和 `builtin/rules/testin
 
 | 规则文件            | 用途         | 适用场景     |
 | ------------------- | ------------ | ------------ |
-| `sdd.md`            | Spec驱动开发 | 设计文档编写 |
-| `tdd.md`            | 测试驱动开发 | 测试代码生成 |
-| `refactoring.md`    | 重构指南     | 代码重构任务 |
-| `generate_rules.md` | 规则生成指南 | 创建新规则时 |
+| `sdd.md`         | Spec驱动开发 | 设计文档编写 |
+| `tdd.md`         | 测试驱动开发 | 测试代码生成 |
+| `refactoring.md` | 重构指南     | 代码重构任务 |
 
 ### 代码质量
 

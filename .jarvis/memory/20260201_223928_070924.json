@@ -1,0 +1,12 @@
+{
+  "id": "20260201_223928_070924",
+  "type": "project_long_term",
+  "tags": [
+    "代码清理",
+    "功能移除",
+    "jarvis_rule_generator"
+  ],
+  "content": "## jarvis_rule_generator 模块删除完成\n\n### 删除内容\n1. **源代码**：`src/jarvis/jarvis_rule_generator/` (712行)\n   - `__init__.py` (18行)\n   - `rule_generator.py` (694行)\n2. **测试代码**：`tests/jarvis_rule_generator/` (592行)\n   - `__init__.py` (1行)\n   - `test_rule_generator.py` (591行)\n\n### 验证结果\n- ✅ 源代码目录已删除\n- ✅ 测试代码目录已删除\n- ✅ 无残留 import 引用\n- ✅ 文档中无引用\n- ✅ 配置文件中无引用\n- ✅ 构建验证通过\n- ✅ 静态扫描通过\n\n### 统计\n- 删除代码总计：1304行\n- 删除文件数：4个\n\n### Git提交\n- b58d441: 删除 jarvis_rule_generator 模块\n\n### 说明\n- 该模块无外部依赖，删除不影响其他功能\n- 模块功能为规则生成，已被标记为低价值功能",
+  "created_at": "2026-02-01T22:39:28.070949",
+  "updated_at": "2026-02-01T22:39:28.070953"
+}

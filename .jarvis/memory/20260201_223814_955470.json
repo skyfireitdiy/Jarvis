@@ -1,0 +1,13 @@
+{
+  "id": "20260201_223814_955470",
+  "type": "project_long_term",
+  "tags": [
+    "代码清理",
+    "功能移除",
+    "generate_rule",
+    "jarvis_methodology_generator"
+  ],
+  "content": "## generate_rule工具和jarvis_methodology_generator模块删除完成\n\n### 删除内容\n1. **generate_rule工具**：`src/jarvis/jarvis_tools/generate_rule.py` (312行)\n2. **jarvis_methodology_generator模块**：\n   - 源代码：`src/jarvis/jarvis_methodology_generator/`\n   - 测试代码：`tests/jarvis_methodology_generator/`\n3. **task_analyzer.py中的相关方法**（约160行）：\n   - `_try_extract_methodology()`\n   - `_extract_and_save_methodology()`\n   - `_collect_execution_steps()`\n   - `_collect_tool_calls_as_dicts()`\n   - `_get_existing_methodologies()`\n   - `_save_methodology()`\n4. **文档引用**：`docs/best_practices/rules_best_practices.md` 中的 `generate_rules.md` 引用\n\n### 清理的import语句\n- `from jarvis.jarvis_utils.config import is_enable_auto_methodology_extraction`\n- `from typing import Dict`\n\n### 验证结果\n- ✅ 所有import引用已清理\n- ✅ 所有工具引用已清理\n- ✅ 所有文档引用已清理\n- ✅ ruff代码检查通过\n- ✅ mypy类型检查通过\n\n### 注意事项\n- `jarvis_rule_generator` 模块被保留（与 `jarvis_methodology_generator` 不同）\n- `jarvis_rule_generator` 中的 `generate_rule_content` 方法是正常的，不是残留引用\n\n### Git提交\n- 470662e: 删除 generate_rule.py\n- a597e23: 删除 _try_extract_methodology 调用\n- 6e6f477: 删除 _try_extract_methodology 方法\n- e8692bb: 删除 _extract_and_save_methodology 方法\n- 5e9cef0: 删除 _collect_tool_calls_as_dicts 方法\n- 9db4d24: 删除 _get_existing_methodologies 方法\n- 21c6809: 删除 _save_methodology 方法\n- 570fb88: 删除文档中的 generate_rules.md 引用",
+  "created_at": "2026-02-01T22:38:14.955541",
+  "updated_at": "2026-02-01T22:38:14.955548"
+}

@@ -80,15 +80,7 @@ digraph G {
     mcp_stream [label="MCP客户端：streamable"];
   }
 
-  subgraph cluster_stats {
-    label = "jarvis_stats（统计）";
-    style = "filled";
-    color = "#f7f7f7";
-    node [fillcolor="#E6E6E6", color="#7D7D7D"];
-    st_stats [label="统计管理（StatsManager）"];
-    st_storage [label="存储（StatsStorage）"];
-    st_visual [label="可视化（StatsVisualizer）"];
-  }
+
 
   // 关键依赖关系（抽象到模块级）
   // Agent核心依赖
