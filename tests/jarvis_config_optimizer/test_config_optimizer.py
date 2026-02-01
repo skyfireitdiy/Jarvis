@@ -316,9 +316,9 @@ class TestConfigOptimizer:
         optimizer.print_report(report)
         captured = capsys.readouterr()
 
-        assert "Configuration Optimization Report" in captured.out
-        assert "Total Issues" in captured.out
-        assert "Optimization Suggestions" in captured.out
+        assert "配置优化报告" in captured.out
+        assert "问题总数" in captured.out
+        assert "优化建议" in captured.out
 
     def test_history_management(self, temp_config_file):
         """Test analysis history management."""
