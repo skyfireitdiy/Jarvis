@@ -66,7 +66,6 @@
 | `jarvis-sec`                   | `jsec`   | 安全分析套件 (C/C++/Rust)  |
 | `jarvis-c2rust`                | `jc2r`   | C→Rust 迁移套件            |
 | `jarvis-config`                | `jcfg`   | 配置管理工具               |
-| `jarvis-quick-config`          | `jqc`    | 快速配置 LLM 平台          |
 
 #### Codex CLI 命令列表
 
