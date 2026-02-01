@@ -1,0 +1,8 @@
+{
+  "id": "20260201_103139_989873",
+  "type": "project_long_term",
+  "tags": ["prediction", "timing_judge", "design_pattern", "digital_twin"],
+  "content": "TimingJudge时机判断器设计模式：\n\n1. **决策矩阵**：基于用户状态（STUCK/BUSY/EXPLORING/FOCUSED/IDLE/UNKNOWN）和紧急程度（CRITICAL/HIGH/MEDIUM/LOW/NONE）的30种组合决策矩阵\n\n2. **三种判断策略**：\n   - CONSERVATIVE：保守策略，倾向于保持沉默或请求确认\n   - BALANCED：平衡策略（默认），根据情况灵活决策\n   - PROACTIVE：主动策略，倾向于主动提供帮助\n\n3. **用户偏好调整**：\n   - 根据interaction_style.preferred_style调整（proactive/quiet）\n   - 根据help_history.acceptance_rate调整置信度\n\n4. **核心方法**：\n   - should_offer_help()：判断是否主动提供帮助\n   - should_stay_silent()：判断是否保持沉默\n   - should_ask_confirmation()：判断是否请求确认\n\n文件位置：src/jarvis/jarvis_digital_twin/prediction/timing_judge.py",
+  "created_at": "2026-02-01T10:31:39.989891",
+  "updated_at": "2026-02-01T10:31:39.989894"
+}
