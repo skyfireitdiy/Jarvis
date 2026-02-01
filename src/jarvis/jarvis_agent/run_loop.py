@@ -141,7 +141,7 @@ class AgentRunLoop:
         except ImportError:
             pass  # 主动服务管理器加载失败不影响其他功能
 
-        # 初始化持续学习管理器，为所有子组件注入独立的LLM实例
+        # 初始化持续学习管理器，为所有子组件注入独立的LLM实例和集成模块
         try:
             from jarvis.jarvis_digital_twin.continuous_learning import (
                 ContinuousLearningManager,
@@ -159,9 +159,19 @@ class AgentRunLoop:
                 AdaptiveEngine,
             )
 
+            # 尝试加载知识图谱模块用于知识存储
+            knowledge_graph = None
+            try:
+                from jarvis.jarvis_knowledge_graph import KnowledgeGraph
+
+                knowledge_graph = KnowledgeGraph()
+            except ImportError:
+                pass  # 知识图谱模块不可用时使用内存存储
+
             self._continuous_learning_manager = ContinuousLearningManager(
                 knowledge_acquirer=KnowledgeAcquirer(
-                    llm_client=registry.get_cheap_platform()
+                    llm_client=registry.get_cheap_platform(),
+                    knowledge_graph=knowledge_graph,
                 ),
                 skill_learner=SkillLearner(llm_client=registry.get_cheap_platform()),
                 experience_accumulator=ExperienceAccumulator(

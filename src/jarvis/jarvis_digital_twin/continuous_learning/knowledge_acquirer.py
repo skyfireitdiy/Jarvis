@@ -438,6 +438,10 @@ class KnowledgeAcquirer:
     ) -> List[Knowledge]:
         """从交互中提取知识。
 
+        支持两种提取模式：
+        1. 规则提取：使用正则表达式模式匹配（默认）
+        2. LLM提取：使用LLM进行语义理解和知识提取（当llm_client可用时）
+
         Args:
             context: 交互上下文
             source: 来源标识
@@ -450,7 +454,12 @@ class KnowledgeAcquirer:
 
         knowledge_list: List[Knowledge] = []
 
-        # 使用内置交互来源
+        # 优先使用LLM进行语义知识提取
+        if self._llm_client is not None:
+            llm_extracted = self._extract_knowledge_with_llm(context, source)
+            knowledge_list.extend(llm_extracted)
+
+        # 使用内置交互来源（规则提取作为补充或fallback）
         extracted = self._interaction_source.extract(context)
         for k in extracted:
             k.source = source
@@ -472,6 +481,99 @@ class KnowledgeAcquirer:
                 stored_knowledge.append(knowledge)
 
         return stored_knowledge
+
+    def _extract_knowledge_with_llm(
+        self,
+        context: str,
+        source: str,
+    ) -> List[Knowledge]:
+        """使用LLM进行语义知识提取。
+
+        Args:
+            context: 交互上下文
+            source: 来源标识
+
+        Returns:
+            提取的知识列表
+        """
+        if not self._llm_client or len(context) < 50:
+            return []
+
+        try:
+            # 构建提取提示
+            prompt = f"""分析以下对话内容，提取有价值的知识点。
+
+对话内容：
+{context[:2000]}
+
+请提取以下类型的知识（如果存在）：
+1. CONCEPT - 概念定义或解释
+2. FACT - 事实性信息
+3. RULE - 规则或原则
+4. PATTERN - 代码模式或最佳实践
+5. PROCEDURE - 操作步骤或方法论
+
+以JSON格式返回，格式如下：
+{{
+  "knowledge": [
+    {{"type": "CONCEPT", "content": "知识内容"}},
+    {{"type": "FACT", "content": "知识内容"}}
+  ]
+}}
+
+如果没有提取到有价值的知识，返回空数组：{{"knowledge": []}}
+只返回JSON，不要其他内容。"""
+
+            # 调用LLM
+            response = self._llm_client.chat(prompt)
+            if not response:
+                return []
+
+            # 解析响应
+            import json
+            import re
+
+            # 尝试提取JSON
+            json_match = re.search(
+                r'\{[^{}]*"knowledge"[^{}]*\[.*?\][^{}]*\}', response, re.DOTALL
+            )
+            if not json_match:
+                return []
+
+            result = json.loads(json_match.group())
+            knowledge_items = result.get("knowledge", [])
+
+            # 转换为Knowledge对象
+            extracted: List[Knowledge] = []
+            type_mapping = {
+                "CONCEPT": KnowledgeType.CONCEPT,
+                "FACT": KnowledgeType.FACT,
+                "RULE": KnowledgeType.RULE,
+                "PATTERN": KnowledgeType.PATTERN,
+                "PROCEDURE": KnowledgeType.PROCEDURE,
+            }
+
+            for item in knowledge_items:
+                k_type = type_mapping.get(
+                    item.get("type", "").upper(), KnowledgeType.FACT
+                )
+                content = item.get("content", "").strip()
+                if content and len(content) >= 10:
+                    extracted.append(
+                        Knowledge(
+                            id=str(uuid.uuid4()),
+                            type=k_type,
+                            content=content,
+                            source=f"{source}_llm",
+                            confidence=0.8,  # LLM提取的知识给予较高置信度
+                        )
+                    )
+
+            return extracted
+
+        except Exception:
+            # LLM提取失败时返回空列表，不影响规则提取
+            return []
 
     def learn_from_code(
         self,
@@ -559,13 +661,29 @@ class KnowledgeAcquirer:
         # 如果有知识图谱，同步存储
         if self._knowledge_graph is not None:
             try:
-                # 假设knowledge_graph有add_node方法
+                # 导入NodeType并映射KnowledgeType到NodeType
+                from jarvis.jarvis_knowledge_graph import NodeType
+
+                # KnowledgeType到NodeType的映射
+                type_mapping = {
+                    KnowledgeType.CONCEPT: NodeType.CONCEPT,
+                    KnowledgeType.PATTERN: NodeType.CODE,
+                    KnowledgeType.RULE: NodeType.RULE,
+                    KnowledgeType.FACT: NodeType.MEMORY,
+                    KnowledgeType.PROCEDURE: NodeType.METHODOLOGY,
+                }
+                node_type = type_mapping.get(knowledge.type, NodeType.CONCEPT)
+
                 if hasattr(self._knowledge_graph, "add_node"):
                     self._knowledge_graph.add_node(
-                        node_type="knowledge",
+                        node_type=node_type,
                         name=knowledge.content[:50],
                         description=knowledge.content,
-                        tags=[knowledge.type.value, knowledge.source],
+                        tags=[
+                            knowledge.type.value,
+                            knowledge.source,
+                            "continuous_learning",
+                        ],
                     )
             except Exception:
                 # 忽略知识图谱存储错误
