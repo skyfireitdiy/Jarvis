@@ -1,0 +1,14 @@
+{
+  "id": "20260201_185454_711450",
+  "type": "project_long_term",
+  "tags": [
+    "continuous_learning",
+    "optimization",
+    "P0",
+    "knowledge_graph",
+    "LLM"
+  ],
+  "content": "## 持续学习系统P0优化完成\n\n### 优化内容\n\n#### 1. 模块集成深度优化（run_loop.py）\n- 在初始化持续学习管理器时注入KnowledgeGraph实例\n- 修改位置：src/jarvis/jarvis_agent/run_loop.py 第144-175行\n- 学习到的知识会自动同步到知识图谱存储\n\n#### 2. 知识提取机制增强（knowledge_acquirer.py）\n- 添加LLM辅助的语义知识提取方法 `_extract_knowledge_with_llm()`\n- 支持提取5种知识类型：CONCEPT、FACT、RULE、PATTERN、PROCEDURE\n- LLM提取作为主要方式，规则提取作为补充\n- 修复了store_knowledge中NodeType的使用问题，添加KnowledgeType到NodeType的映射\n\n### 技术细节\n- KnowledgeType到NodeType映射：CONCEPT→CONCEPT, PATTERN→CODE, RULE→RULE, FACT→MEMORY, PROCEDURE→METHODOLOGY\n- LLM提取的知识置信度设为0.8\n- 所有同步到知识图谱的知识添加'continuous_learning'标签\n\n### 测试验证\n- 660个digital_twin测试全部通过\n- 65个agent测试全部通过",
+  "created_at": "2026-02-01T18:54:54.711472",
+  "updated_at": "2026-02-01T18:54:54.711476"
+}
