@@ -160,3 +160,4 @@ coverage.xml
 .jarvis/history
 .jarvis/rag
 .jarvis/task_lists
+.jarvis/knowledge_graph
