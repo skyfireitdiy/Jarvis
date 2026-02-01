@@ -209,11 +209,8 @@ class AgentRunLoop:
                         # 将情绪信息作为上下文提示
                         emotion_hint = f"[用户情绪: {emotion_result.emotion_type.value}, 置信度: {emotion_result.confidence:.2f}]"
                         enhanced_input = f"{emotion_hint}\n{user_input}"
-                        PrettyOutput.auto_print(
-                            f"🎭 情绪识别: {emotion_result.emotion_type.value} (置信度: {emotion_result.confidence:.2f})"
-                        )
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 情绪识别异常: {e}")
+            except Exception:
+                pass  # 情绪识别失败不影响主流程
 
         # 3. 歧义检测
         if self._ambiguity_resolver:
@@ -225,11 +222,8 @@ class AgentRunLoop:
                         f"[检测到歧义: {ambiguity_result.ambiguity_type.value}]"
                     )
                     enhanced_input = f"{ambiguity_hint}\n{enhanced_input}"
-                    PrettyOutput.auto_print(
-                        f"🔍 歧义检测: {ambiguity_result.ambiguity_type.value}"
-                    )
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 歧义检测异常: {e}")
+            except Exception:
+                pass  # 歧义检测失败不影响主流程
 
         # 4. 主动服务处理
         if self._proactive_service_manager:
@@ -258,10 +252,8 @@ class AgentRunLoop:
                             f"[主动服务: {result.message}]\n{enhanced_input}"
                         )
                         service_count += 1
-                if service_count > 0:
-                    PrettyOutput.auto_print(f"💡 主动服务: 触发 {service_count} 个服务")
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 主动服务异常: {e}")
+            except Exception:
+                pass  # 主动服务失败不影响主流程
 
         return enhanced_input
 
@@ -307,30 +299,12 @@ class AgentRunLoop:
                                 last_user_input = turn.content
                                 break
                 if last_user_input:
-                    learning_result = (
-                        self._continuous_learning_manager.learn_from_interaction(
-                            user_input=last_user_input,
-                            assistant_response=response,
-                        )
+                    self._continuous_learning_manager.learn_from_interaction(
+                        user_input=last_user_input,
+                        assistant_response=response,
                     )
-                    if learning_result:
-                        knowledge_count = len(
-                            learning_result.get("knowledge_learned", [])
-                        )
-                        skills_count = len(learning_result.get("skills_learned", []))
-                        experience_recorded = learning_result.get(
-                            "experience_recorded", False
-                        )
-                        experience_count = 1 if experience_recorded else 0
-                        total_learned = (
-                            knowledge_count + skills_count + experience_count
-                        )
-                        if total_learned > 0:
-                            PrettyOutput.auto_print(
-                                f"📚 持续学习: 知识+{knowledge_count}, 技能+{skills_count}, 经验+{experience_count}"
-                            )
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 持续学习异常: {e}")
+            except Exception:
+                pass  # 持续学习失败不影响主流程
 
         return response
 
