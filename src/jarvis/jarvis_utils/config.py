@@ -576,6 +576,19 @@ def get_data_dir() -> str:
     return os.path.expanduser("~/.jarvis")
 
 
+def get_continuous_learning_dir() -> str:
+    """
+    获取持续学习数据存储目录路径。
+
+    返回:
+        str: 持续学习数据目录路径，为 ~/.jarvis/continuous_learning
+    """
+    cl_dir = os.path.join(os.path.expanduser("~/.jarvis"), "continuous_learning")
+    # 确保目录存在
+    os.makedirs(cl_dir, exist_ok=True)
+    return cl_dir
+
+
 def get_pretty_output() -> bool:
     """
     获取是否启用PrettyOutput。
