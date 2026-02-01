@@ -313,10 +313,23 @@ class AgentRunLoop:
                             assistant_response=response,
                         )
                     )
-                    if learning_result and learning_result.total_learned > 0:
-                        PrettyOutput.auto_print(
-                            f"📚 持续学习: 知识+{learning_result.knowledge_learned}, 技能+{learning_result.skills_learned}, 经验+{learning_result.experiences_learned}"
+                    if learning_result:
+                        knowledge_count = len(
+                            learning_result.get("knowledge_learned", [])
                         )
+                        skills_count = len(learning_result.get("skills_learned", []))
+                        experience_recorded = learning_result.get(
+                            "experience_recorded", False
+                        )
+                        total_learned = (
+                            knowledge_count
+                            + skills_count
+                            + (1 if experience_recorded else 0)
+                        )
+                        if total_learned > 0:
+                            PrettyOutput.auto_print(
+                                f"📚 持续学习: 知识+{knowledge_count}, 技能+{skills_count}, 经验+{experience_recorded}"
+                            )
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 持续学习异常: {e}")
 
