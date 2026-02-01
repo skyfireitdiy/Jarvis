@@ -1,0 +1,13 @@
+{
+  "id": "20251228_072634_128623",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "jpm",
+    "chat",
+    "llm_group"
+  ],
+  "content": "jpm chat 和 jpm role 命令支持 -g/--llm-group 参数，用于指定使用的模型组并覆盖配置文件中的设置。chat_with_model 函数需要接收 llm_group 参数并传递给 get_llm_config 函数，才能正确获取指定模型组的配置。",
+  "created_at": "2025-12-28T07:26:34.128695",
+  "updated_at": "2025-12-28T07:26:34.128699"
+}
