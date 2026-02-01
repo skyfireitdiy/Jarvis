@@ -5,6 +5,14 @@ from typing import Dict
 from playwright.sync_api import sync_playwright
 from markdownify import markdownify as md
 
+# 降级方案依赖
+try:
+    import requests
+
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+
 from jarvis.jarvis_utils.config import calculate_content_token_limit
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -56,13 +64,80 @@ class WebpageTool:
                 # 将HTML转换为Markdown
                 content_md = md(html_content, strip=["script", "style"])
 
+            except ImportError:
+                # Playwright 未安装，尝试降级到 requests
+                PrettyOutput.auto_print(
+                    "⚠️ Playwright 未安装，正在降级使用 requests 方案..."
+                )
+                if not REQUESTS_AVAILABLE:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "Playwright 和 requests 库均不可用。请安装至少一个：pip install playwright 或 pip install requests beautifulsoup4",
+                    }
+
+                try:
+                    PrettyOutput.auto_print(f"📡 正在使用 requests 访问: {url}")
+                    PrettyOutput.auto_print(
+                        "💡 注意：requests 方案无法获取 JavaScript 动态渲染的内容"
+                    )
+
+                    response = requests.get(
+                        url,
+                        timeout=30,
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        },
+                    )
+                    response.raise_for_status()
+
+                    # 直接使用 markdownify 转换，strip 参数会移除 script 和 style
+                    content_md = md(response.text, strip=["script", "style"])
+
+                except Exception as req_error:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"requests 方案也失败：{req_error}",
+                    }
+
             except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 无头浏览器错误: {e}")
-                return {
-                    "success": False,
-                    "stdout": "",
-                    "stderr": f"无头浏览器错误：{e}",
-                }
+                # Playwright 运行时错误，尝试降级到 requests
+                PrettyOutput.auto_print(
+                    f"⚠️ 无头浏览器错误: {e}，正在降级使用 requests 方案..."
+                )
+
+                if not REQUESTS_AVAILABLE:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"无头浏览器错误：{e}\n注意：requests 库也不可用，无法降级。请安装: pip install requests beautifulsoup4",
+                    }
+
+                try:
+                    PrettyOutput.auto_print(f"📡 正在使用 requests 访问: {url}")
+                    PrettyOutput.auto_print(
+                        "💡 注意：requests 方案无法获取 JavaScript 动态渲染的内容"
+                    )
+
+                    response = requests.get(
+                        url,
+                        timeout=30,
+                        headers={
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        },
+                    )
+                    response.raise_for_status()
+
+                    # 直接使用 markdownify 转换，strip 参数会移除 script 和 style
+                    content_md = md(response.text, strip=["script", "style"])
+
+                except Exception as req_error:
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": f"requests 方案也失败：{req_error}",
+                    }
 
             if not content_md or not content_md.strip():
                 return {
@@ -122,24 +197,27 @@ class WebpageTool:
 
     @staticmethod
     def check() -> bool:
-        """工具可用性检查：检查Playwright是否可用。
+        """工具可用性检查：检查Playwright或requests降级方案是否可用。
 
+        优先检查Playwright，如果不可用则检查requests降级方案。
         如果浏览器驱动未安装，会自动尝试安装。
 
         Returns:
-            bool: Playwright是否可用
+            bool: 工具是否可用（Playwright或requests至少一个可用）
         """
+        # 首先尝试 Playwright
         try:
             from playwright.sync_api import sync_playwright
 
             with sync_playwright() as p:
                 browser = p.chromium.launch()
                 browser.close()
+            PrettyOutput.auto_print(
+                "✅ Playwright 可用（完整功能，支持JavaScript渲染）"
+            )
             return True
         except ImportError:
-            PrettyOutput.auto_print("❌ Playwright Python包未安装")
-            PrettyOutput.auto_print("💡 请运行: pip install playwright")
-            return False
+            PrettyOutput.auto_print("⚠️ Playwright Python包未安装")
         except Exception as e:
             error_msg = str(e)
             # 检测是否是浏览器驱动未安装
@@ -154,8 +232,18 @@ class WebpageTool:
                     return WebpageTool.check()
                 except Exception as install_error:
                     PrettyOutput.auto_print(f"❌ 自动安装失败: {install_error}")
-                    PrettyOutput.auto_print("💡 请手动运行: install-playwright")
-                    return False
             else:
-                PrettyOutput.auto_print(f"❌ Playwright不可用: {e}")
-                return False
+                PrettyOutput.auto_print(f"⚠️ Playwright 运行时错误: {e}")
+
+        # Playwright 不可用，检查降级方案
+        if REQUESTS_AVAILABLE:
+            PrettyOutput.auto_print(
+                "✅ requests 降级方案可用（不支持JavaScript动态渲染）"
+            )
+            return True
+        else:
+            PrettyOutput.auto_print("❌ Playwright 和 requests 均不可用")
+            PrettyOutput.auto_print("💡 请安装至少一个方案：")
+            PrettyOutput.auto_print("   - pip install playwright")
+            PrettyOutput.auto_print("   - pip install requests beautifulsoup4")
+            return False
