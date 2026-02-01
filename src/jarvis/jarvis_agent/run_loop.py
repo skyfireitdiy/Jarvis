@@ -36,6 +36,11 @@ if TYPE_CHECKING:
     from jarvis.jarvis_autonomous.interaction import AmbiguityResolver
     from jarvis.jarvis_autonomous.interaction import ProactiveAssistant
     from jarvis.jarvis_autonomous.empathy import EmotionRecognizer
+    from jarvis.jarvis_autonomous.empathy import NeedPredictor
+    from jarvis.jarvis_autonomous.empathy import PersonalityAdapter
+    from jarvis.jarvis_digital_twin.proactive_service import ProactiveServiceManager
+    from jarvis.jarvis_digital_twin.continuous_learning import ContinuousLearningManager
+    from jarvis.jarvis_autonomous.manager import AutonomousManager
 
 
 class AgentRunLoop:
@@ -55,8 +60,13 @@ class AgentRunLoop:
         self._autonomous_enabled = is_enable_autonomous()
         self._dialogue_manager: Optional["DialogueManager"] = None
         self._emotion_recognizer: Optional["EmotionRecognizer"] = None
+        self._need_predictor: Optional["NeedPredictor"] = None
+        self._personality_adapter: Optional["PersonalityAdapter"] = None
         self._proactive_assistant: Optional["ProactiveAssistant"] = None
         self._ambiguity_resolver: Optional["AmbiguityResolver"] = None
+        self._proactive_service_manager: Optional["ProactiveServiceManager"] = None
+        self._continuous_learning_manager: Optional["ContinuousLearningManager"] = None
+        self._autonomous_manager: Optional["AutonomousManager"] = None
         if self._autonomous_enabled:
             self._init_autonomous_components()
 
@@ -67,15 +77,64 @@ class AgentRunLoop:
             from jarvis.jarvis_autonomous.interaction import AmbiguityResolver
             from jarvis.jarvis_autonomous.interaction import ProactiveAssistant
             from jarvis.jarvis_autonomous.empathy import EmotionRecognizer
+            from jarvis.jarvis_autonomous.empathy import NeedPredictor
+            from jarvis.jarvis_autonomous.empathy import PersonalityAdapter
 
             self._dialogue_manager = DialogueManager()
             self._emotion_recognizer = EmotionRecognizer()
+            self._need_predictor = NeedPredictor()
+            self._personality_adapter = PersonalityAdapter()
             self._proactive_assistant = ProactiveAssistant()
             self._ambiguity_resolver = AmbiguityResolver()
             PrettyOutput.print("智能增强组件已启用", OutputType.INFO)
         except ImportError as e:
             PrettyOutput.print(f"智能增强组件加载失败: {e}", OutputType.WARNING)
             self._autonomous_enabled = False
+
+        # 初始化主动服务管理器（集成阶段5.1和5.2组件）
+        try:
+            from jarvis.jarvis_digital_twin.proactive_service import (
+                ProactiveServiceManager,
+            )
+            from jarvis.jarvis_digital_twin.prediction import (
+                NeedInferrer,
+                TimingJudge,
+            )
+            from jarvis.jarvis_digital_twin.user_profile import (
+                PreferenceLearner,
+            )
+
+            # 初始化阶段5.1和5.2组件
+            timing_judge = TimingJudge()
+            need_inferrer = NeedInferrer()
+            preference_learner = PreferenceLearner()
+
+            # 将组件注入到主动服务管理器
+            self._proactive_service_manager = ProactiveServiceManager(
+                timing_judge=timing_judge,
+                need_inferrer=need_inferrer,
+                preference_learner=preference_learner,
+            )
+        except ImportError:
+            pass  # 主动服务管理器加载失败不影响其他功能
+
+        # 初始化持续学习管理器
+        try:
+            from jarvis.jarvis_digital_twin.continuous_learning import (
+                ContinuousLearningManager,
+            )
+
+            self._continuous_learning_manager = ContinuousLearningManager()
+        except ImportError:
+            pass  # 持续学习管理器加载失败不影响其他功能
+
+        # 初始化自主能力管理器（整合阶段4.1和4.2组件）
+        try:
+            from jarvis.jarvis_autonomous.manager import AutonomousManager
+
+            self._autonomous_manager = AutonomousManager()
+        except ImportError:
+            pass  # 自主能力管理器加载失败不影响其他功能
 
     def _preprocess_user_input(self, user_input: str) -> str:
         """预处理用户输入（智能增强）
@@ -122,6 +181,34 @@ class AgentRunLoop:
             except Exception:
                 pass  # 歧义检测失败不影响主流程
 
+        # 4. 主动服务处理
+        if self._proactive_service_manager:
+            try:
+                from jarvis.jarvis_digital_twin.proactive_service import ServiceStatus
+
+                # 获取对话历史
+                conversation_history = []
+                if self._dialogue_manager:
+                    context = self._dialogue_manager.get_context("default")
+                    if context:
+                        conversation_history = [
+                            {"role": turn.role, "content": turn.content}
+                            for turn in context.turns
+                        ]
+
+                results = self._proactive_service_manager.process_context(
+                    user_input,
+                    conversation_history=conversation_history,
+                )
+                # 将服务结果添加到增强输入
+                for result in results:
+                    if result.status == ServiceStatus.COMPLETED:
+                        enhanced_input = (
+                            f"[主动服务: {result.message}]\n{enhanced_input}"
+                        )
+            except Exception:
+                pass  # 主动服务处理失败不影响主流程
+
         return enhanced_input
 
     def _postprocess_response(self, response: str) -> str:
@@ -151,6 +238,27 @@ class AgentRunLoop:
                     )
             except Exception:
                 pass  # 主动交互分析失败不影响主流程
+
+        # 持续学习：从交互中学习
+        if self._continuous_learning_manager:
+            try:
+                # 获取最近的用户输入（从对话管理器）
+                last_user_input = ""
+                if self._dialogue_manager:
+                    dialogue_context = self._dialogue_manager.get_context("default")
+                    if dialogue_context and dialogue_context.turns:
+                        # 获取最近的用户输入
+                        for turn in reversed(dialogue_context.turns):
+                            if turn.role == "user":
+                                last_user_input = turn.content
+                                break
+                if last_user_input:
+                    self._continuous_learning_manager.learn_from_interaction(
+                        user_input=last_user_input,
+                        assistant_response=response,
+                    )
+            except Exception:
+                pass  # 学习失败不影响主流程
 
         return response
 
