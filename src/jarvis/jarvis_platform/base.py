@@ -38,6 +38,7 @@ from jarvis.jarvis_utils.config import is_save_session_history
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_interrupt
+from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_in_chat
 from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -546,6 +547,10 @@ class BasePlatform(ABC):
     def chat_until_success(self, message: str) -> str:
         """与模型对话直到成功响应。"""
         try:
+            # 清除中断标志，确保每次新的对话都从干净的状态开始
+            # 这可以防止之前的中断（如Ctrl+C）影响新对话的首次调用
+            # 修复问题：用户中断后再次执行任务时，方法论加载失败（返回结果为空）
+            set_interrupt(False)
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
                 PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
