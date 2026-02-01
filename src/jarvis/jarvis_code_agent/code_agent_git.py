@@ -367,15 +367,6 @@ class GitManager:
                 "ℹ️ 跳过 .gitattributes 文件创建。如遇换行符问题，可手动创建此文件。"
             )
 
-    def record_code_changes_stats(self, diff_text: str) -> None:
-        """记录代码变更的统计信息（已废弃，jarvis-stats功能已移除）
-
-        Args:
-            diff_text: git diff的文本输出
-        """
-        # jarvis-stats 功能已移除，此函数不再执行任何操作
-        pass
-
     def handle_uncommitted_changes(self) -> None:
         """处理未提交的修改，包括：
         1. 提示用户确认是否提交
@@ -388,20 +379,6 @@ class GitManager:
         reset_confirm_add_new_files_flag()
 
         if has_uncommitted_changes():
-            # 获取代码变更统计
-            try:
-                diff_result = subprocess.run(
-                    ["git", "diff", "HEAD", "--shortstat"],
-                    capture_output=True,
-                    text=False,
-                    check=True,
-                )
-                diff_stdout = decode_output(diff_result.stdout)
-                if diff_result.returncode == 0 and diff_stdout:
-                    self.record_code_changes_stats(diff_stdout)
-            except subprocess.CalledProcessError:
-                pass
-
             PrettyOutput.auto_print("⚠️ 检测到未提交的修改，是否要提交？")
             if not user_confirm("是否要提交？", True):
                 return
@@ -458,9 +435,6 @@ class GitManager:
             commits = []
 
         if commits:
-            # 统计生成的commit数量（已废弃，jarvis-stats功能已移除）
-            pass
-
             commit_messages = "检测到以下提交记录:\n" + "\n".join(
                 f"- {commit_hash[:7]}: {message}" for commit_hash, message in commits
             )
@@ -478,9 +452,6 @@ class GitManager:
     ) -> None:
         """处理提交确认和可能的重置"""
         if commits and user_confirm("是否接受以上提交记录？", True):
-            # 统计接受的commit数量（已废弃，jarvis-stats功能已移除）
-            pass
-
             subprocess.run(
                 ["git", "reset", "--mixed", str(start_commit)],
                 stdout=subprocess.DEVNULL,

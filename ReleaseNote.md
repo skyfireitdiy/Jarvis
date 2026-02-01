@@ -35,6 +35,27 @@
 - 更新 `docs/images/jarvis_implementation_view.dot` 架构图
 - 移除 `docs/best_practices/rules_best_practices.md` 中的 `generate_rules.md` 引用
 
+##### 🎯 Jarvis Stats 模块清理（Code Cleanup）
+
+彻底清理 v2.0.1 中已移除的 `jarvis_stats` 模块的残留代码和废弃函数：
+
+| 文件 | 清理内容 | 类型 |
+|------|---------|------|
+| `jarvis_utils/utils.py` | 删除 `count_cmd_usage()` 函数及调用 | 废弃函数 |
+| `jarvis_tools/registry.py` | 删除 `_get_tool_stats()` 和 `_update_tool_stats()` 函数及调用 | 废弃函数 |
+| `jarvis_tools/cli/main.py` | 删除 `stat` 命令 | 废弃命令 |
+| `jarvis_code_agent/code_agent_git.py` | 删除 `record_code_changes_stats()` 函数及调用，清理废弃注释 | 废弃函数 + 注释 |
+| `jarvis_code_agent/code_agent.py` | 清理废弃的统计代码调用和注释 | 废弃代码 |
+| `jarvis_tools/edit_file.py` | 清理 PATCH 操作的废弃统计注释 | 废弃注释 |
+
+**总计**：删除 4 个废弃函数、1 个 CLI 命令、7 处废弃注释和相关代码块
+
+**影响范围**：
+- 清理所有 `jarvis-stats` 相关的废弃函数定义和调用
+- 移除误导性的「已废弃，jarvis-stats 功能已移除」注释
+- 删除空的 `pass` 语句和无用的 try-except 统计代码块
+- 保留 `get_loc_stats()` 函数（仍在 `jarvis_code_agent/utils.py` 中使用）
+
 #### **📌 修复**
 
 - **🔧 配置时序修复**

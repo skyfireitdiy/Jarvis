@@ -59,20 +59,6 @@ def list_tools(
         PrettyOutput.print("\n".join(lines), OutputType.CODE, lang="markdown")
 
 
-@app.command("stat")
-def stat_tools(
-    as_json: bool = typer.Option(False, "--json", help="以JSON格式输出"),
-    last_days: Optional[int] = typer.Option(
-        None, "--days", help="显示最近N天的统计（默认显示所有历史数据）"
-    ),
-    format: str = typer.Option(
-        "table", "--format", help="显示格式: table, chart, summary"
-    ),
-) -> None:
-    """显示工具调用统计信息（已废弃，jarvis-stats功能已移除）"""
-    PrettyOutput.auto_print("⚠️ jarvis-stats 功能已移除，此命令不再可用")
-
-
 @app.command("call")
 def call_tool(
     tool_name: str = typer.Argument(..., help="要调用的工具名称"),
