@@ -95,10 +95,12 @@ def dispatch_to_tmux_window(
         使用水平分割（split-window -h）创建新窗格，适合代码任务。
     """
     # 检查配置中是否启用了tmux
-    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
+    # 如果是由 jcad/jvsd 启动的，忽略 enable_tmux 配置
+    if os.environ.get("JARVIS_DISPATCHER_CALL") != "1":
+        from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
 
-    if not GLOBAL_CONFIG_DATA.get("enable_tmux", False):
-        return False
+        if not GLOBAL_CONFIG_DATA.get("enable_tmux", False):
+            return False
 
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
@@ -240,9 +242,11 @@ def check_and_launch_tmux(
             pass
 
     # 检查 enable_tmux 配置（使用模块引用确保获取最新值）
-    enable_tmux = config_module.GLOBAL_CONFIG_DATA.get("enable_tmux", False)
-    if not enable_tmux:
-        return
+    # 如果是由 jcad/jvsd 启动的，忽略 enable_tmux 配置
+    if os.environ.get("JARVIS_DISPATCHER_CALL") != "1":
+        enable_tmux = config_module.GLOBAL_CONFIG_DATA.get("enable_tmux", False)
+        if not enable_tmux:
+            return
 
     # 检查tmux是否安装
     tmux_path = shutil.which("tmux")
@@ -1112,6 +1116,10 @@ def dispatch_command_to_panel(
         stay_in_session_after_exit: 命令执行结束后是否保持会话活动
         shell_fallback: 命令执行结束后是否启动shell作为fallback（True表示启动shell，False表示不启动shell，直接以进程为入口）
     """
+    # 在命令前设置环境变量，让子进程知道这是由 jcad/jvsd 启动的
+    # 这样可以忽略 enable_tmux 配置
+    shell_command_with_env = f"JARVIS_DISPATCHER_CALL=1 {shell_command}"
+
     # 检查 tmux 是否安装
     tmux_path = shutil.which("tmux")
     if tmux_path is None:
@@ -1141,7 +1149,7 @@ def dispatch_command_to_panel(
         pane_id = create_panel(
             session_name=existing_session,
             window_id=current_window,
-            initial_command=shell_command,
+            initial_command=shell_command_with_env,
             split_direction="h",
             stay_in_session_after_exit=stay_in_session_after_exit,
             shell_fallback=shell_fallback,
@@ -1165,7 +1173,7 @@ def dispatch_command_to_panel(
     else:
         # 没有现有 session，创建新 session 并直接以主进程启动
         new_session = find_or_create_jarvis_session(
-            force_create=True, initial_command=shell_command
+            force_create=True, initial_command=shell_command_with_env
         )
         if not new_session:
             PrettyOutput.auto_print(
