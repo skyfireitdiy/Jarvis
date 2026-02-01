@@ -1,0 +1,14 @@
+{
+  "id": "20250914_134900_112193",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "defaults",
+    "pretty_output",
+    "force_save_memory",
+    "docs_consistency"
+  ],
+  "content": "Decisions: 1) JARVIS_PRETTY_OUTPUT default is True (Windows forced False); code and docs updated (docs/jarvis_book/9.附录.md). 2) JARVIS_FORCE_SAVE_MEMORY default is False; code updated and docs already consistent. Note: JARVIS_WEB_SEARCH_PLATFORM/MODEL return None in code while docs show \"\"; treat both as 'unset' for consistency.",
+  "created_at": "2025-09-14T13:49:00.112235",
+  "updated_at": "2025-09-14T13:49:00.112238"
+}
