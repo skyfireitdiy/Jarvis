@@ -29,15 +29,15 @@ from jarvis.jarvis_utils.output import PrettyOutput
 class EmotionType(Enum):
     """情绪类型枚举"""
 
-    POSITIVE = "positive"  # 积极/满意
-    NEGATIVE = "negative"  # 消极/不满
-    NEUTRAL = "neutral"  # 中性
-    FRUSTRATED = "frustrated"  # 沮丧/受挫
-    CONFUSED = "confused"  # 困惑
-    EXCITED = "excited"  # 兴奋/期待
-    ANXIOUS = "anxious"  # 焦虑/担忧
-    GRATEFUL = "grateful"  # 感激
-    IMPATIENT = "impatient"  # 不耐烦
+    POSITIVE = "积极"  # 积极/满意
+    NEGATIVE = "消极"  # 消极/不满
+    NEUTRAL = "中性"  # 中性
+    FRUSTRATED = "沮丧"  # 沮丧/受挫
+    CONFUSED = "困惑"  # 困惑
+    EXCITED = "兴奋"  # 兴奋/期待
+    ANXIOUS = "焦虑"  # 焦虑/担忧
+    GRATEFUL = "感激"  # 感激
+    IMPATIENT = "不耐烦"  # 不耐烦
 
 
 @dataclass
@@ -249,11 +249,11 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
         # 从规则的action中提取情绪类型
         try:
             output_data = json.loads(rule.action)
-            emotion_str = output_data.get("emotion_type", "neutral")
+            emotion_str = output_data.get("emotion_type", "中性")
             try:
                 emotion_type = EmotionType(emotion_str)
             except ValueError:
-                emotion_type = EmotionType.NEUTRAL
+                emotion_type = EmotionType.NEUTRAL  # 默认为中性
 
             return EmotionResult(
                 emotion_type=emotion_type,
@@ -272,7 +272,7 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
             json_match = re.search(r"\{[^{}]*\}", output, re.DOTALL)
             if json_match:
                 parsed = json.loads(json_match.group())
-                emotion_str = parsed.get("emotion_type", "neutral")
+                emotion_str = parsed.get("emotion_type", "中性")
                 try:
                     emotion_type = EmotionType(emotion_str)
                 except ValueError:
@@ -299,7 +299,7 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
         instruction = """分析以下文本的情绪状态。
 
 请识别：
-1. 主要情绪类型（positive/negative/neutral/frustrated/confused/excited/anxious/grateful/impatient）
+1. 主要情绪类型（积极/消极/中性/沮丧/困惑/兴奋/焦虑/感激/不耐烦）
 2. 置信度（0-1）
 3. 情绪强度（0-1）
 4. 识别依据

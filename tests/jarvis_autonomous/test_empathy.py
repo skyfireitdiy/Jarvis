@@ -108,7 +108,7 @@ class TestEmotionRecognizer:
             source="rule",
         )
         d = result.to_dict()
-        assert d["emotion_type"] == "positive"
+        assert d["emotion_type"] == "积极"
         assert d["confidence"] == 0.9
 
 
