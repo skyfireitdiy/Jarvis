@@ -4,6 +4,8 @@
 提供统一的持续学习接口。
 """
 
+import json
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -85,6 +87,20 @@ class ContinuousLearningManager:
         self._learning_history: List[Dict[str, Any]] = []
         self._interaction_count = 0
         self._task_count = 0
+
+        # 自动加载已保存的学习成果
+        try:
+            load_result = self.load_from_disk()
+            if load_result.get("success") and load_result.get("files_loaded"):
+                PrettyOutput.auto_print(
+                    f"🔄 已加载持续学习数据："
+                    f"知识 {load_result.get('knowledge_count', 0)} 条，"
+                    f"技能 {load_result.get('skills_count', 0)} 个，"
+                    f"经验 {load_result.get('experiences_count', 0)} 条"
+                )
+        except Exception:
+            # 加载失败不影响初始化
+            pass
 
     @property
     def enabled(self) -> bool:
@@ -230,6 +246,12 @@ class ContinuousLearningManager:
             f"🧠 持续学习: 知识+{k_count}, 技能+{s_count}, 经验+{e_count} (模式: {mode})"
         )
 
+        # 自动保存学习成果
+        try:
+            self.save_to_disk()
+        except Exception:
+            pass  # 保存失败不影响学习结果
+
         return result
 
     def learn_from_task_result(
@@ -338,6 +360,12 @@ class ContinuousLearningManager:
         PrettyOutput.auto_print(
             f"🧠 持续学习: 经验+{e_count}, 方法论+{m_count}, 适应+{a_count} (模式: {mode})"
         )
+
+        # 自动保存学习成果
+        try:
+            self.save_to_disk()
+        except Exception:
+            pass  # 保存失败不影响学习结果
 
         return learning_result
 
@@ -692,6 +720,131 @@ class ContinuousLearningManager:
             success = False
 
         return success
+
+    def save_to_disk(self) -> Dict[str, Any]:
+        """保存学习成果到磁盘。
+
+        将知识、技能、经验保存到JSON文件，使用原子写入确保数据安全。
+
+        Returns:
+            保存结果字典，包含：
+            - success: 是否成功
+            - files_saved: 保存的文件列表
+            - error: 错误信息（如果失败）
+        """
+        result: Dict[str, Any] = {
+            "success": False,
+            "files_saved": [],
+            "error": None,
+        }
+
+        try:
+            # 获取数据目录
+            from jarvis.jarvis_utils.config import get_continuous_learning_dir
+
+            cl_dir = get_continuous_learning_dir()
+
+            # 导出数据
+            export_data = self.export_learnings()
+
+            # 定义要保存的文件
+            files_to_save = {
+                "statistics.json": export_data.get("statistics", {}),
+                "knowledge.json": export_data.get("knowledge", []),
+                "skills.json": export_data.get("skills", []),
+                "experiences.json": export_data.get("experiences", []),
+                "adaptations.json": export_data.get("adaptations", []),
+            }
+
+            # 使用原子写入（先写临时文件再重命名）
+            for filename, data in files_to_save.items():
+                filepath = os.path.join(cl_dir, filename)
+                temp_filepath = filepath + ".tmp"
+
+                # 写入临时文件
+                with open(temp_filepath, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+
+                # 原子重命名
+                os.replace(temp_filepath, filepath)
+
+                result["files_saved"].append(filename)
+
+            result["success"] = True
+
+        except Exception as e:
+            result["error"] = str(e)
+
+        return result
+
+    def load_from_disk(self) -> Dict[str, Any]:
+        """从磁盘加载学习成果。
+
+        从JSON文件加载知识、技能、经验，如果文件不存在则不报错。
+
+        Returns:
+            加载结果字典，包含：
+            - success: 是否成功
+            - files_loaded: 加载的文件列表
+            - knowledge_count: 加载的知识数量
+            - skills_count: 加载的技能数量
+            - experiences_count: 加载的经验数量
+            - error: 错误信息（如果失败）
+        """
+        result: Dict[str, Any] = {
+            "success": False,
+            "files_loaded": [],
+            "knowledge_count": 0,
+            "skills_count": 0,
+            "experiences_count": 0,
+            "error": None,
+        }
+
+        try:
+            # 获取数据目录
+            from jarvis.jarvis_utils.config import get_continuous_learning_dir
+
+            cl_dir = get_continuous_learning_dir()
+
+            # 定义要加载的文件
+            files_to_load = ["knowledge.json", "skills.json", "experiences.json"]
+
+            # 收集所有数据
+            import_data: Dict[str, Any] = {"version": "1.0"}
+
+            for filename in files_to_load:
+                filepath = os.path.join(cl_dir, filename)
+
+                # 检查文件是否存在
+                if not os.path.exists(filepath):
+                    continue
+
+                # 读取文件
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                # 根据文件名分类存储
+                if filename == "knowledge.json":
+                    import_data["knowledge"] = data
+                    result["knowledge_count"] = len(data)
+                elif filename == "skills.json":
+                    import_data["skills"] = data
+                    result["skills_count"] = len(data)
+                elif filename == "experiences.json":
+                    import_data["experiences"] = data
+                    result["experiences_count"] = len(data)
+
+                result["files_loaded"].append(filename)
+
+            # 如果有数据，导入
+            if result["files_loaded"]:
+                self.import_learnings(import_data)
+                result["success"] = True
+
+        except Exception as e:
+            result["error"] = str(e)
+
+        return result
 
     def _categorize_input(self, user_input: str) -> str:
         """对用户输入进行分类。
