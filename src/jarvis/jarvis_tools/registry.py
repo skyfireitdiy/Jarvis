@@ -256,16 +256,6 @@ class ToolRegistry(OutputHandlerProtocol):
         # 应用工具配置组过滤
         self._apply_tool_config_filter()
 
-    def _get_tool_stats(self) -> Dict[str, int]:
-        """从数据目录获取工具调用统计（已废弃，jarvis-stats功能已移除）"""
-        # jarvis-stats 功能已移除，返回空字典
-        return {}
-
-    def _update_tool_stats(self, name: str) -> None:
-        """更新工具调用统计（已废弃，jarvis-stats功能已移除）"""
-        # jarvis-stats 功能已移除，此函数不再执行任何操作
-        pass
-
     def use_tools(self, name: List[str]) -> None:
         """使用指定工具
 
@@ -1166,9 +1156,6 @@ class ToolRegistry(OutputHandlerProtocol):
                 "stdout": "",
             }
 
-        # 更新工具调用统计
-        self._update_tool_stats(name)
-
         # 根据工具实现声明的协议版本分发调用方式
         try:
             result = None
@@ -1192,9 +1179,6 @@ class ToolRegistry(OutputHandlerProtocol):
             if agent is not None:
                 args_to_call["agent"] = agent
             result = tool.execute(args_to_call)
-        finally:
-            # 记录工具执行耗时（已废弃，jarvis-stats功能已移除）
-            pass
 
         return result
 

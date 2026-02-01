@@ -723,14 +723,7 @@ def init_env(
     except Exception:
         pass
 
-    # 2. 统计命令使用（异步执行，避免阻塞初始化）
-    try:
-        count_cmd_usage()
-    except Exception:
-        # 静默失败，不影响正常使用
-        pass
-
-    # 3. 设置配置文件
+    # 2. 设置配置文件
     global g_config_file
     g_config_file = config_file
     try:
@@ -1414,12 +1407,6 @@ def get_file_line_count(filename: str) -> int:
             return sum(1 for _ in f)
     except Exception:
         return 0
-
-
-def count_cmd_usage() -> None:
-    """统计当前命令的使用次数（已废弃，保留函数以兼容旧代码）"""
-    # jarvis-stats 功能已移除，此函数不再执行任何操作
-    pass
 
 
 def is_context_overflow(

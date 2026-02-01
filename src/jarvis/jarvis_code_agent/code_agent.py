@@ -537,25 +537,6 @@ git reset --hard {start_commit}
 
             commited = handle_commit_workflow()
             if commited:
-                # 统计代码行数变化
-                # 获取diff的统计信息
-                try:
-                    diff_result = subprocess.run(
-                        ["git", "diff", "HEAD~1", "HEAD", "--shortstat"],
-                        capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                        check=True,
-                    )
-                    if diff_result.returncode == 0 and diff_result.stdout:
-                        self.git_manager.record_code_changes_stats(diff_result.stdout)
-                except subprocess.CalledProcessError:
-                    pass
-
-                # 统计修改次数（已废弃，jarvis-stats功能已移除）
-                pass
-
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()
                 commits = get_commits_between(start_hash, end_hash)
