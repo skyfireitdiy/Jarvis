@@ -23,6 +23,8 @@ from ..intelligence.llm_reasoning import ReasoningContext
 from ..intelligence.llm_reasoning import ReasoningType
 from ..intelligence.rule_learner import LearnedRule
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 
 class EmotionType(Enum):
     """情绪类型枚举"""
@@ -336,24 +338,43 @@ class EmotionRecognizer(HybridEngine[EmotionResult]):
         # 先尝试快速规则匹配
         quick_result = self._quick_rule_match(text)
         if quick_result and quick_result.confidence >= 0.7:
+            PrettyOutput.auto_print(
+                f"🎭 情绪识别: {quick_result.emotion_type.value} "
+                f"(置信度: {quick_result.confidence:.2f}, 模式: 规则快路径)"
+            )
             return quick_result
 
         # 使用双轨制推理
         result = self.infer(text, history=history)
 
         if result.success and result.output:
-            return result.output
+            emotion_result = result.output
+            mode_str = "LLM" if result.llm_used else "规则"
+            PrettyOutput.auto_print(
+                f"🎭 情绪识别: {emotion_result.emotion_type.value} "
+                f"(置信度: {emotion_result.confidence:.2f}, 模式: {mode_str})"
+            )
+            return emotion_result
 
         # 回退到快速匹配结果或默认值
         if quick_result:
+            PrettyOutput.auto_print(
+                f"🎭 情绪识别: {quick_result.emotion_type.value} "
+                f"(置信度: {quick_result.confidence:.2f}, 模式: 规则降级)"
+            )
             return quick_result
 
-        return EmotionResult(
+        default_result = EmotionResult(
             emotion_type=EmotionType.NEUTRAL,
             confidence=0.5,
             intensity=0.5,
             source="default",
         )
+        PrettyOutput.auto_print(
+            f"🎭 情绪识别: {default_result.emotion_type.value} "
+            f"(置信度: {default_result.confidence:.2f}, 模式: 默认值)"
+        )
+        return default_result
 
     def _quick_rule_match(self, text: str) -> Optional[EmotionResult]:
         """快速规则匹配（不使用LLM）"""
