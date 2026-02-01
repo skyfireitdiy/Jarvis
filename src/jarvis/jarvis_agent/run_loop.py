@@ -255,6 +255,52 @@ class AgentRunLoop:
             except Exception:
                 pass  # 主动服务失败不影响主流程
 
+        # 5. 持续学习知识应用
+        if self._continuous_learning_manager:
+            try:
+                knowledge_hints = []
+                total_chars = 0
+                MAX_TOTAL_CHARS = 300  # 总字符数硬限制，保护LLM上下文
+                MIN_CONFIDENCE = 0.7  # 最低置信度阈值
+
+                # 获取相关知识（只取高置信度的）
+                relevant_knowledge = (
+                    self._continuous_learning_manager.get_relevant_knowledge(
+                        context=user_input,
+                        limit=3,
+                    )
+                )
+                if relevant_knowledge.get("knowledge"):
+                    for k in relevant_knowledge["knowledge"][:2]:
+                        if k.get("confidence", 0) >= MIN_CONFIDENCE:
+                            hint = f"知识({k['type']}): {k['content'][:80]}"
+                            if total_chars + len(hint) <= MAX_TOTAL_CHARS:
+                                knowledge_hints.append(hint)
+                                total_chars += len(hint)
+
+                # 获取相似经验（仅在还有空间时）
+                if total_chars < MAX_TOTAL_CHARS - 50:
+                    similar_experiences = (
+                        self._continuous_learning_manager.get_similar_experiences(
+                            context=user_input,
+                            limit=2,
+                        )
+                    )
+                    if similar_experiences:
+                        for exp in similar_experiences[:1]:
+                            if exp.get("outcome"):
+                                hint = f"经验: {exp['outcome'][:60]}"
+                                if total_chars + len(hint) <= MAX_TOTAL_CHARS:
+                                    knowledge_hints.append(hint)
+                                    total_chars += len(hint)
+
+                # 将知识提示添加到增强输入
+                if knowledge_hints:
+                    hints_text = "; ".join(knowledge_hints)
+                    enhanced_input = f"[学习知识: {hints_text}]\n{enhanced_input}"
+            except Exception:
+                pass  # 知识应用失败不影响主流程
+
         return enhanced_input
 
     def _postprocess_response(self, response: str) -> str:
