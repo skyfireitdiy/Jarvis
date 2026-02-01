@@ -890,6 +890,19 @@ def run_cli(
             llm_group, tool_group, config_file, restore_session, task
         )
 
+    # 提前加载配置文件，确保 handle_builtin_config_selector 能读取到正确的配置值
+    # 修复：enable_startup_config_selector 配置不生效的问题
+    try:
+        from jarvis.jarvis_utils import utils
+
+        # 设置全局配置文件路径（与 init_env 中的逻辑一致）
+        utils.g_config_file = config_file
+        # 加载配置文件
+        utils.load_config()
+    except Exception:
+        # 静默失败，不影响主流程
+        pass
+
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
     # 非交互模式下跳过内置角色/配置选择
     # 如果指定了 -T/--task 参数，跳过配置选择
