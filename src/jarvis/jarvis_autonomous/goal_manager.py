@@ -11,6 +11,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 
 class GoalStatus(Enum):
     """目标状态枚举"""
@@ -162,7 +164,7 @@ class GoalManager:
                         self.goals[goal.id] = goal
             except (json.JSONDecodeError, KeyError) as e:
                 # 文件损坏或格式错误，从空开始
-                print(f"Warning: Failed to load goals: {e}")
+                PrettyOutput.auto_print(f"⚠️ 警告: 加载目标失败: {e}")
                 self.goals = {}
 
     def _save_goals(self) -> None:

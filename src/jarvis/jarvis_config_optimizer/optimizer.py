@@ -374,48 +374,67 @@ class ConfigOptimizer:
         Args:
             report: Optimization report to print.
         """
-        print("=" * 60)
-        print("Configuration Optimization Report")
-        print(f"Generated: {report.timestamp.strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 60)
-        print()
-        print(f"Configuration File: {self.config_path}")
-        print(f"Total Issues: {report.total_issues}")
-        print()
+        from jarvis.jarvis_utils.output import PrettyOutput
+
+        PrettyOutput.auto_print("=" * 60)
+        PrettyOutput.auto_print("📋 配置优化报告")
+        PrettyOutput.auto_print(
+            f"🕐 生成时间: {report.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        PrettyOutput.auto_print("=" * 60)
+        PrettyOutput.auto_print("")
+        PrettyOutput.auto_print(f"📁 配置文件: {self.config_path}")
+        PrettyOutput.auto_print(f"📊 问题总数: {report.total_issues}")
+        PrettyOutput.auto_print("")
 
         # Print issues by severity
-        print("Issues by Severity:")
+        PrettyOutput.auto_print("🔴 按严重程度分类的问题:")
         for severity in ["high", "medium", "low"]:
             count = report.issues_by_severity.get(severity, 0)
             if count > 0:
-                print(f"  {severity.capitalize()}: {count}")
-        print()
+                severity_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(
+                    severity, "⚪"
+                )
+                PrettyOutput.auto_print(
+                    f"  {severity_emoji} {severity.capitalize()}: {count}"
+                )
+        PrettyOutput.auto_print("")
 
         # Print issues by category
-        print("Issues by Category:")
+        PrettyOutput.auto_print("📂 按类别分类的问题:")
         for category in ["security", "performance", "maintainability"]:
             count = report.issues_by_category.get(category, 0)
             if count > 0:
-                print(f"  {category.capitalize()}: {count}")
-        print()
+                category_emoji = {
+                    "security": "🔒",
+                    "performance": "⚡",
+                    "maintainability": "🔧",
+                }.get(category, "📋")
+                PrettyOutput.auto_print(
+                    f"  {category_emoji} {category.capitalize()}: {count}"
+                )
+        PrettyOutput.auto_print("")
 
         # Print suggestions
-        print("Optimization Suggestions:")
-        print("-" * 60)
+        PrettyOutput.auto_print("💡 优化建议:")
+        PrettyOutput.auto_print("-" * 60)
         for suggestion in report.suggestions:
-            print(
-                f"\n[{suggestion.issue.severity.upper()}] {suggestion.issue.category}"
+            severity_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(
+                suggestion.issue.severity.lower(), "⚪"
             )
-            print(f"Location: {suggestion.issue.location}")
-            print(f"Issue: {suggestion.issue.issue_type}")
-            print(f"Action: {suggestion.action}")
-            print(f"Impact: {suggestion.impact}")
-            print(f"Effort: {suggestion.effort}")
-            print(f"Reason: {suggestion.issue.reason}")
-        print()
+            PrettyOutput.auto_print(
+                f"\n{severity_emoji} [{suggestion.issue.severity.upper()}] {suggestion.issue.category}"
+            )
+            PrettyOutput.auto_print(f"📍 位置: {suggestion.issue.location}")
+            PrettyOutput.auto_print(f"❓ 问题: {suggestion.issue.issue_type}")
+            PrettyOutput.auto_print(f"✅ 操作: {suggestion.action}")
+            PrettyOutput.auto_print(f"📈 影响: {suggestion.impact}")
+            PrettyOutput.auto_print(f"⚙️ 工作量: {suggestion.effort}")
+            PrettyOutput.auto_print(f"💭 原因: {suggestion.issue.reason}")
+        PrettyOutput.auto_print("")
 
         # Print summary
-        print("Summary:")
-        print("-" * 60)
-        print(report.summary)
-        print("=" * 60)
+        PrettyOutput.auto_print("📝 总结:")
+        PrettyOutput.auto_print("-" * 60)
+        PrettyOutput.auto_print(report.summary)
+        PrettyOutput.auto_print("=" * 60)

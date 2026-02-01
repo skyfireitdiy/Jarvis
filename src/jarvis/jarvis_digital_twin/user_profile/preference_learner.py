@@ -8,6 +8,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 
 class CodeStylePreference(Enum):
     """代码风格偏好枚举"""
@@ -464,7 +466,7 @@ class PreferenceLearner:
         interaction_style_str: str = (
             self._preference.interaction_style.preferred_style.value
         )
-        print(
+        PrettyOutput.auto_print(
             f"👤 偏好学习: 代码风格={code_style_str}, 交互风格={interaction_style_str} (模式: {mode})"
         )
 

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional, Protocol
 
+from jarvis.jarvis_utils.output import PrettyOutput
+
 from jarvis.jarvis_digital_twin.prediction import (
     InferenceResult,
     PredictionContext,
@@ -604,7 +606,9 @@ class NeedInferrer:
         results.sort(key=lambda x: x.confidence_score, reverse=True)
 
         # 过程打印
-        print(f"📚 需求推理: {len(results)}个结果 (模式: {inference_mode})")
+        PrettyOutput.auto_print(
+            f"📚 需求推理: {len(results)}个结果 (模式: {inference_mode})"
+        )
 
         return results
 

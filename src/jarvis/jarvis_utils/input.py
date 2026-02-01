@@ -904,7 +904,7 @@ def _show_history_and_copy() -> None:
 
     # 为避免 PrettyOutput 在循环中为每行加框，先拼接后统一打印
     lines = []
-    lines.append("\n" + "=" * 20 + " 消息历史记录 " + "=" * 20)
+    lines.append("\n" + "=" * 20 + " 📜 消息历史记录 " + "=" * 20)
     for i, msg in enumerate(history):
         cleaned_msg = msg.replace("\n", r"\n")
         display_msg = (
@@ -912,7 +912,7 @@ def _show_history_and_copy() -> None:
         )
         lines.append(f"  {i + 1}: {display_msg.strip()}")
         lines.append("=" * 58 + "\n")
-    print("\n".join(lines))
+    PrettyOutput.auto_print("\n".join(lines))
 
     while True:
         try:
