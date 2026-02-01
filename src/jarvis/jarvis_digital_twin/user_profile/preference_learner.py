@@ -304,13 +304,15 @@ class PreferenceLearner:
         InteractionStylePreference.FRIENDLY: ["友好", "亲切", "friendly", "warm"],
     }
 
-    def __init__(self, user_id: str = "default"):
+    def __init__(self, user_id: str = "default", llm_client: Optional[Any] = None):
         """初始化偏好学习器
 
         Args:
             user_id: 用户ID
+            llm_client: LLM客户端实例（可选）
         """
         self.user_id = user_id
+        self.llm_client = llm_client
         self._preference = UserPreference(user_id=user_id)
         self._interaction_history: List[InteractionData] = []
 
@@ -318,6 +320,74 @@ class PreferenceLearner:
     def preference(self) -> UserPreference:
         """获取当前用户偏好"""
         return self._preference
+
+    def _llm_analyze_preferences(
+        self, interaction: InteractionData
+    ) -> Optional[Dict[str, Any]]:
+        """使用LLM分析用户偏好
+
+        Args:
+            interaction: 交互数据
+
+        Returns:
+            Optional[Dict[str, Any]]: 分析结果字典，失败时返回None
+        """
+        if self.llm_client is None:
+            return None
+
+        try:
+            # 构建分析上下文
+            recent_interactions = (
+                self._interaction_history[-5:] if self._interaction_history else []
+            )
+            interaction_context = "\n".join(
+                [f"- {interp.content}" for interp in recent_interactions]
+            )
+
+            prompt = f"""你是一个用户偏好分析专家。请分析用户的代码和交互行为，推断其偏好。
+
+当前输入：{interaction.content}
+交互类型：{interaction.interaction_type}
+标签：{", ".join(interaction.tags)}
+
+最近的交互历史：
+{interaction_context if interaction_context else "无"}
+
+请返回JSON格式的分析结果：
+{{
+  "code_style": "concise/verbose/functional/oop/mixed",
+  "interaction_style": "formal/casual/technical/friendly",
+  "verbosity_level": 0.7,
+  "prefer_examples": true,
+  "preferred_languages": ["python", "rust"],
+  "reasoning": "分析依据",
+  "confidence": 0.85
+}}
+
+只返回JSON，不要其他内容。"""
+
+            # 调用LLM
+            response = self.llm_client.complete(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=500,
+            )
+
+            # 解析响应
+            import json
+            import re
+
+            # 提取JSON内容
+            json_match = re.search(r"\{[^}]+\}", response.content, re.DOTALL)
+            if json_match:
+                result: Dict[str, Any] = json.loads(json_match.group())
+                return result
+            else:
+                return None
+
+        except Exception:
+            # LLM调用失败时返回None，将降级到规则模式
+            return None
 
     def learn_from_interaction(self, interaction: InteractionData) -> None:
         """从交互中学习偏好
@@ -327,14 +397,76 @@ class PreferenceLearner:
         """
         self._interaction_history.append(interaction)
 
-        # 分析代码风格偏好
-        self._learn_code_style(interaction)
+        # 优先尝试使用LLM分析
+        llm_result = self._llm_analyze_preferences(interaction)
+        mode = "LLM" if llm_result else "规则"
 
-        # 分析技术栈偏好
-        self._learn_tech_stack(interaction)
+        if llm_result:
+            # LLM模式：使用LLM分析结果
+            try:
+                # 更新代码风格
+                if "code_style" in llm_result:
+                    try:
+                        code_style = CodeStylePreference(llm_result["code_style"])
+                        self._preference.code_style.preferred_style = code_style
+                    except ValueError:
+                        pass
 
-        # 分析交互风格偏好
-        self._learn_interaction_style(interaction)
+                # 更新交互风格
+                if "interaction_style" in llm_result:
+                    try:
+                        interaction_style = InteractionStylePreference(
+                            llm_result["interaction_style"]
+                        )
+                        self._preference.interaction_style.preferred_style = (
+                            interaction_style
+                        )
+                    except ValueError:
+                        pass
+
+                # 更新详细程度
+                if "verbosity_level" in llm_result:
+                    self._preference.interaction_style.verbosity_level = llm_result[
+                        "verbosity_level"
+                    ]
+
+                # 更新示例偏好
+                if "prefer_examples" in llm_result:
+                    self._preference.interaction_style.prefer_examples = llm_result[
+                        "prefer_examples"
+                    ]
+
+                # 更新语言偏好
+                if "preferred_languages" in llm_result:
+                    for lang in llm_result["preferred_languages"]:
+                        if lang not in self._preference.tech_stack.preferred_languages:
+                            self._preference.tech_stack.preferred_languages.append(lang)
+
+                # 提升置信度
+                self._preference.code_style.confidence.update(True)
+                self._preference.interaction_style.confidence.update(True)
+                self._preference.tech_stack.confidence.update(True)
+
+            except Exception:
+                # LLM结果解析失败，降级到规则模式
+                mode = "规则"
+                self._learn_code_style(interaction)
+                self._learn_tech_stack(interaction)
+                self._learn_interaction_style(interaction)
+        else:
+            # 规则模式：使用关键词匹配
+            self._learn_code_style(interaction)
+            self._learn_tech_stack(interaction)
+            self._learn_interaction_style(interaction)
+
+        # 过程打印
+        code_style_str: str = self._preference.code_style.preferred_style.value
+        interaction_style_str: str = (
+            self._preference.interaction_style.preferred_style.value
+        )
+        print(
+            f"👤 偏好学习: 代码风格={code_style_str}, 交互风格={interaction_style_str} (模式: {mode})"
+        )
 
         # 更新时间戳
         self._preference.updated_at = datetime.now().isoformat()

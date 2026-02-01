@@ -261,13 +261,16 @@ class AdaptiveEngine:
         self,
         feedback_learner: Optional[Any] = None,
         user_profile: Optional[Any] = None,
+        llm_client: Optional[Any] = None,
     ) -> None:
         """初始化自适应引擎。
 
         Args:
             feedback_learner: 反馈学习器（来自阶段5.3）
             user_profile: 用户画像（来自阶段5.1）
+            llm_client: LLM客户端（可选）
         """
+        self._llm_client = llm_client
         self._feedback_learner = feedback_learner
         self._user_profile = user_profile
 

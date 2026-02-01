@@ -453,12 +453,14 @@ class NeedInferrer:
         self,
         strategy: InferenceStrategy = InferenceStrategy.HYBRID,
         knowledge_graph: Optional[KnowledgeGraphProvider] = None,
+        llm_client: Optional[Any] = None,
     ) -> None:
         """初始化需求推理器"""
         self._strategy = strategy
         self._rule_inferrer = RuleBasedInferrer()
         self._pattern_inferrer = PatternBasedInferrer()
         self._knowledge_graph = knowledge_graph
+        self._llm_client = llm_client
 
     @property
     def strategy(self) -> InferenceStrategy:
@@ -469,6 +471,68 @@ class NeedInferrer:
     def strategy(self, value: InferenceStrategy) -> None:
         """设置推理策略"""
         self._strategy = value
+
+    def _llm_infer_implicit_needs(
+        self, explicit_need: str
+    ) -> List[tuple[str, float, str, List[str]]]:
+        """使用LLM推理隐式需求"""
+        if not self._llm_client:
+            return []
+
+        try:
+            prompt = f"""你是一个需求分析专家。请分析用户的显式需求，推理出可能的隐式需求。
+
+显式需求：{explicit_need}
+
+请返回JSON格式的推理结果，每个结果包含：
+- implicit_need: 隐式需求描述
+- confidence: 置信度（0-1之间的浮点数）
+- reasoning: 推理依据
+- inference_chain: 推理步骤列表
+
+返回格式示例：
+[
+  {{
+    "implicit_need": "编写单元测试",
+    "confidence": 0.9,
+    "reasoning": "功能实现通常需要配套测试",
+    "inference_chain": ["识别到功能开发需求", "根据最佳实践推断需要测试", "得出结论"]
+  }}
+]
+
+请仅返回JSON数组，不要包含其他解释文字。"""
+
+            response = self._llm_client.complete(prompt)
+
+            # 解析JSON响应
+            import json
+            import re
+
+            # 提取JSON数组部分
+            json_match = re.search(r"\[.*\]", response, re.DOTALL)
+            if not json_match:
+                return []
+
+            json_str = json_match.group(0)
+            data = json.loads(json_str)
+
+            results = []
+            for item in data:
+                implicit_need = item.get("implicit_need", "")
+                confidence = float(item.get("confidence", 0.5))
+                reasoning = item.get("reasoning", "LLM推理")
+                inference_chain = item.get("inference_chain", ["LLM智能推理"])
+
+                if implicit_need:
+                    results.append(
+                        (implicit_need, confidence, reasoning, inference_chain)
+                    )
+
+            return results
+
+        except Exception:
+            # LLM推理失败时返回空列表，将降级到规则推理
+            return []
 
     def set_knowledge_graph(self, provider: KnowledgeGraphProvider) -> None:
         """设置知识图谱提供者"""
@@ -484,11 +548,23 @@ class NeedInferrer:
             return []
 
         all_inferences: List[tuple[str, float, str, List[str]]] = []
+        inference_mode = "规则"
 
-        # 规则推理
+        # LLM推理（优先）
+        if self._llm_client is not None:
+            llm_results = self._llm_infer_implicit_needs(explicit_need)
+            if llm_results:
+                all_inferences.extend(llm_results)
+                inference_mode = "LLM"
+            else:
+                # LLM推理失败，降级到规则推理
+                inference_mode = "规则(降级)"
+
+        # 规则推理（LLM失败时或作为补充）
         if self._strategy in (InferenceStrategy.RULE_BASED, InferenceStrategy.HYBRID):
-            rule_results = self._rule_inferrer.infer_implicit_needs(explicit_need)
-            all_inferences.extend(rule_results)
+            if not all_inferences or self._strategy == InferenceStrategy.HYBRID:
+                rule_results = self._rule_inferrer.infer_implicit_needs(explicit_need)
+                all_inferences.extend(rule_results)
 
         # 模式推理
         if self._strategy in (
@@ -526,6 +602,10 @@ class NeedInferrer:
         )
 
         results.sort(key=lambda x: x.confidence_score, reverse=True)
+
+        # 过程打印
+        print(f"📚 需求推理: {len(results)}个结果 (模式: {inference_mode})")
+
         return results
 
     def infer_follow_up_tasks(

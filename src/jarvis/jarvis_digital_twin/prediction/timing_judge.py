@@ -5,13 +5,15 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_digital_twin.prediction import (
     PredictionContext,
     TimingDecision,
     TimingResult,
 )
+
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 class JudgmentStrategy(Enum):
@@ -504,14 +506,17 @@ class TimingJudge:
     def __init__(
         self,
         strategy: JudgmentStrategy = JudgmentStrategy.BALANCED,
+        llm_client=None,
     ) -> None:
         """初始化时机判断器
 
         Args:
             strategy: 判断策略
+            llm_client: LLM客户端（可选，用于智能判断）
         """
         self._strategy = strategy
         self._rule_judge = RuleBasedJudge()
+        self._llm_client = llm_client
 
     @property
     def strategy(self) -> JudgmentStrategy:
@@ -522,6 +527,81 @@ class TimingJudge:
     def strategy(self, value: JudgmentStrategy) -> None:
         """设置判断策略"""
         self._strategy = value
+
+    def _llm_judge_timing(self, context: PredictionContext) -> Optional[Dict[str, Any]]:
+        """使用LLM进行时机判断
+
+        Args:
+            context: 预测上下文
+
+        Returns:
+            包含user_state、urgency_level、should_interact、reasoning、confidence的字典
+            如果LLM调用失败，返回None
+        """
+        if not self._llm_client:
+            return None
+
+        try:
+            # 构建LLM prompt
+            user_input = context.current_message or ""
+            project_info = ""
+            if context.project_state:
+                project_info = f"""项目状态:
+- 有错误: {context.project_state.get("has_errors", False)}
+- 构建失败: {context.project_state.get("build_failed", False)}
+- 测试失败: {context.project_state.get("tests_failing", False)}
+"""
+
+            code_info = ""
+            if context.code_context:
+                modified_files = context.code_context.get("modified_files", [])
+                code_info = f"代码上下文: 修改了{len(modified_files)}个文件"
+
+            prompt = f"""你是一个用户状态分析专家。请分析用户当前的行为和上下文，判断服务时机。
+
+用户输入：{user_input}
+{project_info}
+{code_info}
+
+请返回JSON格式的判断结果：
+{{
+  "user_state": "stuck/busy/exploring/focused/idle",
+  "urgency_level": "critical/high/medium/low/none",
+  "should_interact": true/false,
+  "reasoning": "判断依据",
+  "confidence": 0.9
+}}
+
+只返回JSON，不要有其他内容。"""
+
+            # 调用LLM
+            response = self._llm_client.complete(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=500,
+            )
+
+            # 解析响应
+            import json
+
+            result: Dict[str, Any] = json.loads(response.content.strip())
+
+            # 验证返回结果
+            required_fields = [
+                "user_state",
+                "urgency_level",
+                "should_interact",
+                "reasoning",
+                "confidence",
+            ]
+            if not all(field in result for field in required_fields):
+                return None
+
+            return result
+
+        except Exception:
+            # LLM调用失败，返回None触发降级
+            return None
 
     def should_offer_help(self, context: PredictionContext) -> TimingResult:
         """判断是否应该主动提供帮助
@@ -534,6 +614,68 @@ class TimingJudge:
         Returns:
             时机判断结果
         """
+        # 尝试使用LLM判断
+        llm_result = self._llm_judge_timing(context)
+
+        if llm_result:
+            # LLM判断成功
+            try:
+                # 解析LLM结果
+                user_state_str = llm_result["user_state"]
+                urgency_str = llm_result["urgency_level"]
+                should_interact = llm_result["should_interact"]
+                reasoning = llm_result["reasoning"]
+                confidence = llm_result["confidence"]
+
+                # 转换为枚举类型
+                llm_user_state = UserState(UserState[user_state_str.upper()])
+                llm_urgency = UrgencyLevel(UrgencyLevel[urgency_str.upper()])
+
+                # 根据should_interact决定决策
+                if should_interact:
+                    if llm_urgency in (UrgencyLevel.CRITICAL, UrgencyLevel.HIGH):
+                        decision = TimingDecision.OFFER_HELP
+                    else:
+                        decision = TimingDecision.ASK_CONFIRMATION
+                else:
+                    decision = TimingDecision.STAY_SILENT
+
+                # 应用策略调整
+                decision, confidence = self._apply_strategy_adjustment(
+                    decision, confidence, "offer_help"
+                )
+
+                # 应用用户偏好调整
+                decision, confidence = self._apply_user_preference_adjustment(
+                    context, decision, confidence
+                )
+
+                # 生成建议行动
+                suggested_action = self._get_suggested_action(
+                    decision, llm_user_state, llm_urgency
+                )
+
+                # 计算延迟时间
+                delay = self._get_delay(decision, llm_urgency)
+
+                # 过程打印
+                PrettyOutput.auto_print(
+                    f"⏰  时机判断: 用户状态={llm_user_state.value}, 紧急度={llm_urgency.value} (模式: LLM)"
+                )
+
+                return TimingResult(
+                    decision=decision,
+                    confidence_score=confidence,
+                    reasoning=reasoning,
+                    suggested_action=suggested_action,
+                    delay_seconds=delay,
+                )
+
+            except Exception:
+                # LLM结果解析失败，降级到规则模式
+                pass
+
+        # LLM判断失败或未提供，使用规则模式
         # 分析用户状态
         user_state = self._rule_judge.analyze_user_state(context)
 

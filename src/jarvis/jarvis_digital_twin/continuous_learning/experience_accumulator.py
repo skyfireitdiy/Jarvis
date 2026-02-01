@@ -153,8 +153,18 @@ class ExperienceAccumulator:
     负责记录和复用经验，支持经验分类和检索。
     """
 
-    def __init__(self, memory_manager: Optional[Any] = None) -> None:
-        """初始化经验积累器。"""
+    def __init__(
+        self,
+        memory_manager: Optional[Any] = None,
+        llm_client: Optional[Any] = None,
+    ) -> None:
+        """初始化经验积累器。
+
+        Args:
+            memory_manager: 记忆管理器实例（可选）
+            llm_client: LLM客户端（可选）
+        """
+        self._llm_client = llm_client
         self._memory_manager = memory_manager
         self._experience_store: Dict[str, ExperienceRecord] = {}
         self._content_hash_index: Dict[str, str] = {}

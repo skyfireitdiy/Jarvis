@@ -71,7 +71,10 @@ class AgentRunLoop:
 
     def _init_autonomous_components(self) -> None:
         """初始化智能增强组件（仅在启用时调用）"""
+        # 为每个组件创建独立的LLM实例，避免共享实例导致的上下文问题
+        # 每个组件调用 registry.get_cheap_platform() 都会创建新的独立实例
         try:
+            from jarvis.jarvis_platform.registry import PlatformRegistry
             from jarvis.jarvis_autonomous.interaction import DialogueManager
             from jarvis.jarvis_autonomous.interaction import AmbiguityResolver
             from jarvis.jarvis_autonomous.interaction import ProactiveAssistant
@@ -79,13 +82,32 @@ class AgentRunLoop:
             from jarvis.jarvis_autonomous.empathy import NeedPredictor
             from jarvis.jarvis_autonomous.empathy import PersonalityAdapter
 
+            registry = PlatformRegistry.get_global_platform_registry()
+
+            # 为每个组件创建独立的LLM实例，确保完全隔离
             self._dialogue_manager = DialogueManager()
-            self._emotion_recognizer = EmotionRecognizer()
-            self._need_predictor = NeedPredictor()
-            self._personality_adapter = PersonalityAdapter()
-            self._proactive_assistant = ProactiveAssistant()
-            self._ambiguity_resolver = AmbiguityResolver()
-            PrettyOutput.auto_print("✅ 智能增强组件已启用")
+            self._emotion_recognizer = EmotionRecognizer(
+                llm_client=registry.get_cheap_platform()
+            )
+            self._need_predictor = NeedPredictor(
+                llm_client=registry.get_cheap_platform()
+            )
+            self._personality_adapter = PersonalityAdapter(
+                llm_client=registry.get_cheap_platform()
+            )
+            self._proactive_assistant = ProactiveAssistant(
+                llm_client=registry.get_cheap_platform()
+            )
+            self._ambiguity_resolver = AmbiguityResolver(
+                llm_client=registry.get_cheap_platform()
+            )
+
+            PrettyOutput.auto_print(
+                "✅ 智能增强组件已启用（9个组件，每个使用独立LLM实例）"
+            )
+        except ImportError as e:
+            PrettyOutput.auto_print(f"⚠️ 智能增强组件加载失败: {e}")
+            self._autonomous_enabled = False
         except ImportError as e:
             PrettyOutput.auto_print(f"⚠️ 智能增强组件加载失败: {e}")
             self._autonomous_enabled = False
@@ -103,10 +125,12 @@ class AgentRunLoop:
                 PreferenceLearner,
             )
 
-            # 初始化阶段5.1和5.2组件
-            timing_judge = TimingJudge()
-            need_inferrer = NeedInferrer()
-            preference_learner = PreferenceLearner()
+            # 初始化阶段5.1和5.2组件，每个使用独立的LLM实例
+            timing_judge = TimingJudge(llm_client=registry.get_cheap_platform())
+            need_inferrer = NeedInferrer(llm_client=registry.get_cheap_platform())
+            preference_learner = PreferenceLearner(
+                llm_client=registry.get_cheap_platform()
+            )
 
             # 将组件注入到主动服务管理器
             self._proactive_service_manager = ProactiveServiceManager(
@@ -117,13 +141,36 @@ class AgentRunLoop:
         except ImportError:
             pass  # 主动服务管理器加载失败不影响其他功能
 
-        # 初始化持续学习管理器
+        # 初始化持续学习管理器，为所有子组件注入独立的LLM实例
         try:
             from jarvis.jarvis_digital_twin.continuous_learning import (
                 ContinuousLearningManager,
             )
+            from jarvis.jarvis_digital_twin.continuous_learning.knowledge_acquirer import (
+                KnowledgeAcquirer,
+            )
+            from jarvis.jarvis_digital_twin.continuous_learning.skill_learner import (
+                SkillLearner,
+            )
+            from jarvis.jarvis_digital_twin.continuous_learning.experience_accumulator import (
+                ExperienceAccumulator,
+            )
+            from jarvis.jarvis_digital_twin.continuous_learning.adaptive_engine import (
+                AdaptiveEngine,
+            )
 
-            self._continuous_learning_manager = ContinuousLearningManager()
+            self._continuous_learning_manager = ContinuousLearningManager(
+                knowledge_acquirer=KnowledgeAcquirer(
+                    llm_client=registry.get_cheap_platform()
+                ),
+                skill_learner=SkillLearner(llm_client=registry.get_cheap_platform()),
+                experience_accumulator=ExperienceAccumulator(
+                    llm_client=registry.get_cheap_platform()
+                ),
+                adaptive_engine=AdaptiveEngine(
+                    llm_client=registry.get_cheap_platform()
+                ),
+            )
         except ImportError:
             pass  # 持续学习管理器加载失败不影响其他功能
 
@@ -157,15 +204,16 @@ class AgentRunLoop:
         if self._emotion_recognizer:
             try:
                 emotion_result = self._emotion_recognizer.recognize(user_input)
-                if emotion_result and emotion_result.emotion_type.value not in (
-                    "neutral",
-                    "unknown",
-                ):
-                    # 将情绪信息作为上下文提示
-                    emotion_hint = f"[用户情绪: {emotion_result.emotion_type.value}, 置信度: {emotion_result.confidence:.2f}]"
-                    enhanced_input = f"{emotion_hint}\n{user_input}"
-            except Exception:
-                pass  # 情绪识别失败不影响主流程
+                if emotion_result:
+                    if emotion_result.emotion_type.value not in ("neutral", "unknown"):
+                        # 将情绪信息作为上下文提示
+                        emotion_hint = f"[用户情绪: {emotion_result.emotion_type.value}, 置信度: {emotion_result.confidence:.2f}]"
+                        enhanced_input = f"{emotion_hint}\n{user_input}"
+                        PrettyOutput.auto_print(
+                            f"🎭 情绪识别: {emotion_result.emotion_type.value} (置信度: {emotion_result.confidence:.2f})"
+                        )
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 情绪识别异常: {e}")
 
         # 3. 歧义检测
         if self._ambiguity_resolver:
@@ -177,8 +225,11 @@ class AgentRunLoop:
                         f"[检测到歧义: {ambiguity_result.ambiguity_type.value}]"
                     )
                     enhanced_input = f"{ambiguity_hint}\n{enhanced_input}"
-            except Exception:
-                pass  # 歧义检测失败不影响主流程
+                    PrettyOutput.auto_print(
+                        f"🔍 歧义检测: {ambiguity_result.ambiguity_type.value}"
+                    )
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 歧义检测异常: {e}")
 
         # 4. 主动服务处理
         if self._proactive_service_manager:
@@ -200,13 +251,17 @@ class AgentRunLoop:
                     conversation_history=conversation_history,
                 )
                 # 将服务结果添加到增强输入
+                service_count = 0
                 for result in results:
                     if result.status == ServiceStatus.COMPLETED:
                         enhanced_input = (
                             f"[主动服务: {result.message}]\n{enhanced_input}"
                         )
-            except Exception:
-                pass  # 主动服务处理失败不影响主流程
+                        service_count += 1
+                if service_count > 0:
+                    PrettyOutput.auto_print(f"💡 主动服务: 触发 {service_count} 个服务")
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 主动服务异常: {e}")
 
         return enhanced_input
 
@@ -252,12 +307,18 @@ class AgentRunLoop:
                                 last_user_input = turn.content
                                 break
                 if last_user_input:
-                    self._continuous_learning_manager.learn_from_interaction(
-                        user_input=last_user_input,
-                        assistant_response=response,
+                    learning_result = (
+                        self._continuous_learning_manager.learn_from_interaction(
+                            user_input=last_user_input,
+                            assistant_response=response,
+                        )
                     )
-            except Exception:
-                pass  # 学习失败不影响主流程
+                    if learning_result and learning_result.total_learned > 0:
+                        PrettyOutput.auto_print(
+                            f"📚 持续学习: 知识+{learning_result.knowledge_learned}, 技能+{learning_result.skills_learned}, 经验+{learning_result.experiences_learned}"
+                        )
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 持续学习异常: {e}")
 
         return response
 

@@ -215,12 +215,15 @@ class SkillLearner:
     def __init__(
         self,
         methodology_manager: Optional[Any] = None,
+        llm_client: Optional[Any] = None,
     ) -> None:
         """初始化技能学习器。
 
         Args:
             methodology_manager: 方法论管理器实例（可选）
+            llm_client: LLM客户端（可选）
         """
+        self._llm_client = llm_client
         self._methodology_manager = methodology_manager
 
         # 内部技能存储

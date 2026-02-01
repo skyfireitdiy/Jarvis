@@ -382,13 +382,16 @@ class KnowledgeAcquirer:
         self,
         knowledge_graph: Optional[Any] = None,
         memory_manager: Optional[Any] = None,
+        llm_client: Optional[Any] = None,
     ) -> None:
         """初始化知识获取器。
 
         Args:
             knowledge_graph: 知识图谱实例（可选）
             memory_manager: 记忆管理器实例（可选）
+            llm_client: LLM客户端（可选）
         """
+        self._llm_client = llm_client
         self._knowledge_graph = knowledge_graph
         self._memory_manager = memory_manager
 
