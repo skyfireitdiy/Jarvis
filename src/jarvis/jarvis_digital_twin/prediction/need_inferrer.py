@@ -552,21 +552,20 @@ class NeedInferrer:
         all_inferences: List[tuple[str, float, str, List[str]]] = []
         inference_mode = "规则"
 
-        # LLM推理（优先）
-        if self._llm_client is not None:
-            llm_results = self._llm_infer_implicit_needs(explicit_need)
-            if llm_results:
-                all_inferences.extend(llm_results)
-                inference_mode = "LLM"
-            else:
-                # LLM推理失败，降级到规则推理
-                inference_mode = "规则(降级)"
-
-        # 规则推理（LLM失败时或作为补充）
+        # 规则推理（优先）
         if self._strategy in (InferenceStrategy.RULE_BASED, InferenceStrategy.HYBRID):
-            if not all_inferences or self._strategy == InferenceStrategy.HYBRID:
-                rule_results = self._rule_inferrer.infer_implicit_needs(explicit_need)
+            rule_results = self._rule_inferrer.infer_implicit_needs(explicit_need)
+            if rule_results:
                 all_inferences.extend(rule_results)
+
+        # LLM推理（作为补充，仅在规则覆盖不足时使用）
+        if self._llm_client is not None and self._strategy == InferenceStrategy.HYBRID:
+            # 只在规则推理结果较少时才使用LLM补充
+            if len(all_inferences) < 2:  # 规则结果少于2个时
+                llm_results = self._llm_infer_implicit_needs(explicit_need)
+                if llm_results:
+                    all_inferences.extend(llm_results)
+                    inference_mode = "规则+LLM"
 
         # 模式推理
         if self._strategy in (
