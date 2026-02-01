@@ -1,0 +1,13 @@
+{
+  "id": "20260201_181244_661771",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "startup_config_selector",
+    "configuration",
+    "timing_issue"
+  ],
+  "content": "## Bug修复：enable_startup_config_selector 配置不生效\n\n### 问题描述\n在 `~/.jarvis/config.yaml` 中设置 `enable_startup_config_selector: false` 后，jvs 启动时仍然弹出配置选择界面。\n\n### 根本原因\n时序问题：在 `jarvis.py` 的 `run_cli()` 函数中，`handle_builtin_config_selector()` 在第909行被调用，但配置文件的加载 `load_config()` 是在第916行的 `init_env()` 中才执行的。因此，当 `is_enable_builtin_config_selector()` 函数执行时，`GLOBAL_CONFIG_DATA` 中还没有加载用户配置文件，只能使用默认值 `True`。\n\n### 解决方案\n在 `run_cli()` 函数中，将 `load_config()` 调用提前到 `handle_builtin_config_selector()` 之前（第893-903行）。\n\n### 修改文件\n- `src/jarvis/jarvis_agent/jarvis.py`\n\n### 修改内容\n```python\n# 提前加载配置文件，确保 handle_builtin_config_selector 能读取到正确的配置值\n# 修复：enable_startup_config_selector 配置不生效的问题\ntry:\n    from jarvis.jarvis_utils import utils\n    # 设置全局配置文件路径（与 init_env 中的逻辑一致）\n    utils.g_config_file = config_file\n    # 加载配置文件\n    utils.load_config()\nexcept Exception:\n    # 静默失败，不影响主流程\n    pass\n```\n\n### 验证方法\n1. 在 `~/.jarvis/config.yaml` 中设置 `enable_startup_config_selector: false`\n2. 运行 `jvs` 命令\n3. 确认不再弹出配置选择界面\n\n### 影响范围\n- 不影响其他功能\n- `load_config()` 具有幂等性，不会重复加载配置\n- 使用 try-except 确保异常不影响主流程\n\n### Commit ID\n- 67cbcaf: 第一次提交（有问题）\n- 9596435: 修复静态检查问题",
+  "created_at": "2026-02-01T18:12:44.661792",
+  "updated_at": "2026-02-01T18:12:44.661795"
+}
