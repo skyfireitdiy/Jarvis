@@ -135,10 +135,10 @@ class TestAmbiguityResolver:
 
     def test_ambiguity_types(self):
         """测试各种歧义类型"""
-        assert AmbiguityType.LEXICAL.value == "lexical"
-        assert AmbiguityType.REFERENTIAL.value == "referential"
-        assert AmbiguityType.SCOPE.value == "scope"
-        assert AmbiguityType.NONE.value == "none"
+        assert AmbiguityType.LEXICAL.value == "词汇歧义"
+        assert AmbiguityType.REFERENTIAL.value == "指代歧义"
+        assert AmbiguityType.SCOPE.value == "范围歧义"
+        assert AmbiguityType.NONE.value == "无歧义"
 
 
 class TestProactiveAssistant:

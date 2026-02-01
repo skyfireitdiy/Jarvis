@@ -17,13 +17,13 @@ from ..intelligence.llm_reasoning import ReasoningContext, ReasoningType
 class AmbiguityType(Enum):
     """歧义类型"""
 
-    LEXICAL = "lexical"  # 词汇歧义
-    SYNTACTIC = "syntactic"  # 句法歧义
-    SEMANTIC = "semantic"  # 语义歧义
-    REFERENTIAL = "referential"  # 指代歧义
-    SCOPE = "scope"  # 范围歧义
-    PRAGMATIC = "pragmatic"  # 语用歧义
-    NONE = "none"  # 无歧义
+    LEXICAL = "词汇歧义"  # 词汇歧义
+    SYNTACTIC = "句法歧义"  # 句法歧义
+    SEMANTIC = "语义歧义"  # 语义歧义
+    REFERENTIAL = "指代歧义"  # 指代歧义
+    SCOPE = "范围歧义"  # 范围歧义
+    PRAGMATIC = "语用歧义"  # 语用歧义
+    NONE = "无歧义"  # 无歧义
 
 
 @dataclass
@@ -61,7 +61,7 @@ class AmbiguityResolver(HybridEngine):
     ):
         super().__init__(llm_client=llm_client, mode=mode, enable_learning=True)
         self._ambiguous_patterns = {
-            "referential": [
+            AmbiguityType.REFERENTIAL: [
                 "它",
                 "这个",
                 "那个",
@@ -71,8 +71,8 @@ class AmbiguityResolver(HybridEngine):
                 "前者",
                 "后者",
             ],
-            "scope": ["所有", "每个", "一些", "部分", "大多数"],
-            "lexical": ["处理", "运行", "执行", "操作", "管理"],
+            AmbiguityType.SCOPE: ["所有", "每个", "一些", "部分", "大多数"],
+            AmbiguityType.LEXICAL: ["处理", "运行", "执行", "操作", "管理"],
         }
         self._clarification_templates = {
             AmbiguityType.REFERENTIAL: "您提到的'{term}'具体指的是什么？",
@@ -171,7 +171,7 @@ class AmbiguityResolver(HybridEngine):
                 if pattern in input_data:
                     return AmbiguityResult(
                         has_ambiguity=True,
-                        ambiguity_type=AmbiguityType(amb_type),
+                        ambiguity_type=amb_type,
                         ambiguous_parts=[pattern],
                         confidence=0.7,
                         source="pattern",
@@ -218,7 +218,7 @@ class AmbiguityResolver(HybridEngine):
 文本：{input_data}
 上下文：{context}
 
-请检测歧义类型（lexical/syntactic/semantic/referential/scope/pragmatic/none）。"""
+请检测歧义类型（词汇歧义/句法歧义/语义歧义/指代歧义/范围歧义/语用歧义/无歧义）。"""
         return ReasoningContext(
             task_type=ReasoningType.ANALYSIS,
             input_data=input_data,
