@@ -1,0 +1,15 @@
+{
+  "id": "20260201_150813_903430",
+  "type": "project_long_term",
+  "tags": [
+    "用户画像",
+    "数据使用",
+    "主动服务",
+    "偏好学习",
+    "需求推理",
+    "反馈学习"
+  ],
+  "content": "# 用户画像数据使用流程\n\n## 数据流转路径\n\n### 1. 数据收集阶段\n**PreferenceLearner（偏好学习器）**\n- 触发时机：每次用户交互、用户反馈\n- 学习内容：\n  - 代码风格（简洁/详细、类型注解、文档字符串）\n  - 技术栈（语言、框架、工具）\n  - 交互风格（简洁度、示例需求、响应语言）\n- 存储位置：内存中的 UserPreference 对象\n\n**FeedbackLearner（反馈学习器）**\n- 触发时机：用户对主动服务提供反馈\n- 学习方式：调用 PreferenceLearner.learn_from_interaction()\n- 学习内容：用户对服务的接受度，优化触发策略\n\n### 2. 数据传递阶段\n**TriggerContext（触发上下文）**\n```python\n@dataclass\nclass TriggerContext:\n    user_input: str  # 用户输入\n    conversation_history: List[Dict]  # 对话历史\n    user_profile: Optional[Any]  # 用户画像数据\n    predictions: Optional[Dict]  # 预测结果\n    timestamp: datetime  # 时间戳\n```\n\n**调用链**：\n```\nAgentRunLoop.run()\n  └─> ProactiveServiceManager.process_context()\n       └─> ServiceTrigger.check_trigger(context)  # 触发评估\n       └─> ServiceOrchestrator.orchestrate(services, context)  # 编排\n            └─> NeedInferrer.infer_implicit_needs(context)  # 需求推理\n       └─> ServiceExecutor.execute(service, context)  # 执行\n```\n\n### 3. 数据使用场景\n\n#### 场景1：服务触发评估\n- **位置**：ServiceTrigger.check_trigger()\n- **使用方式**：触发评估器使用 user_profile 判断是否满足触发条件\n- **示例**：根据用户技术栈偏好，决定是否触发相关服务\n\n#### 场景2：服务编排优化\n- **位置**：ServiceOrchestrator._apply_intelligent_ordering()\n- **使用方式**：\n  1. 将 TriggerContext 转换为 PredictionContext\n  2. 调用 NeedInferrer.infer_implicit_needs()\n  3. 使用用户画像推理隐式需求\n  4. 根据推理结果调整服务优先级\n\n**代码示例**：\n```python\n# service_orchestrator.py\nprediction_context = PredictionContext(\n    current_message=context.user_input,\n    conversation_history=context.conversation_history,\n    user_profile=context.user_profile or {},  # 传递用户画像\n)\ninferences = self._need_inferrer.infer_implicit_needs(\n    prediction_context, context.user_input\n)\n```\n\n#### 场景3：需求推理\n- **位置**：NeedInferrer.infer_implicit_needs()\n- **使用方式**：\n  - 优先使用 LLM 分析（需要用户画像作为上下文）\n  - 降级到规则匹配（使用关键词映射）\n- **推理类型**：\n  - 隐式需求推理\n  - 后续任务推理\n  - 根本原因推理\n\n#### 场景4：服务执行个性化\n- **位置**：ServiceHandler.handle()\n- **使用方式**：服务处理器使用 user_profile 个性化服务内容\n- **示例**：根据用户交互风格偏好，调整响应的详细程度\n\n#### 场景5：反馈闭环学习\n- **位置**：FeedbackLearner.record_feedback()\n- **使用方式**：\n  1. 收集用户反馈（接受/拒绝/忽略/修改）\n  2. 创建 InteractionData\n  3. 调用 PreferenceLearner.learn_from_interaction()\n  4. 更新用户偏好，影响后续服务\n\n### 4. 数据持久化\n**UserProfileAggregator**\n- 保存：save_profile(file_path) → ~/.jarvis/digital_twin/profiles/\n- 加载：load_profile(file_path) → 恢复历史画像\n- 更新：update_profile() → 增量更新画像数据\n\n## 关键特点\n1. **实时学习**：每次交互都持续学习，无需手动触发\n2. **闭环优化**：反馈学习 → 更新偏好 → 优化服务 → 收集反馈\n3. **分层使用**：触发、编排、执行各层都可以使用用户画像\n4. **降级策略**：LLM 失败时自动降级到规则匹配\n5. **版本管理**：支持多版本画像，可回溯历史",
+  "created_at": "2026-02-01T15:08:13.903458",
+  "updated_at": "2026-02-01T15:08:13.903462"
+}
