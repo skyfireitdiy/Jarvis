@@ -1,3 +1,102 @@
+### Release Note - v2.0.1 (2026-02-01)
+
+#### **🗑️ 功能移除与代码清理**
+
+##### 🎯 智能增强模块移除（Architecture Cleanup）
+
+基于「LLM本身已具备相关能力」的判断，移除低价值智能增强功能模块，简化架构，提升可维护性：
+
+| 模块 | 代码行数 | 移除原因 |
+|------|---------|---------|
+| `jarvis_ab_test` | 306 | A/B测试功能使用率低 |
+| `jarvis_arch_analyzer` | 1,759 | 架构分析功能重复，LLM可替代 |
+| `jarvis_auto_fix` | 3,652 | 自动修复功能复杂度高，收益低 |
+| `jarvis_autonomous` | 2,780 | 智能增强核心模块，功能分散 |
+| `jarvis_digital_twin` | 6,648 | 数字孪生系统过于超前 |
+| `jarvis_smart_advisor` | 1,636 | 智能顾问功能与LLM重复 |
+| `jarvis_config_optimizer` | 754 | 配置优化器实际使用少 |
+| `jarvis_api_version` | 366 | API版本管理未实际使用 |
+| `jarvis_canary` | 279 | 金丝雀发布功能未落地 |
+| `jarvis_code_analysis` | 1,353 | 代码分析检查表功能重复 |
+| `jarvis_dependency_manager` | 1,054 | 依赖管理功能与现有工具重复 |
+| `jarvis_knowledge_graph` | 716 | 知识图谱功能未完成 |
+| `jarvis_plugin` | 188 | 插件系统功能未实现 |
+| `jarvis_methodology_generator` | 428 | 方法论自动提取功能不稳定 |
+| `jarvis_rule_generator` | 712 | 规则生成器功能未验证 |
+
+**总计**：删除 15 个模块，约 **23,495 行代码**（14,042 源码 + 8,902 测试 + 551 工具）
+
+**影响范围**：
+- 移除 `jarvis-code-review` 和 `jcr` CLI 入口点
+- 从 `pyproject.toml` 中删除废弃的命令注册
+- 清理 `src/jarvis/jarvis_agent/task_analyzer.py` 中的方法论自动提取逻辑
+- 简化 `src/jarvis/jarvis_agent/run_loop.py`，移除智能增强组件初始化
+- 清理 `docs/jarvis_book/3.核心概念与架构.md` 中的智能增强文档
+- 更新 `docs/images/jarvis_implementation_view.dot` 架构图
+- 移除 `docs/best_practices/rules_best_practices.md` 中的 `generate_rules.md` 引用
+
+#### **📌 修复**
+
+- **🔧 配置时序修复**
+  - **问题**：`enable_startup_config_selector` 配置不生效，jvs 启动时仍然弹出配置选择界面
+  - **原因**：在 `jarvis.py` 的 `run_cli()` 函数中，`handle_builtin_config_selector()` 在配置文件加载之前被调用
+  - **修复**：将 `load_config()` 调用提前到 `handle_builtin_config_selector()` 之前
+  - **文件**：`src/jarvis/jarvis_agent/jarvis.py`
+
+- **🔧 中断处理改进**
+  - **问题**：用户按 Ctrl+C 中断后，再次执行任务时，方法论加载失败，日志显示「返回结果为空」
+  - **原因**：创建新平台实例时，全局中断标志 `g_interrupt` 没有被清除
+  - **修复**：在 `BasePlatform.chat_until_success()` 方法开始时添加 `set_interrupt(False)`，确保每次新对话都从干净的状态开始
+  - **文件**：`src/jarvis/jarvis_platform/base.py`
+
+- **🔧 tmux 配置优化**
+  - **功能**：jcad/jvsd 启动时自动忽略 tmux 被禁用的配置
+  - **实现**：在 `dispatch_command_to_panel()` 中设置环境变量 `JARVIS_DISPATCHER_CALL=1`，tmux 相关函数检查该环境变量来决定是否忽略 `enable_tmux` 配置
+  - **文件**：`src/jarvis/jarvis_utils/tmux_wrapper.py`
+
+#### **🔧 优化与重构**
+
+- **🎯 run_loop 精简**
+  - 移除 `src/jarvis/jarvis_agent/run_loop.py` 中的智能增强相关代码（约 270 行）
+  - 删除 `TYPE_CHECKING` 导入：DialogueManager、ContinuousLearningManager、AutonomousManager 等
+  - 删除属性定义：`_autonomous_enabled`、`_dialogue_manager`、`_continuous_learning_manager` 等
+  - 删除方法：`_init_autonomous_components()`、`_preprocess_user_input()`、`_postprocess_response()` 中的智能增强逻辑
+  - 简化为直接返回，保持方法签名不变
+
+- **🎯 task_analyzer 精简**
+  - 移除 `src/jarvis/jarvis_agent/task_analyzer.py` 中的方法论自动提取功能（约 160 行）
+  - 删除方法：`_try_extract_methodology()`、`_extract_and_save_methodology()`、`_collect_execution_steps()` 等
+  - 清理导入语句：`is_enable_auto_methodology_extraction`、`Dict` 等
+
+- **🎯 依赖清理**
+  - 移除 `pyproject.toml` 中的废弃 CLI 入口点：`jarvis-code-review`、`jcr`
+  - 移除 `src/jarvis/jarvis_code_agent/code_agent.py` 中的废弃工具引用：`arch_analyzer_tool`、`knowledge_graph_tool`
+
+#### **📚 文档更新**
+
+- **新增文档**：
+  - `docs/GITHUB_PAGES_DEPLOYMENT.md`：GitHub Pages 部署指南，使用 MkDocs + Material Theme
+  - `mkdocs.yml`：MkDocs 配置文件，支持中文搜索、深色模式、代码高亮等
+  - `.github/workflows/deploy-docs.yml`：GitHub Actions 自动部署工作流
+
+- **更新文档**：
+  - `docs/jarvis_book/3.核心概念与架构.md`：删除智能增强系统和数字孪生系统章节（360 行）
+  - `docs/jarvis_book/9.附录.md`：删除 `enable_autonomous` 配置项说明
+  - `docs/best_practices/rules_best_practices.md`：删除 `generate_rules.md` 引用
+  - `docs/images/jarvis_implementation_view.dot`：更新架构图，移除智能增强和数字孪生节点
+  - `.gitignore`：新增 `.jarvis/knowledge_graph` 和 `goals` 忽略规则
+
+- **文档统计**：
+  - 新增文档：163 行（GitHub Pages 部署指南）
+  - 删除文档：576 行（智能增强相关文档）
+  - 净减少：413 行
+
+---
+
+**版本说明**：本次更新是一次大规模的**架构简化与代码清理**，移除了低价值的智能增强功能模块，聚焦核心代码生成能力，提升系统可维护性和稳定性。删除了约 2.3 万行代码，修复了 3 个配置相关 Bug，优化了文档结构。
+
+---
+
 ### Release Note - v2.0.0 (2026-02-01)
 
 > **🎉 里程碑版本**：本版本实现了 Jarvis 从「代码助手」向「智能伙伴」的重大跨越，新增 800+ 测试用例，代码质量和智能化水平全面提升。
