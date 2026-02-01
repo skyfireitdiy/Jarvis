@@ -13,7 +13,7 @@ import sys
 import uuid
 from typing import List, Optional
 
-from jarvis.jarvis_utils.output import PrettyOutput, OutputType
+from jarvis.jarvis_utils.output import PrettyOutput
 
 
 def _get_username() -> str:
@@ -150,16 +150,14 @@ def dispatch_to_tmux_window(
         current_window = result.stdout.strip()
         # 验证格式是否正确（应包含冒号分隔符）
         if not current_window or ":" not in current_window:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ Invalid window format: '{current_window}'",
-                OutputType.WARNING,
                 timestamp=False,
             )
             current_window = None
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Failed to get current window: {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
 
@@ -189,9 +187,8 @@ def dispatch_to_tmux_window(
         subprocess.run(tmux_args, check=True)
         return True
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Failed to dispatch to tmux window: {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return False
@@ -264,9 +261,8 @@ def check_and_launch_tmux(
 
     # 如果找到现有 session，在该 session 的当前窗口中创建 panel
     if existing_session:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"ℹ️ 找到现有 session: {existing_session}，正在当前窗口创建 panel...",
-            OutputType.INFO,
             timestamp=False,
         )
 
@@ -287,9 +283,8 @@ def check_and_launch_tmux(
         # 获取 session 的当前窗口
         current_window = get_session_current_window(existing_session)
         if not current_window:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ 无法获取 session '{existing_session}' 的当前窗口，创建新窗口...",
-                OutputType.WARNING,
                 timestamp=False,
             )
             # 降级到创建新窗口（原有逻辑）
@@ -310,9 +305,8 @@ def check_and_launch_tmux(
                 )
                 new_window_index = result.stdout.strip()
             except subprocess.CalledProcessError as e:
-                PrettyOutput.print(
+                PrettyOutput.auto_print(
                     f"⚠️ Failed to create new window in tmux session '{existing_session}': {e}",
-                    OutputType.WARNING,
                     timestamp=False,
                 )
                 return
@@ -327,9 +321,8 @@ def check_and_launch_tmux(
                 shell_fallback=shell_fallback,
             )
             if not pane_id:
-                PrettyOutput.print(
+                PrettyOutput.auto_print(
                     f"⚠️ 在窗口 '{current_window}' 中创建 panel 失败，创建新窗口...",
-                    OutputType.WARNING,
                     timestamp=False,
                 )
                 # 降级到创建新窗口（原有逻辑）
@@ -350,9 +343,8 @@ def check_and_launch_tmux(
                     )
                     new_window_index = result.stdout.strip()
                 except subprocess.CalledProcessError as e:
-                    PrettyOutput.print(
+                    PrettyOutput.auto_print(
                         f"⚠️ Failed to create new window in tmux session '{existing_session}': {e}",
-                        OutputType.WARNING,
                         timestamp=False,
                     )
                     return
@@ -375,9 +367,8 @@ def check_and_launch_tmux(
         try:
             os.execvp("tmux", tmux_args)
         except OSError as e:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ Failed to attach to tmux session '{existing_session}': {e}",
-                OutputType.WARNING,
                 timestamp=False,
             )
             return
@@ -417,9 +408,8 @@ def check_and_launch_tmux(
         os.execvp("tmux", tmux_args)
     except OSError as e:
         # 如果执行失败，输出警告并继续
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Failed to launch tmux: {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return
@@ -468,9 +458,8 @@ def _find_jarvis_session() -> Optional[str]:
         pass
     except Exception as e:
         # 保留真正的意外错误警告
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Unexpected error while listing sessions: {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
     return None
@@ -514,9 +503,8 @@ def list_session_windows(session_name: str) -> List[str]:
         return []
     except Exception as e:
         # 记录意外错误
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Unexpected error while listing windows for session '{session_name}': {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return []
@@ -569,9 +557,8 @@ def get_window_pane_count(session_name: str, window_id: str) -> int:
         return 0
     except Exception as e:
         # 记录意外错误
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Unexpected error while counting panes for window '{window_id}' in session '{session_name}': {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return 0
@@ -651,35 +638,30 @@ def create_window(
         if window_id:
             return window_id
         else:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ tmux new-window returned empty window_id for session '{session_name}'",
-                OutputType.WARNING,
                 timestamp=False,
             )
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ stdout: {result.stdout}",
-                OutputType.WARNING,
                 timestamp=False,
             )
             return None
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Failed to create window in session '{session_name}': {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
     except subprocess.TimeoutExpired:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Creating window in session '{session_name}' timed out",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
     except Exception as e:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Unexpected error creating window in session '{session_name}': {type(e).__name__}: {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
@@ -716,18 +698,16 @@ def create_panel(
     """
     # 验证 split_direction 参数
     if split_direction not in ("h", "v"):
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Invalid split_direction: '{split_direction}', must be 'h' or 'v'",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
 
     # 验证 pane_percentage 参数
     if pane_percentage is not None and (pane_percentage < 1 or pane_percentage > 99):
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Invalid pane_percentage: '{pane_percentage}', must be between 1 and 99",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
@@ -796,9 +776,8 @@ def create_panel(
         # 找到最新的 pane（索引最大的）
         panes = list_result.stdout.strip().split("\n")
         if not panes or not panes[0]:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ Failed to list panes for target '{target}'",
-                OutputType.WARNING,
                 timestamp=False,
             )
             return None
@@ -827,41 +806,35 @@ def create_panel(
         if pane_id:
             return pane_id
         else:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ Failed to get pane_id for target '{target}'",
-                OutputType.WARNING,
                 timestamp=False,
             )
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ list-panes output: {list_result.stdout.strip()}",
-                OutputType.WARNING,
                 timestamp=False,
             )
             return None
     except subprocess.CalledProcessError as e:
         stderr_output = e.stderr.strip() if e.stderr else "(no stderr output)"
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Failed to create panel in window '{window_id}' of session '{session_name}': {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ tmux stderr: {stderr_output}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
     except subprocess.TimeoutExpired:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Creating panel in window '{window_id}' of session '{session_name}' timed out",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
     except Exception as e:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Unexpected error creating panel in window '{window_id}' of session '{session_name}': {type(e).__name__}: {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
@@ -903,16 +876,14 @@ def set_window_tiled_layout(session_name: str, window_id: Optional[str] = None) 
         )
         return True
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Failed to set tiled layout for window '{window_id or 'current'}' in session '{session_name}': {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return False
     except subprocess.TimeoutExpired:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Setting tiled layout for window '{window_id or 'current'}' in session '{session_name}' timed out",
-            OutputType.WARNING,
             timestamp=False,
         )
         return False
@@ -962,16 +933,14 @@ def find_or_create_jarvis_session(
             )
         return session_name
     except subprocess.CalledProcessError as e:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Failed to create tmux session '{session_name}': {e}",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
     except subprocess.TimeoutExpired:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ Creating tmux session '{session_name}' timed out",
-            OutputType.WARNING,
             timestamp=False,
         )
         return None
@@ -1146,9 +1115,7 @@ def dispatch_command_to_panel(
     # 检查 tmux 是否安装
     tmux_path = shutil.which("tmux")
     if tmux_path is None:
-        PrettyOutput.print(
-            "⚠️ tmux is not installed", OutputType.WARNING, timestamp=False
-        )
+        PrettyOutput.auto_print("⚠️ tmux is not installed", timestamp=False)
         return None
 
     # 先尝试查找现有 session
@@ -1156,18 +1123,16 @@ def dispatch_command_to_panel(
 
     if existing_session:
         # 使用现有 session，在当前 window 创建 panel
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"ℹ️ 使用现有 tmux session: {existing_session}",
-            OutputType.INFO,
             timestamp=False,
         )
 
         # 获取当前窗口索引
         current_window = get_session_current_window(existing_session)
         if not current_window:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"⚠️ 无法获取 session '{existing_session}' 的当前窗口",
-                OutputType.WARNING,
                 timestamp=False,
             )
             return None
@@ -1182,21 +1147,18 @@ def dispatch_command_to_panel(
             shell_fallback=shell_fallback,
         )
         if pane_id:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"✅ Successfully created panel {pane_id} in current window {current_window}",
-                OutputType.SUCCESS,
                 timestamp=False,
             )
             return existing_session
         else:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"❌ Failed to create panel in window {current_window} of session '{existing_session}'",
-                OutputType.ERROR,
                 timestamp=False,
             )
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 f"🔍 Command: {shell_command[:100]}{'...' if len(shell_command) > 100 else ''}",
-                OutputType.INFO,
                 timestamp=False,
             )
             return None
@@ -1206,16 +1168,14 @@ def dispatch_command_to_panel(
             force_create=True, initial_command=shell_command
         )
         if not new_session:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 "⚠️ Failed to create jarvis session",
-                OutputType.WARNING,
                 timestamp=False,
             )
             return None
 
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"✅ Successfully created session '{new_session}' with main process",
-            OutputType.SUCCESS,
             timestamp=False,
         )
         return new_session
@@ -1244,16 +1204,14 @@ def _dispatch_to_existing_jarvis_session(
     # 查找或创建 jarvis session
     session_name = find_or_create_jarvis_session(force_create=True)
     if not session_name:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             "❌ 无法找到或创建 tmux session",
-            OutputType.ERROR,
             timestamp=False,
         )
         return False
 
-    PrettyOutput.print(
+    PrettyOutput.auto_print(
         f"ℹ️ 使用 tmux session: {session_name}",
-        OutputType.INFO,
         timestamp=False,
     )
 
@@ -1284,9 +1242,8 @@ def _dispatch_to_existing_jarvis_session(
     # 获取 session 的当前窗口
     current_window = get_session_current_window(session_name)
     if not current_window:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ 无法获取 session '{session_name}' 的当前窗口，创建新session",
-            OutputType.WARNING,
             timestamp=False,
         )
         # 无法获取当前窗口时，创建新session并以主进程启动
@@ -1294,16 +1251,14 @@ def _dispatch_to_existing_jarvis_session(
             force_create=True, initial_command=command
         )
         if not new_session:
-            PrettyOutput.print(
+            PrettyOutput.auto_print(
                 "⚠️ 创建新session失败",
-                OutputType.WARNING,
                 timestamp=False,
             )
             return False
 
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"✅ 成功创建新session '{new_session}' 并启动任务",
-            OutputType.SUCCESS,
             timestamp=False,
         )
         return True
@@ -1318,17 +1273,15 @@ def _dispatch_to_existing_jarvis_session(
         shell_fallback=shell_fallback,
     )
     if not pane_id:
-        PrettyOutput.print(
+        PrettyOutput.auto_print(
             f"⚠️ 在窗口 '{current_window}' 中创建 panel 失败",
-            OutputType.WARNING,
             timestamp=False,
         )
         return False
 
     # panel创建成功
-    PrettyOutput.print(
+    PrettyOutput.auto_print(
         f"✅ 任务已派发到 tmux session '{session_name}' 的 panel 中",
-        OutputType.SUCCESS,
         timestamp=False,
     )
     return True

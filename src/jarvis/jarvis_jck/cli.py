@@ -111,11 +111,11 @@ def _install_missing_tools(results: list) -> None:
 
     except FileNotFoundError:
         # jvs命令不存在，无法继续安装
-        PrettyOutput.print("❌ 找不到 'jvs' 命令，无法继续安装工具", OutputType.ERROR)
-        PrettyOutput.print("   请确保 jarvis 已正确安装后再试", OutputType.ERROR)
+        PrettyOutput.auto_print("❌ 找不到 'jvs' 命令，无法继续安装工具")
+        PrettyOutput.auto_print("   请确保 jarvis 已正确安装后再试")
     except Exception as e:
         # 其他异常
-        PrettyOutput.print(f"❌ 批量安装时出错: {e}", OutputType.ERROR)
+        PrettyOutput.auto_print(f"❌ 批量安装时出错: {e}")
 
     PrettyOutput.auto_print("\n🔍 正在重新检查工具安装状态...")
 
@@ -131,7 +131,7 @@ def _print_results(results: list, summary: dict) -> None:
     PrettyOutput.auto_print("🔍 Jarvis Check - 工具检查结果")
 
     # 分隔线
-    PrettyOutput.print("=" * 60, OutputType.INFO)
+    PrettyOutput.auto_print("=" * 60)
 
     # 摘要
     total = summary["total"]
@@ -141,7 +141,7 @@ def _print_results(results: list, summary: dict) -> None:
     PrettyOutput.auto_print(f"总计: {total} | 已安装: {found} | 未安装: {missing}")
 
     # 分隔线
-    PrettyOutput.print("=" * 60, OutputType.INFO)
+    PrettyOutput.auto_print("=" * 60)
 
     # 每个工具的结果
     for result in results:
@@ -213,8 +213,8 @@ def check(
     check_flags = [check_lint, check_build]
     active_flags = sum(check_flags)
     if active_flags > 1:
-        PrettyOutput.print(
-            "❌ 错误：--check-lint 和 --check-build 选项不能同时使用", OutputType.ERROR
+        PrettyOutput.auto_print(
+            "❌ 错误：--check-lint 和 --check-build 选项不能同时使用"
         )
         sys.exit(1)
 

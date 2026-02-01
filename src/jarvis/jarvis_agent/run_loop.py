@@ -24,7 +24,6 @@ from jarvis.jarvis_agent.utils import normalize_next_action
 from jarvis.jarvis_utils.config import get_conversation_turn_threshold
 from jarvis.jarvis_utils.config import get_max_input_token_count
 from jarvis.jarvis_utils.config import is_enable_autonomous
-from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import get_context_token_count
@@ -86,9 +85,9 @@ class AgentRunLoop:
             self._personality_adapter = PersonalityAdapter()
             self._proactive_assistant = ProactiveAssistant()
             self._ambiguity_resolver = AmbiguityResolver()
-            PrettyOutput.print("智能增强组件已启用", OutputType.INFO)
+            PrettyOutput.auto_print("✅ 智能增强组件已启用")
         except ImportError as e:
-            PrettyOutput.print(f"智能增强组件加载失败: {e}", OutputType.WARNING)
+            PrettyOutput.auto_print(f"⚠️ 智能增强组件加载失败: {e}")
             self._autonomous_enabled = False
 
         # 初始化主动服务管理器（集成阶段5.1和5.2组件）
