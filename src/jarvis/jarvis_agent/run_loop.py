@@ -588,6 +588,23 @@ class AgentRunLoop:
                 ag.session.prompt = ""
                 run_input_handlers = False
 
+                # 打印LLM输出（过滤掉工具调用内容，在智能增强处理之前）
+                if current_response and current_response.strip():
+                    # 过滤掉 <TOOL_CALL>...</TOOL_CALL> 标签及其内容
+                    filtered_response = self._filter_tool_calls_from_response(
+                        current_response
+                    )
+                    # 只有在过滤后仍有内容时才打印
+                    if filtered_response:
+                        import jarvis.jarvis_utils.globals as G
+
+                        # 获取模型名称：优先使用model.get_model_name()，如果不存在则回退到'LLM'
+                        model_name = ag.model.model_name
+                        title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{model_name}[/bold cyan]"
+                        PrettyOutput.print_markdown(
+                            filtered_response, title=title, border_style="bright_blue"
+                        )
+
                 # 智能增强：后处理响应
                 current_response = self._postprocess_response(current_response)
 
@@ -647,23 +664,6 @@ class AgentRunLoop:
                     )
                 except Exception:
                     pass
-
-                # 打印LLM输出（过滤掉工具调用内容）
-                if current_response and current_response.strip():
-                    # 过滤掉 <TOOL_CALL>...</TOOL_CALL> 标签及其内容
-                    filtered_response = self._filter_tool_calls_from_response(
-                        current_response
-                    )
-                    # 只有在过滤后仍有内容时才打印
-                    if filtered_response:
-                        import jarvis.jarvis_utils.globals as G
-
-                        # 获取模型名称：优先使用model.get_model_name()，如果不存在则回退到'LLM'
-                        model_name = ag.model.model_name
-                        title = f"[bold cyan]{(G.get_current_agent_name() + ' · ') if G.get_current_agent_name() else ''}{model_name}[/bold cyan]"
-                        PrettyOutput.print_markdown(
-                            filtered_response, title=title, border_style="bright_blue"
-                        )
 
                 try:
                     need_return, tool_prompt = ag._call_tools(current_response)
