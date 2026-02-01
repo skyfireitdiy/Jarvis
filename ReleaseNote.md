@@ -105,6 +105,22 @@
     - 更新 `docs/compare/jarvis_vs_codex_cli.md`，删除 `jqc` 命令行
   - **向后兼容性**：`quick_config.py` 模块保留，供内部调用，功能逻辑完全保留
 
+- **🎯 CLI 重构：jck 命令迁移**
+  - **变更**：删除独立的 `jck` 命令（jarvis-check），功能迁移为 `jvs` 的 `--check` 参数
+  - **使用方式**：
+    - `jvs --check`：检查所有工具（替代原来的 `jck` 命令）
+    - `jvs --check-lint`：检查 lint 工具（替代原来的 `jck --check-lint`）
+    - `jvs --check-build`：检查构建工具（替代原来的 `jck --check-build`）
+    - `jvs --check --check-json`：以 JSON 格式输出（替代原来的 `jck --json`）
+    - `jvs --check-tool <工具名>`：检查指定工具（替代原来的 `jck <工具名>`）
+  - **优势**：统一 CLI 入口，减少命令数量，参数设计更简洁
+  - **影响范围**：
+    - 删除 `pyproject.toml` 中的 `jarvis-check` 和 `jck` 入口点
+    - 在 `jarvis.py` 中添加 `--check`、`--check-lint`、`--check-build`、`--check-json`、`--check-tool` 参数
+    - 复用 `jarvis_jck` 模块的 `ToolChecker` 类实现检查逻辑
+    - 保留 `jarvis_jck` 目录（core.py、config.py、cli.py）作为内部模块
+  - **向后兼容性**：`jarvis_jck` 模块保留，供内部调用，功能逻辑完全保留
+
 #### **📚 文档更新**
 
 - **新增文档**：
