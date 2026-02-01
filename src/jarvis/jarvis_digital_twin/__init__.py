@@ -3,65 +3,22 @@
 阶段5：数字孪生智能 - 完全理解用户，成为数字化的自我延伸。
 
 子模块：
-- user_profile: 用户画像深度建模（阶段5.1）
+- continuous_learning: 持续学习管理（项目知识积累）
 """
 
-from jarvis.jarvis_digital_twin.user_profile import (
-    # History Analyzer
-    HistoryAnalyzer,
-    InteractionPattern,
-    InteractionRecord,
-    TimePattern,
-    CommandPattern,
-    QuestionPattern,
-    WorkSchedule,
-    # Preference Learner
-    PreferenceLearner,
-    UserPreference,
-    CodeStyleDetail,
-    TechStackPreference,
-    InteractionStyleDetail,
-    PreferenceConfidence,
-    # Goal Tracker
-    GoalTracker,
-    TrackedGoal,
-    GoalType,
-    GoalStatus,
-    GoalProgress,
-    GoalInferenceResult,
-    # Aggregator
-    UserProfileAggregator,
-    DigitalTwinProfile,
-    ProfileMetadata,
-    ProfileSummary,
+from jarvis.jarvis_digital_twin.continuous_learning import (
+    ContinuousLearningManager,
+    KnowledgeAcquirer,
+    ExperienceAccumulator,
+    SkillLearner,
+    AdaptiveEngine,
 )
 
 __all__ = [
-    # History Analyzer
-    "HistoryAnalyzer",
-    "InteractionPattern",
-    "InteractionRecord",
-    "TimePattern",
-    "CommandPattern",
-    "QuestionPattern",
-    "WorkSchedule",
-    # Preference Learner
-    "PreferenceLearner",
-    "UserPreference",
-    "CodeStyleDetail",
-    "TechStackPreference",
-    "InteractionStyleDetail",
-    "PreferenceConfidence",
-    # Goal Tracker
-    "GoalTracker",
-    "TrackedGoal",
-    "GoalType",
-    "GoalStatus",
-    "GoalProgress",
-    "GoalInferenceResult",
-    # Aggregator
-    "UserProfileAggregator",
-    "DigitalTwinProfile",
-    "ProfileMetadata",
-    "ProfileSummary",
+    # 持续学习
+    "ContinuousLearningManager",
+    "KnowledgeAcquirer",
+    "ExperienceAccumulator",
+    "SkillLearner",
+    "AdaptiveEngine",
 ]
