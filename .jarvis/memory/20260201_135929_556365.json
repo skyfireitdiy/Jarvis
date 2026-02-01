@@ -1,0 +1,8 @@
+{
+  "id": "20260201_135929_556365",
+  "type": "project_long_term",
+  "tags": ["智能增强", "LLM集成", "实现模式", "组件集成"],
+  "content": "## 智能增强组件LLM集成标准模式\n\n### 适用场景\n为数字孪生系统的智能增强组件添加LLM推理能力\n\n### 实现模式选择\n\n**模式A：继承HybridEngine基类**（适用于复杂组件）\n- 组件继承自`HybridEngine[T]`基类\n- 基类提供_llm_infer方法和fallback机制\n- 示例：EmotionRecognizer、AmbiguityResolver\n\n**模式B：直接集成LLM**（适用于简单组件）\n- 不改变继承结构\n- 在__init__中添加llm_client参数\n- 实现独立的_llm_infer_xxx方法\n- 手动处理降级逻辑\n- 示例：NeedInferrer\n\n### 通用实现步骤\n\n1. **添加LLM客户端**：\n   - `__init__`中添加`llm_client: Optional[Any] = None`参数\n\n2. **实现LLM推理方法**：\n   - 方法名：`_llm_infer_<功能名>`\n   - 返回类型：`List[tuple[str, float, str, List[str]]]`\n   - 检查llm_client是否存在\n   - 设计结构化prompt（要求JSON返回）\n   - 使用`complete()`方法进行无状态调用\n   - 解析JSON响应并构建结果\n   - 捕获异常返回空列表\n\n3. **修改主推理方法**：\n   - 优先调用LLM推理\n   - LLM失败时降级到规则/模式推理\n   - 添加inference_mode变量跟踪模式\n\n4. **添加过程打印**：\n   - 格式：`📚 <功能名>: {count}个结果 (模式: {mode})`\n   - 让用户感知LLM工作状态\n\n### Prompt设计原则\n- 明确角色定位（\"你是一个...专家\"）\n- 提供清晰的输入示例\n- 要求JSON格式返回\n- 包含必要的字段说明和示例\n- 要求\"仅返回JSON，不要包含其他文字\"\n\n### 异常处理要点\n- 使用`except Exception:`捕获所有异常\n- 返回空列表触发降级\n- 不使用未使用的异常变量（避免ruff F841）\n\n### 过程打印格式规范\n- 情绪识别：🎭 情绪识别: {emotion_type} (置信度: {confidence})\n- 歧义检测：🔍 歧义检测: {ambiguity_type}\n- 主动服务：💡 主动服务: 触发 {count} 个服务\n- 需求推理：📚 需求推理: {count}个结果 (模式: {mode})\n- 持续学习：📚 持续学习: 知识+{k}, 技能+{s}, 经验+{e}",
+  "created_at": "2026-02-01T13:59:29.556384",
+  "updated_at": "2026-02-01T13:59:29.556387"
+}

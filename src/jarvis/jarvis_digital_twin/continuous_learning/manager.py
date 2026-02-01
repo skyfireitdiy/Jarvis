@@ -47,6 +47,7 @@ class ContinuousLearningManager:
         skill_learner: Optional[SkillLearner] = None,
         experience_accumulator: Optional[ExperienceAccumulator] = None,
         adaptive_engine: Optional[AdaptiveEngine] = None,
+        llm_client: Optional[Any] = None,
     ) -> None:
         """初始化持续学习管理器。
 
@@ -55,11 +56,28 @@ class ContinuousLearningManager:
             skill_learner: 技能学习器（可选，默认创建新实例）
             experience_accumulator: 经验积累器（可选，默认创建新实例）
             adaptive_engine: 自适应引擎（可选，默认创建新实例）
+            llm_client: LLM客户端（可选）
         """
-        self._knowledge_acquirer = knowledge_acquirer or KnowledgeAcquirer()
-        self._skill_learner = skill_learner or SkillLearner()
-        self._experience_accumulator = experience_accumulator or ExperienceAccumulator()
-        self._adaptive_engine = adaptive_engine or AdaptiveEngine()
+        self._llm_client = llm_client
+        # 如果提供了llm_client且没有提供子组件，创建带llm_client的子组件
+        if llm_client:
+            self._knowledge_acquirer = knowledge_acquirer or KnowledgeAcquirer(
+                llm_client=llm_client
+            )
+            self._skill_learner = skill_learner or SkillLearner(llm_client=llm_client)
+            self._experience_accumulator = (
+                experience_accumulator or ExperienceAccumulator(llm_client=llm_client)
+            )
+            self._adaptive_engine = adaptive_engine or AdaptiveEngine(
+                llm_client=llm_client
+            )
+        else:
+            self._knowledge_acquirer = knowledge_acquirer or KnowledgeAcquirer()
+            self._skill_learner = skill_learner or SkillLearner()
+            self._experience_accumulator = (
+                experience_accumulator or ExperienceAccumulator()
+            )
+            self._adaptive_engine = adaptive_engine or AdaptiveEngine()
 
         self._enabled = True
         self._learning_history: List[Dict[str, Any]] = []
@@ -200,6 +218,15 @@ class ContinuousLearningManager:
             }
         )
 
+        # 5. 打印学习进度
+        mode = "LLM" if self._llm_client else "规则"
+        k_count = len(result.get("knowledge_learned", []))
+        s_count = len(result.get("skills_learned", []))
+        e_recorded = result.get("experience_recorded", False)
+        print(
+            f"🧠 持续学习: 知识+{k_count}, 技能+{s_count}, 经验+{e_recorded} (模式: {mode})"
+        )
+
         return result
 
     def learn_from_task_result(
@@ -296,6 +323,15 @@ class ContinuousLearningManager:
                 "success": success,
                 "result": learning_result,
             }
+        )
+
+        # 5. 打印学习进度
+        mode = "LLM" if self._llm_client else "规则"
+        e_recorded = learning_result.get("experience_recorded", False)
+        m_extracted = learning_result.get("methodology_extracted", False)
+        a_count = len(learning_result.get("adaptations_made", []))
+        print(
+            f"🧠 持续学习: 经验+{e_recorded}, 方法论+{m_extracted}, 适应+{a_count} (模式: {mode})"
         )
 
         return learning_result

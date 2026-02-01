@@ -122,6 +122,34 @@ class BasePlatform(ABC):
         """执行对话"""
         raise NotImplementedError("chat is not implemented")
 
+    def complete(self, prompt: str, **kwargs: Any) -> str:
+        """无状态补全方法
+
+        每次调用前自动重置对话状态，确保多次调用之间不会累积上下文。
+        适用于：情绪分析、歧义检测、代码分析等一次性推理任务。
+
+        参数:
+            prompt: 提示词
+            **kwargs: 额外参数（预留）
+
+        返回:
+            str: 完整的响应内容
+
+        注意:
+            - 此方法会调用 delete_chat() 重置状态
+            - 不会影响主对话的 messages 历史
+            - 每次调用都是独立的，无状态
+        """
+        # 先重置对话状态，确保无状态
+        self.delete_chat()
+
+        # 调用 chat 方法并收集所有响应
+        response = ""
+        for chunk in self.chat(prompt):
+            response += chunk
+
+        return response
+
     def _format_progress_bar(self, percent: float, width: int = 20) -> str:
         """格式化进度条字符串
 

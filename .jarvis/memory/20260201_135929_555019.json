@@ -1,0 +1,8 @@
+{
+  "id": "20260201_135929_555019",
+  "type": "project_long_term",
+  "tags": ["NeedInferrer", "LLM集成", "数字孪生", "需求推理", "实现细节"],
+  "content": "## NeedInferrer LLM集成实现\n\n### 架构决策\n- **不改变继承结构**：NeedInferrer不继承HybridEngine基类，直接在类中添加LLM能力\n- **LLM优先策略**：优先使用LLM推理，失败时优雅降级到规则模式\n\n### 代码实现要点\n\n1. **__init__修改**：\n   - 添加`llm_client: Optional[Any] = None`参数\n   - 保存为`self._llm_client`\n\n2. **_llm_infer_implicit_needs方法**：\n   - 检查`self._llm_client`是否存在\n   - 设计结构化prompt，要求JSON返回\n   - 使用`self._llm_client.complete(prompt)`进行无状态调用\n   - 使用正则提取JSON：`re.search(r'\\[.*\\]', response, re.DOTALL)`\n   - 解析JSON并构建结果：`(implicit_need, confidence, reasoning, inference_chain)`\n   - 捕获所有异常，返回空列表触发降级\n\n3. **infer_implicit_needs修改**：\n   - 添加`inference_mode`变量跟踪推理模式\n   - 优先尝试LLM推理\n   - LLM失败时或HYBRID模式下补充规则推理\n   - 添加过程打印：`print(f\"📚 需求推理: {len(results)}个结果 (模式: {inference_mode})\")`\n\n4. **LLM Prompt模板**：\n```\n你是一个需求分析专家。请分析用户的显式需求，推理出可能的隐式需求。\n\n显式需求：{explicit_need}\n\n请返回JSON格式的推理结果，每个结果包含：\n- implicit_need: 隐式需求描述\n- confidence: 置信度（0-1之间的浮点数）\n- reasoning: 推理依据\n- inference_chain: 推理步骤列表\n\n请仅返回JSON数组，不要包含其他解释文字。\n```\n\n### 关键技术点\n- **无状态调用**：使用complete()方法，避免上下文污染\n- **异常处理**：捕获所有Exception，返回空列表触发降级\n- **JSON解析**：使用正则提取，处理LLM可能返回的多余文本\n- **过程打印**：让用户感知LLM工作状态\n\n### 降级策略\n- LLM不可用时自动使用规则推理\n- LLM解析失败时自动使用规则推理\n- HYBRID模式下LLM和规则结果合并",
+  "created_at": "2026-02-01T13:59:29.555038",
+  "updated_at": "2026-02-01T13:59:29.555042"
+}
