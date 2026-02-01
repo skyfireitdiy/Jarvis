@@ -338,16 +338,19 @@ class PersonalityAdapter(HybridEngine[AdaptedResponse]):
             )
             return quick_result
 
-        # 使用双轨制推理
+        # 使用双轨制推理（避免重复打印）
         result = self.infer(content, profile=profile)
 
         if result.success and result.output:
             adapted = result.output
-            mode_str = "LLM" if result.llm_used else "规则"
-            PrettyOutput.auto_print(
-                f"🎨 个性适配: 适配风格={adapted.style_applied.value} "
-                f"(置信度: {adapted.confidence:.2f}, 模式: {mode_str})"
-            )
+            # 只有在双轨制推理使用了LLM，或者快速适配结果为None时才打印
+            # 避免与前面的规则快路径打印重复
+            if result.llm_used or quick_result is None:
+                mode_str = "LLM" if result.llm_used else "规则"
+                PrettyOutput.auto_print(
+                    f"🎨 个性适配: 适配风格={adapted.style_applied.value} "
+                    f"(置信度: {adapted.confidence:.2f}, 模式: {mode_str})"
+                )
             return adapted
 
         # 回退到快速适配结果或默认值
