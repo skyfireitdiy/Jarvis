@@ -93,6 +93,18 @@
   - 移除 `pyproject.toml` 中的废弃 CLI 入口点：`jarvis-code-review`、`jcr`
   - 移除 `src/jarvis/jarvis_code_agent/code_agent.py` 中的废弃工具引用：`arch_analyzer_tool`、`knowledge_graph_tool`
 
+- **🎯 CLI 重构：jqc 命令迁移**
+  - **变更**：删除独立的 `jqc` 命令（jarvis-quick-config），功能迁移为 `jvs` 的 `--quick-config` 参数
+  - **使用方式**：`jvs --quick-config`（替代原来的 `jqc` 命令）
+  - **优势**：统一 CLI 入口，简化安装和配置流程
+  - **影响范围**：
+    - 删除 `setup.py` 中的 `jarvis-quick-config` 和 `jqc` 入口点
+    - 在 `jarvis.py` 中添加 `--quick-config` 布尔参数和处理逻辑
+    - 修改 `utils.py` 中的 `_interactive_config_setup()` 函数，改为直接调用 `quick_config` 模块
+    - 更新 `docs/jarvis_book/4.使用指南.md`，删除 4.19 章节，在 jvs 参数说明中添加 `--quick-config` 说明
+    - 更新 `docs/compare/jarvis_vs_codex_cli.md`，删除 `jqc` 命令行
+  - **向后兼容性**：`quick_config.py` 模块保留，供内部调用，功能逻辑完全保留
+
 #### **📚 文档更新**
 
 - **新增文档**：

@@ -812,16 +812,25 @@ def init_env(
 def _interactive_config_setup(config_file_path: Path) -> None:
     """交互式配置引导
 
-    直接调用 jqc 命令进行快速配置。
+    直接调用 quick_config 模块进行快速配置。
     """
     PrettyOutput.auto_print("ℹ️ 欢迎使用 Jarvis！正在启动快速配置程序...")
 
     try:
-        # 构建 jqc 命令
-        cmd = ["jqc", "--output", str(config_file_path)]
+        # 导入 quick_config 模块
+        from jarvis.jarvis_utils import quick_config
 
-        # 直接调用 jqc 命令
-        subprocess.run(cmd)
+        # 调用 quick_config 的主函数，传入输出文件参数
+        # 注意：quick_config 使用 typer，需要模拟命令行参数
+        import sys
+
+        original_argv = sys.argv
+        try:
+            sys.argv = ["quick-config", "--output", str(config_file_path)]
+            quick_config.app()
+        finally:
+            sys.argv = original_argv
+
         sys.exit(0)
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 启动配置程序失败: {e}")

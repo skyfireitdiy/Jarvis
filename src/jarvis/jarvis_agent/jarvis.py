@@ -41,6 +41,9 @@ from jarvis.jarvis_utils.utils import init_env
 from jarvis.jarvis_utils.tmux_wrapper import check_and_launch_tmux
 from jarvis.jarvis_utils.tmux_wrapper import dispatch_to_tmux_window
 
+# 导入quick_config模块用于--quick-config参数
+from jarvis.jarvis_utils import quick_config as qc
+
 
 def _normalize_backup_data_argv(argv: List[str]) -> None:
     """
@@ -78,7 +81,11 @@ def print_commands_overview() -> None:
         cmd_table.add_column("快捷方式", style="cyan")
         cmd_table.add_column("功能描述", style="white")
 
-        cmd_table.add_row("jarvis", "jvs", "通用AI代理，适用于多种任务")
+        cmd_table.add_row(
+            "jarvis",
+            "jvs",
+            "通用AI代理，适用于多种任务（支持 --quick-config 快速配置 LLM）",
+        )
         cmd_table.add_row("jarvis-agent", "ja", "AI代理基础功能，处理会话和任务")
         cmd_table.add_row(
             "jarvis-agent-dispatcher", "jvsd", "jvs 的便捷封装，支持任务派发和交互模式"
@@ -113,9 +120,7 @@ def print_commands_overview() -> None:
         cmd_table.add_row("jarvis-multi-agent", "jma", "多智能体协作系统")
         cmd_table.add_row("jarvis-tool", "jt", "工具管理与调用系统")
         cmd_table.add_row("jarvis-methodology", "jm", "方法论知识库管理")
-        cmd_table.add_row(
-            "jarvis-quick-config", "jqc", "快速配置 LLM 平台信息到 Jarvis 配置文件"
-        )
+
         cmd_table.add_row("jarvis-smart-shell", "jss", "实验性的智能Shell功能")
         cmd_table.add_row(
             "jarvis-sec", "jsec", "安全分析套件，结合启发式扫描和 AI 深度验证"
@@ -764,9 +769,19 @@ def run_cli(
         "--optimize-system-prompt",
         help="自动优化系统提示词：根据用户需求使用大模型优化系统提示词",
     ),
+    quick_config: bool = typer.Option(
+        False,
+        "--quick-config",
+        help="启动快速配置向导：快速配置 LLM 平台信息（Claude/OpenAI）",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
+        return
+
+    # 处理 --quick-config 参数：启动快速配置向导
+    if quick_config:
+        qc.app()
         return
 
     # 处理任务内容：优先从文件读取
