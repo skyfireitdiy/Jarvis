@@ -62,23 +62,23 @@ class arch_analyzer_tool:
             self._analyzer = ArchitectureAnalyzer()
         return self._analyzer
 
-    def execute(self, **kwargs: Any) -> Dict[str, Any]:
+    def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行架构分析操作"""
-        operation = kwargs.get("operation")
+        operation = args.get("operation")
         if operation == "analyze_project":
-            return self._handle_analyze_project(kwargs)
+            return self._handle_analyze_project(args)
         elif operation == "analyze_complexity":
-            return self._handle_analyze_complexity(kwargs)
+            return self._handle_analyze_complexity(args)
         elif operation == "analyze_dependency":
-            return self._handle_analyze_dependency(kwargs)
+            return self._handle_analyze_dependency(args)
         elif operation == "analyze_duplication":
-            return self._handle_analyze_duplication(kwargs)
+            return self._handle_analyze_duplication(args)
         return {"success": False, "error": f"未知操作: {operation}"}
 
-    def _handle_analyze_project(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_analyze_project(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理项目整体分析"""
-        path = kwargs.get("path", ".")
-        include_details = kwargs.get("include_details", False)
+        path = args.get("path", ".")
+        include_details = args.get("include_details", False)
         try:
             analyzer = self._get_analyzer()
             report = analyzer.analyze_project(path)
@@ -98,10 +98,10 @@ class arch_analyzer_tool:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _handle_analyze_complexity(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_analyze_complexity(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理复杂度分析"""
-        path = kwargs.get("path", ".")
-        include_details = kwargs.get("include_details", False)
+        path = args.get("path", ".")
+        include_details = args.get("include_details", False)
         try:
             from jarvis.jarvis_arch_analyzer.complexity import ComplexityAnalyzer
 
@@ -131,10 +131,10 @@ class arch_analyzer_tool:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _handle_analyze_dependency(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_analyze_dependency(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理依赖分析"""
-        path = kwargs.get("path", ".")
-        include_details = kwargs.get("include_details", False)
+        path = args.get("path", ".")
+        include_details = args.get("include_details", False)
         try:
             from jarvis.jarvis_arch_analyzer.dependency import DependencyAnalyzer
 
@@ -179,10 +179,10 @@ class arch_analyzer_tool:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def _handle_analyze_duplication(self, kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    def _handle_analyze_duplication(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理重复度分析"""
-        path = kwargs.get("path", ".")
-        include_details = kwargs.get("include_details", False)
+        path = args.get("path", ".")
+        include_details = args.get("include_details", False)
         try:
             from jarvis.jarvis_arch_analyzer.duplication import DuplicationAnalyzer
 
