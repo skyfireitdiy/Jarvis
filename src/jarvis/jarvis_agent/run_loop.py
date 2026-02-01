@@ -32,12 +32,6 @@ if TYPE_CHECKING:
     # 仅用于类型标注，避免运行时循环依赖
     from . import Agent
     from jarvis.jarvis_autonomous.interaction import DialogueManager
-    from jarvis.jarvis_autonomous.interaction import AmbiguityResolver
-    from jarvis.jarvis_autonomous.interaction import ProactiveAssistant
-    from jarvis.jarvis_autonomous.empathy import EmotionRecognizer
-    from jarvis.jarvis_autonomous.empathy import NeedPredictor
-    from jarvis.jarvis_autonomous.empathy import PersonalityAdapter
-    from jarvis.jarvis_digital_twin.proactive_service import ProactiveServiceManager
     from jarvis.jarvis_digital_twin.continuous_learning import ContinuousLearningManager
     from jarvis.jarvis_autonomous.manager import AutonomousManager
 
@@ -56,90 +50,36 @@ class AgentRunLoop:
         self._git_diff: Optional[str] = None  # 缓存git diff内容
 
         # 智能增强组件（可选启用）
+        # 注：已移除低性价比组件（情绪识别、歧义检测、主动服务等），保留真正有价值的组件
         self._autonomous_enabled = is_enable_autonomous()
         self._dialogue_manager: Optional["DialogueManager"] = None
-        self._emotion_recognizer: Optional["EmotionRecognizer"] = None
-        self._need_predictor: Optional["NeedPredictor"] = None
-        self._personality_adapter: Optional["PersonalityAdapter"] = None
-        self._proactive_assistant: Optional["ProactiveAssistant"] = None
-        self._ambiguity_resolver: Optional["AmbiguityResolver"] = None
-        self._proactive_service_manager: Optional["ProactiveServiceManager"] = None
         self._continuous_learning_manager: Optional["ContinuousLearningManager"] = None
         self._autonomous_manager: Optional["AutonomousManager"] = None
         if self._autonomous_enabled:
             self._init_autonomous_components()
 
     def _init_autonomous_components(self) -> None:
-        """初始化智能增强组件（仅在启用时调用）"""
-        # 为每个组件创建独立的LLM实例，避免共享实例导致的上下文问题
-        # 每个组件调用 registry.get_cheap_platform() 都会创建新的独立实例
+        """初始化智能增强组件（仅在启用时调用）
+       
+        注：已移除低性价比组件（情绪识别、歧义检测、主动服务等），
+        这些功能 LLM 本身已经具备，额外调用反而增加延迟。
+        保留真正有价值的组件：对话管理、持续学习、自主能力管理。
+        """
         try:
             from jarvis.jarvis_platform.registry import PlatformRegistry
             from jarvis.jarvis_autonomous.interaction import DialogueManager
-            from jarvis.jarvis_autonomous.interaction import AmbiguityResolver
-            from jarvis.jarvis_autonomous.interaction import ProactiveAssistant
-            from jarvis.jarvis_autonomous.empathy import EmotionRecognizer
-            from jarvis.jarvis_autonomous.empathy import NeedPredictor
-            from jarvis.jarvis_autonomous.empathy import PersonalityAdapter
 
             registry = PlatformRegistry.get_global_platform_registry()
 
-            # 为每个组件创建独立的LLM实例，确保完全隔离
+            # 对话管理器（轻量，无 LLM 调用）
             self._dialogue_manager = DialogueManager()
-            self._emotion_recognizer = EmotionRecognizer(
-                llm_client=registry.get_cheap_platform()
-            )
-            self._need_predictor = NeedPredictor(
-                llm_client=registry.get_cheap_platform()
-            )
-            self._personality_adapter = PersonalityAdapter(
-                llm_client=registry.get_cheap_platform()
-            )
-            self._proactive_assistant = ProactiveAssistant(
-                llm_client=registry.get_cheap_platform()
-            )
-            self._ambiguity_resolver = AmbiguityResolver(
-                llm_client=registry.get_cheap_platform()
-            )
 
             PrettyOutput.auto_print(
-                "✅ 智能增强组件已启用（9个组件，每个使用独立LLM实例）"
+                "✅ 智能增强组件已启用（精简版：对话管理 + 持续学习 + 自主能力）"
             )
         except ImportError as e:
             PrettyOutput.auto_print(f"⚠️ 智能增强组件加载失败: {e}")
             self._autonomous_enabled = False
-        except ImportError as e:
-            PrettyOutput.auto_print(f"⚠️ 智能增强组件加载失败: {e}")
-            self._autonomous_enabled = False
-
-        # 初始化主动服务管理器（集成阶段5.1和5.2组件）
-        try:
-            from jarvis.jarvis_digital_twin.proactive_service import (
-                ProactiveServiceManager,
-            )
-            from jarvis.jarvis_digital_twin.prediction import (
-                NeedInferrer,
-                TimingJudge,
-            )
-            from jarvis.jarvis_digital_twin.user_profile import (
-                PreferenceLearner,
-            )
-
-            # 初始化阶段5.1和5.2组件，每个使用独立的LLM实例
-            timing_judge = TimingJudge(llm_client=registry.get_cheap_platform())
-            need_inferrer = NeedInferrer(llm_client=registry.get_cheap_platform())
-            preference_learner = PreferenceLearner(
-                llm_client=registry.get_cheap_platform()
-            )
-
-            # 将组件注入到主动服务管理器
-            self._proactive_service_manager = ProactiveServiceManager(
-                timing_judge=timing_judge,
-                need_inferrer=need_inferrer,
-                preference_learner=preference_learner,
-            )
-        except ImportError:
-            pass  # 主动服务管理器加载失败不影响其他功能
 
         # 初始化持续学习管理器，为所有子组件注入独立的LLM实例和集成模块
         try:
@@ -206,67 +146,11 @@ class AgentRunLoop:
 
         enhanced_input = user_input
 
-        # 1. 记录对话轮次
+        # 1. 记录对话轮次（轻量，无 LLM 调用）
         if self._dialogue_manager:
             self._dialogue_manager.add_turn("default", "user", user_input)
 
-        # 2. 情绪识别
-        if self._emotion_recognizer:
-            try:
-                emotion_result = self._emotion_recognizer.recognize(user_input)
-                if emotion_result:
-                    if emotion_result.emotion_type.value not in ("neutral", "unknown"):
-                        # 将情绪信息作为上下文提示
-                        emotion_hint = f"[用户情绪: {emotion_result.emotion_type.value}, 置信度: {emotion_result.confidence:.2f}]"
-                        enhanced_input = f"{emotion_hint}\n{user_input}"
-            except Exception:
-                pass  # 情绪识别失败不影响主流程
-
-        # 3. 歧义检测
-        if self._ambiguity_resolver:
-            try:
-                ambiguity_result = self._ambiguity_resolver.detect_ambiguity(user_input)
-                if ambiguity_result and ambiguity_result.has_ambiguity:
-                    # 提示存在歧义
-                    ambiguity_hint = (
-                        f"[检测到歧义: {ambiguity_result.ambiguity_type.value}]"
-                    )
-                    enhanced_input = f"{ambiguity_hint}\n{enhanced_input}"
-            except Exception:
-                pass  # 歧义检测失败不影响主流程
-
-        # 4. 主动服务处理
-        if self._proactive_service_manager:
-            try:
-                from jarvis.jarvis_digital_twin.proactive_service import ServiceStatus
-
-                # 获取对话历史
-                conversation_history = []
-                if self._dialogue_manager:
-                    context = self._dialogue_manager.get_context("default")
-                    if context:
-                        conversation_history = [
-                            {"role": turn.role, "content": turn.content}
-                            for turn in context.turns
-                        ]
-
-                results = self._proactive_service_manager.process_context(
-                    user_input,
-                    conversation_history=conversation_history,
-                )
-                # 将服务结果添加到增强输入
-                service_count = 0
-                for result in results:
-                    if result.status == ServiceStatus.COMPLETED:
-                        service_name = result.service_name or "主动服务"
-                        enhanced_input = (
-                            f"[{service_name}: {result.message}]\n{enhanced_input}"
-                        )
-                        service_count += 1
-            except Exception:
-                pass  # 主动服务失败不影响主流程
-
-        # 5. 持续学习知识应用
+        # 2. 持续学习知识应用（真正有价值：项目知识积累）
         if self._continuous_learning_manager:
             try:
                 knowledge_hints = []
@@ -326,23 +210,11 @@ class AgentRunLoop:
         if not self._autonomous_enabled:
             return response
 
-        # 记录助手响应
+        # 1. 记录助手响应（轻量，无 LLM 调用）
         if self._dialogue_manager:
             self._dialogue_manager.add_turn("default", "assistant", response)
 
-        # 检查是否需要主动交互（暂不修改响应，仅记录）
-        if self._proactive_assistant:
-            try:
-                # 获取对话历史用于分析
-                if self._dialogue_manager:
-                    context = self._dialogue_manager.summarize_context("default")
-                    self._proactive_assistant.analyze_for_proactive_action(
-                        {"context": context}
-                    )
-            except Exception:
-                pass  # 主动交互分析失败不影响主流程
-
-        # 持续学习：从交互中学习
+        # 2. 持续学习：从交互中学习（真正有价值：项目知识积累）
         if self._continuous_learning_manager:
             try:
                 # 获取最近的用户输入（从对话管理器）
