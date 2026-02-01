@@ -1,0 +1,126 @@
+site_name: Jarvis Documentation
+site_description: AI-powered coding assistant with multi-agent architecture
+site_author: Jarvis Team
+
+# Repository
+definition:
+  github:
+    repo_url: https://github.com/your-username/jarvis
+    edit_uri: edit/main/docs/
+
+# Navigation structure
+nav:
+  - 首页:
+      - 项目介绍: jarvis_book/1.项目介绍.md
+      - 快速开始: jarvis_book/2.快速开始.md
+  - 核心概念:
+      - 核心概念与架构: jarvis_book/3.核心概念与架构.md
+  - 使用指南:
+      - 使用指南: jarvis_book/4.使用指南.md
+      - 功能扩展: jarvis_book/5.功能扩展.md
+      - 高级主题: jarvis_book/6.高级主题.md
+  - 社区:
+      - 参与贡献: jarvis_book/7.参与贡献.md
+      - 常见问题: jarvis_book/8.常见问题.md
+      - 附录: jarvis_book/9.附录.md
+  - 最佳实践:
+      - Jarvis规则系统介绍: best_practices/Jarvis规则系统介绍.md
+      - 规则使用最佳实践: best_practices/规则使用最佳实践.md
+      - jcad最佳实践: best_practices/jcad最佳实践.md
+      - 利用规则快速引入MCP、SKILLS: best_practices/利用规则快速引入MCP、SKILLS.md
+      - 利用规则增加新的规则: best_practices/利用规则增加新的规则.md
+      - 使用jca进行交互式代码开发: best_practices/使用jca进行交互式代码开发.md
+      - 使用jcad进行多feature并行开发: best_practices/使用jcad进行多feature并行开发.md
+      - 在项目中引入CodeAgent和Agent: best_practices/在项目中引入CodeAgent和Agent.md
+  - 配置参考:
+      - jarvis_config.md
+  - 对比分析:
+      - Jarvis vs Codex CLI: compare/jarvis_vs_codex_cli.md
+
+# Theme configuration
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+# Plugins
+plugins:
+  - search:
+      lang:
+        - en
+        - zh
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+# Markdown extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Extra configuration
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-username/jarvis
+      name: GitHub
+  version:
+    provider: automatic
