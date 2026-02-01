@@ -4,7 +4,7 @@
 负责处理任务分析和方法论生成功能
 """
 
-from typing import Any, Dict, List
+from typing import Any, List
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_SUMMARY
@@ -12,7 +12,6 @@ from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_agent.events import TASK_COMPLETED
 from jarvis.jarvis_agent.prompts import get_task_analysis_prompt
 from jarvis.jarvis_agent.utils import join_prompts
-from jarvis.jarvis_utils.config import is_enable_auto_methodology_extraction
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -278,72 +277,6 @@ class TaskAnalyzer:
         except Exception:
             self._analysis_done = True
 
-        # 尝试自动提取方法论（旁路逻辑，不影响主流程）
-        self._try_extract_methodology()
-
-    def _try_extract_methodology(self) -> None:
-        """尝试从任务执行过程中自动提取方法论
-
-        此方法为旁路逻辑，任何异常都不会影响主流程。
-        仅在启用 auto_methodology_extraction 配置时执行。
-        """
-        # 检查是否已经执行过
-        if self._methodology_extraction_done:
-            return
-        self._methodology_extraction_done = True
-
-        # 检查是否启用了方法论自动提取
-        if not is_enable_auto_methodology_extraction():
-            return
-
-        try:
-            self._extract_and_save_methodology()
-        except Exception as e:
-            # 旁路逻辑，静默失败
-            try:
-                PrettyOutput.auto_print(f"⚠️ 方法论自动提取失败: {str(e)}")
-            except Exception:
-                pass
-
-    def _extract_and_save_methodology(self) -> None:
-        """执行方法论提取和保存"""
-        from jarvis.jarvis_methodology_generator import (
-            MethodologyGenerator,
-            TaskContext,
-        )
-
-        # 获取任务描述
-        task_description = getattr(self.agent, "original_user_input", "") or ""
-        if not task_description:
-            return
-
-        # 收集执行步骤（从对话历史中提取）
-        execution_steps = self._collect_execution_steps()
-        if len(execution_steps) < 3:
-            # 步骤太少，不值得提取方法论
-            return
-
-        # 构建任务上下文
-        task_context = TaskContext(
-            task_description=task_description,
-            execution_steps=execution_steps,
-            tool_calls=self._collect_tool_calls_as_dicts(),
-            decisions=[],  # 决策点需要从对话中提取，暂时留空
-            verification_steps=[],  # 验证步骤暂时留空
-            actual_output="",
-            success=True,  # 任务完成即视为成功
-        )
-
-        # 获取现有方法论列表用于去重
-        existing_methodologies = self._get_existing_methodologies()
-
-        # 创建生成器并提取方法论
-        generator = MethodologyGenerator(existing_methodologies=existing_methodologies)
-        result = generator.extract_methodology_from_task(task_context)
-
-        if result:
-            self._save_methodology(result)
-
     def _collect_execution_steps(self) -> List[str]:
         """从对话历史中收集执行步骤"""
         steps: List[str] = []
@@ -372,72 +305,3 @@ class TaskAnalyzer:
         except Exception:
             pass
         return steps[:20]  # 限制步骤数量
-
-    def _collect_tool_calls_as_dicts(self) -> List[Dict[str, Any]]:
-        """收集工具调用记录（返回字典列表）"""
-        tool_calls: List[Dict[str, Any]] = []
-        seen_names: set = set()
-        try:
-            # 尝试从模型的对话历史中提取工具调用
-            if hasattr(self.agent, "model") and self.agent.model:
-                history = getattr(self.agent.model, "_history", [])
-                for msg in history:
-                    if isinstance(msg, dict):
-                        content = msg.get("content", "")
-                        if "<TOOL_CALL>" in content or "tool_call" in content.lower():
-                            # 提取工具名称
-                            if '"name":' in content:
-                                import re
-
-                                matches = re.findall(r'"name"\s*:\s*"([^"]+)"', content)
-                                for name in matches:
-                                    if name not in seen_names:
-                                        seen_names.add(name)
-                                        tool_calls.append({"name": name})
-        except Exception:
-            pass
-        return tool_calls
-
-    def _get_existing_methodologies(self) -> List[str]:
-        """获取现有方法论列表"""
-        methodologies: List[str] = []
-        try:
-            from jarvis.jarvis_utils.methodology import _load_all_methodologies
-
-            all_methods = _load_all_methodologies()
-            # _load_all_methodologies 返回 List[Tuple[str, str]]，第一个元素是 problem_type
-            methodologies = [m[0] for m in all_methods if m[0]]
-        except Exception:
-            pass
-        return methodologies
-
-    def _save_methodology(self, result: dict) -> None:
-        """保存提取的方法论"""
-        try:
-            from jarvis.jarvis_tools.methodology import MethodologyTool
-
-            problem_type = result.get("problem_type", "")
-            content = result.get("content", "")
-            quality_score = result.get("quality_score", 0)
-
-            if problem_type and content:
-                # 使用 MethodologyTool 保存为项目级方法论
-                tool = MethodologyTool()
-                save_result = tool.execute(
-                    {
-                        "operation": "add",
-                        "problem_type": problem_type,
-                        "content": content,
-                        "scope": "project",
-                    }
-                )
-                if save_result.get("success"):
-                    PrettyOutput.auto_print(
-                        f"✅ 已自动提取方法论: {problem_type} (质量分: {quality_score})"
-                    )
-                else:
-                    PrettyOutput.auto_print(
-                        f"⚠️ 保存方法论失败: {save_result.get('stderr', '未知错误')}"
-                    )
-        except Exception as e:
-            PrettyOutput.auto_print(f"⚠️ 保存方法论失败: {str(e)}")
