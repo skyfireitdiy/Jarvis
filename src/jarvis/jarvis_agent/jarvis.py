@@ -811,7 +811,7 @@ def run_cli(
 
     # 处理 --quick-config 参数：启动快速配置向导
     if quick_config:
-        qc.app()
+        qc.quick_config(None, None, None, None, None)
         return
 
     # 处理工具检查参数（原 jck 命令功能）
