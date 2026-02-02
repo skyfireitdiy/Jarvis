@@ -1,0 +1,8 @@
+{
+  "id": "20260202_222305_280686",
+  "type": "project_long_term",
+  "tags": ["refactoring", "task_analyzer", "事件驱动重构", "代码重构"],
+  "content": "## 任务分析器事件驱动重构\n\n### 重构时间\n$(date)\n\n### 重构目标\n将 TaskAnalyzer 从事件驱动架构改为直接函数调用，减少对事件系统的依赖。\n\n### 修改文件\n1. **src/jarvis/jarvis_agent/task_analyzer.py**\n   - 移除事件相关导入：`BEFORE_SUMMARY`, `TASK_COMPLETED`\n   - 移除 `_subscribe_events()` 方法\n   - 移除 `_on_before_summary()` 和 `_on_task_completed()` 事件处理方法\n   - 新增 `trigger_task_analysis(auto_completed: bool)` 公共方法\n   - 保留仍在使用的 `AFTER_TOOL_CALL` 和 `BEFORE_TOOL_CALL` 导入\n\n2. **src/jarvis/jarvis_agent/__init__.py**\n   - 在 `_complete_task()` 方法中，将对 `_on_before_summary()` 的调用改为 `trigger_task_analysis(auto_completed)`\n   - 移除了对 `_on_task_completed()` 的第二次调用（新方法内部有防重复逻辑）\n   - 保留了事件广播机制（`BEFORE_SUMMARY`, `TASK_COMPLETED`）以支持其他组件（如 MemoryManager）\n\n### 重构效果\n- 代码更清晰直接，减少了隐式的事件依赖\n- 保持了向后兼容性，其他组件仍可使用事件机制\n- 简化了 TaskAnalyzer 的实现，删除了约43行重复代码\n- 功能保持不变，任务分析逻辑完整保留\n\n### 注意事项\n- MemoryManager 仍通过事件订阅工作，未受影响\n- 事件总线系统仍保留，供其他组件使用\n- 新方法内部有防重复执行逻辑，确保只执行一次",
+  "created_at": "2026-02-02T22:23:05.280745",
+  "updated_at": "2026-02-02T22:23:05.280754"
+}
