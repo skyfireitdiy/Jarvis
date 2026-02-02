@@ -434,20 +434,7 @@ git reset --hard {start_commit}
                     code_generation_summary=result_str,
                 )
 
-            end_commit = get_latest_commit_hash()
-            commits = self.git_manager.show_commit_history(
-                self.start_commit, end_commit
-            )
-            self.git_manager.handle_commit_confirmation(
-                commits,
-                self.start_commit,
-                prefix,
-                suffix,
-                self,
-                self.post_process_manager.post_process_modified_files,
-            )
-
-            # 根据配置在任务结束时手动调用分析功能
+            # 根据配置在任务结束时手动调用分析功能（在最终提交之前）
             if self._use_analysis_config:
                 # 询问用户是否需要分析
                 # 非交互模式默认为True（执行分析），交互模式默认为False（不执行分析）
@@ -461,6 +448,19 @@ git reset --hard {start_commit}
                     except Exception as e:
                         # 分析失败不应该影响主流程，仅记录错误
                         PrettyOutput.auto_print(f"⚠️ 任务分析失败: {str(e)}")
+
+            end_commit = get_latest_commit_hash()
+            commits = self.git_manager.show_commit_history(
+                self.start_commit, end_commit
+            )
+            self.git_manager.handle_commit_confirmation(
+                commits,
+                self.start_commit,
+                prefix,
+                suffix,
+                self,
+                self.post_process_manager.post_process_modified_files,
+            )
 
             return result_str
 
