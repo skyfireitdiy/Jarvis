@@ -237,6 +237,8 @@ class CodeAgent(Agent):
         # 如果 kwargs 中未指定，则从配置文件读取默认值
         use_methodology = kwargs.pop("use_methodology", is_use_methodology())
         use_analysis = kwargs.pop("use_analysis", is_use_analysis())
+        # 保存原始的 use_analysis 配置值，用于在 run 方法结束前手动调用分析
+        self._use_analysis_config = use_analysis
         # name 使用传入的值，如果没有传入则使用默认值 "CodeAgent"
         name = kwargs.pop("name", "CodeAgent")
 
@@ -248,7 +250,7 @@ class CodeAgent(Agent):
             "auto_complete": False,
             "need_summary": need_summary,
             "use_methodology": use_methodology,
-            "use_analysis": use_analysis,
+            "use_analysis": False,  # 初始化时不启用分析，在 run 方法结束前手动调用
             "non_interactive": non_interactive,
             "use_tools": base_tools,
             "optimize_system_prompt": optimize_system_prompt,
@@ -444,6 +446,22 @@ git reset --hard {start_commit}
                 self,
                 self.post_process_manager.post_process_modified_files,
             )
+
+            # 根据配置在任务结束时手动调用分析功能
+            if self._use_analysis_config:
+                # 询问用户是否需要分析
+                # 非交互模式默认为True（执行分析），交互模式默认为False（不执行分析）
+                should_analyze = user_confirm(
+                    "📊 是否对本次任务进行分析并生成方法论？",
+                    default=self.non_interactive,  # 非交互模式默认True，交互模式默认False
+                )
+                if should_analyze:
+                    try:
+                        self.analysis()
+                    except Exception as e:
+                        # 分析失败不应该影响主流程，仅记录错误
+                        PrettyOutput.auto_print(f"⚠️ 任务分析失败: {str(e)}")
+
             return result_str
 
         except RuntimeError as e:
