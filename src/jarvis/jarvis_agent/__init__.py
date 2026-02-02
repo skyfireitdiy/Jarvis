@@ -2278,6 +2278,28 @@ class Agent:
             if not isinstance(self, CodeAgent):
                 clear_current_agent()
 
+    def analysis(self, satisfaction_feedback: str = "") -> None:
+        """直接执行任务分析（跳过用户确认）
+
+        该方法提供了任务分析的直接接口，可以立即执行任务分析流程，
+        包括保存记忆、生成方法论等操作，无需用户确认。
+
+        参数:
+            satisfaction_feedback: 满意度反馈内容（可选）。
+                - 如果提供，则直接使用该反馈进行分析
+                - 如果为空字符串，则不收集反馈，直接进行分析
+
+        示例:
+            >>> agent.analysis()  # 直接分析，无反馈
+            >>> agent.analysis("用户满意")  # 带反馈的分析
+
+        注意:
+            - 该方法会跳过用户确认环节
+            - 适用于自动化场景或需要程序化调用的场景
+            - 如需用户确认和反馈收集，请使用 task_analyzer.trigger_task_analysis()
+        """
+        self.task_analyzer.analysis_task(satisfaction_feedback)
+
     def _main_loop(self) -> Any:
         """主运行循环"""
         # 委派至独立的运行循环类，保持行为一致
