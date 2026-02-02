@@ -2049,11 +2049,8 @@ class Agent:
             # 关键流程：直接调用 task_analyzer 执行任务分析（仅在非交互模式下）
             if self.non_interactive:
                 try:
-                    self.task_analyzer._on_before_summary(
-                        agent=self,
-                        prompt=safe_summary_prompt,
-                        auto_completed=auto_completed,
-                        need_summary=self.need_summary,
+                    self.task_analyzer.trigger_task_analysis(
+                        auto_completed=auto_completed
                     )
                 except Exception:
                     pass
@@ -2114,16 +2111,6 @@ class Agent:
         if self.non_interactive:
             if self.original_user_input:
                 PrettyOutput.auto_print(f"📝 原始任务输入:\n{self.original_user_input}")
-
-            # 关键流程：直接调用 task_analyzer（仅在非交互模式下）
-            try:
-                self.task_analyzer._on_task_completed(
-                    agent=self,
-                    auto_completed=auto_completed,
-                    need_summary=self.need_summary,
-                )
-            except Exception:
-                pass
 
         try:
             self.memory_manager._ensure_memory_prompt(

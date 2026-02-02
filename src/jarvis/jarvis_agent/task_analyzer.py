@@ -7,9 +7,7 @@
 from typing import Any, List
 
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
-from jarvis.jarvis_agent.events import BEFORE_SUMMARY
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
-from jarvis.jarvis_agent.events import TASK_COMPLETED
 from jarvis.jarvis_agent.prompts import get_task_analysis_prompt
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.globals import get_interrupt
@@ -33,11 +31,6 @@ class TaskAnalyzer:
         # 收集任务执行过程中的信息，用于方法论提取
         self._execution_steps: List[str] = []
         self._tool_calls: List[str] = []
-        # 旁路集成事件订阅，失败不影响主流程
-        try:
-            self._subscribe_events()
-        except Exception:
-            pass
 
     def analysis_task(self, satisfaction_feedback: str = "") -> None:
         """分析任务并生成方法论"""
@@ -202,20 +195,17 @@ class TaskAnalyzer:
 
         return satisfaction_feedback
 
-    # -----------------------
-    # 事件订阅与处理（旁路）
-    # -----------------------
-    def _subscribe_events(self) -> None:
-        bus = self.agent.get_event_bus()
-        # 在生成总结前触发（保持与原顺序一致）
-        bus.subscribe(BEFORE_SUMMARY, self._on_before_summary)
-        # 当无需总结时，作为兜底触发分析
-        bus.subscribe(TASK_COMPLETED, self._on_task_completed)
+    def trigger_task_analysis(self, auto_completed: bool = False) -> None:
+        """触发任务分析和满意度收集
 
-    def _on_before_summary(self, **payload: Any) -> None:
+        该方法将替代原有的事件驱动机制，直接由Agent调用
+
+        参数:
+            auto_completed: 是否为自动完成模式
+        """
         if self._analysis_done:
             return
-        # 避免与直接调用重复
+        # 避免重复执行
         try:
             if bool(self.agent.get_user_data("__task_analysis_done__")):
                 self._analysis_done = True
@@ -237,44 +227,11 @@ class TaskAnalyzer:
             return
 
         # 非交互模式或用户确认后执行任务分析
-        auto_completed = bool(payload.get("auto_completed", False))
         try:
             feedback = self.collect_satisfaction_feedback(auto_completed)
             self.analysis_task(feedback)
         except Exception:
-            # 忽略事件处理异常，保证主流程
-            self._analysis_done = True
-
-    def _on_task_completed(self, **payload: Any) -> None:
-        # 当未在 before_summary 阶段执行过时，作为兜底
-        if self._analysis_done:
-            return
-        try:
-            if bool(self.agent.get_user_data("__task_analysis_done__")):
-                self._analysis_done = True
-                return
-        except Exception:
-            pass
-
-        # 检查是否启用了任务分析
-        if not getattr(self.agent, "use_analysis", False):
-            self._analysis_done = True
-            return
-
-        # 交互模式：询问用户是否执行任务分析（默认True）
-        if not self.agent.confirm_callback(
-            "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？",
-            True if self.agent.non_interactive else False,
-        ):
-            self._analysis_done = True
-            return
-
-        # 非交互模式或用户确认后执行任务分析
-        auto_completed = bool(payload.get("auto_completed", False))
-        try:
-            feedback = self.collect_satisfaction_feedback(auto_completed)
-            self.analysis_task(feedback)
-        except Exception:
+            # 忽略异常，保证主流程
             self._analysis_done = True
 
     def _collect_execution_steps(self) -> List[str]:
