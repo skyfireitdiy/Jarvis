@@ -1,11 +1,12 @@
 site_name: Jarvis Documentation
 site_description: AI-powered coding assistant with multi-agent architecture
 site_author: Jarvis Team
+site_url: https://skyfireitdiy.github.io/Jarvis/
 
 # Repository
 definition:
   github:
-    repo_url: https://github.com/your-username/jarvis
+    repo_url: https://github.com/skyfireitdiy/Jarvis
     edit_uri: edit/main/docs/
 
 # Navigation structure
@@ -120,7 +121,7 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/your-username/jarvis
+      link: https://github.com/skyfireitdiy/Jarvis
       name: GitHub
   version:
     provider: automatic

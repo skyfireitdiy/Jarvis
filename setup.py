@@ -88,7 +88,16 @@ setup(
         "install": PostInstallCommand,
     },
     extras_require={
-        "dev": ["pytest", "ruff", "mypy", "build", "twine"],
+        "dev": [
+            "pytest",
+            "ruff",
+            "mypy",
+            "build",
+            "twine",
+            "mkdocs-material",
+            "mkdocs-git-revision-date-localized-plugin",
+            "pymdown-extensions",
+        ],
         "clang16": ["clang==16.*"],
         "clang17": ["clang==17.*"],
         "clang18": ["clang==18.*"],

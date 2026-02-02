@@ -67,7 +67,7 @@ dependencies = [
     requires-python = "==3.12.*"
 
     [project.optional-dependencies]
-    dev = ["pytest", "pytest-cov", "coverage", "pytest-xdist", "pytest-benchmark", "pytest-asyncio", "ruff", "mypy", "bandit", "build", "twine"]
+    dev = ["pytest", "pytest-cov", "coverage", "pytest-xdist", "pytest-benchmark", "pytest-asyncio", "ruff", "mypy", "bandit", "build", "twine", "mkdocs-material", "mkdocs-git-revision-date-localized-plugin", "pymdown-extensions"]
     browser = ["playwright==1.48.0"]
     clang16 = ["clang==16.*"]
     clang17 = ["clang==17.*"]
