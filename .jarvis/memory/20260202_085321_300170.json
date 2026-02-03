@@ -1,0 +1,8 @@
+{
+  "id": "20260202_085321_300170",
+  "type": "project_long_term",
+  "tags": ["code_review", "playwright", "read_webpage", "debug_print_removal"],
+  "content": "在read_webpage.py的WebpageTool.check()方法中，已删除Playwright可用性提示的调试打印语句：'✅ Playwright 可用（完整功能，支持JavaScript渲染）'。此修改符合用户需求，只移除了调试信息，不影响核心功能。",
+  "created_at": "2026-02-02T08:53:21.300205",
+  "updated_at": "2026-02-02T08:53:21.300211"
+}
