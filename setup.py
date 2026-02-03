@@ -159,8 +159,6 @@ setup(
             "jcr=jarvis.jarvis_code_analysis.code_review:main",
             "jarvis-git-squash=jarvis.jarvis_git_squash.main:main",
             "jgs=jarvis.jarvis_git_squash.main:main",
-            "jarvis-multi-agent=jarvis.jarvis_multi_agent.main:main",
-            "jma=jarvis.jarvis_multi_agent.main:main",
             "jarvis-agent=jarvis.jarvis_agent.main:main",
             "ja=jarvis.jarvis_agent.main:main",
             "jarvis-tool=jarvis.jarvis_tools.cli.main:main",

@@ -27,7 +27,6 @@ from jarvis.jarvis_agent.rule_share_manager import RuleShareManager
 from jarvis.jarvis_agent.tool_share_manager import ToolShareManager
 from jarvis.jarvis_utils.config import get_agent_definition_dirs
 from jarvis.jarvis_utils.config import get_data_dir
-from jarvis.jarvis_utils.config import get_multi_agent_dirs
 from jarvis.jarvis_utils.config import get_roles_dirs
 from jarvis.jarvis_utils.config import is_non_interactive
 from jarvis.jarvis_utils.config import set_config
@@ -124,7 +123,6 @@ def print_commands_overview() -> None:
             "jpm",
             "管理和测试不同的大语言模型平台",
         )
-        cmd_table.add_row("jarvis-multi-agent", "jma", "多智能体协作系统")
         cmd_table.add_row("jarvis-tool", "jt", "工具管理与调用系统")
         cmd_table.add_row("jarvis-methodology", "jm", "方法论知识库管理")
 
@@ -259,8 +257,7 @@ def handle_restore_option(
     data_dir_str: Optional[str] = None
     try:
         if config_file:
-            cfg_path = Path(os.path.expanduser(
-                os.path.expandvars(config_file)))
+            cfg_path = Path(os.path.expanduser(os.path.expandvars(config_file)))
             if cfg_path.is_file():
                 with open(cfg_path, "r", encoding="utf-8", errors="ignore") as cf:
                     cfg_data = yaml.safe_load(cf) or {}
@@ -358,7 +355,7 @@ def handle_builtin_config_selector(
     task: Optional[str],
     skip_selector: bool = False,
 ) -> None:
-    """在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）。
+    """在进入默认通用代理前，列出内置配置供选择（agent/roles）。
 
     Args:
         skip_selector: 是否跳过配置选择器，直接使用默认通用代理
@@ -404,7 +401,6 @@ def handle_builtin_config_selector(
 
             categories = [
                 ("agent", "jarvis-agent", "*.yaml"),
-                ("multi_agent", "jarvis-multi-agent", "*.yaml"),
                 ("roles", "jarvis-platform-manager", "*.yaml"),
             ]
 
@@ -416,26 +412,15 @@ def handle_builtin_config_selector(
                     if cat == "agent":
                         search_dirs.extend(
                             [
-                                Path(os.path.expanduser(
-                                    os.path.expandvars(str(p))))
+                                Path(os.path.expanduser(os.path.expandvars(str(p))))
                                 for p in get_agent_definition_dirs()
-                                if p
-                            ]
-                        )
-                    elif cat == "multi_agent":
-                        search_dirs.extend(
-                            [
-                                Path(os.path.expanduser(
-                                    os.path.expandvars(str(p))))
-                                for p in get_multi_agent_dirs()
                                 if p
                             ]
                         )
                     elif cat == "roles":
                         search_dirs.extend(
                             [
-                                Path(os.path.expanduser(
-                                    os.path.expandvars(str(p))))
+                                Path(os.path.expanduser(os.path.expandvars(str(p))))
                                 for p in get_roles_dirs()
                                 if p
                             ]
@@ -493,10 +478,8 @@ def handle_builtin_config_selector(
                             ) as fh:
                                 data = yaml.safe_load(fh) or {}
                             if isinstance(data, dict):
-                                name = data.get("name") or data.get(
-                                    "title") or name
-                                desc = data.get("description") or data.get(
-                                    "desc") or ""
+                                name = data.get("name") or data.get("title") or name
+                                desc = data.get("description") or data.get("desc") or ""
                                 if cat == "roles" and isinstance(
                                     data.get("roles"), list
                                 ):
@@ -516,8 +499,7 @@ def handle_builtin_config_selector(
                                 for role in roles:
                                     if isinstance(role, dict):
                                         rname = str(role.get("name", "") or "")
-                                        rdesc = str(
-                                            role.get("description", "") or "")
+                                        rdesc = str(role.get("description", "") or "")
                                         lines.append(
                                             f"{rname} - {rdesc}" if rdesc else rname
                                         )
@@ -580,8 +562,7 @@ def handle_builtin_config_selector(
                         desc_display = "\n".join(parts) if parts else ""
                     else:
                         desc_display = str(opt.get("desc", ""))
-                    table.add_row(str(idx), category, name,
-                                  file_path, desc_display)
+                    table.add_row(str(idx), category, name, file_path, desc_display)
 
                 Console().print(table)
 
@@ -633,24 +614,13 @@ def handle_builtin_config_selector(
 
                             if sel["category"] == "agent":
                                 # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
-                                args = [str(sel["cmd"]), "-c",
-                                        str(sel["file"])]
+                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
                                 if llm_group:
                                     args += ["-g", str(llm_group)]
                                 if config_file:
                                     args += ["-f", str(config_file)]
                                 if task:
                                     args += ["--task", str(task)]
-
-                            elif sel["category"] == "multi_agent":
-                                # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
-                                # 同时传递 -g/--llm-group 以继承 jvs 的模型组选择
-                                args = [str(sel["cmd"]), "-c",
-                                        str(sel["file"])]
-                                if llm_group:
-                                    args += ["-g", str(llm_group)]
-                                if task:
-                                    args += ["-i", str(task)]
 
                             elif sel["category"] == "roles":
                                 # jarvis-platform-manager role 子命令，支持 -c/-t/-g
@@ -664,8 +634,7 @@ def handle_builtin_config_selector(
                                     args += ["-g", str(llm_group)]
 
                             if args:
-                                PrettyOutput.auto_print(
-                                    f"ℹ️ 正在启动: {' '.join(args)}")
+                                PrettyOutput.auto_print(f"ℹ️ 正在启动: {' '.join(args)}")
                                 os.execvp(args[0], args)
                     except Exception:
                         # 任何异常都不影响默认流程
@@ -699,8 +668,7 @@ def _run_with_builtin_handler(
             - (True, "") = 跳过 agent.run， builtin handler 已处理
             - (False, processed_input) = 需要调用 agent.run，传入处理后的输入
     """
-    processed_input, should_skip_agent = builtin_input_handler(
-        user_input, agent)
+    processed_input, should_skip_agent = builtin_input_handler(user_input, agent)
     if should_skip_agent:
         # builtin handler 已处理完成，不需要调用 agent
         output_content_ref[0] = ""
@@ -1121,8 +1089,7 @@ def run_cli(
                     task_manager = TaskManager()
                     tasks = task_manager.load_tasks()
                     if tasks and (selected_task := task_manager.select_task(tasks)):
-                        PrettyOutput.auto_print(
-                            f"ℹ️ 开始执行任务: \n{selected_task}")
+                        PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
                         # 先经过 builtin_input_handler 处理
                         should_skip, processed_input = _run_with_builtin_handler(
                             selected_task,
@@ -1196,8 +1163,7 @@ def run_cli(
                                 return str(content)
 
                         output_content_str = _convert_to_string(output_content)
-                        output_file.write_text(
-                            output_content_str, encoding="utf-8")
+                        output_file.write_text(output_content_str, encoding="utf-8")
                     except Exception as output_err:
                         # 如果写入输出失败，至少写入错误信息
                         PrettyOutput.auto_print(
