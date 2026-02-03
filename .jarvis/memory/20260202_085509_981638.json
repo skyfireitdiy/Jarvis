@@ -1,0 +1,15 @@
+{
+  "id": "20260202_085509_981638",
+  "type": "project_long_term",
+  "tags": [
+    "configuration",
+    "cli",
+    "refactoring",
+    "completed",
+    "jarvis",
+    "startup"
+  ],
+  "content": "Jarvis 配置选择器改造任务已完成：\n\n**已完成的工作**：\n1. 删除了 `config.py` 中的 `is_enable_builtin_config_selector()` 函数\n2. 删除了 `jarvis.py` 中对该函数的导入\n3. 在 `run_cli` 函数中添加了命令行参数 `--skip-config-selector` / `-S`\n4. 修改了 `handle_builtin_config_selector` 函数签名，接受 `skip_selector` 参数控制\n5. 更新了函数调用点，传递 `skip_config_selector` 参数\n6. 更新了 `docs/jarvis_book/4.使用指南.md` 文档\n7. 更新了 `docs/jarvis_book/2.快速开始.md` 文档\n\n**关键变更**：\n- 配置项从配置文件迁移到命令行参数\n- 默认行为保持不变（启用配置选择器）\n- 通过 `-S` 或 `--skip-config-selector` 参数跳过配置选择器\n\n**提交记录**：\n- cd09d47: 删除 config.py 中的函数\n- 5679f2b: 删除 jarvis.py 中的导入\n- ac5bab9: 添加命令行参数\n- 6cbfeb5: 修改函数签名\n- 5e32f04: 更新函数调用\n- 6329e59: 更新使用指南文档\n- 425e6b5: 更新快速开始文档",
+  "created_at": "2026-02-02T08:55:09.981695",
+  "updated_at": "2026-02-02T08:55:09.981703"
+}

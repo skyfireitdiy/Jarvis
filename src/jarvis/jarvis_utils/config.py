@@ -951,14 +951,6 @@ def is_enable_git_repo_jca_switch() -> bool:
     return GLOBAL_CONFIG_DATA.get("enable_git_jca_switch", True) is True
 
 
-def is_enable_builtin_config_selector() -> bool:
-    """
-    是否启用：在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择
-    默认开启
-    """
-    return GLOBAL_CONFIG_DATA.get("enable_startup_config_selector", True) is True
-
-
 def is_save_session_history() -> bool:
     """
     是否保存会话记录。

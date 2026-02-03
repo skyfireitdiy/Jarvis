@@ -29,7 +29,6 @@ from jarvis.jarvis_utils.config import get_agent_definition_dirs
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_multi_agent_dirs
 from jarvis.jarvis_utils.config import get_roles_dirs
-from jarvis.jarvis_utils.config import is_enable_builtin_config_selector
 from jarvis.jarvis_utils.config import is_enable_git_repo_jca_switch
 from jarvis.jarvis_utils.config import is_non_interactive
 from jarvis.jarvis_utils.config import set_config
@@ -361,9 +360,14 @@ def handle_builtin_config_selector(
     tool_group: Optional[str],
     config_file: Optional[str],
     task: Optional[str],
+    skip_selector: bool = False,
 ) -> None:
-    """在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）。"""
-    if is_enable_builtin_config_selector():
+    """在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）。
+
+    Args:
+        skip_selector: 是否跳过配置选择器，直接使用默认通用代理
+    """
+    if skip_selector:
         try:
             # 查找可用的 builtin 目录（支持多候选）
             builtin_dirs: List[Path] = []
@@ -810,6 +814,12 @@ def run_cli(
         "--check-tool",
         help="检查指定工具（原 jck <tool_name>）",
     ),
+    skip_config_selector: bool = typer.Option(
+        False,
+        "-S",
+        "--skip-config-selector",
+        help="跳过内置配置选择器，直接使用默认通用代理",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -1023,7 +1033,9 @@ def run_cli(
     # 非交互模式下跳过内置角色/配置选择
     # 如果指定了 -T/--task 参数，跳过配置选择
     if not non_interactive and not task:
-        handle_builtin_config_selector(llm_group, tool_group, config_file, task)
+        handle_builtin_config_selector(
+            llm_group, tool_group, config_file, task, skip_config_selector
+        )
 
     # 检测tmux并在需要时启动（在参数解析之后）
     # 传入 config_file 以便在检查前加载配置

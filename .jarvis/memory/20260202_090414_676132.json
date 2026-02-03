@@ -1,0 +1,8 @@
+{
+  "id": "20260202_090414_676132",
+  "type": "project_long_term",
+  "tags": ["jarvis", "config", "cli", "refactoring"],
+  "content": "Jarvis 配置选择器改造：删除了 `enable_startup_config_selector` 配置项，改为命令行参数 `--skip-config-selector` (-S)。相关变更包括：1) config.py: 删除 is_enable_builtin_config_selector() 函数 2) jarvis.py: 添加命令行参数并修改 handle_builtin_config_selector 函数签名 3) 文档: 更新使用指南和快速开始文档。默认行为保持不变（启用配置选择器），通过 -S 参数可跳过配置选择器。",
+  "created_at": "2026-02-02T09:04:14.676186",
+  "updated_at": "2026-02-02T09:04:14.676191"
+}
