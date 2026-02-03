@@ -29,7 +29,6 @@ from jarvis.jarvis_utils.config import get_agent_definition_dirs
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_multi_agent_dirs
 from jarvis.jarvis_utils.config import get_roles_dirs
-from jarvis.jarvis_utils.config import is_enable_git_repo_jca_switch
 from jarvis.jarvis_utils.config import is_non_interactive
 from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.fzf import fzf_select
@@ -260,7 +259,8 @@ def handle_restore_option(
     data_dir_str: Optional[str] = None
     try:
         if config_file:
-            cfg_path = Path(os.path.expanduser(os.path.expandvars(config_file)))
+            cfg_path = Path(os.path.expanduser(
+                os.path.expandvars(config_file)))
             if cfg_path.is_file():
                 with open(cfg_path, "r", encoding="utf-8", errors="ignore") as cf:
                     cfg_data = yaml.safe_load(cf) or {}
@@ -316,43 +316,39 @@ def try_switch_to_jca_if_git_repo(
     restore_session: bool,
     task: Optional[str],
 ) -> None:
-    """在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）。"""
-    # 非交互模式下跳过代码模式切换提示与相关输出
+    """在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）。"""
+    # 非交互模式下跳过代码模式自动切换
     if is_non_interactive():
         return
-    if is_enable_git_repo_jca_switch():
-        try:
-            res = subprocess.run(
-                ["git", "rev-parse", "--show-toplevel"],
-                capture_output=True,
-                text=False,
-            )
-            if res.returncode == 0:
-                git_root = decode_output(res.stdout).strip()
-                if git_root and os.path.isdir(git_root):
-                    PrettyOutput.auto_print(f"ℹ️ 检测到当前位于 Git 仓库: {git_root}")
-                    if user_confirm(
-                        "检测到Git仓库，是否切换到代码开发模式（jca）？", default=False
-                    ):
-                        # 构建并切换到 jarvis-code-agent 命令，传递兼容参数
-                        args = ["jarvis-code-agent"]
-                        if llm_group:
-                            args += ["-g", llm_group]
-                        if tool_group:
-                            args += ["-G", tool_group]
-                        if config_file:
-                            args += ["-f", config_file]
-                        if restore_session:
-                            args += ["--restore-session"]
-                        if task:
-                            args += ["-T", task]
-                        PrettyOutput.auto_print(
-                            "ℹ️ 正在切换到 'jca'（jarvis-code-agent）以进入代码开发模式..."
-                        )
-                        os.execvp(args[0], args)
-        except Exception:
-            # 静默忽略检测异常，不影响主流程
-            pass
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=False,
+        )
+        if res.returncode == 0:
+            git_root = decode_output(res.stdout).strip()
+            if git_root and os.path.isdir(git_root):
+                PrettyOutput.auto_print(f"ℹ️ 检测到当前位于 Git 仓库: {git_root}")
+                PrettyOutput.auto_print(
+                    "ℹ️ 正在自动切换到 'jca'（jarvis-code-agent）以进入代码开发模式..."
+                )
+                # 构建并切换到 jarvis-code-agent 命令，传递兼容参数
+                args = ["jarvis-code-agent"]
+                if llm_group:
+                    args += ["-g", llm_group]
+                if tool_group:
+                    args += ["-G", tool_group]
+                if config_file:
+                    args += ["-f", config_file]
+                if restore_session:
+                    args += ["--restore-session"]
+                if task:
+                    args += ["-T", task]
+                os.execvp(args[0], args)
+    except Exception:
+        # 静默忽略检测异常，不影响主流程
+        pass
 
 
 def handle_builtin_config_selector(
@@ -420,7 +416,8 @@ def handle_builtin_config_selector(
                     if cat == "agent":
                         search_dirs.extend(
                             [
-                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                Path(os.path.expanduser(
+                                    os.path.expandvars(str(p))))
                                 for p in get_agent_definition_dirs()
                                 if p
                             ]
@@ -428,7 +425,8 @@ def handle_builtin_config_selector(
                     elif cat == "multi_agent":
                         search_dirs.extend(
                             [
-                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                Path(os.path.expanduser(
+                                    os.path.expandvars(str(p))))
                                 for p in get_multi_agent_dirs()
                                 if p
                             ]
@@ -436,7 +434,8 @@ def handle_builtin_config_selector(
                     elif cat == "roles":
                         search_dirs.extend(
                             [
-                                Path(os.path.expanduser(os.path.expandvars(str(p))))
+                                Path(os.path.expanduser(
+                                    os.path.expandvars(str(p))))
                                 for p in get_roles_dirs()
                                 if p
                             ]
@@ -494,8 +493,10 @@ def handle_builtin_config_selector(
                             ) as fh:
                                 data = yaml.safe_load(fh) or {}
                             if isinstance(data, dict):
-                                name = data.get("name") or data.get("title") or name
-                                desc = data.get("description") or data.get("desc") or ""
+                                name = data.get("name") or data.get(
+                                    "title") or name
+                                desc = data.get("description") or data.get(
+                                    "desc") or ""
                                 if cat == "roles" and isinstance(
                                     data.get("roles"), list
                                 ):
@@ -515,7 +516,8 @@ def handle_builtin_config_selector(
                                 for role in roles:
                                     if isinstance(role, dict):
                                         rname = str(role.get("name", "") or "")
-                                        rdesc = str(role.get("description", "") or "")
+                                        rdesc = str(
+                                            role.get("description", "") or "")
                                         lines.append(
                                             f"{rname} - {rdesc}" if rdesc else rname
                                         )
@@ -578,7 +580,8 @@ def handle_builtin_config_selector(
                         desc_display = "\n".join(parts) if parts else ""
                     else:
                         desc_display = str(opt.get("desc", ""))
-                    table.add_row(str(idx), category, name, file_path, desc_display)
+                    table.add_row(str(idx), category, name,
+                                  file_path, desc_display)
 
                 Console().print(table)
 
@@ -630,7 +633,8 @@ def handle_builtin_config_selector(
 
                             if sel["category"] == "agent":
                                 # jarvis-agent 支持 -f/--config（全局配置）与 -c/--agent-definition
-                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                                args = [str(sel["cmd"]), "-c",
+                                        str(sel["file"])]
                                 if llm_group:
                                     args += ["-g", str(llm_group)]
                                 if config_file:
@@ -641,7 +645,8 @@ def handle_builtin_config_selector(
                             elif sel["category"] == "multi_agent":
                                 # jarvis-multi-agent 需要 -c/--config，用户输入通过 -i/--input 传递
                                 # 同时传递 -g/--llm-group 以继承 jvs 的模型组选择
-                                args = [str(sel["cmd"]), "-c", str(sel["file"])]
+                                args = [str(sel["cmd"]), "-c",
+                                        str(sel["file"])]
                                 if llm_group:
                                     args += ["-g", str(llm_group)]
                                 if task:
@@ -659,7 +664,8 @@ def handle_builtin_config_selector(
                                     args += ["-g", str(llm_group)]
 
                             if args:
-                                PrettyOutput.auto_print(f"ℹ️ 正在启动: {' '.join(args)}")
+                                PrettyOutput.auto_print(
+                                    f"ℹ️ 正在启动: {' '.join(args)}")
                                 os.execvp(args[0], args)
                     except Exception:
                         # 任何异常都不影响默认流程
@@ -693,7 +699,8 @@ def _run_with_builtin_handler(
             - (True, "") = 跳过 agent.run， builtin handler 已处理
             - (False, processed_input) = 需要调用 agent.run，传入处理后的输入
     """
-    processed_input, should_skip_agent = builtin_input_handler(user_input, agent)
+    processed_input, should_skip_agent = builtin_input_handler(
+        user_input, agent)
     if should_skip_agent:
         # builtin handler 已处理完成，不需要调用 agent
         output_content_ref[0] = ""
@@ -998,7 +1005,7 @@ def run_cli(
         return
 
     # 提前加载配置文件，确保后续功能能读取到正确的配置值
-    # 修复：enable_git_jca_switch 和 enable_startup_config_selector 配置不生效的问题
+    # 修复：enable_startup_config_selector 配置不生效的问题
     try:
         from jarvis.jarvis_utils import utils
 
@@ -1010,8 +1017,8 @@ def run_cli(
         # 静默失败，不影响主流程
         pass
 
-    # 在初始化环境前检测Git仓库，并可选择自动切换到代码开发模式（jca）
-    # 如果指定了 -T/--task 参数，跳过切换提示
+    # 在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）
+    # 如果指定了 -T/--task 参数，跳过自动切换
     if not non_interactive and not task:
         try_switch_to_jca_if_git_repo(
             llm_group, tool_group, config_file, restore_session, task
@@ -1114,7 +1121,8 @@ def run_cli(
                     task_manager = TaskManager()
                     tasks = task_manager.load_tasks()
                     if tasks and (selected_task := task_manager.select_task(tasks)):
-                        PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
+                        PrettyOutput.auto_print(
+                            f"ℹ️ 开始执行任务: \n{selected_task}")
                         # 先经过 builtin_input_handler 处理
                         should_skip, processed_input = _run_with_builtin_handler(
                             selected_task,
@@ -1188,7 +1196,8 @@ def run_cli(
                                 return str(content)
 
                         output_content_str = _convert_to_string(output_content)
-                        output_file.write_text(output_content_str, encoding="utf-8")
+                        output_file.write_text(
+                            output_content_str, encoding="utf-8")
                     except Exception as output_err:
                         # 如果写入输出失败，至少写入错误信息
                         PrettyOutput.auto_print(

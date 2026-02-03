@@ -342,7 +342,8 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
                     f"❌ 错误：cheap_llm 引用的 '{expanded_config['cheap_llm']}' 在 llms 中不存在。"
                 )
             # 直接使用引用的值
-            expanded_config["cheap_platform"] = llm_ref.get("platform", "openai")
+            expanded_config["cheap_platform"] = llm_ref.get(
+                "platform", "openai")
             expanded_config["cheap_model"] = llm_ref.get("model", "gpt-5")
             expanded_config["cheap_max_input_token_count"] = llm_ref.get(
                 "max_input_token_count", 128000
@@ -364,7 +365,8 @@ def _expand_llm_references(group_config: Dict[str, Any]) -> Dict[str, Any]:
                     f"❌ 错误：smart_llm 引用的 '{expanded_config['smart_llm']}' 在 llms 中不存在。"
                 )
             # 直接使用引用的值
-            expanded_config["smart_platform"] = llm_ref.get("platform", "openai")
+            expanded_config["smart_platform"] = llm_ref.get(
+                "platform", "openai")
             expanded_config["smart_model"] = llm_ref.get("model", "gpt-5")
             expanded_config["smart_max_input_token_count"] = llm_ref.get(
                 "max_input_token_count", 128000
@@ -583,7 +585,8 @@ def get_continuous_learning_dir() -> str:
     返回:
         str: 持续学习数据目录路径，为 ~/.jarvis/continuous_learning
     """
-    cl_dir = os.path.join(os.path.expanduser("~/.jarvis"), "continuous_learning")
+    cl_dir = os.path.join(os.path.expanduser(
+        "~/.jarvis"), "continuous_learning")
     # 确保目录存在
     os.makedirs(cl_dir, exist_ok=True)
     return cl_dir
@@ -888,7 +891,8 @@ def _get_resolved_tool_config(
         Dict[str, Any]: 解析后的工具配置字典，包含 'use' 和 'dont_use' 列表
     """
     group_config = {}
-    tool_group_name = tool_group_override or GLOBAL_CONFIG_DATA.get("tool_group")
+    tool_group_name = tool_group_override or GLOBAL_CONFIG_DATA.get(
+        "tool_group")
     tool_groups = GLOBAL_CONFIG_DATA.get("tool_groups", [])
 
     if tool_group_name and isinstance(tool_groups, list):
@@ -941,14 +945,6 @@ def get_script_execution_timeout() -> int:
         int: 超时时间（300秒/5分钟）
     """
     return 300
-
-
-def is_enable_git_repo_jca_switch() -> bool:
-    """
-    是否启用：在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）
-    默认开启
-    """
-    return GLOBAL_CONFIG_DATA.get("enable_git_jca_switch", True) is True
 
 
 def is_save_session_history() -> bool:
