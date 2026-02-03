@@ -91,8 +91,6 @@ COMMAND_MAPPING = {
     "jcr": "jarvis-code-review",
     # Git压缩
     "jgs": "jarvis-git-squash",
-    # 多代理
-    "jma": "jarvis-multi-agent",
     # 代理
     "ja": "jarvis-agent",
     # 工具

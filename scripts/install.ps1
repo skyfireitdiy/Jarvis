@@ -206,7 +206,7 @@ if ($choice -eq 'y' -or $choice -eq 'Y') {
     Write-Host "Installing auto-completion..."
 
     # Install completion for all tools
-    $tools = @("jvs", "jvsd", "ja", "jca", "jcad", "jcr", "jgc", "jgs", "jsec", "jc2r", "jpm", "jma", "jcfg", "jqc", "jt", "jm", "jss", "jmo")
+    $tools = @("jvs", "jvsd", "ja", "jca", "jcad", "jgc", "jgs", "jsec", "jc2r", "jpm", "jt", "jm", "jss", "jmo")
     foreach ($tool in $tools) {
         Write-Host "Installing auto-completion for $tool..."
         try {

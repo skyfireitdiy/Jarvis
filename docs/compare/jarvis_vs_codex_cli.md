@@ -16,7 +16,7 @@
 | 安装方式 | pip/uv/Docker/源码         | 官方安装包/Docker          |
 | 配置格式 | YAML                       | TOML                       |
 | SDK 支持 | ✅ Python SDK              | ❌ 无 SDK                  |
-| 首次发布 | 2025年                       | 2025年                     |
+| 首次发布 | 2025年                     | 2025年                     |
 
 ---
 
@@ -58,7 +58,6 @@
 | `jarvis-git-commit`            | `jgc`    | 生成 Git 提交信息          |
 | `jarvis-git-squash`            | `jgs`    | Git 提交历史整理           |
 | `jarvis-platform-manager`      | `jpm`    | 管理大语言模型平台         |
-| `jarvis-multi-agent`           | `jma`    | 多智能体协作系统           |
 | `jarvis-tool`                  | `jt`     | 工具管理与调用             |
 | `jarvis-methodology`           | `jm`     | 方法论知识库管理           |
 | `jarvis-smart-shell`           | `jss`    | 智能 Shell 功能            |
@@ -101,7 +100,7 @@
 | **工具类型**     | 文件操作、代码分析、命令执行、网页搜索、Git 操作等 | 文件读写、代码编辑、Shell 命令、网络搜索等 |
 | **扩展方式**     | 自定义 Python 工具注册                             | MCP (Model Context Protocol)               |
 | **代码分析深度** | 深度（符号查找、精确编辑、构建验证）               | 中等（智能编辑、diff 预览）                |
-| **特殊工具**     | 方法论系统、记忆系统、安全扫描、代码迁移      | 图像输入、Web 搜索、云服务                 |
+| **特殊工具**     | 方法论系统、记忆系统、安全扫描、代码迁移           | 图像输入、Web 搜索、云服务                 |
 
 #### Jarvis 内置核心工具（部分）
 
@@ -275,20 +274,15 @@ default = "gpt-5-codex"
 
 ### Jarvis 独特功能
 
-
-2. **方法论系统** (`jarvis-methodology`)
+1. **方法论系统** (`jarvis-methodology`)
    - 沉淀成功经验为可复用方法论
    - 支持本地和中心化共享
 
-3. **多智能体协作** (`jarvis-multi-agent`)
-   - 多 Agent 并行协作
-   - 任务派发和结果整合
-
-4. **记忆系统** (`jarvis-memory-organizer`)
+2. **记忆系统** (`jarvis-memory-organizer`)
    - 三层记忆架构
    - 记忆整理、合并、导入导出
 
-5. **Python SDK**
+3. **Python SDK**
    - 完整的 Python API
    - 可编程构建 AI 应用
 
