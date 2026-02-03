@@ -212,9 +212,6 @@ class WebpageTool:
             with sync_playwright() as p:
                 browser = p.chromium.launch()
                 browser.close()
-            PrettyOutput.auto_print(
-                "✅ Playwright 可用（完整功能，支持JavaScript渲染）"
-            )
             return True
         except ImportError:
             PrettyOutput.auto_print("⚠️ Playwright Python包未安装")
