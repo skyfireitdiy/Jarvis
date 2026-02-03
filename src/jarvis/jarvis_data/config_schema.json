@@ -248,11 +248,6 @@
       "description": "构建验证的超时时间（秒）。当构建验证执行时间超过此值时，将终止验证并报告超时。",
       "default": 30
     },
-    "enable_git_jca_switch": {
-      "type": "boolean",
-      "description": "在初始化环境前检测Git仓库并提示可切换到代码开发模式（jca）",
-      "default": true
-    },
     "enable_startup_config_selector": {
       "type": "boolean",
       "description": "在进入默认通用代理前，列出可用配置（agent/multi_agent/roles）供选择",
