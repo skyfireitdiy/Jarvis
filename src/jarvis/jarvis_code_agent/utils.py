@@ -15,7 +15,7 @@ from jarvis.jarvis_utils.utils import decode_output, get_loc_stats
 
 
 def get_git_tracked_files_info(
-    project_root: str, max_files: int = 100
+    project_root: str, max_files: int = 100, max_tree_lines: int = 200
 ) -> Optional[str]:
     """获取git托管的文件列表或目录结构
 
@@ -24,6 +24,7 @@ def get_git_tracked_files_info(
     参数:
         project_root: 项目根目录
         max_files: 文件数量阈值，超过此值则返回目录结构
+        max_tree_lines: 目录树最大行数，防止目录树过大超出LLM上下文限制
 
     返回:
         str: 文件列表或目录结构的字符串表示，失败时返回None
@@ -71,25 +72,47 @@ def get_git_tracked_files_info(
                     current = current[part]
 
             def format_tree(
-                tree: dict, prefix: str = "", is_last: bool = True
+                tree: dict,
+                prefix: str = "",
+                is_last: bool = True,
+                current_lines: int = 0,
             ) -> List[str]:
-                """格式化目录树"""
+                """格式化目录树（带行数限制）"""
                 lines = []
                 items = sorted(tree.items())
                 for i, (name, subtree) in enumerate(items):
+                    # 检查行数限制
+                    if current_lines + len(lines) >= max_tree_lines:
+                        break
                     is_last_item = i == len(items) - 1
                     connector = "└── " if is_last_item else "├── "
                     lines.append(f"{prefix}{connector}{name}/")
 
                     extension = "    " if is_last_item else "│   "
-                    if subtree:
-                        lines.extend(
-                            format_tree(subtree, prefix + extension, is_last_item)
+                    if subtree and current_lines + len(lines) < max_tree_lines:
+                        subtree_lines = format_tree(
+                            subtree,
+                            prefix + extension,
+                            is_last_item,
+                            current_lines + len(lines),
                         )
+                        lines.extend(subtree_lines)
+                        # 如果子树被截断，停止处理
+                        if len(subtree_lines) == 0 and subtree:
+                            break
                 return lines
 
             tree_lines = format_tree(dir_tree)
-            return f"Git托管目录结构（共{file_count}个文件）:\n" + "\n".join(tree_lines)
+            truncated_msg = (
+                "\n... (目录结构已截断，使用工具查看完整结构)"
+                if len(tree_lines) >= max_tree_lines
+                else ""
+            )
+            return (
+                f"Git托管目录结构（共{file_count}个文件）:\n"
+                + "\n".join(tree_lines)
+                + truncated_msg
+            )
         else:
             # 文件数量不多，直接返回文件列表
             files_str = "\n".join(f"  - {file}" for file in sorted(files))
