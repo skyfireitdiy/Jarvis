@@ -196,7 +196,6 @@ class PromptBuilder:
   - 目录项使用对象表示，键为 '<name>/'，值为子项数组
   - 文件为字符串项（例如 "lib.rs"）
 - 不要创建与入口无关的占位文件
-- 支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）
 """.strip()
         if has_main:
             entry_rule = f"""

@@ -89,7 +89,7 @@ def build_fix_prompt(content: str, error_msg: str, tool_usage: str) -> str:
 请修复上述工具调用内容，确保：
 1. 包含完整的 {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 标签
 2. JSON格式正确，包含 name、arguments、want 三个字段
-3. 如果使用多行字符串，推荐使用 ||| 或 ``` 分隔符包裹
+3. 如果使用多行字符串，直接换行即可
 
 请直接返回修复后的完整工具调用内容，不要添加其他说明文字。"""
 

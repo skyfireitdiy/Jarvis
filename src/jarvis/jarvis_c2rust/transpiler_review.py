@@ -768,13 +768,13 @@ class ReviewManager:
                     error_guidance = (
                         f"\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n"
                         f"- JSON解析失败: {parse_error_msg}\n\n"
-                        f"请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）、breaking_issues（字符串数组）、structure_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
+                        f"请确保输出的JSON格式正确，包括正确的引号、逗号、大括号等。JSON 对象必须包含字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）、breaking_issues（字符串数组）、structure_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释等）。"
                     )
                 elif parse_failed:
                     error_guidance = (
                         "\n\n**格式错误详情（请根据以下错误修复输出格式）：**\n"
                         "- 无法从摘要中解析出有效的 JSON 对象\n\n"
-                        "请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）、breaking_issues（字符串数组）、structure_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释、||| 或 ``` 分隔符多行字符串等）。"
+                        "请确保输出格式正确：仅输出一个 <SUMMARY> 块，块内直接包含 JSON 对象（不需要额外的标签），字段：ok（布尔值）、function_issues（字符串数组）、critical_issues（字符串数组）、breaking_issues（字符串数组）、structure_issues（字符串数组）。支持jsonnet语法（如尾随逗号、注释等）。"
                     )
 
                 full_prompt = f"{composed_prompt}{error_guidance}\n\n{sum_p_init}"

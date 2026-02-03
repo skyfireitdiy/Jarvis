@@ -70,7 +70,7 @@ tool_call_help = f"""
 
 **Jsonnet格式特性**
 - 字符串引号：可使用双引号或单引号
-- 多行字符串：推荐使用 ||| 或 ``` 分隔符包裹多行字符串，直接换行无需转义，支持保留缩进
+- 多行字符串：直接换行无需转义，支持保留缩进
   示例：
 {_multiline_example}
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
@@ -79,7 +79,7 @@ tool_call_help = f"""
 **关键规则**
 1. 每次只使用一个工具，等待结果后再进行下一步
 2. {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
-3. 多行字符串参数推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进
+3. 多行字符串参数直接换行即可，无需转义
 4. 等待执行结果，不要假设或创建虚假响应
 5. 信息不足时询问用户，不要在没有完整信息的情况下继续
 
@@ -1019,7 +1019,7 @@ class ToolRegistry(OutputHandlerProtocol):
                 long_hint = ToolRegistry._get_long_response_hint(content)
                 error_msg = f"""Jsonnet 解析失败：{e}
 
-提示：Jsonnet支持双引号/单引号、尾随逗号、注释。多行字符串推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。
+提示：Jsonnet支持双引号/单引号、尾随逗号、注释。多行字符串直接换行即可，无需转义。
 
 {tool_call_help}{long_hint}"""
 
@@ -1287,7 +1287,7 @@ class ToolRegistry(OutputHandlerProtocol):
                     except Exception:
                         usage_prompt = tool_call_help
                     PrettyOutput.auto_print("❌ 工具参数格式无效")
-                    return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n提示：对于多行字符串参数，推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。\n\n{usage_prompt}"
+                    return f"工具参数格式无效: {name}。arguments 应为可解析的 Jsonnet 或对象，请按工具调用格式提供。\n\n{usage_prompt}"
 
             # 生成参数摘要，过滤敏感信息
             param_summary = ""
