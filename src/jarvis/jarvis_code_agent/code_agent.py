@@ -1049,9 +1049,7 @@ git reset --hard {start_commit}
         if git_diff is None:
             return
 
-        if self.disable_review or not user_confirm(
-            "是否进行代码审查？", default=True if self.non_interactive else False
-        ):
+        if self.disable_review:
             PrettyOutput.auto_print("ℹ️ 跳过代码审查（当前模式或配置不支持）")
             return
 
@@ -1067,6 +1065,14 @@ git reset --hard {start_commit}
 
         while is_infinite or iteration < max_iterations:
             iteration += 1
+
+            # 每轮review开始前询问用户
+            if not user_confirm(
+                f"是否进行第 {iteration} 轮代码审查？",
+                default=True if self.non_interactive else False,
+            ):
+                PrettyOutput.auto_print(f"ℹ️ 用户选择跳过第 {iteration} 轮代码审查")
+                break
 
             # 获取从开始到当前的 git diff（提前检测是否有代码修改）
             git_diff = self._check_and_get_git_diff()
