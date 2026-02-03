@@ -404,7 +404,6 @@ def get_task_analysis_prompt(
 }}
 {ct("TOOL_CALL")}
 
-注意：tool_code 参数推荐使用 ||| 或 ``` 分隔符包裹多行代码，直接换行无需转义，支持保留缩进。
 3. 方法论创建（如果需要创建新方法论）:
 判断标准：
 - 如果方法论特定于当前项目（如项目特定的技术方案、开发流程、规范等），使用 scope="project"
@@ -421,14 +420,12 @@ def get_task_analysis_prompt(
     "content": |||
 方法论内容
 可以包含多行内容
-推荐使用 ||| 或 ``` 分隔符包裹多行字符串，直接换行无需转义，支持保留缩进
 包含"双引号"和'单引号'都无需转义
     |||
   }}
 }}
 {ct("TOOL_CALL")}
 
-注意：如果 content 参数包含多行内容，推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
     else:
@@ -456,14 +453,12 @@ def get_task_analysis_prompt(
     "content": |||
 方法论内容
 可以包含多行内容
-推荐使用 ||| 或 ``` 分隔符包裹多行字符串，直接换行无需转义，支持保留缩进
 包含"双引号"和'单引号'都无需转义
     |||
   }}
 }}
 {ct("TOOL_CALL")}
 
-注意：如果 content 参数包含多行内容，推荐使用 ||| 或 ``` 分隔符包裹，直接换行无需转义，支持保留缩进。
 如果以上三种情况都不适用，则直接输出原因分析，不要使用工具调用格式。
 </output_requirements>"""
 
@@ -492,7 +487,7 @@ def get_task_analysis_prompt(
 <tool_requirements>
 工具代码要求:
 1. 工具类名与工具名称一致，包含name、description、parameters属性，实现execute方法
-2. 参数定义遵循JSON Schema，工具调用使用Jsonnet格式（支持 ||| 或 ``` 分隔符多行字符串、尾随逗号）
+2. 参数定义遵循JSON Schema，工具调用使用Jsonnet格式（支持尾随逗号）
 3. 使用print显示执行过程，返回{{success, stdout, stderr}}结构化结果
 4. 妥善处理异常，失败时清理资源。如需调用大模型，创建独立实例避免干扰主流程
 </tool_requirements>
