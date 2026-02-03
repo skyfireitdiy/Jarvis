@@ -312,10 +312,14 @@ def try_switch_to_jca_if_git_repo(
     config_file: Optional[str],
     restore_session: bool,
     task: Optional[str],
+    keep_jvs: bool = False,
 ) -> None:
     """在初始化环境前自动检测Git仓库，并自动切换到代码开发模式（jca）。"""
     # 非交互模式下跳过代码模式自动切换
     if is_non_interactive():
+        return
+    # 如果指定了 --keep-jvs 参数，跳过自动切换
+    if keep_jvs:
         return
     try:
         res = subprocess.run(
@@ -795,6 +799,11 @@ def run_cli(
         "--skip-config-selector",
         help="跳过内置配置选择器，直接使用默认通用代理",
     ),
+    keep_jvs: bool = typer.Option(
+        False,
+        "--keep-jvs",
+        help="禁止自动切换到代码开发模式（jca），保持使用通用代理（jvs）",
+    ),
 ) -> None:
     """Jarvis AI assistant command-line interface."""
     if ctx.invoked_subcommand is not None:
@@ -989,7 +998,7 @@ def run_cli(
     # 如果指定了 -T/--task 参数，跳过自动切换
     if not non_interactive and not task:
         try_switch_to_jca_if_git_repo(
-            llm_group, tool_group, config_file, restore_session, task
+            llm_group, tool_group, config_file, restore_session, task, keep_jvs
         )
 
     # 在进入默认通用代理前，列出内置配置供选择（agent/multi_agent/roles）
