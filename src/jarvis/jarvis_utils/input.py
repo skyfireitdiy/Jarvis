@@ -884,8 +884,20 @@ def user_confirm(tip: str, default: bool = True) -> bool:
     try:
         if _is_non_interactive_for_current_agent():
             return default
+
+        # 获取当前agent名称并添加到提示前缀
+        agent_name = ""
+        try:
+            ag = _get_current_agent_for_input()
+            if ag is not None:
+                name = getattr(ag, "name", None)
+                if name:
+                    agent_name = f"[{name}] "
+        except Exception:
+            pass
+
         suffix = "[Y/n]" if default else "[y/N]"
-        ret = get_single_line_input(f"{tip} {suffix}: ")
+        ret = get_single_line_input(f"{agent_name}{tip} {suffix}: ")
         return default if ret == "" else ret.lower() == "y"
     except KeyboardInterrupt:
         return False
