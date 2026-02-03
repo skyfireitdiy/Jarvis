@@ -213,11 +213,6 @@ class TaskAnalyzer:
         except Exception:
             pass
 
-        # 检查是否启用了任务分析
-        if not getattr(self.agent, "use_analysis", False):
-            self._analysis_done = True
-            return
-
         # 交互模式：询问用户是否执行任务分析（默认True）
         if not self.agent.confirm_callback(
             "任务已完成，是否进行任务分析（保存记忆、生成方法论等）？",

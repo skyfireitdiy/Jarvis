@@ -2046,8 +2046,8 @@ class Agent:
                 safe_summary_prompt = DEFAULT_SUMMARY_PROMPT
             # 注意：不要写回 session.prompt，避免回调修改/清空后导致使用空prompt
 
-            # 关键流程：直接调用 task_analyzer 执行任务分析（仅在非交互模式下）
-            if self.non_interactive:
+            # 关键流程：直接调用 task_analyzer 执行任务分析（内部会根据模式决定是否询问）
+            if self.use_analysis:
                 try:
                     self.task_analyzer.trigger_task_analysis(
                         auto_completed=auto_completed
