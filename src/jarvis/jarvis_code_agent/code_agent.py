@@ -1126,7 +1126,7 @@ git reset --hard {start_commit}
                 ],
                 non_interactive=self.non_interactive,
                 use_methodology=True,
-                use_analysis=True,
+                use_analysis=False,
             )
 
             # 运行 review
