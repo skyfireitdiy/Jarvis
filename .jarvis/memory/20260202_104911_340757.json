@@ -1,0 +1,8 @@
+{
+  "id": "20260202_104911_340757",
+  "type": "project_long_term",
+  "tags": ["jarvis", "gitignore", "code_agent", "功能修改"],
+  "content": "CodeAgent的.gitignore处理逻辑已简化：原逻辑检测并追加8类默认规则（Python、Rust等），新逻辑只检测.jarvis字符串。如果文件中已包含.jarvis则不做任何处理，如果不存在则追加。修改位置：src/jarvis/jarvis_code_agent/code_agent_git.py的update_gitignore方法。",
+  "created_at": "2026-02-02T10:49:11.341192",
+  "updated_at": "2026-02-02T10:49:11.341196"
+}

@@ -88,157 +88,38 @@ class GitManager:
         return git_dir
 
     def update_gitignore(self, git_dir: str) -> None:
-        """检查并更新.gitignore文件，确保忽略.jarvis目录，并追加常用语言的忽略规则（若缺失）
+        """检查并更新.gitignore文件，确保忽略.jarvis目录（若缺失）
 
         参数:
             git_dir: git根目录路径
         """
         gitignore_path = os.path.join(git_dir, ".gitignore")
 
-        # 常用忽略规则（按语言/场景分组）
-        # 注意：以 / 开头的路径表示只在根目录匹配，避免误忽略子目录中的源码
-        sections = {
-            "General": [
-                ".jarvis",
-                ".DS_Store",
-                "Thumbs.db",
-                "*.log",
-                "*.tmp",
-                "*.swp",
-                "*.swo",
-                ".idea/",
-                ".vscode/",
-            ],
-            "Python": [
-                "__pycache__/",  # 任何目录下的 __pycache__
-                "*.py[cod]",  # 任何目录下的编译文件
-                "*$py.class",
-                ".Python",
-                "env/",  # 只在根目录
-                "venv/",  # 只在根目录
-                ".venv/",  # 只在根目录
-                "build/",  # 只在根目录
-                "dist/",  # 只在根目录
-                "develop-eggs/",
-                "downloads/",
-                "eggs/",
-                ".eggs/",
-                # 注意：不忽略 lib/ 和 lib64/，因为这些目录可能存放源码
-                "parts/",
-                "sdist/",
-                "var/",
-                "wheels/",
-                "pip-wheel-metadata/",
-                "share/python-wheels/",
-                "*.egg-info/",
-                ".installed.cfg",
-                "*.egg",
-                "MANIFEST",
-                ".mypy_cache/",
-                ".pytest_cache/",
-                ".ruff_cache/",
-                ".tox/",
-                ".coverage",
-                ".coverage.*",
-                "htmlcov/",
-                ".hypothesis/",
-                ".ipynb_checkpoints",
-                ".pyre/",
-                ".pytype/",
-            ],
-            "Rust": [
-                "target/",  # 只在根目录
-            ],
-            "Node": [
-                "node_modules/",  # 只在根目录
-                "npm-debug.log*",
-                "yarn-debug.log*",
-                "yarn-error.log*",
-                "pnpm-debug.log*",
-                "lerna-debug.log*",
-                "dist/",  # 只在根目录
-                "coverage/",
-                ".turbo/",  # 只在根目录
-                ".next/",  # 只在根目录
-                ".nuxt/",  # 只在根目录
-                "out/",  # 只在根目录
-            ],
-            "Go": [
-                # 注意：不忽略 bin/，因为这个目录可能存放源码
-                "vendor/",  # 只在根目录
-                "coverage.out",
-            ],
-            "Java": [
-                "target/",  # 只在根目录
-                "*.class",  # 任何目录下的编译文件
-                ".gradle/",  # 只在根目录
-                "build/",  # 只在根目录
-                "out/",  # 只在根目录
-            ],
-            "C/C++": [
-                "build/",  # 只在根目录
-                "cmake-build-*/",  # 只在根目录
-                "*.o",  # 任何目录下的编译文件
-                "*.a",
-                "*.so",
-                "*.obj",
-                "*.dll",
-                "*.dylib",
-                "*.exe",
-                "*.pdb",
-            ],
-            ".NET": [
-                # 注意：不忽略 bin/，因为这个目录可能存放源码
-                "obj/",  # 只在根目录
-            ],
-        }
-
         existing_content = ""
         if os.path.exists(gitignore_path):
             with open(gitignore_path, "r", encoding="utf-8", errors="replace") as f:
                 existing_content = f.read()
 
-        # 已存在的忽略项（去除注释与空行）
-        existing_set = set(
-            ln.strip()
-            for ln in existing_content.splitlines()
-            if ln.strip() and not ln.strip().startswith("#")
-        )
+        # 检查是否已包含 .jarvis
+        if ".jarvis" in existing_content:
+            return
 
-        # 计算缺失项并准备追加内容
-        new_lines: List[str] = []
-        for name, patterns in sections.items():
-            missing = []
-            for p in patterns:
-                if p == ".jarvis":
-                    # 特殊处理：如果 .gitignore 中已包含 .jarvis 字符串，则跳过
-                    if ".jarvis" not in existing_content:
-                        missing.append(p)
-                else:
-                    # 其他规则保持精确匹配
-                    if p not in existing_set:
-                        missing.append(p)
-            if missing:
-                new_lines.append(f"# {name}")
-                new_lines.extend(missing)
-                new_lines.append("")  # 分组空行
+        # 添加 .jarvis 规则
+        jarvis_line = ".jarvis"
 
         if not os.path.exists(gitignore_path):
-            # 新建 .gitignore（仅包含缺失项；此处即为全部常用规则）
+            # 新建 .gitignore
             with open(gitignore_path, "w", encoding="utf-8", newline="\n") as f:
-                content_to_write = "\n".join(new_lines).rstrip()
-                if content_to_write:
-                    f.write(content_to_write + "\n")
-            PrettyOutput.auto_print("✅ 已创建 .gitignore 并添加常用忽略规则")
+                f.write(jarvis_line + "\n")
+            PrettyOutput.auto_print("✅ 已创建 .gitignore 并添加 .jarvis 忽略规则")
         else:
-            if new_lines:
-                # 追加缺失的规则
-                with open(gitignore_path, "a", encoding="utf-8", newline="\n") as f:
-                    # 若原文件不以换行结尾，先补一行
-                    if existing_content and not existing_content.endswith("\n"):
-                        f.write("\n")
-                    f.write("\n".join(new_lines).rstrip() + "\n")
-                PrettyOutput.auto_print("✅ 已更新 .gitignore，追加常用忽略规则")
+            # 追加到现有文件
+            with open(gitignore_path, "a", encoding="utf-8", newline="\n") as f:
+                # 若原文件不以换行结尾，先补一行
+                if existing_content and not existing_content.endswith("\n"):
+                    f.write("\n")
+                f.write(jarvis_line + "\n")
+            PrettyOutput.auto_print("✅ 已更新 .gitignore，添加 .jarvis 忽略规则")
 
     def handle_git_changes(self, prefix: str, suffix: str, agent: Any) -> None:
         """处理git仓库中的未提交修改"""
