@@ -19,6 +19,10 @@ refactor:
   name: "代码重构"
   description: "代码结构优化、设计模式应用、代码质量提升、技术债务清理等"
 
+detailed_design:
+  name: "详细设计"
+  description: "需求分析、系统架构设计、模块设计、接口设计、数据结构设计、核心算法设计、详细设计文档编写等"
+
 research:
   name: "技术研究"
   description: "技术调研、方案对比、架构分析、技术选型、可行性研究、竞品分析、文献调研、原型验证等"
