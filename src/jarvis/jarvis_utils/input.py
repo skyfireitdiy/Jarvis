@@ -228,19 +228,9 @@ def _run_fzf_for_selection(files: List[str], prompt_text: str) -> Optional[str]:
         PrettyOutput.auto_print("ℹ️ 未找到可选择的文件。")
         return None
 
-    try:
-        specials = [
-            ot("Summary"),
-            ot("Pin"),
-            ot("Clear"),
-            ot("ToolUsage"),
-            ot("ReloadConfig"),
-            ot("SaveSession"),
-            ot("Quiet"),
-        ]
-    except Exception:
-        specials = []
-
+    # _get_fzf_completion_items会自动添加完整的BUILTIN_COMMANDS
+    # 因此这里传入空列表，避免重复
+    specials: List[str] = []
     items = _get_fzf_completion_items(specials, files)
     proc = _subprocess.run(
         [
