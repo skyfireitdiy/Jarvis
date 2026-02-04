@@ -306,7 +306,7 @@ class BasePlatform(ABC):
             1  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
         )
         update_count = 0  # 更新计数器，用于控制 subtitle 更新频率
-        with Live(panel, refresh_per_second=4, transient=True) as live:
+        with Live(panel, refresh_per_second=1, transient=True) as live:
 
             def _update_panel_content(content: str, update_subtitle: bool = False):
                 nonlocal \
