@@ -309,7 +309,7 @@ class BasePlatform(ABC):
         with Live(panel, refresh_per_second=4, transient=True) as live:
 
             def _update_panel_content(content: str, update_subtitle: bool = False):
-                nonlocal response, last_subtitle_update_time, update_count
+                nonlocal response, last_subtitle_update_time, update_count, text_content
                 text_content.append(content, style="bright_white")
                 update_count += 1
 
@@ -325,9 +325,14 @@ class BasePlatform(ABC):
 
                 # 只在内容超过最大高度时才截取，减少不必要的操作
                 if len(lines) > max_text_height:
-                    text_content.plain = "\n".join(
-                        [line.plain for line in lines[-max_text_height:]]
+                    # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致
+                    # 这确保了Rich内部spans列表与文本内容保持同步
+                    new_text = Text(
+                        "\n".join([line.plain for line in lines[-max_text_height:]]),
+                        overflow="fold",
                     )
+                    text_content = new_text
+                    panel.renderable = text_content
 
                 # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
                 # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
