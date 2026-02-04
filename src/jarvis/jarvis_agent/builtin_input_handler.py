@@ -230,21 +230,24 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 )
 
                 # 添加列
-                table.add_column("规则名称", style="cyan", width=40, no_wrap=False)
-                table.add_column("内容预览", style="green", width=60)
+                table.add_column("规则名称", style="cyan", width=35, no_wrap=False)
+                table.add_column("内容预览", style="green", width=50)
+                table.add_column("文件路径", style="yellow", width=40, no_wrap=False)
                 table.add_column("状态", justify="center", width=10)
 
                 # 添加行数据
-                for rule_name, preview, is_loaded in rules_info:
-                    # 截断过长的预览
-                    if len(preview) > 57:
-                        preview = preview[:57] + "..."
+                for rule_name, preview, is_loaded, file_path in rules_info:
+                    # 截断过长的预览（已由 get_rule_preview 限制为100字符）
+                    # 这里不再需要二次截断，保持原有预览内容
+                    # 截断过长的文件路径
+                    if len(file_path) > 37:
+                        file_path = file_path[:37] + "..."
                     status = (
                         "[green]✓ 已加载[/green]"
                         if is_loaded
                         else "[dim]  未加载[/dim]"
                     )
-                    table.add_row(rule_name, preview, status)
+                    table.add_row(rule_name, preview, file_path, status)
 
                 # 打印表格和统计信息
                 console.print(table)

@@ -660,49 +660,103 @@ class RulesManager:
         return "", set()
 
     def get_rule_preview(self, rule_name: str) -> str:
-        """获取规则内容的前50个字符作为预览
+        """获取规则内容的前100个字符作为预览
 
         参数:
             rule_name: 规则名称
 
         返回:
-            str: 规则内容的前50个字符，如果读取失败则返回 "--"
+            str: 规则内容的前100个字符，如果读取失败则返回 "--"
         """
         try:
             content = self.get_named_rule(rule_name)
             if content:
-                # 移除换行符和多余空格，保留前50个字符
+                # 移除换行符和多余空格，保留前100个字符
                 preview = content.replace("\n", " ").strip()
-                return preview[:50] + "..." if len(preview) > 50 else preview
+                return preview[:100] + "..." if len(preview) > 100 else preview
             return "--"
         except Exception:
             return "--"
 
-    def get_all_rules_with_status(self) -> List[Tuple[str, str, bool]]:
+    def get_all_rules_with_status(self) -> List[Tuple[str, str, bool, str]]:
         """获取所有规则及其加载状态
 
         返回:
-            List[Tuple[str, str, bool]]: (规则名称, 内容预览, 是否已加载) 列表
+            List[Tuple[str, str, bool, str]]: (规则名称, 内容预览, 是否已加载, 文件路径) 列表
         """
+        import os
+        from jarvis.jarvis_utils.config import get_data_dir
+
         rules_info = []
         available_rules = self.get_all_available_rule_names()
+
+        # 辅助函数：根据规则名称获取文件路径
+        def get_rule_file_path(rule_name: str) -> str:
+            """获取规则文件的绝对路径"""
+            # 处理带前缀的规则名称
+            if ":" in rule_name:
+                prefix, actual_name = rule_name.split(":", 1)
+                if prefix == "project":
+                    return os.path.join(self.root_dir, ".jarvis", "rules", actual_name)
+                elif prefix == "global":
+                    return os.path.join(get_data_dir(), "rules", actual_name)
+                elif prefix == "central":
+                    if self.central_repo_path:
+                        return os.path.join(
+                            self.central_repo_path, "rules", actual_name
+                        )
+                elif prefix.startswith("config"):
+                    all_dirs = self._get_all_rules_dirs()
+                    try:
+                        config_num = int(prefix[6:])
+                        if config_num + 2 < len(all_dirs):
+                            return os.path.join(all_dirs[config_num + 2], actual_name)
+                    except ValueError:
+                        pass
+                elif prefix.endswith("_yaml"):
+                    # YAML规则显示为规则文件路径
+                    for desc, yaml_path in self._get_all_rules_yaml_files():
+                        if (
+                            (prefix == "project_yaml" and desc == "项目")
+                            or (prefix == "global_yaml" and desc == "全局")
+                            or (prefix == "central_yaml" and desc == "中心库")
+                        ):
+                            return yaml_path
+            return "--"
 
         # 处理内置规则
         for rule_name in available_rules.get("builtin", []):
             preview = self.get_rule_preview(rule_name)
             is_loaded = rule_name in self.loaded_rules
-            rules_info.append((rule_name, preview, is_loaded))
+            file_path = "内置规则"  # 内置规则不显示文件路径
+            rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理文件规则
         for rule_name in available_rules.get("files", []):
             preview = self.get_rule_preview(rule_name)
             is_loaded = rule_name in self.loaded_rules
-            rules_info.append((rule_name, preview, is_loaded))
+            file_path = get_rule_file_path(rule_name)
+            rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理YAML规则
         for rule_name in available_rules.get("yaml", []):
             preview = self.get_rule_preview(rule_name)
             is_loaded = rule_name in self.loaded_rules
-            rules_info.append((rule_name, preview, is_loaded))
+            file_path = get_rule_file_path(rule_name)
+            rules_info.append((rule_name, preview, is_loaded, file_path))
+
+        # 处理项目单个规则文件 .jarvis/rule
+        project_rule_path = os.path.join(self.root_dir, ".jarvis", "rule")
+        if os.path.exists(project_rule_path):
+            preview = self.get_rule_preview("project_rule")
+            is_loaded = "project_rule" in self.loaded_rules
+            rules_info.append(("project_rule", preview, is_loaded, project_rule_path))
+
+        # 处理全局单个规则文件 ~/.jarvis/rule
+        global_rule_path = os.path.join(get_data_dir(), "rule")
+        if os.path.exists(global_rule_path):
+            preview = self.get_rule_preview("global_rule")
+            is_loaded = "global_rule" in self.loaded_rules
+            rules_info.append(("global_rule", preview, is_loaded, global_rule_path))
 
         return rules_info
