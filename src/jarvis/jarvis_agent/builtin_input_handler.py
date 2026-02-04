@@ -243,9 +243,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     if len(file_path) > 37:
                         file_path = file_path[:37] + "..."
                     status = (
-                        "[green]✓ 已加载[/green]"
+                        "✅ [green]已加载[/green]"
                         if is_loaded
-                        else "[dim]  未加载[/dim]"
+                        else "🔴 [dim]未加载[/dim]"
                     )
                     table.add_row(rule_name, preview, file_path, status)
 
