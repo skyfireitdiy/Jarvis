@@ -664,12 +664,12 @@ class AgentRunLoop:
                     else:
                         # 没有工具调用，增加计数器
                         ag._no_tool_call_count += 1
-                        # 如果连续5次没有工具调用，尝试使用大模型修复
-                        if ag._no_tool_call_count >= 5:
+                        # 如果连续2次没有工具调用，尝试使用大模型修复
+                        if ag._no_tool_call_count >= 2:
                             from jarvis.jarvis_agent.utils import fix_tool_call_with_llm
 
                             error_msg = (
-                                "连续5次对话没有工具调用，请使用工具来完成你的任务"
+                                "连续2次对话没有工具调用，请使用工具来完成你的任务"
                             )
                             PrettyOutput.auto_print(f"⚠️ {error_msg}")
 
