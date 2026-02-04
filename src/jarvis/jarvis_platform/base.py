@@ -301,6 +301,7 @@ class BasePlatform(ABC):
         )
 
         response = ""
+        interrupted = False  # 标记是否被中断
         last_subtitle_update_time = time.time()
         subtitle_update_interval = (
             1  # subtitle 更新间隔（秒），减少更新频率避免重复渲染标题
@@ -405,12 +406,18 @@ class BasePlatform(ABC):
                     _flush_buffer()
 
                 if is_immediate_abort() and get_interrupt():
+                    interrupted = True
                     _flush_buffer()
                     self._append_session_history(message, response)
-                    return response
+                    break  # 跳出循环，让Live自然结束
 
             _flush_buffer()
             # 在结束前，将面板内容替换为完整响应，确保最后一次渲染的 panel 显示全部内容
+
+        # Live 退出后打印已接收的内容（避免被 Live 覆盖）
+        if interrupted:
+            PrettyOutput.print_markdown(response)
+
         return response
 
     def _chat_with_simple_output(self, message: str, start_time: float) -> str:
