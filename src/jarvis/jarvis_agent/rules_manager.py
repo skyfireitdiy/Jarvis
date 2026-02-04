@@ -28,6 +28,8 @@ class RulesManager:
         self.root_dir = root_dir
         # 初始化规则目录列表
         self._init_rules_dirs()
+        # 跟踪已加载的规则名称
+        self.loaded_rules: Set[str] = set()
 
     def _init_rules_dirs(self) -> None:
         """初始化规则目录列表，包括配置的目录和中心库"""
@@ -652,5 +654,55 @@ class RulesManager:
 
         if combined_parts:
             merged_rules = "\n\n".join(combined_parts)
+            # 记录已加载的规则名称
+            self.loaded_rules.update(loaded_rule_names)
             return merged_rules, loaded_rule_names
         return "", set()
+
+    def get_rule_preview(self, rule_name: str) -> str:
+        """获取规则内容的前50个字符作为预览
+
+        参数:
+            rule_name: 规则名称
+
+        返回:
+            str: 规则内容的前50个字符，如果读取失败则返回 "--"
+        """
+        try:
+            content = self.get_named_rule(rule_name)
+            if content:
+                # 移除换行符和多余空格，保留前50个字符
+                preview = content.replace("\n", " ").strip()
+                return preview[:50] + "..." if len(preview) > 50 else preview
+            return "--"
+        except Exception:
+            return "--"
+
+    def get_all_rules_with_status(self) -> List[Tuple[str, str, bool]]:
+        """获取所有规则及其加载状态
+
+        返回:
+            List[Tuple[str, str, bool]]: (规则名称, 内容预览, 是否已加载) 列表
+        """
+        rules_info = []
+        available_rules = self.get_all_available_rule_names()
+
+        # 处理内置规则
+        for rule_name in available_rules.get("builtin", []):
+            preview = self.get_rule_preview(rule_name)
+            is_loaded = rule_name in self.loaded_rules
+            rules_info.append((rule_name, preview, is_loaded))
+
+        # 处理文件规则
+        for rule_name in available_rules.get("files", []):
+            preview = self.get_rule_preview(rule_name)
+            is_loaded = rule_name in self.loaded_rules
+            rules_info.append((rule_name, preview, is_loaded))
+
+        # 处理YAML规则
+        for rule_name in available_rules.get("yaml", []):
+            preview = self.get_rule_preview(rule_name)
+            is_loaded = rule_name in self.loaded_rules
+            rules_info.append((rule_name, preview, is_loaded))
+
+        return rules_info

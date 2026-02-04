@@ -6,6 +6,8 @@ from typing import Tuple
 
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.output import PrettyOutput
+from rich.table import Table
+from rich.console import Console
 
 
 def _get_rule_content(rule_name: str) -> str | None:
@@ -207,6 +209,47 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             from jarvis.jarvis_utils.utils import load_config
 
             load_config()
+            return "", True
+        elif tag == "ListRule":
+            # 列出所有规则及其状态
+            import os
+            from jarvis.jarvis_agent.rules_manager import RulesManager
+
+            rules_manager = RulesManager(root_dir=os.getcwd())
+            rules_info = rules_manager.get_all_rules_with_status()
+
+            if not rules_info:
+                PrettyOutput.auto_print("📋 未找到任何规则")
+            else:
+                # 使用 rich.Table 创建美观的表格
+                console = Console()
+                table = Table(
+                    title="📋 所有可用规则",
+                    show_header=True,
+                    header_style="bold magenta",
+                )
+
+                # 添加列
+                table.add_column("规则名称", style="cyan", width=40, no_wrap=False)
+                table.add_column("内容预览", style="green", width=60)
+                table.add_column("状态", justify="center", width=10)
+
+                # 添加行数据
+                for rule_name, preview, is_loaded in rules_info:
+                    # 截断过长的预览
+                    if len(preview) > 57:
+                        preview = preview[:57] + "..."
+                    status = (
+                        "[green]✓ 已加载[/green]"
+                        if is_loaded
+                        else "[dim]  未加载[/dim]"
+                    )
+                    table.add_row(rule_name, preview, status)
+
+                # 打印表格和统计信息
+                console.print(table)
+                console.print(f"\n总计: {len(rules_info)} 个规则\n")
+
             return "", True
         elif tag == "SaveSession":
             # 检查是否允许使用SaveSession命令
