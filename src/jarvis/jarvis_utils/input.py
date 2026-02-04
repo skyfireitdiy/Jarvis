@@ -81,6 +81,7 @@ BUILTIN_COMMANDS = [
     ("SaveSession", "保存当前会话"),
     ("RestoreSession", "恢复会话"),
     ("ListSessions", "列出所有会话"),
+    ("ListRule", "列出所有规则"),
     ("Quiet", "无人值守模式"),
     ("FixToolCall", "修复工具调用"),
 ]
