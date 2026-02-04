@@ -190,6 +190,53 @@ class AgentRunLoop:
             should_compress = token_limit_triggered or turn_limit_triggered
 
             if should_compress:
+                # 检查是否由当前消息过长导致
+                current_prompt = self.agent.session.prompt
+                if current_prompt and current_message_tokens > 0:
+                    # 计算当前消息占总token的比例
+                    total_tokens = (
+                        max_input_tokens - remaining_tokens + current_message_tokens
+                    )
+                    message_ratio = (
+                        current_message_tokens / total_tokens if total_tokens > 0 else 0
+                    )
+
+                    # 如果当前消息超过总token的30%，进行截断处理
+                    if message_ratio > 0.3:
+                        PrettyOutput.auto_print(
+                            f"⚠️ 当前消息过长 (占{message_ratio * 100:.1f}%)，进行截断处理"
+                        )
+
+                        # 截断策略：保留前50%和后20%
+                        content_length = len(current_prompt)
+                        keep_start = int(content_length * 0.5)
+                        keep_end = max(1, int(content_length * 0.2))
+
+                        truncated_prompt = (
+                            current_prompt[:keep_start]
+                            + "\n...[中间部分已省略]...\n"
+                            + current_prompt[-keep_end:]
+                        )
+
+                        # 更新prompt并重新计算token
+                        self.agent.session.prompt = truncated_prompt
+                        current_message_tokens = get_context_token_count(
+                            truncated_prompt
+                        )
+
+                        # 重新计算剩余token并判断是否还需要压缩
+                        remaining_tokens = model_instance.get_remaining_token_count()
+                        remaining_tokens -= current_message_tokens
+                        token_limit_triggered = (
+                            max_input_tokens > 0
+                            and remaining_tokens <= int(max_input_tokens * 0.25)
+                        )
+                        should_compress = token_limit_triggered or turn_limit_triggered
+
+                        if not should_compress:
+                            PrettyOutput.auto_print("✅ 截断后无需压缩")
+                            return  # 直接返回，不执行压缩
+
                 # 确定触发原因
                 if token_limit_triggered and turn_limit_triggered:
                     trigger_reason = "Token和轮次双重限制触发"
