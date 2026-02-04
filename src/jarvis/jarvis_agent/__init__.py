@@ -2036,6 +2036,14 @@ class Agent:
 
         result = "任务完成"
 
+        # 🔧 修复：任务分析和总结解耦，use_analysis 独立于 need_summary
+        # 关键流程：直接调用 task_analyzer 执行任务分析（内部会根据模式决定是否询问）
+        if self.use_analysis:
+            try:
+                self.task_analyzer.trigger_task_analysis(auto_completed=auto_completed)
+            except Exception:
+                pass
+
         if self.need_summary:
             # 确保总结提示词非空：若为None或仅空白，则回退到默认提示词
             safe_summary_prompt = self.summary_prompt or ""
@@ -2045,15 +2053,6 @@ class Agent:
             ):
                 safe_summary_prompt = DEFAULT_SUMMARY_PROMPT
             # 注意：不要写回 session.prompt，避免回调修改/清空后导致使用空prompt
-
-            # 关键流程：直接调用 task_analyzer 执行任务分析（内部会根据模式决定是否询问）
-            if self.use_analysis:
-                try:
-                    self.task_analyzer.trigger_task_analysis(
-                        auto_completed=auto_completed
-                    )
-                except Exception:
-                    pass
 
             # 非关键流程：广播将要生成总结事件（用于日志、监控等）
             try:
