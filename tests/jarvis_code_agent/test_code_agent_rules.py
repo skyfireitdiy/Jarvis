@@ -265,9 +265,10 @@ class TestRulesManager:
         assert "Global rule" in merged_rules
         assert "Project rule" in merged_rules
         assert "Named rule" in merged_rules
-        # builtin_rules_index 会自动加载，所以有4个规则
-        assert len(loaded_names) == 4
+        # builtin_rules 和 builtin_rules_index 都会加载（向后兼容），所以有5个规则
+        assert len(loaded_names) == 5
         assert "global_rule" in loaded_names
         assert "project_rule" in loaded_names
         assert "named1" in loaded_names
+        assert "builtin_rules" in loaded_names
         assert "builtin_rules_index" in loaded_names

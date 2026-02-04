@@ -1,0 +1,8 @@
+{
+  "id": "20260203_171149_258121",
+  "type": "project_long_term",
+  "tags": ["架构设计", "RulesManager", "状态管理", "重构经验"],
+  "content": "## RulesManager 状态管理重构架构\n\n### 核心设计模式\n\n采用三层状态管理架构，明确区分\"加载\"和\"激活\"状态：\n\n1. **_loaded_rules (Dict[str, str])**：规则内容缓存\n   - 存储已读取到内存的规则内容\n   - 避免重复文件读取\n   - 支持快速访问\n\n2. **_active_rules (Set[str])**：激活规则名称集合\n   - 记录哪些规则已生效（添加到系统提示词）\n   - 支持动态激活/停用\n   - 提供状态查询\n\n3. **_merged_rules (str)**：合并后的规则内容\n   - 所有激活规则的合并结果\n   - 预计算提升性能\n   - 避免每次重新合并\n\n### 向后兼容策略\n\n- 保留 `loaded_rules` 属性（Set[str]）\n- 新旧机制并行运行\n- `load_all_rules()` 方法内部使用新机制\n- `get_all_rules_with_status()` 同时检查新旧状态\n\n### 关键接口\n\n- `activate_rule(name)` - 激活规则\n- `deactivate_rule(name)` - 停用规则\n- `get_active_rules_content()` - 获取激活内容\n- `get_rule_status(name)` - 获取状态（active/loaded/not_loaded）\n\n### 位置\n\n文件：`src/jarvis/jarvis_agent/rules_manager.py`\n提交范围：90c0f71 ~ 7bc7417",
+  "created_at": "2026-02-03T17:11:49.258156",
+  "updated_at": "2026-02-03T17:11:49.258160"
+}

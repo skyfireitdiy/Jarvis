@@ -6,6 +6,7 @@ import subprocess
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Set
@@ -28,8 +29,15 @@ class RulesManager:
         self.root_dir = root_dir
         # 初始化规则目录列表
         self._init_rules_dirs()
-        # 跟踪已加载的规则名称
+        # 跟踪已加载的规则名称（向后兼容）
         self.loaded_rules: Set[str] = set()
+
+        # 私有属性：状态管理
+        self._loaded_rules: Dict[
+            str, str
+        ] = {}  # {rule_name: rule_content} - 已加载的规则内容缓存
+        self._active_rules: Set[str] = set()  # 已激活的规则名称集合
+        self._merged_rules: str = ""  # 合并后的规则字符串（激活的规则内容）
 
     def _init_rules_dirs(self) -> None:
         """初始化规则目录列表，包括配置的目录和中心库"""
@@ -618,46 +626,161 @@ class RulesManager:
     def load_all_rules(self, rule_names: Optional[str] = None) -> Tuple[str, Set[str]]:
         """加载所有规则并合并
 
+        向后兼容方法：内部使用新的状态管理机制
+
         参数:
             rule_names: 规则名称列表（逗号分隔）
 
         返回:
             (merged_rules, loaded_rule_names): 合并后的规则字符串和已加载的规则名称列表
         """
-        combined_parts: List[str] = []
+        # 加载默认规则
+        self._load_default_rules()
+
         loaded_rule_names: Set[str] = set()
 
-        global_rules = self.read_global_rules()
-        project_rules = self.read_project_rule()
-
-        if global_rules:
-            combined_parts.append(global_rules)
+        # 默认规则已通过 _load_default_rules 加载
+        if "global_rule" in self._active_rules:
             loaded_rule_names.add("global_rule")
-        if project_rules:
-            combined_parts.append(project_rules)
+        if "project_rule" in self._active_rules:
             loaded_rule_names.add("project_rule")
+        # 为了向后兼容，同时返回 builtin_rules_index（旧名称）和 builtin_rules（新名称）
+        if "builtin_rules" in self._active_rules:
+            loaded_rule_names.add("builtin_rules")
+            loaded_rule_names.add("builtin_rules_index")  # 向后兼容
 
-        # 加载 builtin_rules.md 内置规则索引
-        builtin_rules_index = self._get_builtin_rules_index()
-        if builtin_rules_index:
-            combined_parts.append(builtin_rules_index)
-            loaded_rule_names.add("builtin_rules_index")
-
-        # 如果指定了 rule_names，从 rules.yaml 文件中读取并添加多个规则
+        # 如果指定了 rule_names，激活这些规则
         if rule_names:
             rule_list = [name.strip() for name in rule_names.split(",") if name.strip()]
             for rule_name in rule_list:
-                named_rule = self.get_named_rule(rule_name)
-                if named_rule:
-                    combined_parts.append(named_rule)
+                if self.activate_rule(rule_name):
                     loaded_rule_names.add(rule_name)
 
-        if combined_parts:
-            merged_rules = "\n\n".join(combined_parts)
-            # 记录已加载的规则名称
-            self.loaded_rules.update(loaded_rule_names)
+        # 获取合并后的规则内容
+        merged_rules = self.get_active_rules_content()
+
+        if merged_rules:
             return merged_rules, loaded_rule_names
         return "", set()
+
+    def activate_rule(self, name: str) -> bool:
+        """激活指定名称的规则
+
+        参数:
+            name: 规则名称
+
+        返回:
+            bool: 是否成功激活
+        """
+        # 如果规则已经激活，直接返回True
+        if name in self._active_rules:
+            return True
+
+        # 尝试获取规则内容
+        rule_content = self.get_named_rule(name)
+        if rule_content is None:
+            return False
+
+        # 加载规则到缓存
+        self._loaded_rules[name] = rule_content
+        # 激活规则
+        self._active_rules.add(name)
+        # 更新向后兼容的 loaded_rules
+        self.loaded_rules.add(name)
+        # 重新合并激活的规则
+        self._merge_active_rules()
+
+        return True
+
+    def deactivate_rule(self, name: str) -> bool:
+        """停用指定名称的规则
+
+        参数:
+            name: 规则名称
+
+        返回:
+            bool: 是否成功停用
+        """
+        # 如果规则未激活，返回False
+        if name not in self._active_rules:
+            return False
+
+        # 停用规则
+        self._active_rules.remove(name)
+        # 从向后兼容的 loaded_rules 中移除
+        if name in self.loaded_rules:
+            self.loaded_rules.remove(name)
+        # 重新合并激活的规则
+        self._merge_active_rules()
+
+        return True
+
+    def get_active_rules_content(self) -> str:
+        """获取所有激活规则的合并内容
+
+        返回:
+            str: 合并后的规则内容
+        """
+        return self._merged_rules
+
+    def get_rule_status(self, name: str) -> str:
+        """获取规则的状态
+
+        参数:
+            name: 规则名称
+
+        返回:
+            str: 规则状态（"active", "loaded", "not_loaded"）
+        """
+        if name in self._active_rules:
+            return "active"
+        elif name in self._loaded_rules:
+            return "loaded"
+        else:
+            return "not_loaded"
+
+    def _merge_active_rules(self) -> None:
+        """合并所有激活的规则内容"""
+        if not self._active_rules:
+            self._merged_rules = ""
+            return
+
+        combined_parts = []
+        for rule_name in sorted(self._active_rules):
+            if rule_name in self._loaded_rules:
+                combined_parts.append(self._loaded_rules[rule_name])
+
+        if combined_parts:
+            self._merged_rules = "\n\n".join(combined_parts)
+        else:
+            self._merged_rules = ""
+
+    def _load_default_rules(self) -> None:
+        """加载默认规则（global_rule 和 project_rule）"""
+        # 加载全局规则
+        global_rules = self.read_global_rules()
+        if global_rules:
+            self._loaded_rules["global_rule"] = global_rules
+            self._active_rules.add("global_rule")
+            self.loaded_rules.add("global_rule")
+
+        # 加载项目规则
+        project_rules = self.read_project_rule()
+        if project_rules:
+            self._loaded_rules["project_rule"] = project_rules
+            self._active_rules.add("project_rule")
+            self.loaded_rules.add("project_rule")
+
+        # 加载内置规则索引
+        builtin_rules_index = self._get_builtin_rules_index()
+        if builtin_rules_index:
+            # 使用 builtin_rules 作为键名（与 BUILTIN_RULES 字典保持一致）
+            self._loaded_rules["builtin_rules"] = builtin_rules_index
+            self._active_rules.add("builtin_rules")
+            self.loaded_rules.add("builtin_rules")
+
+        # 合并激活的规则
+        self._merge_active_rules()
 
     def get_rule_preview(self, rule_name: str) -> str:
         """获取规则内容的前100个字符作为预览
@@ -669,7 +792,13 @@ class RulesManager:
             str: 规则内容的前100个字符，如果读取失败则返回 "--"
         """
         try:
-            content = self.get_named_rule(rule_name)
+            # 优先从缓存中获取
+            if rule_name in self._loaded_rules:
+                content: str | None = self._loaded_rules[rule_name]
+            else:
+                # 从文件或内置规则中获取
+                content = self.get_named_rule(rule_name)
+
             if content:
                 # 移除换行符和多余空格，保留前100个字符
                 preview = content.replace("\n", " ").strip()
@@ -727,21 +856,30 @@ class RulesManager:
         # 处理内置规则
         for rule_name in available_rules.get("builtin", []):
             preview = self.get_rule_preview(rule_name)
-            is_loaded = rule_name in self.loaded_rules
+            # 检查状态：只有明确激活的规则才显示为已激活
+            is_loaded = rule_name in self._active_rules
+            # 向后兼容：也检查旧的 loaded_rules
+            is_loaded = is_loaded or rule_name in self.loaded_rules
             file_path = "内置规则"  # 内置规则不显示文件路径
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理文件规则
         for rule_name in available_rules.get("files", []):
             preview = self.get_rule_preview(rule_name)
-            is_loaded = rule_name in self.loaded_rules
+            # 检查状态：只有明确激活的规则才显示为已激活
+            is_loaded = rule_name in self._active_rules
+            # 向后兼容：也检查旧的 loaded_rules
+            is_loaded = is_loaded or rule_name in self.loaded_rules
             file_path = get_rule_file_path(rule_name)
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理YAML规则
         for rule_name in available_rules.get("yaml", []):
             preview = self.get_rule_preview(rule_name)
-            is_loaded = rule_name in self.loaded_rules
+            # 检查状态：只有明确激活的规则才显示为已激活
+            is_loaded = rule_name in self._active_rules
+            # 向后兼容：也检查旧的 loaded_rules
+            is_loaded = is_loaded or rule_name in self.loaded_rules
             file_path = get_rule_file_path(rule_name)
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
@@ -749,14 +887,20 @@ class RulesManager:
         project_rule_path = os.path.join(self.root_dir, ".jarvis", "rule")
         if os.path.exists(project_rule_path):
             preview = self.get_rule_preview("project_rule")
-            is_loaded = "project_rule" in self.loaded_rules
+            # 检查状态：使用新的状态管理机制
+            is_loaded = "project_rule" in self._active_rules
+            # 向后兼容：也检查旧的 loaded_rules
+            is_loaded = is_loaded or "project_rule" in self.loaded_rules
             rules_info.append(("project_rule", preview, is_loaded, project_rule_path))
 
         # 处理全局单个规则文件 ~/.jarvis/rule
         global_rule_path = os.path.join(get_data_dir(), "rule")
         if os.path.exists(global_rule_path):
             preview = self.get_rule_preview("global_rule")
-            is_loaded = "global_rule" in self.loaded_rules
+            # 检查状态：使用新的状态管理机制
+            is_loaded = "global_rule" in self._active_rules
+            # 向后兼容：也检查旧的 loaded_rules
+            is_loaded = is_loaded or "global_rule" in self.loaded_rules
             rules_info.append(("global_rule", preview, is_loaded, global_rule_path))
 
         return rules_info

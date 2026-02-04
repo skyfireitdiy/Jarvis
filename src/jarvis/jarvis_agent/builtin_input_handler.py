@@ -212,10 +212,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return "", True
         elif tag == "ListRule":
             # 列出所有规则及其状态
-            import os
-            from jarvis.jarvis_agent.rules_manager import RulesManager
-
-            rules_manager = RulesManager(root_dir=os.getcwd())
+            # 使用 agent 的 rules_manager 实例，而不是创建新实例
+            # 这样可以正确获取已加载的规则状态
+            rules_manager = agent.rules_manager
             rules_info = rules_manager.get_all_rules_with_status()
 
             if not rules_info:
@@ -227,13 +226,14 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     title="📋 所有可用规则",
                     show_header=True,
                     header_style="bold magenta",
+                    expand=True,
                 )
 
                 # 添加列
-                table.add_column("规则名称", style="cyan", width=35, no_wrap=False)
-                table.add_column("内容预览", style="green", width=50)
-                table.add_column("文件路径", style="yellow", width=40, no_wrap=False)
-                table.add_column("状态", justify="center", width=10)
+                table.add_column("规则名称", style="cyan", no_wrap=False)
+                table.add_column("内容预览", style="green")
+                table.add_column("文件路径", style="yellow", no_wrap=False)
+                table.add_column("状态", justify="center")
 
                 # 添加行数据
                 for rule_name, preview, is_loaded, file_path in rules_info:
@@ -243,9 +243,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                     if len(file_path) > 37:
                         file_path = file_path[:37] + "..."
                     status = (
-                        "✅ [green]已加载[/green]"
+                        "✅ [green]已激活[/green]"
                         if is_loaded
-                        else "🔴 [dim]未加载[/dim]"
+                        else "🔴 [dim]未激活[/dim]"
                     )
                     table.add_row(rule_name, preview, file_path, status)
 
