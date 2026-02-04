@@ -1,0 +1,8 @@
+{
+  "id": "20260203_172555_484094",
+  "type": "project_long_term",
+  "tags": ["RulesManager", "架构重构", "状态管理", "规则加载", "规则激活"],
+  "content": "# RulesManager 状态管理重构完成\n           \n## 重构目标\n将所有规则管理功能集中到 RulesManager 类中，明确区分\"加载\"和\"激活\"状态。\n           \n## 核心概念\n- **加载**：规则文件被读取到内存中（可在 RulesManager 内部缓存）\n- **激活**：规则内容被添加到系统提示词中，真正生效\n           \n## 架构设计\n三层状态管理架构：\n1. `_loaded_rules: Dict[str, str]` - 规则内容缓存\n2. `_active_rules: Set[str]` - 激活规则名称集合\n3. `_merged_rules: str` - 合并后的规则内容\n           \n## 新增接口\n- `activate_rule(name: str) -> bool` - 激活指定规则\n- `deactivate_rule(name: str) -> bool` - 停用指定规则\n- `get_active_rules_content() -> str` - 获取所有激活规则的合并内容\n- `get_rule_status(name: str) -> str` - 获取规则状态\n- `_merge_active_rules() -> None` - 合并激活的规则内容\n- `_load_default_rules() -> None` - 加载默认规则\n           \n## 向后兼容\n- 保留 `loaded_rules: Set[str]` 属性用于向后兼容\n- `load_all_rules()` 方法保持原有签名和行为\n- Agent 无需修改即可使用新接口\n           \n## 测试验证\n- RulesManager 测试：18/18 通过\n- Agent 测试：53/53 通过\n- 总计：71/71 测试通过\n- ListRule 功能验证通过\n         \n## 代码变更\n- 文件：src/jarvis/jarvis_agent/rules_manager.py\n- 变更：+218 行，-36 行\n- Commit: 4e161b8c\n           \n## 验证结果\n✅ 所有测试通过\n✅ 向后兼容性保持\n✅ ListRule 功能正常\n✅ 规则状态显示正确\n",
+  "created_at": "2026-02-03T17:25:55.484587",
+  "updated_at": "2026-02-03T17:25:55.484598"
+}

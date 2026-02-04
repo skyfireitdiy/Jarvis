@@ -2241,10 +2241,11 @@ class Agent:
             # 将非交互模式说明添加到用户输入中
             enhanced_input = user_input + non_interactive_note
 
-            # 将已加载的规则内容添加到用户输入的最前面
-            if hasattr(self, "loaded_rules") and self.loaded_rules:
+            # 将已激活的规则内容添加到用户输入的最前面
+            active_rules_content = self.rules_manager.get_active_rules_content()
+            if active_rules_content:
                 enhanced_input = (
-                    f"<rules>\n{self.loaded_rules}\n</rules>\n\n{enhanced_input}"
+                    f"<rules>\n{active_rules_content}\n</rules>\n\n{enhanced_input}"
                 )
 
             self.session.prompt = enhanced_input
