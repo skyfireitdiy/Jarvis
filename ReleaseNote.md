@@ -1,3 +1,66 @@
+### Release Note - v2.0.4 (2026-02-04)
+
+#### **📌 修复**
+
+- **🔧 中断时内容显示不完整问题**
+  - **问题**：当用户中断输出时，Live 组件退出后已接收的内容被覆盖，导致用户看不到已生成的响应
+  - **修复**：在中断时标记状态，Live 退出后打印已接收的内容
+  - **文件**：`src/jarvis/jarvis_platform/base.py`
+  - **效果**：用户中断后仍能看到已生成的完整响应内容
+
+- **🔧 Rich Text 滚动逻辑 IndexError 修复**
+  - **问题**：流式输出内容超过终端高度触发滚动后，继续 append 新内容导致 `IndexError: list index out of range`
+  - **根本原因**：直接修改 `text_content.plain` 属性导致 Rich 内部 spans 列表与实际文本内容不同步
+  - **修复**：创建新的 Text 对象替代直接修改 plain 属性，并重建 Panel 对象
+  - **文件**：`src/jarvis/jarvis_platform/base.py`（+37行，-5行）
+  - **经验**：Rich Text 对象内部维护 spans 列表跟踪样式范围，应避免直接修改 plain 属性
+
+- **🔧 jqc命令模型组配置命名统一**
+  - **问题**：单模型和多模型场景下使用不同的命名规则（`claude` vs `claude_claude_3_5_sonnet_latest`），导致配置结构不一致
+  - **修复**：统一使用 `{config_name}_{sanitized_model}` 格式作为 model_config_name
+  - **文件**：`src/jarvis/jarvis_utils/quick_config.py`（+5行，-9行）
+  - **效果**：单模型和多模型配置结构统一，模型组引用正确
+
+#### **🔧 优化与重构**
+
+- **🎯 Live组件刷新频率优化**
+  - **优化**：将 refresh_per_second 从 4 降至 1
+  - **效果**：减少不必要的重复渲染，降低 CPU 占用
+  - **文件**：`src/jarvis/jarvis_platform/base.py`
+
+- **🎯 Token处理策略优化**
+  - **新增**：当单条消息超过总 token 的 30% 时，自动截断处理（保留前 50% 和后 20%）
+  - **效果**：避免单条消息过长导致上下文溢出，提升长消息处理效率
+  - **文件**：`src/jarvis/jarvis_agent/run_loop.py`（+47行）
+
+- **🎯 无工具调用检测阈值优化**
+  - **优化**：将连续无工具调用检测阈值从 5 次降至 2 次
+  - **效果**：更快触发异常检测，及时使用 LLM 辅助修复工具调用问题
+  - **文件**：`src/jarvis/jarvis_agent/run_loop.py`
+
+- **🎯 Sub任务创建规则文档完善**
+  - **新增**：添加 Sub 任务创建规则和上下文完整性要求
+  - **内容**：强调谨慎使用 sub 类型，要求提供完整上下文信息
+  - **文件**：`src/jarvis/jarvis_tools/task_list_manager.py`
+
+#### **📚 文档更新**
+
+- **✨ 功能开发规则完善**
+  - **新增**：SDD（Spec 驱动开发）规则推荐
+  - **优化**：完善功能开发场景的规则加载说明，添加使用示例
+  - **文件**：`builtin/prompts/code_agent_system/feature.md`（+26行，-9行）
+
+- **✨ 反向工程规则扩展**
+  - **新增**：大型模块文档拆分策略（103行）
+  - **内容**：定义拆分条件（超过500行、5个功能点、20个文件）、拆分原则（按功能/层次/组件）、文档命名规范
+  - **文件**：`builtin/rules/architecture_design/reverse_engineering.md`
+
+---
+
+**版本说明**：本次更新是一次 **Bug修复与体验优化** 版本，重点修复了中断显示问题和模型配置命名问题，优化了 Live 组件性能和 Token 处理策略，完善了功能开发和反向工程规则。
+
+---
+
 ### Release Note - v2.0.3 (2026-02-04)
 
 #### **📌 修复**
