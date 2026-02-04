@@ -309,7 +309,12 @@ class BasePlatform(ABC):
         with Live(panel, refresh_per_second=4, transient=True) as live:
 
             def _update_panel_content(content: str, update_subtitle: bool = False):
-                nonlocal response, last_subtitle_update_time, update_count, text_content
+                nonlocal \
+                    response, \
+                    last_subtitle_update_time, \
+                    update_count, \
+                    text_content, \
+                    panel
                 text_content.append(content, style="bright_white")
                 update_count += 1
 
@@ -332,7 +337,17 @@ class BasePlatform(ABC):
                         overflow="fold",
                     )
                     text_content = new_text
-                    panel.renderable = text_content
+                    # 重建panel对象，避免Live无法正确清除旧的panel显示
+                    # 当text_content对象被替换时，panel必须重建才能让Live正确处理
+                    current_subtitle = panel.subtitle
+                    panel = Panel(
+                        text_content,
+                        title=panel.title,
+                        subtitle=current_subtitle,
+                        border_style="cyan",
+                        box=box.ROUNDED,
+                        expand=True,
+                    )
 
                 # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
                 # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
