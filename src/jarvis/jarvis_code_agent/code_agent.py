@@ -24,6 +24,7 @@ from jarvis.jarvis_code_agent.code_agent_git import GitManager
 from jarvis.jarvis_code_agent.code_agent_impact import ImpactManager
 from jarvis.jarvis_code_agent.code_agent_lint import LintManager
 from jarvis.jarvis_code_agent.code_agent_postprocess import PostProcessManager
+from jarvis.jarvis_agent.builtin_input_handler import builtin_input_handler
 from jarvis.jarvis_code_agent.code_agent_prompts import (
     classify_user_request,
     get_system_prompt,
@@ -301,6 +302,13 @@ class CodeAgent(Agent):
         """
         try:
             set_current_agent(self.name, self)
+
+            # 优先处理内置命令（如 <ListRule>）
+            # 如果是内置命令且已被处理，则直接返回，不进入需求分类流程
+            processed_input, is_handled = builtin_input_handler(user_input, self)
+            if is_handled:
+                # 内置命令已处理完成，直接返回
+                return None
 
             # 需求分类：使用 normal_llm 对用户需求进行分类
             scenario = classify_user_request(user_input)
