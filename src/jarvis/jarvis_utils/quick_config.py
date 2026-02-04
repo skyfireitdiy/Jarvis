@@ -163,14 +163,8 @@ def quick_config(
 
     # 为每个选择的模型创建配置
     for i, model in enumerate(selected_models):
-        if len(selected_models) == 1:
-            # 单个模型使用指定的配置名称
-            model_config_name = config_name
-        else:
-            # 多个模型使用配置名称+模型名的方式避免冲突
-            model_config_name = (
-                f"{config_name}_{model.replace('.', '_').replace('-', '_')}"
-            )
+        # 统一使用配置名称+模型名的方式避免命名冲突，保持单模型和多模型配置结构一致
+        model_config_name = f"{config_name}_{model.replace('.', '_').replace('-', '_')}"
 
         # 根据平台类型生成正确的配置键名
         if platform == "openai":

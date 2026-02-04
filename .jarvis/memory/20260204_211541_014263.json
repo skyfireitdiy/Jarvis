@@ -1,0 +1,8 @@
+{
+  "id": "20260204_211541_014263",
+  "type": "project_long_term",
+  "tags": ["jqc", "Bug修复", "模型组配置", "quick_config"],
+  "content": "jqc命令模型组配置Bug修复\n\n问题描述：\n当使用jqc命令配置LLM时，如果选择单个模型或部分模型，生成的配置文件中模型组配置的命名不一致。\n\n根本原因：\n原代码在单模型和多模型场景下使用不同的命名规则：\n- 单模型：model_config_name = config_name（如'claude'）\n- 多模型：model_config_name = '{config_name}_{sanitized_model}'（如'claude_claude_3_5_sonnet_latest'）\n这导致配置结构不一致，模型组引用混乱。\n\n修复方案：\n统一使用 '{config_name}_{sanitized_model}' 格式作为model_config_name，确保单模型和多模型场景下配置结构一致。\n\n修改位置：\n- src/jarvis/jarvis_utils/quick_config.py 第165-173行\n- 移除了单模型的特殊处理逻辑\n\n修复效果：\n✅ 单模型和多模型配置结构统一\n✅ model_config_name格式：{config_name}_{sanitized_model}\n✅ group_name格式：{sanitized_model}\n✅ llm_groups中的normal_llm正确引用model_config_name\n\n提交：f99e910feba8054410f8784af6ec823b2efa5ff1",
+  "created_at": "2026-02-04T21:15:41.014288",
+  "updated_at": "2026-02-04T21:15:41.014292"
+}
