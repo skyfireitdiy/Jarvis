@@ -337,6 +337,29 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             )
 
             return fix_prompt, False
+        elif tag == "Commit":
+            # 处理代码提交命令（仅在 code agent 中可用）
+            if not hasattr(agent, "start_commit"):
+                PrettyOutput.auto_print("⚠️ Commit 命令仅在 code agent 中可用。")
+                return "", True
+
+            from jarvis.jarvis_utils.git_utils import (
+                handle_commit_workflow,
+                get_latest_commit_hash,
+            )
+
+            PrettyOutput.auto_print("📝 正在提交代码...")
+            commited = handle_commit_workflow()
+            if commited:
+                new_commit = get_latest_commit_hash()
+                agent.start_commit = new_commit
+                PrettyOutput.auto_print(
+                    f"✅ 代码已提交，新的起始 commit: {new_commit[:12]}"
+                )
+            else:
+                PrettyOutput.auto_print("❌ 提交失败或已取消")
+
+            return "", True
 
         elif tag == "Pin":
             # Pin标记已在前面处理，跳过
