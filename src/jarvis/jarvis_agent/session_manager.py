@@ -54,7 +54,7 @@ class SessionManager:
         Returns:
             会话文件路径列表，按文件名排序。
         """
-        session_dir = os.path.join(os.getcwd(), ".jarvis")
+        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
         if not os.path.exists(session_dir):
             return []
 
@@ -70,7 +70,18 @@ class SessionManager:
         )
 
         files = sorted(glob.glob(pattern))
-        return files
+
+        # 过滤掉辅助文件（commit文件和tasklist文件）
+        session_files = []
+        for f in files:
+            basename = os.path.basename(f)
+            # 排除 _commit.json 和 _tasklist.json 结尾的辅助文件
+            if not (
+                basename.endswith("_commit.json") or basename.endswith("_tasklist.json")
+            ):
+                session_files.append(f)
+
+        return session_files
 
     def _extract_timestamp(self, filename: str) -> Optional[str]:
         """
@@ -119,7 +130,7 @@ class SessionManager:
 
     def save_session(self) -> bool:
         """Saves the current session state to a file."""
-        session_dir = os.path.join(os.getcwd(), ".jarvis")
+        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
         os.makedirs(session_dir, exist_ok=True)
         platform_name = self.model.platform_name()
         model_name = self.model.name().replace("/", "_").replace("\\", "_")
