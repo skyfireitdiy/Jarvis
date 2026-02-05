@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import threading
+import time
 from typing import Any
 from typing import Callable
 from typing import Dict
@@ -168,11 +169,12 @@ class StreamableMcpClient(McpClient):
                 # If endpoint_path is empty, use base_url directly (keep trailing slash if present)
                 mcp_url = self.base_url.rstrip("/") + "/"
 
-            # 所有请求都使用流式传输，因为服务器返回SSE格式
-            use_stream = True
+            # 添加会话头
+            if self.mcp_session_id:
+                self.session.headers["Mcp-Session-Id"] = self.mcp_session_id
 
             response = self.session.post(
-                mcp_url, json=request, stream=use_stream, timeout=self.timeout
+                mcp_url, json=request, timeout=self.timeout
             )
 
             # 保存 MCP 会话ID（如果存在）
@@ -206,58 +208,60 @@ class StreamableMcpClient(McpClient):
             warning_lines = []
             error_lines = []
 
-            if use_stream:
-                # 处理流式响应（SSE格式）
-                for line in response.iter_lines(decode_unicode=True):
-                    if not line:
-                        continue
-                    try:
-                        line_str = (
-                            line.decode("utf-8") if isinstance(line, bytes) else line
-                        )
-                        # 处理SSE格式：id:, event:, data: 等
-                        if line_str.startswith("data:"):
-                            # 提取data字段的内容
-                            line_data = line_str.split(":", 1)[1].strip()
-                            try:
-                                data = json.loads(line_data)
-                                if "id" in data and data["id"] == req_id:
-                                    # 这是我们的请求响应
+            # 处理响应
+            result = None
+            warning_lines = []
+            error_lines = []
+            
+            # 检查响应是否为SSE格式
+            content_type = response.headers.get('content-type', '')
+            
+            if 'text/event-stream' in content_type.lower():
+                # 处理SSE格式响应
+                response_text = response.text
+                for line in response_text.splitlines():
+                    line = line.strip()
+                    if line.startswith('data:'):
+                        try:
+                            data_str = line[5:].strip()
+                            if data_str:
+                                data = json.loads(data_str)
+                                if 'id' in data and data['id'] == req_id:
                                     result = data
                                     break
-                                elif "method" in data:
-                                    # 这是一个通知
-                                    notify_method = data.get("method", "")
-                                    params = data.get("params", {})
-                                    if notify_method in self.notification_handlers:
-                                        for handler in self.notification_handlers[
-                                            notify_method
-                                        ]:
-                                            try:
-                                                handler(params)
-                                            except Exception as e:
-                                                error_lines.append(
-                                                    f"处理通知时出错 ({notify_method}): {e}"
-                                                )
-                            except json.JSONDecodeError:
-                                # 如果不是JSON，跳过
-                                continue
-                        # 跳过其他SSE字段（id:, event: 等）
-                        elif line_str.startswith(("id:", "event:", "retry:")):
+                        except json.JSONDecodeError:
                             continue
-                        else:
-                            # 尝试直接解析为JSON（非SSE格式）
-                            try:
-                                data = json.loads(line_str)
-                                if "id" in data and data["id"] == req_id:
-                                    result = data
-                                    break
-                            except json.JSONDecodeError:
-                                continue
-                    except Exception as e:
-                        warning_lines.append(f"无法解析响应行: {line}, 错误: {e}")
-                        continue
             else:
+                # 直接解析为JSON
+                try:
+                    result = response.json()
+                except json.JSONDecodeError as e:
+                    error_lines.append(f"JSON解析失败: {e}")
+                    warning_lines.append(f"响应内容: {response.text[:200]}...")
+            
+            if result is None:
+                # 尝试从响应文本中提取
+                response_text = response.text
+                if response_text.strip():
+                    # 查找包含我们请求ID的JSON对象
+                    import re
+                    pattern = r'"id":\s*"' + re.escape(req_id) + r'"'
+                    if re.search(pattern, response_text):
+                        # 尝试解析整个响应
+                        try:
+                            lines = response_text.split('\n')
+                            for line in lines:
+                                line = line.strip()
+                                if line.startswith('data:'):
+                                    try:
+                                        data = json.loads(line[5:])
+                                        if data.get('id') == req_id:
+                                            result = data
+                                            break
+                                    except:
+                                        continue
+                        except:
+                            pass
                 # 处理非流式响应（用于初始化请求）
                 # 即使是非流式请求，服务器也可能返回SSE格式的响应
                 try:
