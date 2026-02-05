@@ -986,7 +986,7 @@ class Agent:
                 return True  # 没有任务列表，视为成功
 
             # 构建文件路径（与会话文件相同的前缀）
-            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
             os.makedirs(session_dir, exist_ok=True)
 
             platform_name = self.model.platform_name()
@@ -1024,7 +1024,7 @@ class Agent:
 
         # 如果当前是CodeAgent，额外保存start_commit信息到单独的文件
         if hasattr(self, "start_commit") and self.start_commit is not None:
-            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
             os.makedirs(session_dir, exist_ok=True)
             platform_name = self.model.platform_name()
             model_name = self.model.name().replace("/", "_").replace("\\", "_")
@@ -1077,7 +1077,7 @@ class Agent:
                 # 旧格式：不包含时间戳
                 commit_filename = f"{base_name}_commit.json"
 
-            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
             commit_file = os.path.join(session_dir, commit_filename)
 
             try:
@@ -1116,7 +1116,7 @@ class Agent:
 
         try:
             # 构建文件路径（与保存时相同的前缀）
-            session_dir = os.path.join(os.getcwd(), ".jarvis")
+            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
             platform_name = self.model.platform_name()
             model_name = self.model.name().replace("/", "_").replace("\\", "_")
             tasklist_file = os.path.join(
