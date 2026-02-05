@@ -207,9 +207,9 @@ class AgentRunLoop:
                             f"⚠️ 当前消息过长 (占{message_ratio * 100:.1f}%)，进行截断处理"
                         )
 
-                        # 截断策略：保留前50%和后20%
+                        # 截断策略：保留前后20%
                         content_length = len(current_prompt)
-                        keep_start = int(content_length * 0.5)
+                        keep_start = int(content_length * 0.2)
                         keep_end = max(1, int(content_length * 0.2))
 
                         truncated_prompt = (
