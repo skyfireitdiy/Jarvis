@@ -321,9 +321,426 @@ def run_with_agent(
     )
 
 
+# ---------------------------
+# 外部格式分析支持
+# ---------------------------
+
+
+def _validate_format(data: Any) -> bool:
+    """
+    验证外部数据是否符合标准 Issue 格式。
+
+    标准格式：
+    {
+        "issues": [
+            {
+                "language": "c",
+                "category": "memory",
+                "pattern": "strcpy",
+                "file": "src/main.c",
+                "line": 42,
+                "evidence": "strcpy(dest, src)",
+                "description": "Unsafe string copy",
+                "suggestion": "Use strncpy instead",
+                "confidence": 0.8,
+                "severity": "high"
+            }
+        ]
+    }
+
+    或者直接是一个数组：[Issue, ...]
+    """
+    if isinstance(data, list):
+        # 直接是数组格式
+        if not data:
+            return False
+        item = data[0]
+        return isinstance(item, dict) and all(
+            k in item
+            for k in [
+                "language",
+                "category",
+                "pattern",
+                "file",
+                "line",
+                "evidence",
+                "description",
+                "suggestion",
+                "confidence",
+            ]
+        )
+    elif isinstance(data, dict):
+        # 对象格式，检查是否有 "issues" 字段
+        if "issues" not in data:
+            return False
+        issues = data["issues"]
+        if not isinstance(issues, list) or not issues:
+            return False
+        item = issues[0]
+        return isinstance(item, dict) and all(
+            k in item
+            for k in [
+                "language",
+                "category",
+                "pattern",
+                "file",
+                "line",
+                "evidence",
+                "description",
+                "suggestion",
+                "confidence",
+            ]
+        )
+    return False
+
+
+def _create_conversion_agent(
+    input_file: str,
+    output_file: str,
+) -> Any:
+    """
+    创建转换 Agent，学习外部文件格式并生成转换脚本。
+
+    参数：
+    - input_file: 外部 JSON 文件路径
+    - output_file: 输出标准格式 JSON 文件路径
+
+    返回：
+    - 转换后的标准格式数据（字典）
+
+    异常：
+    - 转换失败时抛出 RuntimeError
+    """
+    import json
+    import tempfile
+
+    from jarvis.jarvis_agent import Agent
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    # 读取外部文件样本
+    input_path = Path(input_file)
+    if not input_path.exists():
+        raise FileNotFoundError(f"输入文件不存在: {input_file}")
+
+    with input_path.open("r", encoding="utf-8") as f:
+        external_data = json.load(f)
+
+    # 构建转换提示词
+    conversion_prompt = f"""# 任务：格式转换脚本生成
+
+## 目标
+你需要分析外部扫描工具的 JSON 格式，并编写一个 Python 脚本将其转换为标准的安全问题格式。
+
+## 外部数据样本
+```json
+{json.dumps(external_data, indent=2, ensure_ascii=False)[:5000]}
+```
+
+## 标准格式
+```json
+{{
+    "issues": [
+        {{
+            "language": "c",
+            "category": "memory",
+            "pattern": "strcpy",
+            "file": "src/main.c",
+            "line": 42,
+            "evidence": "strcpy(dest, src)",
+            "description": "Unsafe string copy",
+            "suggestion": "Use strncpy instead",
+            "confidence": 0.8,
+            "severity": "high"
+        }}
+    ]
+}}
+```
+
+## 字段映射说明
+- language: 编程语言（c/cpp/rust 等）
+- category: 问题类别（memory/buffer/error_handling 等）
+- pattern: 检测模式（函数名、API调用等）
+- file: 源代码文件路径
+- line: 代码行号（整数）
+- evidence: 问题证据（代码片段）
+- description: 问题描述
+- suggestion: 修复建议
+- confidence: 置信度（0-1 的浮点数）
+- severity: 严重程度（low/medium/high/critical，可选，默认 medium）
+
+## 要求
+1. 编写一个 Python 脚本，读取 `{input_file}`，转换为标准格式，输出到 `{output_file}`
+2. 脚本必须使用 json 库处理 JSON 文件
+3. 如果外部数据中缺少某些字段，使用合理的默认值：
+   - severity: "medium"
+   - confidence: 0.5
+   - language: 从文件扩展名推断（.c/.h -> c, .cpp/.hpp -> cpp, .rs -> rust）
+4. 脚本必须有错误处理（try-except）
+5. 输出完整的可执行 Python 脚本代码，不要包含任何解释文字
+
+## 输出格式
+只输出 Python 脚本代码，不要包含 markdown 标记或其他说明。
+"""
+
+    PrettyOutput.auto_print("📝 [jarvis-sec] 正在学习外部文件格式并生成转换脚本...")
+
+    # 创建 Agent
+    agent = Agent(
+        system_prompt="""你是一个安全扫描格式转换专家。
+你的任务是分析外部扫描工具的JSON格式，并生成Python转换脚本，将其转换为标准的安全问题格式。
+""",
+        name="format_converter",
+        description="安全扫描格式转换专家",
+        use_tools=["read_code", "execute_script"],
+    )
+
+    # 执行转换
+    try:
+        response = agent.run(conversion_prompt)
+
+        # 提取脚本代码（移除可能的 markdown 标记）
+        script = response.strip()
+        if script.startswith("```python"):
+            script = script[9:]
+        if script.startswith("```"):
+            script = script[3:]
+        if script.endswith("```"):
+            script = script[:-3]
+        script = script.strip()
+
+        # 保存转换脚本到临时文件
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".py", delete=False, encoding="utf-8"
+        ) as f:
+            script_file = f.name
+            f.write(script)
+
+        PrettyOutput.auto_print(f"🔧 [jarvis-sec] 转换脚本已生成: {script_file}")
+
+        # 执行转换脚本
+        import subprocess
+
+        result = subprocess.run(
+            ["python3", script_file],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        # 清理临时脚本文件
+        try:
+            Path(script_file).unlink()
+        except Exception:
+            pass
+
+        if result.returncode != 0:
+            raise RuntimeError(f"转换脚本执行失败: {result.stderr}")
+
+        PrettyOutput.auto_print(f"✅ [jarvis-sec] 格式转换成功: {output_file}")
+
+        # 读取转换后的数据
+        output_path = Path(output_file)
+        with output_path.open("r", encoding="utf-8") as f:
+            converted_data = json.load(f)
+
+        return converted_data
+
+    except Exception as e:
+        raise RuntimeError(f"格式转换失败: {e}") from e
+
+
+def analyze_from_json(
+    input_file: str,
+    cluster_limit: int = 50,
+    enable_verification: bool = True,
+    force_save_memory: bool = False,
+    output_file: Optional[str] = None,
+) -> str:
+    """
+    从外部 JSON 文件分析安全问题。
+
+    支持两种模式：
+    1. 标准格式：直接分析
+    2. 非标准格式：自动创建 Agent 学习格式并转换
+
+    参数：
+    - input_file: 外部 JSON 文件路径
+    - cluster_limit: 聚类时每批次最多处理的告警数（默认 50）
+    - enable_verification: 是否启用二次验证（默认 True）
+    - force_save_memory: 是否强制保存记忆（默认 False）
+    - output_file: 输出报告文件路径（可选）
+    - max_retries: 格式转换最大重试次数（默认 3）
+
+    返回：
+    - 最终报告（字符串）
+
+    异常：
+    - 转换失败超过最大重试次数时抛出 RuntimeError
+    """
+    import json
+    import tempfile
+
+    from jarvis.jarvis_utils.output import PrettyOutput
+
+    input_path = Path(input_file)
+    if not input_path.exists():
+        raise FileNotFoundError(f"输入文件不存在: {input_file}")
+
+    # 读取外部数据
+    with input_path.open("r", encoding="utf-8") as f:
+        external_data = json.load(f)
+
+    # 检查格式
+    if _validate_format(external_data):
+        PrettyOutput.auto_print("✅ [jarvis-sec] 检测到标准格式，直接分析")
+        candidates = (
+            external_data
+            if isinstance(external_data, list)
+            else external_data["issues"]
+        )
+    else:
+        PrettyOutput.auto_print("⚠️  [jarvis-sec] 检测到非标准格式，启动智能转换")
+
+        # 尝试格式转换（无限重试直到用户取消）
+        retries = 0
+        converted_data = None
+
+        while True:
+            try:
+                # 创建临时输出文件
+                temp_output = ""
+                with tempfile.NamedTemporaryFile(  # type: ignore[arg-type]
+                    mode="w", suffix=".json", delete=False, encoding="utf-8"
+                ) as f:
+                    temp_output = f.name
+
+                # 执行转换
+                converted_data = _create_conversion_agent(str(input_path), temp_output)
+
+                # 验证转换结果
+                if not _validate_format(converted_data):
+                    raise RuntimeError("转换后的格式仍然不符合标准")
+
+                # 提取 candidates 列表
+                if isinstance(converted_data, list):
+                    candidates = converted_data
+                else:
+                    candidates = converted_data.get("issues", [])
+
+                # 保存转换后的文件用于后续使用
+                converted_output = (
+                    input_path.parent / f"{input_path.stem}_converted.json"
+                )
+                with Path(converted_output).open("w", encoding="utf-8") as f:
+                    json.dump(converted_data, f, indent=2, ensure_ascii=False)
+                PrettyOutput.auto_print(
+                    f"💾 [jarvis-sec] 转换结果已保存: {converted_output}"
+                )
+
+                break
+
+            except Exception as e:
+                retries += 1
+                PrettyOutput.auto_print(
+                    f"❌ [jarvis-sec] 格式转换失败 (第 {retries} 次尝试): {e}"
+                )
+
+                # 询问用户是否重试
+                PrettyOutput.auto_print(
+                    "\n🤔 [jarvis-sec] 格式转换失败，是否继续重试？"
+                )
+                user_input = input("请输入 'y' 继续重试，或其他键取消: ")
+
+                if user_input.lower() != "y":
+                    PrettyOutput.auto_print("❌ [jarvis-sec] 用户取消操作")
+                    raise RuntimeError("用户取消格式转换") from e
+
+                PrettyOutput.auto_print("🔄 [jarvis-sec] 正在重试...")
+
+    # 导入必要的模块
+    from jarvis.jarvis_sec.utils import prepare_candidates as _prepare_candidates
+    from jarvis.jarvis_sec.clustering import (
+        process_clustering_phase as _process_clustering_phase,
+    )
+    from jarvis.jarvis_sec.verification import (
+        process_verification_phase as _process_verification_phase,
+    )
+    from jarvis.jarvis_sec.file_manager import save_candidates
+    from jarvis.jarvis_sec.report import build_json_and_markdown
+
+    # 创建临时分析目录
+    with tempfile.TemporaryDirectory() as temp_dir:
+        sec_dir = Path(temp_dir)
+
+        # 保存候选到 candidates.jsonl
+        compact_candidates = _prepare_candidates(candidates)
+        save_candidates(sec_dir, compact_candidates)
+
+        PrettyOutput.auto_print(
+            f"📊 [jarvis-sec] 已加载 {len(compact_candidates)} 个安全问题"
+        )
+
+        # 创建状态管理器（空实现）
+        class DummyStatusManager:
+            def update_clustering(self, **kwargs):
+                pass
+
+            def update_verification(self, **kwargs):
+                pass
+
+        status_mgr = DummyStatusManager()
+
+        # 进度回调（空实现）
+        def _progress_append(event):
+            pass
+
+        # 创建报告写入函数
+        def _append_report(record):
+            pass
+
+        # 聚类阶段
+        cluster_batches, invalid_clusters = _process_clustering_phase(
+            compact_candidates,
+            ".",  # entry_path（可以不是真实路径）
+            [],  # languages
+            cluster_limit,
+            sec_dir,
+            status_mgr,
+            _progress_append,
+            force_save_memory=force_save_memory,
+        )
+
+        # 验证阶段
+        all_issues = _process_verification_phase(
+            cluster_batches,
+            ".",
+            [],
+            sec_dir,
+            status_mgr,
+            _progress_append,
+            _append_report,
+            enable_verification=enable_verification,
+            force_save_memory=force_save_memory,
+        )
+
+        # 生成最终报告
+        result = build_json_and_markdown(all_issues, sec_dir)
+
+        # 保存到输出文件（如果指定）
+        if output_file:
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with output_path.open("w", encoding="utf-8") as f:
+                f.write(result)
+            PrettyOutput.auto_print(f"📄 [jarvis-sec] 报告已保存: {output_file}")
+
+        return result
+
+
 __all__ = [
     "Issue",
     "direct_scan",
     "format_markdown_report",
     "run_with_agent",
+    "analyze_from_json",
 ]
