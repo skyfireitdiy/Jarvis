@@ -163,3 +163,5 @@ coverage.xml
 .jarvis/knowledge_graph
 goals
 site
+.jarvis/sessions
+
