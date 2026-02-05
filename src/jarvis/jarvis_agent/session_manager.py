@@ -71,13 +71,16 @@ class SessionManager:
 
         files = sorted(glob.glob(pattern))
 
-        # 过滤掉辅助文件（commit文件和tasklist文件）
+        # 过滤掉辅助文件（commit文件、tasklist文件、state文件、codeagent文件）
         session_files = []
         for f in files:
             basename = os.path.basename(f)
-            # 排除 _commit.json 和 _tasklist.json 结尾的辅助文件
+            # 排除 _commit.json、_tasklist.json、_state.json 和 _codeagent.json 结尾的辅助文件
             if not (
-                basename.endswith("_commit.json") or basename.endswith("_tasklist.json")
+                basename.endswith("_commit.json")
+                or basename.endswith("_tasklist.json")
+                or basename.endswith("_state.json")
+                or basename.endswith("_codeagent.json")
             ):
                 session_files.append(f)
 

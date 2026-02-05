@@ -1051,6 +1051,9 @@ class Agent:
         # 保存任务列表（如果存在）
         self._save_task_lists()
 
+        # 保存SessionManager和Agent运行时状态
+        self._save_agent_state(timestamp)
+
         # 会话保存成功即可返回 True，任务列表保存失败不影响主流程
         return session_saved
 
@@ -1099,9 +1102,193 @@ class Agent:
         # 恢复任务列表（如果存在）
         self._restore_task_lists()
 
+        # 恢复SessionManager和Agent运行时状态
+        self._restore_agent_state()
+
         if session_restored:
             self.first = False
         return session_restored
+
+    def _save_agent_state(self, timestamp: str) -> None:
+        """保存SessionManager和Agent运行时状态到文件。
+
+        Args:
+            timestamp: 会话时间戳，用于生成文件名
+        """
+        import json
+
+        session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
+        os.makedirs(session_dir, exist_ok=True)
+        platform_name = self.model.platform_name()
+        model_name = self.model.name().replace("/", "_").replace("\\", "_")
+
+        # 构建状态文件路径
+        state_file = os.path.join(
+            session_dir,
+            f"saved_session_{self.name}_{platform_name}_{model_name}_{timestamp}_state.json",
+        )
+
+        # 构建要保存的状态数据
+        state_data = {
+            "session_manager": {
+                "prompt": self.session.prompt,
+                "user_data": self.session.user_data,
+                "addon_prompt": self.session.addon_prompt,
+                "conversation_length": self.session.conversation_length,
+                "non_interactive": self.session.non_interactive,
+            },
+            "agent_runtime": {
+                "addon_prompt_skip_rounds": getattr(
+                    self, "_addon_prompt_skip_rounds", 0
+                ),
+                "no_tool_call_count": getattr(self, "_no_tool_call_count", 0),
+                "last_response_content": getattr(self, "_last_response_content", ""),
+                "recent_memories": getattr(self, "recent_memories", []),
+                "MAX_RECENT_MEMORIES": getattr(self, "MAX_RECENT_MEMORIES", 10),
+            },
+            "metadata": {
+                "agent_name": self.name,
+                "platform_name": platform_name,
+                "model_name": model_name,
+                "timestamp": datetime.datetime.now().isoformat(),
+            },
+        }
+
+        # 如果是CodeAgent，额外保存CodeAgent特定状态
+        if hasattr(self, "start_commit"):
+            state_data["codeagent"] = {
+                "disable_review": getattr(self, "disable_review", False),
+                "review_max_iterations": getattr(self, "review_max_iterations", 3),
+                "tool_group": getattr(self, "tool_group", "default"),
+                "root_dir": getattr(self, "root_dir", os.getcwd()),
+            }
+
+        # 保存RulesManager状态（已激活的规则列表）
+        if hasattr(self, "rules_manager") and self.rules_manager:
+            state_data["rules_manager"] = {
+                "loaded_rules": list(
+                    getattr(self.rules_manager, "loaded_rules", set())
+                ),
+                "active_rules": list(
+                    getattr(self.rules_manager, "_active_rules", set())
+                ),
+            }
+
+        try:
+            with open(state_file, "w", encoding="utf-8") as f:
+                json.dump(state_data, f, ensure_ascii=False, indent=2)
+            PrettyOutput.auto_print(f"✅ Agent状态已保存")
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 保存Agent状态失败: {e}")
+
+    def _restore_agent_state(self) -> None:
+        """从文件恢复SessionManager和Agent运行时状态。"""
+        import json
+
+        try:
+            # 提取时间戳
+            if not self.session.last_restored_session:
+                return
+
+            session_file = os.path.basename(self.session.last_restored_session)
+            timestamp = self.session._extract_timestamp(session_file)
+
+            if not timestamp:
+                PrettyOutput.auto_print("ℹ️ 会话文件无时间戳，跳过状态恢复")
+                return
+
+            # 构建状态文件路径
+            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
+            platform_name = self.model.platform_name()
+            model_name = self.model.name().replace("/", "_").replace("\\", "_")
+            state_file = os.path.join(
+                session_dir,
+                f"saved_session_{self.name}_{platform_name}_{model_name}_{timestamp}_state.json",
+            )
+
+            if not os.path.exists(state_file):
+                PrettyOutput.auto_print(f"ℹ️ 未找到状态文件，跳过状态恢复")
+                return
+
+            # 从文件加载状态数据
+            with open(state_file, "r", encoding="utf-8") as f:
+                state_data = json.load(f)
+
+            # 恢复SessionManager状态
+            session_manager_state = state_data.get("session_manager", {})
+            if session_manager_state:
+                self.session.prompt = session_manager_state.get("prompt", "")
+                self.session.user_data = session_manager_state.get("user_data", {})
+                self.session.addon_prompt = session_manager_state.get(
+                    "addon_prompt", ""
+                )
+                self.session.conversation_length = session_manager_state.get(
+                    "conversation_length", 0
+                )
+                self.session.non_interactive = session_manager_state.get(
+                    "non_interactive", False
+                )
+                PrettyOutput.auto_print("✅ SessionManager状态已恢复")
+
+            # 恢复Agent运行时状态
+            agent_runtime_state = state_data.get("agent_runtime", {})
+            if agent_runtime_state:
+                self._addon_prompt_skip_rounds = agent_runtime_state.get(
+                    "addon_prompt_skip_rounds", 0
+                )
+                self._no_tool_call_count = agent_runtime_state.get(
+                    "no_tool_call_count", 0
+                )
+                self._last_response_content = agent_runtime_state.get(
+                    "last_response_content", ""
+                )
+                # 恢复最近记忆队列
+                self.recent_memories = agent_runtime_state.get("recent_memories", [])
+                self.MAX_RECENT_MEMORIES = agent_runtime_state.get(
+                    "MAX_RECENT_MEMORIES", 10
+                )
+                if self.recent_memories:
+                    PrettyOutput.auto_print(
+                        f"✅ 已恢复 {len(self.recent_memories)} 条最近记忆"
+                    )
+                PrettyOutput.auto_print("✅ Agent运行时状态已恢复")
+
+            # 恢复CodeAgent特定状态
+            if hasattr(self, "start_commit"):
+                codeagent_state = state_data.get("codeagent", {})
+                if codeagent_state:
+                    self.disable_review = codeagent_state.get("disable_review", False)
+                    self.review_max_iterations = codeagent_state.get(
+                        "review_max_iterations", 3
+                    )
+                    self.tool_group = codeagent_state.get("tool_group", "default")
+                    self.root_dir = codeagent_state.get("root_dir", os.getcwd())
+                    PrettyOutput.auto_print("✅ CodeAgent配置已恢复")
+
+            # 恢复RulesManager状态（已激活的规则）
+            if hasattr(self, "rules_manager") and self.rules_manager:
+                rules_manager_state = state_data.get("rules_manager", {})
+                if rules_manager_state:
+                    loaded_rules = rules_manager_state.get("loaded_rules", [])
+                    active_rules = rules_manager_state.get("active_rules", [])
+
+                    # 重新激活规则
+                    reactivated_count = 0
+                    for rule_name in active_rules:
+                        try:
+                            if hasattr(self.rules_manager, "activate_rule"):
+                                self.rules_manager.activate_rule(rule_name)
+                                reactivated_count += 1
+                        except Exception:
+                            pass  # 规则可能已不存在，静默失败
+
+                    if reactivated_count > 0:
+                        PrettyOutput.auto_print(
+                            f"✅ 已重新激活 {reactivated_count} 个规则"
+                        )
+
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 恢复Agent状态失败: {e}")
 
     def _restore_task_lists(self) -> bool:
         """从文件恢复当前 Agent 的任务列表。
