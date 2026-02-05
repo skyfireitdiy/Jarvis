@@ -261,7 +261,9 @@ class BasePlatform(ABC):
             else:
                 panel.subtitle = f"[yellow]{current_time} | ({self.get_conversation_turn()}/{threshold}) | 正在回答... (按 Ctrl+C 中断)[/yellow]"
 
-    def _chat_with_pretty_output(self, message: str, start_time: float) -> str:
+    def _chat_with_pretty_output(
+        self, message: str, start_time: float, max_output: int = 0
+    ) -> str:
         """使用 pretty output 模式进行聊天
 
         参数:
@@ -396,6 +398,13 @@ class BasePlatform(ABC):
                 response += s
                 buffer += s
 
+                # 检查是否达到最大输出长度
+                if max_output > 0 and len(response) >= max_output:
+                    interrupted = True
+                    _flush_buffer()
+                    self._append_session_history(message, response)
+                    break
+
                 current_time = time.time()
                 should_update = (
                     len(buffer) >= min_buffer_size
@@ -420,12 +429,15 @@ class BasePlatform(ABC):
 
         return response
 
-    def _chat_with_simple_output(self, message: str, start_time: float) -> str:
+    def _chat_with_simple_output(
+        self, message: str, start_time: float, max_output: int = 0
+    ) -> str:
         """使用简单输出模式进行聊天
 
         参数:
             message: 用户消息
             start_time: 开始时间
+            max_output: 最大输出长度，0表示无限制
 
         返回:
             str: 模型响应
@@ -440,6 +452,10 @@ class BasePlatform(ABC):
         for s in self.chat(message):
             console.print(s, end="")
             response += s
+            # 检查是否达到最大输出长度
+            if max_output > 0 and len(response) >= max_output:
+                self._append_session_history(message, response)
+                return response
             if is_immediate_abort() and get_interrupt():
                 self._append_session_history(message, response)
                 return response
@@ -449,11 +465,12 @@ class BasePlatform(ABC):
         console.print(f"✓ 对话完成耗时: {duration:.2f}秒")
         return response
 
-    def _chat_with_suppressed_output(self, message: str) -> str:
+    def _chat_with_suppressed_output(self, message: str, max_output: int = 0) -> str:
         """使用无人值守模式进行聊天
 
         参数:
             message: 用户消息
+            max_output: 最大输出长度，0表示无限制
 
         返回:
             str: 模型响应
@@ -461,6 +478,10 @@ class BasePlatform(ABC):
         response = ""
         for s in self.chat(message):
             response += s
+            # 检查是否达到最大输出长度
+            if max_output > 0 and len(response) >= max_output:
+                self._append_session_history(message, response)
+                return response
             if is_immediate_abort() and get_interrupt():
                 self._append_session_history(message, response)
                 return response
@@ -483,7 +504,7 @@ class BasePlatform(ABC):
         )
         return response
 
-    def _chat(self, message: str):
+    def _chat(self, message: str, max_output: int = 0):
         import time
 
         start_time = time.time()
@@ -499,9 +520,13 @@ class BasePlatform(ABC):
         # 根据输出模式选择不同的处理方式
         if not self.suppress_output:
             if get_pretty_output():
-                response = self._chat_with_pretty_output(message, start_time)
+                response = self._chat_with_pretty_output(
+                    message, start_time, max_output
+                )
             else:
-                response = self._chat_with_simple_output(message, start_time)
+                response = self._chat_with_simple_output(
+                    message, start_time, max_output
+                )
 
             # 计算响应时间并打印总结
             end_time = time.time()
@@ -529,7 +554,7 @@ class BasePlatform(ABC):
                     f"✅ {self.name()}模型响应完成: {duration:.2f}秒 | 轮次: {self.get_conversation_turn()}/{threshold}"
                 )
         else:
-            response = self._chat_with_suppressed_output(message)
+            response = self._chat_with_suppressed_output(message, max_output)
 
         # 处理响应并保存会话历史
         response = self._process_response(response)
@@ -571,8 +596,16 @@ class BasePlatform(ABC):
 
         return response
 
-    def chat_until_success(self, message: str) -> str:
-        """与模型对话直到成功响应。"""
+    def chat_until_success(self, message: str, max_output: int = 0) -> str:
+        """与模型对话直到成功响应。
+
+        参数:
+            message: 用户消息
+            max_output: 最大输出长度，0表示无限制
+
+        返回:
+            str: 模型响应
+        """
         try:
             # 清除中断标志，确保每次新的对话都从干净的状态开始
             # 这可以防止之前的中断（如Ctrl+C）影响新对话的首次调用
@@ -588,7 +621,9 @@ class BasePlatform(ABC):
             record_user_message(message)
 
             result: str = ""
-            result = while_true(lambda: while_success(lambda: self._chat(message)))
+            result = while_true(
+                lambda: while_success(lambda: self._chat(message, max_output))
+            )
 
             # Check if result is empty or False (retry exhausted)
             # Convert False to empty string for type safety
