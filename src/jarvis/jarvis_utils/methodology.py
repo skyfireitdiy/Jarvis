@@ -245,8 +245,8 @@ def load_methodology(
 注意：只返回<NUM>标签内的内容，不要有其他任何输出。
 """
 
-        # 获取大模型选择的方法论序号
-        response = platform.chat_until_success(selection_prompt).strip()
+        # 获取大模型选择的方法论序号（限制输出最大50字）
+        response = platform.chat_until_success(selection_prompt, max_output=50).strip()
 
         # 重置平台，恢复输出
         platform.reset()
