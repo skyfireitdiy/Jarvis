@@ -852,32 +852,38 @@ def load_config() -> None:
                 str(config_file_path.parent), str(config_file_path)
             )
     else:
-        # 从当前目录开始逐层向上查找所有 .jarvis/config.yaml 文件
-        config_files = _find_all_config_files(os.getcwd())
+        # 始终加载 ~/.jarvis/config.yaml 作为基础配置
+        user_config_path = Path(os.path.expanduser("~/.jarvis/config.yaml"))
+        config_files = []
 
-        if not config_files:
-            # 如果没有找到任何配置文件，使用默认路径
-            config_file_path = Path(os.path.expanduser("~/.jarvis/config.yaml"))
-            if not config_file_path.exists():
-                old_config_file = config_file_path.parent / "env"
-                if old_config_file.exists():  # 旧的配置文件存在
-                    _read_old_config_file(old_config_file)
-                else:
-                    _interactive_config_setup(config_file_path)
-            else:
-                _load_and_process_config(
-                    str(config_file_path.parent), str(config_file_path)
-                )
-        elif len(config_files) == 1:
-            # 只找到一个配置文件，直接加载
-            config_file_path = Path(config_files[0])
+        # 首先添加用户全局配置文件（如果存在）
+        if user_config_path.exists():
+            config_files.append(str(user_config_path))
+        elif (user_config_path.parent / "env").exists():
+            # 旧的配置文件存在
+            _read_old_config_file(user_config_path.parent / "env")
+            return
+        else:
+            # 用户配置文件不存在，需要交互式配置
+            _interactive_config_setup(user_config_path)
+            return
+
+        # 然后查找当前目录及其父目录中的项目配置文件
+        project_config_files = _find_all_config_files(os.getcwd())
+
+        # 将项目配置文件添加到列表中（项目配置会覆盖用户配置）
+        config_files.extend(project_config_files)
+
+        # 合并所有配置文件（后面的覆盖前面的）
+        if len(config_files) == 1:
+            # 只有用户配置文件，直接加载
             _load_and_process_config(
-                str(config_file_path.parent), str(config_file_path)
+                str(user_config_path.parent), str(user_config_path)
             )
         else:
-            # 找到多个配置文件，合并配置（底层覆盖上层）
+            # 有多个配置文件，合并配置（项目配置覆盖用户配置）
             content, merged_config = _merge_configs(config_files)
-            # 使用最底层的配置文件（最后一个）作为主配置文件
+            # 使用最后一个配置文件作为主配置文件
             main_config_file = config_files[-1]
             main_config_dir = str(Path(main_config_file).parent)
 

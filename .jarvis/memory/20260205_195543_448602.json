@@ -1,0 +1,8 @@
+{
+  "id": "20260205_195543_448602",
+  "type": "project_long_term",
+  "tags": ["config", "configuration", "配置管理", "配置合并", "jarvis_config"],
+  "content": "## Jarvis 配置文件合并机制\n\n**核心发现**：当前目录下的 `.jarvis/config.yaml` **不会**和 `~/.jarvis/config.yaml` 合并，即使它们没有父子关系。\n\n**配置加载逻辑**：\n1. 如果用户显式指定配置文件（-f 参数），只加载该文件\n2. 否则，从当前目录开始逐层向上查找所有 `.jarvis/config.yaml` 文件（最多20层）\n3. 如果找到多个配置文件，按从上层到下层的顺序合并（底层覆盖上层）\n4. **关键**：只有在当前目录及其父目录中都没有找到任何 `.jarvis/config.yaml` 文件时，才会使用 `~/.jarvis/config.yaml` 作为默认配置\n\n**结论**：\n- 如果当前目录下有 `.jarvis/config.yaml`，就只会使用这个文件（及其父目录的配置文件），**不会**和 `~/.jarvis/config.yaml` 合并\n- 只有在项目目录下没有任何 `.jarvis/config.yaml` 文件时，才会回退到使用 `~/.jarvis/config.yaml`\n\n**相关代码位置**：\n- 查找逻辑：`src/jarvis/jarvis_utils/utils.py::_find_all_config_files()`\n- 合并逻辑：`src/jarvis/jarvis_utils/utils.py::_merge_configs()`\n- 加载入口：`src/jarvis/jarvis_utils/utils.py::load_config()`",
+  "created_at": "2026-02-05T19:55:43.448626",
+  "updated_at": "2026-02-05T19:55:43.448630"
+}
