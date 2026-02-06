@@ -8,6 +8,7 @@
 """
 
 import os
+import shlex
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -175,8 +176,8 @@ def _format_after_change_command(
 
     # 准备占位符替换字典
     placeholders = {
-        "file_path": abs_file_path,
-        "file_name": os.path.basename(abs_file_path),
+        "file_path": shlex.quote(abs_file_path),
+        "file_name": shlex.quote(os.path.basename(abs_file_path)),
     }
 
     # 替换占位符
