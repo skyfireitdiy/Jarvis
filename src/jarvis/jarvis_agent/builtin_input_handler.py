@@ -343,14 +343,13 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 PrettyOutput.auto_print("⚠️ Commit 命令仅在 code agent 中可用。")
                 return "", True
 
-            from jarvis.jarvis_utils.git_utils import (
-                handle_commit_workflow,
-                get_latest_commit_hash,
-            )
+            from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
+            from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 
             PrettyOutput.auto_print("📝 正在提交代码...")
-            commited = handle_commit_workflow()
-            if commited:
+            git_tool = GitCommitTool()
+            result = git_tool.execute({"root_dir": ".", "prefix": "", "suffix": ""})
+            if result.get("success", False):
                 new_commit = get_latest_commit_hash()
                 agent.start_commit = new_commit
                 PrettyOutput.auto_print(
