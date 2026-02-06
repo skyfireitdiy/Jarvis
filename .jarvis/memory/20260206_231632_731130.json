@@ -1,0 +1,8 @@
+{
+  "id": "20260206_231632_731130",
+  "type": "project_long_term",
+  "tags": ["session", "restore_session", "commit_consistency", "功能改进"],
+  "content": "Session恢复Commit一致性校验改进\n\n问题描述：\n用户反馈恢复session时从未见过commit一致性校验流程，希望无论校验结果如何都显示校验状态。\n\n修改内容：\n- 文件：src/jarvis/jarvis_agent/session_manager.py\n- 方法：_check_commit_consistency()\n- 修改：在commit一致时添加\"✅ Git commit 一致校验通过\"提示（第308行）\n\n原因分析：\n用户未见过校验流程是因为commit一致时会直接返回，不显示任何信息。这是正常行为，但用户体验不佳。\n\n效果：\n- commit一致时：显示\"✅ Git commit 一致校验通过\"\n- commit不一致时：显示原有的警告信息和选项\n- 跳过校验时：不显示额外信息\n\n测试验证：\n- ✅ Python语法检查通过\n- ✅ 静态扫描通过\n- ✅ Git自动提交完成（Commit: 7cd9953）",
+  "created_at": "2026-02-06T23:16:32.731154",
+  "updated_at": "2026-02-06T23:16:32.731158"
+}
