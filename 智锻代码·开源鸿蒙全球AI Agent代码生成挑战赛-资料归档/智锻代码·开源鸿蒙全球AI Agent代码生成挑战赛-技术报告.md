@@ -9,7 +9,7 @@
 
 ## 系统架构设计
 
-Jarvis 系统采用分层架构设计，以通用 Agent 为核心基础，通过继承与组合的方式构建了 CodeAgent、MultiAgent 等增强系统，并在此基础上实现了 jarvis-sec（jsec）和 jarvis-c2rust（jc2r）两个专业应用系统。
+Jarvis 系统采用分层架构设计，以通用 Agent 为核心基础，通过继承的方式构建了 CodeAgent 增强系统，并在此基础上实现了 jarvis-sec（jsec）和 jarvis-c2rust（jc2r）两个专业应用系统。
 
 ### 系统关系总览
 
@@ -29,10 +29,8 @@ package "核心基础层" #LightGreen {
 
 package "功能增强层" #LightYellow {
   class CodeAgent <<代码增强>>
-  class MultiAgent <<多Agent协作>>
   
   Agent <|-- CodeAgent : "继承\n功能扩展"
-  Agent *-- "1..n" MultiAgent : "组合\n聚合多个Agent实例"
   
   note right of CodeAgent
     基于 Agent，叠加代码相关能力：
@@ -40,14 +38,6 @@ package "功能增强层" #LightYellow {
     - 文件编辑工具（edit_file：search/replace 编辑；edit_file_free：基于新代码片段的自由编辑）
     - 文件重写工具（rewrite_file：整文件重写）
     - 变更影响分析
-  end note
-  
-  note right of MultiAgent
-    组合多个 Agent，实现协作：
-    - 消息路由（SEND_MESSAGE）
-    - 上下文传递（交接摘要）
-    - 历史管理（发送后清理）
-    - 以 OutputHandler 形式接入
   end note
 }
 
@@ -97,7 +87,7 @@ package "专业应用层" #LightBlue {
 
 **扩展点**：
 
-- 通过 OutputHandler 协议扩展输出处理能力（如 MultiAgent 的消息路由）
+- 通过 OutputHandler 协议扩展输出处理能力
 - 通过 ToolRegistry 扩展工具能力
 - 通过事件总线实现旁路扩展
 
@@ -120,22 +110,6 @@ package "专业应用层" #LightBlue {
 - 被 jarvis-c2rust 用于代码生成与修复（代码生成实现方法）
 - 独立使用：`jarvis-code-agent`（jca）命令行工具
 
-##### 2.2 MultiAgent（多Agent系统）
-
-**关系**：组合多个 Agent 实例，通过消息通信机制实现多 Agent 协作。
-
-**协作机制**：
-
-- 以 OutputHandler 形式接入每个 Agent 的输出处理链
-- 通过消息发送指令实现消息路由
-- 支持上下文传递（交接摘要）、历史管理（发送后清理）
-- 提供 YAML 配置与 CLI 入口，支持交互与非交互模式
-
-**应用场景**：
-
-- 复杂任务分工协作（如安全演进流水线）
-- 多角色协作（如代码审查、安全评估）
-
 #### 3. 专业应用层
 
 ##### 3.1 jarvis-sec（jsec：安全分析套件）
@@ -144,7 +118,9 @@ package "专业应用层" #LightBlue {
 
 **使用方式**：
 
-- **启发式扫描**：纯 Python 本地扫描，不依赖 Agent
+- **CLI 交互模式**：提供 `config` 和 `scan` 两个子命令，支持配置文件管理（`.jarvis/jsec/config.json`）和零参数执行扫描
+- **启发式扫描**：纯 Python 本地扫描，不依赖 Agent，采用模块化检查器架构
+- **C/C++ 检查器**：按功能域拆分为 6 个独立模块（memory_checker、io_checker、pointer_checker、thread_checker、api_checker、cpp_checker），包含 82 个正则表达式规则，按 9 个类别组织
 - **Agent 验证**：使用 Agent 进行逐条验证（只读工具：代码读取工具/脚本执行工具）
 - **报告聚合**：将 Agent 验证结果聚合为 JSON + Markdown 报告
 
@@ -174,12 +150,19 @@ package "专业应用层" #LightBlue {
   - 测试失败信息反馈：测试失败时获取完整的测试失败信息并通过专门的标签传递给修复Agent
   - 测试代码删除检测：基于事件订阅机制（工具调用前事件和工具调用后事件），在每次工具调用后立即检测测试代码是否被错误删除，若检测到问题则立即回退，确保测试代码不会被意外删除（工具调用前回调方法、工具调用后回调方法，优化器模块中同样实现）
 
+**CLI 交互模式**：提供 `config` 和 `run` 两个子命令，支持配置文件管理（`.jarvis/c2rust/config.json`）和执行转译任务
+
 **工作流程**：
 
 ```
-扫描（scanner）→ 库替代（library_replacer）→ 模块规划（Agent）→ 
+扫描（scanner）→ 库替代评估（library_replacer）→ 模块规划（Agent）→ 
 转译（CodeAgent + Agent）→ 优化（optimizer + CodeAgent）
 ```
+
+- **库替代评估**：评估可用 Rust 标准库和第三方库，决定是使用现有库还是转译 C 实现
+- **模块规划增强**：Agent 生成 crate 模块结构（JSON），智能划分功能模块
+- **转译器优化**：基于 CodeAgent 的代码生成，在单个函数生命周期内复用实例
+- **优化器增强**：基于 CodeAgent 的代码优化，支持测试代码删除检测与回退
 
 **特点**：
 
@@ -190,8 +173,7 @@ package "专业应用层" #LightBlue {
 ### 系统依赖关系总结
 
 1. **继承关系**：CodeAgent 继承自 Agent，扩展代码相关能力
-2. **组合关系**：MultiAgent 组合多个 Agent 实例，实现协作
-3. **使用关系**：
+2. **使用关系**：
    - jarvis-sec 使用 Agent 进行安全分析
    - jarvis-c2rust 使用 Agent 进行规划，使用 CodeAgent 进行代码生成与修复
 4. **工具共享**：所有系统共享工具注册表，使用统一的工具接口（代码读取工具、文件编辑工具/文件重写工具、脚本执行工具等）
@@ -200,7 +182,7 @@ package "专业应用层" #LightBlue {
 
 - **分层清晰**：核心基础 → 功能增强 → 专业应用的清晰分层
 - **高内聚低耦合**：各系统通过标准接口（Agent/CodeAgent API）交互，保持模块边界清晰
-- **可扩展性**：通过继承（CodeAgent）和组合（MultiAgent）实现能力扩展
+- **可扩展性**：通过继承（CodeAgent）实现能力扩展
 - **可复用性**：专业应用系统复用通用 Agent 和 CodeAgent 的能力，避免重复实现
 
 接下来依此对每个模块进行详细说明。
@@ -350,7 +332,8 @@ MainEntry --> Agent : 代理入口
   - 源码位置：AgentRunLoop模块
 - **SessionManager**（会话管理）
   - 图型：状态图（Active↔Persisted(file)；Clear 重置）或活动图（save/restore/clear）
-  - 聚焦：清理历史后"保留系统提示约束"；保存/恢复文件命名与作用域；user_data 存储
+  - 聚焦：基于 SessionRestorable 基类的统一会话持久化架构；支持会话恢复与状态一致性检查（如 Git Commit 验证）；清理历史后"保留系统提示约束"；保存/恢复文件命名与作用域；user_data 存储
+  - **SessionRestorable 基类**：定义会话持久化标准接口，提供统一的 save_session/restore_session 方法，确保所有支持会话恢复的模块（Agent、CodeAgent等）采用一致的状态管理策略
   - 源码位置：SessionManager模块
 - **PromptManager**（提示管理）
   - 图型：数据流/组件图（system_prompt=系统规则+工具提示；addon_prompt=工具规范+记忆引导+完成标记+主动总结标记说明）
@@ -1044,7 +1027,7 @@ Loop --> Agent : 返回最终结果
   5) 执行处理器：调用处理器处理方法
   6) 返回标准协议：`(need_return: bool, tool_prompt: Any)`
 - 返回协议：
-  - `need_return=True`：工具要求立即结束本轮，直接返回结果给用户（如 MultiAgent 的 SEND_MESSAGE）
+  - `need_return=True`：工具要求立即结束本轮，直接返回结果给用户
   - `need_return=False`：工具结果将拼接回上下文，继续下一轮循环
   - 工具提示字段：工具执行结果文本或返回对象
 - 异常处理：工具执行异常被捕获并返回错误信息，不影响主循环稳定
@@ -2160,6 +2143,9 @@ CLI --> CodeAgent : 入口与参数传递
   - 运行入口：通过 `self.run(input)` 启动任务（继承自 Agent）
 
 - CodeAgent 的扩展能力（在 Agent 基础上新增）：
+  - **内置命令处理**：优先识别并执行内置快捷命令（如 @ 触发的操作），避免不必要的工具调用，提升响应效率
+  - **目录树优化**：智能截断目录树输出（max_tree_lines=200），防止大型项目上下文膨胀，确保关键信息优先展示
+  - **会话管理统一架构**：基于 SessionRestorable 基类实现会话持久化，支持会话恢复与状态一致性检查（如 Git Commit 验证）
   - 环境与仓库管理：发现仓库根、更新 .gitignore、处理未提交修改、统一换行符敏感策略（含 Windows 建议）。
   - 代码分析器模块：
     - 上下文管理：维护符号表和依赖图，提供代码上下文查询能力
@@ -3156,456 +3142,6 @@ CA -> CA : 显示提交历史并处理确认
 - 通过"启动参数 + 事件订阅"的最小侵入方式使用 Agent，避免对底层实现的耦合与依赖。
 - 借助 CLI 与配置体系，兼顾交互与非交互场景，提供稳定可控、可扩展的工程化实践路径。
 - 所有增强功能均具备完善的容错机制，确保单个功能失败不影响主流程。
-
-### MultiAgent 系统架构设计
-
-本章节围绕多智能体协作组件 MultiAgent，基于源码进行结构化设计说明，聚焦"如何在多个 Agent 之间进行消息路由与协作"，并说明与 Agent 的集成方式、消息协议、运行流程、容错机制与配置参数。本章节不展开 Agent 的内部实现细节。
-
-- 源码位置：`src/jarvis/jarvis_multi_agent/`
-  - 初始化模块：MultiAgent 核心实现（消息路由、Agent 构造、运行循环）
-  - 主入口模块：Typer CLI 入口，支持 YAML 配置文件启动
-- 相关组件与工具：
-  - Agent（对话与工具执行的统一入口）
-  - OutputHandler（输出处理器协议；MultiAgent 为其实现之一）
-  - ToolRegistry（工具注册表，包含 edit_file/rewrite_file 等文件编辑工具）
-  - PrettyOutput（统一输出）
-  - JSON（SEND_MESSAGE 解析，支持 JSON5 语法）
-  - YAML（配置文件读取）
-
-#### 1. 设计目标与总体思路
-
-- 面向协作的消息路由：提供跨 Agent 的消息发送能力与基本的校验、修复建议，降低多智能体协作的格式/路由错误率。
-- 低耦合集成：以 OutputHandler 形式接入 Agent 输出处理链，与 ToolRegistry/编辑器保持并列关系，不改变 Agent 的主循环逻辑。
-- 一致的交互体验：统一的 SEND_MESSAGE 消息格式与提示，约束“每轮仅发送一个消息”，并提供明确的错误定位与修复指引。
-- 可读与可追溯：发送前可选生成“交接摘要”，携带上下文关键信息；支持“发送后清理历史”以降低单体上下文压力。
-- 安全稳健：对字段缺失、类型不符、目标不存在、JSON 解析失败、多消息块等进行诊断与容错，明确反馈并不中断整体流程。
-
-#### 2. 结构组成（PlantUML）
-
-下图展示 MultiAgent 与其协作组件的静态组成与依赖关系。MultiAgent 以 OutputHandler 的形式加入各个 Agent 的输出处理列表中，并负责在 Agent 之间路由消息。
-
-```plantuml
-@startuml
-!theme vibrant
-title 多智能体结构图（简化）
-
-package "多智能体" #LightGreen {
-  component "多智能体" as MultiAgent
-  component "智能体配置" as AgentsCfg
-  component "通用规则" as CommonSP
-}
-
-package "智能体层" #LightGray {
-  component "主智能体" as AgentMain
-  component "智能体A1" as AgentA1
-  component "智能体A2" as AgentA2
-}
-
-package "输出处理" #Thistle {
-  component "工具列表" as ToolRegistry
-  component "文件修改" as EditHandler
-  component "整文件重写" as RewriteHandler
-  component "多智能体处理" as MAHandler
-}
-
-package "可用工具" #Wheat {
-  component "读取代码" as ToolReadCode
-  component "文件编辑" as ToolEditFile
-  component "文件重写" as ToolRewriteFile
-  component "执行命令" as ToolExec
-  component "网页搜索" as ToolSearch
-  component "记忆（存/取/清）" as ToolMemory
-}
-
-MultiAgent --> AgentsCfg
-MultiAgent --> CommonSP
-
-AgentMain --> ToolRegistry
-AgentMain --> EditHandler
-AgentMain --> RewriteHandler
-AgentMain --> MAHandler
-
-AgentA1 --> ToolRegistry
-AgentA1 --> EditHandler
-AgentA1 --> RewriteHandler
-AgentA1 --> MAHandler
-
-AgentA2 --> ToolRegistry
-AgentA2 --> EditHandler
-AgentA2 --> RewriteHandler
-AgentA2 --> MAHandler
-
-' 智能体可调用以下工具完成开发与协作
-AgentMain --> ToolReadCode
-AgentMain --> ToolEditFile
-AgentMain --> ToolRewriteFile
-AgentMain --> ToolExec
-AgentMain --> ToolSearch
-AgentMain --> ToolMemory
-
-AgentA1 --> ToolReadCode
-AgentA1 --> ToolEditFile
-AgentA1 --> ToolRewriteFile
-AgentA1 --> ToolExec
-AgentA1 --> ToolSearch
-AgentA1 --> ToolMemory
-
-AgentA2 --> ToolReadCode
-AgentA2 --> ToolEditFile
-AgentA2 --> ToolRewriteFile
-AgentA2 --> ToolExec
-AgentA2 --> ToolSearch
-AgentA2 --> ToolMemory
-@enduml
-```
-
-关键点
-
-- MultiAgent 以 OutputHandler 形式存在于每个受管 Agent 的输出处理器链中，负责识别并处理 SEND_MESSAGE 指令。
-- 消息总线角色：MultiAgent 作为 OutputHandler 注入每个智能体，相当于为其接入“消息总线”，使其具备与其他智能体通信的能力；在转发过程中携带并控制部分上下文（如交接摘要），并可按配置进行历史清理，实现“上下文的部分转移与控制”。
-- 每个 Agent 仍通过 ToolRegistry/编辑器等执行代码工程所需的核心工具能力（read_code、edit_file/rewrite_file、execute_script、search_web、memory 工具等）。
-- MultiAgent 仅负责消息路由与必要的补充（如交接摘要），不干预工具执行流程。
-
-#### 3. 消息协议与处理逻辑
-
-##### 3.1 交互原则与格式（面向模型提示）
-
-MultiAgent 通过提示方法为每个 Agent 提供多智能体协作的提示信息，包含：
-
-- **交互原则与策略**：
-  - 单一操作原则：每轮只执行一个操作（工具调用或消息发送），避免并发歧义
-  - 完整性原则：确保消息包含所有必要信息，避免歧义
-  - 明确性原则：清晰表达意图、需求和期望结果
-  - 上下文保留：在消息中包含足够的背景信息，便于接收方继续工作
-- **消息格式标准**：提供标准化的消息模板，包含背景信息、具体需求、相关资源、期望结果、下一步计划等结构化字段
-- **可用智能体资源**：自动列出所有配置的智能体及其描述（基于智能体配置中的名称和描述字段），便于模型选择合适的协作对象
-
-建议的消息格式（示例）：
-
-```
-<SEND_MESSAGE>
-{
-  "to": "目标Agent名称",
-  "content": "# 消息主题\n## 背景信息\n[提供必要的上下文与背景]\n## 具体需求\n[明确表达期望完成的任务]\n## 相关资源\n[列出相关文档、数据或工具]\n## 期望结果\n[描述期望的输出格式和内容]\n## 下一步计划\n[描述下一步的计划和行动]"
-}
-</SEND_MESSAGE>
-```
-
-或反馈结果形式：
-
-```
-<SEND_MESSAGE>
-{
-  "to": "目标Agent名称",
-  "content": "# 任务结果\n[用于反馈的简要结果/结论/产出链接]"
-}
-</SEND_MESSAGE>
-```
-
-##### 3.2 OutputHandler 行为（can_handle/handle）
-
-- can_handle(response)：
-  - 规则：只要检测到起始标签 `<SEND_MESSAGE>` 即认为可处理（使用 `ot("SEND_MESSAGE")` 生成标签）。
-  - 设计理念：宽松检测，严格校验，即使内容有误也由 handle 返回明确错误与修复指导。
-- handle(response, agent)：
-  - 核心流程（基于 `_extract_send_msg` 方法）：
-    1. **换行规范化**：统一处理 CRLF/CR/LF 换行符，确保跨平台兼容。
-    2. **自动补齐结束标签**：若检测到起始标签但缺少结束标签 `</SEND_MESSAGE>`，自动在尾部补齐。
-    3. **正则提取**：使用 DOTALL 模式的正则表达式提取标签间的内容，支持两种模式：
-       - 主要模式：标签各自独占一行，中间包含 JSON 内容
-       - 备用模式：标签与内容在同一行或相邻行
-    4. **JSON 解析**：对提取的每个块尝试 `json.loads`（支持 JSON5 语法），仅保留包含 `to` 和 `content` 字段的字典。
-  - 校验流程（按优先级）：
-    1. **单块检测**：若解析出多个 SEND_MESSAGE 块，返回"一次仅允许一个块"的错误提示。
-    2. **字段校验**：
-       - `to`：必须存在且为字符串类型，非空
-       - `content`：必须存在且为字符串类型，允许空白，支持多行字符串（使用 `\n` 转义）
-       - 缺失或空白字段时返回明确错误与修复示例
-    3. **类型校验**：`to` 和 `content` 必须为字符串类型，否则返回类型错误提示。
-    4. **目标校验**：`to` 必须存在于 `agents_config_map` 的 name 集合中，否则返回可用智能体列表与修复建议。
-  - 错误诊断（针对解析失败）：
-    - 检测是否有起始标签但缺少结束标签，提供补齐建议
-    - 尝试提取原始块并指出 JSON 问题（引号、逗号、大括号等）
-    - 针对常见错误提供具体修复建议与完整示例
-  - 返回：
-    - 成功：`True, {"to": "...", "content": "..."}`
-    - 失败：`False, "错误原因与修复指导"`（包含可用智能体列表、修复示例等）
-
-说明
-
-- 解析前会进行换行规范化，确保跨平台兼容性。
-- 若发现缺少结束标签，会自动在尾部补齐后再尝试解析，尽量给出可操作反馈。
-- 即使 can_handle 判断"可处理"，handle 仍可能因格式/字段错误而返回失败信息（帮助模型自修）。
-- 错误提示包含具体修复示例，提升模型自修成功率。
-
-#### 4. Agent 构造与配置继承
-
-MultiAgent 负责按需延迟构造参与协作的各个 Agent，通过 `_get_agent` 方法实现懒加载策略：
-
-- **受控构造**：当首次需要某个目标智能体时，通过其配置创建 Agent：
-  - `output_handler = [ToolRegistry(), MultiAgent]`
-  - 确保每个 Agent 都具备工具调用（包括 edit_file/rewrite_file 文件编辑工具）和多智能体通信能力
-- **运行形态约束**：
-  - `in_multi_agent=True`：标记多智能体运行环境，避免在非交互模式下自动开启 auto_complete
-  - **非主智能体**：统一设置 `auto_complete=False`，避免多智能体并行时误触发自动交互
-- **系统提示拼接**（按优先级顺序）：
-  1. **公共系统提示**：若 MultiAgent 构造函数中配置了公共系统提示参数，则拼接到该 Agent 的系统提示前部（若 Agent 已有系统提示，则用换行符分隔）
-  2. **Agent自身系统提示**：来自智能体配置中的配置
-  3. **原始问题**：对非主智能体，将"原始问题"作为附加段落拼入系统提示末尾，明确共同目标
-- **命名与检索**：智能体配置映射按名称字段建立索引，便于路由目标校验与构造
-- **实例缓存**：已创建的 Agent 实例缓存在代理字典属性中，避免重复构造
-
-#### 5. 运行与路由流程
-
-##### 5.1 顶层运行与回环（run）
-
-- **初始化**：
-  - 记录 `original_question`（用户原始输入）
-  - 获取 `main_agent` 实例（通过 `_get_agent` 懒加载）
-  - 调用 `agent.run(user_input)` 启动主智能体
-- **循环路由**（while msg 循环）：
-  - **终止条件**：若 `Agent.run` 返回字符串（最终输出），流程结束并返回该字符串。
-  - **消息路由**：若返回字典（来自 `MultiAgent.handle` 的 `{"to", "content"}`），则进行以下处理：
-    1. **交接摘要生成**（可选，基于发送方配置）：
-       - 检查发送方配置中的 `summary_on_send`（默认 True）
-       - 若启用，通过直接模型调用生成交接摘要（`agent.model.chat_until_success`），避免递归：
-         - 基于当前会话的 `session.prompt` 追加多智能体摘要提示
-         - 摘要包含：已完成的主要工作与产出、关键决策及其理由、已知的约束/风险/边界条件、未解决的问题与待澄清点、下一步建议与对目标智能体的具体请求
-         - 若生成失败，摘要置空并继续流程（不中断协作）
-    2. **构造接收方输入**：
-
-       ```
-       from: {last_agent_name}
-       summary_of_sender_work: {summary_text}
-       content: {msg['content']}
-       ```
-
-    3. **目标 Agent 获取/创建**：
-       - 通过 `_get_agent(to_agent_name)` 获取或创建目标 Agent
-       - 若目标不存在，返回错误信息并重试发送方（提示可用智能体列表）
-    4. **发送后清理**（可选）：
-       - 检查发送方配置中的 `clear_after_send_message`
-       - 若为 True，调用 `sender_agent.clear_history()` 清理发送方历史，控制上下文增长
-    5. **切换上下文**：
-       - 更新 `last_agent_name = agent.name`
-       - 调用目标 Agent 的 `run(prompt)`，继续循环
-  - **异常处理**：
-    - 当返回值不为 `str` 也不为 `dict` 时，输出警告（`PrettyOutput.print`）并中止循环（防御性处理）
-
-##### 5.2 时序图（PlantUML）
-
-```plantuml
-@startuml
-!theme plain
-title 路由与协作时序（简化）
-
-actor 用户 as User
-participant "多智能体" as MA
-participant "主智能体" as A0
-participant "目标智能体" as Ai
-participant "其他智能体" as Aj
-
-User -> MA : 运行(原始问题)
-MA -> A0 : 运行(用户输入)
-A0 --> MA : 消息{收件人/内容} 或 文本
-
-alt 发送消息
-  MA -> MA : 生成交接摘要（可选）
-  MA -> Ai : 获取/创建目标\n并运行(包含摘要与内容)
-  Ai --> MA : 文本 或 新消息
-  alt 继续转发
-    MA -> Aj : 获取/创建下一个目标并运行
-    Aj --> MA : 文本 或 新消息
-  end
-else 返回文本
-  MA --> User : 输出结果
-end
-@enduml
-```
-
-说明
-
-- 交接摘要通过直接模型调用（`agent.model.chat_until_success`）完成，不走 Agent 输出处理器链，避免递归循环。
-- 每次仅处理一个 SEND_MESSAGE，保证路由串行、语义清晰。
-- 发送后清理历史是可选的，仅在发送方配置中显式启用时执行，不影响接收方的上下文。
-
-#### 6. 核心工具能力（Agent 工具调用）
-
-多智能体协作以 Agent 为执行单元，核心开发与工程能力通过 Agent 的工具调用完成：
-
-- 代码读取：read_code
-  - 用途：读取源代码文件、带行号，便于精准分析与定位。
-  - 最佳实践：先读后写，按范围读取避免上下文膨胀。
-
-- 文件编辑工具：edit_file / edit_file_free / rewrite_file
-  - edit_file：基于 search/replace 的普通文本编辑，使用精确字符串匹配
-  - edit_file_free：基于新代码片段的自由编辑，自动进行模糊匹配和定位
-  - rewrite_file：整文件重写（大范围生成/重构），原子写与回滚
-  - 建议：优先使用 edit_file 或 edit_file_free，仅在确需整文件重写时使用 rewrite_file
-
-- 命令执行（静态检测等）：execute_script
-  - 用途：执行 lint/静态分析/测试/构建等脚本
-  - 约束：非交互模式下有超时；避免超长输出，配合 rg/grep 做过滤
-  - 建议：修改完成后集中进行一次性静态检查，避免分散多次调用
-
-- Web 搜索：search_web
-  - 用途：检索 API/错误/最佳实践/安全建议等外部信息，辅助决策
-  - 最佳实践：明确查询目标，重要结论做二次验证，可结合记忆工具沉淀
-
-- 记忆工具：save_memory / retrieve_memory / clear_memory
-  - 用途：沉淀项目约定、架构决策、常用命令、方法论；支持按类型/标签检索与清理
-  - 建议：在任务完成或历史清理前按需保存与整理
-
-提示
-
-- MultiAgent 不改变 Agent 的工具调用协议，仅在消息路由完成后继续由目标 Agent 决定是否调用工具与如何处理结果。
-
-#### 7. 参数与配置说明
-
-##### 7.1 MultiAgent 构造函数
-
-- `MultiAgent(agents_config: List[Dict], main_agent_name: str, common_system_prompt: str="")`
-  - `agents_config`：智能体配置列表，每个元素为字典
-  - `main_agent_name`：主智能体名称（首次入口，必须存在于 agents_config 中）
-  - `common_system_prompt`：可选公共系统提示，自动拼接至各 Agent 的 system_prompt 前部
-
-##### 7.2 agents_config 配置项
-
-每个 Agent 的配置字典支持以下字段：
-
-- **必填字段**：
-  - `name`：智能体名称（必填，唯一，用于消息路由目标识别）
-- **可选字段**：
-  - `description`：智能体说明（可选，用于在 `prompt()` 方法中生成"可用智能体资源"提示）
-  - `system_prompt`：该 Agent 的系统提示（可与 `common_system_prompt` 组合）
-  - `summary_on_send`：bool（发送前是否生成交接摘要，默认 True）
-  - `clear_after_send_message`：bool（发送后是否清理发送方历史，默认 False）
-- **自动设置字段**（MultiAgent 运行时自动添加，无需配置）：
-  - `in_multi_agent=True`：标记多智能体运行环境
-  - 非主智能体：`auto_complete=False`（统一禁用，避免并行时误触发自动交互）
-- **其他字段**：所有与 Agent 构造函数兼容的参数均可按需设置（如 `model_name`、`temperature` 等）
-
-##### 7.3 YAML 配置文件格式（CLI 入口）
-
-通过 `main.py` 的 CLI 入口启动时，支持 YAML 配置文件格式：
-
-```yaml
-main_agent: "主智能体名称"
-common_system_prompt: |
-  公共系统提示内容（可选）
-agents:
-  - name: "智能体A"
-    description: "智能体A的说明"
-    system_prompt: |
-      智能体A的系统提示
-    summary_on_send: true
-    clear_after_send_message: false
-    # 其他 Agent 构造参数...
-  - name: "智能体B"
-    description: "智能体B的说明"
-    system_prompt: |
-      智能体B的系统提示
-```
-
-##### 7.4 CLI 启动方式
-
-```bash
-python -m jarvis.jarvis_multi_agent.main \
-  --config config.yaml \
-  --input "用户输入（可选）" \
-  --llm-group "模型组名称（可选）" \
-  --non-interactive  # 非交互模式（必须同时提供 --input）
-```
-
-- `--config, -c`：YAML 配置文件路径（必填）
-- `--input, -i`：用户输入（可选，不提供时交互式输入）
-- `--llm-group, -g`：使用的模型组，覆盖配置文件中的设置
-- `--non-interactive, -n`：启用非交互模式（必须同时提供 `--input`，脚本执行超时限制为5分钟）
-
-#### 8. 可靠性与容错设计
-
-MultiAgent 实现了多层次的容错机制，确保协作流程的稳定性：
-
-- **标签与 JSON 解析**：
-  - 换行规范化：统一处理 CRLF/CR/LF，确保跨平台兼容
-  - 缺失结束标签：自动补齐后再解析，仍失败则给出修复建议与示例
-  - JSON 格式错误：捕获 `json.JSONDecodeError` 异常，返回具体错误原因与验证建议（引号、逗号、大括号等），支持 JSON5 语法（如尾随逗号、注释等）
-  - 双重正则匹配：支持标签独占一行和标签与内容相邻两种模式，提升解析成功率
-- **字段与类型校验**：
-  - 缺失/空白字段（to/content）：明确列出缺失项，提供完整修复示例
-  - 类型错误：返回期望的类型（str）及修复示例
-  - 空值检测：content 允许空白，支持多行字符串（使用 `\n` 转义）
-- **目标校验**：
-  - 不存在的目标：返回可用智能体列表（`agents_config_map.keys()`）与修复建议
-  - 目标不存在时，将错误信息返回给发送方 Agent，让其自行修复或重试
-- **多块检测**：
-  - 一次仅允许一个 SEND_MESSAGE，多个块时提示"合并或分多轮发送"
-  - 通过 `_extract_send_msg` 返回列表长度判断
-- **运行时稳健性**：
-  - 生成交接摘要失败：捕获异常，摘要置空并继续发送（不中断协作流程）
-  - 返回类型异常：使用 `isinstance` 检查，记录警告（`PrettyOutput.print`）并结束循环（防御性收束）
-  - 可选清理：发送后按配置清理发送方历史，控制上下文增长（仅当 `clear_after_send_message=True` 时执行）
-  - Agent 构造失败：返回明确的错误信息，不抛出未捕获异常
-- **错误提示质量**：
-  - 所有错误提示包含具体修复示例，提升模型自修成功率
-  - 错误信息格式化良好，便于模型理解和修复
-
-#### 9. 典型执行流程（端到端，PlantUML）
-
-```plantuml
-@startuml
-!theme vibrant
-title 多智能体协作（端到端，简化）
-
-actor 用户 as User
-participant "多智能体" as MA
-participant "主智能体" as A0
-participant "智能体A1" as A1
-
-User -> MA : 运行(原始问题)
-MA -> A0 : 运行(用户输入)
-A0 --> MA : 文本 或 消息{收件人:A1, 内容}
-
-alt 路由到 A1
-  MA -> MA : 生成交接摘要（可选）
-  MA -> A1 : 运行(来自A0的摘要与内容)
-  A1 --> MA : 文本 或 新消息
-  alt 需要继续
-    MA -> ... : 获取/创建下一个目标并运行
-  else 完成
-    MA --> User : 输出结果
-  end
-else 无需路由
-  MA --> User : 输出结果
-end
-@enduml
-```
-
-特点
-
-- 路由串行清晰；每轮仅处理一个 SEND_MESSAGE。
-- 交接摘要（可选）提升跨 Agent 协作的上下文传递质量。
-- 工具与文件编辑等核心能力由各 Agent 通过自身工具执行完成（read_code、edit_file/rewrite_file、execute_script、search_web、memory 工具等）。
-
-#### 10. 扩展与二次开发建议
-
-- 自定义路由策略：
-  - 目前策略为显式 to 指定目标；可在上层为“没有明确 to 的情况”注入一个调度器智能体负责仲裁。
-- 交接摘要模板：
-  - 可替换或扩展摘要提示模板，以适配不同团队的交接规范（如引入风险等级/合规点/性能指标等）。
-- 发送后策略：
-  - clear_after_send_message 针对历史控制有效；也可扩展为“按 token/轮次阈值”触发清理。
-- 错误教育与自修：
-  - 当前提供格式与字段级修复建议；可扩展为“给出修复后完整块”，提升自修成功率。
-- 可观测性：
-  - 结合日志与统计对跨 Agent 的消息数量、平均跳数、失败原因等指标进行记录与可视化。
-
-#### 11. 总结
-
-- **架构设计**：MultiAgent 以 OutputHandler 方式接入 Agent，负责识别与路由 SEND_MESSAGE，实现多智能体间的明确协作。通过懒加载机制按需构造 Agent，支持配置继承与上下文管理。
-- **工具生态解耦**：保持与 Agent 的工具生态解耦，代码读取、修改/重写、命令执行（静态检测）、Web 搜索与记忆工具等仍通过各 Agent 的工具调用完成。MultiAgent 仅负责消息路由与必要的补充（如交接摘要），不干预工具执行流程。
-- **容错机制**：通过格式约束、字段校验、目标检索、摘要生成与历史清理等机制，提供稳定、可解释、可扩展的多智能体协作能力。错误提示包含具体修复示例，提升模型自修成功率。
-- **工程实践**：提供 YAML 配置文件与 CLI 入口，支持交互与非交互模式，便于集成到自动化流程中。通过配置参数灵活控制协作行为（摘要生成、历史清理等）。
 
 ### jarvis-sec 系统架构设计
 
@@ -8370,34 +7906,6 @@ request_request 是 OpenHarmony 的网络请求管理核心组件，提供了网
    - `test_build_validator_validate_success`：测试构建验证成功
    - `test_build_validator_validate_failure`：测试构建验证失败
    - `test_build_validator_fallback`：测试构建验证回退
-
-##### 2.3 MultiAgent 测试
-
-**测试文件**：`tests/jarvis_multi_agent/test_multi_agent.py`
-
-**测试类**：`TestMultiAgent`
-
-**测试用例**：
-
-1. **初始化测试**
-   - `test_multi_agent_init`：测试 MultiAgent 初始化
-   - `test_multi_agent_init_with_config`：测试带配置的初始化
-   - `test_multi_agent_agent_lazy_loading`：测试 Agent 懒加载
-
-2. **消息路由**
-   - `test_multi_agent_send_message`：测试发送消息
-   - `test_multi_agent_message_routing`：测试消息路由
-   - `test_multi_agent_context_transfer`：测试上下文传递
-
-3. **历史管理**
-   - `test_multi_agent_history_clear_after_send`：测试发送后清理历史
-   - `test_multi_agent_history_preservation`：测试历史保留
-
-4. **协作流程**
-   - `test_multi_agent_collaboration_flow`：测试协作流程
-   - `test_multi_agent_output_handler_integration`：测试输出处理器集成
-
-#### 3. 专业应用层测试用例设计
 
 ##### 3.1 jarvis-sec 测试
 
