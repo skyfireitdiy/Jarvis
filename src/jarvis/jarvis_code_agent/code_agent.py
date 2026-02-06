@@ -1527,13 +1527,17 @@ def cli(
                     # 尝试恢复会话
                     if restore_session:
                         if agent.restore_session():
-                            PrettyOutput.auto_print(
-                                "✅ 已从 .jarvis/saved_session.json 恢复会话。"
-                            )
+                            # 显示实际恢复的session文件名
+                            restored_file = agent.session.last_restored_session
+                            if restored_file:
+                                file_basename = os.path.basename(restored_file)
+                                PrettyOutput.auto_print(
+                                    f"✅ 已从 {file_basename} 恢复会话。"
+                                )
+                            else:
+                                PrettyOutput.auto_print("✅ 会话已恢复。")
                         else:
-                            PrettyOutput.auto_print(
-                                "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
-                            )
+                            PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
                     output_content = agent.run(task, prefix=prefix, suffix=suffix)
                     if agent.non_interactive:
@@ -1557,13 +1561,17 @@ def cli(
                     # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
                     if restore_session or is_auto_resume_session():
                         if agent.restore_session():
-                            PrettyOutput.auto_print(
-                                "✅ 已从 .jarvis/saved_session.json 恢复会话。"
-                            )
+                            # 显示实际恢复的session文件名
+                            restored_file = agent.session.last_restored_session
+                            if restored_file:
+                                file_basename = os.path.basename(restored_file)
+                                PrettyOutput.auto_print(
+                                    f"✅ 已从 {file_basename} 恢复会话。"
+                                )
+                            else:
+                                PrettyOutput.auto_print("✅ 会话已恢复。")
                         else:
-                            PrettyOutput.auto_print(
-                                "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
-                            )
+                            PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
                     while True:
                         user_input = get_multiline_input(
