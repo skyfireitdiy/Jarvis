@@ -339,24 +339,32 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             return fix_prompt, False
         elif tag == "Commit":
             # 处理代码提交命令（仅在 code agent 中可用）
-            if not hasattr(agent, "start_commit"):
+            if not hasattr(agent, "git_manager"):
                 PrettyOutput.auto_print("⚠️ Commit 命令仅在 code agent 中可用。")
                 return "", True
 
-            from jarvis.jarvis_git_utils.git_commiter import GitCommitTool
             from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
 
             PrettyOutput.auto_print("📝 正在提交代码...")
-            git_tool = GitCommitTool()
-            result = git_tool.execute({"root_dir": ".", "prefix": "", "suffix": ""})
-            if result.get("success", False):
-                new_commit = get_latest_commit_hash()
-                agent.start_commit = new_commit
-                PrettyOutput.auto_print(
-                    f"✅ 代码已提交，新的起始 commit: {new_commit[:12]}"
-                )
-            else:
-                PrettyOutput.auto_print("❌ 提交失败或已取消")
+
+            # 获取当前的 end commit
+            end_commit = get_latest_commit_hash()
+
+            # 获取提交历史
+            commits = agent.git_manager.show_commit_history(
+                agent.start_commit, end_commit
+            )
+
+            # 调用 handle_commit_confirmation 处理提交确认
+            # 使用 agent 中存储的 prefix/suffix，不需要额外的后处理函数
+            agent.git_manager.handle_commit_confirmation(
+                commits,
+                agent.start_commit,
+                prefix=agent.prefix,
+                suffix=agent.suffix,
+                agent=agent,
+                post_process_func=lambda files: None,  # 简化实现，不需要后处理
+            )
 
             return "", True
 

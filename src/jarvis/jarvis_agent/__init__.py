@@ -372,6 +372,10 @@ class Agent:
     model: BasePlatform
     session: SessionManager
 
+    # Commit 相关属性（CodeAgent 使用）
+    prefix: str
+    suffix: str
+
     def agent_type(self) -> str:
         """获取Agent类型"""
         return self._agent_type
@@ -1197,6 +1201,8 @@ class Agent:
                 "review_max_iterations": getattr(self, "review_max_iterations", 3),
                 "tool_group": getattr(self, "tool_group", "default"),
                 "root_dir": getattr(self, "root_dir", os.getcwd()),
+                "prefix": getattr(self, "prefix", ""),
+                "suffix": getattr(self, "suffix", ""),
             }
 
         # 保存RulesManager状态（已激活的规则列表）
@@ -1299,6 +1305,8 @@ class Agent:
                     )
                     self.tool_group = codeagent_state.get("tool_group", "default")
                     self.root_dir = codeagent_state.get("root_dir", os.getcwd())
+                    self.prefix = codeagent_state.get("prefix", "")
+                    self.suffix = codeagent_state.get("suffix", "")
                     PrettyOutput.auto_print("✅ CodeAgent配置已恢复")
 
             # 恢复RulesManager状态（已激活的规则）
