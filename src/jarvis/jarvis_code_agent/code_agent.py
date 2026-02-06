@@ -1428,6 +1428,17 @@ def cli(
                     errors="replace",
                 )
                 PrettyOutput.auto_print("✅ 已成功初始化git仓库。")
+
+                # 初始化 .gitignore 文件，包含所有语言的默认忽略规则
+                from jarvis.jarvis_utils.git_utils import (
+                    get_default_gitignore_templates,
+                )
+
+                gitignore_path = ".gitignore"
+                default_templates = get_default_gitignore_templates()
+                with open(gitignore_path, "w", encoding="utf-8", newline="\n") as f:
+                    f.write(default_templates + "\n")
+                PrettyOutput.auto_print("✅ 已创建 .gitignore 并添加各语言默认忽略规则")
             except (subprocess.CalledProcessError, FileNotFoundError) as e:
                 PrettyOutput.auto_print(f"❌ 初始化git仓库失败: {e}")
                 sys.exit(1)
