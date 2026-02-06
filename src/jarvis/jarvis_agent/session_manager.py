@@ -431,7 +431,6 @@ class SessionManager:
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
-                PrettyOutput.auto_print("✅ 会话已恢复。")
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
@@ -450,7 +449,6 @@ class SessionManager:
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
-                PrettyOutput.auto_print("✅ 会话已恢复。")
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
@@ -504,7 +502,6 @@ class SessionManager:
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
-                PrettyOutput.auto_print("✅ 会话已恢复。")
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")

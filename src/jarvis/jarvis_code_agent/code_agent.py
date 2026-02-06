@@ -1534,8 +1534,6 @@ def cli(
                                 PrettyOutput.auto_print(
                                     f"✅ 已从 {file_basename} 恢复会话。"
                                 )
-                            else:
-                                PrettyOutput.auto_print("✅ 会话已恢复。")
                         else:
                             PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
@@ -1568,8 +1566,6 @@ def cli(
                                 PrettyOutput.auto_print(
                                     f"✅ 已从 {file_basename} 恢复会话。"
                                 )
-                            else:
-                                PrettyOutput.auto_print("✅ 会话已恢复。")
                         else:
                             PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 

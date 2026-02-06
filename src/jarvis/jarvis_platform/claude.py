@@ -325,8 +325,6 @@ class ClaudeModel(BasePlatform):
             # 可以根据需要使用start_commit信息
             # atexit.register(self.delete_chat)
             self._saved = True
-
-            PrettyOutput.auto_print(f"✅ 从 {file_path} 成功恢复会话")
             return True
         except FileNotFoundError:
             PrettyOutput.auto_print(f"❌ 会话文件未找到: {file_path}")
