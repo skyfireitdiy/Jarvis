@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # 标准库导入
 import datetime
+import json
 import os
 import platform
 import re
@@ -95,6 +96,41 @@ __all__ = [
     "get_multiline_input",
     "user_confirm",
 ]
+
+
+class SafeEncoder(json.JSONEncoder):
+    """自定义JSON编码器，用于处理不可序列化的对象
+
+    主要用于会话保存时的序列化，处理以下情况：
+    - 函数对象：转换为字符串表示
+    - 其他不可序列化对象：尝试转换为字符串
+    """
+
+    def default(self, obj: Any) -> Any:
+        """处理不可序列化的对象
+
+        参数:
+            obj: 要序列化的对象
+
+        返回:
+            可序列化的对象
+        """
+        # 处理函数对象
+        if callable(obj):
+            # 尝试获取函数名
+            if hasattr(obj, "__name__"):
+                return f"<function:{obj.__name__}>"
+            # 尝试获取类名（对于可调用对象）
+            elif hasattr(obj, "__class__"):
+                return f"<callable:{obj.__class__.__name__}>"
+            else:
+                return "<function>"
+
+        # 对于其他不可序列化的对象，尝试转换为字符串
+        try:
+            return str(obj)
+        except Exception:
+            return "<unserializable_object>"
 
 
 def show_agent_startup_stats(
@@ -1176,8 +1212,8 @@ class Agent:
 
         try:
             with open(state_file, "w", encoding="utf-8") as f:
-                json.dump(state_data, f, ensure_ascii=False, indent=2)
-            PrettyOutput.auto_print(f"✅ Agent状态已保存")
+                json.dump(state_data, f, ensure_ascii=False, indent=2, cls=SafeEncoder)
+            PrettyOutput.auto_print("✅ Agent状态已保存")
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 保存Agent状态失败: {e}")
 

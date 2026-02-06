@@ -1,0 +1,8 @@
+{
+  "id": "20260206_104836_381237",
+  "type": "project_long_term",
+  "tags": ["Bug修复", "序列化", "会话保存", "SafeEncoder"],
+  "content": "## Bug修复: 会话保存时的JSON序列化错误\n\n### 问题描述\n会话保存时出现错误：\"Object of type function is not JSON serializable\"\n\n### 根本原因\n`recent_memories` 列表中可能包含函数对象或其他不可序列化的对象，导致 `json.dump()` 失败。\n\n### 修复方案\n在 `src/jarvis/jarvis_agent/__init__.py` 中实现自定义JSON编码器：\n\n1. **添加 `SafeEncoder` 类**（第101-133行）：\n   - 继承 `json.JSONEncoder`\n   - 重写 `default()` 方法处理不可序列化对象\n   - 函数对象转换为 `<function:function_name>` 格式\n   - 其他对象尝试 `str()` 转换\n\n2. **修改序列化调用**（第1215行）：\n   - 原代码：`json.dump(state_data, f, ensure_ascii=False, indent=2)`\n   - 修改为：`json.dump(state_data, f, ensure_ascii=False, indent=2, cls=SafeEncoder)`\n\n### 影响范围\n- 修改文件：`src/jarvis/jarvis_agent/__init__.py`\n- 新增代码：约35行（SafeEncoder类定义）\n- 修改代码：1行（json.dump调用）\n- 风险等级：低\n\n### 验证结果\n- ✅ 基础测试通过：函数对象可正确序列化为字符串\n- ✅ 场景测试通过：模拟实际会话保存成功\n- ✅ 无副作用：不影响其他JSON序列化场景\n\n### 关键代码片段\n```python\nclass SafeEncoder(json.JSONEncoder):\n    def default(self, obj: Any) -> Any:\n        if callable(obj):\n            if hasattr(obj, '__name__'):\n                return f\"<function:{obj.__name__}>\"\n            elif hasattr(obj, '__class__'):\n                return f\"<callable:{obj.__class__.__name__}>\"\n            else:\n                return \"<function>\"\n        try:\n            return str(obj)\n        except Exception:\n            return \"<unserializable_object>\"\n```\n\n### 最佳实践\n对于包含不可序列化对象的JSON序列化场景，优先使用自定义编码器而非修改数据源，可以降低风险并保持代码简洁。",
+  "created_at": "2026-02-06T10:48:36.381258",
+  "updated_at": "2026-02-06T10:48:36.381263"
+}
