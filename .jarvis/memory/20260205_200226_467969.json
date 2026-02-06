@@ -1,0 +1,15 @@
+{
+  "id": "20260205_200226_467969",
+  "type": "project_long_term",
+  "tags": [
+    "config",
+    "configuration",
+    "配置管理",
+    "配置合并",
+    "bugfix",
+    "已完成"
+  ],
+  "content": "## 配置加载逻辑修复\n\n**问题**：之前在当前目录下找到 `.jarvis/config.yaml` 后，会完全忽略 `~/.jarvis/config.yaml`，导致用户的全局配置失效。\n\n**修复方案**：\n修改 `src/jarvis/jarvis_utils/utils.py` 中的 `load_config()` 函数，使其始终加载 `~/.jarvis/config.yaml` 作为基础配置。\n\n**新的配置加载逻辑**：\n1. 首先加载 `~/.jarvis/config.yaml`（用户全局配置）\n2. 然后查找当前目录及其父目录中的项目配置文件（`.jarvis/config.yaml`）\n3. 将项目配置文件追加到配置列表中\n4. 合并所有配置文件（后面的覆盖前面的，即项目配置覆盖用户配置）\n\n**配置优先级**（从低到高）：\n- `~/.jarvis/config.yaml`（最低优先级）\n- 项目父目录的 `.jarvis/config.yaml`\n- 当前目录的 `.jarvis/config.yaml`（最高优先级）\n\n**向后兼容**：\n- 如果用户显式指定配置文件（`-f` 参数），仍然只加载该文件\n- 保持现有的配置合并逻辑（底层覆盖上层）\n\n**修改位置**：`src/jarvis/jarvis_utils/utils.py` 第 854-908 行",
+  "created_at": "2026-02-05T20:02:26.467994",
+  "updated_at": "2026-02-05T20:02:26.467999"
+}
