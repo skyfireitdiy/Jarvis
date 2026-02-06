@@ -269,15 +269,22 @@ class SessionManager:
             PrettyOutput.auto_print(
                 f"  {idx}. {os.path.basename(file_path)} [{time_str}]"
             )
+        # 添加取消选项
+        PrettyOutput.auto_print("  0. 取消恢复")
 
         try:
-            choice = input("请选择要恢复的会话（输入序号）: ").strip()
+            choice = input("请选择要恢复的会话（输入序号，0取消）: ").strip()
 
             if not choice.isdigit():
                 PrettyOutput.auto_print("❌ 无效的选择。")
                 return False
 
             choice_idx = int(choice) - 1
+            # 选择0表示取消恢复
+            if choice_idx == -1:
+                PrettyOutput.auto_print("⏸️  已取消恢复会话。")
+                return False
+
             if choice_idx < 0 or choice_idx >= len(sessions):
                 PrettyOutput.auto_print("❌ 无效的选择。")
                 return False
