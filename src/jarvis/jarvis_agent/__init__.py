@@ -1104,7 +1104,7 @@ class Agent:
                         # 恢复start_commit信息
                         self.start_commit = commit_data.get("start_commit")
                         PrettyOutput.auto_print(
-                            f"✅ 已恢复commit信息: {self.start_commit[:8] if self.start_commit else 'None'}..."
+                            f"✅ 已恢复start_commit信息: {self.start_commit[:8] if self.start_commit else 'None'}..."
                         )
                 else:
                     PrettyOutput.auto_print(
