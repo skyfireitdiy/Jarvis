@@ -561,7 +561,7 @@ git reset --hard {start_commit}
                     self.session.prompt += final_ret
                     return
 
-            commited = handle_commit_workflow()
+            commited = handle_commit_workflow(start_hash)
             if commited:
                 # 获取提交信息
                 end_hash = get_latest_commit_hash()
