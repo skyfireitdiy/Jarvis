@@ -167,10 +167,15 @@ class SessionManager:
             # 获取当前 commit 和 start_commit（如果有）
             current_commit = get_latest_commit_hash()
 
-            # 获取 start_commit（从 agent 的 user_data 中）
+            # 获取 start_commit（优先从 agent 属性获取，兼容 user_data）
             start_commit = None
             if self.agent:
-                start_commit = self.agent.get_user_data("start_commit")
+                # 优先检查 agent 的 start_commit 属性（CodeAgent 使用这种方式）
+                if hasattr(self.agent, "start_commit"):
+                    start_commit = self.agent.start_commit
+                # 兼容：如果没有属性，尝试从 user_data 获取
+                elif hasattr(self.agent, "get_user_data"):
+                    start_commit = self.agent.get_user_data("start_commit")
 
             # 获取元数据
             agent_name = self.agent_name
