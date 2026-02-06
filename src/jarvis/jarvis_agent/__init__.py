@@ -1062,32 +1062,6 @@ class Agent:
         # 获取时间戳（与会话文件使用相同的时间戳）
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # 如果当前是CodeAgent，额外保存start_commit信息到单独的文件
-        if hasattr(self, "start_commit") and self.start_commit is not None:
-            session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
-            os.makedirs(session_dir, exist_ok=True)
-            platform_name = self.model.platform_name()
-            model_name = self.model.name().replace("/", "_").replace("\\", "_")
-            # 使用与会话文件相同的时间戳，但添加_commit后缀
-            commit_file = os.path.join(
-                session_dir,
-                f"saved_session_{self.name}_{platform_name}_{model_name}_{timestamp}_commit.json",
-            )
-
-            commit_data = {
-                "start_commit": self.start_commit,
-                "agent_name": self.name,
-                "platform_name": platform_name,
-                "model_name": model_name,
-                "timestamp": datetime.datetime.now().isoformat(),
-            }
-
-            try:
-                with open(commit_file, "w", encoding="utf-8") as f:
-                    json.dump(commit_data, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                PrettyOutput.auto_print(f"⚠️ 保存commit信息失败: {e}")
-
         # 保存任务列表（如果存在）
         self._save_task_lists()
 
