@@ -172,9 +172,37 @@ class SessionManager:
             if self.agent:
                 start_commit = self.agent.get_user_data("start_commit")
 
-            # 构建 commit 信息
+            # 获取元数据
+            agent_name = self.agent_name
+            platform_name = self.model.platform_name()
+            model_name = self.model.name().replace("/", "_").replace("\\", "_")
+
+            # 从会话文件路径中提取时间戳
+            import os
+
+            basename = os.path.basename(session_file)
+            parts = (
+                basename.replace("saved_session_", "").replace(".json", "").split("_")
+            )
+            timestamp = parts[-1] if len(parts) >= 4 else None
+            if timestamp and "_" in timestamp:
+                from datetime import datetime
+
+                try:
+                    dt = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+                    timestamp_iso = dt.isoformat()
+                except Exception:
+                    timestamp_iso = timestamp
+            else:
+                timestamp_iso = datetime.now().isoformat()
+
+            # 构建 commit 信息（包含所有字段）
             commit_info = {
                 "current_commit": current_commit,
+                "agent_name": agent_name,
+                "platform_name": platform_name,
+                "model_name": model_name,
+                "timestamp": timestamp_iso,
             }
             if start_commit:
                 commit_info["start_commit"] = start_commit
