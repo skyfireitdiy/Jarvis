@@ -1301,8 +1301,9 @@ class Agent:
                             pass  # 规则可能已不存在，静默失败
 
                     if reactivated_count > 0:
+                        rule_names = ", ".join(active_rules)
                         PrettyOutput.auto_print(
-                            f"✅ 已重新激活 {reactivated_count} 个规则"
+                            f"✅ 已重新激活 {reactivated_count} 个规则: {rule_names}"
                         )
 
         except Exception as e:
