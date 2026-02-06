@@ -361,6 +361,11 @@ class GitManager:
                 }
             )
 
+            # 更新 start_commit 为最新的 commit hash，以便下次提交时使用正确的起始点
+            from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+
+            agent.start_commit = get_latest_commit_hash()
+
             # 在用户接受commit后，根据配置决定是否保存记忆
             if getattr(agent, "force_save_memory", False):
                 agent.memory_manager.prompt_memory_save()
