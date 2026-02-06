@@ -273,22 +273,27 @@ class SessionManager:
         PrettyOutput.auto_print("  0. 取消恢复")
 
         try:
-            choice = input("请选择要恢复的会话（输入序号，0取消）: ").strip()
+            while True:
+                choice = input("请选择要恢复的会话（输入序号，0取消）: ").strip()
 
-            if not choice.isdigit():
-                PrettyOutput.auto_print("❌ 无效的选择。")
-                return False
+                if not choice.isdigit():
+                    PrettyOutput.auto_print("❌ 无效的选择，请输入数字。")
+                    continue
 
-            choice_idx = int(choice) - 1
-            # 选择0表示取消恢复
-            if choice_idx == -1:
-                PrettyOutput.auto_print("⏸️  已取消恢复会话。")
-                return False
+                choice_idx = int(choice) - 1
+                # 选择0表示取消恢复
+                if choice_idx == -1:
+                    PrettyOutput.auto_print("⏸️  已取消恢复会话。")
+                    return False
 
-            if choice_idx < 0 or choice_idx >= len(sessions):
-                PrettyOutput.auto_print("❌ 无效的选择。")
-                return False
+                if choice_idx < 0 or choice_idx >= len(sessions):
+                    PrettyOutput.auto_print(f"❌ 无效的选择，请输入0-{len(sessions)}之间的数字。")
+                    continue
 
+                # 输入有效，跳出循环
+                break
+
+            # 恢复选中的会话
             session_file = sessions[choice_idx][0]
             timestamp = sessions[choice_idx][1]
             time_str = timestamp if timestamp else "(无时间戳)"
