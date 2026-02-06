@@ -703,6 +703,7 @@ def run_cli(
     ),
     restore_session: bool = typer.Option(
         False,
+        "-r",
         "--restore-session",
         help="从 .jarvis/saved_session.json 恢复会话",
     ),

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import glob
+import json
 import os
+import subprocess
 from datetime import datetime
 from typing import TYPE_CHECKING
 from typing import Any
@@ -144,11 +146,49 @@ class SessionManager:
         )
         result = self.model.save(session_file)
 
-        # 保存成功后，清理旧会话文件（最多保留10个）
+        # 保存成功后，保存 commit 信息到辅助文件
         if result:
+            self._save_commit_info(session_file)
+            # 清理旧会话文件（最多保留10个）
             self._cleanup_old_sessions(session_dir)
 
         return result
+
+    def _save_commit_info(self, session_file: str) -> None:
+        """
+        保存 commit 信息到辅助文件。
+
+        Args:
+            session_file: 会话文件路径
+        """
+        try:
+            from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+
+            # 获取当前 commit 和 start_commit（如果有）
+            current_commit = get_latest_commit_hash()
+
+            # 获取 start_commit（从 agent 的 user_data 中）
+            start_commit = None
+            if self.agent:
+                start_commit = self.agent.get_user_data("start_commit")
+
+            # 构建 commit 信息
+            commit_info = {
+                "current_commit": current_commit,
+            }
+            if start_commit:
+                commit_info["start_commit"] = start_commit
+
+            # 写入 _commit.json 文件
+            commit_file = (
+                session_file[:-5] + "_commit.json"
+            )  # 去掉 ".json" 加上 "_commit.json"
+            with open(commit_file, "w", encoding="utf-8") as f:
+                json.dump(commit_info, f, ensure_ascii=False, indent=4)
+
+        except Exception as e:
+            # 保存 commit 信息失败不影响主流程
+            PrettyOutput.auto_print(f"⚠️  保存 commit 信息失败: {e}")
 
     def _cleanup_old_sessions(self, session_dir: str) -> None:
         """
@@ -218,6 +258,117 @@ class SessionManager:
             # 清理过程出错不应影响保存功能
             PrettyOutput.auto_print(f"⚠️  清理旧会话文件时出错: {e}")
 
+    def _check_commit_consistency(self, session_file: str) -> bool:
+        """
+        检查会话文件保存时的 commit 与当前 commit 是否一致。
+
+        Args:
+            session_file: 会话文件路径
+
+        Returns:
+            bool: True 表示一致或用户选择继续，False 表示用户取消
+        """
+        try:
+            # 从 _commit.json 文件读取保存时的 commit
+            commit_file = session_file[:-5] + "_commit.json"
+
+            # 如果 commit 文件不存在，跳过检查
+            if not os.path.exists(commit_file):
+                return True
+
+            with open(commit_file, "r", encoding="utf-8") as f:
+                commit_data = json.load(f)
+
+            saved_commit = commit_data.get("current_commit", "")
+
+            # 如果会话文件中没有保存 commit 信息，跳过检查
+            if not saved_commit:
+                return True
+
+            # 获取当前 HEAD commit
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                current_commit = result.stdout.strip()
+
+                # 如果不在 git 仓库中，跳过检查
+                if result.returncode != 0:
+                    return True
+
+            except Exception:
+                # git 命令执行失败，跳过检查
+                return True
+
+            # 检查 commit 是否一致
+            if saved_commit == current_commit:
+                return True
+
+            # commit 不一致，显示警告并询问用户
+            PrettyOutput.auto_print("")
+            PrettyOutput.auto_print("⚠️  ==============================================")
+            PrettyOutput.auto_print("⚠️  Git Commit 不一致警告")
+            PrettyOutput.auto_print("⚠️  ==============================================")
+            PrettyOutput.auto_print("")
+            PrettyOutput.auto_print(f"会话保存时的 commit: {saved_commit[:12]}")
+            PrettyOutput.auto_print(f"当前 HEAD commit:    {current_commit[:12]}")
+            PrettyOutput.auto_print("")
+            PrettyOutput.auto_print("代码状态可能与会话保存时不一致，这可能导致：")
+            PrettyOutput.auto_print("  • 代码上下文缺失")
+            PrettyOutput.auto_print("  • 引用的文件或函数不存在")
+            PrettyOutput.auto_print("  • 历史对话中的代码引用失效")
+            PrettyOutput.auto_print("")
+
+            # 如果是非交互模式，直接警告并继续
+            if self.non_interactive:
+                PrettyOutput.auto_print("🤖 非交互模式：自动继续恢复（状态可能不一致）")
+                return True
+
+            # 交互模式：询问用户
+            while True:
+                choice = input(
+                    "请选择操作: [1] Reset 到保存的 commit  [2] 继续恢复（可能不一致）: "
+                ).strip()
+
+                if choice == "1":
+                    # 执行 git reset
+                    PrettyOutput.auto_print(
+                        f"正在 reset 到 commit {saved_commit[:12]}..."
+                    )
+                    reset_result = subprocess.run(
+                        ["git", "reset", "--hard", saved_commit],
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    if reset_result.returncode == 0:
+                        PrettyOutput.auto_print("✅ 已成功 reset 到会话保存时的 commit")
+                        return True
+                    else:
+                        PrettyOutput.auto_print(f"❌ Reset 失败: {reset_result.stderr}")
+                        # reset 失败，询问是否继续
+                        cont = input("是否仍然继续恢复会话？[y/N]: ").strip().lower()
+                        if cont in ["y", "yes"]:
+                            PrettyOutput.auto_print("⚠️  继续恢复会话（状态可能不一致）")
+                            return True
+                        else:
+                            return False
+
+                elif choice == "2":
+                    PrettyOutput.auto_print("⚠️  继续恢复会话（状态可能不一致）")
+                    return True
+
+                else:
+                    PrettyOutput.auto_print("❌ 无效的选择，请输入 1 或 2")
+
+        except Exception as e:
+            # 检查过程出错，记录警告但继续恢复
+            PrettyOutput.auto_print(f"⚠️  检查 commit 一致性时出错: {e}")
+            return True
+
     def restore_session(self) -> bool:
         """Restores the session state from a file."""
         sessions = self._parse_session_files()
@@ -234,6 +385,11 @@ class SessionManager:
             PrettyOutput.auto_print(
                 f"📂 恢复会话: {os.path.basename(session_file)} ({time_str})"
             )
+
+            # 检查 commit 一致性
+            if not self._check_commit_consistency(session_file):
+                PrettyOutput.auto_print("⏸️  已取消恢复会话。")
+                return False
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
@@ -287,7 +443,9 @@ class SessionManager:
                     return False
 
                 if choice_idx < 0 or choice_idx >= len(sessions):
-                    PrettyOutput.auto_print(f"❌ 无效的选择，请输入0-{len(sessions)}之间的数字。")
+                    PrettyOutput.auto_print(
+                        f"❌ 无效的选择，请输入0-{len(sessions)}之间的数字。"
+                    )
                     continue
 
                 # 输入有效，跳出循环
@@ -300,6 +458,11 @@ class SessionManager:
             PrettyOutput.auto_print(
                 f"📂 恢复会话: {os.path.basename(session_file)} ({time_str})"
             )
+
+            # 检查 commit 一致性
+            if not self._check_commit_consistency(session_file):
+                PrettyOutput.auto_print("⏸️  已取消恢复会话。")
+                return False
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
