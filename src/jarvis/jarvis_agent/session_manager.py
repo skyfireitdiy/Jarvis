@@ -311,6 +311,9 @@ class SessionManager:
 
             # 如果会话文件中没有保存 commit 信息，跳过检查
             if not saved_commit:
+                PrettyOutput.auto_print(
+                    "ℹ️  Commit文件存在但缺少current_commit字段，跳过一致性校验"
+                )
                 return True
 
             # 获取当前 HEAD commit
