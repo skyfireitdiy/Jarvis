@@ -263,6 +263,11 @@
       "description": "是否保存会话记录",
       "default": false
     },
+    "auto_resume_session": {
+      "type": "boolean",
+      "description": "是否自动恢复会话（启动时自动恢复最近的会话，无需手动选择）",
+      "default": false
+    },
     "skip_predefined_tasks": {
       "type": "boolean",
       "description": "是否跳过预定义任务加载（不读取 pre-command 列表）",
