@@ -36,6 +36,7 @@ from jarvis.jarvis_code_agent.code_analyzer.llm_context_recommender import (
 from jarvis.jarvis_code_agent.worktree_manager import WorktreeManager
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
+from jarvis.jarvis_utils.config import is_auto_resume_session
 from jarvis.jarvis_utils.config import is_confirm_before_apply_patch
 from jarvis.jarvis_utils.config import is_enable_intent_recognition
 from jarvis.jarvis_utils.config import is_use_analysis
@@ -458,7 +459,9 @@ git reset --hard {start_commit}
                 # 非交互模式默认为True（执行分析），交互模式默认为False（不执行分析）
                 should_analyze = user_confirm(
                     "📊 是否对本次任务进行分析并生成方法论？",
-                    default=self.non_interactive,  # 非交互模式默认True，交互模式默认False
+                    default=self.non_interactive
+                    if self.non_interactive is not None
+                    else False,  # 非交互模式默认True，交互模式默认False
                 )
                 if should_analyze:
                     try:
@@ -1410,7 +1413,7 @@ def cli(
             set_config("llm_group", str(llm_group))
         if tool_group:
             set_config("tool_group", str(tool_group))
-        if restore_session:
+        if restore_session or is_auto_resume_session():
             set_config("restore_session", True)
     except Exception:
         # 静默忽略同步异常，不影响主流程
@@ -1551,7 +1554,7 @@ def cli(
                     )
 
                     # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
-                    if restore_session:
+                    if restore_session or is_auto_resume_session():
                         if agent.restore_session():
                             PrettyOutput.auto_print(
                                 "✅ 已从 .jarvis/saved_session.json 恢复会话。"
