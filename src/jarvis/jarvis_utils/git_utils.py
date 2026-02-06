@@ -921,6 +921,85 @@ def _get_new_files() -> List[str]:
     return decode_output(result.stdout).splitlines()
 
 
+def get_default_gitignore_templates() -> str:
+    """获取各语言的默认 .gitignore 模板
+
+    返回:
+        str: 格式化的 .gitignore 内容，按语言分组
+    """
+    # 延迟导入以避免循环依赖
+    from jarvis.jarvis_code_agent.code_analyzer.file_ignore import FileIgnorePatterns
+
+    templates = []
+
+    # Python
+    if FileIgnorePatterns.PYTHON_DIRS or FileIgnorePatterns.PYTHON_VENV_DIRS:
+        templates.append("# Python")
+        templates.extend(sorted(FileIgnorePatterns.PYTHON_DIRS))
+        templates.extend(sorted(FileIgnorePatterns.PYTHON_VENV_DIRS))
+        templates.append("")
+
+    # Rust
+    if FileIgnorePatterns.RUST_DIRS:
+        templates.append("# Rust")
+        templates.extend(sorted(FileIgnorePatterns.RUST_DIRS))
+        templates.append("")
+
+    # Go
+    if FileIgnorePatterns.GO_DIRS:
+        templates.append("# Go")
+        templates.extend(sorted(FileIgnorePatterns.GO_DIRS))
+        templates.append("")
+
+    # Node.js
+    if FileIgnorePatterns.NODE_DIRS:
+        templates.append("# Node.js")
+        templates.extend(sorted(FileIgnorePatterns.NODE_DIRS))
+        templates.append("")
+
+    # Java
+    if FileIgnorePatterns.JAVA_DIRS:
+        templates.append("# Java")
+        templates.extend(sorted(FileIgnorePatterns.JAVA_DIRS))
+        templates.append("")
+
+    # C/C++
+    if FileIgnorePatterns.C_CPP_DIRS:
+        templates.append("# C/C++")
+        templates.extend(sorted(FileIgnorePatterns.C_CPP_DIRS))
+        templates.append("")
+
+    # .NET
+    if FileIgnorePatterns.DOTNET_DIRS:
+        templates.append("# .NET")
+        templates.extend(sorted(FileIgnorePatterns.DOTNET_DIRS))
+        templates.append("")
+
+    # 通用构建产物
+    if FileIgnorePatterns.BUILD_DIRS:
+        templates.append("# Build artifacts")
+        templates.extend(sorted(FileIgnorePatterns.BUILD_DIRS))
+        templates.append("")
+
+    # 依赖目录
+    if FileIgnorePatterns.DEPENDENCY_DIRS:
+        templates.append("# Dependencies")
+        templates.extend(sorted(FileIgnorePatterns.DEPENDENCY_DIRS))
+        templates.append("")
+
+    # IDE 和编辑器
+    if FileIgnorePatterns.OTHER_DIRS:
+        templates.append("# IDE & Editors")
+        templates.extend(sorted(FileIgnorePatterns.OTHER_DIRS))
+        templates.append("")
+
+    # Jarvis 特定
+    templates.append("# Jarvis")
+    templates.extend(sorted(FileIgnorePatterns.dirs))
+
+    return "\n".join(templates)
+
+
 def confirm_add_new_files() -> None:
     """确认新增文件、代码行数和二进制文件"""
     global _confirm_add_new_files_called
@@ -1005,7 +1084,7 @@ def confirm_add_new_files() -> None:
             "是否要添加这些变更（如果不需要请修改.gitignore文件以忽略不需要的文件）？",
             True,
         ):
-            # 用户选择 N：自动将未跟踪文件列表添加到仓库根目录的 .gitignore
+            # 用户选择 N：处理 .gitignore
             try:
                 repo_root_result = subprocess.run(
                     ["git", "rev-parse", "--show-toplevel"],
@@ -1016,6 +1095,48 @@ def confirm_add_new_files() -> None:
             except Exception:
                 repo_root = "."
             gitignore_path = os.path.join(repo_root, ".gitignore")
+
+            # 检查是否需要添加默认的各语言 ignore 模板
+            needs_default_templates = False
+            if os.path.exists(gitignore_path):
+                with open(gitignore_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                # 只检查是否已包含 .jarvis
+                if ".jarvis" not in content:
+                    needs_default_templates = True
+            else:
+                needs_default_templates = True
+
+            # 询问是否添加默认模板
+            if needs_default_templates:
+                PrettyOutput.auto_print(
+                    "ℹ️ 检测到 .gitignore 缺少常见语言默认规则，建议添加以避免跟踪不必要的文件"
+                )
+                if user_confirm("是否添加各语言的默认 .gitignore 规则？", True):
+                    default_templates = get_default_gitignore_templates()
+                    try:
+                        if os.path.exists(gitignore_path):
+                            # 追加模式：检查并补齐换行
+                            with open(gitignore_path, "r", encoding="utf-8") as f:
+                                content = f.read()
+                            needs_newline = content and not content.endswith("\n")
+                            with open(
+                                gitignore_path, "a", encoding="utf-8", newline="\n"
+                            ) as f:
+                                if needs_newline:
+                                    f.write("\n")
+                                f.write("\n" + default_templates + "\n")
+                        else:
+                            # 新建模式
+                            with open(
+                                gitignore_path, "w", encoding="utf-8", newline="\n"
+                            ) as f:
+                                f.write(default_templates + "\n")
+                        PrettyOutput.auto_print("✅ 已添加各语言默认 .gitignore 规则")
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"⚠️ 添加默认 .gitignore 规则失败: {str(e)}"
+                        )
 
             # 仅对未跟踪的新文件进行忽略（已跟踪文件无法通过 .gitignore 忽略）
             files_to_ignore = sorted(set(new_files))
