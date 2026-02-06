@@ -657,8 +657,8 @@ def _run_with_builtin_handler(
     output_content_ref: list,
     exit_code_ref: list,
     error_message_ref: list,
-) -> Tuple[bool, str]:
-    """使用 builtin_input_handler 处理输入，并返回是否需要调用 agent.run 和处理后的输入
+) -> Tuple[str, bool]:
+    """使用 builtin_input_handler 处理输入，并返回处理后的输入和是否需要调用 agent.run
 
     参数:
         user_input: 用户输入
@@ -668,9 +668,9 @@ def _run_with_builtin_handler(
         error_message_ref: 错误信息的引用列表
 
     返回:
-        Tuple[bool, str]: (是否需要调用 agent.run, 处理后的输入)
-            - (True, "") = 跳过 agent.run， builtin handler 已处理
-            - (False, processed_input) = 需要调用 agent.run，传入处理后的输入
+        Tuple[str, bool]: (处理后的输入, 是否需要调用 agent.run)
+            - ("", True) = builtin handler 已处理，跳过 agent.run
+            - (processed_input, False) = 需要调用 agent.run
     """
     processed_input, should_skip_agent = builtin_input_handler(user_input, agent)
     if should_skip_agent:
@@ -678,9 +678,9 @@ def _run_with_builtin_handler(
         output_content_ref[0] = ""
         exit_code_ref[0] = 0
         error_message_ref[0] = ""
-        return True, ""  # 跳过 agent.run
+        return "", True  # 跳过 agent.run
     else:
-        return False, processed_input  # 需要调用 agent.run
+        return processed_input, False  # 需要调用 agent.run
 
 
 @app.callback(invoke_without_command=True)
@@ -1072,7 +1072,7 @@ def run_cli(
             # 优先处理命令行直接传入的任务
             if task:
                 # 先经过 builtin_input_handler 处理
-                should_skip, processed_input = _run_with_builtin_handler(
+                processed_input, should_skip = _run_with_builtin_handler(
                     task, agent, [output_content], [exit_code], [error_message]
                 )
                 if not should_skip:
@@ -1100,7 +1100,7 @@ def run_cli(
                     if tasks and (selected_task := task_manager.select_task(tasks)):
                         PrettyOutput.auto_print(f"ℹ️ 开始执行任务: \n{selected_task}")
                         # 先经过 builtin_input_handler 处理
-                        should_skip, processed_input = _run_with_builtin_handler(
+                        processed_input, should_skip = _run_with_builtin_handler(
                             selected_task,
                             agent,
                             [output_content],
@@ -1117,7 +1117,7 @@ def run_cli(
                     if not user_input:
                         break
                     # 先经过 builtin_input_handler 处理
-                    should_skip, processed_input = _run_with_builtin_handler(
+                    processed_input, should_skip = _run_with_builtin_handler(
                         user_input,
                         agent,
                         [output_content],
