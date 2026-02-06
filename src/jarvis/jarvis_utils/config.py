@@ -953,6 +953,16 @@ def is_save_session_history() -> bool:
     return GLOBAL_CONFIG_DATA.get("save_session_history", False) is True
 
 
+def is_auto_resume_session() -> bool:
+    """
+    是否启用CodeAgent自动恢复会话。
+
+    返回:
+        bool: 如果启用自动恢复会话则返回True, 默认为False
+    """
+    return GLOBAL_CONFIG_DATA.get("auto_resume_session", False) is True
+
+
 def is_immediate_abort() -> bool:
     """
     是否启用立即中断：当在对话过程中检测到用户中断信号时，立即停止输出并返回。
