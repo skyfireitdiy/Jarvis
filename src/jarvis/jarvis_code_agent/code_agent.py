@@ -1536,7 +1536,31 @@ def cli(
                         raise typer.Exit(code=0)
                 else:
                     # 循环任务模式：每次迭代创建新的agent实例，避免任务间污染
-                    is_first_iteration = True
+
+                    # 创建第一个 agent 实例（用于会话恢复和第一条任务）
+                    agent = CodeAgent(
+                        need_summary=False,
+                        append_tools=append_tools,
+                        tool_group=tool_group,
+                        non_interactive=non_interactive,
+                        rule_names=rule_names,
+                        disable_review=disable_review,
+                        review_max_iterations=review_max_iterations,
+                        allow_savesession=True,
+                        optimize_system_prompt=optimize_system_prompt,
+                    )
+
+                    # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
+                    if restore_session:
+                        if agent.restore_session():
+                            PrettyOutput.auto_print(
+                                "✅ 已从 .jarvis/saved_session.json 恢复会话。"
+                            )
+                        else:
+                            PrettyOutput.auto_print(
+                                "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
+                            )
+
                     while True:
                         user_input = get_multiline_input(
                             "请输入你的需求（输入空行退出）"
@@ -1544,7 +1568,14 @@ def cli(
                         if not user_input:
                             raise typer.Exit(code=0)
 
-                        # 每次循环创建新的agent实例
+                        # 使用当前 agent 执行任务
+                        output_content = agent.run(
+                            user_input, prefix=prefix, suffix=suffix
+                        )
+                        if agent.non_interactive:
+                            raise typer.Exit(code=0)
+
+                        # 为下一次循环创建新的 agent 实例（避免任务间污染）
                         agent = CodeAgent(
                             need_summary=False,
                             append_tools=append_tools,
@@ -1556,24 +1587,6 @@ def cli(
                             allow_savesession=True,
                             optimize_system_prompt=optimize_system_prompt,
                         )
-
-                        # 仅在第一次迭代时恢复会话
-                        if is_first_iteration and restore_session:
-                            if agent.restore_session():
-                                PrettyOutput.auto_print(
-                                    "✅ 已从 .jarvis/saved_session.json 恢复会话。"
-                                )
-                            else:
-                                PrettyOutput.auto_print(
-                                    "⚠️ 无法从 .jarvis/saved_session.json 恢复会话。"
-                                )
-                            is_first_iteration = False
-
-                        output_content = agent.run(
-                            user_input, prefix=prefix, suffix=suffix
-                        )
-                        if agent.non_interactive:
-                            raise typer.Exit(code=0)
             except typer.Exit:
                 # 正常退出，设置成功状态
                 exit_code = 0
