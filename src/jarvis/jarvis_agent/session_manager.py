@@ -142,7 +142,81 @@ class SessionManager:
             session_dir,
             f"saved_session_{self.agent_name}_{platform_name}_{model_name}_{timestamp}.json",
         )
-        return self.model.save(session_file)
+        result = self.model.save(session_file)
+
+        # 保存成功后，清理旧会话文件（最多保留10个）
+        if result:
+            self._cleanup_old_sessions(session_dir)
+
+        return result
+
+    def _cleanup_old_sessions(self, session_dir: str) -> None:
+        """
+        清理旧会话文件，最多保留10个最近的会话。
+
+        Args:
+            session_dir: 会话文件所在目录
+        """
+        try:
+            # 直接在传入的目录中查找会话文件
+            platform_name = self.model.platform_name()
+            model_name = self.model.name().replace("/", "_").replace("\\", "_")
+
+            # 匹配会话文件模式
+            pattern = os.path.join(
+                session_dir,
+                f"saved_session_{self.agent_name}_{platform_name}_{model_name}*.json",
+            )
+
+            # 获取所有匹配的文件
+            all_files = glob.glob(pattern)
+
+            # 过滤掉辅助文件，只保留主会话文件
+            session_files = []
+            for f in all_files:
+                basename = os.path.basename(f)
+                # 排除辅助文件
+                if not (
+                    basename.endswith("_commit.json")
+                    or basename.endswith("_tasklist.json")
+                    or basename.endswith("_state.json")
+                    or basename.endswith("_codeagent.json")
+                ):
+                    # 提取时间戳并排序
+                    timestamp = self._extract_timestamp(f)
+                    session_files.append((f, timestamp))
+
+            # 按时间戳降序排列（最新的在前）
+            session_files.sort(key=lambda x: (x[1] is None, x[1] or ""), reverse=True)
+
+            # 如果超过10个，删除最旧的
+            if len(session_files) > 10:
+                # 删除第11个及之后的所有会话
+                for session_file, _ in session_files[10:]:
+                    try:
+                        # 删除主会话文件
+                        if os.path.exists(session_file):
+                            os.remove(session_file)
+
+                        # 删除对应的辅助文件
+                        base_path = session_file[:-5]  # 去掉 ".json"
+                        auxiliary_suffixes = [
+                            "_commit.json",
+                            "_tasklist.json",
+                            "_state.json",
+                            "_codeagent.json",
+                        ]
+
+                        for suffix in auxiliary_suffixes:
+                            auxiliary_file = base_path + suffix
+                            if os.path.exists(auxiliary_file):
+                                os.remove(auxiliary_file)
+                    except Exception as e:
+                        # 删除失败不影响其他文件的清理
+                        PrettyOutput.auto_print(f"⚠️  删除旧会话文件失败: {e}")
+        except Exception as e:
+            # 清理过程出错不应影响保存功能
+            PrettyOutput.auto_print(f"⚠️  清理旧会话文件时出错: {e}")
 
     def restore_session(self) -> bool:
         """Restores the session state from a file."""
