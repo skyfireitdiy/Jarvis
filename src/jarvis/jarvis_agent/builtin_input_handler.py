@@ -364,9 +364,6 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 post_process_func=lambda files: None,  # 简化实现，不需要后处理
             )
 
-            # 更新 start_commit 为最新的 commit hash，以便下次提交时使用正确的起始点
-            agent.start_commit = get_latest_commit_hash()
-
             return "", True
 
         elif tag == "Pin":
