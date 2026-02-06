@@ -341,6 +341,8 @@ class SessionManager:
             # 检查 commit 是否一致
             if saved_commit == current_commit:
                 PrettyOutput.auto_print("✅ Git commit 一致校验通过")
+                PrettyOutput.auto_print(f"   保存时的commit: {saved_commit[:12]}")
+                PrettyOutput.auto_print(f"   当前的commit:  {current_commit[:12]}")
                 return True
 
             # commit 不一致，显示警告并询问用户
