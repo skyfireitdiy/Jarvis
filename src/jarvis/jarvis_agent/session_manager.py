@@ -179,6 +179,7 @@ class SessionManager:
 
             # 从会话文件路径中提取时间戳
             import os
+            from datetime import datetime
 
             basename = os.path.basename(session_file)
             parts = (
@@ -186,8 +187,6 @@ class SessionManager:
             )
             timestamp = parts[-1] if len(parts) >= 4 else None
             if timestamp and "_" in timestamp:
-                from datetime import datetime
-
                 try:
                     dt = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
                     timestamp_iso = dt.isoformat()
