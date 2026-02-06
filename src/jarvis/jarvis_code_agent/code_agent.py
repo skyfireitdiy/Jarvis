@@ -139,6 +139,10 @@ class CodeAgent(Agent):
         # Git 相关初始化：存储开始时的 commit hash，用于后续 git diff 获取
         self.start_commit: Optional[str] = None
 
+        # Commit prefix 和 suffix，用于生成提交信息
+        self.prefix: str = ""
+        self.suffix: str = ""
+
     def _init_code_agent_context_managers(self) -> None:
         """初始化 CodeAgent 上下文管理相关组件"""
         # 初始化上下文管理器（用于代码分析和上下文追踪）
@@ -302,6 +306,10 @@ class CodeAgent(Agent):
         """
         try:
             set_current_agent(self.name, self)
+
+            # 存储 prefix 和 suffix，供 commit 命令使用
+            self.prefix = prefix
+            self.suffix = suffix
 
             # 优先处理内置命令（如 <ListRule>）
             # 如果是内置命令且已被处理，则直接返回，不进入需求分类流程
