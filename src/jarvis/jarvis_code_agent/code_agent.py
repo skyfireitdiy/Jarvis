@@ -486,6 +486,12 @@ git reset --hard {start_commit}
             return f"Error during execution: {str(e)}"
         finally:
             # 在run方法结束时反注册agent
+            # 自动保存会话状态
+            try:
+                self.save_session()
+            except Exception as e:
+                # 保存会话失败不影响其他清理操作
+                PrettyOutput.auto_print(f"⚠️ 保存会话失败: {str(e)}")
             clear_current_agent()
 
             # Ensure switching back to the original working directory after CodeAgent completes
