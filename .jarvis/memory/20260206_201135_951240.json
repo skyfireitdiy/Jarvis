@@ -1,0 +1,8 @@
+{
+  "id": "20260206_201135_951240",
+  "type": "project_long_term",
+  "tags": ["会话恢复", "需求分类", "CodeAgent", "bugfix"],
+  "content": "修复了恢复会话后仍执行需求分类的问题：\n\n**问题**：使用 --restore-session 参数恢复会话时，虽然系统提示词已从保存的会话中恢复，但 run() 方法仍会执行需求分类（classify_user_request），导致恢复的系统提示词被覆盖。\n\n**解决方案**：在 code_agent.py 的 run() 方法中，将需求分类逻辑包裹在 `if self.first:` 条件判断中。\n\n**修改位置**：src/jarvis/jarvis_code_agent/code_agent.py 第321-334行\n\n**核心逻辑**：\n- self.first 在 Agent 初始化时为 True\n- restore_session() 成功后，self.first 被设置为 False\n- 通过检查 self.first 判断是否需要执行需求分类\n\n**影响**：使用 --restore-session 时，不会执行需求分类，恢复的系统提示词不会被覆盖。",
+  "created_at": "2026-02-06T20:11:35.951267",
+  "updated_at": "2026-02-06T20:11:35.951271"
+}

@@ -318,18 +318,20 @@ class CodeAgent(Agent):
                 # 内置命令已处理完成，直接返回
                 return None
 
-            # 需求分类：使用 normal_llm 对用户需求进行分类
-            scenario = classify_user_request(user_input)
+            # 需求分类：仅在首次运行时执行（未恢复会话）
+            # 如果指定了恢复会话的参数，就不用对需求进行分类了（因为系统提示词早就有了）
+            if self.first:
+                scenario = classify_user_request(user_input)
 
-            # 根据分类结果获取对应的系统提示词并更新
-            scenario_system_prompt = get_system_prompt(scenario)
-            if scenario_system_prompt != self.system_prompt:
-                self.system_prompt = scenario_system_prompt
-                # 更新模型的系统提示词
-                if self.model:
-                    # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
-                    prompt_text = self.prompt_manager.build_system_prompt(self)
-                    self.model.set_system_prompt(prompt_text)
+                # 根据分类结果获取对应的系统提示词并更新
+                scenario_system_prompt = get_system_prompt(scenario)
+                if scenario_system_prompt != self.system_prompt:
+                    self.system_prompt = scenario_system_prompt
+                    # 更新模型的系统提示词
+                    if self.model:
+                        # 使用 prompt_manager 重新构建系统提示词（包含方法论等）
+                        prompt_text = self.prompt_manager.build_system_prompt(self)
+                        self.model.set_system_prompt(prompt_text)
 
             # 根据当前模式生成额外说明，供 LLM 感知执行策略
             prev_dir = os.getcwd()
