@@ -29,9 +29,9 @@ package "核心基础层" #LightGreen {
 
 package "功能增强层" #LightYellow {
   class CodeAgent <<代码增强>>
-  
+
   Agent <|-- CodeAgent : "继承\n功能扩展"
-  
+
   note right of CodeAgent
     基于 Agent，叠加代码相关能力：
     - 代码结构分析
@@ -43,11 +43,11 @@ package "功能增强层" #LightYellow {
 package "专业应用层" #LightBlue {
   class jarvis_sec <<安全分析>>
   class jarvis_c2rust <<C2Rust转换>>
-  
+
   Agent ..> jarvis_sec : "使用\n单Agent逐条验证"
   Agent ..> jarvis_c2rust : "使用\n模块规划与签名规划"
   CodeAgent ..> jarvis_c2rust : "使用\n代码生成与修复"
-  
+
   note right of jarvis_sec
     安全分析套件：
     - 启发式扫描（直扫）
@@ -56,7 +56,7 @@ package "专业应用层" #LightBlue {
     - 报告聚合（JSON + Markdown）
     - 使用 Agent 进行逐条验证
   end note
-  
+
   note right of jarvis_c2rust
     C→Rust 迁移套件：
     - 配置管理（config）
@@ -124,8 +124,8 @@ package "专业应用层" #LightBlue {
 
 **工作流程**：
 
-```
-直扫（direct_scan）→ 聚类（Cluster Agent）→ 分析（Analysis Agent）→ 
+```text
+直扫（direct_scan）→ 聚类（Cluster Agent）→ 分析（Analysis Agent）→
 验证（Verification Agent）→ 复核（Review Agent）→ 报告聚合
 ```
 
@@ -153,7 +153,7 @@ package "专业应用层" #LightBlue {
 **工作流程**：
 
 ```
-扫描（scanner）→ 库替代评估（library_replacer）→ 模块规划（Agent）→ 
+扫描（scanner）→ 库替代评估（library_replacer）→ 模块规划（Agent）→
 转译（CodeAgent + Agent）→ 优化（optimizer + CodeAgent）
 ```
 
@@ -174,7 +174,7 @@ package "专业应用层" #LightBlue {
 2. **使用关系**：
    - jarvis-sec 使用 Agent 进行安全分析
    - jarvis-c2rust 使用 Agent 进行规划，使用 CodeAgent 进行代码生成与修复
-4. **工具共享**：所有系统共享工具注册表，使用统一的工具接口（代码读取工具、文件编辑工具/文件重写工具、脚本执行工具等）
+3. **工具共享**：所有系统共享工具注册表，使用统一的工具接口（代码读取工具、文件编辑工具/文件重写工具、脚本执行工具等）
 
 ### 设计原则
 
@@ -374,7 +374,7 @@ MainEntry --> Agent : 代理入口
   - 聚焦：调用 CodeAgent/Agent 生成完整可用的新工具代码（包含参数定义、错误处理、最佳实践模板），写入 `data/tools/<tool_name>.py` 并通过 ToolRegistry 自动注册
   - 关键特性：
     - 支持在生成的新工具内部编排现有 Agent（通用任务编排、ARCHER 工作流、task_list_manager）和 CodeAgent（代码修改、构建验证、lint、review 等）
-    - 支持对已有工具进行自举式演化（再次调用 meta_agent，为指定工具生成"_improved" 版本）
+    - 支持对已有工具进行自举式演化（再次调用 meta_agent，为指定工具生成"\_improved" 版本）
     - 输入参数：
       - `tool_name`：要生成或改进的工具名，同时作为文件名和类名
       - `function_description`：清晰描述工具的目标功能、输入/输出、约束条件以及是否需要编排 Agent/CodeAgent
@@ -419,7 +419,7 @@ MainEntry --> Agent : 代理入口
 - **OutputHandlerProtocol**（输出处理器协议）
   - 职责：定义输出处理器的接口协议
   - 源码位置：OutputHandlerProtocol模块
-**3.1.7 分享管理模块（Share Management）**
+    **3.1.7 分享管理模块（Share Management）**
 
 - **ShareManager**（分享管理器基类）
   - 职责：提供工具和方法论分享的通用逻辑（Git 仓库管理、资源选择等）
@@ -497,7 +497,7 @@ MainEntry --> Agent : 代理入口
   - 设置系统提示，首轮按需进行工具筛选与文件/方法论处理
   - 将主运行循环委派给 AgentRunLoop
   - 在关键节点广播事件（TASK_STARTED、BEFORE/AFTER_MODEL_CALL、BEFORE/AFTER_HISTORY_CLEAR、BEFORE/AFTER_ADDON_PROMPT、BEFORE/AFTER_SUMMARY、BEFORE_TOOL_FILTER、TOOL_FILTERED、AFTER_TOOL_CALL、INTERRUPT_TRIGGERED）
-  - 动态加载 after_tool_call 回调：扫描 after_tool_call_cb_dirs 配置指定的目录，支持三种导出形式（直接回调、get_*工厂、register_* 工厂）
+  - 动态加载 after*tool_call 回调：扫描 after_tool_call_cb_dirs 配置指定的目录，支持三种导出形式（直接回调、get*_工厂、register\__ 工厂）
 - **AgentRunLoop**（主循环执行体）
   - 驱动"模型思考 → 工具执行 → 结果拼接/中断处理 → 下一轮"的迭代
   - 统一处理工具返回协议与异常兜底，支持自动完成
@@ -616,12 +616,12 @@ stop
   - 通过 Registry 与事件总线实现可插拔能力与旁路扩展
 - 核心方法：
   - **init**: 解析参数与配置；初始化 Platform/Session/Handlers/Managers/Prompt；设置系统提示；统计资源；加载 after_tool_call 回调
-  - run/_main_loop: 进入主循环，委派 AgentRunLoop
-  - _call_model/_invoke_model: 输入处理、附加提示拼接、上下文计数与模型调用（含 BEFORE/AFTER_MODEL_CALL 事件）
-  - _call_tools: 工具执行委派至 execute_tool_call
-  - _complete_task: 处理总结与任务完成事件，触发记忆/分析旁路
-  - _filter_tools_if_needed: 工具超过阈值时使用临时模型筛选并重设系统提示
-  - _summarize_and_clear_history: 上下文过长的摘要/文件上传分流与历史清理
+  - run/\_main_loop: 进入主循环，委派 AgentRunLoop
+  - \_call_model/\_invoke_model: 输入处理、附加提示拼接、上下文计数与模型调用（含 BEFORE/AFTER_MODEL_CALL 事件）
+  - \_call_tools: 工具执行委派至 execute_tool_call
+  - \_complete_task: 处理总结与任务完成事件，触发记忆/分析旁路
+  - \_filter_tools_if_needed: 工具超过阈值时使用临时模型筛选并重设系统提示
+  - \_summarize_and_clear_history: 上下文过长的摘要/文件上传分流与历史清理
 - 关键参数影响行为：auto_complete、need_summary、use_methodology、use_analysis、execute_tool_confirm、force_save_memory、non_interactive、in_multi_agent、use_tools/files 等
 - 小型结构图：
 
@@ -702,7 +702,7 @@ stop
 - 关键约束：清理历史后必须重设系统提示，避免丢失行为规范与工具约束
 - 失败回退：上传失败返回空提示；摘要为空则使用占位文本；流程不中断
 
-- 工具筛选流程（Agent._filter_tools_if_needed）
+- 工具筛选流程（Agent.\_filter_tools_if_needed）
 
 ```plantuml
 @startuml
@@ -743,21 +743,21 @@ stop
 
 - 职责：承载主运行循环；控制迭代、工具执行、拼接提示、处理中断与完成
 - 核心流程：
-  - 首轮初始化（由 Agent._first_run 触发）后循环执行：
-    1) 轮次计数递增（conversation_rounds，用于工具提醒）
-    2) 工具提醒机制：每工具提醒轮次间隔轮（默认20）注入工具使用提示
-    3) 自动摘要检查：当剩余token低于输入窗口的25%时触发摘要与历史清理，重置对话长度计数
+  - 首轮初始化（由 Agent.\_first_run 触发）后循环执行：
+    1. 轮次计数递增（conversation_rounds，用于工具提醒）
+    2. 工具提醒机制：每工具提醒轮次间隔轮（默认20）注入工具使用提示
+    3. 自动摘要检查：当剩余token低于输入窗口的25%时触发摘要与历史清理，重置对话长度计数
        - **Git diff 集成优化**：在触发总结前，如果 Agent 是 CodeAgent 类型（有 `start_commit` 属性），自动获取并缓存 git diff 信息
-    4) 更新输入处理器标志（run_input_handlers_next_turn）
-    5) 首次运行处理（Agent._first_run：工具筛选、文件/方法论处理）
-    6) _call_model → 获取响应（含输入处理器链处理）
-    7) 检查响应中的 <!!!SUMMARY!!!> 标记（`ot('!!!SUMMARY!!!')` 是等价的封装形式）：如果检测到该标记，触发摘要与历史清理，移除标记后继续处理响应
+    4. 更新输入处理器标志（run_input_handlers_next_turn）
+    5. 首次运行处理（Agent.\_first_run：工具筛选、文件/方法论处理）
+    6. \_call_model → 获取响应（含输入处理器链处理）
+    7. 检查响应中的 <!!!SUMMARY!!!> 标记（`ot('!!!SUMMARY!!!')` 是等价的封装形式）：如果检测到该标记，触发摘要与历史清理，移除标记后继续处理响应
        - **Git diff 集成优化**：主动总结标记触发时，同样会获取并缓存 git diff 信息（仅对 CodeAgent 类型）
-    8) _handle_run_interrupt → 处理用户中断（INTERRUPT_TRIGGERED）
-    9) execute_tool_call → 执行工具（若识别到 TOOL_CALL）
-    10) join_prompts → 拼接工具结果到 session.prompt
-    11) 自动完成检测（!!!COMPLETE!!!）→ _complete_task
-    12) 获取下一步用户动作（continue/complete）→ 继续或完成
+    8. \_handle_run_interrupt → 处理用户中断（INTERRUPT_TRIGGERED）
+    9. execute_tool_call → 执行工具（若识别到 TOOL_CALL）
+    10. join_prompts → 拼接工具结果到 session.prompt
+    11. 自动完成检测（!!!COMPLETE!!!）→ \_complete_task
+    12. 获取下一步用户动作（continue/complete）→ 继续或完成
 - 事件：在工具与模型调用关键节点广播 BEFORE/AFTER_TOOL_CALL
 - 返回协议：当工具返回 need_return=True，立即返回当前上下文；否则继续循环
 - 关键参数：
@@ -899,11 +899,11 @@ stop
 - 边界：EventBus 不做业务判断与流程控制，仅负责调用订阅者；是否保存记忆/执行分析由订阅者自行决定
 - 使用建议：为每类关键节点定义清晰事件名（如 BEFORE_MODEL_CALL、AFTER_TOOL_CALL 等），订阅者内部做好容错与幂等
 
-- API：subscribe(callback)、emit(event, **kwargs)、unsubscribe(callback)
+- API：subscribe(callback)、emit(event, \*\*kwargs)、unsubscribe(callback)
 - 特性：同步广播、回调异常隔离，便于旁路扩展（记忆保存、任务分析、统计）
 
 - 事件总线全局事件流（总览图）
-下图以通俗步骤展示“任务启动 → 模型/工具 → 历史清理 → 总结 → 完成”的全链路广播与响应，弱化内部术语，便于整体理解。
+  下图以通俗步骤展示“任务启动 → 模型/工具 → 历史清理 → 总结 → 完成”的全链路广播与响应，弱化内部术语，便于整体理解。
 
 ```plantuml
 @startuml
@@ -976,12 +976,12 @@ Loop --> Agent : 返回最终结果
 
 - 职责：统一解析模型响应中的工具调用，选择并执行合适的输出处理器，返回标准协议
 - 核心流程：
-  1) 遍历 Agent 的输出处理器列表，筛选可处理响应的处理器（can_handle）
-  2) 多处理器冲突检测：若多个处理器同时可处理，返回错误提示，要求模型明确选择
-  3) 无处理器匹配：返回空结果，继续循环
-  4) 执行前确认：若工具执行确认参数为 True，进行用户确认；用户拒绝则返回空结果
-  5) 执行处理器：调用处理器处理方法
-  6) 返回标准协议：`(need_return: bool, tool_prompt: Any)`
+  1. 遍历 Agent 的输出处理器列表，筛选可处理响应的处理器（can_handle）
+  2. 多处理器冲突检测：若多个处理器同时可处理，返回错误提示，要求模型明确选择
+  3. 无处理器匹配：返回空结果，继续循环
+  4. 执行前确认：若工具执行确认参数为 True，进行用户确认；用户拒绝则返回空结果
+  5. 执行处理器：调用处理器处理方法
+  6. 返回标准协议：`(need_return: bool, tool_prompt: Any)`
 - 返回协议：
   - `need_return=True`：工具要求立即结束本轮，直接返回结果给用户
   - `need_return=False`：工具结果将拼接回上下文，继续下一轮循环
@@ -1740,7 +1740,7 @@ end
 - 平台扩展：在 jarvis_platform 下新增 BasePlatform 子类，通过 PlatformRegistry 自动发现
 - 旁路增强：通过 after_tool_call_cb_dirs 配置注入 AFTER_TOOL_CALL 回调，实现统计/审计等旁路能力
 - 方法论共享：建立中心方法论库（Git），团队同步沉淀最佳实践，提升协作效率
-- 子 Agent：利用 _build_child_agent_params 继承父 Agent 能力，构建递归执行的子任务体系
+- 子 Agent：利用 \_build_child_agent_params 继承父 Agent 能力，构建递归执行的子任务体系
 - UI 替换：UserInteractionHandler 与 OutputHandlerProtocol 的抽象便于替换为 TUI/GUI/WebUI
 
 #### 10. TaskListManager 运行流程详解
@@ -1892,12 +1892,10 @@ TaskListManager 是 Jarvis 系统中用于管理复杂任务分拆、执行和�
   - 由主 Agent 直接执行，无需创建子 Agent
   - 执行完成后自动触发验证，确保质量
   - 适用于：简单文件修改、配置更新、简单查询等
-  
 - `sub`：复杂任务（多步骤、多文件、需要专门规划）
   - 自动创建子 Agent 执行
   - 子 Agent 继承父 Agent 的工具和配置
   - 适用于：复杂功能实现、多模块重构、系统设计等
-  
 - `code_agent`：代码相关任务（需要 CodeAgent 的增强能力）
   - 创建 CodeAgent 子实例
   - 享有代码分析、构建验证、lint 等增强功能
@@ -2123,17 +2121,17 @@ CLI --> CodeAgent : 入口与参数传递
 ##### 3.1 CodeAgent 初始化流程
 
 - 初始化步骤（按顺序）：
-  1) 设置基础属性：
+  1. 设置基础属性：
      - 设置根目录为当前工作目录
      - 保存工具组等配置参数
-  2) 初始化上下文管理器（ContextManager）：
+  2. 初始化上下文管理器（ContextManager）：
      - 创建 ContextManager 实例，传入项目根目录
      - 维护符号表（SymbolTable）和依赖图（DependencyGraph）
      - 提供代码上下文查询能力（查找定义、引用、依赖关系等）
-  3) Git 配置检查（Git配置检查方法）：检查用户名和用户邮箱是否已设置
+  3. Git 配置检查（Git配置检查方法）：检查用户名和用户邮箱是否已设置
      - 严格模式（默认）：任一缺失则退出，提示配置命令
      - 警告模式（JARVIS_GIT_CHECK_MODE=warn）：仅提示警告，继续运行
-  4) 构建工具白名单：
+  4. 构建工具白名单：
      - 基础工具列表：
        - `execute_script`：脚本执行工具，用于执行 shell/脚本命令
        - `read_code`：代码读取工具，读取源代码文件的指定行号范围
@@ -2148,7 +2146,7 @@ CLI --> CodeAgent : 入口与参数传递
        - `methodology`：方法论工具，加载和使用方法论
        - `task_list_manager`：任务列表管理工具（可选，通过 `enable_task_list_manager` 参数控制）
      - 追加工具：通过追加工具参数（逗号分隔）追加，自动去重
-  5) 读取规则文件（按优先级顺序加载，动态加载机制）：
+  5. 读取规则文件（按优先级顺序加载，动态加载机制）：
      - **规则文件组织**：规则以 Markdown 文件形式组织，统一存储在 `.jarvis` 目录下：
        - 项目规则：`.jarvis/rules/` 目录（用户自定义规则）
        - 内置规则：通过 `RulesManager` 统一管理，支持命名规则（named rules）和文件规则
@@ -2175,7 +2173,7 @@ CLI --> CodeAgent : 入口与参数传递
        - 不能分享配置的规则目录和项目规则目录中的规则
        - 分享时会将规则文件移动到中心仓库（而非复制），原文件会被删除
        - 自动检测并排除已存在于中心仓库的规则
-  6) 调用父类 Agent 初始化（父类初始化方法）：
+  6. 调用父类 Agent 初始化（父类初始化方法）：
      - 注入系统提示（代码工程师工作准则 + 规则块）
      - 设置工具白名单（使用工具参数）
      - 默认禁用方法论引导（使用方法论参数为False，可通过关键字参数覆盖）
@@ -2183,14 +2181,14 @@ CLI --> CodeAgent : 入口与参数传递
      - 关闭自动完成（自动完成参数为False）
      - 启用规划（规划参数，默认从配置读取）
      - 初始化模型、会话、处理器等 Agent 核心组件
-  7) 建立 CodeAgent 自关联：
+  7. 建立 CodeAgent 自关联：
      - 设置代码代理属性为自身，便于工具通过属性获取方法获取 CodeAgent 实例
-  8) 初始化上下文推荐器（上下文推荐器，可选）：
+  8. 初始化上下文推荐器（上下文推荐器，可选）：
      - 若模型已初始化且可用（通过模型属性访问）：
        - 创建上下文推荐器实例，传入上下文管理器和 LLM 模型
        - 用于任务开始时的智能上下文推荐
      - 若初始化失败：仅记录警告，不影响主流程（跳过上下文推荐功能）
-  9) 订阅工具调用后事件：通过事件总线订阅方法注册工具调用后回调
+  9. 订阅工具调用后事件：通过事件总线订阅方法注册工具调用后回调
 
 - 系统提示内容：
   - 代码工程师角色定位与核心原则
@@ -2203,15 +2201,15 @@ CLI --> CodeAgent : 入口与参数传递
 ##### 3.2 环境与仓库初始化
 
 - 初始化流程（环境初始化方法，在运行方法开始时调用）：
-  1) 查找 Git 根目录（查找Git根目录方法）：调用查找Git根目录并切换目录方法，切换到仓库根并更新根目录属性
-  2) 更新 .gitignore（更新Git忽略文件方法）：
+  1. 查找 Git 根目录（查找Git根目录方法）：调用查找Git根目录并切换目录方法，切换到仓库根并更新根目录属性
+  2. 更新 .gitignore（更新Git忽略文件方法）：
      - 检查并确保配置目录被忽略
      - 追加常用语言忽略规则（按语言分组：通用、Python、Rust、Node、Go、Java、C/C++、.NET 等）
      - 仅追加缺失项，不覆盖现有规则；保留注释与空行
-  3) 处理未提交修改（处理Git变更方法）：
+  3. 处理未提交修改（处理Git变更方法）：
      - 调用Git提交工具执行提交工作流（使用前缀/后缀参数）
      - 支持交互式确认与临时提交
-  4) 配置换行符设置（配置行尾设置方法）：
+  4. 配置换行符设置（配置行尾设置方法）：
      - 目标设置：自动换行转换关闭、安全换行检查关闭、空白字符处理为行尾回车
      - 仅在当前设置与目标不一致时修改
      - Windows 平台额外提示：建议创建最小化Git属性文件（交互式确认）
@@ -2254,16 +2252,16 @@ stop
 
 - 回调入口：工具调用后回调方法（订阅工具调用后事件）
 - 核心流程：
-  1) 获取差异信息：
+  1. 获取差异信息：
      - 调用获取差异方法获取完整差异文本
      - 调用获取差异文件列表方法获取修改文件列表
      - 调用获取最新提交哈希方法记录起始提交哈希
-  2) 更新上下文管理器（更新修改文件上下文方法）：
+  2. 更新上下文管理器（更新修改文件上下文方法）：
      - 对每个修改的文件，更新符号表和依赖图
      - 调用上下文管理器更新文件上下文方法重新分析文件内容
      - 提取符号（函数、类、变量等）并更新符号表
      - 分析导入依赖并更新依赖图
-  3) 影响范围分析（分析编辑影响方法，可选）：
+  3. 影响范围分析（分析编辑影响方法，可选）：
      - 若启用影响分析（启用影响分析参数），解析Git差异为编辑操作列表
      - 使用影响分析器分析编辑的影响范围：
        - 识别受影响的符号（函数、类等）
@@ -2279,7 +2277,7 @@ stop
        - 风险等级评估（LOW/MEDIUM/HIGH）
        - 修复建议
      - 高风险编辑时，在 addon_prompt 中注入警告提示
-  4) 构建按文件补丁预览（构建按文件补丁预览方法）：
+  4. 构建按文件补丁预览（构建按文件补丁预览方法）：
      - 构建文件名状态映射（构建名称状态映射方法）：通过Git差异名称状态命令识别文件状态（新增/修改/删除/重命名/复制）
      - 为每个文件获取差异（获取文件差异方法）：使用Git临时暂存命令临时暂存未跟踪文件以展示差异
      - 特殊处理策略：
@@ -2288,14 +2286,14 @@ stop
        - 大变更（新增+删除 > 300 行）：仅输出统计行数，避免上下文过长
        - 其它文件：输出该文件的 diff 代码块（使用 `git diff --numstat` 获取行数统计）
        - 无法获取 diff：输出友好提示（"变更已记录（无可展示的文本差异）"）
-  5) 提交工作流：
+  5. 提交工作流：
      - 显示完整差异（格式化输出打印方法，语言类型为差异）
      - 调用处理提交工作流方法执行提交（交互或自动）
-  6) 统计记录（提交成功后）：
+  6. 统计记录（提交成功后）：
      - 代码行数变化：通过Git差异统计命令获取，调用记录代码变更统计方法记录到统计管理器
      - 修改次数：统计管理器增量方法（代码修改指标，分组为代码代理）
      - 提交计数：统计管理器增量方法（生成提交指标，分组为代码代理）（在显示提交历史方法中）
-  7) 构建验证（处理构建验证方法，可选）：
+  7. 构建验证（处理构建验证方法，可选）：
      - 若启用构建验证（启用构建验证参数）：
        - 检查项目配置（构建验证配置）：是否已禁用构建验证
        - 若已禁用：使用回退构建验证器进行基础静态检查
@@ -2308,7 +2306,7 @@ stop
          - 首次失败：询问用户是否禁用构建验证（适用于特殊环境场景）
          - 已询问过：直接显示错误并注入修复提示到附加提示
        - 构建成功：显示构建系统类型和耗时
-  8) 文件变更后处理（文件变更后处理工具，可选）：
+  8. 文件变更后处理（文件变更后处理工具，可选）：
      - 若启用文件变更后处理（通过 `after_change.py` 模块配置）：
        - 根据文件扩展名自动选择对应的格式化工具：
          - Python：ruff format
@@ -2326,7 +2324,7 @@ stop
        - 支持从数据目录的 `after_change_tools.yaml` 配置文件加载自定义命令模板
        - 命令模板支持占位符：`{file_path}`（完整路径）、`{file_name}`（文件名）
        - 自动执行格式化命令，确保代码风格一致
-  9) 静态分析（处理静态分析方法，可选）：
+  9. 静态分析（处理静态分析方法，可选）：
      - 若启用静态分析（启用静态分析参数）且构建验证通过（或已禁用）：
        - 根据文件类型获取静态检查工具列表（获取静态检查工具方法）：
          - 支持多种语言：Python（ruff、mypy）、Rust（cargo clippy、rustfmt）、Go（go vet）、C/C++（clang-tidy）、JavaScript/TypeScript（eslint、tsc）、Java（pmd）等
@@ -2345,13 +2343,13 @@ stop
          - 输出工具名、文件路径、命令、错误信息
          - 限制输出长度（1000字符），避免过长
        - 发现问题时：注入修复提示到附加提示，要求模型修复所有问题
-  10) 会话上下文更新：
+  10. 会话上下文更新：
   - 提交成功：将"补丁内容（按文件）"追加到代理会话提示字段
   - 影响分析报告：若生成了影响报告，追加到会话上下文
   - 构建验证结果：追加构建验证结果（成功/失败）
   - 静态分析结果：追加静态分析结果（通过/发现问题）
   - 文件变更后处理结果：追加格式化执行结果（如适用）
-  11) 用户确认机制（提交被拒绝时）：
+  1. 用户确认机制（提交被拒绝时）：
   - 输出预览与拒绝提示
   - 若应用补丁前确认方法返回 False 或用户确认，将补丁内容追加到会话上下文
   - 否则允许用户输入自定义回复作为附加提示
@@ -2391,7 +2389,7 @@ alt 提交成功
   CA -> Stats: 记录行数变化（code_lines_inserted/code_lines_deleted）
   CA -> Stats: 记录修改次数（code_modifications）
   CA -> CA: 追加"补丁内容（按文件）"到 session.prompt
-  
+
   alt 启用构建验证
     CA -> BVC: 检查构建验证配置
     alt 已禁用构建验证
@@ -2408,7 +2406,7 @@ alt 提交成功
       end
     end
   end
-  
+
   alt 启用静态分析且（构建验证通过或已禁用）
     CA -> Lint: 根据文件类型获取 lint 工具列表
     CA -> Lint: 生成 lint 命令（按工具分组）
@@ -2418,7 +2416,7 @@ alt 提交成功
       CA -> CA: 注入修复提示到 addon_prompt
     end
   end
-  
+
   alt 影响分析报告存在
     CA -> CA: 追加影响报告到 session.prompt
     alt 高风险编辑
@@ -2478,25 +2476,25 @@ end
 
 - CLI 入口：命令行接口函数（使用Typer框架装饰）
 - 核心流程：
-  1) 参数解析与预处理：
+  1. 参数解析与预处理：
      - 解析 CLI 参数（模型组/工具组/需求/非交互/恢复会话/提交前后缀等）
-  2) 环境初始化：
+  2. 环境初始化：
      - 调用 `init_env` 初始化配置与欢迎信息
      - 同步 CLI 选项到全局配置（llm_group/tool_group/restore_session/non_interactive）
-  3) Git 仓库校验与初始化：
+  3. Git 仓库校验与初始化：
      - 检查是否为 git 仓库（`git rev-parse --git-dir`）
      - 若非仓库：交互式或非交互模式下提示初始化新仓库
-  4) 仓库根目录定位与单实例锁：
+  4. 仓库根目录定位与单实例锁：
      - 调用 `find_git_root_and_cd` 切换到仓库根
      - 按仓库维度加锁：基于 `repo_root` 的 md5 哈希生成锁文件名（`code_agent_{md5}.lock`）
      - 回退策略：加锁失败时回退到全局锁（`code_agent.lock`）
-  5) CodeAgent 构造与初始化：
+  5. CodeAgent 构造与初始化：
      - 创建 CodeAgent 实例（传入 llm_group/tool_group/append_tools/non_interactive）
      - CodeAgent 内部执行：git 配置检查、工具白名单构建、规则加载、调用父类 Agent 初始化（super().**init**）、事件订阅
-  6) 会话恢复（可选）：
+  6. 会话恢复（可选）：
      - 若 `restore_session=True`，调用 `agent.restore_session()`
      - 失败不影响继续运行
-  7) 任务执行：
+  7. 任务执行：
      - 若传入 `requirement`：直接调用 `agent.run(requirement, prefix, suffix)`
      - 否则：进入多行输入循环，持续处理用户输入
 
@@ -2610,9 +2608,9 @@ CodeAgent 集成了代码分析器模块，提供代码结构分析、依赖关�
 
 - 职责：使用 LLM 进行语义理解，根据用户输入推荐相关的代码符号位置
 - 核心功能：
-  - 使用 LLM 从用户输入中提取关键词（_extract_keywords_with_llm）
-  - 基于关键词进行符号名称匹配和文本搜索（_search_symbols_by_keywords、_search_text_by_keywords）
-  - 使用 LLM 从候选符号中筛选关联度高的条目（_select_relevant_symbols_with_llm）
+  - 使用 LLM 从用户输入中提取关键词（\_extract_keywords_with_llm）
+  - 基于关键词进行符号名称匹配和文本搜索（\_search_symbols_by_keywords、\_search_text_by_keywords）
+  - 使用 LLM 从候选符号中筛选关联度高的条目（\_select_relevant_symbols_with_llm）
   - 在 LLM 交互时提供项目概况信息（代码统计、Git 文件信息、最近提交）
 - 推荐策略：
   - 基于关键词提取：使用 LLM 从用户输入中提取关键词
@@ -2747,6 +2745,7 @@ CodeAgent 集成了代码分析器模块，提供代码结构分析、依赖关�
       - 匹配失败：明确提示未找到匹配，建议检查代码上下文
       - 部分失败：支持部分补丁成功，返回详细错误摘要
       - 多处匹配：自动生成预览并要求确认，避免误替换
+
   - 使用示例：
     - edit_file 使用示例：
 
@@ -2851,11 +2850,11 @@ CodeAgent 集成了代码分析器模块，提供代码结构分析、依赖关�
   - user：嵌入用户需求与当前 git diff，要求逐项检查。
   - summary：要求输出 JSON，字段 `ok`、`issues[]`（type/description/location/suggestion）、`summary`。
 - 审查执行流程（`_review_and_fix`）：
-  1) 计算待审 diff（若当前提交等于起始提交则取未提交 diff，否则取起始到当前提交的 diff）；无 diff 时直接返回。
-  2) 每轮创建 Review Agent（工具白名单仅 `execute_script` 与 `read_code`，`auto_complete=True`，关闭 methodology/analysis，名称 `CodeReview-Agent-{n}`），运行审查并解析 JSON 结果。
-  3) 若 `ok=true` 则结束审查；若存在问题则逐条打印类型/描述/位置/建议（交互模式下先询问是否继续）。
-  4) 超出最大迭代时：交互模式下询问是否重置计数继续，否则退出。
-  5) 构建修复提示（汇总问题与建议）调用父类 `run` 进行代码修复，修复后再次处理未提交变更并进入下一轮。
+  1. 计算待审 diff（若当前提交等于起始提交则取未提交 diff，否则取起始到当前提交的 diff）；无 diff 时直接返回。
+  2. 每轮创建 Review Agent（工具白名单仅 `execute_script` 与 `read_code`，`auto_complete=True`，关闭 methodology/analysis，名称 `CodeReview-Agent-{n}`），运行审查并解析 JSON 结果。
+  3. 若 `ok=true` 则结束审查；若存在问题则逐条打印类型/描述/位置/建议（交互模式下先询问是否继续）。
+  4. 超出最大迭代时：交互模式下询问是否重置计数继续，否则退出。
+  5. 构建修复提示（汇总问题与建议）调用父类 `run` 进行代码修复，修复后再次处理未提交变更并进入下一轮。
 - 交互/非交互差异：交互模式下每轮开始与修复前都询问用户是否继续；非交互模式直接循环直到通过或达到上限。
 - 目的：在单 Agent 内形成“修改→审查→修复”闭环，提高改动正确性与覆盖度，减少人工复核成本。
 
@@ -3039,17 +3038,17 @@ CA -> CA : 显示提交历史并处理确认
 #### 8. CodeAgent.run 方法详细流程
 
 - 执行流程（run 方法）：
-  1) 环境初始化（_init_env）：
+  1. 环境初始化（\_init_env）：
      - 查找 git 根目录
      - 更新 .gitignore
      - 处理未提交修改（使用 prefix/suffix）
      - 配置换行符设置
-  2) 记录起始提交哈希：`start_commit = get_latest_commit_hash()`
-  3) 获取项目统计信息：
+  2. 记录起始提交哈希：`start_commit = get_latest_commit_hash()`
+  3. 获取项目统计信息：
      - 代码统计（获取代码行数统计方法）：代码行数等统计信息
      - 最近提交（获取最近提交及文件方法）：最近 5 次提交及其修改文件列表
      - Git托管文件信息（获取Git跟踪文件信息方法）：文件列表或目录结构（文件数量超过阈值时返回目录结构）
-  4) 智能上下文推荐（可选）：
+  4. 智能上下文推荐（可选）：
      - 若启用意图识别（is_enable_intent_recognition）且上下文推荐器已初始化：
        - 调用 ContextRecommender.recommend_context(user_input) 生成上下文推荐
        - 推荐流程：
@@ -3058,16 +3057,16 @@ CA -> CA : 显示提交历史并处理确认
          - 使用 LLM 从候选符号中筛选关联度高的条目
          - 返回推荐符号列表（包含文件路径和行号）
        - 格式化推荐结果并追加到用户输入
-  5) 增强用户输入：
+  5. 增强用户输入：
      - 添加项目概况（代码统计 + Git 文件信息 + 最近提交）
      - 添加规范提示（"先分析再修改"、"优先使用 edit_file" 等）
      - 添加智能上下文推荐（若生成）
-  6) 运行 Agent：`self.agent.run(enhanced_input)`
-  7) 任务完成后处理：
-     - 处理未提交修改（_handle_uncommitted_changes）：交互式确认并提交
+  6. 运行 Agent：`self.agent.run(enhanced_input)`
+  7. 任务完成后处理：
+     - 处理未提交修改（\_handle_uncommitted_changes）：交互式确认并提交
      - 记录结束提交哈希：`end_commit = get_latest_commit_hash()`
-     - 显示提交历史（_show_commit_history）：展示 start_commit 到 end_commit 之间的提交
-     - 处理提交确认（_handle_commit_confirmation）：
+     - 显示提交历史（\_show_commit_history）：展示 start_commit 到 end_commit 之间的提交
+     - 处理提交确认（\_handle_commit_confirmation）：
        - 若用户接受提交：重置到起始提交，使用 GitCommitTool 重新提交（应用 prefix/suffix）
        - 若用户拒绝：询问是否重置到起始提交
        - 若启用强制保存记忆：在用户接受提交后触发记忆保存
@@ -3494,7 +3493,7 @@ Verification -> Workflow: 返回all_issues
 alt 存在无效聚类需要复核
     Workflow -> Review: process_review_phase()
     Review -> Review: 构建复核批次\n包含无效聚类
-    
+
     loop 对每个复核批次
         Review -> ReviewAgent: create_review_agent()\n创建复核Agent
         Review -> ReviewAgent: 构建复核任务\n包含无效聚类信息
@@ -3505,7 +3504,7 @@ alt 存在无效聚类需要复核
         Review -> Review: 解析并验证结果\n重试直到格式正确
         Review -> Review: 处理复核结果\n理由不充分则重新加入验证流程
     end
-    
+
     Review -> Workflow: 返回reinstated_candidates
     Workflow -> Verification: 对重新加入的候选\n重新执行验证流程
 end
@@ -3570,7 +3569,7 @@ Workflow -> CLI: 返回报告字符串
 
 关键接口（源码参考）
 
-- _iter_source_files：递归枚举源文件，支持扩展名过滤与目录排除
+- \_iter_source_files：递归枚举源文件，支持扩展名过滤与目录排除
 - direct_scan：主入口，调用检查器并汇总统计
 
 流程（PlantUML）
@@ -3629,7 +3628,7 @@ stop
 
 关键接口（源码参考）
 
-- _parse_clusters_from_text：解析 <CLUSTERS> JSON 内容（使用 json5 解析，支持尾随逗号、注释等）
+- \_parse_clusters_from_text：解析 <CLUSTERS> JSON 内容（使用 json5 解析，支持尾随逗号、注释等）
 - save_cluster：写入聚类快照到 clusters.jsonl（通过 file_manager 模块）
 - 聚类Agent工具：read_code/execute_script/save_memory/retrieve_memory（记忆工具）
 
@@ -3710,7 +3709,7 @@ stop
 
 关键接口（源码参考）
 
-- _try_parse_summary_report：解析 <REPORT> JSON 内容
+- \_try_parse_summary_report：解析 <REPORT> JSON 内容
 - 复核Agent工具：read_code/execute_script/retrieve_memory（召回记忆工具）
 
 流程（PlantUML）
@@ -3810,10 +3809,10 @@ stop
 
 关键接口（源码参考）
 
-- _try_parse_summary_report：解析 <REPORT> JSON 内容（使用 json5 解析，支持尾随逗号、注释等）
-- _build_summary_prompt：构建分析Agent摘要提示词
-- _build_verification_summary_prompt：构建验证Agent摘要提示词
-- _git_restore_if_dirty：工作区保护（git checkout -- .）
+- \_try_parse_summary_report：解析 <REPORT> JSON 内容（使用 json5 解析，支持尾随逗号、注释等）
+- \_build_summary_prompt：构建分析Agent摘要提示词
+- \_build_verification_summary_prompt：构建验证Agent摘要提示词
+- \_git_restore_if_dirty：工作区保护（git checkout -- .）
 
 流程（PlantUML）
 
@@ -3878,10 +3877,10 @@ stop
 职责（精细拆解）
 
 - 数据归一化：
-  - _normalize_issue：归一化字段并补充缺省值（language/category/pattern/file/line/evidence/...）
-  - _make_issue_id：基于文件/行/类别/模式哈希生成稳定 ID（C/R 前缀）
+  - \_normalize_issue：归一化字段并补充缺省值（language/category/pattern/file/line/evidence/...）
+  - \_make_issue_id：基于文件/行/类别/模式哈希生成稳定 ID（C/R 前缀）
 - 评分计算：
-  - score = confidence * severity_weight（high:3.0, medium:2.0, low:1.0）
+  - score = confidence \* severity_weight（high:3.0, medium:2.0, low:1.0）
 - 统计汇总：
   - summary.total：总问题数
   - summary.by_language：按语言统计（c/cpp, rust）
@@ -3942,7 +3941,7 @@ stop
 - unchecked_io：I/O/系统调用可能未检查返回值
 - format_string：格式化字符串参数不是字面量
 - insecure_tmpfile：tmpnam/tempnam/mktemp 不安全临时文件 API
-- command_execution：system/popen/exec* 命令执行，参数非字面量
+- command_execution：system/popen/exec\* 命令执行，参数非字面量
 - scanf_no_width：scanf 使用 %s 但未指定最大宽度
 - possible_null_deref：指针解引用附近未见 NULL 检查
 - uninitialized_ptr_use：野指针使用（声明后未初始化即解引用）
@@ -3952,10 +3951,10 @@ stop
 
 实现要点（准确性优化）
 
-- 注释移除：_remove_comments_preserve_strings 移除注释（保留字符串/字符字面量），避免注释中的 API 命中导致误报。
-- 字符串掩蔽：_mask_strings_preserve_len 将字符串字面量内容替换为空格，避免将字符串中的片段（如 "system("）当作代码。
-- 条件编译跳过：_strip_if0_blocks 跳过 #if 0 ... #endif 块。
-- 上下文检测：_has_null_check_around、_has_len_bound_around 等辅助函数检测邻近上下文，降低误报。
+- 注释移除：\_remove_comments_preserve_strings 移除注释（保留字符串/字符字面量），避免注释中的 API 命中导致误报。
+- 字符串掩蔽：\_mask_strings_preserve_len 将字符串字面量内容替换为空格，避免将字符串中的片段（如 "system("）当作代码。
+- 条件编译跳过：\_strip_if0_blocks 跳过 #if 0 ... #endif 块。
+- 上下文检测：\_has_null_check_around、\_has_len_bound_around 等辅助函数检测邻近上下文，降低误报。
 - 置信度调整：基于上下文线索（NULL 检查、边界检查、SAFETY 注释、测试上下文等）动态调整置信度。
 
 流程（PlantUML）
@@ -4000,13 +3999,13 @@ stop
 - unwrap/expect：错误处理不充分，可能 panic
 - extern "C"：FFI 边界风险（指针有效性/对齐/生命周期/线程安全）
 - unsafe impl Send/Sync：并发内存模型风险
-- ignored_result：let_ = ... 或 .ok() 等可能忽略错误
+- ignored*result：let* = ... 或 .ok() 等可能忽略错误
 
 实现要点
 
-- 邻域窗口与 SAFETY 注释检测：_window/_has_safety_comment_around 检测邻近 SAFETY 注释（支持中英文），降低置信度。
-- 测试上下文检测：_in_test_context 检测 #[test]/cfg(test)/mod tests，适度降低严重度。
-- 置信度到严重性映射：_severity_from_confidence（>=0.8→high, >=0.6→medium, <0.6→low）。
+- 邻域窗口与 SAFETY 注释检测：\_window/\_has_safety_comment_around 检测邻近 SAFETY 注释（支持中英文），降低置信度。
+- 测试上下文检测：\_in_test_context 检测 #[test]/cfg(test)/mod tests，适度降低严重度。
+- 置信度到严重性映射：\_severity_from_confidence（>=0.8→high, >=0.6→medium, <0.6→low）。
 
 流程（PlantUML）
 
@@ -4379,7 +4378,7 @@ loop 对每个函数
     FunctionPlanner -> FunctionPlanner: 创建Agent实例\n(C2Rust-Function-Planner)
     FunctionPlanner -> FunctionPlanner: Agent.run()\n选择模块路径和函数签名
     FunctionPlanner -> Transpiler: 返回(module, signature, skip_impl)
-    
+
     alt 跳过实现
         Transpiler -> Transpiler: 记录映射，跳过
     else 需要实现
@@ -4389,7 +4388,7 @@ loop 对每个函数
         Transpiler -> CodeGenAgent: CodeAgent.run()\n生成Rust实现
         CodeGenAgent -> CodeGenAgent: 检查依赖函数\n补齐未实现依赖
         CodeGenAgent -> CodeGenAgent: 生成测试用例\n保存记忆
-        
+
         == 4.3 构建与修复循环 ==
         loop 直到构建成功或达到上限
             Transpiler -> Transpiler: cargo check
@@ -4404,7 +4403,7 @@ loop 对每个函数
                 Transpiler -> CodeRepairAgent: CodeAgent.run()\n修复测试错误
             end
         end
-        
+
         == 4.4 代码审查 ==
         Transpiler -> ReviewAgent: _review_and_optimize()
         ReviewAgent -> ReviewAgent: 创建Agent实例\n(代码审查专家)
@@ -4417,7 +4416,7 @@ loop 对每个函数
                 ReviewAgent -> ReviewAgent: Agent.run()\n重新审查
             end
         end
-        
+
         == 4.5 完成转译 ==
         Transpiler -> Transpiler: 更新symbol_map.jsonl\n记录C→Rust映射
         Transpiler -> Transpiler: 更新progress.json
@@ -4830,11 +4829,11 @@ stop
 
 关键类型与函数（源码参考）
 
-- _FnMeta /_GraphLoader：函数元信息与子图加载
+- \_FnMeta /\_GraphLoader：函数元信息与子图加载
 - plan_crate_json_text / plan_crate_json_llm：生成 JSON 结构文本
-- entries_to_json / _parse_project_json_entries*：JSON 与内部结构互转
-- _ensure_pub_mod_declarations / _apply_entries_with_mods：确保模块声明与写盘
-- _resolve_created_dir /_ensure_cargo_toml：目录定位与 Cargo.toml 保障
+- entries_to_json / \_parse_project_json_entries\*：JSON 与内部结构互转
+- \_ensure_pub_mod_declarations / \_apply_entries_with_mods：确保模块声明与写盘
+- \_resolve_created_dir /\_ensure_cargo_toml：目录定位与 Cargo.toml 保障
 - execute_llm_plan(apply=True, llm_group=...)
 
 组件关系（PlantUML）
@@ -4917,10 +4916,10 @@ stop
 职责（精细拆解）
 
 - 顺序与索引：
-  - 确保并加载 translation_order.jsonl（_ensure_order_file/_iter_order_steps）
-  - 构建自包含索引（id → FnRecord、name/qname → id）（_load_order_index）
+  - 确保并加载 translation_order.jsonl（\_ensure_order_file/\_iter_order_steps）
+  - 构建自包含索引（id → FnRecord、name/qname → id）（\_load_order_index）
 - 模块与签名规划（Agent）：
-  - 基于 C 源片段、调用者上下文（已转译/未转译）、crate 目录树，调用 Agent 选择目标模块文件与 Rust 函数签名（_plan_module_and_signature）
+  - 基于 C 源片段、调用者上下文（已转译/未转译）、crate 目录树，调用 Agent 选择目标模块文件与 Rust 函数签名（\_plan_module_and_signature）
   - 对规划结果进行基本格式检查（字段存在性）与至多 plan_max_retries 次重试，失败回退至兜底模块与占位签名
   - **附加说明支持**：从 `config.json` 读取 `additional_notes`，自动追加到所有 Agent 提示词末尾（以 `【附加说明（用户自定义）】` 标题），用于传递用户自定义的要求和约束
   - **资源释放类函数跳过实现逻辑**：
@@ -4936,27 +4935,27 @@ stop
       - 对于需要返回值的函数（如错误码），可以返回成功状态（如 `Ok(())` 或 `0`）
       - 测试可以非常简单（如仅验证函数可以调用而不崩溃），或可以跳过测试（在文档注释中说明原因）
 - 进度记录：
-  - 更新 progress.json 当前项（id/name/qname/file/位置/module/rust_signature/signature_hint/metrics）（_update_progress_current）
+  - 更新 progress.json 当前项（id/name/qname/file/位置/module/rust_signature/signature_hint/metrics）（\_update_progress_current）
   - 支持 resume：跳过已完成函数（symbol_map.has_rec；progress['converted']）
 - 上下文与复用：
-  - 构建当前函数的上下文头部（全量/精简），在复用代码生成Agent/Review等Agent时拼接（_reset_function_context/_compose_prompt_with_context/_refresh_compact_context）
-  - 保存当前函数的 C 代码，供修复 Agent 使用（_current_c_code）
+  - 构建当前函数的上下文头部（全量/精简），在复用代码生成Agent/Review等Agent时拼接（\_reset_function_context/\_compose_prompt_with_context/\_refresh_compact_context）
+  - 保存当前函数的 C 代码，供修复 Agent 使用（\_current_c_code）
 - 代码生成 Agent（CodeAgent，可复用）：
-  - 在单个函数生命周期内创建并复用同一个CodeAgent实例，用于代码生成任务（_get_generation_agent）
+  - 在单个函数生命周期内创建并复用同一个CodeAgent实例，用于代码生成任务（\_get_generation_agent）
   - CodeAgent配置：启用方法论和分析功能（use_methodology=True, use_analysis=True），附加工具包括 read_symbols 和 methodology，用于提供更好的代码生成能力
 - 修复 Agent（CodeAgent，每次重新创建）：
-  - 每次修复时重新创建CodeAgent实例，不复用，确保每次修复都有独立的上下文和状态（_get_fix_agent）
+  - 每次修复时重新创建CodeAgent实例，不复用，确保每次修复都有独立的上下文和状态（\_get_fix_agent）
   - CodeAgent配置：启用方法论和分析功能（use_methodology=True, use_analysis=True），附加工具包括 read_symbols 和 methodology，用于提供更好的修复能力
   - 上下文增强：修复 Agent 的上下文中自动包含原 C 实现代码，通过 `compose_prompt_with_context(prompt, for_fix=True)` 自动添加
   - 代码生成遵循TDD（测试驱动开发）方法：通过提示词指导Agent先写测试再写实现，确保生成的代码可测试且质量更高
-  - 代码生成：在目标模块生成或更新实现，遵循"最小变更、禁止 todo!/unimplemented!、必要时补齐依赖实现"的约束（_codeagent_generate_impl）
+  - 代码生成：在目标模块生成或更新实现，遵循"最小变更、禁止 todo!/unimplemented!、必要时补齐依赖实现"的约束（\_codeagent_generate_impl）
   - **附加说明支持**：所有代码生成和修复提示词都会自动追加 `additional_notes`（从 `config.json` 读取），确保用户自定义要求在所有 Agent 对话中生效
 - 记忆功能：代码生成 Agent 默认不强制保存记忆（force_save_memory=False），但提示词中会建议Agent在需要时使用 save_memory 工具记录关键信息；修复 Agent 每次重新创建，不依赖记忆功能
   - 记忆召回提示：在代码生成和修复阶段，强烈建议使用 retrieve_memory 工具召回已保存的函数实现记忆，这些记忆可能包含之前已实现的类似函数、设计决策、实现模式等有价值的信息，可以显著提高实现和修复效率
   - 依赖检查与实现要求：在实现或修复函数时，要求检查当前函数及其所有依赖函数是否已实现，对于未实现的依赖函数，需在本次一并补齐等价的Rust实现，禁止使用 todo!/unimplemented! 占位
-  - **代码格式化**：在每个函数开始转译前（读取C函数源码之后、规划模块与签名之前）自动执行 `cargo fmt` 格式化代码，确保代码风格一致（_run_cargo_fmt）
+  - **代码格式化**：在每个函数开始转译前（读取C函数源码之后、规划模块与签名之前）自动执行 `cargo fmt` 格式化代码，确保代码风格一致（\_run_cargo_fmt）
 - 模块可见性与声明链：
-  - 确保 src/lib.rs 顶层 pub mod，补齐从目标模块文件向上的 mod.rs 声明链（_ensure_top_level_pub_mod/_ensure_mod_rs_decl/_ensure_mod_chain_for_module）
+  - 确保 src/lib.rs 顶层 pub mod，补齐从目标模块文件向上的 mod.rs 声明链（\_ensure_top_level_pub_mod/\_ensure_mod_rs_decl/\_ensure_mod_chain_for_module）
 - 构建校验与最小修复（核心闭环）：
   - 直接执行 cargo test（运行所有测试，不区分项目结构）：`cargo test` 会自动编译并运行所有类型的测试（lib tests、bin tests、integration tests、doc tests 等），无需单独执行 cargo check
   - **Cargo Test 编译警告检测**：
@@ -4964,7 +4963,7 @@ stop
     - 如果发现警告（如 `unused_mut`、`unused_variables`、`dead_code`、`unused_import` 等），进入警告修复阶段
     - 警告修复提示词包含完整的警告信息，要求修复所有警告
     - 修复后必须确保 `cargo test -- --nocapture` 能够通过（返回码为 0 且无警告输出）
-  - 测试失败时：错误分类（missing_import/type_mismatch/visibility/borrow_checker/dependency_missing/module_not_found），使用修复 Agent（每次重新创建，包含原 C 代码上下文）进行最小修复并继续循环（_classify_rust_error/_cargo_build_loop）
+  - 测试失败时：错误分类（missing_import/type_mismatch/visibility/borrow_checker/dependency_missing/module_not_found），使用修复 Agent（每次重新创建，包含原 C 代码上下文）进行最小修复并继续循环（\_classify_rust_error/\_cargo_build_loop）
   - 测试命令配置：使用 `cargo test -- --nocapture` 获取完整的测试失败信息，并设置30秒超时（timeout=30）防止测试卡死
   - 统一测试验证：使用 `cargo test` 运行所有类型的测试（lib tests、bin tests、integration tests、doc tests 等），不区分项目结构（lib/bin/mixed），确保所有测试都能被验证
   - 测试失败信息反馈：测试失败时使用 `cargo test -- --nocapture` 获取完整的测试失败信息（包括测试用例名称、断言失败位置、期望值与实际值、堆栈跟踪等），并通过专门的 `<TEST_FAILURE>` 标签传递给修复 Agent，明确区分测试失败和编译错误
@@ -5030,7 +5029,7 @@ stop
     - 重新开始时，重新记录 commit id 并重置连续失败计数，确保每次重新开始都有新的基准点
     - 若重新开始次数达到上限（10 次），停止处理该函数并保留当前状态，便于后续 resume
 - 审查与复核：
-  - Review Agent 合并审查功能一致性和严重问题（_review_and_optimize）：
+  - Review Agent 合并审查功能一致性和严重问题（\_review_and_optimize）：
     - 功能一致性检查：核心输入输出、主要功能逻辑是否与 C 实现一致；允许 Rust 实现修复 C 代码中的安全漏洞或使用不同的类型设计、错误处理方式、资源管理方式等，只要功能一致即可
     - 严重问题检查：明显的空指针解引用、明显的越界访问等可能导致功能错误的问题
     - 不检查类型匹配、指针可变性、边界检查细节、资源释放细节等技术细节（除非会导致功能错误）
@@ -5052,8 +5051,8 @@ stop
   - 审查采用循环验证机制：发现问题 → 修复 → 构建验证 → 重新审查，最多迭代 review_max_iterations 次（0 表示无限重试）
   - **附加说明支持**：审查和优化阶段的提示词也会自动追加 `additional_notes`，确保用户自定义要求在整个审查流程中生效
 - 映射与占位清理：
-  - 记录 C→Rust 符号映射到 JSONL（支持同名/重载），更新 progress['converted']（_mark_converted，_SymbolMapJsonl）
-  - 清理 crate 源码中对当前符号的 todo!("sym")/unimplemented!("sym") 占位，替换为真实调用并回归测试（_resolve_pending_todos_for_symbol）
+  - 记录 C→Rust 符号映射到 JSONL（支持同名/重载），更新 progress['converted']（\_mark_converted，\_SymbolMapJsonl）
+  - 清理 crate 源码中对当前符号的 todo!("sym")/unimplemented!("sym") 占位，替换为真实调用并回归测试（\_resolve_pending_todos_for_symbol）
 - 初始工程自洽：
   - 在未执行 prepare 的情况下，兜底确保最小 Cargo.toml 与 src/lib.rs 存在（transpile开头的初始化逻辑）
 
@@ -5195,7 +5194,7 @@ stop
   - 每个步骤完成后自动记录当前 commit id，恢复时自动 reset 到最后一个已完成步骤的 commit id，确保代码状态一致
 - 快照与回滚（git_guard）：
   - 每个优化步骤前记录当前 HEAD 快照；步骤后若构建仍失败且无法修复，自动 reset --hard 回快照
-- 0) Clippy 告警消除（CodeAgent，可选）：
+- 1. Clippy 告警消除（CodeAgent，可选）：
   - 检查是否有 clippy 告警，如果有则使用 CodeAgent 消除告警
   - **迭代修复策略**：每次只修复第一个告警，然后重新检查告警，迭代修复直到没有告警
   - 每次修复前：记录运行前的 commit id，执行 `cargo fmt` 格式化代码
@@ -5203,20 +5202,20 @@ stop
   - 如果没有告警，则跳过此步骤
   - Agent 名字：`ClippyWarningEliminator-iter{iteration}`
   - **测试代码删除检测（基于事件订阅）**：所有 CodeAgent 实例都会自动订阅 `BEFORE_TOOL_CALL` 和 `AFTER_TOOL_CALL` 事件，在每次工具调用后立即检测测试代码删除，如果检测到问题则立即回退
-- 1) unsafe 清理（CodeAgent）：
+- 1. unsafe 清理（CodeAgent）：
   - **迭代处理策略**：每次只处理一个文件，迭代处理所有目标文件
   - 使用 CodeAgent 识别并移除该文件中不必要的 `unsafe { ... }` 包裹
   - 若必须使用 unsafe，缩小 unsafe 块的范围，并在紧邻位置添加 `/// SAFETY: ...` 文档注释说明理由
   - 每个文件处理前：记录运行前的 commit id，执行 `cargo fmt` 格式化代码
   - 每个文件处理后：执行 `cargo test` 验证，通过后保存进度和 commit id，失败时回退到运行前的 commit
   - Agent 名字：`UnsafeCleanupAgent-file{file_idx}`
-- 2) 可见性最小化（CodeAgent）：
+- 1. 可见性最小化（CodeAgent）：
   - 使用 CodeAgent 将 `pub fn` 降为 `pub(crate) fn`（如果函数仅在 crate 内部使用）
   - 保持对外接口（跨 crate 使用的接口，如 lib.rs 中的顶层导出）为 `pub`
   - 运行前：记录运行前的 commit id，执行 `cargo fmt` 格式化代码
   - 运行后：执行 `cargo test` 验证，通过后保存进度和 commit id，失败时回退到运行前的 commit
   - Agent 名字：`VisibilityOptimizer`
-- 3) 文档补充（CodeAgent）：
+- 1. 文档补充（CodeAgent）：
   - 使用 CodeAgent 为缺少模块级文档的文件添加 `//! ...` 模块文档注释
   - 为缺少函数文档的公共函数添加 `/// ...` 文档注释（可以是占位注释或简要说明）
   - 运行前：记录运行前的 commit id，执行 `cargo fmt` 格式化代码
@@ -5540,7 +5539,7 @@ CLI 命令主要参数（源码为准）
 
 **总体流程与数据流**
 
-- 文件发现与过滤（workflow._iter_source_files）
+- 文件发现与过滤（workflow.\_iter_source_files）
   - 递归枚举目标仓库源文件
   - 包含扩展名：.c/.cpp/.h/.hpp/.rs
   - 默认排除目录：.git、build、out、target、third_party、vendor（任一祖先匹配即排除）
@@ -5552,22 +5551,22 @@ CLI 命令主要参数（源码为准）
 
 **C/C++ 启发式检测算法（checkers/c_checker.py）**
 
-1) 预处理（降低误报，保持行号稳定）
+1. 预处理（降低误报，保持行号稳定）
 
-- _strip_if0_blocks：跳过 #if 0 主体，保留 #else 与行数
-- _remove_comments_preserve_strings：移除注释（//、/**/），保留字符串/字符字面量与换行，维持列/行稳定
-- _mask_strings_preserve_len：将字符串/字符字面量内容掩蔽为空格，保留引号与换行，便于“通用 API 匹配”避免把字面量当作代码
+- \_strip_if0_blocks：跳过 #if 0 主体，保留 #else 与行数
+- \_remove_comments_preserve_strings：移除注释（//、/\*\*/），保留字符串/字符字面量与换行，维持列/行稳定
+- \_mask_strings_preserve_len：将字符串/字符字面量内容掩蔽为空格，保留引号与换行，便于“通用 API 匹配”避免把字面量当作代码
 - 使用策略：
   - 需解析字面量的规则（如格式串、scanf 宽度）使用原始行（clean_text）
   - 通用 API/关键字匹配、复杂语义线索使用掩蔽行（masked_text）
 
-2) 规则分类与要点（部分示例）
+1. 规则分类与要点（部分示例）
 
 - 不安全/边界类
   - unsafe_api：strcpy/strcat/gets/sprintf/vsprintf 等（跳过头文件函数原型）
-  - buffer_overflow：memcpy/memmove/strncpy/strncat 等；若第三参明显为 sizeof(非指针解引用) 且不含 strlen，则认定更安全用法并跳过；若出现 strlen/sizeof(*ptr) 则提高风险
+  - buffer_overflow：memcpy/memmove/strncpy/strncat 等；若第三参明显为 sizeof(非指针解引用) 且不含 strlen，则认定更安全用法并跳过；若出现 strlen/sizeof(\*ptr) 则提高风险
   - strncpy/strncat 未保证 NUL 结尾（邻近窗口无 '\0' 处理提示风险）
-  - scanf %s 未限宽（忽略 %*s、GNU %ms/%m[...] 等更安全用法）
+  - scanf %s 未限宽（忽略 %\*s、GNU %ms/%m[...] 等更安全用法）
   - alloc_size_overflow：malloc(size 含乘法且未显式使用 sizeof)
   - alloca_unbounded/VLA：非常量/未界定的栈分配
 - 内存管理类
@@ -5575,7 +5574,7 @@ CLI 命令主要参数（源码为准）
   - alloc_no_null_check：malloc/calloc/new 后未见 NULL 检查即使用
   - use_after_free_suspect：free(var) 后窗口内检测到解引用且未重新赋值/置空
   - double_free/free_non_heap：重复释放或对非堆内存（&var/字符串字面量）调用 free
-  - possible_null_deref：p-> 或 *p 解引用附近无 NULL 判定（带上下文过滤乘法误报）
+  - possible_null_deref：p-> 或 \*p 解引用附近无 NULL 判定（带上下文过滤乘法误报）
   - wild_pointer_deref：未初始化指针声明后在赋值前被解引用
 - 错误处理与并发类
   - unchecked_io：I/O/系统调用可能未检查返回值（尝试识别赋值后对变量的判断以降低误报）
@@ -5585,27 +5584,27 @@ CLI 命令主要参数（源码为准）
   - thread_leak_no_join：创建线程后未见 join/detach
 - 输入/权限/敏感信息与网络时间等
   - format_string：printf/snprintf/fprintf 等格式串参数非字面量（允许本地化包装与回看变量字面量赋值）
-  - command_exec：system/exec* 非字面量参数（回看变量是否被赋值为字面量）
+  - command_exec：system/exec\* 非字面量参数（回看变量是否被赋值为字面量）
   - getenv_unchecked：从环境变量读取后未见显式校验
   - rand_insecure：安全敏感上下文使用 rand/srand
   - strtok_nonreentrant：非重入线程不安全
   - open_permissive_perms：open(..., O_CREAT, 0666/0777/...) 权限过宽；fopen 在敏感上下文写模式提示
   - inet_legacy/time_api_not_threadsafe：过期/非线程安全接口使用
 
-3) 置信度与严重度
+1. 置信度与严重度
 
 - 置信度 confidence ∈ [0,1]：按命中模式 + 临近窗口信号加减（如存在边界检查/NULL 检查/字面量赋值/SAFETY 注释等）
-- 严重度 severity：_severity_from_confidence(conf, base) 阈值映射
+- 严重度 severity：\_severity_from_confidence(conf, base) 阈值映射
   - conf ≥ 0.8 → high；≥ 0.6 → medium；否则 low
 - 证据 evidence：截断 200 字符的命中行（剔除缩进与制表符）
 
 **Rust 启发式检测算法（checkers/rust_checker.py）**
 
 - unsafe_usage：unsafe 代码与关键不安全接口（mem::transmute、MaybeUninit/assume_init、原始指针）
-- 错误处理：unwrap/expect 与忽略结果（let _ = / .ok() 等）
+- 错误处理：unwrap/expect 与忽略结果（let \_ = / .ok() 等）
 - FFI 与并发：extern "C"、unsafe impl Send/Sync
 - 置信度与降噪：
-  - SAFETY 注释附近降低置信度（_has_safety_comment_around）
+  - SAFETY 注释附近降低置信度（\_has_safety_comment_around）
   - 测试上下文（#[test] 或 mod tests）降低置信度
   - 严重度映射与 C/C++ 类似（high/medium/low）
 - 证据与行号同上
@@ -5674,15 +5673,15 @@ CLI 命令主要参数（源码为准）
 
 - 统一结构化 Issue（types.Issue）：language、category、pattern、file、line、evidence、description、suggestion、confidence、severity
 - 归一化与稳定 ID
-  - _normalize_issue 将 Issue 或 dict 统一为 dict，并补默认值
+  - \_normalize_issue 将 Issue 或 dict 统一为 dict，并补默认值
   - 稳定 ID：id = PREFIX + sha1(file:line:category:pattern) 前 6 位；C 前缀为 C，Rust 为 R
 - 评分规则
-  - 严重度权重：_SEVERITY_WEIGHT = {"high":3.0, "medium":2.0, "low":1.0}
+  - 严重度权重：\_SEVERITY_WEIGHT = {"high":3.0, "medium":2.0, "low":1.0}
   - 分数：score = round(confidence × severity_weight, 2)
 - Summary 聚合
   - total/by_language/by_category/top_risk_files
   - Top 风险文件按累计 score 降序，更稳定可解释
-  - 预设类别顺序 _CATEGORY_ORDER 用于 Markdown 展示；不在该序列的类别仍出现在 JSON 的 by_category 中
+  - 预设类别顺序 \_CATEGORY_ORDER 用于 Markdown 展示；不在该序列的类别仍出现在 JSON 的 by_category 中
 - Markdown 渲染
   - format_markdown_report：输出统计概览与逐条问题详情（含评分），附改进建议段落
   - build_json_and_markdown：一次性输出 JSON + Markdown，便于评测
@@ -5747,7 +5746,7 @@ CLI 命令主要参数（源码为准）
 
 **报告扩展**
 
-- 聚合与报告通过 report 模块统一收敛；新增类别只需规则产出即可被 JSON 记录，Markdown 可通过 _CATEGORY_ORDER 配置显示顺序
+- 聚合与报告通过 report 模块统一收敛；新增类别只需规则产出即可被 JSON 记录，Markdown 可通过 \_CATEGORY_ORDER 配置显示顺序
 - 扩展评分维度与审阅视图（文件粒度统计、按验证条件聚合）
 
 **断点与可靠性**
@@ -5917,15 +5916,15 @@ stop
 
 - **原则**：函数接口设计应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；禁止使用 `extern "C"`；优先使用 Rust 原生类型和惯用法，而不是 C 风格类型
 - 指针与切片
-  - 输入 const 指针：优先使用 &T / &[T]；仅在必要时使用原始指针 *const T
-  - 输入可变指针：优先使用 &mut T / &mut [T]；仅在必要时使用原始指针 *mut T
+  - 输入 const 指针：优先使用 &T / &[T]；仅在必要时使用原始指针 \*const T
+  - 输入可变指针：优先使用 &mut T / &mut [T]；仅在必要时使用原始指针 \*mut T
 - 指针+长度（ptr,len）
   - 首选 &[T]/&mut [T]；仅在特殊场景下保留原始指针
 - 字符串与字节
-  - const char* NUL 终止：优先使用 &str（需校验 UTF-8）；必要时使用 &CStr
-  - 可变 char* 或需要拥有：优先使用 String；必要时使用 CString / Vec<u8>
+  - const char\* NUL 终止：优先使用 &str（需校验 UTF-8）；必要时使用 &CStr
+  - 可变 char\* 或需要拥有：优先使用 String；必要时使用 CString / Vec<u8>
 - 基本类型
-  - 优先使用 i32/u32/i64/u64/isize/usize/f32/f64 等原生 Rust 类型，而不是 core::ffi::c_*或 libc::c_*
+  - 优先使用 i32/u32/i64/u64/isize/usize/f32/f64 等原生 Rust 类型，而不是 core::ffi::c*\*或 libc::c*\*
 - 所有权与生命周期
   - malloc/calloc/realloc/free → Box/Vec/Arc 等 RAII 容器；realloc 覆盖风险由容器规避
   - 输出参数/双指针：优先返回值或 Result<T,E>，必要时 &mut Option<T> 传回
@@ -5934,7 +5933,7 @@ stop
 - 错误语义
   - 优先考虑使用 Result<T,E> 而非 C 风格的错误码；如适用，在 Rust API 层统一使用 Result
 - 并发
-  - pthread_* → std::thread/std::sync 映射；优先使用 Rust 原生并发抽象
+  - pthread\_\* → std::thread/std::sync 映射；优先使用 Rust 原生并发抽象
 
 PlantUML：签名与类型映射（简化）
 
@@ -5976,7 +5975,7 @@ stop
 - **原则**：函数接口设计应遵循 Rust 最佳实践，不需要兼容 C 的数据类型；禁止使用 `extern "C"`；函数应使用标准的 Rust 调用约定
 - 类型设计优先考虑 Rust 的惯用法、安全性和可读性
   - 优先使用 Rust 原生类型（i32/u32/usize、&[T]/&mut [T]、String、Result<T, E> 等）
-  - 避免使用 C 风格类型（core::ffi::c_*、libc::c_*），禁止使用 `extern "C"`
+  - 避免使用 C 风格类型（core::ffi::c*\*、libc::c*\*），禁止使用 `extern "C"`
   - 仅在必要时使用原始指针或 #[repr(C)]，并在使用处进行适当的安全检查
 - 错误处理：优先考虑使用 Result<T, E> 而非 C 风格的错误码
 - 安全保证：以 SAFETY 注释记录前置条件（与 rust_checker 中的约定一致）
@@ -6337,7 +6336,7 @@ unsafe { ... }
 - 非交互运行：
   - jarvis-sec: agent 命令（失败时自动回退到 direct_scan）
   - c2rust: scan → lib-replace → prepare → transpile → optimize
-- 中间产物版本化并入仓（.jarvis/c2rust/* 与 issues 基线），支持跨分支协作与回归对比
+- 中间产物版本化并入仓（.jarvis/c2rust/\* 与 issues 基线），支持跨分支协作与回归对比
 
 PlantUML：演进路线图（简化）
 
@@ -6419,11 +6418,11 @@ bzip2 是一个基于 Burrows-Wheeler 算法和 Huffman 编码的文件压缩工
   - 置信度: 0.9, 严重性: high, 评分: 2.7
 
 - `bzip2.c:1163`（`strcat`）
-  - 在 `compress()` 流程中使用 `strcat` 追加固定后缀 "    "，当输入文件名长度接近上限时存在越界风险。触发路径：`compress()` -> `strcat()`，数据流未进行长度校验。建议在追加前验证可用空间或使用安全拼接策略。
+  - 在 `compress()` 流程中使用 `strcat` 追加固定后缀 " "，当输入文件名长度接近上限时存在越界风险。触发路径：`compress()` -> `strcat()`，数据流未进行长度校验。建议在追加前验证可用空间或使用安全拼接策略。
   - 置信度: 0.9, 严重性: high, 评分: 2.7
 
 - `bzip2.c:1351`（`strcat`）
-  - 在 `uncompress()` 流程中，当不可识别后缀时使用 `strcat` 追加固定后缀 "    "，可能越界。触发路径：`uncompress()` -> `strcat()`，未对目标缓冲区剩余空间进行检查。建议在多次映射后重新评估剩余空间。
+  - 在 `uncompress()` 流程中，当不可识别后缀时使用 `strcat` 追加固定后缀 " "，可能越界。触发路径：`uncompress()` -> `strcat()`，未对目标缓冲区剩余空间进行检查。建议在多次映射后重新评估剩余空间。
   - 置信度: 0.9, 严重性: high, 评分: 2.7
 
 - `bzip2.c:1744`（`strcpy`）
@@ -7435,4 +7434,3 @@ request_request 是 OpenHarmony 的网络请求管理核心组件，提供了网
 - 小规模项目（< 50 文件）：预计在 5-15 分钟内完成
 - 中等规模项目（50-200 文件）：预计在 15-60 分钟内完成
 - 大规模项目（> 200 文件）：预计在 1-3 小时内完成（具体取决于项目复杂度和 LLM 响应时间）
-
