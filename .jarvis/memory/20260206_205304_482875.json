@@ -1,0 +1,8 @@
+{
+  "id": "20260206_205304_482875",
+  "type": "project_long_term",
+  "tags": ["save_session", "session_management", "cleanup", "功能修改"],
+  "content": "会话清理功能：限制最多保存10个会话文件\n\n功能描述：\n- 在save_session()方法中添加了自动清理旧会话的功能\n- 每次保存会话成功后，自动检查并清理超过10个的旧会话\n- 删除最旧的会话文件及其对应的辅助文件（_commit.json、_tasklist.json、_state.json、_codeagent.json）\n\n实现位置：\n- src/jarvis/jarvis_agent/session_manager.py\n- 新增方法：_cleanup_old_sessions(session_dir)\n- 修改方法：save_session() 在保存成功后调用清理方法\n\n清理逻辑：\n1. 使用glob模式匹配当前agent的所有会话文件\n2. 过滤掉辅助文件，只保留主会话文件\n3. 提取时间戳并按降序排序（最新的在前）\n4. 如果超过10个，删除第11个及之后的所有文件\n5. 删除主文件时同时删除对应的辅助文件\n\n异常处理：\n- 清理过程失败不影响保存功能\n- 单个文件删除失败不影响其他文件的清理\n- 所有错误都会通过PrettyOutput输出警告信息\n\n测试验证：\n- ✅ 创建12个会话文件后，自动清理到10个\n- ✅ 删除最旧的会话文件及其辅助文件\n- ✅ Python语法检查通过",
+  "created_at": "2026-02-06T20:53:04.482902",
+  "updated_at": "2026-02-06T20:53:04.482907"
+}
