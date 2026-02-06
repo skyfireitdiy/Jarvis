@@ -239,13 +239,6 @@ package "Input Handlers" #AliceBlue {
 
 package "Output Handlers" #Thistle {
   component "OutputHandlerProtocol" as OutputHandlerProtocol
-  component "WebOutputSink" as WebOutputSink
-}
-
-package "Web Support" #Lavender {
-  component "WebServer" as WebServer
-  component "WebBridge" as WebBridge
-  component "StdioRedirect" as StdioRedirect
 }
 
 package "Share Management" #PeachPuff {
@@ -293,10 +286,6 @@ Agent --> builtin_input_handler
 Agent --> shell_input_handler
 Agent --> file_context_handler
 Agent --> UserInteractionHandler : 交互封装
-
-WebServer --> WebBridge : WebSocket桥接
-WebServer --> WebOutputSink : 输出广播
-WebServer --> StdioRedirect : 标准流重定向
 
 ShareManager <|-- MethodologyShareManager
 ShareManager <|-- ToolShareManager
@@ -430,25 +419,6 @@ MainEntry --> Agent : 代理入口
 - **OutputHandlerProtocol**（输出处理器协议）
   - 职责：定义输出处理器的接口协议
   - 源码位置：OutputHandlerProtocol模块
-- **WebOutputSink**（Web 输出接收器）
-  - 职责：将输出事件广播到 Web 前端
-  - 源码位置：WebOutputSink模块
-
-**3.1.6 Web 支持模块（Web Support）**
-
-- **WebServer**（Web 服务器）
-  - 职责：基于 FastAPI 提供 Web 服务，支持 WebSocket 通信和终端交互
-  - 聚焦：WebSocket 路由（`/ws`、`/stdio`）、HTML 页面、标准流重定向集成
-  - 源码位置：WebServer模块
-- **WebBridge**（WebSocket 桥接）
-  - 职责：提供线程安全的 WebSocket 交互桥，处理多行输入和确认请求
-  - 聚焦：阻塞式输入/确认请求、事件约定、客户端管理
-  - 源码位置：WebBridge模块
-- **StdioRedirect**（标准流重定向）
-  - 职责：将标准输出/错误重定向到 WebSocket 通道
-  - 聚焦：工具直接打印输出的捕获与转发
-  - 源码位置：StdioRedirect模块
-
 **3.1.7 分享管理模块（Share Management）**
 
 - **ShareManager**（分享管理器基类）
@@ -510,8 +480,8 @@ MainEntry --> Agent : 代理入口
 **3.1.10 入口模块（Entry Points）**
 
 - **jarvis**（主入口）
-  - 职责：主命令的入口点，提供完整的 CLI 接口和 Web 模式支持
-  - 聚焦：命令行参数解析、配置管理、AgentManager 初始化、Web 服务启动
+  - 职责：主命令的入口点，提供完整的 CLI 接口
+  - 聚焦：命令行参数解析、配置管理、AgentManager 初始化
   - 源码位置：主入口模块
 - **main**（代理入口）
   - 职责：`jarvis-agent` 命令的入口点，提供简化的 Agent 启动接口
@@ -575,7 +545,7 @@ MainEntry --> Agent : 代理入口
   - shell_input_handler：处理 Shell 命令（以 `!` 开头）
   - file_context_handler：处理文件引用（如 `@file.txt`），自动加载文件内容到上下文
 - **UserInteractionHandler**（用户交互封装）
-  - 封装多行输入与确认回调，便于未来替换为 TUI/WebUI
+  - 封装多行输入与确认回调，便于未来替换为 TUI
   - 多行输入兼容性：优先使用带空行打印参数的签名，失败时回退为单参数签名
   - 确认回调委派：保持与原有用户确认方法一致的行为
 
@@ -583,18 +553,6 @@ MainEntry --> Agent : 代理入口
 
 - **OutputHandlerProtocol**（输出处理器协议）
   - 定义输出处理器的标准接口，支持扩展自定义输出处理逻辑
-- **WebOutputSink**（Web 输出接收器）
-  - 在 Web 模式下将输出事件广播到前端
-
-**Web 支持模块（Web Support）**
-
-- **WebServer**（Web 服务器）
-  - 基于 FastAPI 提供 Web 服务，支持 WebSocket 通信（`/ws`、`/stdio`）和终端交互
-  - 集成标准流重定向，捕获工具直接打印的输出
-- **WebBridge**（WebSocket 桥接）
-  - 提供线程安全的 WebSocket 交互桥，处理多行输入和确认请求的阻塞式等待
-- **StdioRedirect**（标准流重定向）
-  - 将标准输出/错误重定向到 WebSocket 通道，实现工具输出的实时转发
 
 **分享管理模块（Share Management）**
 
