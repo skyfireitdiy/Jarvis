@@ -478,8 +478,11 @@ def check_large_code_deletion(threshold: int = 30) -> bool:
     return True
 
 
-def handle_commit_workflow() -> bool:
+def handle_commit_workflow(start_commit: Optional[str] = None) -> bool:
     """Handle the git commit workflow and return the commit details.
+
+    Args:
+        start_commit: 起始 commit hash，用于 squash 工作流
 
     Returns:
         bool: 提交是否成功
@@ -495,6 +498,23 @@ def handle_commit_workflow() -> bool:
     try:
         confirm_add_new_files()
 
+        # 获取当前 HEAD
+        current_head = get_latest_commit_hash()
+
+        # 检查是否需要 squash：有 start_commit 且与当前 HEAD 不一致
+        if start_commit and start_commit != current_head:
+            # 执行 squash 操作：将 start_commit 之后的所有 commit 压缩成一个
+            subprocess.run(
+                ["git", "reset", "--soft", start_commit],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "提交代码"], check=True, capture_output=True
+            )
+            return True
+
+        # 原有逻辑：检查工作区是否有未提交的更改
         if not has_uncommitted_changes():
             return False
 
