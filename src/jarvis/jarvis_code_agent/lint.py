@@ -8,6 +8,7 @@ Lint工具配置模块
 """
 
 import os
+import shlex
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -241,9 +242,10 @@ def _format_lint_command(
         abs_file_path = os.path.abspath(file_path)
 
     # 准备占位符替换字典
+    # 使用 shlex.quote 对路径进行安全的shell转义，处理包含空格的路径
     placeholders = {
-        "file_path": abs_file_path,
-        "file_name": os.path.basename(abs_file_path),
+        "file_path": shlex.quote(abs_file_path),
+        "file_name": shlex.quote(os.path.basename(abs_file_path)),
     }
 
     # 如果模板中有 {config} 占位符，说明需要配置文件
