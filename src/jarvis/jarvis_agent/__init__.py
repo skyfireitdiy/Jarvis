@@ -376,6 +376,13 @@ class Agent:
     prefix: str
     suffix: str
 
+    # CodeAgent 特有属性（仅在 CodeAgent 实例中存在）
+    disable_review: bool
+    review_max_iterations: int
+    tool_group: Optional[str]
+    root_dir: str
+    start_commit: Optional[str]
+
     def agent_type(self) -> str:
         """获取Agent类型"""
         return self._agent_type
