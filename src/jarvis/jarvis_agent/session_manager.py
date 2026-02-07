@@ -125,10 +125,11 @@ class SessionManager:
 
         # 匹配新旧两种格式的会话文件
         # 旧格式：saved_session_{agent_name}_{platform_name}_{model_name}.json
-        # 新格式：saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json
+        # 中间格式：saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json
+        # 新格式：{session_name}_saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json
         pattern = os.path.join(
             session_dir,
-            f"saved_session_{self.agent_name}_{platform_name}_{model_name}*.json",
+            f"*saved_session_{self.agent_name}_{platform_name}_{model_name}*.json",
         )
 
         files = sorted(glob.glob(pattern))
@@ -355,7 +356,7 @@ class SessionManager:
             # 匹配会话文件模式
             pattern = os.path.join(
                 session_dir,
-                f"saved_session_{self.agent_name}_{platform_name}_{model_name}*.json",
+                f"*saved_session_{self.agent_name}_{platform_name}_{model_name}*.json",
             )
 
             # 获取所有匹配的文件
