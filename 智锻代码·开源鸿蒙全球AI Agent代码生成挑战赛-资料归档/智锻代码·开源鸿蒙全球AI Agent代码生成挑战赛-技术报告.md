@@ -154,7 +154,7 @@ package "专业应用层" #LightBlue {
 
 ```
 扫描（scanner）→ 库替代评估（library_replacer）→ 模块规划（Agent）→
-转译（CodeAgent + Agent）→ 优化（optimizer + CodeAgent）
+转译（CodeAgent + Agent）→ 优化（optimizer + CodeAgent）；可选地执行 **verify**（功能对齐验证，独立子命令）对转译结果做 C 与 Rust 功能对齐分析与迭代优化。
 ```
 
 - **库替代评估**：评估可用 Rust 标准库和第三方库，决定是使用现有库还是转译 C 实现
@@ -497,7 +497,7 @@ MainEntry --> Agent : 代理入口
   - 设置系统提示，首轮按需进行工具筛选与文件/方法论处理
   - 将主运行循环委派给 AgentRunLoop
   - 在关键节点广播事件（TASK_STARTED、BEFORE/AFTER_MODEL_CALL、BEFORE/AFTER_HISTORY_CLEAR、BEFORE/AFTER_ADDON_PROMPT、BEFORE/AFTER_SUMMARY、BEFORE_TOOL_FILTER、TOOL_FILTERED、AFTER_TOOL_CALL、INTERRUPT_TRIGGERED）
-  - 动态加载 after*tool_call 回调：扫描 after_tool_call_cb_dirs 配置指定的目录，支持三种导出形式（直接回调、get*_工厂、register\__ 工厂）
+  - 动态加载 after*tool_call 回调：扫描 after_tool_call_cb_dirs 配置指定的目录，支持三种导出形式（直接回调、get**工厂、register\_* 工厂）
 - **AgentRunLoop**（主循环执行体）
   - 驱动"模型思考 → 工具执行 → 结果拼接/中断处理 → 下一轮"的迭代
   - 统一处理工具返回协议与异常兜底，支持自动完成
@@ -4164,6 +4164,7 @@ CLI 子命令主要参数（源码为准）
   - `transpiler.py`：函数级转译器与构建修复循环（模块规划、代码生成、构建校验、审查复核）
     - 相关支持模块：`constants.py`（常量定义）、`models.py`（数据模型）、`loaders.py`（数据加载器）、`utils.py`（工具函数）
   - `optimizer.py`：Rust 代码保守优化器（所有优化步骤均使用 CodeAgent 完成，包括 clippy 告警消除、unsafe 清理、可见性优化、文档补充）
+  - `verify.py`：功能对齐验证（检查转译是否完成、按文件分析 C 与 Rust 功能对齐性、支持迭代优化直至对齐或达到上限）
 
 - **核心数据目录与产物**（默认路径 `<project_root>/.jarvis/c2rust/`）：
   - **符号表**：
@@ -4277,6 +4278,12 @@ Transpiler --> Optimizer : 已生成的 crate 源码
     - **prepare**：调用 LLM 规划 crate 结构并直接落盘，执行初始构建校验（`cargo check`）并进行最小修复
     - **transpile**：按 `translation_order.jsonl` 逐函数转译并进行构建修复，默认始终启用断点续跑（通过 `progress.json` 记录细粒度进度）
     - **optimize**：对生成的 crate 执行保守优化（所有优化步骤均使用 CodeAgent 完成，包括 clippy 告警消除、unsafe 清理、可见性优化、文档补充），采用默认优化配置，自动检测 crate 根目录；每个修复前执行 `cargo fmt` 格式化代码，每个 Agent 调用后执行 `cargo test` 验证，测试失败时自动回退到运行前的 commit
+- **verify**：功能对齐验证（独立子命令，需在 `run` 完成后执行）
+  - 参数：`-g/--llm-group <name>`（用于分析与优化的模型组），`-i/--max-iterations <N>`（最大迭代次数，默认 10），`--interactive`（启用交互模式）
+  - 前置条件：要求 `run_state.json` 中 transpile 与 optimize 阶段均已完成，否则提示先执行 `jarvis-c2rust run`
+  - 工作流程：检查转译状态 → 切换到目标 crate 目录 → 创建功能对齐分析任务（按文件拆分子任务）→ 使用 Agent 分析 C 与 Rust 代码的功能对齐性（函数签名、逻辑、错误处理、内存安全、数据结构布局等）→ 生成结构化报告（如 `alignment_report.md`）→ 若判定未对齐则调用 CodeAgent 基于报告优化代码并重新验证，直到对齐或达到最大迭代次数
+  - 产物：crate 根目录下的 `alignment_report.md`（对齐分析报告）；验证结果以 JSON 形式在最终总结中输出（含 `is_aligned`、`summary` 等）
+  - 源码位置：`verify.py`（`check_transpile_completed`、`run_verify`、`_run_alignment_analysis`、`_run_optimization`）
 
 典型流水线（PlantUML）
 
