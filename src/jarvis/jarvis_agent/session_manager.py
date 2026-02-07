@@ -993,16 +993,16 @@ class SessionManager:
             session_file = os.path.basename(self.last_restored_session)
             timestamp = self._extract_timestamp(session_file)
 
-            # 构建commit文件的基础名称
-            base_name = f"saved_session_{self.agent_name}_{self.model.platform_name()}_{self.model.name().replace('/', '_').replace('\\', '_')}"
+            # 使用 _get_session_file_prefix() 获取正确的前缀（包含session_name）
+            prefix = self._get_session_file_prefix()
 
             # 根据时间戳确定commit文件名
             if timestamp:
                 # 新格式：包含时间戳
-                commit_filename = f"{base_name}_{timestamp}_commit.json"
+                commit_filename = f"{prefix}_{timestamp}_commit.json"
             else:
                 # 旧格式：不包含时间戳
-                commit_filename = f"{base_name}_commit.json"
+                commit_filename = f"{prefix}_commit.json"
 
             session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
             commit_file = os.path.join(session_dir, commit_filename)
