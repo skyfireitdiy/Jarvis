@@ -115,6 +115,14 @@ class CodeAgent(Agent):
         # 父类初始化后的设置
         self._setup_code_agent_after_parent_init()
 
+    def get_user_origin_input(self) -> str:
+        """获取原始用户输入（CodeAgent重写）
+
+        返回:
+            str: 原始用户输入（未经CodeAgent增强处理）
+        """
+        return self._raw_user_input
+
     def _init_code_agent_base_attributes(
         self,
         tool_group: Optional[str],
@@ -143,6 +151,9 @@ class CodeAgent(Agent):
         # Commit prefix 和 suffix，用于生成提交信息
         self.prefix: str = ""
         self.suffix: str = ""
+
+        # 保存原始用户输入（用于会话名称生成）
+        self._raw_user_input: str = ""
 
     def _init_code_agent_context_managers(self) -> None:
         """初始化 CodeAgent 上下文管理相关组件"""
@@ -307,6 +318,9 @@ class CodeAgent(Agent):
         """
         try:
             set_current_agent(self.name, self)
+
+            # 保存原始用户输入（用于会话名称生成）
+            self._raw_user_input = user_input
 
             # 存储 prefix 和 suffix，供 commit 命令使用
             self.prefix = prefix

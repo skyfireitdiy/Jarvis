@@ -338,8 +338,8 @@ class SessionManager:
         else:
             # 新建会话，从agent获取原始输入生成名称
             user_input = ""
-            if self.agent and hasattr(self.agent, "original_user_input"):
-                user_input = self.agent.original_user_input.strip()
+            if self.agent and hasattr(self.agent, "get_user_origin_input"):
+                user_input = self.agent.get_user_origin_input().strip()
 
             if user_input:
                 session_name = self._generate_session_name(user_input)
