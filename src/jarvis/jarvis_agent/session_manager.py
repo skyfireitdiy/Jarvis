@@ -10,6 +10,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -35,6 +36,7 @@ class SessionManager:
         self.addon_prompt: str = ""
         self.conversation_length: int = 0
         self.last_restored_session: Optional[str] = None  # 记录最后恢复的会话文件路径
+        self.current_session_name: Optional[str] = None  # 当前会话名称
         self.non_interactive: bool = False  # 是否为非交互模式
 
     def set_user_data(self, key: str, value: Any) -> None:
@@ -48,6 +50,64 @@ class SessionManager:
     def set_addon_prompt(self, addon_prompt: str) -> None:
         """Sets the addon prompt for the next model call."""
         self.addon_prompt = addon_prompt
+
+    def _generate_session_name(self, user_input: str) -> str:
+        """根据用户输入生成会话名称
+
+        Args:
+            user_input: 用户第一条输入
+
+        Returns:
+            str: 生成的会话名称（3-8个中文字符）
+        """
+        import re
+        from jarvis.jarvis_platform.registry import PlatformRegistry
+
+        # 限制输入长度，避免token过多
+        if len(user_input) > 200:
+            user_input = user_input[:200]
+
+        # 使用cheap模型生成会话名称
+        try:
+            registry = PlatformRegistry.get_global_platform_registry()
+            cheap_model = registry.create_platform(platform_type="cheap")
+            if cheap_model is None:
+                return "未命名会话"
+            prompt = f"""请根据以下用户输入，生成一个简洁的会话名称（3-8个中文字符）。
+要求：
+1. 名称要能概括会话主题
+2. 使用简洁的中文表达
+3. 只返回名称，不要其他内容
+
+用户输入：{user_input}
+
+会话名称："""
+
+            # 调用模型生成
+            response = ""
+            for chunk in cheap_model.chat(prompt):
+                response += chunk
+
+            # 清理响应
+            session_name = response.strip()
+
+            # 限制长度（3-8个中文字符，约等于6-16个字符）
+            if len(session_name) > 16:
+                session_name = session_name[:16]
+
+            # 清理特殊字符，只保留中文、字母、数字、下划线、短横线
+            session_name = re.sub(r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", session_name)
+
+            # 如果清理后为空，使用默认名称
+            if not session_name:
+                session_name = "未命名会话"
+
+            return session_name
+
+        except Exception as e:
+            # 生成失败时使用默认名称
+            PrettyOutput.auto_print(f"⚠️  生成会话名称失败: {e}，使用默认名称")
+            return "未命名会话"
 
     def _list_session_files(self) -> List[str]:
         """
@@ -113,20 +173,52 @@ class SessionManager:
 
         return None
 
-    def _parse_session_files(self) -> List[Tuple[str, Optional[str]]]:
+    def _read_session_name(self, session_file: str) -> Optional[str]:
         """
-        解析会话文件列表，返回包含文件路径和时间戳的列表。
+        从会话的 commit 信息文件中读取会话名称。
+
+        Args:
+            session_file: 会话文件路径
 
         Returns:
-            会话信息列表，每个元素为 (文件路径, 时间戳)，按时间戳降序排列。
-            如果文件没有时间戳，时间戳为 None，这类文件会排在最后。
+            会话名称，如果不存在则返回 None。
+        """
+        try:
+            # 构建对应的 _commit.json 文件路径
+            commit_file = (
+                session_file[:-5] + "_commit.json"
+            )  # 去掉 ".json" 加上 "_commit.json"
+
+            if not os.path.exists(commit_file):
+                return None
+
+            with open(commit_file, "r", encoding="utf-8") as f:
+                commit_info = cast(Dict[str, Any], json.load(f))
+                session_name = commit_info.get("session_name")
+                # 确保返回值类型为 Optional[str]
+                if session_name is not None and isinstance(session_name, str):
+                    return cast(Optional[str], session_name)
+                return None
+
+        except Exception:
+            # 读取失败不影响主流程，返回 None
+            return None
+
+    def _parse_session_files(self) -> List[Tuple[str, Optional[str], Optional[str]]]:
+        """
+        解析会话文件列表，返回包含文件路径、时间戳和会话名称的列表。
+
+        Returns:
+            会话信息列表，每个元素为 (文件路径, 时间戳, 会话名称)，按时间戳降序排列。
+            如果文件没有时间戳，时间戳为 None；如果没有会话名称，会话名称为 None。
         """
         files = self._list_session_files()
 
         sessions = []
         for file_path in files:
             timestamp = self._extract_timestamp(file_path)
-            sessions.append((file_path, timestamp))
+            session_name = self._read_session_name(file_path)
+            sessions.append((file_path, timestamp, session_name))
 
         # 按时间戳降序排列（最新的在前），没有时间戳的排在最后
         sessions.sort(key=lambda x: (x[1] is None, x[1] or ""), reverse=True)
@@ -140,9 +232,29 @@ class SessionManager:
         platform_name = self.model.platform_name()
         model_name = self.model.name().replace("/", "_").replace("\\", "_")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # 确定会话名称
+        if self.current_session_name:
+            # 已有会话名称（从恢复的会话继承），直接使用
+            session_name = self.current_session_name
+        else:
+            # 新建会话，从agent获取原始输入生成名称
+            user_input = ""
+            if self.agent and hasattr(self.agent, "original_user_input"):
+                user_input = self.agent.original_user_input.strip()
+
+            if user_input:
+                session_name = self._generate_session_name(user_input)
+                PrettyOutput.auto_print(f"📝 生成会话名称: {session_name}")
+            else:
+                session_name = "未命名会话"
+
+            self.current_session_name = session_name
+
+        # 使用session_name作为文件名前缀
         session_file = os.path.join(
             session_dir,
-            f"saved_session_{self.agent_name}_{platform_name}_{model_name}_{timestamp}.json",
+            f"{session_name}_saved_session_{self.agent_name}_{platform_name}_{model_name}_{timestamp}.json",
         )
         result = self.model.save(session_file)
 
@@ -210,6 +322,8 @@ class SessionManager:
             }
             if start_commit:
                 commit_info["start_commit"] = start_commit
+            if self.current_session_name:
+                commit_info["session_name"] = self.current_session_name
 
             # 写入 _commit.json 文件
             commit_file = (
@@ -417,11 +531,11 @@ class SessionManager:
 
         # 如果只有一个会话文件，直接恢复
         if len(sessions) == 1:
-            session_file = sessions[0][0]
-            timestamp = sessions[0][1]
+            session_file, timestamp, session_name = sessions[0]
             time_str = timestamp if timestamp else "(无时间戳)"
+            name_str = f" [{session_name}]" if session_name else ""
             PrettyOutput.auto_print(
-                f"📂 恢复会话: {os.path.basename(session_file)} ({time_str})"
+                f"📂 恢复会话{name_str}: {os.path.basename(session_file)} ({time_str})"
             )
 
             # 检查 commit 一致性
@@ -431,6 +545,7 @@ class SessionManager:
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
+                self.current_session_name = session_name  # 记录会话名称
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
@@ -440,15 +555,16 @@ class SessionManager:
         # 检查是否为非交互模式
         if self.non_interactive:
             # 非交互模式：自动恢复最新的会话
-            session_file = sessions[0][0]
-            timestamp = sessions[0][1]
+            session_file, timestamp, session_name = sessions[0]
             time_str = timestamp if timestamp else "(无时间戳)"
+            name_str = f" [{session_name}]" if session_name else ""
             PrettyOutput.auto_print(
-                f"🤖 非交互模式：自动恢复最新会话: {os.path.basename(session_file)} ({time_str})"
+                f"🤖 非交互模式：自动恢复最新会话{name_str}: {os.path.basename(session_file)} ({time_str})"
             )
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
+                self.current_session_name = session_name  # 记录会话名称
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
@@ -456,10 +572,11 @@ class SessionManager:
 
         # 交互模式：显示列表让用户选择
         PrettyOutput.auto_print("📋 找到多个会话文件：")
-        for idx, (file_path, timestamp) in enumerate(sessions, 1):
+        for idx, (file_path, timestamp, session_name) in enumerate(sessions, 1):
             time_str = timestamp if timestamp else "(无时间戳)"
+            name_str = f" - {session_name}" if session_name else ""
             PrettyOutput.auto_print(
-                f"  {idx}. {os.path.basename(file_path)} [{time_str}]"
+                f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}"
             )
         # 添加取消选项
         PrettyOutput.auto_print("  0. 取消恢复")
@@ -488,11 +605,11 @@ class SessionManager:
                 break
 
             # 恢复选中的会话
-            session_file = sessions[choice_idx][0]
-            timestamp = sessions[choice_idx][1]
+            session_file, timestamp, session_name = sessions[choice_idx]
             time_str = timestamp if timestamp else "(无时间戳)"
+            name_str = f" [{session_name}]" if session_name else ""
             PrettyOutput.auto_print(
-                f"📂 恢复会话: {os.path.basename(session_file)} ({time_str})"
+                f"📂 恢复会话{name_str}: {os.path.basename(session_file)} ({time_str})"
             )
 
             # 检查 commit 一致性
@@ -502,6 +619,7 @@ class SessionManager:
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
+                self.current_session_name = session_name  # 记录会话名称
                 return True
             else:
                 PrettyOutput.auto_print("❌ 会话恢复失败。")
