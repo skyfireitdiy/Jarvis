@@ -23,7 +23,7 @@ from typing import List
 from typing import Sequence
 from typing import Tuple
 
-from ..types import Issue
+from jarvis.jarvis_sec.types import Issue
 
 # ---------------------------
 # 规则库（正则表达式）
