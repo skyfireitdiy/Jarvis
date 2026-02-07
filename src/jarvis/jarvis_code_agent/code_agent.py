@@ -1556,6 +1556,53 @@ def cli(
                         optimize_system_prompt=optimize_system_prompt,
                     )
 
+                    # 检测与当前commit一致的历史会话（仅在交互模式且未指定restore_session时）
+                    if (
+                        not non_interactive
+                        and not restore_session
+                        and not is_auto_resume_session()
+                    ):
+                        try:
+                            current_commit = get_latest_commit_hash()
+                            if current_commit:
+                                matching_sessions = (
+                                    agent.session._find_sessions_by_commit(
+                                        current_commit
+                                    )
+                                )
+                                if matching_sessions:
+                                    selected_session = agent.session._prompt_to_restore_matching_sessions(
+                                        matching_sessions
+                                    )
+                                    if selected_session:
+                                        # 用户选择恢复会话
+                                        if agent.session.model.restore(
+                                            selected_session
+                                        ):
+                                            agent.session.last_restored_session = (
+                                                selected_session
+                                            )
+                                            session_name = (
+                                                agent.session._read_session_name(
+                                                    selected_session
+                                                )
+                                            )
+                                            agent.session.current_session_name = (
+                                                session_name
+                                            )
+                                            agent.session._restore_agent_state()
+                                            agent.session._restore_task_lists()
+                                            agent.session._restore_start_commit_info()
+                                            file_basename = os.path.basename(
+                                                selected_session
+                                            )
+                                            PrettyOutput.auto_print(
+                                                f"✅ 已从 {file_basename} 恢复会话。"
+                                            )
+                        except Exception as e:
+                            # 检测失败不影响主流程
+                            PrettyOutput.auto_print(f"⚠️  检测历史会话失败: {e}")
+
                     # 如果指定了会话恢复，先恢复会话（让用户先选择会话，再输入需求）
                     if restore_session or is_auto_resume_session():
                         if agent.restore_session():

@@ -226,6 +226,103 @@ class SessionManager:
 
         return sessions
 
+    def _find_sessions_by_commit(
+        self, commit_hash: str
+    ) -> List[Tuple[str, Optional[str], Optional[str]]]:
+        """
+        查找与指定commit匹配的会话列表。
+
+        Args:
+            commit_hash: 要匹配的commit hash
+
+        Returns:
+            匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称)，按时间戳降序排列。
+        """
+        files = self._list_session_files()
+        matching_sessions = []
+
+        for file_path in files:
+            try:
+                # 读取对应的 _commit.json 文件
+                commit_file = file_path[:-5] + "_commit.json"
+                if not os.path.exists(commit_file):
+                    continue
+
+                with open(commit_file, "r", encoding="utf-8") as f:
+                    commit_data = json.load(f)
+
+                saved_commit = commit_data.get("current_commit", "")
+                # 检查commit是否匹配
+                if saved_commit == commit_hash:
+                    timestamp = self._extract_timestamp(file_path)
+                    session_name = self._read_session_name(file_path)
+                    matching_sessions.append((file_path, timestamp, session_name))
+
+            except Exception:
+                # 读取失败时跳过该会话
+                continue
+
+        # 按时间戳降序排列（最新的在前）
+        matching_sessions.sort(key=lambda x: (x[1] is None, x[1] or ""), reverse=True)
+        return matching_sessions
+
+    def _prompt_to_restore_matching_sessions(
+        self, matching_sessions: List[Tuple[str, Optional[str], Optional[str]]]
+    ) -> Optional[str]:
+        """
+        提示用户选择是否恢复匹配的会话。
+
+        Args:
+            matching_sessions: 匹配的会话列表，每个元素为 (文件路径, 时间戳, 会话名称)
+
+        Returns:
+            恢复的会话文件路径，如果用户选择不恢复则返回 None
+        """
+        if not matching_sessions:
+            return None
+
+        PrettyOutput.auto_print("\n🔍 检测到与当前commit一致的历史会话：")
+        for idx, (file_path, timestamp, session_name) in enumerate(
+            matching_sessions, 1
+        ):
+            time_str = timestamp if timestamp else "(无时间戳)"
+            name_str = f" - {session_name}" if session_name else ""
+            PrettyOutput.auto_print(
+                f"  {idx}. {os.path.basename(file_path)} [{time_str}]{name_str}"
+            )
+
+        try:
+            while True:
+                choice = input(
+                    "\n是否恢复会话？（输入序号恢复，直接回车跳过）: "
+                ).strip()
+
+                # 直接回车，不恢复
+                if not choice:
+                    PrettyOutput.auto_print("⏭️  跳过会话恢复，继续正常流程。")
+                    return None
+
+                # 验证输入是否为数字
+                if not choice.isdigit():
+                    PrettyOutput.auto_print("❌ 无效的选择，请输入数字或直接回车跳过。")
+                    continue
+
+                choice_idx = int(choice) - 1
+
+                # 验证序号是否在有效范围内
+                if choice_idx < 0 or choice_idx >= len(matching_sessions):
+                    PrettyOutput.auto_print(
+                        f"❌ 无效的选择，请输入1-{len(matching_sessions)}之间的数字，或直接回车跳过。"
+                    )
+                    continue
+
+                # 输入有效，返回选中的会话文件
+                return matching_sessions[choice_idx][0]
+
+        except (EOFError, KeyboardInterrupt):
+            PrettyOutput.auto_print("\n⚠️  已取消会话恢复。")
+            return None
+
     def save_session(self) -> bool:
         """Saves the current session state to a file."""
         session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
