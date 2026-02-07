@@ -697,21 +697,21 @@ class SessionManager:
 
         try:
             while True:
-                choice = input("请选择要恢复的会话（输入序号，0取消）: ").strip()
+                choice = input("请选择要恢复的会话（输入序号，直接回车取消）: ").strip()
+
+                # 直接回车或输入0表示取消恢复
+                if not choice or choice == "0":
+                    return False
 
                 if not choice.isdigit():
                     PrettyOutput.auto_print("❌ 无效的选择，请输入数字。")
                     continue
 
                 choice_idx = int(choice) - 1
-                # 选择0表示取消恢复
-                if choice_idx == -1:
-                    PrettyOutput.auto_print("⏸️  已取消恢复会话。")
-                    return False
 
                 if choice_idx < 0 or choice_idx >= len(sessions):
                     PrettyOutput.auto_print(
-                        f"❌ 无效的选择，请输入0-{len(sessions)}之间的数字。"
+                        f"❌ 无效的选择，请输入1-{len(sessions)}之间的数字。"
                     )
                     continue
 
