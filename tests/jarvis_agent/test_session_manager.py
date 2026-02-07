@@ -92,11 +92,14 @@ class TestSessionManager:
 
             # 验证结果
             assert result is True
-            mock_makedirs.assert_called_once_with("/test/dir/.jarvis", exist_ok=True)
+            mock_makedirs.assert_called_once_with(
+                "/test/dir/.jarvis/sessions", exist_ok=True
+            )
 
             # 验证保存路径格式（文件名包含时间戳）
             actual_path = mock_model.save.call_args[0][0]
-            expected_pattern = r"/test/dir/\.jarvis/saved_session_test_agent_test_platform_test_model_\d{8}_\d{6}\.json$"
+            # 文件名可能包含会话名称前缀（如：未命名会话）
+            expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_test_platform_test_model_\d{8}_\d{6}\.json$"
             assert re.match(expected_pattern, actual_path), (
                 f"路径格式不匹配: {actual_path}"
             )
@@ -115,7 +118,8 @@ class TestSessionManager:
 
             # 验证特殊字符被替换，且文件名包含时间戳
             actual_path = mock_model.save.call_args[0][0]
-            expected_pattern = r"/test/dir/\.jarvis/saved_session_test_agent_test_platform_test_model_name_\d{8}_\d{6}\.json$"
+            # 文件名可能包含会话名称前缀（如：未命名会话）
+            expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_test_platform_test_model_name_\d{8}_\d{6}\.json$"
             assert re.match(expected_pattern, actual_path), (
                 f"路径格式不匹配: {actual_path}"
             )
@@ -130,7 +134,7 @@ class TestSessionManager:
         with patch.object(
             session_manager,
             "_parse_session_files",
-            return_value=[(mock_session_file, "20250107_120000")],
+            return_value=[(mock_session_file, "20250107_120000", None)],
         ):
             result = session_manager.restore_session()
 
@@ -140,14 +144,11 @@ class TestSessionManager:
             # 验证文件路径
             mock_model.restore.assert_called_once_with(mock_session_file)
 
-            # 验证输出：应该有两次print调用（显示恢复的文件名和成功消息）
-            assert mock_auto_print.call_count == 2
-            # 第一次调用显示恢复的文件名
+            # 验证输出：应该有一次print调用（显示恢复的文件名）
+            assert mock_auto_print.call_count == 1
+            # 调用显示恢复的文件名
             first_call = mock_auto_print.call_args_list[0][0][0]
             assert "📂 恢复会话:" in first_call
-            # 第二次调用显示成功消息
-            second_call = mock_auto_print.call_args_list[1][0][0]
-            assert "✅ 会话已恢复。" == second_call
 
     @patch("os.path.exists")
     def test_restore_session_file_not_exists(self, mock_exists, session_manager):
@@ -174,8 +175,8 @@ class TestSessionManager:
             session_manager,
             "_parse_session_files",
             return_value=[
-                (mock_newer_file, "20250107_120000"),
-                (mock_older_file, "20250106_080000"),
+                (mock_newer_file, "20250107_120000", None),
+                (mock_older_file, "20250106_080000", None),
             ],
         ):
             result = session_manager.restore_session()
@@ -186,14 +187,11 @@ class TestSessionManager:
             # 验证恢复的是最新的会话文件（列表第一个）
             mock_model.restore.assert_called_once_with(mock_newer_file)
 
-            # 验证输出：应该有两次print调用
-            assert mock_auto_print.call_count == 2
-            # 第一次调用显示非交互模式自动恢复的消息
+            # 验证输出：应该有一次print调用
+            assert mock_auto_print.call_count == 1
+            # 调用显示非交互模式自动恢复的消息
             first_call = mock_auto_print.call_args_list[0][0][0]
             assert "🤖 非交互模式" in first_call
-            # 第二次调用显示成功消息
-            second_call = mock_auto_print.call_args_list[1][0][0]
-            assert "✅ 会话已恢复。" == second_call
 
     @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_restore_session_restore_failure(
@@ -205,7 +203,7 @@ class TestSessionManager:
         with patch.object(
             session_manager,
             "_parse_session_files",
-            return_value=[(mock_session_file, "20250107_120000")],
+            return_value=[(mock_session_file, "20250107_120000", None)],
         ):
             # 模拟 restore 失败
             mock_model.restore.return_value = False
