@@ -66,7 +66,7 @@ class TestAgentTaskLists:
         self.agent.task_list_manager.task_lists.clear()
 
         # 调用保存方法
-        result = self.agent._save_task_lists()
+        result = self.agent.session._save_task_lists()
 
         # 验证返回值
         assert result is True
@@ -97,11 +97,11 @@ class TestAgentTaskLists:
         assert len(task_list.tasks) == 1
 
         # 保存任务列表
-        save_result = self.agent._save_task_lists()
+        save_result = self.agent.session._save_task_lists()
         assert save_result is True
 
         # 验证保存文件是否存在
-        session_dir = os.path.join(self.temp_dir, ".jarvis")
+        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
         platform_name = self.agent.model.platform_name()
         model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
@@ -123,7 +123,7 @@ class TestAgentTaskLists:
         assert len(self.agent.task_list_manager.task_lists) == 0
 
         # 恢复任务列表
-        restore_result = self.agent._restore_task_lists()
+        restore_result = self.agent.session._restore_task_lists()
         assert restore_result is True
 
         # 验证任务列表已恢复
@@ -143,7 +143,7 @@ class TestAgentTaskLists:
     def test_restore_task_lists_file_not_exists(self):
         """测试恢复任务列表时文件不存在的情况"""
         # 确保没有保存任务列表文件
-        result = self.agent._restore_task_lists()
+        result = self.agent.session._restore_task_lists()
 
         # 应该返回True（没有文件也视为成功）
         assert result is True
@@ -185,11 +185,11 @@ class TestAgentTaskLists:
         )
 
         # 保存任务列表
-        save_result = self.agent._save_task_lists()
+        save_result = self.agent.session._save_task_lists()
         assert save_result is True
 
         # 验证保存的文件内容
-        session_dir = os.path.join(self.temp_dir, ".jarvis")
+        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
         platform_name = self.agent.model.platform_name()
         model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
@@ -209,7 +209,7 @@ class TestAgentTaskLists:
         assert len(self.agent.task_list_manager.task_lists) == 0
 
         # 恢复任务列表
-        restore_result = self.agent._restore_task_lists()
+        restore_result = self.agent.session._restore_task_lists()
         assert restore_result is True
 
         # 验证两个任务列表都已恢复
@@ -261,11 +261,11 @@ class TestAgentTaskLists:
         assert success is True
 
         # 保存任务列表
-        save_result = self.agent._save_task_lists()
+        save_result = self.agent.session._save_task_lists()
         assert save_result is True
 
         # 验证保存的文件内容
-        session_dir = os.path.join(self.temp_dir, ".jarvis")
+        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
         platform_name = self.agent.model.platform_name()
         model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
@@ -286,7 +286,7 @@ class TestAgentTaskLists:
         assert len(self.agent.task_list_manager.task_lists) == 0
 
         # 恢复任务列表
-        restore_result = self.agent._restore_task_lists()
+        restore_result = self.agent.session._restore_task_lists()
         assert restore_result is True
 
         # 验证恢复后依赖关系仍然存在
@@ -304,11 +304,11 @@ class TestAgentTaskLists:
         self.agent.task_list_manager.task_lists.clear()
 
         # 保存任务列表（应该成功，即使没有任务）
-        save_result = self.agent._save_task_lists()
+        save_result = self.agent.session._save_task_lists()
         assert save_result is True
 
         # 验证不会创建文件
-        session_dir = os.path.join(self.temp_dir, ".jarvis")
+        session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
         platform_name = self.agent.model.platform_name()
         model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
@@ -340,7 +340,7 @@ class TestAgentTaskLists:
         assert success is True
 
         # 保存任务列表
-        save_result = self.agent._save_task_lists()
+        save_result = self.agent.session._save_task_lists()
         assert save_result is True
 
         # 清空当前任务列表
@@ -352,14 +352,30 @@ class TestAgentTaskLists:
             session_saved = self.agent.save_session()
             assert session_saved is True
 
-        # 用Mock来检查_restore_task_lists是否被调用
-        with patch.object(self.agent, "_restore_task_lists") as mock_restore_task_lists:
-            # 从文件系统角度看，我们需要模拟session restore
-            with patch.object(self.agent.session, "restore_session", return_value=True):
-                result = self.agent.restore_session()
+        # Mock restore_session 的依赖项，让它能完整执行
+        with patch.object(
+            self.agent.session,
+            "_parse_session_files",
+            return_value=[("fake_session.json", "20240101_120000", None)],
+        ):
+            with patch.object(
+                self.agent.session, "_check_commit_consistency", return_value=True
+            ):
+                with patch.object(
+                    self.agent.session.model, "restore", return_value=True
+                ):
+                    with patch.object(self.agent.session, "_restore_agent_state"):
+                        with patch.object(
+                            self.agent.session, "_restore_start_commit_info"
+                        ):
+                            with patch.object(
+                                self.agent.session, "_restore_task_lists"
+                            ) as mock_restore_task_lists:
+                                # 执行restore_session
+                                result = self.agent.restore_session()
 
-                # 验证restore_session返回True
-                assert result is True
+                                # 验证restore_session返回True
+                                assert result is True
 
-                # 验证_restore_task_lists被调用
-                mock_restore_task_lists.assert_called_once()
+                                # 验证_restore_task_lists被调用（现在由SessionManager调用）
+                                mock_restore_task_lists.assert_called_once()
