@@ -1607,6 +1607,8 @@ def cli(
                                             agent.session._restore_agent_state()
                                             agent.session._restore_task_lists()
                                             agent.session._restore_start_commit_info()
+                                            # 设置first标志为False，避免run()方法执行需求分类和方法论加载
+                                            agent.first = False
                                             file_basename = os.path.basename(
                                                 selected_session
                                             )
