@@ -37,3 +37,13 @@
 ## 性能优化 (performance/)
 
 - [性能优化]({{ rule_file_dir }}/performance/performance.md)
+
+## Agent 性格 (agent_personality/)
+
+- [专业严谨型]({{ rule_file_dir }}/agent_personality/professional.md)
+- [友好亲切型]({{ rule_file_dir }}/agent_personality/friendly.md)
+- [简洁高效型]({{ rule_file_dir }}/agent_personality/concise.md)
+- [教学型]({{ rule_file_dir }}/agent_personality/educational.md)
+- [幽默风趣型]({{ rule_file_dir }}/agent_personality/humorous.md)
+- [温柔体贴型]({{ rule_file_dir }}/agent_personality/gentle.md)
+- [暧昧型]({{ rule_file_dir }}/agent_personality/flirty.md)
