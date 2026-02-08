@@ -79,6 +79,14 @@ class SaveMemoryTool:
         memory_type = memory_data["memory_type"]
         tags = memory_data.get("tags", [])
         content = memory_data.get("content", "")
+        
+        # 收集记忆标签到 agent 的 memory_tags 属性
+        if agent and hasattr(agent, "add_memory_tags") and tags:
+            try:
+                agent.add_memory_tags(tags)
+            except Exception:
+                # 添加标签失败不影响保存记忆的主要功能
+                pass
 
         # 生成记忆ID
         memory_id = self._generate_memory_id()
