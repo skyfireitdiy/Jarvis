@@ -1115,11 +1115,37 @@ class SessionManager:
             if os.path.exists(commit_file):
                 with open(commit_file, "r", encoding="utf-8") as f:
                     commit_data = json.load(f)
-                    # 恢复start_commit信息
-                    self.agent.start_commit = commit_data.get("start_commit")
-                    PrettyOutput.auto_print(
-                        f"✅ 已恢复start_commit信息: {self.agent.start_commit[:8] if self.agent.start_commit else 'None'}..."
-                    )
+
+                    # 获取保存的 commit 信息
+                    saved_start_commit = commit_data.get("start_commit")
+                    saved_current_commit = commit_data.get("current_commit")
+
+                    # 获取当前的最新 commit
+                    from jarvis.jarvis_utils.git_utils import get_latest_commit_hash
+
+                    current_commit = get_latest_commit_hash()
+
+                    # 验证：对比保存的 current_commit 和当前的 current_commit
+                    # 如果不一致，说明仓库状态已经改变（有新提交、reset、rebase 等）
+                    if saved_current_commit and saved_current_commit != current_commit:
+                        # 仓库状态已改变，忽略保存的 start_commit，使用当前最新 commit
+                        self.agent.start_commit = current_commit
+                        PrettyOutput.auto_print(
+                            f"⚠️ 检测到仓库状态已改变（保存时: {saved_current_commit[:8]}..., 现在: {current_commit[:8] if current_commit else 'None'}...），"
+                            f"已忽略保存的 start_commit，更新为当前 commit"
+                        )
+                    elif saved_start_commit:
+                        # 仓库状态未改变，可以恢复保存的 start_commit
+                        self.agent.start_commit = saved_start_commit
+                        PrettyOutput.auto_print(
+                            f"✅ 已恢复start_commit信息: {self.agent.start_commit[:8] if self.agent.start_commit else 'None'}..."
+                        )
+                    else:
+                        # 没有保存的 start_commit，使用当前最新 commit
+                        self.agent.start_commit = current_commit
+                        PrettyOutput.auto_print(
+                            f"✅ 已设置start_commit为当前commit: {current_commit[:8] if current_commit else 'None'}..."
+                        )
             else:
                 PrettyOutput.auto_print(f"ℹ️ 未找到对应的commit文件: {commit_filename}")
         except Exception as e:
