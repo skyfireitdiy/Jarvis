@@ -634,6 +634,9 @@ class Agent:
         # 权限和状态控制
         self.allow_savesession = bool(allow_savesession)  # SaveSession 命令权限控制
         self._addon_prompt_skip_rounds = 0  # 记录连续未添加 addon_prompt 的轮数
+        
+        # 记忆标签收集：用于记录当前 agent 及其子 agent 产生的所有记忆标签
+        self.memory_tags: set = set()  # 使用 set 自动去重
         self._no_tool_call_count = (
             0  # 记录连续没有工具调用的次数（用于非交互模式下的工具使用提示）
         )
@@ -641,6 +644,23 @@ class Agent:
             ""  # 记录最近一次LLM响应内容（用于手动修复等操作）
         )
         self._agent_type = "normal"
+
+    def add_memory_tags(self, tags: List[str]) -> None:
+        """添加记忆标签到 memory_tags 集合
+
+        参数:
+            tags: 要添加的标签列表
+        """
+        if tags:
+            self.memory_tags.update(tags)
+
+    def get_memory_tags(self) -> List[str]:
+        """获取所有记忆标签
+
+        返回:
+            标签列表（已排序）
+        """
+        return sorted(list(self.memory_tags))
 
     def _init_user_interaction(
         self,
@@ -2016,6 +2036,13 @@ class Agent:
             )
         except Exception:
             pass
+
+        # 如果有记忆标签，在返回结果中添加提示信息
+        memory_tags = self.get_memory_tags()
+        if memory_tags:
+            tags_str = ", ".join(f"`{tag}`" for tag in memory_tags)
+            memory_hint = f"\n\n💡 **记忆标签提示**: 本次任务产生了以下记忆标签: {tags_str}\n你可以使用 `retrieve_memory` 工具通过这些标签检索相关记忆，获取更多详细信息。"
+            result = result + memory_hint
 
         return result
 

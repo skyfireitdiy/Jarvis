@@ -184,6 +184,16 @@ class SubCodeAgentTool:
 
             # 执行子任务（无提交信息前后缀）
             ret = code_agent.run(enhanced_task, prefix="", suffix="")
+            
+            # 合并子 agent 的记忆标签到父 agent
+            if parent_agent and hasattr(parent_agent, "add_memory_tags"):
+                try:
+                    child_tags = code_agent.get_memory_tags()
+                    if child_tags:
+                        parent_agent.add_memory_tags(child_tags)
+                except Exception:
+                    # 合并标签失败不影响主要功能
+                    pass
 
             return {
                 "success": True,

@@ -910,6 +910,7 @@ class SessionManager:
                 ),
                 "recent_memories": getattr(self.agent, "recent_memories", []),
                 "MAX_RECENT_MEMORIES": getattr(self.agent, "MAX_RECENT_MEMORIES", 10),
+                "memory_tags": list(getattr(self.agent, "memory_tags", set())),
             },
             "metadata": {
                 "agent_name": self.agent_name,
@@ -1022,6 +1023,13 @@ class SessionManager:
                 self.agent.MAX_RECENT_MEMORIES = agent_runtime_state.get(
                     "MAX_RECENT_MEMORIES", 10
                 )
+                # 恢复记忆标签
+                memory_tags = agent_runtime_state.get("memory_tags", [])
+                if memory_tags:
+                    self.agent.memory_tags = set(memory_tags)
+                    PrettyOutput.auto_print(
+                        f"✅ 已恢复 {len(self.agent.memory_tags)} 个记忆标签"
+                    )
                 if self.agent.recent_memories:
                     PrettyOutput.auto_print(
                         f"✅ 已恢复 {len(self.agent.recent_memories)} 条最近记忆"

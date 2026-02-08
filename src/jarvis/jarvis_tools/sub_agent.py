@@ -178,6 +178,16 @@ class SubAgentTool:
 
             # 执行任务
             result = agent.run(enhanced_task)
+            
+            # 合并子 agent 的记忆标签到父 agent
+            if parent_agent and hasattr(parent_agent, "add_memory_tags"):
+                try:
+                    child_tags = agent.get_memory_tags()
+                    if child_tags:
+                        parent_agent.add_memory_tags(child_tags)
+                except Exception:
+                    # 合并标签失败不影响主要功能
+                    pass
 
             # 规范化输出
             if isinstance(result, (dict, list)):
