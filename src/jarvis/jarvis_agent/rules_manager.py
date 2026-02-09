@@ -903,4 +903,8 @@ class RulesManager:
             is_loaded = is_loaded or "global_rule" in self.loaded_rules
             rules_info.append(("global_rule", preview, is_loaded, global_rule_path))
 
+        # 排序：已激活的规则放在最底部，未激活的规则按目录排序
+        # 使用 (is_loaded, rule_name) 作为排序键，确保 False(未激活) 在前，True(已激活) 在后
+        rules_info.sort(key=lambda x: (x[2], x[0]))
+
         return rules_info
