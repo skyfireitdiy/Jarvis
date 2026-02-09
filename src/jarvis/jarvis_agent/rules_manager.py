@@ -860,7 +860,21 @@ class RulesManager:
             actual_rule_name = (
                 rule_name.split(":", 1)[1] if ":" in rule_name else rule_name
             )
-            preview = self.get_rule_preview(actual_rule_name)
+            # 对于内置规则，直接使用 get_builtin_rule() 获取预览
+            # 因为新格式的规则名称（如 architecture_design:clean_code.md）
+            # 会被 get_named_rule() 误解析为带前缀的规则
+            try:
+                from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
+
+                rule_content = get_builtin_rule(actual_rule_name)
+                if rule_content:
+                    # 移除换行符和多余空格，保留前100个字符
+                    preview = rule_content.replace("\n", " ").strip()
+                    preview = preview[:100] + "..." if len(preview) > 100 else preview
+                else:
+                    preview = "--"
+            except Exception:
+                preview = "--"
             # 检查状态：只有明确激活的规则才显示为已激活
             # 同时检查带前缀和不带前缀的名称，向后兼容
             is_loaded = (
