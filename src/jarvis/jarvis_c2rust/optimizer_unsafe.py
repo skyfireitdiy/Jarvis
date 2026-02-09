@@ -17,7 +17,8 @@ from jarvis.jarvis_c2rust.optimizer_progress import ProgressManager
 from jarvis.jarvis_c2rust.optimizer_utils import cargo_check_full
 from jarvis.jarvis_c2rust.optimizer_utils import check_missing_safety_doc_warnings
 from jarvis.jarvis_c2rust.optimizer_utils import run_cargo_fmt
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_c2rust.agent_factory import create_code_agent
+from jarvis.jarvis_c2rust.agent_protocol import CodeAgentType
 
 
 class UnsafeOptimizer:
@@ -189,7 +190,7 @@ class UnsafeOptimizer:
                 commit_before = self.progress_manager.get_crate_commit_hash()
 
                 # CodeAgent 在 crate 目录下创建和执行
-                agent = CodeAgent(
+                agent = create_code_agent(
                     name=f"UnsafeCleanupAgent-iter{iteration}",
                     need_summary=False,
                     non_interactive=self.options.non_interactive,

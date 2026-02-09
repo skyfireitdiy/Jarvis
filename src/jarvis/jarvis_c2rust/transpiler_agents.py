@@ -17,7 +17,10 @@ from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_c2rust.models import FnRecord
 from jarvis.jarvis_c2rust.utils import dir_tree
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
+
+# 使用抽象接口，解耦对具体实现的依赖
+from jarvis.jarvis_c2rust.agent_factory import create_code_agent
+from jarvis.jarvis_c2rust.agent_protocol import CodeAgentType
 
 
 class AgentManager:
@@ -46,7 +49,7 @@ class AgentManager:
         # 存储当前函数的 C 代码，供修复 Agent 使用
         self._current_c_code: str = ""
 
-    def get_generation_agent(self) -> CodeAgent:
+    def get_generation_agent(self) -> CodeAgentType:
         """
         获取代码生成Agent（CodeAgent）。每次调用都重新创建，不复用。
         用于代码生成。
@@ -64,14 +67,13 @@ class AgentManager:
             if rec:
                 fn_name = rec.qname or rec.name or f"fn_{fid}"
         agent_name = "C2Rust-GenerationAgent" + (f"({fn_name})" if fn_name else "")
-        agent = CodeAgent(
+        agent = create_code_agent(
             name=agent_name,
             need_summary=False,
             non_interactive=self.non_interactive,
             append_tools="read_symbols",
             use_methodology=True,
             use_analysis=True,
-            force_save_memory=False,
             enable_task_list_manager=False,
             disable_review=True,
         )
@@ -88,7 +90,7 @@ class AgentManager:
 
     def get_fix_agent(
         self, c_code: Optional[str] = None, need_summary: bool = False
-    ) -> CodeAgent:
+    ) -> CodeAgentType:
         """
         获取修复Agent（CodeAgent）。每次调用都重新创建，不复用。
         用于修复构建错误和测试失败，启用方法论和分析功能以提供更好的修复能力。
@@ -133,7 +135,7 @@ class AgentManager:
 
 请使用清晰的结构和简洁的语言，确保总结信息完整且易于理解。"""
 
-        agent = CodeAgent(
+        agent = create_code_agent(
             name=agent_name,
             need_summary=need_summary,
             summary_prompt=summary_prompt,
@@ -141,7 +143,6 @@ class AgentManager:
             append_tools="read_symbols",
             use_methodology=True,
             use_analysis=True,
-            force_save_memory=False,
             disable_review=True,
         )
         # 订阅 BEFORE_TOOL_CALL 和 AFTER_TOOL_CALL 事件，用于细粒度检测测试代码删除
@@ -169,7 +170,7 @@ class AgentManager:
 
         return agent
 
-    def get_code_agent(self) -> CodeAgent:
+    def get_code_agent(self) -> CodeAgentType:
         """
         获取代码生成/修复Agent（CodeAgent）。每次调用都重新创建，不复用。
         统一用于代码生成和修复，启用方法论和分析功能以提供更好的代码质量。
@@ -187,14 +188,13 @@ class AgentManager:
             if rec:
                 fn_name = rec.qname or rec.name or f"fn_{fid}"
         agent_name = "C2Rust-CodeAgent" + (f"({fn_name})" if fn_name else "")
-        agent = CodeAgent(
+        agent = create_code_agent(
             name=agent_name,
             need_summary=False,
             non_interactive=self.non_interactive,
             append_tools="read_symbols",
             use_methodology=True,
             use_analysis=True,
-            force_save_memory=False,
             enable_task_list_manager=False,
             disable_review=True,
         )

@@ -16,7 +16,7 @@ from jarvis.jarvis_c2rust.optimizer_options import OptimizeStats
 from jarvis.jarvis_c2rust.optimizer_progress import ProgressManager
 from jarvis.jarvis_c2rust.optimizer_utils import cargo_check_full
 from jarvis.jarvis_c2rust.optimizer_utils import run_cargo_fmt
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
+from jarvis.jarvis_c2rust.agent_factory import create_code_agent
 
 
 class BuildFixOptimizer:
@@ -157,7 +157,7 @@ class BuildFixOptimizer:
                 commit_before = self.progress_manager.get_crate_commit_hash()
 
                 # CodeAgent 在 crate 目录下创建和执行
-                agent = CodeAgent(
+                agent = create_code_agent(
                     name=f"BuildFixAgent-iter{attempt}",
                     need_summary=False,
                     non_interactive=self.options.non_interactive,

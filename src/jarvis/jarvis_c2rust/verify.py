@@ -200,7 +200,8 @@ def _run_alignment_analysis(
     子任务将不一致的地方记录到文件中，最终总结基于这些文件生成。
     返回包含 is_aligned 和 summary 的字典。
     """
-    from jarvis.jarvis_agent import Agent
+    from jarvis.jarvis_c2rust.agent_factory import create_agent
+    from jarvis.jarvis_c2rust.agent_factory import create_code_agent
 
     # 定义报告文件路径（保存到 crate 根目录）
     report_file = crate_dir / "alignment_report.md"
@@ -328,7 +329,7 @@ def _run_alignment_analysis(
 请先读取报告文件 {report_file}，根据报告内容判断 is_aligned 的值，然后输出 JSON。
 """
 
-    agent = Agent(
+    agent = create_agent(
         name="C2Rust-VerificationAgent",
         non_interactive=non_interactive,
         system_prompt=system_prompt,
@@ -590,7 +591,7 @@ def _run_optimization(
 
     使用 CodeAgent 基于对齐报告优化 Rust 代码。
     """
-    from jarvis.jarvis_code_agent.code_agent import CodeAgent
+    from jarvis.jarvis_c2rust.agent_factory import create_code_agent
     from jarvis.jarvis_c2rust.constants import C2RUST_DIRNAME
     from jarvis.jarvis_c2rust.constants import SYMBOLS_JSONL
 
@@ -598,7 +599,7 @@ def _run_optimization(
     symbols_path = project_root / C2RUST_DIRNAME / SYMBOLS_JSONL
 
     # 创建优化 CodeAgent，添加 read_symbols 工具
-    agent = CodeAgent(
+    agent = create_code_agent(
         name="C2Rust-OptimizationAgent",
         need_summary=False,
         non_interactive=non_interactive,
