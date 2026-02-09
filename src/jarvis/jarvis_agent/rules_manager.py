@@ -146,10 +146,10 @@ class RulesManager:
         return None
 
     def _get_builtin_rules_index(self) -> Optional[str]:
-        """读取 builtin_rules.md 索引文件的完整内容
+        """读取 rule.md 索引文件的完整内容
 
         返回:
-            str: builtin_rules.md 的完整内容，如果未找到则返回 None
+            str: rule.md 的完整内容，如果未找到则返回 None
         """
         try:
             from jarvis.jarvis_utils.template_utils import _get_builtin_dir
@@ -159,7 +159,7 @@ class RulesManager:
             if builtin_dir is None:
                 return None
 
-            index_file_path = builtin_dir / "rules" / "builtin_rules.md"
+            index_file_path = builtin_dir / "rules" / "rule.md"
 
             # 检查索引文件是否存在
             if not index_file_path.exists() or not index_file_path.is_file():
@@ -179,11 +179,11 @@ class RulesManager:
 
         except Exception as e:
             # 读取失败时忽略，不影响主流程
-            PrettyOutput.auto_print(f"⚠️ 读取builtin_rules.md失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 读取rule.md失败: {e}")
             return None
 
     def _get_rule_from_builtin_index(self, rule_name: str) -> Optional[str]:
-        """从 builtin_rules.md 索引文件中查找并加载指定名称的规则
+        """从 rule.md 索引文件中查找并加载指定名称的规则
 
         该索引文件记录了内置规则的映射关系，格式为：
         - [规则名称]({{ template_var }}/path/to/rule.md)
@@ -205,7 +205,7 @@ class RulesManager:
             if builtin_dir is None:
                 return None
 
-            index_file_path = builtin_dir / "rules" / "builtin_rules.md"
+            index_file_path = builtin_dir / "rules" / "rule.md"
 
             # 检查索引文件是否存在
             if not index_file_path.exists() or not index_file_path.is_file():
@@ -333,7 +333,7 @@ class RulesManager:
         - central_yaml: - 中心库 rules.yaml
         - project_yaml: - 项目 rules.yaml
         - global_yaml: - 全局 rules.yaml
-        - 无前缀 - 内置规则或 builtin_rules.md 索引文件中的规则
+        - 无前缀 - 内置规则或 rule.md 索引文件中的规则
 
         参数:
             rule_name: 规则名称（可能包含前缀）
@@ -462,7 +462,7 @@ class RulesManager:
                 # 未知前缀
                 return None
 
-            # 无前缀：按优先级查找（项目 rules.yaml > 全局 rules.yaml > builtin_rules.md > 内置规则）
+            # 无前缀：按优先级查找（项目 rules.yaml > 全局 rules.yaml > rule.md > 内置规则）
             # 优先级 1: 从项目 rules.yaml 文件中查找
             for desc, yaml_path in self._get_all_rules_yaml_files():
                 if desc == "项目":
@@ -519,7 +519,7 @@ class RulesManager:
                         except Exception:
                             continue
 
-            # 优先级 3: 从 builtin_rules.md 索引文件中查找
+            # 优先级 3: 从 rule.md 索引文件中查找
             indexed_rule = self._get_rule_from_builtin_index(rule_name)
             if indexed_rule:
                 return indexed_rule
