@@ -15,6 +15,7 @@ from typing import Tuple
 import yaml
 
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
+from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
 from jarvis.jarvis_utils.template_utils import render_rule_template
 from jarvis.jarvis_utils.config import get_central_rules_repo
 from jarvis.jarvis_utils.config import get_data_dir
@@ -860,7 +861,8 @@ class RulesManager:
             is_loaded = rule_name in self._active_rules
             # 向后兼容：也检查旧的 loaded_rules
             is_loaded = is_loaded or rule_name in self.loaded_rules
-            file_path = "内置规则"  # 内置规则不显示文件路径
+            # 获取内置规则的实际文件路径
+            file_path = get_builtin_rule_path(rule_name) or "内置规则"
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理文件规则
