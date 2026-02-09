@@ -15,7 +15,7 @@ from typing import Tuple
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
-from jarvis.jarvis_agent import Agent
+from jarvis.jarvis_c2rust.agent_factory import create_agent
 from jarvis.jarvis_agent.events import AFTER_TOOL_CALL
 from jarvis.jarvis_agent.events import BEFORE_TOOL_CALL
 from jarvis.jarvis_c2rust.models import FnRecord
@@ -642,7 +642,7 @@ class ReviewManager:
             # 每次迭代都创建新的 Agent，避免历史记忆干扰
             # 但会在提示词中包含 previous_issues
             sys_p_init, _, sum_p_init = build_review_prompts()
-            review_agent = Agent(
+            review_agent = create_agent(
                 system_prompt=sys_p_init,
                 name=agent_name,
                 summary_prompt=sum_p_init,
@@ -782,8 +782,13 @@ class ReviewManager:
                     f"⚠️ [c2rust-transpiler][review] 直接调用模型接口修复格式错误（第 {i + 1} 次重试）",
                 )
                 try:
-                    response = agent.model.chat_until_success(full_prompt)
-                    summary = str(response or "")
+                    # 尝试直接使用model属性（如果存在）以提高效率
+                    if hasattr(agent, "model"):
+                        response = agent.model.chat_until_success(full_prompt)
+                        summary = str(response or "")
+                    else:
+                        # 回退到run()方法
+                        summary = str(agent.run(full_prompt) or "")
                 except Exception as e:
                     PrettyOutput.auto_print(
                         f"⚠️ [c2rust-transpiler][review] 直接模型调用失败: {e}，回退到 run()",

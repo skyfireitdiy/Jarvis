@@ -22,7 +22,10 @@ from jarvis.jarvis_c2rust.optimizer_utils import git_toplevel
 from jarvis.jarvis_c2rust.optimizer_utils import iter_rust_files
 from jarvis.jarvis_c2rust.optimizer_utils import run_cargo_fmt
 from jarvis.jarvis_c2rust.optimizer_utils import run_cmd
-from jarvis.jarvis_code_agent.code_agent import CodeAgent
+
+# 使用抽象接口，解耦对具体实现的依赖
+from jarvis.jarvis_c2rust.agent_factory import create_code_agent
+from jarvis.jarvis_c2rust.agent_protocol import CodeAgentType
 
 
 class ClippyOptimizer:
@@ -351,7 +354,7 @@ class ClippyOptimizer:
                 commit_before = self.progress_manager.get_crate_commit_hash()
 
                 # CodeAgent 在 crate 目录下创建和执行
-                agent = CodeAgent(
+                agent = create_code_agent(
                     name=f"ClippyWarningEliminator-iter{iteration}",
                     need_summary=False,
                     non_interactive=self.options.non_interactive,
