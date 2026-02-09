@@ -354,6 +354,19 @@ class SessionManager:
             session_dir,
             f"{session_name}_saved_session_{self.agent_name}_{platform_name}_{model_name}_{timestamp}.json",
         )
+
+        # 检查是否有用户消息，如果没有则不保存
+        try:
+            has_user_message = any(
+                msg.get("role") == "user" for msg in self.model.get_messages()
+            )
+            if not has_user_message:
+                # 没有用户消息，不保存会话
+                return False
+        except Exception:
+            # 如果检查失败（如 messages 不存在），为了安全起见仍然执行保存
+            pass
+
         result = self.model.save(session_file)
 
         # 保存成功后，保存 commit 信息到辅助文件
