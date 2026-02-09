@@ -547,7 +547,7 @@ class RulesManager:
         from jarvis.jarvis_agent.builtin_rules import list_builtin_rules
 
         result = {
-            "builtin": list_builtin_rules(),
+            "builtin": [f"builtin:{rule}" for rule in list_builtin_rules()],
             "files": [],
             "yaml": [],
         }
@@ -856,13 +856,25 @@ class RulesManager:
 
         # 处理内置规则
         for rule_name in available_rules.get("builtin", []):
-            preview = self.get_rule_preview(rule_name)
+            # 从带前缀的名称中提取实际规则名称（去掉 "builtin:" 前缀）
+            actual_rule_name = (
+                rule_name.split(":", 1)[1] if ":" in rule_name else rule_name
+            )
+            preview = self.get_rule_preview(actual_rule_name)
             # 检查状态：只有明确激活的规则才显示为已激活
-            is_loaded = rule_name in self._active_rules
+            # 同时检查带前缀和不带前缀的名称，向后兼容
+            is_loaded = (
+                rule_name in self._active_rules
+                or actual_rule_name in self._active_rules
+            )
             # 向后兼容：也检查旧的 loaded_rules
-            is_loaded = is_loaded or rule_name in self.loaded_rules
+            is_loaded = (
+                is_loaded
+                or rule_name in self.loaded_rules
+                or actual_rule_name in self.loaded_rules
+            )
             # 获取内置规则的实际文件路径
-            file_path = get_builtin_rule_path(rule_name) or "内置规则"
+            file_path = get_builtin_rule_path(actual_rule_name) or "内置规则"
             rules_info.append((rule_name, preview, is_loaded, file_path))
 
         # 处理文件规则
