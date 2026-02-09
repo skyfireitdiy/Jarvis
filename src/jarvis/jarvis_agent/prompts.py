@@ -360,7 +360,7 @@ def get_task_analysis_prompt(
    - 安全检查流程规范
    - 其他项目特定的规范或流程
 3. 如果发现规则缺失或待完善：
-   - 使用 load_rule 工具加载 builtin/rules/builtin_rules.md 查看现有规则体系
+   - 使用 load_rule 工具加载 builtin:rule 查看现有规则体系
    - 评估缺失的规则是否需要创建
    - 如果需要创建新规则，在第三步中说明
 4. 如果现有规则已经完善，直接说明即可"""

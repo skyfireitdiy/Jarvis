@@ -1,0 +1,8 @@
+{
+  "id": "20260209_140413_701308",
+  "type": "project_long_term",
+  "tags": ["builtin规则", "规则管理", "builtin前缀", "rule.md"],
+  "content": "## builtin_rules.md 重命名为 rule.md\n\n**修改时间**: 2025-02-09\n\n**修改目的**: 统一 builtin 规则的路径访问方式，使其与 project: 和 global: 前缀保持一致\n\n**修改内容**:\n1. 将 `builtin/rules/builtin_rules.md` 重命名为 `builtin/rules/rule.md`\n2. 更新 `src/jarvis/jarvis_agent/rules_manager.py` 中所有引用\n3. 更新 `src/jarvis/jarvis_agent/prompts.py` 中的引用\n\n**效果**:\n- 用户现在可以使用 `builtin:rule` 来访问规则索引文件\n- 访问方式与 `project:deployment/version_release.md` 和 `global:xxx.md` 保持一致\n- 所有路径访问都使用统一的相对路径方式\n\n**相关提交**: dd43fcb",
+  "created_at": "2026-02-09T14:04:13.701349",
+  "updated_at": "2026-02-09T14:04:13.701354"
+}
