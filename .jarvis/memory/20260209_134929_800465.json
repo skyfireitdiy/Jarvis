@@ -1,0 +1,8 @@
+{
+  "id": "20260209_134929_800465",
+  "type": "project_long_term",
+  "tags": ["ListRule", "规则管理", "内置规则"],
+  "content": "## ListRule 内置规则路径显示优化\n\n**需求**：在 `<ListRule>` 命令的输出中，内置规则也要显示实际的文件路径，而不是显示\"内置规则\"这个固定文本。\n\n**实现**：\n\n1. **在 `builtin_rules.py` 中添加新函数**：\n   - 添加 `get_builtin_rule_path(rule_name: str) -> str | None` 函数\n   - 该函数根据规则名称在 `builtin/rules/` 和 `builtin/rules/testing/` 目录中查找对应的 `.md` 文件\n   - 返回文件的绝对路径，未找到则返回 None\n   - 规则名称转换为小写后再查找，与 `BUILTIN_RULES` 的键保持一致\n\n2. **修改 `rules_manager.py` 的 `get_all_rules_with_status()` 方法**：\n   - 导入 `get_builtin_rule_path` 函数\n   - 将 `file_path = \"内置规则\"` 改为 `file_path = get_builtin_rule_path(rule_name) or \"内置规则\"`\n   - 如果路径为 None，则显示 \"内置规则\" 作为回退\n\n**效果**：\n- 内置规则显示实际的文件路径（如 `/home/wangmaobin/code/Jarvis/builtin/rules/architecture_design/solid.md`）\n- 如果找不到文件路径，则显示 \"内置规则\" 作为回退\n\n**Commit**: fbe370f",
+  "created_at": "2026-02-09T13:49:29.800509",
+  "updated_at": "2026-02-09T13:49:29.800514"
+}

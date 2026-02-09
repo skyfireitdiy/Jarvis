@@ -80,3 +80,35 @@ def list_builtin_rules() -> list[str]:
         list[str]: 规则名称列表
     """
     return list(BUILTIN_RULES.keys())
+
+
+def get_builtin_rule_path(rule_name: str) -> str | None:
+    """获取内置规则的文件路径
+
+    参数:
+        rule_name: 规则名称
+
+    返回:
+        str | None: 规则文件的绝对路径，如果未找到则返回 None
+    """
+    builtin_dir = _get_builtin_dir()
+    if builtin_dir is None:
+        return None
+
+    # 规则名称在 BUILTIN_RULES 中以小写存储
+    rule_name_lower = rule_name.lower()
+
+    # 在通用规则目录中查找
+    general_rules_dir = builtin_dir / "rules"
+    rule_file = general_rules_dir / f"{rule_name_lower}.md"
+    if rule_file.exists() and rule_file.is_file():
+        return str(rule_file.absolute())
+
+    # 在测试规则目录中查找
+    testing_rules_dir = general_rules_dir / "testing"
+    rule_file = testing_rules_dir / f"{rule_name_lower}.md"
+    if rule_file.exists() and rule_file.is_file():
+        return str(rule_file.absolute())
+
+    # 未找到
+    return None
