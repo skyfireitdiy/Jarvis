@@ -140,26 +140,26 @@ package "专业应用层" #LightBlue {
   - 签名规划（签名规划方法）：使用 Agent 选择目标模块与 Rust 函数签名
   - 代码审查（代码审查方法）：使用 Agent 审查逻辑一致性
 - **CodeAgent 用于生成与修复（分离使用）**：
-  - 代码生成 Agent：在单个函数生命周期内复用同一个 CodeAgent 实例，用于代码生成任务（代码生成实现方法）
+  - 代码生成 Agent：每个函数使用独立的代码生成 CodeAgent（每次调用 get_generation_agent 重新创建，不复用实例），用于代码生成任务（代码生成实现方法）
   - 修复 Agent：每次修复时重新创建 CodeAgent 实例，不复用，用于修复构建错误和测试失败（构建循环方法）
   - 修复 Agent 上下文增强：修复 Agent 的上下文中自动包含原 C 实现代码，帮助 Agent 更好地理解原始实现意图，提高修复准确性
-  - 强制使用记忆功能：代码生成Agent启用强制保存记忆参数，要求在完成函数实现后使用记忆保存工具记录关键信息
+  - 记忆功能：代码生成 Agent 当前实现中未启用 force_save_memory；完成函数实现后可根据需要记录关键信息，供后续修复 Agent 和优化 Agent 使用
   - 依赖检查与实现：在实现或修复函数时，要求检查当前函数及其所有依赖函数是否已实现，对于未实现的依赖函数需一并补齐等价的Rust实现
   - 测试失败信息反馈：测试失败时获取完整的测试失败信息并通过专门的标签传递给修复Agent
   - 测试代码删除检测：基于事件订阅机制（工具调用前事件和工具调用后事件），在每次工具调用后立即检测测试代码是否被错误删除，若检测到问题则立即回退，确保测试代码不会被意外删除（工具调用前回调方法、工具调用后回调方法，优化器模块中同样实现）
 
-**CLI 交互模式**：提供 `config` 和 `run` 两个子命令，支持配置文件管理（`.jarvis/c2rust/config.json`）和执行转译任务
+**CLI 交互模式**：提供 **config**、**run**（一键流水线）以及分阶段子命令 **scan**、**lib-replace**、**prepare**、**transpile**、**optimize**、**verify**。config 管理 `.jarvis/c2rust/config.json`（含 root_symbols、disabled_libraries、additional_notes、enable_ffi_export_validation 等）；run 依次执行 scan → lib-replace → prepare → transpile → optimize（支持断点续跑，状态记录于 run_state.json）；verify 为可选功能对齐验证（独立子命令）。
 
 **工作流程**：
 
 ```
-扫描（scanner）→ 库替代评估（library_replacer）→ 模块规划（Agent）→
-转译（CodeAgent + Agent）→ 优化（optimizer + CodeAgent）；可选地执行 **verify**（功能对齐验证，独立子命令）对转译结果做 C 与 Rust 功能对齐分析与迭代优化。
+scan（scanner）→ lib-replace（library_replacer）→ prepare（模块规划，由 llm_module_agent 执行 LLM 规划并落盘）→
+transpile（CodeAgent + Agent）→ optimize（optimizer + CodeAgent）；可选地执行 **verify** 对转译结果做 C 与 Rust 功能对齐分析与迭代优化。
 ```
 
 - **库替代评估**：评估可用 Rust 标准库和第三方库，决定是使用现有库还是转译 C 实现
-- **模块规划增强**：Agent 生成 crate 模块结构（JSON），智能划分功能模块
-- **转译器优化**：基于 CodeAgent 的代码生成，在单个函数生命周期内复用实例
+- **模块规划增强**：prepare 阶段由 llm_module_agent 执行，Agent 生成 crate 模块结构（JSON）并落盘，智能划分功能模块
+- **转译器优化**：基于 CodeAgent 的代码生成，每个函数使用独立 CodeAgent 实例（每次调用重新创建）
 - **优化器增强**：基于 CodeAgent 的代码优化，支持测试代码删除检测与回退
 
 **特点**：
@@ -196,17 +196,19 @@ package "专业应用层" #LightBlue {
 - 轻协调、强委托：Agent 保持轻量化，侧重编排，将核心逻辑委托至独立组件（运行循环、工具注册表、平台适配层等）。
 - 高解耦、可插拔：通过 Registry（ToolRegistry/PlatformRegistry）与事件总线（EventBus）实现能力可插拔与旁路扩展。
 - 稳健运行：针对模型空响应、上下文超长、工具输出过大、异常回调等场景提供防御性处理。
-- 易扩展与可观测：关键节点统一事件广播，支持 after_tool_call 回调动态注入；启动时输出资源统计，便于观测。
+- 易扩展与可观测：关键节点统一事件广播，支持 after_tool_call 回调动态注入。
 - 多场景友好：支持非交互模式、文件上传/本地两种方法论与历史处理模式、工具筛选降噪等。
 
 #### 2. 模块组成
 
-下图展示 Agent 内部与其周边模块的静态组成与依赖关系，聚焦 Agent 直接协作的组件。
+下图分两部分展示 Agent 内部与其周边模块的静态组成与依赖关系。
+
+**图 2-1：Agent 核心、管理器与工具执行**
 
 ```plantuml
 @startuml
 !theme vibrant
-title Agent 结构组成图
+title Agent 结构组成（核心 / 管理器 / 工具执行）
 
 package "Agent Core" #LightGreen {
   component "Agent" as Agent
@@ -221,6 +223,8 @@ package "Managers" #LightYellow {
   component "MemoryManager" as MemoryManager
   component "TaskAnalyzer" as TaskAnalyzer
   component "FileMethodologyManager" as FileMethodologyManager
+  component "RulesManager" as RulesManager
+  component "TaskListManager" as TaskListManager
   component "AgentManager" as AgentManager
   component "TaskManager" as TaskManager
 }
@@ -229,6 +233,40 @@ package "Tool Execution" #Wheat {
   component "execute_tool_call" as ExecTool
   component "ToolRegistry" as ToolRegistry
 }
+
+Agent --> AgentRunLoop : 委派主循环
+Agent --> SessionManager : 会话状态
+Agent --> PromptManager : 构建系统/附加提示
+Agent --> EventBus : 广播事件
+EventBus --> Events : 事件定义
+
+Agent --> MemoryManager
+Agent --> TaskAnalyzer
+Agent --> FileMethodologyManager
+Agent --> RulesManager
+Agent --> TaskListManager
+AgentManager --> Agent : 创建与管理
+AgentManager --> TaskManager : 预定义任务选择
+
+AgentRunLoop --> ExecTool : 解析与执行工具
+ExecTool --> ToolRegistry : 分发具体工具
+Agent --> ToolRegistry : 默认输出处理器
+
+PromptManager --> PromptBuilder : 提示构建
+PromptManager --> Prompts : 提示模板
+@enduml
+```
+
+要点：**TaskListManager** 为 Agent 内部持有，负责任务列表与子 Agent 执行（task_list_manager 工具）；**TaskManager** 为入口层使用，负责从 `.jarvis/pre-command` 等加载与选择预定义任务。
+
+**图 2-2：输入输出、分享、工具层与入口**
+
+```plantuml
+@startuml
+!theme vibrant
+title Agent 结构组成（输入输出 / 分享 / 平台 / 入口）
+
+component "Agent" as Agent
 
 package "Input Handlers" #AliceBlue {
   component "builtin_input_handler" as builtin_input_handler
@@ -245,6 +283,7 @@ package "Share Management" #PeachPuff {
   component "ShareManager" as ShareManager
   component "MethodologyShareManager" as MethodologyShareManager
   component "ToolShareManager" as ToolShareManager
+  component "RuleShareManager" as RuleShareManager
 }
 
 package "Utilities" #LightCyan {
@@ -266,21 +305,7 @@ package "Entry Points" #MistyRose {
   component "main" as MainEntry
 }
 
-Agent --> AgentRunLoop : 委派主循环
-Agent --> SessionManager : 会话状态
-Agent --> PromptManager : 构建系统/附加提示
-Agent --> EventBus : 广播事件
-EventBus --> Events : 事件定义
-
-Agent --> MemoryManager
-Agent --> TaskAnalyzer
-Agent --> FileMethodologyManager
-AgentManager --> Agent : 创建与管理
-AgentManager --> TaskManager : 任务选择
-
-AgentRunLoop --> ExecTool : 解析与执行工具
-ExecTool --> ToolRegistry : 分发具体工具
-Agent --> ToolRegistry : 默认输出处理器
+component "AgentManager" as AgentManager
 
 Agent --> builtin_input_handler
 Agent --> shell_input_handler
@@ -289,9 +314,7 @@ Agent --> UserInteractionHandler : 交互封装
 
 ShareManager <|-- MethodologyShareManager
 ShareManager <|-- ToolShareManager
-
-PromptManager --> PromptBuilder : 提示构建
-PromptManager --> Prompts : 提示模板
+ShareManager <|-- RuleShareManager
 
 Agent --> PlatformRegistry : 创建平台实例
 PlatformRegistry --> BasePlatform : 实例化平台/模型
@@ -380,6 +403,10 @@ MainEntry --> Agent : 代理入口
       - `function_description`：清晰描述工具的目标功能、输入/输出、约束条件以及是否需要编排 Agent/CodeAgent
     - 返回值：`success/stdout/stderr` 结构，其中 `stdout` 会包含生成结果说明和新工具文件的绝对路径
   - 源码位置：`src/jarvis/jarvis_tools/meta_agent.py`
+- **RulesManager**（规则管理）
+  - 职责：加载、合并与激活/停用规则，为系统提示提供“已加载规则”内容；支持多来源（全局/项目/内置/中心库/配置目录、rules.yaml）与命名规则解析（含前缀）
+  - 聚焦：规则目录优先级（中心库 > 项目 > 配置）；默认规则（global_rule、project_rule、builtin_rules）；activate_rule/deactivate_rule 与合并结果注入 PromptManager
+  - 源码位置：RulesManager 模块（`src/jarvis/jarvis_agent/rules_manager.py`）
 
 **3.1.3 工具执行模块（Tool Execution）**
 
@@ -422,7 +449,7 @@ MainEntry --> Agent : 代理入口
     **3.1.7 分享管理模块（Share Management）**
 
 - **ShareManager**（分享管理器基类）
-  - 职责：提供工具和方法论分享的通用逻辑（Git 仓库管理、资源选择等）
+  - 职责：提供工具、方法论、规则分享的通用逻辑（Git 仓库管理、资源选择等）
   - 源码位置：ShareManager模块
 - **MethodologyShareManager**（方法论分享管理器）
   - 职责：管理方法论的分享流程
@@ -430,6 +457,9 @@ MainEntry --> Agent : 代理入口
 - **ToolShareManager**（工具分享管理器）
   - 职责：管理工具的分享流程
   - 源码位置：ToolShareManager模块
+- **RuleShareManager**（规则分享管理器）
+  - 职责：管理规则的分享流程，将本地规则分享到中心规则仓库（需配置 central_rules_repo）
+  - 源码位置：RuleShareManager模块
 
 **3.1.8 辅助模块（Utilities）**
 
@@ -590,16 +620,15 @@ title Agent 内部逻辑流程（初始化与委派）
 
 start
 :解析入参与配置（参数优先级: 入参 > 环境变量 > 配置文件）;
-:初始化 Platform（PlatformRegistry.create_platform）;
+:初始化 Platform（PlatformRegistry.get_normal_platform()，内部调用 create_platform）;
 :初始化 Session（SessionManager）;
 :初始化输入/输出处理器链;
 :初始化用户交互封装（UserInteractionHandler）;
 :解析配置默认值（use_methodology/use_analysis/execute_tool_confirm/force_save_memory）;
 :确定自动完成策略（多智能体模式 vs 非交互模式）;
 :创建 EventBus（需先于 Managers，以便 Managers 在构造中订阅事件）;
-:创建 Managers（MemoryManager/TaskAnalyzer/\nFileMethodologyManager/PromptManager）;
-:设置系统提示词（通过 PromptManager 或回退逻辑）;
-:输出启动统计（show_agent_startup_stats:\n方法论/工具/记忆等）;
+:创建 Managers（MemoryManager/TaskAnalyzer/FileMethodologyManager/\nPromptManager/TaskListManager/RulesManager）;
+:设置系统提示词（通过 PromptManager，含 RulesManager 的 loaded_rules，见 3.5.1）;
 if (存在 after_tool_call 回调目录?) then (是)
   :扫描 after_tool_call_cb_dirs 配置指定的目录;
   :识别三种导出形式（优先级）:\n1. 直接回调 after_tool_call_cb\n2. 工厂方法 get_after_tool_call_cb()\n3. 工厂方法 register_after_tool_call_cb();
@@ -615,7 +644,7 @@ stop
   - 轻量协调者：初始化组件、构建系统/附加提示、委派主循环、广播事件
   - 通过 Registry 与事件总线实现可插拔能力与旁路扩展
 - 核心方法：
-  - **init**: 解析参数与配置；初始化 Platform/Session/Handlers/Managers/Prompt；设置系统提示；统计资源；加载 after_tool_call 回调
+  - **init**: 解析参数与配置；初始化 Platform（get_normal_platform）/Session/Handlers/Managers（含 TaskListManager、RulesManager，见 3.5.1）/Prompt；设置系统提示；加载 after_tool_call 回调
   - run/\_main_loop: 进入主循环，委派 AgentRunLoop
   - \_call_model/\_invoke_model: 输入处理、附加提示拼接、上下文计数与模型调用（含 BEFORE/AFTER_MODEL_CALL 事件）
   - \_call_tools: 工具执行委派至 execute_tool_call
@@ -632,6 +661,8 @@ title Agent 与核心组件关系
 [Agent] --> [AgentRunLoop]
 [Agent] --> [SessionManager]
 [Agent] --> [PromptManager]
+[Agent] --> [RulesManager]
+[Agent] --> [TaskListManager]
 [Agent] --> [EventBus]
 [Agent] --> [ToolRegistry]
 [Agent] --> [MemoryManager]
@@ -749,7 +780,7 @@ stop
     3. 自动摘要检查：当剩余token低于输入窗口的25%时触发摘要与历史清理，重置对话长度计数
        - **Git diff 集成优化**：在触发总结前，如果 Agent 是 CodeAgent 类型（有 `start_commit` 属性），自动获取并缓存 git diff 信息
     4. 更新输入处理器标志（run_input_handlers_next_turn）
-    5. 首次运行处理（Agent.\_first_run：工具筛选、文件/方法论处理）
+    5. 首次运行处理（Agent.\_first_run：工具筛选、记忆标签提示注入、文件/方法论处理）
     6. \_call_model → 获取响应（含输入处理器链处理）
     7. 检查响应中的 <!!!SUMMARY!!!> 标记（`ot('!!!SUMMARY!!!')` 是等价的封装形式）：如果检测到该标记，触发摘要与历史清理，移除标记后继续处理响应
        - **Git diff 集成优化**：主动总结标记触发时，同样会获取并缓存 git diff 信息（仅对 CodeAgent 类型）
@@ -843,6 +874,48 @@ stop
 @enduml
 ```
 
+##### 3.5.1 Rule 设计说明
+
+Rule 系统用于将“行为约束、编码规范、流程定义”等以规则文本形式注入 Agent 的系统提示或单轮输入，使模型在对话中持续遵循或按需加载规则。
+
+**设计目标与定位**
+
+- **统一规则入口**：规则内容通过 RulesManager 加载与合并，由 PromptManager 写入系统提示的 `<loaded_rules>` 块，与系统提示词、工具提示等一起下发给模型。
+- **多来源、可扩展**：支持全局规则（`~/.jarvis/rule`）、项目规则（`.jarvis/rule`）、项目/全局/中心库的 `rules` 目录与 `rules.yaml`、内置规则索引（builtin_rules.md）及配置的规则目录；支持中心规则仓库（Git）的克隆与每日更新检查。
+- **按需激活与运行时注入**：启动时通过 Agent 参数 `rule_names`（逗号分隔）指定要加载的命名规则；支持通过 `load_rule` 工具按文件路径加载并渲染规则，以及通过输入标记 `<rule:规则名>` 在当轮将规则内容注入用户输入。
+
+**规则来源与优先级**
+
+- **默认加载（无 `rule_names` 时）**：依次加载并合并（1）全局单文件规则 `read_global_rules()`（`~/.jarvis/rule`）、（2）项目单文件规则 `read_project_rule()`（`.jarvis/rule`）、（3）内置规则索引 `_get_builtin_rules_index()`（builtin_rules.md）。合并结果写入 `loaded_rules`，供 PromptManager 使用。
+- **命名规则解析（get_named_rule）**：规则名可带前缀以指定来源：`builtin:`、`project:`、`global:`、`central:`、`configN:`、`central_yaml:`、`project_yaml:`、`global_yaml:`；无前缀时按优先级从项目/全局 rules.yaml、builtin_rules.md 索引、内置规则文件中查找。
+- **规则目录优先级（_get_all_rules_dirs）**：中心规则仓库（若配置）> 项目 `.jarvis/rules` > 配置的规则目录；同名规则以优先级高的为准。
+
+**RulesManager 职责与状态**
+
+- **加载与缓存**：从各来源读取规则内容，经 Jinja2 渲染（支持 current_dir、git_root_dir、jarvis_src_dir、jarvis_data_dir、rule_file_dir 等变量）后写入 `_loaded_rules`（name → content）。
+- **激活与合并**：默认规则与 `rule_names` 中指定的规则被加入 `_active_rules`；`activate_rule(name)` / `deactivate_rule(name)` 可动态增删激活集合；`_merge_active_rules()` 将当前激活规则按名排序后拼接为 `_merged_rules`。
+- **对外接口**：`load_all_rules(rule_names)` 返回 `(merged_rules, loaded_rule_names)`，供 Agent 初始化时得到 `loaded_rules`（字符串）与 `loaded_rule_names`；`get_named_rule(rule_name)` 供工具与输入处理器按名取内容；`get_all_available_rule_names()`、`get_all_rules_with_status()` 支持列表与状态展示。
+
+**规则注入流程**
+
+- **启动时**：Agent 构造时传入 `rule_names` → `_init_managers(rule_names)` → `RulesManager.load_all_rules(rule_names)` → 得到 `self.loaded_rules`（合并字符串）、`self.loaded_rule_names`；`_setup_system_prompt()` 中 PromptManager 将 `loaded_rules` 包在 `<loaded_rules>...</loaded_rules>` 中拼入系统提示。
+- **运行时（输入侧）**：builtin_input_handler 识别用户输入中的 `'<rule:规则名>'`，调用 `_get_rule_content(rule_name)`（内部使用 RulesManager.get_named_rule）获取内容，将标记替换为 `<rule>...</rule>` 及分隔符后写入当轮输入，实现单轮按名注入。
+- **运行时（工具侧）**：`load_rule` 工具接收 `file_path`，按路径读文件并用 `render_rule_template` 渲染后返回内容；不依赖规则名，适合项目内任意路径的规则文件。若存在 load_rule 工具，PromptManager 会在系统提示中追加 `<rule_usage_guide>`，引导模型在涉及规范、流程时使用该工具。
+
+**内置输入标记与规则**
+
+- **`<rule:规则名>`**：在用户输入中书写该标记，会在当轮被替换为对应规则的完整内容（含可选路径注释），便于临时引入某条命名规则。
+- **`<ListRule>`**：触发后调用 `rules_manager.get_all_rules_with_status()`，以表格形式输出所有可用规则及其状态（已激活/未激活）、预览与路径，便于查看与选规则。
+
+**规则文件与规范**
+
+- 项目规则建议放在 `.jarvis/rules/` 下（可按子目录分类）；全局规则在 `~/.jarvis/rules/` 或单文件 `~/.jarvis/rule`；内置规则在 Jarvis 的 `builtin/rules/`，通过 `builtin_rules.md` 索引与 `get_builtin_rule` 暴露。
+- 规则内容支持 Markdown 与 Jinja2 模板；新增规则可参考 `add_rule` 规范（如 builtin/rules/tool_config/add_rule.md），区分项目规则与全局规则、目录与命名约定。
+
+**小结**
+
+- Rule 系统通过 RulesManager 统一多来源规则的加载、激活与合并，经 PromptManager 注入系统提示，并通过 `<rule:xxx>` 与 load_rule 工具支持按名/按路径的运行时注入，与 ListRule 一起提供可观测与可扩展的规则使用方式。
+
 ##### 3.6 SessionManager 设计
 
 读者要点
@@ -852,6 +925,8 @@ stop
 - 使用场景：长对话需释放上下文时的重置；跨运行的会话持久化与恢复
 - 风险与约束：清理后必须重新设置系统提示；恢复失败或文件缺失时应平稳回退，不影响主流程
 - 数据存储：当前提示字段（当前提示）、附加提示字段（附加提示）、会话长度计数字段（会话长度计数）、用户自定义数据字段（用户自定义数据字典）
+
+以下为 **EventBus** 的逻辑结构（事件总线为 Agent 核心组件，与 SessionManager 同属“模块功能说明”中的核心/管理器类，此处一并编排）：
 
 - 内部逻辑结构（PlantUML）
 
@@ -902,19 +977,19 @@ stop
 - API：subscribe(callback)、emit(event, \*\*kwargs)、unsubscribe(callback)
 - 特性：同步广播、回调异常隔离，便于旁路扩展（记忆保存、任务分析、统计）
 
-- 事件总线全局事件流（总览图）
-  下图以通俗步骤展示“任务启动 → 模型/工具 → 历史清理 → 总结 → 完成”的全链路广播与响应，弱化内部术语，便于整体理解。
+- 事件总线全局事件流（总览图，分两部分展示）
+
+**图：事件流（一）任务启动、模型调用与工具筛选**
 
 ```plantuml
 @startuml
 !theme plain
-title 事件总线全局事件流
+title 事件总线全局事件流（一）任务启动 / 模型调用 / 工具筛选
 
 actor 用户 as User
 participant "Agent" as Agent
 participant "事件总线" as Bus
 participant "记忆" as Mem
-participant "分析" as Analyzer
 participant "循环" as Loop
 participant "工具" as Tools
 participant "模型" as Model
@@ -938,6 +1013,23 @@ Agent -> Bus : 广播：完成模型调用
 Agent -> Bus : 广播：开始工具筛选
 Agent -> Tools : 启用筛选后的工具
 Agent -> Bus : 广播：筛选完成
+@enduml
+```
+
+**图：事件流（二）工具执行、历史清理、总结与任务结束**
+
+```plantuml
+@startuml
+!theme plain
+title 事件总线全局事件流（二）工具执行 / 历史清理 / 总结 / 结束
+
+participant "Agent" as Agent
+participant "事件总线" as Bus
+participant "记忆" as Mem
+participant "分析" as Analyzer
+participant "循环" as Loop
+participant "工具" as Tools
+participant "模型" as Model
 
 == 执行工具（若需要） ==
 Agent -> Bus : 广播：开始工具调用
@@ -1587,12 +1679,11 @@ end
 
 #### 6. 参数与配置说明
 
-以下参数来自 Agent.**init**。默认值或行为参考 jarvis_utils.config 与内部回退逻辑。除特别标注外，布尔型参数可通过入参覆盖配置默认值。
+以下参数来自 Agent.**init**。默认值或行为参考 jarvis_utils.config 与内部回退逻辑。除特别标注外，布尔型参数可通过入参覆盖配置默认值。平台与模型由配置（如 get_normal_platform_name）决定，非 Agent 构造参数。
 
 - system_prompt: 系统提示词，定义 Agent 行为准则（必要）
 - name: Agent 名称，默认 "Jarvis"，用于全局登记与交互提示
 - description: Agent 描述信息
-- llm_group: 模型组标识，用于按组选择平台与模型（get_normal_platform_name/get_normal_model_name/get_cheap_platform_name/get_smart_platform_name）
 - summary_prompt: 任务总结提示词；为空时回退 DEFAULT_SUMMARY_PROMPT 或 SUMMARY_REQUEST_PROMPT
 - auto_complete: 自动完成开关；非交互模式默认开启；多智能体模式下仅在显式 True 时开启
 - output_handler: 输出处理器列表；默认 [ToolRegistry]（包含 edit_file 等工具，支持整文件重写）
@@ -1607,6 +1698,10 @@ end
 - confirm_callback: 确认回调，签名 (tip: str, default: bool) -> bool；默认 CLI user_confirm
 - in_multi_agent: 多智能体运行标志；用于控制自动完成（子 Agent 默认非交互自动完成）
 - agent_type: "normal" 或 "code"；"code" 时构造 CodeAgent（转发构造参数）
+- rule_names: 规则名称列表（逗号分隔），用于加载指定规则（见 3.5.1 Rule 设计说明）
+- allow_savesession: 是否允许 SaveSession/RestoreSession 命令；默认 False，仅 jvs/jca 主程序传入 True
+- optimize_system_prompt: 若为 True，在第一次 run() 时根据用户输入优化系统提示词
+- non_interactive: 是否非交互模式（优先级最高，覆盖环境变量与配置）
 
 行为与默认策略补充
 
@@ -1640,7 +1735,7 @@ end
 以“分析代码并修改某个函数”为例（伪场景）：
 
 1. CLI 将用户需求交给 Agent.run
-2. Agent 初始化与启动统计：加载 Platform 与 ToolRegistry；设置系统提示；输出方法论/工具/记忆统计信息
+2. Agent 已完成初始化（在 run 调用前）：已加载 Platform、ToolRegistry、系统提示等；run 被调用时进入主循环
 3. Agent 注册与运行状态管理：
    - 注册逻辑：普通 Agent 在 run 方法开始时注册到全局注册表；CodeAgent 跳过注册（由 CodeAgent.run 自行管理）
    - 运行状态标记：调用 set_current_agent 标记 agent 开始运行
@@ -1996,12 +2091,14 @@ TaskListManager 是 Jarvis 系统中用于管理复杂任务分拆、执行和�
 
 #### 2. 模块组成（PlantUML）
 
-下图展示 CodeAgent 与其协作组件的静态组成与依赖关系，Agent 作为运行与工具执行的统一入口，不展开内部细节。
+下图分两部分展示 CodeAgent 与其协作组件的静态组成与依赖关系。
+
+**图：CodeAgent 结构组成（一）继承关系与工具层**
 
 ```plantuml
 @startuml
 !theme vibrant
-title CodeAgent 结构组成图（继承 Agent）
+title CodeAgent 结构组成（一）继承 Agent 与工具调用
 
 package "CodeAgent Layer" #LightGreen {
   component "CodeAgent" as CodeAgent
@@ -2020,6 +2117,28 @@ package "Agent Tools" #Wheat {
   component "search_web" as ToolSearchWeb
   component "memory_tools(save/retrieve/clear)" as ToolMemory
 }
+
+AgentNode <|-- CodeAgent : 继承
+CodeAgent --> EventBus : 订阅 AFTER_TOOL_CALL
+
+CodeAgent --> ToolReadCode
+CodeAgent --> ToolEditFile
+CodeAgent --> ToolExecuteScript
+CodeAgent --> ToolSearchWeb
+CodeAgent --> ToolMemory
+
+CLI --> CodeAgent : 入口与参数传递
+@enduml
+```
+
+**图：CodeAgent 结构组成（二）Git / 配置 / 统计 / 代码分析器**
+
+```plantuml
+@startuml
+!theme vibrant
+title CodeAgent 结构组成（二）Git、配置、统计与代码分析
+
+component "CodeAgent" as CodeAgent
 
 package "Git & Repo Utils" #LightYellow {
   component "提交工作流工具" as GitCommitTool
@@ -2045,16 +2164,6 @@ package "Code Analyzer" #LightCyan {
   component "BuildValidationConfig" as BVC
 }
 
-AgentNode <|-- CodeAgent : 继承
-CodeAgent --> EventBus : 订阅 AFTER_TOOL_CALL
-
-CodeAgent --> ToolReadCode
-CodeAgent --> ToolEditFile
-CodeAgent --> ToolRewriteFile
-CodeAgent --> ToolExecuteScript
-CodeAgent --> ToolSearchWeb
-CodeAgent --> ToolMemory
-
 CodeAgent --> GitUtils : 仓库检测/差异/历史
 CodeAgent --> GitCommitTool : 提交工作流封装
 CodeAgent --> Config : 读取/覆盖配置项
@@ -2067,7 +2176,6 @@ CodeAgent --> IA : 影响范围分析
 CodeAgent --> CR : 智能上下文推荐（可选）
 CodeAgent --> BV : 构建验证
 CodeAgent --> BVC : 构建验证配置管理
-CLI --> CodeAgent : 入口与参数传递
 @enduml
 ```
 
@@ -2093,14 +2201,17 @@ CLI --> CodeAgent : 入口与参数传递
   - 运行入口：通过 `self.run(input)` 启动任务（继承自 Agent）
 
 - CodeAgent 的扩展能力（在 Agent 基础上新增）：
+  - **模型平台**：重写 `_init_model()`，使用 **smart 平台**（get_smart_platform），适用于代码生成等复杂场景。
+  - **需求/场景分类**：首次运行时根据用户输入调用 `classify_user_request` 进行场景分类，按场景切换系统提示词（scenarios.yaml + get_system_prompt(scenario)），使系统提示与任务类型匹配。
   - **内置命令处理**：优先识别并执行内置快捷命令（如 @ 触发的操作），避免不必要的工具调用，提升响应效率
   - **目录树优化**：智能截断目录树输出（max_tree_lines=200），防止大型项目上下文膨胀，确保关键信息优先展示
   - **会话管理统一架构**：基于 SessionRestorable 基类实现会话持久化，支持会话恢复与状态一致性检查（如 Git Commit 验证）
   - 环境与仓库管理：发现仓库根、更新 .gitignore、处理未提交修改、统一换行符敏感策略（含 Windows 建议）。
+  - **项目概况注入**：首轮 run 时调用 `get_project_overview(root_dir)` 将项目概况拼接到用户输入前，并注入首轮操作规范提示（如 PATCH 优先、禁止 sed 等），便于模型理解项目结构。
   - 代码分析器模块：
     - 上下文管理：维护符号表和依赖图，提供代码上下文查询能力
     - 影响范围分析：分析编辑的影响范围，识别受影响文件、符号、测试等
-    - 智能上下文推荐：使用 LLM 进行语义理解，推荐相关上下文信息
+    - 智能上下文推荐：根据用户输入推荐相关代码上下文（可通过配置 `is_enable_intent_recognition` 启用/关闭意图识别与推荐）
     - 构建验证：自动检测构建系统并执行构建验证
     - 静态分析：根据文件类型自动选择和执行 lint 工具（已重构为命令模板机制）
   - 内置规则系统：
@@ -2108,14 +2219,18 @@ CLI --> CodeAgent : 入口与参数传递
     - 动态加载：启动时自动扫描并加载所有规则文件
     - 指令性格式：规则已优化为适合大模型的指令性格式，使用"必须"、"禁止"等明确指令
     - 规则分类：通用开发实践规则（TDD、代码审查、重构等）和语言特定测试规则
+  - **文件编辑**：edit_file 支持 search/replace 与**整文件重写**（空 search 参数）；大范围重写时建议配合空 search 并提前备份。
   - 文件变更后处理：
     - 自动格式化：根据文件类型自动执行对应的格式化工具（ruff、prettier、rustfmt等）
     - 可配置：支持通过配置文件自定义格式化命令模板
     - 多语言支持：支持 Python、JavaScript、Rust、Go、Java、C/C++ 等多种语言
-  - 提交工作流：自动/交互式 commit、提交历史展示与接受/重置。
-  - 差异与预览：按文件输出 diff，针对删除/重命名/大变更进行适配与摘要化处理。
-  - 大量代码删除防护：非交互模式下自动检测大量代码删除，询问大模型判断是否合理，防止误删重要代码。
+    - 提交确认后可执行后处理：handle_commit_confirmation 的 post_process 会调用 post_process_manager 对已修改文件执行格式化等
+  - **代码审查（Review）与迭代修复**：主流程结束后可选执行多轮“审查 → 修复”循环（`_review_and_fix`）。使用独立 Review Agent 审查本次修改的 git diff，输出结构化 JSON（ok/issues/summary）；若不通过则根据 issues 触发修复（修复阶段可生成总结并再次审查）。支持 `disable_review`、`review_max_iterations`（0 表示不设上限）。
+  - 提交工作流：run 支持 **prefix/suffix** 参数用于提交信息生成；主流程与 review 后调用 **handle_uncommitted_changes** 处理未提交变更；自动/交互式 commit、提交历史展示与接受/重置；提交确认后执行后处理（格式化等）。
+  - 差异与预览：按文件输出 diff，**按文件补丁预览**（build_per_file_patch_preview）；支持**增强 diff 可视化**（visualize_diff_enhanced、可视化模式与行号显示可配置）；针对删除/重命名/大变更进行适配与摘要化处理；**补丁应用前可选用户确认**（is_confirm_before_apply_patch），未确认时可输入自定义回复作为附加提示。
+  - 大量代码删除防护：非交互模式下自动检测大量代码删除，询问大模型判断是否合理（ask_llm_about_large_deletion），防止误删重要代码。
   - 统计与提示：记录代码行增删、修改次数；根据文件类型生成 lint 建议与静态扫描引导。
+  - **任务结束前可选分析**：CodeAgent 初始化时关闭 Agent 的 use_analysis，在 run 结束前（最终提交确认之前）根据配置与用户确认可选调用 `analysis()` 进行任务分析与方法论沉淀。
   - CLI 入口：非交互约束、单实例锁（按仓库维度）、会话恢复、参数同步配置。
 
 ##### 3.1 CodeAgent 初始化流程
@@ -4326,25 +4441,20 @@ CLI --> User : 输出摘要与结果路径
 
 **Agent 交互时序图**：
 
-以下时序图展示了 jarvis-c2rust 模块中各个 Agent 的交互流程：
+以下三幅时序图分阶段展示 jarvis-c2rust 中 CLI、Scanner、Library Replacer、模块规划 Agent、Transpiler、CodeAgent（生成/修复）、Review Agent、Optimizer 及各类优化用 CodeAgent 的交互流程。
+
+**（一）扫描、库替代评估与模块规划**
 
 ```plantuml
 @startuml
 !theme vibrant
-title jarvis-c2rust Agent 交互时序图
+title Agent 交互时序（一）扫描 / 库替代 / 模块规划
 
 actor 用户
 participant CLI as "CLI\n(cli.py)"
 participant Scanner as "Scanner\n(scanner.py)"
 participant LibReplacer as "Library Replacer\n(library_replacer.py)"
 participant ModulePlanner as "LLMRustCratePlannerAgent\n(llm_module_agent.py)"
-participant Transpiler as "Transpiler\n(transpiler.py)"
-participant FunctionPlanner as "Function-Planner Agent\n(transpiler.py)"
-participant CodeGenAgent as "CodeAgent (生成)\n(transpiler.py)"
-participant CodeRepairAgent as "CodeAgent (修复)\n(transpiler.py)"
-participant ReviewAgent as "Review Agent\n(transpiler.py)"
-participant Optimizer as "Optimizer\n(optimizer.py)"
-participant OptCodeAgent as "CodeAgent (优化)\n(optimizer.py)"
 
 == 阶段1: 扫描 ==
 用户 -> CLI: jarvis-c2rust run
@@ -4373,10 +4483,24 @@ ModulePlanner -> ModulePlanner: 解析并验证JSON\n应用目录结构
 ModulePlanner -> ModulePlanner: CodeAgent初始化\n补齐模块声明\n配置Cargo.toml
 ModulePlanner -> ModulePlanner: cargo build循环\n直到构建成功
 CLI -> CLI: 记录状态到 run_state.json
+@enduml
+```
 
-== 阶段4: 代码转译 ==
+**（二）代码转译（单函数流程）**
+
+```plantuml
+@startuml
+!theme vibrant
+title Agent 交互时序（二）代码转译（对每个函数）
+
+participant CLI as "CLI\n(cli.py)"
+participant Transpiler as "Transpiler\n(transpiler.py)"
+participant FunctionPlanner as "Function-Planner Agent\n(transpiler.py)"
+participant CodeGenAgent as "CodeAgent (生成)\n(transpiler.py)"
+participant CodeRepairAgent as "CodeAgent (修复)\n(transpiler.py)"
+participant ReviewAgent as "Review Agent\n(transpiler.py)"
+
 CLI -> Transpiler: run_transpile() (如未完成)
-CLI -> Transpiler: run_transpile()
 Transpiler -> Transpiler: 读取translation_order.jsonl\n遍历函数列表
 
 loop 对每个函数
@@ -4391,10 +4515,10 @@ loop 对每个函数
     else 需要实现
         == 4.2 代码生成 ==
         Transpiler -> Transpiler: _reset_function_context()\n初始化上下文
-        Transpiler -> CodeGenAgent: 获取/创建CodeAgent (生成)\n可复用，force_save_memory=True
+        Transpiler -> CodeGenAgent: 获取CodeAgent (生成)\n(每次重新创建)
         Transpiler -> CodeGenAgent: CodeAgent.run()\n生成Rust实现
         CodeGenAgent -> CodeGenAgent: 检查依赖函数\n补齐未实现依赖
-        CodeGenAgent -> CodeGenAgent: 生成测试用例\n保存记忆
+        CodeGenAgent -> CodeGenAgent: 生成测试用例\n(可选保存记忆)
 
         == 4.3 构建与修复循环 ==
         loop 直到构建成功或达到上限
@@ -4429,8 +4553,24 @@ loop 对每个函数
         Transpiler -> Transpiler: 更新progress.json
     end
 end
+@enduml
+```
 
-== 阶段5: 代码优化 ==
+**（三）代码优化**
+
+```plantuml
+@startuml
+!theme vibrant
+title Agent 交互时序（三）代码优化
+
+participant CLI as "CLI\n(cli.py)"
+participant Optimizer as "Optimizer\n(optimizer.py)"
+participant ClippyCodeAgent as "CodeAgent (Clippy)\n(optimizer.py)"
+participant UnsafeCodeAgent as "CodeAgent (Unsafe)\n(optimizer.py)"
+participant VisibilityCodeAgent as "CodeAgent (可见性)\n(optimizer.py)"
+participant DocCodeAgent as "CodeAgent (文档)\n(optimizer.py)"
+participant FixCodeAgent as "CodeAgent (修复)\n(optimizer.py)"
+
 CLI -> Optimizer: optimize_project() (如未完成)
 Optimizer -> Optimizer: 计算目标文件集\n记录快照
 Optimizer -> Optimizer: 检查是否有 clippy 告警
@@ -4495,45 +4635,22 @@ else 失败
 end
 
 Optimizer -> Optimizer: 更新进度并写报告
-
 @enduml
 ```
 
 **时序图说明**：
 
-1. **阶段1 - 扫描**：Scanner 模块扫描 C/C++ 代码，生成符号表和引用关系。
-
-2. **阶段2 - 库替代评估**：Library Replacer 使用 LLM 直接调用（非 Agent）评估每个根函数的子树是否可用标准库替代。
-
-3. **阶段3 - 模块规划**：
-   - LLMRustCratePlannerAgent（Agent）规划 Rust crate 的目录结构
-   - 使用 CodeAgent 初始化 crate（补齐模块声明、配置 Cargo.toml）
-
-4. **阶段4 - 代码转译**（核心阶段）：
-   - **Function-Planner Agent**：为每个函数选择目标模块和 Rust 函数签名
-   - **CodeAgent (生成)**：生成 Rust 实现，检查并补齐依赖函数，生成测试用例（在单个函数生命周期内复用）
-   - **CodeAgent (修复)**：修复构建错误和测试失败（每次重新创建，上下文中包含原 C 实现代码，启用方法论和分析）
-   - **Review Agent**：审查代码功能一致性，发现问题时调用 CodeAgent (修复) 优化
-
-5. **阶段5 - 代码优化**：
-   - 检查 clippy 告警，如果有则使用 CodeAgent 消除告警（如果没有告警则跳过）
-   - Clippy 告警修复：每次只修复第一个告警，迭代修复直到没有告警；每次修复后执行 `cargo test` 验证，通过后保存进度和 commit id，失败时回退到运行前的 commit
-   - 所有优化步骤均使用 CodeAgent 完成：
-     - CodeAgent 消除 clippy 告警（如有，每次只修复第一个告警，迭代修复）
-     - CodeAgent 进行 unsafe 清理（每次只处理一个文件，迭代处理所有文件）
-     - CodeAgent 进行可见性优化
-     - CodeAgent 进行文档补充
-   - 每个 CodeAgent 调用前执行 `cargo fmt` 格式化代码
-   - 每个 Agent 调用后立即执行 `cargo test` 验证，通过后保存进度和 commit id，失败时回退到运行前的 commit
-   - 每个 Agent 都有唯一的名字（如 ClippyWarningEliminator-iterN、UnsafeCleanupAgent-fileN、VisibilityOptimizer、DocumentationAgent、BuildFixAgent-iterN）
+- **图（一）**：阶段1 扫描 → 阶段2 库替代评估 → 阶段3 模块规划。Scanner 扫描 C/C++ 生成符号表；Library Replacer 用 LLM 直接调用（非 Agent）评估子树是否可库替代；LLMRustCratePlannerAgent 规划 crate 目录结构并落盘，CodeAgent 初始化补齐模块与 Cargo.toml。
+- **图（二）**：阶段4 代码转译（对每个函数）。Function-Planner Agent 选择模块与签名；CodeAgent (生成) 每次调用重新创建，生成 Rust 实现并补齐依赖与测试；CodeAgent (修复) 每次重新创建、带原 C 上下文，用于构建/测试修复；Review Agent 审查一致性，有问题时用 CodeAgent (修复) 迭代优化。
+- **图（三）**：阶段5 代码优化。先按需用 CodeAgent 消除 clippy 告警（每次只修第一个，迭代）；再按文件用 CodeAgent 做 unsafe 清理、可见性优化、文档补充；每步前 `cargo fmt`，每步后 `cargo test`，失败则回退；修复失败时走 `_build_fix_loop()`。
 
 **Agent 复用策略**：
 
-- **代码生成 Agent**：在单个函数生命周期内复用同一个 CodeAgent 实例，用于代码生成任务，共享函数上下文
-- **修复 Agent**：每次修复时重新创建 CodeAgent 实例，不复用，确保每次修复都有独立的上下文和状态
-- **修复 Agent 上下文增强**：修复 Agent 的上下文中自动包含原 C 实现代码，帮助 Agent 更好地理解原始实现意图，提高修复准确性
-- **上下文传递**：通过 `_compose_prompt_with_context()` 在复用 Agent 时传递函数上下文；修复 Agent 调用时使用 `for_fix=True` 参数，自动添加原 C 代码上下文
-- **记忆功能**：代码生成 Agent 启用 `force_save_memory=True`，保存函数实现记忆供后续参考
+- **代码生成 Agent**：每个函数使用独立的 CodeAgent（每次调用 get_generation_agent 重新创建），用于代码生成任务。
+- **修复 Agent**：每次修复时重新创建 CodeAgent 实例，不复用，确保每次修复都有独立的上下文和状态。
+- **修复 Agent 上下文增强**：修复 Agent 的上下文中自动包含原 C 实现代码，帮助 Agent 更好地理解原始实现意图，提高修复准确性。
+- **上下文传递**：通过 `_compose_prompt_with_context()` 传递函数上下文；修复 Agent 调用时使用 `for_fix=True` 参数，自动添加原 C 代码上下文。
+- **记忆功能**：代码生成 Agent 当前实现中未启用 `force_save_memory`；完成函数实现后可根据需要记录关键信息供后续修复与优化使用。
 
 #### 5. 模块内部设计
 
