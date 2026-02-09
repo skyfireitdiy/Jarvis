@@ -411,20 +411,39 @@ class task_list_manager:
 
         return verification_agent
 
-    def _build_task_content(self, task: Any, additional_info: str = "") -> str:
+    def _build_task_content(
+        self, task: Any, parent_agent: Any = None, additional_info: str = ""
+    ) -> str:
         """构建任务内容
 
         参数:
             task: 任务对象
+            parent_agent: 父Agent实例（用于获取记忆标签）
             additional_info: 附加信息
 
         返回:
             str: 格式化的任务内容
         """
         task_desc = task.task_desc
+
+        # 获取父Agent的记忆标签并添加到任务描述中
+        memory_tags_info = ""
+        if parent_agent:
+            try:
+                memory_tags = parent_agent.get_memory_tags()
+                if memory_tags:
+                    memory_tags_info = f"\n\n父Agent记忆标签: {', '.join(memory_tags)}\n提示：这些标签可以帮助你通过记忆召回相关信息。"
+            except Exception:
+                # 获取记忆标签失败，不影响任务执行
+                pass
+
         if additional_info and str(additional_info).strip():
             separator = "\n" + "=" * 50 + "\n"
             task_desc = f"{task.task_desc}{separator}附加信息:\n{additional_info}"
+
+        # 将记忆标签信息添加到任务描述末尾
+        if memory_tags_info:
+            task_desc = f"{task_desc}{memory_tags_info}"
 
         return f"""任务名称: {task.task_name}
 
@@ -1571,7 +1590,7 @@ class task_list_manager:
                 )
 
             # 使用公共方法构建任务执行内容
-            task_content = self._build_task_content(task)
+            task_content = self._build_task_content(task, parent_agent)
 
             # 构建背景信息
             background_parts = []
@@ -2151,7 +2170,7 @@ class task_list_manager:
 
                         if should_verify:
                             # 使用公共方法构建任务内容
-                            task_content = self._build_task_content(task)
+                            task_content = self._build_task_content(task, agent)
 
                             # 使用公共方法构建背景信息
                             background = self._build_task_background(
