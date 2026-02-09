@@ -2079,15 +2079,15 @@ TaskListManager 是 Jarvis 系统中用于管理复杂任务分拆、执行和�
 
 本章节描述 CodeAgent 作为 Agent 的子类，在继承 Agent 核心能力的基础上，为"代码工程"场景提供的增强能力与流程封装。内容基于源码进行结构化说明，覆盖模块组成、职责与接口、关键交互流程、CLI 入口与参数说明、可靠性与扩展建议。
 
-- 关联组件与工具：Git 提交工作流工具、工具注册生态（由 Agent 承载）、事件系统（AFTER_TOOL_CALL）、StatsManager、lint 工具建议（lint.py）、文件变更后处理工具（after_change.py）、内置规则系统（builtin_rules.py）、配置系统（jarvis_utils.config）、输出交互（PrettyOutput）
+- 关联组件与工具：Git 提交工作流工具、工具注册生态（由 Agent 承载）、事件系统（AFTER_TOOL_CALL）、lint 工具建议（lint.py）、文件变更后处理工具（after_change.py）、内置规则系统（builtin_rules.py）、配置系统（jarvis_utils.config）、输出交互（PrettyOutput）
 - 源码位置：`src/jarvis/jarvis_code_agent/code_agent.py::CodeAgent`
 
 #### 1. 设计目标与总体思路
 
 - 继承 Agent：CodeAgent 直接继承 Agent 类，通过父类初始化方法初始化父类，获得 Agent 的所有核心能力（模型交互、工具调用、会话管理等）。
-- 场景聚焦：围绕"代码分析与修改"的端到端流程，提供仓库管理、补丁预览、提交确认与统计、静态检查引导等增值能力。
+- 场景聚焦：围绕"代码分析与修改"的端到端流程，提供仓库管理、补丁预览、提交确认、静态检查引导等增值能力。
 - 功能扩展：在 Agent 基础上扩展代码相关能力（上下文管理、影响分析、构建验证等），通过重写和扩展方法实现。
-- 稳健与可观测：强调 git 配置/仓库状态检查、换行符策略、错误回退；对代码行增删与提交进行统计记录；大变更摘要化预览，避免上下文膨胀。
+- 稳健与可观测：强调 git 配置/仓库状态检查、换行符策略、错误回退；大变更摘要化预览，避免上下文膨胀。
 
 #### 2. 模块组成（PlantUML）
 
@@ -2131,12 +2131,12 @@ CLI --> CodeAgent : 入口与参数传递
 @enduml
 ```
 
-**图：CodeAgent 结构组成（二）Git / 配置 / 统计 / 代码分析器**
+**图：CodeAgent 结构组成（二）Git / 配置 / 代码分析器**
 
 ```plantuml
 @startuml
 !theme vibrant
-title CodeAgent 结构组成（二）Git、配置、统计与代码分析
+title CodeAgent 结构组成（二）Git、配置与代码分析
 
 component "CodeAgent" as CodeAgent
 
@@ -2150,8 +2150,7 @@ package "Config & IO" #Thistle {
   component "PrettyOutput" as Output
 }
 
-package "Stats & Lint" #AliceBlue {
-  component "StatsManager" as Stats
+package "Lint & 文件变更后处理" #AliceBlue {
   component "LintToolsSelector" as Lint
   component "AfterChangeTools" as AfterChange
 }
@@ -2168,7 +2167,6 @@ CodeAgent --> GitUtils : 仓库检测/差异/历史
 CodeAgent --> GitCommitTool : 提交工作流封装
 CodeAgent --> Config : 读取/覆盖配置项
 CodeAgent --> Output : 提示与代码块输出
-CodeAgent --> Stats : 行数与提交统计
 CodeAgent --> Lint : 修改后静态检查建议
 CodeAgent --> AfterChange : 文件变更后格式化处理
 CodeAgent --> CM : 上下文管理（符号表/依赖图）
@@ -2183,8 +2181,8 @@ CodeAgent --> BVC : 构建验证配置管理
 
 - CodeAgent 直接继承 Agent，通过父类初始化方法初始化父类，获得 Agent 的所有核心能力（模型交互、工具调用、会话管理等）。
 - CodeAgent 在 Agent 基础上扩展代码相关能力，通过重写和扩展方法实现。
-- AFTER_TOOL_CALL 用于在工具执行后进行旁路增强（展示 diff、提交、统计、静态扫描引导、影响分析、构建验证、文件格式化）。
-- Git 工具链与配置/输出/统计等均为 CodeAgent 的扩展能力。
+- AFTER_TOOL_CALL 用于在工具执行后进行旁路增强（展示 diff、提交、静态扫描引导、影响分析、构建验证、文件格式化）。
+- Git 工具链与配置/输出等均为 CodeAgent 的扩展能力。
 - 代码分析器模块提供代码结构分析、依赖关系管理、影响范围分析和智能上下文推荐等能力。
 - 内置规则系统：规则以 Markdown 文件形式组织，支持动态加载，已优化为适合大模型的指令性格式。
 - 文件变更后处理：支持根据文件类型自动执行格式化工具，确保代码风格一致。
@@ -2405,9 +2403,8 @@ stop
      - 显示完整差异（格式化输出打印方法，语言类型为差异）
      - 调用处理提交工作流方法执行提交（交互或自动）
   6. 统计记录（提交成功后）：
-     - 代码行数变化：通过Git差异统计命令获取，调用记录代码变更统计方法记录到统计管理器
-     - 修改次数：统计管理器增量方法（代码修改指标，分组为代码代理）
-     - 提交计数：统计管理器增量方法（生成提交指标，分组为代码代理）（在显示提交历史方法中）
+     - 代码行数变化：通过 Git 差异统计命令获取并记录
+     - 修改次数与提交计数：在提交与显示提交历史时更新
   7. 构建验证（处理构建验证方法，可选）：
      - 若启用构建验证（启用构建验证参数）：
        - 检查项目配置（构建验证配置）：是否已禁用构建验证
@@ -2482,7 +2479,6 @@ participant "git_utils" as Git
 participant "提交工作流工具" as GCT
 participant "BuildValidator" as BV
 participant "BuildValidationConfig" as BVC
-participant "StatsManager" as Stats
 participant "lint" as Lint
 
 Bus -> CA: AFTER_TOOL_CALL
@@ -2501,8 +2497,6 @@ GCT --> CA: 返回是否已提交
 
 alt 提交成功
   CA -> Git: 获取提交后统计（git diff HEAD~1 HEAD --shortstat）
-  CA -> Stats: 记录行数变化（code_lines_inserted/code_lines_deleted）
-  CA -> Stats: 记录修改次数（code_modifications）
   CA -> CA: 追加"补丁内容（按文件）"到 session.prompt
 
   alt 启用构建验证
@@ -2580,9 +2574,7 @@ end
   - 其它文件：输出该文件的 diff 代码块（使用临时 `git add -N` 处理未跟踪文件）
   - 无法获取 diff：输出友好提示
 - 统计记录：
-  - 插入/删除行数（基于 `git diff --shortstat`）：记录到 StatsManager（code_lines_inserted/code_lines_deleted）
-  - 修改次数（code_modifications）
-  - 提交计数（commits_generated/commits_accepted）
+  - 插入/删除行数（基于 `git diff --shortstat`）及修改、提交相关计数
 - 用户确认机制：
   - 提交被拒绝时，根据应用补丁前确认配置决定是否要求用户确认
   - 支持用户输入自定义回复作为附加提示，便于后续继续处理
