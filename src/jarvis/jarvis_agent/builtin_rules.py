@@ -16,17 +16,28 @@ from jarvis.jarvis_utils.template_utils import _get_builtin_dir, render_rule_tem
 BUILTIN_RULES: dict[str, str] = {}
 
 
-def _load_rules_from_directory(directory: Path) -> None:
+def _load_rules_from_directory(directory: Path, base_dir: Path) -> None:
     """从指定目录加载规则文件，支持jinja2模板渲染
 
     参数:
         directory: 规则文件所在目录
+        base_dir: 基准目录（用于计算相对路径）
     """
     if not directory.exists():
         return
 
     for rule_file in directory.rglob("*.md"):
-        rule_name = rule_file.stem  # 去掉 .md 后缀
+        # 计算相对于基准目录的相对路径
+        # 例如：architecture_design/clean_code.md → architecture_design:clean_code.md
+        try:
+            relative_path = rule_file.relative_to(base_dir)
+        except ValueError:
+            # 如果文件不在基准目录下，使用文件名
+            rule_name = rule_file.name
+        else:
+            # 将路径分隔符替换为冒号
+            rule_name = str(relative_path).replace("/", ":").replace("\\", ":")
+
         try:
             with open(rule_file, "r", encoding="utf-8") as f:
                 rule_content = f.read().strip()
@@ -50,11 +61,14 @@ def _load_builtin_rules() -> None:
         # 如果找不到 builtin 目录，静默返回（可能是开发环境或安装不完整）
         return
 
+    # 基准目录（用于计算相对路径）
+    rules_base_dir = builtin_dir / "rules"
+
     # 加载通用规则（rules 目录）
-    _load_rules_from_directory(builtin_dir / "rules")
+    _load_rules_from_directory(rules_base_dir, rules_base_dir)
 
     # 加载测试规则（testing 目录）
-    _load_rules_from_directory(builtin_dir / "rules" / "testing")
+    _load_rules_from_directory(rules_base_dir / "testing", rules_base_dir)
 
 
 # 在模块加载时自动加载所有规则
@@ -86,7 +100,7 @@ def get_builtin_rule_path(rule_name: str) -> str | None:
     """获取内置规则的文件路径
 
     参数:
-        rule_name: 规则名称
+        rule_name: 规则名称（新格式，如 architecture_design:clean_code.md）
 
     返回:
         str | None: 规则文件的绝对路径，如果未找到则返回 None
@@ -98,15 +112,13 @@ def get_builtin_rule_path(rule_name: str) -> str | None:
     # 规则名称在 BUILTIN_RULES 中以小写存储
     rule_name_lower = rule_name.lower()
 
+    # 从新格式规则名称解析路径
+    # architecture_design:clean_code.md → architecture_design/clean_code.md
+    path_parts = rule_name_lower.replace(":", "/")
+
     # 在通用规则目录中查找
     general_rules_dir = builtin_dir / "rules"
-    rule_file = general_rules_dir / f"{rule_name_lower}.md"
-    if rule_file.exists() and rule_file.is_file():
-        return str(rule_file.absolute())
-
-    # 在测试规则目录中查找
-    testing_rules_dir = general_rules_dir / "testing"
-    rule_file = testing_rules_dir / f"{rule_name_lower}.md"
+    rule_file = general_rules_dir / path_parts
     if rule_file.exists() and rule_file.is_file():
         return str(rule_file.absolute())
 
