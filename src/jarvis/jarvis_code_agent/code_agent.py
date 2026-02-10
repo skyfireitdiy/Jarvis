@@ -1552,8 +1552,8 @@ def cli(
                             PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
                     output_content = agent.run(task, prefix=prefix, suffix=suffix)
-                    if agent.non_interactive:
-                        raise typer.Exit(code=0)
+                    # 单次任务模式：任务完成后直接退出
+                    raise typer.Exit(code=0)
                 else:
                     # 循环任务模式：每次迭代创建新的agent实例，避免任务间污染
 
