@@ -28,15 +28,15 @@ def _load_rules_from_directory(directory: Path, base_dir: Path) -> None:
 
     for rule_file in directory.rglob("*.md"):
         # 计算相对于基准目录的相对路径
-        # 例如：architecture_design/clean_code.md → architecture_design:clean_code.md
+        # 例如：architecture_design/clean_code.md → architecture_design/clean_code.md
         try:
             relative_path = rule_file.relative_to(base_dir)
         except ValueError:
             # 如果文件不在基准目录下，使用文件名
             rule_name = rule_file.name
         else:
-            # 将路径分隔符替换为冒号
-            rule_name = str(relative_path).replace("/", ":").replace("\\", ":")
+            # 直接使用相对路径，保持斜杠格式
+            rule_name = str(relative_path)
 
         try:
             with open(rule_file, "r", encoding="utf-8") as f:
@@ -112,9 +112,9 @@ def get_builtin_rule_path(rule_name: str) -> str | None:
     # 规则名称在 BUILTIN_RULES 中以小写存储
     rule_name_lower = rule_name.lower()
 
-    # 从新格式规则名称解析路径
-    # architecture_design:clean_code.md → architecture_design/clean_code.md
-    path_parts = rule_name_lower.replace(":", "/")
+    # 从规则名称解析路径
+    # architecture_design/clean_code.md → architecture_design/clean_code.md
+    path_parts = rule_name_lower
 
     # 在通用规则目录中查找
     general_rules_dir = builtin_dir / "rules"
