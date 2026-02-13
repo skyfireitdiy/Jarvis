@@ -729,3 +729,85 @@ class LSPDaemonClient:
             )
             for loc in locations_data
         ]
+
+    async def incoming_calls_by_name(
+        self, language: str, project_path: str, file_path: str, symbol_name: str
+    ) -> list[LocationInfo]:
+        """通过符号名查询谁调用了这个符号（incoming calls / callers）
+
+        Args:
+            language: 语言
+            project_path: 项目路径
+            file_path: 文件路径
+            symbol_name: 符号名称
+
+        Returns:
+            调用者位置列表
+        """
+        response = await self._send_request(
+            "incoming_calls_by_name",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "symbol_name": symbol_name,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "Unknown error"))
+
+        locations_data = response.get("locations", [])
+        return [
+            LocationInfo(
+                file_path=loc["file_path"],
+                line=loc["line"],
+                column=loc["column"],
+                uri=loc.get("uri", f"file://{loc['file_path']}"),
+                code_snippet=loc.get("code_snippet"),
+                symbol_name=loc.get("symbol_name"),
+                context=loc.get("context"),
+            )
+            for loc in locations_data
+        ]
+
+    async def outgoing_calls_by_name(
+        self, language: str, project_path: str, file_path: str, symbol_name: str
+    ) -> list[LocationInfo]:
+        """通过符号名查询这个符号调用了哪些符号（outgoing calls / callees）
+
+        Args:
+            language: 语言
+            project_path: 项目路径
+            file_path: 文件路径
+            symbol_name: 符号名称
+
+        Returns:
+            被调用者位置列表
+        """
+        response = await self._send_request(
+            "outgoing_calls_by_name",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "symbol_name": symbol_name,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "Unknown error"))
+
+        locations_data = response.get("locations", [])
+        return [
+            LocationInfo(
+                file_path=loc["file_path"],
+                line=loc["line"],
+                column=loc["column"],
+                uri=loc.get("uri", f"file://{loc['file_path']}"),
+                code_snippet=loc.get("code_snippet"),
+                symbol_name=loc.get("symbol_name"),
+                context=loc.get("context"),
+            )
+            for loc in locations_data
+        ]
