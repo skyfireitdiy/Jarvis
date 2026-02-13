@@ -688,3 +688,44 @@ class LSPDaemonClient:
             column=location_data["column"],
             uri=f"file://{location_data['file_path']}",
         )
+
+    async def callers_by_name(
+        self, language: str, project_path: str, file_path: str, symbol_name: str
+    ) -> list[LocationInfo]:
+        """通过符号名查找被调用方（该函数内部调用的所有符号）
+
+        Args:
+            language: 语言
+            project_path: 项目路径
+            file_path: 文件路径
+            symbol_name: 符号名称
+
+        Returns:
+            被调用符号的定义位置列表
+        """
+        response = await self._send_request(
+            "callers_by_name",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "symbol_name": symbol_name,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "Unknown error"))
+
+        locations_data = response.get("locations", [])
+        return [
+            LocationInfo(
+                file_path=loc["file_path"],
+                line=loc["line"],
+                column=loc["column"],
+                uri=loc.get("uri", f"file://{loc['file_path']}"),
+                code_snippet=loc.get("code_snippet"),
+                symbol_name=loc.get("symbol_name"),
+                context=loc.get("context"),
+            )
+            for loc in locations_data
+        ]
