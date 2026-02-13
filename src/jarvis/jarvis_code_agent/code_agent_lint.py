@@ -318,7 +318,6 @@ class LintManager:
 
             # 打印完整的检查结果
             errors_summary = self.format_lint_results(lint_results)
-            PrettyOutput.auto_print(f"⚠️ 静态扫描发现问题:\n{errors_summary}")
 
             # 构建提示信息
             if auto_fix_suggestions:
