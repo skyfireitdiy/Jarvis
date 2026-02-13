@@ -279,8 +279,8 @@ def format_code_action_json(code_actions: list[CodeActionInfo]) -> str:
 @app.command("document_symbols")
 def document_symbols_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -299,8 +299,6 @@ def document_symbols_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
-    if language is None:
-        language = "python"
     project_path = os.getcwd()
     client = LSPDaemonClient()
 
@@ -337,8 +335,8 @@ def document_symbols_command(
 @app.command("folding_range")
 def folding_range_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -364,8 +362,8 @@ def hover_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     line: int = typer.Argument(..., help="行号（从1开始）"),
     character: int = typer.Argument(..., help="列号（从1开始）"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -387,13 +385,6 @@ def hover_command(
     """
     # 读取配置
     config_reader = LSPConfigReader()
-
-    # 检测语言
-    if language is None:
-        language = config_reader.detect_language(file_path)
-        if language is None:
-            print("❌ 错误: 无法检测文件语言，请使用 --language 参数指定")
-            raise typer.Exit(code=1)
 
     # 获取语言配置
     lang_config = config_reader.get_language_config(language)
@@ -436,8 +427,8 @@ def hover_command(
 @app.command("symbol")
 def symbol_command(
     query: str = typer.Argument(..., help="搜索查询字符串"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -462,9 +453,6 @@ def symbol_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 workspace/symbol 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
-    # 如果没有指定语言，默认使用 python
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -549,8 +537,8 @@ def definition_at_line_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     line: int = typer.Argument(..., help="行号（从1开始）"),
     symbol_name: str = typer.Argument(..., help="符号名称（必填，用于精确匹配）"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -570,8 +558,6 @@ def definition_at_line_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 和 textDocument/definition 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -604,8 +590,8 @@ def definition_at_line_command(
 def definition_by_name_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     symbol_name: str = typer.Argument(..., help="符号名称"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -618,8 +604,6 @@ def definition_by_name_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 和 textDocument/definition 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -647,8 +631,8 @@ def definition_by_name_command(
 def references_by_name_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     symbol_name: str = typer.Argument(..., help="符号名称"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -667,8 +651,6 @@ def references_by_name_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 和 textDocument/references 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -695,8 +677,8 @@ def references_by_name_command(
 def implementation_by_name_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     symbol_name: str = typer.Argument(..., help="符号名称"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -715,8 +697,6 @@ def implementation_by_name_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 和 textDocument/implementation 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -743,8 +723,8 @@ def implementation_by_name_command(
 def type_definition_by_name_command(
     file_path: str = typer.Argument(..., help="文件路径"),
     symbol_name: str = typer.Argument(..., help="符号名称"),
-    language: Optional[str] = typer.Option(
-        None, "--language", "-l", help="编程语言 (默认自动检测)"
+    language: str = typer.Option(
+        ..., "--language", "-l", help="指定语言（如 python, rust, javascript）"
     ),
 ) -> None:
     """通过符号名查找类型定义（类型定义）
@@ -759,9 +739,6 @@ def type_definition_by_name_command(
     - symbol_name 必须是文件中存在的符号名称
     - pylsp 可能不支持类型定义查询，会显示友好错误
     """
-    # 自动检测语言
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -789,8 +766,8 @@ def type_definition_by_name_command(
 def callers_by_name_command(
     file_path: str = typer.Argument(..., help="文件路径"),
     symbol_name: str = typer.Argument(..., help="符号名称"),
-    language: Optional[str] = typer.Option(
-        None, "--language", "-l", help="编程语言 (默认自动检测)"
+    language: str = typer.Option(
+        ..., "--language", "-l", help="指定语言（如 python, rust, javascript）"
     ),
 ) -> None:
     """通过符号名查找被调用方（该函数内部调用的所有符号）
@@ -805,9 +782,6 @@ def callers_by_name_command(
     - symbol_name 必须是文件中存在的函数符号名称
     - 返回该函数内部调用的所有符号的定义位置
     """
-    # 自动检测语言
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -834,8 +808,8 @@ def callers_by_name_command(
 @app.command("diagnostic")
 def diagnostic_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -855,9 +829,6 @@ def diagnostic_command(
     - 返回所有诊断信息（ERROR, WARNING, INFO, HINT）
     - pylsp 可能不支持诊断，会显示友好错误
     """
-    # 自动检测语言
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -880,8 +851,8 @@ def diagnostic_command(
 def code_action_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     line: int = typer.Argument(..., help="行号（0-based）"),
-    language: Optional[str] = typer.Option(
-        None,
+    language: str = typer.Option(
+        ...,
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
@@ -909,9 +880,6 @@ def code_action_command(
     - line 是基于 0 的索引
     - pylsp 可能不提供代码动作，会返回空列表
     """
-    # 自动检测语言
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
@@ -938,8 +906,8 @@ def code_action_command(
 def code_action_by_name_command(
     file_path: str = typer.Argument(..., help="文件路径"),
     symbol_name: str = typer.Argument(..., help="符号名称（函数名、类名等）"),
-    language: Optional[str] = typer.Option(
-        None, "--language", "-l", help="编程语言 (默认自动检测)"
+    language: str = typer.Option(
+        ..., "--language", "-l", help="指定语言（如 python, rust, javascript）"
     ),
 ) -> None:
     """通过符号名查找代码动作（修复建议）
@@ -957,9 +925,6 @@ def code_action_by_name_command(
     - symbol_name 必须是文件中存在的符号名称
     - pylsp 可能不提供代码动作，会返回空列表
     """
-    # 自动检测语言
-    if language is None:
-        language = "python"
 
     project_path = os.getcwd()
     client = LSPDaemonClient()

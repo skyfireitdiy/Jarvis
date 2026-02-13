@@ -624,7 +624,7 @@ class LSPClient:
         return self._parse_locations(response.result or [])
 
     async def callers_in_range(
-        self, file_path: str, start_line: int, end_line: int, language: str = "python"
+        self, file_path: str, start_line: int, end_line: int, language: str
     ) -> List[Dict[str, Any]]:
         """解析指定行号范围内的函数调用
 
