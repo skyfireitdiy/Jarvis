@@ -1276,6 +1276,10 @@ class LSPClient:
             line = start.get("line", 0)
             column = start.get("character", 0)
 
+            # 提取文件路径
+            uri = location.get("uri", "")
+            file_path = self._uri_to_path(uri) if uri else ""
+
             # 如果列号为 0，尝试在目标行中查找符号名
             # pylsp 可能不返回 selectionRange，导致列号总是 0
             if column == 0 and name:
