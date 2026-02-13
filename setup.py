@@ -54,6 +54,7 @@ setup(
         "tiktoken==0.7.0",
         "pillow==10.2.0",
         "openai==1.78.1",
+        "python-lsp-server>=1.14.0",
         "tabulate==0.9.0",
         "pyte==0.8.2",
         "pyyaml>=5.3.1",
