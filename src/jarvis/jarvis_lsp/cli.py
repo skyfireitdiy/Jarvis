@@ -55,7 +55,7 @@ def format_symbols_json(symbols: list[SymbolInfo], file_path: str) -> str:
 
     Args:
         symbols: 符号列表
-        file_path: 文件路径
+        file_path: 文件路径（仅作为默认值，优先使用符号自己的 file_path）
 
     Returns:
         JSON 字符串
@@ -66,6 +66,7 @@ def format_symbols_json(symbols: list[SymbolInfo], file_path: str) -> str:
             {
                 "name": s.name,
                 "kind": s.kind,
+                "file": s.file_path or file_path,
                 "line": s.line,
                 "column": s.column,
                 "description": s.description,
