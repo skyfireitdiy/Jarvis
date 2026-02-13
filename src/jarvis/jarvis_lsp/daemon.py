@@ -1105,6 +1105,55 @@ class LSPDaemon:
             }
         )
 
+    async def callers_by_name(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """通过符号名查找被调用方（该函数内部调用的所有符号）"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+        symbol_name = params.get("symbol_name")
+
+        if not language or not project_path or not file_path or not symbol_name:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path, symbol_name",
+            }
+
+        server = await self.get_or_create_server(language, project_path)
+
+        if server.client is None:
+            return {
+                "success": False,
+                "error": "LSP server client not initialized",
+            }
+
+        try:
+            locations = await server.client.callers_by_name(file_path, symbol_name)
+        except RuntimeError as e:
+            error_msg = str(e)
+            if "Method Not Found" in error_msg or "-32601" in error_msg:
+                return {
+                    "success": False,
+                    "error": f"LSP server does not support the required method. {error_msg}",
+                    "not_supported": True,
+                }
+            raise
+
+        return {
+            "success": True,
+            "locations": [
+                {
+                    "file_path": loc.file_path,
+                    "line": loc.line,
+                    "column": loc.column,
+                    "uri": loc.uri,
+                    "symbol_name": loc.symbol_name,
+                    "context": loc.context,
+                    "code_snippet": loc.code_snippet,
+                }
+                for loc in locations
+            ],
+        }
+
 
 async def main(socket_path: str | None = None) -> None:
     """主函数"""
