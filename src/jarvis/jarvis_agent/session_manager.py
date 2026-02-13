@@ -120,16 +120,10 @@ class SessionManager:
         if not os.path.exists(session_dir):
             return []
 
-        platform_name = self.model.platform_name()
-        model_name = self.model.name().replace("/", "_").replace("\\", "_")
-
-        # 匹配新旧两种格式的会话文件
-        # 旧格式：saved_session_{agent_name}_{platform_name}_{model_name}.json
-        # 中间格式：saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json
-        # 新格式：{session_name}_saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json
+        # 匹配会话文件：{session_name}_saved_session_{agent_name}_{timestamp}.json
         pattern = os.path.join(
             session_dir,
-            f"*saved_session_{self.agent_name}_{platform_name}_{model_name}*.json",
+            f"*saved_session_{self.agent_name}_*.json",
         )
 
         files = sorted(glob.glob(pattern))
@@ -162,7 +156,7 @@ class SessionManager:
         import re
 
         basename = os.path.basename(filename)
-        # 新格式：saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json
+        # 新格式：{session_name}_saved_session_{agent_name}_{timestamp}.json
         # 时间戳格式：YYYYMMDD_HHMMSS（8位日期_6位时间）
         # 使用正则表达式精确匹配时间戳格式
         # \d{8}_\d{6} 匹配 8位数字 + 下划线 + 6位数字
@@ -327,8 +321,6 @@ class SessionManager:
         """Saves the current session state to a file."""
         session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
         os.makedirs(session_dir, exist_ok=True)
-        platform_name = self.model.platform_name()
-        model_name = self.model.name().replace("/", "_").replace("\\", "_")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # 确定会话名称
@@ -352,7 +344,7 @@ class SessionManager:
         # 使用session_name作为文件名前缀
         session_file = os.path.join(
             session_dir,
-            f"{session_name}_saved_session_{self.agent_name}_{platform_name}_{model_name}_{timestamp}.json",
+            f"{session_name}_saved_session_{self.agent_name}_{timestamp}.json",
         )
 
         # 检查是否有用户消息，如果没有则不保存
@@ -406,24 +398,16 @@ class SessionManager:
 
             # 获取元数据
             agent_name = self.agent_name
-            platform_name = self.model.platform_name()
-            model_name = self.model.name().replace("/", "_").replace("\\", "_")
 
-            # 从会话文件路径中提取时间戳
-            import os
-            from datetime import datetime
-
-            basename = os.path.basename(session_file)
-            parts = (
-                basename.replace("saved_session_", "").replace(".json", "").split("_")
-            )
-            timestamp = parts[-1] if len(parts) >= 4 else None
-            if timestamp and "_" in timestamp:
+            # 从会话文件路径中提取时间戳（复用 _extract_timestamp 逻辑）
+            timestamp_str = self._extract_timestamp(session_file)
+            if timestamp_str:
+                # 将时间戳字符串转换为 ISO 格式
                 try:
-                    dt = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+                    dt = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
                     timestamp_iso = dt.isoformat()
                 except Exception:
-                    timestamp_iso = timestamp
+                    timestamp_iso = datetime.now().isoformat()
             else:
                 timestamp_iso = datetime.now().isoformat()
 
@@ -431,8 +415,6 @@ class SessionManager:
             commit_info = {
                 "current_commit": current_commit,
                 "agent_name": agent_name,
-                "platform_name": platform_name,
-                "model_name": model_name,
                 "timestamp": timestamp_iso,
             }
             if start_commit:
@@ -459,14 +441,10 @@ class SessionManager:
             session_dir: 会话文件所在目录
         """
         try:
-            # 直接在传入的目录中查找会话文件
-            platform_name = self.model.platform_name()
-            model_name = self.model.name().replace("/", "_").replace("\\", "_")
-
             # 匹配会话文件模式
             pattern = os.path.join(
                 session_dir,
-                f"*saved_session_{self.agent_name}_{platform_name}_{model_name}*.json",
+                f"*saved_session_{self.agent_name}_*.json",
             )
 
             # 获取所有匹配的文件
@@ -767,14 +745,12 @@ class SessionManager:
         生成会话文件前缀（不含后缀）。
 
         Returns:
-            str: 会话文件前缀，如 "saved_session_Jarvos_normal_gpt4"
+            str: 会话文件前缀，如 "saved_session_Jarvos"
         """
         import os
 
         session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
         os.makedirs(session_dir, exist_ok=True)
-        platform_name = self.model.platform_name()
-        model_name = self.model.name().replace("/", "_").replace("\\", "_")
 
         # 使用session_name作为前缀（如果存在）
         if self.current_session_name:
@@ -785,9 +761,9 @@ class SessionManager:
                 r"[^\u4e00-\u9fa5a-zA-Z0-9_-]", "", self.current_session_name
             )
             if safe_name:
-                return f"{safe_name}_saved_session_{self.agent_name}_{platform_name}_{model_name}"
+                return f"{safe_name}_saved_session_{self.agent_name}"
 
-        return f"saved_session_{self.agent_name}_{platform_name}_{model_name}"
+        return f"saved_session_{self.agent_name}"
 
     def _save_task_lists(self) -> bool:
         """保存当前 Agent 的任务列表到文件。
@@ -927,8 +903,6 @@ class SessionManager:
             },
             "metadata": {
                 "agent_name": self.agent_name,
-                "platform_name": self.model.platform_name(),
-                "model_name": self.model.name().replace("/", "_").replace("\\", "_"),
                 "timestamp": timestamp,
             },
         }
