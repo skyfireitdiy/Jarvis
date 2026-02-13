@@ -300,6 +300,7 @@ class ClaudeModel(BasePlatform):
         state: Dict[str, Any] = {
             "messages": self.messages,
             "model_name": self.model_name,
+            "platform_type": self.platform_type,
         }
 
         try:
