@@ -1537,8 +1537,7 @@ def switch_model_group(agent: Any) -> bool:
             agent, new_group, platform_type)
         if not can_switch:
             PrettyOutput.auto_print(f"⚠️ {reason}")
-            confirm = input("是否仍要切换? (y/n): ").strip().lower()
-            if confirm != "y":
+            if not user_confirm("是否仍要切换? ", False):
                 PrettyOutput.auto_print("🚫 已取消切换")
                 return False
         else:
@@ -1548,7 +1547,6 @@ def switch_model_group(agent: Any) -> bool:
         PrettyOutput.auto_print(f"🔄 正在切换到模型组 '{new_group}'...")
         if perform_switch(agent, new_group, platform_type):
             PrettyOutput.auto_print(f"✅ 已成功切换到模型组 '{new_group}'")
-            set_llm_group(new_group)
             return True
         else:
             return False
