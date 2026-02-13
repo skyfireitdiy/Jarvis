@@ -665,24 +665,99 @@ class SessionManager:
             PrettyOutput.auto_print(f"⚠️ 重新创建平台实例失败: {e}，使用现有实例")
             return False
 
-    def _check_token_compatibility(self) -> bool:
-        """检查历史保存的消息token数量与当前模型的token数量是否满足要求
+    def restore_session_from_file(
+        self, session_file: str, session_name: Optional[str] = None
+    ) -> bool:
+        """从指定的会话文件恢复会话状态（统一的恢复入口）
+
+        该方法封装了完整的恢复逻辑和检测，包括：
+        - commit一致性检查
+        - 平台实例重新创建
+        - token兼容性检查
+        - 会话状态恢复
+
+        参数:
+            session_file: 会话文件路径
+            session_name: 会话名称（可选，用于设置current_session_name）
+
+        返回:
+            bool: 是否恢复成功
+        """
+        # 检查 commit 一致性
+        if not self._check_commit_consistency(session_file):
+            PrettyOutput.auto_print("⏸️  已取消恢复会话。")
+            return False
+
+        # 重新创建平台实例（如果需要）
+        self._recreate_platform_if_needed(session_file)
+
+        # 在恢复会话之前检查token兼容性
+        if not self._check_token_compatibility_before_restore(session_file):
+            PrettyOutput.auto_print(
+                "❌ 会话恢复失败：历史消息的token数量超出当前模型的限制。"
+            )
+            return False
+
+        # 恢复会话消息到模型
+        if not self.model.restore(session_file):
+            PrettyOutput.auto_print("❌ 会话恢复失败。")
+            return False
+
+        # 更新会话信息
+        self.last_restored_session = session_file
+        if session_name:
+            self.current_session_name = session_name
+        else:
+            # 尝试从会话文件中读取名称
+            self.current_session_name = self._read_session_name(session_file)
+
+        # 恢复Agent运行时状态
+        self._restore_agent_state()
+
+        # 恢复任务列表
+        self._restore_task_lists()
+
+        # 如果是CodeAgent，恢复start_commit信息
+        self._restore_start_commit_info()
+
+        return True
+
+    def _check_token_compatibility_before_restore(self, session_file: str) -> bool:
+        """在恢复会话之前检查历史消息的token数量是否满足要求
+
+        该方法直接从会话文件读取消息并计算token，不依赖已恢复的model状态
+
+        参数:
+            session_file: 会话文件路径
 
         返回:
             bool: 如果token数量满足要求返回True，否则返回False
         """
         try:
+            import json
+            from jarvis.jarvis_utils.embedding import get_context_token_count
+
             # 获取当前模型的最大输入token数量
             max_input_tokens = self.model._get_platform_max_input_token_count()
 
-            # 获取当前对话历史使用的token数量
-            used_tokens = self.model.get_used_token_count()
+            # 从会话文件读取消息
+            with open(session_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            messages = state.get("messages", [])
+
+            # 计算历史消息的token数量
+            used_tokens = 0
+            for message in messages:
+                content = message.get("content", "")
+                if content:
+                    used_tokens += get_context_token_count(content)
 
             PrettyOutput.auto_print(
                 f"📊 会话token统计: 已使用 {used_tokens}, 最大限制 {max_input_tokens}"
             )
 
-            # 如果当前使用的token数量超过了模型的最大输入限制，则不兼容
+            # 如果历史消息的token数量超过了模型的最大输入限制，则不兼容
             if used_tokens > max_input_tokens:
                 PrettyOutput.auto_print(
                     f"⚠️  当前会话token数量({used_tokens})超出模型限制({max_input_tokens})"
@@ -693,7 +768,7 @@ class SessionManager:
             safety_margin = int(max_input_tokens * 0.1)
             if used_tokens > max_input_tokens - safety_margin:
                 PrettyOutput.auto_print(
-                    f"⚠️  当前会话token数量接近模型限制，建议进行历史压缩"
+                    "⚠️  当前会话token数量接近模型限制，建议进行历史压缩"
                 )
                 # 虽然接近限制，但仍在范围内，返回True
 
@@ -728,14 +803,14 @@ class SessionManager:
             # 重新创建平台实例（如果需要）
             self._recreate_platform_if_needed(session_file)
 
-            if self.model.restore(session_file):
-                # 检查历史保存的消息token数量与当前模型的token数量是否满足要求
-                if not self._check_token_compatibility():
-                    PrettyOutput.auto_print(
-                        "❌ 会话恢复失败：历史消息的token数量超出当前模型的限制。"
-                    )
-                    return False
+            # 在恢复会话之前检查token兼容性
+            if not self._check_token_compatibility_before_restore(session_file):
+                PrettyOutput.auto_print(
+                    "❌ 会话恢复失败：历史消息的token数量超出当前模型的限制。"
+                )
+                return False
 
+            if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
                 self.current_session_name = session_name  # 记录会话名称
                 # 恢复Agent运行时状态
@@ -768,14 +843,14 @@ class SessionManager:
             # 重新创建平台实例（如果需要）
             self._recreate_platform_if_needed(session_file)
 
-            if self.model.restore(session_file):
-                # 检查历史保存的消息token数量与当前模型的token数量是否满足要求
-                if not self._check_token_compatibility():
-                    PrettyOutput.auto_print(
-                        "❌ 会话恢复失败：历史消息的token数量超出当前模型的限制。"
-                    )
-                    return False
+            # 在恢复会话之前检查token兼容性
+            if not self._check_token_compatibility_before_restore(session_file):
+                PrettyOutput.auto_print(
+                    "❌ 会话恢复失败：历史消息的token数量超出当前模型的限制。"
+                )
+                return False
 
+            if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
                 self.current_session_name = session_name  # 记录会话名称
                 # 恢复Agent运行时状态
@@ -839,14 +914,14 @@ class SessionManager:
             # 重新创建平台实例（如果需要）
             self._recreate_platform_if_needed(session_file)
 
-            if self.model.restore(session_file):
-                # 检查历史保存的消息token数量与当前模型的token数量是否满足要求
-                if not self._check_token_compatibility():
-                    PrettyOutput.auto_print(
-                        "❌ 会话恢复失败：历史消息的token数量超出当前模型的限制。"
-                    )
-                    return False
+            # 在恢复会话之前检查token兼容性
+            if not self._check_token_compatibility_before_restore(session_file):
+                PrettyOutput.auto_print(
+                    "❌ 会话恢复失败：历史消息的token数量超出当前模型的限制。"
+                )
+                return False
 
+            if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
                 self.current_session_name = session_name  # 记录会话名称
                 # 恢复Agent运行时状态
