@@ -37,6 +37,9 @@ def _get_rule_content(rule_name: str) -> str | None:
     返回:
         str | None: 规则内容，如果未找到则返回 None
     """
+    PrettyOutput.auto_print(
+        f"🔍 [DEBUG] _get_rule_content 被调用，rule_name = '{rule_name}'"
+    )
     try:
         import os
 
@@ -45,6 +48,9 @@ def _get_rule_content(rule_name: str) -> str | None:
         # 使用当前工作目录作为root_dir
         rules_manager = RulesManager(root_dir=os.getcwd())
         rule_content = rules_manager.get_named_rule(rule_name)
+        PrettyOutput.auto_print(
+            f"🔍 [DEBUG] _get_rule_content: get_named_rule 返回结果: {bool(rule_content)}"
+        )
 
         if rule_content:
             # 尝试查找规则文件路径
@@ -416,15 +422,23 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
                 )
         elif tag.startswith("rule:"):
             # 处理 rule:xxx 格式的规则标记
+            PrettyOutput.auto_print(f"🔍 [DEBUG] 检测到 rule: 标签，完整标签 = '{tag}'")
             if tag not in processed_tag:
                 rule_name = tag[5:]  # 去掉 "rule:" 前缀
+                PrettyOutput.auto_print(f"🔍 [DEBUG] 提取的规则名称 = '{rule_name}'")
                 rule_content = _get_rule_content(rule_name)
                 processed_tag.add(tag)
+                PrettyOutput.auto_print(
+                    f"🔍 [DEBUG] 规则内容获取结果: {bool(rule_content)}"
+                )
                 if rule_content:
                     separator = "\n" + "=" * 50 + "\n"
+                    PrettyOutput.auto_print(f"🔍 [DEBUG] 替换 '<{tag}>' 为规则内容")
                     modified_input = modified_input.replace(
                         f"'<{tag}>'", f"<rule>\n{rule_content}\n</rule>{separator}"
                     )
+                else:
+                    PrettyOutput.auto_print("🔍 [DEBUG] 规则内容为空，跳过替换")
 
     # 设置附加提示词并返回处理后的内容
     agent.set_addon_prompt(add_on_prompt)

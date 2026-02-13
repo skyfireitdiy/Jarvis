@@ -41,11 +41,22 @@ class PromptManager:
         # 获取已加载的规则内容
         loaded_rules = ""
         if hasattr(agent_, "loaded_rules") and agent_.loaded_rules:
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            PrettyOutput.auto_print(
+                f"🔍 [DEBUG] PromptManager: 已加载规则列表: {agent_.loaded_rules}"
+            )
             loaded_rules = f"""\n
 <loaded_rules>
 # 已加载的规则
 \n{agent_.loaded_rules}
 </loaded_rules>"""
+        else:
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            PrettyOutput.auto_print(
+                f"🔍 [DEBUG] PromptManager: 没有已加载的规则 (hasattr loaded_rules: {hasattr(agent_, 'loaded_rules')})"
+            )
 
         # 检查 load_rule 工具是否可用
         load_rule_guide = ""
