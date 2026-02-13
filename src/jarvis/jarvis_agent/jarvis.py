@@ -1131,6 +1131,10 @@ def run_cli(
                     else:
                         # 需要传递给 agent 处理
                         output_content = agent.run(processed_input)
+                        # 如果 agent 返回 None（ builtin handler 在 agent.run 内部处理了），继续循环
+                        if output_content is None:
+                            continue
+                        # 否则正常退出（单次任务模式）
                         break
 
                 raise typer.Exit(code=0)
