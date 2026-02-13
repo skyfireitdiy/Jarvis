@@ -188,6 +188,8 @@ class LSPDaemon:
             return await self.implementation_by_name(params)
         elif method == "type_definition_by_name":
             return await self.type_definition_by_name(params)
+        elif method == "callers_by_name":
+            return await self.callers_by_name(params)
         elif method == "status":
             return await self.status(params)
         elif method == "shutdown":
