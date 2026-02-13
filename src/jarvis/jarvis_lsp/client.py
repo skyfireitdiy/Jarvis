@@ -859,13 +859,9 @@ class LSPClient:
         # 读取代码片段（包含前后几行上下文）
         code_snippet = self._extract_code_snippet(file_path, line)
 
-        # 尝试提取符号名称
-        symbol_name = self._extract_symbol_name(code_snippet)
-
-        # 生成上下文描述
+        # 生成上下文描述（不尝试提取符号名，符合 LSP 原则）
         context = f"File: {file_path}, Line: {line + 1}, Column: {column}"
-        if symbol_name:
-            context += f", Symbol: {symbol_name}"
+        symbol_name = None  # LSP 协议层不应该假设目标语言的语法结构
 
         return LocationInfo(
             file_path=file_path,
@@ -907,42 +903,12 @@ class LSPClient:
         except Exception:
             return None
 
-    def _extract_symbol_name(self, code_snippet: Optional[str]) -> Optional[str]:
-        """从代码片段中提取符号名称
-
-        Args:
-            code_snippet: 代码片段
-
-        Returns:
-            符号名称（如果能识别）
-        """
-        if not code_snippet:
-            return None
-
-        # 查找目标行（带 > 标记的行）
-        for line in code_snippet.split("\n"):
-            if " > " in line:
-                code_line = line.split(" | ", 1)[1].strip()
-
-                # 尝试提取函数名、类名等
-                if code_line.startswith("def "):
-                    rest = code_line[4:].split("(")[0].strip()
-                    return rest
-                elif code_line.startswith("class "):
-                    rest = code_line[6:].split(":")[0].split("(")[0].strip()
-                    return rest
-                elif code_line.startswith("async def "):
-                    rest = code_line[10:].split("(")[0].strip()
-                    return rest
-                elif " = " in code_line:
-                    # 变量赋值
-                    var_name = code_line.split(" = ")[0].strip()
-                    return var_name
-
-        return None
-
     def _find_symbol_in_line(self, file_path: str, line: int, symbol_name: str) -> Optional[int]:
-        """在指定行中查找符号名的位置
+        """在指定行中查找符号名的位置（fallback 机制）
+
+        注意：这是一个不完美的 fallback 机制，只做简单的字符串匹配。
+        不假设任何语言的语法结构，因此可能不准确。
+        正确的做法是依赖 LSP 服务器返回准确的 selectionRange。
 
         Args:
             file_path: 文件路径
@@ -961,31 +927,9 @@ class LSPClient:
 
             line_text = lines[line]
 
-            # 尝试查找符号名的位置
-            # 支持多种模式：def name, class name, name =, from name, import name 等
-            import re
-            patterns = [
-                # 函数定义：def name(... 或 async def name(...
-                rf"def\s+\*?{re.escape(symbol_name)}\b",
-                rf"async\s+def\s+\*?{re.escape(symbol_name)}\b",
-                # 类定义：class name(...
-                rf"class\s+{re.escape(symbol_name)}\b",
-                # 变量赋值：name = 或 name: =
-                rf"{re.escape(symbol_name)}\s*=",
-                rf"{re.escape(symbol_name)}\s*:\s*=",
-                # 导入：import name 或 from module import name
-                rf"import\s+{re.escape(symbol_name)}\b",
-                rf"from\s+\w+\s+import\s+{re.escape(symbol_name)}\b",
-            ]
-
-            for pattern in patterns:
-                match = re.search(pattern, line_text)
-                if match:
-                    # 找到符号名的起始位置
-                    return match.start()
-
-            # 如果上面的模式都匹配不上，直接查找符号名
+            # 只做简单的字符串匹配，不假设任何语言的语法
             # 使用单词边界确保精确匹配
+            import re
             match = re.search(rf"\b{re.escape(symbol_name)}\b", line_text)
             if match:
                 return match.start()
