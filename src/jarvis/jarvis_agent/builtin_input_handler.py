@@ -335,6 +335,19 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             )
 
             return fix_prompt, False
+        elif tag == "SwitchModel":
+            # 处理切换模型组命令（仅在主 agent 中可用）
+            if not getattr(agent, "allow_savesession", False):
+                PrettyOutput.auto_print("⚠️ SwitchModel 命令仅在 jvs/jca 主程序中可用。")
+                return "", True
+
+            from jarvis.jarvis_utils.input import switch_model_group
+
+            if switch_model_group(agent):
+                PrettyOutput.auto_print("✅ 模型组切换成功。")
+            else:
+                PrettyOutput.auto_print("❌ 模型组切换失败或已取消。")
+            return "", True
         elif tag == "Commit":
             # 处理代码提交命令（仅在 code agent 中可用）
             if not hasattr(agent, "git_manager"):
