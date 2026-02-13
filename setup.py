@@ -182,6 +182,8 @@ setup(
             "jc2r=jarvis.jarvis_c2rust.cli:main",
             "jarvis-config=jarvis.jarvis_config.cli:app",
             "jcfg=jarvis.jarvis_config.cli:app",
+            "jarvis-lsp=jarvis.jarvis_lsp.cli:app",
+            "jlsp=jarvis.jarvis_lsp.cli:app",
         ],
     },
     python_requires="==3.12.*",
