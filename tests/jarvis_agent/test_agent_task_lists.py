@@ -102,11 +102,9 @@ class TestAgentTaskLists:
 
         # 验证保存文件是否存在
         session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        platform_name = self.agent.model.platform_name()
-        model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
             session_dir,
-            f"saved_session_{self.agent.name}_{platform_name}_{model_name}_tasklist.json",
+            f"saved_session_{self.agent.name}_tasklist.json",
         )
 
         assert os.path.exists(tasklist_file) is True
@@ -190,11 +188,9 @@ class TestAgentTaskLists:
 
         # 验证保存的文件内容
         session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        platform_name = self.agent.model.platform_name()
-        model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
             session_dir,
-            f"saved_session_{self.agent.name}_{platform_name}_{model_name}_tasklist.json",
+            f"saved_session_{self.agent.name}_tasklist.json",
         )
 
         with open(tasklist_file, "r", encoding="utf-8") as f:
@@ -266,11 +262,9 @@ class TestAgentTaskLists:
 
         # 验证保存的文件内容
         session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        platform_name = self.agent.model.platform_name()
-        model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
             session_dir,
-            f"saved_session_{self.agent.name}_{platform_name}_{model_name}_tasklist.json",
+            f"saved_session_{self.agent.name}_tasklist.json",
         )
 
         with open(tasklist_file, "r", encoding="utf-8") as f:
@@ -309,11 +303,9 @@ class TestAgentTaskLists:
 
         # 验证不会创建文件
         session_dir = os.path.join(self.temp_dir, ".jarvis", "sessions")
-        platform_name = self.agent.model.platform_name()
-        model_name = self.agent.model.name().replace("/", "_").replace("\\", "_")
         tasklist_file = os.path.join(
             session_dir,
-            f"saved_session_{self.agent.name}_{platform_name}_{model_name}_tasklist.json",
+            f"saved_session_{self.agent.name}_tasklist.json",
         )
 
         # 文件不应存在，因为没有任务列表
