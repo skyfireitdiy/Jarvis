@@ -651,7 +651,6 @@ class BasePlatform(ABC):
         """删除对话"""
         raise NotImplementedError("delete_chat is not implemented")
 
-    @abstractmethod
     def save(self, file_path: str) -> bool:
         """保存对话会话到文件。
 
@@ -665,9 +664,25 @@ class BasePlatform(ABC):
         返回:
             如果保存成功返回True，否则返回False。
         """
-        raise NotImplementedError("save is not implemented")
+        import json
 
-    @abstractmethod
+        state = {
+            "messages": self.get_messages(),
+        }
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=4)
+            self._saved = True
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            PrettyOutput.auto_print(f"✅ 会话已成功保存到 {file_path}")
+            return True
+        except Exception as e:
+            from jarvis.jarvis_utils.output import PrettyOutput
+
+            PrettyOutput.auto_print(f"❌ 保存会话失败: {str(e)}")
+            return False
+
     def restore(self, file_path: str) -> bool:
         """从文件恢复对话会话。
 
@@ -677,7 +692,22 @@ class BasePlatform(ABC):
         返回:
             如果恢复成功返回True，否则返回False。
         """
-        raise NotImplementedError("restore is not implemented")
+        import json
+        from jarvis.jarvis_utils.output import PrettyOutput
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            messages = state.get("messages", [])
+            self.set_messages(messages)
+            self._saved = True
+            return True
+        except FileNotFoundError:
+            PrettyOutput.auto_print(f"❌ 会话文件未找到: {file_path}")
+            return False
+        except Exception as e:
+            PrettyOutput.auto_print(f"❌ 恢复会话失败: {str(e)}")
+            return False
 
     @abstractmethod
     def set_system_prompt(self, message: str):
