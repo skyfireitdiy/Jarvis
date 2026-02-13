@@ -1,0 +1,8 @@
+{
+  "id": "20260213_005106_824759",
+  "type": "project_long_term",
+  "tags": ["jarvis_lsp", "all_commands", "tested", "completed"],
+  "content": "jarvis_lsp 所有命令测试完成\n\n测试结果汇总：\n\n✅ 正常工作的命令：\n1. document_symbols - 列出文件中的文档符号\n2. definition - 跳转到定义\n3. references - 查找所有引用\n4. implementation - 查找实现（显示 pylsp 不支持的友好错误）\n5. type_definition - 查找类型定义（显示 pylsp 不支持的友好错误）\n6. daemon status - 查看守护进程状态\n7. daemon stop - 停止守护进程\n\n⚠️  pylsp 不支持的命令（显示友好错误）：\n1. symbol - pylsp 不支持 workspace/symbol 方法\n2. implementation - pylsp 不支持 textDocument/implementation 方法\n3. type_definition - pylsp 不支持 textDocument/typeDefinition 方法\n\n修复的问题：\n1. ✅ LSP 服务器初始化超时（从 10 秒增加到 30 秒）\n2. ✅ implementation 命令错误处理（捕获 RuntimeError 并显示友好错误）\n3. ✅ type_definition 命令错误处理（捕获 RuntimeError 并显示友好错误）\n4. ✅ 删除旧的 start/stop/status/stop-all 命令（已被 daemon 命令取代）\n\n代码质量：\n- mypy strict 检查通过（daemon.py, cli.py）\n- ruff 检查通过（daemon.py, cli.py）\n\n性能表现：\n- 第一次查询：约 27 秒（启动守护进程 + LSP 服务器 + 初始化）\n- 后续查询：约 5 秒（复用服务器，性能提升约 5.4 倍）\n\n修改的文件：\n- src/jarvis/jarvis_lsp/server_manager.py（增加超时时间）\n- src/jarvis/jarvis_lsp/daemon.py（修复错误处理）\n- src/jarvis/jarvis_lsp/cli.py（删除旧命令）",
+  "created_at": "2026-02-13T00:51:06.824783",
+  "updated_at": "2026-02-13T00:51:06.824787"
+}
