@@ -8,7 +8,7 @@ import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from jarvis.jarvis_lsp.protocol import (
     CodeActionInfo,
