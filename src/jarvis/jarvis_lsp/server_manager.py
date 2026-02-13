@@ -82,6 +82,7 @@ class LSPServerInstance:
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                cwd=self.project_path,  # 设置工作目录为项目路径
                 start_new_session=True,  # 让进程独立，避免被父进程杀死
             )
 

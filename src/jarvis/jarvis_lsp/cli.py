@@ -6,6 +6,7 @@
 import asyncio
 import json
 import os
+import sys
 from typing import Optional
 
 import typer
@@ -42,7 +43,7 @@ def format_symbols_human(symbols: list[SymbolInfo], file_path: str) -> str:
 
     for symbol in symbols:
         lines.append(f"{symbol.kind.title()}: {symbol.name}")
-        lines.append(f"  位置: 第 {symbol.line + 1} 行")
+        lines.append(f"  位置: 第 {symbol.line} 行")
         if symbol.description:
             lines.append(f"  描述: {symbol.description}")
         lines.append("")
@@ -91,7 +92,9 @@ def format_folding_ranges_human(ranges: list[FoldingRangeInfo], file_path: str) 
 
     for range in ranges:
         kind_str = f" [{range.kind}]" if range.kind else ""
-        lines.append(f"第 {range.start_line + 1} 行 - 第 {range.end_line + 1} 行{kind_str}")
+        lines.append(
+            f"第 {range.start_line + 1} 行 - 第 {range.end_line + 1} 行{kind_str}"
+        )
         if range.collapsed_text:
             lines.append(f"  折叠文本: {range.collapsed_text}")
         lines.append("")
@@ -137,7 +140,9 @@ def format_hover_human(hover_info: HoverInfo, file_path: str) -> str:
         格式化后的字符串
     """
     lines = [f"📋 符号信息 ({file_path})", ""]
-    lines.append(f"📍 位置: 第 {hover_info.line + 1} 行，第 {hover_info.character + 1} 列")
+    lines.append(
+        f"📍 位置: 第 {hover_info.line + 1} 行，第 {hover_info.character + 1} 列"
+    )
     lines.append("")
     lines.append("📝 文档:")
     lines.append(hover_info.contents)
@@ -281,12 +286,6 @@ def document_symbols_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
     kind: Optional[str] = typer.Option(
         None,
         "--kind",
@@ -301,6 +300,39 @@ def document_symbols_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
+    if language is None:
+        language = "python"
+    project_path = os.getcwd()
+    client = LSPDaemonClient()
+
+    async def run() -> list[SymbolInfo]:
+        symbols = await client.document_symbol(language, project_path, file_path)
+        return symbols
+
+    try:
+        symbols = asyncio.run(run())
+    except RuntimeError as e:
+        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        raise typer.Exit(code=1)
+
+    # 过滤符号类型
+    if kind:
+        symbols = [s for s in symbols if s.kind.lower() == kind.lower()]
+
+    # 默认输出 JSON 格式（供 LLM 使用）
+    symbols_data = [
+        {
+            "name": s.name,
+            "kind": s.kind,
+            "file": s.file_path,
+            "line": s.line,
+            "column": s.column,
+            "description": s.description,
+        }
+        for s in symbols
+    ]
+    result = {"file": file_path, "symbols": symbols_data}
+    PrettyOutput.auto_print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 @app.command("folding_range")
@@ -479,7 +511,9 @@ def format_location_human(locations: list[LocationInfo]) -> str:
     lines = [f"\U0001f50d 找到 {len(locations)} 个位置", ""]
 
     for i, loc in enumerate(locations, 1):
-        lines.append(f"# {i}. {loc.context}")
+        # 优先显示符号名，如果存在则使用，否则使用 context
+        display_name = loc.symbol_name if loc.symbol_name else loc.context
+        lines.append(f"# {i}. {display_name}")
         if loc.code_snippet:
             lines.append("\n代码片段:")
             lines.append(loc.code_snippet)
@@ -519,9 +553,7 @@ def format_location_json(locations: list[LocationInfo]) -> str:
 def definition_at_line_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     line: int = typer.Argument(..., help="行号（从1开始）"),
-    symbol_name: str = typer.Argument(
-        ..., help="符号名称（必填，用于精确匹配）"
-    ),
+    symbol_name: str = typer.Argument(..., help="符号名称（必填，用于精确匹配）"),
     language: Optional[str] = typer.Option(
         None,
         "--language",
@@ -551,7 +583,7 @@ def definition_at_line_command(
 
     async def run() -> LocationInfo | None:
         location = await client.definition_at_line(
-            language, project_path, file_path, line - 1, symbol_name
+            language, project_path, file_path, line, symbol_name
         )
         return location
 
@@ -583,12 +615,6 @@ def definition_by_name_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
 ) -> None:
     """通过符号名查找定义
 
@@ -615,16 +641,11 @@ def definition_by_name_command(
         PrettyOutput.auto_print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    if as_json:
-        if location is None:
-            PrettyOutput.auto_print("[]")
-        else:
-            PrettyOutput.auto_print(format_location_json([location]))
+    # 默认输出 JSON 格式（供 LLM 使用）
+    if location is None:
+        PrettyOutput.auto_print("[]")
     else:
-        if location is None:
-            PrettyOutput.auto_print("🔍 未找到定义")
-        else:
-            PrettyOutput.auto_print(format_location_human([location]))
+        PrettyOutput.auto_print(format_location_json([location]))
 
 
 @app.command("ref-name")
@@ -730,14 +751,12 @@ def type_definition_by_name_command(
     language: Optional[str] = typer.Option(
         None, "--language", "-l", help="编程语言 (默认自动检测)"
     ),
-    as_json: bool = typer.Option(False, "--json", "-j", help="输出 JSON 格式"),
 ) -> None:
     """通过符号名查找类型定义（类型定义）
 
     示例:
     ```
     jlsp type-def-name src/main.py MyClass
-    jlsp type-def-name src/main.py "MyClass" --json
     ```
 
     注意:
@@ -764,12 +783,11 @@ def type_definition_by_name_command(
         PrettyOutput.auto_print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
+    # 默认输出 JSON 格式（供 LLM 使用）
     if location is None:
-        PrettyOutput.auto_print("⚠️  未找到类型定义")
-    elif as_json:
-        PrettyOutput.auto_print(format_location_json([location]))
+        PrettyOutput.auto_print("[]")
     else:
-        PrettyOutput.auto_print(format_location_human([location]))
+        PrettyOutput.auto_print(format_location_json([location]))
 
 
 @app.command("callers-name")
@@ -779,14 +797,12 @@ def callers_by_name_command(
     language: Optional[str] = typer.Option(
         None, "--language", "-l", help="编程语言 (默认自动检测)"
     ),
-    as_json: bool = typer.Option(False, "--json", "-j", help="输出 JSON 格式"),
 ) -> None:
     """通过符号名查找被调用方（该函数内部调用的所有符号）
 
     示例:
     ```
     jlsp callers-name src/main.py my_function
-    jlsp callers-name src/main.py "my_function" --json
     ```
 
     注意:
@@ -813,12 +829,11 @@ def callers_by_name_command(
         PrettyOutput.auto_print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
+    # 默认输出 JSON 格式（供 LLM 使用）
     if not locations:
-        PrettyOutput.auto_print("⚠️  未找到被调用方")
-    elif as_json:
-        PrettyOutput.auto_print(format_location_json(locations))
+        PrettyOutput.auto_print("[]")
     else:
-        PrettyOutput.auto_print(format_location_human(locations))
+        PrettyOutput.auto_print(format_location_json(locations))
 
 
 @app.command("diagnostic")
@@ -830,12 +845,6 @@ def diagnostic_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="输出 JSON 格式",
-    ),
 ) -> None:
     """获取代码诊断信息
 
@@ -845,7 +854,6 @@ def diagnostic_command(
     示例:
     ```
     jlsp diagnostic src/main.py
-    jlsp diagnostic src/main.py --json
     ```
 
     注意:
@@ -860,9 +868,7 @@ def diagnostic_command(
     client = LSPDaemonClient()
 
     async def run() -> list[DiagnosticInfo]:
-        diagnostics = await client.diagnostic(
-            language, project_path, file_path
-        )
+        diagnostics = await client.diagnostic(language, project_path, file_path)
         return diagnostics
 
     try:
@@ -871,10 +877,8 @@ def diagnostic_command(
         PrettyOutput.auto_print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    if as_json:
-        PrettyOutput.auto_print(format_diagnostic_json(diagnostics, file_path))
-    else:
-        PrettyOutput.auto_print(format_diagnostic_human(diagnostics, file_path))
+    # 默认输出 JSON 格式（供 LLM 使用）
+    PrettyOutput.auto_print(format_diagnostic_json(diagnostics, file_path))
 
 
 @app.command("codeAction")
@@ -942,7 +946,6 @@ def code_action_by_name_command(
     language: Optional[str] = typer.Option(
         None, "--language", "-l", help="编程语言 (默认自动检测)"
     ),
-    as_json: bool = typer.Option(False, "--json", "-j", help="输出 JSON 格式"),
 ) -> None:
     """通过符号名查找代码动作（修复建议）
 
@@ -952,7 +955,6 @@ def code_action_by_name_command(
     示例:
     ```
     jlsp codeAction-by-name src/main.py MyClass
-    jlsp codeAction-by-name src/main.py "MyClass" --json
     ```
 
     注意:
@@ -979,10 +981,8 @@ def code_action_by_name_command(
         PrettyOutput.auto_print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    if as_json:
-        PrettyOutput.auto_print(format_code_action_json(code_actions))
-    else:
-        PrettyOutput.auto_print(format_code_action_human(code_actions))
+    # 默认输出 JSON 格式（供 LLM 使用）
+    PrettyOutput.auto_print(format_code_action_json(code_actions))
 
 
 @app.command("version")

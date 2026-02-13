@@ -176,6 +176,7 @@ class LSPDaemonClient:
             SymbolInfo(
                 name=s["name"],
                 kind=s["kind"],
+                file_path=s.get("file_path", ""),
                 line=s["line"],
                 column=s["column"],
                 description=s["description"],
@@ -204,6 +205,7 @@ class LSPDaemonClient:
             SymbolInfo(
                 name=s["name"],
                 kind=s["kind"],
+                file_path=s.get("file_path", ""),
                 line=s["line"],
                 column=s["column"],
                 description=s["description"],
@@ -524,6 +526,7 @@ class LSPDaemonClient:
             line=location_data["line"],
             column=location_data["column"],
             uri=f"file://{location_data['file_path']}",
+            symbol_name=location_data.get("symbol_name"),
         )
 
     async def definition_at_line(
@@ -569,6 +572,7 @@ class LSPDaemonClient:
             line=location_data["line"],
             column=location_data["column"],
             uri=f"file://{location_data['file_path']}",
+            symbol_name=location_data.get("symbol_name"),
         )
 
     async def definition_by_name(
@@ -588,7 +592,11 @@ class LSPDaemonClient:
         if not response.get("success"):
             raise RuntimeError(response.get("error", "未知错误"))
 
+        print(f"[DEBUG] daemon_client.definition_by_name: response = {response}")
         location_data = response.get("location")
+        print(
+            f"[DEBUG] daemon_client.definition_by_name: location_data = {location_data}"
+        )
         if location_data is None:
             return None
 
@@ -597,6 +605,7 @@ class LSPDaemonClient:
             line=location_data["line"],
             column=location_data["column"],
             uri=f"file://{location_data['file_path']}",
+            symbol_name=location_data.get("symbol_name"),
         )
 
     async def references_by_name(
@@ -629,6 +638,25 @@ class LSPDaemonClient:
             )
             for loc in locations_data
         ]
+
+    async def callers_by_name(
+        self, language: str, project_path: str, file_path: str, symbol_name: str
+    ) -> list[Dict[str, Any]]:
+        """查询指定函数内部调用了哪些其他函数"""
+        response = await self._send_request(
+            "callers_by_name",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "symbol_name": symbol_name,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "未知错误"))
+
+        return response.get("callers", [])
 
     async def implementation_by_name(
         self, language: str, project_path: str, file_path: str, symbol_name: str
@@ -687,6 +715,7 @@ class LSPDaemonClient:
             line=location_data["line"],
             column=location_data["column"],
             uri=f"file://{location_data['file_path']}",
+            symbol_name=location_data.get("symbol_name"),
         )
 
     async def callers_by_name(
