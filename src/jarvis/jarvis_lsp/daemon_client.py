@@ -341,6 +341,37 @@ class LSPDaemonClient:
             for action in code_actions_data
         ]
 
+    async def code_action_by_name(
+        self,
+        language: str,
+        project_path: str,
+        file_path: str,
+        symbol_name: str,
+    ) -> List[CodeActionInfo]:
+        """通过符号名获取代码动作信息"""
+        response = await self._send_request(
+            "code_action_by_name",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "symbol_name": symbol_name,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "未知错误"))
+
+        code_actions_data = response.get("code_actions", [])
+        return [
+            CodeActionInfo(
+                title=action["title"],
+                kind=action["kind"],
+                is_preferred=action["is_preferred"],
+            )
+            for action in code_actions_data
+        ]
+
     async def status(self) -> Dict[str, Any]:
         """获取守护进程状态"""
         response = await self._send_request("status", {})

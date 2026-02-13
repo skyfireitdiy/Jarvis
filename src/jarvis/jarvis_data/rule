@@ -2,6 +2,3 @@
 
 规则文件记录其他 rule 和 skill 等文件的位置或内容，为Agent提供扩展能力和指导规范。
 
-内置规则文件位置：{{ jarvis_src_dir }}/builtin/rules/builtin_rules.md，可通过`load_rule`工具加载。
-
-
