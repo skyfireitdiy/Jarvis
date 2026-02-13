@@ -1,0 +1,12 @@
+{
+  "id": "20260213_101957_174767",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_lsp",
+    "CLI",
+    "refactor"
+  ],
+  "content": "## jarvis_lsp 删除需要列号的命令\n\n### 删除的命令\n删除了所有需要传入 `column` 参数的命令，这些命令不符合用户需求：\n\n1. **definition** - 跳转到定义（需要 line 和 column）\n2. **references** - 查找所有引用（需要 line 和 column）\n3. **implementation** - 查找实现（需要 line 和 column）\n4. **type_definition** - 查找类型定义（需要 line 和 column）\n\n### 保留的命令\n保留的命令都是基于符号名的，不需要列号：\n\n1. **document_symbols** - 列出文件中的文档符号\n2. **symbol** - 工作区符号搜索\n3. **def-at** - 通过行号查找定义（需要行号和符号名，不需要列号）\n4. **def-name** - 通过符号名查找定义\n5. **ref-name** - 通过符号名查找引用\n6. **impl-name** - 通过符号名查找实现\n7. **type-def-name** - 通过符号名查找类型定义\n8. **daemon status** - 查看守护进程状态\n9. **daemon stop** - 停止守护进程\n10. **version** - 版本信息\n\n### 删除原因\n- 需要列号的命令使用不便，用户需要手动计算列号\n- 基于符号名的命令更易用，只需要知道符号名称\n- 符号名查询更符合 LSP 原则，客户端不需要解析源代码\n\n### 代码质量\n- mypy strict: 通过 ✅\n- ruff: 通过 ✅\n\n### 删除的代码行数\n- 共删除 220 行代码（58 + 52 + 52 + 58）",
+  "created_at": "2026-02-13T10:19:57.174812",
+  "updated_at": "2026-02-13T10:19:57.174817"
+}

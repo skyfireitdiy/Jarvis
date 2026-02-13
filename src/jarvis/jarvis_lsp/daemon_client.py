@@ -9,9 +9,15 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_lsp.client import LocationInfo, SymbolInfo
+from jarvis.jarvis_lsp.protocol import (
+    CodeActionInfo,
+    DiagnosticInfo,
+    FoldingRangeInfo,
+    HoverInfo,
+)
 
 
 class LSPDaemonClient:
@@ -203,6 +209,136 @@ class LSPDaemonClient:
                 description=s["description"],
             )
             for s in symbols_data
+        ]
+
+    async def folding_range(
+        self, language: str, project_path: str, file_path: str
+    ) -> List[FoldingRangeInfo]:
+        """获取代码折叠范围"""
+        response = await self._send_request(
+            "folding_range",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "未知错误"))
+
+        folding_ranges_data = response.get("folding_ranges", [])
+        return [
+            FoldingRangeInfo(
+                start_line=fr["start_line"],
+                start_character=fr["start_character"],
+                end_line=fr["end_line"],
+                end_character=fr["end_character"],
+                kind=fr.get("kind"),
+                collapsed_text=fr.get("collapsed_text"),
+            )
+            for fr in folding_ranges_data
+        ]
+
+    async def hover(
+        self,
+        language: str,
+        project_path: str,
+        file_path: str,
+        line: int,
+        character: int,
+    ) -> Optional[HoverInfo]:
+        """获取符号悬停信息"""
+        response = await self._send_request(
+            "hover",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "line": line,
+                "character": character,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "未知错误"))
+
+        hover_data = response.get("hover_info")
+        if hover_data is None:
+            return None
+
+        return HoverInfo(
+            contents=hover_data["contents"],
+            range=hover_data["range"],
+            file_path=hover_data["file_path"],
+            line=hover_data["line"],
+            character=hover_data["character"],
+        )
+
+    async def diagnostic(
+        self,
+        language: str,
+        project_path: str,
+        file_path: str,
+        severity_filter: Optional[int] = None,
+    ) -> List[DiagnosticInfo]:
+        """获取代码诊断信息"""
+        response = await self._send_request(
+            "diagnostic",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "severity_filter": severity_filter,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "未知错误"))
+
+        diagnostics_data = response.get("diagnostics", [])
+        return [
+            DiagnosticInfo(
+                range=diag["range"],
+                severity=diag["severity"],
+                code=diag["code"],
+                source=diag["source"],
+                message=diag["message"],
+            )
+            for diag in diagnostics_data
+        ]
+
+    async def code_action(
+        self,
+        language: str,
+        project_path: str,
+        file_path: str,
+        line: int,
+        character: int,
+    ) -> List[CodeActionInfo]:
+        """获取代码动作信息"""
+        response = await self._send_request(
+            "code_action",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "line": line,
+                "character": character,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "未知错误"))
+
+        code_actions_data = response.get("code_actions", [])
+        return [
+            CodeActionInfo(
+                title=action["title"],
+                kind=action["kind"],
+                is_preferred=action["is_preferred"],
+            )
+            for action in code_actions_data
         ]
 
     async def status(self) -> Dict[str, Any]:

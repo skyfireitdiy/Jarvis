@@ -160,6 +160,14 @@ class LSPDaemon:
             return await self.workspace_symbol(params)
         elif method == "document_symbol":
             return await self.document_symbol(params)
+        elif method == "folding_range":
+            return await self.folding_range(params)
+        elif method == "hover":
+            return await self.hover(params)
+        elif method == "diagnostic":
+            return await self.diagnostic(params)
+        elif method == "code_action":
+            return await self.code_action(params)
         elif method == "definition":
             return await self.definition(params)
         elif method == "references":
@@ -313,6 +321,191 @@ class LSPDaemon:
                     "description": s.description,
                 }
                 for s in symbols
+            ],
+        }
+
+    async def folding_range(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """获取代码折叠范围"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+
+        if not language or not project_path or not file_path:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path",
+            }
+
+        server = await self.get_or_create_server(language, project_path)
+
+        if server.client is None:
+            return {
+                "success": False,
+                "error": "LSP server client not initialized",
+            }
+
+        folding_ranges = await server.client.folding_range(file_path)
+
+        return {
+            "success": True,
+            "folding_ranges": [
+                {
+                    "start_line": fr.start_line,
+                    "start_character": fr.start_character,
+                    "end_line": fr.end_line,
+                    "end_character": fr.end_character,
+                    "kind": fr.kind,
+                    "collapsed_text": fr.collapsed_text,
+                }
+                for fr in folding_ranges
+            ],
+        }
+
+    async def hover(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """获取符号悬停信息"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+        line = params.get("line")
+        character = params.get("character")
+
+        if not language or not project_path or not file_path:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path",
+            }
+
+        if line is None or character is None:
+            return {
+                "success": False,
+                "error": "Missing required parameters: line, character",
+            }
+
+        server = await self.get_or_create_server(language, project_path)
+
+        if server.client is None:
+            return {
+                "success": False,
+                "error": "LSP server client not initialized",
+            }
+
+        hover_info = await server.client.hover(file_path, line, character)
+
+        if hover_info is None:
+            return {
+                "success": True,
+                "hover_info": None,
+            }
+
+        return {
+            "success": True,
+            "hover_info": {
+                "contents": hover_info.contents,
+                "range": hover_info.range,
+                "file_path": hover_info.file_path,
+                "line": hover_info.line,
+                "character": hover_info.character,
+            },
+        }
+
+    async def diagnostic(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """获取代码诊断信息"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+        severity_filter = params.get("severity_filter")
+
+        if not language or not project_path or not file_path:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path",
+            }
+
+        server = await self.get_or_create_server(language, project_path)
+
+        if server.client is None:
+            return {
+                "success": False,
+                "error": "LSP server client not initialized",
+            }
+
+        try:
+            diagnostics = await server.client.diagnostic(file_path, severity_filter)
+        except RuntimeError as e:
+            # 检查是否是方法不支持的错误
+            error_msg = str(e)
+            if "Method Not Found" in error_msg or "-32601" in error_msg:
+                return {
+                    "success": False,
+                    "error": f"LSP server does not support textDocument/diagnostic method. {language} LSP server may not provide diagnostics.",
+                    "not_supported": True,
+                }
+            raise
+
+        return {
+            "success": True,
+            "diagnostics": [
+                {
+                    "range": diag.range,
+                    "severity": diag.severity,
+                    "code": diag.code,
+                    "source": diag.source,
+                    "message": diag.message,
+                }
+                for diag in diagnostics
+            ],
+        }
+
+    async def code_action(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """获取代码动作信息"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+        line = params.get("line")
+        character = params.get("character")
+
+        if not language or not project_path or not file_path:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path",
+            }
+
+        if line is None or character is None:
+            return {
+                "success": False,
+                "error": "Missing required parameters: line, character",
+            }
+
+        server = await self.get_or_create_server(language, project_path)
+
+        if server.client is None:
+            return {
+                "success": False,
+                "error": "LSP server client not initialized",
+            }
+
+        try:
+            code_actions = await server.client.code_action(file_path, line, character)
+        except RuntimeError as e:
+            # 检查是否是方法不支持的错误
+            error_msg = str(e)
+            if "Method Not Found" in error_msg or "-32601" in error_msg:
+                return {
+                    "success": False,
+                    "error": f"LSP server does not support textDocument/codeAction method. {language} LSP server may not provide code actions.",
+                    "not_supported": True,
+                }
+            raise
+
+        return {
+            "success": True,
+            "code_actions": [
+                {
+                    "title": action.title,
+                    "kind": action.kind,
+                    "is_preferred": action.is_preferred,
+                }
+                for action in code_actions
             ],
         }
 
