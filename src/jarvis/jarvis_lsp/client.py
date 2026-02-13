@@ -1330,8 +1330,9 @@ class LSPClient:
             return SymbolInfo(
                 name=name or "",
                 kind=kind_name,
-                line=line,
-                column=column,
+                file_path=file_path,
+                line=line + 1,  # 转换为 1-based
+                column=column + 1,  # 转换为 1-based
                 description=item.get("detail"),
             )
 
