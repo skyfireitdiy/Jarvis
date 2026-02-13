@@ -1858,7 +1858,7 @@ class LSPClient:
 
         return calls
 
-    def _get_call_name(self, node: ast.expr) -> Optional[str]:
+    def _get_call_name(self, node: "ast.expr") -> Optional[str]:
         """从 AST Call 节点获取函数名
 
         Args:
