@@ -55,13 +55,15 @@ class SymbolInfo:
     Attributes:
         name: 符号名称
         kind: 符号类型（function, class, variable 等）
-        line: 行号
-        column: 列号
+        file_path: 符号所在文件路径
+        line: 行号（1-based）
+        column: 列号（1-based）
         description: 描述信息
     """
 
     name: str
     kind: str
+    file_path: str = ""
     line: int
     column: int
     description: Optional[str] = None
