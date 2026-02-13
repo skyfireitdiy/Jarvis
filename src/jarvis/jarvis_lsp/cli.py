@@ -6,7 +6,6 @@
 import asyncio
 import json
 import os
-import sys
 from typing import Optional
 
 import typer
@@ -21,7 +20,7 @@ from jarvis.jarvis_lsp.protocol import (
 )
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.daemon_client import LSPDaemonClient
-from jarvis.jarvis_utils.output import PrettyOutput
+
 
 app = typer.Typer(
     help="Jarvis LSP 客户端工具 - 与语言服务器通信的命令行接口",
@@ -312,7 +311,7 @@ def document_symbols_command(
     try:
         symbols = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 过滤符号类型
@@ -332,7 +331,7 @@ def document_symbols_command(
         for s in symbols
     ]
     result = {"file": file_path, "symbols": symbols_data}
-    PrettyOutput.auto_print(json.dumps(result, indent=2, ensure_ascii=False))
+    print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 @app.command("folding_range")
@@ -393,18 +392,14 @@ def hover_command(
     if language is None:
         language = config_reader.detect_language(file_path)
         if language is None:
-            PrettyOutput.auto_print(
-                "❌ 错误: 无法检测文件语言，请使用 --language 参数指定"
-            )
+            print("❌ 错误: 无法检测文件语言，请使用 --language 参数指定")
             raise typer.Exit(code=1)
 
     # 获取语言配置
     lang_config = config_reader.get_language_config(language)
     if lang_config is None:
-        PrettyOutput.auto_print(f"❌ 错误: 未找到语言 '{language}' 的配置")
-        PrettyOutput.auto_print(
-            "请在 ~/.jarvis/config.yaml 的 lsp.languages 节中添加配置"
-        )
+        print(f"❌ 错误: 未找到语言 '{language}' 的配置")
+        print("请在 ~/.jarvis/config.yaml 的 lsp.languages 节中添加配置")
         raise typer.Exit(code=1)
 
     # 转换为 0-based 索引
@@ -425,17 +420,17 @@ def hover_command(
     try:
         hover_info = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 输出结果
     if hover_info is None:
-        PrettyOutput.auto_print(f"ℹ️  在第 {line} 行第 {character} 列未找到符号")
+        print(f"ℹ️  在第 {line} 行第 {character} 列未找到符号")
     else:
         if as_json:
-            PrettyOutput.auto_print(format_hover_json(hover_info, file_path))
+            print(format_hover_json(hover_info, file_path))
         else:
-            PrettyOutput.auto_print(format_hover_human(hover_info, file_path))
+            print(format_hover_human(hover_info, file_path))
 
 
 @app.command("symbol")
@@ -482,7 +477,7 @@ def symbol_command(
     try:
         symbols = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 过滤符号类型
@@ -491,9 +486,9 @@ def symbol_command(
 
     # 输出结果（使用空字符串作为文件路径，因为符号可能来自多个文件）
     if as_json:
-        PrettyOutput.auto_print(format_symbols_json(symbols, ""))
+        print(format_symbols_json(symbols, ""))
     else:
-        PrettyOutput.auto_print(format_symbols_human(symbols, ""))
+        print(format_symbols_human(symbols, ""))
 
 
 def format_location_human(locations: list[LocationInfo]) -> str:
@@ -590,19 +585,19 @@ def definition_at_line_command(
     try:
         location = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     if as_json:
         if location is None:
-            PrettyOutput.auto_print("[]")
+            print("[]")
         else:
-            PrettyOutput.auto_print(format_location_json([location]))
+            print(format_location_json([location]))
     else:
         if location is None:
-            PrettyOutput.auto_print("🔍 未找到定义")
+            print("🔍 未找到定义")
         else:
-            PrettyOutput.auto_print(format_location_human([location]))
+            print(format_location_human([location]))
 
 
 @app.command("def-name")
@@ -638,14 +633,14 @@ def definition_by_name_command(
     try:
         location = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 默认输出 JSON 格式（供 LLM 使用）
     if location is None:
-        PrettyOutput.auto_print("[]")
+        print("[]")
     else:
-        PrettyOutput.auto_print(format_location_json([location]))
+        print(format_location_json([location]))
 
 
 @app.command("ref-name")
@@ -687,13 +682,13 @@ def references_by_name_command(
     try:
         locations = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     if as_json:
-        PrettyOutput.auto_print(format_location_json(locations))
+        print(format_location_json(locations))
     else:
-        PrettyOutput.auto_print(format_location_human(locations))
+        print(format_location_human(locations))
 
 
 @app.command("impl-name")
@@ -735,13 +730,13 @@ def implementation_by_name_command(
     try:
         locations = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     if as_json:
-        PrettyOutput.auto_print(format_location_json(locations))
+        print(format_location_json(locations))
     else:
-        PrettyOutput.auto_print(format_location_human(locations))
+        print(format_location_human(locations))
 
 
 @app.command("type-def-name")
@@ -780,14 +775,14 @@ def type_definition_by_name_command(
     try:
         location = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 默认输出 JSON 格式（供 LLM 使用）
     if location is None:
-        PrettyOutput.auto_print("[]")
+        print("[]")
     else:
-        PrettyOutput.auto_print(format_location_json([location]))
+        print(format_location_json([location]))
 
 
 @app.command("callers-name")
@@ -826,14 +821,14 @@ def callers_by_name_command(
     try:
         locations = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 默认输出 JSON 格式（供 LLM 使用）
     if not locations:
-        PrettyOutput.auto_print("[]")
+        print("[]")
     else:
-        PrettyOutput.auto_print(format_location_json(locations))
+        print(format_location_json(locations))
 
 
 @app.command("diagnostic")
@@ -874,11 +869,11 @@ def diagnostic_command(
     try:
         diagnostics = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 默认输出 JSON 格式（供 LLM 使用）
-    PrettyOutput.auto_print(format_diagnostic_json(diagnostics, file_path))
+    print(format_diagnostic_json(diagnostics, file_path))
 
 
 @app.command("codeAction")
@@ -930,13 +925,13 @@ def code_action_command(
     try:
         code_actions = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     if as_json:
-        PrettyOutput.auto_print(format_code_action_json(code_actions))
+        print(format_code_action_json(code_actions))
     else:
-        PrettyOutput.auto_print(format_code_action_human(code_actions))
+        print(format_code_action_human(code_actions))
 
 
 @app.command("codeAction-by-name")
@@ -978,17 +973,17 @@ def code_action_by_name_command(
     try:
         code_actions = asyncio.run(run())
     except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
     # 默认输出 JSON 格式（供 LLM 使用）
-    PrettyOutput.auto_print(format_code_action_json(code_actions))
+    print(format_code_action_json(code_actions))
 
 
 @app.command("version")
 def version_command() -> None:
     """显示版本信息"""
-    PrettyOutput.auto_print(f"jarvis-lsp version {__version__}")
+    print(f"jarvis-lsp version {__version__}")
 
 
 daemon_app = typer.Typer(help="守护进程管理命令")
@@ -1018,11 +1013,11 @@ def daemon_stop() -> None:
         sock.sendall(f"Content-Length: {len(message)}\r\n\r\n{message}".encode())
         sock.close()
 
-        PrettyOutput.auto_print("✅ LSP 守护进程已停止")
+        print("✅ LSP 守护进程已停止")
     except (FileNotFoundError, ConnectionRefusedError):
-        PrettyOutput.auto_print("⚠️  守护进程未运行")
+        print("⚠️  守护进程未运行")
     except Exception as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
 
@@ -1041,32 +1036,32 @@ def daemon_status() -> None:
         try:
             status = await client.status()
 
-            PrettyOutput.auto_print("📊 LSP 守护进程状态:")
-            PrettyOutput.auto_print("\n   ✅ 守护进程运行中")
-            PrettyOutput.auto_print(f"   Socket: {client.socket_path}")
+            print("📊 LSP 守护进程状态:")
+            print("\n   ✅ 守护进程运行中")
+            print(f"   Socket: {client.socket_path}")
 
             # 移除 success 字段，只保留服务器信息
             servers = {k: v for k, v in status.items() if k != "success"}
 
             if not servers:
-                PrettyOutput.auto_print("\n   📌 没有运行中的 LSP 服务器")
+                print("\n   📌 没有运行中的 LSP 服务器")
                 return
 
-            PrettyOutput.auto_print("\n   📌 LSP 服务器列表:")
+            print("\n   📌 LSP 服务器列表:")
             for server_key, server_info in servers.items():
-                PrettyOutput.auto_print(
+                print(
                     f"\n     • {server_key}"
                     f"\n       进程 ID: {server_info['pid']}"
                     f"\n       启动时间: {server_info['start_time']}"
                     f"\n       活跃: {'是' if server_info['is_alive'] else '否'}"
                 )
         except (FileNotFoundError, ConnectionRefusedError):
-            PrettyOutput.auto_print("📊 LSP 守护进程状态:")
-            PrettyOutput.auto_print("\n   ❌ 守护进程未运行")
-            PrettyOutput.auto_print(f"\n   Socket: {client.socket_path}")
-            PrettyOutput.auto_print("\n   ℹ️  守护进程会在第一次使用 LSP 命令时自动启动")
+            print("📊 LSP 守护进程状态:")
+            print("\n   ❌ 守护进程未运行")
+            print(f"\n   Socket: {client.socket_path}")
+            print("\n   ℹ️  守护进程会在第一次使用 LSP 命令时自动启动")
         except Exception as e:
-            PrettyOutput.auto_print(f"❌ 错误: {e}")
+            print(f"❌ 错误: {e}")
             raise typer.Exit(code=1)
 
     asyncio.run(run())

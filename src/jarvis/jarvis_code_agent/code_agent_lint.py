@@ -56,7 +56,8 @@ class LintManager:
         tools_str = ", ".join(tool_names[:3])
         if len(tool_names) > 3:
             tools_str += f" 等{len(tool_names)}个工具"
-        PrettyOutput.auto_print("🔍 静态检查中...")
+        # 将静态检查信息反馈给LLM而不是输出给用户
+        # PrettyOutput.auto_print("🔍 静态检查中...")
 
         results = []
         # 记录每个文件的检查结果
@@ -79,7 +80,7 @@ class LintManager:
                         file_results.append((file_name, command, "跳过", "文件不存在"))
                         continue
 
-                    # 打印执行的命令
+                    # 仍然向用户显示执行的命令
                     PrettyOutput.auto_print(f"ℹ️ 执行: {command}")
 
                     # 执行命令
