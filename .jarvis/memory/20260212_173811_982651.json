@@ -1,0 +1,14 @@
+{
+  "id": "20260212_173811_982651",
+  "type": "project_long_term",
+  "tags": [
+    "Bug修复",
+    "pytest",
+    "session_manager",
+    "test_agent_task_lists",
+    "文件命名格式"
+  ],
+  "content": "## Bug修复：pytest测试失败\n\n### Bug现象\n- 8个pytest测试失败，涉及 `test_agent_task_lists.py` (3个) 和 `test_session_manager.py` (5个)\n- 测试期望的文件名包含 `platform_name` 和 `model_name`，但实际生成的文件名只有 `agent_name`\n\n### 根因分析\n- 提交 `53dbb844 refactor(session_manager): 简化会话文件命名格式` 修改了文件命名规则\n- 旧格式：`{session_name}_saved_session_{agent_name}_{platform_name}_{model_name}_{timestamp}.json`\n- 新格式：`{session_name}_saved_session_{agent_name}_{timestamp}.json`\n- 测试代码还在使用旧的文件命名格式\n\n### 修复方案\n1. 更新 `tests/jarvis_agent/test_agent_task_lists.py` 中的文件名格式（4处）\n2. 更新 `tests/jarvis_agent/test_session_manager.py` 中的文件名格式和mock设置（5处）\n3. 为恢复会话的测试添加必要的mock：`_check_commit_consistency`, `_recreate_platform_if_needed`, `_check_token_compatibility_before_restore`, `_restore_agent_state`, `_restore_task_lists`, `_restore_start_commit_info`\n\n### 验证结果\n- 所有844个测试全部通过\n- 修复后未引入新的测试失败\n\n### 影响范围\n- 修改文件：\n  - `tests/jarvis_agent/test_agent_task_lists.py`\n  - `tests/jarvis_agent/test_session_manager.py`\n- 不影响源代码，仅更新测试以适配新的实现",
+  "created_at": "2026-02-12T17:38:11.982672",
+  "updated_at": "2026-02-12T17:38:11.982677"
+}

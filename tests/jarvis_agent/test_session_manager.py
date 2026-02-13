@@ -99,7 +99,7 @@ class TestSessionManager:
             # 验证保存路径格式（文件名包含时间戳）
             actual_path = mock_model.save.call_args[0][0]
             # 文件名可能包含会话名称前缀（如：未命名会话）
-            expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_test_platform_test_model_\d{8}_\d{6}\.json$"
+            expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_\d{8}_\d{6}\.json$"
             assert re.match(expected_pattern, actual_path), (
                 f"路径格式不匹配: {actual_path}"
             )
@@ -119,7 +119,7 @@ class TestSessionManager:
             # 验证特殊字符被替换，且文件名包含时间戳
             actual_path = mock_model.save.call_args[0][0]
             # 文件名可能包含会话名称前缀（如：未命名会话）
-            expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_test_platform_test_model_name_\d{8}_\d{6}\.json$"
+            expected_pattern = r"/test/dir/\.jarvis/sessions/[^_]*_saved_session_test_agent_\d{8}_\d{6}\.json$"
             assert re.match(expected_pattern, actual_path), (
                 f"路径格式不匹配: {actual_path}"
             )
@@ -130,25 +130,43 @@ class TestSessionManager:
     ):
         """测试成功恢复会话"""
         # Mock _parse_session_files 返回一个模拟的会话文件
-        mock_session_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250107_120000.json"
+        mock_session_file = (
+            "/test/dir/.jarvis/saved_session_test_agent_20250107_120000.json"
+        )
         with patch.object(
             session_manager,
             "_parse_session_files",
             return_value=[(mock_session_file, "20250107_120000", None)],
         ):
-            result = session_manager.restore_session()
+            with patch.object(
+                session_manager, "_check_commit_consistency", return_value=True
+            ):
+                with patch.object(session_manager, "_recreate_platform_if_needed"):
+                    with patch.object(
+                        session_manager,
+                        "_check_token_compatibility_before_restore",
+                        return_value=True,
+                    ):
+                        with patch.object(session_manager, "_restore_agent_state"):
+                            with patch.object(session_manager, "_restore_task_lists"):
+                                with patch.object(
+                                    session_manager, "_restore_start_commit_info"
+                                ):
+                                    result = session_manager.restore_session()
 
-            # 验证结果
-            assert result is True
+                                    # 验证结果
+                                    assert result is True
 
-            # 验证文件路径
-            mock_model.restore.assert_called_once_with(mock_session_file)
+                                    # 验证文件路径
+                                    mock_model.restore.assert_called_once_with(
+                                        mock_session_file
+                                    )
 
-            # 验证输出：应该有一次print调用（显示恢复的文件名）
-            assert mock_auto_print.call_count == 1
-            # 调用显示恢复的文件名
-            first_call = mock_auto_print.call_args_list[0][0][0]
-            assert "📂 恢复会话:" in first_call
+                                    # 验证输出：应该有一次print调用（显示恢复的文件名）
+                                    assert mock_auto_print.call_count == 1
+                                    # 调用显示恢复的文件名
+                                    first_call = mock_auto_print.call_args_list[0][0][0]
+                                    assert "📂 恢复会话:" in first_call
 
     @patch("os.path.exists")
     def test_restore_session_file_not_exists(self, mock_exists, session_manager):
@@ -169,8 +187,12 @@ class TestSessionManager:
         session_manager.non_interactive = True
 
         # Mock _parse_session_files 返回两个会话文件
-        mock_newer_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250107_120000.json"
-        mock_older_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250106_080000.json"
+        mock_newer_file = (
+            "/test/dir/.jarvis/saved_session_test_agent_20250107_120000.json"
+        )
+        mock_older_file = (
+            "/test/dir/.jarvis/saved_session_test_agent_20250106_080000.json"
+        )
         with patch.object(
             session_manager,
             "_parse_session_files",
@@ -179,19 +201,35 @@ class TestSessionManager:
                 (mock_older_file, "20250106_080000", None),
             ],
         ):
-            result = session_manager.restore_session()
+            with patch.object(
+                session_manager, "_check_commit_consistency", return_value=True
+            ):
+                with patch.object(session_manager, "_recreate_platform_if_needed"):
+                    with patch.object(
+                        session_manager,
+                        "_check_token_compatibility_before_restore",
+                        return_value=True,
+                    ):
+                        with patch.object(session_manager, "_restore_agent_state"):
+                            with patch.object(session_manager, "_restore_task_lists"):
+                                with patch.object(
+                                    session_manager, "_restore_start_commit_info"
+                                ):
+                                    result = session_manager.restore_session()
 
-            # 验证结果
-            assert result is True
+                                    # 验证结果
+                                    assert result is True
 
-            # 验证恢复的是最新的会话文件（列表第一个）
-            mock_model.restore.assert_called_once_with(mock_newer_file)
+                                    # 验证恢复的是最新的会话文件（列表第一个）
+                                    mock_model.restore.assert_called_once_with(
+                                        mock_newer_file
+                                    )
 
-            # 验证输出：应该有一次print调用
-            assert mock_auto_print.call_count == 1
-            # 调用显示非交互模式自动恢复的消息
-            first_call = mock_auto_print.call_args_list[0][0][0]
-            assert "🤖 非交互模式" in first_call
+                                    # 验证输出：应该有一次print调用
+                                    assert mock_auto_print.call_count == 1
+                                    # 调用显示非交互模式自动恢复的消息
+                                    first_call = mock_auto_print.call_args_list[0][0][0]
+                                    assert "🤖 非交互模式" in first_call
 
     @patch("jarvis.jarvis_utils.output.PrettyOutput.auto_print")
     def test_restore_session_restore_failure(
@@ -199,25 +237,36 @@ class TestSessionManager:
     ):
         """测试恢复会话失败的情况"""
         # Mock _parse_session_files 返回一个模拟的会话文件
-        mock_session_file = "/test/dir/.jarvis/saved_session_test_agent_test_platform_test_model_20250107_120000.json"
+        mock_session_file = (
+            "/test/dir/.jarvis/saved_session_test_agent_20250107_120000.json"
+        )
         with patch.object(
             session_manager,
             "_parse_session_files",
             return_value=[(mock_session_file, "20250107_120000", None)],
         ):
-            # 模拟 restore 失败
-            mock_model.restore.return_value = False
+            with patch.object(
+                session_manager, "_check_commit_consistency", return_value=True
+            ):
+                with patch.object(session_manager, "_recreate_platform_if_needed"):
+                    with patch.object(
+                        session_manager,
+                        "_check_token_compatibility_before_restore",
+                        return_value=True,
+                    ):
+                        # 模拟 restore 失败
+                        mock_model.restore.return_value = False
 
-            result = session_manager.restore_session()
+                        result = session_manager.restore_session()
 
-            # 验证结果
-            assert result is False
+                        # 验证结果
+                        assert result is False
 
-            # 验证输出：应该有两次print调用（显示恢复的文件名和失败消息）
-            assert mock_auto_print.call_count == 2
-            # 第一次调用显示恢复的文件名
-            first_call = mock_auto_print.call_args_list[0][0][0]
-            assert "📂 恢复会话:" in first_call
-            # 第二次调用显示失败消息
-            second_call = mock_auto_print.call_args_list[1][0][0]
-            assert "❌ 会话恢复失败。" == second_call
+                        # 验证输出：应该有两次print调用（显示恢复的文件名和失败消息）
+                        assert mock_auto_print.call_count == 2
+                        # 第一次调用显示恢复的文件名
+                        first_call = mock_auto_print.call_args_list[0][0][0]
+                        assert "📂 恢复会话:" in first_call
+                        # 第二次调用显示失败消息
+                        second_call = mock_auto_print.call_args_list[1][0][0]
+                        assert "❌ 会话恢复失败。" == second_call
