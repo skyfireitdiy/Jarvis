@@ -436,10 +436,9 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
 
                 if rule_content:
                     # 激活规则：调用 RulesManager.activate_rule()
-                    import os
-                    from jarvis.jarvis_agent.rules_manager import RulesManager
-
-                    rules_manager = RulesManager(root_dir=os.getcwd())
+                    # 使用 Agent 已有的 rules_manager 实例，而不是创建新的
+                    # Agent 一定存在 rules_manager 属性，直接使用
+                    rules_manager = agent.rules_manager
                     PrettyOutput.auto_print(f"🔍 [DEBUG] 尝试激活规则 '{rule_name}'")
                     activated = rules_manager.activate_rule(rule_name)
                     PrettyOutput.auto_print(f"🔍 [DEBUG] 规则激活结果: {activated}")
