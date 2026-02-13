@@ -365,7 +365,7 @@ class LSPDaemonClient:
         project_path: str,
         file_path: str,
         line: int,
-        symbol_name: str | None = None,
+        symbol_name: str,
     ) -> LocationInfo | None:
         """通过行号查找定义（自动查找该行的符号列号）
 
@@ -374,7 +374,7 @@ class LSPDaemonClient:
             project_path: 项目路径
             file_path: 文件路径
             line: 行号（从 0 开始）
-            symbol_name: 符号名称（可选，用于精确匹配）
+            symbol_name: 符号名称（必填，用于精确匹配）
 
         Returns:
             定义位置信息，如果找不到返回 None

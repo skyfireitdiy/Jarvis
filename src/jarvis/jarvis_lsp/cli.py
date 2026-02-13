@@ -479,8 +479,8 @@ def type_definition_command(
 def definition_at_line_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     line: int = typer.Argument(..., help="行号（从1开始）"),
-    symbol_name: Optional[str] = typer.Argument(
-        None, help="符号名称（可选，用于精确匹配）"
+    symbol_name: str = typer.Argument(
+        ..., help="符号名称（必填，用于精确匹配）"
     ),
     language: Optional[str] = typer.Option(
         None,
