@@ -69,7 +69,7 @@ npm install -g javascript-typescript-stdio typescript-language-server
 
 ### 查询文件符号
 
-```bash
+````bash
 # 查询文件的符号（人类可读格式）
 jlsp symbols /path/to/file.py
 
@@ -84,7 +84,7 @@ jlsp symbols /path/to/file.py --server-command "python -m pylsp"
 
 ```bash
 jlsp version
-```
+````
 
 ## 配置
 
@@ -92,20 +92,20 @@ jlsp version
 
 `jarvis_lsp` 内置了以下常用语言的 LSP 服务器配置，开箱即用：
 
-| 语言 | LSP 服务器 |
-|------|-----------|
-| Python | `python -m pylsp` |
-| Go | `gopls` |
-| Rust | `rust-analyzer` |
-| C/C++ | `clangd` |
-| JavaScript | `javascript-typescript-stdio` |
-| TypeScript | `typescript-language-server --stdio` |
-| Lua | `lua-language-server` |
-| Bash | `bash-language-server start` |
-| Ruby | `solargraph stdio` |
-| PHP | `intelephense --stdio` |
-| HTML | `vscode-html-language-server --stdio` |
-| CSS | `vscode-css-language-server --stdio` |
+| 语言       | LSP 服务器                            |
+| ---------- | ------------------------------------- |
+| Python     | `python -m pylsp`                     |
+| Go         | `gopls`                               |
+| Rust       | `rust-analyzer`                       |
+| C/C++      | `clangd`                              |
+| JavaScript | `javascript-typescript-stdio`         |
+| TypeScript | `typescript-language-server --stdio`  |
+| Lua        | `lua-language-server`                 |
+| Bash       | `bash-language-server start`          |
+| Ruby       | `solargraph stdio`                    |
+| PHP        | `intelephense --stdio`                |
+| HTML       | `vscode-html-language-server --stdio` |
+| CSS        | `vscode-css-language-server --stdio`  |
 
 ### 配置文件位置
 
@@ -121,12 +121,12 @@ lsp:
       command: python
       args: ["-m", "pylsp"]
       file_extensions: [".py", ".pyi"]
-    
+
     rust:
       command: rust-analyzer
       args: []
       file_extensions: [".rs"]
-    
+
     go:
       command: gopls
       args: []
@@ -183,7 +183,7 @@ LSP 客户端层 (client.py)
 
 - 使用 `typer` 作为 CLI 框架
 - 使用 `asyncio` 实现异步 LSP 通信
-- 使用 `jarvis_utils.output.PrettyOutput` 进行输出
+- 使用 `print` 进行输出
 - 遵循项目代码规范（mypy、ruff、bandit 检查）
 
 ## 依赖
