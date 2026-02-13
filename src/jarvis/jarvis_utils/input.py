@@ -45,13 +45,11 @@ from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.styles import Style as PromptStyle
 
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
-from jarvis.jarvis_utils.config import get_data_dir, set_llm_group
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.globals import get_message_history
 from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import decode_output
-from rich.console import Console
-from rich.table import Table
 
 # 在文件顶部导入需要在函数内部使用的模块
 # (使用别名避免与内置模块冲突)
@@ -71,8 +69,7 @@ FZF_REQUEST_SENTINEL_PREFIX = "__FZF_REQUEST__::"
 FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 
 # Persistent hint marker for multiline input (shown only once across runs)
-_MULTILINE_HINT_MARK_FILE = os.path.join(
-    get_data_dir(), "multiline_enter_hint_shown")
+_MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
 
 # 内置命令标记列表（用于自动补全和 fzf）
 BUILTIN_COMMANDS = [
@@ -205,10 +202,10 @@ def _parse_fzf_payload(
         (cursor, text) 元组，解析失败时返回 (None, None)
     """
     try:
-        payload = user_input[len(prefix):]
+        payload = user_input[len(prefix) :]
         sep_index = payload.find(":")
         cursor = int(payload[:sep_index])
-        text = base64.b64decode(payload[sep_index + 1:].encode("ascii")).decode(
+        text = base64.b64decode(payload[sep_index + 1 :].encode("ascii")).decode(
             "utf-8"
         )
         return cursor, text
@@ -272,7 +269,7 @@ def _insert_file_path(
     """
     text_before = text[:cursor]
     last_symbol = text_before.rfind(symbol)
-    if last_symbol != -1 and " " not in text_before[last_symbol + 1:]:
+    if last_symbol != -1 and " " not in text_before[last_symbol + 1 :]:
         # Replace @... or #... segment
         inserted = f"'{path}'"
         new_text = text[:last_symbol] + inserted + text[cursor:]
@@ -546,8 +543,7 @@ class FileCompleter(Completer):
         cursor_pos = document.cursor_position
 
         # Support both '@' (git files) and '#' (all files excluding .git)
-        sym_positions = [(i, ch)
-                         for i, ch in enumerate(text) if ch in ("@", "#")]
+        sym_positions = [(i, ch) for i, ch in enumerate(text) if ch in ("@", "#")]
         if not sym_positions:
             return
         current_pos = None
@@ -559,7 +555,7 @@ class FileCompleter(Completer):
         if current_pos is None:
             return
 
-        text_after = text[current_pos + 1: cursor_pos]
+        text_after = text[current_pos + 1 : cursor_pos]
         if " " in text_after:
             return
 
@@ -568,11 +564,9 @@ class FileCompleter(Completer):
 
         all_completions = []
         all_completions.extend(
-            [(ot(tag), self._get_description(tag))
-             for tag in self.replace_map.keys()]
+            [(ot(tag), self._get_description(tag)) for tag in self.replace_map.keys()]
         )
-        all_completions.extend([(ot(cmd), desc)
-                               for cmd, desc in BUILTIN_COMMANDS])
+        all_completions.extend([(ot(cmd), desc) for cmd, desc in BUILTIN_COMMANDS])
         # 添加所有规则（包括内置规则、文件规则、YAML规则）到补全列表
         rules = self._get_all_rules()
         for rule_name, rule_desc in rules:
@@ -618,8 +612,7 @@ class FileCompleter(Completer):
                         ]
                         for name in fnames:
                             files.append(
-                                _os.path.relpath(
-                                    _os.path.join(root, name), ".")
+                                _os.path.relpath(_os.path.join(root, name), ".")
                             )
                             if len(files) > self._max_walk_files:
                                 break
@@ -920,8 +913,7 @@ def _show_history_and_copy() -> None:
     for i, msg in enumerate(history):
         cleaned_msg = msg.replace("\n", r"\n")
         display_msg = (
-            (cleaned_msg[:70] +
-             "...") if len(cleaned_msg) > 70 else cleaned_msg
+            (cleaned_msg[:70] + "...") if len(cleaned_msg) > 70 else cleaned_msg
         )
         lines.append(f"  {i + 1}: {display_msg.strip()}")
         lines.append("=" * 58 + "\n")
@@ -1160,8 +1152,7 @@ def _get_multiline_input_internal(
 
     history_dir = get_data_dir()
     session: PromptSession[Any] = PromptSession(
-        history=FileHistory(os.path.join(
-            history_dir, "multiline_input_history")),
+        history=FileHistory(os.path.join(history_dir, "multiline_input_history")),
         completer=FileCompleter(),
         key_bindings=bindings,
         complete_while_typing=True,
@@ -1229,8 +1220,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             FZF_REQUEST_SENTINEL_PREFIX
         ):
             # Handle fzf request outside the prompt, then prefill new text.
-            cursor, text = _parse_fzf_payload(
-                user_input, FZF_REQUEST_SENTINEL_PREFIX)
+            cursor, text = _parse_fzf_payload(user_input, FZF_REQUEST_SENTINEL_PREFIX)
             if cursor is None or text is None:
                 # Malformed payload; just continue without change.
                 preset = None
@@ -1288,7 +1278,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             FZF_INSERT_SENTINEL_PREFIX
         ):
             # 从哨兵载荷中提取新文本，作为下次进入提示的预填内容
-            preset = user_input[len(FZF_INSERT_SENTINEL_PREFIX):]
+            preset = user_input[len(FZF_INSERT_SENTINEL_PREFIX) :]
             preset_cursor = len(preset)
 
             # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
@@ -1306,250 +1296,3 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             if not user_input and print_on_empty:
                 PrettyOutput.auto_print("ℹ️ 输入已取消")
             return user_input
-
-
-def get_platform_type_from_agent(agent: Any) -> str:
-    """根据 Agent 类型返回平台类型
-
-    参数:
-        agent: Agent 实例
-
-    返回:
-        str: 平台类型，'normal' 或 'smart'
-    """
-    agent_type = getattr(agent, "_agent_type", "normal")
-    return "smart" if agent_type == "code_agent" else "normal"
-
-
-def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
-    """列出所有可用的模型组
-
-    返回:
-        Optional[List[Tuple[str, str, str, str]]]: 模型组列表，每个元素为 (group_name, smart_model, normal_model, cheap_model)
-    """
-    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
-
-    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
-    if not isinstance(model_groups, dict) or not model_groups:
-        PrettyOutput.auto_print("📋 未找到任何模型组配置")
-        return None
-
-    groups = []
-    for group_name, group_config in model_groups.items():
-        if isinstance(group_config, dict):
-            # 获取各平台的模型名称
-            smart_model = group_config.get("smart_model", "-")
-            normal_model = group_config.get("model", "-")
-            cheap_model = group_config.get("cheap_model", "-")
-            groups.append((group_name, smart_model, normal_model, cheap_model))
-
-    return groups
-
-
-def check_context_limit(
-    agent: Any, new_model_group: str, platform_type: str = "normal"
-) -> Tuple[bool, str]:
-    """检查当前对话是否超出新模型的上下文限制
-
-    参数:
-        agent: Agent 实例
-        new_model_group: 新模型组名称
-        platform_type: 平台类型 ('normal' 或 'smart')
-
-    返回:
-        Tuple[bool, str]: (是否可以切换, 原因说明)
-    """
-    from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
-
-    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
-    if not isinstance(model_groups, dict):
-        return False, "模型组配置不存在"
-
-    group_config = model_groups.get(new_model_group)
-    if not isinstance(group_config, dict):
-        return False, f"模型组 '{new_model_group}' 不存在"
-
-    # 获取当前对话的 token 数
-    current_tokens = 0
-    if hasattr(agent, "session"):
-        from jarvis.jarvis_utils.embedding import get_context_token_count
-
-        # 从 session 获取所有消息并计算 token
-        try:
-            messages_text = str(agent.session.get_messages())
-            current_tokens = get_context_token_count(messages_text)
-        except Exception:
-            # 如果无法计算，使用粗略估计
-            current_tokens = 0
-
-    # 根据平台类型获取对应的 token 限制
-    if platform_type == "smart":
-        token_limit_key = "smart_max_input_token_count"
-    else:
-        token_limit_key = "max_input_token_count"
-
-    # 从模型组配置中获取 token 限制
-    token_limit = group_config.get(token_limit_key)
-    if token_limit is None:
-        # 尝试从 llms 引用中获取
-        normal_llm = group_config.get("normal_llm")
-        if normal_llm:
-            llms = GLOBAL_CONFIG_DATA.get("llms", {})
-            llm_config = llms.get(normal_llm, {})
-            token_limit = llm_config.get("max_input_token_count")
-
-    if token_limit is None:
-        # 使用默认限制
-        token_limit = 128000
-
-    # 检查是否超出限制（留出 10% 的余量）
-    if current_tokens > token_limit * 0.9:
-        return (
-            False,
-            f"当前对话 ({current_tokens} tokens) 超出新模型限制 ({token_limit} tokens) 的 90%",
-        )
-
-    return (
-        True,
-        f"当前对话 ({current_tokens} tokens) 在新模型限制 ({token_limit} tokens) 范围内",
-    )
-
-
-def perform_switch(
-    agent: Any, new_model_group: str, platform_type: str = "normal"
-) -> bool:
-    """执行模型组切换
-
-    参数:
-        agent: Agent 实例
-        new_model_group: 新模型组名称
-        platform_type: 平台类型 ('normal' 或 'smart')
-
-    返回:
-        bool: 是否切换成功
-    """
-    from jarvis.jarvis_utils.config import set_llm_group
-    from jarvis.jarvis_platform.registry import PlatformRegistry
-
-    try:
-        # 保存旧模型的消息
-        old_messages = agent.model.get_messages()
-
-        # 更新全局配置
-        set_llm_group(new_model_group)
-
-        # 重新创建模型
-        platform_registry = PlatformRegistry()
-        if platform_type == "smart":
-            agent.model = platform_registry.get_smart_platform()
-        else:
-            agent.model = platform_registry.get_normal_platform()
-
-        agent.model.set_suppress_output(False)
-        agent.model.agent = agent
-
-        # 将旧消息设置到新模型
-        if old_messages:
-            agent.model.set_messages(old_messages)
-
-        # 将新模型设置到现有的 session 中
-        agent.session.model = agent.model
-
-        return True
-    except Exception as e:
-        PrettyOutput.auto_print(f"❌ 切换模型组失败: {e}")
-        return False
-
-
-def switch_model_group(agent: Any) -> bool:
-    """切换模型组的主函数
-
-    参数:
-        agent: Agent 实例
-
-    返回:
-        bool: 是否切换成功
-    """
-    from jarvis.jarvis_utils.config import get_llm_group
-
-    # 获取当前模型组
-    current_group = get_llm_group() or "(未设置)"
-    PrettyOutput.auto_print(f"📌 当前模型组: {current_group}")
-
-    # 列出所有模型组
-    groups = list_model_groups()
-    if not groups:
-        return False
-
-    # 显示模型组列表
-    console = Console()
-    table = Table(
-        title="📋 可用模型组",
-        show_header=True,
-        header_style="bold magenta",
-        expand=True,
-    )
-    table.add_column("编号", style="cyan", justify="center")
-    table.add_column("模型组名称", style="green")
-    table.add_column("Smart", style="cyan", justify="center")
-    table.add_column("Normal", style="magenta", justify="center")
-    table.add_column("Cheap", style="yellow", justify="center")
-
-    for idx, (group_name, smart_model, normal_model, cheap_model) in enumerate(groups, 1):
-        table.add_row(str(idx), group_name, smart_model,
-                      normal_model, cheap_model)
-
-    console.print(table)
-
-    # 用户选择（循环直到输入有效）
-    PrettyOutput.auto_print("")
-    while True:
-        choice = input("请输入模型组编号 (0 取消): ").strip()
-
-        if choice == "0":
-            PrettyOutput.auto_print("🚫 已取消切换")
-            return False
-
-        try:
-            choice_idx = int(choice) - 1
-            if choice_idx < 0 or choice_idx >= len(groups):
-                PrettyOutput.auto_print(f"❌ 无效的编号: {choice}，请重新输入")
-                continue
-
-            new_group = groups[choice_idx][0]
-            break
-        except ValueError:
-            PrettyOutput.auto_print(f"❌ 无效的输入: {choice}，请输入数字")
-            continue
-
-    # 执行切换逻辑
-    try:
-        # 检查是否与当前模型组相同
-        if new_group == current_group:
-            PrettyOutput.auto_print("⚠️ 当前已使用该模型组")
-            return False
-
-        # 获取平台类型
-        platform_type = get_platform_type_from_agent(agent)
-
-        # 检查上下文限制
-        can_switch, reason = check_context_limit(
-            agent, new_group, platform_type)
-        if not can_switch:
-            PrettyOutput.auto_print(f"⚠️ {reason}")
-            if not user_confirm("是否仍要切换? ", False):
-                PrettyOutput.auto_print("🚫 已取消切换")
-                return False
-        else:
-            PrettyOutput.auto_print(f"✅ {reason}")
-
-        # 执行切换
-        PrettyOutput.auto_print(f"🔄 正在切换到模型组 '{new_group}'...")
-        if perform_switch(agent, new_group, platform_type):
-            PrettyOutput.auto_print(f"✅ 已成功切换到模型组 '{new_group}'")
-            return True
-        else:
-            return False
-    except Exception as e:
-        PrettyOutput.auto_print(f"❌ 切换失败: {e}")
-        return False
