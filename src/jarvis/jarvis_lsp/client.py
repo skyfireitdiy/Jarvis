@@ -1781,7 +1781,7 @@ class LSPClient:
         Returns:
             (line, column) 元组，如果未找到则返回 None
         """
-        symbols = await self.document_symbols(file_path)
+        symbols = await self.document_symbol(file_path)
         for sym in symbols:
             if sym.name == symbol_name:
                 return (sym.line, sym.column)
