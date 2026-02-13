@@ -614,6 +614,57 @@ class SessionManager:
             PrettyOutput.auto_print(f"⚠️  检查 commit 一致性时出错: {e}")
             return True
 
+    def _recreate_platform_if_needed(self, session_file: str) -> bool:
+        """如果会话文件包含platform_type，则重新创建平台实例
+
+        Args:
+            session_file: 会话文件路径
+
+        Returns:
+            bool: 是否重新创建了平台实例
+        """
+        import json
+        from jarvis.jarvis_platform.registry import PlatformRegistry
+
+        try:
+            with open(session_file, "r", encoding="utf-8") as f:
+                state = json.load(f)
+
+            platform_type = state.get("platform_type")
+            if not platform_type:
+                # 旧会话文件没有platform_type，跳过
+                return False
+
+            # 重新创建平台实例，使用最新的llm_group配置
+            registry = PlatformRegistry()
+            if platform_type == "smart":
+                new_model = registry.get_smart_platform()
+            elif platform_type == "cheap":
+                new_model = registry.get_cheap_platform()
+            else:
+                new_model = registry.get_normal_platform()
+
+            # 保留原有设置
+            new_model.set_suppress_output(self.model.suppress_output)
+            new_model.agent = self.model.agent
+
+            # 更新SessionManager的model引用
+            self.model = new_model
+            # 更新Agent的model引用
+            if self.agent:
+                self.agent.model = new_model
+                self.agent.session.model = new_model
+
+            PrettyOutput.auto_print(
+                f"✅ 已根据platform_type重新创建平台实例: {platform_type}"
+            )
+            return True
+        except FileNotFoundError:
+            return False
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 重新创建平台实例失败: {e}，使用现有实例")
+            return False
+
     def restore_session(self) -> bool:
         """Restores the session state from a file."""
         sessions = self._parse_session_files()
@@ -635,6 +686,9 @@ class SessionManager:
             if not self._check_commit_consistency(session_file):
                 PrettyOutput.auto_print("⏸️  已取消恢复会话。")
                 return False
+
+            # 重新创建平台实例（如果需要）
+            self._recreate_platform_if_needed(session_file)
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
@@ -660,6 +714,14 @@ class SessionManager:
             PrettyOutput.auto_print(
                 f"🤖 非交互模式：自动恢复最新会话{name_str}: {os.path.basename(session_file)} ({time_str})"
             )
+
+            # 检查 commit 一致性
+            if not self._check_commit_consistency(session_file):
+                PrettyOutput.auto_print("⏸️  已取消恢复会话。")
+                return False
+
+            # 重新创建平台实例（如果需要）
+            self._recreate_platform_if_needed(session_file)
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
@@ -721,6 +783,9 @@ class SessionManager:
             if not self._check_commit_consistency(session_file):
                 PrettyOutput.auto_print("⏸️  已取消恢复会话。")
                 return False
+
+            # 重新创建平台实例（如果需要）
+            self._recreate_platform_if_needed(session_file)
 
             if self.model.restore(session_file):
                 self.last_restored_session = session_file  # 记录恢复的会话文件
