@@ -33,8 +33,8 @@
 
 - [脚本生成规则]({{ rule_file_dir }}/development_tools/script-generation.md)
 - [Jarvis 帮助规则]({{ rule_file_dir }}/development_tools/jarvis_help.md)
+- [LSP 工具使用规则]({{ rule_file_dir }}/development_tools/lsp_usage.md)
 
 ## 性能优化 (performance/)
 
 - [性能优化]({{ rule_file_dir }}/performance/performance.md)
-
