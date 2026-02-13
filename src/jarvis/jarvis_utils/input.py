@@ -1490,22 +1490,29 @@ def switch_model_group(agent: Any) -> bool:
 
     console.print(table)
 
-    # 用户选择
+    # 用户选择（循环直到输入有效）
     PrettyOutput.auto_print("")
-    choice = input("请输入模型组编号 (0 取消): ").strip()
+    while True:
+        choice = input("请输入模型组编号 (0 取消): ").strip()
 
-    if choice == "0":
-        PrettyOutput.auto_print("🚫 已取消切换")
-        return False
-
-    try:
-        choice_idx = int(choice) - 1
-        if choice_idx < 0 or choice_idx >= len(groups):
-            PrettyOutput.auto_print(f"❌ 无效的编号: {choice}")
+        if choice == "0":
+            PrettyOutput.auto_print("🚫 已取消切换")
             return False
 
-        new_group = groups[choice_idx][0]
+        try:
+            choice_idx = int(choice) - 1
+            if choice_idx < 0 or choice_idx >= len(groups):
+                PrettyOutput.auto_print(f"❌ 无效的编号: {choice}，请重新输入")
+                continue
 
+            new_group = groups[choice_idx][0]
+            break
+        except ValueError:
+            PrettyOutput.auto_print(f"❌ 无效的输入: {choice}，请输入数字")
+            continue
+
+    # 执行切换逻辑
+    try:
         # 检查是否与当前模型组相同
         if new_group == current_group:
             PrettyOutput.auto_print("⚠️ 当前已使用该模型组")
@@ -1532,10 +1539,6 @@ def switch_model_group(agent: Any) -> bool:
             return True
         else:
             return False
-
-    except ValueError:
-        PrettyOutput.auto_print(f"❌ 无效的输入: {choice}")
-        return False
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换失败: {e}")
         return False
