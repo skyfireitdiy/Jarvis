@@ -63,9 +63,9 @@ class SymbolInfo:
 
     name: str
     kind: str
-    file_path: str = ""
     line: int
     column: int
+    file_path: str = ""
     description: Optional[str] = None
 
 
@@ -354,7 +354,9 @@ class LSPClient:
         folding_ranges = self._parse_folding_ranges(response.result)
         return folding_ranges
 
-    async def hover(self, file_path: str, line: int, character: int) -> Optional[HoverInfo]:
+    async def hover(
+        self, file_path: str, line: int, character: int
+    ) -> Optional[HoverInfo]:
         """获取符号悬停信息
 
         Args:
@@ -618,7 +620,72 @@ class LSPClient:
                 f"{error.get('message', 'Unknown error')} (code: {error.get('code', 'unknown')})"
             )
 
+        print(f"[DEBUG] definition: response.result = {response.result}")
         return self._parse_locations(response.result or [])
+
+    async def callers_in_range(
+        self, file_path: str, start_line: int, end_line: int, language: str = "python"
+    ) -> List[Dict[str, Any]]:
+        """解析指定行号范围内的函数调用
+
+        Args:
+            file_path: 文件路径
+            start_line: 起始行号（1-based）
+            end_line: 结束行号（1-based）
+            language: 语言（用于选择解析器，目前仅支持 python）
+
+        Returns:
+            函数调用列表，每个调用包含 name, line, column 信息
+        """
+        callers = []
+
+        try:
+            # 读取文件内容
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # 使用 AST 解析函数体
+            import ast
+
+            tree = ast.parse(content)
+
+            # 找到指定行号范围内的所有函数调用
+            class CallVisitor(ast.NodeVisitor):
+                def __init__(self, start_line, end_line):
+                    self.start_line = start_line
+                    self.end_line = end_line
+                    self.calls = []
+
+                def visit_Call(self, node):
+                    # 检查调用是否在指定行号范围内
+                    if self.start_line <= node.lineno <= self.end_line:
+                        # 获取函数名
+                        if isinstance(node.func, ast.Name):
+                            func_name = node.func.id
+                        elif isinstance(node.func, ast.Attribute):
+                            func_name = node.func.attr
+                        else:
+                            func_name = "<unknown>"
+
+                        self.calls.append(
+                            {
+                                "name": func_name,
+                                "line": node.lineno,  # 1-based
+                                "column": node.col_offset,  # 0-based
+                            }
+                        )
+
+                    # 继续遍历子节点
+                    self.generic_visit(node)
+
+            visitor = CallVisitor(start_line, end_line)
+            visitor.visit(tree)
+            callers = visitor.calls
+
+        except Exception as e:
+            print(f"[ERROR] Failed to parse callers: {e}")
+
+        return callers
 
     async def references(
         self, file_path: str, line: int, column: int
@@ -998,11 +1065,14 @@ class LSPClient:
             LocationInfo 对象（包含代码片段和上下文）
         """
         # LSP Location 格式: {uri: str, range: {start: {line, character}, end: {line, character}}}
+        print(f"[DEBUG] _parse_location: raw location = {location}")
         uri = location.get("uri", "")
+        print(f"[DEBUG] _parse_location: uri = {uri}")
         range_info = location.get("range", {})
         start = range_info.get("start", {})
 
         file_path = self._uri_to_path(uri)
+        print(f"[DEBUG] _parse_location: file_path = {file_path}")
         line = start.get("line", 0)
         column = start.get("character", 0)
 
@@ -1127,7 +1197,9 @@ class LSPClient:
             character=character,
         )
 
-    def _find_symbol_in_line(self, file_path: str, line: int, symbol_name: str) -> Optional[int]:
+    def _find_symbol_in_line(
+        self, file_path: str, line: int, symbol_name: str
+    ) -> Optional[int]:
         """在指定行中查找符号名的位置（fallback 机制）
 
         注意：这是一个不完美的 fallback 机制，只做简单的字符串匹配。
@@ -1154,6 +1226,7 @@ class LSPClient:
             # 只做简单的字符串匹配，不假设任何语言的语法
             # 使用单词边界确保精确匹配
             import re
+
             match = re.search(rf"\b{re.escape(symbol_name)}\b", line_text)
             if match:
                 return match.start()
@@ -1262,7 +1335,7 @@ class LSPClient:
                 range_info = location["range"]
             else:
                 range_info = item.get("range", {})
-            
+
             # LSP DocumentSymbol 有 selectionRange 字段，表示符号名称的范围
             # 这比 range 更精确（range 可能包含整个定义，selectionRange 只是符号名）
             selection_range = item.get("selectionRange")
@@ -1272,7 +1345,7 @@ class LSPClient:
             else:
                 # 如果没有 selectionRange，尝试使用 range
                 start = range_info.get("start", {})
-            
+
             line = start.get("line", 0)
             column = start.get("character", 0)
 
@@ -1684,9 +1757,7 @@ class LSPClient:
             )
 
         if response.error:
-            raise RuntimeError(
-                f"prepareCallHierarchy request failed: {response.error}"
-            )
+            raise RuntimeError(f"prepareCallHierarchy request failed: {response.error}")
 
         result = response.result
         if not result:

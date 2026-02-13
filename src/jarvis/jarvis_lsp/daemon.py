@@ -324,6 +324,7 @@ class LSPDaemon:
                 {
                     "name": s.name,
                     "kind": s.kind,
+                    "file_path": s.file_path or file_path,
                     "line": s.line,
                     "column": s.column,
                     "description": s.description,
@@ -616,12 +617,19 @@ class LSPDaemon:
             }
 
         locations = await server.client.definition(file_path, line, column)
+        print(
+            f"[DEBUG] daemon.definition: file_path={file_path}, line={line}, column={column}, locations={locations}"
+        )
 
         if not locations:
             return {"success": True, "location": None}
 
         # 返回第一个位置（不包含 code_snippet 和 context 以避免 JSON 序列化问题）
         first_location = locations[0]
+        # 检查位置的有效性：file_path 不能为空
+        if not first_location.file_path:
+            return {"success": True, "location": None}
+
         return {
             "success": True,
             "location": {
@@ -782,6 +790,10 @@ class LSPDaemon:
 
         # 返回第一个位置（不包含 code_snippet 和 context 以避免 JSON 序列化问题）
         first_location = locations[0]
+        # 检查位置的有效性：file_path 不能为空
+        if not first_location.file_path:
+            return {"success": True, "location": None}
+
         return {
             "success": True,
             "location": {
@@ -865,6 +877,60 @@ class LSPDaemon:
             return symbols_result
 
         symbols = symbols_result.get("symbols", [])
+        print(
+            f"[DEBUG] daemon.definition_by_name: found {len(symbols)} symbols: {[s['name'] + ':' + s['kind'] for s in symbols]}"
+        )
+        print(
+            f"[DEBUG] daemon.definition_by_name: looking for symbol_name={symbol_name}"
+        )
+        symbol = self._find_symbol_by_name(symbols, symbol_name, file_path)
+        print(f"[DEBUG] daemon.definition_by_name: symbol = {symbol}")
+
+        if symbol is None:
+            return {
+                "success": False,
+                "error": f"Symbol '{symbol_name}' not found in file '{file_path}'",
+            }
+
+        # 直接返回符号的位置（不再调用 definition，因为在定义位置查询定义会返回空）
+        result = {
+            "success": True,
+            "location": {
+                "file_path": file_path,
+                "line": symbol["line"],  # 1-based 行号
+                "column": symbol["column"],  # 1-based 列号
+                "uri": f"file://{file_path}",
+                "symbol_name": symbol_name,
+            },
+        }
+        return result
+
+    async def callers_by_name(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """查询指定函数内部调用了哪些其他函数"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+        symbol_name = params.get("symbol_name")
+
+        if not language or not project_path or not file_path or not symbol_name:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path, symbol_name",
+            }
+
+        # 获取符号位置
+        symbols_result = await self.document_symbol(
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+            }
+        )
+
+        if not symbols_result.get("success"):
+            return symbols_result
+
+        symbols = symbols_result.get("symbols", [])
         symbol = self._find_symbol_by_name(symbols, symbol_name, file_path)
 
         if symbol is None:
@@ -873,15 +939,27 @@ class LSPDaemon:
                 "error": f"Symbol '{symbol_name}' not found in file '{file_path}'",
             }
 
-        return await self.definition(
-            {
-                "language": language,
-                "project_path": project_path,
-                "file_path": file_path,
-                "line": symbol["line"],
-                "column": symbol["column"],
+        # 获取符号的起始和结束行号
+        start_line = symbol["line"]
+        end_line = symbol["end_line"]
+
+        # 解析函数调用
+        server = await self.get_or_create_server(language, project_path)
+
+        if server.client is None:
+            return {
+                "success": False,
+                "error": "LSP server client not initialized",
             }
+
+        callers = await server.client.callers_in_range(
+            file_path, start_line, end_line, language
         )
+
+        return {
+            "success": True,
+            "callers": callers,
+        }
 
     async def definition_at_line(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """通过行号查找定义（自动查找该行的符号列号）"""
@@ -891,7 +969,13 @@ class LSPDaemon:
         line = params.get("line")
         symbol_name = params.get("symbol_name")  # 必填，用于精确匹配
 
-        if not language or not project_path or not file_path or line is None or not symbol_name:
+        if (
+            not language
+            or not project_path
+            or not file_path
+            or line is None
+            or not symbol_name
+        ):
             return {
                 "success": False,
                 "error": "Missing required parameters: language, project_path, file_path, line, symbol_name",
@@ -911,7 +995,7 @@ class LSPDaemon:
 
         symbols = symbols_result.get("symbols", [])
 
-        # 查找该行的符号
+        # 查找该行的符号（document_symbol 和 line 参数都是 1-based）
         line_symbols = [s for s in symbols if s["line"] == line]
 
         if not line_symbols:
@@ -937,6 +1021,7 @@ class LSPDaemon:
                 # 读取文件内容，查找符号在该行的实际列号
                 import asyncio
                 from pathlib import Path
+
                 content_text = await asyncio.to_thread(Path(file_path).read_text)
                 lines = content_text.splitlines()
                 if line < len(lines):
@@ -946,7 +1031,7 @@ class LSPDaemon:
                         column = symbol_pos
             except Exception:
                 pass  # 如果查找失败，使用原始列号
-        
+
         # 调用 definition 方法查找定义
         return await self.definition(
             {
@@ -1055,8 +1140,9 @@ class LSPDaemon:
                 "language": language,
                 "project_path": project_path,
                 "file_path": file_path,
-                "line": symbol["line"],
-                "column": symbol["column"],
+                "line": symbol["line"] - 1,  # SymbolInfo 是 1-based，LSP 需要 0-based
+                "column": symbol["column"]
+                - 1,  # SymbolInfo 是 1-based，LSP 需要 0-based
             }
         )
 
