@@ -1024,9 +1024,9 @@ def get_addon_prompt_threshold() -> int:
     当消息长度超过此阈值时，会自动添加默认的附加提示。
 
     返回:
-        int: 触发阈值，默认为1024
+        int: 触发阈值，默认为4096
     """
-    return 1024
+    return 4096
 
 
 def is_enable_intent_recognition() -> bool:

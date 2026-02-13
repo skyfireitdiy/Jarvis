@@ -1,0 +1,8 @@
+{
+  "id": "20260213_195319_523564",
+  "type": "project_long_term",
+  "tags": ["addon_prompt", "threshold", "提示词长度", "context_window"],
+  "content": "提示词超出阈值时会增加默认附加提示词：\n\n**触发条件**（位于 src/jarvis/jarvis_agent/__init__.py 的 _add_addon_prompt 方法）：\n1. 条件1：消息长度超过阈值（默认4096字符）\n2. 条件2：连续10轮都没有添加过 addon_prompt，强制添加一次\n\n**阈值配置**（位于 src/jarvis/jarvis_utils/config.py 的 get_addon_prompt_threshold 函数）：\n- 返回值：4096（字符数）- 已从1024修改为4096\n- 说明：当前使用字符长度判断，不是token长度\n\n**修改记录**：2026-02-13 将阈值从1024字符提升至4096字符（4k），减少不必要的附加提示词添加频率。\n\n**注意**：虽然项目中其他地方（如 is_context_overflow）已经迁移到token计算，但 addon_prompt 的触发阈值目前仍使用字符长度（len(message) > 4096）",
+  "created_at": "2026-02-13T19:53:19.523600",
+  "updated_at": "2026-02-13T19:53:19.523605"
+}
