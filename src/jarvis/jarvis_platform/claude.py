@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import json
 import os
 from typing import Any
 from typing import Dict
@@ -294,45 +293,6 @@ class ClaudeModel(BasePlatform):
         else:
             self.messages = []
         return True
-
-    def save(self, file_path: str) -> bool:
-        """Save chat session to a file."""
-        state: Dict[str, Any] = {
-            "messages": self.messages,
-            "model_name": self.model_name,
-            "platform_type": self.platform_type,
-        }
-
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(state, f, ensure_ascii=False, indent=4)
-            self._saved = True
-            PrettyOutput.auto_print(f"✅ 会话已成功保存到 {file_path}")
-            return True
-        except Exception as e:
-            PrettyOutput.auto_print(f"❌ 保存会话失败: {str(e)}")
-            return False
-
-    def restore(self, file_path: str) -> bool:
-        """Restore chat session from a file."""
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                state = json.load(f)
-
-            self.messages = state.get("messages", [])
-            self.model_name = state.get("model_name", "claude-3-5-sonnet-20241022")
-            # 处理start_commit信息（如果存在）
-            # start_commit = state.get("start_commit", None)
-            # 可以根据需要使用start_commit信息
-            # atexit.register(self.delete_chat)
-            self._saved = True
-            return True
-        except FileNotFoundError:
-            PrettyOutput.auto_print(f"❌ 会话文件未找到: {file_path}")
-            return False
-        except Exception as e:
-            PrettyOutput.auto_print(f"❌ 恢复会话失败: {str(e)}")
-            return False
 
     def trim_messages(self) -> bool:
         """裁剪消息历史以腾出token空间
