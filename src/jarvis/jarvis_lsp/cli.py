@@ -68,8 +68,8 @@ def format_symbols_json(symbols: list[SymbolInfo], file_path: str) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
-@app.command("symbols")
-def symbols_command(
+@app.command("document_symbols")
+def document_symbols_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     language: Optional[str] = typer.Option(
         None,
@@ -95,7 +95,7 @@ def symbols_command(
         help="过滤符号类型（如 function, class, variable）",
     ),
 ) -> None:
-    """列出文件中的符号
+    """列出文件中的文档符号
 
     列出指定文件中的函数、类、变量等符号信息。
     """
