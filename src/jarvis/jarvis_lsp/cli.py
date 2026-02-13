@@ -475,6 +475,64 @@ def type_definition_command(
             PrettyOutput.auto_print(format_location_human([location]))
 
 
+@app.command("def-at")
+def definition_at_line_command(
+    file_path: str = typer.Argument(..., help="目标文件路径"),
+    line: int = typer.Argument(..., help="行号（从1开始）"),
+    symbol_name: Optional[str] = typer.Argument(
+        None, help="符号名称（可选，用于精确匹配）"
+    ),
+    language: Optional[str] = typer.Option(
+        None,
+        "--language",
+        "-l",
+        help="指定语言（如 python, rust, javascript）",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="以 JSON 格式输出",
+    ),
+) -> None:
+    """通过行号查找定义（自动查找该行的符号列号）
+
+    在文件的指定行查找符号的定义位置，不需要精确的列号。
+    如果该行有多个符号，可以指定符号名称进行精确匹配。
+
+    注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 和 textDocument/definition 功能。
+    如果服务器不支持此功能或响应超时，命令会失败。
+    """
+    if language is None:
+        language = "python"
+
+    project_path = os.getcwd()
+    client = LSPDaemonClient()
+
+    async def run() -> LocationInfo | None:
+        location = await client.definition_at_line(
+            language, project_path, file_path, line - 1, symbol_name
+        )
+        return location
+
+    try:
+        location = asyncio.run(run())
+    except RuntimeError as e:
+        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        raise typer.Exit(code=1)
+
+    if as_json:
+        if location is None:
+            PrettyOutput.auto_print("[]")
+        else:
+            PrettyOutput.auto_print(format_location_json([location]))
+    else:
+        if location is None:
+            PrettyOutput.auto_print("🔍 未找到定义")
+        else:
+            PrettyOutput.auto_print(format_location_human([location]))
+
+
 @app.command("def-name")
 def definition_by_name_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),

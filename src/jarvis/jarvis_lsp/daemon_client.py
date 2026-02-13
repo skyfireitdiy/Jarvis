@@ -359,6 +359,51 @@ class LSPDaemonClient:
             uri=f"file://{location_data['file_path']}",
         )
 
+    async def definition_at_line(
+        self,
+        language: str,
+        project_path: str,
+        file_path: str,
+        line: int,
+        symbol_name: str | None = None,
+    ) -> LocationInfo | None:
+        """通过行号查找定义（自动查找该行的符号列号）
+
+        Args:
+            language: 语言
+            project_path: 项目路径
+            file_path: 文件路径
+            line: 行号（从 0 开始）
+            symbol_name: 符号名称（可选，用于精确匹配）
+
+        Returns:
+            定义位置信息，如果找不到返回 None
+        """
+        response = await self._send_request(
+            "definition_at_line",
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "line": line,
+                "symbol_name": symbol_name,
+            },
+        )
+
+        if not response.get("success"):
+            raise RuntimeError(response.get("error", "未知错误"))
+
+        location_data = response.get("location")
+        if location_data is None:
+            return None
+
+        return LocationInfo(
+            file_path=location_data["file_path"],
+            line=location_data["line"],
+            column=location_data["column"],
+            uri=f"file://{location_data['file_path']}",
+        )
+
     async def definition_by_name(
         self, language: str, project_path: str, file_path: str, symbol_name: str
     ) -> LocationInfo | None:
