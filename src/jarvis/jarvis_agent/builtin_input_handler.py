@@ -441,6 +441,15 @@ def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
     返回:
         Optional[List[Tuple[str, str, str, str]]]: 模型组列表，每个元素为 (group_name, smart_model, normal_model, cheap_model)
     """
+    # 调试：输出 GLOBAL_CONFIG_DATA 的实际内容
+    PrettyOutput.auto_print(
+        f"🔍 GLOBAL_CONFIG_DATA keys: {list(GLOBAL_CONFIG_DATA.keys())[:20]}"
+    )
+    PrettyOutput.auto_print(f"🔍 GLOBAL_CONFIG_DATA id: {id(GLOBAL_CONFIG_DATA)}")
+    PrettyOutput.auto_print(
+        f"🔍 GLOBAL_CONFIG_DATA.get('llm_groups'): {GLOBAL_CONFIG_DATA.get('llm_groups', 'NOT_FOUND')}"
+    )
+
     model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
     if not isinstance(model_groups, dict) or not model_groups:
         PrettyOutput.auto_print("📋 未找到任何模型组配置")
