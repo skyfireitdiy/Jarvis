@@ -426,12 +426,33 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
             if tag not in processed_tag:
                 rule_name = tag[5:]  # 去掉 "rule:" 前缀
                 PrettyOutput.auto_print(f"🔍 [DEBUG] 提取的规则名称 = '{rule_name}'")
+
+                # 获取规则内容
                 rule_content = _get_rule_content(rule_name)
                 processed_tag.add(tag)
                 PrettyOutput.auto_print(
                     f"🔍 [DEBUG] 规则内容获取结果: {bool(rule_content)}"
                 )
+
                 if rule_content:
+                    # 激活规则：调用 RulesManager.activate_rule()
+                    import os
+                    from jarvis.jarvis_agent.rules_manager import RulesManager
+
+                    rules_manager = RulesManager(root_dir=os.getcwd())
+                    PrettyOutput.auto_print(f"🔍 [DEBUG] 尝试激活规则 '{rule_name}'")
+                    activated = rules_manager.activate_rule(rule_name)
+                    PrettyOutput.auto_print(f"🔍 [DEBUG] 规则激活结果: {activated}")
+
+                    # 将激活的规则添加到 agent.loaded_rule_names
+                    if activated:
+                        if not hasattr(agent, "loaded_rule_names"):
+                            agent.loaded_rule_names = set()
+                        agent.loaded_rule_names.add(rule_name)
+                        PrettyOutput.auto_print(
+                            f"🔍 [DEBUG] 规则 '{rule_name}' 已添加到 agent.loaded_rule_names"
+                        )
+
                     separator = "\n" + "=" * 50 + "\n"
                     PrettyOutput.auto_print(f"🔍 [DEBUG] 替换 '<{tag}>' 为规则内容")
                     modified_input = modified_input.replace(
