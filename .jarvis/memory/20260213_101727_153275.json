@@ -1,0 +1,13 @@
+{
+  "id": "20260213_101727_153275",
+  "type": "project_long_term",
+  "tags": [
+    "jarvis_lsp",
+    "LSP",
+    "architecture",
+    "design-principle"
+  ],
+  "content": "## jarvis_lsp LSP 原则修复（Commit 106b1e4）\n\n### 修复内容\n1. **删除 `_extract_symbol_name` 方法**（client.py）\n   - 问题：硬编码了 Python 语法解析逻辑（`def`, `class`, `async def`）\n   - 违反：LSP 客户端不应该假设目标语言的语法结构\n   - 解决：删除该方法，依赖 LSP 服务器返回准确的 selectionRange\n\n2. **简化 `_find_symbol_in_line` 方法**（client.py）\n   - 问题：硬编码了 Python 特定的语法模式\n   - 违反：LSP 客户端不应该假设目标语言的结构\n   - 解决：只做简单的字符串匹配，移除所有语言特定的模式\n   - 说明：这是 fallback 机制，用于处理 pylsp 不返回 selectionRange 的情况\n\n### LSP 核心原则\n1. **服务器决定一切**：客户端只负责传递请求和解析响应，不做语法解析\n2. **不假设语言结构**：客户端不应该知道目标语言的语法（`def`, `class`, `import` 等）\n3. **依赖服务器数据**：如果服务器返回不准确的数据（如列号为 0），客户端可以简单处理，但不能硬编码语言逻辑\n\n### 合理的设计（非问题）\n1. **language_map** - LSP 协议要求的扩展名到 languageId 映射\n2. **kind_map** - LSP 协议标准的 SymbolKind 枚举映射\n3. **_extract_code_snippet** - 只读取文件内容，不涉及语法解析\n\n### 代码质量\n- mypy strict: 通过\n- ruff: 通过\n\n### Git 提交\n- 106b1e4 (106b1e488864db06eca3bd2698832ceb5ffe0890)",
+  "created_at": "2026-02-13T10:17:27.153388",
+  "updated_at": "2026-02-13T10:17:27.153394"
+}
