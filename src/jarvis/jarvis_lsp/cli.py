@@ -28,28 +28,6 @@ app = typer.Typer(
 )
 
 
-def format_symbols_human(symbols: list[SymbolInfo], file_path: str) -> str:
-    """格式化符号列表为人类可读格式
-
-    Args:
-        symbols: 符号列表
-        file_path: 文件路径
-
-    Returns:
-        格式化后的字符串
-    """
-    lines = [f"📋 符号列表 ({file_path})", ""]
-
-    for symbol in symbols:
-        lines.append(f"{symbol.kind.title()}: {symbol.name}")
-        lines.append(f"  位置: 第 {symbol.line} 行")
-        if symbol.description:
-            lines.append(f"  描述: {symbol.description}")
-        lines.append("")
-
-    return "\n".join(lines)
-
-
 def format_symbols_json(symbols: list[SymbolInfo], file_path: str) -> str:
     """格式化符号列表为 JSON 格式
 
@@ -75,30 +53,6 @@ def format_symbols_json(symbols: list[SymbolInfo], file_path: str) -> str:
         ],
     }
     return json.dumps(data, indent=2, ensure_ascii=False)
-
-
-def format_folding_ranges_human(ranges: list[FoldingRangeInfo], file_path: str) -> str:
-    """格式化可折叠范围为人类可读格式
-
-    Args:
-        ranges: 可折叠范围列表
-        file_path: 文件路径
-
-    Returns:
-        格式化后的字符串
-    """
-    lines = [f"📋 可折叠范围 ({file_path})", ""]
-
-    for range in ranges:
-        kind_str = f" [{range.kind}]" if range.kind else ""
-        lines.append(
-            f"第 {range.start_line + 1} 行 - 第 {range.end_line + 1} 行{kind_str}"
-        )
-        if range.collapsed_text:
-            lines.append(f"  折叠文本: {range.collapsed_text}")
-        lines.append("")
-
-    return "\n".join(lines)
 
 
 def format_folding_ranges_json(ranges: list[FoldingRangeInfo], file_path: str) -> str:
@@ -128,26 +82,6 @@ def format_folding_ranges_json(ranges: list[FoldingRangeInfo], file_path: str) -
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
-def format_hover_human(hover_info: HoverInfo, file_path: str) -> str:
-    """格式化悬停信息为人类可读格式
-
-    Args:
-        hover_info: 悬停信息
-        file_path: 文件路径
-
-    Returns:
-        格式化后的字符串
-    """
-    lines = [f"📋 符号信息 ({file_path})", ""]
-    lines.append(
-        f"📍 位置: 第 {hover_info.line + 1} 行，第 {hover_info.character + 1} 列"
-    )
-    lines.append("")
-    lines.append("📝 文档:")
-    lines.append(hover_info.contents)
-    return "\n".join(lines)
-
-
 def format_hover_json(hover_info: HoverInfo, file_path: str) -> str:
     """格式化悬停信息为 JSON 格式
 
@@ -168,41 +102,6 @@ def format_hover_json(hover_info: HoverInfo, file_path: str) -> str:
         },
     }
     return json.dumps(data, indent=2, ensure_ascii=False)
-
-
-def format_diagnostic_human(diagnostics: list[DiagnosticInfo], file_path: str) -> str:
-    """格式化诊断信息为人类可读格式
-
-    Args:
-        diagnostics: 诊断信息列表
-        file_path: 文件路径
-
-    Returns:
-        格式化后的字符串
-    """
-    if not diagnostics:
-        return f"✅ 无诊断问题 ({file_path})"
-
-    lines = [f"📋 诊断信息 ({file_path})", ""]
-
-    for diag in diagnostics:
-        # 严重级别
-        severity_map = {
-            1: "❌ 错误",
-            2: "⚠️  警告",
-            3: "ℹ️  信息",
-            4: "💡 提示",
-        }
-        severity_label = severity_map.get(diag.severity, f"{diag.severity}")
-
-        lines.append(f"{severity_label} [{diag.source}]")
-        lines.append(f"  位置: 第 {diag.range[0] + 1} 行，第 {diag.range[1] + 1} 列")
-        if diag.code:
-            lines.append(f"  代码: {diag.code}")
-        lines.append(f"  消息: {diag.message}")
-        lines.append("")
-
-    return "\n".join(lines)
 
 
 def format_diagnostic_json(diagnostics: list[DiagnosticInfo], file_path: str) -> str:
@@ -229,29 +128,6 @@ def format_diagnostic_json(diagnostics: list[DiagnosticInfo], file_path: str) ->
         ],
     }
     return json.dumps(data, indent=2, ensure_ascii=False)
-
-
-def format_code_action_human(code_actions: list[CodeActionInfo]) -> str:
-    """格式化代码动作为人类可读格式
-
-    Args:
-        code_actions: 代码动作列表
-
-    Returns:
-        格式化后的字符串
-    """
-    if not code_actions:
-        return "✅ 无可用动作"
-
-    lines = ["📋 可执行动作", ""]
-
-    for idx, action in enumerate(code_actions, 1):
-        preferred = " ⭐" if action.is_preferred else ""
-        lines.append(f"{idx}. {action.title}{preferred}")
-        lines.append(f"   类型: {action.kind}")
-        lines.append("")
-
-    return "\n".join(lines)
 
 
 def format_code_action_json(code_actions: list[CodeActionInfo]) -> str:
@@ -341,12 +217,6 @@ def folding_range_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
 ) -> None:
     """返回代码的可折叠范围
 
@@ -367,12 +237,6 @@ def hover_command(
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
     ),
 ) -> None:
     """获取符号的悬停信息
@@ -414,14 +278,11 @@ def hover_command(
         print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    # 输出结果
+    # 输出结果（默认 JSON 格式）
     if hover_info is None:
         print(f"ℹ️  在第 {line} 行第 {character} 列未找到符号")
     else:
-        if as_json:
-            print(format_hover_json(hover_info, file_path))
-        else:
-            print(format_hover_human(hover_info, file_path))
+        print(format_hover_json(hover_info, file_path))
 
 
 @app.command("symbol")
@@ -432,12 +293,6 @@ def symbol_command(
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
     ),
     kind: Optional[str] = typer.Option(
         None,
@@ -472,37 +327,8 @@ def symbol_command(
     if kind:
         symbols = [s for s in symbols if s.kind.lower() == kind.lower()]
 
-    # 输出结果（使用空字符串作为文件路径，因为符号可能来自多个文件）
-    if as_json:
-        print(format_symbols_json(symbols, ""))
-    else:
-        print(format_symbols_human(symbols, ""))
-
-
-def format_location_human(locations: list[LocationInfo]) -> str:
-    """格式化位置列表为人类可读格式
-
-    Args:
-        locations: 位置列表
-
-    Returns:
-        格式化后的字符串
-    """
-    if not locations:
-        return "\U0001f50d 未找到匹配的位置"
-
-    lines = [f"\U0001f50d 找到 {len(locations)} 个位置", ""]
-
-    for i, loc in enumerate(locations, 1):
-        # 优先显示符号名，如果存在则使用，否则使用 context
-        display_name = loc.symbol_name if loc.symbol_name else loc.context
-        lines.append(f"# {i}. {display_name}")
-        if loc.code_snippet:
-            lines.append("\n代码片段:")
-            lines.append(loc.code_snippet)
-        lines.append("")
-
-    return "\n".join(lines)
+    # 输出结果（使用空字符串作为文件路径，因为符号可能来自多个文件，默认 JSON 格式）
+    print(format_symbols_json(symbols, ""))
 
 
 def format_location_json(locations: list[LocationInfo]) -> str:
@@ -543,12 +369,6 @@ def definition_at_line_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
 ) -> None:
     """通过行号查找定义（自动查找该行的符号列号）
 
@@ -574,16 +394,11 @@ def definition_at_line_command(
         print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    if as_json:
-        if location is None:
-            print("[]")
-        else:
-            print(format_location_json([location]))
+    # 输出结果（默认 JSON 格式）
+    if location is None:
+        print("[]")
     else:
-        if location is None:
-            print("🔍 未找到定义")
-        else:
-            print(format_location_human([location]))
+        print(format_location_json([location]))
 
 
 @app.command("def-name")
@@ -637,12 +452,6 @@ def references_by_name_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
 ) -> None:
     """通过符号名查找引用
 
@@ -667,10 +476,8 @@ def references_by_name_command(
         print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    if as_json:
-        print(format_location_json(locations))
-    else:
-        print(format_location_human(locations))
+    # 输出结果（默认 JSON 格式）
+    print(format_location_json(locations))
 
 
 @app.command("impl-name")
@@ -682,12 +489,6 @@ def implementation_by_name_command(
         "--language",
         "-l",
         help="指定语言（如 python, rust, javascript）",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
     ),
 ) -> None:
     """通过符号名查找实现
@@ -713,10 +514,8 @@ def implementation_by_name_command(
         print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    if as_json:
-        print(format_location_json(locations))
-    else:
-        print(format_location_human(locations))
+    # 输出结果（默认 JSON 格式）
+    print(format_location_json(locations))
 
 
 @app.command("type-def-name")
@@ -786,7 +585,7 @@ def callers_by_name_command(
     project_path = os.getcwd()
     client = LSPDaemonClient()
 
-    async def run() -> list[LocationInfo]:
+    async def run() -> list[dict]:
         locations = await client.callers_by_name(
             language, project_path, file_path, symbol_name
         )
@@ -799,10 +598,7 @@ def callers_by_name_command(
         raise typer.Exit(code=1)
 
     # 默认输出 JSON 格式（供 LLM 使用）
-    if not locations:
-        print("[]")
-    else:
-        print(format_location_json(locations))
+    print(json.dumps(locations, indent=2, ensure_ascii=False))
 
 
 @app.command("diagnostic")
@@ -857,12 +653,6 @@ def code_action_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="输出 JSON 格式",
-    ),
 ) -> None:
     """获取代码动作（修复建议）
 
@@ -896,10 +686,8 @@ def code_action_command(
         print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    if as_json:
-        print(format_code_action_json(code_actions))
-    else:
-        print(format_code_action_human(code_actions))
+    # 输出结果（默认 JSON 格式）
+    print(format_code_action_json(code_actions))
 
 
 @app.command("codeAction-by-name")

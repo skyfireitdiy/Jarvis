@@ -59,6 +59,8 @@
    jlsp hover <file_path> <line> <column> --language <lang>
    ```
 
+   - **必须**：`--language` 参数是必填项，必须指定编程语言
+
    - **必须**：在需要理解符号的语义、类型、文档字符串时使用
    - **输出**：包含类型信息、参数说明、文档字符串等
 
@@ -67,8 +69,10 @@
 1. **diagnostic** - 获取代码诊断信息
 
    ```bash
-   jlsp diagnostic <file_path>
+   jlsp diagnostic <file_path> --language <lang>
    ```
+
+   - **必须**：`--language` 参数是必填项，必须指定编程语言
 
    - **必须**：在检查代码质量、查找错误时使用
    - **输出**：包含所有诊断信息（ERROR/WARNING/INFO/HINT）
@@ -77,8 +81,10 @@
 2. **codeAction-by-name** - 通过符号名获取修复建议（最适合 LLM）
 
    ```bash
-   jlsp codeAction-by-name <file_path> <symbol_name>
+   jlsp codeAction-by-name <file_path> <symbol_name> --language <lang>
    ```
+
+   - **必须**：`--language` 参数是必填项，必须指定编程语言
 
    - **必须**：LLM 优先使用此命令获取修复建议
    - **适用**：获取针对特定符号的修复、重构、优化建议
@@ -98,7 +104,7 @@
 
 - **必须**：优先使用基于符号名的命令（如 `def-name`、`codeAction-by-name`）
 - **必须**：避免使用需要精确列号的命令（LLM 不擅长处理精确的列号）
-- **必须**：使用 `--language` 参数指定编程语言（默认为 python）
+- **必须**：使用 `--language` 参数指定编程语言（必填项，无默认值）
 
 **使用流程**：
 
@@ -159,42 +165,42 @@
 
 ```bash
 # 1. 先了解文件结构
-jlsp document_symbols src/main.py
+jlsp document_symbols src/main.py --language python
 
 # 2. 查找某个函数的定义
-jlsp def-name src/main.py MyClass
+jlsp def-name src/main.py MyClass --language python
 
 # 3. 获取函数的详细信息
-jlsp hover src/main.py 10 5
+jlsp hover src/main.py 10 5 --language python
 
 # 4. 检查代码问题
-jlsp diagnostic src/main.py
+jlsp diagnostic src/main.py --language python
 
 # 5. 获取修复建议
-jlsp codeAction-by-name src/main.py MyClass
+jlsp codeAction-by-name src/main.py MyClass --language python
 ```
 
 ### 示例 2：查找所有引用
 
 ```bash
 # 1. 先获取符号列表
-jlsp document_symbols src/main.py
+jlsp document_symbols src/main.py --language python
 
 # 2. 查找符号的所有引用
-jlsp ref-name src/main.py MyClass
+jlsp ref-name src/main.py MyClass --language python
 ```
 
 ### 示例 3：查找函数调用的符号（被调用方）
 
 ```bash
 # 1. 先获取符号列表
-jlsp document_symbols src/main.py
+jlsp document_symbols src/main.py --language python
 
 # 2. 查找函数内部调用的所有符号
-jlsp callers-name src/main.py my_function
+jlsp callers-name src/main.py my_function --language python
 
-# 3. 使用 JSON 格式输出
-jlsp callers-name src/main.py my_function --json
+# 3. 使用 JSON 格式输出（默认）
+jlsp callers-name src/main.py my_function --language python
 ```
 
 **说明**：`callers-name` 命令用于分析指定函数内部调用了哪些其他符号，返回这些被调用符号的定义位置。这对于理解函数依赖关系非常有用。
@@ -202,10 +208,10 @@ jlsp callers-name src/main.py my_function --json
 ### 示例 4：JSON 输出格式
 
 ```bash
-# 获取结构化的 JSON 输出
-jlsp document_symbols src/main.py --json
-jlsp diagnostic src/main.py --json
-jlsp codeAction-by-name src/main.py MyClass --json
+# 获取结构化的 JSON 输出（默认）
+jlsp document_symbols src/main.py --language python
+jlsp diagnostic src/main.py --language python
+jlsp codeAction-by-name src/main.py MyClass --language python
 ```
 
 ## 常见问题和注意事项
@@ -361,7 +367,8 @@ codeAction-by-name → 应用修复方案
    ```
 
 4. **配置 jlsp 使用新的 LSP server**
-   - 如果使用 `--language` 参数，确保使用正确的 languageId
+   - **必须**：使用 `--language` 参数指定编程语言（必填项）
+   - 确保使用正确的 languageId
    - 常见 languageId：`python`, `rust`, `javascript`, `typescript`, `go`, `cpp`, `java`, etc.
    - 如果 LSP server 不在 PATH 中，需要设置绝对路径或添加到 PATH
 
@@ -411,6 +418,8 @@ codeAction-by-name → 应用修复方案
 jlsp document_symbols src/main.rs --language rust
 jlsp def-name src/main.rs MyStruct --language rust
 ```
+
+**注意**：`--language` 参数是必填项，所有命令都必须指定。
 
 ## 总结
 
