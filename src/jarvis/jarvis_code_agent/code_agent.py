@@ -1632,31 +1632,41 @@ def cli(
                         else:
                             PrettyOutput.auto_print("⚠️ 无法恢复会话。")
 
-                    user_input = get_multiline_input(
-                        "请输入你的需求（输入空行退出）"
-                    )
-                    if not user_input:
-                        raise typer.Exit(code=0)
+                    # 循环任务模式：持续接收用户输入
+                    while True:
+                        user_input = get_multiline_input(
+                            "请输入你的需求（输入空行退出）"
+                        )
+                        if not user_input:
+                            break
 
-                    # 使用当前 agent 执行任务
-                    output_content = agent.run(
-                        user_input, prefix=prefix, suffix=suffix
-                    )
-                    if agent.non_interactive:
-                        raise typer.Exit(code=0)
+                        # 使用当前 agent 执行任务
+                        output_content = agent.run(
+                            user_input, prefix=prefix, suffix=suffix
+                        )
 
-                    # 为下一次循环创建新的 agent 实例（避免任务间污染）
-                    agent = CodeAgent(
-                        need_summary=False,
-                        append_tools=append_tools,
-                        tool_group=tool_group,
-                        non_interactive=non_interactive,
-                        rule_names=rule_names,
-                        disable_review=disable_review,
-                        review_max_iterations=review_max_iterations,
-                        allow_savesession=True,
-                        optimize_system_prompt=optimize_system_prompt,
-                    )
+                        # 如果是内置命令处理（返回None），直接继续下一轮循环
+                        if output_content is None:
+                            continue
+
+                        if agent.non_interactive:
+                            break
+
+                        # 为下一次循环创建新的 agent 实例（避免任务间污染）
+                        agent = CodeAgent(
+                            need_summary=False,
+                            append_tools=append_tools,
+                            tool_group=tool_group,
+                            non_interactive=non_interactive,
+                            rule_names=rule_names,
+                            disable_review=disable_review,
+                            review_max_iterations=review_max_iterations,
+                            allow_savesession=True,
+                            optimize_system_prompt=optimize_system_prompt,
+                        )
+
+                    # 循环正常退出
+                    raise typer.Exit(code=0)
             except typer.Exit:
                 # 正常退出，设置成功状态
                 exit_code = 0
