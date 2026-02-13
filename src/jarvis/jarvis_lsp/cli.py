@@ -780,12 +780,6 @@ def diagnostic_command(
         "-l",
         help="指定语言（如 python, rust, javascript）",
     ),
-    severity: Optional[str] = typer.Option(
-        None,
-        "--severity",
-        "-s",
-        help="过滤严重级别（ERROR, WARNING, INFO, HINT）",
-    ),
     as_json: bool = typer.Option(
         False,
         "--json",
@@ -796,38 +790,28 @@ def diagnostic_command(
     """获取代码诊断信息
 
     检查文件的语法错误、lint 警告、类型错误、代码规范问题等。
+    返回所有诊断信息，LLM 可以根据 severity 字段自行过滤。
 
     示例:
     ```
     jlsp diagnostic src/main.py
-    jlsp diagnostic src/main.py --severity ERROR
     jlsp diagnostic src/main.py --json
     ```
 
     注意:
-    - 严重级别：ERROR(1), WARNING(2), INFO(3), HINT(4)
-    - 不指定 --severity 时显示所有诊断
-    - pylsp 需要配置才能提供诊断信息
+    - 返回所有诊断信息（ERROR, WARNING, INFO, HINT）
+    - pylsp 可能不支持诊断，会显示友好错误
     """
     # 自动检测语言
     if language is None:
         language = "python"
-
-    # 解析严重级别
-    severity_map = {
-        "ERROR": 1,
-        "WARNING": 2,
-        "INFO": 3,
-        "HINT": 4,
-    }
-    severity_filter = severity_map.get(severity.upper()) if severity else None
 
     project_path = os.getcwd()
     client = LSPDaemonClient()
 
     async def run() -> list[DiagnosticInfo]:
         diagnostics = await client.diagnostic(
-            language, project_path, file_path, severity_filter
+            language, project_path, file_path
         )
         return diagnostics
 
@@ -847,7 +831,6 @@ def diagnostic_command(
 def code_action_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
     line: int = typer.Argument(..., help="行号（0-based）"),
-    column: int = typer.Argument(..., help="列号（0-based）"),
     language: Optional[str] = typer.Option(
         None,
         "--language",
@@ -863,17 +846,18 @@ def code_action_command(
 ) -> None:
     """获取代码动作（修复建议）
 
-    获取针对指定位置的可执行动作，如修复错误、重构、优化等。
+    获取针对指定行的可执行动作，如修复错误、重构、优化等。
+    列号默认为 0，适合 LLM 使用。
 
     示例:
     ```
-    jlsp codeAction src/main.py 10 5
-    jlsp codeAction src/main.py 10 5 --json
+    jlsp codeAction src/main.py 10
+    jlsp codeAction src/main.py 10 --json
     ```
 
     注意:
-    - 需要先使用 `jlsp diagnostic <file>` 查看诊断问题
-    - line 和 column 是基于 0 的索引
+    - 只需要行号，列号默认为 0
+    - line 是基于 0 的索引
     - pylsp 可能不提供代码动作，会返回空列表
     """
     # 自动检测语言
@@ -885,7 +869,57 @@ def code_action_command(
 
     async def run() -> list[CodeActionInfo]:
         code_actions = await client.code_action(
-            language, project_path, file_path, line, column
+            language, project_path, file_path, line, 0
+        )
+        return code_actions
+
+    try:
+        code_actions = asyncio.run(run())
+    except RuntimeError as e:
+        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        raise typer.Exit(code=1)
+
+    if as_json:
+        PrettyOutput.auto_print(format_code_action_json(code_actions))
+    else:
+        PrettyOutput.auto_print(format_code_action_human(code_actions))
+
+
+@app.command("codeAction-by-name")
+def code_action_by_name_command(
+    file_path: str = typer.Argument(..., help="文件路径"),
+    symbol_name: str = typer.Argument(..., help="符号名称（函数名、类名等）"),
+    language: Optional[str] = typer.Option(
+        None, "--language", "-l", help="编程语言 (默认自动检测)"
+    ),
+    as_json: bool = typer.Option(False, "--json", "-j", help="输出 JSON 格式"),
+) -> None:
+    """通过符号名查找代码动作（修复建议）
+
+    获取针对指定符号的可执行动作，如修复错误、重构、优化等。
+    只需要知道符号名称，不需要精确的行列号，适合 LLM 使用。
+
+    示例:
+    ```
+    jlsp codeAction-by-name src/main.py MyClass
+    jlsp codeAction-by-name src/main.py "MyClass" --json
+    ```
+
+    注意:
+    - 需要先使用 `jlsp document_symbols <file>` 查看文件中的符号列表
+    - symbol_name 必须是文件中存在的符号名称
+    - pylsp 可能不提供代码动作，会返回空列表
+    """
+    # 自动检测语言
+    if language is None:
+        language = "python"
+
+    project_path = os.getcwd()
+    client = LSPDaemonClient()
+
+    async def run() -> list[CodeActionInfo]:
+        code_actions = await client.code_action_by_name(
+            language, project_path, file_path, symbol_name
         )
         return code_actions
 

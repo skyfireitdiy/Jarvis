@@ -168,6 +168,8 @@ class LSPDaemon:
             return await self.diagnostic(params)
         elif method == "code_action":
             return await self.code_action(params)
+        elif method == "code_action_by_name":
+            return await self.code_action_by_name(params)
         elif method == "definition":
             return await self.definition(params)
         elif method == "references":
@@ -486,6 +488,60 @@ class LSPDaemon:
 
         try:
             code_actions = await server.client.code_action(file_path, line, character)
+        except RuntimeError as e:
+            # 检查是否是方法不支持的错误
+            error_msg = str(e)
+            if "Method Not Found" in error_msg or "-32601" in error_msg:
+                return {
+                    "success": False,
+                    "error": f"LSP server does not support textDocument/codeAction method. {language} LSP server may not provide code actions.",
+                    "not_supported": True,
+                }
+            raise
+
+        return {
+            "success": True,
+            "code_actions": [
+                {
+                    "title": action.title,
+                    "kind": action.kind,
+                    "is_preferred": action.is_preferred,
+                }
+                for action in code_actions
+            ],
+        }
+
+    async def code_action_by_name(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """通过符号名获取代码动作信息"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+        symbol_name = params.get("symbol_name")
+
+        if not language or not project_path or not file_path:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path",
+            }
+
+        if not symbol_name:
+            return {
+                "success": False,
+                "error": "Missing required parameter: symbol_name",
+            }
+
+        server = await self.get_or_create_server(language, project_path)
+
+        if server.client is None:
+            return {
+                "success": False,
+                "error": "LSP server client not initialized",
+            }
+
+        try:
+            code_actions = await server.client.code_action_by_name(
+                file_path, symbol_name
+            )
         except RuntimeError as e:
             # 检查是否是方法不支持的错误
             error_msg = str(e)

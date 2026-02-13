@@ -1503,6 +1503,39 @@ class LSPClient:
         code_actions = self._parse_code_action(response.result)
         return code_actions
 
+    async def code_action_by_name(
+        self, file_path: str, symbol_name: str
+    ) -> List[CodeActionInfo]:
+        """通过符号名获取代码动作信息
+
+        Args:
+            file_path: 文件路径
+            symbol_name: 符号名称（函数名、类名等）
+
+        Returns:
+            代码动作列表
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
+        """
+        if not self._initialized:
+            raise RuntimeError("LSP client not initialized")
+
+        # 先打开文档
+        await self.open_document(file_path)
+
+        # 获取文档符号
+        symbols = await self.document_symbol(file_path)
+
+        # 查找匹配的符号
+        for symbol in symbols:
+            if symbol.name == symbol_name:
+                # 找到符号，获取其位置的代码动作
+                return await self.code_action(file_path, symbol.line, 0)
+
+        # 未找到符号，返回空列表
+        return []
+
     def _parse_diagnostic(
         self, result: Any, severity_filter: Optional[int] = None
     ) -> List[DiagnosticInfo]:
