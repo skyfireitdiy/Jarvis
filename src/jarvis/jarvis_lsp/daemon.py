@@ -168,6 +168,8 @@ class LSPDaemon:
             return await self.implementation(params)
         elif method == "type_definition":
             return await self.type_definition(params)
+        elif method == "definition_at_line":
+            return await self.definition_at_line(params)
         elif method == "definition_by_name":
             return await self.definition_by_name(params)
         elif method == "references_by_name":
@@ -372,11 +374,9 @@ class LSPDaemon:
                 "line": first_location.line,
                 "column": first_location.column,
                 "uri": first_location.uri,
-                # code_snippet 暂时不返回，避免 JSON 序列化问题
-                # "code_snippet": first_location.code_snippet,
+                "code_snippet": first_location.code_snippet,
                 "symbol_name": first_location.symbol_name,
-                # context 暂时不返回，避免 JSON 序列化问题
-                # "context": first_location.context,
+                "context": first_location.context,
             },
         }
 
@@ -534,11 +534,9 @@ class LSPDaemon:
                 "line": first_location.line,
                 "column": first_location.column,
                 "uri": first_location.uri,
-                # code_snippet 暂时不返回，避免 JSON 序列化问题
-                # "code_snippet": first_location.code_snippet,
+                "code_snippet": first_location.code_snippet,
                 "symbol_name": first_location.symbol_name,
-                # context 暂时不返回，避免 JSON 序列化问题
-                # "context": first_location.context,
+                "context": first_location.context,
             },
         }
 
@@ -627,6 +625,68 @@ class LSPDaemon:
                 "file_path": file_path,
                 "line": symbol["line"],
                 "column": symbol["column"],
+            }
+        )
+
+    async def definition_at_line(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """通过行号查找定义（自动查找该行的符号列号）"""
+        language = params.get("language")
+        project_path = params.get("project_path")
+        file_path = params.get("file_path")
+        line = params.get("line")
+        symbol_name = params.get("symbol_name")  # 可选，用于精确匹配
+
+        if not language or not project_path or not file_path or line is None:
+            return {
+                "success": False,
+                "error": "Missing required parameters: language, project_path, file_path, line",
+            }
+
+        # 获取文件中的符号列表
+        symbols_result = await self.document_symbol(
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+            }
+        )
+
+        if not symbols_result.get("success"):
+            return symbols_result
+
+        symbols = symbols_result.get("symbols", [])
+
+        # 查找该行的符号
+        line_symbols = [s for s in symbols if s["line"] == line]
+
+        if not line_symbols:
+            return {
+                "success": False,
+                "error": f"No symbol found at line {line}",
+            }
+
+        # 如果提供了符号名，精确匹配
+        if symbol_name:
+            matched = [s for s in line_symbols if s["name"] == symbol_name]
+            if matched:
+                target_symbol = matched[0]
+            else:
+                return {
+                    "success": False,
+                    "error": f"Symbol '{symbol_name}' not found at line {line}",
+                }
+        else:
+            # 没有提供符号名，选择第一个符号
+            target_symbol = line_symbols[0]
+
+        # 调用 definition 方法查找定义
+        return await self.definition(
+            {
+                "language": language,
+                "project_path": project_path,
+                "file_path": file_path,
+                "line": target_symbol["line"],
+                "column": target_symbol["column"],
             }
         )
 
