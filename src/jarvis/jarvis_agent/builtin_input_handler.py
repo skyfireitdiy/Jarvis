@@ -450,9 +450,9 @@ def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
     for group_name, group_config in model_groups.items():
         if isinstance(group_config, dict):
             # 获取各平台的模型名称
-            smart_model = group_config.get("smart_model", "-")
-            normal_model = group_config.get("model", "-")
-            cheap_model = group_config.get("cheap_model", "-")
+            smart_model = group_config.get("smart_llm", "-")
+            normal_model = group_config.get("normal_llm", "-")
+            cheap_model = group_config.get("cheap_llm", "-")
             groups.append((group_name, smart_model, normal_model, cheap_model))
 
     return groups
