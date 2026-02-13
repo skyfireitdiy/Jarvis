@@ -941,6 +941,59 @@ class LSPClient:
 
         return None
 
+    def _find_symbol_in_line(self, file_path: str, line: int, symbol_name: str) -> Optional[int]:
+        """在指定行中查找符号名的位置
+
+        Args:
+            file_path: 文件路径
+            line: 行号（0-based）
+            symbol_name: 符号名称
+
+        Returns:
+            符号名的列号（0-based），如果找不到返回 None
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            if line < 0 or line >= len(lines):
+                return None
+
+            line_text = lines[line]
+
+            # 尝试查找符号名的位置
+            # 支持多种模式：def name, class name, name =, from name, import name 等
+            import re
+            patterns = [
+                # 函数定义：def name(... 或 async def name(...
+                rf"def\s+\*?{re.escape(symbol_name)}\b",
+                rf"async\s+def\s+\*?{re.escape(symbol_name)}\b",
+                # 类定义：class name(...
+                rf"class\s+{re.escape(symbol_name)}\b",
+                # 变量赋值：name = 或 name: =
+                rf"{re.escape(symbol_name)}\s*=",
+                rf"{re.escape(symbol_name)}\s*:\s*=",
+                # 导入：import name 或 from module import name
+                rf"import\s+{re.escape(symbol_name)}\b",
+                rf"from\s+\w+\s+import\s+{re.escape(symbol_name)}\b",
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, line_text)
+                if match:
+                    # 找到符号名的起始位置
+                    return match.start()
+
+            # 如果上面的模式都匹配不上，直接查找符号名
+            # 使用单词边界确保精确匹配
+            match = re.search(rf"\b{re.escape(symbol_name)}\b", line_text)
+            if match:
+                return match.start()
+
+            return None
+        except Exception:
+            return None
+
     def _parse_locations(self, result: Any) -> List[LocationInfo]:
         """解析 LSP Location 列表
 
@@ -987,15 +1040,37 @@ class LSPClient:
             kind = item.get("kind")
 
             # 位置信息可能在 location.range 或直接在 range
+            # 优先使用 selectionRange（符号名称的范围），如果不存在则使用 range
             location = item.get("location", {})
             if "range" in location:
                 range_info = location["range"]
             else:
                 range_info = item.get("range", {})
-
-            start = range_info.get("start", {})
+            
+            # LSP DocumentSymbol 有 selectionRange 字段，表示符号名称的范围
+            # 这比 range 更精确（range 可能包含整个定义，selectionRange 只是符号名）
+            selection_range = item.get("selectionRange")
+            if selection_range:
+                # 使用 selectionRange 获取符号名称的精确位置
+                start = selection_range.get("start", {})
+            else:
+                # 如果没有 selectionRange，尝试使用 range
+                start = range_info.get("start", {})
+            
             line = start.get("line", 0)
             column = start.get("character", 0)
+
+            # 如果列号为 0，尝试在目标行中查找符号名
+            # pylsp 可能不返回 selectionRange，导致列号总是 0
+            if column == 0 and name:
+                # 尝试从 range 中获取文件路径
+                uri = location.get("uri", "")
+                if uri:
+                    file_path = self._uri_to_path(uri)
+                    # 读取目标行内容，查找符号名
+                    found_column = self._find_symbol_in_line(file_path, line, name)
+                    if found_column is not None:
+                        column = found_column
 
             # LSP SymbolKind 映射
             kind_map: dict[int, str] = {

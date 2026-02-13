@@ -365,7 +365,7 @@ class LSPDaemon:
         if not locations:
             return {"success": True, "location": None}
 
-        # 返回第一个位置（不包含 code_snippet 以避免 JSON 序列化问题）
+        # 返回第一个位置（不包含 code_snippet 和 context 以避免 JSON 序列化问题）
         first_location = locations[0]
         return {
             "success": True,
@@ -374,9 +374,9 @@ class LSPDaemon:
                 "line": first_location.line,
                 "column": first_location.column,
                 "uri": first_location.uri,
-                "code_snippet": first_location.code_snippet,
                 "symbol_name": first_location.symbol_name,
-                "context": first_location.context,
+                # "code_snippet": first_location.code_snippet,
+                # "context": first_location.context,
             },
         }
 
@@ -525,7 +525,7 @@ class LSPDaemon:
         if not locations:
             return {"success": True, "location": None}
 
-        # 返回第一个位置（不包含 code_snippet 以避免 JSON 序列化问题）
+        # 返回第一个位置（不包含 code_snippet 和 context 以避免 JSON 序列化问题）
         first_location = locations[0]
         return {
             "success": True,
@@ -534,9 +534,9 @@ class LSPDaemon:
                 "line": first_location.line,
                 "column": first_location.column,
                 "uri": first_location.uri,
-                "code_snippet": first_location.code_snippet,
                 "symbol_name": first_location.symbol_name,
-                "context": first_location.context,
+                # "code_snippet": first_location.code_snippet,
+                # "context": first_location.context,
             },
         }
 
@@ -634,12 +634,12 @@ class LSPDaemon:
         project_path = params.get("project_path")
         file_path = params.get("file_path")
         line = params.get("line")
-        symbol_name = params.get("symbol_name")  # 可选，用于精确匹配
+        symbol_name = params.get("symbol_name")  # 必填，用于精确匹配
 
-        if not language or not project_path or not file_path or line is None:
+        if not language or not project_path or not file_path or line is None or not symbol_name:
             return {
                 "success": False,
-                "error": "Missing required parameters: language, project_path, file_path, line",
+                "error": "Missing required parameters: language, project_path, file_path, line, symbol_name",
             }
 
         # 获取文件中的符号列表
@@ -665,20 +665,33 @@ class LSPDaemon:
                 "error": f"No symbol found at line {line}",
             }
 
-        # 如果提供了符号名，精确匹配
-        if symbol_name:
-            matched = [s for s in line_symbols if s["name"] == symbol_name]
-            if matched:
-                target_symbol = matched[0]
-            else:
-                return {
-                    "success": False,
-                    "error": f"Symbol '{symbol_name}' not found at line {line}",
-                }
+        # 使用符号名精确匹配
+        matched = [s for s in line_symbols if s["name"] == symbol_name]
+        if matched:
+            target_symbol = matched[0]
         else:
-            # 没有提供符号名，选择第一个符号
-            target_symbol = line_symbols[0]
+            return {
+                "success": False,
+                "error": f"Symbol '{symbol_name}' not found at line {line}",
+            }
 
+        # 如果列号为 0，自动查找符号在该行的实际位置
+        column = target_symbol["column"]
+        if column == 0:
+            try:
+                # 读取文件内容，查找符号在该行的实际列号
+                import asyncio
+                from pathlib import Path
+                content_text = await asyncio.to_thread(Path(file_path).read_text)
+                lines = content_text.splitlines()
+                if line < len(lines):
+                    line_content = lines[line]
+                    symbol_pos = line_content.find(target_symbol["name"])
+                    if symbol_pos != -1:
+                        column = symbol_pos
+            except Exception:
+                pass  # 如果查找失败，使用原始列号
+        
         # 调用 definition 方法查找定义
         return await self.definition(
             {
@@ -686,7 +699,7 @@ class LSPDaemon:
                 "project_path": project_path,
                 "file_path": file_path,
                 "line": target_symbol["line"],
-                "column": target_symbol["column"],
+                "column": column,
             }
         )
 
