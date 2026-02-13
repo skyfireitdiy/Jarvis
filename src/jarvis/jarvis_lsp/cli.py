@@ -12,6 +12,12 @@ import typer
 
 from jarvis.jarvis_lsp import __version__
 from jarvis.jarvis_lsp.client import LocationInfo, SymbolInfo
+from jarvis.jarvis_lsp.protocol import (
+    CodeActionInfo,
+    DiagnosticInfo,
+    FoldingRangeInfo,
+    HoverInfo,
+)
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.daemon_client import LSPDaemonClient
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -70,6 +76,201 @@ def format_symbols_json(symbols: list[SymbolInfo], file_path: str) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
+def format_folding_ranges_human(ranges: list[FoldingRangeInfo], file_path: str) -> str:
+    """格式化可折叠范围为人类可读格式
+
+    Args:
+        ranges: 可折叠范围列表
+        file_path: 文件路径
+
+    Returns:
+        格式化后的字符串
+    """
+    lines = [f"📋 可折叠范围 ({file_path})", ""]
+
+    for range in ranges:
+        kind_str = f" [{range.kind}]" if range.kind else ""
+        lines.append(f"第 {range.start_line + 1} 行 - 第 {range.end_line + 1} 行{kind_str}")
+        if range.collapsed_text:
+            lines.append(f"  折叠文本: {range.collapsed_text}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def format_folding_ranges_json(ranges: list[FoldingRangeInfo], file_path: str) -> str:
+    """格式化可折叠范围为 JSON 格式
+
+    Args:
+        ranges: 可折叠范围列表
+        file_path: 文件路径
+
+    Returns:
+        JSON 字符串
+    """
+    data = {
+        "file": file_path,
+        "folding_ranges": [
+            {
+                "start_line": r.start_line,
+                "start_character": r.start_character,
+                "end_line": r.end_line,
+                "end_character": r.end_character,
+                "kind": r.kind,
+                "collapsed_text": r.collapsed_text,
+            }
+            for r in ranges
+        ],
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
+def format_hover_human(hover_info: HoverInfo, file_path: str) -> str:
+    """格式化悬停信息为人类可读格式
+
+    Args:
+        hover_info: 悬停信息
+        file_path: 文件路径
+
+    Returns:
+        格式化后的字符串
+    """
+    lines = [f"📋 符号信息 ({file_path})", ""]
+    lines.append(f"📍 位置: 第 {hover_info.line + 1} 行，第 {hover_info.character + 1} 列")
+    lines.append("")
+    lines.append("📝 文档:")
+    lines.append(hover_info.contents)
+    return "\n".join(lines)
+
+
+def format_hover_json(hover_info: HoverInfo, file_path: str) -> str:
+    """格式化悬停信息为 JSON 格式
+
+    Args:
+        hover_info: 悬停信息
+        file_path: 文件路径
+
+    Returns:
+        JSON 字符串
+    """
+    data = {
+        "file": file_path,
+        "hover_info": {
+            "contents": hover_info.contents,
+            "range": hover_info.range,
+            "line": hover_info.line,
+            "character": hover_info.character,
+        },
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
+def format_diagnostic_human(diagnostics: list[DiagnosticInfo], file_path: str) -> str:
+    """格式化诊断信息为人类可读格式
+
+    Args:
+        diagnostics: 诊断信息列表
+        file_path: 文件路径
+
+    Returns:
+        格式化后的字符串
+    """
+    if not diagnostics:
+        return f"✅ 无诊断问题 ({file_path})"
+
+    lines = [f"📋 诊断信息 ({file_path})", ""]
+
+    for diag in diagnostics:
+        # 严重级别
+        severity_map = {
+            1: "❌ 错误",
+            2: "⚠️  警告",
+            3: "ℹ️  信息",
+            4: "💡 提示",
+        }
+        severity_label = severity_map.get(diag.severity, f"{diag.severity}")
+
+        lines.append(f"{severity_label} [{diag.source}]")
+        lines.append(f"  位置: 第 {diag.range[0] + 1} 行，第 {diag.range[1] + 1} 列")
+        if diag.code:
+            lines.append(f"  代码: {diag.code}")
+        lines.append(f"  消息: {diag.message}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def format_diagnostic_json(diagnostics: list[DiagnosticInfo], file_path: str) -> str:
+    """格式化诊断信息为 JSON 格式
+
+    Args:
+        diagnostics: 诊断信息列表
+        file_path: 文件路径
+
+    Returns:
+        JSON 字符串
+    """
+    data = {
+        "file": file_path,
+        "diagnostics": [
+            {
+                "range": diag.range,
+                "severity": diag.severity,
+                "code": diag.code,
+                "source": diag.source,
+                "message": diag.message,
+            }
+            for diag in diagnostics
+        ],
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
+def format_code_action_human(code_actions: list[CodeActionInfo]) -> str:
+    """格式化代码动作为人类可读格式
+
+    Args:
+        code_actions: 代码动作列表
+
+    Returns:
+        格式化后的字符串
+    """
+    if not code_actions:
+        return "✅ 无可用动作"
+
+    lines = ["📋 可执行动作", ""]
+
+    for idx, action in enumerate(code_actions, 1):
+        preferred = " ⭐" if action.is_preferred else ""
+        lines.append(f"{idx}. {action.title}{preferred}")
+        lines.append(f"   类型: {action.kind}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def format_code_action_json(code_actions: list[CodeActionInfo]) -> str:
+    """格式化代码动作为 JSON 格式
+
+    Args:
+        code_actions: 代码动作列表
+
+    Returns:
+        JSON 字符串
+    """
+    data = {
+        "code_actions": [
+            {
+                "title": action.title,
+                "kind": action.kind,
+                "is_preferred": action.is_preferred,
+            }
+            for action in code_actions
+        ],
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
 @app.command("document_symbols")
 def document_symbols_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
@@ -99,6 +300,59 @@ def document_symbols_command(
     注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 document/symbol 功能。
     如果服务器不支持此功能或响应超时，命令会失败。
     """
+
+
+@app.command("folding_range")
+def folding_range_command(
+    file_path: str = typer.Argument(..., help="目标文件路径"),
+    language: Optional[str] = typer.Option(
+        None,
+        "--language",
+        "-l",
+        help="指定语言（如 python, rust, javascript）",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="以 JSON 格式输出",
+    ),
+) -> None:
+    """返回代码的可折叠范围
+
+    返回指定文件中可以折叠的代码块范围，辅助识别代码块边界。
+
+    注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 textDocument/foldingRange 功能。
+    如果服务器不支持此功能或响应超时，命令会失败。
+    """
+
+
+@app.command("hover")
+def hover_command(
+    file_path: str = typer.Argument(..., help="目标文件路径"),
+    line: int = typer.Argument(..., help="行号（从1开始）"),
+    character: int = typer.Argument(..., help="列号（从1开始）"),
+    language: Optional[str] = typer.Option(
+        None,
+        "--language",
+        "-l",
+        help="指定语言（如 python, rust, javascript）",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="以 JSON 格式输出",
+    ),
+) -> None:
+    """获取符号的悬停信息
+
+    获取指定位置符号的悬停信息，包括注释、类型、参数说明、文档字符串等。
+    此功能为 LLM 补充代码的语义信息，避免解析原始代码。
+
+    注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 textDocument/hover 功能。
+    如果服务器不支持此功能或响应超时，命令会失败。
+    """
     # 读取配置
     config_reader = LSPConfigReader()
 
@@ -120,30 +374,35 @@ def document_symbols_command(
         )
         raise typer.Exit(code=1)
 
+    # 转换为 0-based 索引
+    line_0based = line - 1
+    character_0based = character - 1
+
     project_path = os.getcwd()
     client = LSPDaemonClient()
 
     # 运行异步任务（使用守护进程）
-    async def run() -> list[SymbolInfo]:
-        # 通过守护进程获取文档符号
-        symbols = await client.document_symbol(language, project_path, file_path)
-        return symbols
+    async def run() -> Optional[HoverInfo]:
+        # 通过守护进程获取悬停信息
+        hover_info = await client.hover(
+            language, project_path, file_path, line_0based, character_0based
+        )
+        return hover_info
 
     try:
-        symbols = asyncio.run(run())
+        hover_info = asyncio.run(run())
     except RuntimeError as e:
         PrettyOutput.auto_print(f"❌ 错误: {e}")
         raise typer.Exit(code=1)
 
-    # 过滤符号类型
-    if kind:
-        symbols = [s for s in symbols if s.kind.lower() == kind.lower()]
-
     # 输出结果
-    if as_json:
-        PrettyOutput.auto_print(format_symbols_json(symbols, file_path))
+    if hover_info is None:
+        PrettyOutput.auto_print(f"ℹ️  在第 {line} 行第 {character} 列未找到符号")
     else:
-        PrettyOutput.auto_print(format_symbols_human(symbols, file_path))
+        if as_json:
+            PrettyOutput.auto_print(format_hover_json(hover_info, file_path))
+        else:
+            PrettyOutput.auto_print(format_hover_human(hover_info, file_path))
 
 
 @app.command("symbol")
@@ -253,226 +512,6 @@ def format_location_json(locations: list[LocationInfo]) -> str:
         ],
     }
     return json.dumps(data, indent=2, ensure_ascii=False)
-
-
-@app.command("definition")
-def definition_command(
-    file_path: str = typer.Argument(..., help="目标文件路径"),
-    line: int = typer.Argument(..., help="行号（从1开始）"),
-    column: int = typer.Argument(1, help="列号（从0开始，默认为1）"),
-    language: Optional[str] = typer.Option(
-        None,
-        "--language",
-        "-l",
-        help="指定语言（如 python, rust, javascript）",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
-) -> None:
-    """跳转到定义
-
-    在指定位置查找符号的定义位置。
-
-    注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 textDocument/definition 功能。
-    如果服务器不支持此功能或响应超时，命令会失败。
-    """
-    # 如果没有指定语言，默认使用 python
-    if language is None:
-        language = "python"
-
-    project_path = os.getcwd()
-    client = LSPDaemonClient()
-
-    async def run() -> LocationInfo | None:
-        # 通过守护进程获取定义
-        location = await client.definition(
-            language, project_path, file_path, line - 1, column
-        )
-        return location
-
-    try:
-        location = asyncio.run(run())
-    except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
-        raise typer.Exit(code=1)
-
-    # 输出结果（daemon_client 返回单个位置或 None）
-    if as_json:
-        if location is None:
-            PrettyOutput.auto_print("[]")
-        else:
-            PrettyOutput.auto_print(format_location_json([location]))
-    else:
-        if location is None:
-            PrettyOutput.auto_print("\U0001f50d 未找到定义")
-        else:
-            PrettyOutput.auto_print(format_location_human([location]))
-
-
-@app.command("references")
-def references_command(
-    file_path: str = typer.Argument(..., help="目标文件路径"),
-    line: int = typer.Argument(..., help="行号（从1开始）"),
-    column: int = typer.Argument(1, help="列号（从0开始，默认为1）"),
-    language: Optional[str] = typer.Option(
-        None,
-        "--language",
-        "-l",
-        help="指定语言（如 python, rust, javascript）",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
-) -> None:
-    """查找所有引用
-
-    查找指定位置符号的所有引用位置。
-
-    注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 textDocument/references 功能。
-    如果服务器不支持此功能或响应超时，命令会失败。
-    """
-    # 如果没有指定语言，默认使用 python
-    if language is None:
-        language = "python"
-
-    project_path = os.getcwd()
-    client = LSPDaemonClient()
-
-    async def run() -> list[LocationInfo]:
-        # 通过守护进程获取引用
-        locations = await client.references(
-            language, project_path, file_path, line - 1, column
-        )
-        return locations
-
-    try:
-        locations = asyncio.run(run())
-    except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
-        raise typer.Exit(code=1)
-
-    # 输出结果
-    if as_json:
-        PrettyOutput.auto_print(format_location_json(locations))
-    else:
-        PrettyOutput.auto_print(format_location_human(locations))
-
-
-@app.command("implementation")
-def implementation_command(
-    file_path: str = typer.Argument(..., help="目标文件路径"),
-    line: int = typer.Argument(..., help="行号（从1开始）"),
-    column: int = typer.Argument(1, help="列号（从0开始，默认为1）"),
-    language: Optional[str] = typer.Option(
-        None,
-        "--language",
-        "-l",
-        help="指定语言（如 python, rust, javascript）",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
-) -> None:
-    """查找实现
-
-    查找指定接口或抽象方法的所有实现位置。
-
-    注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 textDocument/implementation 功能。
-    如果服务器不支持此功能或响应超时，命令会失败。
-    """
-    # 如果没有指定语言，默认使用 python
-    if language is None:
-        language = "python"
-
-    project_path = os.getcwd()
-    client = LSPDaemonClient()
-
-    async def run() -> list[LocationInfo]:
-        # 通过守护进程获取实现
-        locations = await client.implementation(
-            language, project_path, file_path, line - 1, column
-        )
-        return locations
-
-    try:
-        locations = asyncio.run(run())
-    except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
-        raise typer.Exit(code=1)
-
-    # 输出结果
-    if as_json:
-        PrettyOutput.auto_print(format_location_json(locations))
-    else:
-        PrettyOutput.auto_print(format_location_human(locations))
-
-
-@app.command("type_definition")
-def type_definition_command(
-    file_path: str = typer.Argument(..., help="目标文件路径"),
-    line: int = typer.Argument(..., help="行号（从1开始）"),
-    column: int = typer.Argument(1, help="列号（从0开始，默认为1）"),
-    language: Optional[str] = typer.Option(
-        None,
-        "--language",
-        "-l",
-        help="指定语言（如 python, rust, javascript）",
-    ),
-    as_json: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="以 JSON 格式输出",
-    ),
-) -> None:
-    """查找类型定义
-
-    查找指定位置符号的类型定义位置。
-
-    注意：此功能依赖于 LSP 守护进程和 LSP 服务器的 textDocument/typeDefinition 功能。
-    如果服务器不支持此功能或响应超时，命令会失败。
-    """
-    # 如果没有指定语言，默认使用 python
-    if language is None:
-        language = "python"
-
-    project_path = os.getcwd()
-    client = LSPDaemonClient()
-
-    async def run() -> LocationInfo | None:
-        # 通过守护进程获取类型定义
-        location = await client.type_definition(
-            language, project_path, file_path, line - 1, column
-        )
-        return location
-
-    try:
-        location = asyncio.run(run())
-    except RuntimeError as e:
-        PrettyOutput.auto_print(f"❌ 错误: {e}")
-        raise typer.Exit(code=1)
-
-    # 输出结果（daemon_client 返回单个位置或 None）
-    if as_json:
-        if location is None:
-            PrettyOutput.auto_print("[]")
-        else:
-            PrettyOutput.auto_print(format_location_json([location]))
-    else:
-        if location is None:
-            PrettyOutput.auto_print("\U0001f50d 未找到类型定义")
-        else:
-            PrettyOutput.auto_print(format_location_human([location]))
 
 
 @app.command("def-at")
@@ -730,6 +769,136 @@ def type_definition_by_name_command(
         PrettyOutput.auto_print(format_location_json([location]))
     else:
         PrettyOutput.auto_print(format_location_human([location]))
+
+
+@app.command("diagnostic")
+def diagnostic_command(
+    file_path: str = typer.Argument(..., help="目标文件路径"),
+    language: Optional[str] = typer.Option(
+        None,
+        "--language",
+        "-l",
+        help="指定语言（如 python, rust, javascript）",
+    ),
+    severity: Optional[str] = typer.Option(
+        None,
+        "--severity",
+        "-s",
+        help="过滤严重级别（ERROR, WARNING, INFO, HINT）",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="输出 JSON 格式",
+    ),
+) -> None:
+    """获取代码诊断信息
+
+    检查文件的语法错误、lint 警告、类型错误、代码规范问题等。
+
+    示例:
+    ```
+    jlsp diagnostic src/main.py
+    jlsp diagnostic src/main.py --severity ERROR
+    jlsp diagnostic src/main.py --json
+    ```
+
+    注意:
+    - 严重级别：ERROR(1), WARNING(2), INFO(3), HINT(4)
+    - 不指定 --severity 时显示所有诊断
+    - pylsp 需要配置才能提供诊断信息
+    """
+    # 自动检测语言
+    if language is None:
+        language = "python"
+
+    # 解析严重级别
+    severity_map = {
+        "ERROR": 1,
+        "WARNING": 2,
+        "INFO": 3,
+        "HINT": 4,
+    }
+    severity_filter = severity_map.get(severity.upper()) if severity else None
+
+    project_path = os.getcwd()
+    client = LSPDaemonClient()
+
+    async def run() -> list[DiagnosticInfo]:
+        diagnostics = await client.diagnostic(
+            language, project_path, file_path, severity_filter
+        )
+        return diagnostics
+
+    try:
+        diagnostics = asyncio.run(run())
+    except RuntimeError as e:
+        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        raise typer.Exit(code=1)
+
+    if as_json:
+        PrettyOutput.auto_print(format_diagnostic_json(diagnostics, file_path))
+    else:
+        PrettyOutput.auto_print(format_diagnostic_human(diagnostics, file_path))
+
+
+@app.command("codeAction")
+def code_action_command(
+    file_path: str = typer.Argument(..., help="目标文件路径"),
+    line: int = typer.Argument(..., help="行号（0-based）"),
+    column: int = typer.Argument(..., help="列号（0-based）"),
+    language: Optional[str] = typer.Option(
+        None,
+        "--language",
+        "-l",
+        help="指定语言（如 python, rust, javascript）",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="输出 JSON 格式",
+    ),
+) -> None:
+    """获取代码动作（修复建议）
+
+    获取针对指定位置的可执行动作，如修复错误、重构、优化等。
+
+    示例:
+    ```
+    jlsp codeAction src/main.py 10 5
+    jlsp codeAction src/main.py 10 5 --json
+    ```
+
+    注意:
+    - 需要先使用 `jlsp diagnostic <file>` 查看诊断问题
+    - line 和 column 是基于 0 的索引
+    - pylsp 可能不提供代码动作，会返回空列表
+    """
+    # 自动检测语言
+    if language is None:
+        language = "python"
+
+    project_path = os.getcwd()
+    client = LSPDaemonClient()
+
+    async def run() -> list[CodeActionInfo]:
+        code_actions = await client.code_action(
+            language, project_path, file_path, line, column
+        )
+        return code_actions
+
+    try:
+        code_actions = asyncio.run(run())
+    except RuntimeError as e:
+        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        raise typer.Exit(code=1)
+
+    if as_json:
+        PrettyOutput.auto_print(format_code_action_json(code_actions))
+    else:
+        PrettyOutput.auto_print(format_code_action_human(code_actions))
 
 
 @app.command("version")

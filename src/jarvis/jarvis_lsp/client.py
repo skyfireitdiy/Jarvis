@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from jarvis.jarvis_lsp.protocol import (
+    CodeActionInfo,
+    DiagnosticInfo,
+    FoldingRangeInfo,
+    HoverInfo,
     LSPMessageCodec,
     LSPNotification,
     LSPRequest,
@@ -278,6 +282,150 @@ class LSPClient:
         )
 
         await self._send_notification(notification)
+
+    async def folding_range(self, file_path: str) -> List[FoldingRangeInfo]:
+        """获取代码折叠范围
+
+        Args:
+            file_path: 文件路径
+
+        Returns:
+            折叠范围信息列表
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
+        """
+        if not self._initialized:
+            raise RuntimeError("LSP client not initialized")
+
+        # 先打开文档
+        await self.open_document(file_path)
+
+        # 类型断言：open_document 确保了 process 已初始化
+        if self.process is None:
+            raise RuntimeError("LSP server process is not initialized")
+
+        path = Path(file_path).resolve()
+        uri = f"file://{path}"
+
+        # 发送 foldingRange 请求
+        request = LSPRequest(
+            jsonrpc="2.0",
+            id=self._next_id(),
+            method="textDocument/foldingRange",
+            params={
+                "textDocument": {
+                    "uri": uri,
+                }
+            },
+        )
+
+        await self._send_request(request)
+
+        # 检查进程是否还在运行
+        await asyncio.sleep(0.5)
+        if self.process.returncode is not None:
+            # 进程已退出，读取 stderr 错误信息
+            if self.process.stderr:
+                stderr_output = await self.process.stderr.read()
+                error_msg = stderr_output.decode("utf-8", errors="ignore")
+            else:
+                error_msg = "No stderr output available"
+            raise RuntimeError(
+                f"LSP server '{' '.join([self.command] + self.args)}' crashed after sending initialize request\n"
+                f"Exit code: {self.process.returncode}\n"
+                f"Error: {error_msg}"
+            )
+
+        try:
+            response = await self._read_response(timeout=30.0)
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                "LSP server initialization timed out after 30 seconds. "
+                "The server may be unresponsive or slow to start."
+            )
+
+        if response.error:
+            raise RuntimeError(f"Folding range request failed: {response.error}")
+
+        # 解析折叠范围
+        folding_ranges = self._parse_folding_ranges(response.result)
+        return folding_ranges
+
+    async def hover(self, file_path: str, line: int, character: int) -> Optional[HoverInfo]:
+        """获取符号悬停信息
+
+        Args:
+            file_path: 文件路径
+            line: 行号（0-based）
+            character: 列号（0-based）
+
+        Returns:
+            悬停信息，如果位置没有符号则返回 None
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
+        """
+        if not self._initialized:
+            raise RuntimeError("LSP client not initialized")
+
+        # 先打开文档
+        await self.open_document(file_path)
+
+        # 类型断言：open_document 确保了 process 已初始化
+        if self.process is None:
+            raise RuntimeError("LSP server process is not initialized")
+
+        path = Path(file_path).resolve()
+        uri = f"file://{path}"
+
+        # 发送 hover 请求
+        request = LSPRequest(
+            jsonrpc="2.0",
+            id=self._next_id(),
+            method="textDocument/hover",
+            params={
+                "textDocument": {
+                    "uri": uri,
+                },
+                "position": {
+                    "line": line,
+                    "character": character,
+                },
+            },
+        )
+
+        await self._send_request(request)
+
+        # 检查进程是否还在运行
+        await asyncio.sleep(0.5)
+        if self.process.returncode is not None:
+            # 进程已退出，读取 stderr 错误信息
+            if self.process.stderr:
+                stderr_output = await self.process.stderr.read()
+                error_msg = stderr_output.decode("utf-8", errors="ignore")
+            else:
+                error_msg = "No stderr output available"
+            raise RuntimeError(
+                f"LSP server '{' '.join([self.command] + self.args)}' crashed after sending hover request\n"
+                f"Exit code: {self.process.returncode}\n"
+                f"Error: {error_msg}"
+            )
+
+        try:
+            response = await self._read_response(timeout=30.0)
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                "LSP server hover request timed out after 30 seconds. "
+                "The server may be unresponsive or slow to start."
+            )
+
+        if response.error:
+            raise RuntimeError(f"Hover request failed: {response.error}")
+
+        # 解析悬停信息
+        hover_info = self._parse_hover(response.result, file_path, line, character)
+        return hover_info
 
     async def document_symbol(self, file_path: str) -> List[SymbolInfo]:
         """获取文档符号
@@ -903,6 +1051,80 @@ class LSPClient:
         except Exception:
             return None
 
+    def _parse_hover(
+        self, result: Any, file_path: str, line: int, character: int
+    ) -> Optional[HoverInfo]:
+        """解析 LSP hover 响应
+
+        Args:
+            result: LSP 响应结果
+            file_path: 文件路径
+            line: 行号（0-based）
+            character: 列号（0-based）
+
+        Returns:
+            HoverInfo 对象，如果结果为空则返回 None
+        """
+        if result is None:
+            return None
+
+        # 提取 contents
+        contents = result.get("contents")
+        if contents is None:
+            return None
+
+        # 处理不同格式的 contents
+        # LSP 规范允许 contents 为以下格式之一：
+        # 1. MarkedString: { language: str, value: str }
+        # 2. MarkedString数组: [{ language: str, value: str }]
+        # 3. MarkupContent: { kind: 'markdown'|'plaintext', value: str }
+        # 4. string
+        if isinstance(contents, str):
+            contents_str = contents
+        elif isinstance(contents, dict):
+            # MarkupContent 或 MarkedString
+            value = contents.get("value")
+            if value is None:
+                return None
+            contents_str = value
+        elif isinstance(contents, list):
+            # MarkedString数组
+            contents_list = []
+            for item in contents:
+                if isinstance(item, str):
+                    contents_list.append(item)
+                elif isinstance(item, dict):
+                    value = item.get("value")
+                    if value:
+                        contents_list.append(value)
+            if not contents_list:
+                return None
+            contents_str = "\n\n".join(contents_list)
+        else:
+            return None
+
+        # 提取 range（可选）
+        range_data = result.get("range")
+        if range_data:
+            start = range_data.get("start", {})
+            end = range_data.get("end", {})
+            range_info = (
+                start.get("line", 0),
+                start.get("character", 0),
+                end.get("line", 0),
+                end.get("character", 0),
+            )
+        else:
+            range_info = None
+
+        return HoverInfo(
+            contents=contents_str,
+            range=range_info,
+            file_path=file_path,
+            line=line,
+            character=character,
+        )
+
     def _find_symbol_in_line(self, file_path: str, line: int, symbol_name: str) -> Optional[int]:
         """在指定行中查找符号名的位置（fallback 机制）
 
@@ -961,6 +1183,54 @@ class LSPClient:
                 locations.append(self._parse_location(loc))
 
         return locations
+
+    def _parse_folding_ranges(self, result: Any) -> List[FoldingRangeInfo]:
+        """解析折叠范围
+
+        Args:
+            result: foldingRange 响应结果
+
+        Returns:
+            折叠范围信息列表
+        """
+        folding_ranges: List[FoldingRangeInfo] = []
+
+        if not isinstance(result, list):
+            return folding_ranges
+
+        for item in result:
+            if not isinstance(item, dict):
+                continue
+
+            # LSP FoldingRange 格式:
+            # {
+            #   "startLine": int,
+            #   "startCharacter": int (可选),
+            #   "endLine": int,
+            #   "endCharacter": int (可选),
+            #   "kind": string (可选),
+            #   "collapsedText": string (可选)
+            # }
+            start_line = item.get("startLine", 0)
+            start_character = item.get("startCharacter", 0)
+            end_line_raw = item.get("endLine")
+            end_line = end_line_raw if end_line_raw is not None else start_line
+            end_character = item.get("endCharacter", 0)
+            kind = item.get("kind")
+            collapsed_text = item.get("collapsedText")
+
+            folding_ranges.append(
+                FoldingRangeInfo(
+                    start_line=start_line,
+                    start_character=start_character,
+                    end_line=end_line,
+                    end_character=end_character,
+                    kind=kind,
+                    collapsed_text=collapsed_text,
+                )
+            )
+
+        return folding_ranges
 
     def _parse_symbols(self, result: Any) -> List[SymbolInfo]:
         """解析符号
@@ -1073,6 +1343,251 @@ class LSPClient:
                         symbols.append(child_symbol)
 
         return symbols
+
+    async def diagnostic(
+        self, file_path: str, severity_filter: Optional[int] = None
+    ) -> List[DiagnosticInfo]:
+        """获取代码诊断信息
+
+        Args:
+            file_path: 文件路径
+            severity_filter: 严重级别过滤（1=Error, 2=Warning, 3=Info, 4=Hint），
+                          None 表示不过滤，返回所有诊断
+
+        Returns:
+            诊断信息列表
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
+        """
+        if not self._initialized:
+            raise RuntimeError("LSP client not initialized")
+
+        # 先打开文档
+        await self.open_document(file_path)
+
+        # 类型断言：open_document 确保了 process 已初始化
+        if self.process is None:
+            raise RuntimeError("LSP server process is not initialized")
+
+        path = Path(file_path).resolve()
+        uri = f"file://{path}"
+
+        # 发送 diagnostic 请求
+        request = LSPRequest(
+            jsonrpc="2.0",
+            id=self._next_id(),
+            method="textDocument/diagnostic",
+            params={
+                "textDocument": {
+                    "uri": uri,
+                },
+            },
+        )
+
+        await self._send_request(request)
+
+        # 检查进程是否还在运行
+        await asyncio.sleep(0.5)
+        if self.process.returncode is not None:
+            # 进程已退出，读取 stderr 错误信息
+            if self.process.stderr:
+                stderr_output = await self.process.stderr.read()
+                error_msg = stderr_output.decode("utf-8", errors="ignore")
+            else:
+                error_msg = "No stderr output available"
+            raise RuntimeError(
+                f"LSP server '{' '.join([self.command] + self.args)}' crashed after sending diagnostic request\n"
+                f"Exit code: {self.process.returncode}\n"
+                f"Error: {error_msg}"
+            )
+
+        try:
+            response = await self._read_response(timeout=30.0)
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                "LSP server diagnostic request timed out after 30 seconds. "
+                "The server may be unresponsive or slow to start."
+            )
+
+        if response.error:
+            raise RuntimeError(f"Diagnostic request failed: {response.error}")
+
+        # 解析诊断信息
+        diagnostics = self._parse_diagnostic(response.result, severity_filter)
+        return diagnostics
+
+    async def code_action(
+        self, file_path: str, line: int, character: int
+    ) -> List[CodeActionInfo]:
+        """获取代码动作信息
+
+        Args:
+            file_path: 文件路径
+            line: 行号（0-based）
+            character: 列号（0-based）
+
+        Returns:
+            代码动作列表
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
+        """
+        if not self._initialized:
+            raise RuntimeError("LSP client not initialized")
+
+        # 先打开文档
+        await self.open_document(file_path)
+
+        # 类型断言：open_document 确保了 process 已初始化
+        if self.process is None:
+            raise RuntimeError("LSP server process is not initialized")
+
+        path = Path(file_path).resolve()
+        uri = f"file://{path}"
+
+        # 发送 codeAction 请求
+        request = LSPRequest(
+            jsonrpc="2.0",
+            id=self._next_id(),
+            method="textDocument/codeAction",
+            params={
+                "textDocument": {
+                    "uri": uri,
+                },
+                "range": {
+                    "start": {
+                        "line": line,
+                        "character": character,
+                    },
+                    "end": {
+                        "line": line,
+                        "character": character,
+                    },
+                },
+                "context": {
+                    "diagnostics": [],
+                },
+            },
+        )
+
+        await self._send_request(request)
+
+        # 检查进程是否还在运行
+        await asyncio.sleep(0.5)
+        if self.process.returncode is not None:
+            # 进程已退出，读取 stderr 错误信息
+            if self.process.stderr:
+                stderr_output = await self.process.stderr.read()
+                error_msg = stderr_output.decode("utf-8", errors="ignore")
+            else:
+                error_msg = "No stderr output available"
+            raise RuntimeError(
+                f"LSP server '{' '.join([self.command] + self.args)}' crashed after sending codeAction request\n"
+                f"Exit code: {self.process.returncode}\n"
+                f"Error: {error_msg}"
+            )
+
+        try:
+            response = await self._read_response(timeout=30.0)
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                "LSP server codeAction request timed out after 30 seconds. "
+                "The server may be unresponsive or slow to start."
+            )
+
+        if response.error:
+            raise RuntimeError(f"CodeAction request failed: {response.error}")
+
+        # 解析代码动作信息
+        code_actions = self._parse_code_action(response.result)
+        return code_actions
+
+    def _parse_diagnostic(
+        self, result: Any, severity_filter: Optional[int] = None
+    ) -> List[DiagnosticInfo]:
+        """解析诊断信息
+
+        Args:
+            result: LSP 响应结果
+            severity_filter: 严重级别过滤
+
+        Returns:
+            诊断信息列表
+        """
+        diagnostics: List[DiagnosticInfo] = []
+
+        # 处理 pylsp 的响应格式
+        # pylsp 可能返回一个包含 diagnostics 列表的字典
+        if isinstance(result, dict):
+            diagnostics_list = result.get("diagnostics", [])
+        elif isinstance(result, list):
+            diagnostics_list = result
+        else:
+            return diagnostics
+
+        for item in diagnostics_list:
+            if not isinstance(item, dict):
+                continue
+
+            # 解析 range
+            range_info = item.get("range", {})
+            start = range_info.get("start", {})
+            end = range_info.get("end", {})
+            start_line = start.get("line", 0)
+            start_char = start.get("character", 0)
+            end_line = end.get("line", 0)
+            end_char = end.get("character", 0)
+
+            # 解析严重级别
+            severity = item.get("severity", 1)  # 默认为 Error
+
+            # 应用严重级别过滤
+            if severity_filter is not None and severity != severity_filter:
+                continue
+
+            diagnostic = DiagnosticInfo(
+                range=(start_line, start_char, end_line, end_char),
+                severity=severity,
+                code=item.get("code"),
+                source=item.get("source", "unknown"),
+                message=item.get("message", ""),
+            )
+            diagnostics.append(diagnostic)
+
+        return diagnostics
+
+    def _parse_code_action(self, result: Any) -> List[CodeActionInfo]:
+        """解析代码动作信息
+
+        Args:
+            result: LSP 响应结果
+
+        Returns:
+            代码动作列表
+        """
+        code_actions: List[CodeActionInfo] = []
+
+        # 处理 pylsp 的响应格式
+        if isinstance(result, list):
+            code_actions_list = result
+        elif isinstance(result, dict):
+            code_actions_list = result.get("result", [])
+        else:
+            return code_actions
+
+        for item in code_actions_list:
+            if not isinstance(item, dict):
+                continue
+
+            code_action = CodeActionInfo(
+                title=item.get("title", ""),
+                kind=item.get("kind", ""),
+                is_preferred=item.get("isPreferred", False),
+            )
+            code_actions.append(code_action)
+
+        return code_actions
 
     async def __aenter__(self) -> "LSPClient":
         """异步上下文管理器入口"""
