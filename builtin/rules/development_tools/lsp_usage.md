@@ -133,6 +133,9 @@
 | ---------------- | ----------------------- | -------------------- | ---------- |
 | document_symbols | file_path               | 列出文件中的所有符号 | ⭐⭐⭐⭐⭐ |
 | def-name         | file_path, symbol_name  | 通过符号名查找定义   | ⭐⭐⭐⭐⭐ |
+| ref-name         | file_path, symbol_name  | 通过符号名查找引用   | ⭐⭐⭐⭐⭐ |
+| impl-name        | file_path, symbol_name  | 通过符号名查找实现   | ⭐⭐⭐⭐⭐ |
+| callers-name     | file_path, symbol_name  | 查找函数内调用的符号 | ⭐⭐⭐⭐⭐ |
 | hover            | file_path, line, column | 获取符号悬停信息     | ⭐⭐⭐⭐   |
 
 ### 诊断和修复类
@@ -181,7 +184,22 @@ jlsp document_symbols src/main.py
 jlsp ref-name src/main.py MyClass
 ```
 
-### 示例 3：JSON 输出格式
+### 示例 3：查找函数调用的符号（被调用方）
+
+```bash
+# 1. 先获取符号列表
+jlsp document_symbols src/main.py
+
+# 2. 查找函数内部调用的所有符号
+jlsp callers-name src/main.py my_function
+
+# 3. 使用 JSON 格式输出
+jlsp callers-name src/main.py my_function --json
+```
+
+**说明**：`callers-name` 命令用于分析指定函数内部调用了哪些其他符号，返回这些被调用符号的定义位置。这对于理解函数依赖关系非常有用。
+
+### 示例 4：JSON 输出格式
 
 ```bash
 # 获取结构化的 JSON 输出
