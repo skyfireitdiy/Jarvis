@@ -499,10 +499,10 @@ def check_context_limit(
 
     # 获取当前对话的 token 数
     current_tokens = 0
-    if hasattr(agent, "session"):
-        # 从 session 获取所有消息并计算 token
+    if hasattr(agent, "model"):
+        # 从 model 获取所有消息并计算 token
         try:
-            messages_text = str(agent.session.get_messages())
+            messages_text = str(agent.model.get_messages())
             current_tokens = get_context_token_count(messages_text)
         except Exception:
             # 如果无法计算，使用粗略估计
