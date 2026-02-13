@@ -341,6 +341,9 @@ class RulesManager:
         返回:
             str: 规则内容，如果未找到则返回 None
         """
+        PrettyOutput.auto_print(
+            f"🔍 [DEBUG] get_named_rule 被调用，rule_name = '{rule_name}'"
+        )
         try:
             # 解析前缀
             if ":" in rule_name:
@@ -350,21 +353,40 @@ class RulesManager:
 
                 # 处理 builtin 前缀
                 if prefix == "builtin":
+                    PrettyOutput.auto_print(
+                        f"🔍 [DEBUG] 检测到 builtin 前缀，actual_name = '{actual_name}'"
+                    )
                     try:
                         from jarvis.jarvis_utils.template_utils import _get_builtin_dir
 
                         builtin_dir = _get_builtin_dir()
+                        PrettyOutput.auto_print(
+                            f"🔍 [DEBUG] builtin_dir = {builtin_dir}"
+                        )
                         if builtin_dir is not None:
                             builtin_rules_dir = builtin_dir / "rules"
+                            PrettyOutput.auto_print(
+                                f"🔍 [DEBUG] builtin_rules_dir = {builtin_rules_dir}, exists = {builtin_rules_dir.exists()}, is_dir = {builtin_rules_dir.is_dir()}"
+                            )
                             if (
                                 builtin_rules_dir.exists()
                                 and builtin_rules_dir.is_dir()
                             ):
-                                return self._read_rule_from_dir(
+                                rule_content = self._read_rule_from_dir(
                                     str(builtin_rules_dir), actual_name
                                 )
-                    except Exception:
+                                PrettyOutput.auto_print(
+                                    f"🔍 [DEBUG] 从 builtin 目录读取规则结果: {bool(rule_content)}"
+                                )
+                                return rule_content
+                    except Exception as e:
+                        PrettyOutput.auto_print(
+                            f"🔍 [DEBUG] 处理 builtin 前缀时出错: {e}"
+                        )
                         pass
+                    PrettyOutput.auto_print(
+                        "🔍 [DEBUG] builtin 规则查找失败，返回 None"
+                    )
                     return None
 
                 # 处理 project 前缀
@@ -673,13 +695,19 @@ class RulesManager:
         返回:
             bool: 是否成功激活
         """
+        PrettyOutput.auto_print(f"🔍 [DEBUG] activate_rule 被调用，name = '{name}'")
         # 如果规则已经激活，直接返回True
         if name in self._active_rules:
+            PrettyOutput.auto_print(f"🔍 [DEBUG] 规则 '{name}' 已经激活")
             return True
 
         # 尝试获取规则内容
         rule_content = self.get_named_rule(name)
+        PrettyOutput.auto_print(
+            f"🔍 [DEBUG] get_named_rule 返回结果: {bool(rule_content)}"
+        )
         if rule_content is None:
+            PrettyOutput.auto_print(f"🔍 [DEBUG] 规则 '{name}' 未找到，激活失败")
             return False
 
         # 加载规则到缓存
@@ -690,6 +718,9 @@ class RulesManager:
         self.loaded_rules.add(name)
         # 重新合并激活的规则
         self._merge_active_rules()
+        PrettyOutput.auto_print(
+            f"🔍 [DEBUG] 规则 '{name}' 激活成功，当前激活规则: {self._active_rules}"
+        )
 
         return True
 
