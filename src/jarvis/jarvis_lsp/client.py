@@ -1623,97 +1623,26 @@ class LSPClient:
 
         return code_actions
 
-    async def callers_by_name(
-        self, file_path: str, symbol_name: str
-    ) -> List[LocationInfo]:
-        """通过符号名查找该函数/方法内部调用的所有符号
+    # ==================== Call Hierarchy API ====================
 
-        分析指定符号（函数/方法）的函数体，提取所有函数调用，
-        并使用 LSP definition 查询每个调用的定义位置。
-
-        Args:
-            file_path: 文件路径
-            symbol_name: 符号名称（函数名或方法名）
-
-        Returns:
-            被调用符号的定义位置列表
-
-        Raises:
-            RuntimeError: 客户端未初始化或查询失败
-        """
-        if not self._initialized:
-            raise RuntimeError("LSP client not initialized")
-
-        # 获取文档符号（带完整范围信息）
-        symbols_with_range = await self._document_symbols_with_range(file_path)
-
-        # 查找目标符号
-        target_symbol = None
-        for sym in symbols_with_range:
-            if sym["name"] == symbol_name:
-                target_symbol = sym
-                break
-
-        if target_symbol is None:
-            return []
-
-        # 获取符号的范围
-        range_info = target_symbol.get("range")
-        if range_info is None:
-            return []
-
-        start_line = range_info.get("start", {}).get("line", 0)
-        end_line = range_info.get("end", {}).get("line", 0)
-
-        # 读取文件内容
-        try:
-            content = await asyncio.to_thread(Path(file_path).read_text)
-        except Exception:
-            return []
-
-        lines = content.splitlines()
-        if start_line >= len(lines):
-            return []
-
-        # 提取函数体代码
-        func_lines = lines[start_line : end_line + 1]
-        func_code = "\n".join(func_lines)
-
-        # 分析函数调用
-        call_names = self._extract_function_calls(func_code, file_path, start_line)
-
-        # 对每个调用查询定义位置
-        locations: List[LocationInfo] = []
-        seen_symbols: set = set()  # 避免重复
-
-        for call_name, call_line, call_col in call_names:
-            if call_name in seen_symbols:
-                continue
-            seen_symbols.add(call_name)
-
-            try:
-                def_locations = await self.definition(file_path, call_line, call_col)
-                if def_locations:
-                    # 只取第一个定义位置
-                    locations.append(def_locations[0])
-            except Exception:
-                # 忽略查询失败的调用
-                pass
-
-        return locations
-
-    async def _document_symbols_with_range(self, file_path: str) -> List[dict]:
-        """获取带完整范围信息的文档符号
+    async def prepare_call_hierarchy(
+        self, file_path: str, line: int, column: int
+    ) -> List[dict]:
+        """准备调用层次结构
 
         Args:
             file_path: 文件路径
+            line: 行号（0-based）
+            column: 列号（0-based）
 
         Returns:
-            带范围信息的符号字典列表，每个字典包含:
+            CallHierarchyItem 列表，每个包含:
+            - uri: 文件 URI
+            - range: 符号范围
+            - selectionRange: 符号名称范围
             - name: 符号名称
             - kind: 符号类型
-            - range: 符号范围 {start: {line, character}, end: {line, character}}
-            - selectionRange: 符号名称范围
+            - detail: 详细信息
 
         Raises:
             RuntimeError: 客户端未初始化或查询失败
@@ -1721,7 +1650,6 @@ class LSPClient:
         if not self._initialized:
             raise RuntimeError("LSP client not initialized")
 
-        # 先打开文档
         await self.open_document(file_path)
 
         if self.process is None:
@@ -1730,15 +1658,13 @@ class LSPClient:
         path = Path(file_path).resolve()
         uri = f"file://{path}"
 
-        # 发送 documentSymbol 请求
         request = LSPRequest(
             jsonrpc="2.0",
             id=self._next_id(),
-            method="textDocument/documentSymbol",
+            method="textDocument/prepareCallHierarchy",
             params={
-                "textDocument": {
-                    "uri": uri,
-                }
+                "textDocument": {"uri": uri},
+                "position": {"line": line, "character": column},
             },
         )
 
@@ -1748,174 +1674,270 @@ class LSPClient:
             response = await self._read_response(timeout=30.0)
         except asyncio.TimeoutError:
             raise RuntimeError(
-                "LSP server documentSymbol request timed out after 30 seconds."
+                "textDocument/prepareCallHierarchy request timed out after 30 seconds."
             )
 
         if response.error:
-            raise RuntimeError(f"Document symbol request failed: {response.error}")
+            raise RuntimeError(
+                f"prepareCallHierarchy request failed: {response.error}"
+            )
 
-        # 解析带范围信息的符号
-        return self._parse_symbols_with_range(response.result or [])
+        result = response.result
+        if not result:
+            return []
 
-    def _parse_symbols_with_range(self, result: Any) -> List[dict]:
-        """解析带完整范围信息的符号
+        return result if isinstance(result, list) else [result]
 
-        Args:
-            result: documentSymbol 响应结果
-
-        Returns:
-            带范围信息的符号字典列表
-        """
-        symbols: List[dict] = []
-
-        if not isinstance(result, list):
-            return symbols
-
-        for item in result:
-            if not isinstance(item, dict):
-                continue
-
-            name = item.get("name")
-            if not name:
-                continue
-
-            # 获取范围信息
-            range_info = item.get("range", {})
-            selection_range = item.get("selectionRange", {})
-
-            symbol_dict = {
-                "name": name,
-                "kind": item.get("kind"),
-                "range": range_info,
-                "selectionRange": selection_range,
-                "detail": item.get("detail"),
-            }
-            symbols.append(symbol_dict)
-
-            # 递归处理子符号
-            children = item.get("children")
-            if isinstance(children, list):
-                child_symbols = self._parse_symbols_with_range(children)
-                symbols.extend(child_symbols)
-
-        return symbols
-
-    def _extract_function_calls(
-        self, code: str, file_path: str, base_line: int
-    ) -> List[tuple]:
-        """从代码中提取函数调用
-
-        使用 AST 解析 Python 代码，提取所有函数调用。
-        对于非 Python 语言，使用正则表达式进行简单匹配。
+    async def call_hierarchy_incoming_calls(self, item: dict) -> List[dict]:
+        """查询调用层次 - 谁调用了这个符号（incoming calls / callers）
 
         Args:
-            code: 函数体代码
-            file_path: 文件路径（用于判断语言类型）
-            base_line: 函数起始行号（0-based）
+            item: CallHierarchyItem，从 prepare_call_hierarchy 获取
 
         Returns:
-            元组列表: [(函数名, 行号, 列号), ...]
+            CallHierarchyIncomingCall 列表，每个包含:
+            - from: 调用者的 CallHierarchyItem
+            - fromRanges: 调用位置范围列表
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
         """
-        calls: List[tuple] = []
+        if not self._initialized:
+            raise RuntimeError("LSP client not initialized")
 
-        # 判断是否为 Python 文件
-        if file_path.endswith(".py"):
-            calls = self._extract_python_calls(code, base_line)
-        else:
-            # 其他语言使用通用正则匹配
-            calls = self._extract_generic_calls(code, base_line)
+        request = LSPRequest(
+            jsonrpc="2.0",
+            id=self._next_id(),
+            method="callHierarchy/incomingCalls",
+            params={"item": item},
+        )
 
-        return calls
-
-    def _extract_python_calls(self, code: str, base_line: int) -> List[tuple]:
-        """使用 AST 提取 Python 函数调用
-
-        Args:
-            code: Python 代码
-            base_line: 基准行号偏移
-
-        Returns:
-            元组列表: [(函数名, 行号, 列号), ...]
-        """
-        import ast
-
-        calls: List[tuple] = []
+        await self._send_request(request)
 
         try:
-            tree = ast.parse(code)
-        except SyntaxError:
-            # 语法错误时返回空列表
-            return calls
+            response = await self._read_response(timeout=30.0)
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                "callHierarchy/incomingCalls request timed out after 30 seconds."
+            )
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                # 获取函数名
-                func_name = self._get_call_name(node.func)
-                if func_name:
-                    # ast 的行号是 1-based，转换为 0-based
-                    line = base_line + node.lineno - 1
-                    col = node.col_offset
-                    calls.append((func_name, line, col))
+        if response.error:
+            raise RuntimeError(
+                f"callHierarchy/incomingCalls request failed: {response.error}"
+            )
 
-        return calls
+        return response.result or []
 
-    def _get_call_name(self, node: ast.expr) -> Optional[str]:
-        """从 AST Call 节点获取函数名
+    async def call_hierarchy_outgoing_calls(self, item: dict) -> List[dict]:
+        """查询调用层次 - 这个符号调用了哪些符号（outgoing calls / callees）
 
         Args:
-            node: AST 节点（可能是 Name 或 Attribute）
+            item: CallHierarchyItem，从 prepare_call_hierarchy 获取
 
         Returns:
-            函数名字符串，如果无法提取则返回 None
-        """
-        if isinstance(node, ast.Name):
-            # 简单函数调用: func_name()
-            return node.id
-        elif isinstance(node, ast.Attribute):
-            # 方法调用: obj.method() 或 module.func()
-            # 只返回方法名，不包含对象名
-            return node.attr
+            CallHierarchyOutgoingCall 列表，每个包含:
+            - to: 被调用者的 CallHierarchyItem
+            - fromRanges: 调用位置范围列表
 
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
+        """
+        if not self._initialized:
+            raise RuntimeError("LSP client not initialized")
+
+        request = LSPRequest(
+            jsonrpc="2.0",
+            id=self._next_id(),
+            method="callHierarchy/outgoingCalls",
+            params={"item": item},
+        )
+
+        await self._send_request(request)
+
+        try:
+            response = await self._read_response(timeout=30.0)
+        except asyncio.TimeoutError:
+            raise RuntimeError(
+                "callHierarchy/outgoingCalls request timed out after 30 seconds."
+            )
+
+        if response.error:
+            raise RuntimeError(
+                f"callHierarchy/outgoingCalls request failed: {response.error}"
+            )
+
+        return response.result or []
+
+    # ==================== 符号名便捷方法 ====================
+
+    async def _find_symbol_position(
+        self, file_path: str, symbol_name: str
+    ) -> Optional[tuple]:
+        """查找符号在文件中的位置
+
+        Args:
+            file_path: 文件路径
+            symbol_name: 符号名称
+
+        Returns:
+            (line, column) 元组，如果未找到则返回 None
+        """
+        symbols = await self.document_symbols(file_path)
+        for sym in symbols:
+            if sym.name == symbol_name:
+                return (sym.line, sym.column)
         return None
 
-    def _extract_generic_calls(self, code: str, base_line: int) -> List[tuple]:
-        """使用正则表达式提取通用函数调用
-
-        适用于非 Python 语言的简单匹配。
+    async def incoming_calls_by_name(
+        self, file_path: str, symbol_name: str
+    ) -> List[LocationInfo]:
+        """通过符号名查询谁调用了这个符号（incoming calls / callers）
 
         Args:
-            code: 代码字符串
-            base_line: 基准行号偏移
+            file_path: 文件路径
+            symbol_name: 符号名称
 
         Returns:
-            元组列表: [(函数名, 行号, 列号), ...]
+            调用者位置列表
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
         """
-        import re
+        position = await self._find_symbol_position(file_path, symbol_name)
+        if position is None:
+            return []
 
-        calls: List[tuple] = []
+        line, column = position
+        items = await self.prepare_call_hierarchy(file_path, line, column)
+        if not items:
+            return []
 
-        # 匹配函数调用模式: identifier(
-        # 排除常见关键字
-        keywords = {
-            "if", "else", "elif", "for", "while", "def", "class", "return",
-            "import", "from", "try", "except", "with", "async", "await",
-            "print", "len", "str", "int", "float", "list", "dict", "set",
-            "True", "False", "None", "and", "or", "not", "in", "is",
-        }
+        locations: List[LocationInfo] = []
+        for item in items:
+            calls = await self.call_hierarchy_incoming_calls(item)
+            for call in calls:
+                from_item = call.get("from", {})
+                uri = from_item.get("uri", "")
+                if uri.startswith("file://"):
+                    caller_path = uri[7:]
+                else:
+                    caller_path = uri
 
-        # 匹配标识符后跟括号
-        pattern = r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\("
+                range_info = from_item.get("range", {})
+                start = range_info.get("start", {})
+                caller_line = start.get("line", 0)
+                caller_col = start.get("character", 0)
 
-        lines = code.split("\n")
-        for i, line in enumerate(lines):
-            for match in re.finditer(pattern, line):
-                name = match.group(1)
-                if name not in keywords:
-                    line_num = base_line + i
-                    col = match.start(1)
-                    calls.append((name, line_num, col))
+                # 获取代码片段
+                snippet = await self._get_code_snippet(caller_path, caller_line)
 
-        return calls
+                locations.append(
+                    LocationInfo(
+                        file_path=caller_path,
+                        line=caller_line,
+                        column=caller_col,
+                        uri=uri,
+                        code_snippet=snippet,
+                        symbol_name=from_item.get("name"),
+                    )
+                )
+
+        return locations
+
+    async def outgoing_calls_by_name(
+        self, file_path: str, symbol_name: str
+    ) -> List[LocationInfo]:
+        """通过符号名查询这个符号调用了哪些符号（outgoing calls / callees）
+
+        Args:
+            file_path: 文件路径
+            symbol_name: 符号名称
+
+        Returns:
+            被调用者位置列表
+
+        Raises:
+            RuntimeError: 客户端未初始化或查询失败
+        """
+        position = await self._find_symbol_position(file_path, symbol_name)
+        if position is None:
+            return []
+
+        line, column = position
+        items = await self.prepare_call_hierarchy(file_path, line, column)
+        if not items:
+            return []
+
+        locations: List[LocationInfo] = []
+        for item in items:
+            calls = await self.call_hierarchy_outgoing_calls(item)
+            for call in calls:
+                to_item = call.get("to", {})
+                uri = to_item.get("uri", "")
+                if uri.startswith("file://"):
+                    callee_path = uri[7:]
+                else:
+                    callee_path = uri
+
+                range_info = to_item.get("range", {})
+                start = range_info.get("start", {})
+                callee_line = start.get("line", 0)
+                callee_col = start.get("character", 0)
+
+                # 获取代码片段
+                snippet = await self._get_code_snippet(callee_path, callee_line)
+
+                locations.append(
+                    LocationInfo(
+                        file_path=callee_path,
+                        line=callee_line,
+                        column=callee_col,
+                        uri=uri,
+                        code_snippet=snippet,
+                        symbol_name=to_item.get("name"),
+                    )
+                )
+
+        return locations
+
+    async def _get_code_snippet(
+        self, file_path: str, line: int, context_lines: int = 3
+    ) -> Optional[str]:
+        """获取指定位置周围的代码片段
+
+        Args:
+            file_path: 文件路径
+            line: 行号（0-based）
+            context_lines: 上下文行数
+
+        Returns:
+            代码片段字符串
+        """
+        try:
+            content = await asyncio.to_thread(Path(file_path).read_text)
+            lines = content.splitlines()
+            start = max(0, line - context_lines)
+            end = min(len(lines), line + context_lines + 1)
+            return "\n".join(lines[start:end])
+        except Exception:
+            return None
+
+    # 兼容旧接口名称
+    async def callers_by_name(
+        self, file_path: str, symbol_name: str
+    ) -> List[LocationInfo]:
+        """通过符号名查询这个符号调用了哪些符号（outgoing calls 的别名）
+
+        这是 outgoing_calls_by_name 的别名，保持向后兼容。
+
+        Args:
+            file_path: 文件路径
+            symbol_name: 符号名称
+
+        Returns:
+            被调用者位置列表
+        """
+        return await self.outgoing_calls_by_name(file_path, symbol_name)
 
     async def __aenter__(self) -> "LSPClient":
         """异步上下文管理器入口"""
