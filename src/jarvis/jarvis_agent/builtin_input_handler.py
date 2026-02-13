@@ -16,7 +16,6 @@ from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.config import set_llm_group
 from jarvis.jarvis_utils.config import get_global_config_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
-from jarvis.jarvis_utils.input import user_confirm
 
 
 # 辅助函数：获取全局配置数据（避免导入时绑定问题）
@@ -650,9 +649,8 @@ def switch_model_group(agent: Any) -> bool:
         can_switch, reason = check_context_limit(agent, new_group, platform_type)
         if not can_switch:
             PrettyOutput.auto_print(f"⚠️ {reason}")
-            if not user_confirm("是否仍要切换? ", False):
-                PrettyOutput.auto_print("🚫 已取消切换")
-                return False
+            PrettyOutput.auto_print("🚫 已取消切换")
+            return False
         else:
             PrettyOutput.auto_print(f"✅ {reason}")
 

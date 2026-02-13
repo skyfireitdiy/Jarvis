@@ -1600,24 +1600,14 @@ def cli(
                                         matching_sessions
                                     )
                                     if selected_session:
-                                        # 用户选择恢复会话
-                                        if agent.session.model.restore(
+                                        # 用户选择恢复会话，使用统一的恢复方法
+                                        # 该方法会执行完整的检测：commit一致性、平台重新创建、token兼容性
+                                        session_name = agent.session._read_session_name(
                                             selected_session
+                                        )
+                                        if agent.session.restore_session_from_file(
+                                            selected_session, session_name
                                         ):
-                                            agent.session.last_restored_session = (
-                                                selected_session
-                                            )
-                                            session_name = (
-                                                agent.session._read_session_name(
-                                                    selected_session
-                                                )
-                                            )
-                                            agent.session.current_session_name = (
-                                                session_name
-                                            )
-                                            agent.session._restore_agent_state()
-                                            agent.session._restore_task_lists()
-                                            agent.session._restore_start_commit_info()
                                             # 设置first标志为False，避免run()方法执行需求分类和方法论加载
                                             agent.first = False
                                             file_basename = os.path.basename(
