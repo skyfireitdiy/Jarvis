@@ -1,0 +1,8 @@
+{
+  "id": "20260213_115731_313019",
+  "type": "project_long_term",
+  "tags": ["code_agent", "static_analysis", "auto_fix", "lint"],
+  "content": "用户需求：CodeAgent中，如果静态检查后有告警，提示如果有自动化工具可以修复，优先使用自动化工具修复，而不是直接修改代码。审查代码修改是否正确实现此功能。",
+  "created_at": "2026-02-13T11:57:31.313056",
+  "updated_at": "2026-02-13T11:57:31.313062"
+}

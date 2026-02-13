@@ -1,16 +1,19 @@
 """CodeAgent 静态分析模块"""
 
 import os
+import shlex
 import subprocess
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
 from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
 
+from jarvis.jarvis_code_agent.lint import LINT_AUTO_FIX_COMMANDS
 from jarvis.jarvis_code_agent.lint import LINT_COMMAND_TEMPLATES_BY_FILE
 from jarvis.jarvis_code_agent.lint import get_lint_commands_for_files
 from jarvis.jarvis_code_agent.lint import group_commands_by_template
@@ -205,6 +208,46 @@ class LintManager:
 
         return "\n".join(lines)
 
+    def _get_auto_fix_suggestions(
+        self, lint_results: List[Tuple[str, str, int, str]]
+    ) -> str:
+        """根据lint结果生成自动修复建议
+
+        Args:
+            lint_results: [(file_path, command, returncode, output), ...]
+
+        Returns:
+            自动修复命令建议字符串，如果没有可用的自动修复工具则返回空字符串
+        """
+        # 收集所有涉及的文件和工具
+        file_tool_map: Dict[str, set] = {}  # {file_path: set(tool_names)}
+        for file_path, command, _, _ in lint_results:
+            command_parts = command.split()
+            tool_name = command_parts[0] if command_parts else "unknown"
+            if file_path not in file_tool_map:
+                file_tool_map[file_path] = set()
+            file_tool_map[file_path].add(tool_name)
+
+        # 生成自动修复命令
+        suggestions = []
+        for file_path, tool_names in file_tool_map.items():
+            for tool_name in tool_names:
+                # 查找该工具的自动修复命令
+                auto_fix_cmds = LINT_AUTO_FIX_COMMANDS.get(tool_name, [])
+                for cmd_template in auto_fix_cmds:
+                    # 替换占位符
+                    if "{file_path}" in cmd_template:
+                        cmd = cmd_template.replace(
+                            "{file_path}", shlex.quote(file_path)
+                        )
+                    else:
+                        cmd = cmd_template
+                    suggestions.append(f"  {cmd}")
+
+        if suggestions:
+            return "\n".join(suggestions)
+        return ""
+
     def handle_static_analysis(
         self,
         modified_files: List[str],
@@ -264,17 +307,40 @@ class LintManager:
         # 直接执行静态扫描
         lint_results = self.run_static_analysis(modified_files)
         if lint_results:
-            # 有错误或警告，让大模型修复
-            errors_summary = self.format_lint_results(lint_results)
+            # 有错误或警告，先检查是否有自动修复工具
+            auto_fix_suggestions = self._get_auto_fix_suggestions(lint_results)
+
+            # 打印自动修复建议
+            if auto_fix_suggestions:
+                PrettyOutput.auto_print(
+                    f"💡 检测到静态检查告警，建议优先使用自动修复工具:\n{auto_fix_suggestions}"
+                )
+
             # 打印完整的检查结果
+            errors_summary = self.format_lint_results(lint_results)
             PrettyOutput.auto_print(f"⚠️ 静态扫描发现问题:\n{errors_summary}")
-            addon_prompt = f"""
+
+            # 构建提示信息
+            if auto_fix_suggestions:
+                addon_prompt = f"""
+静态扫描发现以下问题，建议优先使用自动修复工具处理:
+
+{auto_fix_suggestions}
+
+如果自动修复工具无法解决所有问题，再手动修复。静态检查详情:
+
+{errors_summary}
+
+请先尝试使用上述自动修复命令，然后再检查剩余问题。
+                """
+            else:
+                addon_prompt = f"""
 静态扫描发现以下问题，请根据错误信息修复代码:
 
 {errors_summary}
 
 请仔细检查并修复所有问题。
-            """
+                """
             agent.set_addon_prompt(addon_prompt)
             final_ret += "\n\n⚠️ 静态扫描发现问题，已提示修复\n"
         else:

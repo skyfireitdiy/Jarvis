@@ -18,6 +18,34 @@ import yaml
 
 from jarvis.jarvis_utils.config import get_data_dir
 
+# Lint工具对应的自动修复命令映射（lint工具名 -> 自动修复命令模板）
+# 用于在发现lint告警时，提示用户可用的自动修复工具
+LINT_AUTO_FIX_COMMANDS: Dict[str, List[str]] = {
+    # Python
+    "ruff": ["ruff check --fix {file_path}", "ruff format {file_path}"],
+    "mypy": [],  # mypy没有自动修复功能
+    "pylint": [],  # pylint没有自动修复功能
+    "flake8": [],  # flake8没有自动修复功能
+    # JavaScript/TypeScript
+    "eslint": ["eslint --fix {file_path}"],
+    # Rust
+    "cargo": ["cargo clippy --fix --allow-dirty"],
+    "clippy": ["cargo clippy --fix --allow-dirty"],
+    # Go
+    "go": ["go fmt {file_path}", "goimports -w {file_path}"],
+    # C/C++
+    "clang-tidy": ["clang-tidy --fix {file_path}"],
+    # Shell
+    "shellcheck": ["shfmt -w {file_path}"],
+    # Ruby
+    "rubocop": ["rubocop --auto-correct {file_path}"],
+    # PHP
+    "phpstan": [],  # phpstan没有自动修复功能
+    # SQL
+    "sqlfluff": ["sqlfluff fix {file_path}"],
+}
+
+
 # Lint工具命令模板映射（文件扩展名/文件名 -> 命令模板列表）
 # 占位符说明：
 # - {file_path}: 单个文件的完整路径
