@@ -771,6 +771,55 @@ def type_definition_by_name_command(
         PrettyOutput.auto_print(format_location_human([location]))
 
 
+@app.command("callers-name")
+def callers_by_name_command(
+    file_path: str = typer.Argument(..., help="文件路径"),
+    symbol_name: str = typer.Argument(..., help="符号名称"),
+    language: Optional[str] = typer.Option(
+        None, "--language", "-l", help="编程语言 (默认自动检测)"
+    ),
+    as_json: bool = typer.Option(False, "--json", "-j", help="输出 JSON 格式"),
+) -> None:
+    """通过符号名查找被调用方（该函数内部调用的所有符号）
+
+    示例:
+    ```
+    jlsp callers-name src/main.py my_function
+    jlsp callers-name src/main.py "my_function" --json
+    ```
+
+    注意:
+    - 需要先使用 `jlsp symbols <file>` 查看文件中的符号列表
+    - symbol_name 必须是文件中存在的函数符号名称
+    - 返回该函数内部调用的所有符号的定义位置
+    """
+    # 自动检测语言
+    if language is None:
+        language = "python"
+
+    project_path = os.getcwd()
+    client = LSPDaemonClient()
+
+    async def run() -> list[LocationInfo]:
+        locations = await client.callers_by_name(
+            language, project_path, file_path, symbol_name
+        )
+        return locations
+
+    try:
+        locations = asyncio.run(run())
+    except RuntimeError as e:
+        PrettyOutput.auto_print(f"❌ 错误: {e}")
+        raise typer.Exit(code=1)
+
+    if not locations:
+        PrettyOutput.auto_print("⚠️  未找到被调用方")
+    elif as_json:
+        PrettyOutput.auto_print(format_location_json(locations))
+    else:
+        PrettyOutput.auto_print(format_location_human(locations))
+
+
 @app.command("diagnostic")
 def diagnostic_command(
     file_path: str = typer.Argument(..., help="目标文件路径"),
