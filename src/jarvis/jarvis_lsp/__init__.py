@@ -22,6 +22,15 @@
 __version__ = "0.1.0"
 
 from jarvis.jarvis_lsp.config import LSPConfigReader
-from jarvis.jarvis_lsp.client import LSPClient
+from jarvis.jarvis_lsp.client import LSPClient, LocationInfo, SymbolInfo
+from jarvis.jarvis_lsp.server_manager import LSPServerInstance, LSPServerManager
 
-__all__ = ["LSPConfigReader", "LSPClient", "__version__"]
+__all__ = [
+    "LSPConfigReader",
+    "LSPClient",
+    "LocationInfo",
+    "SymbolInfo",
+    "LSPServerInstance",
+    "LSPServerManager",
+    "__version__",
+]

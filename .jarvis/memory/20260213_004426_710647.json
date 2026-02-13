@@ -1,0 +1,8 @@
+{
+  "id": "20260213_004426_710647",
+  "type": "project_long_term",
+  "tags": ["jarvis_lsp", "daemon", "auto_start", "completed"],
+  "content": "jarvis_lsp 守护进程自动启动功能已完成\n\n核心功能：\n1. 守护进程会在第一次使用任何 LSP 命令时自动启动\n2. 不需要用户手动执行 `jlsp daemon start`\n3. 守护进程通过 LSPDaemonClient._ensure_daemon_running() 方法自动管理\n4. 自动检测 socket 文件，如果不存在或守护进程未运行，则自动启动\n\n实现细节：\n- daemon_client.py 添加 _ensure_daemon_running() 方法\n- 该方法检查 socket 文件是否存在，尝试连接验证守护进程状态\n- 如果守护进程未运行，使用 asyncio.create_subprocess_exec 启动守护进程\n- 等待最多 5 秒让守护进程创建 socket 文件\n- 移除了 CLI 中的 daemon start 命令\n\n代码质量：\n- mypy strict 检查通过\n- ruff 检查通过\n\n验证结果：\n- 守护进程自动启动成功\n- daemon status 命令能正确显示守护进程状态\n- daemon stop 命令能正确停止守护进程\n\n注意：LSP 服务器初始化超时（10s）问题是另一个独立的问题，需要后续优化 pylsp 配置或增加超时时间。",
+  "created_at": "2026-02-13T00:44:26.710697",
+  "updated_at": "2026-02-13T00:44:26.710704"
+}
