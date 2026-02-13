@@ -12,11 +12,21 @@ from rich.console import Console
 
 # 模型组切换相关导入
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
 from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.config import set_llm_group
+from jarvis.jarvis_utils.config import get_global_config_data
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.input import user_confirm
+
+
+# 辅助函数：获取全局配置数据（避免导入时绑定问题）
+def _get_global_config() -> Any:
+    """获取全局配置数据的辅助函数
+
+    使用函数调用而不是直接导入，避免在 set_global_config_data()
+    重新赋值后使用旧引用。
+    """
+    return get_global_config_data()
 
 
 def _get_rule_content(rule_name: str) -> str | None:
@@ -442,15 +452,14 @@ def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
         Optional[List[Tuple[str, str, str, str]]]: 模型组列表，每个元素为 (group_name, smart_model, normal_model, cheap_model)
     """
     # 调试：输出 GLOBAL_CONFIG_DATA 的实际内容
+    config = _get_global_config()
+    PrettyOutput.auto_print(f"🔍 GLOBAL_CONFIG_DATA keys: {list(config.keys())[:20]}")
+    PrettyOutput.auto_print(f"🔍 GLOBAL_CONFIG_DATA id: {id(config)}")
     PrettyOutput.auto_print(
-        f"🔍 GLOBAL_CONFIG_DATA keys: {list(GLOBAL_CONFIG_DATA.keys())[:20]}"
-    )
-    PrettyOutput.auto_print(f"🔍 GLOBAL_CONFIG_DATA id: {id(GLOBAL_CONFIG_DATA)}")
-    PrettyOutput.auto_print(
-        f"🔍 GLOBAL_CONFIG_DATA.get('llm_groups'): {GLOBAL_CONFIG_DATA.get('llm_groups', 'NOT_FOUND')}"
+        f"🔍 _get_global_config().get('llm_groups'): {config.get('llm_groups', 'NOT_FOUND')}"
     )
 
-    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
+    model_groups = _get_global_config().get("llm_groups", {})
     if not isinstance(model_groups, dict) or not model_groups:
         PrettyOutput.auto_print("📋 未找到任何模型组配置")
         return None
@@ -480,7 +489,7 @@ def check_context_limit(
     返回:
         Tuple[bool, str]: (是否可以切换, 原因说明)
     """
-    model_groups = GLOBAL_CONFIG_DATA.get("llm_groups", {})
+    model_groups = _get_global_config().get("llm_groups", {})
     if not isinstance(model_groups, dict):
         return False, "模型组配置不存在"
 
@@ -511,7 +520,7 @@ def check_context_limit(
         # 尝试从 llms 引用中获取
         normal_llm = group_config.get("normal_llm")
         if normal_llm:
-            llms = GLOBAL_CONFIG_DATA.get("llms", {})
+            llms = _get_global_config().get("llms", {})
             llm_config = llms.get(normal_llm, {})
             token_limit = llm_config.get("max_input_token_count")
 
