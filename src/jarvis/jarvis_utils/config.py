@@ -40,6 +40,16 @@ def set_global_config_data(env_data: Dict[str, Any]) -> None:
     GLOBAL_CONFIG_DATA = CaseInsensitiveDict(env_data)
 
 
+def get_global_config_data() -> CaseInsensitiveDict:
+    """获取全局配置数据
+
+    返回:
+        CaseInsensitiveDict: 全局配置字典
+    """
+    global GLOBAL_CONFIG_DATA
+    return GLOBAL_CONFIG_DATA
+
+
 def set_config(key: str, value: Any) -> None:
     """设置配置"""
     GLOBAL_CONFIG_DATA[key] = value
