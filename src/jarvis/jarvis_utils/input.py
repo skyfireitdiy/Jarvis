@@ -45,7 +45,7 @@ from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.styles import Style as PromptStyle
 
 from jarvis.jarvis_utils.clipboard import copy_to_clipboard
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, set_llm_group
 from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.globals import get_message_history
 from jarvis.jarvis_utils.tag import ot
@@ -71,7 +71,8 @@ FZF_REQUEST_SENTINEL_PREFIX = "__FZF_REQUEST__::"
 FZF_REQUEST_ALL_SENTINEL_PREFIX = "__FZF_REQUEST_ALL__::"
 
 # Persistent hint marker for multiline input (shown only once across runs)
-_MULTILINE_HINT_MARK_FILE = os.path.join(get_data_dir(), "multiline_enter_hint_shown")
+_MULTILINE_HINT_MARK_FILE = os.path.join(
+    get_data_dir(), "multiline_enter_hint_shown")
 
 # 内置命令标记列表（用于自动补全和 fzf）
 BUILTIN_COMMANDS = [
@@ -204,10 +205,10 @@ def _parse_fzf_payload(
         (cursor, text) 元组，解析失败时返回 (None, None)
     """
     try:
-        payload = user_input[len(prefix) :]
+        payload = user_input[len(prefix):]
         sep_index = payload.find(":")
         cursor = int(payload[:sep_index])
-        text = base64.b64decode(payload[sep_index + 1 :].encode("ascii")).decode(
+        text = base64.b64decode(payload[sep_index + 1:].encode("ascii")).decode(
             "utf-8"
         )
         return cursor, text
@@ -271,7 +272,7 @@ def _insert_file_path(
     """
     text_before = text[:cursor]
     last_symbol = text_before.rfind(symbol)
-    if last_symbol != -1 and " " not in text_before[last_symbol + 1 :]:
+    if last_symbol != -1 and " " not in text_before[last_symbol + 1:]:
         # Replace @... or #... segment
         inserted = f"'{path}'"
         new_text = text[:last_symbol] + inserted + text[cursor:]
@@ -545,7 +546,8 @@ class FileCompleter(Completer):
         cursor_pos = document.cursor_position
 
         # Support both '@' (git files) and '#' (all files excluding .git)
-        sym_positions = [(i, ch) for i, ch in enumerate(text) if ch in ("@", "#")]
+        sym_positions = [(i, ch)
+                         for i, ch in enumerate(text) if ch in ("@", "#")]
         if not sym_positions:
             return
         current_pos = None
@@ -557,7 +559,7 @@ class FileCompleter(Completer):
         if current_pos is None:
             return
 
-        text_after = text[current_pos + 1 : cursor_pos]
+        text_after = text[current_pos + 1: cursor_pos]
         if " " in text_after:
             return
 
@@ -566,9 +568,11 @@ class FileCompleter(Completer):
 
         all_completions = []
         all_completions.extend(
-            [(ot(tag), self._get_description(tag)) for tag in self.replace_map.keys()]
+            [(ot(tag), self._get_description(tag))
+             for tag in self.replace_map.keys()]
         )
-        all_completions.extend([(ot(cmd), desc) for cmd, desc in BUILTIN_COMMANDS])
+        all_completions.extend([(ot(cmd), desc)
+                               for cmd, desc in BUILTIN_COMMANDS])
         # 添加所有规则（包括内置规则、文件规则、YAML规则）到补全列表
         rules = self._get_all_rules()
         for rule_name, rule_desc in rules:
@@ -614,7 +618,8 @@ class FileCompleter(Completer):
                         ]
                         for name in fnames:
                             files.append(
-                                _os.path.relpath(_os.path.join(root, name), ".")
+                                _os.path.relpath(
+                                    _os.path.join(root, name), ".")
                             )
                             if len(files) > self._max_walk_files:
                                 break
@@ -915,7 +920,8 @@ def _show_history_and_copy() -> None:
     for i, msg in enumerate(history):
         cleaned_msg = msg.replace("\n", r"\n")
         display_msg = (
-            (cleaned_msg[:70] + "...") if len(cleaned_msg) > 70 else cleaned_msg
+            (cleaned_msg[:70] +
+             "...") if len(cleaned_msg) > 70 else cleaned_msg
         )
         lines.append(f"  {i + 1}: {display_msg.strip()}")
         lines.append("=" * 58 + "\n")
@@ -1154,7 +1160,8 @@ def _get_multiline_input_internal(
 
     history_dir = get_data_dir()
     session: PromptSession[Any] = PromptSession(
-        history=FileHistory(os.path.join(history_dir, "multiline_input_history")),
+        history=FileHistory(os.path.join(
+            history_dir, "multiline_input_history")),
         completer=FileCompleter(),
         key_bindings=bindings,
         complete_while_typing=True,
@@ -1222,7 +1229,8 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             FZF_REQUEST_SENTINEL_PREFIX
         ):
             # Handle fzf request outside the prompt, then prefill new text.
-            cursor, text = _parse_fzf_payload(user_input, FZF_REQUEST_SENTINEL_PREFIX)
+            cursor, text = _parse_fzf_payload(
+                user_input, FZF_REQUEST_SENTINEL_PREFIX)
             if cursor is None or text is None:
                 # Malformed payload; just continue without change.
                 preset = None
@@ -1280,7 +1288,7 @@ def get_multiline_input(tip: str, print_on_empty: bool = True) -> str:
             FZF_INSERT_SENTINEL_PREFIX
         ):
             # 从哨兵载荷中提取新文本，作为下次进入提示的预填内容
-            preset = user_input[len(FZF_INSERT_SENTINEL_PREFIX) :]
+            preset = user_input[len(FZF_INSERT_SENTINEL_PREFIX):]
             preset_cursor = len(preset)
 
             # 清除上一条输入行（多行安全），避免多清，保守仅按提示行估算
@@ -1313,11 +1321,11 @@ def get_platform_type_from_agent(agent: Any) -> str:
     return "smart" if agent_type == "code_agent" else "normal"
 
 
-def list_model_groups() -> Optional[List[Tuple[str, str]]]:
+def list_model_groups() -> Optional[List[Tuple[str, str, str, str]]]:
     """列出所有可用的模型组
 
     返回:
-        Optional[List[Tuple[str, str]]]: 模型组列表，每个元素为 (group_name, description)
+        Optional[List[Tuple[str, str, str, str]]]: 模型组列表，每个元素为 (group_name, smart_model, normal_model, cheap_model)
     """
     from jarvis.jarvis_utils.config import GLOBAL_CONFIG_DATA
 
@@ -1329,8 +1337,11 @@ def list_model_groups() -> Optional[List[Tuple[str, str]]]:
     groups = []
     for group_name, group_config in model_groups.items():
         if isinstance(group_config, dict):
-            description = group_config.get("description", "")
-            groups.append((group_name, description))
+            # 获取各平台的模型名称
+            smart_model = group_config.get("smart_model", "-")
+            normal_model = group_config.get("model", "-")
+            cheap_model = group_config.get("cheap_model", "-")
+            groups.append((group_name, smart_model, normal_model, cheap_model))
 
     return groups
 
@@ -1444,9 +1455,6 @@ def perform_switch(
         # 将新模型设置到现有的 session 中
         agent.session.model = agent.model
 
-        # 重新设置系统提示词
-        agent._setup_system_prompt()
-
         return True
     except Exception as e:
         PrettyOutput.auto_print(f"❌ 切换模型组失败: {e}")
@@ -1483,10 +1491,13 @@ def switch_model_group(agent: Any) -> bool:
     )
     table.add_column("编号", style="cyan", justify="center")
     table.add_column("模型组名称", style="green")
-    table.add_column("描述", style="yellow")
+    table.add_column("Smart", style="cyan", justify="center")
+    table.add_column("Normal", style="magenta", justify="center")
+    table.add_column("Cheap", style="yellow", justify="center")
 
-    for idx, (group_name, description) in enumerate(groups, 1):
-        table.add_row(str(idx), group_name, description or "")
+    for idx, (group_name, smart_model, normal_model, cheap_model) in enumerate(groups, 1):
+        table.add_row(str(idx), group_name, smart_model,
+                      normal_model, cheap_model)
 
     console.print(table)
 
@@ -1522,7 +1533,8 @@ def switch_model_group(agent: Any) -> bool:
         platform_type = get_platform_type_from_agent(agent)
 
         # 检查上下文限制
-        can_switch, reason = check_context_limit(agent, new_group, platform_type)
+        can_switch, reason = check_context_limit(
+            agent, new_group, platform_type)
         if not can_switch:
             PrettyOutput.auto_print(f"⚠️ {reason}")
             confirm = input("是否仍要切换? (y/n): ").strip().lower()
@@ -1536,6 +1548,7 @@ def switch_model_group(agent: Any) -> bool:
         PrettyOutput.auto_print(f"🔄 正在切换到模型组 '{new_group}'...")
         if perform_switch(agent, new_group, platform_type):
             PrettyOutput.auto_print(f"✅ 已成功切换到模型组 '{new_group}'")
+            set_llm_group(new_group)
             return True
         else:
             return False
