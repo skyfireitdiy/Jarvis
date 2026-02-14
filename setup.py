@@ -43,6 +43,7 @@ setup(
     install_requires=[
         "requests==2.32.3",
         "playwright==1.48.0",
+        "nest_asyncio>=1.5.0",
         "colorama==0.4.6",
         "prompt_toolkit==3.0.50",
         "pygments==2.19.1",
