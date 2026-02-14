@@ -129,6 +129,54 @@ def call_tool(
         raise typer.Exit(code=1)
 
 
+@app.command("show")
+def show_tool(
+    tool_name: str = typer.Argument(..., help="要查看的工具名称"),
+    as_json: bool = typer.Option(False, "--json", help="以JSON格式输出"),
+) -> None:
+    """显示指定工具的详细信息"""
+    registry = ToolRegistry()
+    # 从 _all_tools 查找，这样可以显示所有已加载的工具（包括被过滤的）
+    tool_obj = registry._all_tools.get(tool_name)
+
+    if not tool_obj:
+        PrettyOutput.auto_print(f"❌ 错误: 工具 '{tool_name}' 不存在")
+        available_tools = ", ".join([t["name"] for t in registry.get_all_tools()])
+        PrettyOutput.auto_print(f"ℹ️ 可用工具: {available_tools}")
+        raise typer.Exit(code=1)
+
+    if as_json:
+        # 以 JSON 格式输出完整工具信息
+        tool_dict = tool_obj.to_dict()
+        PrettyOutput.print(
+            json.dumps(tool_dict, indent=2, ensure_ascii=False),
+            OutputType.CODE,
+            lang="json",
+        )
+    else:
+        # 以可读格式显示
+        lines = [
+            f"📦 工具名称: {tool_obj.name}",
+            f"📝 描述: {tool_obj.description}",
+            f"🔧 协议版本: {getattr(tool_obj, 'protocol_version', '1.0')}",
+            "",
+            "📋 参数:",
+        ]
+
+        # 显示参数信息
+        params = tool_obj.parameters
+        properties = params.get("properties", {})
+
+        if properties:
+            lines.append("```json")
+            lines.append(json.dumps(params, indent=2, ensure_ascii=False))
+            lines.append("```")
+        else:
+            lines.append("   无参数")
+
+        PrettyOutput.print("\n".join(lines), OutputType.CODE, lang="markdown")
+
+
 def cli() -> None:
     """Typer application entry point"""
     init_env()
