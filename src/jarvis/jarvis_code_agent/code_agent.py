@@ -227,6 +227,37 @@ class CodeAgent(Agent):
 
         return base_tools
 
+    def _merge_rule_names(self, cli_rule_names: Optional[str]) -> Optional[str]:
+        """合并配置文件默认规则和命令行规则
+
+        参数:
+            cli_rule_names: 命令行传入的规则名称（逗号分隔的字符串）
+
+        返回:
+            Optional[str]: 合并后的规则名称（逗号分隔的字符串），如果都为空则返回 None
+        """
+        from jarvis.jarvis_utils.config import get_default_rule_names
+
+        # 获取配置文件中的默认规则
+        default_rules = get_default_rule_names()
+
+        # 解析命令行规则
+        cli_rules: List[str] = []
+        if cli_rule_names and cli_rule_names.strip():
+            cli_rules = [
+                name.strip() for name in cli_rule_names.split(",") if name.strip()
+            ]
+
+        # 如果两个都没有，返回 None
+        if not default_rules and not cli_rules:
+            return None
+
+        # 合并并去重
+        all_rules = list(dict.fromkeys(default_rules + cli_rules))  # 保持顺序的去重
+
+        # 转换为逗号分隔的字符串
+        return ",".join(all_rules) if all_rules else None
+
     def _prepare_code_agent_parent_init(
         self,
         need_summary: bool,
@@ -250,6 +281,10 @@ class CodeAgent(Agent):
         # 获取 CodeAgent 专用的系统提示词
         code_system_prompt = get_system_prompt()
 
+        # 合并默认规则和命令行规则
+        cli_rule_names = kwargs.pop("rule_names", None)
+        merged_rule_names = self._merge_rule_names(cli_rule_names)
+
         # 从配置文件读取默认值，允许通过 kwargs 覆盖
         # 如果 kwargs 中未指定，则从配置文件读取默认值
         use_methodology = kwargs.pop("use_methodology", is_use_methodology())
@@ -271,6 +306,7 @@ class CodeAgent(Agent):
             "non_interactive": non_interactive,
             "use_tools": base_tools,
             "optimize_system_prompt": optimize_system_prompt,
+            "rule_names": merged_rule_names,
         }
 
         # 自动移除所有显式传递的参数，避免重复传递错误
