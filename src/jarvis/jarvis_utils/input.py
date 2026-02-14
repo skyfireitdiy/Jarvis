@@ -8,7 +8,6 @@
 - 用于输入控制的自定义键绑定
 """
 
-import asyncio
 import base64
 import os
 import sys
@@ -420,14 +419,7 @@ def get_choice(tip: str, choices: List[str]) -> str:
     )
 
     try:
-        # 检测是否有正在运行的事件循环
-        try:
-            loop = asyncio.get_running_loop()
-            # 如果已有事件循环，使用 run_until_complete + run_async
-            result = loop.run_until_complete(app.run_async())
-        except RuntimeError:
-            # 没有运行中的事件循环，使用常规的 run()
-            result = app.run()
+        result = app.run()
         return result if result is not None else ""
     except (KeyboardInterrupt, EOFError):
         return ""
@@ -1185,30 +1177,14 @@ def _get_multiline_input_internal(
             pass
 
     try:
-        # 检测是否有正在运行的事件循环
-        try:
-            loop = asyncio.get_running_loop()
-            # 如果已有事件循环，使用 run_until_complete + prompt_async
-            result = loop.run_until_complete(
-                session.prompt_async(
-                    prompt,
-                    style=style,
-                    pre_run=_pre_run,
-                    bottom_toolbar=_bottom_toolbar,
-                    placeholder=FormattedText([("class:placeholder", tip)]),
-                    default=(preset or ""),
-                )
-            )
-        except RuntimeError:
-            # 没有运行中的事件循环，使用常规的 prompt()
-            result = session.prompt(
-                prompt,
-                style=style,
-                pre_run=_pre_run,
-                bottom_toolbar=_bottom_toolbar,
-                placeholder=FormattedText([("class:placeholder", tip)]),
-                default=(preset or ""),
-            )
+        result = session.prompt(
+            prompt,
+            style=style,
+            pre_run=_pre_run,
+            bottom_toolbar=_bottom_toolbar,
+            placeholder=FormattedText([("class:placeholder", tip)]),
+            default=(preset or ""),
+        )
         return str(result).strip() if result else ""
     except (KeyboardInterrupt, EOFError):
         return ""

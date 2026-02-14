@@ -1,0 +1,8 @@
+{
+  "id": "20260214_231801_431199",
+  "type": "project_long_term",
+  "tags": ["CLI扩展", "playwright_browser", "开发规范", "标签页管理"],
+  "content": "Playwright Browser CLI工具扩展规范：\n\n1. 扩展新命令的标准流程：\n   - 步骤1：实现函数（返回{success, stdout, stderr}格式）\n   - 步骤2：添加argparse参数定义（在main()函数中）\n   - 步骤3：添加命令分发逻辑（elif分支）\n\n2. 所有函数必须遵守的规则：\n   - 返回统一JSON格式：{success, stdout, stderr}\n   - 支持browser_id参数（默认值\"default\"）\n   - 检查浏览器是否启动（session['page']是否为None）\n   - 使用try-except捕获异常\n\n3. 标签页管理实现模式：\n   - session结构：{\"context\": ..., \"page\": ..., \"pages\": {}, \"current_page_id\": ...}\n   - pages字典：page_id -> page映射\n   - page_id格式：page_1, page_2等\n   - 关闭当前标签页时，需自动切换到其他标签页或清空\n\n4. 当前CLI工具状态：\n   - 文件：src/jarvis/jarvis_browser/cli.py\n   - 已支持31个命令（14基础+9高级+8标签页/导航）\n   - 基础操作：launch, close, navigate, click, type, screenshot, gettext\n   - 高级操作：hover, drag, double_click, press_key, fill_form, submit_form, clear_form, upload_file, download_file\n   - 标签页/导航：new_tab, switch_tab, close_tab, go_back, go_forward, scroll_to, scroll_down, scroll_up\n   - 其他操作：list, console, eval, getattribute, getelementinfo, waitforselector, waitfortext",
+  "created_at": "2026-02-14T23:18:01.431220",
+  "updated_at": "2026-02-14T23:18:01.431223"
+}

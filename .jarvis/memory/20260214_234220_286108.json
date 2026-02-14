@@ -1,0 +1,8 @@
+{
+  "id": "20260214_234220_286108",
+  "type": "project_long_term",
+  "tags": ["CLI开发", "playwright_browser", "代码扩展", "开发规范"],
+  "content": "## Playwright Browser CLI工具扩展模式\n\n### 文件结构规范\n- **函数实现**：在set_local_storage函数之后，main函数之前添加新函数\n- **参数定义**：在setlocalstorage命令参数定义之后，args = parser.parse_args()之前添加新命令的argparse参数\n- **分发逻辑**：在setlocalstorage命令分发之后，else分支之前添加新命令的elif分支\n\n### 函数实现规范\n- 所有函数必须返回统一的JSON格式：{\"success\": bool, \"stdout\": str, \"stderr\": str}\n- 使用try-except包裹核心逻辑，捕获所有异常\n- 参数顺序：功能性参数在前，browser_id参数在后（如element_screenshot(selector, browser_id)）\n- 使用datetime.now().strftime(\"%Y%m%d_%H%M%S\")生成时间戳\n- 临时文件保存到：/tmp/playwright_browser/ 目录\n\n### 验证步骤\n1. Python语法检查：python3 -m py_compile src/jarvis/jarvis_browser/cli.py\n2. ruff静态检查：ruff check src/jarvis/jarvis_browser/cli.py\n3. mypy类型检查：mypy src/jarvis/jarvis_browser/cli.py\n4. 验证函数定义存在：rg -n \"^def function_name\" src/jarvis/jarvis_browser/cli.py\n5. 验证参数定义存在：rg -n \"command_parser\" src/jarvis/jarvis_browser/cli.py\n6. 验证分发逻辑存在：rg -n \"args.command == \\\"command\\\"\" src/jarvis/jarvis_browser/cli.py\n\n### 文件修改技巧\n- 如果edit_file工具无法处理大段代码插入，可使用Python脚本+sed命令：\n  1. 创建临时Python脚本，使用re.sub进行正则替换\n  2. 使用sed命令删除不可见字符或其他问题行\n\n### 网络和性能操作特殊说明\n- start_network_monitor：需要在session中维护network_requests列表，添加request和response监听器\n- get_network_requests：保存到{browser_id}_network_requests_{timestamp}.json\n- element_screenshot：需要selector参数，保存到{browser_id}_element_screenshot_{timestamp}.png\n- export_pdf：保存到{browser_id}_page_{timestamp}.pdf\n- get_performance_metrics：使用JavaScript的performance.timing API获取指标，保存到{browser_id}_performance_metrics_{timestamp}.json",
+  "created_at": "2026-02-14T23:42:20.286129",
+  "updated_at": "2026-02-14T23:42:20.286133"
+}

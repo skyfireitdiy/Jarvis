@@ -9,7 +9,6 @@ AgentRunLoop: 承载 Agent 的主运行循环逻辑。
 """
 
 import asyncio
-import nest_asyncio
 import os
 import re
 from enum import Enum

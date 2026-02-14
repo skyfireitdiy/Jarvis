@@ -1,0 +1,8 @@
+{
+  "id": "20260214_232330_992940",
+  "type": "project_long_term",
+  "tags": ["playwright_browser", "CLI架构", "开发规范", "命令扩展"],
+  "content": "Playwright Browser CLI工具架构：\n1. 统一返回格式：所有命令函数返回{success, stdout, stderr}格式\n2. 浏览器会话管理：使用全局变量_browser_sessions管理多个浏览器会话，通过browser_id参数区分\n3. 结果保存路径：/tmp/playwright_browser/{browser_id}_{type}_{timestamp}.json\n4. CLI工具扩展规范：新增命令需要实现三部分：函数实现、argparse参数定义、main()命令分发逻辑\n5. 数据传递方式：Cookie/Storage等复杂数据使用JSON字符串格式传递\n6. 参考实现：参考playwright_browser.py的实现，但需移除PrettyOutput.auto_print调用，改用JSON返回格式",
+  "created_at": "2026-02-14T23:23:30.992966",
+  "updated_at": "2026-02-14T23:23:30.992969"
+}
