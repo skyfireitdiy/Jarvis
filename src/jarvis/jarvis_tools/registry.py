@@ -294,6 +294,9 @@ class ToolRegistry(OutputHandlerProtocol):
 
     def _apply_tool_config_filter(self) -> None:
         """应用工具配置组的过滤规则"""
+        # 保存所有工具的完整副本，用于 execute_tool 时直接查找（不经过过滤）
+        self._all_tools = self.tools.copy()
+
         from jarvis.jarvis_utils.config import get_tool_dont_use_list
         from jarvis.jarvis_utils.config import get_tool_use_list
 
@@ -1102,7 +1105,11 @@ class ToolRegistry(OutputHandlerProtocol):
         """
         if name in self.tools:
             PrettyOutput.auto_print(f"⚠️ 警告: 工具 '{name}' 已存在，将被覆盖")
-        self.tools[name] = Tool(name, description, parameters, func, protocol_version)
+        tool = Tool(name, description, parameters, func, protocol_version)
+        self.tools[name] = tool
+        # 同时更新 _all_tools，确保新注册的工具可以被调用
+        if hasattr(self, "_all_tools"):
+            self._all_tools[name] = tool
 
     def get_tool(self, name: str) -> Optional[Tool]:
         """获取工具
@@ -1148,11 +1155,11 @@ class ToolRegistry(OutputHandlerProtocol):
         返回:
             Dict[str, Any]: 包含执行结果的字典，包含success、stdout和stderr字段
         """
-        tool = self.get_tool(name)
+        tool = self._all_tools.get(name)
         if tool is None:
             return {
                 "success": False,
-                "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self.tools.keys())}",
+                "stderr": f"工具 {name} 不存在，可用的工具有: {', '.join(self._all_tools.keys())}",
                 "stdout": "",
             }
 
