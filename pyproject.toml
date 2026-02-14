@@ -23,6 +23,7 @@ dependencies = [
     "playwright==1.48.0",
     "colorama==0.4.6",
     "prompt_toolkit==3.0.50",
+    "nest_asyncio==1.6.0",
     "pygments==2.19.1",
     "fuzzywuzzy==0.18.0",
     "fastapi==0.115.12",

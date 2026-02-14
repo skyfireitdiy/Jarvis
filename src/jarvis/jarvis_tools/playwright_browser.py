@@ -544,11 +544,18 @@ class PlaywrightBrowserTool:
                     f"📥 启动浏览器 [{browser_id}] 时的内容已保存到: {', '.join(file_paths)}"
                 )
 
-            return {
+            result = {
                 "success": True,
                 "stdout": stdout_msg,
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "launch", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -604,11 +611,18 @@ class PlaywrightBrowserTool:
                 )
                 stdout_msg += f"。页面内容已保存到: {', '.join(output_files)}"
 
-            return {
+            result = {
                 "success": True,
                 "stdout": stdout_msg,
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "navigate", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -663,11 +677,18 @@ class PlaywrightBrowserTool:
                 )
                 stdout_msg += f"。页面内容已保存到: {', '.join(output_files)}"
 
-            return {
+            result = {
                 "success": True,
                 "stdout": stdout_msg,
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "click", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -723,11 +744,18 @@ class PlaywrightBrowserTool:
                 )
                 stdout_msg += f"。页面内容已保存到: {', '.join(output_files)}"
 
-            return {
+            result = {
                 "success": True,
                 "stdout": stdout_msg,
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "type", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -986,6 +1014,55 @@ class PlaywrightBrowserTool:
 
         return content
 
+    def _add_interactive_elements_to_result(
+        self, result: Dict[str, Any], page: Any, action: str, browser_id: str
+    ) -> Dict[str, Any]:
+        """在操作结果中添加可交互元素清单
+
+        参数:
+            result: 原始结果字典
+            page: Playwright 页面对象
+            action: 操作名称
+            browser_id: 浏览器ID
+
+        返回:
+            Dict[str, Any]: 添加了交互元素清单的结果
+        """
+        if not result.get("success"):
+            return result
+
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            interactive_elements = self._extract_interactive_elements(
+                page, action, timestamp
+            )
+
+            # 添加交互元素清单到 stdout
+            original_stdout = result.get("stdout", "")
+            if original_stdout:
+                result["stdout"] = f"{original_stdout}\n\n{interactive_elements}"
+            else:
+                result["stdout"] = interactive_elements
+
+            # 保存交互元素清单到文件
+            file_path = (
+                Path("/tmp/playwright_browser")
+                / f"{browser_id}_{action}_interactive_{timestamp.replace(' ', '_').replace(':', '-')}.txt"
+            )
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(interactive_elements, encoding="utf-8")
+
+            # 将文件路径添加到 output_files
+            if "output_files" not in result:
+                result["output_files"] = []
+            result["output_files"].append(str(file_path))
+
+        except Exception:
+            # 即使提取失败也不影响主操作
+            pass
+
+        return result
+
     def _wait_for_condition(
         self, page: Any, wait_condition: str, timeout: float
     ) -> None:
@@ -1216,11 +1293,18 @@ class PlaywrightBrowserTool:
                 f"📥 表单填写结果已保存到: {', '.join(output_files)}"
             )
 
-            return {
+            result = {
                 "success": len(errors) == 0,
                 "stdout": f"成功填写 {len(filled_fields)} 个字段。表单结果已保存到: {filename}",
                 "stderr": "; ".join(errors) if errors else "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "fill_form", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1268,11 +1352,18 @@ class PlaywrightBrowserTool:
             # 等待条件满足
             self._wait_for_condition(page, wait_condition, timeout)
 
-            return {
+            result = {
                 "success": True,
                 "stdout": "表单已提交",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "submit_form", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1328,11 +1419,18 @@ class PlaywrightBrowserTool:
                 except Exception:
                     pass
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已清空 {cleared_count} 个表单字段",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "clear_form", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1424,11 +1522,19 @@ class PlaywrightBrowserTool:
             # 设置 cookies
             context.add_cookies(cookies)
 
-            return {
+            page = agent.browser_sessions[browser_id]["page"]
+            result = {
                 "success": True,
                 "stdout": f"已设置 {len(cookies)} 个 Cookies",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "set_cookies", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1453,11 +1559,19 @@ class PlaywrightBrowserTool:
             # 清空 cookies
             context.clear_cookies()
 
-            return {
+            page = agent.browser_sessions[browser_id]["page"]
+            result = {
                 "success": True,
                 "stdout": "已清空所有 Cookies",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "clear_cookies", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1598,11 +1712,18 @@ class PlaywrightBrowserTool:
             # 滚动到指定位置
             page.evaluate(f"window.scrollTo({scroll_x}, {scroll_y})")
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已滚动到位置 ({scroll_x}, {scroll_y})",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "scroll_to", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1636,11 +1757,18 @@ class PlaywrightBrowserTool:
             # 向下滚动
             page.evaluate(f"window.scrollTo(0, {new_scroll})")
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已向下滚动 {scroll_amount} 像素",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "scroll_down", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1678,11 +1806,18 @@ class PlaywrightBrowserTool:
             # 向上滚动
             page.evaluate(f"window.scrollTo(0, {new_scroll})")
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已向上滚动 {abs(scroll_amount)} 像素",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "scroll_up", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1902,11 +2037,18 @@ class PlaywrightBrowserTool:
             # 鼠标悬停
             element.hover()
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已悬停到元素 [{selector}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "hover", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -1969,11 +2111,18 @@ class PlaywrightBrowserTool:
             # 执行拖拽操作
             source_element.drag_to(target_element)
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已将元素 [{selector}] 拖拽到 [{target_selector}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "drag", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2018,11 +2167,18 @@ class PlaywrightBrowserTool:
             # 双击元素
             element.dblclick()
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已双击元素 [{selector}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "double_click", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2059,11 +2215,18 @@ class PlaywrightBrowserTool:
             # 按下按键
             page.keyboard.press(key)
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已按下按键 [{key}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "press_key", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2116,11 +2279,18 @@ class PlaywrightBrowserTool:
             # 上传文件
             element.set_input_files(file_path)
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已上传文件 [{file_path}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "upload_file", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2159,11 +2329,18 @@ class PlaywrightBrowserTool:
                 f"✅ 新建标签页 [{page_id}] 成功，当前标签页总数: {len(pages)}"
             )
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已新建标签页 [{page_id}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, new_page, "new_tab", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2210,11 +2387,18 @@ class PlaywrightBrowserTool:
 
             PrettyOutput.auto_print(f"✅ 已切换到标签页 [{page_id}]")
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已切换到标签页 [{page_id}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, pages[page_id], "switch_tab", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2325,11 +2509,18 @@ class PlaywrightBrowserTool:
 
             PrettyOutput.auto_print("✅ 已后退到上一个页面")
 
-            return {
+            result = {
                 "success": True,
                 "stdout": "已后退到上一个页面",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "go_back", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2358,11 +2549,18 @@ class PlaywrightBrowserTool:
 
             PrettyOutput.auto_print("✅ 已前进到下一个页面")
 
-            return {
+            result = {
                 "success": True,
                 "stdout": "已前进到下一个页面",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "go_forward", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2470,11 +2668,18 @@ class PlaywrightBrowserTool:
                 f"✅ 已{action_desc}本地存储数据，共 {len(data)} 项"
             )
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"已{action_desc}本地存储数据，共 {len(data)} 项",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "set_local_storage", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
@@ -2805,11 +3010,18 @@ class PlaywrightBrowserTool:
             # 保存文件
             download.save_as(save_path)
 
-            return {
+            result = {
                 "success": True,
                 "stdout": f"文件已下载到 [{save_path}]",
                 "stderr": "",
             }
+
+            # 添加交互元素清单
+            result = self._add_interactive_elements_to_result(
+                result, page, "download_file", browser_id
+            )
+
+            return result
 
         except Exception as e:
             return {
