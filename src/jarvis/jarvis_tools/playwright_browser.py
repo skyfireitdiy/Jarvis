@@ -32,6 +32,22 @@ class PlaywrightBrowserTool:
                     "screenshot",
                     "close",
                     "list",
+                    "console",
+                    "eval",
+                    "fill_form",
+                    "submit_form",
+                    "clear_form",
+                    "get_cookies",
+                    "set_cookies",
+                    "clear_cookies",
+                    "wait_for_selector",
+                    "wait_for_text",
+                    "scroll_to",
+                    "scroll_down",
+                    "scroll_up",
+                    "get_element_info",
+                    "get_text",
+                    "get_attribute",
                 ],
             },
             "browser_id": {
@@ -65,6 +81,54 @@ class PlaywrightBrowserTool:
             "headless": {
                 "type": "boolean",
                 "description": "是否以无头模式启动浏览器（仅 action=launch 时有效，默认true）",
+            },
+            "code": {
+                "type": "string",
+                "description": "要执行的 JavaScript 代码（仅 action=eval 时有效）",
+            },
+            "save_result": {
+                "type": "boolean",
+                "description": "是否保存 eval 结果到文件（仅 action=eval 时有效，默认false）",
+            },
+            "clear_logs": {
+                "type": "boolean",
+                "description": "是否清空已读取的 console 日志（仅 action=console 时有效，默认false）",
+            },
+            "fields": {
+                "type": "object",
+                "description": "表单字段映射，字段名到值的字典（仅 action=fill_form 时有效）",
+            },
+            "form_selector": {
+                "type": "string",
+                "description": "表单选择器（仅 action=submit_form、action=clear_form 时有效）",
+            },
+            "cookies": {
+                "type": "array",
+                "description": "Cookies 数组（仅 action=set_cookies 时有效），每个 cookie 包含 name、value 等字段",
+            },
+            "wait_state": {
+                "type": "string",
+                "description": "等待状态（仅 action=wait_for_selector 时有效），可选: 'visible', 'hidden', 'attached', 'detached'，默认 'visible'",
+            },
+            "wait_text": {
+                "type": "string",
+                "description": "等待文本内容（仅 action=wait_for_text 时有效）",
+            },
+            "scroll_x": {
+                "type": "number",
+                "description": "水平滚动位置（像素），仅scroll_to时有效",
+            },
+            "scroll_y": {
+                "type": "number",
+                "description": "垂直滚动位置（像素），仅scroll_to时有效",
+            },
+            "scroll_amount": {
+                "type": "number",
+                "description": "滚动距离（像素），scroll_up时为负值，scroll_down时为正值",
+            },
+            "attribute": {
+                "type": "string",
+                "description": "属性名（仅action=get_attribute时有效）",
             },
         },
         "required": ["action"],
@@ -152,6 +216,22 @@ class PlaywrightBrowserTool:
             "screenshot",
             "close",
             "list",
+            "console",
+            "eval",
+            "fill_form",
+            "submit_form",
+            "clear_form",
+            "get_cookies",
+            "set_cookies",
+            "clear_cookies",
+            "wait_for_selector",
+            "wait_for_text",
+            "scroll_to",
+            "scroll_down",
+            "scroll_up",
+            "get_element_info",
+            "get_text",
+            "get_attribute",
         ]
         if action not in valid_actions:
             return {
@@ -196,6 +276,86 @@ class PlaywrightBrowserTool:
                 result = self._run_async(self._list_browsers(agent))
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取浏览器列表失败")
+                return result
+            elif action == "console":
+                result = self._run_async(self._get_console_logs(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取 console 日志失败")
+                return result
+            elif action == "eval":
+                result = self._run_async(self._evaluate_javascript(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 执行 JavaScript 代码失败")
+                return result
+            elif action == "fill_form":
+                result = self._run_async(self._fill_form(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 填写表单失败")
+                return result
+            elif action == "submit_form":
+                result = self._run_async(self._submit_form(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 提交表单失败")
+                return result
+            elif action == "clear_form":
+                result = self._run_async(self._clear_form(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 清空表单失败")
+                return result
+            elif action == "get_cookies":
+                result = self._run_async(self._get_cookies(agent, browser_id))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取 Cookies 失败")
+                return result
+            elif action == "set_cookies":
+                result = self._run_async(self._set_cookies(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 设置 Cookies 失败")
+                return result
+            elif action == "clear_cookies":
+                result = self._run_async(self._clear_cookies(agent, browser_id))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 清空 Cookies 失败")
+                return result
+            elif action == "wait_for_selector":
+                result = self._run_async(self._wait_for_selector(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 等待元素失败")
+                return result
+            elif action == "wait_for_text":
+                result = self._run_async(self._wait_for_text(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 等待文本失败")
+                return result
+            elif action == "scroll_to":
+                result = self._run_async(self._scroll_to(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 滚动到指定位置失败")
+                return result
+            elif action == "scroll_down":
+                result = self._run_async(self._scroll_down(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 向下滚动失败")
+                return result
+            elif action == "scroll_up":
+                result = self._run_async(self._scroll_up(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 向上滚动失败")
+                return result
+            elif action == "get_element_info":
+                result = self._run_async(self._get_element_info(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取元素信息失败")
+                return result
+            elif action == "get_text":
+                result = self._run_async(self._get_text(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取文本失败")
+                return result
+            elif action == "get_attribute":
+                result = self._run_async(self._get_attribute(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取属性失败")
                 return result
             return {
                 "success": False,
@@ -243,12 +403,29 @@ class PlaywrightBrowserTool:
             context = await browser.new_context()
             page = await context.new_page()
 
+            # 添加 console 事件监听器
+            async def handle_console_message(msg):
+                # 限制日志条数，最多保存 1000 条
+                session = agent.browser_sessions[browser_id]
+                if len(session["console_logs"]) >= 1000:
+                    session["console_logs"].pop(0)  # 移除最早的日志
+                session["console_logs"].append(
+                    {
+                        "type": msg.type,
+                        "text": msg.text,
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                )
+
+            page.on("console", handle_console_message)
+
             # 保存会话
             agent.browser_sessions[browser_id] = {
                 "playwright_manager": playwright_manager,
                 "browser": browser,
                 "context": context,
                 "page": page,
+                "console_logs": [],
             }
 
             # 保存初始页面内容
@@ -749,3 +926,927 @@ class PlaywrightBrowserTool:
         except Exception:
             # 超时或其他错误，继续执行
             pass
+
+    async def _get_console_logs(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """获取 console 日志（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            session = agent.browser_sessions[browser_id]
+            console_logs = session.get("console_logs", [])
+            clear_logs = args.get("clear_logs", False)
+
+            # 生成文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_dir = Path("/tmp/playwright_browser")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            filename = temp_dir / f"{browser_id}_console_{timestamp}.txt"
+
+            # 格式化日志内容
+            content = f"浏览器 ID: {browser_id}\n"
+            content += f"时间: {timestamp}\n"
+            content += f"日志数量: {len(console_logs)}\n"
+            content += "=" * 50 + "\n\n"
+
+            for log in console_logs:
+                content += f"[{log['timestamp']}] [{log['type'].upper()}] {log['text']}\n"
+
+            # 保存到文件
+            filename.write_text(content, encoding="utf-8")
+            output_files = [str(filename)]
+            PrettyOutput.auto_print(f"📥 Console 日志已保存到: {', '.join(output_files)}")
+
+            # 清空日志
+            if clear_logs:
+                session["console_logs"] = []
+
+            return {
+                "success": True,
+                "stdout": f"已获取 {len(console_logs)} 条 console 日志",
+                "stderr": "",
+                "output_files": output_files,
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取 console 日志失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _evaluate_javascript(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """执行 JavaScript 代码（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        code = args.get("code", "").strip()
+        save_result = args.get("save_result", False)
+
+        if not code:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 JavaScript 代码参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 执行 JavaScript 代码
+            result = await page.evaluate(code)
+
+            # 格式化结果为字符串
+            result_str = str(result)
+            if len(result_str) > 10000:
+                result_str = result_str[:10000] + "... (已截断)"
+
+            output_files = []
+
+            # 可选保存结果到文件
+            if save_result:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                temp_dir = Path("/tmp/playwright_browser")
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                filename = temp_dir / f"{browser_id}_eval_{timestamp}.txt"
+
+                content = f"浏览器 ID: {browser_id}\n"
+                content += f"时间: {timestamp}\n"
+                content += f"代码:\n{code}\n\n"
+                content += f"结果:\n{result_str}\n"
+
+                filename.write_text(content, encoding="utf-8")
+                output_files = [str(filename)]
+                PrettyOutput.auto_print(f"📥 Eval 结果已保存到: {', '.join(output_files)}")
+
+            return {
+                "success": True,
+                "stdout": f"JavaScript 执行成功: {result_str}",
+                "stderr": "",
+                "output_files": output_files,
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"执行 JavaScript 代码失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _fill_form(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """填写表单（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        fields = args.get("fields", {})
+
+        if not fields:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少表单字段参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            filled_fields = []
+            errors = []
+
+            # 遍历所有字段
+            for field_name, field_value in fields.items():
+                try:
+                    # 尝试多种选择器
+                    selectors = [
+                        f"input[name='{field_name}']",
+                        f"input[id='{field_name}']",
+                        f"textarea[name='{field_name}']",
+                        f"textarea[id='{field_name}']",
+                        f"select[name='{field_name}']",
+                        f"select[id='{field_name}']",
+                    ]
+
+                    element = None
+                    for selector in selectors:
+                        try:
+                            element = await page.query_selector(selector)
+                            if element:
+                                break
+                        except Exception:
+                            continue
+
+                    if element:
+                        await element.fill(str(field_value))
+                        filled_fields.append(field_name)
+                    else:
+                        errors.append(f"未找到字段: {field_name}")
+
+                except Exception as e:
+                    errors.append(f"填写字段 {field_name} 失败: {str(e)}")
+
+            # 保存操作结果
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_dir = Path("/tmp/playwright_browser")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            filename = temp_dir / f"{browser_id}_fill_form_{timestamp}.txt"
+
+            content = f"浏览器 ID: {browser_id}\n"
+            content += f"时间: {timestamp}\n"
+            content += f"成功填写: {len(filled_fields)} 个字段\n"
+            content += f"失败: {len(errors)} 个字段\n\n"
+
+            if filled_fields:
+                content += "=== 成功填写的字段 ===\n"
+                for field in filled_fields:
+                    content += f"  - {field}: {fields[field]}\n"
+                content += "\n"
+
+            if errors:
+                content += "=== 错误信息 ===\n"
+                for error in errors:
+                    content += f"  - {error}\n"
+
+            filename.write_text(content, encoding="utf-8")
+            output_files = [str(filename)]
+            PrettyOutput.auto_print(f"📥 表单填写结果已保存到: {', '.join(output_files)}")
+
+            return {
+                "success": len(errors) == 0,
+                "stdout": f"成功填写 {len(filled_fields)} 个字段",
+                "stderr": "; ".join(errors) if errors else "",
+                "output_files": output_files,
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"填写表单失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _submit_form(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """提交表单（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            form_selector = args.get("form_selector", "form")
+            wait_condition = args.get("wait_condition", "network_idle")
+            timeout = args.get("timeout", 30.0)
+
+            # 尝试提交表单
+            try:
+                await page.click(f"{form_selector} button[type='submit']")
+            except Exception:
+                try:
+                    await page.click(f"{form_selector} input[type='submit']")
+                except Exception:
+                    # 尝试直接提交表单
+                    form = await page.query_selector(form_selector)
+                    if form:
+                        await form.evaluate("el => el.submit()")
+                    else:
+                        return {
+                            "success": False,
+                            "stdout": "",
+                            "stderr": f"未找到表单: {form_selector}",
+                            "output_files": [],
+                        }
+
+            # 等待条件满足
+            await self._wait_for_condition(page, wait_condition, timeout)
+
+            return {
+                "success": True,
+                "stdout": "表单已提交",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"提交表单失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _clear_form(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """清空表单（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            form_selector = args.get("form_selector", "form")
+
+            # 获取表单内的所有输入元素
+            inputs = await page.query_selector_all(f"{form_selector} input")
+            textareas = await page.query_selector_all(f"{form_selector} textarea")
+            selects = await page.query_selector_all(f"{form_selector} select")
+
+            cleared_count = 0
+
+            # 清空 input 元素
+            for input_elem in inputs:
+                try:
+                    await input_elem.fill("")
+                    cleared_count += 1
+                except Exception:
+                    pass
+
+            # 清空 textarea 元素
+            for textarea in textareas:
+                try:
+                    await textarea.fill("")
+                    cleared_count += 1
+                except Exception:
+                    pass
+
+            # 重置 select 元素到第一个选项
+            for select in selects:
+                try:
+                    await select.select_option(index=0)
+                    cleared_count += 1
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "stdout": f"已清空 {cleared_count} 个表单字段",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"清空表单失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _get_cookies(
+        self, agent: Any, browser_id: str
+    ) -> Dict[str, Any]:
+        """获取所有 Cookies（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            context = agent.browser_sessions[browser_id]["context"]
+
+            # 获取所有 cookies
+            cookies = await context.cookies()
+
+            # 保存到文件
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_dir = Path("/tmp/playwright_browser")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            filename = temp_dir / f"{browser_id}_cookies_{timestamp}.json"
+
+            # 格式化输出
+            content = f"浏览器 ID: {browser_id}\n"
+            content += f"时间: {timestamp}\n"
+            content += f"Cookies 数量: {len(cookies)}\n\n"
+
+            for i, cookie in enumerate(cookies, 1):
+                content += f"=== Cookie {i} ===\n"
+                content += f"  Name: {cookie.get('name', '')}\n"
+                content += f"  Value: {cookie.get('value', '')}\n"
+                content += f"  Domain: {cookie.get('domain', '')}\n"
+                content += f"  Path: {cookie.get('path', '')}\n"
+                content += f"  Expires: {cookie.get('expires', 'Session')}\n"
+                content += f"  Secure: {cookie.get('secure', False)}\n"
+                content += f"  HttpOnly: {cookie.get('httpOnly', False)}\n"
+                content += "\n"
+
+            filename.write_text(content, encoding="utf-8")
+            output_files = [str(filename)]
+            PrettyOutput.auto_print(f"📥 Cookies 已保存到: {', '.join(output_files)}")
+
+            return {
+                "success": True,
+                "stdout": f"已获取 {len(cookies)} 个 Cookies",
+                "stderr": "",
+                "output_files": output_files,
+                "cookies": cookies,
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取 Cookies 失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _set_cookies(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """设置 Cookies（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        cookies = args.get("cookies", [])
+
+        if not cookies:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 cookies 参数",
+                "output_files": [],
+            }
+
+        try:
+            context = agent.browser_sessions[browser_id]["context"]
+
+            # 设置 cookies
+            await context.add_cookies(cookies)
+
+            return {
+                "success": True,
+                "stdout": f"已设置 {len(cookies)} 个 Cookies",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"设置 Cookies 失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _clear_cookies(
+        self, agent: Any, browser_id: str
+    ) -> Dict[str, Any]:
+        """清空所有 Cookies（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            context = agent.browser_sessions[browser_id]["context"]
+
+            # 清空 cookies
+            await context.clear_cookies()
+
+            return {
+                "success": True,
+                "stdout": "已清空所有 Cookies",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"清空 Cookies 失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _wait_for_selector(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """等待元素达到指定状态（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+        wait_state = args.get("wait_state", "visible")
+        timeout = args.get("timeout", 30.0)
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        # 验证状态参数
+        valid_states = ["visible", "hidden", "attached", "detached"]
+        if wait_state not in valid_states:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"无效的等待状态: {wait_state}，有效状态: {', '.join(valid_states)}",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 等待元素达到指定状态
+            await page.wait_for_selector(
+                selector, state=wait_state, timeout=timeout * 1000
+            )
+
+            return {
+                "success": True,
+                "stdout": f"元素 [{selector}] 已达到状态 [{wait_state}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"等待元素失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _wait_for_text(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """等待文本出现（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        text = args.get("wait_text", "").strip()
+        selector = args.get("selector", "*")
+        timeout = args.get("timeout", 30.0)
+
+        if not text:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 wait_text 参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 等待文本出现
+            await page.wait_for_function(
+                """
+                (text, selector) => {{
+                    const elements = document.querySelectorAll(selector);
+                    for (const el of elements) {{
+                        if (el.textContent && el.textContent.includes(text)) {{
+                            return true;
+                        }}
+                    }}
+                    return false;
+                }}
+                """,
+                text=text,
+                selector=selector,
+                timeout=timeout * 1000,
+            )
+
+            return {
+                "success": True,
+                "stdout": f"文本 [{text}] 已出现",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"等待文本失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _scroll_to(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """滚动到指定位置（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        scroll_x = args.get("scroll_x", 0)
+        scroll_y = args.get("scroll_y", 0)
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 滚动到指定位置
+            await page.evaluate(
+                f"window.scrollTo({scroll_x}, {scroll_y})"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已滚动到位置 ({scroll_x}, {scroll_y})",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"滚动失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _scroll_down(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """向下滚动页面（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        scroll_amount = args.get("scroll_amount", 300)
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 获取当前滚动位置
+            current_scroll = await page.evaluate("window.scrollY")
+            new_scroll = current_scroll + scroll_amount
+
+            # 向下滚动
+            await page.evaluate(f"window.scrollTo(0, {new_scroll})")
+
+            return {
+                "success": True,
+                "stdout": f"已向下滚动 {scroll_amount} 像素",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"向下滚动失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _scroll_up(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """向上滚动页面（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        scroll_amount = args.get("scroll_amount", -300)  # 默认向上300像素
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 获取当前滚动位置
+            current_scroll = await page.evaluate("window.scrollY")
+            new_scroll = current_scroll + scroll_amount
+
+            # 确保 new_scroll 不小于0
+            if new_scroll < 0:
+                new_scroll = 0
+
+            # 向上滚动
+            await page.evaluate(f"window.scrollTo(0, {new_scroll})")
+
+            return {
+                "success": True,
+                "stdout": f"已向上滚动 {abs(scroll_amount)} 像素",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"向上滚动失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _get_element_info(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """获取元素的详细信息（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            element = await page.query_selector(selector)
+
+            if not element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到元素 [{selector}]",
+                    "output_files": [],
+                }
+
+            # 获取元素信息
+            info = {
+                "selector": selector,
+                "tag_name": await element.evaluate("el => el.tagName"),
+                "text": await element.evaluate("el => el.textContent"),
+                "visible": await element.is_visible(),
+                "enabled": await element.is_enabled(),
+                "id": await element.evaluate("el => el.id"),
+                "class": await element.evaluate("el => el.className"),
+            }
+
+            # 将信息转换为 JSON 字符串
+            import json
+            info_str = json.dumps(info, indent=2, ensure_ascii=False)
+
+            return {
+                "success": True,
+                "stdout": f"元素信息:\n{info_str}",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取元素信息失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _get_text(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """获取元素的文本内容（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            element = await page.query_selector(selector)
+
+            if not element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到元素 [{selector}]",
+                    "output_files": [],
+                }
+
+            # 获取文本内容
+            text = await element.text_content()
+
+            return {
+                "success": True,
+                "stdout": text if text else "",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取文本失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _get_attribute(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """获取元素的属性值（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+        attribute = args.get("attribute", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        if not attribute:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少属性名参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            element = await page.query_selector(selector)
+
+            if not element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到元素 [{selector}]",
+                    "output_files": [],
+                }
+
+            # 获取属性值
+            attr_value = await element.get_attribute(attribute)
+
+            if attr_value is None:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"元素 [{selector}] 没有属性 [{attribute}]",
+                    "output_files": [],
+                }
+
+            return {
+                "success": True,
+                "stdout": attr_value,
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取属性失败: {str(e)}",
+                "output_files": [],
+            }
