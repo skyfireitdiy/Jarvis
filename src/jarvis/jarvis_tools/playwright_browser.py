@@ -48,6 +48,24 @@ class PlaywrightBrowserTool:
                     "get_element_info",
                     "get_text",
                     "get_attribute",
+                    "hover",
+                    "drag",
+                    "double_click",
+                    "press_key",
+                    "upload_file",
+                    "download_file",
+                    "new_tab",
+                    "switch_tab",
+                    "close_tab",
+                    "go_back",
+                    "go_forward",
+                    "get_local_storage",
+                    "set_local_storage",
+                    "start_network_monitor",
+                    "get_network_requests",
+                    "element_screenshot",
+                    "export_pdf",
+                    "get_performance_metrics",
                 ],
             },
             "browser_id": {
@@ -129,6 +147,22 @@ class PlaywrightBrowserTool:
             "attribute": {
                 "type": "string",
                 "description": "属性名（仅action=get_attribute时有效）",
+            },
+            "target_selector": {
+                "type": "string",
+                "description": "目标元素选择器（仅action=drag时有效）",
+            },
+            "key": {
+                "type": "string",
+                "description": "按键名称（仅action=press_key时有效）",
+            },
+            "file_path": {
+                "type": "string",
+                "description": "文件路径（仅action=upload_file时有效）",
+            },
+            "tab_id": {
+                "type": "string",
+                "description": "标签页ID（仅action=switch_tab时有效）",
             },
         },
         "required": ["action"],
@@ -232,6 +266,24 @@ class PlaywrightBrowserTool:
             "get_element_info",
             "get_text",
             "get_attribute",
+            "hover",
+            "drag",
+            "double_click",
+            "press_key",
+            "upload_file",
+            "download_file",
+            "new_tab",
+            "switch_tab",
+            "close_tab",
+            "go_back",
+            "go_forward",
+            "get_local_storage",
+            "set_local_storage",
+            "start_network_monitor",
+            "get_network_requests",
+            "element_screenshot",
+            "export_pdf",
+            "get_performance_metrics",
         ]
         if action not in valid_actions:
             return {
@@ -356,6 +408,96 @@ class PlaywrightBrowserTool:
                 result = self._run_async(self._get_attribute(agent, browser_id, args))
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取属性失败")
+                return result
+            elif action == "hover":
+                result = self._run_async(self._hover(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 悬停失败")
+                return result
+            elif action == "drag":
+                result = self._run_async(self._drag(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 拖拽失败")
+                return result
+            elif action == "double_click":
+                result = self._run_async(self._double_click(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 双击失败")
+                return result
+            elif action == "press_key":
+                result = self._run_async(self._press_key(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 按键失败")
+                return result
+            elif action == "upload_file":
+                result = self._run_async(self._upload_file(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 上传文件失败")
+                return result
+            elif action == "download_file":
+                result = self._run_async(self._download_file(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 下载文件失败")
+                return result
+            elif action == "new_tab":
+                result = self._run_async(self._new_tab(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 新建标签页失败")
+                return result
+            elif action == "switch_tab":
+                result = self._run_async(self._switch_tab(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 切换标签页失败")
+                return result
+            elif action == "close_tab":
+                result = self._run_async(self._close_tab(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 关闭标签页失败")
+                return result
+            elif action == "go_back":
+                result = self._run_async(self._go_back(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 后退失败")
+                return result
+            elif action == "go_forward":
+                result = self._run_async(self._go_forward(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 前进失败")
+                return result
+            elif action == "get_local_storage":
+                result = self._run_async(self._get_local_storage(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取本地存储失败")
+                return result
+            elif action == "set_local_storage":
+                result = self._run_async(self._set_local_storage(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 设置本地存储失败")
+                return result
+            elif action == "start_network_monitor":
+                result = self._run_async(self._start_network_monitor(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 启动网络监听失败")
+                return result
+            elif action == "get_network_requests":
+                result = self._run_async(self._get_network_requests(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取网络请求失败")
+                return result
+            elif action == "element_screenshot":
+                result = self._run_async(self._element_screenshot(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 元素截图失败")
+                return result
+            elif action == "export_pdf":
+                result = self._run_async(self._export_pdf(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 导出PDF失败")
+                return result
+            elif action == "get_performance_metrics":
+                result = self._run_async(self._get_performance_metrics(agent, browser_id, args))
+                if not result["success"]:
+                    PrettyOutput.auto_print("❌ 获取性能指标失败")
                 return result
             return {
                 "success": False,
@@ -1848,5 +1990,1025 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"获取属性失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _hover(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """鼠标悬停到元素上（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            element = await page.query_selector(selector)
+
+            if not element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到元素 [{selector}]",
+                    "output_files": [],
+                }
+
+            # 鼠标悬停
+            await element.hover()
+
+            return {
+                "success": True,
+                "stdout": f"已悬停到元素 [{selector}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"悬停失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _drag(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """拖拽元素（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+        target_selector = args.get("target_selector", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        if not target_selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少目标选择器参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 获取源元素和目标元素
+            source_element = await page.query_selector(selector)
+            target_element = await page.query_selector(target_selector)
+
+            if not source_element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到源元素 [{selector}]",
+                    "output_files": [],
+                }
+
+            if not target_element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到目标元素 [{target_selector}]",
+                    "output_files": [],
+                }
+
+            # 执行拖拽操作
+            await source_element.drag_to(target_element)
+
+            return {
+                "success": True,
+                "stdout": f"已将元素 [{selector}] 拖拽到 [{target_selector}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"拖拽失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _double_click(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """双击元素（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            element = await page.query_selector(selector)
+
+            if not element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到元素 [{selector}]",
+                    "output_files": [],
+                }
+
+            # 双击元素
+            await element.dblclick()
+
+            return {
+                "success": True,
+                "stdout": f"已双击元素 [{selector}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"双击失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _press_key(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """按下键盘按键（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        key = args.get("key", "").strip()
+
+        if not key:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少按键参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 按下按键
+            await page.keyboard.press(key)
+
+            return {
+                "success": True,
+                "stdout": f"已按下按键 [{key}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"按键失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _upload_file(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """上传文件（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+        file_path = args.get("file_path", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少选择器参数",
+                "output_files": [],
+            }
+
+        if not file_path:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少文件路径参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+            element = await page.query_selector(selector)
+
+            if not element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到元素 [{selector}]",
+                    "output_files": [],
+                }
+
+            # 上传文件
+            await element.set_input_files(file_path)
+
+            return {
+                "success": True,
+                "stdout": f"已上传文件 [{file_path}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"上传文件失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _new_tab(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """新建标签页（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            browser = agent.browser_sessions[browser_id]["browser"]
+            pages = agent.browser_sessions[browser_id].get("pages", {})
+
+            # 创建新页面
+            new_page = await browser.new_page()
+            page_id = f"page_{len(pages) + 1}"
+            pages[page_id] = new_page
+
+            # 更新会话
+            agent.browser_sessions[browser_id]["pages"] = pages
+            agent.browser_sessions[browser_id]["current_page_id"] = page_id
+            agent.browser_sessions[browser_id]["page"] = new_page
+
+            PrettyOutput.auto_print(
+                f"✅ 新建标签页 [{page_id}] 成功，当前标签页总数: {len(pages)}"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已新建标签页 [{page_id}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"新建标签页失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _switch_tab(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """切换标签页（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        page_id = args.get("page_id", "").strip()
+
+        if not page_id:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 page_id 参数",
+                "output_files": [],
+            }
+
+        try:
+            pages = agent.browser_sessions[browser_id].get("pages", {})
+
+            if page_id not in pages:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"标签页 [{page_id}] 不存在，可用标签页: {', '.join(pages.keys())}",
+                    "output_files": [],
+                }
+
+            # 切换到指定标签页
+            agent.browser_sessions[browser_id]["current_page_id"] = page_id
+            agent.browser_sessions[browser_id]["page"] = pages[page_id]
+
+            PrettyOutput.auto_print(
+                f"✅ 已切换到标签页 [{page_id}]"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已切换到标签页 [{page_id}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"切换标签页失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _close_tab(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """关闭标签页（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        page_id = args.get("page_id", "").strip()
+
+        if not page_id:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 page_id 参数",
+                "output_files": [],
+            }
+
+        try:
+            pages = agent.browser_sessions[browser_id].get("pages", {})
+
+            if page_id not in pages:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"标签页 [{page_id}] 不存在，可用标签页: {', '.join(pages.keys())}",
+                    "output_files": [],
+                }
+
+            # 关闭标签页
+            await pages[page_id].close()
+            del pages[page_id]
+
+            # 如果关闭的是当前标签页，切换到另一个
+            if (
+                "current_page_id" in agent.browser_sessions[browser_id]
+                and agent.browser_sessions[browser_id]["current_page_id"] == page_id
+            ):
+                if pages:
+                    # 切换到第一个可用标签页
+                    new_current_id = list(pages.keys())[0]
+                    agent.browser_sessions[browser_id]["current_page_id"] = new_current_id
+                    agent.browser_sessions[browser_id]["page"] = pages[new_current_id]
+                else:
+                    # 没有其他标签页了，清空
+                    agent.browser_sessions[browser_id]["current_page_id"] = None
+                    agent.browser_sessions[browser_id]["page"] = None
+
+            agent.browser_sessions[browser_id]["pages"] = pages
+
+            PrettyOutput.auto_print(
+                f"✅ 已关闭标签页 [{page_id}]，剩余标签页: {len(pages)}"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已关闭标签页 [{page_id}]",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"关闭标签页失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _go_back(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """后退到上一个页面（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 检查是否有页面可以后退
+            can_go_back = await page.evaluate("() => window.history.length > 1")
+
+            if not can_go_back:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "没有可以后退的页面",
+                    "output_files": [],
+                }
+
+            # 后退到上一个页面
+            await page.go_back()
+
+            PrettyOutput.auto_print("✅ 已后退到上一个页面")
+
+            return {
+                "success": True,
+                "stdout": "已后退到上一个页面",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"后退失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _go_forward(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """前进到下一个页面（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 前进到下一个页面
+            await page.go_forward()
+
+            PrettyOutput.auto_print("✅ 已前进到下一个页面")
+
+            return {
+                "success": True,
+                "stdout": "已前进到下一个页面",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"前进失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _get_local_storage(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """获取本地存储（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 获取所有 localStorage 数据
+            local_storage = await page.evaluate("""() => {
+                const items = {};
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    items[key] = localStorage.getItem(key);
+                }
+                return items;
+            }""")
+
+            # 保存到文件
+            import json
+            import tempfile
+            output_file = tempfile.mktemp(
+                suffix="_local_storage.json",
+                prefix=f"{browser_id}_",
+            )
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(local_storage, f, ensure_ascii=False, indent=2)
+
+            PrettyOutput.auto_print(
+                f"✅ 已获取本地存储数据，共 {len(local_storage)} 项，已保存到: {output_file}"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已获取本地存储数据，共 {len(local_storage)} 项",
+                "stderr": "",
+                "output_files": [output_file],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取本地存储失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _set_local_storage(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """设置本地存储（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        data = args.get("data", {})
+        clear = args.get("clear", False)
+
+        if not isinstance(data, dict):
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "data 参数必须是字典类型",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            if clear:
+                # 清空所有 localStorage
+                await page.evaluate("() => localStorage.clear()")
+
+            # 设置 localStorage 数据
+            if data:
+                await page.evaluate(
+                    """(data) => {
+                        for (const [key, value] of Object.entries(data)) {
+                            localStorage.setItem(key, value);
+                        }
+                    }""",
+                    data,
+                )
+
+            action_desc = "清空并设置" if clear else "设置"
+            PrettyOutput.auto_print(
+                f"✅ 已{action_desc}本地存储数据，共 {len(data)} 项"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已{action_desc}本地存储数据，共 {len(data)} 项",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"设置本地存储失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _start_network_monitor(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """启动网络监听（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 初始化网络请求列表
+            if "network_requests" not in agent.browser_sessions[browser_id]:
+                agent.browser_sessions[browser_id]["network_requests"] = []
+
+            # 设置请求和响应监听器
+            def handle_request(request):
+                request_info = {
+                    "type": "request",
+                    "url": request.url,
+                    "method": request.method,
+                    "headers": dict(request.headers),
+                    "timestamp": self._get_timestamp(),
+                }
+                agent.browser_sessions[browser_id]["network_requests"].append(
+                    request_info
+                )
+
+            def handle_response(response):
+                response_info = {
+                    "type": "response",
+                    "url": response.url,
+                    "status": response.status,
+                    "headers": dict(response.headers),
+                    "timestamp": self._get_timestamp(),
+                }
+                agent.browser_sessions[browser_id]["network_requests"].append(
+                    response_info
+                )
+
+            # 添加监听器
+            page.on("request", handle_request)
+            page.on("response", handle_response)
+
+            PrettyOutput.auto_print("✅ 已启动网络监听")
+
+            return {
+                "success": True,
+                "stdout": "已启动网络监听",
+                "stderr": "",
+                "output_files": [],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"启动网络监听失败: {str(e)}",
+                "output_files": [],
+            }
+
+    def _get_timestamp(self) -> str:
+        """获取当前时间戳"""
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    async def _get_network_requests(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """获取网络请求（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            network_requests = agent.browser_sessions[browser_id].get(
+                "network_requests", []
+            )
+
+            if not network_requests:
+                return {
+                    "success": True,
+                    "stdout": "暂无网络请求记录",
+                    "stderr": "",
+                    "output_files": [],
+                }
+
+            # 保存到文件
+            import json
+            import tempfile
+            output_file = tempfile.mktemp(
+                suffix="_network_requests.json",
+                prefix=f"{browser_id}_",
+            )
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(network_requests, f, ensure_ascii=False, indent=2)
+
+            PrettyOutput.auto_print(
+                f"✅ 已获取网络请求记录，共 {len(network_requests)} 条，已保存到: {output_file}"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已获取网络请求记录，共 {len(network_requests)} 条",
+                "stderr": "",
+                "output_files": [output_file],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取网络请求失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _element_screenshot(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """元素截图（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        # 获取参数
+        selector = args.get("selector", "").strip()
+
+        if not selector:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": "缺少 selector 参数",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 查找元素
+            element = await page.wait_for_selector(selector, timeout=30000)
+
+            if not element:
+                return {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"未找到选择器: {selector}",
+                    "output_files": [],
+                }
+
+            # 截图
+            import tempfile
+            screenshot_path = tempfile.mktemp(
+                suffix="_element_screenshot.png",
+                prefix=f"{browser_id}_",
+            )
+            await element.screenshot(path=screenshot_path)
+
+            PrettyOutput.auto_print(
+                f"✅ 已对元素 [{selector}] 截图，保存到: {screenshot_path}"
+            )
+
+            return {
+                "success": True,
+                "stdout": f"已对元素 [{selector}] 截图",
+                "stderr": "",
+                "output_files": [screenshot_path],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"元素截图失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _export_pdf(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """导出PDF（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 导出PDF
+            import tempfile
+            pdf_path = tempfile.mktemp(
+                suffix="_page.pdf",
+                prefix=f"{browser_id}_",
+            )
+            await page.pdf(path=pdf_path)
+
+            PrettyOutput.auto_print(f"✅ 已导出PDF，保存到: {pdf_path}")
+
+            return {
+                "success": True,
+                "stdout": "已导出PDF",
+                "stderr": "",
+                "output_files": [pdf_path],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"导出PDF失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _get_performance_metrics(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """获取页面性能指标（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 获取性能指标
+            metrics = await page.evaluate("""() => {
+                const perfData = performance.timing;
+                const metrics = {
+                    "页面加载时间": perfData.loadEventEnd - perfData.navigationStart,
+                    "DOM 解析时间": perfData.domComplete - perfData.domInteractive,
+                    "资源加载时间": perfData.loadEventEnd - perfData.domContentLoadedEventEnd,
+                    "DNS 查询时间": perfData.domainLookupEnd - perfData.domainLookupStart,
+                    "TCP 连接时间": perfData.connectEnd - perfData.connectStart,
+                    "请求响应时间": perfData.responseStart - perfData.requestStart,
+                    "文档下载时间": perfData.responseEnd - perfData.responseStart,
+                    "DOM 内容加载时间": perfData.domContentLoadedEventEnd - perfData.navigationStart,
+                };
+                return metrics;
+            }""")
+
+            # 保存到文件
+            import json
+            import tempfile
+            output_file = tempfile.mktemp(
+                suffix="_performance_metrics.json",
+                prefix=f"{browser_id}_",
+            )
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(metrics, f, ensure_ascii=False, indent=2)
+
+            PrettyOutput.auto_print(
+                f"✅ 已获取页面性能指标，已保存到: {output_file}"
+            )
+
+            return {
+                "success": True,
+                "stdout": "已获取页面性能指标",
+                "stderr": "",
+                "output_files": [output_file],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"获取性能指标失败: {str(e)}",
+                "output_files": [],
+            }
+
+    async def _download_file(
+        self, agent: Any, browser_id: str, args: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """下载文件（异步）"""
+        # 检查浏览器是否启动
+        if browser_id not in agent.browser_sessions:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"浏览器 [{browser_id}] 未启动",
+                "output_files": [],
+            }
+
+        try:
+            page = agent.browser_sessions[browser_id]["page"]
+
+            # 设置下载路径
+            import os
+            from datetime import datetime
+
+            download_dir = "/tmp/playwright_downloads"
+            os.makedirs(download_dir, exist_ok=True)
+
+            # 开始下载，等待下载完成
+            async with page.expect_download() as download_info:
+                # 点击下载链接或按钮
+                selector = args.get("selector", "").strip()
+                if selector:
+                    element = await page.query_selector(selector)
+                    if element:
+                        await element.click()
+                else:
+                    # 如果没有 selector，假设页面已经开始下载
+                    pass
+
+            download = await download_info.value
+            file_name = download.suggested_filename or f"download_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            save_path = os.path.join(download_dir, file_name)
+
+            # 保存文件
+            await download.save_as(save_path)
+
+            return {
+                "success": True,
+                "stdout": f"文件已下载到 [{save_path}]",
+                "stderr": "",
+                "output_files": [save_path],
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"下载文件失败: {str(e)}",
                 "output_files": [],
             }
