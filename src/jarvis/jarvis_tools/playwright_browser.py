@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
-import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -178,35 +176,6 @@ class PlaywrightBrowserTool:
         except ImportError:
             return False
 
-    def _run_async(self, coro: Any) -> Dict[str, Any]:
-        """在现有事件循环中运行异步操作
-
-        使用 nest_asyncio 支持嵌套事件循环
-
-        返回:
-            Dict[str, Any]: 异步操作的执行结果
-        """
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 使用 nest_asyncio 在运行中的循环中执行
-                try:
-                    return cast(
-                        Dict[str, Any],
-                        asyncio.run_coroutine_threadsafe(coro, loop).result(),
-                    )
-                except KeyboardInterrupt:
-                    # 用户中断操作，返回友好的错误信息
-                    return {
-                        "success": False,
-                        "stdout": "",
-                        "stderr": "操作被用户中断",
-                    }
-            else:
-                return cast(Dict[str, Any], loop.run_until_complete(coro))
-        except RuntimeError:
-            return cast(Dict[str, Any], asyncio.run(coro))
-
     def execute(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """执行浏览器操作
 
@@ -292,227 +261,207 @@ class PlaywrightBrowserTool:
 
         try:
             if action == "launch":
-                result = self._run_async(self._launch_browser(agent, browser_id, args))
+                result = self._launch_browser(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print(f"❌ 启动浏览器 [{browser_id}] 失败")
                 return result
             elif action == "navigate":
-                result = self._run_async(self._navigate(agent, browser_id, args))
+                result = self._navigate(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 导航到 URL 失败")
                 return result
             elif action == "click":
-                result = self._run_async(self._click(agent, browser_id, args))
+                result = self._click(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 点击元素失败")
                 return result
             elif action == "type":
-                result = self._run_async(self._type_text(agent, browser_id, args))
+                result = self._type_text(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 输入文本失败")
                 return result
             elif action == "screenshot":
-                result = self._run_async(self._screenshot(agent, browser_id, args))
+                result = self._screenshot(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 截图失败")
                 return result
             elif action == "close":
-                result = self._run_async(self._close_browser(agent, browser_id))
+                result = self._close_browser(agent, browser_id)
                 if not result["success"]:
                     PrettyOutput.auto_print(f"❌ 关闭浏览器 [{browser_id}] 失败")
                 return result
             elif action == "list":
-                result = self._run_async(self._list_browsers(agent))
+                result = self._list_browsers(agent)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取浏览器列表失败")
                 return result
             elif action == "console":
-                result = self._run_async(
-                    self._get_console_logs(agent, browser_id, args)
-                )
+                result = self._get_console_logs(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取 console 日志失败")
                 return result
             elif action == "eval":
-                result = self._run_async(
-                    self._evaluate_javascript(agent, browser_id, args)
-                )
+                result = self._evaluate_javascript(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 执行 JavaScript 代码失败")
                 return result
             elif action == "fill_form":
-                result = self._run_async(self._fill_form(agent, browser_id, args))
+                result = self._fill_form(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 填写表单失败")
                 return result
             elif action == "submit_form":
-                result = self._run_async(self._submit_form(agent, browser_id, args))
+                result = self._submit_form(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 提交表单失败")
                 return result
             elif action == "clear_form":
-                result = self._run_async(self._clear_form(agent, browser_id, args))
+                result = self._clear_form(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 清空表单失败")
                 return result
             elif action == "get_cookies":
-                result = self._run_async(self._get_cookies(agent, browser_id))
+                result = self._get_cookies(agent, browser_id)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取 Cookies 失败")
                 return result
             elif action == "set_cookies":
-                result = self._run_async(self._set_cookies(agent, browser_id, args))
+                result = self._set_cookies(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 设置 Cookies 失败")
                 return result
             elif action == "clear_cookies":
-                result = self._run_async(self._clear_cookies(agent, browser_id))
+                result = self._clear_cookies(agent, browser_id)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 清空 Cookies 失败")
                 return result
             elif action == "wait_for_selector":
-                result = self._run_async(
-                    self._wait_for_selector(agent, browser_id, args)
-                )
+                result = self._wait_for_selector(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 等待元素失败")
                 return result
             elif action == "wait_for_text":
-                result = self._run_async(self._wait_for_text(agent, browser_id, args))
+                result = self._wait_for_text(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 等待文本失败")
                 return result
             elif action == "scroll_to":
-                result = self._run_async(self._scroll_to(agent, browser_id, args))
+                result = self._scroll_to(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 滚动到指定位置失败")
                 return result
             elif action == "scroll_down":
-                result = self._run_async(self._scroll_down(agent, browser_id, args))
+                result = self._scroll_down(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 向下滚动失败")
                 return result
             elif action == "scroll_up":
-                result = self._run_async(self._scroll_up(agent, browser_id, args))
+                result = self._scroll_up(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 向上滚动失败")
                 return result
             elif action == "get_element_info":
-                result = self._run_async(
-                    self._get_element_info(agent, browser_id, args)
-                )
+                result = self._get_element_info(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取元素信息失败")
                 return result
             elif action == "get_text":
-                result = self._run_async(self._get_text(agent, browser_id, args))
+                result = self._get_text(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取文本失败")
                 return result
             elif action == "get_attribute":
-                result = self._run_async(self._get_attribute(agent, browser_id, args))
+                result = self._get_attribute(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取属性失败")
                 return result
             elif action == "hover":
-                result = self._run_async(self._hover(agent, browser_id, args))
+                result = self._hover(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 悬停失败")
                 return result
             elif action == "drag":
-                result = self._run_async(self._drag(agent, browser_id, args))
+                result = self._drag(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 拖拽失败")
                 return result
             elif action == "double_click":
-                result = self._run_async(self._double_click(agent, browser_id, args))
+                result = self._double_click(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 双击失败")
                 return result
             elif action == "press_key":
-                result = self._run_async(self._press_key(agent, browser_id, args))
+                result = self._press_key(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 按键失败")
                 return result
             elif action == "upload_file":
-                result = self._run_async(self._upload_file(agent, browser_id, args))
+                result = self._upload_file(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 上传文件失败")
                 return result
             elif action == "download_file":
-                result = self._run_async(self._download_file(agent, browser_id, args))
+                result = self._download_file(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 下载文件失败")
                 return result
             elif action == "new_tab":
-                result = self._run_async(self._new_tab(agent, browser_id, args))
+                result = self._new_tab(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 新建标签页失败")
                 return result
             elif action == "switch_tab":
-                result = self._run_async(self._switch_tab(agent, browser_id, args))
+                result = self._switch_tab(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 切换标签页失败")
                 return result
             elif action == "close_tab":
-                result = self._run_async(self._close_tab(agent, browser_id, args))
+                result = self._close_tab(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 关闭标签页失败")
                 return result
             elif action == "go_back":
-                result = self._run_async(self._go_back(agent, browser_id, args))
+                result = self._go_back(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 后退失败")
                 return result
             elif action == "go_forward":
-                result = self._run_async(self._go_forward(agent, browser_id, args))
+                result = self._go_forward(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 前进失败")
                 return result
             elif action == "get_local_storage":
-                result = self._run_async(
-                    self._get_local_storage(agent, browser_id, args)
-                )
+                result = self._get_local_storage(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取本地存储失败")
                 return result
             elif action == "set_local_storage":
-                result = self._run_async(
-                    self._set_local_storage(agent, browser_id, args)
-                )
+                result = self._set_local_storage(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 设置本地存储失败")
                 return result
             elif action == "start_network_monitor":
-                result = self._run_async(
-                    self._start_network_monitor(agent, browser_id, args)
-                )
+                result = self._start_network_monitor(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 启动网络监听失败")
                 return result
             elif action == "get_network_requests":
-                result = self._run_async(
-                    self._get_network_requests(agent, browser_id, args)
-                )
+                result = self._get_network_requests(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取网络请求失败")
                 return result
             elif action == "element_screenshot":
-                result = self._run_async(
-                    self._element_screenshot(agent, browser_id, args)
-                )
+                result = self._element_screenshot(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 元素截图失败")
                 return result
             elif action == "export_pdf":
-                result = self._run_async(self._export_pdf(agent, browser_id, args))
+                result = self._export_pdf(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 导出PDF失败")
                 return result
             elif action == "get_performance_metrics":
-                result = self._run_async(
-                    self._get_performance_metrics(agent, browser_id, args)
-                )
+                result = self._get_performance_metrics(agent, browser_id, args)
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取性能指标失败")
                 return result
@@ -529,14 +478,14 @@ class PlaywrightBrowserTool:
                 "stderr": f"执行浏览器操作出错: {str(e)}",
             }
 
-    async def _launch_browser(
+    def _launch_browser(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """启动浏览器（异步）"""
+        """启动浏览器（同步）"""
         try:
             # 尝试导入 playwright
             try:
-                from playwright.async_api import async_playwright  # pylint: disable=import-outside-toplevel
+                from playwright.sync_api import sync_playwright  # pylint: disable=import-outside-toplevel
             except ImportError:
                 return {
                     "success": False,
@@ -549,18 +498,16 @@ class PlaywrightBrowserTool:
 
             # 如果该ID的浏览器已经启动，先关闭它
             if browser_id in agent.browser_sessions:
-                await self._close_browser(agent, browser_id)
+                self._close_browser(agent, browser_id)
 
-            # 创建浏览器会话（异步）- 不使用 async with 以保持会话活跃
-            from playwright.async_api import async_playwright  # noqa: F401
-
-            playwright_manager = await async_playwright().start()
-            browser = await playwright_manager.chromium.launch(headless=headless)
-            context = await browser.new_context()
-            page = await context.new_page()
+            # 创建浏览器会话（同步）
+            playwright_manager = sync_playwright().start()
+            browser = playwright_manager.chromium.launch(headless=headless)
+            context = browser.new_context()
+            page = context.new_page()
 
             # 添加 console 事件监听器
-            async def handle_console_message(msg):
+            def handle_console_message(msg):
                 # 限制日志条数，最多保存 1000 条
                 session = agent.browser_sessions[browser_id]
                 if len(session["console_logs"]) >= 1000:
@@ -586,7 +533,7 @@ class PlaywrightBrowserTool:
 
             # 保存初始页面内容
             content_mode = args.get("content_mode", "abstract")
-            file_paths = await self._save_page_content(
+            file_paths = self._save_page_content(
                 page, browser_id, "launch", content_mode
             )
 
@@ -610,10 +557,10 @@ class PlaywrightBrowserTool:
                 "stderr": f"启动浏览器 [{browser_id}] 失败: {str(e)}",
             }
 
-    async def _navigate(
+    def _navigate(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """导航到 URL（异步）"""
+        """导航到 URL（同步）"""
         # 检查浏览器是否启动
         if browser_id not in agent.browser_sessions:
             return {
@@ -640,13 +587,13 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 导航到 URL
-            await page.goto(url)
+            page.goto(url)
 
             # 等待条件满足
-            await self._wait_for_condition(page, wait_condition, timeout)
+            self._wait_for_condition(page, wait_condition, timeout)
 
             # 保存页面内容
-            output_files = await self._save_page_content(
+            output_files = self._save_page_content(
                 page, browser_id, "navigate", content_mode
             )
 
@@ -670,10 +617,10 @@ class PlaywrightBrowserTool:
                 "stderr": f"导航到 URL 失败: {str(e)}",
             }
 
-    async def _click(
+    def _click(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """点击元素（异步）"""
+        """点击元素（同步）"""
         # 检查浏览器是否启动
         if browser_id not in agent.browser_sessions:
             return {
@@ -699,13 +646,13 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 点击元素
-            await page.click(selector)
+            page.click(selector)
 
             # 等待条件满足
-            await self._wait_for_condition(page, wait_condition, timeout)
+            self._wait_for_condition(page, wait_condition, timeout)
 
             # 保存页面内容
-            output_files = await self._save_page_content(
+            output_files = self._save_page_content(
                 page, browser_id, "click", content_mode
             )
 
@@ -729,10 +676,10 @@ class PlaywrightBrowserTool:
                 "stderr": f"点击元素失败: {str(e)}",
             }
 
-    async def _type_text(
+    def _type_text(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """输入文本（异步）"""
+        """输入文本（同步）"""
         # 检查浏览器是否启动
         if browser_id not in agent.browser_sessions:
             return {
@@ -759,13 +706,13 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 清空并输入文本
-            await page.fill(selector, text)
+            page.fill(selector, text)
 
             # 等待条件满足
-            await self._wait_for_condition(page, wait_condition, timeout)
+            self._wait_for_condition(page, wait_condition, timeout)
 
             # 保存页面内容
-            output_files = await self._save_page_content(
+            output_files = self._save_page_content(
                 page, browser_id, "type", content_mode
             )
 
@@ -789,7 +736,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"输入文本失败: {str(e)}",
             }
 
-    async def _screenshot(
+    def _screenshot(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """截图（异步）"""
@@ -811,7 +758,7 @@ class PlaywrightBrowserTool:
             filename = temp_dir / f"{browser_id}_screenshot_{timestamp}.png"
 
             # 截图
-            await page.screenshot(path=str(filename))
+            page.screenshot(path=str(filename))
 
             output_files = [str(filename)]
             PrettyOutput.auto_print(f"📥 截图已保存到: {', '.join(output_files)}")
@@ -829,8 +776,8 @@ class PlaywrightBrowserTool:
                 "stderr": f"截图失败: {str(e)}",
             }
 
-    async def _close_browser(self, agent: Any, browser_id: str) -> Dict[str, Any]:
-        """关闭浏览器（异步）"""
+    def _close_browser(self, agent: Any, browser_id: str) -> Dict[str, Any]:
+        """关闭浏览器（同步）"""
         # 检查浏览器是否存在
         if browser_id not in agent.browser_sessions:
             return {
@@ -843,9 +790,9 @@ class PlaywrightBrowserTool:
             session = agent.browser_sessions[browser_id]
 
             # 关闭浏览器
-            await session["context"].close()
-            await session["browser"].close()
-            await session["playwright_manager"].stop()
+            session["context"].close()
+            session["browser"].close()
+            session["playwright_manager"].stop()
 
             # 删除会话
             del agent.browser_sessions[browser_id]
@@ -863,8 +810,8 @@ class PlaywrightBrowserTool:
                 "stderr": f"关闭浏览器 [{browser_id}] 失败: {str(e)}",
             }
 
-    async def _list_browsers(self, agent: Any) -> Dict[str, Any]:
-        """列出所有浏览器会话（异步）"""
+    def _list_browsers(self, agent: Any) -> Dict[str, Any]:
+        """列出所有浏览器会话（同步）"""
         try:
             browser_list = []
 
@@ -875,7 +822,7 @@ class PlaywrightBrowserTool:
                         {
                             "id": browser_id,
                             "status": "活跃",
-                            "title": await page.title(),
+                            "title": page.title(),
                             "url": page.url,
                         }
                     )
@@ -902,10 +849,10 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取浏览器列表失败: {str(e)}",
             }
 
-    async def _save_page_content(
+    def _save_page_content(
         self, page: Any, browser_id: str, action: str, content_mode: str
     ) -> List[str]:
-        """保存页面内容到临时文件（异步）
+        """保存页面内容到临时文件（同步）
 
         参数:
             page: Playwright 页面对象
@@ -925,15 +872,13 @@ class PlaywrightBrowserTool:
             if content_mode == "html":
                 # 保存完整 HTML
                 filename = temp_dir / f"{browser_id}_{action}_{timestamp}.html"
-                content = await page.content()
+                content = page.content()
                 filename.write_text(content, encoding="utf-8")
                 output_files.append(str(filename))
             else:
                 # 保存抽象模式（可交互控件）
                 filename = temp_dir / f"{browser_id}_{action}_{timestamp}.txt"
-                content = await self._extract_interactive_elements(
-                    page, action, timestamp
-                )
+                content = self._extract_interactive_elements(page, action, timestamp)
                 filename.write_text(content, encoding="utf-8")
                 output_files.append(str(filename))
         except Exception as e:
@@ -941,10 +886,10 @@ class PlaywrightBrowserTool:
 
         return output_files
 
-    async def _extract_interactive_elements(
+    def _extract_interactive_elements(
         self, page: Any, action: str, timestamp: str
     ) -> str:
-        """提取页面的可交互控件（异步）
+        """提取页面的可交互控件（同步）
 
         参数:
             page: Playwright 页面对象
@@ -961,13 +906,13 @@ class PlaywrightBrowserTool:
 
         try:
             # 提取链接
-            links = await page.query_selector_all("a[href]")
+            links = page.query_selector_all("a[href]")
             if links:
                 content += "[链接]\n"
                 for link in links[:50]:  # 限制数量
                     try:
-                        text = await link.inner_text() or ""
-                        href = await link.get_attribute("href") or ""
+                        text = link.inner_text() or ""
+                        href = link.get_attribute("href") or ""
                         if text.strip():
                             content += f"  文本: {text.strip()}\n"
                             content += f'  链接: a[href="{href}"]\n\n'
@@ -975,7 +920,7 @@ class PlaywrightBrowserTool:
                         pass
 
             # 提取按钮
-            buttons = await page.query_selector_all(
+            buttons = page.query_selector_all(
                 "button, input[type='button'], input[type='submit']"
             )
             if buttons:
@@ -983,13 +928,9 @@ class PlaywrightBrowserTool:
                 for button in buttons[:50]:
                     try:
                         text = (
-                            await button.inner_text()
-                            or await button.get_attribute("value")
-                            or ""
+                            button.inner_text() or button.get_attribute("value") or ""
                         )
-                        tag_name = await button.evaluate(
-                            "el => el.tagName.toLowerCase()"
-                        )
+                        tag_name = button.evaluate("el => el.tagName.toLowerCase()")
                         selector = (
                             f"{tag_name}[{'text="' + text + '"' if text else ''}]"
                         )
@@ -1000,19 +941,17 @@ class PlaywrightBrowserTool:
                         pass
 
             # 提取输入框
-            inputs = await page.query_selector_all(
+            inputs = page.query_selector_all(
                 "input[type='text'], input[type='email'], input[type='password'], textarea"
             )
             if inputs:
                 content += "[输入框]\n"
                 for inp in inputs[:50]:
                     try:
-                        tag_name = await inp.evaluate("el => el.tagName.toLowerCase()")
-                        input_type = await inp.get_attribute("type") or "text"
+                        tag_name = inp.evaluate("el => el.tagName.toLowerCase()")
+                        input_type = inp.get_attribute("type") or "text"
                         name = (
-                            await inp.get_attribute("name")
-                            or await inp.get_attribute("id")
-                            or ""
+                            inp.get_attribute("name") or inp.get_attribute("id") or ""
                         )
                         selector = f"{tag_name}[type='{input_type}'{'[name="' + name + '"]' if name else ''}]"
                         content += f"  类型: {input_type}\n"
@@ -1022,19 +961,19 @@ class PlaywrightBrowserTool:
                         pass
 
             # 提取选择框
-            selects = await page.query_selector_all("select")
+            selects = page.query_selector_all("select")
             if selects:
                 content += "[选择框]\n"
                 for select in selects[:50]:
                     try:
                         name = (
-                            await select.get_attribute("name")
-                            or await select.get_attribute("id")
+                            select.get_attribute("name")
+                            or select.get_attribute("id")
                             or ""
                         )
-                        options = await select.query_selector_all("option")
+                        options = select.query_selector_all("option")
                         option_texts = [
-                            text for opt in options if (text := await opt.inner_text())
+                            text for opt in options if (text := opt.inner_text())
                         ]
                         content += f"  名称: {name or '未知'}\n"
                         content += f"  选项: {', '.join(option_texts[:10])}\n"
@@ -1047,10 +986,10 @@ class PlaywrightBrowserTool:
 
         return content
 
-    async def _wait_for_condition(
+    def _wait_for_condition(
         self, page: Any, wait_condition: str, timeout: float
     ) -> None:
-        """等待条件满足（异步）
+        """等待条件满足（同步）
 
         参数:
             page: Playwright 页面对象
@@ -1060,15 +999,15 @@ class PlaywrightBrowserTool:
         try:
             if wait_condition == "network_idle":
                 # 等待网络空闲
-                await page.wait_for_load_state("networkidle", timeout=timeout * 1000)
+                page.wait_for_load_state("networkidle", timeout=timeout * 1000)
             else:
                 # 固定等待
-                await page.wait_for_timeout(timeout * 1000)
+                page.wait_for_timeout(timeout * 1000)
         except Exception:
             # 超时或其他错误，继续执行
             pass
 
-    async def _get_console_logs(
+    def _get_console_logs(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """获取 console 日志（异步）"""
@@ -1124,7 +1063,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取 console 日志失败: {str(e)}",
             }
 
-    async def _evaluate_javascript(
+    def _evaluate_javascript(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """执行 JavaScript 代码（异步）"""
@@ -1151,7 +1090,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 执行 JavaScript 代码
-            result = await page.evaluate(code)
+            result = page.evaluate(code)
 
             # 格式化结果为字符串
             result_str = str(result)
@@ -1191,7 +1130,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"执行 JavaScript 代码失败: {str(e)}",
             }
 
-    async def _fill_form(
+    def _fill_form(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """填写表单（异步）"""
@@ -1234,14 +1173,14 @@ class PlaywrightBrowserTool:
                     element = None
                     for selector in selectors:
                         try:
-                            element = await page.query_selector(selector)
+                            element = page.query_selector(selector)
                             if element:
                                 break
                         except Exception:
                             continue
 
                     if element:
-                        await element.fill(str(field_value))
+                        element.fill(str(field_value))
                         filled_fields.append(field_name)
                     else:
                         errors.append(f"未找到字段: {field_name}")
@@ -1290,7 +1229,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"填写表单失败: {str(e)}",
             }
 
-    async def _submit_form(
+    def _submit_form(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """提交表单（异步）"""
@@ -1310,15 +1249,15 @@ class PlaywrightBrowserTool:
 
             # 尝试提交表单
             try:
-                await page.click(f"{form_selector} button[type='submit']")
+                page.click(f"{form_selector} button[type='submit']")
             except Exception:
                 try:
-                    await page.click(f"{form_selector} input[type='submit']")
+                    page.click(f"{form_selector} input[type='submit']")
                 except Exception:
                     # 尝试直接提交表单
-                    form = await page.query_selector(form_selector)
+                    form = page.query_selector(form_selector)
                     if form:
-                        await form.evaluate("el => el.submit()")
+                        form.evaluate("el => el.submit()")
                     else:
                         return {
                             "success": False,
@@ -1327,7 +1266,7 @@ class PlaywrightBrowserTool:
                         }
 
             # 等待条件满足
-            await self._wait_for_condition(page, wait_condition, timeout)
+            self._wait_for_condition(page, wait_condition, timeout)
 
             return {
                 "success": True,
@@ -1342,7 +1281,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"提交表单失败: {str(e)}",
             }
 
-    async def _clear_form(
+    def _clear_form(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """清空表单（异步）"""
@@ -1359,16 +1298,16 @@ class PlaywrightBrowserTool:
             form_selector = args.get("form_selector", "form")
 
             # 获取表单内的所有输入元素
-            inputs = await page.query_selector_all(f"{form_selector} input")
-            textareas = await page.query_selector_all(f"{form_selector} textarea")
-            selects = await page.query_selector_all(f"{form_selector} select")
+            inputs = page.query_selector_all(f"{form_selector} input")
+            textareas = page.query_selector_all(f"{form_selector} textarea")
+            selects = page.query_selector_all(f"{form_selector} select")
 
             cleared_count = 0
 
             # 清空 input 元素
             for input_elem in inputs:
                 try:
-                    await input_elem.fill("")
+                    input_elem.fill("")
                     cleared_count += 1
                 except Exception:
                     pass
@@ -1376,7 +1315,7 @@ class PlaywrightBrowserTool:
             # 清空 textarea 元素
             for textarea in textareas:
                 try:
-                    await textarea.fill("")
+                    textarea.fill("")
                     cleared_count += 1
                 except Exception:
                     pass
@@ -1384,7 +1323,7 @@ class PlaywrightBrowserTool:
             # 重置 select 元素到第一个选项
             for select in selects:
                 try:
-                    await select.select_option(index=0)
+                    select.select_option(index=0)
                     cleared_count += 1
                 except Exception:
                     pass
@@ -1402,7 +1341,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"清空表单失败: {str(e)}",
             }
 
-    async def _get_cookies(self, agent: Any, browser_id: str) -> Dict[str, Any]:
+    def _get_cookies(self, agent: Any, browser_id: str) -> Dict[str, Any]:
         """获取所有 Cookies（异步）"""
         # 检查浏览器是否启动
         if browser_id not in agent.browser_sessions:
@@ -1416,7 +1355,7 @@ class PlaywrightBrowserTool:
             context = agent.browser_sessions[browser_id]["context"]
 
             # 获取所有 cookies
-            cookies = await context.cookies()
+            cookies = context.cookies()
 
             # 保存到文件
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1457,7 +1396,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取 Cookies 失败: {str(e)}",
             }
 
-    async def _set_cookies(
+    def _set_cookies(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """设置 Cookies（异步）"""
@@ -1483,7 +1422,7 @@ class PlaywrightBrowserTool:
             context = agent.browser_sessions[browser_id]["context"]
 
             # 设置 cookies
-            await context.add_cookies(cookies)
+            context.add_cookies(cookies)
 
             return {
                 "success": True,
@@ -1498,7 +1437,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"设置 Cookies 失败: {str(e)}",
             }
 
-    async def _clear_cookies(self, agent: Any, browser_id: str) -> Dict[str, Any]:
+    def _clear_cookies(self, agent: Any, browser_id: str) -> Dict[str, Any]:
         """清空所有 Cookies（异步）"""
         # 检查浏览器是否启动
         if browser_id not in agent.browser_sessions:
@@ -1512,7 +1451,7 @@ class PlaywrightBrowserTool:
             context = agent.browser_sessions[browser_id]["context"]
 
             # 清空 cookies
-            await context.clear_cookies()
+            context.clear_cookies()
 
             return {
                 "success": True,
@@ -1527,7 +1466,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"清空 Cookies 失败: {str(e)}",
             }
 
-    async def _wait_for_selector(
+    def _wait_for_selector(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """等待元素达到指定状态（异步）"""
@@ -1564,9 +1503,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 等待元素达到指定状态
-            await page.wait_for_selector(
-                selector, state=wait_state, timeout=timeout * 1000
-            )
+            page.wait_for_selector(selector, state=wait_state, timeout=timeout * 1000)
 
             return {
                 "success": True,
@@ -1581,7 +1518,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"等待元素失败: {str(e)}",
             }
 
-    async def _wait_for_text(
+    def _wait_for_text(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """等待文本出现（异步）"""
@@ -1609,7 +1546,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 等待文本出现
-            await page.wait_for_function(
+            page.wait_for_function(
                 """
                 (text, selector) => {{
                     const elements = document.querySelectorAll(selector);
@@ -1639,7 +1576,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"等待文本失败: {str(e)}",
             }
 
-    async def _scroll_to(
+    def _scroll_to(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """滚动到指定位置（异步）"""
@@ -1659,7 +1596,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 滚动到指定位置
-            await page.evaluate(f"window.scrollTo({scroll_x}, {scroll_y})")
+            page.evaluate(f"window.scrollTo({scroll_x}, {scroll_y})")
 
             return {
                 "success": True,
@@ -1674,7 +1611,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"滚动失败: {str(e)}",
             }
 
-    async def _scroll_down(
+    def _scroll_down(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """向下滚动页面（异步）"""
@@ -1693,11 +1630,11 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 获取当前滚动位置
-            current_scroll = await page.evaluate("window.scrollY")
+            current_scroll = page.evaluate("window.scrollY")
             new_scroll = current_scroll + scroll_amount
 
             # 向下滚动
-            await page.evaluate(f"window.scrollTo(0, {new_scroll})")
+            page.evaluate(f"window.scrollTo(0, {new_scroll})")
 
             return {
                 "success": True,
@@ -1712,7 +1649,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"向下滚动失败: {str(e)}",
             }
 
-    async def _scroll_up(
+    def _scroll_up(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """向上滚动页面（异步）"""
@@ -1731,7 +1668,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 获取当前滚动位置
-            current_scroll = await page.evaluate("window.scrollY")
+            current_scroll = page.evaluate("window.scrollY")
             new_scroll = current_scroll + scroll_amount
 
             # 确保 new_scroll 不小于0
@@ -1739,7 +1676,7 @@ class PlaywrightBrowserTool:
                 new_scroll = 0
 
             # 向上滚动
-            await page.evaluate(f"window.scrollTo(0, {new_scroll})")
+            page.evaluate(f"window.scrollTo(0, {new_scroll})")
 
             return {
                 "success": True,
@@ -1754,7 +1691,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"向上滚动失败: {str(e)}",
             }
 
-    async def _get_element_info(
+    def _get_element_info(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """获取元素的详细信息（异步）"""
@@ -1778,7 +1715,7 @@ class PlaywrightBrowserTool:
 
         try:
             page = agent.browser_sessions[browser_id]["page"]
-            element = await page.query_selector(selector)
+            element = page.query_selector(selector)
 
             if not element:
                 return {
@@ -1790,12 +1727,12 @@ class PlaywrightBrowserTool:
             # 获取元素信息
             info = {
                 "selector": selector,
-                "tag_name": await element.evaluate("el => el.tagName"),
-                "text": await element.evaluate("el => el.textContent"),
-                "visible": await element.is_visible(),
-                "enabled": await element.is_enabled(),
-                "id": await element.evaluate("el => el.id"),
-                "class": await element.evaluate("el => el.className"),
+                "tag_name": element.evaluate("el => el.tagName"),
+                "text": element.evaluate("el => el.textContent"),
+                "visible": element.is_visible(),
+                "enabled": element.is_enabled(),
+                "id": element.evaluate("el => el.id"),
+                "class": element.evaluate("el => el.className"),
             }
 
             # 将信息转换为 JSON 字符串
@@ -1816,7 +1753,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取元素信息失败: {str(e)}",
             }
 
-    async def _get_text(
+    def _get_text(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """获取元素的文本内容（异步）"""
@@ -1840,7 +1777,7 @@ class PlaywrightBrowserTool:
 
         try:
             page = agent.browser_sessions[browser_id]["page"]
-            element = await page.query_selector(selector)
+            element = page.query_selector(selector)
 
             if not element:
                 return {
@@ -1850,7 +1787,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 获取文本内容
-            text = await element.text_content()
+            text = element.text_content()
 
             return {
                 "success": True,
@@ -1865,7 +1802,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取文本失败: {str(e)}",
             }
 
-    async def _get_attribute(
+    def _get_attribute(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """获取元素的属性值（异步）"""
@@ -1897,7 +1834,7 @@ class PlaywrightBrowserTool:
 
         try:
             page = agent.browser_sessions[browser_id]["page"]
-            element = await page.query_selector(selector)
+            element = page.query_selector(selector)
 
             if not element:
                 return {
@@ -1907,7 +1844,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 获取属性值
-            attr_value = await element.get_attribute(attribute)
+            attr_value = element.get_attribute(attribute)
 
             if attr_value is None:
                 return {
@@ -1929,7 +1866,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取属性失败: {str(e)}",
             }
 
-    async def _hover(
+    def _hover(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """鼠标悬停到元素上（异步）"""
@@ -1953,7 +1890,7 @@ class PlaywrightBrowserTool:
 
         try:
             page = agent.browser_sessions[browser_id]["page"]
-            element = await page.query_selector(selector)
+            element = page.query_selector(selector)
 
             if not element:
                 return {
@@ -1963,7 +1900,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 鼠标悬停
-            await element.hover()
+            element.hover()
 
             return {
                 "success": True,
@@ -1978,7 +1915,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"悬停失败: {str(e)}",
             }
 
-    async def _drag(
+    def _drag(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """拖拽元素（异步）"""
@@ -2012,8 +1949,8 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 获取源元素和目标元素
-            source_element = await page.query_selector(selector)
-            target_element = await page.query_selector(target_selector)
+            source_element = page.query_selector(selector)
+            target_element = page.query_selector(target_selector)
 
             if not source_element:
                 return {
@@ -2030,7 +1967,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 执行拖拽操作
-            await source_element.drag_to(target_element)
+            source_element.drag_to(target_element)
 
             return {
                 "success": True,
@@ -2045,7 +1982,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"拖拽失败: {str(e)}",
             }
 
-    async def _double_click(
+    def _double_click(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """双击元素（异步）"""
@@ -2069,7 +2006,7 @@ class PlaywrightBrowserTool:
 
         try:
             page = agent.browser_sessions[browser_id]["page"]
-            element = await page.query_selector(selector)
+            element = page.query_selector(selector)
 
             if not element:
                 return {
@@ -2079,7 +2016,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 双击元素
-            await element.dblclick()
+            element.dblclick()
 
             return {
                 "success": True,
@@ -2094,7 +2031,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"双击失败: {str(e)}",
             }
 
-    async def _press_key(
+    def _press_key(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """按下键盘按键（异步）"""
@@ -2120,7 +2057,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 按下按键
-            await page.keyboard.press(key)
+            page.keyboard.press(key)
 
             return {
                 "success": True,
@@ -2135,7 +2072,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"按键失败: {str(e)}",
             }
 
-    async def _upload_file(
+    def _upload_file(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """上传文件（异步）"""
@@ -2167,7 +2104,7 @@ class PlaywrightBrowserTool:
 
         try:
             page = agent.browser_sessions[browser_id]["page"]
-            element = await page.query_selector(selector)
+            element = page.query_selector(selector)
 
             if not element:
                 return {
@@ -2177,7 +2114,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 上传文件
-            await element.set_input_files(file_path)
+            element.set_input_files(file_path)
 
             return {
                 "success": True,
@@ -2192,7 +2129,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"上传文件失败: {str(e)}",
             }
 
-    async def _new_tab(
+    def _new_tab(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """新建标签页（异步）"""
@@ -2209,7 +2146,7 @@ class PlaywrightBrowserTool:
             pages = agent.browser_sessions[browser_id].get("pages", {})
 
             # 创建新页面
-            new_page = await browser.new_page()
+            new_page = browser.new_page()
             page_id = f"page_{len(pages) + 1}"
             pages[page_id] = new_page
 
@@ -2235,7 +2172,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"新建标签页失败: {str(e)}",
             }
 
-    async def _switch_tab(
+    def _switch_tab(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """切换标签页（异步）"""
@@ -2286,7 +2223,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"切换标签页失败: {str(e)}",
             }
 
-    async def _close_tab(
+    def _close_tab(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """关闭标签页（异步）"""
@@ -2319,7 +2256,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 关闭标签页
-            await pages[page_id].close()
+            pages[page_id].close()
             del pages[page_id]
 
             # 如果关闭的是当前标签页，切换到另一个
@@ -2358,7 +2295,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"关闭标签页失败: {str(e)}",
             }
 
-    async def _go_back(
+    def _go_back(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """后退到上一个页面（异步）"""
@@ -2374,7 +2311,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 检查是否有页面可以后退
-            can_go_back = await page.evaluate("() => window.history.length > 1")
+            can_go_back = page.evaluate("() => window.history.length > 1")
 
             if not can_go_back:
                 return {
@@ -2384,7 +2321,7 @@ class PlaywrightBrowserTool:
                 }
 
             # 后退到上一个页面
-            await page.go_back()
+            page.go_back()
 
             PrettyOutput.auto_print("✅ 已后退到上一个页面")
 
@@ -2401,7 +2338,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"后退失败: {str(e)}",
             }
 
-    async def _go_forward(
+    def _go_forward(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """前进到下一个页面（异步）"""
@@ -2417,7 +2354,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 前进到下一个页面
-            await page.go_forward()
+            page.go_forward()
 
             PrettyOutput.auto_print("✅ 已前进到下一个页面")
 
@@ -2434,7 +2371,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"前进失败: {str(e)}",
             }
 
-    async def _get_local_storage(
+    def _get_local_storage(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """获取本地存储（异步）"""
@@ -2450,7 +2387,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 获取所有 localStorage 数据
-            local_storage = await page.evaluate("""() => {
+            local_storage = page.evaluate("""() => {
                 const items = {};
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
@@ -2487,7 +2424,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取本地存储失败: {str(e)}",
             }
 
-    async def _set_local_storage(
+    def _set_local_storage(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """设置本地存储（异步）"""
@@ -2515,11 +2452,11 @@ class PlaywrightBrowserTool:
 
             if clear:
                 # 清空所有 localStorage
-                await page.evaluate("() => localStorage.clear()")
+                page.evaluate("() => localStorage.clear()")
 
             # 设置 localStorage 数据
             if data:
-                await page.evaluate(
+                page.evaluate(
                     """(data) => {
                         for (const [key, value] of Object.entries(data)) {
                             localStorage.setItem(key, value);
@@ -2546,7 +2483,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"设置本地存储失败: {str(e)}",
             }
 
-    async def _start_network_monitor(
+    def _start_network_monitor(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """启动网络监听（异步）"""
@@ -2615,7 +2552,7 @@ class PlaywrightBrowserTool:
 
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    async def _get_network_requests(
+    def _get_network_requests(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """获取网络请求（异步）"""
@@ -2667,7 +2604,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取网络请求失败: {str(e)}",
             }
 
-    async def _element_screenshot(
+    def _element_screenshot(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """元素截图（异步）"""
@@ -2693,7 +2630,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 查找元素
-            element = await page.wait_for_selector(selector, timeout=30000)
+            element = page.wait_for_selector(selector, timeout=30000)
 
             if not element:
                 return {
@@ -2709,7 +2646,7 @@ class PlaywrightBrowserTool:
                 suffix="_element_screenshot.png",
                 prefix=f"{browser_id}_",
             )
-            await element.screenshot(path=screenshot_path)
+            element.screenshot(path=screenshot_path)
 
             PrettyOutput.auto_print(
                 f"✅ 已对元素 [{selector}] 截图，保存到: {screenshot_path}"
@@ -2728,7 +2665,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"元素截图失败: {str(e)}",
             }
 
-    async def _export_pdf(
+    def _export_pdf(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """导出PDF（异步）"""
@@ -2750,7 +2687,7 @@ class PlaywrightBrowserTool:
                 suffix="_page.pdf",
                 prefix=f"{browser_id}_",
             )
-            await page.pdf(path=pdf_path)
+            page.pdf(path=pdf_path)
 
             PrettyOutput.auto_print(f"✅ 已导出PDF，保存到: {pdf_path}")
 
@@ -2767,7 +2704,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"导出PDF失败: {str(e)}",
             }
 
-    async def _get_performance_metrics(
+    def _get_performance_metrics(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """获取页面性能指标（异步）"""
@@ -2783,7 +2720,7 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 获取性能指标
-            metrics = await page.evaluate("""() => {
+            metrics = page.evaluate("""() => {
                 const perfData = performance.timing;
                 const metrics = {
                     "页面加载时间": perfData.loadEventEnd - perfData.navigationStart,
@@ -2824,7 +2761,7 @@ class PlaywrightBrowserTool:
                 "stderr": f"获取性能指标失败: {str(e)}",
             }
 
-    async def _download_file(
+    def _download_file(
         self, agent: Any, browser_id: str, args: Dict[str, Any]
     ) -> Dict[str, Any]:
         """下载文件（异步）"""
@@ -2847,18 +2784,18 @@ class PlaywrightBrowserTool:
             os.makedirs(download_dir, exist_ok=True)
 
             # 开始下载，等待下载完成
-            async with page.expect_download() as download_info:
+            with page.expect_download() as download_info:
                 # 点击下载链接或按钮
                 selector = args.get("selector", "").strip()
                 if selector:
-                    element = await page.query_selector(selector)
+                    element = page.query_selector(selector)
                     if element:
-                        await element.click()
+                        element.click()
                 else:
                     # 如果没有 selector，假设页面已经开始下载
                     pass
 
-            download = await download_info.value
+            download = download_info.value
             file_name = (
                 download.suggested_filename
                 or f"download_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -2866,7 +2803,7 @@ class PlaywrightBrowserTool:
             save_path = os.path.join(download_dir, file_name)
 
             # 保存文件
-            await download.save_as(save_path)
+            download.save_as(save_path)
 
             return {
                 "success": True,
