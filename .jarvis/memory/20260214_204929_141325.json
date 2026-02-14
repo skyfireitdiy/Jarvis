@@ -1,0 +1,17 @@
+{
+  "id": "20260214_204929_141325",
+  "type": "project_long_term",
+  "tags": [
+    "bugfix",
+    "thread_safety",
+    "rich",
+    "Live",
+    "IndexError",
+    "pretty_output",
+    "base.py",
+    "流式输出"
+  ],
+  "content": "## Rich Live IndexError 修复完成 (2026-02-20)\n\n### Bug 现象\n流式输出过程中偶尔出现 `IndexError: list index out of range` 错误，发生在 rich 的 `Text.divide()` 方法中。\n\n### 根本原因\n1. Live 有内部刷新线程（refresh_per_second=10），每秒刷新10次\n2. 主线程在 `_update_panel_content` 中调用 `text_content.append()` 修改 Text 对象内部状态\n3. 虽然使用了锁保护，但 Text 对象不是线程安全的，并发访问可能导致内部 spans 列表和 plain 文本不一致\n4. Live 内部线程在渲染时访问了状态不一致的 Text 对象，导致 line_ranges 索引越界\n\n### 修复方案\n在每次更新内容时，不再在原 Text 对象上调用 `append()`，而是：\n1. 获取当前文本内容：`current_text = text_content.plain`\n2. 拼接新内容：`new_content = current_text + content`\n3. 创建新的 Text 对象：`text_content = Text(new_content, ...)`\n\n这样确保传递给 Live 的 Text 对象始终处于稳定状态，不会被后续操作修改。\n\n### 修改位置\n- 文件：src/jarvis/jarvis_platform/base.py\n- 函数：_chat_with_pretty_output > _update_panel_content\n- 行号：第325-329行\n\n### 验证方法\n- ✓ Python 语法检查通过\n- 需要在实际场景中测试流式输出，确认不再出现 IndexError\n\n### 经验总结\n- **避免修改正在被并发访问的对象**：当第三方库的内部线程可能访问某个对象时，避免直接修改该对象的内部状态\n- **创建新对象替代修改**：通过创建新的对象来替代修改现有对象，可以避免并发访问导致的状态不一致\n- **防御性编程**：即使有锁保护，也要考虑对象本身的线程安全性",
+  "created_at": "2026-02-14T20:49:29.141354",
+  "updated_at": "2026-02-14T20:49:29.141358"
+}
