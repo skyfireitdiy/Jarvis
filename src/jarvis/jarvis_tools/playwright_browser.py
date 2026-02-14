@@ -637,13 +637,13 @@ class PlaywrightBrowserTool:
 
         try:
             # 提取链接
-            links = page.query_selector_all("a[href]")
+            links = await page.query_selector_all("a[href]")
             if links:
                 content += "[链接]\n"
                 for link in links[:50]:  # 限制数量
                     try:
-                        text = link.inner_text() or ""
-                        href = link.get_attribute("href") or ""
+                        text = await link.inner_text() or ""
+                        href = await link.get_attribute("href") or ""
                         if text.strip():
                             content += f"  文本: {text.strip()}\n"
                             content += f'  链接: a[href="{href}"]\n\n'
@@ -651,7 +651,7 @@ class PlaywrightBrowserTool:
                         pass
 
             # 提取按钮
-            buttons = page.query_selector_all(
+            buttons = await page.query_selector_all(
                 "button, input[type='button'], input[type='submit']"
             )
             if buttons:
@@ -659,9 +659,13 @@ class PlaywrightBrowserTool:
                 for button in buttons[:50]:
                     try:
                         text = (
-                            button.inner_text() or button.get_attribute("value") or ""
+                            await button.inner_text()
+                            or await button.get_attribute("value")
+                            or ""
                         )
-                        tag_name = button.evaluate("el => el.tagName.toLowerCase()")
+                        tag_name = await button.evaluate(
+                            "el => el.tagName.toLowerCase()"
+                        )
                         selector = (
                             f"{tag_name}[{'text="' + text + '"' if text else ''}]"
                         )
@@ -672,17 +676,19 @@ class PlaywrightBrowserTool:
                         pass
 
             # 提取输入框
-            inputs = page.query_selector_all(
+            inputs = await page.query_selector_all(
                 "input[type='text'], input[type='email'], input[type='password'], textarea"
             )
             if inputs:
                 content += "[输入框]\n"
                 for inp in inputs[:50]:
                     try:
-                        tag_name = inp.evaluate("el => el.tagName.toLowerCase()")
-                        input_type = inp.get_attribute("type") or "text"
+                        tag_name = await inp.evaluate("el => el.tagName.toLowerCase()")
+                        input_type = await inp.get_attribute("type") or "text"
                         name = (
-                            inp.get_attribute("name") or inp.get_attribute("id") or ""
+                            await inp.get_attribute("name")
+                            or await inp.get_attribute("id")
+                            or ""
                         )
                         selector = f"{tag_name}[type='{input_type}'{'[name="' + name + '"]' if name else ''}]"
                         content += f"  类型: {input_type}\n"
@@ -692,19 +698,19 @@ class PlaywrightBrowserTool:
                         pass
 
             # 提取选择框
-            selects = page.query_selector_all("select")
+            selects = await page.query_selector_all("select")
             if selects:
                 content += "[选择框]\n"
                 for select in selects[:50]:
                     try:
                         name = (
-                            select.get_attribute("name")
-                            or select.get_attribute("id")
+                            await select.get_attribute("name")
+                            or await select.get_attribute("id")
                             or ""
                         )
-                        options = select.query_selector_all("option")
+                        options = await select.query_selector_all("option")
                         option_texts = [
-                            opt.inner_text() for opt in options if opt.inner_text()
+                            text for opt in options if (text := await opt.inner_text())
                         ]
                         content += f"  名称: {name or '未知'}\n"
                         content += f"  选项: {', '.join(option_texts[:10])}\n"
