@@ -322,7 +322,13 @@ class BasePlatform(ABC):
 
                 # 使用锁保护 panel 更新，避免与 Live 内部线程冲突
                 with self._panel_lock:
-                    text_content.append(content, style="bright_white")
+                    # 获取当前文本并添加新内容，创建新的 Text 对象
+                    # 避免在原 Text 对象上调用 append()，防止与 Live 内部线程并发访问导致不一致
+                    current_text = text_content.plain
+                    new_content = current_text + content
+                    text_content = Text(
+                        new_content, overflow="fold", style="bright_white"
+                    )
                     update_count += 1
 
                     # Scrolling Logic - 只在内容超过一定行数时才应用滚动
