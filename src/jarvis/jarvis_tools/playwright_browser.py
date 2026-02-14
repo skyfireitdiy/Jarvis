@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import asyncio
-import nest_asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -10,9 +9,6 @@ from typing import List
 from typing import cast
 
 from jarvis.jarvis_utils.output import PrettyOutput
-
-# 允许嵌套事件循环
-nest_asyncio.apply()
 
 # 为了类型检查，总是导入这些模块
 if TYPE_CHECKING:
@@ -96,10 +92,19 @@ class PlaywrightBrowserTool:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # 使用 nest_asyncio 在运行中的循环中执行
-                return cast(
-                    Dict[str, Any],
-                    asyncio.run_coroutine_threadsafe(coro, loop).result(),
-                )
+                try:
+                    return cast(
+                        Dict[str, Any],
+                        asyncio.run_coroutine_threadsafe(coro, loop).result(),
+                    )
+                except KeyboardInterrupt:
+                    # 用户中断操作，返回友好的错误信息
+                    return {
+                        "success": False,
+                        "stdout": "",
+                        "stderr": "操作被用户中断",
+                        "output_files": [],
+                    }
             else:
                 return cast(Dict[str, Any], loop.run_until_complete(coro))
         except RuntimeError:
@@ -230,38 +235,39 @@ class PlaywrightBrowserTool:
             if browser_id in agent.browser_sessions:
                 await self._close_browser(agent, browser_id)
 
-            # 创建浏览器会话（异步）
-            async with async_playwright() as p:
-                playwright_manager = p
-                browser = await p.chromium.launch(headless=headless)
-                context = await browser.new_context()
-                page = await context.new_page()
+            # 创建浏览器会话（异步）- 不使用 async with 以保持会话活跃
+            from playwright.async_api import async_playwright  # noqa: F401
 
-                # 保存会话
-                agent.browser_sessions[browser_id] = {
-                    "playwright_manager": playwright_manager,
-                    "browser": browser,
-                    "context": context,
-                    "page": page,
-                }
+            playwright_manager = await async_playwright().start()
+            browser = await playwright_manager.chromium.launch(headless=headless)
+            context = await browser.new_context()
+            page = await context.new_page()
 
-                # 保存初始页面内容
-                content_mode = args.get("content_mode", "abstract")
-                output_files = await self._save_page_content(
-                    page, browser_id, "launch", content_mode
+            # 保存会话
+            agent.browser_sessions[browser_id] = {
+                "playwright_manager": playwright_manager,
+                "browser": browser,
+                "context": context,
+                "page": page,
+            }
+
+            # 保存初始页面内容
+            content_mode = args.get("content_mode", "abstract")
+            output_files = await self._save_page_content(
+                page, browser_id, "launch", content_mode
+            )
+
+            if output_files:
+                PrettyOutput.auto_print(
+                    f"📥 启动浏览器 [{browser_id}] 时的内容已保存到: {', '.join(output_files)}"
                 )
 
-                if output_files:
-                    PrettyOutput.auto_print(
-                        f"📥 启动浏览器 [{browser_id}] 时的内容已保存到: {', '.join(output_files)}"
-                    )
-
-                return {
-                    "success": True,
-                    "stdout": f"浏览器 [{browser_id}] 已启动",
-                    "stderr": "",
-                    "output_files": output_files,
-                }
+            return {
+                "success": True,
+                "stdout": f"浏览器 [{browser_id}] 已启动",
+                "stderr": "",
+                "output_files": output_files,
+            }
 
         except Exception as e:
             return {
