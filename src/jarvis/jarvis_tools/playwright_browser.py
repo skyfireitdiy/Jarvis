@@ -201,7 +201,6 @@ class PlaywrightBrowserTool:
                         "success": False,
                         "stdout": "",
                         "stderr": "操作被用户中断",
-                        "output_files": [],
                     }
             else:
                 return cast(Dict[str, Any], loop.run_until_complete(coro))
@@ -228,7 +227,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "未提供agent对象",
-                "output_files": [],
             }
 
         # 获取参数
@@ -290,7 +288,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"不支持的操作: {action}。有效操作: {', '.join(valid_actions)}",
-                "output_files": [],
             }
 
         try:
@@ -330,12 +327,16 @@ class PlaywrightBrowserTool:
                     PrettyOutput.auto_print("❌ 获取浏览器列表失败")
                 return result
             elif action == "console":
-                result = self._run_async(self._get_console_logs(agent, browser_id, args))
+                result = self._run_async(
+                    self._get_console_logs(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取 console 日志失败")
                 return result
             elif action == "eval":
-                result = self._run_async(self._evaluate_javascript(agent, browser_id, args))
+                result = self._run_async(
+                    self._evaluate_javascript(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 执行 JavaScript 代码失败")
                 return result
@@ -370,7 +371,9 @@ class PlaywrightBrowserTool:
                     PrettyOutput.auto_print("❌ 清空 Cookies 失败")
                 return result
             elif action == "wait_for_selector":
-                result = self._run_async(self._wait_for_selector(agent, browser_id, args))
+                result = self._run_async(
+                    self._wait_for_selector(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 等待元素失败")
                 return result
@@ -395,7 +398,9 @@ class PlaywrightBrowserTool:
                     PrettyOutput.auto_print("❌ 向上滚动失败")
                 return result
             elif action == "get_element_info":
-                result = self._run_async(self._get_element_info(agent, browser_id, args))
+                result = self._run_async(
+                    self._get_element_info(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取元素信息失败")
                 return result
@@ -465,27 +470,37 @@ class PlaywrightBrowserTool:
                     PrettyOutput.auto_print("❌ 前进失败")
                 return result
             elif action == "get_local_storage":
-                result = self._run_async(self._get_local_storage(agent, browser_id, args))
+                result = self._run_async(
+                    self._get_local_storage(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取本地存储失败")
                 return result
             elif action == "set_local_storage":
-                result = self._run_async(self._set_local_storage(agent, browser_id, args))
+                result = self._run_async(
+                    self._set_local_storage(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 设置本地存储失败")
                 return result
             elif action == "start_network_monitor":
-                result = self._run_async(self._start_network_monitor(agent, browser_id, args))
+                result = self._run_async(
+                    self._start_network_monitor(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 启动网络监听失败")
                 return result
             elif action == "get_network_requests":
-                result = self._run_async(self._get_network_requests(agent, browser_id, args))
+                result = self._run_async(
+                    self._get_network_requests(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取网络请求失败")
                 return result
             elif action == "element_screenshot":
-                result = self._run_async(self._element_screenshot(agent, browser_id, args))
+                result = self._run_async(
+                    self._element_screenshot(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 元素截图失败")
                 return result
@@ -495,7 +510,9 @@ class PlaywrightBrowserTool:
                     PrettyOutput.auto_print("❌ 导出PDF失败")
                 return result
             elif action == "get_performance_metrics":
-                result = self._run_async(self._get_performance_metrics(agent, browser_id, args))
+                result = self._run_async(
+                    self._get_performance_metrics(agent, browser_id, args)
+                )
                 if not result["success"]:
                     PrettyOutput.auto_print("❌ 获取性能指标失败")
                 return result
@@ -503,7 +520,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "不支持的操作",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -511,7 +527,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"执行浏览器操作出错: {str(e)}",
-                "output_files": [],
             }
 
     async def _launch_browser(
@@ -527,7 +542,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": "Playwright 未安装，请运行: pip install playwright",
-                    "output_files": [],
                 }
 
             # 获取参数
@@ -572,20 +586,21 @@ class PlaywrightBrowserTool:
 
             # 保存初始页面内容
             content_mode = args.get("content_mode", "abstract")
-            output_files = await self._save_page_content(
+            file_paths = await self._save_page_content(
                 page, browser_id, "launch", content_mode
             )
 
-            if output_files:
+            stdout_msg = f"浏览器 [{browser_id}] 已启动"
+            if file_paths:
+                stdout_msg += f"。文件路径: {', '.join(file_paths)}"
                 PrettyOutput.auto_print(
-                    f"📥 启动浏览器 [{browser_id}] 时的内容已保存到: {', '.join(output_files)}"
+                    f"📥 启动浏览器 [{browser_id}] 时的内容已保存到: {', '.join(file_paths)}"
                 )
 
             return {
                 "success": True,
-                "stdout": f"浏览器 [{browser_id}] 已启动",
+                "stdout": stdout_msg,
                 "stderr": "",
-                "output_files": output_files,
             }
 
         except Exception as e:
@@ -593,7 +608,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"启动浏览器 [{browser_id}] 失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _navigate(
@@ -606,7 +620,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -621,7 +634,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"无效的 URL: {url}，必须以 http:// 或 https:// 开头",
-                "output_files": [],
             }
 
         try:
@@ -638,16 +650,17 @@ class PlaywrightBrowserTool:
                 page, browser_id, "navigate", content_mode
             )
 
+            stdout_msg = f"已导航到: {url}"
             if output_files:
                 PrettyOutput.auto_print(
                     f"📥 导航到 [{url}] 后的内容已保存到: {', '.join(output_files)}"
                 )
+                stdout_msg += f"。页面内容已保存到: {', '.join(output_files)}"
 
             return {
                 "success": True,
-                "stdout": f"已导航到: {url}",
+                "stdout": stdout_msg,
                 "stderr": "",
-                "output_files": output_files,
             }
 
         except Exception as e:
@@ -655,7 +668,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"导航到 URL 失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _click(
@@ -668,7 +680,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -682,7 +693,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         try:
@@ -699,16 +709,17 @@ class PlaywrightBrowserTool:
                 page, browser_id, "click", content_mode
             )
 
+            stdout_msg = f"已点击元素: {selector}"
             if output_files:
                 PrettyOutput.auto_print(
                     f"📥 点击元素 [{selector}] 后的内容已保存到: {', '.join(output_files)}"
                 )
+                stdout_msg += f"。页面内容已保存到: {', '.join(output_files)}"
 
             return {
                 "success": True,
-                "stdout": f"已点击元素: {selector}",
+                "stdout": stdout_msg,
                 "stderr": "",
-                "output_files": output_files,
             }
 
         except Exception as e:
@@ -716,7 +727,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"点击元素失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _type_text(
@@ -729,7 +739,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -744,7 +753,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         try:
@@ -761,16 +769,17 @@ class PlaywrightBrowserTool:
                 page, browser_id, "type", content_mode
             )
 
+            stdout_msg = f"已在元素 [{selector}] 中输入文本"
             if output_files:
                 PrettyOutput.auto_print(
                     f"📥 输入文本后 [{selector}] 的内容已保存到: {', '.join(output_files)}"
                 )
+                stdout_msg += f"。页面内容已保存到: {', '.join(output_files)}"
 
             return {
                 "success": True,
-                "stdout": f"已在元素 [{selector}] 中输入文本",
+                "stdout": stdout_msg,
                 "stderr": "",
-                "output_files": output_files,
             }
 
         except Exception as e:
@@ -778,7 +787,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"输入文本失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _screenshot(
@@ -791,7 +799,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -811,9 +818,8 @@ class PlaywrightBrowserTool:
 
             return {
                 "success": True,
-                "stdout": "截图已保存",
+                "stdout": f"截图已保存。文件路径: {filename}",
                 "stderr": "",
-                "output_files": output_files,
             }
 
         except Exception as e:
@@ -821,7 +827,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"截图失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _close_browser(self, agent: Any, browser_id: str) -> Dict[str, Any]:
@@ -832,7 +837,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"浏览器 [{browser_id}] 未启动或已关闭",
                 "stderr": "",
-                "output_files": [],
             }
 
         try:
@@ -850,7 +854,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"浏览器 [{browser_id}] 已关闭",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -858,7 +861,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"关闭浏览器 [{browser_id}] 失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _list_browsers(self, agent: Any) -> Dict[str, Any]:
@@ -891,8 +893,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": output,
                 "stderr": "",
-                "output_files": [],
-                "browser_list": browser_list,
             }
 
         except Exception as e:
@@ -900,7 +900,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"获取浏览器列表失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _save_page_content(
@@ -1099,7 +1098,9 @@ class PlaywrightBrowserTool:
             content += "=" * 50 + "\n\n"
 
             for log in console_logs:
-                content += f"[{log['timestamp']}] [{log['type'].upper()}] {log['text']}\n"
+                content += (
+                    f"[{log['timestamp']}] [{log['type'].upper()}] {log['text']}\n"
+                )
 
             # 保存到文件
             filename.write_text(content, encoding="utf-8")
@@ -1200,7 +1201,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1211,7 +1211,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少表单字段参数",
-                "output_files": [],
             }
 
         try:
@@ -1274,13 +1273,14 @@ class PlaywrightBrowserTool:
 
             filename.write_text(content, encoding="utf-8")
             output_files = [str(filename)]
-            PrettyOutput.auto_print(f"📥 表单填写结果已保存到: {', '.join(output_files)}")
+            PrettyOutput.auto_print(
+                f"📥 表单填写结果已保存到: {', '.join(output_files)}"
+            )
 
             return {
                 "success": len(errors) == 0,
-                "stdout": f"成功填写 {len(filled_fields)} 个字段",
+                "stdout": f"成功填写 {len(filled_fields)} 个字段。表单结果已保存到: {filename}",
                 "stderr": "; ".join(errors) if errors else "",
-                "output_files": output_files,
             }
 
         except Exception as e:
@@ -1288,7 +1288,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"填写表单失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _submit_form(
@@ -1301,7 +1300,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -1326,7 +1324,6 @@ class PlaywrightBrowserTool:
                             "success": False,
                             "stdout": "",
                             "stderr": f"未找到表单: {form_selector}",
-                            "output_files": [],
                         }
 
             # 等待条件满足
@@ -1336,7 +1333,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": "表单已提交",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1344,7 +1340,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"提交表单失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _clear_form(
@@ -1357,7 +1352,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -1399,7 +1393,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已清空 {cleared_count} 个表单字段",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1407,12 +1400,9 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"清空表单失败: {str(e)}",
-                "output_files": [],
             }
 
-    async def _get_cookies(
-        self, agent: Any, browser_id: str
-    ) -> Dict[str, Any]:
+    async def _get_cookies(self, agent: Any, browser_id: str) -> Dict[str, Any]:
         """获取所有 Cookies（异步）"""
         # 检查浏览器是否启动
         if browser_id not in agent.browser_sessions:
@@ -1420,7 +1410,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -1457,10 +1446,8 @@ class PlaywrightBrowserTool:
 
             return {
                 "success": True,
-                "stdout": f"已获取 {len(cookies)} 个 Cookies",
+                "stdout": f"已获取 {len(cookies)} 个 Cookies。Cookies 已保存到: {filename}",
                 "stderr": "",
-                "output_files": output_files,
-                "cookies": cookies,
             }
 
         except Exception as e:
@@ -1468,7 +1455,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"获取 Cookies 失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _set_cookies(
@@ -1481,7 +1467,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1492,7 +1477,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少 cookies 参数",
-                "output_files": [],
             }
 
         try:
@@ -1505,7 +1489,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已设置 {len(cookies)} 个 Cookies",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1513,12 +1496,9 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"设置 Cookies 失败: {str(e)}",
-                "output_files": [],
             }
 
-    async def _clear_cookies(
-        self, agent: Any, browser_id: str
-    ) -> Dict[str, Any]:
+    async def _clear_cookies(self, agent: Any, browser_id: str) -> Dict[str, Any]:
         """清空所有 Cookies（异步）"""
         # 检查浏览器是否启动
         if browser_id not in agent.browser_sessions:
@@ -1526,7 +1506,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -1539,7 +1518,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": "已清空所有 Cookies",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1547,7 +1525,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"清空 Cookies 失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _wait_for_selector(
@@ -1560,7 +1537,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1573,7 +1549,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         # 验证状态参数
@@ -1583,7 +1558,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"无效的等待状态: {wait_state}，有效状态: {', '.join(valid_states)}",
-                "output_files": [],
             }
 
         try:
@@ -1598,7 +1572,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"元素 [{selector}] 已达到状态 [{wait_state}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1606,7 +1579,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"等待元素失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _wait_for_text(
@@ -1619,7 +1591,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1632,7 +1603,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少 wait_text 参数",
-                "output_files": [],
             }
 
         try:
@@ -1660,7 +1630,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"文本 [{text}] 已出现",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1668,7 +1637,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"等待文本失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _scroll_to(
@@ -1681,7 +1649,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1692,15 +1659,12 @@ class PlaywrightBrowserTool:
             page = agent.browser_sessions[browser_id]["page"]
 
             # 滚动到指定位置
-            await page.evaluate(
-                f"window.scrollTo({scroll_x}, {scroll_y})"
-            )
+            await page.evaluate(f"window.scrollTo({scroll_x}, {scroll_y})")
 
             return {
                 "success": True,
                 "stdout": f"已滚动到位置 ({scroll_x}, {scroll_y})",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1708,7 +1672,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"滚动失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _scroll_down(
@@ -1721,7 +1684,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1741,7 +1703,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已向下滚动 {scroll_amount} 像素",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1749,7 +1710,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"向下滚动失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _scroll_up(
@@ -1762,7 +1722,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1786,7 +1745,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已向上滚动 {abs(scroll_amount)} 像素",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1794,7 +1752,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"向上滚动失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _get_element_info(
@@ -1807,7 +1764,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1818,7 +1774,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         try:
@@ -1830,7 +1785,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到元素 [{selector}]",
-                    "output_files": [],
                 }
 
             # 获取元素信息
@@ -1846,13 +1800,13 @@ class PlaywrightBrowserTool:
 
             # 将信息转换为 JSON 字符串
             import json
+
             info_str = json.dumps(info, indent=2, ensure_ascii=False)
 
             return {
                 "success": True,
                 "stdout": f"元素信息:\n{info_str}",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1860,7 +1814,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"获取元素信息失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _get_text(
@@ -1873,7 +1826,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1884,7 +1836,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         try:
@@ -1896,7 +1847,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到元素 [{selector}]",
-                    "output_files": [],
                 }
 
             # 获取文本内容
@@ -1906,7 +1856,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": text if text else "",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1914,7 +1863,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"获取文本失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _get_attribute(
@@ -1927,7 +1875,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -1939,7 +1886,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         if not attribute:
@@ -1947,7 +1893,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少属性名参数",
-                "output_files": [],
             }
 
         try:
@@ -1959,7 +1904,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到元素 [{selector}]",
-                    "output_files": [],
                 }
 
             # 获取属性值
@@ -1970,14 +1914,12 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"元素 [{selector}] 没有属性 [{attribute}]",
-                    "output_files": [],
                 }
 
             return {
                 "success": True,
                 "stdout": attr_value,
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -1985,7 +1927,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"获取属性失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _hover(
@@ -1998,7 +1939,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2009,7 +1949,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         try:
@@ -2021,7 +1960,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到元素 [{selector}]",
-                    "output_files": [],
                 }
 
             # 鼠标悬停
@@ -2031,7 +1969,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已悬停到元素 [{selector}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2039,7 +1976,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"悬停失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _drag(
@@ -2052,7 +1988,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2064,7 +1999,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         if not target_selector:
@@ -2072,7 +2006,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少目标选择器参数",
-                "output_files": [],
             }
 
         try:
@@ -2087,7 +2020,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到源元素 [{selector}]",
-                    "output_files": [],
                 }
 
             if not target_element:
@@ -2095,7 +2027,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到目标元素 [{target_selector}]",
-                    "output_files": [],
                 }
 
             # 执行拖拽操作
@@ -2105,7 +2036,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已将元素 [{selector}] 拖拽到 [{target_selector}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2113,7 +2043,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"拖拽失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _double_click(
@@ -2126,7 +2055,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2137,7 +2065,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         try:
@@ -2149,7 +2076,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到元素 [{selector}]",
-                    "output_files": [],
                 }
 
             # 双击元素
@@ -2159,7 +2085,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已双击元素 [{selector}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2167,7 +2092,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"双击失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _press_key(
@@ -2180,7 +2104,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2191,7 +2114,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少按键参数",
-                "output_files": [],
             }
 
         try:
@@ -2204,7 +2126,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已按下按键 [{key}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2212,7 +2133,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"按键失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _upload_file(
@@ -2225,7 +2145,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2237,7 +2156,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少选择器参数",
-                "output_files": [],
             }
 
         if not file_path:
@@ -2245,7 +2163,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少文件路径参数",
-                "output_files": [],
             }
 
         try:
@@ -2257,7 +2174,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"未找到元素 [{selector}]",
-                    "output_files": [],
                 }
 
             # 上传文件
@@ -2267,7 +2183,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已上传文件 [{file_path}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2275,7 +2190,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"上传文件失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _new_tab(
@@ -2288,7 +2202,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -2313,7 +2226,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已新建标签页 [{page_id}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2321,7 +2233,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"新建标签页失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _switch_tab(
@@ -2334,7 +2245,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2345,7 +2255,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少 page_id 参数",
-                "output_files": [],
             }
 
         try:
@@ -2356,22 +2265,18 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"标签页 [{page_id}] 不存在，可用标签页: {', '.join(pages.keys())}",
-                    "output_files": [],
                 }
 
             # 切换到指定标签页
             agent.browser_sessions[browser_id]["current_page_id"] = page_id
             agent.browser_sessions[browser_id]["page"] = pages[page_id]
 
-            PrettyOutput.auto_print(
-                f"✅ 已切换到标签页 [{page_id}]"
-            )
+            PrettyOutput.auto_print(f"✅ 已切换到标签页 [{page_id}]")
 
             return {
                 "success": True,
                 "stdout": f"已切换到标签页 [{page_id}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2379,7 +2284,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"切换标签页失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _close_tab(
@@ -2392,7 +2296,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2403,7 +2306,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "缺少 page_id 参数",
-                "output_files": [],
             }
 
         try:
@@ -2414,7 +2316,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": f"标签页 [{page_id}] 不存在，可用标签页: {', '.join(pages.keys())}",
-                    "output_files": [],
                 }
 
             # 关闭标签页
@@ -2429,7 +2330,9 @@ class PlaywrightBrowserTool:
                 if pages:
                     # 切换到第一个可用标签页
                     new_current_id = list(pages.keys())[0]
-                    agent.browser_sessions[browser_id]["current_page_id"] = new_current_id
+                    agent.browser_sessions[browser_id]["current_page_id"] = (
+                        new_current_id
+                    )
                     agent.browser_sessions[browser_id]["page"] = pages[new_current_id]
                 else:
                     # 没有其他标签页了，清空
@@ -2446,7 +2349,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已关闭标签页 [{page_id}]",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2454,7 +2356,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"关闭标签页失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _go_back(
@@ -2467,7 +2368,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -2481,7 +2381,6 @@ class PlaywrightBrowserTool:
                     "success": False,
                     "stdout": "",
                     "stderr": "没有可以后退的页面",
-                    "output_files": [],
                 }
 
             # 后退到上一个页面
@@ -2493,7 +2392,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": "已后退到上一个页面",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2501,7 +2399,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"后退失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _go_forward(
@@ -2514,7 +2411,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -2529,7 +2425,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": "已前进到下一个页面",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2537,7 +2432,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"前进失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _get_local_storage(
@@ -2550,7 +2444,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -2569,6 +2462,7 @@ class PlaywrightBrowserTool:
             # 保存到文件
             import json
             import tempfile
+
             output_file = tempfile.mktemp(
                 suffix="_local_storage.json",
                 prefix=f"{browser_id}_",
@@ -2591,7 +2485,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"获取本地存储失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _set_local_storage(
@@ -2604,7 +2497,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         # 获取参数
@@ -2616,7 +2508,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": "data 参数必须是字典类型",
-                "output_files": [],
             }
 
         try:
@@ -2646,7 +2537,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"已{action_desc}本地存储数据，共 {len(data)} 项",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2654,7 +2544,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"设置本地存储失败: {str(e)}",
-                "output_files": [],
             }
 
     async def _start_network_monitor(
@@ -2667,7 +2556,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -2712,7 +2600,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": "已启动网络监听",
                 "stderr": "",
-                "output_files": [],
             }
 
         except Exception as e:
@@ -2720,12 +2607,12 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"启动网络监听失败: {str(e)}",
-                "output_files": [],
             }
 
     def _get_timestamp(self) -> str:
         """获取当前时间戳"""
         from datetime import datetime
+
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     async def _get_network_requests(
@@ -2755,6 +2642,7 @@ class PlaywrightBrowserTool:
             # 保存到文件
             import json
             import tempfile
+
             output_file = tempfile.mktemp(
                 suffix="_network_requests.json",
                 prefix=f"{browser_id}_",
@@ -2816,6 +2704,7 @@ class PlaywrightBrowserTool:
 
             # 截图
             import tempfile
+
             screenshot_path = tempfile.mktemp(
                 suffix="_element_screenshot.png",
                 prefix=f"{browser_id}_",
@@ -2856,6 +2745,7 @@ class PlaywrightBrowserTool:
 
             # 导出PDF
             import tempfile
+
             pdf_path = tempfile.mktemp(
                 suffix="_page.pdf",
                 prefix=f"{browser_id}_",
@@ -2911,6 +2801,7 @@ class PlaywrightBrowserTool:
             # 保存到文件
             import json
             import tempfile
+
             output_file = tempfile.mktemp(
                 suffix="_performance_metrics.json",
                 prefix=f"{browser_id}_",
@@ -2918,9 +2809,7 @@ class PlaywrightBrowserTool:
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(metrics, f, ensure_ascii=False, indent=2)
 
-            PrettyOutput.auto_print(
-                f"✅ 已获取页面性能指标，已保存到: {output_file}"
-            )
+            PrettyOutput.auto_print(f"✅ 已获取页面性能指标，已保存到: {output_file}")
 
             return {
                 "success": True,
@@ -2945,7 +2834,6 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"浏览器 [{browser_id}] 未启动",
-                "output_files": [],
             }
 
         try:
@@ -2971,7 +2859,10 @@ class PlaywrightBrowserTool:
                     pass
 
             download = await download_info.value
-            file_name = download.suggested_filename or f"download_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            file_name = (
+                download.suggested_filename
+                or f"download_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            )
             save_path = os.path.join(download_dir, file_name)
 
             # 保存文件
@@ -2981,7 +2872,6 @@ class PlaywrightBrowserTool:
                 "success": True,
                 "stdout": f"文件已下载到 [{save_path}]",
                 "stderr": "",
-                "output_files": [save_path],
             }
 
         except Exception as e:
@@ -2989,5 +2879,4 @@ class PlaywrightBrowserTool:
                 "success": False,
                 "stdout": "",
                 "stderr": f"下载文件失败: {str(e)}",
-                "output_files": [],
             }
