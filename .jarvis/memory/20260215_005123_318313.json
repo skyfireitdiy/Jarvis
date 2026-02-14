@@ -1,0 +1,8 @@
+{
+  "id": "20260215_005123_318313",
+  "type": "project_long_term",
+  "tags": ["playwright_browser", "守护进程", "asyncio", "架构升级", "完成"],
+  "content": "## playwright_browser守护进程架构 - 最终完成报告\n\n### 架构设计\n- **守护进程**：独立运行，使用asyncio事件循环\n- **通信协议**：Unix domain socket，Content-Length协议，JSON格式\n- **Socket路径**：~/.jarvis/playwright_daemon.sock\n- **Browser会话**：存储在守护进程全局变量`_browser_sessions`，支持多browser实例\n\n### 技术实现\n1. **Async API迁移**：所有41个browser操作函数从`playwright.sync_api`迁移到`playwright.async_api`\n2. **守护进程功能**：\n   - BrowserDaemon类：socket服务器、请求处理、命令路由\n   - Content-Length协议：确保消息边界\n   - 优雅退出：SIGTERM/SIGINT信号处理\n3. **CLI工具**：所有41个命令通过`send_to_daemon()`与守护进程通信\n\n### 解决的核心问题\n- **事件循环冲突**：守护进程独立运行，与主进程完全隔离\n- **Session持久化**：browser会话存储在守护进程中，所有命令共享同一个会话\n- **兼容性**：保持CLI工具对外接口不变，41个命令全部正常工作\n\n### 验证结果\n- ✅ 守护进程启动成功\n- ✅ launch/navigate/list/close操作测试成功\n- ✅ Session持久化验证：list显示active browser，close后list为空\n- ✅ 无asyncio事件循环冲突\n- ✅ 所有41个命令静态检查通过（mypy/ruff）\n\n### 关键文件\n- `src/jarvis/jarvis_browser/cli.py` - CLI工具主文件（2933行）\n- Socket路径：~/.jarvis/playwright_daemon.sock\n\n### 使用方式\n```bash\n# 启动守护进程\npython3 -m jarvis.jarvis_browser.cli daemon\n\n# 使用CLI工具\npython3 -m jarvis.jarvis_browser.cli launch --headless\npython3 -m jarvis.jarvis_browser.cli navigate --url https://example.com\npython3 -m jarvis.jarvis_browser.cli list\npython3 -m jarvis.jarvis_browser.cli close\n```",
+  "created_at": "2026-02-15T00:51:23.318337",
+  "updated_at": "2026-02-15T00:51:23.318341"
+}

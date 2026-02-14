@@ -1,0 +1,8 @@
+{
+  "id": "20260215_000101_994653",
+  "type": "project_long_term",
+  "tags": ["playwright_browser", "守护进程", "架构设计", "browser_daemon"],
+  "content": "PlaywrightBrowser守护进程架构设计：\n1. **架构目标**：解决事件循环冲突，保持浏览器会话持久化\n2. **技术选型**：\n   - Unix domain socket IPC通信\n   - asyncio异步框架\n   - Content-Length协议\n3. **Socket路径**：~/.jarvis/playwright_daemon.sock (通过get_socket_path()获取)\n4. **守护进程类**：BrowserDaemon(src/jarvis/jarvis_browser/cli.py)\n   - start(): 启动socket服务器，注册信号处理器\n   - stop(): 优雅退出，清理socket文件\n   - handle_client(): 处理客户端连接\n   - handle_request(): 命令路由\n5. **支持的命令**：launch, close, navigate, click, type, screenshot, gettext, shutdown\n6. **参考实现**：src/jarvis/jarvis_lsp/daemon.py (LSPDaemon)\n7. **客户端函数**：send_to_daemon(action, params, socket_path) 用于与守护进程通信\n8. **安全特性**：\n   - 优雅退出（SIGTERM, SIGINT）\n   - Socket文件自动清理\n   - 类型安全（mypy验证通过）",
+  "created_at": "2026-02-15T00:01:01.994677",
+  "updated_at": "2026-02-15T00:01:01.994680"
+}

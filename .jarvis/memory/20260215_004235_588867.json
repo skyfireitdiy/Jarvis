@@ -1,0 +1,8 @@
+{
+  "id": "20260215_004235_588867",
+  "type": "project_long_term",
+  "tags": ["playwright_browser", "async迁移", "CLI工具", "守护进程"],
+  "content": "playwright_browser async API迁移进展：\n\n已完成：\n1. ✅ 导入修改：from playwright.sync_api import sync_playwright 改为 from playwright.async_api import async_playwright\n2. ✅ 41个browser操作函数全部改为async def，所有playwright调用添加await\n3. ✅ BrowserDaemon.handle_request正确调用async函数\n4. ✅ 守护进程启动成功，socket通信正常\n5. ✅ 3个CLI命令改为使用send_to_daemon：launch、navigate、close\n\n待完成：\n- 38个CLI命令需要改为使用send_to_daemon（而不是直接asyncio.run调用async函数）\n  包括：click, type, screenshot, gettext, list, console, eval, get_attribute, get_element_info, wait_for_selector, wait_for_text, hover, drag, double_click, press_key, fill_form, submit_form, clear_form, upload_file, download_file, new_tab, switch_tab, close_tab, go_back, go_forward, scroll_to, scroll_down, scroll_up, get_cookies, set_cookies, clear_cookies, get_local_storage, set_local_storage, start_network_monitor, get_network_requests, element_screenshot, export_pdf, get_performance_metrics\n\n关键发现：\n- CLI命令必须使用send_to_daemon函数，否则每个命令都是独立进程，无法共享browser会话\n- 守护进程架构工作正常，async API迁移成功\n\n文件：src/jarvis/jarvis_browser/cli.py\nSocket路径：~/.jarvis/playwright_daemon.sock",
+  "created_at": "2026-02-15T00:42:35.588890",
+  "updated_at": "2026-02-15T00:42:35.588894"
+}
