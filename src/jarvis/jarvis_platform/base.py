@@ -2,6 +2,7 @@ import os
 
 # -*- coding: utf-8 -*-
 import re
+import threading
 from abc import ABC
 from abc import abstractmethod
 from datetime import datetime
@@ -64,6 +65,7 @@ class BasePlatform(ABC):
         """
         self.suppress_output = True  # 添加输出控制标志
         self._saved = False
+        self._panel_lock = threading.RLock()  # 用于保护 panel 更新的线程锁
 
         self._session_history_file: Optional[str] = None
         self.platform_type: str = platform_type  # 平台类型：normal/cheap/smart
@@ -317,58 +319,69 @@ class BasePlatform(ABC):
                     update_count, \
                     text_content, \
                     panel
-                text_content.append(content, style="bright_white")
-                update_count += 1
 
-                # Scrolling Logic - 只在内容超过一定行数时才应用滚动
-                max_text_height = console.height - 5
-                if max_text_height <= 0:
-                    max_text_height = 1
+                # 使用锁保护 panel 更新，避免与 Live 内部线程冲突
+                with self._panel_lock:
+                    text_content.append(content, style="bright_white")
+                    update_count += 1
 
-                lines = text_content.wrap(
-                    console,
-                    console.width - 4 if console.width > 4 else 1,
-                )
+                    # Scrolling Logic - 只在内容超过一定行数时才应用滚动
+                    max_text_height = console.height - 5
+                    if max_text_height <= 0:
+                        max_text_height = 1
 
-                # 只在内容超过最大高度时才截取，减少不必要的操作
-                if len(lines) > max_text_height:
-                    # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致
-                    # 这确保了Rich内部spans列表与文本内容保持同步
-                    new_text = Text(
-                        "\n".join([line.plain for line in lines[-max_text_height:]]),
-                        overflow="fold",
-                    )
-                    text_content = new_text
-                    # 重建panel对象，避免Live无法正确清除旧的panel显示
-                    # 当text_content对象被替换时，panel必须重建才能让Live正确处理
-                    current_subtitle = panel.subtitle
-                    panel = Panel(
-                        text_content,
-                        title=panel.title,
-                        subtitle=current_subtitle,
-                        border_style="cyan",
-                        box=box.ROUNDED,
-                        expand=True,
+                    lines = text_content.wrap(
+                        console,
+                        console.width - 4 if console.width > 4 else 1,
                     )
 
-                # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
-                # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
-                current_time = time.time()
-                should_update_subtitle = (
-                    update_subtitle
-                    or update_count % 10 == 0  # 每 10 次更新一次
-                    or (current_time - last_subtitle_update_time)
-                    >= subtitle_update_interval
-                )
+                    # 只在内容超过最大高度时才截取，减少不必要的操作
+                    if len(lines) > max_text_height:
+                        # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致
+                        # 这确保了Rich内部spans列表与文本内容保持同步
+                        new_text = Text(
+                            "\n".join(
+                                [line.plain for line in lines[-max_text_height:]]
+                            ),
+                            overflow="fold",
+                        )
+                        text_content = new_text
+                        # 重建panel对象，避免Live无法正确清除旧的panel显示
+                        # 当text_content对象被替换时，panel必须重建才能让Live正确处理
+                        current_subtitle = panel.subtitle
+                        panel = Panel(
+                            text_content,
+                            title=panel.title,
+                            subtitle=current_subtitle,
+                            border_style="cyan",
+                            box=box.ROUNDED,
+                            expand=True,
+                        )
 
-                if should_update_subtitle:
-                    self._update_panel_subtitle_with_token(
-                        panel, response, is_completed=False
+                    # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
+                    # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
+                    current_time = time.time()
+                    should_update_subtitle = (
+                        update_subtitle
+                        or update_count % 10 == 0  # 每 10 次更新一次
+                        or (current_time - last_subtitle_update_time)
+                        >= subtitle_update_interval
                     )
-                    last_subtitle_update_time = current_time
 
-                # 更新 panel（只更新内容，subtitle 更新频率已降低）
-                live.update(panel)
+                    if should_update_subtitle:
+                        self._update_panel_subtitle_with_token(
+                            panel, response, is_completed=False
+                        )
+                        last_subtitle_update_time = current_time
+
+                    # 更新 panel（只更新内容，subtitle 更新频率已降低）
+                    # 添加异常处理，防止 rich 内部线程冲突导致的 IndexError
+                    try:
+                        live.update(panel)
+                    except (IndexError, RuntimeError):
+                        # 忽略 rich 内部错误，避免影响主流程
+                        # 这些错误通常是由于 Live 内部线程与主线程的时序冲突导致的
+                        pass
 
             # Process first chunk
             response += first_chunk
