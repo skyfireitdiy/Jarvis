@@ -233,6 +233,14 @@
       "description": "中心规则仓库路径或Git仓库地址。支持本地目录（含git子路径）：若为本地目录将直接加入规则加载路径；若为Git URL则会克隆到数据目录并加载。",
       "default": ""
     },
+    "default_rule_names": {
+      "type": "array",
+      "description": "默认加载的规则名称列表。这些规则会与命令行参数 --rule-names 合并使用（去重后合并）。支持在配置文件中预定义常用规则，同时保留命令行覆盖的灵活性。",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "print_prompt": {
       "type": "boolean",
       "description": "是否打印提示",

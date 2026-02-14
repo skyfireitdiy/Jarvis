@@ -757,6 +757,34 @@ def get_central_rules_repo() -> str:
     return cast(str, GLOBAL_CONFIG_DATA.get("central_rules_repo", ""))
 
 
+def get_default_rule_names() -> List[str]:
+    """
+    获取默认规则名称列表。
+
+    返回:
+        List[str]: 默认规则名称列表，如果未配置则返回空列表
+    """
+    value = GLOBAL_CONFIG_DATA.get("default_rule_names", [])
+    # 如果配置是列表，直接返回
+    if isinstance(value, list):
+        return cast(List[str], value)
+    # 如果配置是字符串（兼容旧格式），按逗号分割
+    if isinstance(value, str) and value.strip():
+        return [name.strip() for name in value.split(",") if name.strip()]
+    return []
+
+
+def set_default_rule_names(rule_names: Optional[List[str]]) -> None:
+    """
+    设置默认规则名称列表。
+
+    参数:
+        rule_names: 规则名称列表，如果为 None 则不修改现有配置
+    """
+    if rule_names is not None:
+        GLOBAL_CONFIG_DATA["default_rule_names"] = rule_names
+
+
 def is_print_prompt() -> bool:
     """
     获取是否打印提示。

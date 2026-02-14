@@ -2,6 +2,7 @@
 """Agent管理器模块，负责Agent的初始化和任务执行"""
 
 from typing import Callable
+from typing import List
 from typing import Optional
 
 import typer
@@ -44,6 +45,37 @@ class AgentManager:
         self.rule_names = rule_names
         self.optimize_system_prompt = optimize_system_prompt
 
+    def _merge_rule_names(self, cli_rule_names: Optional[str]) -> Optional[str]:
+        """合并配置文件默认规则和命令行规则
+
+        参数:
+            cli_rule_names: 命令行传入的规则名称（逗号分隔的字符串）
+
+        返回:
+            Optional[str]: 合并后的规则名称（逗号分隔的字符串），如果都为空则返回 None
+        """
+        from jarvis.jarvis_utils.config import get_default_rule_names
+
+        # 获取配置文件中的默认规则
+        default_rules = get_default_rule_names()
+
+        # 解析命令行规则
+        cli_rules: List[str] = []
+        if cli_rule_names and cli_rule_names.strip():
+            cli_rules = [
+                name.strip() for name in cli_rule_names.split(",") if name.strip()
+            ]
+
+        # 如果两个都没有，返回 None
+        if not default_rules and not cli_rules:
+            return None
+
+        # 合并并去重
+        all_rules = list(dict.fromkeys(default_rules + cli_rules))  # 保持顺序的去重
+
+        # 转换为逗号分隔的字符串
+        return ",".join(all_rules) if all_rules else None
+
     def initialize(self) -> Agent:
         """初始化Agent"""
         # 如果提供了 tool_group 参数，设置到配置中
@@ -51,6 +83,9 @@ class AgentManager:
             from jarvis.jarvis_utils.config import set_config
 
             set_config("tool_group", self.tool_group)
+
+        # 合并默认规则和命令行规则
+        merged_rule_names = self._merge_rule_names(self.rule_names)
 
         self.agent = Agent(
             system_prompt=origin_agent_system_prompt,
@@ -62,7 +97,7 @@ class AgentManager:
             non_interactive=self.non_interactive,
             auto_complete=self.non_interactive or False,  # 非交互模式下自动完成
             allow_savesession=self.allow_savesession,
-            rule_names=self.rule_names,
+            rule_names=merged_rule_names,
             optimize_system_prompt=self.optimize_system_prompt,
         )
 
