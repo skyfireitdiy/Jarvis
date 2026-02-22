@@ -1668,7 +1668,7 @@ class task_list_manager:
 
                         if is_code_task:
                             # 代码相关任务：使用 sub_code_agent 工具
-                            from jarvis.jarvis_tools.sub_code_agent import (
+                            from jarvis.jarvis_code_agent.sub_code_agent import (
                                 SubCodeAgentTool,
                             )
 
@@ -1700,7 +1700,7 @@ class task_list_manager:
                             )
                         else:
                             # 通用任务：使用 sub_agent 工具
-                            from jarvis.jarvis_tools.sub_agent import SubAgentTool
+                            from jarvis.jarvis_agent.sub_agent import SubAgentTool
 
                             sub_general_agent_tool = SubAgentTool()
 

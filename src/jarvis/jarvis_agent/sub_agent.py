@@ -178,7 +178,7 @@ class SubAgentTool:
 
             # 执行任务
             result = agent.run(enhanced_task)
-            
+
             # 合并子 agent 的记忆标签到父 agent
             if parent_agent and hasattr(parent_agent, "add_memory_tags"):
                 try:
