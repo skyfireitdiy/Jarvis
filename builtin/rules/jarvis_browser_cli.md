@@ -313,6 +313,65 @@ jb getattribute --selector 'img' --attribute 'src' --browser-id demo
 jb getelementinfo --selector '#main-content' --browser-id demo
 ```
 
+#### get-markdown - 获取页面 Markdown
+
+将当前页面的 HTML 内容转换为 Markdown 格式。
+
+**参数：**
+
+- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+
+**示例：**
+
+```bash
+jb get-markdown --browser-id demo
+```
+
+**说明：**
+
+- 使用 markdownify 库将页面 HTML 转换为 Markdown
+- 适用于提取页面结构化内容
+- 返回的 Markdown 格式可直接用于文档生成或内容分析
+
+#### list-interactables - 列出交互控件
+
+列出页面上所有可交互的元素（按钮、输入框、链接等）。
+
+**参数：**
+
+- `--browser-id TEXT`: 浏览器 ID（默认：`default`）
+- `-f, --filter TEXT`: 按元素类型过滤（可选：`button`, `input`, `link`, `checkbox`, `radio`, `select`, `file`）
+
+**示例：**
+
+```bash
+# 列出所有交互控件
+jb list-interactables --browser-id demo
+
+# 只列出按钮
+jb list-interactables --browser-id demo --filter button
+
+# 只列出输入框
+jb list-interactables --browser-id demo --filter input
+
+# 只列出链接
+jb list-interactables --browser-id demo --filter link
+```
+
+**说明：**
+
+- 支持的元素类型包括：
+  - `button`: 按钮、提交按钮、重置按钮等
+  - `input`: 文本输入框、密码框、邮箱框、数字输入框、文本区域
+  - `link`: 带有 href 属性的链接
+  - `checkbox`: 复选框
+  - `radio`: 单选按钮
+  - `select`: 下拉选择框
+  - `file`: 文件上传输入框
+- 每个元素返回的信息包括：类型、选择器、文本内容
+- 最多返回 100 个元素，避免数据量过大
+- 元素文本内容限制为 100 个字符
+
 #### elementscreenshot - 元素截图
 
 截取指定元素的屏幕截图。
