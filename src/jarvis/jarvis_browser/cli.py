@@ -138,7 +138,7 @@ class BrowserDaemon:
 
                     # Send response
                     response_json = json.dumps(response, ensure_ascii=False)
-                    response_data = f"Content-Length: {len(response_json)}\r\n\r\n{response_json}".encode()
+                    response_data = f"Content-Length: {len(response_json.encode())}\r\n\r\n{response_json}".encode()
                     writer.write(response_data)
                     await writer.drain()
 
@@ -150,7 +150,7 @@ class BrowserDaemon:
                         "stdout": "",
                     }
                     error_json = json.dumps(error_response, ensure_ascii=False)
-                    error_data = f"Content-Length: {len(error_json)}\r\n\r\n{error_json}".encode()
+                    error_data = f"Content-Length: {len(error_json.encode())}\r\n\r\n{error_json}".encode()
                     writer.write(error_data)
                     await writer.drain()
                     break
