@@ -185,6 +185,8 @@ setup(
             "jcfg=jarvis.jarvis_config.cli:app",
             "jarvis-lsp=jarvis.jarvis_lsp.cli:app",
             "jlsp=jarvis.jarvis_lsp.cli:app",
+            "jarvis-browser=jarvis.jarvis_browser.cli:app",
+            "jb=jarvis.jarvis_browser.cli:app",
         ],
     },
     python_requires="==3.12.*",
