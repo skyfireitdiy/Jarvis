@@ -15,6 +15,7 @@ from datetime import datetime
 
 import typer
 from playwright.async_api import async_playwright
+from markdownify import markdownify as html_to_markdown
 
 from jarvis.jarvis_utils.config import get_data_dir
 
@@ -199,6 +200,13 @@ class BrowserDaemon:
             return await get_text(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
+            )
+        elif action == "get_markdown":
+            return await get_markdown(browser_id=params.get("browser_id", "default"))
+        elif action == "list_interactables":
+            return await list_interactables(
+                browser_id=params.get("browser_id", "default"),
+                filter_type=params.get("filter_type", ""),
             )
         elif action == "list":
             return await list_browsers()
@@ -394,7 +402,6 @@ def daemon(
     multiple CLI invocations. Clients communicate with the daemon via Unix socket.
     """
     import sys
-    import subprocess
 
     socket_path = socket_path or get_socket_path()
 
@@ -416,7 +423,7 @@ def daemon(
         finally:
             try:
                 loop.close()
-            except:
+            except Exception:
                 pass
 
     if os.path.exists(socket_path):
@@ -588,6 +595,42 @@ def gettext(
     Get text content from the element matching the CSS selector.
     """
     result = send_to_daemon("gettext", {"selector": selector, "browser_id": browser_id})
+    print(json.dumps(result, ensure_ascii=False))
+    if not result["success"]:
+        raise typer.Exit(code=1)
+
+
+@app.command(name="get-markdown")
+def get_markdown_cmd(
+    browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
+) -> None:
+    """Get page content as Markdown
+
+    Convert the current page HTML content to Markdown format.
+    """
+    result = send_to_daemon("get_markdown", {"browser_id": browser_id})
+    print(json.dumps(result, ensure_ascii=False))
+    if not result["success"]:
+        raise typer.Exit(code=1)
+
+
+@app.command(name="list-interactables")
+def list_interactables_cmd(
+    browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
+    filter_type: str = typer.Option(
+        "",
+        "--filter",
+        "-f",
+        help="Filter by element type (button, input, link, checkbox, radio, select, file)",
+    ),
+) -> None:
+    """List interactive elements
+
+    List all interactive elements on the current page (buttons, inputs, links, etc.).
+    """
+    result = send_to_daemon(
+        "list_interactables", {"browser_id": browser_id, "filter_type": filter_type}
+    )
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -1447,6 +1490,114 @@ async def get_text(selector: str, browser_id: str = "default") -> Dict[str, Any]
             "success": False,
             "stdout": "",
             "stderr": f"Failed to get text: {str(e)}",
+        }
+
+
+async def get_markdown(browser_id: str = "default") -> Dict[str, Any]:
+    """Get page content as Markdown"""
+    try:
+        session = get_browser_session(browser_id)
+        if session["page"] is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Browser [{browser_id}] not launched",
+            }
+
+        page = session["page"]
+        html_content = await page.content()
+        markdown_content = html_to_markdown(html_content)
+
+        return {
+            "success": True,
+            "stdout": markdown_content,
+            "stderr": "",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Failed to get markdown: {str(e)}",
+        }
+
+
+async def list_interactables(
+    browser_id: str = "default", filter_type: str = ""
+) -> Dict[str, Any]:
+    """List all interactive elements on the page"""
+    try:
+        session = get_browser_session(browser_id)
+        if session["page"] is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Browser [{browser_id}] not launched",
+            }
+
+        page = session["page"]
+        interactables = []
+
+        # Define selectors for different interactive element types
+        selectors = {
+            "button": "button, input[type='button'], input[type='submit'], input[type='reset'], [role='button']",
+            "input": "input[type='text'], input[type='password'], input[type='email'], input[type='number'], textarea",
+            "link": "a[href]",
+            "checkbox": "input[type='checkbox']",
+            "radio": "input[type='radio']",
+            "select": "select",
+            "file": "input[type='file']",
+        }
+
+        for element_type, selector in selectors.items():
+            if filter_type and element_type != filter_type:
+                continue
+
+            elements = await page.query_selector_all(selector)
+            for element in elements:
+                try:
+                    # Get element text or value
+                    text = await element.evaluate(
+                        "el => el.textContent || el.value || el.getAttribute('placeholder') || ''"
+                    )
+                    text = text.strip()[:100]  # Limit text length
+
+                    # Get a unique selector for the element
+                    element_selector = await element.evaluate("""
+                        el => {
+                            if (el.id) return '#' + el.id;
+                            if (el.className) return '.' + el.className.split(' ')[0];
+                            if (el.tagName) return el.tagName.toLowerCase();
+                            return '*';
+                        }
+                    """)
+
+                    interactables.append(
+                        {
+                            "type": element_type,
+                            "selector": element_selector,
+                            "text": text,
+                        }
+                    )
+
+                    # Limit total number of interactables
+                    if len(interactables) >= 100:
+                        break
+                except Exception:
+                    continue
+
+            if len(interactables) >= 100:
+                break
+
+        return {
+            "success": True,
+            "stdout": json.dumps(interactables, ensure_ascii=False),
+            "stderr": "",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Failed to list interactables: {str(e)}",
         }
 
 
