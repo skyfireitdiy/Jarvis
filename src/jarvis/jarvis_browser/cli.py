@@ -393,7 +393,37 @@ def daemon(
     The daemon runs in the background and maintains browser sessions across
     multiple CLI invocations. Clients communicate with the daemon via Unix socket.
     """
+    import sys
+    import subprocess
+
     socket_path = socket_path or get_socket_path()
+
+    # Check if daemon is already running
+    def check_daemon_running():
+        """Check if daemon is already running"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            _, writer = loop.run_until_complete(asyncio.open_unix_connection(socket_path))
+            writer.close()
+            loop.run_until_complete(writer.wait_closed())
+            loop.close()
+            return True
+        except (ConnectionRefusedError, FileNotFoundError):
+            return False
+        finally:
+            try:
+                loop.close()
+            except:
+                pass
+
+    if os.path.exists(socket_path):
+        if check_daemon_running():
+            print(f"Daemon is already running at {socket_path}")
+            return
+        else:
+            # Socket file exists but daemon is not running, remove it
+            os.unlink(socket_path)
 
     async def run_daemon(socket_path_str: str) -> None:
         """Run daemon"""
@@ -409,7 +439,43 @@ def daemon(
         finally:
             await daemon_instance.stop()
 
-    # Run async daemon
+    # Fork and detach process to run as a true daemon
+    # This ensures the daemon continues running even if the parent process exits
+    pid = os.fork()
+    if pid > 0:
+        # Parent process: exit
+        print(f"Daemon started in background, PID: {pid}")
+        print(f"Socket: {socket_path}")
+        print("Use 'jb list' to check daemon status")
+        sys.exit(0)
+
+    # Child process: create new session
+    os.setsid()
+
+    # Second fork to prevent acquiring controlling terminal
+    pid = os.fork()
+    if pid > 0:
+        # First child: exit
+        sys.exit(0)
+
+    # Second child (grandchild): actual daemon process
+    # Redirect standard file descriptors
+    sys.stdout.flush()
+    sys.stderr.flush()
+    with open(os.devnull, 'r') as si:
+        os.dup2(si.fileno(), sys.stdin.fileno())
+    with open(os.devnull, 'a+') as so:
+        os.dup2(so.fileno(), sys.stdout.fileno())
+    with open(os.devnull, 'a+') as se:
+        os.dup2(se.fileno(), sys.stderr.fileno())
+
+    # Change working directory to root to avoid blocking file systems
+    os.chdir('/')
+
+    # Set umask
+    os.umask(0)
+
+    # Run the actual daemon
     asyncio.run(run_daemon(str(socket_path)))
 
 
