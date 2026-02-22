@@ -404,7 +404,9 @@ def daemon(
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            _, writer = loop.run_until_complete(asyncio.open_unix_connection(socket_path))
+            _, writer = loop.run_until_complete(
+                asyncio.open_unix_connection(socket_path)
+            )
             writer.close()
             loop.run_until_complete(writer.wait_closed())
             loop.close()
@@ -462,15 +464,15 @@ def daemon(
     # Redirect standard file descriptors
     sys.stdout.flush()
     sys.stderr.flush()
-    with open(os.devnull, 'r') as si:
+    with open(os.devnull, "r") as si:
         os.dup2(si.fileno(), sys.stdin.fileno())
-    with open(os.devnull, 'a+') as so:
+    with open(os.devnull, "a+") as so:
         os.dup2(so.fileno(), sys.stdout.fileno())
-    with open(os.devnull, 'a+') as se:
+    with open(os.devnull, "a+") as se:
         os.dup2(se.fileno(), sys.stderr.fileno())
 
     # Change working directory to root to avoid blocking file systems
-    os.chdir('/')
+    os.chdir("/")
 
     # Set umask
     os.umask(0)
@@ -3008,9 +3010,7 @@ def send_to_daemon(
             # Prepare request
             request = {"action": action, "params": params}
             request_json = json.dumps(request, ensure_ascii=False)
-            request_data = (
-                f"Content-Length: {len(request_json)}\r\n\r\n{request_json}".encode()
-            )
+            request_data = f"Content-Length: {len(request_json.encode())}\r\n\r\n{request_json}".encode()
 
             # Send request
             writer.write(request_data)
