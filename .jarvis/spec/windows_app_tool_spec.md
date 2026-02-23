@@ -48,7 +48,7 @@ jarvis-windows <command> [options]
 ### 通用参数
 
 - `--app-id`：应用会话 ID（默认 `"default"`），用于区分多个连接
-- `--backend`：pywinauto 后端，`uia`（默认）或 `win32`
+- `--backend`：pywinauto 后端，`uia`（默认）或 `win32`。连接失败时自动尝试另一后端
 
 ## 输入输出说明
 
@@ -94,9 +94,9 @@ jarvis-windows <command> [options]
 
 #### close
 
-断开并可选关闭应用。
+关闭会话并结束进程。
 
-- `--kill`（可选）：是否强制结束进程，默认 false（仅断开连接）
+- `--kill` / `--no-kill`：是否结束进程，默认 kill（结束进程）。使用 `--no-kill` 仅断开会话、不结束进程
 
 #### click
 
