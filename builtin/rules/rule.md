@@ -34,7 +34,8 @@
 - [脚本生成规则]({{ rule_file_dir }}/development_tools/script-generation.md) - 脚本代码生成规范和模板
 - [Jarvis 帮助规则]({{ rule_file_dir }}/development_tools/jarvis_help.md) - Jarvis 系统帮助信息和使用指南
 - [LSP 工具使用规则]({{ rule_file_dir }}/development_tools/lsp_usage.md) - LSP (Language Server Protocol) 工具配置和使用
-- [Jarvis Browser CLI (jb) 使用指南]({{ rule_file_dir }}/jarvis_browser_cli.md) - 浏览器自动化命令行工具，支持 35+ 命令和守护进程模式
+- [Jarvis Browser CLI (jb) 使用指南]({{ rule_file_dir }}/development_tools/jarvis_browser_cli.md) - 浏览器自动化命令行工具，支持 35+ 命令和守护进程模式
+- [Jarvis Windows CLI (jw) 使用指南]({{ rule_file_dir }}/development_tools/jarvis_windows_cli.md) - Windows 桌面程序自动化命令行工具，支持启动/连接应用、点击、输入、截图、控件树等（仅 Windows）
 
 ## 性能优化 (performance/)
 
