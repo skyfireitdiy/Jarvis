@@ -564,22 +564,16 @@ class BrowserDaemon:
 
 
 @app.command()
-def daemon(
-    socket_path: Path = typer.Option(
-        None,
-        "--socket-path",
-        "-s",
-        help="Socket path for IPC communication",
-    ),
-):
+def daemon():
     """Run as daemon process for persistent browser sessions.
 
     The daemon runs in the background and maintains browser sessions across
-    multiple CLI invocations. Clients communicate with the daemon via Unix socket.
+    multiple CLI invocations. Clients communicate with the daemon via Unix socket
+    at ~/.jarvis/playwright_daemon.sock.
     """
     import sys
 
-    socket_path = socket_path or get_socket_path()
+    socket_path = get_socket_path()
 
     # Check if daemon is already running
     def check_daemon_running():
@@ -3334,20 +3328,17 @@ async def get_performance_metrics(browser_id: str = "default") -> Dict[str, Any]
 DAEMON_TIMEOUT = 120.0
 
 
-def send_to_daemon(
-    action: str, params: Dict[str, Any], socket_path: Path | None = None
-) -> Dict[str, Any]:
-    """Send request to daemon and get response
+def send_to_daemon(action: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Send request to daemon and get response.
 
     Args:
         action: Action to perform (e.g., 'launch', 'navigate', 'click')
         params: Parameters for the action
-        socket_path: Socket path (default: get_socket_path())
 
     Returns:
         Response dict with 'success', 'stdout', 'stderr' keys
     """
-    socket_path = socket_path or get_socket_path()
+    socket_path = get_socket_path()
 
     async def _send() -> Dict[str, Any]:
         try:
