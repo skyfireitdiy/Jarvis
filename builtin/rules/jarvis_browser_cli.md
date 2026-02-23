@@ -39,16 +39,12 @@ jb screenshot --browser-id demo --path /tmp/screenshot.png
 
 **参数：**
 
-- `-s, --socket-path PATH`: IPC 通信的 socket 路径（默认：`~/.jarvis/playwright_daemon.sock`）
+无（socket 固定为 `~/.jarvis/playwright_daemon.sock`）
 
 **示例：**
 
 ```bash
-# 使用默认路径启动
 jb daemon
-
-# 指定自定义 socket 路径
-jb daemon --socket-path /tmp/my_socket.sock
 ```
 
 **说明：**
@@ -57,7 +53,6 @@ jb daemon --socket-path /tmp/my_socket.sock
 - 使用 double-fork 方法实现真正的后台守护进程
 - 若 30 分钟内无任何请求，守护进程将自动退出以节省资源
 - 运行日志写入 `~/.jarvis/logs/browser_daemon/daemon.log`，包含各类浏览器操作记录（如 launch、navigate、click 等）
-- 自动重定向标准输入/输出/错误到 /dev/null
 
 ### 2. 浏览器管理
 
@@ -1007,7 +1002,7 @@ jb waitforselector --selector '#loading' --wait-state hidden --browser-id demo
 
 | 命令                  | 描述              | 关键参数                                                  |
 | --------------------- | ----------------- | --------------------------------------------------------- |
-| daemon                | 启动守护进程      | --socket-path                                             |
+| daemon                | 启动守护进程      | 无                                                        |
 | launch                | 启动浏览器        | --browser-id                                             |
 | close                 | 关闭浏览器        | --browser-id                                              |
 | list                  | 列出浏览器        | 无                                                        |
