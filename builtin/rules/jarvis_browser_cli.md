@@ -11,7 +11,7 @@
 jb daemon
 
 # 2. 启动浏览器
-jb launch --browser-id demo --headless
+jb launch --browser-id demo
 
 # 3. 导航到页面
 jb navigate --url https://example.com --browser-id demo
@@ -55,6 +55,8 @@ jb daemon --socket-path /tmp/my_socket.sock
 
 - 守护进程会检查是否已运行，如果已运行则不会重复启动
 - 使用 double-fork 方法实现真正的后台守护进程
+- 若 30 分钟内无任何请求，守护进程将自动退出以节省资源
+- 运行日志写入 `~/.jarvis/logs/browser_daemon/daemon.log`，包含各类浏览器操作记录（如 launch、navigate、click 等）
 - 自动重定向标准输入/输出/错误到 /dev/null
 
 ### 2. 浏览器管理
@@ -66,16 +68,15 @@ jb daemon --socket-path /tmp/my_socket.sock
 **参数：**
 
 - `--browser-id TEXT`: 浏览器 ID（默认：`default`）
-- `--headless, --no-headless`: 无头模式（默认：`True`）
+
+**说明：**
+
+- 优先尝试有界面（UI）模式启动；若失败则自动回退为无头（headless）模式。
 
 **示例：**
 
 ```bash
-# 启动无头浏览器
-jb launch --browser-id demo --headless
-
-# 启动有界面浏览器
-jb launch --browser-id demo --no-headless
+jb launch --browser-id demo
 ```
 
 #### close - 关闭浏览器
@@ -785,7 +786,7 @@ jb exportpdf --browser-id demo
 jb daemon
 
 # 2. 启动浏览器
-jb launch --browser-id mybrowser --headless
+jb launch --browser-id mybrowser
 
 # 3. 导航到登录页面
 jb navigate --url https://example.com/login --browser-id mybrowser
@@ -811,7 +812,7 @@ jb close --browser-id mybrowser
 ```bash
 # 1. 启动守护进程和浏览器
 jb daemon
-jb launch --browser-id scraper --headless
+jb launch --browser-id scraper
 
 # 2. 导航到目标页面
 jb navigate --url https://example.com/articles --browser-id scraper
@@ -833,7 +834,7 @@ jb exportpdf --browser-id scraper
 ```bash
 # 1. 启动守护进程和浏览器
 jb daemon
-jb launch --browser-id form_test --headless
+jb launch --browser-id form_test
 
 # 2. 导航到表单页面
 jb navigate --url https://example.com/contact --browser-id form_test
@@ -863,8 +864,8 @@ jb gettext --selector '.success-message' --browser-id form_test
 为不同的任务使用不同的浏览器 ID，避免冲突：
 
 ```bash
-jb launch --browser-id task1 --headless
-jb launch --browser-id task2 --headless
+jb launch --browser-id task1
+jb launch --browser-id task2
 ```
 
 ### 2. 使用等待而不是睡眠
@@ -925,7 +926,7 @@ jb eval --code 'console.log("debug"); document.title' --browser-id demo
 对于大型页面，考虑使用无头模式：
 
 ```bash
-jb launch --browser-id demo --headless
+jb launch --browser-id demo
 ```
 
 ### 7. 会话管理
@@ -1007,7 +1008,7 @@ jb waitforselector --selector '#loading' --wait-state hidden --browser-id demo
 | 命令                  | 描述              | 关键参数                                                  |
 | --------------------- | ----------------- | --------------------------------------------------------- |
 | daemon                | 启动守护进程      | --socket-path                                             |
-| launch                | 启动浏览器        | --browser-id, --headless                                  |
+| launch                | 启动浏览器        | --browser-id                                             |
 | close                 | 关闭浏览器        | --browser-id                                              |
 | list                  | 列出浏览器        | 无                                                        |
 | navigate              | 导航到 URL        | --url (必需), --browser-id                                |
