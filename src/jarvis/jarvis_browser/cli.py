@@ -9,6 +9,7 @@ import asyncio
 import json
 import os
 import signal
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 from datetime import datetime
@@ -40,21 +41,47 @@ def get_socket_path() -> Path:
     return Path(get_data_dir()) / "playwright_daemon.sock"
 
 
+def get_daemon_log_dir() -> Path:
+    """Get the daemon log directory under Jarvis data dir."""
+    log_dir = Path(get_data_dir()) / "logs" / "browser_daemon"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir
+
+
+# Daemon idle timeout: exit if no requests for this many seconds
+DAEMON_IDLE_TIMEOUT = 30 * 60  # 30 minutes
+
+
 class BrowserDaemon:
     """Playwright Browser Daemon
 
     Manages browser sessions and provides IPC interface via Unix domain socket.
+    Exits automatically after 30 minutes of inactivity.
     """
 
     def __init__(self, socket_path: str):
         self.socket_path = socket_path
         self.server: asyncio.Server | None = None
         self._server_task: asyncio.Task[None] | None = None
+        self._idle_check_task: asyncio.Task[None] | None = None
+        self._last_activity_time: float = 0.0
         self.running = False
+
+    async def _idle_check_loop(self) -> None:
+        """Periodically check idle timeout and shut down if exceeded."""
+        while self.running:
+            await asyncio.sleep(60)  # Check every minute
+            if not self.running:
+                break
+            if time.monotonic() - self._last_activity_time >= DAEMON_IDLE_TIMEOUT:
+                print("Daemon idle for 30 minutes, shutting down")
+                await self.stop()
+                break
 
     async def start(self) -> None:
         """Start daemon"""
         self.running = True
+        self._last_activity_time = time.monotonic()
 
         # Ensure socket file does not exist
         if os.path.exists(self.socket_path):
@@ -70,6 +97,9 @@ class BrowserDaemon:
 
         # Start server task
         self._server_task = asyncio.create_task(self.server.serve_forever())
+
+        # Start idle check task
+        self._idle_check_task = asyncio.create_task(self._idle_check_loop())
 
         # Graceful shutdown handling
         loop = asyncio.get_running_loop()
@@ -88,6 +118,15 @@ class BrowserDaemon:
             return
 
         self.running = False
+
+        # Cancel idle check task
+        if self._idle_check_task:
+            self._idle_check_task.cancel()
+            try:
+                await self._idle_check_task
+            except asyncio.CancelledError:
+                pass
+            self._idle_check_task = None
 
         # Cancel server task
         if self._server_task:
@@ -119,6 +158,7 @@ class BrowserDaemon:
                 if not line:
                     break
 
+                request: Dict[str, Any] = {}
                 try:
                     # Parse Content-Length header
                     header = line.decode().strip()
@@ -137,6 +177,13 @@ class BrowserDaemon:
                     # Handle request
                     response = await self.handle_request(request)
 
+                    # Log browser activity
+                    action = request.get("action")
+                    if action:
+                        self._log_activity(
+                            action, request.get("params", {}), response
+                        )
+
                     # Send response
                     response_json = json.dumps(response, ensure_ascii=False)
                     response_data = f"Content-Length: {len(response_json.encode())}\r\n\r\n{response_json}".encode()
@@ -144,7 +191,12 @@ class BrowserDaemon:
                     await writer.drain()
 
                 except Exception as e:
-                    # Send error response
+                    # Log and send error response
+                    self._log_activity(
+                        request.get("action", "parse_error"),
+                        request.get("params", {}),
+                        {"success": False, "stderr": str(e), "stdout": ""},
+                    )
                     error_response = {
                         "success": False,
                         "stderr": str(e),
@@ -162,8 +214,77 @@ class BrowserDaemon:
             writer.close()
             await writer.wait_closed()
 
+    def _log_activity(
+        self,
+        action: str,
+        params: Dict[str, Any],
+        response: Dict[str, Any],
+    ) -> None:
+        """Log browser activity to daemon log (stdout)."""
+        browser_id = params.get("browser_id", "default")
+        success = response.get("success", False)
+        status = "OK" if success else "FAIL"
+        parts = [
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            action,
+            f"browser_id={browser_id}",
+            status,
+        ]
+        if success:
+            stdout = response.get("stdout", "")
+            if stdout and len(stdout) < 80:
+                parts.append(stdout[:80])
+            elif stdout:
+                parts.append(stdout[:77] + "...")
+        else:
+            stderr = response.get("stderr", "")
+            if stderr:
+                parts.append(stderr[:100] + ("..." if len(stderr) > 100 else ""))
+        # Action-specific param summary (avoid logging sensitive data)
+        if action == "navigate" and "url" in params:
+            url = str(params["url"])[:60]
+            if len(str(params["url"])) > 60:
+                url += "..."
+            parts.append(f"url={url}")
+        elif action in ("click", "gettext", "get_element_info", "element_screenshot") and "selector" in params:
+            parts.append(f"selector={params['selector'][:50]}")
+        elif action == "type" and "selector" in params:
+            text_len = len(str(params.get("text", "")))
+            parts.append(f"selector={params['selector'][:30]} text_len={text_len}")
+        elif action in ("hover", "double_click", "drag") and "selector" in params:
+            parts.append(f"selector={params['selector'][:40]}")
+        elif action == "screenshot" and "path" in params:
+            parts.append(f"path={params['path']}")
+        elif action == "fill_form" and "fields" in params:
+            fields = params["fields"]
+            count = len(fields) if isinstance(fields, dict) else 0
+            parts.append(f"fields_count={count}")
+        elif action == "upload_file" and "file_path" in params:
+            parts.append(f"file={params['file_path'][:40]}")
+        elif action == "eval" and "code" in params:
+            code_len = len(str(params["code"]))
+            parts.append(f"code_len={code_len}")
+        elif action == "press_key" and "key" in params:
+            parts.append(f"key={params['key']}")
+        print(" | ".join(str(p) for p in parts if str(p)))
+
+    def _check_required_params(
+        self, params: Dict[str, Any], required: List[str], action: str
+    ) -> Dict[str, Any] | None:
+        """Validate required params. Returns error dict if missing, else None."""
+        missing = [k for k in required if k not in params]
+        if missing:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Missing required params for {action}: {', '.join(missing)}",
+            }
+        return None
+
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Handle request"""
+        self._last_activity_time = time.monotonic()
+
         action = request.get("action")
         params = request.get("params", {})
 
@@ -171,21 +292,29 @@ class BrowserDaemon:
         if action == "launch":
             return await launch_browser(
                 browser_id=params.get("browser_id", "default"),
-                headless=params.get("headless", True),
             )
         elif action == "close":
             return await close_browser(browser_id=params.get("browser_id", "default"))
         elif action == "navigate":
+            err = self._check_required_params(params, ["url"], "navigate")
+            if err:
+                return err
             return await navigate(
                 url=params.get("url"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "click":
+            err = self._check_required_params(params, ["selector"], "click")
+            if err:
+                return err
             return await click(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "type":
+            err = self._check_required_params(params, ["selector", "text"], "type")
+            if err:
+                return err
             return await type_text(
                 selector=params.get("selector"),
                 text=params.get("text"),
@@ -197,6 +326,9 @@ class BrowserDaemon:
                 path=params.get("path", "/tmp/screenshot.png"),
             )
         elif action == "gettext":
+            err = self._check_required_params(params, ["selector"], "gettext")
+            if err:
+                return err
             return await get_text(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
@@ -216,23 +348,37 @@ class BrowserDaemon:
                 clear_logs=params.get("clear_logs", False),
             )
         elif action == "eval":
+            err = self._check_required_params(params, ["code"], "eval")
+            if err:
+                return err
             return await evaluate_javascript(
                 code=params.get("code"),
                 browser_id=params.get("browser_id", "default"),
                 save_result=params.get("save_result", False),
             )
         elif action == "get_attribute":
+            err = self._check_required_params(
+                params, ["selector", "attribute"], "get_attribute"
+            )
+            if err:
+                return err
             return await get_attribute(
                 selector=params.get("selector"),
                 attribute=params.get("attribute"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "get_element_info":
+            err = self._check_required_params(params, ["selector"], "get_element_info")
+            if err:
+                return err
             return await get_element_info(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "wait_for_selector":
+            err = self._check_required_params(params, ["selector"], "wait_for_selector")
+            if err:
+                return err
             return await wait_for_selector(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
@@ -240,6 +386,9 @@ class BrowserDaemon:
                 timeout=params.get("timeout", 30.0),
             )
         elif action == "wait_for_text":
+            err = self._check_required_params(params, ["text"], "wait_for_text")
+            if err:
+                return err
             return await wait_for_text(
                 text=params.get("text"),
                 browser_id=params.get("browser_id", "default"),
@@ -247,27 +396,44 @@ class BrowserDaemon:
                 timeout=params.get("timeout", 30.0),
             )
         elif action == "hover":
+            err = self._check_required_params(params, ["selector"], "hover")
+            if err:
+                return err
             return await hover(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "drag":
+            err = self._check_required_params(
+                params, ["selector", "target_selector"], "drag"
+            )
+            if err:
+                return err
             return await drag(
                 selector=params.get("selector"),
                 target_selector=params.get("target_selector"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "double_click":
+            err = self._check_required_params(params, ["selector"], "double_click")
+            if err:
+                return err
             return await double_click(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "press_key":
+            err = self._check_required_params(params, ["key"], "press_key")
+            if err:
+                return err
             return await press_key(
                 key=params.get("key"),
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "fill_form":
+            err = self._check_required_params(params, ["fields"], "fill_form")
+            if err:
+                return err
             return await fill_form(
                 fields=params.get("fields", {}),
                 browser_id=params.get("browser_id", "default"),
@@ -283,6 +449,11 @@ class BrowserDaemon:
                 form_selector=params.get("form_selector", "form"),
             )
         elif action == "upload_file":
+            err = self._check_required_params(
+                params, ["selector", "file_path"], "upload_file"
+            )
+            if err:
+                return err
             return await upload_file(
                 selector=params.get("selector"),
                 file_path=params.get("file_path"),
@@ -363,6 +534,11 @@ class BrowserDaemon:
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "element_screenshot":
+            err = self._check_required_params(
+                params, ["selector"], "element_screenshot"
+            )
+            if err:
+                return err
             return await element_screenshot(
                 selector=params.get("selector"),
                 browser_id=params.get("browser_id", "default"),
@@ -408,23 +584,24 @@ def daemon(
     # Check if daemon is already running
     def check_daemon_running():
         """Check if daemon is already running"""
+        loop = None
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             _, writer = loop.run_until_complete(
-                asyncio.open_unix_connection(socket_path)
+                asyncio.open_unix_connection(str(socket_path))
             )
             writer.close()
             loop.run_until_complete(writer.wait_closed())
-            loop.close()
             return True
         except (ConnectionRefusedError, FileNotFoundError):
             return False
         finally:
-            try:
-                loop.close()
-            except Exception:
-                pass
+            if loop is not None:
+                try:
+                    loop.close()
+                except Exception:
+                    pass
 
     if os.path.exists(socket_path):
         if check_daemon_running():
@@ -453,8 +630,10 @@ def daemon(
     pid = os.fork()
     if pid > 0:
         # Parent process: exit
+        log_dir = get_daemon_log_dir()
         print(f"Daemon started in background, PID: {pid}")
         print(f"Socket: {socket_path}")
+        print(f"Log: {log_dir / 'daemon.log'}")
         print("Use 'jb list' to check daemon status")
         sys.exit(0)
 
@@ -468,15 +647,21 @@ def daemon(
         sys.exit(0)
 
     # Second child (grandchild): actual daemon process
-    # Redirect standard file descriptors
+    # Redirect standard file descriptors to log files
     sys.stdout.flush()
     sys.stderr.flush()
     with open(os.devnull, "r") as si:
         os.dup2(si.fileno(), sys.stdin.fileno())
-    with open(os.devnull, "a+") as so:
-        os.dup2(so.fileno(), sys.stdout.fileno())
-    with open(os.devnull, "a+") as se:
-        os.dup2(se.fileno(), sys.stderr.fileno())
+    log_dir = get_daemon_log_dir()
+    log_file = log_dir / "daemon.log"
+    log_f = open(log_file, "a", encoding="utf-8")
+    log_f.write(f"\n{'='*60}\n")
+    log_f.write(f"Daemon process started at {datetime.now().isoformat()}\n")
+    log_f.write(f"{'='*60}\n")
+    log_f.flush()
+    os.dup2(log_f.fileno(), sys.stdout.fileno())
+    os.dup2(log_f.fileno(), sys.stderr.fileno())
+    # Do not close log_f: stdout/stderr now use this fd
 
     # Change working directory to root to avoid blocking file systems
     os.chdir("/")
@@ -491,16 +676,13 @@ def daemon(
 @app.command()
 def launch(
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
-    headless: bool = typer.Option(
-        True, "--headless", "--no-headless", help="Headless mode"
-    ),
 ) -> None:
     """Launch browser
 
     Launch a new browser instance with the specified ID.
-    If headless is True, the browser runs without a UI.
+    Tries to open with UI first; falls back to headless if UI launch fails.
     """
-    result = send_to_daemon("launch", {"browser_id": browser_id, "headless": headless})
+    result = send_to_daemon("launch", {"browser_id": browser_id})
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -1259,10 +1441,8 @@ def get_browser_session(browser_id: str = "default") -> Dict[str, Any]:
     return _browser_sessions[browser_id]
 
 
-async def launch_browser(
-    browser_id: str = "default", headless: bool = True
-) -> Dict[str, Any]:
-    """Launch browser"""
+async def launch_browser(browser_id: str = "default") -> Dict[str, Any]:
+    """Launch browser. Prefer UI mode; fall back to headless if UI launch fails."""
     global _playwright_context
 
     try:
@@ -1277,7 +1457,19 @@ async def launch_browser(
                 "stderr": f"Browser [{browser_id}] already launched",
             }
 
-        browser = await _playwright_context.chromium.launch(headless=headless)
+        browser = None
+        for headless in (False, True):
+            try:
+                browser = await _playwright_context.chromium.launch(headless=headless)
+                break
+            except Exception:
+                if headless:
+                    raise
+                continue
+
+        if browser is None:
+            raise RuntimeError("Failed to launch browser")
+
         context = await browser.new_context()
         page = await context.new_page()
 
@@ -3138,6 +3330,10 @@ async def get_performance_metrics(browser_id: str = "default") -> Dict[str, Any]
         }
 
 
+# Timeout for daemon IPC (seconds). Long enough for slow navigations/screenshots.
+DAEMON_TIMEOUT = 120.0
+
+
 def send_to_daemon(
     action: str, params: Dict[str, Any], socket_path: Path | None = None
 ) -> Dict[str, Any]:
@@ -3204,8 +3400,17 @@ def send_to_daemon(
                 "stderr": f"Failed to communicate with daemon: {str(e)}",
             }
 
-    # Run async function
-    return asyncio.run(_send())
+    async def _send_with_timeout() -> Dict[str, Any]:
+        return await asyncio.wait_for(_send(), timeout=DAEMON_TIMEOUT)
+
+    try:
+        return asyncio.run(_send_with_timeout())
+    except asyncio.TimeoutError:
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Daemon request timed out after {DAEMON_TIMEOUT}s. Action: {action}",
+        }
 
 
 if __name__ == "__main__":
