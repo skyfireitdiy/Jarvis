@@ -281,6 +281,18 @@ class BrowserDaemon:
             }
         return None
 
+    def _check_selector_or_index(
+        self, params: Dict[str, Any], action: str
+    ) -> Dict[str, Any] | None:
+        """Require selector or index. Returns error dict if both missing."""
+        if "selector" in params or "index" in params:
+            return None
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Missing required param for {action}: selector or index",
+        }
+
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Handle request"""
         self._last_activity_time = time.monotonic()
@@ -304,6 +316,14 @@ class BrowserDaemon:
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "click":
+            err = self._check_selector_or_index(params, "click")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(params, ["selector"], "click")
             if err:
                 return err
@@ -312,6 +332,14 @@ class BrowserDaemon:
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "type":
+            err = self._check_selector_or_index(params, "type")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(params, ["selector", "text"], "type")
             if err:
                 return err
@@ -326,6 +354,14 @@ class BrowserDaemon:
                 path=params.get("path", "/tmp/screenshot.png"),
             )
         elif action == "gettext":
+            err = self._check_selector_or_index(params, "gettext")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(params, ["selector"], "gettext")
             if err:
                 return err
@@ -357,6 +393,14 @@ class BrowserDaemon:
                 save_result=params.get("save_result", False),
             )
         elif action == "get_attribute":
+            err = self._check_selector_or_index(params, "get_attribute")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(
                 params, ["selector", "attribute"], "get_attribute"
             )
@@ -368,6 +412,14 @@ class BrowserDaemon:
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "get_element_info":
+            err = self._check_selector_or_index(params, "get_element_info")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(params, ["selector"], "get_element_info")
             if err:
                 return err
@@ -396,6 +448,14 @@ class BrowserDaemon:
                 timeout=params.get("timeout", 30.0),
             )
         elif action == "hover":
+            err = self._check_selector_or_index(params, "hover")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(params, ["selector"], "hover")
             if err:
                 return err
@@ -415,6 +475,14 @@ class BrowserDaemon:
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "double_click":
+            err = self._check_selector_or_index(params, "double_click")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(params, ["selector"], "double_click")
             if err:
                 return err
@@ -534,6 +602,14 @@ class BrowserDaemon:
                 browser_id=params.get("browser_id", "default"),
             )
         elif action == "element_screenshot":
+            err = self._check_selector_or_index(params, "element_screenshot")
+            if err:
+                return err
+            res = await _resolve_index_in_params(
+                params, params.get("browser_id", "default")
+            )
+            if res:
+                return res
             err = self._check_required_params(
                 params, ["selector"], "element_screenshot"
             )
@@ -667,6 +743,18 @@ def daemon():
     asyncio.run(run_daemon(str(socket_path)))
 
 
+@app.command(name="daemon-stop")
+def daemon_stop() -> None:
+    """Stop the browser daemon
+
+    Gracefully shut down the daemon. All browser sessions will be closed.
+    """
+    result = send_to_daemon("shutdown", {})
+    print(json.dumps(result, ensure_ascii=False))
+    if not result["success"]:
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def launch(
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
@@ -713,14 +801,25 @@ def navigate_cmd(
 
 @app.command(name="click")
 def click_cmd(
-    selector: str = typer.Option(..., "--selector", "-s", help="CSS selector"),
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
+    ),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Click element
 
-    Click on the element matching the CSS selector.
+    Click by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon("click", {"selector": selector, "browser_id": browser_id})
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("click", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -728,17 +827,26 @@ def click_cmd(
 
 @app.command()
 def type(
-    selector: str = typer.Option(..., "--selector", "-s", help="CSS selector"),
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
+    ),
     text: str = typer.Option(..., "--text", "-t", help="Text to type"),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Type text into element
 
-    Type text into the element matching the CSS selector.
+    Type text by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon(
-        "type", {"selector": selector, "text": text, "browser_id": browser_id}
-    )
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"text": text, "browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("type", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -763,14 +871,25 @@ def screenshot_cmd(
 
 @app.command()
 def gettext(
-    selector: str = typer.Option(..., "--selector", "-s", help="CSS selector"),
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
+    ),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Get text from element
 
-    Get text content from the element matching the CSS selector.
+    Get text by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon("gettext", {"selector": selector, "browser_id": browser_id})
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("gettext", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -865,18 +984,26 @@ def eval(
 
 @app.command()
 def getattribute(
-    selector: str = typer.Option(..., "--selector", "-s", help="CSS selector"),
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
+    ),
     attribute: str = typer.Option(..., "--attribute", "-a", help="Attribute name"),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Get element attribute
 
-    Get the value of an attribute from the selected element.
+    Get attribute by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon(
-        "get_attribute",
-        {"selector": selector, "attribute": attribute, "browser_id": browser_id},
-    )
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"attribute": attribute, "browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("get_attribute", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -884,16 +1011,25 @@ def getattribute(
 
 @app.command()
 def getelementinfo(
-    selector: str = typer.Option(..., "--selector", "-s", help="CSS selector"),
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
+    ),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Get element information
 
-    Get detailed information about the selected element.
+    Get element info by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon(
-        "get_element_info", {"selector": selector, "browser_id": browser_id}
-    )
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("get_element_info", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -955,14 +1091,25 @@ def waitfortext(
 
 @app.command(name="hover")
 def hover_cmd(
-    selector: str = typer.Option(..., "--selector", "-s", help="CSS selector"),
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
+    ),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Hover over element
 
-    Move mouse over the element matching the CSS selector.
+    Hover by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon("hover", {"selector": selector, "browser_id": browser_id})
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("hover", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -997,16 +1144,25 @@ def drag_cmd(
 
 @app.command()
 def doubleclick(
-    selector: str = typer.Option(..., "--selector", "-s", help="CSS selector"),
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
+    ),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Double click on element
 
-    Double click on the element matching the CSS selector.
+    Double click by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon(
-        "double_click", {"selector": selector, "browser_id": browser_id}
-    )
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("double_click", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -1376,18 +1532,25 @@ def getnetworkrequests(
 
 @app.command()
 def elementscreenshot(
-    selector: str = typer.Option(
-        ..., "--selector", "-s", help="CSS selector for element"
+    selector: str | None = typer.Option(None, "--selector", "-s", help="CSS selector"),
+    index: int | None = typer.Option(
+        None, "--index", "-i", help="Interactable index from list-interactables"
     ),
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
 ) -> None:
     """Element screenshot
 
-    Take a screenshot of a specific element.
+    Screenshot by CSS selector or by interactable index (from jb list-interactables).
     """
-    result = send_to_daemon(
-        "element_screenshot", {"selector": selector, "browser_id": browser_id}
-    )
+    if selector is None and index is None:
+        print(json.dumps({"success": False, "stdout": "", "stderr": "Need --selector or --index"}))
+        raise typer.Exit(code=1)
+    params: Dict[str, Any] = {"browser_id": browser_id}
+    if index is not None:
+        params["index"] = index
+    else:
+        params["selector"] = selector
+    result = send_to_daemon("element_screenshot", params)
     print(json.dumps(result, ensure_ascii=False))
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -1707,48 +1870,35 @@ async def get_markdown(browser_id: str = "default") -> Dict[str, Any]:
         }
 
 
-async def list_interactables(
+async def _get_interactables_list(
     browser_id: str = "default", filter_type: str = ""
-) -> Dict[str, Any]:
-    """List all interactive elements on the page"""
-    try:
-        session = get_browser_session(browser_id)
-        if session["page"] is None:
-            return {
-                "success": False,
-                "stdout": "",
-                "stderr": f"Browser [{browser_id}] not launched",
-            }
-
-        page = session["page"]
-        interactables = []
-
-        # Define selectors for different interactive element types
-        selectors = {
-            "button": "button, input[type='button'], input[type='submit'], input[type='reset'], [role='button']",
-            "input": "input[type='text'], input[type='password'], input[type='email'], input[type='number'], textarea",
-            "link": "a[href]",
-            "checkbox": "input[type='checkbox']",
-            "radio": "input[type='radio']",
-            "select": "select",
-            "file": "input[type='file']",
-        }
-
-        for element_type, selector in selectors.items():
-            if filter_type and element_type != filter_type:
-                continue
-
-            elements = await page.query_selector_all(selector)
-            for element in elements:
-                try:
-                    # Get element text or value
-                    text = await element.evaluate(
-                        "el => el.textContent || el.value || el.getAttribute('placeholder') || ''"
-                    )
-                    text = text.strip()[:100]  # Limit text length
-
-                    # Generate a unique CSS selector (same format used by click/type)
-                    element_selector = await element.evaluate("""
+) -> List[Dict[str, Any]]:
+    """Get raw list of interactables (index, type, selector, text). Used by list_interactables and index resolution."""
+    session = get_browser_session(browser_id)
+    if session["page"] is None:
+        return []
+    page = session["page"]
+    interactables: List[Dict[str, Any]] = []
+    selectors_map = {
+        "button": "button, input[type='button'], input[type='submit'], input[type='reset'], [role='button']",
+        "input": "input[type='text'], input[type='password'], input[type='email'], input[type='number'], textarea",
+        "link": "a[href]",
+        "checkbox": "input[type='checkbox']",
+        "radio": "input[type='radio']",
+        "select": "select",
+        "file": "input[type='file']",
+    }
+    for element_type, selector in selectors_map.items():
+        if filter_type and element_type != filter_type:
+            continue
+        elements = await page.query_selector_all(selector)
+        for element in elements:
+            try:
+                text = await element.evaluate(
+                    "el => el.textContent || el.value || el.getAttribute('placeholder') || ''"
+                )
+                text = text.strip()[:100]  # Limit text length
+                element_selector = await element.evaluate("""
                         el => {
                             const tag = el.tagName.toLowerCase();
                             const id = el.id && /^[a-zA-Z][\\w-]*$/.test(el.id);
@@ -1806,24 +1956,63 @@ async def list_interactables(
                             return tag;
                         }
                     """)
+                interactables.append({
+                    "index": len(interactables) + 1,
+                    "type": element_type,
+                    "selector": element_selector,
+                    "text": text,
+                })
+                if len(interactables) >= 100:
+                    break
+            except Exception:
+                continue
+        if len(interactables) >= 100:
+            break
+    return interactables
 
-                    interactables.append(
-                        {
-                            "type": element_type,
-                            "selector": element_selector,
-                            "text": text,
-                        }
-                    )
 
-                    # Limit total number of interactables
-                    if len(interactables) >= 100:
-                        break
-                except Exception:
-                    continue
+async def _resolve_index_to_selector(
+    browser_id: str, index: int
+) -> tuple[str, str | None]:
+    """Resolve interactable index to selector. Returns (selector, error_msg)."""
+    items = await _get_interactables_list(browser_id)
+    for item in items:
+        if item.get("index") == index:
+            return (item["selector"], None)
+    return ("", f"Index {index} not found in interactables (1-{len(items)})")
 
-            if len(interactables) >= 100:
-                break
 
+async def _resolve_index_in_params(
+    params: Dict[str, Any], browser_id: str
+) -> Dict[str, Any] | None:
+    """If index in params, resolve to selector. Returns error dict or None."""
+    index_val = params.pop("index", None)
+    if index_val is None:
+        return None
+    try:
+        idx = int(index_val) if not isinstance(index_val, int) else index_val
+    except (ValueError, TypeError):
+        return {"success": False, "stdout": "", "stderr": f"Invalid index: {index_val}"}
+    selector, err = await _resolve_index_to_selector(browser_id, idx)
+    if err:
+        return {"success": False, "stdout": "", "stderr": err}
+    params["selector"] = selector
+    return None
+
+
+async def list_interactables(
+    browser_id: str = "default", filter_type: str = ""
+) -> Dict[str, Any]:
+    """List all interactive elements on the page"""
+    try:
+        session = get_browser_session(browser_id)
+        if session["page"] is None:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Browser [{browser_id}] not launched",
+            }
+        interactables = await _get_interactables_list(browser_id, filter_type)
         return {
             "success": True,
             "stdout": json.dumps(interactables, ensure_ascii=False),
