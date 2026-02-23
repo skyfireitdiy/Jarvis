@@ -331,7 +331,7 @@ jb get-markdown --browser-id demo
 
 #### list-interactables - 列出交互控件
 
-列出页面上所有可交互的元素（按钮、输入框、链接等）。
+列出页面上所有可交互的元素（按钮、输入框、链接等）。返回的 `selector` 与 click、type 等命令一致，可直接用于后续操作。
 
 **参数：**
 
@@ -365,6 +365,7 @@ jb list-interactables --browser-id demo --filter link
   - `select`: 下拉选择框
   - `file`: 文件上传输入框
 - 每个元素返回的信息包括：类型、选择器、文本内容
+- **selector 生成优先级**：`#id` > `[name]` > `[placeholder]` > `[aria-label]` > `[data-testid]` > `a[href]` > `.class:nth-of-type(n)` > `tag:nth-of-type(n)`，尽量保证唯一性
 - 最多返回 100 个元素，避免数据量过大
 - 元素文本内容限制为 100 个字符
 

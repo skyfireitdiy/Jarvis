@@ -1747,13 +1747,63 @@ async def list_interactables(
                     )
                     text = text.strip()[:100]  # Limit text length
 
-                    # Get a unique selector for the element
+                    # Generate a unique CSS selector (same format used by click/type)
                     element_selector = await element.evaluate("""
                         el => {
-                            if (el.id) return '#' + el.id;
-                            if (el.className) return '.' + el.className.split(' ')[0];
-                            if (el.tagName) return el.tagName.toLowerCase();
-                            return '*';
+                            const tag = el.tagName.toLowerCase();
+                            const id = el.id && /^[a-zA-Z][\\w-]*$/.test(el.id);
+                            if (id) return '#' + el.id;
+
+                            const name = el.getAttribute('name');
+                            if (name && /^[a-zA-Z][\\w-.:]*$/.test(name)) {
+                                if (['input','select','textarea','button'].includes(tag))
+                                    return tag + '[name="' + name.replace(/"/g,'\\\\"') + '"]';
+                            }
+
+                            const placeholder = el.getAttribute('placeholder');
+                            if (placeholder && tag === 'input' && placeholder.length < 60)
+                                return 'input[placeholder="' + placeholder.replace(/"/g,'\\\\"') + '"]';
+
+                            const ariaLabel = el.getAttribute('aria-label');
+                            if (ariaLabel && ariaLabel.length < 80)
+                                return '[aria-label="' + ariaLabel.replace(/"/g,'\\\\"') + '"]';
+
+                            const testId = el.getAttribute('data-testid');
+                            if (testId) return '[data-testid="' + testId.replace(/"/g,'\\\\"') + '"]';
+
+                            if (tag === 'a') {
+                                const href = el.getAttribute('href');
+                                if (href && href.length < 120)
+                                    return 'a[href="' + href.replace(/"/g,'\\\\"') + '"]';
+                            }
+
+                            const cls = el.className;
+                            if (typeof cls === 'string' && cls.trim()) {
+                                const firstClass = cls.trim().split(/\\s+/)[0];
+                                if (/^[a-zA-Z][\\w-]*$/.test(firstClass)) {
+                                    const parent = el.parentElement;
+                                    if (parent) {
+                                        const sameTagSiblings = Array.from(parent.children)
+                                            .filter(c => c.tagName === el.tagName);
+                                        const idx = sameTagSiblings.indexOf(el) + 1;
+                                        return (sameTagSiblings.length > 1)
+                                            ? tag + '.' + firstClass + ':nth-of-type(' + idx + ')'
+                                            : '.' + firstClass;
+                                    }
+                                    return '.' + firstClass;
+                                }
+                            }
+
+                            const parent = el.parentElement;
+                            if (parent) {
+                                const sameTagSiblings = Array.from(parent.children)
+                                    .filter(c => c.tagName === el.tagName);
+                                const idx = sameTagSiblings.indexOf(el) + 1;
+                                return (sameTagSiblings.length > 1)
+                                    ? tag + ':nth-of-type(' + idx + ')'
+                                    : tag;
+                            }
+                            return tag;
                         }
                     """)
 
