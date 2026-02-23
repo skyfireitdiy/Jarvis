@@ -64,12 +64,14 @@ dependencies = [
     "tree-sitter-ruby==0.23.1",
     "tree-sitter-php==0.24.1",
     "tree-sitter-sql==0.3.11",
+    "pywinauto>=0.6.9; sys_platform == 'win32'",
     ]
     requires-python = "==3.12.*"
 
     [project.optional-dependencies]
     dev = ["pytest", "pytest-cov", "coverage", "pytest-xdist", "pytest-benchmark", "pytest-asyncio", "ruff", "mypy", "bandit", "build", "twine", "mkdocs-material", "mkdocs-git-revision-date-localized-plugin", "pymdown-extensions"]
     browser = ["playwright==1.48.0"]
+    windows = ["pywinauto>=0.6.9; sys_platform == 'win32'"]
     clang16 = ["clang==16.*"]
     clang17 = ["clang==17.*"]
     clang18 = ["clang==18.*"]
@@ -175,6 +177,8 @@ dependencies = [
     jlsp = "jarvis.jarvis_lsp.cli:app"
     jarvis-browser = "jarvis.jarvis_browser.cli:app"
     jb = "jarvis.jarvis_browser.cli:app"
+    jarvis-windows = "jarvis.jarvis_windows.cli:app"
+    jw = "jarvis.jarvis_windows.cli:app"
     jarvis-quick-config = "jarvis.jarvis_utils.quick_config:app"
     jqc = "jarvis.jarvis_utils.quick_config:app"
 
