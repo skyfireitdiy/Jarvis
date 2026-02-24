@@ -85,6 +85,7 @@ setup(
         "tree-sitter-php==0.24.1",
         "tree-sitter-sql==0.3.11",
         "pywinauto>=0.6.9; sys_platform == 'win32'",
+        "pywinpty>=2.0.0; sys_platform == 'win32'",
     ],
     cmdclass={
         "install": PostInstallCommand,
@@ -100,7 +101,6 @@ setup(
             "mkdocs-git-revision-date-localized-plugin",
             "pymdown-extensions",
         ],
-        "windows": ["pywinauto>=0.6.9; sys_platform == 'win32'"],
         "clang16": ["clang==16.*"],
         "clang17": ["clang==17.*"],
         "clang18": ["clang==18.*"],
