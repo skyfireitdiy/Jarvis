@@ -20,7 +20,7 @@ from typing import Optional
 from typing import Tuple
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_central_methodology_repo
+from jarvis.jarvis_utils.config import get_central_methodology_repo, get_default_encoding
 from jarvis.jarvis_utils.config import get_cheap_max_input_token_count
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_methodology_dirs
@@ -87,7 +87,7 @@ def _load_methodologies_from_dir(directory: str) -> Dict[str, str]:
 
     for filepath in glob.glob(os.path.join(directory, "*.json")):
         try:
-            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
                 methodology = json.load(f)
                 problem_type = methodology.get("problem_type", "")
                 content = methodology.get("content", "")
@@ -164,7 +164,7 @@ def _load_all_methodologies() -> List[Tuple[str, str]]:
             reverse=True,
         ):
             try:
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
                     methodology = json.load(f)
                     problem_type = methodology.get("problem_type", "")
                     content = methodology.get("content", "")

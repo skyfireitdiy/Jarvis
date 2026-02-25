@@ -11,8 +11,12 @@ from typing import List
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
-# 匹配 ANSI/终端转义序列，如 ^[[?61;4;6;7;14;21;22;23;24;28;32;42;52c（终端能力查询应答）
-_ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+# 匹配 ANSI/终端转义序列
+# CSI: ^[[?61;4;6;7;...c（终端能力查询应答）
+# OSC: ^[]0;253971765/49760;C:\...\powershell.EXE（窗口标题/进程信息等，会混入输出）
+_ANSI_ESCAPE = re.compile(
+    r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)"
+)
 
 
 class ScriptTool:
@@ -94,10 +98,12 @@ class ScriptTool:
 
     @staticmethod
     def _decode_windows_output(data: bytes) -> str:
-        """Windows 下解码子进程输出，优先 UTF-8，回退到 cp936（中文 Windows）"""
+        """Windows 下解码子进程输出，使用系统默认编码（Windows: gbk）"""
         if not data:
             return ""
-        for enc in ("utf-8", "cp936", "gbk", "latin-1"):
+        from jarvis.jarvis_utils.config import get_default_encoding
+
+        for enc in (get_default_encoding(), "utf-8", "cp936", "latin-1"):
             try:
                 return data.decode(enc, errors="replace")
             except (LookupError, ValueError):
@@ -166,7 +172,7 @@ class ScriptTool:
                     if msvcrt.kbhit():
                         try:
                             ch = msvcrt.getwch()
-                            proc.write(ch.encode("utf-8"))
+                            proc.write(ch)
                         except (EOFError, OSError, UnicodeEncodeError):
                             break
                     else:

@@ -2,6 +2,8 @@
 import os
 import re
 from typing import Any
+
+from jarvis.jarvis_utils.config import get_default_encoding
 from typing import Callable
 
 
@@ -18,7 +20,7 @@ def is_text_file(filepath: str) -> bool:
     检查文件是否为文本文件。
     """
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, "r", encoding=get_default_encoding()) as f:
             f.read(1024)  # 尝试读取一小块
         return True
     except (UnicodeDecodeError, IOError):
@@ -30,7 +32,7 @@ def count_lines(filepath: str) -> int:
     统计文件中的行数。
     """
     try:
-        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
             return sum(1 for _ in f)
     except IOError:
         return 0
@@ -127,7 +129,7 @@ def extract_symbols_from_file(filepath: str) -> list[dict[str, Any]]:
         return []
 
     try:
-        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
             content = f.read()
 
         symbols = extractor.extract_symbols(filepath, content)

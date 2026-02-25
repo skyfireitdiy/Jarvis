@@ -17,7 +17,7 @@ import yaml
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule
 from jarvis.jarvis_agent.builtin_rules import get_builtin_rule_path
 from jarvis.jarvis_utils.template_utils import render_rule_template
-from jarvis.jarvis_utils.config import get_central_rules_repo
+from jarvis.jarvis_utils.config import get_central_rules_repo, get_default_encoding
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_rules_load_dirs
 from jarvis.jarvis_utils.utils import daily_check_git_updates
@@ -87,7 +87,7 @@ class RulesManager:
         try:
             rules_path = os.path.join(self.root_dir, ".jarvis", "rule")
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
-                with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
+                with open(rules_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                     content = f.read().strip()
                 # 使用jinja2渲染规则模板
                 if content:
@@ -103,7 +103,7 @@ class RulesManager:
         try:
             rules_path = os.path.join(get_data_dir(), "rule")
             if os.path.exists(rules_path) and os.path.isfile(rules_path):
-                with open(rules_path, "r", encoding="utf-8", errors="replace") as f:
+                with open(rules_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                     content = f.read().strip()
                 # 使用jinja2渲染规则模板
                 if content:
@@ -131,7 +131,7 @@ class RulesManager:
             # 支持相对路径（如 deployment/version_release.md）
             rule_file_path = os.path.join(rules_dir, rule_name)
             if os.path.exists(rule_file_path) and os.path.isfile(rule_file_path):
-                with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
+                with open(rule_file_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                     content = f.read().strip()
                 # 使用jinja2渲染规则模板
                 if content:
@@ -166,7 +166,7 @@ class RulesManager:
                 return None
 
             # 读取索引文件内容
-            with open(index_file_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(index_file_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                 index_content = f.read()
 
             # 使用jinja2渲染规则模板
@@ -212,7 +212,7 @@ class RulesManager:
                 return None
 
             # 读取索引文件内容
-            with open(index_file_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(index_file_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                 index_content = f.read()
 
             # 解析索引文件，查找匹配的规则
@@ -252,7 +252,7 @@ class RulesManager:
                 return None
 
             # 读取规则文件内容
-            with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(rule_file_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                 rule_content = f.read().strip()
 
             # 使用jinja2渲染规则模板
@@ -416,7 +416,7 @@ class RulesManager:
                                     with open(
                                         yaml_path,
                                         "r",
-                                        encoding="utf-8",
+                                        encoding=get_default_encoding(),
                                         errors="replace",
                                     ) as f:
                                         rules = yaml.safe_load(f) or {}
@@ -440,7 +440,7 @@ class RulesManager:
                                     with open(
                                         yaml_path,
                                         "r",
-                                        encoding="utf-8",
+                                        encoding=get_default_encoding(),
                                         errors="replace",
                                     ) as f:
                                         rules = yaml.safe_load(f) or {}
@@ -472,7 +472,7 @@ class RulesManager:
                             with open(
                                 yaml_path,
                                 "r",
-                                encoding="utf-8",
+                                encoding=get_default_encoding(),
                                 errors="replace",
                             ) as f:
                                 rules = yaml.safe_load(f) or {}
@@ -500,7 +500,7 @@ class RulesManager:
                             with open(
                                 yaml_path,
                                 "r",
-                                encoding="utf-8",
+                                encoding=get_default_encoding(),
                                 errors="replace",
                             ) as f:
                                 rules = yaml.safe_load(f) or {}
@@ -614,7 +614,7 @@ class RulesManager:
                     continue
 
                 try:
-                    with open(yaml_path, "r", encoding="utf-8", errors="replace") as f:
+                    with open(yaml_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                         rules = yaml.safe_load(f) or {}
                         if isinstance(rules, dict):
                             for rule_name in rules.keys():

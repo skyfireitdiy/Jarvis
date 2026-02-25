@@ -8,6 +8,7 @@
 
 from pathlib import Path
 
+from jarvis.jarvis_utils.config import get_default_encoding
 from jarvis.jarvis_utils.template_utils import _get_builtin_dir, render_rule_template
 
 
@@ -39,7 +40,7 @@ def _load_rules_from_directory(directory: Path, base_dir: Path) -> None:
             rule_name = str(relative_path)
 
         try:
-            with open(rule_file, "r", encoding="utf-8") as f:
+            with open(rule_file, "r", encoding=get_default_encoding()) as f:
                 rule_content = f.read().strip()
                 # 使用通用的渲染函数
                 rendered_content = render_rule_template(

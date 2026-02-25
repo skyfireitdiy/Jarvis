@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 from functools import lru_cache
 from typing import Any
 from typing import Dict
@@ -13,6 +14,14 @@ from jarvis.jarvis_utils.collections import CaseInsensitiveDict
 # 全局环境变量存储
 
 GLOBAL_CONFIG_DATA: CaseInsensitiveDict = CaseInsensitiveDict()
+
+# 系统默认编码：Windows 使用 gbk，其他平台使用 utf-8
+DEFAULT_ENCODING = "gbk" if sys.platform == "win32" else "utf-8"
+
+
+def get_default_encoding() -> str:
+    """获取系统默认编码。Windows 为 gbk，其他为 utf-8"""
+    return DEFAULT_ENCODING
 
 
 # 上下文长度限制常量

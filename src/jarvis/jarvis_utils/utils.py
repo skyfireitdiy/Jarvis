@@ -27,6 +27,7 @@ import yaml
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (
     get_data_dir,
+    get_default_encoding,
     get_max_input_token_count,
     set_llm_group,
 )
@@ -54,17 +55,14 @@ def decode_output(data: bytes) -> str:
     Returns:
         解码后的字符串
     """
-    # 优先尝试 UTF-8（严格模式，失败时回退到其他编码）
-    try:
-        return data.decode("utf-8")
-    except (UnicodeDecodeError, AttributeError):
-        pass
+    from jarvis.jarvis_utils.config import get_default_encoding
 
-    # 回退到 GBK（Windows 常用编码）
-    try:
-        return data.decode("gbk")
-    except (UnicodeDecodeError, AttributeError):
-        pass
+    # 优先使用系统默认编码（Windows: gbk，其他: utf-8）
+    for enc in (get_default_encoding(), "utf-8", "gbk"):
+        try:
+            return data.decode(enc)
+        except (UnicodeDecodeError, AttributeError):
+            pass
 
     # 最后尝试 latin-1（不会失败，但可能有乱码）
     try:
@@ -970,7 +968,7 @@ def _load_config_file(config_file: str) -> Tuple[str, Dict[str, Any]]:
     返回:
         Tuple[str, dict]: (文件原始内容, 解析后的配置字典)
     """
-    with open(config_file, "r", encoding="utf-8") as f:
+    with open(config_file, "r", encoding=get_default_encoding()) as f:
         content = f.read()
         config_data = yaml.safe_load(content) or {}
         return content, config_data
@@ -997,7 +995,7 @@ def _ensure_schema_declaration(
                 start=jarvis_dir,
             )
         )
-        with open(config_file, "w", encoding="utf-8") as f:
+        with open(config_file, "w", encoding=get_default_encoding()) as f:
             f.write(f"# yaml-language-server: $schema={schema_path}\n")
             f.write(content)
 
@@ -1081,7 +1079,7 @@ def generate_default_config(schema_path: str, output_path: str) -> None:
     content = f"# yaml-language-server: $schema={schema_path}\n"
     content += yaml.dump(default_config, allow_unicode=True, sort_keys=False)
 
-    with open(output_path, "w", encoding="utf-8") as f:
+    with open(output_path, "w", encoding=get_default_encoding()) as f:
         f.write(content)
 
 
@@ -1164,7 +1162,7 @@ def _read_old_config_file(config_file: Union[str, Path]) -> None:
     config_data = {}
     current_key = None
     current_value = []
-    with open(config_file, "r", encoding="utf-8", errors="ignore") as f:
+    with open(config_file, "r", encoding=get_default_encoding(), errors="ignore") as f:
         for line in f:
             line = line.rstrip()
             if not line or line.startswith(("#", ";")):
@@ -1416,7 +1414,7 @@ def get_file_line_count(filename: str) -> int:
     """
     try:
         # 使用流式逐行计数，避免将整个文件读入内存
-        with open(filename, "r", encoding="utf-8", errors="ignore") as f:
+        with open(filename, "r", encoding=get_default_encoding(), errors="ignore") as f:
             return sum(1 for _ in f)
     except Exception:
         return 0
