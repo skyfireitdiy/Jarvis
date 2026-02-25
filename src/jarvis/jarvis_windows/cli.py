@@ -31,6 +31,10 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+config_app = typer.Typer(help="Windows 常用系统配置修改")
+
+app.add_typer(config_app, name="config")
+
 DEFAULT_APP_ID = "default"
 SESSIONS_FILE = "jw_sessions.json"
 
@@ -401,6 +405,59 @@ def list_cmd(
     _output({
         "success": True,
         "stdout": json.dumps(items, ensure_ascii=False, indent=2),
+        "stderr": "",
+    })
+
+
+@app.command(name="list-windows")
+def list_windows_cmd(
+    backend: str = typer.Option("uia", "--backend", help="Backend: uia (default) or win32"),
+    title_filter: Optional[str] = typer.Option(None, "--title", "-t", help="Filter by window title (substring match)"),
+    limit: int = typer.Option(50, "--limit", "-n", help="Max windows to list (default 50)"),
+) -> None:
+    """List visible windows (title, pid, handle). Use --title to filter."""
+    _ensure_windows()
+    try:
+        from pywinauto import Desktop
+    except ImportError:
+        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        return
+
+    seen: set = set()
+    items: list = []
+    be = "win32" if backend == "uia" else "uia"
+    for be_try in [backend, be]:
+        try:
+            desktop = Desktop(backend=be_try)
+            for win in desktop.windows():
+                if len(items) >= limit:
+                    break
+                try:
+                    raw_title = win.window_text() or ""
+                    if not raw_title.strip():
+                        continue
+                    title = "".join(c for c in raw_title if ord(c) >= 32 and c != "\u200b").strip()
+                    if not title:
+                        title = raw_title
+                    pid = win.process_id()
+                    key = (pid, title)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    if title_filter and title_filter.lower() not in title.lower():
+                        continue
+                    h = getattr(win.element_info, "handle", None) or getattr(win, "handle", None)
+                    items.append({"title": title, "pid": pid, "handle": h})
+                except Exception:
+                    continue
+            if items:
+                break
+        except Exception:
+            continue
+
+    _output({
+        "success": True,
+        "stdout": json.dumps(items, ensure_ascii=True, indent=2),
         "stderr": "",
     })
 
@@ -1028,6 +1085,230 @@ def menu(
         _output({"success": True, "stdout": f"Menu selected: {menu_path}", "stderr": ""})
     except Exception as e:
         _output({"success": False, "stdout": "", "stderr": f"Menu failed: {e}"})
+
+
+# --- System Config Commands (PowerShell/Registry based) ---
+
+
+def _run_ps(script: str, timeout: int = 30) -> Dict[str, Any]:
+    """Run PowerShell script and return {success, stdout, stderr}."""
+    try:
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            capture_output=True,
+            timeout=timeout,
+            encoding="utf-8",
+            errors="replace",
+        )
+        out = (r.stdout or "").strip()
+        err = (r.stderr or "").strip()
+        return {"success": r.returncode == 0, "stdout": out, "stderr": err}
+    except subprocess.TimeoutExpired:
+        return {"success": False, "stdout": "", "stderr": "PowerShell execution timed out"}
+    except Exception as e:
+        return {"success": False, "stdout": "", "stderr": str(e)}
+
+
+@config_app.command("theme")
+def config_theme(
+    mode: str = typer.Argument(..., help="dark | light | toggle"),
+) -> None:
+    """切换系统/应用主题（深色/浅色模式）"""
+    _ensure_windows()
+    path = r"HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+    if mode == "toggle":
+        script = f"""
+$p = Get-ItemProperty -Path '{path}' -Name AppsUseLightTheme -ErrorAction SilentlyContinue
+$v = if ($p.AppsUseLightTheme -eq 0) {{ 1 }} else {{ 0 }}
+Set-ItemProperty -Path '{path}' -Name AppsUseLightTheme -Value $v -Type Dword -Force
+Set-ItemProperty -Path '{path}' -Name SystemUsesLightTheme -Value $v -Type Dword -Force
+Write-Output "Theme: $(if ($v -eq 0) {{ 'dark' }} else {{ 'light' }})"
+"""
+    elif mode == "dark":
+        script = f"""
+Set-ItemProperty -Path '{path}' -Name AppsUseLightTheme -Value 0 -Type Dword -Force
+Set-ItemProperty -Path '{path}' -Name SystemUsesLightTheme -Value 0 -Type Dword -Force
+Write-Output "Theme: dark"
+"""
+    elif mode == "light":
+        script = f"""
+Set-ItemProperty -Path '{path}' -Name AppsUseLightTheme -Value 1 -Type Dword -Force
+Set-ItemProperty -Path '{path}' -Name SystemUsesLightTheme -Value 1 -Type Dword -Force
+Write-Output "Theme: light"
+"""
+    else:
+        _output({"success": False, "stdout": "", "stderr": f"Invalid mode: {mode}. Use dark, light, or toggle"})
+        return
+    _output(_run_ps(script))
+
+
+@config_app.command("power-plan")
+def config_power_plan(
+    action: str = typer.Argument(..., help="list | set"),
+    plan_id: Optional[str] = typer.Option(None, "--id", help="电源方案 GUID（set 时必需）"),
+) -> None:
+    """列出或切换电源计划"""
+    _ensure_windows()
+    if action == "list":
+        script = "powercfg /list | Out-String"
+        _output(_run_ps(script))
+        return
+    if action == "set":
+        if not plan_id:
+            _output({"success": False, "stdout": "", "stderr": "Need --id (plan GUID) for 'set'"})
+            return
+        script = f"powercfg /setactive {plan_id}"
+        _output(_run_ps(script))
+        return
+    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use list or set"})
+
+
+@config_app.command("proxy")
+def config_proxy(
+    action: str = typer.Argument(..., help="get | enable | disable | set"),
+    server: Optional[str] = typer.Option(None, "--server", help="代理地址，如 127.0.0.1:7890"),
+    bypass: Optional[str] = typer.Option(None, "--bypass", help="绕过列表，如 localhost;127.*"),
+) -> None:
+    """获取或设置系统代理"""
+    _ensure_windows()
+    path = r"HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Internet Settings"
+    if action == "get":
+        script = f"""
+$p = Get-ItemProperty -Path '{path}' -Name ProxyEnable -ErrorAction SilentlyContinue
+$s = (Get-ItemProperty -Path '{path}' -Name ProxyServer -ErrorAction SilentlyContinue).ProxyServer
+Write-Output "enabled=$($p.ProxyEnable); server=$s"
+"""
+        _output(_run_ps(script))
+        return
+    if action == "disable":
+        script = f"""
+Set-ItemProperty -Path '{path}' -Name ProxyEnable -Value 0 -Type Dword -Force
+Write-Output "Proxy disabled"
+"""
+        _output(_run_ps(script))
+        return
+    if action == "enable":
+        server_val = server or "127.0.0.1:7890"
+        bypass_val = bypass or "localhost;127.*;10.*;172.16.*;192.168.*"
+        script = f"""
+Set-ItemProperty -Path '{path}' -Name ProxyEnable -Value 1 -Type Dword -Force
+Set-ItemProperty -Path '{path}' -Name ProxyServer -Value '{server_val}' -Force
+Set-ItemProperty -Path '{path}' -Name ProxyOverride -Value '{bypass_val}' -Force -ErrorAction SilentlyContinue
+Write-Output "Proxy enabled: {server_val}"
+"""
+        _output(_run_ps(script))
+        return
+    if action == "set":
+        if not server:
+            _output({"success": False, "stdout": "", "stderr": "Need --server for 'set'"})
+            return
+        bypass_val = bypass or "localhost;127.*;10.*;172.16.*;192.168.*"
+        script = f"""
+Set-ItemProperty -Path '{path}' -Name ProxyEnable -Value 1 -Type Dword -Force
+Set-ItemProperty -Path '{path}' -Name ProxyServer -Value '{server}' -Force
+Set-ItemProperty -Path '{path}' -Name ProxyOverride -Value '{bypass_val}' -Force -ErrorAction SilentlyContinue
+Write-Output "Proxy set: {server}"
+"""
+        _output(_run_ps(script))
+        return
+    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use get, enable, disable, or set"})
+
+
+@config_app.command("screen-timeout")
+def config_screen_timeout(
+    action: str = typer.Argument(..., help="get | set"),
+    minutes: Optional[int] = typer.Option(None, "--minutes", "-m", help="熄屏分钟数，0 表示从不"),
+) -> None:
+    """获取或设置屏幕关闭超时（当前电源计划）"""
+    _ensure_windows()
+    if action == "get":
+        script = "powercfg /query SCHEME_CURRENT SUB_VIDEO VIDEOIDLE"
+        _output(_run_ps(script))
+        return
+    if action == "set":
+        if minutes is None:
+            _output({"success": False, "stdout": "", "stderr": "Need --minutes for 'set'"})
+            return
+        ac_min = max(0, minutes)  # AC power
+        dc_min = max(0, minutes)  # DC/battery
+        script = f"powercfg /change monitor-timeout-ac {ac_min}; powercfg /change monitor-timeout-dc {dc_min}"
+        _output(_run_ps(script))
+        return
+    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use get or set"})
+
+
+@config_app.command("remote-desktop")
+def config_remote_desktop(
+    action: str = typer.Argument(..., help="enable | disable | get"),
+) -> None:
+    """启用/禁用远程桌面（需管理员权限）"""
+    _ensure_windows()
+    path = r"HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server"
+    if action == "get":
+        script = f"(Get-ItemProperty -Path '{path}' -Name fDenyTSConnections -ErrorAction SilentlyContinue).fDenyTSConnections"
+        _output(_run_ps(script))
+        return
+    if action == "enable":
+        script = f"""
+Set-ItemProperty -Path '{path}' -Name fDenyTSConnections -Value 0 -Force
+Write-Output "Remote Desktop enabled (may need admin)"
+"""
+        _output(_run_ps(script))
+        return
+    if action == "disable":
+        script = f"""
+Set-ItemProperty -Path '{path}' -Name fDenyTSConnections -Value 1 -Force
+Write-Output "Remote Desktop disabled (may need admin)"
+"""
+        _output(_run_ps(script))
+        return
+    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use enable, disable, or get"})
+
+
+@config_app.command("startup")
+def config_startup(
+    action: str = typer.Argument(..., help="list | enable | disable"),
+    name: Optional[str] = typer.Option(None, "--name", help="启动项名称（enable/disable 时）"),
+    path: Optional[str] = typer.Option(None, "--path", help="启动项路径/命令行（enable 时）"),
+) -> None:
+    """列出启动项或启用/禁用（当前用户 Startup 文件夹）"""
+    _ensure_windows()
+    startup_dir = r"$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+    if action == "list":
+        script = f"""
+Get-ChildItem -Path '{startup_dir}' -ErrorAction SilentlyContinue | ForEach-Object {{
+  $n = $_.Name; $t = $_.Target -replace '^.*\\', ''; Write-Output "$n | $t"
+}}
+"""
+        _output(_run_ps(script))
+        return
+    if action == "disable":
+        if not name:
+            _output({"success": False, "stdout": "", "stderr": "Need --name for 'disable'"})
+            return
+        safe_name = name.replace("'", "''")
+        script = f"""
+$p = Join-Path '{startup_dir}' '{safe_name}'
+if (Test-Path $p) {{ Rename-Item $p ($p + '.disabled') -Force; Write-Output "Disabled: {safe_name}" }}
+else {{ Write-Error "Not found: {safe_name}" }}
+"""
+        _output(_run_ps(script))
+        return
+    if action == "enable":
+        if not name:
+            _output({"success": False, "stdout": "", "stderr": "Need --name for 'enable'"})
+            return
+        safe_name = name.replace("'", "''")
+        script = f"""
+$p = Join-Path '{startup_dir}' '{safe_name}'
+$disabled = $p + '.disabled'
+if (Test-Path $disabled) {{ Rename-Item $disabled $p -Force; Write-Output "Enabled: {safe_name}" }}
+elseif (Test-Path $p) {{ Write-Output "Already enabled: {safe_name}" }}
+else {{ Write-Error "Not found: {safe_name}" }}
+"""
+        _output(_run_ps(script))
+        return
+    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use list, enable, or disable"})
 
 
 if __name__ == "__main__":
