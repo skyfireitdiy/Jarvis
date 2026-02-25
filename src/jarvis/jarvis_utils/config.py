@@ -25,11 +25,14 @@ def get_default_encoding() -> str:
 
 
 # 编码检测：常见编码尝试顺序（utf-8 优先，适配现代文件；gbk 次之，适配 Windows 中文）
-_DETECT_ENCODINGS = ["utf-8", "gbk", "gb2312", "utf-16", "utf-16-le", "utf-16-be", "latin1"]
+# 注意：不包含 'utf-16'，因为 Python 的 utf-16 编码器严格要求 BOM，而 BOM 检测已单独处理
+_DETECT_ENCODINGS = ["utf-8", "gbk", "gb2312", "utf-16-le", "utf-16-be", "latin1"]
 _DETECT_SAMPLE_SIZE = 8192  # 读取前 8KB 用于检测
 
 
-def detect_file_encoding(file_path: str, sample_size: int = _DETECT_SAMPLE_SIZE) -> Optional[str]:
+def detect_file_encoding(
+    file_path: str, sample_size: int = _DETECT_SAMPLE_SIZE
+) -> Optional[str]:
     """根据文件内容检测编码
 
     读取文件前 N 字节，依次尝试常见编码解码，返回第一个成功的编码。
