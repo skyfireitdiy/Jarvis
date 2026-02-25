@@ -33,6 +33,7 @@ jarvis-windows <command> [options]
 | `start` | 启动应用程序 |
 | `connect` | 连接到已运行的窗口 |
 | `list` | 列出当前管理的应用会话 |
+| `list-windows` | 列举可见窗口（title、pid、handle），便于 connect |
 | `close` | 关闭/断开应用会话 |
 | `click` | 点击控件（通过标题、auto_id、索引等） |
 | `double-click` | 双击控件 |
@@ -44,6 +45,17 @@ jarvis-windows <command> [options]
 | `screenshot` | 截取窗口截图 |
 | `get-tree` | 获取窗口控件树结构 |
 | `menu` | 执行菜单操作 |
+
+### config 子命令（系统配置）
+
+| 命令 | 描述 |
+|------|------|
+| `config theme` | 切换深色/浅色主题（dark \| light \| toggle） |
+| `config power-plan` | 列出或切换电源计划（list \| set） |
+| `config proxy` | 获取或设置系统代理（get \| enable \| disable \| set） |
+| `config screen-timeout` | 获取或设置屏幕关闭超时（get \| set） |
+| `config remote-desktop` | 启用/禁用远程桌面（enable \| disable \| get，需管理员） |
+| `config startup` | 列出或启用/禁用当前用户启动项（list \| enable \| disable） |
 
 ### 通用参数
 
@@ -91,6 +103,16 @@ jarvis-windows <command> [options]
 列出当前通过工具管理（start/connect）的应用会话。
 
 返回：app_id、进程名、窗口标题、状态。
+
+#### list-windows
+
+列举当前可见的顶层窗口。
+
+- `--backend`：uia（默认）或 win32
+- `--title`：按窗口标题过滤（子串匹配）
+- `--limit`：最多列出数量，默认 50
+
+返回：每项含 `title`、`pid`、`handle`，可用于 connect 的 `--title` 或 `--pid`。
 
 #### close
 
@@ -163,6 +185,47 @@ jarvis-windows <command> [options]
 - `--depth`（可选）：遍历深度，默认 3
 - `--control`（可选）：从指定控件开始，不指定则为根窗口
 
+#### config theme
+
+切换系统/应用深色或浅色主题。
+
+- 参数：`dark` \| `light` \| `toggle`
+
+#### config power-plan
+
+列出或切换电源计划。
+
+- 参数：`list` \| `set`
+- `--id`：电源方案 GUID（set 时必需，可通过 list 获取）
+
+#### config proxy
+
+获取或设置系统代理。
+
+- 参数：`get` \| `enable` \| `disable` \| `set`
+- `--server`：代理地址，如 `127.0.0.1:7890`
+- `--bypass`：绕过列表，如 `localhost;127.*`
+
+#### config screen-timeout
+
+获取或设置屏幕关闭超时（当前电源计划）。
+
+- 参数：`get` \| `set`
+- `--minutes`：熄屏分钟数，0 表示从不
+
+#### config remote-desktop
+
+启用/禁用远程桌面（需管理员权限）。
+
+- 参数：`enable` \| `disable` \| `get`
+
+#### config startup
+
+列出或启用/禁用当前用户「启动」文件夹中的启动项。
+
+- 参数：`list` \| `enable` \| `disable`
+- `--name`：启动项文件名，如 `MyApp.lnk`（enable/disable 时必需）
+
 ## 功能行为
 
 ### 1. start
@@ -181,6 +244,12 @@ jarvis-windows <command> [options]
 ### 3. list
 
 - 返回所有 `app_id` 对应的进程名、窗口标题
+
+### 3a. list-windows
+
+- 使用 `Desktop(backend).windows()` 遍历可见顶层窗口
+- 返回每项 `title`、`pid`、`handle`
+- 支持 `--title` 子串过滤、`--limit` 数量限制
 
 ### 4. close
 
@@ -238,6 +307,15 @@ jarvis-windows <command> [options]
 - 执行 `window.menu_select(menu_path)`
 - `menu_path` 格式：`父菜单->子菜单`，如 `文件(&F)->另存为(&A)`
 
+### 11. config（系统配置）
+
+- **theme**：修改注册表 `HKCU\...\Themes\Personalize` 的 `AppsUseLightTheme`、`SystemUsesLightTheme`（0=深色，1=浅色）
+- **power-plan**：调用 `powercfg /list`、`powercfg /setactive`
+- **proxy**：修改注册表 `HKCU\...\Internet Settings` 的 `ProxyEnable`、`ProxyServer`、`ProxyOverride`
+- **screen-timeout**：调用 `powercfg /change monitor-timeout-ac/dc`
+- **remote-desktop**：修改 `HKLM\...\Terminal Server` 的 `fDenyTSConnections`（需管理员）
+- **startup**：对 `%APPDATA%\...\Startup` 下的快捷方式重命名（添加/移除 `.disabled` 后缀）
+
 ## 边界条件
 
 - **平台**：非 Windows 时，所有命令返回 `"Platform not supported"`，退出码 1
@@ -254,7 +332,7 @@ jarvis-windows <command> [options]
 
 ## 验收标准
 
-1. **功能完整性**：start、connect、list、close、click、double-click、right-click、hover、drag、type、type-keys、screenshot、get-tree、menu 均可正常执行
+1. **功能完整性**：start、connect、list、list-windows、close、click、double-click、right-click、hover、drag、type、type-keys、screenshot、get-tree、menu、config（theme/power-plan/proxy/screen-timeout/startup）均可正常执行
 2. **平台检查**：非 Windows 时给出清晰提示
 3. **会话管理**：list 正确列出会话；close 可正确断开
 4. **依赖**：pywinauto 作为可选依赖，仅在 Windows 下安装
