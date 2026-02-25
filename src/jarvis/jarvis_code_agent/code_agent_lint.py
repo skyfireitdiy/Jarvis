@@ -26,6 +26,24 @@ class LintManager:
     def __init__(self, root_dir: str):
         self.root_dir = root_dir
 
+    @staticmethod
+    def _clean_surrogates(text: str) -> str:
+        """清理字符串中的 surrogate 字符
+
+        Windows 下 subprocess 返回的输出可能包含 surrogates (U+DC80-U+DCFF),
+        这些字符无法被 UTF-8 编码，会导致打印时抛出异常。
+        此方法将 surrogates 替换为替换字符 。
+
+        Args:
+            text: 可能包含 surrogates 的字符串
+
+        Returns:
+            清理后的字符串
+        """
+        # 使用 encode 的 errors='replace' 参数将 surrogates 替换为 ?
+        # 然后 decode 回字符串
+        return text.encode("utf-8", errors="replace").decode("utf-8")
+
     def run_static_analysis(
         self, modified_files: List[str]
     ) -> List[Tuple[str, str, int, str]]:
@@ -114,6 +132,8 @@ class LintManager:
                             output_preview = (
                                 output[:2000] if len(output) > 2000 else output
                             )
+                            # 清理可能存在的 surrogates 字符，避免 Windows 下编码异常
+                            output_preview = self._clean_surrogates(output_preview)
                             PrettyOutput.auto_print(
                                 f"⚠️ 检查失败 ({file_name}):\n{output_preview}"
                             )
@@ -140,7 +160,11 @@ class LintManager:
                     continue
                 except Exception as e:
                     # 其他错误，记录但继续
-                    PrettyOutput.auto_print(f"⚠️ 执行lint命令失败: {command}, 错误: {e}")
+                    # 清理异常消息中的 surrogates 字符
+                    e_msg = self._clean_surrogates(str(e))
+                    PrettyOutput.auto_print(
+                        f"⚠执行lint命令失败: {command}, 错误: {e_msg}"
+                    )
                     file_results.append(
                         (file_name, command, "失败", f"执行失败: {str(e)[:50]}")
                     )
