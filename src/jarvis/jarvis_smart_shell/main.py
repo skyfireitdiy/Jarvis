@@ -7,7 +7,7 @@ from typing import Tuple
 import typer
 
 from jarvis.jarvis_platform.registry import PlatformRegistry
-from jarvis.jarvis_utils.config import get_shell_name
+from jarvis.jarvis_utils.config import get_shell_name, read_text_file
 from jarvis.jarvis_utils.config import set_config
 from jarvis.jarvis_utils.input import get_multiline_input
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -132,8 +132,7 @@ def install_jss_completion(
             with open(config_file, "w") as f:
                 f.write("")
 
-        with open(config_file, "r") as f:
-            content = f.read()
+        content = read_text_file(config_file)
 
         if start_marker in content:
             PrettyOutput.auto_print(
@@ -171,8 +170,7 @@ end
             with open(config_file, "w") as f:
                 f.write("")
 
-        with open(config_file, "r") as f:
-            content = f.read()
+        content = read_text_file(config_file)
 
         if start_marker in content:
             PrettyOutput.auto_print(
@@ -233,8 +231,7 @@ command_not_found_handle() {{
             with open(config_file, "w") as f:
                 f.write("")
 
-        with open(config_file, "r") as f:
-            content = f.read()
+        content = read_text_file(config_file)
 
         if start_marker in content:
             PrettyOutput.auto_print(
@@ -309,8 +306,7 @@ def uninstall_jss_completion(
             PrettyOutput.auto_print("ℹ️ 未找到 JSS fish completion 配置，无需卸载")
             return
 
-        with open(config_file, "r") as f:
-            content = f.read()
+        content = read_text_file(config_file)
 
         if start_marker not in content:
             PrettyOutput.auto_print("ℹ️ 未找到 JSS fish completion 配置，无需卸载")
@@ -332,8 +328,7 @@ def uninstall_jss_completion(
             PrettyOutput.auto_print("ℹ️ 未找到 JSS bash completion 配置，无需卸载")
             return
 
-        with open(config_file, "r") as f:
-            content = f.read()
+        content = read_text_file(config_file)
 
         if start_marker not in content:
             PrettyOutput.auto_print("ℹ️ 未找到 JSS bash completion 配置，无需卸载")
@@ -355,8 +350,7 @@ def uninstall_jss_completion(
             PrettyOutput.auto_print("ℹ️ 未找到 JSS zsh completion 配置，无需卸载")
             return
 
-        with open(config_file, "r") as f:
-            content = f.read()
+        content = read_text_file(config_file)
 
         if start_marker not in content:
             PrettyOutput.auto_print("ℹ️ 未找到 JSS zsh completion 配置，无需卸载")

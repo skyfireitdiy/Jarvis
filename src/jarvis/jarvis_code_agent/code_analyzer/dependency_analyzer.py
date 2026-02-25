@@ -10,6 +10,8 @@ from typing import List
 from typing import Optional
 from typing import Set
 
+from jarvis.jarvis_utils.config import read_text_file
+
 from .file_ignore import filter_walk_dirs
 
 
@@ -119,9 +121,7 @@ class DependencyAnalyzer:
                     continue
 
                 try:
-                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                        content = f.read()
-
+                    content = read_text_file(file_path, errors="replace")
                     dependencies = self.analyze_imports(file_path, content)
                     for dep in dependencies:
                         # Resolve dependency path (this should be done by language-specific analyzer)

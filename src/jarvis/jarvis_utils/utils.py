@@ -26,9 +26,11 @@ import yaml
 
 from jarvis import __version__
 from jarvis.jarvis_utils.config import (
+    detect_file_encoding,
     get_data_dir,
     get_default_encoding,
     get_max_input_token_count,
+    read_text_file,
     set_llm_group,
 )
 from jarvis.jarvis_utils.config import set_global_config_data
@@ -968,10 +970,9 @@ def _load_config_file(config_file: str) -> Tuple[str, Dict[str, Any]]:
     返回:
         Tuple[str, dict]: (文件原始内容, 解析后的配置字典)
     """
-    with open(config_file, "r", encoding=get_default_encoding()) as f:
-        content = f.read()
-        config_data = yaml.safe_load(content) or {}
-        return content, config_data
+    content = read_text_file(config_file)
+    config_data = yaml.safe_load(content) or {}
+    return content, config_data
 
 
 def _ensure_schema_declaration(
@@ -1162,48 +1163,48 @@ def _read_old_config_file(config_file: Union[str, Path]) -> None:
     config_data = {}
     current_key = None
     current_value = []
-    with open(config_file, "r", encoding=get_default_encoding(), errors="ignore") as f:
-        for line in f:
-            line = line.rstrip()
-            if not line or line.startswith(("#", ";")):
-                continue
-            if "=" in line and not line.startswith((" ", "\t")):
-                # 处理之前收集的多行值
-                if current_key is not None:
-                    processed_value = (
-                        "\n".join(current_value).strip().strip("'").strip('"')
-                    )
-                    # 将字符串"true"/"false"转换为bool类型
-                    if processed_value.lower() == "true":
-                        final_value = True
-                    elif processed_value.lower() == "false":
-                        final_value = False
-                    else:
-                        final_value = processed_value  # type: ignore[assignment]
-                    config_data[current_key] = final_value
-                    current_value = []
-                    # 解析新的键值对
-                key_part, value_part = line.split("=", 1)
-                current_key = key_part.strip()
-                current_value.append(value_part.strip())
-            elif current_key is not None:
-                # 多行值的后续行
-                current_value.append(line.strip())
-                # 处理最后一个键值对
-        if current_key is not None:
-            processed_value = "\n".join(current_value).strip().strip("'").strip('"')
-            # 将字符串"true"/"false"转换为bool类型
-            if processed_value.lower() == "true":
-                final_value = True
-            elif processed_value.lower() == "false":
-                final_value = False
-            else:
-                final_value = processed_value  # type: ignore[assignment]
-            config_data[current_key] = final_value
-        os.environ.update(
-            {str(k): str(v) for k, v in config_data.items() if v is not None}
-        )
-        set_global_config_data(config_data)
+    content = read_text_file(config_file, errors="ignore")
+    for line in content.splitlines():
+        line = line.rstrip()
+        if not line or line.startswith(("#", ";")):
+            continue
+        if "=" in line and not line.startswith((" ", "\t")):
+            # 处理之前收集的多行值
+            if current_key is not None:
+                processed_value = (
+                    "\n".join(current_value).strip().strip("'").strip('"')
+                )
+                # 将字符串"true"/"false"转换为bool类型
+                if processed_value.lower() == "true":
+                    final_value = True
+                elif processed_value.lower() == "false":
+                    final_value = False
+                else:
+                    final_value = processed_value  # type: ignore[assignment]
+                config_data[current_key] = final_value
+                current_value = []
+                # 解析新的键值对
+            key_part, value_part = line.split("=", 1)
+            current_key = key_part.strip()
+            current_value.append(value_part.strip())
+        elif current_key is not None:
+            # 多行值的后续行
+            current_value.append(line.strip())
+    # 处理最后一个键值对
+    if current_key is not None:
+        processed_value = "\n".join(current_value).strip().strip("'").strip('"')
+        # 将字符串"true"/"false"转换为bool类型
+        if processed_value.lower() == "true":
+            final_value = True
+        elif processed_value.lower() == "false":
+            final_value = False
+        else:
+            final_value = processed_value  # type: ignore[assignment]
+        config_data[current_key] = final_value
+    os.environ.update(
+        {str(k): str(v) for k, v in config_data.items() if v is not None}
+    )
+    set_global_config_data(config_data)
     PrettyOutput.auto_print(
         "⚠️ 检测到旧格式配置文件，旧格式以后将不再支持，请尽快迁移到新格式"
     )
@@ -1414,7 +1415,8 @@ def get_file_line_count(filename: str) -> int:
     """
     try:
         # 使用流式逐行计数，避免将整个文件读入内存
-        with open(filename, "r", encoding=get_default_encoding(), errors="ignore") as f:
+        enc = detect_file_encoding(filename) or get_default_encoding()
+        with open(filename, "r", encoding=enc, errors="ignore") as f:
             return sum(1 for _ in f)
     except Exception:
         return 0

@@ -16,6 +16,7 @@ from typing import Optional
 from typing import Set
 from typing import Tuple
 
+from jarvis.jarvis_utils.config import read_text_file
 from jarvis.jarvis_utils.utils import decode_output
 
 from .context_manager import ContextManager
@@ -229,8 +230,7 @@ class TestDiscoverer:
         """判断测试文件是否可能测试目标文件"""
         # 读取测试文件内容，查找目标文件的引用
         try:
-            with open(test_file, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
+            content = read_text_file(test_file, errors="replace")
 
             # 检查是否导入或引用了目标文件
             # 简单的启发式方法：检查文件名、模块名等
@@ -596,8 +596,7 @@ class ImpactAnalyzer:
     ) -> Optional[str]:
         """获取编辑前的文件内容"""
         try:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                return f.read()
+            return read_text_file(file_path, errors="replace")
         except Exception:
             return None
 
@@ -609,8 +608,7 @@ class ImpactAnalyzer:
         # 为了简化，我们直接读取当前文件内容
         # 在实际使用中，应该根据edits应用变更
         try:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                return f.read()
+            return read_text_file(file_path, errors="replace")
         except Exception:
             return None
 

@@ -16,7 +16,7 @@ from typing import Tuple
 
 import yaml
 
-from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_data_dir, read_text_file
 
 # Lint工具对应的自动修复命令映射（lint工具名 -> 自动修复命令模板）
 # 用于在发现lint告警时，提示用户可用的自动修复工具
@@ -191,20 +191,20 @@ def load_lint_tools_config() -> Dict[str, List[str]]:
     if not os.path.exists(config_path):
         return {}
 
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f) or {}
-        result = {}
-        for k, v in config.items():
-            k_lower = k.lower()
-            # 支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]
-            if isinstance(v, list) and v:
-                if isinstance(v[0], str):
-                    # 新格式：直接是命令模板列表
-                    result[k_lower] = v
-                elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
-                    # 旧格式：需要提取模板
-                    result[k_lower] = [template for _, template in v]
-        return result
+    content = read_text_file(config_path)
+    config = yaml.safe_load(content) or {}
+    result = {}
+    for k, v in config.items():
+        k_lower = k.lower()
+        # 支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]
+        if isinstance(v, list) and v:
+            if isinstance(v[0], str):
+                # 新格式：直接是命令模板列表
+                result[k_lower] = v
+            elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
+                # 旧格式：需要提取模板
+                result[k_lower] = [template for _, template in v]
+    return result
 
 
 def load_project_lint_tools_config(project_root: str) -> Dict[str, List[str]]:
@@ -220,20 +220,20 @@ def load_project_lint_tools_config(project_root: str) -> Dict[str, List[str]]:
     if not os.path.exists(project_config_path):
         return {}
 
-    with open(project_config_path, "r") as f:
-        config = yaml.safe_load(f) or {}
-        result = {}
-        for k, v in config.items():
-            k_lower = k.lower()
-            # 支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]
-            if isinstance(v, list) and v:
-                if isinstance(v[0], str):
-                    # 新格式：直接是命令模板列表
-                    result[k_lower] = v
-                elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
-                    # 旧格式：需要提取模板
-                    result[k_lower] = [template for _, template in v]
-        return result
+    content = read_text_file(project_config_path)
+    config = yaml.safe_load(content) or {}
+    result = {}
+    for k, v in config.items():
+        k_lower = k.lower()
+        # 支持格式: ["template1", "template2"] 或 [("tool1", "template1"), ("tool2", "template2")]
+        if isinstance(v, list) and v:
+            if isinstance(v[0], str):
+                # 新格式：直接是命令模板列表
+                result[k_lower] = v
+            elif isinstance(v[0], (list, tuple)) and len(v[0]) == 2:
+                # 旧格式：需要提取模板
+                result[k_lower] = [template for _, template in v]
+    return result
 
 
 # 合并默认配置和全局yaml配置（项目级配置在运行时动态加载）
