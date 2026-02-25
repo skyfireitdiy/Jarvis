@@ -14,6 +14,11 @@ from typing import Any, Dict, Optional
 
 import typer
 
+from jarvis.jarvis_utils.config import DEFAULT_ENCODING
+
+# 文本使用系统默认编码（Windows: gbk，其他: utf-8；本模块仅 Windows，故恒为 gbk）
+ENCODING = DEFAULT_ENCODING
+
 # Platform check must be first
 if sys.platform != "win32":
     # Lazy message - pywinauto not needed on non-Windows
@@ -48,8 +53,14 @@ def _load_sessions() -> Dict[str, Dict[str, Any]]:
     if not p.exists():
         return {}
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_text(encoding=ENCODING))
         return data if isinstance(data, dict) else {}
+    except UnicodeDecodeError:
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
     except Exception:
         return {}
 
@@ -57,7 +68,7 @@ def _load_sessions() -> Dict[str, Dict[str, Any]]:
 def _save_sessions(sessions: Dict[str, Dict[str, Any]]) -> None:
     p = _sessions_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(sessions, ensure_ascii=False, indent=2), encoding="utf-8")
+    p.write_text(json.dumps(sessions, ensure_ascii=False, indent=2), encoding=ENCODING)
 
 
 def _save_session(app_id: str, params: Dict[str, Any]) -> None:
@@ -73,12 +84,21 @@ def _get_session_params(app_id: str) -> Optional[Dict[str, Any]]:
 def _ensure_windows() -> None:
     if sys.platform != "win32":
         result = {"success": False, "stdout": "", "stderr": _NOT_WINDOWS_MSG}
-        print(json.dumps(result, ensure_ascii=False))
+        _print_gbk(json.dumps(result, ensure_ascii=False))
         raise typer.Exit(code=1)
 
 
+def _print_gbk(s: str) -> None:
+    """按 GBK 编码输出到 stdout，适配中文 Windows 控制台"""
+    try:
+        sys.stdout.buffer.write((s + "\n").encode(ENCODING, errors="replace"))
+        sys.stdout.buffer.flush()
+    except (AttributeError, OSError):
+        print(s)
+
+
 def _output(result: Dict[str, Any], exit_on_fail: bool = True) -> None:
-    print(json.dumps(result, ensure_ascii=False))
+    _print_gbk(json.dumps(result, ensure_ascii=False))
     if exit_on_fail and not result.get("success", True):
         raise typer.Exit(code=1)
 
@@ -1097,7 +1117,7 @@ def _run_ps(script: str, timeout: int = 30) -> Dict[str, Any]:
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
             capture_output=True,
             timeout=timeout,
-            encoding="utf-8",
+            encoding=ENCODING,
             errors="replace",
         )
         out = (r.stdout or "").strip()

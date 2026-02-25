@@ -23,6 +23,7 @@ from jarvis.jarvis_mcp.stdio_mcp_client import StdioMcpClient
 from jarvis.jarvis_mcp.streamable_mcp_client import StreamableMcpClient
 from jarvis.jarvis_tools.base import Tool
 from jarvis.jarvis_utils.config import calculate_token_limit
+from jarvis.jarvis_utils.config import get_default_encoding
 from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_utils.config import get_tool_load_dirs
 
@@ -365,7 +366,7 @@ class ToolRegistry(OutputHandlerProtocol):
         error_lines = []
         for file_path in mcp_tools_dir.glob("*.yaml"):
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, "r", encoding=get_default_encoding()) as f:
                     config = yaml.safe_load(f)
                 self.register_mcp_tool_by_config(config)
             except Exception as e:

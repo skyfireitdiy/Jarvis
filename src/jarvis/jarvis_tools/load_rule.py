@@ -13,6 +13,7 @@
 import os
 from typing import Any, Dict
 
+from jarvis.jarvis_utils.config import get_default_encoding
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.template_utils import render_rule_template
 
@@ -76,7 +77,7 @@ class LoadRuleTool:
                 }
 
             # 读取文件内容
-            with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(abs_path, "r", encoding=get_default_encoding(), errors="replace") as f:
                 content = f.read()
 
             if not content:

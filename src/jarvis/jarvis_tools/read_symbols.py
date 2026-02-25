@@ -18,6 +18,7 @@
 import json
 import os
 
+from jarvis.jarvis_utils.config import get_default_encoding
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -116,7 +117,7 @@ class ReadSymbolsTool:
             results: Dict[str, List[Dict[str, Any]]] = {s: [] for s in requested}
 
             # 流式读取，避免载入整个大文件
-            with open(symbols_path, "r", encoding="utf-8") as f:
+            with open(symbols_path, "r", encoding=get_default_encoding()) as f:
                 for line in f:
                     line = line.strip()
                     if not line:

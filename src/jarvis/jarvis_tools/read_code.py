@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.config import (
     calculate_token_limit,
+    get_default_encoding,
     get_max_input_token_count,
     get_llm_group,
 )
@@ -104,7 +105,7 @@ class ReadCodeTool:
                 }
 
             # 读取文件内容
-            with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(abs_path, "r", encoding=get_default_encoding(), errors="ignore") as f:
                 lines = f.readlines()
 
             total_lines = len(lines)
@@ -271,7 +272,7 @@ class ReadCodeTool:
                 or filepath not in context_manager._file_cache
             ):
                 try:
-                    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+                    with open(filepath, "r", encoding=get_default_encoding(), errors="replace") as f:
                         content = f.read()
                     context_manager.update_context_for_file(filepath, content)
                 except Exception:
@@ -398,7 +399,7 @@ class ReadCodeTool:
                 }
 
             # 读取文件内容
-            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+            with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
                 lines = f.readlines()
 
             total_lines = len(lines)
@@ -496,7 +497,7 @@ class ReadCodeTool:
 
                 try:
                     # 读取文件内容
-                    with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(abs_path, "r", encoding=get_default_encoding(), errors="ignore") as f:
                         lines = f.readlines()
 
                     total_lines = len(lines)
