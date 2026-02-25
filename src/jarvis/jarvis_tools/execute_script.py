@@ -17,9 +17,11 @@ from jarvis.jarvis_utils.output import PrettyOutput
 _ANSI_ESCAPE = re.compile(
     r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)"
 )
-# Windows ConPTY 有时只输出 OSC payload 而 ESC 被吞掉，导致混入：0;pid/pid;C:\path\exe.EXE
+# Windows ConPTY 有时只输出 OSC payload 而 ESC 被吞掉，导致混入：
+# 格式1: 0;pid/pid;C:\path\exe.EXE
+# 格式2: 0;C:\path\exe.EXE (pid/pid 部分缺失)
 _OSC_PAYLOAD_ORPHAN = re.compile(
-    r"0;\d+/\d+;[^\n\r]*\.(?:EXE|exe|ps1|bat|cmd|py)\s*"
+    r"0;(?:\d+/\d+;)?[^\n\r]*\.(?:EXE|exe|ps1|bat|cmd|py)\s*"
 )
 
 
@@ -151,6 +153,27 @@ class ScriptTool:
                                 captured.append(text)
                             sys.stdout.write(text)
                             sys.stdout.flush()
+                    except (EOFError, OSError):
+                        break
+                # 进程结束后，再尝试多次读取剩余数据（包括 OSC 残留）
+                # ConPTY 可能在进程退出后仍输出 OSC 序列
+                for _ in range(3):
+                    try:
+                        remaining_data = pty_proc.read(4096)
+                        if remaining_data:
+                            text = self._strip_ansi(
+                                self._decode_windows_output(
+                                    remaining_data if isinstance(remaining_data, bytes) else remaining_data.encode()
+                                )
+                            )
+                            # 只输出非空内容，避免输出清理后的空行
+                            if text.strip():
+                                with capture_lock:
+                                    captured.append(text)
+                                sys.stdout.write(text)
+                                sys.stdout.flush()
+                        else:
+                            break
                     except (EOFError, OSError):
                         break
             except Exception as e:
