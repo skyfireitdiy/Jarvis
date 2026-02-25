@@ -15,6 +15,8 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -390,32 +392,28 @@ class LSPServerManager:
             # 移除进程信息
             self._remove_server_state(key)
 
-            # 查找并停止守护进程
-            try:
-                # 状态文件已经被移除，但我们需要找到守护进程
-                # 通过查找运行中的守护进程来停止它
-                import subprocess
+            # 查找并停止守护进程（仅 Unix，Windows 无 pgrep）
+            if sys.platform != "win32":
+                try:
+                    result = subprocess.run(
+                        [
+                            "pgrep",
+                            "-f",
+                            f'keep_server_alive.*"{language}".*"{project_path}"',
+                        ],
+                        capture_output=True,
+                        text=True,
+                    )
 
-                # 查找所有包含当前项目和语言的守护进程
-                result = subprocess.run(
-                    [
-                        "pgrep",
-                        "-f",
-                        f'keep_server_alive.*"{language}".*"{project_path}"',
-                    ],
-                    capture_output=True,
-                    text=True,
-                )
-
-                if result.returncode == 0:
-                    for pid in result.stdout.strip().split("\n"):
-                        if pid:
-                            try:
-                                os.kill(int(pid), 9)  # 强制杀死守护进程
-                            except (ProcessLookupError, ValueError):
-                                pass
-            except Exception:
-                pass  # 忽略守护进程停止错误
+                    if result.returncode == 0:
+                        for pid in result.stdout.strip().split("\n"):
+                            if pid:
+                                try:
+                                    os.kill(int(pid), 9)
+                                except (ProcessLookupError, ValueError):
+                                    pass
+                except Exception:
+                    pass
 
     async def stop_all(self) -> None:
         """停止所有 LSP 服务器实例。"""

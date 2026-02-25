@@ -748,26 +748,30 @@ app.add_typer(daemon_app, name="daemon", help="守护进程管理命令")
 @daemon_app.command("stop")
 def daemon_stop() -> None:
     """停止 LSP 守护进程"""
+    import socket
+
     from jarvis.jarvis_lsp.daemon_client import LSPDaemonClient
 
     client = LSPDaemonClient()
 
     try:
-        # 发送 shutdown 请求
-        import socket
-        import json
-
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.connect(client.socket_path)
+        # 发送 shutdown 请求（Unix: AF_UNIX，Windows: TCP）
+        if client._is_unix:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(client.addr)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((client.addr[0], client.addr[1]))
 
         request = {"id": 1, "method": "shutdown", "params": {}}
-
         message = json.dumps(request)
-        sock.sendall(f"Content-Length: {len(message)}\r\n\r\n{message}".encode())
+        sock.sendall(
+            f"Content-Length: {len(message)}\r\n\r\n{message}".encode("utf-8")
+        )
         sock.close()
 
         print("✅ LSP 守护进程已停止")
-    except (FileNotFoundError, ConnectionRefusedError):
+    except (FileNotFoundError, ConnectionRefusedError, OSError):
         print("⚠️  守护进程未运行")
     except Exception as e:
         print(f"❌ 错误: {e}")
@@ -791,7 +795,12 @@ def daemon_status() -> None:
 
             print("📊 LSP 守护进程状态:")
             print("\n   ✅ 守护进程运行中")
-            print(f"   Socket: {client.socket_path}")
+            addr_str = (
+                client.socket_path
+                if client._is_unix
+                else f"{client.addr[0]}:{client.addr[1]}"
+            )
+            print(f"   地址: {addr_str}")
 
             # 移除 success 字段，只保留服务器信息
             servers = {k: v for k, v in status.items() if k != "success"}
@@ -808,10 +817,15 @@ def daemon_status() -> None:
                     f"\n       启动时间: {server_info['start_time']}"
                     f"\n       活跃: {'是' if server_info['is_alive'] else '否'}"
                 )
-        except (FileNotFoundError, ConnectionRefusedError):
+        except (FileNotFoundError, ConnectionRefusedError, OSError):
             print("📊 LSP 守护进程状态:")
             print("\n   ❌ 守护进程未运行")
-            print(f"\n   Socket: {client.socket_path}")
+            addr_str = (
+                client.socket_path
+                if client._is_unix
+                else f"{client.addr[0]}:{client.addr[1]}"
+            )
+            print(f"\n   地址: {addr_str}")
             print("\n   ℹ️  守护进程会在第一次使用 LSP 命令时自动启动")
         except Exception as e:
             print(f"❌ 错误: {e}")

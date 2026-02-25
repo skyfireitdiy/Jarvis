@@ -1,7 +1,7 @@
 """LSP 守护进程模块
 
 该模块提供一个独立的后台守护进程，管理所有 LSP server 的生命周期。
-通过 Unix domain socket 提供 IPC 接口，响应客户端请求。
+Unix: IPC 通过 Unix domain socket；Windows: IPC 通过 TCP 127.0.0.1。
 """
 
 import asyncio
@@ -10,20 +10,41 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.server_manager import LSPServerInstance
+
+_IS_WINDOWS = sys.platform == "win32"
+LSP_DAEMON_TCP_PORT = 39282  # Windows 使用 TCP 端口（避免与 browser 39281 冲突）
+LSP_DAEMON_PORT_FILE = "lsp_daemon.port"
+
+
+def _get_lsp_daemon_addr() -> Union[str, tuple]:
+    """获取 LSP 守护进程地址：Unix 为 socket 路径，Windows 为 (host, port)。"""
+    if _IS_WINDOWS:
+        port_file = Path(get_data_dir()) / LSP_DAEMON_PORT_FILE
+        if port_file.exists():
+            try:
+                port = int(port_file.read_text(encoding="utf-8").strip())
+                return ("127.0.0.1", port)
+            except (ValueError, OSError):
+                pass
+        return ("127.0.0.1", LSP_DAEMON_TCP_PORT)
+    return str(Path(get_data_dir()) / "lsp_daemon.sock")
 
 
 class LSPDaemon:
     """LSP 守护进程
 
-    负责管理所有 LSP server 实例，通过 Unix domain socket 提供 IPC 接口。
+    负责管理所有 LSP server 实例。
+    Unix: Unix domain socket；Windows: TCP 127.0.0.1。
     """
 
-    def __init__(self, socket_path: str):
-        self.socket_path = socket_path
+    def __init__(self, addr: Union[str, tuple]):
+        self.addr = addr
+        self._is_unix = isinstance(addr, str)
         self.servers: Dict[str, LSPServerInstance] = {}
         self.config_reader = LSPConfigReader()
         self.server: asyncio.Server | None = None
@@ -34,25 +55,50 @@ class LSPDaemon:
         """启动守护进程"""
         self.running = True
 
-        # 确保 socket 文件不存在
-        if os.path.exists(self.socket_path):
-            os.unlink(self.socket_path)
-
-        # 创建 Unix domain socket
-        self.server = await asyncio.start_unix_server(
-            self.handle_client,
-            path=self.socket_path,
-        )
-
-        print(f"LSP 守护进程已启动，socket: {self.socket_path}")
+        if self._is_unix:
+            socket_path = self.addr
+            if os.path.exists(socket_path):
+                try:
+                    os.unlink(socket_path)
+                except OSError:
+                    pass
+            self.server = await asyncio.start_unix_server(
+                self.handle_client,
+                path=socket_path,
+            )
+            print(f"LSP 守护进程已启动，socket: {socket_path}")
+        else:
+            host, port = self.addr
+            port_file = Path(get_data_dir()) / LSP_DAEMON_PORT_FILE
+            for try_port in range(port, port + 10):
+                try:
+                    self.server = await asyncio.start_server(
+                        self.handle_client,
+                        host=host,
+                        port=try_port,
+                    )
+                    port_file.parent.mkdir(parents=True, exist_ok=True)
+                    port_file.write_text(str(try_port), encoding="utf-8")
+                    print(f"LSP 守护进程已启动，TCP: {host}:{try_port}")
+                    break
+                except OSError as e:
+                    if "address already in use" in str(e).lower() or getattr(
+                        e, "errno", 0
+                    ) in (98, 10048):
+                        continue
+                    raise
 
         # 启动服务任务
         self._server_task = asyncio.create_task(self.server.serve_forever())
 
-        # 优雅退出处理
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+        # 优雅退出（Unix 注册信号；Windows 信号支持有限，跳过）
+        if not _IS_WINDOWS:
+            try:
+                loop = asyncio.get_running_loop()
+                for sig in (signal.SIGTERM, signal.SIGINT):
+                    loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+            except NotImplementedError:
+                pass
 
     async def _delayed_stop(self) -> None:
         """延迟停止守护进程"""
@@ -85,9 +131,19 @@ class LSPDaemon:
             self.server.close()
             await self.server.wait_closed()
 
-        # 删除 socket 文件
-        if os.path.exists(self.socket_path):
-            os.unlink(self.socket_path)
+        # 删除 socket 文件（仅 Unix）
+        if self._is_unix and os.path.exists(self.addr):
+            try:
+                os.unlink(self.addr)
+            except OSError:
+                pass
+        elif not self._is_unix:
+            port_file = Path(get_data_dir()) / LSP_DAEMON_PORT_FILE
+            if port_file.exists():
+                try:
+                    port_file.unlink()
+                except OSError:
+                    pass
 
         print("LSP 守护进程已停止")
 
@@ -1349,12 +1405,12 @@ class LSPDaemon:
         }
 
 
-async def main(socket_path: str | None = None) -> None:
+async def main(addr: Union[str, tuple, None] = None) -> None:
     """主函数"""
-    if socket_path is None:
-        socket_path = str(Path.home() / ".jarvis" / "lsp_daemon.sock")
+    if addr is None:
+        addr = _get_lsp_daemon_addr()
 
-    daemon = LSPDaemon(socket_path)
+    daemon = LSPDaemon(addr)
     await daemon.start()
 
     try:
@@ -1368,8 +1424,17 @@ async def main(socket_path: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    socket_path_arg: str | None = None
+    addr_arg: Union[str, tuple, None] = None
     if len(sys.argv) > 1:
-        socket_path_arg = sys.argv[1]
+        arg = sys.argv[1]
+        if ":" in arg and not arg.startswith("/"):
+            parts = arg.split(":")
+            if len(parts) == 2:
+                try:
+                    addr_arg = (parts[0], int(parts[1]))
+                except ValueError:
+                    pass
+        else:
+            addr_arg = arg
 
-    asyncio.run(main(socket_path_arg))
+    asyncio.run(main(addr_arg))
