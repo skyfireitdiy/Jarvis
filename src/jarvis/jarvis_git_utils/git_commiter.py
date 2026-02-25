@@ -462,7 +462,9 @@ commit信息
                 # 执行提交
 
                 # Windows 兼容性：使用 delete=False 避免权限错误
-                tmp_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
+                tmp_file = tempfile.NamedTemporaryFile(
+                    mode="w", delete=False, encoding="utf-8"
+                )
                 tmp_file_path = tmp_file.name
                 try:
                     tmp_file.write(commit_message)
