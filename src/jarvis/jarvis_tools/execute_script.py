@@ -373,7 +373,9 @@ class ScriptTool:
                 tempfile.gettempdir(), f"jarvis_output_{os.getpid()}.log"
             )
             try:
-                with open(script_path, "w", encoding="utf-8", errors="ignore") as f:
+                # PowerShell 需 UTF-8 BOM 才能正确识别中文；Python 等用 UTF-8 即可
+                enc = "utf-8-sig" if interpreter in ("powershell", "pwsh") else "utf-8"
+                with open(script_path, "w", encoding=enc, errors="ignore") as f:
                     f.write(script_content)
 
                 # Display script content using rich panel before execution
