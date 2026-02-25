@@ -1,0 +1,15 @@
+{
+  "id": "20260225_214753_364602",
+  "type": "project_long_term",
+  "tags": [
+    "bug_fix",
+    "Windows",
+    "ConPTY",
+    "OSC",
+    "execute_script",
+    "多余输出"
+  ],
+  "content": "Windows ConPTY OSC 残留导致多余输出问题修复 (2026-02-25)\n\n问题现象：\n在 Windows 上执行命令（如 jw --help）时，输出末尾会出现多余内容：\n0;C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE\n\n根本原因：\nWindows ConPTY（伪终端）在进程退出时会输出 OSC（Operating System Command）序列来设置窗口标题，但有时 ESC 转义字符被吞掉，导致 OSC payload 直接混入输出中。\n\n修复方案：\n1. 修改正则表达式 _OSC_PAYLOAD_ORPHAN，使其支持两种格式：\n   - 格式1：0;pid/pid;path\\exe.EXE（原有）\n   - 格式2：0;path\\exe.EXE（新增，pid/pid 部分缺失）\n   新正则：r\"0;(?:\\d+/\\d+;)?[^\\n\\r]*\\.(?:EXE|exe|ps1|bat|cmd|py)\\s*\"\n\n2. 在 _execute_on_windows_interactive_pty 的 reader 函数中，添加进程结束后多次读取剩余数据的逻辑，确保捕获延迟输出的 OSC 残留。\n\n修改文件：\n- src/jarvis/jarvis_tools/execute_script.py\n\n验收标准：\n- 执行 jw --help 等命令时，不再出现多余内容\n- 正常命令输出不受影响\n- 返回值（stdout）中不包含 OSC 残留\n\n注意：此修复需要重启进程后才能生效。",
+  "created_at": "2026-02-25T21:47:53.364602",
+  "updated_at": "2026-02-25T21:47:53.364602"
+}
