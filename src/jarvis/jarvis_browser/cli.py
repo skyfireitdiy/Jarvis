@@ -9,9 +9,11 @@ import asyncio
 import json
 import os
 import signal
+import subprocess
+import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 from datetime import datetime
 
 import typer
@@ -36,9 +38,28 @@ app = typer.Typer(
 )
 
 
+_IS_WINDOWS = sys.platform == "win32"
+DAEMON_TCP_PORT = 39281  # 仅 Windows 使用 TCP
+DAEMON_PORT_FILE = "playwright_daemon.port"
+
+
 def get_socket_path() -> Path:
-    """Get the default socket path for daemon mode."""
+    """Get the default socket path for daemon mode (Unix only)."""
     return Path(get_data_dir()) / "playwright_daemon.sock"
+
+
+def get_daemon_addr() -> Union[str, tuple]:
+    """Get daemon address: Unix 用 socket 路径，Windows 用 (host, port)。"""
+    if _IS_WINDOWS:
+        port_file = Path(get_data_dir()) / DAEMON_PORT_FILE
+        if port_file.exists():
+            try:
+                port = int(port_file.read_text().strip())
+                return ("127.0.0.1", port)
+            except (ValueError, OSError):
+                pass
+        return ("127.0.0.1", DAEMON_TCP_PORT)
+    return str(get_socket_path())
 
 
 def get_daemon_log_dir() -> Path:
@@ -48,6 +69,16 @@ def get_daemon_log_dir() -> Path:
     return log_dir
 
 
+def _get_browser_temp_dir() -> Path:
+    """跨平台临时目录：Unix 用 /tmp/playwright_browser，Windows 用数据目录/browser_temp"""
+    if _IS_WINDOWS:
+        d = Path(get_data_dir()) / "browser_temp"
+    else:
+        d = Path("/tmp") / "playwright_browser"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 # Daemon idle timeout: exit if no requests for this many seconds
 DAEMON_IDLE_TIMEOUT = 30 * 60  # 30 minutes
 
@@ -55,12 +86,15 @@ DAEMON_IDLE_TIMEOUT = 30 * 60  # 30 minutes
 class BrowserDaemon:
     """Playwright Browser Daemon
 
-    Manages browser sessions and provides IPC interface via Unix domain socket.
+    Manages browser sessions and provides IPC interface.
+    Unix: Unix domain socket; Windows: TCP localhost.
     Exits automatically after 30 minutes of inactivity.
     """
 
-    def __init__(self, socket_path: str):
-        self.socket_path = socket_path
+    def __init__(self, addr: Union[str, tuple]):
+        """addr: Unix 下为 socket 路径 (str)，Windows 下为 (host, port) 元组"""
+        self.addr = addr
+        self._is_unix = isinstance(addr, str)
         self.server: asyncio.Server | None = None
         self._server_task: asyncio.Task[None] | None = None
         self._idle_check_task: asyncio.Task[None] | None = None
@@ -83,17 +117,36 @@ class BrowserDaemon:
         self.running = True
         self._last_activity_time = time.monotonic()
 
-        # Ensure socket file does not exist
-        if os.path.exists(self.socket_path):
-            os.unlink(self.socket_path)
-
-        # Create Unix domain socket
-        self.server = await asyncio.start_unix_server(
-            self.handle_client,
-            path=self.socket_path,
-        )
-
-        print(f"Playwright Browser Daemon started, socket: {self.socket_path}")
+        if self._is_unix:
+            socket_path = self.addr
+            if os.path.exists(socket_path):
+                try:
+                    os.unlink(socket_path)
+                except OSError:
+                    pass
+            self.server = await asyncio.start_unix_server(
+                self.handle_client,
+                path=socket_path,
+            )
+            print(f"Playwright Browser Daemon started, socket: {socket_path}")
+        else:
+            host, port = self.addr
+            port_file = Path(get_data_dir()) / DAEMON_PORT_FILE
+            for try_port in range(port, port + 10):
+                try:
+                    self.server = await asyncio.start_server(
+                        self.handle_client,
+                        host=host,
+                        port=try_port,
+                    )
+                    port_file.write_text(str(try_port), encoding="utf-8")
+                    print(f"Playwright Browser Daemon started, tcp: {host}:{try_port}")
+                    break
+                except OSError as e:
+                    # 98=Linux EADDRINUSE, 10048=Windows WSAEADDRINUSE
+                    if "address already in use" in str(e).lower() or getattr(e, "errno", 0) in (98, 10048):
+                        continue
+                    raise
 
         # Start server task
         self._server_task = asyncio.create_task(self.server.serve_forever())
@@ -101,10 +154,14 @@ class BrowserDaemon:
         # Start idle check task
         self._idle_check_task = asyncio.create_task(self._idle_check_loop())
 
-        # Graceful shutdown handling
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+        # Graceful shutdown handling (Unix only; Windows has limited signal support)
+        if not _IS_WINDOWS:
+            try:
+                loop = asyncio.get_running_loop()
+                for sig in (signal.SIGTERM, signal.SIGINT):
+                    loop.add_signal_handler(sig, lambda: asyncio.create_task(self.stop()))
+            except NotImplementedError:
+                pass
 
     async def _delayed_stop(self) -> None:
         """Delayed stop daemon"""
@@ -141,9 +198,19 @@ class BrowserDaemon:
             self.server.close()
             await self.server.wait_closed()
 
-        # Delete socket file
-        if os.path.exists(self.socket_path):
-            os.unlink(self.socket_path)
+        # Delete socket file (Unix) or port file (Windows)
+        if self._is_unix and os.path.exists(self.addr):
+            try:
+                os.unlink(self.addr)
+            except OSError:
+                pass
+        elif not self._is_unix:
+            port_file = Path(get_data_dir()) / DAEMON_PORT_FILE
+            if port_file.exists():
+                try:
+                    port_file.unlink()
+                except OSError:
+                    pass
 
         print("Playwright Browser Daemon stopped")
 
@@ -351,7 +418,7 @@ class BrowserDaemon:
         elif action == "screenshot":
             return await screenshot(
                 browser_id=params.get("browser_id", "default"),
-                path=params.get("path", "/tmp/screenshot.png"),
+                path=params.get("path", str(_get_browser_temp_dir() / "screenshot.png")),
             )
         elif action == "gettext":
             err = self._check_selector_or_index(params, "gettext")
@@ -640,31 +707,35 @@ class BrowserDaemon:
 
 
 @app.command()
-def daemon():
+def daemon(foreground: bool = typer.Option(False, "--foreground", help="Run in foreground (used internally)")):
     """Run as daemon process for persistent browser sessions.
 
     The daemon runs in the background and maintains browser sessions across
-    multiple CLI invocations. Clients communicate with the daemon via Unix socket
-    at ~/.jarvis/playwright_daemon.sock.
+    multiple CLI invocations.
+    Unix: IPC via ~/.jarvis/playwright_daemon.sock
+    Windows: IPC via TCP 127.0.0.1:39281 (port stored in playwright_daemon.port)
     """
-    import sys
+    addr = get_daemon_addr()
+    is_unix = isinstance(addr, str)
 
-    socket_path = get_socket_path()
-
-    # Check if daemon is already running
-    def check_daemon_running():
+    def check_daemon_running() -> bool:
         """Check if daemon is already running"""
         loop = None
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            _, writer = loop.run_until_complete(
-                asyncio.open_unix_connection(str(socket_path))
-            )
-            writer.close()
-            loop.run_until_complete(writer.wait_closed())
+
+            async def _check():
+                if is_unix:
+                    _, writer = await asyncio.open_unix_connection(addr)
+                else:
+                    _, writer = await asyncio.open_connection(addr[0], addr[1])
+                writer.close()
+                await writer.wait_closed()
+
+            loop.run_until_complete(_check())
             return True
-        except (ConnectionRefusedError, FileNotFoundError):
+        except (ConnectionRefusedError, FileNotFoundError, OSError):
             return False
         finally:
             if loop is not None:
@@ -673,21 +744,27 @@ def daemon():
                 except Exception:
                     pass
 
-    if os.path.exists(socket_path):
+    if is_unix:
+        socket_path = Path(addr)
+        if socket_path.exists():
+            if check_daemon_running():
+                print(f"Daemon is already running at {socket_path}")
+                return
+            try:
+                socket_path.unlink()
+            except OSError:
+                pass
+    else:
         if check_daemon_running():
-            print(f"Daemon is already running at {socket_path}")
+            print(f"Daemon is already running at {addr[0]}:{addr[1]}")
             return
-        else:
-            # Socket file exists but daemon is not running, remove it
-            os.unlink(socket_path)
 
-    async def run_daemon(socket_path_str: str) -> None:
+    async def run_daemon(daemon_addr: Union[str, tuple]) -> None:
         """Run daemon"""
-        daemon_instance = BrowserDaemon(socket_path_str)
+        daemon_instance = BrowserDaemon(daemon_addr)
         await daemon_instance.start()
 
         try:
-            # Wait for stop signal
             while daemon_instance.running:
                 await asyncio.sleep(1)
         except asyncio.CancelledError:
@@ -695,29 +772,57 @@ def daemon():
         finally:
             await daemon_instance.stop()
 
-    # Fork and detach process to run as a true daemon
-    # This ensures the daemon continues running even if the parent process exits
+    def _run_daemon_subprocess() -> None:
+        """Windows: 使用 subprocess 在后台启动 daemon 进程"""
+        log_dir = get_daemon_log_dir()
+        log_file = log_dir / "daemon.log"
+        exe = sys.executable
+        cmd = [exe, "-m", "jarvis.jarvis_browser.cli", "daemon", "--foreground"]
+        # DETACHED_PROCESS + CREATE_NEW_PROCESS_GROUP 使子进程独立于父进程
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP
+        if hasattr(subprocess, "DETACHED_PROCESS"):
+            flags |= subprocess.DETACHED_PROCESS
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"\n{'='*60}\n")
+            f.write(f"Daemon process started at {datetime.now().isoformat()}\n")
+            f.write(f"{'='*60}\n")
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=open(log_file, "a", encoding="utf-8"),
+            stderr=subprocess.STDOUT,
+            creationflags=flags,
+            cwd=os.path.expanduser("~"),
+        )
+        print(f"Daemon started in background, PID: {proc.pid}")
+        print(f"TCP: 127.0.0.1:{addr[1]}")
+        print(f"Log: {log_file}")
+        print("Use 'jb list' to check daemon status")
+
+    # foreground=True: 直接运行 daemon（Windows 子进程或调试时）
+    if foreground:
+        asyncio.run(run_daemon(addr))
+        return
+
+    if _IS_WINDOWS:
+        _run_daemon_subprocess()
+        return
+
+    # Unix: fork and detach
     pid = os.fork()
     if pid > 0:
-        # Parent process: exit
         log_dir = get_daemon_log_dir()
         print(f"Daemon started in background, PID: {pid}")
-        print(f"Socket: {socket_path}")
+        print(f"Socket: {addr}")
         print(f"Log: {log_dir / 'daemon.log'}")
         print("Use 'jb list' to check daemon status")
         sys.exit(0)
 
-    # Child process: create new session
     os.setsid()
-
-    # Second fork to prevent acquiring controlling terminal
     pid = os.fork()
     if pid > 0:
-        # First child: exit
         sys.exit(0)
 
-    # Second child (grandchild): actual daemon process
-    # Redirect standard file descriptors to log files
     sys.stdout.flush()
     sys.stderr.flush()
     with open(os.devnull, "r") as si:
@@ -731,16 +836,18 @@ def daemon():
     log_f.flush()
     os.dup2(log_f.fileno(), sys.stdout.fileno())
     os.dup2(log_f.fileno(), sys.stderr.fileno())
-    # Do not close log_f: stdout/stderr now use this fd
 
-    # Change working directory to root to avoid blocking file systems
-    os.chdir("/")
+    try:
+        os.chdir("/")
+    except OSError:
+        os.chdir(os.path.expanduser("~"))
 
-    # Set umask
-    os.umask(0)
+    try:
+        os.umask(0)
+    except OSError:
+        pass
 
-    # Run the actual daemon
-    asyncio.run(run_daemon(str(socket_path)))
+    asyncio.run(run_daemon(addr))
 
 
 @app.command(name="daemon-stop")
@@ -856,7 +963,7 @@ def type(
 def screenshot_cmd(
     browser_id: str = typer.Option("default", "--browser-id", help="Browser ID"),
     path: str = typer.Option(
-        "/tmp/screenshot.png", "--path", "-p", help="Screenshot path"
+        str(_get_browser_temp_dir() / "screenshot.png"), "--path", "-p", help="Screenshot path"
     ),
 ) -> None:
     """Take screenshot
@@ -1778,7 +1885,8 @@ async def type_text(
 
 
 async def screenshot(
-    browser_id: str = "default", path: str = "/tmp/screenshot.png"
+    browser_id: str = "default",
+    path: str = "",
 ) -> Dict[str, Any]:
     """Take screenshot"""
     try:
@@ -1791,6 +1899,8 @@ async def screenshot(
             }
 
         page = session["page"]
+        if not path:
+            path = str(_get_browser_temp_dir() / "screenshot.png")
         screenshot_path = Path(path)
         screenshot_path.parent.mkdir(parents=True, exist_ok=True)
         await page.screenshot(path=str(screenshot_path))
@@ -2096,7 +2206,7 @@ async def get_console_logs(
 
         # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_console_{timestamp}.txt"
 
@@ -2158,7 +2268,7 @@ async def evaluate_javascript(
         # Optionally save result to file
         if save_result:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            temp_dir = Path("/tmp/playwright_browser")
+            temp_dir = _get_browser_temp_dir()
             temp_dir.mkdir(parents=True, exist_ok=True)
             filename = temp_dir / f"{browser_id}_eval_{timestamp}.txt"
 
@@ -2563,7 +2673,7 @@ async def fill_form(
 
         # Save operation result
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_fill_form_{timestamp}.txt"
 
@@ -2759,7 +2869,7 @@ async def download_file(
         # Set download directory
         import os
 
-        download_dir = "/tmp/playwright_downloads"
+        download_dir = str(Path(get_data_dir()) / "browser_temp" / "playwright_downloads") if _IS_WINDOWS else "/tmp/playwright_downloads"
         os.makedirs(download_dir, exist_ok=True)
 
         # Start download, wait for download to complete
@@ -3126,7 +3236,7 @@ async def get_cookies(browser_id: str = "default") -> Dict[str, Any]:
 
         # Save to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_cookies_{timestamp}.json"
 
@@ -3249,7 +3359,7 @@ async def get_local_storage(browser_id: str = "default") -> Dict[str, Any]:
 
         # Save to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_local_storage_{timestamp}.json"
 
@@ -3403,7 +3513,7 @@ async def get_network_requests(browser_id: str = "default") -> Dict[str, Any]:
 
         # Save to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_network_requests_{timestamp}.json"
 
@@ -3458,7 +3568,7 @@ async def element_screenshot(
 
         # Take screenshot
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_element_screenshot_{timestamp}.png"
 
@@ -3492,7 +3602,7 @@ async def export_pdf(browser_id: str = "default") -> Dict[str, Any]:
 
         # Export PDF
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_page_{timestamp}.pdf"
 
@@ -3542,7 +3652,7 @@ async def get_performance_metrics(browser_id: str = "default") -> Dict[str, Any]
 
         # Save to file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        temp_dir = Path("/tmp/playwright_browser")
+        temp_dir = _get_browser_temp_dir()
         temp_dir.mkdir(parents=True, exist_ok=True)
         filename = temp_dir / f"{browser_id}_performance_metrics_{timestamp}.json"
 
@@ -3577,12 +3687,15 @@ def send_to_daemon(action: str, params: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Response dict with 'success', 'stdout', 'stderr' keys
     """
-    socket_path = get_socket_path()
+    addr = get_daemon_addr()
+    addr_str = addr if isinstance(addr, str) else f"{addr[0]}:{addr[1]}"
 
     async def _send() -> Dict[str, Any]:
         try:
-            # Connect to daemon socket
-            reader, writer = await asyncio.open_unix_connection(str(socket_path))
+            if isinstance(addr, str):
+                reader, writer = await asyncio.open_unix_connection(addr)
+            else:
+                reader, writer = await asyncio.open_connection(addr[0], addr[1])
 
             # Prepare request
             request = {"action": action, "params": params}
@@ -3621,7 +3734,13 @@ def send_to_daemon(action: str, params: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 "success": False,
                 "stdout": "",
-                "stderr": f"Daemon not running at {socket_path}. Please start daemon first.",
+                "stderr": f"Daemon not running at {addr_str}. Please start daemon first.",
+            }
+        except (ConnectionRefusedError, OSError) as e:
+            return {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Daemon not running at {addr_str}. Please start daemon first. ({e})",
             }
         except Exception as e:
             return {
