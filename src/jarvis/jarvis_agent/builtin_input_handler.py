@@ -5,7 +5,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-from jarvis.jarvis_utils.config import get_default_encoding, get_replace_map
+from jarvis.jarvis_utils.config import get_replace_map
 from jarvis.jarvis_utils.output import PrettyOutput
 from rich.table import Table
 from rich.console import Console
@@ -80,7 +80,7 @@ def _find_rule_file_path(rules_manager: Any, rule_name: str) -> str | None:
         if os.path.exists(project_rules_yaml):
             import yaml
 
-            with open(project_rules_yaml, "r", encoding=get_default_encoding()) as f:
+            with open(project_rules_yaml, "r", encoding="utf-8") as f:
                 rules = yaml.safe_load(f) or {}
             if rule_name in rules:
                 # 从 rules.yaml 读取的规则，文件路径就是 yaml 文件路径
@@ -100,7 +100,7 @@ def _find_rule_file_path(rules_manager: Any, rule_name: str) -> str | None:
         if os.path.exists(global_rules_yaml):
             import yaml
 
-            with open(global_rules_yaml, "r", encoding=get_default_encoding()) as f:
+            with open(global_rules_yaml, "r", encoding="utf-8") as f:
                 rules = yaml.safe_load(f) or {}
             if rule_name in rules:
                 return os.path.abspath(global_rules_yaml)
