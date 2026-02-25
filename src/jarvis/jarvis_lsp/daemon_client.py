@@ -1,17 +1,24 @@
 """LSP 守护进程客户端模块
 
 该模块提供与 LSP 守护进程通信的客户端接口。
-通过 Unix domain socket 发送请求并接收响应。
+Unix: Unix domain socket；Windows: TCP 127.0.0.1。
 """
 
 import asyncio
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
+from jarvis.jarvis_utils.config import get_data_dir
 from jarvis.jarvis_lsp.client import LocationInfo, SymbolInfo
+from jarvis.jarvis_lsp.daemon import (
+    LSP_DAEMON_PORT_FILE,
+    LSP_DAEMON_TCP_PORT,
+    _get_lsp_daemon_addr,
+)
 from jarvis.jarvis_lsp.protocol import (
     CodeActionInfo,
     DiagnosticInfo,
@@ -19,61 +26,89 @@ from jarvis.jarvis_lsp.protocol import (
     HoverInfo,
 )
 
+_IS_WINDOWS = sys.platform == "win32"
+
 
 class LSPDaemonClient:
     """LSP 守护进程客户端
 
-    通过 Unix domain socket 与守护进程通信。
+    Unix: Unix domain socket；Windows: TCP 127.0.0.1。
     """
 
-    def __init__(self, socket_path: str | None = None):
-        if socket_path is None:
-            socket_path = str(Path.home() / ".jarvis" / "lsp_daemon.sock")
-
-        self.socket_path = socket_path
+    def __init__(self, addr: Union[str, tuple, None] = None):
+        if addr is None:
+            addr = _get_lsp_daemon_addr()
+        self.addr = addr
+        self._is_unix = isinstance(addr, str)
+        # 兼容旧代码中 client.socket_path 的引用（如 daemon_stop）
+        self.socket_path = addr if self._is_unix else f"{addr[0]}:{addr[1]}"
 
     async def _ensure_daemon_running(self) -> None:
         """确保守护进程正在运行"""
-        # 检查 socket 文件是否存在
-        if os.path.exists(self.socket_path):
-            # 尝试连接守护进程，验证是否真的在运行
+        async def _try_connect() -> bool:
             try:
-                reader, writer = await asyncio.wait_for(
-                    asyncio.open_unix_connection(self.socket_path), timeout=2.0
-                )
+                if self._is_unix:
+                    reader, writer = await asyncio.wait_for(
+                        asyncio.open_unix_connection(self.addr), timeout=2.0
+                    )
+                else:
+                    reader, writer = await asyncio.wait_for(
+                        asyncio.open_connection(self.addr[0], self.addr[1]),
+                        timeout=2.0,
+                    )
                 writer.close()
                 await writer.wait_closed()
-                return  # 守护进程正在运行
-            except (ConnectionRefusedError, FileNotFoundError, asyncio.TimeoutError):
-                # Socket 文件存在但守护进程已崩溃，继续启动
-                pass
+                return True
+            except (
+                ConnectionRefusedError,
+                FileNotFoundError,
+                asyncio.TimeoutError,
+                OSError,
+            ):
+                return False
+
+        if await _try_connect():
+            return
 
         # 启动守护进程
-        daemon_script = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "jarvis_lsp", "daemon.py"
+        daemon_script = str(
+            Path(__file__).resolve().parent / "daemon.py"
         )
-
-        # 检查 daemon.py 是否存在
         if not os.path.exists(daemon_script):
             raise FileNotFoundError(f"守护进程脚本不存在: {daemon_script}")
 
-        # 启动守护进程（后台运行）
-        _ = await asyncio.create_subprocess_exec(
-            sys.executable,
-            daemon_script,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
+        if _IS_WINDOWS:
+            flags = subprocess.CREATE_NEW_PROCESS_GROUP
+            if hasattr(subprocess, "DETACHED_PROCESS"):
+                flags |= subprocess.DETACHED_PROCESS
+            subprocess.Popen(
+                [sys.executable, daemon_script],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=flags,
+                cwd=os.path.expanduser("~"),
+            )
+        else:
+            await asyncio.create_subprocess_exec(
+                sys.executable,
+                daemon_script,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
+            )
 
-        # 等待 socket 文件创建（最多等待 5 秒）
-        for i in range(50):  # 5 秒，每次 0.1 秒
+        # 等待守护进程就绪（最多 5 秒）
+        for i in range(50):
             await asyncio.sleep(0.1)
-            if os.path.exists(self.socket_path):
-                # 再等待 0.5 秒，确保守护进程完全启动
+            if await _try_connect():
                 await asyncio.sleep(0.5)
                 return
 
-        raise RuntimeError(f"守护进程启动失败。socket 文件未创建: {self.socket_path}")
+        raise RuntimeError(
+            f"守护进程启动失败。"
+            + (f"socket 未创建: {self.addr}" if self._is_unix else f"TCP 无法连接: {self.addr[0]}:{self.addr[1]}")
+        )
 
     async def _send_request(
         self, method: str, params: Dict[str, Any]
@@ -83,9 +118,9 @@ class LSPDaemonClient:
         # 自动启动守护进程（如果未运行）
         await self._ensure_daemon_running()
 
-        if not os.path.exists(self.socket_path):
+        if self._is_unix and not os.path.exists(self.addr):
             raise RuntimeError(
-                f"守护进程启动失败。socket 文件不存在: {self.socket_path}"
+                f"守护进程启动失败。socket 文件不存在: {self.addr}"
             )
 
         request = {"method": method, "params": params}
@@ -95,7 +130,12 @@ class LSPDaemonClient:
         )
 
         try:
-            reader, writer = await asyncio.open_unix_connection(self.socket_path)
+            if self._is_unix:
+                reader, writer = await asyncio.open_unix_connection(self.addr)
+            else:
+                reader, writer = await asyncio.open_connection(
+                    self.addr[0], self.addr[1]
+                )
 
             # 发送请求
             writer.write(request_data)
