@@ -14,7 +14,7 @@ from rich.console import Console
 from jarvis.jarvis_code_agent.utils import get_project_overview
 from jarvis.jarvis_platform.registry import PlatformRegistry
 from jarvis.jarvis_platform.base import BasePlatform
-from jarvis.jarvis_utils.config import get_cheap_model_name
+from jarvis.jarvis_utils.config import get_cheap_model_name, read_text_file
 from jarvis.jarvis_utils.config import get_cheap_platform_name
 from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.jsonnet_compat import loads as json_loads
@@ -249,8 +249,7 @@ class ContextRecommender:
                     )
                     console.print(msg, end="\r")
 
-                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                        content = f.read()
+                    content = read_text_file(file_path, errors="replace")
                     if not content:
                         continue
 

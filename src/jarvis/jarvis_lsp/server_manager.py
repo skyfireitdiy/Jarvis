@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from jarvis.jarvis_utils.config import read_text_file
+
 from jarvis.jarvis_lsp.config import LSPConfigReader
 from jarvis.jarvis_lsp.client import LSPClient
 
@@ -273,8 +275,8 @@ class LSPServerManager:
             # 读取现有状态
             state: Dict[str, Dict[str, Any]] = {}
             if self._state_file.exists():
-                with open(self._state_file, "r") as f:
-                    state = json.load(f)
+                content = read_text_file(str(self._state_file))
+                state = json.loads(content)
 
             # 更新状态
             state[key] = {
@@ -298,8 +300,8 @@ class LSPServerManager:
         """
         try:
             if self._state_file.exists():
-                with open(self._state_file, "r") as f:
-                    state = json.load(f)
+                content = read_text_file(str(self._state_file))
+                state = json.loads(content)
 
                 if key in state:
                     del state[key]
@@ -451,8 +453,8 @@ class LSPServerManager:
         # 读取持久化的服务器状态
         try:
             if self._state_file.exists():
-                with open(self._state_file, "r") as f:
-                    saved_state = json.load(f)
+                content = read_text_file(str(self._state_file))
+                saved_state = json.loads(content)
 
                 # 检查持久化的进程是否还在运行
                 for key, info in saved_state.items():

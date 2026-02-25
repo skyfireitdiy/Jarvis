@@ -4,9 +4,9 @@ from typing import Any, Dict, List, Optional
 
 from jarvis.jarvis_utils.config import (
     calculate_token_limit,
-    get_default_encoding,
     get_max_input_token_count,
     get_llm_group,
+    read_text_file,
 )
 from jarvis.jarvis_utils.embedding import get_context_token_count
 from jarvis.jarvis_utils.output import PrettyOutput
@@ -104,9 +104,9 @@ class ReadCodeTool:
                     "stderr": "文件过大 (>10MB)",
                 }
 
-            # 读取文件内容
-            with open(abs_path, "r", encoding=get_default_encoding(), errors="ignore") as f:
-                lines = f.readlines()
+            # 读取文件内容（先检测编码）
+            content = read_text_file(abs_path, errors="ignore")
+            lines = content.splitlines()
 
             total_lines = len(lines)
 
@@ -272,8 +272,7 @@ class ReadCodeTool:
                 or filepath not in context_manager._file_cache
             ):
                 try:
-                    with open(filepath, "r", encoding=get_default_encoding(), errors="replace") as f:
-                        content = f.read()
+                    content = read_text_file(filepath, errors="replace")
                     context_manager.update_context_for_file(filepath, content)
                 except Exception:
                     # 如果读取失败，尝试获取已有上下文
@@ -398,9 +397,9 @@ class ReadCodeTool:
                     "stderr": f"文件不存在: {filepath}",
                 }
 
-            # 读取文件内容
-            with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
-                lines = f.readlines()
+            # 读取文件内容（先检测编码）
+            content = read_text_file(filepath, errors="ignore")
+            lines = content.splitlines()
 
             total_lines = len(lines)
             if total_lines == 0:
@@ -496,9 +495,9 @@ class ReadCodeTool:
                     continue
 
                 try:
-                    # 读取文件内容
-                    with open(abs_path, "r", encoding=get_default_encoding(), errors="ignore") as f:
-                        lines = f.readlines()
+                    # 读取文件内容（先检测编码）
+                    content = read_text_file(abs_path, errors="ignore")
+                    lines = content.splitlines()
 
                     total_lines = len(lines)
 

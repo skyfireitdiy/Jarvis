@@ -3,7 +3,7 @@
 import os
 import shutil
 
-from jarvis.jarvis_utils.config import get_default_encoding
+from jarvis.jarvis_utils.config import detect_file_encoding, get_default_encoding, read_text_file
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -162,8 +162,7 @@ class EditFileNormalTool:
         file_content = ""
         backup_path = None
         if os.path.exists(abs_path):
-            with open(abs_path, "r", encoding=get_default_encoding()) as f:
-                file_content = f.read()
+            file_content = read_text_file(abs_path)
             # 创建备份文件
             backup_path = abs_path + ".bak"
             try:
@@ -188,8 +187,9 @@ class EditFileNormalTool:
         Returns:
             (是否成功, 错误信息或None)
         """
+        enc = detect_file_encoding(abs_path) or get_default_encoding()
         try:
-            with open(abs_path, "w", encoding=get_default_encoding()) as f:
+            with open(abs_path, "w", encoding=enc) as f:
                 f.write(content)
             return (True, None)
         except Exception as write_error:

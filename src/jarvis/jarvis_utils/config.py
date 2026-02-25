@@ -24,6 +24,75 @@ def get_default_encoding() -> str:
     return DEFAULT_ENCODING
 
 
+# 编码检测：常见编码尝试顺序（utf-8 优先，适配现代文件；gbk 次之，适配 Windows 中文）
+_DETECT_ENCODINGS = ["utf-8", "gbk", "gb2312", "utf-16", "utf-16-le", "utf-16-be", "latin1"]
+_DETECT_SAMPLE_SIZE = 8192  # 读取前 8KB 用于检测
+
+
+def detect_file_encoding(file_path: str, sample_size: int = _DETECT_SAMPLE_SIZE) -> Optional[str]:
+    """根据文件内容检测编码
+
+    读取文件前 N 字节，依次尝试常见编码解码，返回第一个成功的编码。
+    优先 UTF-8（现代文件、JSON、YAML 等），其次 GBK（Windows 中文）。
+
+    Args:
+        file_path: 文件路径
+        sample_size: 用于检测的字节数，默认 8KB
+
+    Returns:
+        检测到的编码名称，若均失败则返回 None
+    """
+    try:
+        with open(file_path, "rb") as f:
+            sample = f.read(sample_size)
+
+        if not sample:
+            return "utf-8"
+
+        # BOM 检测
+        if sample.startswith(b"\xef\xbb\xbf"):
+            return "utf-8"
+        if sample.startswith(b"\xff\xfe") or sample.startswith(b"\xfe\xff"):
+            return "utf-16"
+
+        for encoding in _DETECT_ENCODINGS:
+            try:
+                sample.decode(encoding)
+                return encoding
+            except (UnicodeDecodeError, LookupError):
+                continue
+    except OSError:
+        pass
+    return None
+
+
+def read_text_file(
+    file_path: str,
+    *,
+    encoding: Optional[str] = None,
+    errors: str = "replace",
+    detect_encoding: bool = True,
+) -> str:
+    """读取文本文件，支持自动编码检测
+
+    Args:
+        file_path: 文件路径
+        encoding: 指定编码，若为 None 则自动检测或使用系统默认
+        errors: 解码错误处理方式，默认 "replace"
+        detect_encoding: 是否先检测编码，默认 True
+
+    Returns:
+        文件文本内容
+    """
+    enc = encoding
+    if enc is None and detect_encoding:
+        enc = detect_file_encoding(file_path)
+    if enc is None:
+        enc = get_default_encoding()
+    with open(file_path, "r", encoding=enc, errors=errors) as f:
+        return f.read()
+
+
 # 上下文长度限制常量
 MAX_CONTEXT_LENGTH = 64 * 1024  # 64k token绝对上限
 

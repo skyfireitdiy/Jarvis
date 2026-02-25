@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional, Dict
 
+from jarvis.jarvis_utils.config import read_text_file
+
 from jarvis.jarvis_lsp.protocol import (
     CodeActionInfo,
     DiagnosticInfo,
@@ -236,8 +238,7 @@ class LSPClient:
         path = Path(file_path).resolve()
         uri = f"file://{path}"
 
-        with open(path, "r", encoding="utf-8") as f:
-            content = f.read()
+        content = read_text_file(str(path))
 
         # 根据 file extension 检测 languageId
         ext = path.suffix.lower()
@@ -640,9 +641,8 @@ class LSPClient:
         callers = []
 
         try:
-            # 读取文件内容
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            # 读取文件内容（先检测编码）
+            content = read_text_file(file_path)
 
             # 使用 AST 解析函数体
             import ast
@@ -1104,8 +1104,8 @@ class LSPClient:
             代码片段字符串（包含前后几行）
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            content = read_text_file(file_path)
+            lines = content.splitlines()
 
             # 提取前后各 3 行（共 7 行）
             start_line = max(0, target_line - 3)
@@ -1117,7 +1117,7 @@ class LSPClient:
             snippet = ""
             for i, line_text in enumerate(snippet_lines, start=start_line):
                 marker = " > " if i == target_line else "   "
-                snippet += f"{marker}{i + 1:4d} | {line_text}"
+                snippet += f"{marker}{i + 1:4d} | {line_text}\n"
 
             return snippet
         except Exception:
@@ -1215,8 +1215,8 @@ class LSPClient:
             符号名的列号（0-based），如果找不到返回 None
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            content = read_text_file(file_path)
+            lines = content.splitlines()
 
             if line < 0 or line >= len(lines):
                 return None

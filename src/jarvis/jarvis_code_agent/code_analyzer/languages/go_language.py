@@ -10,7 +10,7 @@ from typing import cast
 from tree_sitter import Language
 from tree_sitter import Node
 
-from jarvis.jarvis_utils.config import get_default_encoding
+from jarvis.jarvis_utils.config import read_text_file
 
 from ..base_language import BaseLanguageSupport
 from ..dependency_analyzer import Dependency
@@ -212,9 +212,7 @@ class GoDependencyAnalyzer(DependencyAnalyzer):
 
                 file_path = os.path.join(root, file)
                 try:
-                    with open(file_path, "r", encoding=get_default_encoding(), errors="replace") as f:
-                        content = f.read()
-
+                    content = read_text_file(file_path, errors="replace")
                     dependencies = self.analyze_imports(file_path, content)
                     for dep in dependencies:
                         # For Go, we can resolve to vendor or standard library

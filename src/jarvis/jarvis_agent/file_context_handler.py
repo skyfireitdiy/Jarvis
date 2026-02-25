@@ -3,7 +3,7 @@ import os
 import re
 from typing import Any
 
-from jarvis.jarvis_utils.config import get_default_encoding
+from jarvis.jarvis_utils.config import detect_file_encoding, read_text_file
 from typing import Callable
 
 
@@ -17,23 +17,26 @@ _LANGUAGE_EXTRACTORS: dict[str, Callable[[], Optional[Any]]] = {}
 
 def is_text_file(filepath: str) -> bool:
     """
-    检查文件是否为文本文件。
+    检查文件是否为文本文件。先检测编码再尝试读取。
     """
     try:
-        with open(filepath, "r", encoding=get_default_encoding()) as f:
-            f.read(1024)  # 尝试读取一小块
-        return True
+        enc = detect_file_encoding(filepath, sample_size=1024)
+        if enc:
+            with open(filepath, "r", encoding=enc, errors="strict") as f:
+                f.read(1024)
+            return True
     except (UnicodeDecodeError, IOError):
-        return False
+        pass
+    return False
 
 
 def count_lines(filepath: str) -> int:
     """
-    统计文件中的行数。
+    统计文件中的行数。先检测编码再读取。
     """
     try:
-        with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
-            return sum(1 for _ in f)
+        content = read_text_file(filepath, errors="ignore")
+        return len(content.splitlines()) if content else 0
     except IOError:
         return 0
 
@@ -129,9 +132,7 @@ def extract_symbols_from_file(filepath: str) -> list[dict[str, Any]]:
         return []
 
     try:
-        with open(filepath, "r", encoding=get_default_encoding(), errors="ignore") as f:
-            content = f.read()
-
+        content = read_text_file(filepath, errors="ignore")
         symbols = extractor.extract_symbols(filepath, content)
 
         # 将 Symbol 对象转换为字典格式

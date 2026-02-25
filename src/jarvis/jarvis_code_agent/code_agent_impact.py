@@ -14,7 +14,7 @@ from jarvis.jarvis_code_agent.code_analyzer import ContextManager
 from jarvis.jarvis_code_agent.code_analyzer import ImpactAnalyzer
 from jarvis.jarvis_code_agent.code_analyzer import parse_git_diff_to_edits
 from jarvis.jarvis_code_agent.code_analyzer.impact_analyzer import Edit
-from jarvis.jarvis_utils.config import get_default_encoding, is_enable_impact_analysis
+from jarvis.jarvis_utils.config import is_enable_impact_analysis, read_text_file
 
 
 class ImpactManager:
@@ -34,8 +34,7 @@ class ImpactManager:
 
             if os.path.exists(file_path):
                 try:
-                    with open(file_path, "r", encoding=get_default_encoding(), errors="replace") as f:
-                        content = f.read()
+                    content = read_text_file(file_path, errors="replace")
                     self.context_manager.update_context_for_file(file_path, content)
                 except Exception:
                     # 如果读取文件失败，跳过更新
