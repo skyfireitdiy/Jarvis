@@ -98,15 +98,17 @@ class ScriptTool:
 
     @staticmethod
     def _decode_windows_output(data: bytes) -> str:
-        """Windows 下解码子进程输出，使用系统默认编码（Windows: gbk）"""
+        """Windows 下解码子进程输出。Python 脚本用 PYTHONIOENCODING=utf-8 输出 UTF-8，
+        其他（如 PowerShell）可能用控制台编码（GBK）。优先尝试 UTF-8 以正确显示中文。"""
         if not data:
             return ""
         from jarvis.jarvis_utils.config import get_default_encoding
 
-        for enc in (get_default_encoding(), "utf-8", "cp936", "latin-1"):
+        # 优先 UTF-8：Python 脚本 stdout 在此模式下为 UTF-8
+        for enc in ("utf-8", get_default_encoding(), "cp936"):
             try:
-                return data.decode(enc, errors="replace")
-            except (LookupError, ValueError):
+                return data.decode(enc)
+            except (UnicodeDecodeError, LookupError, ValueError):
                 continue
         return data.decode("latin-1", errors="replace")
 
