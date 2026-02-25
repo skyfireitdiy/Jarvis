@@ -14,10 +14,8 @@ from typing import Any, Dict, Optional
 
 import typer
 
-from jarvis.jarvis_utils.config import DEFAULT_ENCODING
-
-# 文本使用系统默认编码（Windows: gbk，其他: utf-8；本模块仅 Windows，故恒为 gbk）
-ENCODING = DEFAULT_ENCODING
+# 输出编码：统一使用 UTF-8，便于 execute_script/ConPTY 正确解码，避免与 PowerShell 管道混用时乱码
+_OUTPUT_ENCODING = "utf-8"
 
 # Platform check must be first
 if sys.platform != "win32":
@@ -30,6 +28,7 @@ else:
     _NOT_WINDOWS_MSG = ""
 
 from jarvis.jarvis_utils.config import get_data_dir
+from jarvis.jarvis_utils.config import get_default_encoding
 
 app = typer.Typer(
     help="Windows App CLI Tool - Desktop application automation (Windows only)",
@@ -53,7 +52,7 @@ def _load_sessions() -> Dict[str, Dict[str, Any]]:
     if not p.exists():
         return {}
     try:
-        data = json.loads(p.read_text(encoding=ENCODING))
+        data = json.loads(p.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
     except UnicodeDecodeError:
         try:
@@ -68,7 +67,7 @@ def _load_sessions() -> Dict[str, Dict[str, Any]]:
 def _save_sessions(sessions: Dict[str, Dict[str, Any]]) -> None:
     p = _sessions_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(sessions, ensure_ascii=False, indent=2), encoding=ENCODING)
+    p.write_text(json.dumps(sessions, ensure_ascii=False, indent=2), encoding=_OUTPUT_ENCODING)
 
 
 def _save_session(app_id: str, params: Dict[str, Any]) -> None:
@@ -89,9 +88,9 @@ def _ensure_windows() -> None:
 
 
 def _print_gbk(s: str) -> None:
-    """按 GBK 编码输出到 stdout，适配中文 Windows 控制台"""
+    """以 UTF-8 输出到 stdout，便于被 execute_script、ConPTY 等正确解码"""
     try:
-        sys.stdout.buffer.write((s + "\n").encode(ENCODING, errors="replace"))
+        sys.stdout.buffer.write((s + "\n").encode(_OUTPUT_ENCODING, errors="replace"))
         sys.stdout.buffer.flush()
     except (AttributeError, OSError):
         print(s)
@@ -1117,7 +1116,7 @@ def _run_ps(script: str, timeout: int = 30) -> Dict[str, Any]:
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
             capture_output=True,
             timeout=timeout,
-            encoding=ENCODING,
+            encoding=get_default_encoding(),
             errors="replace",
         )
         out = (r.stdout or "").strip()
