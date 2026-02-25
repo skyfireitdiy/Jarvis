@@ -17,6 +17,10 @@ from jarvis.jarvis_utils.output import PrettyOutput
 _ANSI_ESCAPE = re.compile(
     r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)?)"
 )
+# Windows ConPTY 有时只输出 OSC payload 而 ESC 被吞掉，导致混入：0;pid/pid;C:\path\exe.EXE
+_OSC_PAYLOAD_ORPHAN = re.compile(
+    r"0;\d+/\d+;[^\n\r]*\.(?:EXE|exe|ps1|bat|cmd|py)\s*"
+)
 
 
 class ScriptTool:
@@ -114,8 +118,10 @@ class ScriptTool:
 
     @staticmethod
     def _strip_ansi(text: str) -> str:
-        """移除 ANSI/终端转义序列（如能力查询 ^[[?61;4;6;7;...c），避免混入可读输出"""
-        return _ANSI_ESCAPE.sub("", text)
+        """移除 ANSI/终端转义序列及 Windows ConPTY 的 OSC 残留（如 0;pid/pid;C:\\path\\exe.EXE）"""
+        s = _ANSI_ESCAPE.sub("", text)
+        s = _OSC_PAYLOAD_ORPHAN.sub("", s)
+        return s
 
     def _execute_on_windows_interactive_pty(
         self, argv: List[str], env: Dict[str, str], get_timeout: Any
