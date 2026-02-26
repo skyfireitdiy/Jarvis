@@ -320,38 +320,42 @@ class BasePlatform(ABC):
                     text_content, \
                     panel
 
+                # 在锁外进行文本拼接和wrap计算，避免与console内部锁冲突
+                # 获取当前文本并添加新内容，创建新的 Text 对象
+                # 避免在原 Text 对象上调用 append()，防止与 Live 内部线程并发访问导致不一致
+                current_text = text_content.plain
+                new_content = current_text + content
+                new_text_obj = Text(new_content, overflow="fold", style="bright_white")
+                update_count += 1
+
+                # Scrolling Logic - 只在内容超过一定行数时才应用滚动
+                max_text_height = console.height - 5
+                if max_text_height <= 0:
+                    max_text_height = 1
+
+                lines = new_text_obj.wrap(
+                    console,
+                    console.width - 4 if console.width > 4 else 1,
+                )
+
+                # 只在内容超过最大高度时才截取，减少不必要的操作
+                final_text = new_text_obj
+                need_rebuild_panel = False
+                if len(lines) > max_text_height:
+                    # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致
+                    # 这确保了Rich内部spans列表与文本内容保持同步
+                    final_text = Text(
+                        "\n".join([line.plain for line in lines[-max_text_height:]]),
+                        overflow="fold",
+                    )
+                    need_rebuild_panel = True
+
                 # 使用锁保护 panel 更新，避免与 Live 内部线程冲突
                 with self._panel_lock:
-                    # 获取当前文本并添加新内容，创建新的 Text 对象
-                    # 避免在原 Text 对象上调用 append()，防止与 Live 内部线程并发访问导致不一致
-                    current_text = text_content.plain
-                    new_content = current_text + content
-                    text_content = Text(
-                        new_content, overflow="fold", style="bright_white"
-                    )
-                    update_count += 1
+                    # 在锁内只更新text_content和panel
+                    text_content = final_text
 
-                    # Scrolling Logic - 只在内容超过一定行数时才应用滚动
-                    max_text_height = console.height - 5
-                    if max_text_height <= 0:
-                        max_text_height = 1
-
-                    lines = text_content.wrap(
-                        console,
-                        console.width - 4 if console.width > 4 else 1,
-                    )
-
-                    # 只在内容超过最大高度时才截取，减少不必要的操作
-                    if len(lines) > max_text_height:
-                        # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致
-                        # 这确保了Rich内部spans列表与文本内容保持同步
-                        new_text = Text(
-                            "\n".join(
-                                [line.plain for line in lines[-max_text_height:]]
-                            ),
-                            overflow="fold",
-                        )
-                        text_content = new_text
+                    if need_rebuild_panel:
                         # 重建panel对象，避免Live无法正确清除旧的panel显示
                         # 当text_content对象被替换时，panel必须重建才能让Live正确处理
                         current_subtitle = panel.subtitle
