@@ -3,7 +3,11 @@
 import os
 import shutil
 
-from jarvis.jarvis_utils.config import detect_file_encoding, get_default_encoding, read_text_file
+from jarvis.jarvis_utils.config import (
+    detect_file_encoding,
+    get_default_encoding,
+    read_text_file,
+)
 from jarvis.jarvis_utils.output import PrettyOutput
 
 # -*- coding: utf-8 -*-
@@ -189,7 +193,7 @@ class EditFileNormalTool:
         """
         enc = detect_file_encoding(abs_path) or get_default_encoding()
         try:
-            with open(abs_path, "w", encoding=enc) as f:
+            with open(abs_path, "w", encoding=enc, errors="replace") as f:
                 f.write(content)
             return (True, None)
         except Exception as write_error:
