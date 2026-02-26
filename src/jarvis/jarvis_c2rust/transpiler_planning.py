@@ -226,7 +226,7 @@ class PlanningManager:
             )
             + "- 函数签名应包含可见性修饰（pub）与函数名；类型应为 Rust 最佳实践的选择，而非简单映射 C 类型。\n"
             + '- 禁止使用 extern "C"；函数应使用标准的 Rust 调用约定，不需要 C ABI。\n'
-            + "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
+            + "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释等）：\n"
             + "示例1（正常函数）：\n"
             + '<SUMMARY>\n{\n  "module": "...",\n  "rust_signature": "...",\n  "notes": "..."\n}\n</SUMMARY>\n'
             + "示例2（已实现的函数，且功能一致，可跳过实现）：\n"

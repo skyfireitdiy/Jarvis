@@ -35,24 +35,6 @@ from jarvis.jarvis_utils.tag import ot
 from jarvis.jarvis_utils.utils import daily_check_git_updates
 from jarvis.jarvis_utils.utils import is_context_overflow
 
-_multiline_example = """  {
-    "multiline_str": |||
-      第一行：直接换行，无需 \\n
-      第二行：包含"双引号"，无需转义
-      第三行：包含'单引号'，直接写
-      第四行：支持缩进保留
-    |||
-  }
-  
-  或使用 ``` 代替 |||：
-  {
-    "multiline_str": ```
-      第一行：直接换行，无需 \\n
-      第二行：包含"双引号"，无需转义
-      第三行：包含'单引号'，直接写
-      第四行：支持缩进保留
-    ```
-  }"""
 
 tool_call_help = f"""
 ## 工具调用指南（Markdown）
@@ -71,18 +53,12 @@ tool_call_help = f"""
 
 **Jsonnet格式特性**
 - 字符串引号：可使用双引号或单引号
-- 多行字符串：直接换行无需转义，支持保留缩进
-  示例：
-{_multiline_example}
 - 尾随逗号：对象/数组最后一个元素后可添加逗号
 - 注释：支持 // 单行或 /* */ 多行注释
 
 **关键规则**
 1. 每次只使用一个工具，等待结果后再进行下一步
-2. {ot("TOOL_CALL")} 和 {ct("TOOL_CALL")} 必须出现在行首
-3. 多行字符串参数直接换行即可，无需转义
-4. 等待执行结果，不要假设或创建虚假响应
-5. 信息不足时询问用户，不要在没有完整信息的情况下继续
+2. 信息不足时询问用户，不要在没有完整信息的情况下继续
 
 **多个工具调用**
 - 支持一次调用多个工具，格式如下：
@@ -366,7 +342,7 @@ class ToolRegistry(OutputHandlerProtocol):
         error_lines = []
         for file_path in mcp_tools_dir.glob("*.yaml"):
             try:
-                content = read_text_file(file_path)
+                content = read_text_file(str(file_path))
                 config = yaml.safe_load(content)
                 self.register_mcp_tool_by_config(config)
             except Exception as e:

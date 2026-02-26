@@ -610,7 +610,7 @@ class ReviewManager:
                 "    ```rust\n"
                 "    pub mod utils;\n"
                 '    ```"\n'
-                "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释、|||分隔符多行字符串等）：\n"
+                "请严格按以下格式输出（JSON格式，支持jsonnet语法如尾随逗号、注释等）：\n"
                 "**示例1：审查通过（无问题）**\n"
                 '<SUMMARY>\n{\n  "ok": true,\n  "function_issues": [],\n  "critical_issues": [],\n  "breaking_issues": [],\n  "structure_issues": []\n}\n</SUMMARY>\n'
                 "**示例2：发现问题（必须报告问题）**\n"
