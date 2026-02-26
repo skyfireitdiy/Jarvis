@@ -417,11 +417,7 @@ def get_task_analysis_prompt(
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
     "scope": "可选值：'project' 或 'global'（默认）。'project' 保存到项目目录（.jarvis/methodologies/），适用于项目特定的方法论；'global' 保存为全局方法论（用户数据目录），适用于任何项目的通用方法论",
-    "content": |||
-方法论内容
-可以包含多行内容
-包含"双引号"和'单引号'都无需转义
-    |||
+    "content": "方法论内容（支持普通字符串格式）"
   }}
 }}
 {ct("TOOL_CALL")}
@@ -450,11 +446,7 @@ def get_task_analysis_prompt(
     "operation": "add/update",
     "problem_type": "方法论类型，不要过于细节，也不要过于泛化",
     "scope": "可选值：'project' 或 'global'（默认）。'project' 保存到项目目录（.jarvis/methodologies/），适用于项目特定的方法论；'global' 保存为全局方法论（用户数据目录），适用于任何项目的通用方法论",
-    "content": |||
-方法论内容
-可以包含多行内容
-包含"双引号"和'单引号'都无需转义
-    |||
+    "content": "方法论内容（支持普通字符串格式）"
   }}
 }}
 {ct("TOOL_CALL")}
