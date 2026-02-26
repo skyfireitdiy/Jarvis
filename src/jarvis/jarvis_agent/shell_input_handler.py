@@ -1,10 +1,54 @@
 # -*- coding: utf-8 -*-
+import os
 from typing import Any
 from typing import Tuple
 
 from jarvis.jarvis_agent.utils import join_prompts
 from jarvis.jarvis_utils.input import user_confirm
 from jarvis.jarvis_utils.output import PrettyOutput
+
+
+def _detect_interpreter(script: str) -> str:
+    """根据脚本内容自动检测合适的解释器。
+
+    Args:
+        script: 要执行的脚本内容
+
+    Returns:
+        解释器名称：'bash'、'powershell'、'cmd'、'pwsh' 等
+
+    检测规则:
+        1. Windows 上优先检测 powershell/pwsh/cmd 命令
+        2. Unix/Linux 上使用 bash 作为默认
+        3. 如果无法识别，默认使用 bash
+    """
+    # 获取脚本的第一行（去除空白字符）
+    lines = script.strip().splitlines()
+    if not lines:
+        return "bash"
+
+    first_line = lines[0].strip()
+
+    # Windows 检测：powershell/pwsh/cmd
+    if os.name == "nt":
+        # 检测 PowerShell 命令
+        if first_line.startswith("powershell ") or first_line.startswith("pwsh "):
+            return "powershell"
+        # 检测 cmd 命令
+        if first_line.startswith("cmd "):
+            return "cmd"
+    else:
+        # Unix/Linux 检测
+        # 处理 env terminal=1 bash 这样的命令
+        if first_line.startswith("env "):
+            # 提取实际的 shell 名称
+            parts = first_line.split()
+            for part in parts:
+                if part in ("bash", "zsh", "fish", "sh"):
+                    return "bash"
+
+    # 默认使用 bash
+    return "bash"
 
 
 def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
@@ -33,11 +77,14 @@ def shell_input_handler(user_input: str, agent: Any) -> Tuple[str, bool]:
         if no_confirm or user_confirm("是否要执行以上shell脚本？", default=True):
             from jarvis.jarvis_tools.registry import ToolRegistry
 
+            # 根据脚本内容自动检测合适的解释器
+            interpreter = _detect_interpreter(script)
+
             output = ToolRegistry().handle_tool_calls(
                 {
                     "name": "execute_script",
                     "want": "提取命令执行结果关键信息",
-                    "arguments": {"interpreter": "bash", "script_content": script},
+                    "arguments": {"interpreter": interpreter, "script_content": script},
                 },
                 agent,
             )
