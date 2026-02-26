@@ -21,8 +21,7 @@ _OUTPUT_ENCODING = "utf-8"
 if sys.platform != "win32":
     # Lazy message - pywinauto not needed on non-Windows
     _NOT_WINDOWS_MSG = (
-        "jarvis-windows (jw) requires Windows. "
-        "Current platform: " + sys.platform
+        "jarvis-windows (jw) requires Windows. Current platform: " + sys.platform
     )
 else:
     _NOT_WINDOWS_MSG = ""
@@ -67,7 +66,9 @@ def _load_sessions() -> Dict[str, Dict[str, Any]]:
 def _save_sessions(sessions: Dict[str, Dict[str, Any]]) -> None:
     p = _sessions_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(sessions, ensure_ascii=False, indent=2), encoding=_OUTPUT_ENCODING)
+    p.write_text(
+        json.dumps(sessions, ensure_ascii=False, indent=2), encoding=_OUTPUT_ENCODING
+    )
 
 
 def _save_session(app_id: str, params: Dict[str, Any]) -> None:
@@ -182,18 +183,32 @@ def _connect_app(
     }
 
 
-def _get_app(app_id: str, process: Optional[str], title: Optional[str], pid: Optional[int], backend: str):
+def _get_app(
+    app_id: str,
+    process: Optional[str],
+    title: Optional[str],
+    pid: Optional[int],
+    backend: str,
+):
     """Get Application instance. Returns (app, error_result). error_result is None on success."""
-    r = _connect_app(app_id=app_id, process=process, title=title, pid=pid, backend=backend)
+    r = _connect_app(
+        app_id=app_id, process=process, title=title, pid=pid, backend=backend
+    )
     if not r.get("success"):
         return None, r
     app = r.get("_app")
     if app is None:
-        return None, {"success": False, "stdout": "", "stderr": "Connect returned no app"}
+        return None, {
+            "success": False,
+            "stdout": "",
+            "stderr": "Connect returned no app",
+        }
     return app, None
 
 
-def _resolve_control_from_index(control: Optional[str], index: Optional[int]) -> Optional[str]:
+def _resolve_control_from_index(
+    control: Optional[str], index: Optional[int]
+) -> Optional[str]:
     """When only --index given (no --control), use get-tree index #N."""
     if control is not None:
         return control
@@ -202,8 +217,16 @@ def _resolve_control_from_index(control: Optional[str], index: Optional[int]) ->
     return None
 
 
-def _traverse_controls(root, depth_limit: int = 99, start_index: int = 0):
-    """Depth-first 遍历，yield (1-based_index, elem, depth)。start_index 使 subtree 序号与全树一致。"""
+def _traverse_controls(
+    root,
+    depth_limit: int = 99,
+    start_index: int = 0,
+    display_depth_limit: Optional[int] = None,
+):
+    """Depth-first 遍历，yield (1-based_index, elem, depth)。
+    depth_limit: 实际遍历的深度限制（控制序号计算范围）
+    display_depth_limit: 显示深度限制（控制yield的节点深度）
+    start_index: 使 subtree 序号与全树一致。"""
     counter = [start_index]
 
     def _walk(elem, d: int):
@@ -211,12 +234,16 @@ def _traverse_controls(root, depth_limit: int = 99, start_index: int = 0):
             return
         counter[0] += 1
         n = counter[0]
-        yield (n, elem, d)
-        try:
-            for c in elem.children():
-                yield from _walk(c, d + 1)
-        except Exception:
-            pass
+        # 只yield深度 <= display_depth_limit 的节点
+        if display_depth_limit is None or d <= display_depth_limit:
+            yield (n, elem, d)
+        # 继续遍历子节点，但受到 depth_limit 限制
+        if d < depth_limit:
+            try:
+                for c in elem.children():
+                    yield from _walk(c, d + 1)
+            except Exception:
+                pass
 
     yield from _walk(root, 0)
 
@@ -229,9 +256,17 @@ def _get_control_by_index(root, idx: int, depth_limit: int = 99):
         for n, ctrl, _ in _traverse_controls(root, depth_limit):
             if n == idx:
                 return ctrl, None
-        return None, {"success": False, "stdout": "", "stderr": f"Index {idx} not found (tree has < {idx} controls)"}
+        return None, {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Index {idx} not found (tree has < {idx} controls)",
+        }
     except Exception as e:
-        return None, {"success": False, "stdout": "", "stderr": f"Index lookup failed: {e}"}
+        return None, {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Index lookup failed: {e}",
+        }
 
 
 def _find_control(win, control: str, index: Optional[int] = None):
@@ -263,7 +298,11 @@ def _find_control(win, control: str, index: Optional[int] = None):
             if 0 <= index < len(matches):
                 ctrl = matches[index]
     if not ctrl.exists():
-        return None, {"success": False, "stdout": "", "stderr": f"Control not found: {control}"}
+        return None, {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Control not found: {control}",
+        }
     return ctrl, None
 
 
@@ -275,7 +314,11 @@ def start(
     path: str = typer.Option(..., "--path", "-p", help="Executable path"),
     args: str = typer.Option("", "--args", "-a", help="Startup arguments"),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id", help="App session ID"),
-    backend: str = typer.Option("uia", "--backend", help="Backend: uia (default) or win32. Tries fallback automatically if primary fails."),
+    backend: str = typer.Option(
+        "uia",
+        "--backend",
+        help="Backend: uia (default) or win32. Tries fallback automatically if primary fails.",
+    ),
     timeout: int = typer.Option(30, "--timeout", "-t", help="Start timeout (seconds)"),
 ) -> None:
     """Start an application and register the session."""
@@ -283,17 +326,21 @@ def start(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({
-            "success": False,
-            "stdout": "",
-            "stderr": "pywinauto not installed. Run: pip install pywinauto",
-        })
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     import warnings
+
     with warnings.catch_warnings(action="ignore", category=UserWarning):
         try:
             from pywinauto import findwindows
+
             fallback = "win32" if backend == "uia" else "uia"
             backends_to_try = [backend, fallback]
             handles_before: set = set()
@@ -366,43 +413,61 @@ def start(
                 raise RuntimeError(
                     "Window not ready after start (uia and win32 both failed)."
                 )
-            params: Dict[str, Any] = {"process": path, "backend": used_backend, "pid": proc}
+            params: Dict[str, Any] = {
+                "process": path,
+                "backend": used_backend,
+                "pid": proc,
+            }
             if tit:
                 params["title"] = tit
             _save_session(app_id, params)
-            _output({
-                "success": True,
-                "stdout": f"Started. pid={proc}, title={tit}",
-                "stderr": "",
-            })
+            _output(
+                {
+                    "success": True,
+                    "stdout": f"Started. pid={proc}, title={tit}",
+                    "stderr": "",
+                }
+            )
         except Exception as e:
-            _output({
-                "success": False,
-                "stdout": "",
-                "stderr": f"Start failed: {e}",
-            })
+            _output(
+                {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Start failed: {e}",
+                }
+            )
 
 
 @app.command()
 def connect(
-    process: Optional[str] = typer.Option(None, "--process", help="Process name or path"),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="Window title (regex ok)"),
+    process: Optional[str] = typer.Option(
+        None, "--process", help="Process name or path"
+    ),
+    title: Optional[str] = typer.Option(
+        None, "--title", "-t", help="Window title (regex ok)"
+    ),
     pid: Optional[int] = typer.Option(None, "--pid", help="Process ID"),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id", help="App session ID"),
-    backend: str = typer.Option("uia", "--backend", help="Backend: uia (default) or win32"),
+    backend: str = typer.Option(
+        "uia", "--backend", help="Backend: uia (default) or win32"
+    ),
 ) -> None:
     _ensure_windows()
     try:
         from pywinauto import Application
     except ImportError:
-        _output({
-            "success": False,
-            "stdout": "",
-            "stderr": "pywinauto not installed. Run: pip install pywinauto",
-        })
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
-    r = _connect_app(app_id=app_id, process=process, title=title, pid=pid, backend=backend)
+    r = _connect_app(
+        app_id=app_id, process=process, title=title, pid=pid, backend=backend
+    )
     # Don't pass _app to JSON output
     out = {k: v for k, v in r.items() if k != "_app"}
     _output(out)
@@ -418,28 +483,47 @@ def list_cmd(
     if app_id:
         sessions = {k: v for k, v in sessions.items() if k == app_id}
     items = [
-        {"app_id": aid, "process": p.get("process"), "title": p.get("title"), "pid": p.get("pid")}
+        {
+            "app_id": aid,
+            "process": p.get("process"),
+            "title": p.get("title"),
+            "pid": p.get("pid"),
+        }
         for aid, p in sessions.items()
     ]
-    _output({
-        "success": True,
-        "stdout": json.dumps(items, ensure_ascii=False, indent=2),
-        "stderr": "",
-    })
+    _output(
+        {
+            "success": True,
+            "stdout": json.dumps(items, ensure_ascii=False, indent=2),
+            "stderr": "",
+        }
+    )
 
 
 @app.command(name="list-windows")
 def list_windows_cmd(
-    backend: str = typer.Option("uia", "--backend", help="Backend: uia (default) or win32"),
-    title_filter: Optional[str] = typer.Option(None, "--title", "-t", help="Filter by window title (substring match)"),
-    limit: int = typer.Option(50, "--limit", "-n", help="Max windows to list (default 50)"),
+    backend: str = typer.Option(
+        "uia", "--backend", help="Backend: uia (default) or win32"
+    ),
+    title_filter: Optional[str] = typer.Option(
+        None, "--title", "-t", help="Filter by window title (substring match)"
+    ),
+    limit: int = typer.Option(
+        50, "--limit", "-n", help="Max windows to list (default 50)"
+    ),
 ) -> None:
     """List visible windows (title, pid, handle). Use --title to filter."""
     _ensure_windows()
     try:
         from pywinauto import Desktop
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     seen: set = set()
@@ -455,7 +539,9 @@ def list_windows_cmd(
                     raw_title = win.window_text() or ""
                     if not raw_title.strip():
                         continue
-                    title = "".join(c for c in raw_title if ord(c) >= 32 and c != "\u200b").strip()
+                    title = "".join(
+                        c for c in raw_title if ord(c) >= 32 and c != "\u200b"
+                    ).strip()
                     if not title:
                         title = raw_title
                     pid = win.process_id()
@@ -465,7 +551,9 @@ def list_windows_cmd(
                     seen.add(key)
                     if title_filter and title_filter.lower() not in title.lower():
                         continue
-                    h = getattr(win.element_info, "handle", None) or getattr(win, "handle", None)
+                    h = getattr(win.element_info, "handle", None) or getattr(
+                        win, "handle", None
+                    )
                     items.append({"title": title, "pid": pid, "handle": h})
                 except Exception:
                     continue
@@ -474,29 +562,43 @@ def list_windows_cmd(
         except Exception:
             continue
 
-    _output({
-        "success": True,
-        "stdout": json.dumps(items, ensure_ascii=True, indent=2),
-        "stderr": "",
-    })
+    _output(
+        {
+            "success": True,
+            "stdout": json.dumps(items, ensure_ascii=True, indent=2),
+            "stderr": "",
+        }
+    )
 
 
 @app.command()
 def close(
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id", help="App session ID"),
-    kill: bool = typer.Option(True, "--kill/--no-kill", "-k", help="Kill process (default). Use --no-kill to only disconnect"),
+    kill: bool = typer.Option(
+        True,
+        "--kill/--no-kill",
+        "-k",
+        help="Kill process (default). Use --no-kill to only disconnect",
+    ),
 ) -> None:
     """Close session and kill process (use --no-kill to disconnect only)."""
     _ensure_windows()
     sessions = _load_sessions()
     if app_id not in sessions:
-        _output({"success": True, "stdout": "Session not found (already closed)", "stderr": ""})
+        _output(
+            {
+                "success": True,
+                "stdout": "Session not found (already closed)",
+                "stderr": "",
+            }
+        )
         return
 
     if kill:
         try:
             from pywinauto import Application
             import time
+
             params = sessions[app_id]
             backend = params.get("backend", "uia")
             pid = params.get("pid")
@@ -509,7 +611,9 @@ def close(
                     elif proc:
                         app = Application(backend=be).connect(process=proc)
                     else:
-                        app = Application(backend=be).connect(title_re=params.get("title", ".*"))
+                        app = Application(backend=be).connect(
+                            title_re=params.get("title", ".*")
+                        )
                     win = app.window()
                     win.set_focus()
                     win.type_keys("%{F4}")
@@ -525,11 +629,13 @@ def close(
             else:
                 raise RuntimeError("Connect failed for close")
         except Exception as e:
-            _output({
-                "success": False,
-                "stdout": "",
-                "stderr": f"Close failed: {e}",
-            })
+            _output(
+                {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": f"Close failed: {e}",
+                }
+            )
             return
 
     del sessions[app_id]
@@ -539,13 +645,28 @@ def close(
 
 @app.command()
 def click(
-    control: Optional[str] = typer.Option(None, "--control", "-c", help="Control title, AutomationId, title_regex=..., or #N from get-tree"),
-    menu: Optional[str] = typer.Option(None, "--menu", "-m", help="Menu path, e.g. File->Open"),
-    index: Optional[int] = typer.Option(None, "--index", "-i", help="Control index from get-tree (e.g. -i 5 for #5)"),
+    control: Optional[str] = typer.Option(
+        None,
+        "--control",
+        "-c",
+        help="Control title, AutomationId, title_regex=..., or #N from get-tree",
+    ),
+    menu: Optional[str] = typer.Option(
+        None, "--menu", "-m", help="Menu path, e.g. File->Open"
+    ),
+    index: Optional[int] = typer.Option(
+        None, "--index", "-i", help="Control index from get-tree (e.g. -i 5 for #5)"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id", help="App session ID"),
-    process: Optional[str] = typer.Option(None, "--process", help="Process to connect (override session)"),
-    title: Optional[str] = typer.Option(None, "--title", "-t", help="Window title (override session)"),
-    pid: Optional[int] = typer.Option(None, "--pid", help="Process ID (override session)"),
+    process: Optional[str] = typer.Option(
+        None, "--process", help="Process to connect (override session)"
+    ),
+    title: Optional[str] = typer.Option(
+        None, "--title", "-t", help="Window title (override session)"
+    ),
+    pid: Optional[int] = typer.Option(
+        None, "--pid", help="Process ID (override session)"
+    ),
     backend: str = typer.Option("uia", "--backend", help="Backend"),
 ) -> None:
     """Click a control or menu item."""
@@ -553,7 +674,13 @@ def click(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -567,14 +694,22 @@ def click(
         if menu:
             win.menu_select(menu)
         elif control:
-            ctrl, err = _find_control(win, control, None if control.startswith("#") else index)
+            ctrl, err = _find_control(
+                win, control, None if control.startswith("#") else index
+            )
             if err:
                 _output(err)
                 return
             win.set_focus()
             _do_click(ctrl, win=win)
         else:
-            return _output({"success": False, "stdout": "", "stderr": "Need --control, --index, or --menu"})
+            return _output(
+                {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "Need --control, --index, or --menu",
+                }
+            )
         _output({"success": True, "stdout": "Clicked", "stderr": ""})
     except Exception as e:
         _output({"success": False, "stdout": "", "stderr": f"Click failed: {e}"})
@@ -651,9 +786,14 @@ def _click_at_coords(ctrl, win=None, button: str = "left", double: bool = False)
         name = (ctrl.window_text() or "").strip()
         # 1) 标题栏按钮按名称定位，避免兄弟索引匹配失败时点到左侧
         name_offsets = [
-            ("关闭", 23), ("Close", 23), ("✕", 23),
-            ("最大", 69), ("Maximize", 69), ("Restore", 69),
-            ("最小", 115), ("Minimize", 115),
+            ("关闭", 23),
+            ("Close", 23),
+            ("✕", 23),
+            ("最大", 69),
+            ("Maximize", 69),
+            ("Restore", 69),
+            ("最小", 115),
+            ("Minimize", 115),
         ]
         for k, off in name_offsets:
             if k in name:
@@ -695,6 +835,7 @@ def _click_at_coords(ctrl, win=None, button: str = "left", double: bool = False)
             cx = int(left + w * (idx + 0.5) / n)
             cy = int(top + h // 2)
         import time
+
         if win:
             try:
                 win.set_focus()
@@ -702,6 +843,7 @@ def _click_at_coords(ctrl, win=None, button: str = "left", double: bool = False)
             except Exception:
                 pass
         from pywinauto import mouse
+
         if double:
             mouse.double_click(coords=(cx, cy), button=button)
         else:
@@ -718,8 +860,12 @@ def _get_control_center(ctrl) -> tuple:
 
 @app.command(name="double-click")
 def double_click_cmd(
-    control: Optional[str] = typer.Option(None, "--control", "-c", help="Control or #N from get-tree"),
-    index: Optional[int] = typer.Option(None, "--index", "-i", help="Control index from get-tree"),
+    control: Optional[str] = typer.Option(
+        None, "--control", "-c", help="Control or #N from get-tree"
+    ),
+    index: Optional[int] = typer.Option(
+        None, "--index", "-i", help="Control index from get-tree"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -731,7 +877,13 @@ def double_click_cmd(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -743,8 +895,12 @@ def double_click_cmd(
         win = app.window()
         control = _resolve_control_from_index(control, index)
         if not control:
-            return _output({"success": False, "stdout": "", "stderr": "Need --control or --index"})
-        ctrl, err = _find_control(win, control, None if control.startswith("#") else index)
+            return _output(
+                {"success": False, "stdout": "", "stderr": "Need --control or --index"}
+            )
+        ctrl, err = _find_control(
+            win, control, None if control.startswith("#") else index
+        )
         if err:
             _output(err)
             return
@@ -756,8 +912,12 @@ def double_click_cmd(
 
 @app.command(name="right-click")
 def right_click_cmd(
-    control: Optional[str] = typer.Option(None, "--control", "-c", help="Control or #N from get-tree"),
-    index: Optional[int] = typer.Option(None, "--index", "-i", help="Control index from get-tree"),
+    control: Optional[str] = typer.Option(
+        None, "--control", "-c", help="Control or #N from get-tree"
+    ),
+    index: Optional[int] = typer.Option(
+        None, "--index", "-i", help="Control index from get-tree"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -769,7 +929,13 @@ def right_click_cmd(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -781,7 +947,9 @@ def right_click_cmd(
         win = app.window()
         control = _resolve_control_from_index(control, index)
         if control:
-            ctrl, err = _find_control(win, control, None if control.startswith("#") else index)
+            ctrl, err = _find_control(
+                win, control, None if control.startswith("#") else index
+            )
             if err:
                 _output(err)
                 return
@@ -795,10 +963,18 @@ def right_click_cmd(
 
 @app.command()
 def hover(
-    control: Optional[str] = typer.Option(None, "--control", "-c", help="Control or #N from get-tree"),
-    x: Optional[int] = typer.Option(None, "--x", help="Screen X coordinate (used if --control omitted)"),
-    y: Optional[int] = typer.Option(None, "--y", help="Screen Y coordinate (used if --control omitted)"),
-    index: Optional[int] = typer.Option(None, "--index", "-i", help="Control index from get-tree"),
+    control: Optional[str] = typer.Option(
+        None, "--control", "-c", help="Control or #N from get-tree"
+    ),
+    x: Optional[int] = typer.Option(
+        None, "--x", help="Screen X coordinate (used if --control omitted)"
+    ),
+    y: Optional[int] = typer.Option(
+        None, "--y", help="Screen Y coordinate (used if --control omitted)"
+    ),
+    index: Optional[int] = typer.Option(
+        None, "--index", "-i", help="Control index from get-tree"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -810,12 +986,24 @@ def hover(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     control = _resolve_control_from_index(control, index)
     if control is None and (x is None or y is None):
-        _output({"success": False, "stdout": "", "stderr": "Need --control, --index, or both --x and --y"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "Need --control, --index, or both --x and --y",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -826,7 +1014,9 @@ def hover(
     try:
         if control:
             win = app.window()
-            ctrl, err = _find_control(win, control, None if control.startswith("#") else index)
+            ctrl, err = _find_control(
+                win, control, None if control.startswith("#") else index
+            )
             if err:
                 _output(err)
                 return
@@ -842,13 +1032,23 @@ def hover(
 
 @app.command()
 def drag(
-    to_control: Optional[str] = typer.Option(None, "--to-control", help="Drag to this control's center"),
+    to_control: Optional[str] = typer.Option(
+        None, "--to-control", help="Drag to this control's center"
+    ),
     to_x: Optional[int] = typer.Option(None, "--to-x", help="Drag to X (screen coord)"),
     to_y: Optional[int] = typer.Option(None, "--to-y", help="Drag to Y (screen coord)"),
-    from_control: Optional[str] = typer.Option(None, "--from-control", help="Start drag from this control"),
-    from_x: Optional[int] = typer.Option(None, "--from-x", help="Start X (used if --from-control omitted)"),
-    from_y: Optional[int] = typer.Option(None, "--from-y", help="Start Y (used if --from-control omitted)"),
-    button: str = typer.Option("left", "--button", "-b", help="Mouse button: left, right, middle"),
+    from_control: Optional[str] = typer.Option(
+        None, "--from-control", help="Start drag from this control"
+    ),
+    from_x: Optional[int] = typer.Option(
+        None, "--from-x", help="Start X (used if --from-control omitted)"
+    ),
+    from_y: Optional[int] = typer.Option(
+        None, "--from-y", help="Start Y (used if --from-control omitted)"
+    ),
+    button: str = typer.Option(
+        "left", "--button", "-b", help="Mouse button: left, right, middle"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -860,11 +1060,23 @@ def drag(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     if to_control is None and (to_x is None or to_y is None):
-        _output({"success": False, "stdout": "", "stderr": "Need --to-control or both --to-x and --to-y"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "Need --to-control or both --to-x and --to-y",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -884,7 +1096,10 @@ def drag(
             press_coords = (from_x, from_y)
         else:
             rect = win.rectangle()
-            press_coords = ((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2)
+            press_coords = (
+                (rect.left + rect.right) // 2,
+                (rect.top + rect.bottom) // 2,
+            )
 
         if to_control:
             ctrl, err = _find_control(win, to_control, None)
@@ -908,8 +1123,12 @@ def drag(
 @app.command(name="type")
 def type_text(
     text: str = typer.Option(..., "--text", "-t", help="Text to type"),
-    control: Optional[str] = typer.Option(None, "--control", "-c", help="Target control or #N from get-tree"),
-    index: Optional[int] = typer.Option(None, "--index", "-i", help="Control index from get-tree"),
+    control: Optional[str] = typer.Option(
+        None, "--control", "-c", help="Target control or #N from get-tree"
+    ),
+    index: Optional[int] = typer.Option(
+        None, "--index", "-i", help="Control index from get-tree"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id", help="App session ID"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -921,7 +1140,13 @@ def type_text(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -933,7 +1158,9 @@ def type_text(
         win = app.window()
         control = _resolve_control_from_index(control, index)
         if control:
-            ctrl, err = _find_control(win, control, None if control.startswith("#") else index)
+            ctrl, err = _find_control(
+                win, control, None if control.startswith("#") else index
+            )
             if err:
                 _output(err)
                 return
@@ -955,7 +1182,9 @@ def type_text(
 
 @app.command(name="type-keys")
 def type_keys_cmd(
-    keys: str = typer.Option(..., "--keys", "-k", help="Key sequence, e.g. ^a, {ENTER}"),
+    keys: str = typer.Option(
+        ..., "--keys", "-k", help="Key sequence, e.g. ^a, {ENTER}"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -967,7 +1196,13 @@ def type_keys_cmd(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -999,7 +1234,13 @@ def screenshot(
         from pywinauto import Application
         from datetime import datetime
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -1022,8 +1263,12 @@ def screenshot(
 
 @app.command(name="get-tree")
 def get_tree_cmd(
-    depth: int = typer.Option(99, "--depth", "-d", help="Tree depth（与 click -i 序号对应，默认全树）"),
-    control: Optional[str] = typer.Option(None, "--control", "-c", help="Start from control or #N"),
+    depth: int = typer.Option(
+        99, "--depth", "-d", help="Tree depth（与 click -i 序号对应，默认全树）"
+    ),
+    control: Optional[str] = typer.Option(
+        None, "--control", "-c", help="Start from control or #N"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -1035,7 +1280,13 @@ def get_tree_cmd(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -1062,13 +1313,16 @@ def get_tree_cmd(
                 if ctrl.exists():
                     start = ctrl
         lines = []
-        for n, elem, d in _traverse_controls(start, depth, start_idx):
+        # 始终使用 depth_limit=99 遍历全树，但只显示深度 <= depth 的节点
+        for n, elem, d in _traverse_controls(start, 99, start_idx, depth):
             try:
                 ct = elem.element_info.control_type
                 name = elem.window_text() or ""
-                aid = getattr(elem.element_info, 'automation_id', '') or ""
+                aid = getattr(elem.element_info, "automation_id", "") or ""
                 rect = elem.rectangle()
-                lines.append("  " * d + f"#{n} [{ct}] name={name!r} auto_id={aid!r} rect={rect}")
+                lines.append(
+                    "  " * d + f"#{n} [{ct}] name={name!r} auto_id={aid!r} rect={rect}"
+                )
             except Exception:
                 pass
         _output({"success": True, "stdout": "\n".join(lines), "stderr": ""})
@@ -1078,7 +1332,9 @@ def get_tree_cmd(
 
 @app.command()
 def menu(
-    menu_path: str = typer.Option(..., "--path", "-p", help="Menu path, e.g. File->Open"),
+    menu_path: str = typer.Option(
+        ..., "--path", "-p", help="Menu path, e.g. File->Open"
+    ),
     app_id: str = typer.Option(DEFAULT_APP_ID, "--app-id"),
     process: Optional[str] = typer.Option(None, "--process"),
     title: Optional[str] = typer.Option(None, "--title"),
@@ -1090,7 +1346,13 @@ def menu(
     try:
         from pywinauto import Application
     except ImportError:
-        _output({"success": False, "stdout": "", "stderr": "pywinauto not installed. Run: pip install pywinauto"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "pywinauto not installed. Run: pip install pywinauto",
+            }
+        )
         return
 
     app, err = _get_app(app_id, process, title, pid, backend)
@@ -1101,7 +1363,9 @@ def menu(
     try:
         win = app.window()
         win.menu_select(menu_path)
-        _output({"success": True, "stdout": f"Menu selected: {menu_path}", "stderr": ""})
+        _output(
+            {"success": True, "stdout": f"Menu selected: {menu_path}", "stderr": ""}
+        )
     except Exception as e:
         _output({"success": False, "stdout": "", "stderr": f"Menu failed: {e}"})
 
@@ -1113,7 +1377,14 @@ def _run_ps(script: str, timeout: int = 30) -> Dict[str, Any]:
     """Run PowerShell script and return {success, stdout, stderr}."""
     try:
         r = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ],
             capture_output=True,
             timeout=timeout,
             encoding=get_default_encoding(),
@@ -1123,7 +1394,11 @@ def _run_ps(script: str, timeout: int = 30) -> Dict[str, Any]:
         err = (r.stderr or "").strip()
         return {"success": r.returncode == 0, "stdout": out, "stderr": err}
     except subprocess.TimeoutExpired:
-        return {"success": False, "stdout": "", "stderr": "PowerShell execution timed out"}
+        return {
+            "success": False,
+            "stdout": "",
+            "stderr": "PowerShell execution timed out",
+        }
     except Exception as e:
         return {"success": False, "stdout": "", "stderr": str(e)}
 
@@ -1156,7 +1431,13 @@ Set-ItemProperty -Path '{path}' -Name SystemUsesLightTheme -Value 1 -Type Dword 
 Write-Output "Theme: light"
 """
     else:
-        _output({"success": False, "stdout": "", "stderr": f"Invalid mode: {mode}. Use dark, light, or toggle"})
+        _output(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": f"Invalid mode: {mode}. Use dark, light, or toggle",
+            }
+        )
         return
     _output(_run_ps(script))
 
@@ -1164,7 +1445,9 @@ Write-Output "Theme: light"
 @config_app.command("power-plan")
 def config_power_plan(
     action: str = typer.Argument(..., help="list | set"),
-    plan_id: Optional[str] = typer.Option(None, "--id", help="电源方案 GUID（set 时必需）"),
+    plan_id: Optional[str] = typer.Option(
+        None, "--id", help="电源方案 GUID（set 时必需）"
+    ),
 ) -> None:
     """列出或切换电源计划"""
     _ensure_windows()
@@ -1174,19 +1457,35 @@ def config_power_plan(
         return
     if action == "set":
         if not plan_id:
-            _output({"success": False, "stdout": "", "stderr": "Need --id (plan GUID) for 'set'"})
+            _output(
+                {
+                    "success": False,
+                    "stdout": "",
+                    "stderr": "Need --id (plan GUID) for 'set'",
+                }
+            )
             return
         script = f"powercfg /setactive {plan_id}"
         _output(_run_ps(script))
         return
-    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use list or set"})
+    _output(
+        {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Invalid action: {action}. Use list or set",
+        }
+    )
 
 
 @config_app.command("proxy")
 def config_proxy(
     action: str = typer.Argument(..., help="get | enable | disable | set"),
-    server: Optional[str] = typer.Option(None, "--server", help="代理地址，如 127.0.0.1:7890"),
-    bypass: Optional[str] = typer.Option(None, "--bypass", help="绕过列表，如 localhost;127.*"),
+    server: Optional[str] = typer.Option(
+        None, "--server", help="代理地址，如 127.0.0.1:7890"
+    ),
+    bypass: Optional[str] = typer.Option(
+        None, "--bypass", help="绕过列表，如 localhost;127.*"
+    ),
 ) -> None:
     """获取或设置系统代理"""
     _ensure_windows()
@@ -1219,7 +1518,9 @@ Write-Output "Proxy enabled: {server_val}"
         return
     if action == "set":
         if not server:
-            _output({"success": False, "stdout": "", "stderr": "Need --server for 'set'"})
+            _output(
+                {"success": False, "stdout": "", "stderr": "Need --server for 'set'"}
+            )
             return
         bypass_val = bypass or "localhost;127.*;10.*;172.16.*;192.168.*"
         script = f"""
@@ -1230,13 +1531,21 @@ Write-Output "Proxy set: {server}"
 """
         _output(_run_ps(script))
         return
-    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use get, enable, disable, or set"})
+    _output(
+        {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Invalid action: {action}. Use get, enable, disable, or set",
+        }
+    )
 
 
 @config_app.command("screen-timeout")
 def config_screen_timeout(
     action: str = typer.Argument(..., help="get | set"),
-    minutes: Optional[int] = typer.Option(None, "--minutes", "-m", help="熄屏分钟数，0 表示从不"),
+    minutes: Optional[int] = typer.Option(
+        None, "--minutes", "-m", help="熄屏分钟数，0 表示从不"
+    ),
 ) -> None:
     """获取或设置屏幕关闭超时（当前电源计划）"""
     _ensure_windows()
@@ -1246,14 +1555,22 @@ def config_screen_timeout(
         return
     if action == "set":
         if minutes is None:
-            _output({"success": False, "stdout": "", "stderr": "Need --minutes for 'set'"})
+            _output(
+                {"success": False, "stdout": "", "stderr": "Need --minutes for 'set'"}
+            )
             return
         ac_min = max(0, minutes)  # AC power
         dc_min = max(0, minutes)  # DC/battery
         script = f"powercfg /change monitor-timeout-ac {ac_min}; powercfg /change monitor-timeout-dc {dc_min}"
         _output(_run_ps(script))
         return
-    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use get or set"})
+    _output(
+        {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Invalid action: {action}. Use get or set",
+        }
+    )
 
 
 @config_app.command("remote-desktop")
@@ -1281,14 +1598,24 @@ Write-Output "Remote Desktop disabled (may need admin)"
 """
         _output(_run_ps(script))
         return
-    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use enable, disable, or get"})
+    _output(
+        {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Invalid action: {action}. Use enable, disable, or get",
+        }
+    )
 
 
 @config_app.command("startup")
 def config_startup(
     action: str = typer.Argument(..., help="list | enable | disable"),
-    name: Optional[str] = typer.Option(None, "--name", help="启动项名称（enable/disable 时）"),
-    path: Optional[str] = typer.Option(None, "--path", help="启动项路径/命令行（enable 时）"),
+    name: Optional[str] = typer.Option(
+        None, "--name", help="启动项名称（enable/disable 时）"
+    ),
+    path: Optional[str] = typer.Option(
+        None, "--path", help="启动项路径/命令行（enable 时）"
+    ),
 ) -> None:
     """列出启动项或启用/禁用（当前用户 Startup 文件夹）"""
     _ensure_windows()
@@ -1303,7 +1630,9 @@ Get-ChildItem -Path '{startup_dir}' -ErrorAction SilentlyContinue | ForEach-Obje
         return
     if action == "disable":
         if not name:
-            _output({"success": False, "stdout": "", "stderr": "Need --name for 'disable'"})
+            _output(
+                {"success": False, "stdout": "", "stderr": "Need --name for 'disable'"}
+            )
             return
         safe_name = name.replace("'", "''")
         script = f"""
@@ -1315,7 +1644,9 @@ else {{ Write-Error "Not found: {safe_name}" }}
         return
     if action == "enable":
         if not name:
-            _output({"success": False, "stdout": "", "stderr": "Need --name for 'enable'"})
+            _output(
+                {"success": False, "stdout": "", "stderr": "Need --name for 'enable'"}
+            )
             return
         safe_name = name.replace("'", "''")
         script = f"""
@@ -1327,7 +1658,13 @@ else {{ Write-Error "Not found: {safe_name}" }}
 """
         _output(_run_ps(script))
         return
-    _output({"success": False, "stdout": "", "stderr": f"Invalid action: {action}. Use list, enable, or disable"})
+    _output(
+        {
+            "success": False,
+            "stdout": "",
+            "stderr": f"Invalid action: {action}. Use list, enable, or disable",
+        }
+    )
 
 
 if __name__ == "__main__":
