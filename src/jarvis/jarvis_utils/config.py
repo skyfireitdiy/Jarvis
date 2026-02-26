@@ -27,7 +27,7 @@ def get_default_encoding() -> str:
 # 编码检测：常见编码尝试顺序（utf-8 优先，适配现代文件；gbk 次之，适配 Windows 中文）
 # 注意：不包含 'utf-16'，因为 Python 的 utf-16 编码器严格要求 BOM，而 BOM 检测已单独处理
 _DETECT_ENCODINGS = ["utf-8", "gbk", "gb2312", "utf-16-le", "utf-16-be", "latin1"]
-_DETECT_SAMPLE_SIZE = 8192  # 读取前 8KB 用于检测
+_DETECT_SAMPLE_SIZE = 16384  # 读取前 16KB 用于检测
 
 
 def detect_file_encoding(
@@ -58,7 +58,28 @@ def detect_file_encoding(
         if sample.startswith(b"\xff\xfe") or sample.startswith(b"\xfe\xff"):
             return "utf-16"
 
-        for encoding in _DETECT_ENCODINGS:
+        # 优先尝试 UTF-8，如果失败且错误位置在样本末尾附近，则增加样本重新检测
+        # 避免多字节字符被截断导致误判
+        utf8_encoding = "utf-8"
+        for attempt in range(3):  # 最多尝试 3 次
+            try:
+                sample.decode(utf8_encoding)
+                return utf8_encoding
+            except UnicodeDecodeError as e:
+                # 如果错误位置在样本末尾 100 字节内，可能是截断导致，尝试增加样本
+                if e.end >= len(sample) - 100:
+                    with open(file_path, "rb") as f:
+                        new_sample = f.read(sample_size * (attempt + 2))
+                    if len(new_sample) > len(sample):
+                        sample = new_sample
+                        continue
+                # 其他错误或文件已读完，跳出循环
+                break
+            except LookupError:
+                break
+
+        # UTF-8 检测失败，继续尝试其他编码
+        for encoding in _DETECT_ENCODINGS[1:]:  # 跳过 utf-8
             try:
                 sample.decode(encoding)
                 return encoding
