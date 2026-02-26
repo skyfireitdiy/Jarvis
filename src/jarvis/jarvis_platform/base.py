@@ -340,7 +340,6 @@ class BasePlatform(ABC):
 
                 # 只在内容超过最大高度时才截取，减少不必要的操作
                 final_text = new_text_obj
-                need_rebuild_panel = False
                 if len(lines) > max_text_height:
                     # 创建新的Text对象，避免直接修改plain属性导致内部状态不一致
                     # 这确保了Rich内部spans列表与文本内容保持同步
@@ -348,25 +347,23 @@ class BasePlatform(ABC):
                         "\n".join([line.plain for line in lines[-max_text_height:]]),
                         overflow="fold",
                     )
-                    need_rebuild_panel = True
 
                 # 使用锁保护 panel 更新，避免与 Live 内部线程冲突
                 with self._panel_lock:
                     # 在锁内只更新text_content和panel
                     text_content = final_text
 
-                    if need_rebuild_panel:
-                        # 重建panel对象，避免Live无法正确清除旧的panel显示
-                        # 当text_content对象被替换时，panel必须重建才能让Live正确处理
-                        current_subtitle = panel.subtitle
-                        panel = Panel(
-                            text_content,
-                            title=panel.title,
-                            subtitle=current_subtitle,
-                            border_style="cyan",
-                            box=box.ROUNDED,
-                            expand=True,
-                        )
+                    # 重建panel对象，确保panel始终引用最新的text_content
+                    # 这样无论内容是否超出高度，流式输出都能正常刷新
+                    current_subtitle = panel.subtitle
+                    panel = Panel(
+                        text_content,
+                        title=panel.title,
+                        subtitle=current_subtitle,
+                        border_style="cyan",
+                        box=box.ROUNDED,
+                        expand=True,
+                    )
 
                     # 只在需要时更新 subtitle（减少更新频率，避免重复渲染标题）
                     # 策略：每 10 次内容更新或每 3 秒更新一次 subtitle
