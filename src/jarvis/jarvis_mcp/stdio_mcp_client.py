@@ -136,6 +136,11 @@ class StdioMcpClient(McpClient):
             self.process.stdin.flush()
 
         except Exception as e:
+            # 静默处理管道断开错误（进程退出时的正常情况）
+            if isinstance(e, (BrokenPipeError, OSError)) and (
+                e.errno == 32 if hasattr(e, "errno") else True
+            ):
+                return
             PrettyOutput.auto_print(f"❌ 发送通知失败: {str(e)}")
             raise
 
