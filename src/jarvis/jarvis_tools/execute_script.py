@@ -20,8 +20,9 @@ _ANSI_ESCAPE = re.compile(
 # Windows ConPTY 有时只输出 OSC payload 而 ESC 被吞掉，导致混入：
 # 格式1: 0;pid/pid;C:\path\exe.EXE
 # 格式2: 0;C:\path\exe.EXE (pid/pid 部分缺失)
+# 格式3: 0;pid/pid (只有进程信息，无路径)
 _OSC_PAYLOAD_ORPHAN = re.compile(
-    r"0;(?:\d+/\d+;)?[^\n\r]*\.(?:EXE|exe|ps1|bat|cmd|py)\s*"
+    r"^\s*0;(?:\d+/\d+;?)?(?:[^\n\r]*\.(?:EXE|exe|ps1|bat|cmd|py)\s*)?\s*"
 )
 
 
@@ -163,7 +164,9 @@ class ScriptTool:
                         if remaining_data:
                             text = self._strip_ansi(
                                 self._decode_windows_output(
-                                    remaining_data if isinstance(remaining_data, bytes) else remaining_data.encode()
+                                    remaining_data
+                                    if isinstance(remaining_data, bytes)
+                                    else remaining_data.encode()
                                 )
                             )
                             # 只输出非空内容，避免输出清理后的空行
@@ -200,9 +203,9 @@ class ScriptTool:
                 import msvcrt
 
                 while proc.isalive():
-                    if msvcrt.kbhit():
+                    if msvcrt.kbhit():  # type: ignore[attr-defined]
                         try:
-                            ch = msvcrt.getwch()
+                            ch = msvcrt.getwch()  # type: ignore[attr-defined]
                             proc.write(ch)
                         except (EOFError, OSError, UnicodeEncodeError):
                             break
@@ -252,9 +255,7 @@ class ScriptTool:
             }
 
         exit_code = (
-            getattr(proc, "exitstatus", None)
-            or getattr(proc, "returncode", None)
-            or 0
+            getattr(proc, "exitstatus", None) or getattr(proc, "returncode", None) or 0
         )
         read_done.wait(timeout=2)
         output = "".join(captured).strip()
@@ -301,9 +302,7 @@ class ScriptTool:
                     env=env,
                 )
                 try:
-                    stdout_bytes, stderr_bytes = proc.communicate(
-                        timeout=get_timeout()
-                    )
+                    stdout_bytes, stderr_bytes = proc.communicate(timeout=get_timeout())
                 except subprocess.TimeoutExpired:
                     try:
                         proc.terminate()
@@ -326,8 +325,7 @@ class ScriptTool:
                     self._decode_windows_output(stderr_bytes or b"")
                 )
                 output = (
-                    stdout_str
-                    + ("\n" + stderr_str if stderr_str else "")
+                    stdout_str + ("\n" + stderr_str if stderr_str else "")
                 ).strip()
                 return {
                     "success": proc.returncode == 0,
@@ -444,8 +442,7 @@ class ScriptTool:
                 else:
                     # Unix/Linux: 使用 script 命令捕获 stdout 和 stderr
                     tee_command = (
-                        f"script -q -c '{interpreter} {script_path}' "
-                        f"{output_file}"
+                        f"script -q -c '{interpreter} {script_path}' {output_file}"
                     )
                     timed_out = False
                     if is_non_interactive():
