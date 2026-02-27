@@ -219,13 +219,11 @@ class RulesManager:
                             # 如果没有 description，使用文件名
                             description = os.path.splitext(filename)[0]
 
-                        # 计算相对路径作为规则名
-                        rel_path = os.path.relpath(file_path, builtin_rules_dir)
+                        # 使用实际的绝对路径
+                        abs_path = os.path.abspath(file_path)
 
-                        # 格式: - [规则名](路径)
-                        index_lines.append(
-                            f"- [{rel_path}]({{ jarvis_src_dir }}/builtin/rules/{rel_path})"
-                        )
+                        # 格式: - [description](absolute_path)
+                        index_lines.append(f"- [{description}]({abs_path})")
                     except Exception:
                         continue
 
