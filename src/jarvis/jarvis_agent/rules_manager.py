@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+from pathlib import Path
 
 from jarvis.jarvis_utils.output import PrettyOutput
 
@@ -132,7 +133,29 @@ class RulesManager:
             rule_file_path = os.path.join(rules_dir, rule_name)
             if os.path.exists(rule_file_path) and os.path.isfile(rule_file_path):
                 with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read().strip()
+                    content = f.read()
+
+                # 去除 YAML Front Matter 头部
+                if content.startswith("---"):
+                    lines = content.split("\n")
+                    found_first = False
+                    found_second = False
+                    new_lines = []
+                    for line in lines:
+                        if not found_second:
+                            if line.strip() == "---":
+                                if not found_first:
+                                    # 找到第一个 ---
+                                    found_first = True
+                                else:
+                                    # 找到第二个 ---，开始收集内容
+                                    found_second = True
+                            continue
+                        new_lines.append(line)
+                    content = "\n".join(new_lines).strip()
+                else:
+                    content = content.strip()
+
                 # 使用jinja2渲染规则模板
                 if content:
                     # 使用规则文件所在目录作为模板渲染的上下文
@@ -146,10 +169,13 @@ class RulesManager:
         return None
 
     def _get_builtin_rules_index(self) -> Optional[str]:
-        """读取 rule.md 索引文件的完整内容
+        """自动从规则文件生成索引（规则名：描述）
+
+        扫描 builtin/rules/ 目录，从每个 .md 文件的 YAML Front Matter
+        头部提取 description 字段，生成索引内容。
 
         返回:
-            str: rule.md 的完整内容，如果未找到则返回 None
+            str: 索引内容，如果未找到规则则返回 None
         """
         try:
             from jarvis.jarvis_utils.template_utils import _get_builtin_dir
@@ -159,113 +185,151 @@ class RulesManager:
             if builtin_dir is None:
                 return None
 
-            index_file_path = builtin_dir / "rules" / "rule.md"
-
-            # 检查索引文件是否存在
-            if not index_file_path.exists() or not index_file_path.is_file():
+            builtin_rules_dir = builtin_dir / "rules"
+            if not builtin_rules_dir.exists() or not builtin_rules_dir.is_dir():
                 return None
 
-            # 读取索引文件内容
-            with open(index_file_path, "r", encoding="utf-8", errors="replace") as f:
-                index_content = f.read()
+            # 扫描所有 .md 文件
+            index_lines = []
+            for root, dirs, files in os.walk(builtin_rules_dir):
+                for filename in files:
+                    if not filename.endswith(".md"):
+                        continue
 
-            # 使用jinja2渲染规则模板
-            if index_content:
-                index_content = render_rule_template(
-                    index_content, str(index_file_path.parent)
-                )
+                    file_path = os.path.join(root, filename)
 
-            return index_content if index_content else None
+                    try:
+                        with open(
+                            file_path, "r", encoding="utf-8", errors="replace"
+                        ) as f:
+                            content = f.read()
+
+                        # 提取 YAML Front Matter 中的 description
+                        description = None
+                        if content.startswith("---"):
+                            lines = content.split("\n")
+                            for i, line in enumerate(lines[1:], 1):
+                                if line.strip() == "---":
+                                    break
+                                if line.startswith("description:"):
+                                    description = line.split(":", 1)[1].strip()
+                                    break
+
+                        if not description:
+                            # 如果没有 description，使用文件名
+                            description = os.path.splitext(filename)[0]
+
+                        # 计算相对路径作为规则名
+                        rel_path = os.path.relpath(file_path, builtin_rules_dir)
+
+                        # 格式: - [规则名](路径)
+                        index_lines.append(
+                            f"- [{rel_path}]({{ jarvis_src_dir }}/builtin/rules/{rel_path})"
+                        )
+                    except Exception:
+                        continue
+
+            if not index_lines:
+                return None
+
+            # 添加标题和分类
+            index_content = "# Jarvis 内置规则列表\n\n"
+            index_content += "\n".join(index_lines)
+
+            return index_content
 
         except Exception as e:
-            # 读取失败时忽略，不影响主流程
-            PrettyOutput.auto_print(f"⚠️ 读取rule.md失败: {e}")
+            # 生成索引失败时忽略，不影响主流程
+            PrettyOutput.auto_print(f"⚠️ 生成规则索引失败: {e}")
             return None
 
     def _get_rule_from_builtin_index(self, rule_name: str) -> Optional[str]:
-        """从 rule.md 索引文件中查找并加载指定名称的规则
+        """从 builtin/rules/ 目录中查找并加载指定名称的规则
 
-        该索引文件记录了内置规则的映射关系，格式为：
-        - [规则名称]({{ template_var }}/path/to/rule.md)
+        支持两种查找方式：
+        1. 直接路径：如 deployment/version_release.md
+        2. 短名称：如 solid，会搜索所有规则文件名匹配
 
         参数:
-            rule_name: 规则名称
+            rule_name: 规则名称（相对路径或短名称）
 
         返回:
             str: 规则内容，如果未找到则返回 None
         """
         try:
-            from jarvis.jarvis_utils.template_utils import (
-                _get_builtin_dir,
-                _get_jarvis_src_dir,
-            )
+            from jarvis.jarvis_utils.template_utils import _get_builtin_dir
 
             # 获取 builtin 目录路径
             builtin_dir = _get_builtin_dir()
             if builtin_dir is None:
                 return None
 
-            index_file_path = builtin_dir / "rules" / "rule.md"
-
-            # 检查索引文件是否存在
-            if not index_file_path.exists() or not index_file_path.is_file():
+            builtin_rules_dir = builtin_dir / "rules"
+            if not builtin_rules_dir.exists() or not builtin_rules_dir.is_dir():
                 return None
 
-            # 读取索引文件内容
-            with open(index_file_path, "r", encoding="utf-8", errors="replace") as f:
-                index_content = f.read()
+            # 构造规则文件路径
+            if not rule_name.endswith(".md"):
+                rule_name = rule_name + ".md"
+            rule_file_path = builtin_rules_dir / rule_name
 
-            # 解析索引文件，查找匹配的规则
-            # 格式: - [规则名称](路径)
-            import re
+            # 检查规则文件是否存在（支持直接路径）
+            if not rule_file_path.exists() or not rule_file_path.is_file():
+                # 如果直接路径不存在，尝试搜索文件名匹配
+                # 去掉 .md 后缀进行匹配
+                search_name = rule_name.replace(".md", "")
+                for root, dirs, files in os.walk(builtin_rules_dir):
+                    for filename in files:
+                        if not filename.endswith(".md"):
+                            continue
+                        # 检查文件名是否匹配（支持短名称）
+                        file_stem = os.path.splitext(filename)[0]
+                        if search_name.lower() in file_stem.lower():
+                            rule_file_path = Path(root) / filename
+                            break
+                    else:
+                        continue
+                    break
+                else:
+                    return None
 
-            pattern = rf"-\s*\[{re.escape(rule_name)}\]\(([^)]+)\)"
-            match = re.search(pattern, index_content)
-
-            if not match:
-                return None
-
-            # 提取规则文件路径
-            rule_file_template = match.group(1).strip()
-
-            # 渲染模板变量（支持 {{ jarvis_src_dir }} 和 {{ rule_file_dir }}）
-            # 为了向后兼容，仍然提供 jarvis_src_dir（指向 builtin 目录的父目录）
-            jarvis_src_dir = (
-                str(builtin_dir.parent) if builtin_dir else _get_jarvis_src_dir()
-            )
-            context = {
-                "jarvis_src_dir": jarvis_src_dir,
-                "rule_file_dir": str(index_file_path.parent),
-            }
-
-            try:
-                from jinja2 import Template
-
-                template = Template(rule_file_template)
-                rule_file_path = template.render(**context)
-            except Exception:
-                # 模板渲染失败，直接使用原始路径
-                rule_file_path = rule_file_template
-
-            # 检查规则文件是否存在
-            if not os.path.exists(rule_file_path) or not os.path.isfile(rule_file_path):
+            if not rule_file_path.exists() or not rule_file_path.is_file():
                 return None
 
             # 读取规则文件内容
             with open(rule_file_path, "r", encoding="utf-8", errors="replace") as f:
-                rule_content = f.read().strip()
+                content = f.read()
+
+            # 去除 YAML Front Matter 头部
+            if content.startswith("---"):
+                lines = content.split("\n")
+                found_first = False
+                found_second = False
+                new_lines = []
+                for line in lines:
+                    if not found_second:
+                        if line.strip() == "---":
+                            if not found_first:
+                                # 找到第一个 ---
+                                found_first = True
+                            else:
+                                # 找到第二个 ---，开始收集内容
+                                found_second = True
+                        continue
+                    new_lines.append(line)
+                content = "\n".join(new_lines).strip()
+            else:
+                content = content.strip()
 
             # 使用jinja2渲染规则模板
-            if rule_content:
-                rule_content = render_rule_template(
-                    rule_content, os.path.dirname(rule_file_path)
-                )
+            if content:
+                content = render_rule_template(content, str(rule_file_path.parent))
 
-            return rule_content if rule_content else None
+            return content if content else None
 
         except Exception as e:
             # 读取失败时忽略，不影响主流程
-            PrettyOutput.auto_print(f"⚠️ 从索引文件加载规则失败: {e}")
+            PrettyOutput.auto_print(f"⚠️ 从规则目录加载规则失败: {e}")
             return None
 
     def _get_all_rules_dirs(self) -> List[str]:
@@ -364,7 +428,7 @@ class RulesManager:
                                     str(builtin_rules_dir), actual_name
                                 )
                                 return rule_content
-                    except Exception as e:
+                    except Exception:
                         pass
                     return None
 
