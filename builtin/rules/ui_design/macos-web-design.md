@@ -1,5 +1,5 @@
 ---
-description: macOS Web设计规则
+description: macOS Web设计规则。适用于macOS风格Web设计、桌面端UI设计、macOS界面设计等场景
 ---
 
 # macOS Web 设计规范

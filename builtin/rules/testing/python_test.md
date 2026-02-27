@@ -1,5 +1,5 @@
 ---
-description: Python测试规则，Python项目测试框架使用规范
+description: Python测试规则，Python项目测试框架使用规范。适用于Python项目测试、单元测试、集成测试、测试框架配置等场景
 ---
 
 # Python 测试规则

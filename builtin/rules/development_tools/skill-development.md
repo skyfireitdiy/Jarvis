@@ -4,7 +4,7 @@
 <!-- markdownlint-disable MD012 -->
 <!-- YAML Front Matter -->
 ---
-description: Skill开发规则，Jarvis Skill功能开发规范
+description: Skill开发规则，Jarvis Skill功能开发规范。适用于Skill开发、功能扩展、插件开发等场景
 ---
 
 

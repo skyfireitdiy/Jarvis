@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD022 MD012 -->
 <!-- YAML Front Matter -->
 ---
-description: 添加内置快捷命令规则，说明如何添加@触发的内置快捷命令
+description: 添加内置快捷命令规则，说明如何添加@触发的内置快捷命令。适用于添加内置命令、命令开发、快捷键配置等场景
 ---
 
 

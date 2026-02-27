@@ -1,5 +1,5 @@
 ---
-description: LSP工具使用规则，Language Server Protocol工具配置和使用
+description: LSP工具使用规则，Language Server Protocol工具配置和使用。适用于代码编辑器配置、LSP服务集成、开发环境搭建等场景
 ---
 
 # LSP 工具使用规则

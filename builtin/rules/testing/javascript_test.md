@@ -1,5 +1,5 @@
 ---
-description: JavaScript测试规则
+description: JavaScript测试规则。适用于JavaScript/TypeScript项目测试、前端测试、单元测试等场景
 ---
 
 # JavaScript/TypeScript 测试规则

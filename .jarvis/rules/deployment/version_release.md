@@ -3,7 +3,7 @@
 <!-- markdownlint-disable MD022 MD012 -->
 <!-- YAML Front Matter -->
 ---
-description: 版本发布规则，规范Jarvis项目的版本发布流程，确保版本号的正确性和ReleaseNote的格式一致性
+description: 版本发布规则，规范Jarvis项目的版本发布流程，确保版本号的正确性和ReleaseNote的格式一致性。适用于版本发布、版本管理、ReleaseNote编写等场景
 ---
 
 
