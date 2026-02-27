@@ -28,6 +28,7 @@ LINT_AUTO_FIX_COMMANDS: Dict[str, List[str]] = {
     "flake8": [],  # flake8没有自动修复功能
     # JavaScript/TypeScript
     "eslint": ["eslint --fix {file_path}"],
+    "prettier": ["prettier --write {file_path}"],
     # Rust
     "cargo": ["cargo clippy --fix --allow-dirty"],
     "clippy": ["cargo clippy --fix --allow-dirty"],
@@ -43,6 +44,14 @@ LINT_AUTO_FIX_COMMANDS: Dict[str, List[str]] = {
     "phpstan": [],  # phpstan没有自动修复功能
     # SQL
     "sqlfluff": ["sqlfluff fix {file_path}"],
+    # Markdown/Documentation
+    "markdownlint": ["markdownlint --fix {file_path}"],
+    # CSS/SCSS/SASS/LESS
+    "stylelint": ["stylelint --fix {file_path}"],
+    # Swift
+    "swiftlint": ["swiftlint --fix {file_path}"],
+    # Kotlin
+    "ktlint": ["ktlint -F {file_path}"],
 }
 
 
