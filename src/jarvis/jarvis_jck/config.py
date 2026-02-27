@@ -120,6 +120,69 @@ LINT_TOOLS_CONFIG: List[Dict[str, str]] = [
         "install_hint": "安装：gem install rubocop"
         "\n  或访问 https://docs.rubocop.org/ 查看文档",
     },
+    {
+        "name": "pylint",
+        "command": "pylint",
+        "description": "Python代码检查工具",
+        "install_hint": "安装：pip install pylint"
+        "\n  或访问 https://pylint.org/ 查看文档",
+    },
+    {
+        "name": "flake8",
+        "command": "flake8",
+        "description": "Python代码风格检查工具",
+        "install_hint": "安装：pip install flake8"
+        "\n  或访问 https://flake8.pycqa.org/ 查看文档",
+    },
+    {
+        "name": "prettier",
+        "command": "prettier",
+        "description": "通用代码格式化工具（JS/TS/CSS/HTML/JSON/Markdown等）",
+        "install_hint": "安装：npm install -g prettier"
+        "\n  或访问 https://prettier.io/ 查看文档",
+    },
+    {
+        "name": "markdownlint",
+        "command": "markdownlint",
+        "description": "Markdown文件检查和格式化工具",
+        "install_hint": "安装：npm install -g markdownlint-cli"
+        "\n  或访问 https://github.com/igorshubovych/markdownlint-cli 查看文档",
+    },
+    {
+        "name": "stylelint",
+        "command": "stylelint",
+        "description": "CSS/SCSS/SASS/LESS样式检查工具",
+        "install_hint": "安装：npm install -g stylelint"
+        "\n  或访问 https://stylelint.io/ 查看文档",
+    },
+    {
+        "name": "swiftlint",
+        "command": "swiftlint",
+        "description": "Swift代码检查和格式化工具",
+        "install_hint": "安装：brew install swiftlint (macOS)"
+        "\n  或访问 https://github.com/realm/SwiftLint 查看文档",
+    },
+    {
+        "name": "ktlint",
+        "command": "ktlint",
+        "description": "Kotlin代码格式化工具",
+        "install_hint": "安装：brew install ktlint (macOS)"
+        "\n  或访问 https://github.com/pinterest/ktlint 查看文档",
+    },
+    {
+        "name": "sqlfluff",
+        "command": "sqlfluff",
+        "description": "SQL代码格式化和检查工具",
+        "install_hint": "安装：pip install sqlfluff"
+        "\n  或访问 https://docs.sqlfluff.com/ 查看文档",
+    },
+    {
+        "name": "phpstan",
+        "command": "phpstan",
+        "description": "PHP静态分析工具",
+        "install_hint": "安装：composer global require phpstan/phpstan"
+        "\n  或访问 https://phpstan.org/ 查看文档",
+    },
 ]
 
 # 构建工具配置列表
