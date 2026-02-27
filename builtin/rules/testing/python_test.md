@@ -1,3 +1,7 @@
+---
+description: Python测试规则，Python项目测试框架使用规范
+---
+
 # Python 测试规则
 
 ## ⚠️ 你必须遵守的核心要求

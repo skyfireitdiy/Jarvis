@@ -1,3 +1,7 @@
+---
+description: Jarvis工具使用规则
+---
+
 # Jarvis Tool CLI 使用规则
 
 ## 规则简介

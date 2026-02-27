@@ -1,3 +1,7 @@
+---
+description: Jarvis帮助规则，Jarvis系统帮助信息和使用指南
+---
+
 # Jarvis 帮助规则
 
 ## 规则简介

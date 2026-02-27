@@ -1,3 +1,10 @@
+<!-- markdownlint-disable MD022 MD012 -->
+<!-- YAML Front Matter -->
+---
+description: Hacker News搜索规则
+---
+
+
 # Hacker News 搜索规则
 
 ## 规则简介

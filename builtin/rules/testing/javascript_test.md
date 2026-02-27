@@ -1,3 +1,7 @@
+---
+description: JavaScript测试规则
+---
+
 # JavaScript/TypeScript 测试规则
 
 ## ⚠️ 你必须遵守的核心要求

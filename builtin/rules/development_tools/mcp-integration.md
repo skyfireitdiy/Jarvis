@@ -1,3 +1,7 @@
+---
+description: MCP集成规则，Model Context Protocol集成规范
+---
+
 # MCP集成规则
 
 ## 规则简介
