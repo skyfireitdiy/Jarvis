@@ -820,8 +820,6 @@ def run_cli(
     is_check_mode = check or check_lint or check_build or check_tool_name is not None
 
     if is_check_mode:
-        from jarvis.jarvis_utils.output import OutputType
-
         # 检查选项互斥性
         check_flags = [check_lint, check_build]
         active_flags = sum(check_flags)
@@ -847,9 +845,8 @@ def run_cli(
                 "summary": summary,
                 "results": results,
             }
-            PrettyOutput.print(
-                json.dumps(output, ensure_ascii=False, indent=2),
-                output_type=OutputType.CODE,
+            PrettyOutput.auto_print(
+                "📝 " + json.dumps(output, ensure_ascii=False, indent=2),
                 lang="json",
             )
         else:
