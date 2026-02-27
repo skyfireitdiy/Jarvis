@@ -1070,6 +1070,19 @@ class SessionManager:
         if not self.agent:
             return
 
+        # 保存短期记忆
+        short_term_memories = []
+        try:
+            from jarvis.jarvis_utils.globals import get_short_term_memories
+
+            short_term_memories = get_short_term_memories()
+            if short_term_memories:
+                PrettyOutput.auto_print(
+                    f"💾 保存 {len(short_term_memories)} 条短期记忆"
+                )
+        except Exception as e:
+            PrettyOutput.auto_print(f"⚠️ 获取短期记忆失败: {e}")
+
         session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
         os.makedirs(session_dir, exist_ok=True)
 
@@ -1081,6 +1094,7 @@ class SessionManager:
 
         # 构建要保存的状态数据
         state_data = {
+            "short_term_memories": short_term_memories,
             "session_manager": {
                 "prompt": self.prompt,
                 "user_data": self.user_data,
@@ -1153,6 +1167,47 @@ class SessionManager:
             if not self.last_restored_session:
                 return
 
+            # 恢复短期记忆
+            restored_short_term_count = 0
+            try:
+                session_file = os.path.basename(self.last_restored_session)
+                timestamp = self._extract_timestamp(session_file)
+
+                if not timestamp:
+                    PrettyOutput.auto_print("ℹ️ 会话文件无时间戳，跳过短期记忆恢复")
+                else:
+                    # 构建状态文件路径
+                    session_dir = os.path.join(os.getcwd(), ".jarvis", "sessions")
+                    prefix = self._get_session_file_prefix()
+                    state_file = os.path.join(
+                        session_dir,
+                        f"{prefix}_{timestamp}_state.json",
+                    )
+
+                    if os.path.exists(state_file):
+                        with open(state_file, "r", encoding="utf-8") as f:
+                            state_data = json.load(f)
+
+                        short_term_memories = state_data.get("short_term_memories", [])
+                        if short_term_memories:
+                            from jarvis.jarvis_utils.globals import (
+                                add_short_term_memory,
+                            )
+
+                            for memory_data in short_term_memories:
+                                try:
+                                    add_short_term_memory(memory_data)
+                                    restored_short_term_count += 1
+                                except Exception as e:
+                                    PrettyOutput.auto_print(f"⚠️ 恢复短期记忆失败: {e}")
+
+                            if restored_short_term_count > 0:
+                                PrettyOutput.auto_print(
+                                    f"💾 已恢复 {restored_short_term_count} 条短期记忆"
+                                )
+            except Exception as e:
+                PrettyOutput.auto_print(f"⚠️ 恢复短期记忆失败: {e}")
+
             session_file = os.path.basename(self.last_restored_session)
             timestamp = self._extract_timestamp(session_file)
 
@@ -1175,6 +1230,8 @@ class SessionManager:
             # 从文件加载状态数据
             with open(state_file, "r", encoding="utf-8") as f:
                 state_data = json.load(f)
+
+            # 注意：短期记忆已在文件开头恢复，这里不再处理
 
             # 恢复SessionManager状态
             session_manager_state = state_data.get("session_manager", {})
