@@ -62,8 +62,8 @@ def create_analysis_agent(task_id: str, force_save_memory: bool = False) -> Agen
 - 禁止修改任何文件或执行写操作命令（rm/mv/cp/echo >、sed -i、git、patch、chmod、chown 等）；仅进行只读分析与读取。
 - 每次仅执行一个操作；等待工具结果后再进行下一步。
 - **记忆使用**：
-  - 在分析过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是与当前分析函数相关的记忆。
-  - 如果有必要，使用 save_memory 工具保存每个函数的分析要点，使用函数名作为 tag（例如：函数名、文件名等）。
+  - 在分析过程中，充分利用 memory 工具（action=retrieve）检索已有的记忆，特别是与当前分析函数相关的记忆。
+  - 如果有必要，使用 memory 工具（action=save）保存每个函数的分析要点，使用函数名作为 tag（例如：函数名、文件名等）。
   - 记忆内容示例：某个函数的指针已经判空、某个函数已有输入校验、某个函数的调用路径分析结果等。
   - 这样可以避免重复分析，提高效率，并保持分析的一致性。
 - 完成对本批次候选问题的判断后，主输出仅打印结束符 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
@@ -81,7 +81,7 @@ def create_analysis_agent(task_id: str, force_save_memory: bool = False) -> Agen
         use_analysis=False,
         output_handler=[ToolRegistry()],
         force_save_memory=force_save_memory,
-        use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
+        use_tools=["read_code", "execute_script", "memory"],
     )
     return Agent(**agent_kwargs)
 
@@ -105,7 +105,7 @@ def create_review_agent(
         use_methodology=False,
         use_analysis=False,
         output_handler=[ToolRegistry()],
-        use_tools=["read_code", "execute_script", "retrieve_memory", "save_memory"],
+        use_tools=["read_code", "execute_script", "memory"],
     )
     return Agent(**review_agent_kwargs)
 
@@ -131,6 +131,6 @@ def create_cluster_agent(
         use_analysis=False,
         output_handler=[ToolRegistry()],
         force_save_memory=force_save_memory,
-        use_tools=["read_code", "execute_script", "save_memory", "retrieve_memory"],
+        use_tools=["read_code", "execute_script", "memory"],
     )
     return Agent(**agent_kwargs_cluster)

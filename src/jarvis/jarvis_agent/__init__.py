@@ -253,14 +253,14 @@ origin_agent_system_prompt = f"""
 使用 `load_rule` 加载相关规则和最佳实践，理解规则约束和要求。仅在需要专业知识指导时执行。
 
 #### COLLECT（收集信息）
-只读收集必要信息：必要时可使用 `retrieve_memory` 工具检索相关记忆获取历史信息；使用合适的工具（如搜索工具、查询工具等）精准定位和获取相关信息，禁止臆测。对于代码任务，使用搜索工具（rg、fd）定位文件（必须带目录/后缀过滤），读取目标文件及直接依赖。
+只读收集必要信息：必要时可使用 `memory` 工具（action=retrieve）检索相关记忆获取历史信息；使用合适的工具（如搜索工具、查询工具等）精准定位和获取相关信息，禁止臆测。对于代码任务，使用搜索工具（rg、fd）定位文件（必须带目录/后缀过滤），读取目标文件及直接依赖。
 
 #### HYPOTHESIZE（提出方案）
 基于收集的信息提出多个可行方案，对比各方案的优劣、风险、成本，询问用户偏好。用户答复后，根据任务复杂程度决定是否使用 `task_list_manager` 创建任务列表，并制定详细执行计划。**必须明确每个方案的验收标准和清晰的执行步骤**，确保可衡量、可验证、可执行。
 
 **重要：此阶段完成后，必须经过用户确认，才能进入到EXECUTE阶段。**
 
-**用户确认方案后，必须使用 `save_memory` 工具将确认的方案保存到短期记忆中**，以便在执行过程中随时参考。保存时应包含：
+**用户确认方案后，必须使用 `memory` 工具（action=save）将确认的方案保存到短期记忆中**，以便在执行过程中随时参考。保存时应包含：
 - 完整的执行计划（所有步骤）
 - 影响范围（修改/新增/删除的文件）
 - 风险评估和缓解措施
@@ -634,7 +634,7 @@ class Agent:
         # 权限和状态控制
         self.allow_savesession = bool(allow_savesession)  # SaveSession 命令权限控制
         self._addon_prompt_skip_rounds = 0  # 记录连续未添加 addon_prompt 的轮数
-        
+
         # 记忆标签收集：用于记录当前 agent 及其子 agent 产生的所有记忆标签
         self.memory_tags: set = set()  # 使用 set 自动去重
         self._no_tool_call_count = (
@@ -808,7 +808,7 @@ class Agent:
 
     def _setup_tools_and_prompt(self) -> None:
         """设置工具和系统提示词"""
-        # 如果配置了强制保存记忆，确保 save_memory 工具可用
+        # 如果配置了强制保存记忆，确保 memory 工具可用
         if self.force_save_memory:
             self._ensure_save_memory_tool()
 
@@ -1060,25 +1060,25 @@ class Agent:
         return None
 
     def _ensure_save_memory_tool(self) -> None:
-        """如果配置了强制保存记忆，确保 save_memory 工具在 use_tools 列表中"""
+        """如果配置了强制保存记忆，确保 memory 工具在 use_tools 列表中"""
         try:
             tool_registry = self.get_tool_registry()
             if not tool_registry:
                 return
 
-            # 检查 save_memory 工具是否已注册（工具默认都会注册）
-            if not tool_registry.get_tool("save_memory"):
+            # 检查 memory 工具是否已注册（工具默认都会注册）
+            if not tool_registry.get_tool("memory"):
                 # 如果工具本身不存在，则无法使用，直接返回
                 return
 
-            # 检查 save_memory 是否在 use_tools 列表中
+            # 检查 memory 是否在 use_tools 列表中
             # 如果 use_tools 为 None，表示使用所有工具，无需添加
             if self.use_tools is None:
                 return
 
-            # 如果 save_memory 不在 use_tools 列表中，则添加
-            if "save_memory" not in self.use_tools:
-                self.use_tools.append("save_memory")
+            # 如果 memory 不在 use_tools 列表中，则添加
+            if "memory" not in self.use_tools:
+                self.use_tools.append("memory")
                 # 更新工具注册表的工具列表
                 self.set_use_tools(self.use_tools)
         except Exception:
@@ -2041,7 +2041,7 @@ class Agent:
         memory_tags = self.get_memory_tags()
         if memory_tags:
             tags_str = ", ".join(f"`{tag}`" for tag in memory_tags)
-            memory_hint = f"\n\n💡 **记忆标签提示**: 本次任务产生了以下记忆标签: {tags_str}\n你可以使用 `retrieve_memory` 工具通过这些标签检索相关记忆，获取更多详细信息。"
+            memory_hint = f"\n\n💡 **记忆标签提示**: 本次任务产生了以下记忆标签: {tags_str}\n你可以使用 `memory` 工具（action=retrieve）通过这些标签检索相关记忆，获取更多详细信息。"
             result = result + memory_hint
 
         return result

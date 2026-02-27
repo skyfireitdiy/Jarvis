@@ -399,9 +399,7 @@ class task_list_manager:
             use_tools=[
                 "read_code",
                 "execute_script",
-                "save_memory",
-                "retrieve_memory",
-                "clear_memory",
+                "memory",
                 "methodology",
             ],
             non_interactive=True,

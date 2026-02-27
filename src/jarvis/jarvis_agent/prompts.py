@@ -325,27 +325,27 @@ SUMMARY_REQUEST_PROMPT = """<summary_request>
 
 
 def get_task_analysis_prompt(
-    has_save_memory: bool = False, has_generate_new_tool: bool = False
+    has_memory_tool: bool = False, has_generate_new_tool: bool = False
 ) -> str:
     """根据配置返回任务分析提示词
 
     参数:
-        has_save_memory: 是否有 save_memory 工具（工具可用性）
+        has_memory_tool: 是否有 memory 工具（工具可用性）
         has_generate_new_tool: 是否有 meta_agent 工具（原 generate_new_tool，自举式工具生成器）
     """
     # 第一步：记忆保存部分
-    if not has_save_memory:
-        # 如果没有 save_memory 工具，说明无法保存记忆
+    if not has_memory_tool:
+        # 如果没有 memory 工具，说明无法保存记忆
         memory_step = """第一步：记忆值得保存的信息
 1. 识别任务中的关键信息和知识点
 2. 评估是否有值得保存的项目长期记忆或全局长期记忆
-3. 注意：当前环境不支持 save_memory 工具，无法保存记忆。请直接说明识别到的关键信息即可。"""
+3. 注意：当前环境不支持 memory 工具，无法保存记忆。请直接说明识别到的关键信息即可。"""
     else:
-        # 有 save_memory 工具
+        # 有 memory 工具
         memory_step = """第一步：记忆值得保存的信息
 1. 识别任务中的关键信息和知识点
 2. 评估是否有值得保存的项目长期记忆或全局长期记忆
-3. 如果有价值，使用 save_memory 工具保存有价值的信息：
+3. 如果有价值，使用 memory 工具（action=save）保存有价值的信息：
    - project_long_term: 保存与当前项目相关的长期信息（如项目配置、架构决策、开发规范等）
    - global_long_term: 保存通用的信息、用户偏好、知识或方法（如技术知识、最佳实践、用户习惯等）"""
 
@@ -467,7 +467,7 @@ def get_task_analysis_prompt(
 请根据分析结果采取相应行动。
 
 重要提示：每次只能执行一个操作！
-- 如果有记忆需要保存，可以调用一次 save_memory 批量保存多条记忆
+- 如果有记忆需要保存，可以调用一次 memory 工具（action=save）批量保存多条记忆
 - 保存完所有记忆后，再进行工具/方法论的创建或说明
 - 不要在一次响应中同时调用多个工具（如同时保存记忆和创建工具/方法论）
 </request>
@@ -553,5 +553,5 @@ def get_task_analysis_prompt(
 </task_analysis>"""
 
 
-# 为了向后兼容，保留原来的常量（使用默认参数，假设有 save_memory 工具）
-TASK_ANALYSIS_PROMPT = get_task_analysis_prompt(has_save_memory=True)
+# 为了向后兼容，保留原来的常量（使用默认参数，假设有 memory 工具）
+TASK_ANALYSIS_PROMPT = get_task_analysis_prompt(has_memory_tool=True)

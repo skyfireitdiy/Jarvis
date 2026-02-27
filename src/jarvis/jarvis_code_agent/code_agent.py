@@ -207,9 +207,7 @@ class CodeAgent(Agent):
             "virtual_tty",  # 虚拟终端工具，支持交互式操作
             "search_web",  # 网络搜索工具
             "read_webpage",  # 网页内容读取工具
-            "save_memory",  # 记忆保存工具
-            "retrieve_memory",  # 记忆召回工具
-            "clear_memory",  # 记忆删除工具
+            "memory",  # 记忆管理工具（支持save/retrieve/clear操作）
             "methodology",  # 方法论工具
         ]
         # 如果启用了任务列表管理器，添加相应工具
@@ -1223,9 +1221,7 @@ git reset --hard {start_commit}
                 use_tools=[
                     "execute_script",
                     "read_code",
-                    "save_memory",
-                    "retrieve_memory",
-                    "clear_memory",
+                    "memory",
                     "methodology",
                 ],
                 non_interactive=self.non_interactive,

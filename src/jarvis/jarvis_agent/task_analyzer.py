@@ -59,16 +59,16 @@ class TaskAnalyzer:
 
     def _prepare_analysis_prompt(self, satisfaction_feedback: str) -> str:
         """准备分析提示"""
-        # 检查是否有 save_memory 工具（工具可用性）
-        has_save_memory = False
+        # 检查是否有 memory 工具（工具可用性）
+        has_memory_tool = False
         # 检查是否有 meta_agent 工具（原 generate_new_tool，自举式工具生成器）
         has_generate_new_tool = False
         try:
             tool_registry = self.agent.get_tool_registry()
             if tool_registry:
-                # 检查 save_memory 工具
-                save_memory_tool = tool_registry.get_tool("save_memory")
-                has_save_memory = save_memory_tool is not None
+                # 检查 memory 工具
+                memory_tool = tool_registry.get_tool("memory")
+                has_memory_tool = memory_tool is not None
 
                 # 检查 meta_agent 工具
                 generate_tool = tool_registry.get_tool("meta_agent")
@@ -78,7 +78,7 @@ class TaskAnalyzer:
 
         # 根据配置获取相应的提示词
         analysis_prompt = get_task_analysis_prompt(
-            has_save_memory=has_save_memory, has_generate_new_tool=has_generate_new_tool
+            has_memory_tool=has_memory_tool, has_generate_new_tool=has_generate_new_tool
         )
 
         return join_prompts([analysis_prompt, satisfaction_feedback])
