@@ -1,3 +1,7 @@
+---
+description: macOS Web设计规则
+---
+
 # macOS Web 设计规范
 
 ## 角色定义

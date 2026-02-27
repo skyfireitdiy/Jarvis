@@ -1,3 +1,7 @@
+---
+description: Jarvis Windows CLI使用指南，Windows桌面程序自动化命令行工具
+---
+
 # Jarvis Windows CLI (jw) 使用指南
 
 ## 概述

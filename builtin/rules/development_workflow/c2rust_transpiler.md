@@ -1,3 +1,7 @@
+---
+description: C/C++到Rust转译器规则
+---
+
 # C/C++2Rust 转译规则
 
 ## 规则简介

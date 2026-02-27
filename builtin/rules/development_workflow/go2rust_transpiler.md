@@ -1,3 +1,7 @@
+---
+description: Go到Rust转译器规则
+---
+
 # Go2Rust 转译规则
 
 ## 规则简介

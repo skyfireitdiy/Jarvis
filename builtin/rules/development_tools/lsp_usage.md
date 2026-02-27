@@ -1,3 +1,7 @@
+---
+description: LSP工具使用规则，Language Server Protocol工具配置和使用
+---
+
 # LSP 工具使用规则
 
 ## 规则简介
