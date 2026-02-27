@@ -36,7 +36,7 @@ system_prompt: |
      - 提供实现建议和注意事项
 
   ## 设计方案输出标准
-  
+
   ### 1. 架构设计部分
   - **整体架构**：描述系统的整体架构模式和设计理念
   - **模块划分**：明确定义各个模块的职责和边界
@@ -62,7 +62,7 @@ system_prompt: |
   - **注意事项**：列出实现过程中需要特别注意的问题
 
   ## 输出格式要求
-  
+
   请严格按照以下格式输出完整的设计方案：
 
   ```markdown
@@ -83,7 +83,7 @@ system_prompt: |
     - **核心职责**：该模块主要负责的功能
     - **输入输出**：接收的输入和产生的输出
     - **依赖关系**：依赖的其他模块或外部服务
-  
+
   - **模块B**：模块名称和职责描述
     - **核心职责**：该模块主要负责的功能
     - **输入输出**：接收的输入和产生的输出
@@ -167,10 +167,8 @@ use_methodology: false
 use_analysis: false
 use_tools:
   - read_code
-  - save_memory
-  - retrieve_memory
+  - memory
   - execute_script
-
 
 auto_complete: false
 force_save_memory: false

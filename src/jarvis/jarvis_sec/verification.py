@@ -558,7 +558,7 @@ def process_verification_batch(
 - 禁止修改任何文件或执行写操作命令；仅进行只读分析与读取。
 - 每次仅执行一个操作；等待工具结果后再进行下一步。
 - **记忆使用**：
-  - 在验证过程中，充分利用 retrieve_memory 工具检索已有的记忆，特别是分析 Agent 保存的与当前验证函数相关的记忆。
+  - 在验证过程中，充分利用 memory 工具（action=retrieve）检索已有的记忆，特别是分析 Agent 保存的与当前验证函数相关的记忆。
   - 这些记忆可能包含函数的分析要点、指针判空情况、输入校验情况、调用路径分析结果等，可以帮助你更准确地验证分析结论。
   - 如果发现分析 Agent 的结论与记忆中的信息不一致，需要仔细核实。
 - 完成验证后，主输出仅打印结束符 {ot("!!!COMPLETE!!!")}，不要输出其他任何内容。任务总结将会在后面的交互中被询问。
@@ -576,7 +576,7 @@ def process_verification_batch(
                     use_methodology=False,
                     use_analysis=False,
                     output_handler=[ToolRegistry()],
-                    use_tools=["read_code", "execute_script", "retrieve_memory"],
+                    use_tools=["read_code", "execute_script", "memory"],
                 )
                 verification_agent = Agent(**verification_agent_kwargs)
 
