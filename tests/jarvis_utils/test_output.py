@@ -310,7 +310,7 @@ class TestPrettyOutput:
     @patch("jarvis.jarvis_utils.output.emit_output")
     def test_print_basic(self, mock_emit):
         """测试基本print方法"""
-        PrettyOutput.print("Hello World", OutputType.INFO)
+        PrettyOutput._print("Hello World", OutputType.INFO)
         mock_emit.assert_called_once()
         args = mock_emit.call_args[0][0]
         assert args.text == "Hello World"
@@ -320,21 +320,21 @@ class TestPrettyOutput:
     @patch("jarvis.jarvis_utils.output.emit_output")
     def test_print_with_timestamp_false(self, mock_emit):
         """测试print方法（不显示时间戳）"""
-        PrettyOutput.print("Hello World", OutputType.INFO, timestamp=False)
+        PrettyOutput._print("Hello World", OutputType.INFO, timestamp=False)
         args = mock_emit.call_args[0][0]
         assert args.timestamp is False
 
     @patch("jarvis.jarvis_utils.output.emit_output")
     def test_print_with_lang(self, mock_emit):
         """测试print方法（指定语言）"""
-        PrettyOutput.print("print('hello')", OutputType.CODE, lang="python")
+        PrettyOutput._print("print('hello')", OutputType.CODE, lang="python")
         args = mock_emit.call_args[0][0]
         assert args.lang == "python"
 
     @patch("jarvis.jarvis_utils.output.emit_output")
     def test_print_with_traceback(self, mock_emit):
         """测试print方法（打印堆栈）"""
-        PrettyOutput.print("Error occurred", OutputType.ERROR, traceback=True)
+        PrettyOutput._print("Error occurred", OutputType.ERROR, traceback=True)
         args = mock_emit.call_args[0][0]
         assert args.traceback is True
 

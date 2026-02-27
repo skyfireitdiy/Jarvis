@@ -4,7 +4,6 @@ from typing import Optional
 import typer
 
 from jarvis.jarvis_tools.registry import ToolRegistry
-from jarvis.jarvis_utils.output import OutputType
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.utils import init_env
 
@@ -22,18 +21,16 @@ def list_tools(
 
     if as_json:
         if detailed:
-            PrettyOutput.print(
-                json.dumps(tools, indent=2, ensure_ascii=False),
-                OutputType.CODE,
+            PrettyOutput.auto_print(
+                "📝 " + json.dumps(tools, indent=2, ensure_ascii=False),
                 lang="json",
             )
         else:
             simple_tools = [
                 {"name": t["name"], "description": t["description"]} for t in tools
             ]
-            PrettyOutput.print(
-                json.dumps(simple_tools, indent=2, ensure_ascii=False),
-                OutputType.CODE,
+            PrettyOutput.auto_print(
+                "📝 " + json.dumps(simple_tools, indent=2, ensure_ascii=False),
                 lang="json",
             )
     else:
@@ -56,7 +53,7 @@ def list_tools(
                 except Exception:
                     lines.append(str(tool.get("parameters")))
                 lines.append("```")
-        PrettyOutput.print("\n".join(lines), OutputType.CODE, lang="markdown")
+        PrettyOutput.auto_print("📝 " + "\n".join(lines), lang="markdown")
 
 
 @app.command("call")
@@ -119,11 +116,11 @@ def call_tool(
 
     if result.get("stdout"):
         PrettyOutput.auto_print("📤 输出:")
-        PrettyOutput.print(result["stdout"], OutputType.CODE, lang="text")
+        PrettyOutput.auto_print("📝 " + result["stdout"], lang="text")
 
     if result.get("stderr"):
         PrettyOutput.auto_print("❌ 错误:")
-        PrettyOutput.print(result["stderr"], OutputType.CODE, lang="text")
+        PrettyOutput.auto_print("📝 " + result["stderr"], lang="text")
 
     if not result["success"]:
         raise typer.Exit(code=1)
@@ -148,9 +145,8 @@ def show_tool(
     if as_json:
         # 以 JSON 格式输出完整工具信息
         tool_dict = tool_obj.to_dict()
-        PrettyOutput.print(
-            json.dumps(tool_dict, indent=2, ensure_ascii=False),
-            OutputType.CODE,
+        PrettyOutput.auto_print(
+            "📝 " + json.dumps(tool_dict, indent=2, ensure_ascii=False),
             lang="json",
         )
     else:
@@ -174,7 +170,7 @@ def show_tool(
         else:
             lines.append("   无参数")
 
-        PrettyOutput.print("\n".join(lines), OutputType.CODE, lang="markdown")
+        PrettyOutput.auto_print("📝 " + "\n".join(lines), lang="markdown")
 
 
 def cli() -> None:

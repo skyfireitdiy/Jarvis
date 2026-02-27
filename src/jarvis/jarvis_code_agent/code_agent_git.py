@@ -21,7 +21,6 @@ from jarvis.jarvis_utils.git_utils import has_uncommitted_changes
 from jarvis.jarvis_utils.git_utils import reset_confirm_add_new_files_flag
 from jarvis.jarvis_utils.config import get_llm_group
 from jarvis.jarvis_utils.input import user_confirm
-from jarvis.jarvis_utils.output import OutputType
 
 
 class GitManager:
@@ -237,8 +236,8 @@ class GitManager:
                 PrettyOutput.auto_print("✅ 已创建最小化的 .gitattributes 文件")
             else:
                 PrettyOutput.auto_print("ℹ️ 将以下内容追加到现有 .gitattributes 文件：")
-                PrettyOutput.print(
-                    minimal_content, OutputType.CODE, lang="text"
+                PrettyOutput.auto_print(
+                    "📝 " + minimal_content, lang="text"
                 )  # 保留语法高亮
                 if user_confirm("是否追加到现有文件？", True):
                     with open(

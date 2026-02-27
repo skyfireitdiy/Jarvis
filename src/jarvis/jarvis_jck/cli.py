@@ -13,7 +13,7 @@ import typer
 from typer import confirm
 
 from jarvis.jarvis_jck.core import ToolChecker
-from jarvis.jarvis_utils.output import OutputType, PrettyOutput
+from jarvis.jarvis_utils.output import PrettyOutput
 
 # 创建 typer 应用
 app = typer.Typer(help="Jarvis Check - 检查系统工具的安装情况，提供友好的安装建议")
@@ -146,9 +146,7 @@ def _print_results(results: list, summary: dict) -> None:
     # 每个工具的结果
     for result in results:
         formatted = _format_tool_result(result)
-        PrettyOutput.print(
-            formatted, OutputType.CODE if result["found"] else OutputType.ERROR
-        )
+        PrettyOutput.auto_print(formatted)
 
     # 总结
     if missing > 0:
@@ -228,9 +226,8 @@ def check(
             "summary": summary,
             "results": results,
         }
-        PrettyOutput.print(
-            json.dumps(output, ensure_ascii=False, indent=2),
-            OutputType.CODE,
+        PrettyOutput.auto_print(
+            "📝 " + json.dumps(output, ensure_ascii=False, indent=2),
             lang="json",
         )
     else:

@@ -604,11 +604,11 @@ git reset --hard {start_commit}
                 )
             except ImportError:
                 # 如果导入失败，回退到原有方式
-                PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+                PrettyOutput.auto_print(diff, lang="diff")
             except Exception as e:
                 # 如果可视化失败，回退到原有方式
                 PrettyOutput.auto_print(f"⚠️ Diff 可视化失败，使用默认方式: {e}")
-                PrettyOutput.print(diff, OutputType.CODE, lang="diff")
+                PrettyOutput.auto_print(diff, lang="diff")
 
             # 更新上下文管理器
             self.impact_manager.update_context_for_modified_files(modified_files)
@@ -635,9 +635,7 @@ git reset --hard {start_commit}
                         "\n\n修改被撤销（检测到大量代码删除且大模型判断不合理）\n"
                     )
                     final_ret += f"# 补丁预览（按文件）:\n{per_file_preview}"
-                    PrettyOutput.print(
-                        final_ret, OutputType.USER, lang="markdown"
-                    )  # 保留语法高亮
+                    PrettyOutput.auto_print(final_ret, lang="markdown")  # 保留语法高亮
                     self.session.prompt += final_ret
                     return
 
@@ -731,7 +729,7 @@ git reset --hard {start_commit}
         if commited:
             self.session.prompt += final_ret
             return
-        PrettyOutput.print(final_ret, OutputType.USER, lang="markdown")  # 保留语法高亮
+        PrettyOutput.auto_print(final_ret, lang="markdown")  # 保留语法高亮
         if not is_confirm_before_apply_patch() or user_confirm(
             "是否使用此回复？", default=True
         ):

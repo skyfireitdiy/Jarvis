@@ -41,7 +41,6 @@ from jarvis.jarvis_utils.globals import console
 from jarvis.jarvis_utils.globals import get_interrupt
 from jarvis.jarvis_utils.globals import set_interrupt
 from jarvis.jarvis_utils.globals import set_in_chat
-from jarvis.jarvis_utils.output import OutputType  # 保留用于语法高亮
 from jarvis.jarvis_utils.output import PrettyOutput
 from jarvis.jarvis_utils.tag import ct
 from jarvis.jarvis_utils.tag import ot
@@ -626,7 +625,7 @@ class BasePlatform(ABC):
             set_interrupt(False)
             set_in_chat(True)
             if not self.suppress_output and is_print_prompt():
-                PrettyOutput.print(f"{message}", OutputType.USER)  # 保留用于语法高亮
+                PrettyOutput.auto_print(f"👤 {message}")  # 保留用于语法高亮
 
             # 记录用户输入（模型输入）
             from jarvis.jarvis_utils.dialogue_recorder import record_user_message
