@@ -1,9 +1,6 @@
-<!-- markdownlint-disable MD022 MD012 -->
-<!-- YAML Front Matter -->
 ---
 description: Hacker News搜索规则。适用于Hacker News搜索、新闻搜索、信息检索等场景
 ---
-
 
 # Hacker News 搜索规则
 
@@ -36,25 +33,25 @@ description: Hacker News搜索规则。适用于Hacker News搜索、新闻搜索
 **执行步骤：**
 
 1. 确定 API 基础 URL
-   https://hn.algolia.com/api/v1
+   <https://hn.algolia.com/api/v1>
 
 2. 构造搜索请求
    - 基础端点：/search
-   - 完整 URL：https://hn.algolia.com/api/v1/search
+   - 完整 URL：<https://hn.algolia.com/api/v1/search>
 
 3. 设置查询参数
    params = {
-       query: 搜索关键词,      # 必需参数：搜索文本
-       tags: story,show_hn, # 可选：内容类型标签
-       page: 0,                # 可选：页码，从0开始
-       hitsPerPage: 20,        # 可选：每页结果数，默认20
-       numericFilters: [      # 可选：数值过滤器
-           created_at_i > timestamp  # 时间过滤
-       ]
+   query: 搜索关键词, # 必需参数：搜索文本
+   tags: story,show_hn, # 可选：内容类型标签
+   page: 0, # 可选：页码，从0开始
+   hitsPerPage: 20, # 可选：每页结果数，默认20
+   numericFilters: [ # 可选：数值过滤器
+   created_at_i > timestamp # 时间过滤
+   ]
    }
 
 4. 发送 GET 请求
-   curl -X GET "https://hn.algolia.com/api/v1/search?query=Rust&tags=story&page=0&hitsPerPage=10"
+   curl -X GET "<https://hn.algolia.com/api/v1/search?query=Rust&tags=story&page=0&hitsPerPage=10>"
 
 5. 解析响应数据
    - hits: 结果数组，每个结果包含标题、URL、作者、分数等
@@ -78,7 +75,7 @@ description: Hacker News搜索规则。适用于Hacker News搜索、新闻搜索
    - 计算过去 24 小时的时间戳：current_timestamp - 86400
 
 2. 构造时间过滤请求
-   curl -X GET "https://hn.algolia.com/api/v1/search?query=AI&tags=story&numericFilters=created_at_i>$(($(date +%s)-86400))"
+   curl -X GET "<https://hn.algolia.com/api/v1/search?query=AI&tags=story&numericFilters=created_at_i>$(($(date> +%s)-86400))"
 
 **注意事项：**
 
@@ -90,7 +87,7 @@ description: Hacker News搜索规则。适用于Hacker News搜索、新闻搜索
 **执行步骤：**
 
 1. 构造 Show HN 搜索请求
-   curl -X GET "https://hn.algolia.com/api/v1/search?tags=show_hn,story&page=0&hitsPerPage=20"
+   curl -X GET "<https://hn.algolia.com/api/v1/search?tags=show_hn,story&page=0&hitsPerPage=20>"
 
 **注意事项：**
 

@@ -1,11 +1,6 @@
-<!-- markdownlint-disable MD029 -->
-
-<!-- markdownlint-disable MD022 MD012 -->
-<!-- YAML Front Matter -->
 ---
 description: 版本发布规则，规范Jarvis项目的版本发布流程，确保版本号的正确性和ReleaseNote的格式一致性。适用于版本发布、版本管理、ReleaseNote编写等场景
 ---
-
 
 # 版本发布规则
 
@@ -134,7 +129,7 @@ git rev-parse HEAD
 git describe --tags --abbrev=0
 ```
 
-2. 如果没有tag，使用默认版本 `v1.0.0`
+1. 如果没有tag，使用默认版本 `v1.0.0`
 
 **预期输出：** 最新版本号（如 `v1.1.1`）
 
@@ -164,19 +159,19 @@ date +%Y-%m-%d
 ls -lh docs/images/wechat.png
 ```
 
-2. 获取文件修改时间（Unix时间戳）：
+1. 获取文件修改时间（Unix时间戳）：
 
 ```bash
 stat -c %Y docs/images/wechat.png
 ```
 
-3. 获取当前时间戳：
+1. 获取当前时间戳：
 
 ```bash
 date +%s
 ```
 
-4. 计算文件修改天数：
+1. 计算文件修改天数：
 
 ```python
 # 使用Python计算天数差
@@ -188,7 +183,7 @@ days_diff = (current_time - file_mtime) // 86400
 print(f"wechat.png修改天数: {days_diff}天")
 ```
 
-5. 判断检查结果：
+1. 判断检查结果：
    - 如果 `days_diff > 7`：**拒绝更新**，提示用户：`⚠️ wechat.png文件已超过{days_diff}天未更新，请先更新该文件后再进行ReleaseNote更新`
    - 如果 `days_diff <= 7`：继续执行后续操作
 
@@ -209,11 +204,11 @@ print(f"wechat.png修改天数: {days_diff}天")
 pytest -v
 ```
 
-2. 检查测试结果：
+1. 检查测试结果：
    - 如果测试全部通过（exit code为0）：继续执行后续操作
    - 如果有测试失败（exit code非0）：**禁止发布**，提示用户：`⚠️ 测试失败，请修复失败的测试用例后再进行发布`
 
-3. （可选）查看详细测试报告：
+2. （可选）查看详细测试报告：
 
 ```bash
 pytest -v --tb=short
@@ -240,7 +235,7 @@ pytest -v --tb=short
 git diff <latest_tag> HEAD --stat
 ```
 
-2. 然后获取完整的代码差异：
+1. 然后获取完整的代码差异：
 
 ```bash
 git diff <latest_tag> HEAD
@@ -261,14 +256,14 @@ git diff <latest_tag> HEAD
 head -n 200 {{ git_root_dir }}/ReleaseNote.md
 ```
 
-2. 参考历史版本格式（建议查看 v1.2.6 之前的版本）：
+1. 参考历史版本格式（建议查看 v1.2.6 之前的版本）：
    - 标题格式：`### Release Note - v{version} {date}`
    - 分类结构：新功能、修复、优化与重构、文档更新等
    - 图标使用：🚀、📌、🔧、📚、🧪、🗑️等
    - 子分类格式：`#### **分类名称**`
    - 条目格式：`- **🎯 标题**` + `- **标签**：内容`
 
-3. **特别注意**：参考历史版本时，重点关注用户视角和内容简洁性，不要包含技术细节
+2. **特别注意**：参考历史版本时，重点关注用户视角和内容简洁性，不要包含技术细节
 
 ### 操作7：生成新版本ReleaseNote
 
@@ -290,7 +285,7 @@ else:
     raise ValueError("版本类型必须是 major、minor 或 patch")
 ```
 
-2. **生成新版本内容**：
+1. **生成新版本内容**：
 
 ```markdown
 ### Release Note - {new_version} {date}
@@ -306,7 +301,7 @@ else:
 ---
 ```
 
-3. **在ReleaseNote.md头部插入新版本内容**：
+1. **在ReleaseNote.md头部插入新版本内容**：
    - 读取现有ReleaseNote.md内容
    - 在文件开头插入新版本内容
    - 保持原有格式和分隔符
@@ -335,7 +330,7 @@ else:
 git rev-parse HEAD
 ```
 
-2. **提交所有更改**（包括更新后的ReleaseNote.md）：
+1. **提交所有更改**（包括更新后的ReleaseNote.md）：
 
 ```bash
 jgs <保存的commit id>
@@ -343,7 +338,7 @@ jgs <保存的commit id>
 
 说明：`jgs` 命令用于自动生成提交信息并提交更改，**参数必须使用步骤0获取的commit id**。
 
-3. **执行发布脚本**：
+1. **执行发布脚本**：
 
 ```bash
 ./scripts/publish.py <发布类型>
