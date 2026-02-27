@@ -309,7 +309,12 @@ else:
 - 必须在用户确认版本类型后再执行插入操作
 - 插入位置为文件第一行之前
 - 保持原有的 `---` 分隔符格式
-- ⚠️ **禁止依赖edit_file的自动提交功能**，更新ReleaseNote.md后必须使用jgs命令手动提交
+- ⚠️ **禁止依赖edit_file的自动提交功能**，因为edit_file的自动提交信息（如"CheckPoint #6006"）没有实际意义
+- ⚠️ **必须使用jgs命令手动提交ReleaseNote.md**，jgs命令的作用是：
+  - 压缩从起始commit到当前的所有临时提交
+  - 自动生成有意义的提交信息（符合git提交规范）
+  - 确保git历史清晰可读
+- ⚠️ **重要：在edit_file更新ReleaseNote.md后，立即使用jgs <起始commit_id>提交，不要让edit_file的自动提交保留在git历史中**
 
 ### 操作8：执行版本发布
 
