@@ -1,9 +1,6 @@
-<!-- markdownlint-disable MD022 MD012 -->
-<!-- YAML Front Matter -->
 ---
 description: 添加内置快捷命令规则，说明如何添加@触发的内置快捷命令。适用于添加内置命令、命令开发、快捷键配置等场景
 ---
-
 
 # 添加 @ 触发的内置快捷命令规则
 
@@ -116,8 +113,8 @@ BUILTIN_COMMANDS = [
 ]
 ```
 
-3. 编辑 `{{ git_root_dir }}/src/jarvis/jarvis_agent/builtin_input_handler.py`
-4. 在 `builtin_input_handler` 函数中添加处理逻辑
+1. 编辑 `{{ git_root_dir }}/src/jarvis/jarvis_agent/builtin_input_handler.py`
+2. 在 `builtin_input_handler` 函数中添加处理逻辑
 
 **示例：**
 
@@ -126,21 +123,21 @@ def builtin_input_handler(user_input: str, agent_: Any) -> Tuple[str, bool]:
     """处理内置的特殊输入标记，并追加相应的提示词"""
     agent: Agent = agent_
     special_tags = re.findall(r"'<([^>]+)>'", user_input)
-    
+
     if not special_tags:
         return user_input, False
-    
+
     processed_tag = set()
     add_on_prompt = ""
     modified_input = user_input
-    
+
     for tag in special_tags:
         if tag == "YourCommand":
             # 处理你的命令逻辑
             # 如果需要立即返回，返回 "", True
             return "", True
         # ... 其他命令处理
-    
+
     return modified_input, False
 ```
 
