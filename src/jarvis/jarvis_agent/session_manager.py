@@ -1080,6 +1080,8 @@ class SessionManager:
                 PrettyOutput.auto_print(
                     f"💾 保存 {len(short_term_memories)} 条短期记忆"
                 )
+            else:
+                PrettyOutput.auto_print("💾 没有短期记忆需要保存")
         except Exception as e:
             PrettyOutput.auto_print(f"⚠️ 获取短期记忆失败: {e}")
 
@@ -1205,6 +1207,10 @@ class SessionManager:
                                 PrettyOutput.auto_print(
                                     f"💾 已恢复 {restored_short_term_count} 条短期记忆"
                                 )
+                            else:
+                                PrettyOutput.auto_print("💾 没有短期记忆需要恢复")
+                        else:
+                            PrettyOutput.auto_print("💾 没有短期记忆需要恢复")
             except Exception as e:
                 PrettyOutput.auto_print(f"⚠️ 恢复短期记忆失败: {e}")
 
