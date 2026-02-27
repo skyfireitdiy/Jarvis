@@ -1,5 +1,5 @@
 ---
-description: C/C++到Rust转译器规则
+description: C/C++到Rust转译器规则。适用于C/C++代码转译、Rust迁移、跨语言开发等场景
 ---
 
 # C/C++2Rust 转译规则

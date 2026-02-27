@@ -1,5 +1,5 @@
 ---
-description: Jarvis自助配置规则，指导Agent通过自然语言智能修改Jarvis配置文件
+description: Jarvis自助配置规则，指导Agent通过自然语言智能修改Jarvis配置文件。适用于Jarvis配置、配置文件修改、系统配置等场景
 ---
 
 # Jarvis自助配置规则

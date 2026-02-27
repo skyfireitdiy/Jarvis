@@ -1,5 +1,5 @@
 ---
-description: Rust测试规则
+description: Rust测试规则。适用于Rust项目测试、单元测试、集成测试、测试模块设计等场景
 ---
 
 # Rust 测试规则

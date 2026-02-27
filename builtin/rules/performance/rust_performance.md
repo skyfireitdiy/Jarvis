@@ -1,5 +1,5 @@
 ---
-description: Rust性能优化规则，Rust代码性能优化策略
+description: Rust性能优化规则，Rust代码性能优化策略。适用于Rust性能优化、Rust代码调优、Rust性能分析等场景
 ---
 
 # Rust 性能优化规则（基于 Perf 分析）

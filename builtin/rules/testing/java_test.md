@@ -1,5 +1,5 @@
 ---
-description: Java测试规则
+description: Java测试规则。适用于Java项目测试、单元测试、集成测试等场景
 ---
 
 # Java 测试规则

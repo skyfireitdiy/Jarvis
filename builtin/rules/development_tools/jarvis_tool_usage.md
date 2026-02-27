@@ -1,5 +1,5 @@
 ---
-description: Jarvis工具使用规则
+description: Jarvis工具使用规则。适用于工具使用指导、工具配置、工具学习等场景
 ---
 
 # Jarvis Tool CLI 使用规则

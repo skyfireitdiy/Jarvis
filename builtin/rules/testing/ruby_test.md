@@ -1,5 +1,5 @@
 ---
-description: Ruby测试规则
+description: Ruby测试规则。适用于Ruby项目测试、单元测试、RSpec测试等场景
 ---
 
 # Ruby 测试规则

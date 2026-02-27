@@ -1,5 +1,5 @@
 ---
-description: Jarvis Windows CLI使用指南，Windows桌面程序自动化命令行工具
+description: Jarvis Windows CLI使用指南，Windows桌面程序自动化命令行工具。适用于Windows自动化、桌面程序操作、GUI测试等场景
 ---
 
 # Jarvis Windows CLI (jw) 使用指南

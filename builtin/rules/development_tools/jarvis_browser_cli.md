@@ -1,5 +1,5 @@
 ---
-description: Jarvis Browser CLI使用指南，浏览器自动化命令行工具，支持35+命令和守护进程模式
+description: Jarvis Browser CLI使用指南，浏览器自动化命令行工具，支持35+命令和守护进程模式。适用于浏览器自动化、网页测试、数据采集等场景
 ---
 
 # Jarvis Browser CLI (jb) 使用指南

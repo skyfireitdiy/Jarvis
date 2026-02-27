@@ -1,5 +1,5 @@
 ---
-description: PHP测试规则
+description: PHP测试规则。适用于PHP项目测试、单元测试、功能测试等场景
 ---
 
 # PHP 测试规则

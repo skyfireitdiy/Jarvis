@@ -1,5 +1,5 @@
 ---
-description: Go测试规则
+description: Go测试规则。适用于Go项目测试、单元测试、表格驱动测试等场景
 ---
 
 # Go 测试规则

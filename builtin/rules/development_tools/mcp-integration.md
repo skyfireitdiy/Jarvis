@@ -1,5 +1,5 @@
 ---
-description: MCP集成规则，Model Context Protocol集成规范
+description: MCP集成规则，Model Context Protocol集成规范。适用于MCP服务集成、工具扩展、协议开发等场景
 ---
 
 # MCP集成规则

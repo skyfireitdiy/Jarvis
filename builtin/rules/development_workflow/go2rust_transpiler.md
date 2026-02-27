@@ -1,5 +1,5 @@
 ---
-description: Go到Rust转译器规则
+description: Go到Rust转译器规则。适用于Go代码转译、Rust迁移、跨语言开发等场景
 ---
 
 # Go2Rust 转译规则
