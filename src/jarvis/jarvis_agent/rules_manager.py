@@ -216,8 +216,8 @@ class RulesManager:
                                     break
 
                         if not description:
-                            # 如果没有 description，使用文件名
-                            description = os.path.splitext(filename)[0]
+                            # 如果没有 description，跳过该规则
+                            continue
 
                         # 使用实际的绝对路径
                         abs_path = os.path.abspath(file_path)
